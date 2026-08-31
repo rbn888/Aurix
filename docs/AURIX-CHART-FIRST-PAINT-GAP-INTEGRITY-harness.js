@@ -46,12 +46,23 @@ const CONSTS = ['_AURIX_SNAP_NEAR_MS', '_AURIX_SNAP_NEAR_FRAC', '_AURIX_SNAP_FE_
   '_AURIX_24H_COVERAGE_THR', '_AURIX_24H_MIN_BACKEND_POINTS', '_AURIX_VP_GAP_FLOOR_MS',
   '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_OBS_GAP_MIN_MS', '_AURIX_OBS_GAP_MAX_MS', '_AURIX_EMG_RANGE_MS',
   '_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD',
-  '_AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES'];
+  '_AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES',
+  // SPEC P0 CHART RELIABILITY — sin estos dos, `_aurixChartPublicationSourcesPending` no podía
+  // evaluar su propia pierna BACKEND en este sandbox (ver nota en FNS).
+  '_AURIX_PUBLICATION_STATE', '_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED',
+  '_AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED'];
 const FNS = ['_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixTrustedChartSource',
   '_aurixSourceFamily', '_aurixFrontendUsableInWindow', '_aurix24hSourceCoverage',
   '_aurix24hStripNonAuthoritativePreservingHoles', '_aurixApplyRangeSourceAuthority',
   '_aurixEnforceSegmentSourceAuthority', '_aurixRealGapFloorMs', '_aurix24hReconcileInFlight',
-  '_aurixChartPublicationSourcesPending', '_aurixEmergencyPaintBadgeNode', '_aurixResolveChartReturnContract', '_aurixHistoryPresentationBadge', '_aurixReturnPendingHTML', '_aurixBuildContinuityValidatedSeries', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate', '_aurixStableDisplayAnchor', '_aurixCanonicalReturnAnchorIndex', '_aurixResolveReliabilityDeadlock', '_aurixResolveFinalRenderSeriesContract', '_aurixEmergencyHash', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixStructuralBreaks', '_aurixRegimeBoundaryBreaks'];
+  '_aurixChartPublicationSourcesPending', '_aurixEmergencyPaintBadgeNode', '_aurixResolveChartReturnContract', '_aurixHistoryPresentationBadge', '_aurixReturnPendingHTML', '_aurixBuildContinuityValidatedSeries', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate', '_aurixStableDisplayAnchor', '_aurixCanonicalReturnAnchorIndex', '_aurixResolveReliabilityDeadlock', '_aurixResolveFinalRenderSeriesContract', '_aurixEmergencyHash', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixStructuralBreaks', '_aurixRegimeBoundaryBreaks',
+  // SPEC P0 CHART RELIABILITY — `_aurixResolvePublicationReadiness` FALTABA. El gate lo invoca tras
+  // `typeof … === 'function'`, así que en este sandbox esa rama nunca corría y caía al fallback
+  // `idle|loading`, que NO bloquea 'failed'. Consecuencia: 1.6/1.7 afirmaban «carga fallida ⇒ NO
+  // pendiente» mientras PRODUCCIÓN ya bloqueaba (`_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED = true` ⇒
+  // STALE_HISTORY, certificado en AURIX-PUBLICATION-READINESS-CONTRACT). Es exactamente la lección
+  // «no stubear lo que se certifica»: el harness verificaba un motor degradado.
+  '_aurixResolvePublicationReadiness'];
 // globales de sesión que los predicados leen con `typeof … !== 'undefined'` (inyectables por escenario)
 const ctx = {
   console: { log() {}, warn() {} }, Math, JSON, Array, Number, isFinite, Infinity, Date, Set, Object,
@@ -121,11 +132,33 @@ if (has('_aurixChartPublicationSourcesPending')) {
   // CASO 3 — cuenta nueva sin fila remota: es un final terminal, no una espera
   setSession({ currentUser: U, _aurixRemoteLoadOutcome: 'no-row', _aurixCanonicalHistoryLoaded: true, _aurixBackendSnapshotsState: 'ready' });
   ok('1.5 cuenta nueva (no-row) ⇒ NO pendiente (PARTIAL_HISTORY real puede publicarse)', P().pending === false, JSON.stringify(P()));
-  // CASO 7 — offline / fallo real: fallback durable terminal, JAMÁS deadlock
+  // CASO 7 — offline / fallo real. RE-DECIDIDO por SPEC P0 CHART RELIABILITY con contradicción
+  // demostrada: «historia DESCONOCIDA» no es «historia COMPLETA». Publicar la caché local cuando el
+  // canónico no se ha podido leer es justamente lo que producía la FALSA CONTINUIDAD de la primera
+  // entrada (replay S0→S8: 25 pts / 1 segmento / `continuous`, y 86 pts / 2 segmentos tras el
+  // resync). Las dos aserciones anteriores («⇒ NO pendiente») describían además un SANDBOX, no
+  // producción: `_aurixResolvePublicationReadiness` no estaba cargado aquí, así que la pierna
+  // backend del gate no se evaluaba; con ella cargada, un backend 'failed' YA bloqueaba hoy.
+  // La ausencia de deadlock se certifica ahora donde de verdad vive: en la RECUPERACIÓN —
+  // AURIX-CHART-ROOT-DIVERGENCE-REPLAY §5c la EJECUTA (latch en el orden real del código, repintado
+  // obligatorio en estado publicable), en lugar de afirmarla publicando historia desconocida.
   setSession({ currentUser: U, _aurixRemoteLoadOutcome: 'failed', _aurixCanonicalHistoryLoaded: false, _aurixBackendSnapshotsState: 'failed' });
-  ok('1.6 offline: carga fallida ⇒ NO pendiente (fallback durable, sin deadlock)', P().pending === false, JSON.stringify(P()));
+  ok('1.6 canónico ilegible y sin historia canónica ⇒ PENDIENTE (no se publica historia desconocida)',
+    P().pending === true && P().reason === 'canonical_read_failed', JSON.stringify(P()));
+  setSession({ currentUser: U, _aurixRemoteLoadOutcome: 'failed', _aurixCanonicalHistoryLoaded: true, _aurixBackendSnapshotsState: 'ready' });
+  ok('1.6b refresco flaky CON canónico ya cargado ⇒ NO pendiente (no se oculta un gráfico completo)',
+    P().pending === false, JSON.stringify(P()));
   setSession({ currentUser: U, _aurixRemoteLoadOutcome: 'ok-row', _aurixCanonicalHistoryLoaded: true, _aurixBackendSnapshotsState: 'failed' });
-  ok('1.7 hidratación de backend fallida ⇒ NO pendiente (sin carga infinita)', P().pending === false, JSON.stringify(P()));
+  ok('1.7 hidratación de backend fallida ⇒ PENDIENTE (STALE_HISTORY, política ya vigente en producción)',
+    P().pending === true, JSON.stringify(P()));
+  // La retención de 1.6 viene de la pierna CANÓNICA por sí sola: con el backend ya en 'ready', el
+  // único motivo posible es el canónico ilegible. (El toggle de rollback
+  // `_AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED` se ejerce de verdad en
+  // AURIX-CHART-ROOT-DIVERGENCE-REPLAY §3, no aquí: este assert no lo tocaba y su nombre anterior
+  // prometía una cobertura que este fichero no ejerce.)
+  setSession({ currentUser: U, _aurixRemoteLoadOutcome: 'failed', _aurixCanonicalHistoryLoaded: false, _aurixBackendSnapshotsState: 'ready' });
+  ok('1.6c la retención la causa la pierna CANÓNICA por sí sola (backend ya ready)',
+    P().pending === true && P().reason === 'canonical_read_failed', JSON.stringify(P()));
   // anónimo: local ES canónico ⇒ nunca espera nada (si no, deadlock permanente)
   setSession({ currentUser: null, _aurixRemoteLoadOutcome: null, _aurixCanonicalHistoryLoaded: false, _aurixBackendSnapshotsState: 'idle' });
   ok('1.8 sesión anónima ⇒ NO pendiente (sin deadlock)', P().pending === false, JSON.stringify(P()));
@@ -400,10 +433,19 @@ if (has('_aurixEmergencyPaintBadgeNode')) {
   ok('4.9 [reconciliado] el estado honesto FINAL sí se publica (no se pierde)',
     finalPartial.innerHTML !== '' && /Historial parcial|Calculando/.test(finalPartial.innerHTML),
     JSON.stringify(finalPartial.innerHTML.slice(0, 60)));
-  // OFFLINE: comportamiento certificado intacto, sin bloqueo
+  // OFFLINE: RE-DECIDIDO por SPEC P0 CHART RELIABILITY (ver la nota extensa en 1.6). Con el canónico
+  // ilegible Y sin historia canónica en memoria, el badge tampoco publica: el gráfico y el retorno
+  // publican como UNA SOLA UNIDAD —es la promesa que el propio gate ya llevaba escrita— y un % sobre
+  // la caché local es un número que un merge posterior puede contradecir. No es bloqueo indefinido:
+  // `_aurixNoteCanonicalOutcome` fuerza el repintado en cuanto la historia canónica deja de ser
+  // desconocida (recuperación simétrica a la de la pierna backend).
   const off = paintBadge(durable, OFFLINE);
-  ok('4.10 [offline] publica como antes (sin bloqueo indefinido)', off.innerHTML !== '',
+  ok('4.10 [canónico ilegible] retiene el badge junto con la línea (una sola unidad)', off.innerHTML === '',
     JSON.stringify(off.innerHTML.slice(0, 60)));
+  // …y con el canónico YA cargado, un refresco flaky NO retiene nada
+  const offWarm = paintBadge(durable, { currentUser: U, _aurixRemoteLoadOutcome: 'failed', _aurixCanonicalHistoryLoaded: true, _aurixBackendSnapshotsState: 'ready' });
+  ok('4.10b [refresco flaky, canónico cargado] publica con normalidad', offWarm.innerHTML !== '',
+    JSON.stringify(offWarm.innerHTML.slice(0, 60)));
   // un % DEFINITIVO nunca se retiene, ni con fuentes pendientes
   const okEmg = { range: '24h', state: 'ready', points: seg(NOW - 20 * H, 60, 12e5, 10000, 3),
     returnState: 'ok', returnPct: 1.8, badgeReturnPct: 1.8, color: 'up', displayedRangeState: 'full',

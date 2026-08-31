@@ -33,6 +33,7 @@ const ctx = {
   get currentUser() { return env.authed ? { id: 'u1' } : null; },
   get supabaseClient() { return env.authed ? { from: () => mkQuery() } : null; },
   activeRange: '30d',
+  _aurixRemoteLoadOutcome: 'ok-row', _aurixCanonicalHistoryLoaded: true,   // sesión reconciliada: la única pierna en juego es la backend
   render(_a) { env.renderCalls++; },
   renderWealthCurve(_a) { env.rwcCalls++; },
   updateChart() { env.rwcCalls++; },
@@ -45,18 +46,27 @@ const ctx = {
 ctx.window = ctx;
 vm.createContext(ctx);
 // consts the state machine reads
-['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS'].forEach(c => { try { vm.runInContext(konstSrc(c), ctx); } catch (e) { console.log('(const ' + c + ' fail ' + e.message + ')'); } });
+// SPEC P0 CHART RELIABILITY — la rama de éxito repinta AHORA a través de `_aurixNoteCanonicalOutcome`,
+// así que este sandbox tiene que poder evaluar el gate de publicación de verdad. Sin estas consts la
+// llamada caería al fallback y el harness certificaría la ruta secundaria, no la real.
+['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS',
+ '_AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES', '_AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED',
+ '_AURIX_PUBLICATION_STATE', '_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED'].forEach(c => { try { vm.runInContext(konstSrc(c), ctx); } catch (e) { console.log('(const ' + c + ' fail ' + e.message + ')'); } });
 // ONE script so the module `let` state + functions share a lexical scope, exposed via __hyd
 const bundle = [
   letSrc('_aurixBackendSnapshots'),
   letSrc('_aurixBackendSnapshotsState'), letSrc('_aurixBackendHydrateSeq'), letSrc('_aurixBackendHydrateInFlight'),
   letSrc('_aurixBackendHydrateAttempts'), letSrc('_aurixBackendHydrateRetryTimer'),
   fnSrc('_aurixBackendAuthClientReady'), fnSrc('_aurixSetBackendSnapshotsState'), fnSrc('_aurixForceMergedChartRepaint'),
+  letSrc('_aurixChartPublicationWasPending'),
+  fnSrc('_aurixResolvePublicationReadiness'), fnSrc('_aurixChartPublicationSourcesPending'),
+  fnSrc('_aurixNoteCanonicalOutcome'),
   fnSrc('_aurixScheduleBackendHydrateRetry'), asyncFnSrc('_aurixHydrateBackendSnapshots'), asyncFnSrc('_aurixFetchBackendSnapshots'),
   'globalThis.__hyd = { hydrate:_aurixHydrateBackendSnapshots, fetch:_aurixFetchBackendSnapshots, reHydrate:function(r){ if(_aurixBackendSnapshotsState!=="ready") return _aurixHydrateBackendSnapshots(r); },'
   + ' state:function(){return _aurixBackendSnapshotsState;}, snaps:function(){return _aurixBackendSnapshots;}, seq:function(){return _aurixBackendHydrateSeq;},'
   + ' setSnaps:function(v){_aurixBackendSnapshots=v;}, clearInFlight:function(){_aurixBackendHydrateInFlight=false;},'
-  + ' reset:function(){_aurixBackendSnapshotsState="idle";_aurixBackendHydrateSeq=0;_aurixBackendHydrateInFlight=false;_aurixBackendHydrateAttempts=0;_aurixBackendHydrateRetryTimer=null;_aurixBackendSnapshots=[];} };',
+  + ' wasPending:function(){return _aurixChartPublicationWasPending;},'
+  + ' reset:function(){_aurixChartPublicationWasPending=false;_aurixBackendSnapshotsState="idle";_aurixBackendHydrateSeq=0;_aurixBackendHydrateInFlight=false;_aurixBackendHydrateAttempts=0;_aurixBackendHydrateRetryTimer=null;_aurixBackendSnapshots=[];} };',
 ].join('\n');
 vm.runInContext(bundle, ctx);
 const H = ctx.__hyd;
@@ -73,6 +83,16 @@ ok('1 state ready', H.state() === 'ready', H.state());
 ok('1 backend snapshots assigned (2)', H.snaps().length === 2);
 ok('1 forced repaint (desktop wealth curve + mobile lite)', env.rwcCalls >= 1 && env.mobileCalls >= 1, 'rwc=' + env.rwcCalls + ' mobile=' + env.mobileCalls);
 ok('1 visual memo invalidated (desktop+mobile null)', env.lastVisualSig.desktop === null && env.lastVisualSig.mobile === null);
+// SPEC P0 CHART RELIABILITY — el aterrizaje tiene que DESARMAR el latch de recuperación. Si queda
+// armado, el primer resync de primer plano dispara un `_aurixForceMergedChartRepaint()` sin ninguna
+// causa de dato, que anula todo `_aurixLastVisualSig` y hace reescribir innerHTML + repetir la
+// animación en las dos superficies. Se comprueba aquí porque es esta rama la que lo resuelve.
+ok('1 el aterrizaje desarma el latch de recuperación (sin repintado espurio después)',
+  H.wasPending() === false, 'wasPending=' + H.wasPending());
+{ const rwc0 = env.rwcCalls, mob0 = env.mobileCalls;
+  vm.runInContext('_aurixNoteCanonicalOutcome()', ctx);   // simula el resync de primer plano siguiente
+  ok('1 un resync posterior NO repinta de nuevo', env.rwcCalls === rwc0 && env.mobileCalls === mob0,
+    'rwc ' + rwc0 + '→' + env.rwcCalls + ' mobile ' + mob0 + '→' + env.mobileCalls); }
 
 // ── 2) auth ready after many retries (>23s equiv) → eventually loads, never permanently frontend-only ──
 console.log('\n2) late auth (>23s):');

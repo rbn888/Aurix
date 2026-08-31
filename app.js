@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '654'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '655'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2072,6 +2072,55 @@ function _aurixForceMergedChartRepaint() {
   try { if (typeof updateChart === 'function') updateChart(); } catch (_) {}                       // desktop institutional/legacy surface (guarded, no-op on mobile)
   try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}   // mobile lite chart
 }
+// ── SPEC P0 CHART RELIABILITY — RECUPERACIÓN SIMÉTRICA DE LA PIERNA CANÓNICA ────────────────────
+// La pierna BACKEND del gate de publicación tiene desde siempre su propia recuperación: reintento con
+// backoff + `_aurixForceMergedChartRepaint()` al aterrizar (`ready`). La pierna CANÓNICA no tenía
+// ninguna de las dos, así que retener por `canonical_read_failed` habría podido dejar el gráfico
+// oculto MÁS TIEMPO DEL DEBIDO: `loadPortfolioFromBackend` se reejecuta en cada
+// visibilitychange/focus/pageshow/online, pero sólo la rama «aplicar remoto» de
+// `_aurixResyncFromRemote` repinta la curva (vía `updateDonut → _dshRenderPerfSnapshot →
+// renderWealthCurve`); si el resync tiene éxito y decide QUEDARSE CON LO LOCAL, el flag pasaba a
+// 'ok-row' sin que nada repintara, y una pestaña que ya tiene el foco tampoco dispara eventos.
+// Esto cierra el latch: en cuanto la historia canónica deja de ser desconocida, se fuerza UN
+// repintado con el idioma que ya existe. No añade timers ni estado nuevo de negocio: sólo un
+// booleano de borde y una llamada al repintado canónico.
+// EL PREDICADO ES EL GATE MISMO, no una réplica de una de sus piernas. Un primer intento latcheaba
+// sobre `outcome === 'failed' && !canonLoaded`, y eso se GASTABA UN PASO ANTES DE TIEMPO: el orden
+// que el código fuerza siempre es `loadPortfolioFromBackend` (fija el outcome y notifica) → y sólo
+// DESPUÉS el llamante ejecuta `_mergeRemoteState` (boot y resync por igual). Así que al pasar a
+// 'ok-row' con `_aurixCanonicalHistoryLoaded` todavía en false, la condición dejaba de cumplirse, el
+// latch se consumía y se repintaba… dentro de una ventana en la que el gate seguía PENDIENTE por
+// `canonical_reconcile_in_flight`: se repintaba la RETENCIÓN. Cuando la historia canónica sí quedaba
+// disponible ya no había latch, y el instante en que el gráfico se vuelve publicable no repintaba
+// nada. Preguntar al gate elimina la clase entera: no puede consumirse mientras siga pendiente, y
+// cubre CUALQUIER pierna (canónica o backend), no sólo la que yo hubiera replicado.
+// ES EL ÚNICO OWNER DE «HE SALIDO DE PENDIENTE», y por eso la rama de éxito de la hidratación pasa
+// por aquí con `force` en vez de llamar al repintado por su cuenta. Cuando no lo hacía, el latch
+// quedaba ARMADO en toda sesión sana (la hidratación aterriza casi siempre DESPUÉS del merge, así
+// que el gate había estado pendiente por `backend_hydration_in_progress`) y se descargaba en el
+// primer resync de primer plano como un repintado sin ninguna causa de dato. Eso no es inocuo:
+// `_aurixForceMergedChartRepaint` anula TODAS las claves de `_aurixLastVisualSig`, que es justo el
+// guard que evita reescribir innerHTML y repetir la animación cuando nada visual ha cambiado.
+let _aurixChartPublicationWasPending = false;
+function _aurixNoteCanonicalOutcome(opts) {
+  try {
+    const force = !!(opts && opts.force);                      // «acabo de resolver una fuente: repinta igual»
+    if (typeof _aurixChartPublicationSourcesPending !== 'function') {
+      // Un `force` viene de una fuente YA resuelta (la hidratación aterrizó), así que la adopción de
+      // la historia hidratada no puede quedar condicionada a que el gate exista. Endurecimiento: no
+      // encontré cómo hacer alcanzable esta rama —ambas son declaraciones top-level hoisted del mismo
+      // script—, pero antes de existir este owner el repintado no tenía ninguna precondición.
+      if (force && typeof _aurixForceMergedChartRepaint === 'function') _aurixForceMergedChartRepaint();
+      return;
+    }
+    const pending = !!_aurixChartPublicationSourcesPending().pending;
+    if (pending && !force) { _aurixChartPublicationWasPending = true; return; }
+    if (!force && !_aurixChartPublicationWasPending) return;    // no veníamos de una retención ⇒ nada que recuperar
+    _aurixChartPublicationWasPending = pending;                 // sincroniza el latch con la REALIDAD, no con un supuesto
+    if (typeof _aurixForceMergedChartRepaint === 'function') _aurixForceMergedChartRepaint();
+  } catch (_) {}
+}
+try { if (typeof window !== 'undefined') window._aurixNoteCanonicalOutcome = _aurixNoteCanonicalOutcome; } catch (_) {}
 function _aurixScheduleBackendHydrateRetry(reason) {
   if (_aurixBackendSnapshotsState === 'ready') return;
   if (_aurixBackendHydrateRetryTimer) return;           // one pending retry at a time
@@ -2104,7 +2153,14 @@ async function _aurixHydrateBackendSnapshots(reason) {
       _aurixBackendSnapshots = rows;                       // ATOMIC assign; newest-wins guaranteed by the seq guard above
       _aurixBackendHydrateAttempts = 0;
       _aurixSetBackendSnapshotsState('ready');
-      _aurixForceMergedChartRepaint();
+      // SPEC P0 CHART RELIABILITY — mismo repintado incondicional que antes (`force`), pero a través
+      // del ÚNICO owner de la recuperación, para que este aterrizaje desarme el latch en vez de
+      // dejarlo armado y provocar un repintado espurio en el primer resync de primer plano.
+      // DEFENSIVO CON CAUSA: sin este try/catch la llamada vive dentro del try grande de la función,
+      // cuyo catch hace `_aurixSetBackendSnapshotsState('failed')` — así que un throw aquí marcaría
+      // como FALLIDA una hidratación cuyas filas YA habían llegado. El fallback preserva el contrato
+      // que esta rama tenía antes de existir el owner: el repintado ocurre siempre.
+      try { _aurixNoteCanonicalOutcome({ force: true }); } catch (_) { try { _aurixForceMergedChartRepaint(); } catch (__) {} }
       try { console.log('[BACKEND-SNAPSHOTS] ready: ' + rows.length + ' snapshot(s) (' + (reason || '') + ')'); } catch (_) {}
     } else {                                               // null ⇒ transient failure → stay RETRYABLE (never falsely complete)
       _aurixSetBackendSnapshotsState('failed');
@@ -3292,6 +3348,10 @@ function _mergeRemoteState(remoteRow) {
     _aurixCanonicalCatHistory = _mergeCategoryByTs([], remoteCat);
     _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(_aurixCanonicalCatHistory);
     _aurixLocalCanonicalHash  = _aurixRemoteCanonicalHash;   // applied (display) == remote, by construction
+    // SPEC P0 CHART RELIABILITY — ESTE es el borde útil: `_aurixCanonicalHistoryLoaded` se pone arriba
+    // (línea ~3290) pero el store que el display lee de verdad se fusiona AQUÍ. Notificar antes
+    // repintaba con el canónico viejo todavía en su sitio.
+    try { _aurixNoteCanonicalOutcome(); } catch (_) {}
     // SPEC LINE.02 Fase 2.2 — capture the RAW remote span (pre-epoch-filter) for the read-only audit.
     try {
       const rawTs = (Array.isArray(remoteCat) ? remoteCat : []).filter(p => p && Number.isFinite(p.ts)).map(p => ({ ts: p.ts })).sort((a, b) => a.ts - b.ts);
@@ -3672,6 +3732,7 @@ async function loadPortfolioFromBackend(userId) {
         const _noRow = !!(error && (error.code === 'PGRST116' || /0 rows|no rows|multiple \(or no\) rows/i.test(error.message || '')));
         _aurixRemoteLoadOutcome = _noRow ? 'no-row' : 'failed';
       } catch (_) { _aurixRemoteLoadOutcome = 'failed'; }
+      try { _aurixNoteCanonicalOutcome(); } catch (_) {}   // SPEC P0 CHART RELIABILITY — latch/recupera la retención canónica
       _persistDebug('[persist-load-backend] ERROR', error.message);
       if (IS_DEV) console.warn('[DATA] Supabase load error:', error.message);
       try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteLoadStatus = 'error: ' + error.message; _aurixSyncState.lastError = error.message; } } catch (_) {}
@@ -3685,10 +3746,12 @@ async function loadPortfolioFromBackend(userId) {
     // SPEC MULTI-DEVICE STATE HARDENING — a successful read with a row ⇒ reconciled ('ok-row'); a null
     // payload without an error is treated as a failure (never assume an empty account on ambiguous data).
     try { _aurixRemoteLoadOutcome = data ? 'ok-row' : 'failed'; } catch (_) {}
+    try { _aurixNoteCanonicalOutcome(); } catch (_) {}   // SPEC P0 CHART RELIABILITY — idem
     try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastRemoteLoadStatus = data ? ('ok:' + ((data.assets || []).length) + ' assets') : 'null'; } catch (_) {}
     return data || null;
   } catch (err) {
     try { _aurixRemoteLoadOutcome = 'failed'; } catch (_) {}
+    try { _aurixNoteCanonicalOutcome(); } catch (_) {}   // SPEC P0 CHART RELIABILITY — idem
     try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteLoadStatus = 'exception: ' + (err && err.message); _aurixSyncState.lastError = err && err.message; } } catch (_) {}
     if (IS_DEV) console.warn('[DATA] Supabase load exception:', err);
     return null;
@@ -27437,6 +27500,9 @@ function _aurix24hReconcileInFlight() {
 // alone would hold the placeholder indefinitely. Anonymous sessions have no remote authority to wait
 // for ⇒ never pending (byte-identical prior behaviour).
 const _AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES = true;   // rollback: false ⇒ exact v645 (24H-only holds)
+// SPEC P0 CHART RELIABILITY — A FAILED CANONICAL READ IS *UNKNOWN* HISTORY, NOT COMPLETE HISTORY.
+// rollback: false ⇒ exact v693 (a transient user_portfolios read error publishes the local cache).
+const _AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED = true;
 function _aurixChartPublicationSourcesPending() {
   const out = { pending: false, reason: null };
   try {
@@ -27445,6 +27511,40 @@ function _aurixChartPublicationSourcesPending() {
     if (!authed) return out;                                       // local IS canonical ⇒ nothing to wait for
     const outcome = (typeof _aurixRemoteLoadOutcome !== 'undefined') ? _aurixRemoteLoadOutcome : 'failed';
     if (outcome === null) { out.pending = true; out.reason = 'remote_load_not_settled'; return out; }
+    // ── SPEC P0 CHART RELIABILITY — ROOT DIVERGENCE (S0 SOURCE ASSEMBLY) ─────────────────────────
+    // Este gate ya declara «UNKNOWN HISTORY ≠ COMPLETE HISTORY» y lo aplicaba a la pierna BACKEND
+    // (hydration 'failed' ⇒ STALE_HISTORY ⇒ no publica). La pierna CANÓNICA no lo aplicaba: sólo
+    // retenía con `outcome === null` y con `'ok-row'` + reconcile en vuelo, así que `'failed'` —una
+    // lectura de `user_portfolios` que NO sabemos qué contenía— contaba como SETTLED.
+    //
+    // Reproducido con los owners reales (replay S0→S8, misma verdad persistida congelada):
+    // `_aurixCanonicalCatHistory` sigue null ⇒ `_aurixHistorySourceForDisplay` devuelve la CACHÉ
+    // LOCAL, que en un dispositivo recién abierto contiene sólo la sesión en curso. Resultado
+    // publicado: 24H = 25 puntos, 1 segmento, `continuous`. Cuando un resync posterior sí lee la
+    // fila, la historia real aparece con su hueco nocturno: 86 puntos, 2 segmentos,
+    // `segmented_real_gap`. Misma verdad → dos series publicadas distintas, y la PRIMERA era la
+    // falsa continuidad. El hueco no aparecía al reentrar: aparecía la HISTORIA.
+    // Por eso era intermitente: exige que la lectura de la fila falle mientras la de snapshots
+    // funciona (dos queries distintas), lo que en escritorio con buena red casi nunca ocurre.
+    //
+    // No se inventa una regla ni un umbral: se aplica a la lectura la MISMA distinción que la ruta
+    // de ESCRITURA ya tiene decidida en `_aurixHistoryColumnsSafe`/`_aurixPersistenceReady` —
+    // `'no-row'` (PGRST116) es conocimiento COMPLETO (cuenta nueva sin fila remota) y sigue
+    // publicando; `'failed'` sin historia canónica es DESCONOCIDO y retiene.
+    //
+    // LA CONDICIÓN ES «LA HISTORIA CANÓNICA NO ESTÁ DISPONIBLE», NO «LA ÚLTIMA LECTURA FALLÓ».
+    // Un primer intento bloqueaba con `outcome === 'failed'` a secas, y eso era demasiado ancho: un
+    // refresco flaky a media sesión —con `_aurixCanonicalCatHistory` YA poblado y
+    // `_aurixCanonicalHistoryLoaded === true`— ocultaba un gráfico completo y correcto sin ninguna
+    // causa de dato (`_mergeRemoteState` no limpia el canónico ni baja el flag en un fallo). La
+    // divergencia raíz exige que el canónico esté AUSENTE: es entonces cuando
+    // `_aurixHistorySourceForDisplay` cae a la caché local. Con el canónico cargado no hay historia
+    // desconocida que esperar, así que no se retiene.
+    // Recuperación garantizada y simétrica a la pierna backend: ver `_aurixNoteCanonicalOutcome`.
+    // Nada de umbrales, clasificador, merge, geometría ni valores financieros.
+    const _blockCanonFailed = (typeof _AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED !== 'undefined') ? _AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED : true;
+    const _canonAvailable = (typeof _aurixCanonicalHistoryLoaded !== 'undefined') && _aurixCanonicalHistoryLoaded === true;
+    if (outcome === 'failed' && !_canonAvailable && _blockCanonFailed) { out.pending = true; out.reason = 'canonical_read_failed'; return out; }
     if (outcome === 'ok-row' && (typeof _aurixCanonicalHistoryLoaded !== 'undefined') && _aurixCanonicalHistoryLoaded === false) {
       out.pending = true; out.reason = 'canonical_reconcile_in_flight'; return out;
     }
@@ -37867,14 +37967,20 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   // reveal is not consumed: the skin stays 'loading', so the first entry into 'ready' still plays the draw.
   // No timer, no delay, no CSS, no new placeholder, no new state machine — only WHEN publication happens.
   if ((typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
-    let _definitive = false;
-    try {
-      if ((typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT
-          && typeof _aurixResolveFinalRenderSeriesContract === 'function' && emg.state === 'ready') {
-        _definitive = !!_aurixResolveFinalRenderSeriesContract(emg, emg.range, surface).badgeEligible;
-      }
-    } catch (_) { _definitive = false; }
-    if (!_definitive) {
+    // ── SPEC P0 CHART RELIABILITY — NADA CALCULADO SOBRE FUENTES INCOMPLETAS ES DEFINITIVO ──────
+    // Aquí vivía una puerta de escape: si el FRC declaraba `badgeEligible`, la serie se publicaba como
+    // DEFINITIVA aunque el gate acabara de decir que faltan fuentes. Pero `badgeEligible` se calcula
+    // sobre el conjunto de fuentes DE ESE INSTANTE, así que dentro de esta rama es, por definición, un
+    // veredicto emitido sobre historia incompleta: no puede certificar nada.
+    // Medido con el replay sobre los owners reales: la puerta dispara en 68 de las 900 combinaciones
+    // (30 casos adversariales × 5 timeframes × 6 fases de ensamblaje). En todas ellas la serie
+    // publicada COINCIDÍA con la del conjunto completo — pero por la forma del fixture, no por
+    // garantía: en ese momento el motor NO PUEDE SABER si la fuente que falta cambiará la serie.
+    // El invariante exige garantía estructural, no coincidencia afortunada.
+    // Con la puerta cerrada, la rama `pending` siempre resuelve en BLOCK-B (LKG) o en la retención
+    // certificada, y —efecto lateral buscado— `_aurixChartLkgSave` deja de ser alcanzable con
+    // historia incompleta, así que el LKG ya sólo guarda frames de conjunto completo.
+    {
       // ── SPEC CHART-PREMIUM-PUBLICATION.BLOCK-B — INVISIBLE RECONCILIATION ────────────────────
       // A mature account already has a definitive frame for THIS range: keep it on screen instead
       // of blanking, and let reconciliation finish underneath. The restored object replaces `emg`
@@ -37886,6 +37992,11 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
       const _lkg = (typeof _aurixChartLkgRestore === 'function') ? _aurixChartLkgRestore(emg.range) : null;
       if (_lkg) {
         emg = _lkg;
+        // SPEC P0 CHART RELIABILITY — la firma tiene que describir el frame QUE ESTÁ EN PANTALLA.
+        // Se latcheó arriba a partir del build fresco, y aquí ese build se descarta: sin re-firmar, un
+        // build posterior con la misma entrada casaba la firma, salía por el early-return del guard de
+        // repintado y dejaba el frame LKG congelado mientras el motor creía estar mostrando el fresco.
+        try { _aurixLastVisualSig[surface] = _aurixVisualChartSignature(emg, surface); } catch (_) { _aurixLastVisualSig[surface] = null; }
       } else {
         _aurixLastVisualSig[surface] = null;
         try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'loading'); } catch (_) {}
@@ -38522,22 +38633,18 @@ function renderAurixMobileLiteChart(range, token) {
         // existing premium loading skin. A DEFINITIVE result is never held. The existing convergence retry
         // is deliberately reused (reconcile + hydration also call scheduleAurixMobileLite): no new timer.
         if ((typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
-          let _definitiveM = false;
-          try {
-            // NOTE: _frcOnM is declared below this gate — re-evaluate the same condition inline rather than
-            // reading it here (a TDZ ReferenceError would silently degrade to "always hold").
-            if ((typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT
-                && typeof _aurixResolveFinalRenderSeriesContract === 'function' && emg.state === 'ready') {
-              _definitiveM = !!_aurixResolveFinalRenderSeriesContract(emg, r, 'mobile').badgeEligible;
-            }
-          } catch (_) { _definitiveM = false; }
-          if (!_definitiveM) {
+          // SPEC P0 CHART RELIABILITY — paridad con escritorio: la puerta de escape `_definitiveM` se
+          // cierra por la misma razón (un veredicto emitido sobre historia incompleta no certifica).
+          // Dejar abierta sólo una de las dos superficies habría sido, en sí misma, una divergencia.
+          {
             // BLOCK-B — mobile parity: keep this range's definitive frame on screen while the
             // sources reconcile underneath (see the desktop gate). No LKG ⇒ certified skeleton +
             // the existing convergence retry, unchanged. No new timer either way.
             const _lkgM = (typeof _aurixChartLkgRestore === 'function') ? _aurixChartLkgRestore(r) : null;
             if (_lkgM) {
               emg = _lkgM;
+              // paridad con escritorio: re-firmar el frame que queda en pantalla (ver gate de escritorio)
+              try { _aurixLastVisualSig.mobile = _aurixVisualChartSignature(emg, 'mobile'); } catch (_) { _aurixLastVisualSig.mobile = null; }
             } else {
               _aurixLastVisualSig.mobile = null;
               _aurixMobileLiteFallback('pending', null, { quiet: true });
