@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '655'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '656'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -1901,6 +1901,13 @@ const _AURIX_SNAP_FE_AUTHORITY_MS = 60 * 60000;  // 60 min
 // the loader returns [] ⇒ the merge stays a strict NO-OP and the chart is unchanged. Reversible: set false.
 const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;
 const _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS = 400;
+// SPEC P0 HISTORICAL CONTINUITY — tamaño de página y presupuesto de la lectura paginada.
+// _PAGE = el tope real del servidor (PostgREST `max-rows`, 1000 por defecto): pedir más NO da más
+// filas y encima enmascara el recorte, que era exactamente el defecto. El presupuesto acota el coste
+// de arranque: una cuenta pequeña resuelve en UNA petición (la primera página ya viene incompleta).
+const _AURIX_BACKEND_SNAPSHOT_PAGE = 1000;
+const _AURIX_BACKEND_SNAPSHOT_MAX_PAGES = 12;      // 12 000 filas ≈ 125 días a cadencia de 15 min
+let _aurixBackendSnapshotsTruncated = false;       // ¿se agotó el presupuesto? (falta cola ANTIGUA, nunca la reciente)
 // Normalize a backend snapshot row to the pipeline point shape {ts,total,real_estate,…}. Backend rows
 // store total_value_usd + real_estate (USD) + source/confidence/market_state.
 function _aurixNormalizeBackendSnapshot(s) {
@@ -2024,16 +2031,79 @@ async function _aurixFetchBackendSnapshots() {
     const _lookbackMs = Date.now() - _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS * 864e5;
     const _resetEpoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
     const sinceIso = new Date(Math.max(_lookbackMs, _resetEpoch)).toISOString();
-    const { data, error } = await supabaseClient.from('portfolio_snapshots')
-      .select('ts,total_value_usd,real_estate,category_values,source,confidence,market_state,price_staleness')
-      .eq('user_id', currentUser.id).gte('ts', sinceIso).order('ts', { ascending: true }).limit(5000);
-    if (error || !Array.isArray(data)) return null;                                            // transient failure ⇒ retryable
+    // ── SPEC P0 HISTORICAL CONTINUITY — LA CICATRIZ NO ERA UN OUTAGE, ERA ESTA CONSULTA ──────────
+    // Esto pedía `.order('ts', ascending: true).limit(5000)`. PostgREST recorta la respuesta en su
+    // tope de servidor (`max-rows`, 1000 por defecto), que además NO se declara como error: llega un
+    // array corto y perfectamente válido. Resultado: el cliente recibía las 1000 filas MÁS ANTIGUAS
+    // y no volvía a ver NADA posterior. Medido en la cuenta del founder: 1000 filas exactas de
+    // 2026-08-18T18:30 a 2026-08-29T05:45 — una cada 15,1 min, o sea la captura de servidor
+    // funcionando sin un solo fallo — y CERO filas dentro del «hueco» de 55,47 h que el gráfico
+    // dibujaba. Los datos estaban en el servidor; se pedía el extremo equivocado de la tabla.
+    // No es un caso legacy: le ocurre a CUALQUIER cuenta al pasar de 1000 snapshots, es decir a los
+    // ~10,4 días de vida con cadencia de 15 min, y la cicatriz crece un día por día a partir de ahí.
+    //
+    // DOS CAMBIOS, NINGUNO INVENTA UN DATO:
+    // 1. DESCENDENTE. Si algún día hay que recortar, que se recorte la cola ANTIGUA (una frontera
+    //    honesta de «aquí empieza el historial») y nunca la ventana reciente (un agujero en medio).
+    //    Invierte el modo de fallo del peor extremo al menos dañino.
+    // 2. PAGINACIÓN POR CURSOR (`lt` sobre el último ts), no por offset: un `insert` del cron a
+    //    mitad de la paginación desplazaría los offsets y podría duplicar o saltarse filas. Con
+    //    cursor descendente las filas nuevas entran por la cabeza y no afectan a las páginas ya
+    //    pedidas ⇒ el resultado sigue siendo función determinista de la verdad persistida (v694).
+    // Un fallo en CUALQUIER página devuelve null ⇒ lectura reintentable, nunca una historia a medias
+    // publicada como completa. Presupuesto de páginas acotado para no penalizar el arranque.
+    const _PAGE = (typeof _AURIX_BACKEND_SNAPSHOT_PAGE === 'number') ? _AURIX_BACKEND_SNAPSHOT_PAGE : 1000;
+    const _MAXP = (typeof _AURIX_BACKEND_SNAPSHOT_MAX_PAGES === 'number') ? _AURIX_BACKEND_SNAPSHOT_MAX_PAGES : 12;
+    const data = [];
+    let _cursorIso = null, _truncated = false, _total = null;
+    for (let _page = 0; _page < _MAXP; _page++) {
+      // `count: 'exact'` SÓLO en la página 0: es la única cuyo conteo es el total de la población que se
+      // va a paginar, y pedirlo en las demás se paga y se descarta.
+      let _q = supabaseClient.from('portfolio_snapshots')
+        .select('ts,total_value_usd,real_estate,category_values,source,confidence,market_state,price_staleness',
+                _page === 0 ? { count: 'exact' } : undefined)
+        .eq('user_id', currentUser.id).gte('ts', sinceIso);
+      if (_cursorIso != null) _q = _q.lt('ts', _cursorIso);                                    // cursor: estrictamente más antiguo
+      const { data: _rows, error, count: _count } = await _q.order('ts', { ascending: false }).limit(_PAGE);
+      if (error || !Array.isArray(_rows)) return null;                                         // transient failure ⇒ retryable
+      for (const _r of _rows) data.push(_r);
+      // PARAR CON UNA PÁGINA VACÍA, NO CON UNA «CORTA». `_rows.length < _PAGE` daba por hecho que el
+      // tope del servidor es exactamente `_PAGE`: si el proyecto baja `max-rows` a 500, la primera
+      // página vuelve con 500 filas, se rompería el bucle y el cliente creería tener la historia
+      // COMPLETA — el mismo fallo silencioso que este bloque arregla, con otro disparador y encima
+      // invisible desde el cliente. Con el corte en «página vacía» el tope del servidor deja de
+      // importar: sea 1000, 500 o 200, se sigue paginando hasta agotar de verdad.
+      if (_rows.length === 0) break;                                                           // no queda historia más antigua ⇒ cobertura completa
+      // `count` sólo es el TOTAL en la primera página: a partir de la segunda el cursor `lt` filtra la
+      // consulta y el servidor cuenta ese subconjunto. Se captura una vez y se usa para no gastar la
+      // petición vacía final; si el servidor no lo devuelve, se cae al corte por página vacía.
+      // DOS PREMISAS, escritas porque de ellas depende que este atajo sea correcto:
+      //  (1) NO releer el count en páginas posteriores. `data` sólo acumula filas de la MISMA población
+      //      que contó la página 0, así que `data.length <= _total` siempre y la igualdad marca justo la
+      //      cobertura completa. Un count "envejecido" no es un defecto: es lo que hace consistente la
+      //      comparación. Releerlo por página la rompería.
+      //  (2) Nadie inserta filas ANTERIORES al cursor mientras se pagina. Los inserts del cron llegan
+      //      con `ts` mayor, y el cursor descendente ya pasó por encima, así que no se recogen. Si algún
+      //      día existe un escritor de BACKFILL histórico, este atajo puede cortar antes de tiempo con
+      //      `_truncated` en false: entonces hay que quitarlo y dejar sólo el corte por página vacía.
+      if (_page === 0) _total = Number.isFinite(_count) ? _count : null;
+      if (_total != null && data.length >= _total) break;
+      _cursorIso = _rows[_rows.length - 1].ts;                                                 // la más antigua de esta página
+      if (_page === _MAXP - 1) _truncated = true;                                              // se agotó el presupuesto: falta cola antigua
+    }
+    // Observabilidad: que un recorte por presupuesto sea AUDITABLE y no invisible como lo era el de 1000.
+    try { _aurixBackendSnapshotsTruncated = _truncated; if (typeof window !== 'undefined') window.aurixBackendSnapshotsTruncated = _truncated; } catch (_) {}
+    if (_truncated) { try { console.warn('[BACKEND-SNAPSHOTS] cobertura recortada por presupuesto de páginas: ' + data.length + ' filas; falta historia ANTIGUA (la reciente está completa)'); } catch (_) {} }
     return data.map(r => ({
       ts: (typeof r.ts === 'number') ? r.ts : Date.parse(r.ts),
       total_value_usd: Number(r.total_value_usd), real_estate: Number(r.real_estate) || 0,
       category_values: r.category_values || {}, source: 'backend_snapshot',
       confidence: r.confidence || 'scheduled', market_state: r.market_state || null, price_staleness: r.price_staleness || null,
-    })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.total_value_usd) && p.ts >= _resetEpoch);
+    })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.total_value_usd) && p.ts >= _resetEpoch)
+      // La lectura es ahora DESCENDENTE y por páginas: se reordena ASCENDENTE y se deduplica por ts
+      // para devolver exactamente el mismo contrato que consumía el merge (orden estable, sin repes).
+      .sort((a, b) => a.ts - b.ts)
+      .filter((p, i, arr) => i === 0 || p.ts !== arr[i - 1].ts);
   } catch (_) { return null; }
 }
 // ════════════════════════════════════════════════════════════════════════════
@@ -2288,10 +2358,11 @@ const _AURIX_CATHIST_INVESTABLE = Object.freeze(_AURIX_CATHIST_CANONICAL.filter(
 // the buckets are raw sums). Tight on purpose: a genuinely missing bucket must not fit inside the tolerance.
 const _AURIX_CATHIST_RECON_ABS_TOL = 0.05;      // USD
 const _AURIX_CATHIST_RECON_REL_TOL = 1e-6;      // 0.0001% of the total
-// Mirrors the `.limit(5000)` in _aurixFetchBackendSnapshots. The loader orders ASCENDING, so hitting the cap
-// truncates the NEWEST rows — i.e. `end` would silently stop being "now". Surfaced as coverage.truncated
-// instead of being fixed here (the cap is the loader's, and it is a known deferred risk).
-const _AURIX_CATHIST_SOURCE_ROW_CAP = 5000;
+// SPEC P0 HISTORICAL CONTINUITY — `_AURIX_CATHIST_SOURCE_ROW_CAP` RETIRADO. Describía el `.limit(5000)`
+// ASCENDENTE del loader y avisaba de que al tocar el tope se perdían las filas MÁS NUEVAS. El loader ya
+// no funciona así (lee DESCENDENTE y paginado: la ventana reciente está siempre completa y lo único que
+// puede faltar es la cola ANTIGUA), y mantener un segundo umbral que re-deriva el truncado contando
+// filas sólo servía para contradecir al único que lo sabe. Owner único: `_aurixBackendSnapshotsTruncated`.
 // ONLY the two windows Financial declared defensible. 30D/1A/TOTAL are absent by decision, not by omission:
 // declaring them before the real history covers them would publish a window Aurix cannot back.
 // maxStartDriftMs bounds how far the real start snapshot may sit from the ideal start instant, on EITHER
@@ -2423,8 +2494,14 @@ function _aurixCatHistWindow(range) {
     if (hydration !== 'ready') { out.reason = 'not_hydrated'; return out; }
     const rows = _aurixCatHistRows();
     out.coverage.rows = rows.length;
-    out.coverage.truncated = rows.length >= _AURIX_CATHIST_SOURCE_ROW_CAP;
-    if (out.coverage.truncated) out.warnings.push('source_row_cap_reached');   // newest rows may be missing (ascending limit)
+    // SPEC P0 HISTORICAL CONTINUITY — el truncado lo DECIDE el loader, no se re-deriva contando filas.
+    // Antes se comparaba `rows.length` contra un umbral propio, y dos contratos sobre el mismo hecho
+    // sólo pueden desmentirse: con `max-rows` del proyecto en 200 el loader agota su presupuesto y
+    // avisa mientras el conteo local ve pocas filas y declara cobertura completa; y con el presupuesto
+    // justo lleno pero la historia COMPLETA pasaba lo contrario. `_aurixBackendSnapshotsTruncated` es
+    // la única fuente que SABE si se agotaron las páginas.
+    out.coverage.truncated = (typeof _aurixBackendSnapshotsTruncated !== 'undefined') ? !!_aurixBackendSnapshotsTruncated : false;
+    if (out.coverage.truncated) out.warnings.push('source_row_cap_reached');   // falta cola ANTIGUA (lectura descendente); la ventana reciente está completa
     const valid = [];
     for (let i = 0; i < rows.length; i++) {
       const v = _aurixCatHistValidatePoint(rows[i]);

@@ -412,7 +412,14 @@ console.log('\n19–23 · Chart, Performance, Reader, Preview, User Health:');
     const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
       'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
       '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
-      '_aurixCatHistWindow', '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+      '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+    // SPEC P0 HISTORICAL CONTINUITY — `_aurixCatHistWindow` SALE de esta lista con causa: ese bloque lo
+    // edita legítimamente. `coverage.truncated` dejó de re-derivarse contando filas contra un umbral
+    // propio y pasa a leer `_aurixBackendSnapshotsTruncated`, el ÚNICO owner que sabe si el loader
+    // paginado agotó su presupuesto. Mantener dos contratos sobre el mismo hecho sólo permitía que se
+    // desmintieran (con `max-rows` en 200 el loader avisaba y el conteo local decía cobertura completa).
+    // Los otros nueve owners siguen fijados byte a byte: la garantía de este gate no se debilita.
+
     const bodyOf = (src, n) => { const s = 'function ' + n + '('; const i = src.indexOf(s); if (i < 0) return null;
       let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } return null; };
     ok('19.1 Chart, Performance, Reader and Preview are byte-identical to ' + BASELINE + ' (they cannot have moved)',

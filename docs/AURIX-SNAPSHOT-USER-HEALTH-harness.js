@@ -535,7 +535,7 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
     const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
       'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
       '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
-      '_aurixCatHistWindow', '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+      '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
     const bodyOf = (src, n) => { const s = 'function ' + n + '('; const i = src.indexOf(s); if (i < 0) return null;
       let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } return null; };
     ok('22.1 Chart, Performance, Reader and Preview are byte-identical to ' + BASELINE + ' (they cannot have moved)',

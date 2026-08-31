@@ -107,7 +107,7 @@ vm.createContext(LS);
 ['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS'].forEach(c => vm.runInContext(konst(c), LS));
 vm.runInContext('async ' + fn('_aurixFetchBackendSnapshots'), LS);   // fn() extractor drops the async keyword
 function mockClient(result) {
-  const chain = {}; ['from', 'select', 'eq', 'gte', 'order', 'limit'].forEach(m => chain[m] = () => chain);
+  const chain = {}; ['from', 'select', 'eq', 'gte', 'lt', 'order', 'limit'].forEach(m => chain[m] = () => chain);   // `lt` = cursor de paginación
   chain.then = (res) => res(result);   // awaitable → {data,error}
   return { from: () => chain };
 }

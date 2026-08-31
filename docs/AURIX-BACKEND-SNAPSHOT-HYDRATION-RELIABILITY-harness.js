@@ -25,11 +25,21 @@ const wait = () => new Promise(r => setImmediate(r));   // let real microtasks/p
 const env = {
   authed: false, mockResult: () => ({ data: [], error: null }),
   renderCalls: 0, rwcCalls: 0, mobileCalls: 0, timers: [], lastVisualSig: { desktop: 'stale', mobile: 'stale' },
-  listeners: {},
+  listeners: {}, ltCalls: [],
 };
-function mkQuery() { const q = {}; ['from', 'select', 'eq', 'gte', 'order', 'limit'].forEach(m => q[m] = () => q); q.then = (res, rej) => Promise.resolve().then(env.mockResult).then(res, rej); return q; }
+function mkQuery() { const q = {}; ['from', 'select', 'eq', 'gte', 'order', 'limit'].forEach(m => q[m] = () => q);
+  // `lt` = cursor de la lectura paginada. Se captura el valor para poder AFIRMAR que la segunda
+  // página arranca en la fila más antigua de la primera (un mock que no lo conozca haría que la
+  // función lanzara y devolviera null, y el harness "pasaría" por el camino equivocado).
+  q.lt = (col, val) => { env.ltCalls.push(val); return q; };
+  // PostgREST devuelve `count` cuando la consulta lo pide (`{count:'exact'}`), y el loader lo usa para
+  // no gastar una petición vacía final. Un mock que lo omitiera forzaría a agotar el presupuesto de
+  // páginas — es decir, modelaría un servidor que no existe.
+  q.then = (res, rej) => Promise.resolve().then(env.mockResult)
+    .then(r => (r && Array.isArray(r.data) && r.count == null) ? Object.assign({}, r, { count: r.data.length }) : r)
+    .then(res, rej); return q; }
 const ctx = {
-  console: { log() {}, error() {} }, Math, JSON, Object, Number, String, Boolean, Array, isFinite, Date, Promise, setImmediate,
+  console: { log() {}, error() {}, warn() {} }, Math, JSON, Object, Number, String, Boolean, Array, isFinite, Date, Promise, setImmediate,
   get currentUser() { return env.authed ? { id: 'u1' } : null; },
   get supabaseClient() { return env.authed ? { from: () => mkQuery() } : null; },
   activeRange: '30d',
@@ -51,7 +61,8 @@ vm.createContext(ctx);
 // llamada caería al fallback y el harness certificaría la ruta secundaria, no la real.
 ['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS',
  '_AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES', '_AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED',
- '_AURIX_PUBLICATION_STATE', '_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED'].forEach(c => { try { vm.runInContext(konstSrc(c), ctx); } catch (e) { console.log('(const ' + c + ' fail ' + e.message + ')'); } });
+ '_AURIX_PUBLICATION_STATE', '_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED',
+ '_AURIX_BACKEND_SNAPSHOT_PAGE', '_AURIX_BACKEND_SNAPSHOT_MAX_PAGES'].forEach(c => { try { vm.runInContext(konstSrc(c), ctx); } catch (e) { console.log('(const ' + c + ' fail ' + e.message + ')'); } });
 // ONE script so the module `let` state + functions share a lexical scope, exposed via __hyd
 const bundle = [
   letSrc('_aurixBackendSnapshots'),
@@ -71,7 +82,7 @@ const bundle = [
 vm.runInContext(bundle, ctx);
 const H = ctx.__hyd;
 function runTimers() { const pend = env.timers.filter(t => !t.done); env.timers = []; pend.forEach(t => { try { t.fn(); } catch (_) {} }); }
-function resetEnv() { env.authed = false; env.mockResult = () => ({ data: [], error: null }); env.renderCalls = 0; env.rwcCalls = 0; env.mobileCalls = 0; env.timers = []; env.lastVisualSig.desktop = 'stale'; env.lastVisualSig.mobile = 'stale'; H.reset(); }
+function resetEnv() { env.ltCalls = []; env.authed = false; env.mockResult = () => ({ data: [], error: null }); env.renderCalls = 0; env.rwcCalls = 0; env.mobileCalls = 0; env.timers = []; env.lastVisualSig.desktop = 'stale'; env.lastVisualSig.mobile = 'stale'; H.reset(); }
 const ROWS = [{ ts: '2026-07-16T00:00:00Z', total_value_usd: 17000 }, { ts: '2026-07-16T00:15:00Z', total_value_usd: 17010 }];
 
 (async () => {
@@ -213,7 +224,101 @@ ok('S state machine present (idle/loading/ready/failed)', /_aurixBackendSnapshot
 ok('S immediate start (microtask), not only setTimeout(3s)', /Promise\.resolve\(\)\.then\(function \(\) \{ _aurixHydrateBackendSnapshots\('mount'\)/.test(app) && !/setTimeout\(_blTick, 3000\)/.test(app));
 ok('S bounded exponential backoff + stale-seq guard + dedupe present', /Math\.pow\(2, n\)/.test(app) && /seq !== _aurixBackendHydrateSeq/.test(app) && /_aurixBackendHydrateInFlight/.test(app));
 ok('S retry triggers: visibilitychange + focus + online', /addEventListener\('visibilitychange'/.test(app) && /addEventListener\('focus'/.test(app) && /addEventListener\('online'/.test(app));
-ok('S fetch signals failure(null) vs empty([]) for retryability', /if \(error \|\| !Array\.isArray\(data\)\) return null;/.test(app));
+ok('S fetch signals failure(null) vs empty([]) for retryability', /if \(error \|\| !Array\.isArray\(_rows\)\) return null;/.test(app));
+// ── 14) SPEC P0 HISTORICAL CONTINUITY — paginación real de la lectura de snapshots ──────────────
+// El defecto: `.order('ts', ascending: true).limit(5000)` recibía las 1000 filas MÁS ANTIGUAS
+// (PostgREST recorta en `max-rows` sin señalar error) y la historia reciente era invisible para
+// siempre. Aquí se EJECUTA la lectura contra un mock de dos páginas: los asserts estáticos de abajo
+// no distinguirían una paginación rota de una correcta.
+console.log('\n14) lectura paginada (descendente + cursor):');
+{
+  const T0 = Date.parse('2026-08-29T00:00:00Z');
+  // página 1 = las 1000 MÁS RECIENTES, en orden descendente (como las devuelve el servidor)
+  const P1 = Array.from({ length: 1000 }, (_, i) => ({ ts: new Date(T0 - i * 15 * 60000).toISOString(), total_value_usd: 20000 + i }));
+  const P2 = [{ ts: new Date(T0 - 1000 * 15 * 60000).toISOString(), total_value_usd: 19000 },
+              { ts: new Date(T0 - 1001 * 15 * 60000).toISOString(), total_value_usd: 18990 }];
+  resetEnv(); env.authed = true;
+  let call = 0;
+  env.mockResult = () => ({ data: (call++ === 0 ? P1 : P2), error: null, count: 1002 });
+  const out = await H.fetch();
+  ok('14 se piden DOS páginas (la primera venía llena)', call === 2, 'llamadas=' + call);
+  ok('14 la segunda usa CURSOR = la fila más antigua de la primera',
+    env.ltCalls.length === 1 && env.ltCalls[0] === P1[P1.length - 1].ts, JSON.stringify(env.ltCalls));
+  ok('14 devuelve las filas de AMBAS páginas', out.length === 1002, 'n=' + out.length);
+  ok('14 salida ASCENDENTE', out.every((p, i) => i === 0 || p.ts >= out[i-1].ts));
+  ok('14 sin duplicados de ts', new Set(out.map(p => p.ts)).size === out.length);
+  ok('14 la fila MÁS RECIENTE está presente (era justo lo que se perdía)',
+    out[out.length - 1].ts === Date.parse(P1[0].ts), new Date(out[out.length-1].ts).toISOString());
+
+  // un fallo en la SEGUNDA página no puede publicarse como historia completa
+  resetEnv(); env.authed = true; call = 0;
+  env.mockResult = () => (call++ === 0 ? { data: P1, error: null, count: 1002 } : { data: null, error: { message: 'boom' } });
+  const bad = await H.fetch();
+  ok('14 fallo en una página intermedia ⇒ null (reintentable), no historia a medias', bad === null, JSON.stringify(bad && bad.length));
+
+  // TOPE DEL SERVIDOR MENOR QUE LA PÁGINA PEDIDA. Si el proyecto baja `max-rows` a 500, cada página
+  // vuelve con 500 filas aunque se pidan 1000. La condición de parada anterior (`_rows.length < _PAGE`)
+  // habría roto el bucle en la primera y el cliente habría creído tener la historia COMPLETA — el mismo
+  // fallo silencioso que este bloque arregla. `count` es el TOTAL de filas que casan, no el tamaño de la
+  // página, así que la paginación debe continuar.
+  {
+    const TOT = 1200, CAP = 500, T1 = Date.parse('2026-08-20T00:00:00Z');
+    resetEnv(); env.authed = true;
+    let n = 0;
+    env.mockResult = () => { const from = n * CAP, take = Math.max(0, Math.min(CAP, TOT - from)); n++;
+      return { data: Array.from({ length: take }, (_, i) => ({ ts: new Date(T1 - (from + i) * 60000).toISOString(), total_value_usd: 100 + from + i })), error: null, count: TOT }; };
+    const out = await H.fetch();
+    ok('14 tope de servidor (500) menor que la página pedida (1000) ⇒ NO corta: sigue paginando',
+      n === 3 && out.length === TOT, 'peticiones=' + n + ' filas=' + (out && out.length));
+    ok('14 …y la fila más reciente sigue presente', out[out.length - 1].ts === T1);
+  }
+
+  // PRESUPUESTO AGOTADO: 12 páginas llenas ⇒ se marca truncado y es auditable.
+  {
+    resetEnv(); env.authed = true;
+    let n = 0; const T2 = Date.parse('2026-08-25T00:00:00Z');
+    env.mockResult = () => { const from = n * 1000; n++;
+      return { data: Array.from({ length: 1000 }, (_, i) => ({ ts: new Date(T2 - (from + i) * 60000).toISOString(), total_value_usd: 500 + from + i })), error: null, count: 999999 }; };
+    const out = await H.fetch();
+    ok('14 presupuesto agotado ⇒ exactamente 12 páginas', n === 12, 'peticiones=' + n);
+    ok('14 …devuelve 12 000 filas sin duplicar', out.length === 12000 && new Set(out.map(p => p.ts)).size === 12000, 'n=' + out.length);
+    ok('14 …y el recorte queda MARCADO (auditable, no silencioso)', ctx.aurixBackendSnapshotsTruncated === true,
+      'truncated=' + ctx.aurixBackendSnapshotsTruncated);
+    ok('14 …conservando la ventana RECIENTE (lo que se pierde es la cola antigua)',
+      out[out.length - 1].ts === T2);
+  }
+
+  // una cuenta pequeña se resuelve en UNA sola petición
+  resetEnv(); env.authed = true; call = 0;
+  env.mockResult = () => { call++; return { data: P2, error: null }; };
+  const small = await H.fetch();
+  ok('14 cuenta pequeña ⇒ una sola petición, sin cursor', call === 1 && env.ltCalls.length === 0, 'llamadas=' + call);
+  ok('14 …y devuelve sus filas ordenadas', small.length === 2 && small[0].ts < small[1].ts);
+}
+
+// ── SPEC P0 HISTORICAL CONTINUITY — la lectura NO puede recortar la ventana reciente ─────────────
+// La consulta pedía `.order('ts', ascending: true).limit(5000)`. PostgREST recorta en su `max-rows`
+// (1000) SIN señalar error, así que el cliente se quedaba con las 1000 filas MÁS ANTIGUAS y nunca
+// veía nada posterior: en la cuenta del founder, 1000 filas exactas hasta 2026-08-29T05:45 y un
+// «hueco» de 55,47 h que en el servidor NO existía. Le pasa a cualquier cuenta a los ~10,4 días.
+ok('S lectura DESCENDENTE (si se recorta, se pierde la cola ANTIGUA, nunca la ventana reciente)',
+  /\.order\('ts', \{ ascending: false \}\)/.test(app) && !/ascending: true \}\)\.limit\(5000\)/.test(app));
+ok('S paginación por CURSOR, no por offset (un insert del cron no puede duplicar ni saltar filas)',
+  /_q\.lt\('ts', _cursorIso\)/.test(app));
+ok('S un fallo en CUALQUIER página es reintentable (nunca historia a medias como completa)',
+  /for \(let _page = 0; _page < _MAXP; _page\+\+\)[\s\S]{0,900}if \(error \|\| !Array\.isArray\(_rows\)\) return null;/.test(app));
+ok('S el recorte por presupuesto es AUDITABLE (no invisible como el de 1000)',
+  /_aurixBackendSnapshotsTruncated = _truncated/.test(app));
+// El sandbox DEBE cargar las constantes reales del bundle: sin ellas el fetch cae a sus literales de
+// respaldo y este harness certificaría valores que no son los de app.js. Comprobado: con `_PAGE=500` y
+// `_MAX_PAGES=1` —que restaura el defecto de una sola página— el harness pasaba igual.
+ok('S el sandbox usa las constantes REALES del bundle, no los literales de respaldo',
+  vm.runInContext('_AURIX_BACKEND_SNAPSHOT_PAGE', ctx) === 1000 && vm.runInContext('_AURIX_BACKEND_SNAPSHOT_MAX_PAGES', ctx) === 12,
+  'PAGE=' + vm.runInContext('_AURIX_BACKEND_SNAPSHOT_PAGE', ctx) + ' MAXP=' + vm.runInContext('_AURIX_BACKEND_SNAPSHOT_MAX_PAGES', ctx));
+ok('S la parada NO asume el tope del servidor (página VACÍA, no página corta)',
+  /if \(_rows\.length === 0\) break;/.test(app) && !/if \(_rows\.length < _PAGE\) break;/.test(app));
+ok('S salida ordenada ASCENDENTE y deduplicada por ts (mismo contrato que consumía el merge)',
+  /\.sort\(\(a, b\) => a\.ts - b\.ts\)[\s\S]{0,260}p\.ts !== arr\[i - 1\]\.ts/.test(app));
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

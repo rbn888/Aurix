@@ -104,7 +104,7 @@ ok('edge XAU branch does NOT value gold as qty × fresh.price', !/XAU[\s\S]{0,40
 ok('edge requests fresh XAU/USD spot (registry key)', /allSymbols\.push\('XAU\/USD'\)/.test(edge));
 
 console.log('\nNo frontend/app runtime change (this fix is Edge-Function-only):');
-ok('app.js hydration ACTIVATED, auth-gated, retryable (failure→null so it never falsely completes)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app) && /if \(error \|\| !Array\.isArray\(data\)\) return null;/.test(app));
+ok('app.js hydration ACTIVATED, auth-gated, retryable (failure→null so it never falsely completes)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app) && /if \(error \|\| !Array\.isArray\(_rows\)\) return null;/.test(app));   // SPEC P0 HISTORICAL CONTINUITY: la lectura es ahora paginada; el contrato (fallo⇒null) es el mismo, por página
 ok('DRY_RUN still gates inserts (no real write)', /if \(DRY_RUN\) \{[\s\S]{0,80}skipped\+\+; noteHealth\([^;]*\); continue; \}/.test(edge));
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

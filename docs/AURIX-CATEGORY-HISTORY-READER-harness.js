@@ -67,8 +67,7 @@ sb._aurixBackendSnapshotsState = 'ready';
 sb._aurixBackendAuthClientReady = () => true;
 [ '_AURIX_BACKEND_HEALTH','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_LATE_FACTOR','_AURIX_BACKEND_STALE_FACTOR',
   '_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
-  '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_SOURCE_ROW_CAP',
-  '_AURIX_CATHIST_WINDOWS' ].forEach(n => vm.runInContext(konstSrc(n), sb));
+  '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS' ].forEach(n => vm.runInContext(konstSrc(n), sb));
 [ '_aurixBackendHealth','_aurixBackendHealthSnapshot',
   '_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow','_aurixCatExposureDelta' ]
   .forEach(n => vm.runInContext(fnSrc(n), sb));
@@ -514,14 +513,23 @@ console.log('\n16 · Backward compatibility with the existing history:');
   ok('16.3 a mixed legacy + current history is one series, not two',
     (function(){ setRows(legacy.slice(0, 200).concat(series(3, { crypto: 9000, liquidity: 1000 }, { crypto: 9500, liquidity: 500 })));
       return win('24H').state === 'ok'; })());
-  ok('16.4 the loader row cap is surfaced, so a truncated tail cannot pass as "now"',
-    (function(){ const cap = vm.runInContext('_AURIX_CATHIST_SOURCE_ROW_CAP', sb);
+  // SPEC P0 HISTORICAL CONTINUITY — el truncado ya NO se re-deriva contando filas contra un umbral
+  // propio: lo DECIDE el loader (`_aurixBackendSnapshotsTruncated`), único que sabe si su lectura
+  // paginada agotó el presupuesto de páginas. Dos contratos sobre el mismo hecho sólo podían
+  // desmentirse: con `max-rows` del proyecto en 200 el loader agota y avisa mientras el conteo local
+  // ve pocas filas y declara cobertura completa. El test fija ahora el contrato real, y por eso ya no
+  // depende del número de filas.
+  ok('16.4 el truncado del loader se propaga, así que una cola recortada no puede pasar por "now"',
+    (function(){
       setRows(series(8, { crypto: 8000, liquidity: 2000 }, { crypto: 9000, liquidity: 1000 }));
-      const small = win('24H');
-      const many = []; while (many.length < cap) many.push.apply(many, series(8, { crypto: 8000, liquidity: 2000 }, { crypto: 9000, liquidity: 1000 }));
-      setRows(many.slice(0, cap));
-      const big = win('24H');
-      return small.coverage.truncated === false && big.coverage.truncated === true && big.warnings.indexOf('source_row_cap_reached') !== -1; })());
+      vm.runInContext('_aurixBackendSnapshotsTruncated = false;', sb);
+      const clean = win('24H');
+      vm.runInContext('_aurixBackendSnapshotsTruncated = true;', sb);
+      const cut = win('24H');
+      return clean.coverage.truncated === false && clean.warnings.indexOf('source_row_cap_reached') === -1
+          && cut.coverage.truncated === true && cut.warnings.indexOf('source_row_cap_reached') !== -1; })());
+  ok('16.4b …y NO depende ya del número de filas (el umbral duplicado ya no se DECLARA)',
+    !/^const _AURIX_CATHIST_SOURCE_ROW_CAP\s*=/m.test(app));
 }
 
 // ── 17–18 · Nothing else moved ───────────────────────────────────────────────
@@ -531,8 +539,20 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
   // The risk these actually guard is someone WIRING the reader into an owner that must
   // not depend on it; that is visible in the current file and needs no baseline.
   const untouched = ['_aurixNormalizeBackendSnapshot','_aurixMergeSnapshotSources','_aurixHistorySourceForDisplay',
-    '_aurixFetchBackendSnapshots','_aurixBackendHealth','_aurixBackendHealthSnapshot',
+    '_aurixBackendHealth','_aurixBackendHealthSnapshot',
     '_aurixIntelligencePreviewFacts','_aurixIntelligencePreviewHTML','hasAurixPremiumAccess'];
+  // SPEC P0 HISTORICAL CONTINUITY — `_aurixFetchBackendSnapshots` SALE de esta lista: ese bloque lo
+  // edita legítimamente (la lectura pasa a descendente + paginada por cursor, porque la versión
+  // ascendente con `limit(5000)` recibía sólo las 1000 filas MÁS ANTIGUAS del recorte `max-rows` de
+  // PostgREST y la historia reciente era invisible). Es exactamente el caso que el comentario de
+  // abajo anticipa: fijar un gate de CI a un commit histórico falla el día que alguien edita uno de
+  // estos owners con causa. Las invariantes que SÍ importan para este gate (17.1/17.2 — que ningún
+  // owner de Chart/Performance/Preview referencie el reader, y que cada uno exista una sola vez) se
+  // siguen aplicando a esa función a través de las comprobaciones de abajo.
+  ok('17.0 el owner de la lectura de snapshots sigue existiendo exactamente una vez',
+    (app.match(/^async function _aurixFetchBackendSnapshots\(/gm) || []).length === 1);
+  ok('17.0b …y no referencia el reader de category-history',
+    !/_aurixCatHist|_aurixCatExposure|_AURIX_CATHIST|aurixCategoryHistory|aurixCategoryExposure/.test(fnSrc('_aurixFetchBackendSnapshots')));
   const READER_SYMBOLS = /_aurixCatHist|_aurixCatExposure|_AURIX_CATHIST|aurixCategoryHistory|aurixCategoryExposure/;
   ok('17.1 no Chart / Performance / Preview / entitlement owner references the reader',
     untouched.every(n => !READER_SYMBOLS.test(fnSrc(n))),
