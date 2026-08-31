@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '656'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '657'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2906,6 +2906,7 @@ const _AURIX_24H_TRANSIENT_PENDING_CAUSES = [
   'no_current_value',                   // live valuation not yet available
   'insufficient_history',               // window not yet re-spanned
   'awaiting_canonical_history',         // canonical reconcile in flight
+  'awaiting_capital_flows',             // ledger económico remoto aún no demostrado completo
   'awaiting_canonical_reconcile',
   'flows_dominate_baseline',            // one-time onboarding/construction artifact
   'remote_performance_pending',         // reader-side pending echoed into a candidate
@@ -3846,6 +3847,13 @@ async function initPortfolioData(userId) {
   // watchlist into local memory/storage. Runs regardless of which source wins
   // for assets/holdings below; respects the reset epoch/tombstone internally.
   _mergeRemoteState(backendData);
+  // SPEC CIERRE PRE-FREEZE — reconciliar TAMBIÉN el ledger económico en el arranque, no sólo en el
+  // resync de primer plano. `_aurixCapitalFlowsIncomplete` arranca en TRUE (para una sesión
+  // autenticada el ledger remoto es DESCONOCIDO hasta el primer pull con éxito), así que sin esta
+  // llamada un arranque en frío dejaría la rentabilidad en «Calculando…» hasta que se disparara un
+  // visibilitychange/focus/pageshow. Fire-and-forget y fail-soft, igual que en el resync: si falla,
+  // el gate mantiene el estado de cálculo en vez de publicar una cifra que no puede probar.
+  try { _aurixCapitalFlowsPull(); } catch (_) {}
   // P0-SYNC-INTEGRITY — version/timestamp + count-aware merge (NEVER loses assets), replacing the
   // naive "remote wins if it has any assets" (which could let a smaller remote clobber a larger
   // local). remote>local ⇒ remote · local>remote ⇒ keep local · equal ⇒ newer-by-updatedAt.
@@ -10065,6 +10073,21 @@ function _aurixLedgerAssetRemoval(asset, ts) {
 // fire on price refresh / market movement / currency-rate updates. amountUSD is
 // signed: + capital entering the portfolio, − capital leaving.
 const _AURIX_CAPITAL_FLOWS_KEY = 'aurixCapitalFlows';
+// SPEC CIERRE PRE-FREEZE — la lectura del ledger sufría la MISMA clase de truncamiento silencioso que
+// se eliminó de `portfolio_snapshots`: `.select(...).eq('user_id', …)` sin `order`, sin `limit` y sin
+// paginación. PostgREST devuelve como mucho `max-rows` (1000) SIN señalarlo como error y, al no haber
+// `ORDER BY`, el subconjunto ni siquiera es determinista. En un ledger económico eso es P0:
+//   · un flujo que no llega deja la neutralización corta ⇒ una APORTACIÓN se publica como RENDIMIENTO;
+//   · `remoteIds` se construía desde ese `data` truncado, así que las filas remotas ausentes se
+//     clasificaban como «sólo locales» y se reenviaban con `upsert` — y como el push escribe
+//     `revision` sin guarda, una copia local DESFASADA podía sobrescribir una fila remota más nueva
+//     (incluido resucitar un `deleted_at`). Ese camino sólo se abría con la lectura truncada.
+const _AURIX_CAPITAL_FLOWS_PAGE = 1000;        // tope real del servidor (PostgREST max-rows)
+const _AURIX_CAPITAL_FLOWS_MAX_PAGES = 12;     // presupuesto explícito: 12 000 flujos
+// Arranca en TRUE: para una sesión autenticada el ledger remoto es DESCONOCIDO hasta el primer pull
+// con éxito, y desconocido no es completo (misma lección que la pierna canónica de v694). Las sesiones
+// anónimas no se ven afectadas: `_aurixSourceSetComplete` devuelve true cuando no hay usuario.
+let _aurixCapitalFlowsIncomplete = true;       // fail-closed: sin completitud demostrable no se publica rentabilidad
 
 function _aurixLoadCapitalFlows() {
   try {
@@ -10210,10 +10233,53 @@ async function _aurixCapitalFlowsPull() {
   try {
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
     if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return false;
-    const { data, error } = await supabaseClient
-      .from('capital_flows').select('flow_id, ts, kind, amount, currency, amount_usd, asset_id, revision, deleted_at')
-      .eq('user_id', currentUser.id);
-    if (error || !Array.isArray(data)) return false;
+    // Lectura PAGINADA con ORDEN TOTAL y completitud DEMOSTRABLE. El orden es (ts, flow_id) para que
+    // no dependa del plan del servidor: `ts` puede empatar entre dos flujos y `flow_id` desempata, así
+    // que la paginación por rango no puede saltarse ni repetir una fila en la frontera de página.
+    // Se compara lo reunido contra el `count` exacto y, si no cuadra, NO se fusiona ni se empuja nada.
+    const _PAGE = (typeof _AURIX_CAPITAL_FLOWS_PAGE === 'number') ? _AURIX_CAPITAL_FLOWS_PAGE : 1000;
+    const _MAXP = (typeof _AURIX_CAPITAL_FLOWS_MAX_PAGES === 'number') ? _AURIX_CAPITAL_FLOWS_MAX_PAGES : 12;
+    const data = [], _seenIds = new Set();
+    let _total = null, _complete = false, _fetched = 0, _cursorTs = null;
+    for (let _page = 0; _page < _MAXP; _page++) {
+      // CURSOR, NO OFFSET. La primera versión paginaba con `.range()`, y eso es inestable por
+      // definición: una inserción concurrente desplaza los offsets y hace que una fila se salte o se
+      // repita. Peor aún, el dedupe convertía el desplazamiento en duplicados que descontaban del cupo,
+      // de modo que `data.length >= _total` se cumplía antes de tiempo y el `count` ENMASCARABA la
+      // pérdida en vez de detectarla. El lector hermano de snapshots ya había rechazado el offset por
+      // esta misma razón. Aquí el cursor es INCLUSIVO (`lte`) porque dos flujos pueden compartir `ts`:
+      // con `lt` se perdería el resto del grupo empatado en la frontera de página. El solape que
+      // introduce el `lte` lo limpia el dedupe por `flow_id`, y el avance se mide por IDS NUEVOS.
+      let _q = supabaseClient.from('capital_flows')
+        .select('flow_id, ts, kind, amount, currency, amount_usd, asset_id, revision, deleted_at',
+                _page === 0 ? { count: 'exact' } : undefined)
+        .eq('user_id', currentUser.id);
+      if (_cursorTs != null) _q = _q.lte('ts', _cursorTs);
+      const { data: _rows, error, count: _count } = await _q
+        .order('ts', { ascending: false }).order('flow_id', { ascending: false }).limit(_PAGE);
+      if (error || !Array.isArray(_rows)) { _aurixCapitalFlowsIncomplete = true; return false; }   // reintentable
+      _fetched += _rows.length;
+      let _fresh = 0;
+      for (const _r of _rows) { const _id = String(_r.flow_id); if (_seenIds.has(_id)) continue; _seenIds.add(_id); data.push(_r); _fresh++; }
+      if (_page === 0) _total = Number.isFinite(_count) ? _count : null;                            // sólo la página 0 cuenta el total
+      if (_rows.length === 0) { _complete = true; break; }                                          // tabla agotada: prueba DIRECTA
+      // Sin IDS NUEVOS no hay avance posible: o se agotó la tabla, o un grupo de `ts` empatados es más
+      // grande que la página. Marcar esto como «completo» sin más sería FAIL-OPEN: si el servidor no
+      // devolvió `count`, la comprobación final `(_total != null && …)` se salta y se daría por buena
+      // una lectura que perdió filas. Aquí sólo el `count` puede probar la completitud; si no está,
+      // se sale SIN marcarla y la comprobación de abajo falla cerrado.
+      if (_fresh === 0) { _complete = (_total != null && data.length >= _total); break; }
+      _cursorTs = _rows[_rows.length - 1].ts;
+    }
+    // FAIL-CLOSED. Sin completitud demostrable no se toca el ledger local ni se empuja nada: fusionar
+    // un subconjunto arbitrario dejaría la neutralización corta, y empujar `onlyLocal` calculado sobre
+    // él podría sobrescribir filas remotas más nuevas. Se marca y se reintenta en la siguiente pasada.
+    if (!_complete || (_total != null && data.length < _total)) {
+      _aurixCapitalFlowsIncomplete = true;
+      try { console.warn('[capital-flows][pull] completitud NO demostrable: ' + data.length + '/' + _total + ' — no se fusiona ni se empuja'); } catch (_) {}
+      return false;
+    }
+    _aurixCapitalFlowsIncomplete = false;
     const local = _aurixLoadCapitalFlowsRaw();
     const byId  = new Map(local.map(f => [String(f.id), f]));
     let changed = 0;
@@ -10238,8 +10304,9 @@ async function _aurixCapitalFlowsPull() {
     const onlyLocal = local.filter(f => !remoteIds.has(String(f.id)));
     if (onlyLocal.length) { try { await _aurixCapitalFlowsPush(onlyLocal); } catch (_) {} }
     return true;
-  } catch (_) { return false; }
+  } catch (_) { _aurixCapitalFlowsIncomplete = true; return false; }
 }
+try { if (typeof window !== 'undefined') window._aurixCapitalFlowsComplete = function () { return !_aurixCapitalFlowsIncomplete; }; } catch (_) {}
 // Backfill idempotente del ledger histórico que hoy vive en localStorage. El id
 // legacy es DETERMINISTA (kind:asset:ts:importe), así que dos dispositivos que
 // vivieron la misma operación producen la misma fila y el upsert las colapsa:
@@ -27358,7 +27425,20 @@ function getValidReturnBaseline(range, opts) {
   // displayed history is the CONFIRMED remote canonical with no divergent local-only state (else web/mobile
   // diverge). Any block ⇒ "Calculando…", neutral line, no red/green. Anonymous = local canonical (allowed).
   const _disp = (typeof canDisplayCanonicalReturn === 'function') ? canDisplayCanonicalReturn(r) : { ok: true, reason: 'helper_absent' };
-  if (!_disp.ok) invalidReason = 'awaiting_canonical_history';
+  // ── SPEC CIERRE PRE-FREEZE — UN LEDGER INCOMPLETO NO PUEDE PUBLICAR RENTABILIDAD ────────────
+  // La pierna `sourcesComplete` del gate de publicación cubre el CONTRATO DEL GRÁFICO, pero no esta
+  // función — y es esta la que alimenta `computePerformanceSnapshot` (la superficie V2 del dashboard)
+  // y `_aurixComputePerformanceStateCandidate` → `_aurixFlushPerformanceState`, que ESCRIBE el
+  // `performance_state` remoto que leen TODOS los dispositivos. Sin esta guarda, el escenario es
+  // concreto: dispositivo nuevo con el ledger local vacío y un depósito remoto que el pull no llegó a
+  // traer ⇒ la neutralización no lo ve, el flujo tampoco queda `unmatched` (un flujo AUSENTE no puede
+  // quedar sin emparejar), el sanity check pasa porque lo mostrado coincide con la fórmula, y la
+  // APORTACIÓN se publica como RENDIMIENTO y además se propaga al resto de dispositivos.
+  // Se coloca ANTES del resto de causas porque es la más fundamental: sin ledger no hay cálculo que
+  // certificar. Es transitoria y se limpia en el primer pull con éxito.
+  const _flowsOk = (typeof _aurixSourceSetComplete === 'function') ? _aurixSourceSetComplete() : true;
+  if (!_flowsOk) invalidReason = 'awaiting_capital_flows';
+  else if (!_disp.ok) invalidReason = 'awaiting_canonical_history';
   else if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct) || !(baselineValue > 0)) invalidReason = 'no_valid_baseline';
   else if (!(Number.isFinite(currentValue) && currentValue > 0)) invalidReason = 'no_current_value';
   else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
@@ -27648,7 +27728,8 @@ function _aurixChartPublicationSourcesPending() {
     // gates comparten una sola definición y su toggle. Nada de umbrales, clasificador, merge,
     // geometría ni valores financieros. Un hueco real sigue siendo un hueco después de `ready`.
     if (beOn && typeof _aurixResolvePublicationReadiness === 'function') {
-      const rd = _aurixResolvePublicationReadiness({ backendEnabled: true, hydrationState: beSt });
+      const rd = _aurixResolvePublicationReadiness({ backendEnabled: true, hydrationState: beSt,
+        sourcesComplete: (typeof _aurixSourceSetComplete === 'function') ? _aurixSourceSetComplete() : undefined });
       if (!rd.publishable) { out.pending = true; out.reason = rd.blocker || 'backend_snapshots_hydrating'; return out; }
     } else if (beOn && (beSt === 'idle' || beSt === 'loading')) {
       out.pending = true; out.reason = 'backend_snapshots_hydrating'; return out;   // fallback si el resolver falta
@@ -29578,7 +29659,31 @@ try { if (typeof window !== 'undefined') window._aurixBuildContinuityValidatedSe
 const _AURIX_PUBLICATION_STATE = Object.freeze({
   READY: 'READY', VALUATION_INCOMPLETE: 'VALUATION_INCOMPLETE', HYDRATING_HISTORY: 'HYDRATING_HISTORY',
   RECONCILING_HISTORY: 'RECONCILING_HISTORY', STALE_HISTORY: 'STALE_HISTORY',
+  INCOMPLETE_SOURCE_SET: 'INCOMPLETE_SOURCE_SET',
 });
+// SPEC CIERRE PRE-FREEZE — ¿está COMPLETO el conjunto de fuentes que alimenta la publicación?
+// Una lectura paginada que no puede demostrar completitud deja marcada su bandera; aquí se reúnen
+// en un solo predicado para que exista UNA política y no una por fuente. Por defecto TRUE (ausencia
+// de bandera = nada que objetar), igual que el resto de piernas de este resolver.
+function _aurixSourceSetComplete() {
+  try {
+    // Sesión anónima: no hay ledger remoto que esperar, el local ES la verdad.
+    if (!(typeof currentUser !== 'undefined' && currentUser && currentUser.id)) return true;
+    if ((typeof _aurixCapitalFlowsIncomplete !== 'undefined') && _aurixCapitalFlowsIncomplete === true) return false;
+    return true;
+    // NO se incluye `_aurixBackendSnapshotsTruncated` A PROPÓSITO, y conviene dejar dicho por qué:
+    // un truncado de snapshots pierde SÓLO la cola ANTIGUA (la ventana reciente está completa por
+    // construcción, la lectura es descendente), así que 24H/7D/30D siguen siendo correctos y el estado
+    // resultante es indistinguible de una cuenta cuya historia simplemente empieza más tarde — algo que
+    // Aurix ya representa con honestidad vía PARTIAL_HISTORY. Bloquear TODO el retorno por eso sería
+    // desproporcionado y, peor, IRREVERSIBLE: con lookback de 400 días la bandera nunca volvería a
+    // bajar, dejando la rentabilidad en «Calculando…» para siempre. El truncado se queda AUDITABLE
+    // (`_aurixBackendSnapshotsTruncated`, warn, `coverage.truncated`, `source_row_cap_reached`) y no
+    // bloqueante. La retención del cron (35 d completos + 1 fila/día, verificada activa en producción)
+    // acota el volumen en ~3 725 filas por usuario, muy por debajo del presupuesto de 12 000.
+  } catch (_) { return true; }
+}
+try { if (typeof window !== 'undefined') window._aurixSourceSetComplete = _aurixSourceSetComplete; } catch (_) {}
 // Staging-tunable: block a confirmed number while backend hydration is FAILED (spec default), vs. fall back
 // to a labelled local-only number. TRUE = integrity-first (spec). Flip to false only if staging shows a
 // dead-backend must not permanently withhold the badge for otherwise-healthy local histories.
@@ -29600,6 +29705,14 @@ function _aurixResolvePublicationReadiness(ctx) {
     const blockOnFailed = (typeof _AURIX_LB2_BLOCK_ON_HYDRATION_FAILED !== 'undefined') ? _AURIX_LB2_BLOCK_ON_HYDRATION_FAILED : true;
     if (hs === 'failed' && blockOnFailed) { out.state = _AURIX_PUBLICATION_STATE.STALE_HISTORY; out.publishable = false; out.blocker = 'backend_hydration_failed'; return out; }
   }
+  // SPEC CIERRE PRE-FREEZE — CONJUNTO DE FUENTES INCOMPLETO ⇒ NO SE PUBLICA.
+  // Dos lecturas paginadas pueden quedarse cortas sin que el servidor lo señale como error: los
+  // snapshots (si se agota el presupuesto de páginas, falta la cola ANTIGUA ⇒ el baseline de ALL/1A
+  // no sería el inicio real del historial) y el ledger de `capital_flows` (si falta un flujo, la
+  // neutralización se queda corta y una APORTACIÓN se publicaría como RENDIMIENTO). Las dos son la
+  // misma clase de defecto que este bloque acaba de eliminar, así que comparten política: mientras
+  // no se pueda demostrar completitud, no se publica un número que un merge posterior desmentiría.
+  if (ctx.sourcesComplete === false) { out.state = _AURIX_PUBLICATION_STATE.INCOMPLETE_SOURCE_SET; out.publishable = false; out.blocker = 'incomplete_source_set'; return out; }
   // a known-inconsistent merge generation (a late hydrate not yet repainted) ⇒ reconciling.
   if (ctx.generationConsistent === false) { out.state = _AURIX_PUBLICATION_STATE.RECONCILING_HISTORY; out.publishable = false; out.blocker = 'merge_generation_inconsistent'; return out; }
   return out;
@@ -29615,6 +29728,7 @@ function _aurixReturnPublishReadyNow() {
     return _aurixResolvePublicationReadiness({
       backendEnabled: (typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined') ? _AURIX_BACKEND_SNAPSHOTS_ENABLED : false,
       hydrationState: (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready',
+      sourcesComplete: (typeof _aurixSourceSetComplete === 'function') ? _aurixSourceSetComplete() : undefined,
     }).publishable;
   } catch (_) { return true; }
 }
@@ -29665,6 +29779,8 @@ function _aurixResolveChartReturnContract(validatedSeries, range, context) {
         hydrationState: (context.hydrationState != null) ? context.hydrationState
           : ((typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready'),
         generationConsistent: (context.generationConsistent != null) ? context.generationConsistent : undefined,
+        sourcesComplete: (context.sourcesComplete != null) ? context.sourcesComplete
+          : ((typeof _aurixSourceSetComplete === 'function') ? _aurixSourceSetComplete() : undefined),
       })
     : { publishable: true, state: 'READY', blocker: null };
   out.publicationState = _pubReady.state; out.publicationBlocker = _pubReady.blocker;

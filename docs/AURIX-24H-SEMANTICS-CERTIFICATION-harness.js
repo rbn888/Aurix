@@ -250,7 +250,7 @@ console.log('\n10 — Cash Ledger v668 y capital_flows están en el camino real:
      /_aurixLoadCapitalFlows\(\)/.test(fnSource('_aurixFlowNeutralize')));
   ok('10.2 ese ledger excluye tombstones', /!f\.deletedAt/.test(fnSource('_aurixLoadCapitalFlows')));
   ok('10.3 y se alimenta del ledger REMOTO (capital_flows), no sólo del dispositivo',
-     /from\('capital_flows'\)\.select\(/.test(app) && /function _aurixCapitalFlowsPull/.test(app));
+     /from\('capital_flows'\)\s*\n?\s*\.select\(/.test(app) && /function _aurixCapitalFlowsPull/.test(app));   // la lectura es ahora PAGINADA: `.select(` puede ir en otra línea
   ok('10.4 toda operación de liquidez pasa por el owner económico único',
      (app.match(/aurixCashOperation\('deposit'/g) || []).length >= 2
      && (app.match(/aurixCashOperation\('withdrawal'/g) || []).length >= 1);

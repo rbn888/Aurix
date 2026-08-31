@@ -258,7 +258,7 @@ console.log('\n5 — Una sola verdad económica (K, L, M, N):');
      && !/for delete/i.test(sql));
   ok('5.5 M · el cliente empuja y lee el ledger (upsert idempotente)',
      /from\('capital_flows'\)\.upsert\(rows, \{ onConflict: 'user_id,flow_id' \}\)/.test(app)
-     && /from\('capital_flows'\)\.select\(/.test(app));
+     && /from\('capital_flows'\)\s*\n?\s*\.select\(/.test(app));
   ok('5.6 M · el reader remoto resuelve por REVISIÓN, no por reloj',
      /remote\.revision\) \|\| 1\) > \(Number\(cur\.revision\)/.test(app));
   ok('5.7 M · backfill idempotente del ledger local existente',
@@ -371,6 +371,149 @@ console.log('\n6 — No regresión (O):');
      })(), 'restar un offset sin escalón que lo respalde fabrica una pérdida');
 }
 
-console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
-if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }
-process.exit(fail ? 1 : 0);
+// ── 6 · SPEC CIERRE PRE-FREEZE — LECTURA DEL LEDGER: COMPLETITUD DEMOSTRABLE ─────────────────────
+// `_aurixCapitalFlowsPull` hacía `.select(...).eq('user_id', …)` sin `order`, sin `limit` y sin
+// paginación. PostgREST devuelve como mucho `max-rows` (1000) SIN señalarlo como error y, sin
+// `ORDER BY`, ni siquiera de forma determinista. En un ledger económico eso es P0: un flujo que no
+// llega deja la neutralización corta y una APORTACIÓN se publica como RENDIMIENTO; y `onlyLocal`,
+// calculado sobre el subconjunto truncado, reenviaba con `upsert` copias locales que pueden ser
+// más ANTIGUAS que la fila remota (el push escribe `revision` sin guarda).
+// Se EJECUTA el owner real contra un servidor simulado; los asserts estáticos no distinguirían una
+// paginación correcta de la ausencia de paginación.
+console.log('\n6 · lectura paginada del ledger (completitud demostrable):');
+{
+  const vm = require('vm');
+  // SERVIDOR SIMULADO CON ESTADO: mantiene una tabla ordenada (ts desc, flow_id desc) y sirve por
+  // CURSOR INCLUSIVO, como PostgREST. Un servidor estático no podría ver una inserción concurrente,
+  // que es justo el escenario en el que la paginación por offset perdía filas.
+  function server(rows, cap) {
+    const st = { rows: rows.slice(), cap: cap, hits: 0, onPage: null };
+    st.sort = () => st.rows.sort((a, b) => (Date.parse(b.ts) - Date.parse(a.ts)) || (a.flow_id < b.flow_id ? 1 : -1));
+    st.sort();
+    st.serve = (cursorTs) => {
+      st.hits++;
+      if (st.onPage) { st.onPage(st, st.hits); st.sort(); }
+      const total = st.rows.length;
+      const pool = cursorTs == null ? st.rows : st.rows.filter(r => Date.parse(r.ts) <= Date.parse(cursorTs));
+      return { data: pool.slice(0, st.cap), error: null, count: total };
+    };
+    return st;
+  }
+  const mk = (srv, local) => {
+    const env = { pushed: null, saved: null, cursors: [] };
+    const ctx = {
+      console: { log() {}, warn() {} }, Math, JSON, Object, Number, String, Boolean, Array, Set, Map, Date, Promise, isFinite,
+      currentUser: { id: 'u1' },
+      supabaseClient: { from: () => { const q = {};
+        ['from','select','eq','order','limit'].forEach(m => q[m] = () => q);
+        q.lte = (col, v) => { env.cursors.push(v); q._cur = v; return q; };
+        q.then = (res, rej) => Promise.resolve().then(() => srv.serve(q._cur == null ? null : q._cur)).then(res, rej);
+        return q; } },
+      _aurixLoadCapitalFlowsRaw: () => (local || []).map(f => Object.assign({}, f)),
+      _aurixSaveCapitalFlows: (l) => { env.saved = l; },
+      _aurixCapitalFlowsPush: async (l) => { env.pushed = l; return true; },
+      _aurixCapitalFlowsIncomplete: true,
+    };
+    vm.createContext(ctx);
+    ['_AURIX_CAPITAL_FLOWS_PAGE','_AURIX_CAPITAL_FLOWS_MAX_PAGES'].forEach(c => {
+      const m = app.match(new RegExp('^const ' + c + '\\s*=.*?;', 'm')); if (m) vm.runInContext(m[0], ctx); });
+    // `fnSource` localiza `function <n>(` y pierde el `async` de la declaración: se repone.
+    vm.runInContext('async ' + fnSource('_aurixCapitalFlowsPull'), ctx);
+    return { ctx, env, srv, run: () => vm.runInContext('_aurixCapitalFlowsPull()', ctx) };
+  };
+  const flow = (i, tsMs) => ({ flow_id: 'f' + String(i).padStart(6, '0'), ts: new Date(tsMs).toISOString(),
+    kind: 'deposit', amount: 10, currency: 'USD', amount_usd: 10, asset_id: null, revision: 1, deleted_at: null });
+  const T = 1.8e12;
+  const many = (n, step) => Array.from({ length: n }, (_, i) => flow(i, T - i * (step || 60000)));
+
+  (async () => {
+    // (a) 2 500 flujos: la versión sin paginar se quedaba en 1 000 sin avisar
+    const a = mk(server(many(2500), 1000));
+    const okA = await a.run();
+    ok('6.1 >1000 flujos: se paginan TODOS (la versión sin paginar perdía 1 500 en silencio)',
+      okA === true && a.ctx._aurixCapitalFlowsIncomplete === false && a.env.saved && a.env.saved.length === 2500,
+      'peticiones=' + a.srv.hits + ' guardados=' + (a.env.saved ? a.env.saved.length : 0));
+    ok('6.2 sin duplicados por flow_id pese al cursor INCLUSIVO',
+      a.env.saved && new Set(a.env.saved.map(f => f.id)).size === a.env.saved.length);
+
+    // (b) tope de servidor MENOR que la página pedida ⇒ sigue paginando
+    const b = mk(server(many(1300), 400));
+    const okB = await b.run();
+    ok('6.3 tope de servidor menor que la página ⇒ no corta: sigue paginando',
+      okB === true && b.env.saved.length === 1300, 'peticiones=' + b.srv.hits + ' n=' + (b.env.saved && b.env.saved.length));
+
+    // (c) INSERCIÓN CONCURRENTE durante la paginación — el caso que rompía el offset
+    const cS = server(many(2500), 1000);
+    cS.onPage = (st, hit) => { if (hit === 1) st.rows.push(flow(99001, T + 60000)); };   // llega un flujo NUEVO
+    const c = mk(cS);
+    const okC = await c.run();
+    const ids = new Set((c.env.saved || []).map(f => f.id));
+    const perdidos = many(2500).filter(f => !ids.has(f.flow_id));
+    ok('6.4 inserción concurrente durante la paginación: CERO flujos perdidos',
+      okC === true && perdidos.length === 0, 'perdidos=' + perdidos.length + ' guardados=' + (c.env.saved && c.env.saved.length));
+
+    // (d) BACKFILL por debajo del cursor: la fila antigua entra, nada se pierde
+    const dS = server(many(1500), 1000);
+    dS.onPage = (st, hit) => { if (hit === 1) st.rows.push(flow(99002, T - 5000 * 60000)); };
+    const d = mk(dS);
+    const okD = await d.run();
+    ok('6.5 backfill histórico por debajo del cursor: se recoge y no falsea la completitud',
+      okD === true && (d.env.saved || []).some(f => f.id === 'f099002'), 'n=' + (d.env.saved && d.env.saved.length));
+
+    // (e) grupo de `ts` empatados mayor que la página ⇒ no progresa ⇒ FAIL-CLOSED, nunca bucle
+    const e = mk(server(Array.from({ length: 2500 }, (_, i) => flow(i, T)), 1000));
+    const okE = await e.run();
+    ok('6.6 empate de ts mayor que la página ⇒ fail-closed, sin bucle infinito',
+      okE === false && e.env.saved === null && e.ctx._aurixCapitalFlowsIncomplete === true, 'peticiones=' + e.srv.hits);
+
+    // (e2) SIN `count` y sin avance ⇒ no hay nada que pruebe la completitud ⇒ FAIL-CLOSED.
+    // Antes esto era fail-OPEN: «sin ids nuevos» se tomaba como prueba, y sin `_total` la
+    // comprobación final se saltaba, fusionando una lectura incompleta y declarándola completa.
+    const e2S = server(Array.from({ length: 1250 }, (_, i) => flow(i, i < 1200 ? T : T - (i + 1) * 60000)), 1000);
+    e2S.serve = ((orig) => (cur) => { const r = orig(cur); delete r.count; return r; })(e2S.serve);
+    const e2 = mk(e2S);
+    const okE2 = await e2.run();
+    ok('6.6b sin `count` del servidor y sin avance ⇒ fail-closed (antes era fail-OPEN)',
+      okE2 === false && e2.env.saved === null && e2.ctx._aurixCapitalFlowsIncomplete === true, 'ret=' + okE2);
+
+    // (f) error de una página ⇒ reintentable y sin efectos
+    const fS = server(many(3000), 1000);
+    fS.serve = ((orig) => (cur) => (fS.hits++ , fS.hits === 1 ? orig(cur) : { data: null, error: { message: 'boom' } }))(
+      (cur) => ({ data: many(3000).slice(0, 1000), error: null, count: 3000 }));
+    const f = mk(fS);
+    const okF = await f.run();
+    ok('6.7 error en una página ⇒ reintentable y sin tocar el ledger',
+      okF === false && f.env.saved === null && f.env.pushed === null && f.ctx._aurixCapitalFlowsIncomplete === true);
+
+    // (g) presupuesto agotado ⇒ fail-closed
+    const g = mk(server(many(20000), 1000));
+    const okG = await g.run();
+    ok('6.8 presupuesto agotado ⇒ fail-closed, jamás un subconjunto arbitrario',
+      okG === false && g.env.saved === null && g.ctx._aurixCapitalFlowsIncomplete === true, 'peticiones=' + g.srv.hits);
+
+    // contratos de código
+    ok('6.9 CURSOR inclusivo, no offset (el offset se salta filas con inserciones concurrentes)',
+      /_q\.lte\('ts', _cursorTs\)/.test(app) && !/\.range\(_from/.test(app));
+    ok('6.10 orden total determinista (ts + flow_id), no el plan del servidor',
+      /\.order\('ts', \{ ascending: false \}\)\.order\('flow_id', \{ ascending: false \}\)/.test(app));
+    // El alcance real, dicho con precisión: la guarda impide que se CALCULE un retorno nuevo sobre un
+    // ledger sin demostrar, y `getValidReturnBaseline` es el choke point único de la ruta que escribe
+    // `performance_state`. Lo que NO cubre —y queda declarado como residual PREEXISTENTE— es el guard
+    // monótono de 24H (`_aurix24hMonotonicPublication`): al ser `awaiting_capital_flows` una causa
+    // TRANSITORIA, puede REPONER un 24H `ready` anterior, y no tiene cota de antigüedad. Es una mejora
+    // estricta sobre el comportamiento actual (hoy se publicaría un número NUEVO con la aportación
+    // dentro, es decir fabricado; con la guarda se conserva uno caducado), pero no es cobertura total.
+    ok('6.11 un ledger incompleto impide CALCULAR retorno nuevo en la ruta que ESCRIBE performance_state',
+      /invalidReason = 'awaiting_capital_flows'/.test(app) && /ctx\.sourcesComplete === false/.test(app));
+    ok('6.11b RESIDUAL DECLARADO: la causa es transitoria, así que el guard monótono de 24H puede reponer un ready anterior',
+      /'awaiting_capital_flows',/.test(app) && /_AURIX_24H_TRANSIENT_PENDING_CAUSES/.test(app),
+      'preexistente: otras 11 causas ya lo permiten; sin cota temporal en la preservación');
+    ok('6.12 la bandera arranca en DESCONOCIDO para una sesión autenticada',
+      /let _aurixCapitalFlowsIncomplete = true;/.test(app));
+
+    console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
+    if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }
+    process.exit(fail ? 1 : 0);
+  })();
+}
+

@@ -189,9 +189,14 @@ console.log('\n5 · `failed` terminal: NO hay fallback silencioso a frontend-onl
     r.publishable === false && r.blocker === c.reason);
   ok('5.4 el estado declarado es de historia no certificable',
     r.state === 'STALE_HISTORY' || String(r.state).indexOf('STALE') !== -1, String(r.state));
+  // La intención de este assert es que el gate DELEGUE la política en el resolver en vez de duplicarla,
+  // no que el literal del contexto sea inmutable. El cierre pre-freeze añadió al MISMO resolver la
+  // pierna `sourcesComplete` (conjunto de fuentes incompleto ⇒ no se publica), que es justamente
+  // delegar una vez más: sigue habiendo un solo owner de la política y un solo toggle por pierna.
   ok('5.5 la política tiene UN solo toggle, no dos (se delega, no se duplica)',
-    /_aurixResolvePublicationReadiness\(\{ backendEnabled: true, hydrationState: beSt \}\)/.test(app)
-    && (app.match(/_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED/g) || []).length >= 1);
+    /_aurixResolvePublicationReadiness\(\{\s*backendEnabled: true, hydrationState: beSt[,\s]/.test(app)
+    && (app.match(/_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED/g) || []).length >= 1
+    && (app.match(/function _aurixResolvePublicationReadiness\(/g) || []).length === 1);
 }
 
 // ── 6 · una cuenta SIN hueco no cambia ──────────────────────────────────
