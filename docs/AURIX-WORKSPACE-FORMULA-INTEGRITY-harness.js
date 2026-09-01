@@ -374,6 +374,26 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
 // guarda trabajo del usuario, porque `aurix_ws_*_v1` no viaja en el sync y
 // publicar lo demás prometería una permanencia que la arquitectura no da.
 (function workspaceLaunchScope() {
+// ── RE-DECIDIDO por SPEC MONETIZATION M.02 B3/B4 ─────────────────────────────
+// M.01B declaraba la frontera comercial como PRESENTACIÓN y lo congelaba así.
+// B3/B4 la convierte en un gate REAL, y además sustituye los catálogos escritos a
+// mano por `_WS_CATALOG`, la fuente única con estado comercial. Varias aserciones
+// de abajo se apoyaban en los literales de esos arrays; al hacerse el catálogo
+// declarativo, esos literales desaparecen y las aserciones de AUSENCIA pasarían por
+// vacuidad. Así que se repuntan al catálogo, que es donde vive la verdad.
+// Perezoso: este scope se evalúa antes de que `app` esté inicializado.
+let _CATALOG_CACHE = null;
+function catalog() {
+  if (_CATALOG_CACHE) return _CATALOG_CACHE;
+  const i = app.indexOf('const _WS_CATALOG = Object.freeze([');
+  const j = app.indexOf(']);', i);
+  const body = i < 0 ? '' : app.slice(i, j);
+  _CATALOG_CACHE = [...body.matchAll(/\{\s*id:\s*'([\w.]+)'\s*,\s*kind:\s*'(\w+)'\s*,\s*published:\s*(true|false)\s*,\s*featureKey:\s*(null|'[\w.]+')\s*,\s*commercialTier:\s*'(\w+)'/g)]
+    .map(m => ({ id: m[1], kind: m[2], published: m[3] === 'true',
+                 featureKey: m[4] === 'null' ? null : m[4].replace(/'/g, ''), tier: m[5] }));
+  return _CATALOG_CACHE;
+}
+
   const fs = require('fs'), path = require('path');
   const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   const fn = (n) => { const i = app.indexOf('function ' + n + '('); if (i < 0) return '';
@@ -418,20 +438,43 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
      /getCurrencySymbol\(baseCurrency\)/.test(fn('_wsToolCcy')));
 
   // ── Catálogo público ─────────────────────────────────────────────────────
-  const HIDDEN = ['journal', 'realestate', 'receivables', 'assets', 'budget'];
-  OK('L10 ninguna herramienta oculta tiene punto de entrada en el cat\u00e1logo',
-     HIDDEN.every(k => !app.includes('data-wstool="' + k + '"')),
-     HIDDEN.filter(k => app.includes('data-wstool="' + k + '"')).join(','));
-  OK('L11 ni scenario / goals / planning / workspace-templates',
-     ['scenario', 'goals', 'planning', 'workspace'].every(c => !app.includes('data-wsh-cta="' + c + '"')));
-  OK('L12 s\u00ed est\u00e1n las DOS autorizadas',
-     app.includes('data-wstool="compound"') && app.includes('data-wstool="loan"'));
+  // ── RE-DECIDIDO por M.02 B3/B4, y por una raz\u00f3n incómoda: estas dos aserciones
+  // hab\u00edan pasado a ser VACUAS. Compraban su garant\u00eda buscando literales
+  // (`data-wstool="budget"`, `data-wsh-cta="scenario"`) en app.js, y al volverse
+  // declarativo el cat\u00e1logo esos atributos se emiten interpolados
+  // (`data-wstool="${esc(r.tool)}"`), as\u00ed que los literales desaparecieron y las
+  // comprobaciones de AUSENCIA pasaban sin comprobar nada. Lo detect\u00f3 la revisi\u00f3n
+  // de seguridad. Se repuntan a la PROPIEDAD, sobre el cat\u00e1logo, que es donde
+  // ahora vive la decisi\u00f3n de publicaci\u00f3n.
+  const HIDDEN_IDS = ['trade_journal', 'real_estate_portfolio', 'receivables', 'asset_prices',
+                      'monthly_budget', 'scenario', 'goal', 'financial_calc', 'investment_analyzer'];
+  OK('L10 ninguna herramienta oculta est\u00e1 publicada en el cat\u00e1logo',
+     HIDDEN_IDS.every(id => { const e = catalog().find(x => x.id === id); return e && e.published === false; }),
+     HIDDEN_IDS.filter(id => { const e = catalog().find(x => x.id === id); return !e || e.published !== false; }).join(','));
+  OK('L11 ni una sola plantilla publicada, y el filtro de visibilidad es \u00daNICO',
+     catalog().filter(e => e.kind === 'template').every(e => e.published === false) &&
+     /return _WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\);/.test(app));
+  OK('L11b lo NO publicado s\u00f3lo es visible con cat\u00e1logo interno, y eso lo decide el servidor',
+     /if \(entry\.published === true\) return true;/.test(fn('_wsCatalogVisible')) &&
+     /return _aurixEntIsCatalogPreview\(\) === true;/.test(fn('_wsCatalogVisible')));
+  OK('L11c y el owner de apertura bloquea lo no publicado (proyecto guardado incluido)',
+     /if \(entry && !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fn('_wsToolAccess')) &&
+     /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')));
+  OK('L12 s\u00ed est\u00e1n las DOS autorizadas, y ahora en el CAT\u00c1LOGO (no en un literal)',
+     catalog().filter(e => e.published).map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation');
   // L13 SUPERADO por MONETIZATION-V1 · M.01B: Plantillas vuelve como secci\u00f3n
   // estructural (bloque M m\u00e1s abajo). La regla que L13 proteg\u00eda \u2014no dejar una
   // secci\u00f3n vac\u00eda\u2014 sigue viva: ahora se cumple pintando su estado honesto en
   // lugar de una rejilla de cero tarjetas (M3\u2013M5).
-  OK('L14 sin "coming soon" ni cards deshabilitadas en Herramientas',
-     !/soon: true/.test(app));
+  // L14 tambi\u00e9n era vacua: el c\u00f3digo ya no escribe `soon: true` sino
+  // `soon: !openAttr`. La regla que proteg\u00eda \u2014que nada PUBLICADO parezca
+  // deshabilitado\u2014 se comprueba ahora sobre el cat\u00e1logo: toda entrada publicada
+  // tiene ruta de apertura, luego `soon` es false para todas ellas.
+  OK('L14 nada PUBLICADO parece deshabilitado: todo lo publicado tiene ruta de apertura',
+     (() => { const pub = catalog().filter(e => e.published);
+       const home = fn('_renderWorkspaceHome');
+       return pub.length === 2 && pub.every(e => new RegExp(e.id + ":\\s*\\{[^}]*tool: '").test(home))
+              && /soon: !openAttr/.test(home); })());
   OK('L15 Mi Espacio no puede resucitar una oculta por uso previo',
      /const TPL_CAT = \[\];/.test(app) &&
      !/\{ ref: 'tpl:scenario'[\s\S]{0,40}viz: 'compare'/.test(app));
@@ -494,8 +537,10 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
      (app.match(/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/g) || []).length >= 1 &&
      (app.match(/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/g) || []).length >= 1);
   const home = fn('_renderWorkspaceHome');
-  OK('M4 NO se publica ninguna plantilla en este bloque: el cat\u00e1logo sigue vac\u00edo',
-     /const gallery = \[\];/.test(home) && /const TPL_CAT = \[\];/.test(home));
+  OK('M4 NO se publica ninguna plantilla: cero entradas template con published=true',
+     catalog().filter(e => e.kind === 'template').length >= 12 &&
+     catalog().filter(e => e.kind === 'template').every(e => e.published === false) &&
+     /const TPL_CAT = _wsCatalogFor\('tool'\)|const TPL_CAT = \[\];/.test(home));
   OK('M5 con cat\u00e1logo vac\u00edo NO se pinta una rejilla de cero tarjetas',
      /const body = gallery\.length[\s\S]{0,200}wsh-tpl-grid wsh-gallery[\s\S]{0,80}: `<div class="wsh-tplarch">/.test(home));
   OK('M6 el estado de Plantillas no finge contenido: sin card, sin viz, sin "pr\u00f3ximamente", sin banner de upgrade',
@@ -512,21 +557,35 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
   OK('M8 compound se declara FREE y loan PREMIUM en el registro de identidad',
      !!reg && /compound_growth:[^\n]*premiumTier: 'free'/.test(reg[0]) &&
      /loan_simulation:[^\n]*premiumTier: 'premium'/.test(reg[0]));
-  OK('M9 el chip lee ESE campo y no una segunda tabla de planes',
-     /_wsAppIdentity\(id\)\.premiumTier/.test(fn('_wsToolTier')) &&
-     /_wsToolTier\(id\)/.test(fn('_wsTierChip')));
-  OK('M10 un tier no decidido NO pinta chip (no se afirma un plan inexistente)',
-     (() => { const t = fn('_wsToolTier');
-       return /=== 'free' \|\| v === 'premium'/.test(t) && /: ''/.test(t); })());
-  OK('M11 PRESENTACI\u00d3N, no seguridad: la ruta de apertura de loan no gatea nada',
-     !/hasFeature\(/.test(fn('_wsOpenTool')) && !/hasFeature\(/.test(home) &&
-     /data-wstool="loan"/.test(home));
+  OK('M9 el chip lee el CATÁLOGO único, y `premiumTier` ya no decide nada',
+     /_wsCommercialTierClass\(_wsCatalogEntry\(id\)\)/.test(fn('_wsToolTier')) &&
+     /_wsCatalogEntry\(id\)/.test(fn('_wsTierChip')) &&
+     !/premiumTier/.test(fn('_wsToolTier')) && !/premiumTier/.test(fn('_wsTierChip')));
+  OK('M10 un tier no decidido NUNCA afirma un plan: se etiqueta Preview, no Premium/Incluido',
+     (() => { const l = fn('_wsCommercialLabel'), c = fn('_wsCommercialTierClass');
+       // published!==true o tier undecided ⇒ 'preview' ANTES de mirar el tier, y
+       // 'premium' exige featureKey (si no, la etiqueta sería decorativa).
+       return /published !== true \|\| entry\.commercialTier === 'undecided'/.test(l) &&
+              /wstier_preview/.test(l) &&
+              /commercialTier === 'premium' && entry\.featureKey/.test(l) &&
+              /published !== true \|\| entry\.commercialTier === 'undecided'/.test(c); })());
+  // M11 INVERTIDO por M.02 B3/B4. M.01B declaraba "la ruta de apertura de loan NO
+  // gatea nada" porque no exist\u00eda entitlement real; ahora existe y gatea. La regla
+  // que M.01B proteg\u00eda \u2014no fabricar gating sin autoridad\u2014 sigue viva: el gate no
+  // inventa nada, pregunta al resolver server-side.
+  OK('M11 la apertura de loan S\u00cd gatea, contra el entitlement real (no un flag local)',
+     /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')) &&
+     /if \(featureKey && !hasFeature\(featureKey\)\) return \{ ok: false, reason: 'entitlement'/.test(fn('_wsToolAccess')) &&
+     /openUpgradeIntent\(/.test(fn('_wsOpenTool')));
+  OK('M11b el gate vive en el OWNER de apertura, no duplicado en cada tarjeta',
+     !/hasFeature\(/.test(home));
   OK('M12 no se ha fabricado gating comercial: el master switch sigue apagado',
      /const ENFORCE_ENTITLEMENTS = false;/.test(app));
-  OK('M13 loan NO parece deshabilitada: sigue en el cat\u00e1logo, abre y no se marca soon/lock',
-     (() => { const m = /const tools = \[([\s\S]*?)\];/.exec(home); if (!m) return false;
-       const loan = m[1].split('\n').find(l => l.includes('loan_simulation'));
-       return !!loan && /data-wsh-cta="tool"/.test(loan) && /soon: false/.test(loan) && !/lock/i.test(loan); })());
+  OK('M13 loan NO parece deshabilitada: publicada, con ruta de apertura y sin soon/lock',
+     (() => { const e = catalog().find(x => x.id === 'loan_simulation');
+       if (!e || !e.published || e.featureKey !== 'workspace.loan') return false;
+       return /loan_simulation:\s*\{[^}]*tool: 'loan'[^}]*\}/.test(home) &&
+              !/is-locked|lock-icon/i.test(home) && /soon: !openAttr/.test(home); })());
   OK('M14 el chip vive en el MISMO pie que "Abrir \u203a": la tarjeta no cambia de altura',
      /<div class="wsh-toolcard-foot">[\s\S]{0,220}\$\{_wsTierChip\(tl\.id\)\}/.test(home));
 

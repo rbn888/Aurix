@@ -44,27 +44,43 @@ declare
   v_b       uuid;
   e         record;                     -- one row of aurix_entitlements()
   n_pass    int := 0;
+  v_subs0   int;
+  v_ovr0    int;
   v_future  timestamptz := now() + interval '30 days';
   v_past    timestamptz := now() - interval '1 day';
 begin
-  -- ── PRECONDICIÓN ────────────────────────────────────────────────────────
-  -- Se niega a correr sobre un estado que no sea el esperado. Dos razones: no
-  -- contaminar datos reales, y detectar que una ejecución ANTERIOR dejó residuo
-  -- (que es exactamente el fallo que este fichero podría causar).
-  if (select count(*) from public.subscriptions) <> 0
-     or (select count(*) from public.entitlement_overrides) <> 0 then
-    raise exception 'PRECONDICIÓN: subscriptions/entitlement_overrides no están vacías. '
-                    'Residuo de una ejecución previa o datos reales: NO se continúa.';
+  -- ── ELECCIÓN DE SUJETOS ─────────────────────────────────────────────────
+  -- Se eligen dos cuentas SIN estado comercial. Antes se tomaban las dos más
+  -- antiguas y se exigía que las tablas estuvieran vacías globalmente; en cuanto
+  -- M.02 B4 creó el override del founder —que además ES la cuenta más antigua— la
+  -- precondición se negó a correr, con razón: iba a borrar datos reales. Elegir
+  -- sujetos limpios conserva la protección sin volver el fichero inejecutable en
+  -- cuanto exista un solo cliente o una sola concesión.
+  select id into v_a from auth.users u
+   where not exists (select 1 from public.subscriptions s where s.user_id = u.id)
+     and not exists (select 1 from public.entitlement_overrides o where o.user_id = u.id)
+   order by created_at limit 1;
+  select id into v_b from auth.users u
+   where u.id <> v_a
+     and not exists (select 1 from public.subscriptions s where s.user_id = u.id)
+     and not exists (select 1 from public.entitlement_overrides o where o.user_id = u.id)
+   order by created_at limit 1;
+  if v_a is null or v_b is null then
+    raise exception 'PRECONDICIÓN: hacen falta DOS cuentas sin estado comercial para certificar sin tocar datos reales';
   end if;
+
+  -- ── PRECONDICIÓN ────────────────────────────────────────────────────────
+  -- Los sujetos elegidos están limpios por construcción; lo que se comprueba es
+  -- que las CHECK de B1 estén en pie, porque este fichero las retira a mitad y
+  -- necesita saber cuántas debe reponer.
   if (select count(*) from pg_constraint c join pg_class r on r.oid = c.conrelid
        where r.relname = 'subscriptions' and c.contype = 'c') <> 12 then
     raise exception 'PRECONDICIÓN: subscriptions no tiene las 12 CHECK de B1. '
                     'Reponerlas ANTES de certificar (ver el bloque de restauración al final).';
   end if;
-
-  select id into v_a from auth.users order by created_at limit 1;
-  select id into v_b from auth.users order by created_at offset 1 limit 1;
-  if v_a is null or v_b is null then raise exception 'need two real users to certify isolation'; end if;
+  -- Se recuerda el estado de partida para poder AFIRMAR al final que no se movió.
+  select count(*) into v_subs0 from public.subscriptions;
+  select count(*) into v_ovr0  from public.entitlement_overrides;
 
   -- helper: act as a given user for the rest of the transaction
   -- (auth.uid() reads request.jwt.claims; `true` scopes it to this transaction)
@@ -81,9 +97,12 @@ begin
   if e.valid_until is not null then raise exception 'S1: valid_until set'; end if;
   -- Contrato: TODAS las claves canónicas, siempre. Sin esto, un mapa vacío haría
   -- pasar todos los asserts de "denegado" sin comprobar nada.
-  if (select count(*) from jsonb_object_keys(e.features)) <> 3
-    then raise exception 'S1: el mapa no trae las 3 claves canónicas: %', e.features; end if;
-  if (select count(*) from jsonb_object_keys(e.feature_sources)) <> 3
+  -- 4 claves desde M.02 B4: se añadió `workspace.catalog_preview`, que NINGÚN plan
+  -- concede (ver db/monetization_catalog_preview_key_1.sql). El resolver la recoge
+  -- sin cambios porque deriva su conjunto canónico de plan_features.
+  if (select count(*) from jsonb_object_keys(e.features)) <> 4
+    then raise exception 'S1: el mapa no trae las 4 claves canónicas: %', e.features; end if;
+  if (select count(*) from jsonb_object_keys(e.feature_sources)) <> 4
     then raise exception 'S1: feature_sources incompleto: %', e.feature_sources; end if;
   n_pass := n_pass + 1;
   insert into _b2_cert values (n_pass, 'S1', 'PASS', 'sin fila ⇒ free, las 3 features denegadas');
@@ -240,7 +259,7 @@ begin
     values (v_a, 'workspace.templates', true, 'qa');
   select * into e from public.aurix_entitlements();
   if e.features ? 'workspace.templates' then raise exception 'S15: un override INVENTÓ una capacidad'; end if;
-  if (select count(*) from jsonb_object_keys(e.features)) <> 3 then raise exception 'S15: nº de claves=%', e.features; end if;
+  if (select count(*) from jsonb_object_keys(e.features)) <> 4 then raise exception 'S15: nº de claves=%', e.features; end if;
   n_pass := n_pass + 1;
   insert into _b2_cert values (n_pass, 'S15', 'PASS', 'un override no puede inventar una capacidad ausente del catálogo');
   delete from public.entitlement_overrides where user_id = v_a;
@@ -401,10 +420,11 @@ begin
   -- S24 vacía plan_features: reponer el seed de B1 tal cual.
   insert into public.plan_features (plan, feature_key, allowed) values
     ('free','workspace.loan',false), ('free','intelligence.full',false), ('free','premium.settings',false),
-    ('premium','workspace.loan',true), ('premium','intelligence.full',true), ('premium','premium.settings',true)
+    ('premium','workspace.loan',true), ('premium','intelligence.full',true), ('premium','premium.settings',true),
+    ('free','workspace.catalog_preview',false), ('premium','workspace.catalog_preview',false)
   on conflict (plan, feature_key) do update set allowed = excluded.allowed;
-  if (select count(*) from public.plan_features) <> 6 then
-    raise exception 'RESTAURACIÓN FALLIDA: plan_features no vuelve a tener 6 filas';
+  if (select count(*) from public.plan_features) <> 8 then
+    raise exception 'RESTAURACIÓN FALLIDA: plan_features no vuelve a tener 8 filas';
   end if;
 
   alter table public.subscriptions add constraint subscriptions_plan_chk
@@ -425,9 +445,9 @@ begin
        where r.relname = 'subscriptions' and c.contype = 'c') <> 12 then
     raise exception 'RESTAURACIÓN FALLIDA: subscriptions no vuelve a tener 12 CHECK';
   end if;
-  if (select count(*) from public.subscriptions) <> 0
-     or (select count(*) from public.entitlement_overrides) <> 0 then
-    raise exception 'RESTAURACIÓN FALLIDA: quedaron filas de prueba';
+  if (select count(*) from public.subscriptions) <> v_subs0
+     or (select count(*) from public.entitlement_overrides) <> v_ovr0 then
+    raise exception 'RESTAURACIÓN FALLIDA: el recuento no vuelve al de partida (subs %, ovr %)', v_subs0, v_ovr0;
   end if;
   insert into _b2_cert values (99, 'RESTORE', 'PASS',
     '4 CHECK repuestas explícitamente y 0 filas de prueba — sin depender del rollback');
@@ -441,7 +461,7 @@ select (select count(*) from pg_constraint c join pg_class r on r.oid = c.conrel
          where r.relname = 'subscriptions' and c.contype = 'c') as checks_subscriptions,
        (select count(*) from public.subscriptions)         as filas_subscriptions,
        (select count(*) from public.entitlement_overrides) as filas_overrides,
-       (select count(*) from public.plan_features)         as filas_plan_features;
+       (select count(*) from public.plan_features)         as filas_plan_features;  -- 8 desde B4
 
 select n, escenario, verdicto, detalle from _b2_cert order by n;
 

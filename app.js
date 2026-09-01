@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '657'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '658'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4067,6 +4067,10 @@ if (supabaseClient && !window.__AUTH_LISTENER__) {
   supabaseClient.auth.onAuthStateChange(async (event) => {
     try { _aurixAuthTrace('index:auth-event', { event: event }); } catch (_) {}
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      // M.02 B3 — un token refrescado es el OTRO momento en que se revalida el
+      // entitlement (ver `_aurixEntRevalidate`): acota el kill switch en una pestaña de
+      // escritorio que nunca pasa por `visibilitychange`.
+      try { if (typeof _aurixEntRevalidate === 'function') _aurixEntRevalidate('token-refreshed'); } catch (_) {}
       // A fresh/refreshed session cancels any pending guarded login-redirect and refreshes the recent window.
       _aurixMarkSessionConfirmed();
       _aurixCancelLoginRedirect(event + ':confirmed');
@@ -5230,6 +5234,9 @@ const T = {
     wstpl_arch_cta:    'Ver herramientas',
     wstier_free:       'Incluido',
     wstier_premium:    'Premium',
+    wstier_preview:    'Interno',
+    wsh_internal_t:    'Catálogo interno',
+    wsh_internal_b:    'Sólo visible para tu cuenta: aún no está publicado.',
     wsh_space_empty:   'Aún no tienes elementos guardados.',
     wsh_space_cta:     'Crear desde plantilla',
     wstpl_use:         'Usar plantilla',
@@ -7516,6 +7523,9 @@ const T = {
     wstpl_arch_cta:    'View tools',
     wstier_free:       'Included',
     wstier_premium:    'Premium',
+    wstier_preview:    'Internal',
+    wsh_internal_t:    'Internal catalog',
+    wsh_internal_b:    'Visible only to your account: not published yet.',
     wsh_space_empty:   'You have no saved items yet.',
     wsh_space_cta:     'Create from template',
     wstpl_use:         'Use template',
@@ -18073,7 +18083,11 @@ function _wshWireOnce() {
       _wsReturnTab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
       // DSH.WORKSPACE.01 — record real usage so Mi Espacio surfaces it at #1.
       const _carg = cta === 'tool' ? (t.getAttribute('data-wstool') || 'compound') : cta === 'workspace' ? t.getAttribute('data-ws4-type') : '';
-      _wsTouch(_wsCanonRef(cta, _carg));
+      // M.02 B4 — la recencia es una AFIRMACIÓN ("último uso: hace 2 min"), así que
+      // sólo se graba si la herramienta se va a abrir de verdad. Antes se grababa
+      // aquí, ANTES del gate, y un usuario Free que pulsaba Préstamo se encontraba
+      // en Mi Espacio un "último uso" de una herramienta que nunca llegó a abrir.
+      if (cta !== 'tool' || _wsToolAccess(_carg).ok) _wsTouch(_wsCanonRef(cta, _carg));
     }
     if (cta === 'scenario' || nav === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
     if (cta === 'planning' || nav === 'planning') { _wshView = 'planning'; renderWorkspaceHome(); return; }
@@ -18479,6 +18493,122 @@ const _WS_APP_IDENTITY = {
   investment_analyzer:   { type: 'tool', category: 'investing',  visualTone: 'risk-return',      accentColor: 'navy',     previewType: 'risk',             layoutType: 'tool',       canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
   loan_simulation:       { type: 'tool', category: 'financing',  visualTone: 'banking',          accentColor: 'steel-blue', previewType: 'loan-summary',   layoutType: 'calculator', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'premium' },  // M.01B — frontera comercial declarada
 };
+// ════════════════════════════════════════════════════════════════════════════
+// MONETIZATION V1 · M.02 B4 — CATÁLOGO CON ESTADO COMERCIAL (fuente ÚNICA)
+// ════════════════════════════════════════════════════════════════════════════
+// Antes había DOS catálogos escritos a mano dentro de `renderWorkspaceHome` (la
+// galería de plantillas y la rejilla de herramientas) más un tercer criterio en
+// `_WS_APP_IDENTITY.premiumTier`. Tres sitios, tres verdades posibles. Esto es el
+// único sitio donde se declara qué existe y en qué estado comercial está; las
+// vistas se DERIVAN de aquí.
+//
+// Campos:
+//   id             · clave de identidad (coincide con _WS_APP_IDENTITY cuando existe)
+//   kind           · 'tool' | 'template'
+//   published      · ¿lo ve un usuario normal? (false = interno, sólo founder)
+//   featureKey     · entitlement que lo gatea, o null si es libre
+//   commercialTier · 'free' | 'premium' | 'undecided'
+//
+// REGLA DE VERDAD: si el founder ve "Premium", es porque REALMENTE está incluido
+// en Premium — hay una fila en `plan_features` que lo concede al plan premium. No
+// se pinta "Premium" decorativamente. `undecided` es exactamente eso: todavía no
+// se ha decidido, y por eso NO se publica.
+//
+// El inventario interno se recuperó del catálogo previo a WORKSPACE-LAUNCH-V1
+// (`4eeec88`), que es lo que de verdad existe construido, en distintos grados.
+// Publicar cualquiera de estos exige matemática comprobada Y persistencia real
+// (las claves `aurix_ws_*_v1` no viajan en el sync), así que siguen internos.
+const _WS_CATALOG = Object.freeze([
+  // ── herramientas PUBLICADAS ────────────────────────────────────────────────
+  { id: 'compound_growth',       kind: 'tool',     published: true,  featureKey: null,              commercialTier: 'free' },
+  { id: 'loan_simulation',       kind: 'tool',     published: true,  featureKey: 'workspace.loan',  commercialTier: 'premium' },
+  // ── herramientas INTERNAS (founder las evalúa; usuario normal NO las ve) ───
+  { id: 'scenario',              kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'goal',                  kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'financial_calc',        kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'investment_analyzer',   kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'monthly_budget',        kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'real_estate_portfolio', kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'trade_journal',         kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'receivables',           kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'asset_prices',          kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  // ── plantillas INTERNAS · ninguna publicada en V1 ──────────────────────────
+  { id: 'tpl_mbudget',           kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_assets',            kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_realestate',        kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_goals',             kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_journal',           kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_scenario',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_projection',        kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_networth',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_property',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_business',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  { id: 'tpl_fire',              kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+]);
+function _wsCatalogEntry(id) { return _WS_CATALOG.find(e => e.id === id) || null; }
+// El entitlement que gatea una HERRAMIENTA por su clave de apertura ('loan',
+// 'compound', …). Es lo que consume `_wsOpenTool`, el único owner de apertura.
+const _WS_TOOLKEY_TO_ID = Object.freeze({
+  compound: 'compound_growth', loan: 'loan_simulation', budget: 'monthly_budget',
+  journal: 'trade_journal', realestate: 'real_estate_portfolio',
+  receivables: 'receivables', assets: 'asset_prices',
+});
+function _wsToolFeatureKey(toolKey) {
+  const e = _wsCatalogEntry(_WS_TOOLKEY_TO_ID[toolKey] || toolKey);
+  return e && e.featureKey ? e.featureKey : null;
+}
+// ¿Puede el usuario ACTUAL ver esta entrada en un catálogo?
+// Usuario normal: sólo `published`. Founder (override global): todo.
+// Esta es la ÚNICA puerta de visibilidad de catálogo, y el catálogo público NO se
+// construye filtrando el del founder por descuido: se filtra aquí, siempre.
+function _wsCatalogVisible(entry) {
+  if (!entry) return false;
+  if (entry.published === true) return true;
+  return _aurixEntIsCatalogPreview() === true;
+}
+function _wsCatalogFor(kind) {
+  return _WS_CATALOG.filter(e => e.kind === kind && _wsCatalogVisible(e));
+}
+// Etiqueta comercial REAL. Una sola convención:
+//   free → "Incluido" · premium → "Premium" · no publicado/undecided → "Preview"
+// `Premium` sólo se pinta cuando hay featureKey, es decir cuando Premium lo
+// concede de verdad.
+function _wsCommercialLabel(entry) {
+  if (!entry) return '';
+  if (entry.published !== true || entry.commercialTier === 'undecided') return t('wstier_preview');
+  if (entry.commercialTier === 'premium' && entry.featureKey) return t('wstier_premium');
+  if (entry.commercialTier === 'free') return t('wstier_free');
+  return '';
+}
+// §14 — la MISMA identidad visual que la tarjeta del catálogo: escena + icono real.
+function _wsMseToolPreview(it) {
+  const asset = it && it.entryId ? _WS_TOOL_ASSET[it.entryId] : null;
+  const viz = _wsTplViz(it && it.viz);
+  return asset
+    ? `<span class="wsh-mse2-ic has-asset">${viz}${_wsAssetImg(asset, '')}</span>`
+    : viz;
+}
+// ¿Puede el usuario ACTUAL abrir esta herramienta, y si no, por qué?
+// Una sola decisión, dos consumidores: el owner de apertura (`_wsOpenTool`) y el
+// registro de uso reciente. Compartirla es lo que impide que Mi Espacio afirme un
+// "último uso" de algo que nunca se abrió.
+function _wsToolAccess(toolKey) {
+  const id = _WS_TOOLKEY_TO_ID[toolKey] || toolKey;
+  const entry = _wsCatalogEntry(id);
+  // §18 — publicación primero: es otra pregunta ("¿existe para ti?"), no un derecho.
+  if (entry && !_wsCatalogVisible(entry)) return { ok: false, reason: 'unpublished', featureKey: null };
+  const featureKey = entry && entry.featureKey ? entry.featureKey : null;
+  if (featureKey && !hasFeature(featureKey)) return { ok: false, reason: 'entitlement', featureKey };
+  return { ok: true, reason: null, featureKey };
+}
+function _wsCommercialTierClass(entry) {
+  if (!entry) return '';
+  if (entry.published !== true || entry.commercialTier === 'undecided') return 'preview';
+  if (entry.commercialTier === 'premium' && entry.featureKey) return 'premium';
+  return 'free';
+}
+
 function _wsAppIdentity(id) { return _WS_APP_IDENTITY[id] || { type: 'app', category: 'misc', visualTone: 'neutral', accentColor: 'blue', previewType: 'glyph', layoutType: 'tool', canPin: true, canSaveToSpace: true, isDailyUse: true, premiumTier: 'free' }; }
 
 // MONETIZATION-V1 · M.01B — el chip de plan del catálogo de Herramientas. Lee el
@@ -18490,11 +18620,15 @@ function _wsAppIdentity(id) { return _WS_APP_IDENTITY[id] || { type: 'app', cate
 // docs/AURIX-MONETIZATION-M01B.md) sin tocar el catálogo ni las tarjetas.
 // Cualquier otro valor ('soon', 'core', ausente) NO pinta chip: no se afirma un
 // plan que el producto no ha decidido.
-function _wsToolTier(id) { const v = _wsAppIdentity(id).premiumTier; return (v === 'free' || v === 'premium') ? v : ''; }
+// M.02 B4 — el chip pasa a leer `_WS_CATALOG`, la fuente única. `premiumTier` del
+// registro de identidad queda como dato descriptivo heredado SIN autoridad: ya no
+// decide ni la etiqueta ni el gate.
+function _wsToolTier(id) { return _wsCommercialTierClass(_wsCatalogEntry(id)); }
 function _wsTierChip(id) {
-  const tier = _wsToolTier(id);
-  if (!tier) return '';
-  const label = t(tier === 'premium' ? 'wstier_premium' : 'wstier_free');
+  const entry = _wsCatalogEntry(id);
+  const tier = _wsCommercialTierClass(entry);
+  const label = _wsCommercialLabel(entry);
+  if (!tier || !label) return '';
   return `<span class="wsh-tier is-${tier}">${String(label).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</span>`;
 }
 
@@ -18898,11 +19032,22 @@ function _renderWorkspaceHome(metrics) {
     // estuviera fuera del catálogo. Por eso se reducen TAMBIÉN estos dos catálogos:
     // es la otra puerta de entrada. Ninguna plantilla es publicable en V1; de las
     // herramientas quedan las dos con matemática comprobada. Owners intactos.
+    // MONETIZATION V1 · M.02 B4 — Mi Espacio es la TERCERA puerta del catálogo, y es
+    // la que se olvida: ordena por uso real, así que resucita lo que ya se abrió una
+    // vez. Se deriva de `_WS_CATALOG` y pasa por el MISMO filtro de visibilidad, de
+    // modo que nada interno puede reaparecer aquí para un usuario normal.
+    const _MSE_TOOL_RENDER = {
+      compound_growth: { arg: 'compound', viz: 'curve', nameKey: 'wstool_compound_n' },
+      loan_simulation: { arg: 'loan',     viz: 'donut', nameKey: 'wsloan_n' },
+    };
     const TPL_CAT = [];
-    const TOOL_CAT = [
-      { ref: 'tool:compound', cta: 'tool',     arg: 'compound', viz: 'curve',   name: t('wstool_compound_n') },
-      { ref: 'tool:loan',     cta: 'tool',     arg: 'loan',     viz: 'donut',   name: t('wsloan_n') },
-    ];
+    const TOOL_CAT = _wsCatalogFor('tool')
+      .filter(e => _MSE_TOOL_RENDER[e.id])
+      .map(e => {
+        const r = _MSE_TOOL_RENDER[e.id];
+        return { ref: 'tool:' + r.arg, cta: 'tool', arg: r.arg, viz: r.viz,
+                 name: t(r.nameKey), entryId: e.id };
+      });
     // Keep only used/pinned items, ordered by most-recent activity (DESC).
     const activate = arr => arr
       .map(it => { const r = _wsRecentTs(it.ref), p = pinTs(it.ref); return Object.assign({}, it, { ts: Math.max(r, p), used: r > 0 }); })
@@ -18944,7 +19089,12 @@ function _renderWorkspaceHome(metrics) {
     // plantillas públicas, reaparece sola: la condición es el propio catálogo.
     const _mseCols = [
       TPL_CAT.length ? column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates']) : '',
-      column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsTplViz(it.viz), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools']),
+      // M.02 B4 · §14 — identidad visual coherente. Aquí se pintaba SÓLO el glyph
+      // genérico `_wsTplViz`, así que Compound aparecía en Mi Espacio con un dibujo
+      // distinto al de su tarjeta del catálogo, que sí carga `tool_compound.webp`.
+      // Se usa la misma composición que la tarjeta: escena + imagen real, y el
+      // `<img>` se autorretira si no carga, así que nunca queda un hueco.
+      column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsMseToolPreview(it), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools']),
     ].filter(Boolean);
     panel = `<div class="wsh-mse2${_mseCols.length < 2 ? ' is-single' : ''}">
       ${_mseCols.join('\n      ')}
@@ -18959,11 +19109,12 @@ function _renderWorkspaceHome(metrics) {
       const openAttrs = soon ? '' : ` role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? (it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : ' data-ws4-type="' + esc(it.arg) + '"') : ''}`;
       return `
       <div class="wsh-tpl wsh-cardv${soon ? ' is-soon' : ''}"${openAttrs}>
-        ${soon ? '' : pinBtn(it.ref)}
+        ${(soon || it.internal) ? '' : pinBtn(it.ref)}
         <div class="wsh-pv-wrap">${_wsCatPreviewHtml(it.cat)}</div>
         <div class="wsh-cardv-foot">
           <p class="wsh-tpl-name">${esc(it.name)}</p>
           ${soon ? `<span class="wsh-pill">${esc(t('wsh_soon'))}</span>` : `<span class="wsh-tpl-chev" aria-hidden="true">›</span>`}
+          ${it.entryId ? _wsTierChip(it.entryId) : ''}
         </div>
       </div>`;
     };
@@ -18977,7 +19128,34 @@ function _renderWorkspaceHome(metrics) {
     // arquitectura todavía no da. Los renderers y sus datos SIGUEN EXISTENTES e
     // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
     // reponerlos es volver a añadir su línea aquí.
-    const gallery = [];
+    // M.02 B4 — misma derivación para plantillas. Para un usuario normal el catálogo
+    // publicado sigue VACÍO (ninguna plantilla tiene matemática y persistencia
+    // comprobadas), así que ve exactamente el mismo estado vacío premium que antes.
+    // El founder ve el inventario interno para poder evaluarlo.
+    const TPL_RENDER = {
+      tpl_mbudget:     { nameKey: 'wstool_budget_n',      cta: 'tool',      arg: 'budget' },
+      tpl_assets:      { nameKey: 'wsapp_assets_n',       cta: 'tool',      arg: 'assets' },
+      tpl_receivables: { nameKey: 'wsapp_receivables_n',  cta: 'tool',      arg: 'receivables' },
+      tpl_realestate:  { nameKey: 'wsre_n',               cta: 'tool',      arg: 'realestate' },
+      tpl_goals:       { nameKey: 'wsg_title',            cta: 'goals' },
+      tpl_journal:     { nameKey: 'wstool_journal_n',     cta: 'tool',      arg: 'journal' },
+      tpl_scenario:    { nameKey: 'wsh_scenario_title',   cta: 'scenario' },
+      tpl_projection:  { nameKey: 'wsp_title',            cta: 'planning' },
+      tpl_networth:    { nameKey: 'wsh_ws_networth',      cta: 'workspace', arg: 'networth' },
+      tpl_property:    { nameKey: 'wsh_ws_property',      cta: 'workspace', arg: 'property' },
+      tpl_business:    { nameKey: 'wsh_ws_business',      cta: 'workspace', arg: 'business' },
+      tpl_fire:        { nameKey: 'wsh_ws_fire',          cta: 'workspace', arg: 'fire' },
+    };
+    const gallery = _wsCatalogFor('template').map(e => {
+      const r = TPL_RENDER[e.id] || {};
+      // `internal` suprime el botón de fijar: las herramientas ya tenían ese guard
+      // (`pinRef` sólo si `published`), las plantillas no. Fijar una interna no
+      // aparecía en ningún sitio (TPL_CAT está vacío) y encima cambiaba la pestaña
+      // por defecto a `space`.
+      return { cta: r.cta || '', arg: r.arg, ref: e.id.replace(/^tpl_/, 'tpl:'),
+               cat: (r.arg || e.id), name: r.nameKey ? t(r.nameKey) : e.id,
+               entryId: e.id, internal: e.published !== true };
+    });
     // MONETIZATION-V1 · M.01B — con catálogo vacío NO se pinta la rejilla (una
     // galería de cero tarjetas es una galería rota). Se pinta la representación
     // mínima profesional: por qué está vacía, cuál es el criterio de publicación
@@ -18991,7 +19169,11 @@ function _renderWorkspaceHome(metrics) {
           <p class="wsh-tplarch-b">${esc(t('wstpl_arch_b'))}</p>
           <button type="button" class="wsh-cta wsh-tplarch-cta" data-wstab="tools">${esc(t('wstpl_arch_cta'))}</button>
         </div>`;
-    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3></header>${body}</section>`;
+    // Cuando lo que se está viendo es el catálogo interno, se dice. No se disfraza
+    // de catálogo publicado, porque quien lo mira está evaluando qué publicar.
+    const internalNote = (gallery.length && _aurixEntIsCatalogPreview())
+      ? `<p class="wsh-mse2-sub">${esc(t('wsh_internal_b'))}</p>` : '';
+    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3>${internalNote}</header>${body}</section>`;
   } else {
     // WS.12 (v2) — Herramientas = compact, operative toolbox (quick utilities, NOT
     // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
@@ -19003,15 +19185,43 @@ function _renderWorkspaceHome(metrics) {
     // arquitectura todavía no da. Los renderers y sus datos SIGUEN EXISTENTES e
     // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
     // reponerlos es volver a añadir su línea aquí.
-    const tools = [
-      { id: 'compound_growth',     name: t('wstool_compound_n'),  viz: 'curve',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="compound"', pinRef: 'tool:compound', soon: false },
-      { id: 'loan_simulation',     name: t('wsloan_n'),           viz: 'donut',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="loan"',     pinRef: 'tool:loan',     soon: false },
-    ];
+    // MONETIZATION V1 · M.02 B4 — la rejilla se DERIVA de `_WS_CATALOG`. El catálogo
+    // público ya no es una lista escrita a mano: es el filtro `_wsCatalogVisible`,
+    // que para un usuario normal sólo deja pasar `published:true`. El founder ve
+    // además el catálogo interno, por el mismo camino y con su etiqueta real.
+    const TOOL_RENDER = {
+      compound_growth:       { nameKey: 'wstool_compound_n',  viz: 'curve',   tool: 'compound' },
+      loan_simulation:       { nameKey: 'wsloan_n',           viz: 'donut',   tool: 'loan' },
+      scenario:              { nameKey: 'wsh_scenario_title', viz: 'compare', cta: 'scenario' },
+      goal:                  { nameKey: 'wsg_title',          viz: 'target',  cta: 'goals' },
+      financial_calc:        { nameKey: 'wstool_financial_n', viz: 'bars' },
+      investment_analyzer:   { nameKey: 'wstool_analyzer_n',  viz: 'donut' },
+      monthly_budget:        { nameKey: 'wstool_budget_n',    viz: 'bars',    tool: 'budget' },
+      real_estate_portfolio: { nameKey: 'wsre_n',             viz: 'donut',   tool: 'realestate' },
+      trade_journal:         { nameKey: 'wstool_journal_n',   viz: 'bars',    tool: 'journal' },
+      receivables:           { nameKey: 'wsapp_receivables_n', viz: 'bars',   tool: 'receivables' },
+      asset_prices:          { nameKey: 'wsapp_assets_n',     viz: 'bars',    tool: 'assets' },
+    };
+    const tools = _wsCatalogFor('tool').map(e => {
+      const r = TOOL_RENDER[e.id] || {};
+      const openAttr = r.tool
+        ? ` role="button" tabindex="0" data-wsh-cta="tool" data-wstool="${esc(r.tool)}"`
+        : (r.cta ? ` role="button" tabindex="0" data-wsh-cta="${esc(r.cta)}"` : '');
+      return {
+        id: e.id,
+        name: r.nameKey ? t(r.nameKey) : e.id,
+        viz: r.viz || 'bars',
+        open: openAttr,
+        // Sólo se fija/guarda lo publicado: no se promete permanencia de lo interno.
+        pinRef: (e.published && r.tool) ? ('tool:' + r.tool) : '',
+        soon: !openAttr,
+      };
+    });
     const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
     panel = `
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
-        <div class="wsh-tool-grid wsh-toolbox">
+        <div class="wsh-tool-grid wsh-toolbox${tools.length < 3 ? ' is-sparse' : ''}">
           ${tools.map(tl => `
             <div class="wsh-tool wsh-toolcard ${accent(tl.id)}${tl.soon ? ' is-soon' : ''}"${tl.open}>
               ${tl.pinRef ? pinBtn(tl.pinRef) : ''}
@@ -20048,6 +20258,25 @@ function _wsOpenTool(toolKey, projectId) {
   if (key === 'receivables' && !AURIX_WS13_TOOL) return;  // WS.13 gate
   if (key === 'loan'        && !AURIX_WS14_TOOL) return;  // WS.14 gate
   if (key === 'assets'      && !AURIX_WS15_TOOL) return;  // WS.15 gate
+  // MONETIZATION V1 · M.02 B4 — ENTITLEMENT GATE, en el OWNER de la apertura.
+  // Va aquí y no en la tarjeta a propósito: `_wsOpenTool` es el único camino por
+  // el que se abre una herramienta (catálogo, Mi Espacio, proyecto guardado,
+  // enlace directo), así que gatear aquí cubre todas las entradas sin duplicar la
+  // decisión del resolver en cada superficie.
+  // §18 — GATE DE PUBLICACIÓN. Va antes que el de entitlement porque responde otra
+  // pregunta: no es "¿tienes derecho?" sino "¿esto existe para ti?". Un proyecto
+  // GUARDADO de una versión anterior (`monthly_budget`, `trade_journal`…) rutea aquí
+  // desde la lista de proyectos, y esas herramientas salieron del catálogo en
+  // WORKSPACE-LAUNCH-V1 sin que sus renderers se borraran: sin este gate, un usuario
+  // normal con historial abría código no publicado. No se muestra upgrade intent —
+  // decir "esto es Premium" de algo que simplemente no está publicado sería mentir.
+  const _acc = _wsToolAccess(key);
+  if (!_acc.ok) {
+    // Sólo se ofrece upgrade cuando la razón ES comercial. Si la herramienta
+    // simplemente no está publicada, decir "esto es Premium" sería mentir.
+    if (_acc.reason === 'entitlement') openUpgradeIntent({ featureKey: _acc.featureKey, source: 'workspace:' + key });
+    return;
+  }
   _wsToolActive = key;
   _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
   _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
@@ -21506,11 +21735,13 @@ function renderWorkspace() {
   const container = document.getElementById('aurixWorkspace');
   if (!container) return;
 
-  // AURIX PREMIUM — Launch-1 gate: non-premium users see the premium preview (owner bypasses).
-  if (typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess(_aurixCurrentAuthUser())) {
-    container.innerHTML = _aurixPremiumPreviewHTML('workspace');
-    return;
-  }
+  // MONETIZATION V1 · M.02 B4 — WORKSPACE ABIERTO AL PLAN FREE.
+  // Aquí vivía el gate de Launch-1: la sección ENTERA se sustituía por el preview
+  // premium salvo para el owner, así que ningún usuario Free llegó nunca a ver
+  // Compound. Se retira: Workspace es una sección para todo usuario autenticado y
+  // lo que se gatea son las HERRAMIENTAS concretas (loan → workspace.loan), no la
+  // sección. El preview compartido `_aurixPremiumPreviewHTML('workspace')` sigue
+  // existiendo intacto y ya no es el camino de Workspace.
 
   // WS.1 — route to the new planning Home; legacy path below is preserved.
   if (AURIX_WS_HOME) { renderWorkspaceHome(container); return; }
@@ -50328,7 +50559,11 @@ function _applyTab(tab) {
   // non-premium Workspace PREVIEW must render in the SAME normal shell as Dashboard/Intelligence, so the
   // logo never moves and both previews share the exact layout. Only the REAL (premium) workspace grid
   // gets full-bleed.
-  const _wsFullBleed = (tab === 'workspace') && !(typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess(_aurixCurrentAuthUser()));
+  // M.02 B4 — Workspace ya no tiene rama de preview a nivel de sección, así que la
+  // rejilla real es la única que se pinta y el full-bleed pasa a depender sólo de la
+  // pestaña. (Antes: el preview debía renderizar en el shell normal para que el
+  // logo no se moviera; ese caso ya no existe.)
+  const _wsFullBleed = (tab === 'workspace');
   document.body.classList.toggle('workspace-active', _wsFullBleed);
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');
@@ -50423,10 +50658,21 @@ try { if (typeof window !== 'undefined') window.aurixSectionIsolationAudit = fun
 // Visual gating ONLY for Intelligence + Workspace. NO payments / pricing / Founder / charts / market /
 // financial calcs touched. Owner (rbn892@gmail.com, by AUTHENTICATED email — never a localStorage flag
 // or console-settable global secret) gets full access; everyone else sees the premium preview.
-function hasAurixPremiumAccess(user) {
-  const email = String(user && user.email || '').toLowerCase().trim();
-  if (email === 'rbn892@gmail.com') return true;
-  return Boolean(user && (user.premium || user.isPremium || user.subscriptionActive));
+// ⚠ LEGACY · SIN AUTORIDAD desde M.02 B3 (2026-09-01) ⚠
+// Era el gate REAL de producto: allowlist del email del owner en el bundle, más
+// `user.premium || user.isPremium || user.subscriptionActive` (una rama que nunca
+// tuvo escritor y que se volvía auto-concesión el día que alguien mapeara
+// `user_metadata` sobre el objeto user).
+//
+// Ya NO decide nada. Los cinco gates que la usaban leen `hasFeature()`, que deriva
+// del resolver server-side. El acceso del founder se concede con una fila de
+// `entitlement_overrides`, no con un email compilado en el JavaScript.
+//
+// Se conserva la función —devolviendo el entitlement real— porque puede quedar
+// alguna referencia y porque un `undefined` silencioso es peor que un delegado
+// honesto. NO usarla en código nuevo: pregunta por una feature concreta.
+function hasAurixPremiumAccess(_user) {
+  return hasFeature('intelligence.full');
 }
 // The authenticated user this session (Supabase auth), or null. Read fresh each call so it always
 // reflects the real signed-in identity, not a cached/forgeable value.
@@ -50686,7 +50932,11 @@ function renderIntelligenceTab() {
   // real, personalised reading of the user's own portfolio. The gate itself is UNCHANGED —
   // hasAurixPremiumAccess still decides, so full Intelligence stays exactly as it was for the
   // owner. Workspace keeps using the shared _aurixPremiumPreviewHTML.
-  if (!hasAurixPremiumAccess(_aurixCurrentAuthUser())) return _aurixIntelligencePreviewHTML();
+  // M.02 B3 — el gate pasa a ser el entitlement server-side. Free (y cualquiera
+  // sin lectura válida todavía) ve el preview real de INT.PREVIEW.V1; con
+  // intelligence.full=true se ve la superficie completa. El preview es el fallback
+  // fail-closed, no una pantalla de bloqueo.
+  if (!hasFeature('intelligence.full')) return _aurixIntelligencePreviewHTML();
   // INT.1 — premium deterministic portfolio intelligence layer. Reads only
   // existing data (snapshot + distributions); no new APIs, no AI, no external
   // data. Responsive single markup (CSS handles desktop/mobile). The legacy
@@ -58223,6 +58473,31 @@ function _aurixPreloadBootIcons() {
     // P0-RELIABILITY-GATE — set identity + purge any foreign cache as EARLY as auth resolves, so
     // even a load() before initPortfolioData can't surface another user's portfolio.
     try { _aurixActiveUserId = currentUser && currentUser.id; _aurixEnforceCacheOwner(_aurixActiveUserId); } catch (_) {}
+    // MONETIZATION V1 · M.02 B3 — resolver los entitlements en cuanto hay identidad.
+    // Fire-and-forget A PROPÓSITO: el boot no debe esperar por comercio, y hasta que
+    // termine, hasFeature() es false (fail-closed). Al resolverse, si la sección
+    // activa es una de las que dependen de un entitlement, se repinta sola — así se
+    // evita el flicker agresivo Premium→Free (§16): sólo puede ir Free→Premium, y
+    // una sola vez.
+    try {
+      _aurixEntitlementsLoad({ force: true }).then(() => {
+        try {
+          // `currentTab` es el owner de la pestaña activa (no `activeTab`, que no
+          // existe en el bundle: la primera versión de esto era código muerto y un
+          // founder que abriera Intelligence antes de resolver la RPC se quedaba en
+          // el preview Free hasta cambiar de pestaña y volver).
+          // Se siembra la firma aquí: sin esto, el PRIMER regreso a primer plano
+          // disparaba un switchTab (fade + re-render completo) aunque nada hubiera
+          // cambiado, porque `_aurixEntLastSig` seguía en null.
+          try { _aurixEntLastSig = JSON.stringify(_aurixEnt.features); } catch (_) {}
+          const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
+          if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
+          // Y el badge lo pinta `_aurixRenderMenuIdentity`; `_aurixMenuTier` es un
+          // getter y no repintaba nada.
+          if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
+        } catch (_) {}
+      });
+    } catch (_) {}
     window.__aurixBootReady.auth = true;
     try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.mark('auth_done'); } catch (_) {}
     if (IS_DEV) console.log('[AUTH] session restored:', currentUser?.email);
@@ -60443,11 +60718,19 @@ function _aurixMenuDisplayName() {
   } catch (_) {}
   return (typeof lang !== 'undefined' && lang === 'en') ? 'You' : 'Tú';
 }
+// M.02 B3 — el badge pasa a leer el ESTADO COMERCIAL server-side. Antes leía
+// `getPlan()` → `localStorage.aurix_plan`, que ningún servidor escribe: desde la
+// consola, `setPlanTier('founder')` ponía el badge en "FOUNDER" de forma durable y en
+// todos los dispositivos del usuario (savePlan → _touchSubscription → flush escribe
+// la columna `subscription`). No concedía ninguna feature —el resolver no lee esa
+// columna— pero era una afirmación comercial auto-emitida, y el badge es una
+// afirmación. Ahora dice lo que dice el servidor.
+// Nota: retirar la ESCRITURA de `aurix_plan` / `user_portfolios.subscription` es B7;
+// aquí se le retira el último consumidor que la publicaba.
 function _aurixMenuTier() {
   try {
-    const p = window.aurixEntitlements && window.aurixEntitlements.getPlan && window.aurixEntitlements.getPlan();
-    const tier = p && p.tier;
-    if (tier === 'founder' || tier === 'premium' || tier === 'free') return tier;
+    if (!_aurixEntLoaded()) return 'free';        // fail-closed: nunca un plan afirmado sin evidencia
+    return _aurixEnt.plan === 'premium' ? 'premium' : 'free';
   } catch (_) {}
   return 'free';
 }
@@ -60464,7 +60747,7 @@ function _aurixRenderMenuIdentity() {
   // Free → intrigue/coming-soon: subtly blurred golden, not clickable, no modal/navigation (guarded above).
   const premiumEl = document.getElementById('menuPremium');
   if (premiumEl) {
-    const _premiumUser = (typeof hasAurixPremiumAccess === 'function') && hasAurixPremiumAccess(_aurixCurrentAuthUser());
+    const _premiumUser = hasFeature('premium.settings');   // M.02 B3 — entitlement real
     const _en = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
     if (_premiumUser) {
       premiumEl.classList.remove('menu-item--coming-soon');
@@ -62834,10 +63117,163 @@ function planStatus() { return getPlan().status || 'active'; }
 // false it always returns true (prelaunch: everything unlocked for everyone,
 // regardless of tier). When true, the real per-tier entitlement applies. No
 // other code in the app needs to know the switch exists.
-function hasFeature(feature) {
-  if (!ENFORCE_ENTITLEMENTS) return true;
-  const set = PLAN_FEATURES[getPlan().tier] || PLAN_FEATURES.free;
-  return set.has(feature);
+// ════════════════════════════════════════════════════════════════════════════
+// MONETIZATION V1 · M.02 B3 — CLIENT ENTITLEMENT STATE
+// ════════════════════════════════════════════════════════════════════════════
+// La ÚNICA capa cliente que responde "¿puede usar esta feature?". No calcula
+// nada: refleja el resultado de `public.aurix_entitlements()` (M.02 B2), que es
+// la autoridad server-side. El cliente NO decide Premium por email, localStorage,
+// `aurix_plan`, `user.premium`, `isPremium`, `subscriptionActive` ni ningún tier
+// legacy — todo eso sigue existiendo por compatibilidad y NO concede nada.
+//
+// FAIL CLOSED, sin excepción: mientras no haya una lectura correcta del servidor,
+// `hasFeature()` es false. Un timeout, un error de red, una sesión ausente o una
+// respuesta inesperada dejan al usuario en Free/Preview, nunca en Premium.
+//
+// Se gatea SIEMPRE con `features[key] === true`, jamás con `plan` — B2 documenta
+// por qué: si `plan_features` se degradara, `plan` seguiría diciendo 'premium'
+// con el mapa de features vacío, y leer `plan` reabriría el fail-open.
+// Las claves canónicas. `workspace.catalog_preview` (M.02 B4) es distinta de las
+// otras tres: NINGÚN plan la concede —sus dos filas de `plan_features` están en
+// false— así que sólo puede llegar por un override explícito. No se vende, y un
+// Premium de pago no la tiene: vería producto sin terminar.
+const _AURIX_ENT_CANON = Object.freeze([
+  'workspace.loan', 'intelligence.full', 'premium.settings', 'workspace.catalog_preview',
+]);
+const _AURIX_ENT_TTL_MS = 5 * 60 * 1000;   // revalidación perezosa; NUNCA autoridad en sí
+let _aurixEnt = {
+  loaded: false, loading: false, error: null,
+  plan: 'free', status: 'none', source: 'default', validUntil: null,
+  features: Object.create(null), sources: Object.create(null), fetchedAt: 0,
+};
+const _aurixEntWaiters = [];
+function _aurixEntOnReady(fn) {
+  if (typeof fn !== 'function') return;
+  if (_aurixEnt.loaded) { try { fn(); } catch (_) {} return; }
+  _aurixEntWaiters.push(fn);
+}
+function _aurixEntFlushWaiters() {
+  const w = _aurixEntWaiters.splice(0);
+  w.forEach(fn => { try { fn(); } catch (_) {} });
+}
+function _aurixEntReset(reason) {
+  _aurixEnt = { loaded: false, loading: false, error: reason || null, plan: 'free', status: 'none',
+    source: 'default', validUntil: null, features: Object.create(null), sources: Object.create(null), fetchedAt: 0 };
+}
+// Lee la superficie saneada del servidor. Una respuesta que no tenga la forma
+// esperada se DESCARTA (no se acepta a medias): media verdad comercial es
+// exactamente el estado del que B1/B2 se protegen.
+async function _aurixEntitlementsLoad(opts) {
+  const force = !!(opts && opts.force);
+  if (_aurixEnt.loading) return _aurixEnt;
+  if (!force && _aurixEnt.loaded && (Date.now() - _aurixEnt.fetchedAt) < _AURIX_ENT_TTL_MS) return _aurixEnt;
+  _aurixEnt.loading = true;
+  try {
+    if (!supabaseClient || !supabaseClient.rpc) throw new Error('no-client');
+    const { data, error } = await supabaseClient.rpc('aurix_entitlements');
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row !== 'object' || !row.features || typeof row.features !== 'object') {
+      throw new Error('shape');
+    }
+    const feats = Object.create(null), srcs = Object.create(null);
+    // Sólo se aceptan las claves canónicas y sólo el booleano estricto `true`.
+    // Cualquier otra cosa (string "true", 1, null, una clave inventada) NO concede.
+    for (const k of _AURIX_ENT_CANON) {
+      feats[k] = row.features[k] === true;
+      srcs[k]  = typeof row.feature_sources === 'object' && row.feature_sources
+        ? String(row.feature_sources[k] || 'default') : 'default';
+    }
+    _aurixEnt = {
+      loaded: true, loading: false, error: null,
+      plan:   (row.plan === 'premium') ? 'premium' : 'free',
+      status: typeof row.subscription_status === 'string' ? row.subscription_status : 'none',
+      source: typeof row.source === 'string' ? row.source : 'default',
+      validUntil: row.valid_until || null,
+      features: feats, sources: srcs, fetchedAt: Date.now(),
+    };
+    if (IS_DEV) console.log('[ENT] resolved', _aurixEnt.plan, _aurixEnt.source, feats);
+  } catch (e) {
+    const msg = String((e && e.message) || e || 'error');
+    if (_aurixEnt.loaded) {
+      // YA HABÍA una lectura del servidor. Un fallo de TRANSPORTE no la invalida, y
+      // borrarla sería peor que inútil: la revalidación corre al volver la pestaña al
+      // primer plano —típicamente con red mala o sin red— y degradaría a un cliente
+      // que HA PAGADO hasta el preview Free, con el badge en FREE y un "plan premium"
+      // al tocar Préstamo. Fail-closed en dirección, sí, pero una afirmación comercial
+      // FALSA provocada por la cobertura móvil.
+      // `hasFeature` debe distinguir "todavía no sé" de "lo supe y no pude
+      // refrescarlo" — la misma distinción que el resolver de B2 cuida entre ausencia
+      // y denegación. El kill switch no se debilita: aterriza en la primera lectura
+      // que SÍ funcione, igual que antes.
+      _aurixEnt.error = msg;
+      _aurixEnt.fetchedAt = 0;          // sin caché válida: se reintenta al próximo foco
+      if (IS_DEV) console.warn('[ENT] revalidación fallida, se conserva la lectura previa:', msg);
+    } else {
+      // Primera carga: no hay evidencia que conservar ⇒ FAIL CLOSED.
+      _aurixEntReset(msg);
+      if (IS_DEV) console.warn('[ENT] fail-closed:', _aurixEnt.error);
+    }
+  }
+  _aurixEnt.loading = false;
+  _aurixEntFlushWaiters();
+  return _aurixEnt;
+}
+// EL gate. Un solo sitio, un solo criterio.
+function hasFeature(featureKey) {
+  if (!_aurixEnt.loaded) return false;                 // sin evidencia ⇒ NO
+  return _aurixEnt.features[featureKey] === true;       // booleano estricto
+}
+function _aurixEntLoaded() { return _aurixEnt.loaded === true; }
+// REVALIDACIÓN. B2 declara que un deny global ('*', allowed=false) es ABSOLUTO, y en
+// el cliente no lo era: la carga ocurría UNA vez por carga de página, así que un PWA
+// abierto desde ayer conservaba el acceso indefinidamente después de que soporte
+// cortara el abuso — y, simétricamente, una suscripción cancelada seguía dando acceso
+// toda la sesión. Se revalida en dos momentos, y los DOS están cableados: cuando la
+// pestaña vuelve al primer plano (`visibilitychange`) y cuando Supabase refresca el
+// token (`TOKEN_REFRESHED`, ~horario). El segundo importa porque `visibilityState`
+// sigue en 'visible' cuando la ventana está simplemente TAPADA, así que una pestaña de
+// escritorio abierta todo el día no dispararía el primero y ahí el kill switch volvería
+// a ser ilimitado. Respeta el TTL (sin `force`) para no llamar en cada foco. Sin
+// polling: no hay intervalos.
+function _aurixEntRevalidate(reason) {
+  try {
+    if (typeof currentUser === 'undefined' || !currentUser) return;
+    _aurixEntitlementsLoad().then((st) => {
+      // Si el resultado CAMBIA lo que el usuario puede usar, se repinta la sección
+      // que dependa de ello. Sólo entonces: repintar en cada foco sería un parpadeo.
+      try {
+        const sig = JSON.stringify(st.features);
+        if (sig === _aurixEntLastSig) return;
+        _aurixEntLastSig = sig;
+        const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
+        if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
+        if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
+      } catch (_) {}
+    });
+  } catch (_) {}
+}
+let _aurixEntLastSig = null;
+try {
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') _aurixEntRevalidate('visible');
+    });
+  }
+} catch (_) {}
+// CATÁLOGO INTERNO (M.02 B4). Una clave propia, no una deducción.
+//
+// La primera versión lo deducía: "si las tres features vienen de override, es el
+// founder". La revisión adversarial demostró que eso conflaba dos cosas: el
+// resolver estampa source='override' también en los overrides POR CLAVE, y B1
+// admite reason 'comp'/'qa', así que un usuario compensado con tres concesiones
+// individuales —soporte normal— habría visto las 21 entradas sin publicar.
+//
+// Ahora es una capacidad explícita que ningún plan concede (ver
+// db/monetization_catalog_preview_key_1.sql). Fail-closed por construcción: sin
+// override no hay catálogo interno, y ni siquiera pagando se obtiene.
+function _aurixEntIsCatalogPreview() {
+  return hasFeature('workspace.catalog_preview');
 }
 // Expose the entitlement surface for other modules (premium features, the
 // future checkout bridge) without reaching into internals.
@@ -63849,6 +64285,17 @@ const FEATURE_LABELS = {
   monthly_reports:        { es: 'Informes mensuales',      en: 'Monthly reports' },
   advanced_exports:       { es: 'Exportaciones avanzadas', en: 'Advanced exports' },
   ai_wealth_assistant:    { es: 'AI Wealth Assistant',     en: 'AI Wealth Assistant' },
+  // MONETIZATION V1 · M.02 B3 — las claves canónicas. Sin ellas `_featureLabel`
+  // devuelve la clave cruda, y el ÚNICO punto de conversión del producto le mostraba
+  // al usuario "workspace.loan" como nombre de la función.
+  //
+  // `i18nKey` en lugar de una cadena cuando el nombre YA existe en el diccionario:
+  // duplicarlo hacía que la tarjeta dijera "Simulador de préstamos" y el modal, a un
+  // click de distancia, "Simulador de préstamo". Mismo objeto, dos nombres. Leyendo
+  // la misma fuente no puede volver a divergir.
+  'workspace.loan':       { i18nKey: 'wsloan_n' },
+  'intelligence.full':    { es: 'Aurix Intelligence',      en: 'Aurix Intelligence' },
+  'premium.settings':     { es: 'Gestión de tu plan',      en: 'Plan management' },
 };
 // Display order for the Founder "Incluye" list (matches the product framing).
 const FOUNDER_BENEFIT_ORDER = [
@@ -63858,6 +64305,16 @@ const FOUNDER_BENEFIT_ORDER = [
 function _featureLabel(key) {
   const l = FEATURE_LABELS[key];
   if (!l) return key;
+  // Una entrada puede delegar en el diccionario: es lo que garantiza que el nombre
+  // del modal sea EL MISMO que el de la tarjeta.
+  // El `try` sólo cubría la EXCEPCIÓN (idioma desconocido ⇒ `T[lang]` undefined ⇒
+  // lanza). Si el diccionario existe pero le falta la clave, `t()` devuelve
+  // `undefined` sin lanzar, y el subtítulo del modal habría pintado el literal
+  // "undefined" a un usuario. Se comprueba el valor, no sólo la ausencia de error.
+  if (l.i18nKey) {
+    try { const v = t(l.i18nKey); if (typeof v === 'string' && v) return v; } catch (_) {}
+    return key;
+  }
   return (typeof lang !== 'undefined' && l[lang]) ? l[lang] : l.es;
 }
 
@@ -63901,6 +64358,60 @@ function closeFounderPage() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// MONETIZATION V1 · M.02 B3 — UPGRADE INTENT (seam, NO paywall)
+// ════════════════════════════════════════════════════════════════════════════
+// Lo único que hace falta en B3/B4: que una feature denegada no quede MUERTA al
+// click. Nada más. No hay checkout, ni precio, ni trial, ni modal comercial final
+// — eso es M.03/M.04.
+//
+// Reutiliza `#upgradeOverlay`, que ya existe y ya es honesto ("esta herramienta
+// forma parte del plan premium de Aurix"), y OCULTA su botón "Ver Aurix Founder",
+// porque ese camino sí pinta un precio (`openFounderPage` lee PLAN_CATALOG) y este
+// bloque no publica precios.
+//
+// La intención se registra en memoria y en un log local acotado, sin PII, para que
+// M.03 tenga una línea base de conversión en lugar de descubrirla desde cero. No
+// es analítica: no sale del dispositivo.
+const _AURIX_UPGRADE_INTENT_KEY = 'aurix_upgrade_intent_v1';
+let _aurixUpgradeIntents = [];
+function openUpgradeIntent(opts) {
+  const featureKey = String((opts && opts.featureKey) || '').trim();
+  const source     = String((opts && opts.source) || 'unknown').trim();
+  const entry = { featureKey, source, ts: Date.now() };
+  // Durante la ventana de boot `hasFeature()` es false para todos (fail-closed), así
+  // que un Premium DE PAGO que pulse antes de que resuelva el RPC llegaría aquí. Se
+  // le muestra la superficie —no puede abrir la herramienta todavía— pero NO se
+  // registra la intención: sería un deseo inventado en la línea base de conversión.
+  if (_aurixEntLoaded()) _aurixUpgradeIntents.push(entry);
+  try {
+    if (!_aurixEntLoaded()) throw new Error('not-loaded');
+    // Namespaced por usuario: en un dispositivo compartido dos cuentas mezclaban su
+    // registro de intención. Sin PII —sólo el uuid que ya gobierna la caché local.
+    const K = _AURIX_UPGRADE_INTENT_KEY + (_aurixActiveUserId ? ('_' + _aurixActiveUserId) : '');
+    const raw = localStorage.getItem(K);
+    const arr = raw ? (JSON.parse(raw) || []) : [];
+    arr.push(entry);
+    // Cota dura: es un registro de intención, no un historial.
+    localStorage.setItem(K, JSON.stringify(arr.slice(-50)));
+  } catch (_) {}
+  if (IS_DEV) console.log('[UPGRADE-INTENT]', featureKey, source);
+  try {
+    const ov = document.getElementById('upgradeOverlay');
+    if (!ov) return false;
+    const nameEl = document.getElementById('upgradeFeatureName');
+    if (nameEl) nameEl.textContent = featureKey ? _featureLabel(featureKey) : (lang === 'en' ? 'Premium feature' : 'Función premium');
+    // Sin precios en B3/B4.
+    const fBtn = document.getElementById('upgradeFounderBtn');
+    if (fBtn) fBtn.style.display = 'none';
+    if (typeof applyI18n === 'function') applyI18n();
+    ov.classList.add('open');
+    ov.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+  } catch (_) {}
+  return false;
+}
+
 function openUpgradeModal(feature) {
   const ov = document.getElementById('upgradeOverlay');
   if (!ov) return;
@@ -63927,12 +64438,14 @@ function closeUpgradeModal() {
 // hasFeature() is always true → onAllowed runs and the upgrade modal never
 // shows. Returns true if access was granted. Deliberately NOT wired into the
 // dashboard in prelaunch (the main dashboard stays untouched).
-function requireFeature(feature, onAllowed) {
+// M.02 B3 — el seam real. `hasFeature` ya es el entitlement server-side, y la
+// rama denegada abre el upgrade INTENT (sin precio), no el modal comercial.
+function requireFeature(feature, onAllowed, opts) {
   if (hasFeature(feature)) {
     if (typeof onAllowed === 'function') onAllowed();
     return true;
   }
-  openUpgradeModal(feature);
+  openUpgradeIntent({ featureKey: feature, source: (opts && opts.source) || 'requireFeature' });
   return false;
 }
 try {
@@ -63953,7 +64466,7 @@ try {
       e.stopPropagation();
       // PREMIUM-PREVIEW-FINAL — Free users see an intrigue/coming-soon state: clicking does NOTHING
       // (no modal, no navigation, no error). Owner (authenticated email) gets the normal clickable item.
-      const _premiumUser = (typeof hasAurixPremiumAccess === 'function') && hasAurixPremiumAccess(_aurixCurrentAuthUser());
+      const _premiumUser = hasFeature('premium.settings');   // M.02 B3 — entitlement real
       if (!_premiumUser) { e.preventDefault(); return; }
       const panel = document.getElementById('menuPanel');
       const toggle = document.getElementById('menuToggle');

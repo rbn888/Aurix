@@ -216,7 +216,14 @@ ok('E.2 sólo lee las tres tablas canónicas',
     /subscriptions|plan_features|entitlement_overrides/.test(m)));
 ok('E.3 las claves salen del catálogo, no de una lista dura en el resolver',
   /select distinct pf\.feature_key/.test(BODY) &&
-  !/workspace\.loan/.test(BODY) && !/intelligence\.full/.test(BODY) && !/premium\.settings/.test(BODY));
+  !/workspace\.loan/.test(BODY) && !/intelligence\.full/.test(BODY) &&
+  !/premium\.settings/.test(BODY) && !/workspace\.catalog_preview/.test(BODY));
+// M.02 B4 añadió una clave por DATO (dos filas de plan_features) sin tocar el
+// resolver: es la prueba de que derivar las claves del catálogo era la decisión
+// correcta. El contrato de B2 no cambió.
+ok('E.3b una capacidad nueva no exige tocar el resolver (se añadió catalog_preview así)',
+  /monetization_catalog_preview_key_1\.sql/.test(read('db/monetization_catalog_preview_key_1.sql')) === false ||
+  read('db/monetization_catalog_preview_key_1.sql').length > 500);
 ok('E.4 no existe ni puede existir un plan comercial "founder"',
   !/'founder'/.test(CODE) && /check \(plan in \('free','premium'\)\)/.test(b1));
 
@@ -233,17 +240,28 @@ ok('F.4 exige el recuento exacto (no puede pasar habiendo corrido menos)',
 ok('F.4b AUTORREPARABLE: repone las 4 CHECK y el seed por sí misma, sin fiarse del rollback',
   (cert.match(/alter table public\.subscriptions add constraint/g) || []).length === 4 &&
   /RESTAURACIÓN FALLIDA: subscriptions no vuelve a tener 12 CHECK/.test(cert) &&
-  /RESTAURACIÓN FALLIDA: plan_features no vuelve a tener 6 filas/.test(cert) &&
-  /RESTAURACIÓN FALLIDA: quedaron filas de prueba/.test(cert));
-ok('F.4c se niega a correr sobre un estado inesperado (precondición 0/0/12)',
-  /PRECONDICIÓN: subscriptions\/entitlement_overrides no están vacías/.test(cert) &&
+  /RESTAURACIÓN FALLIDA: plan_features no vuelve a tener 8 filas/.test(cert) &&
+  /RESTAURACIÓN FALLIDA: el recuento no vuelve al de partida/.test(cert));
+// RE-DECIDIDO en M.02 B4: la precondición "0 filas globales" se negó a correr en
+// cuanto existió el primer override real (el del founder, que además es la cuenta
+// más antigua y era el sujeto v_a). Hizo bien: iba a borrar datos reales. Ahora
+// elige sujetos SIN estado comercial y afirma el retorno al estado de PARTIDA, así
+// que sigue protegiendo sin volverse inejecutable con clientes en la base — que era
+// el residual declarado de B2.
+ok('F.4c elige sujetos limpios y no exige que la base esté vacía',
+  /where not exists \(select 1 from public\.subscriptions s where s\.user_id = u\.id\)/.test(cert) &&
+  /and not exists \(select 1 from public\.entitlement_overrides o where o\.user_id = u\.id\)/.test(cert) &&
+  /PRECONDICIÓN: hacen falta DOS cuentas sin estado comercial/.test(cert) &&
   /PRECONDICIÓN: subscriptions no tiene las 12 CHECK/.test(cert));
+ok('F.4c2 y afirma el retorno al estado de partida, no a cero',
+  /select count\(\*\) into v_subs0 from public\.subscriptions;/.test(cert) &&
+  /<> v_subs0/.test(cert) && /<> v_ovr0/.test(cert));
 ok('F.4d ningún assert de DENEGADO puede pasar por vacuidad (clave ausente ⇒ falla)',
   !/if \(e\.features->>'[\w.]+'\)::boolean then/.test(cert) &&
   !/(if|or) not \(e\.features->>'[\w.]+'\)::boolean/.test(cert) &&
   !/(if|or) \(e\.features->>'[\w.]+'\)::boolean/.test(cert) &&
   /coalesce\(\(e\.features->>'[\w.]+'\)::boolean, true\)/.test(cert) &&
-  /jsonb_object_keys\(e\.features\)\) <> 3/.test(cert));
+  /jsonb_object_keys\(e\.features\)\) <> 4/.test(cert));
 const REQUIRED = {
   'free sin fila': /sin fila ⇒ free/, 'premium válido': /premium vigente/,
   'premium expirado': /periodo expirado/, 'status no vivo': /canceled\/past_due\/expired/,
@@ -270,16 +288,25 @@ ok('F.7 el fail-closed se certifica SIN depender de las CHECK de B1 (se retiran 
   /drop constraint subscriptions_premium_bound_chk/.test(cert) && /^rollback;/m.test(cert));
 ok('F.8 la privacidad se comprueba con strpos, no con LIKE (en LIKE el _ es comodín)',
   /strpos\(e::text, 'cus_'\)/.test(cert) && !/like '%sub_%'/.test(cert));
-ok('F.9 el aislamiento usa DOS usuarios reales distintos',
-  /select id into v_a from auth\.users/.test(cert) && /select id into v_b from auth\.users/.test(cert) &&
-  /offset 1/.test(cert));
+ok('F.9 el aislamiento usa DOS usuarios reales DISTINTOS y sin estado comercial',
+  /select id into v_a from auth\.users u/.test(cert) &&
+  /select id into v_b from auth\.users u/.test(cert) &&
+  /where u\.id <> v_a/.test(cert) &&
+  (cert.match(/not exists \(select 1 from public\.subscriptions s where s\.user_id = u\.id\)/g) || []).length === 2);
 
 // ══ G. FUERA DE ALCANCE INTACTO ═══════════════════════════════════════════
 console.log('\nG · ALCANCE');
 ok('G.1 ENFORCE_ENTITLEMENTS sigue en false (B2 no activa enforcement)',
   /ENFORCE_ENTITLEMENTS\s*=\s*false/.test(app));
-ok('G.2 la UX no se movió: los 5 call sites legacy siguen en pie',
-  (app.match(/hasAurixPremiumAccess\(/g) || []).length >= 5);
+// RE-DECIDIDA en M.02 B3 (2026-09-01). En B2 este assert era correcto: B2 no
+// cambiaba ninguna superficie, así que los 5 call sites legacy DEBÍAN seguir en pie.
+// B3 es exactamente el bloque autorizado a moverlos, y los movió: los cinco leen
+// ahora `hasFeature()`. Lo que se conserva —y es lo que de verdad importaba— es que
+// `hasAurixPremiumAccess` no vuelva a ser autoridad. Su contrato nuevo lo asevera
+// AURIX-MONETIZATION-PRODUCT-ENTITLEMENT-harness.js (G.8).
+ok('G.2 hasAurixPremiumAccess ya NO es autoridad (B3): delega en el entitlement real',
+  /function hasAurixPremiumAccess\(_user\) \{\s*return hasFeature\('intelligence\.full'\);/.test(app.replace(/\r/g, '')) &&
+  !/rbn892/.test(app.replace(/^\s*\/\/.*$/gm, '')));
 ok('G.3 los previews siguen siendo el fallback',
   /_aurixPremiumPreviewHTML/.test(app) && /_aurixIntelligencePreviewHTML/.test(app));
 ok('G.4 sin Stripe / Apple / checkout / webhook',

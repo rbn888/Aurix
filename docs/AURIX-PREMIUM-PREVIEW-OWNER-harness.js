@@ -18,21 +18,51 @@ function ok(n, c, i) { if (c) { pass++; console.log('  ✓ ' + n + (i ? '  [' + 
 
 const sb = { String, Boolean };
 vm.createContext(sb);
+// SPEC MONETIZATION M.02 B3 — `hasAurixPremiumAccess` ya NO decide: delega en
+// `hasFeature()`, que deriva del resolver server-side. Se inyecta el gate para
+// poder comprobar la DELEGACIÓN, que es el contrato nuevo.
+sb.__hasFeatureReturns = false;
+sb.__hasFeatureCalls = [];
+vm.runInContext('function hasFeature(k){ __hasFeatureCalls.push(k); return __hasFeatureReturns; }', sb);
 vm.runInContext(fn('hasAurixPremiumAccess'), sb);
 vm.runInContext(fn('_aurixPremiumPreviewHTML'), sb);
 const has = u => { sb.__u = u; return vm.runInContext('hasAurixPremiumAccess(__u)', sb); };
+const withEnt = (v, u) => { sb.__hasFeatureReturns = v; sb.__hasFeatureCalls = []; const r = has(u); return r; };
 const previewLang = (s, l) => { sb.lang = l; return vm.runInContext('_aurixPremiumPreviewHTML(' + JSON.stringify(s) + ')', sb); };
 const count = (h, re) => (h.match(re) || []).length;
 
 console.log('AURIX-PREMIUM-PREVIEW-OWNER (FINAL POLISH)\n');
 
-console.log('Owner override (authenticated email only):');
-ok('owner rbn892@gmail.com → full access', has({ email: 'rbn892@gmail.com' }) === true);
-ok('owner email case/space-insensitive', has({ email: '  RBN892@Gmail.com ' }) === true);
-ok('other email → NO premium (preview)', has({ email: 'someone@else.com' }) === false);
-ok('premium/isPremium/subscriptionActive honored', has({ email: 'x@y.com', premium: true }) === true && has({ email: 'x@y.com', isPremium: true }) === true && has({ email: 'x@y.com', subscriptionActive: true }) === true);
-ok('null/undefined/no-email → NO premium', has(null) === false && has(undefined) === false && has({}) === false);
-ok('helper depends only on user (no localStorage/global secret)', !/localStorage|sessionStorage|window\.|SECRET|unlock/i.test(fn('hasAurixPremiumAccess')));
+// ── RE-ESCRITO por SPEC MONETIZATION M.02 B3 ─────────────────────────────────
+// Antes esta sección certificaba la semántica que B3 viene a RETIRAR: el email del
+// owner compilado en el bundle concedía acceso, y `user.premium` / `user.isPremium`
+// / `user.subscriptionActive` también (una rama sin escritor que se volvía
+// auto-concesión el día que alguien mapeara `user_metadata` sobre el user).
+// Ahora la autoridad es `public.aurix_entitlements()` y este helper sólo delega.
+// Lo que se certifica es justo lo contrario que antes, y a propósito.
+console.log('Owner override RETIRADO — el helper delega en el entitlement (M.02 B3):');
+ok('el email del owner ya NO concede acceso',
+  withEnt(false, { email: 'rbn892@gmail.com' }) === false);
+ok('ni con cualquier variante de caja/espacios',
+  withEnt(false, { email: '  RBN892@Gmail.com ' }) === false);
+ok('user.premium / isPremium / subscriptionActive ya NO conceden',
+  withEnt(false, { email: 'x@y.com', premium: true }) === false &&
+  withEnt(false, { email: 'x@y.com', isPremium: true }) === false &&
+  withEnt(false, { email: 'x@y.com', subscriptionActive: true }) === false);
+ok('con el entitlement CONCEDIDO devuelve true, sea quien sea el user',
+  withEnt(true, null) === true && withEnt(true, {}) === true &&
+  withEnt(true, { email: 'someone@else.com' }) === true);
+ok('delega en la feature intelligence.full (una sola pregunta, al resolver)',
+  (function () { sb.__hasFeatureReturns = false; sb.__hasFeatureCalls = []; has({ email: 'x@y.com' });
+    return sb.__hasFeatureCalls.length === 1 && sb.__hasFeatureCalls[0] === 'intelligence.full'; })());
+ok('el helper no mira email, flags del user, localStorage ni ningún secreto global',
+  !/rbn892|localStorage|sessionStorage|SECRET|unlock|\.premium|isPremium|subscriptionActive/i
+    .test(fn('hasAurixPremiumAccess').replace(/^\s*\/\/.*$/gm, '')));
+// Era VACUO: `typeof <cualquier cosa>` siempre devuelve un string. Se comprueba que
+// la función exista de verdad Y que produzca la superficie del preview.
+ok('el preview compartido sigue siendo el fallback y NO se retiró',
+  vm.runInContext('typeof _aurixPremiumPreviewHTML', sb) === 'function' &&
+  /premium-preview-stage/.test(previewLang('intelligence', 'es')));
 
 function check(section, l, C) {
   const h = previewLang(section, l);
@@ -74,14 +104,33 @@ console.log('\nGates + owner + header stability (source):');
 // surface — but Intelligence now returns the personalised INT.PREVIEW.V1 reading instead of the
 // shared "PRÓXIMAMENTE" card. Workspace keeps the shared card (asserted on the next line).
 // Contract of the new surface lives in docs/AURIX-INT-PREVIEW-V1-harness.js.
-ok('renderIntelligenceTab returns the Intelligence preview when NOT premium', /if \(!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) return _aurixIntelligencePreviewHTML\(\);/.test(app));
-ok('renderWorkspace shows preview when NOT premium', /!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) \{[\s\S]{0,140}_aurixPremiumPreviewHTML\('workspace'\)/.test(app));
-ok('header stability: workspace preview does NOT go full-bleed (no logo shift)', /const _wsFullBleed = \(tab === 'workspace'\) && !\(typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\);/.test(app) && /classList\.toggle\('workspace-active', _wsFullBleed\)/.test(app));
+// ── RE-DECIDIDOS por SPEC MONETIZATION M.02 B3/B4 ────────────────────────────
+// Intelligence sigue cayendo al preview cuando no hay derecho: lo que cambia es
+// QUIÉN lo decide (el entitlement server-side, no un email del bundle).
+ok('renderIntelligenceTab devuelve el preview cuando NO hay entitlement',
+  /if \(!hasFeature\('intelligence\.full'\)\) return _aurixIntelligencePreviewHTML\(\);/.test(app));
+// Workspace ya NO tiene rama de preview a nivel de SECCIÓN. Era el bloqueo global
+// que impedía que cualquier usuario Free llegara a ver Compound; B4 abre la sección
+// y gatea las HERRAMIENTAS. El preview compartido sigue existiendo (es el fallback
+// de Intelligence y de quien lo necesite), pero ya no es el camino de Workspace.
+ok('Workspace NO tiene bloqueo global de sección (abierto al plan Free)',
+  !/_aurixPremiumPreviewHTML\('workspace'\)/.test(app.replace(/^\s*\/\/.*$/gm, '')) &&
+  /if \(AURIX_WS_HOME\) \{ renderWorkspaceHome\(container\); return; \}/.test(app));
+ok('el gate de Workspace vive en la HERRAMIENTA, no en la sección',
+  /const _acc = _wsToolAccess\(key\);/.test(app) &&
+  /if \(featureKey && !hasFeature\(featureKey\)\) return \{ ok: false, reason: 'entitlement'/.test(app));
+// Sin rama de preview en Workspace, el motivo de la estabilidad del header
+// desaparece: sólo se pinta la rejilla real, que SÍ es full-bleed. El invariante
+// que queda es que la clase la siga gobernando una sola expresión.
+ok('header: el full-bleed depende sólo de la pestaña, y una sola expresión lo gobierna',
+  /const _wsFullBleed = \(tab === 'workspace'\);/.test(app) &&
+  /classList\.toggle\('workspace-active', _wsFullBleed\)/.test(app));
 ok('i18n by lang (ES default)', /typeof lang !== 'undefined' && lang === 'en'/.test(app));
 ok('payments untouched (entitlement enforcement still off)', /const ENFORCE_ENTITLEMENTS = false;/.test(app));
 
 console.log('\nFree "Aurix Premium" menu item — intrigue/coming-soon (owner = normal):');
-ok('click on menuPremium NO-OPs for Free (no modal, no navigation)', /const _premiumUser = \(typeof hasAurixPremiumAccess === 'function'\) && hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\);\s*if \(!_premiumUser\) \{ e\.preventDefault\(\); return; \}/.test(app));
+ok('click on menuPremium NO-OPs for Free (no modal, no navigation)',
+  /const _premiumUser = hasFeature\('premium\.settings'\);[^\n]*\n\s*if \(!_premiumUser\) \{ e\.preventDefault\(\); return; \}/.test(app));
 ok('owner branch still opens the premium modal', /if \(!_premiumUser\) \{ e\.preventDefault\(\); return; \}[\s\S]{0,600}openAurixPremiumModal\(\{ source: 'settings-menu' \}\)/.test(app));
 ok('menu identity: Free → menu-item--coming-soon; owner → normal (removed)', /premiumEl\.classList\.add\('menu-item--coming-soon'\)/.test(app) && /premiumEl\.classList\.remove\('menu-item--coming-soon'\)/.test(app));
 ok('Free label = ONLY PRÓXIMAMENTE / COMING SOON (never reveals "Aurix Premium")', /premiumEl\.textContent = _en \? 'COMING SOON' : 'PRÓXIMAMENTE';/.test(app));

@@ -540,7 +540,20 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
   // not depend on it; that is visible in the current file and needs no baseline.
   const untouched = ['_aurixNormalizeBackendSnapshot','_aurixMergeSnapshotSources','_aurixHistorySourceForDisplay',
     '_aurixBackendHealth','_aurixBackendHealthSnapshot',
-    '_aurixIntelligencePreviewFacts','_aurixIntelligencePreviewHTML','hasAurixPremiumAccess'];
+    '_aurixIntelligencePreviewFacts','_aurixIntelligencePreviewHTML'];
+  // SPEC MONETIZATION M.02 B3 — `hasAurixPremiumAccess` SALE de la lista de
+  // byte-identidad, por la misma razón y con el mismo patrón que
+  // `_aurixFetchBackendSnapshots`: B3 lo edita legítimamente. Era el gate REAL de
+  // producto (allowlist del email del owner + user.premium/isPremium/
+  // subscriptionActive) y pasa a delegar en `hasFeature()`, que deriva del resolver
+  // server-side de M.02 B2. Retirarle la autoridad es el OBJETIVO del bloque, así
+  // que "byte-idéntico a e9535ff" dejó de ser el invariante correcto.
+  // Lo que este gate SÍ sigue exigiendo, explícitamente, está justo debajo; su
+  // contrato nuevo lo vigila AURIX-MONETIZATION-PRODUCT-ENTITLEMENT-harness.js.
+  ok('17.0c hasAurixPremiumAccess sigue existiendo exactamente una vez',
+    (app.match(/^function hasAurixPremiumAccess\(/gm) || []).length === 1);
+  ok('17.0d …y no referencia el reader de category-history',
+    !/_aurixCatHist|_aurixCatExposure|_AURIX_CATHIST|aurixCategoryHistory|aurixCategoryExposure/.test(fnSrc('hasAurixPremiumAccess')));
   // SPEC P0 HISTORICAL CONTINUITY — `_aurixFetchBackendSnapshots` SALE de esta lista: ese bloque lo
   // edita legítimamente (la lectura pasa a descendente + paginada por cursor, porque la versión
   // ascendente con `limit(5000)` recibía sólo las 1000 filas MÁS ANTIGUAS del recorte `max-rows` de
@@ -601,6 +614,15 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
       _aw8PortfolioUnrealizedTotal: 'AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js',
       _wp5PortfolioAnalytics: 'AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js',
       _buildWorkspaceRiskCategories: 'AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js',
+      // SPEC MONETIZATION M.02 B3 — `hasAurixPremiumAccess` era el gate REAL de
+      // producto (allowlist del email del owner + user.premium/isPremium/
+      // subscriptionActive). B3 le retira la autoridad: pasa a delegar en
+      // `hasFeature()`, que deriva del resolver server-side. El cambio es el
+      // OBJETIVO del bloque, así que la byte-identidad contra e9535ff dejó de ser
+      // el invariante correcto — lo que hay que vigilar es que NO vuelva a decidir
+      // por email ni por un flag del objeto user, y eso lo asevera G.8 del gate
+      // nombrado aquí (que además ejecuta la matriz FREE/PREMIUM/FOUNDER).
+      hasAurixPremiumAccess: 'AURIX-MONETIZATION-PRODUCT-ENTITLEMENT-harness.js',
     };
     const LATER_SPEC_OWNERS = Object.keys(LATER_SPEC_OWNER_GATES);
     ok('18.0 every owner exempted from byte-identity is watched by a NAMED gate that exists',

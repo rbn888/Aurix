@@ -22240,6 +22240,12 @@ body.gs-open { overflow: hidden; }
 .wsh-tpl.is-soon:hover { transform: none; border-color: rgba(120,160,255,0.13); }
 /* Herramientas — compact operative toolbox with per-tool accent. */
 .wsh-toolbox { grid-template-columns: repeat(5, 1fr); gap: 12px; }
+/* M.02 B4 — con Workspace abierto al plan Free el catálogo público son DOS
+   herramientas, y `repeat(5, 1fr)` dejaba tres columnas vacías en escritorio: la
+   misma clase de defecto que GLOBAL POLISH ya cerró una vez (ocultar entradas de un
+   catálogo obliga a revisar quién pinta columnas FIJAS a partir de él). Con menos de
+   tres tarjetas la rejilla deja de ser fija y las tarjetas conservan su ancho. */
+.wsh-toolbox.is-sparse { grid-template-columns: repeat(auto-fit, minmax(150px, 190px)); justify-content: start; }
 .wsh-toolcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(165,196,255,0.025); cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
 .wsh-toolcard:hover { transform: translateY(-2px); }
 .wsh-toolcard.is-soon { cursor: default; opacity: 0.85; }
@@ -23676,6 +23682,14 @@ body.aurix-skeleton #totalValue::after {
   background:rgba(255,255,255,.03);
 }
 .wsh-mse2-pv > *{ width:100%; height:100%; }
+/* MONETIZATION V1 · M.02 B4 · §14 — identidad visual coherente en Mi Espacio.
+   La tarjeta del catálogo carga el icono real (tool_compound.webp) sobre
+   `.wsh-toolcard-ic`, que es `position:relative`. En Mi Espacio se pintaba sólo el
+   glyph genérico, así que la MISMA herramienta tenía dos caras. `.ws-asset-img` es
+   `position:absolute; inset:0`, luego necesita un ancestro posicionado: esta clase
+   nueva lo da sin tocar `.wsh-mse2-pv` ni ninguna superficie existente. */
+.wsh-mse2-ic{ position:relative; display:block; width:100%; height:100%; border-radius:inherit; overflow:hidden; }
+.wsh-mse2-ic > svg{ width:100%; height:100%; }
 .wsh-mse2-pv svg{ width:100%; height:100%; }
 .wsh-mse2-body{ flex:1 1 auto; min-width:0; }
 .wsh-mse2-name{
@@ -25751,6 +25765,16 @@ summary:focus-visible,
 }
 .wsh-tier.is-premium { color: rgba(244,196,90,0.92); background: rgba(244,196,90,0.11); border: 1px solid rgba(244,196,90,0.30); }
 .wsh-tier.is-free    { color: rgba(159,194,255,0.62); background: rgba(120,160,255,0.06); border: 1px solid rgba(120,160,255,0.20); }
+/* MONETIZATION V1 · M.02 B4 — chip del CATÁLOGO INTERNO (sólo lo ve una cuenta con
+   override global). Sin esta regla los 21 chips internos caían a la base sin color
+   ni fondo, junto a un PREMIUM en oro y un INCLUIDO en azul: la superficie hecha
+   para evaluar el catálogo llegaba visualmente rota.
+   Hue propio y NEUTRO —ni oro (que afirma plan) ni azul (que afirma incluido)— y
+   deliberadamente en la familia petróleo de los tokens `--elev-*`, NO en alfa
+   blanco: la lección de DASHBOARD EXCELLENCE es que el alfa blanco sobre el lienzo
+   se lee como gris genérico. Un punto menos de opacidad que los otros dos, porque
+   es información de trabajo, no una etiqueta comercial. */
+.wsh-tier.is-preview { color: rgba(150,178,196,0.66); background: rgba(120,156,176,0.07); border: 1px solid rgba(126,160,180,0.22); }
 
 .wsh-tplarch { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; max-width: 560px; padding: 2px 0 4px; }
 .wsh-tplarch-t { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-bright); }

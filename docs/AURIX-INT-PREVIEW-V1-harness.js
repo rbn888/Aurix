@@ -88,8 +88,10 @@ console.log('AURIX-INT-PREVIEW-V1 — SPEC FASE 2.4 · Intelligence Preview V1\n
 console.log('1 · Dead screen removed:');
 {
   const gate = app.slice(app.indexOf('function renderIntelligenceTab('), app.indexOf('function renderIntelligenceTab(') + 1400);
-  ok('1.1 non-premium branch returns the Intelligence preview',
-    /!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\)\s*return\s+_aurixIntelligencePreviewHTML\(\);/.test(gate), 'gate line');
+  // RE-DECIDIDO por M.02 B3: la rama sigue existiendo y sigue devolviendo el
+  // preview; el gate pasa a ser el entitlement server-side.
+  ok('1.1 la rama sin entitlement devuelve el preview de Intelligence',
+    /!hasFeature\('intelligence\.full'\)\)\s*return\s+_aurixIntelligencePreviewHTML\(\);/.test(gate), 'gate line');
   ok('1.2 Intelligence no longer routes to the shared PRÓXIMAMENTE card',
     !/_aurixPremiumPreviewHTML\('intelligence'\)/.test(app));
   ok('1.3 Workspace STILL uses the shared preview (untouched contract)',
@@ -240,8 +242,13 @@ console.log('\n7 · No commercial or entitlement change:');
   ok('7.1 CTA goes to the Dashboard — no checkout, no founder page, no upgrade modal',
     /switchTab\('home'\)/.test(h) && !/openFounderPage|openUpgradeModal|checkout|stripe/i.test(h));
   ok('7.2 no price anywhere in the preview', !/14,99|14\.99|59\s?€|8,99|€\s?\d/.test(h));
-  ok('7.3 entitlement gate unchanged — hasAurixPremiumAccess still decides',
-    /function hasAurixPremiumAccess/.test(app) && /!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)/.test(app));
+  // RE-DECIDIDO por M.02 B3. Antes: "el gate no cambia, hasAurixPremiumAccess sigue
+  // decidiendo". Ahora decide el resolver server-side y ese helper ya no es
+  // autoridad — es justo el objetivo del bloque. Lo que se exige es que el preview
+  // siga siendo el fallback y que el gate sea la feature.
+  ok('7.3 el gate es el entitlement server-side, no el helper legacy',
+    /!hasFeature\('intelligence\.full'\)/.test(app) &&
+    !/rbn892/.test(app.replace(/^\s*\/\/.*$/gm, '')));
   ok('7.4 ENFORCE_ENTITLEMENTS still false (not activated by this SPEC)',
     /ENFORCE_ENTITLEMENTS\s*=\s*false/.test(app));
   ok('7.5 PLAN_CATALOG premium price still null (pricing untouched)',

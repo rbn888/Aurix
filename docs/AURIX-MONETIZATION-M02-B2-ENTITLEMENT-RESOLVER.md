@@ -247,11 +247,16 @@ que siga cubriendo los 24 escenarios, que cada uno asevere de verdad y que termi
    la carga sigue ahí. **No ejecutar ese fichero por trozos.**
 8. **El ACL del resolver no se certifica dentro del fichero** (todo corre como owner). Se verifica aparte,
    con `set local role`, y queda registrado abajo.
-9. **La precondición `0/0/12` hará que esta certificación deje de poder ejecutarse** el día que exista una
-   suscripción real (B9). Es el intercambio correcto —negarse antes que contaminar datos de un cliente que
-   paga— pero significa que el resolver deja de ser re-certificable en vivo justo cuando empieza a decidir
-   sobre dinero real. Cuando llegue B9 habrá que darle un camino propio (proyecto de staging, o usuarios
-   sintéticos aislados). **No se abre en B2.**
+9. ~~La precondición `0/0/12` hará que esta certificación deje de poder ejecutarse~~ — **CERRADO en M.02
+   B4 (2026-09-01)**, y antes de lo previsto: el override del founder hizo que la precondición se negara a
+   correr, con razón, porque el sujeto `v_a` era la cuenta más antigua, que es justo la del founder, y el
+   fichero iba a borrar datos reales. Corregido eligiendo **sujetos sin estado comercial** en lugar de
+   exigir la base vacía, y afirmando el retorno al **estado de partida** en vez de a cero. La protección se
+   conserva y la certificación sigue siendo ejecutable con clientes en la base.
+10. **La clave canónica pasó de 3 a 4** en M.02 B4: `workspace.catalog_preview`, que **ningún plan
+   concede** (`db/monetization_catalog_preview_key_1.sql`). El resolver la recogió **sin un solo cambio de
+   código**, porque deriva su conjunto canónico de `plan_features` — la decisión de B2 de no hardcodear las
+   claves se pagó sola. Sólo se actualizó el recuento en la certificación.
 10. **`plan` y `features` pueden discrepar por diseño.** Es correcto y está documentado, y es exactamente el
    sitio donde un consumidor descuidado de B3 abriría un fail-open. El gate no puede protegerlo hasta que
    exista ese consumidor.
