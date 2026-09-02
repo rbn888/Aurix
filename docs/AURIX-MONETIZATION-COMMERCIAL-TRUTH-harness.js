@@ -693,9 +693,12 @@ ok('N.3 el billing del servidor está acotado a api/billing/ y su webhook verifi
     if (flat.some(f => /stripe|checkout|billing|webhook|subscri/i.test(f))) return false;
     const dir = path.join(root, 'api', 'billing');
     if (!fs.existsSync(dir)) return true;                       // sin billing: también válido
+    // El webhook es `.mjs` a propósito: es una función Edge y Vercel transpila los
+    // `.js` de api/ a CommonJS, que el runtime Edge no puede ejecutar (ver la
+    // cabecera del fichero y la sección J del gate de billing).
     const files = fs.readdirSync(dir).sort().join(',');
-    if (files !== 'checkout.js,portal.js,webhook.js') return false;
-    const wh = fs.readFileSync(path.join(dir, 'webhook.js'), 'utf8');
+    if (files !== 'checkout.js,portal.js,webhook.mjs') return false;
+    const wh = fs.readFileSync(path.join(dir, 'webhook.mjs'), 'utf8');
     return /stripe-signature/.test(wh) && /crypto\.subtle\.sign/.test(wh)
         && /STRIPE_WEBHOOK_SECRET/.test(wh);
   })());

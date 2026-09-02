@@ -20,7 +20,7 @@ const app  = read('app.js');
 const css  = read('styles.css');
 const idx  = read('index.html');
 const SQL  = read('db/monetization_m04_billing_stripe_1.sql');
-const WH   = read('api/billing/webhook.js');
+const WH   = read('api/billing/webhook.mjs');
 const CO   = read('api/billing/checkout.js');
 const PO   = read('api/billing/portal.js');
 
@@ -741,6 +741,43 @@ console.log('\nH · legacy billing retirado');
   ok('H.4 `aurix_plan` no concede nada en ninguna ruta de acceso',
     !/aurix_plan/.test(fnSrc(app, 'hasFeature')) &&
     !/getPlan\(|isPremiumTier\(/.test(fnSrc(app, 'hasFeature') + fnSrc(app, '_aurixEntIsCatalogPreview')));
+}
+
+// ══ J · DESPLEGABILIDAD (la extensión es contrato, no estilo) ═════════════
+// El primer deployment de M.04 falló entero. `package.json` no declara
+// `"type": "module"`, así que Vercel trata un `.js` de `api/` como CommonJS y lo
+// transpila desde ESM — y ese transform se aplica también a una función Edge, que
+// sólo puede ejecutar ESM. Salía una EdgeFunction en CommonJS: artefacto inválido,
+// Build Failed a los ~6 s y sin mensaje. Reproducido con el builder real:
+//   webhook.js  → EdgeFunction + "Compiling webhook.js from ESM to CommonJS…"
+//   webhook.mjs → EdgeFunction, sin transform.
+console.log('\nJ · desplegabilidad en Vercel');
+{
+  const dir = path.join(root, 'api', 'billing');
+  ok('J.1 el webhook Edge es `.mjs`: ESM sin ambigüedad, sin transpilar a CommonJS',
+    fs.existsSync(path.join(dir, 'webhook.mjs')) &&
+    !fs.existsSync(path.join(dir, 'webhook.js')));
+  ok('J.2 …y su motivo queda escrito en el propio fichero (para que nadie lo renombre)',
+    /WHY THIS FILE IS `\.mjs`/.test(WH) && /Build Failed/.test(WH));
+  // Si algún día se añade `"type": "module"`, el `.js` volvería a ser válido; hasta
+  // entonces, la única función Edge del proyecto NO puede llevar extensión `.js`.
+  ok('J.3 mientras package.json no declare `type: module`, ninguna función Edge usa `.js`',
+    (() => {
+      const pkg = JSON.parse(read('package.json'));
+      if (pkg.type === 'module') return true;
+      const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e =>
+        e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+      return walk(path.join(root, 'api'))
+        .filter(f => f.endsWith('.js'))
+        .every(f => !/runtime:\s*'edge'/.test(fs.readFileSync(f, 'utf8')));
+    })());
+  ok('J.4 las otras dos funciones de billing son Node normales (mismo formato que las 14 que ya despliegan)',
+    ['checkout.js', 'portal.js'].every(f => fs.existsSync(path.join(dir, f))) &&
+    !/runtime:\s*'edge'/.test(CO) && !/runtime:\s*'edge'/.test(PO));
+  ok('J.5 la ruta pública NO cambia con la extensión',
+    /\/api\/billing\/webhook/.test(read('docs/AURIX-MONETIZATION-M04-BILLING.md')) &&
+    /_aurixBillingApi\('checkout'\)/.test(app) &&
+    /AURIX_API_ORIGIN \+ '\/api\/billing\/'/.test(app));
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
