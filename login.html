@@ -471,7 +471,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 488;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 489;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -559,12 +559,18 @@
     // localStorage is not shared) → else the shared 'portfolio_lang' key → else
     // Spanish. The choice is persisted so index.html stays in the same language
     // after sign-in. No more hardcoded Spanish on this screen.
+    // M.03 · B — MISMA precedencia que index.html: `?lang=` es una elección
+    // EXPLÍCITA y gana; `?langhint=` es sólo el idioma con el que se mostraba la
+    // landing y se aplica únicamente si este contenedor no tiene preferencia.
     const LOGIN_LANG = (function () {
       try {
-        const p = new URLSearchParams(location.search).get('lang');
+        const q = new URLSearchParams(location.search);
+        const p = q.get('lang');
         if (p === 'en' || p === 'es') { localStorage.setItem('portfolio_lang', p); return p; }
         const s = localStorage.getItem('portfolio_lang');
         if (s === 'en' || s === 'es') return s;
+        const h = q.get('langhint');
+        if (h === 'en' || h === 'es') { localStorage.setItem('portfolio_lang', h); return h; }
       } catch (_) {}
       return 'es';
     })();

@@ -706,5 +706,97 @@ console.log('\n14 · Non-vacuity: the protections are load-bearing:');
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 15 · M.03 · D/E — TRAYECTORIA PATRIMONIAL Y COBERTURA DE OBSERVACIÓN
+// ════════════════════════════════════════════════════════════════════════════
+// La familia WEALTH_LEVEL emitía dos hechos y la Memoria patrimonial sólo podía
+// consumir uno (el máximo histórico, y sólo si el último punto ES el máximo). Con
+// eso, cualquier cartera que no estuviese en máximos veía el estado "acumulando"
+// para siempre. Aquí se certifica que la trayectoria ES un hecho, con sus guards,
+// y que "no hay cambio material" es un estado DISTINTO de "no hay evidencia".
+console.log('\n15 · M.03 D/E — trayectoria y cobertura:');
+{
+  const base = { serverRows: [], assets: LOPSIDED, snap: SNAP, drivers: DRIVERS };
+  const withRows = (vals, flows) => core(Object.assign({}, base, { rows: inv(vals) }, flows ? { flows } : {}));
+  const keyOf = (c, k) => (c.ledger.facts || []).find(f => f.semanticKey === k) || null;
+  const gapOf = (c, k) => (c.ledger.gaps || []).find(g => g.semanticKey === k) || null;
+
+  // Sube de 10.000 a 12.000: +2.000 sobre 12.000 = 16,7 % ≫ 2 % de materialidad.
+  const rising  = withRows([10000, 10500, 11000, 11500, 12000]);
+  // Termina por debajo del máximo (12.000 el día 2, 11.000 al final).
+  const belowHi = withRows([10000, 11000, 12000, 11500, 11000]);
+  // Variación total 40 sobre 10.040 = 0,4 % ⇒ medido y NO material.
+  const flatish  = withRows([10000, 10010, 10020, 10030, 10040]);
+
+  ok('15.1 el cambio de NIVEL es un hecho fechado, en divisa base y SIN porcentaje',
+    (() => { const f = keyOf(rising, 'investable_level_change');
+      return !!f && f.family === 'wealth_level' && f.unit === 'base_currency'
+        && near(f.value, 2000, 0.01) && f.note === 'level_claim_not_return'
+        && f.changeFact === true
+        && Number.isFinite(f.window.startAt) && Number.isFinite(f.window.endAt)
+        && !('pct' in f.values) && !('returnPct' in f.values); })(),
+    JSON.stringify(keyOf(rising, 'investable_level_change')));
+  ok('15.1b y no publica valor inicial y final juntos (invitaría a derivar el %)',
+    (() => { const v = (keyOf(rising, 'investable_level_change') || {}).values || {};
+      return !('startValue' in v) && !('endValue' in v); })());
+  ok('15.2 un movimiento por debajo del umbral se registra MEDIDO, no como incapacidad',
+    (() => { const g = gapOf(flatish, 'investable_level_change');
+      return !keyOf(flatish, 'investable_level_change') && !!g
+        && g.status === 'available' && g.reason === 'no_material_level_change'
+        && g.observations === 5; })(),
+    JSON.stringify(gapOf(flatish, 'investable_level_change')));
+  ok('15.3 el umbral es una constante NOMBRADA, no un número suelto',
+    /levelDeltaShare/.test(konstSrc('_AURIX_FACT_MATERIAL')) &&
+    /_AURIX_FACT_MATERIAL\.levelDeltaShare/.test(fnSrc('_aurixFactLedger')));
+  ok('15.4 por debajo del máximo se publica el MÁXIMO ANTERIOR, fechado',
+    (() => { const f = keyOf(belowHi, 'investable_prior_high');
+      return !!f && near(f.value, 12000, 0.01) && f.unit === 'base_currency'
+        && f.note === 'level_claim_not_return' && Number.isFinite(f.values.at)
+        && !keyOf(belowHi, 'investable_all_time_high'); })(),
+    JSON.stringify(keyOf(belowHi, 'investable_prior_high')));
+  ok('15.5 en máximos NO se publica máximo anterior (son complementarios, nunca los dos)',
+    !!keyOf(rising, 'investable_all_time_high') && !keyOf(rising, 'investable_prior_high'));
+  ok('15.5b un máximo que EQUIVALE al valor de hoy no es información: no se publica',
+    (() => { const c = withRows([10000, 10000, 10000, 10000, 10000]);
+      return !keyOf(c, 'investable_prior_high') && !keyOf(c, 'investable_all_time_high')
+        && !keyOf(c, 'investable_level_change'); })());
+  // EL guard honesto: si una RETIRADA registrada explica la caída desde el máximo,
+  // "sigues por debajo de tu máximo" describe una decisión como si fuera una caída.
+  ok('15.6 una retirada material que explica la caída ⇒ falla CERRADO, no insinúa una caída',
+    (() => { const c = withRows([10000, 11000, 12000, 9000, 9000],
+              [{ id: 'w1', ts: T0 + 2.5 * DAY, amountUSD: -3000, kind: 'withdrawal' }]);
+      const g = gapOf(c, 'investable_prior_high');
+      return !keyOf(c, 'investable_prior_high') && !!g
+        && g.reason === 'withdrawal_explains_decline'; })(),
+    JSON.stringify(gapOf(withRows([10000, 11000, 12000, 9000, 9000],
+      [{ id: 'w1', ts: T0 + 2.5 * DAY, amountUSD: -3000, kind: 'withdrawal' }]), 'investable_prior_high')));
+  ok('15.7 con menos de 3 observaciones no hay trayectoria (ni cambio ni máximo anterior)',
+    (() => { const c = withRows([10000, 12000]);
+      return !keyOf(c, 'investable_level_change') && !keyOf(c, 'investable_prior_high'); })());
+  ok('15.8 el cambio de nivel entra en QUÉ HA CAMBIADO por su marca explícita, no por familia',
+    (() => { const wc = rising.whatChanged || [];
+      return wc.some(w => w.semanticKey === 'investable_level_change')
+        // el nivel actual y el máximo son ESTADOS: no son cambios
+        && !wc.some(w => w.semanticKey === 'investable_level')
+        && !wc.some(w => w.semanticKey === 'investable_all_time_high'); })(),
+    JSON.stringify((rising.whatChanged || []).map(w => w.semanticKey)));
+  ok('15.9 la COBERTURA DE OBSERVACIÓN forma parte del contrato (permite decir "sin cambio")',
+    (() => { const o = rising.dataAvailability.observation;
+      return !!o && o.observations === 5 && Number.isFinite(o.startAt)
+        && Number.isFinite(o.endAt) && o.spanMs === 4 * DAY; })(),
+    JSON.stringify(rising.dataAvailability.observation));
+  ok('15.9b y no afirma nada del patrimonio: es cobertura, no un hecho',
+    !(rising.ledger.facts || []).some(f => f.semanticKey === 'observation_span'));
+  ok('15.10 "desde" es el primer punto FIABLE de la serie, no el inicio de la cuenta',
+    /meta && Number\.isFinite\(lvl\.meta\.activeWindowStart\)/.test(fnSrc('_aurixFactLedger')));
+  // NO-VACUIDAD: sin los hechos nuevos, la Memoria de `belowHi` se queda a cero.
+  ok('15.11 NON-VACUITY — sin la trayectoria, una cartera por debajo de máximos no tiene NINGÚN evento de memoria',
+    (() => { const ev = (belowHi.temporalEvents || [])
+        .filter(f => f.window && f.window.range !== 'now' && Number.isFinite(f.window.endAt));
+      const legacy = ev.filter(f => f.semanticKey === 'investable_all_time_high');
+      return ev.length >= 1 && legacy.length === 0; })(),
+    JSON.stringify((belowHi.temporalEvents || []).map(f => f.semanticKey + '@' + (f.window || {}).range)));
+}
+
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

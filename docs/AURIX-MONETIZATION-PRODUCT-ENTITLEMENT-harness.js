@@ -73,6 +73,7 @@ function makeApi(overrides) {
       hasFeature, _aurixEntitlementsLoad, _aurixEntIsCatalogPreview, _aurixEntLoaded,
       _aurixEntReset, _wsCatalogFor, _wsCatalogVisible, _wsCommercialLabel,
       _wsCommercialTierClass, _wsToolFeatureKey, _wsCatalogEntry, _wsMseToolPreview, _wsToolAccess,
+      _wsSurfaceEntry,
       openUpgradeIntent, requireFeature, _WS_CATALOG,
       state: () => _aurixEnt, setState: (s) => { _aurixEnt = s; },
     };`;
@@ -225,13 +226,24 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     free._wsToolFeatureKey('loan') === 'workspace.loan');
   ok('C.6 FREE · ve Compound y Loan en el catálogo público',
     free._wsCatalogFor('tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation');
+  // ── RE-DECIDIDO EN M.03 A (SPEC · FREE V1) ────────────────────────────────
+  // C.7 / C.9 / C.18 afirmaban `_wsCatalogFor('template').length === 0`. Eso NO
+  // era el invariante: era el estado de M.02, donde ninguna plantilla estaba
+  // publicada. M.03 publica Real Estate Portfolio como la plantilla gratuita, así
+  // que la afirmación se reescribe sobre el invariante REAL —un usuario normal ve
+  // exactamente las entradas `published:true`, ni una más— y se fija además el
+  // CONJUNTO publicado, que es más fuerte que un recuento a cero: una plantilla
+  // interna que se colara aquí rompe el assert.
+  const PUB_TPL = 'tpl_realestate';
   ok('C.7 FREE · NO ve ninguna entrada no publicada',
     free._wsCatalogFor('tool').every(e => e.published === true) &&
-    free._wsCatalogFor('template').length === 0);
+    free._wsCatalogFor('template').every(e => e.published === true) &&
+    free._wsCatalogFor('template').map(e => e.id).sort().join(',') === PUB_TPL);
   ok('C.8 PREMIUM · las 3 features concedidas',
     prem.hasFeature('workspace.loan') && prem.hasFeature('intelligence.full') && prem.hasFeature('premium.settings'));
   ok('C.9 PREMIUM · el catálogo sigue siendo el PUBLICADO (no ve lo interno)',
-    prem._wsCatalogFor('tool').length === 2 && prem._wsCatalogFor('template').length === 0);
+    prem._wsCatalogFor('tool').length === 2 &&
+    prem._wsCatalogFor('template').map(e => e.id).join(',') === PUB_TPL);
   ok('C.10 FOUNDER · no es Premium comercial (plan free)', fdr.state().plan === 'free');
   ok('C.11 FOUNDER · el acceso viene de override', fdr.state().sources['intelligence.full'] === 'override');
   ok('C.12 FOUNDER · tiene las features', fdr.hasFeature('workspace.loan') && fdr.hasFeature('intelligence.full'));
@@ -254,7 +266,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       .every(k => comp.state().sources[k] === 'override'));
   ok('C.18 …y AUN ASÍ no ve el catálogo interno (era el fail-open de la deducción)',
     comp._aurixEntIsCatalogPreview() === false &&
-    comp._wsCatalogFor('tool').length === 2 && comp._wsCatalogFor('template').length === 0);
+    comp._wsCatalogFor('tool').length === 2 &&
+    comp._wsCatalogFor('template').map(e => e.id).join(',') === PUB_TPL);
   ok('C.19 …ni puede abrir una herramienta sin publicar',
     comp._wsToolAccess('budget').ok === false &&
     comp._wsToolAccess('budget').reason === 'unpublished');
@@ -316,7 +329,10 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     (() => { const a = free._wsToolAccess('budget');
       return a.ok === false && a.reason === 'unpublished'; })());
   ok('E.8 §18 la publicación se comprueba ANTES del entitlement (pregunta distinta)',
-    /if \(entry && !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fnSource('_wsToolAccess')) &&
+    // M.03 A — el predicado pasa de `entry && !visible` a `!entry || !visible`: la
+    // AUSENCIA de entrada también deniega. El orden, que es lo que este assert
+    // protege, no cambia.
+    /if \(!entry \|\| !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fnSource('_wsToolAccess')) &&
     fnSource('_wsToolAccess').indexOf("reason: 'unpublished'") < fnSource('_wsToolAccess').indexOf("reason: 'entitlement'"));
   ok('E.9 §18 sólo se ofrece upgrade cuando la razón ES comercial',
     /if \(_acc\.reason === 'entitlement'\) openUpgradeIntent\(/.test(fnSource('_wsOpenTool')));
@@ -443,9 +459,15 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // vacío. Medido contra el fichero real antes de fijar los números.
   {
     const home = fnSource('_renderWorkspaceHome');
-    ok('E.12 §18 las TRES vistas derivan del catálogo, y no hay una cuarta lista',
-      (home.match(/_wsCatalogFor\(/g) || []).length === 3 &&
-      (app.match(/_wsCatalogFor\(/g) || []).length === 4,
+    // M.03 A — el recuento sube de 3 a 4 en `_renderWorkspaceHome`: la columna
+    // "Mis plantillas" de Mi Espacio ERA UN ARRAY VACÍO ESCRITO A MANO (`TPL_CAT =
+    // []`) y ahora se deriva del catálogo por el mismo filtro de visibilidad. El
+    // invariante que este assert protege —ninguna lista de tarjetas fuera del
+    // catálogo— sale REFORZADO, no relajado: eran cuatro vistas y sólo tres
+    // derivaban.
+    ok('E.12 §18 las CUATRO vistas derivan del catálogo, y no hay una quinta lista',
+      (home.match(/_wsCatalogFor\(/g) || []).length === 4 &&
+      (app.match(/_wsCatalogFor\(/g) || []).length === 5,
       'home=' + (home.match(/_wsCatalogFor\(/g) || []).length + ' app=' + (app.match(/_wsCatalogFor\(/g) || []).length);
     ok('E.13 §18 los emisores de apertura son exactamente los del catálogo',
       (home.match(/data-wsh-cta="/g) || []).length === 4 &&
@@ -465,10 +487,13 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       return [...body.matchAll(/\n\s{6}([\w]+):\s*\{/g)].map(m => m[1]);
     };
     const TR = mapKeys('TOOL_RENDER'), PR = mapKeys('TPL_RENDER'), MR = mapKeys('_MSE_TOOL_RENDER');
+    // M.03 A — `_MSE_TPL_RENDER` entra en el mismo assert: es el cuarto mapa de
+    // renderers y quedaba fuera de la cobertura.
+    const MP = mapKeys('_MSE_TPL_RENDER');
     ok('E.16 §18 todo renderer declarado pertenece al catálogo (nada huérfano)',
-      TR && PR && MR && TR.length === 11 && PR.length === 12 && MR.length === 2 &&
-      [...TR, ...PR, ...MR].every(k => ids.has(k)),
-      'huérfanos: ' + [...(TR || []), ...(PR || []), ...(MR || [])].filter(k => !ids.has(k)));
+      TR && PR && MR && MP && TR.length === 11 && PR.length === 12 && MR.length === 2 && MP.length === 1 &&
+      [...TR, ...PR, ...MR, ...MP].every(k => ids.has(k)),
+      'huérfanos: ' + [...(TR || []), ...(PR || []), ...(MR || []), ...(MP || [])].filter(k => !ids.has(k)));
     ok('E.17 §18 y toda clave de apertura declarada existe en el mapa de herramientas',
       (() => { const i = app.indexOf('const _WS_TOOLKEY_TO_ID');
         const body = app.slice(i, app.indexOf('});', i));
@@ -562,6 +587,71 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     (() => { const e = free._wsCatalogEntry('loan_simulation');
       return e && e.featureKey === 'workspace.loan' && e.commercialTier === 'premium' && e.published === true; })());
 
+  // ══ M3. M.03 · A — WORKSPACE: FREE V1 ══════════════════════════════════
+  // El bloque A del SPEC M.03 publica la primera PLANTILLA gratuita. Lo que hay
+  // que demostrar no es que exista una línea de catálogo, sino que la superficie
+  // se ABRE para un usuario Free sin que la entrada interna de la misma
+  // superficie conceda nada por su cuenta.
+  console.log('\nM3 · WORKSPACE FREE V1 (M.03 A)');
+  {
+    const e = free._wsCatalogEntry('tpl_realestate');
+    ok('M3.1 Real Estate Portfolio: plantilla PUBLICADA, gratis y sin featureKey',
+      !!e && e.kind === 'template' && e.published === true &&
+      e.commercialTier === 'free' && e.featureKey === null, JSON.stringify(e));
+    ok('M3.2 declara la superficie que abre, y el resolver de superficie la elige',
+      e.opens === 'realestate' &&
+      free._wsSurfaceEntry('realestate') === e);
+    ok('M3.3 un usuario FREE la abre de verdad',
+      free._wsToolAccess('realestate').ok === true &&
+      free._wsToolAccess('realestate').featureKey === null);
+    ok('M3.3b …y el founder también, por el mismo camino',
+      fdr._wsToolAccess('realestate').ok === true);
+    // El punto delicado: la MISMA superficie conserva su entrada de herramienta
+    // del inventario de M.02, y esa sigue interna. Publicar la plantilla no puede
+    // haber publicado la herramienta.
+    ok('M3.4 la entrada de HERRAMIENTA de la misma superficie sigue interna e invisible',
+      free._wsCatalogEntry('real_estate_portfolio').published === false &&
+      free._wsCatalogVisible(free._wsCatalogEntry('real_estate_portfolio')) === false &&
+      free._wsCatalogFor('tool').map(x => x.id).sort().join(',') === 'compound_growth,loan_simulation');
+    ok('M3.5 dos entradas publicadas para una superficie = AMBIGÜEDAD y falla cerrado',
+      /if \(opens\.length > 1\) return null;/.test(fnSource('_wsSurfaceEntry')) &&
+      free._wsCatalogVisible(null) === false &&
+      free._wsToolAccess('__inexistente__').ok === false &&
+      free._wsToolAccess('__inexistente__').reason === 'unpublished');
+    ok('M3.6 el gate de la superficie NO duplica la decisión: sigue siendo un solo predicado',
+      /const entry = _wsSurfaceEntry\(toolKey\);/.test(fnSource('_wsToolAccess')) &&
+      (fnSource('_wsToolAccess').match(/hasFeature\(/g) || []).length === 1);
+    ok('M3.7 la columna "Mis plantillas" de Mi Espacio se DERIVA del catálogo',
+      /_wsCatalogFor\('template'\)\s*[\r\n]\s*\.filter\(e => _MSE_TPL_RENDER\[e\.id\]\)/.test(app) &&
+      !/const TPL_CAT = \[\];/.test(app));
+    ok('M3.8 el cover reutiliza un asset YA existente de esa plantilla (no se añade ninguno)',
+      /realestate:\s+'realestate_apartment'/.test(app) &&
+      fs.existsSync(path.join(root, 'assets/workspace/realestate_apartment.webp')));
+    ok('M3.9 ninguna cabecera de herramienta pinta un "Pro" decorativo',
+      !/wsh-pro-badge/.test(app) &&
+      /_wsTierChip\('tpl_realestate'\)/.test(app) && /_wsTierChip\('loan_simulation'\)/.test(app));
+    ok('M3.10 y la etiqueta que pinta esa cabecera es la REAL del catálogo',
+      free._wsCommercialLabel(e) === 'Incluido' &&
+      free._wsCommercialLabel(free._wsCatalogEntry('loan_simulation')) === 'Premium');
+    // La plantilla gratuita SÍ guarda trabajo y sus claves no viajan en el sync:
+    // se declara, no se promete permanencia.
+    ok('M3.11 la permanencia local se DECLARA en la plantilla, en los dos idiomas',
+      (app.match(/wsre_local_note:/g) || []).length === 2 &&
+      /wsre_local_note/.test(fnSource('_renderRealEstateTool')));
+    ok('M3.12 con menos de 3 tarjetas la galería deja de pintar columnas fijas',
+      /wsh-gallery\$\{gallery\.length < 3 \? ' is-sparse' : ''\}/.test(app) &&
+      /\.wsh-gallery\.is-sparse\s*\{[^}]*auto-fit/.test(css));
+    ok('M3.13 Mi Espacio distingue lo USADO de lo GUARDADO',
+      /used: r > 0, saved: p > 0/.test(app) &&
+      (app.match(/wsmse2_saved:/g) || []).length === 2);
+    ok('M3.14 espacio vacío = UNA portada, no dos estados vacíos en paralelo',
+      /const _mseEmpty = !tplList\.length && !toolList\.length;/.test(app) &&
+      /wsh-mse2-blank/.test(app) && /\.wsh-mse2-blank/.test(css));
+    ok('M3.15 paridad i18n de las claves nuevas de Workspace',
+      ['wsmse2_saved', 'wsmse2_empty_t', 'wsmse2_empty_b', 'wsre_local_note']
+        .every(k => (app.match(new RegExp('\\n\\s+' + k + ':', 'g')) || []).length === 2));
+  }
+
   // ══ H. FUERA DE ALCANCE / VERSIONADO ═══════════════════════════════════
   console.log('\nH · ALCANCE Y DEPLOY');
   ok('H.1 sin herramientas ni plantillas nuevas: el inventario es el que ya existía',
@@ -588,8 +678,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     V.appjsIdx === V.src && V.src === V.inApp && String(V.manifest.appjs) === V.src,
     JSON.stringify(V));
   ok('H.5 el BUILD se bumpeó y coincide con el manifiesto',
-    /^v697/.test(V.build || '') && V.manifest.build === V.build);
-  ok('H.6 styles.css?v= bumpeado (hay cambio de CSS en este bloque)', Number(V.css) >= 663);
+    /^v698/.test(V.build || '') && V.manifest.build === V.build);
+  ok('H.6 styles.css?v= bumpeado (hay cambio de CSS en este bloque)', Number(V.css) >= 664);
 
   console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
   if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }

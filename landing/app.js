@@ -233,22 +233,43 @@
   };
 
   var LS_KEY = 'aurix_lang';
+  // M.03 · B — ELECCIÓN EXPLÍCITA vs IDIOMA POR DEFECTO.
+  //
+  // `aurix_lang` se escribe en CADA `applyLang()`, también en la del arranque, así
+  // que su presencia nunca distinguió "el usuario eligió ES/EN aquí" de "la landing
+  // se pintó en su idioma por defecto". Sin esa distinción el CTA afirmaba
+  // `?lang=en` para TODO EL MUNDO, y como el app-side trata `?lang=` como una
+  // elección explícita que gana, un usuario que había elegido español DENTRO de
+  // Aurix volvía a entrar por la landing y se encontraba la app en inglés.
+  //
+  // La clave de elección es NUEVA a propósito: los contenedores que ya tienen
+  // `aurix_lang` escrito por la ruta por defecto no pueden quedar marcados
+  // retroactivamente como una elección que nunca hicieron.
+  var LS_CHOICE_KEY = 'aurix_lang_choice';
   var lang = 'en';
+  var langExplicit = false;
 
   function detectLang() {
     // English by default. Spanish stays available via the ES/EN toggle and is
     // remembered once chosen — we no longer auto-switch from the browser locale.
+    var choice;
+    try { choice = localStorage.getItem(LS_CHOICE_KEY); } catch (_) {}
+    if (choice === 'es' || choice === 'en') { langExplicit = true; return choice; }
     var stored;
     try { stored = localStorage.getItem(LS_KEY); } catch (_) {}
     if (stored === 'es' || stored === 'en') return stored;
     return 'en';
   }
 
-  function applyLang(next) {
+  function applyLang(next, explicit) {
     lang = (next === 'en') ? 'en' : 'es';
     var dict = I18N[lang];
     document.documentElement.lang = lang;
     try { localStorage.setItem(LS_KEY, lang); } catch (_) {}
+    if (explicit === true) {
+      langExplicit = true;
+      try { localStorage.setItem(LS_CHOICE_KEY, lang); } catch (_) {}
+    }
 
     var nodes = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < nodes.length; i++) {
@@ -403,9 +424,20 @@
   var WAITLIST_ENDPOINT = 'https://isa-portfolio-ten.vercel.app/api/waitlist';
 
   // Cross-origin language handoff: localStorage is NOT shared between
-  // aurixsystem.io and the app origin, so we pass ?lang= on every "Enter Aurix"
-  // link; login.html / index.html read it into their own 'portfolio_lang'.
-  function appUrlForLang() { return APP_URL + '?lang=' + (lang === 'en' ? 'en' : 'es'); }
+  // aurixsystem.io and the app origin, so we pass the active language on every
+  // "Enter Aurix" link; login.html / index.html read it into 'portfolio_lang'.
+  //
+  // M.03 · B — DOS PARÁMETROS, DOS AFIRMACIONES DISTINTAS:
+  //   `lang=`     · el usuario ELIGIÓ este idioma en la landing → gana siempre.
+  //   `langhint=` · es sólo el idioma con el que la landing se estaba mostrando →
+  //                 se aplica únicamente si el contenedor de la app no tiene ya
+  //                 una preferencia guardada.
+  // Un único valor persistido en la app (`portfolio_lang`) sigue siendo la
+  // autoridad; esto sólo evita que la landing afirme una elección inexistente.
+  function appUrlForLang() {
+    var v = (lang === 'en' ? 'en' : 'es');
+    return APP_URL + '?' + (langExplicit ? 'lang=' : 'langhint=') + v;
+  }
   function updateAppLinks() {
     var links = document.querySelectorAll('[data-app-link]');
     for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlForLang());
@@ -521,7 +553,7 @@
     // Language toggle
     document.addEventListener('click', function (e) {
       var b = e.target.closest && e.target.closest('.lang-btn');
-      if (b) { applyLang(b.getAttribute('data-lang')); }
+      if (b) { applyLang(b.getAttribute('data-lang'), true); }   // M.03 B — click = elección explícita
     });
 
     // Header scroll state (rAF-throttled)

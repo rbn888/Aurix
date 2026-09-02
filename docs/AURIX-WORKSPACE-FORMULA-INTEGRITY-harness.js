@@ -451,17 +451,29 @@ function catalog() {
   OK('L10 ninguna herramienta oculta est\u00e1 publicada en el cat\u00e1logo',
      HIDDEN_IDS.every(id => { const e = catalog().find(x => x.id === id); return e && e.published === false; }),
      HIDDEN_IDS.filter(id => { const e = catalog().find(x => x.id === id); return !e || e.published !== false; }).join(','));
-  OK('L11 ni una sola plantilla publicada, y el filtro de visibilidad es \u00daNICO',
-     catalog().filter(e => e.kind === 'template').every(e => e.published === false) &&
+  // ── RE-DECIDIDO por M.03 A (SPEC · FREE V1) ───────────────────────────────
+  // L11 / L12 / L14 / L15 / M4 afirmaban "ninguna plantilla publicada". Ese era el
+  // ESTADO de WORKSPACE-LAUNCH-V1, no el invariante. El invariante es que lo que se
+  // publica está declarado en UN catálogo y pasa por UN filtro de visibilidad, y
+  // sigue intacto: M.03 publica Real Estate Portfolio como la plantilla gratuita
+  // porque el SPEC lo declara, y se fija el CONJUNTO publicado —más fuerte que un
+  // recuento a cero, porque una entrada interna que se colara aquí rompe el assert.
+  const PUBLISHED_IDS = 'compound_growth,loan_simulation,tpl_realestate';
+  OK('L11 sólo está publicado el conjunto declarado, y el filtro de visibilidad es \u00daNICO',
+     catalog().filter(e => e.published === true).map(e => e.id).sort().join(',') === PUBLISHED_IDS &&
      /return _WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\);/.test(app));
   OK('L11b lo NO publicado s\u00f3lo es visible con cat\u00e1logo interno, y eso lo decide el servidor',
      /if \(entry\.published === true\) return true;/.test(fn('_wsCatalogVisible')) &&
      /return _aurixEntIsCatalogPreview\(\) === true;/.test(fn('_wsCatalogVisible')));
   OK('L11c y el owner de apertura bloquea lo no publicado (proyecto guardado incluido)',
-     /if \(entry && !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fn('_wsToolAccess')) &&
+     // M.03 A — el predicado pasa a `!entry || !visible`: la AUSENCIA de entrada
+     // también deniega (`_wsSurfaceEntry` devuelve null a propósito si dos entradas
+     // publicadas se pelean por una superficie).
+     /if \(!entry \|\| !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fn('_wsToolAccess')) &&
      /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')));
-  OK('L12 s\u00ed est\u00e1n las DOS autorizadas, y ahora en el CAT\u00c1LOGO (no en un literal)',
-     catalog().filter(e => e.published).map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation');
+  OK('L12 s\u00ed est\u00e1n las autorizadas, y en el CAT\u00c1LOGO (no en un literal)',
+     catalog().filter(e => e.published && e.kind === 'tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation' &&
+     catalog().filter(e => e.published && e.kind === 'template').map(e => e.id).join(',') === 'tpl_realestate');
   // L13 SUPERADO por MONETIZATION-V1 · M.01B: Plantillas vuelve como secci\u00f3n
   // estructural (bloque M m\u00e1s abajo). La regla que L13 proteg\u00eda \u2014no dejar una
   // secci\u00f3n vac\u00eda\u2014 sigue viva: ahora se cumple pintando su estado honesto en
@@ -473,10 +485,18 @@ function catalog() {
   OK('L14 nada PUBLICADO parece deshabilitado: todo lo publicado tiene ruta de apertura',
      (() => { const pub = catalog().filter(e => e.published);
        const home = fn('_renderWorkspaceHome');
-       return pub.length === 2 && pub.every(e => new RegExp(e.id + ":\\s*\\{[^}]*tool: '").test(home))
-              && /soon: !openAttr/.test(home); })());
+       // Una herramienta declara su apertura con `tool: '…'` en TOOL_RENDER; una
+       // plantilla, con `cta: 'tool', arg: '…'` en TPL_RENDER. Las dos formas
+       // valen; lo que no vale es una entrada publicada SIN ruta.
+       const opens = e => new RegExp(e.id + ":\\s*\\{[^}]*(tool: '|cta: ')").test(home);
+       return pub.length === 3 && pub.every(opens) && /soon: !openAttr/.test(home); })());
+  // M.03 A — `TPL_CAT` ya no es un array vacío escrito a mano: se DERIVA del
+  // catálogo con el mismo filtro de visibilidad que las herramientas. La garantía
+  // es la misma y ahora es estructural: lo que no está publicado no puede entrar,
+  // por uso previo ni por nada.
   OK('L15 Mi Espacio no puede resucitar una oculta por uso previo',
-     /const TPL_CAT = \[\];/.test(app) &&
+     /const TPL_CAT = _wsCatalogFor\('template'\)\s*[\r\n]\s*\.filter\(e => _MSE_TPL_RENDER\[e\.id\]\)/.test(app) &&
+     !/const TPL_CAT = \[\];/.test(app) &&
      !/\{ ref: 'tpl:scenario'[\s\S]{0,40}viz: 'compare'/.test(app));
 
   // ── NADA BORRADO: los owners siguen vivos y dormidos ─────────────────────
@@ -495,9 +515,11 @@ function catalog() {
      /TPL_CAT\.length \? column\('wsmse2_tpl_title'/.test(app));
   OK('G2 \u2026as\u00ed que el CTA a la pesta\u00f1a retirada s\u00f3lo vive dentro de esa rama condicional',
      (() => {
-       const m = /const _mseCols = \[([\s\S]*?)\];/.exec(app);
+       // M.03 A — la rejilla arranca ahora con la rama del espacio VACÍO
+       // (`_mseEmpty ? [...] : [...]`), así que el ancla es el operador, no `= [`.
+       const m = /const _mseCols = _mseEmpty \? \[([\s\S]*?)\n    \];/.exec(app);
        if (!m) return false;
-       const tplLine = m[1].split('\n').find(l => l.includes("'templates'"));
+       const tplLine = m[1].split('\n').find(l => l.includes("'templates'") && l.includes('column('));
        return !!tplLine && tplLine.includes('TPL_CAT.length ?');
      })());
   OK('G3 con una sola columna la rejilla no deja hueco del 50%',
@@ -537,12 +559,16 @@ function catalog() {
      (app.match(/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/g) || []).length >= 1 &&
      (app.match(/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/g) || []).length >= 1);
   const home = fn('_renderWorkspaceHome');
-  OK('M4 NO se publica ninguna plantilla: cero entradas template con published=true',
+  // M.03 A — se publica UNA plantilla (la gratuita del SPEC) y el inventario
+  // interno sigue completo e invisible para un usuario normal.
+  OK('M4 s\u00f3lo la plantilla gratuita est\u00e1 publicada; el inventario interno sigue interno',
      catalog().filter(e => e.kind === 'template').length >= 12 &&
-     catalog().filter(e => e.kind === 'template').every(e => e.published === false) &&
-     /const TPL_CAT = _wsCatalogFor\('tool'\)|const TPL_CAT = \[\];/.test(home));
+     catalog().filter(e => e.kind === 'template' && e.published === false).length >= 11 &&
+     catalog().filter(e => e.kind === 'template' && e.published === true)
+       .every(e => e.id === 'tpl_realestate' && e.tier === 'free' && e.featureKey === null) &&
+     /const TPL_CAT = _wsCatalogFor\('template'\)/.test(home));
   OK('M5 con cat\u00e1logo vac\u00edo NO se pinta una rejilla de cero tarjetas',
-     /const body = gallery\.length[\s\S]{0,200}wsh-tpl-grid wsh-gallery[\s\S]{0,80}: `<div class="wsh-tplarch">/.test(home));
+     /const body = gallery\.length[\s\S]{0,700}wsh-tpl-grid wsh-gallery[\s\S]{0,120}: `<div class="wsh-tplarch">/.test(home));
   OK('M6 el estado de Plantillas no finge contenido: sin card, sin viz, sin "pr\u00f3ximamente", sin banner de upgrade',
      (() => { const m = /<div class="wsh-tplarch">[\s\S]*?<\/div>`/.exec(home); if (!m) return false;
        const b = m[0];

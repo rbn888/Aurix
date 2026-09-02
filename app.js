@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '658'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '659'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4862,8 +4862,13 @@ const T = {
     intcc_dim_stab:   'Estabilidad',
     intcc_dim_growth: 'Crecimiento',   // INT.07 — the founder's five conceptual dimensions
     intv7_axis_unavailable: 'sin datos',
-    intv7_radar_legend: 'Las cinco dimensiones de tu estructura. Aurix sólo dibuja las que puede certificar.',
+    intv7_radar_legend: 'Las cinco dimensiones de tu estructura. Cada eje es un porcentaje de su propia magnitud, y Aurix sólo dibuja los que puede certificar.',
     intv7_radar_pending: (d) => `Todavía sin datos: ${d}. Aparecerán cuando Aurix pueda medirlas con rigor.`,
+    // M.03 C — el disclosure nombra la evidencia que falta, eje por eje.
+    intv7_pending_obs:     (d) => `${d}: hay historial, pero todavía no suficientes observaciones para medirla sin exagerar la calma. Aparece sola en cuanto lo haya.`,
+    intv7_pending_scale:   (d) => `${d}: el dato existe y Aurix lo publica como porcentaje de rentabilidad; lo que falta es una referencia con la que convertirlo en una escala de 0 a 100 sin inventarla.`,
+    intv7_pending_generic: (d) => `${d}: todavía sin datos que Aurix pueda certificar.`,
+    intv7_stab_meaning: 'Estabilidad = porcentaje del máximo que tu cartera conservó en su peor momento, con las aportaciones y retiradas neutralizadas.',
     intcc_drivers_title: 'Factores principales',
     intcc_drv_explain_asset: name => `${name} representa actualmente la mayor exposición individual de tu patrimonio.`,
     intcc_drv_explain_cash:  (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades.`,
@@ -4938,6 +4943,9 @@ const T = {
     intv4_brief_empty: 'Aurix está leyendo tu patrimonio. En cuanto haya un hecho que pueda demostrar, aparecerá aquí.',
     intv4_changed_title: 'Qué ha cambiado',
     intv4_changed_empty: 'Todavía no hay cambios que Aurix pueda medir con la historia disponible.',
+    // M.03 E — tres estados vacíos, tres afirmaciones distintas.
+    intv4_changed_stable: 'Aurix ha comparado tu historia y no detecta ningún cambio material.',
+    intv4_changed_all_published: 'El único cambio material de tu cartera es el que Aurix te cuenta arriba.',
     intv4_discovery_title: 'Puede que no hayas visto esto',
     intv4_explore_title: 'Explora tu patrimonio',
     intv4_memory_title: 'Memoria patrimonial',
@@ -4960,6 +4968,14 @@ const T = {
     intv4_f_return_pos: pct => `Tus inversiones han generado un ${pct}% de rendimiento`,
     intv4_f_level: amt => `Tu patrimonio invertible es de ${amt}`,
     intv4_f_ath: amt => `Tu patrimonio invertible está en su máximo: ${amt}`,
+    // M.03 D — NIVEL, nunca rentabilidad: la frase dice "incluyendo aportaciones"
+    // en su propia línea (`intv4_why_investable_level_change`) y aquí no aparece
+    // ningún porcentaje, porque el hecho no lo afirma.
+    intv4_f_level_up:   (amt, since) => `Tu patrimonio invertible ha subido ${amt} desde el ${since}`,
+    intv4_f_level_down: (amt, since) => `Tu patrimonio invertible ha bajado ${amt} desde el ${since}`,
+    intv4_f_prior_high: (amt, at) => `Tu máximo observado sigue siendo el del ${at}: ${amt}`,
+    intv4_why_investable_level_change: 'Es la evolución del nivel, no una rentabilidad: incluye el dinero que has aportado o retirado.',
+    intv4_why_investable_prior_high: 'El máximo es una referencia de nivel; no dice por qué estás por debajo.',
     intv4_f_capital_in: amt => `Has aportado ${amt} de capital nuevo`,
     intv4_f_capital_out: amt => `Has retirado ${amt} de capital`,
     intv4_f_cash: pct => `Tu liquidez es el ${pct}% del patrimonio invertible`,
@@ -5011,6 +5027,10 @@ const T = {
     intv6_comp_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
     intv6_comp_single: 'Todo tu patrimonio invertible está en una sola clase de activo.',
     intv6_memory_accruing: 'Aurix está acumulando tu historia patrimonial.',
+    // M.03 D — historia SÍ, acontecimientos no: se dice lo que es verdad.
+    intv4_memory_stable_t: (since) => `Tu patrimonio se mantiene estable desde el ${since}.`,
+    intv4_memory_stable_b: (n, d) => `Aurix ha registrado ${n} observaciones en ${d} días y no encuentra ningún movimiento material que merezca entrar en tu memoria.`,
+    intv4_memory_stable_b_nodays: (n) => `Aurix ha registrado ${n} observaciones y no encuentra ningún movimiento material que merezca entrar en tu memoria.`,
     intv6_memory_accruing_sub: 'Todavía no hay suficientes eventos registrados para construir tu memoria. Cada observación que Aurix guarda la hace más profunda.',
     intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
     intv5_cat_crypto: 'Cripto', intv5_cat_metal: 'Metales', intv5_cat_liquidity: 'Liquidez',
@@ -5361,8 +5381,11 @@ const T = {
     wsmse2_tool_title:  'Mis herramientas',
     wsmse2_tool_sub:    'Herramientas utilizadas recientemente',
     wsmse2_last:        'Última apertura',
-    wsmse2_tpl_empty_t: 'Todavía no tienes plantillas.',
-    wsmse2_tpl_empty_b: 'Crea tu primera plantilla para empezar.',
+    wsmse2_saved:       'Guardado',
+    wsmse2_empty_t:     'Tu espacio se construye con lo que usas.',
+    wsmse2_empty_b:     'Aquí aparece lo que abres y lo que guardas',
+    wsmse2_tpl_empty_t: 'Todavía no has abierto ninguna plantilla.',
+    wsmse2_tpl_empty_b: 'Ábrela una vez y aparecerá aquí.',
     wsmse2_tpl_empty_cta: 'Explorar plantillas',
     wsmse2_tool_empty_t: 'Todavía no tienes herramientas recientes.',
     wsmse2_tool_empty_b: 'Explora las herramientas disponibles.',
@@ -5529,6 +5552,10 @@ const T = {
     wsre_tl_date:       'Fecha',
     wsre_tl_empty:      'Sin eventos todavía',
     wsre_empty:         'Vista demo · añade tu primer inmueble',
+    // M.03 A — la plantilla gratuita SÍ guarda trabajo, y sus claves no viajan en el
+    // sync. Se declara donde se trabaja, en vez de prometer una permanencia que la
+    // arquitectura todavía no da (Workspace Sync sigue pendiente).
+    wsre_local_note:    'Tu inventario se guarda en este dispositivo.',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
@@ -7162,8 +7189,12 @@ const T = {
     intcc_dim_stab:   'Stability',
     intcc_dim_growth: 'Growth',        // INT.07 — the founder's five conceptual dimensions
     intv7_axis_unavailable: 'no data',
-    intv7_radar_legend: 'The five dimensions of your structure. Aurix only draws the ones it can certify.',
+    intv7_radar_legend: 'The five dimensions of your structure. Each axis is a percentage of its own magnitude, and Aurix only draws the ones it can certify.',
     intv7_radar_pending: (d) => `No data yet: ${d}. They will appear once Aurix can measure them rigorously.`,
+    intv7_pending_obs:     (d) => `${d}: there is history, but not yet enough observations to measure it without overstating the calm. It appears on its own once there is.`,
+    intv7_pending_scale:   (d) => `${d}: the figure exists and Aurix publishes it as a return percentage; what is missing is a reference to turn it into a 0–100 scale without inventing one.`,
+    intv7_pending_generic: (d) => `${d}: no data Aurix can certify yet.`,
+    intv7_stab_meaning: 'Stability = the percentage of its peak your portfolio kept at its worst moment, with contributions and withdrawals neutralised.',
     intcc_drivers_title: 'Key drivers',
     intcc_drv_explain_asset: name => `${name} is currently the single largest exposure in your wealth.`,
     intcc_drv_explain_cash:  (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities.`,
@@ -7235,6 +7266,8 @@ const T = {
     intv4_brief_empty: 'Aurix is reading your wealth. As soon as there is a fact it can prove, it will appear here.',
     intv4_changed_title: 'What changed',
     intv4_changed_empty: 'There are no changes Aurix can measure with the history available yet.',
+    intv4_changed_stable: 'Aurix compared your history and detects no material change.',
+    intv4_changed_all_published: 'The only material change in your portfolio is the one Aurix reports above.',
     intv4_discovery_title: 'You may not have seen this',
     intv4_explore_title: 'Explore your wealth',
     intv4_memory_title: 'Wealth memory',
@@ -7254,6 +7287,11 @@ const T = {
     intv4_f_return_pos: pct => `Your investments have generated a ${pct}% return`,
     intv4_f_level: amt => `Your investable wealth is ${amt}`,
     intv4_f_ath: amt => `Your investable wealth is at its high: ${amt}`,
+    intv4_f_level_up:   (amt, since) => `Your investable wealth is up ${amt} since ${since}`,
+    intv4_f_level_down: (amt, since) => `Your investable wealth is down ${amt} since ${since}`,
+    intv4_f_prior_high: (amt, at) => `Your observed high is still the one from ${at}: ${amt}`,
+    intv4_why_investable_level_change: 'This is how the level moved, not a return: it includes the money you added or withdrew.',
+    intv4_why_investable_prior_high: 'A high is a level reference; it does not say why you are below it.',
     intv4_f_capital_in: amt => `You have added ${amt} of new capital`,
     intv4_f_capital_out: amt => `You have withdrawn ${amt} of capital`,
     intv4_f_cash: pct => `Cash is ${pct}% of your investable wealth`,
@@ -7300,6 +7338,9 @@ const T = {
     intv6_comp_legend: 'Weight of each asset class in your investable wealth.',
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
+    intv4_memory_stable_t: (since) => `Your wealth has been stable since ${since}.`,
+    intv4_memory_stable_b: (n, d) => `Aurix has recorded ${n} observations over ${d} days and finds no material move worth entering your memory.`,
+    intv4_memory_stable_b_nodays: (n) => `Aurix has recorded ${n} observations and finds no material move worth entering your memory.`,
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
     intv5_cat_crypto: 'Crypto', intv5_cat_metal: 'Metals', intv5_cat_liquidity: 'Cash',
@@ -7650,8 +7691,11 @@ const T = {
     wsmse2_tool_title:  'My tools',
     wsmse2_tool_sub:    'Recently used tools',
     wsmse2_last:        'Last opened',
-    wsmse2_tpl_empty_t: "You don't have templates yet.",
-    wsmse2_tpl_empty_b: 'Create your first template to get started.',
+    wsmse2_saved:       'Saved',
+    wsmse2_empty_t:     'Your space builds itself from what you use.',
+    wsmse2_empty_b:     'What you open and what you save shows up here',
+    wsmse2_tpl_empty_t: "You haven't opened a template yet.",
+    wsmse2_tpl_empty_b: 'Open one and it will show up here.',
     wsmse2_tpl_empty_cta: 'Explore templates',
     wsmse2_tool_empty_t: 'No recent tools yet.',
     wsmse2_tool_empty_b: 'Explore the available tools.',
@@ -7818,6 +7862,7 @@ const T = {
     wsre_tl_date:       'Date',
     wsre_tl_empty:      'No events yet',
     wsre_empty:         'Demo view · add your first property',
+    wsre_local_note:    'Your inventory is stored on this device.',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
@@ -18422,6 +18467,11 @@ const _WS_TPL_ASSET = {
   projection:       'template_projection',   // WS.F1 — own cover (was sharing template_scenarios)
   journal:          'template_trading_journal',
   'realestate-pro': 'realestate_apartment',
+  // M.03 A — Real Estate Portfolio pasa a ser la plantilla gratuita, y su tarjeta
+  // usaba el glyph genérico de `_WS_ARCH`. Reutiliza la MISMA imagen que ya usa esa
+  // plantilla por dentro (`_WSRE_ASSET.flat` / la variante 'realestate-pro'): no se
+  // añade ningún asset nuevo.
+  realestate:       'realestate_apartment',
   // WS.F1 — unique cover names so each template auto-upgrades the moment its WebP
   // is dropped into assets/workspace/; until then the distinct CSS scene is the identity.
   networth:         'template_networth',
@@ -18508,6 +18558,8 @@ const _WS_APP_IDENTITY = {
 //   published      · ¿lo ve un usuario normal? (false = interno, sólo founder)
 //   featureKey     · entitlement que lo gatea, o null si es libre
 //   commercialTier · 'free' | 'premium' | 'undecided'
+//   opens          · (M.03) clave de SUPERFICIE que abre esta entrada, cuando no es
+//                    la del mapa de identidad `_WS_TOOLKEY_TO_ID`. Ver `_wsSurfaceEntry`.
 //
 // REGLA DE VERDAD: si el founder ve "Premium", es porque REALMENTE está incluido
 // en Premium — hay una fila en `plan_features` que lo concede al plan premium. No
@@ -18532,11 +18584,18 @@ const _WS_CATALOG = Object.freeze([
   { id: 'trade_journal',         kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'receivables',           kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'asset_prices',          kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
-  // ── plantillas INTERNAS · ninguna publicada en V1 ──────────────────────────
+  // ── plantillas PUBLICADAS ──────────────────────────────────────────────────
+  // M.03 A · FREE V1 — Real Estate Portfolio es la plantilla gratuita. Se publica
+  // la entrada de PLANTILLA, no la de herramienta: la superficie es la misma y su
+  // sitio en el producto es la galería de plantillas. Por eso declara `opens`, y
+  // `real_estate_portfolio` (la entrada de herramienta del inventario de M.02) se
+  // queda interna — una superficie no puede tener dos estados comerciales, así que
+  // la que decide el acceso es la PUBLICADA (ver `_wsSurfaceEntry`).
+  { id: 'tpl_realestate',        kind: 'template', published: true,  featureKey: null,              commercialTier: 'free', opens: 'realestate' },
+  // ── plantillas INTERNAS ────────────────────────────────────────────────────
   { id: 'tpl_mbudget',           kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_assets',            kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
-  { id: 'tpl_realestate',        kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_goals',             kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_journal',           kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_scenario',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
@@ -18554,8 +18613,28 @@ const _WS_TOOLKEY_TO_ID = Object.freeze({
   journal: 'trade_journal', realestate: 'real_estate_portfolio',
   receivables: 'receivables', assets: 'asset_prices',
 });
+// M.03 A — LA ENTRADA QUE DECIDE POR UNA SUPERFICIE.
+//
+// `_WS_TOOLKEY_TO_ID` es el mapa de IDENTIDAD histórico (clave de apertura →
+// entrada del inventario) y sigue intacto. Lo que M.03 añade es que una superficie
+// puede publicarse desde OTRA entrada: Real Estate Portfolio se publica como
+// plantilla (`tpl_realestate`, `opens:'realestate'`) mientras su entrada de
+// herramienta sigue interna. Sin esto, un usuario Free abría la plantilla publicada
+// y el gate le respondía `unpublished` leyendo la entrada equivocada.
+//
+// Regla, y es la conservadora: decide la entrada PUBLICADA que declara la
+// superficie. Si hay más de una, es una ambigüedad de catálogo y se falla CERRADO
+// (null → `_wsCatalogVisible(null)` es false → `unpublished`). Si no hay ninguna,
+// decide la del mapa de identidad, que es la que produce el `unpublished` de M.02.
+// Dos entradas nunca conceden más que la que el producto ha publicado.
+function _wsSurfaceEntry(toolKey) {
+  const opens = _WS_CATALOG.filter(e => e.opens === toolKey && e.published === true);
+  if (opens.length === 1) return opens[0];
+  if (opens.length > 1) return null;
+  return _wsCatalogEntry(_WS_TOOLKEY_TO_ID[toolKey] || toolKey);
+}
 function _wsToolFeatureKey(toolKey) {
-  const e = _wsCatalogEntry(_WS_TOOLKEY_TO_ID[toolKey] || toolKey);
+  const e = _wsSurfaceEntry(toolKey);
   return e && e.featureKey ? e.featureKey : null;
 }
 // ¿Puede el usuario ACTUAL ver esta entrada en un catálogo?
@@ -18594,10 +18673,16 @@ function _wsMseToolPreview(it) {
 // registro de uso reciente. Compartirla es lo que impide que Mi Espacio afirme un
 // "último uso" de algo que nunca se abrió.
 function _wsToolAccess(toolKey) {
-  const id = _WS_TOOLKEY_TO_ID[toolKey] || toolKey;
-  const entry = _wsCatalogEntry(id);
+  // M.03 A — la entrada que decide es la de la SUPERFICIE (ver `_wsSurfaceEntry`),
+  // no siempre la del mapa de identidad. El resto del gate es idéntico a M.02.
+  const entry = _wsSurfaceEntry(toolKey);
   // §18 — publicación primero: es otra pregunta ("¿existe para ti?"), no un derecho.
-  if (entry && !_wsCatalogVisible(entry)) return { ok: false, reason: 'unpublished', featureKey: null };
+  // M.03 A — y SIN entrada también se falla cerrado. El `entry &&` de M.02 dejaba
+  // pasar cualquier clave que el catálogo no conociera: no era alcanzable porque
+  // las siete claves reales están mapeadas (E.10), pero ahora `_wsSurfaceEntry`
+  // devuelve null A PROPÓSITO cuando dos entradas publicadas se pelean por una
+  // superficie, y ese null tiene que DENEGAR. Lo destapó el propio gate.
+  if (!entry || !_wsCatalogVisible(entry)) return { ok: false, reason: 'unpublished', featureKey: null };
   const featureKey = entry && entry.featureKey ? entry.featureKey : null;
   if (featureKey && !hasFeature(featureKey)) return { ok: false, reason: 'entitlement', featureKey };
   return { ok: true, reason: null, featureKey };
@@ -18877,7 +18962,9 @@ function _wsSceneHtml(cat) {
 function _wsCatPreviewBaseHtml(cat) {
   // WS.17C — clean cover: no text overlay inside the premium image (title is shown
   // below the card). The WebP covers this; the gradient is the graceful fallback.
-  if (cat === 'realestate-pro') return `<div class="wspv wspv-re wspv-re-tpl"></div>`;
+  // M.03 A — 'realestate' comparte la escena de 'realestate-pro': es la misma
+  // plantilla y el degradado inmobiliario es el fallback correcto bajo la WebP.
+  if (cat === 'realestate-pro' || cat === 'realestate') return `<div class="wspv wspv-re wspv-re-tpl"></div>`;
   if (cat === 'receivables') return _wsReceivablesPreview();
   if (cat === 'assets') return _wsAssetsPreview();
   if (cat === 'budget') return _wsToolPreviewHtml('budget');
@@ -19007,6 +19094,9 @@ function _renderWorkspaceHome(metrics) {
   // bloque y no se inventa contenido—, así que la sección no pinta una galería
   // sino su estado honesto: ninguna plantilla publicada todavía, con el criterio
   // de publicación y una salida viva a Herramientas (no un enlace muerto).
+  // M.03 A — ese catálogo YA NO está vacío: Real Estate Portfolio es la plantilla
+  // gratuita de FREE V1, así que la galería se pinta de verdad. El estado vacío
+  // sigue existiendo intacto por debajo (la condición es el propio catálogo).
   const TABS = [['space', 'wstab_space'], ['templates', 'wstab_templates'], ['tools', 'wstab_tools']];
   const tabsHtml = `
     <nav class="wsh-tabs" role="tablist">
@@ -19040,7 +19130,20 @@ function _renderWorkspaceHome(metrics) {
       compound_growth: { arg: 'compound', viz: 'curve', nameKey: 'wstool_compound_n' },
       loan_simulation: { arg: 'loan',     viz: 'donut', nameKey: 'wsloan_n' },
     };
-    const TPL_CAT = [];
+    // M.03 A — la columna de plantillas DEJA DE ESTAR VACÍA A MANO. Era `[]` porque
+    // el catálogo público de plantillas lo estaba; ahora se deriva del catálogo por
+    // el MISMO camino y el MISMO filtro de visibilidad que las herramientas, así que
+    // nada interno puede reaparecer aquí y reponer una plantilla es una línea.
+    const _MSE_TPL_RENDER = {
+      tpl_realestate:  { cta: 'tool', arg: 'realestate', cat: 'realestate', nameKey: 'wsre_n' },
+    };
+    const TPL_CAT = _wsCatalogFor('template')
+      .filter(e => _MSE_TPL_RENDER[e.id])
+      .map(e => {
+        const r = _MSE_TPL_RENDER[e.id];
+        return { ref: e.id.replace(/^tpl_/, 'tpl:'), cta: r.cta, arg: r.arg, cat: r.cat,
+                 name: t(r.nameKey), entryId: e.id };
+      });
     const TOOL_CAT = _wsCatalogFor('tool')
       .filter(e => _MSE_TOOL_RENDER[e.id])
       .map(e => {
@@ -19049,19 +19152,28 @@ function _renderWorkspaceHome(metrics) {
                  name: t(r.nameKey), entryId: e.id };
       });
     // Keep only used/pinned items, ordered by most-recent activity (DESC).
+    // M.03 A — `saved` se separa de `used`: un elemento puede estar aquí por haberse
+    // ABIERTO o por estar en FAVORITOS, y son dos afirmaciones distintas. Antes las
+    // dos pintaban la misma fila y un favorito sin abrir mostraba una hora suelta
+    // sin decir de qué.
     const activate = arr => arr
-      .map(it => { const r = _wsRecentTs(it.ref), p = pinTs(it.ref); return Object.assign({}, it, { ts: Math.max(r, p), used: r > 0 }); })
+      .map(it => { const r = _wsRecentTs(it.ref), p = pinTs(it.ref);
+                   return Object.assign({}, it, { ts: Math.max(r, p), used: r > 0, saved: p > 0 }); })
       .filter(x => x.ts > 0)
       .sort((a, b) => b.ts - a.ts);
     const tplList = activate(TPL_CAT), toolList = activate(TOOL_CAT);
 
     const openAttrs = it => ` role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : it.cta === 'workspace' ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}`;
+    // M.03 A — el FAVORITO se declara aquí, no se re-implementa: el toggle sigue
+    // siendo `pinBtn` (misma primitiva, mismo `ref`) en las tarjetas de Plantillas y
+    // Herramientas, y Mi Espacio se limita a DECIR cuál está guardado. Un segundo
+    // toggle aquí sería un segundo sistema de guardado para el mismo estado.
     const card = (it, preview) => `
-      <div class="wsh-mse2-card"${openAttrs(it)}>
+      <div class="wsh-mse2-card${it.saved ? ' is-saved' : ''}"${openAttrs(it)}>
         <div class="wsh-mse2-pv">${preview}</div>
         <div class="wsh-mse2-body">
           <p class="wsh-mse2-name">${esc(it.name)}</p>
-          <span class="wsh-mse2-meta">${it.used ? esc(t('wsmse2_last')) + ': ' : ''}${esc(_wsRelTime(it.ts))}</span>
+          <span class="wsh-mse2-meta">${esc(it.used ? t('wsmse2_last') + ': ' : (it.saved ? t('wsmse2_saved') + ' · ' : ''))}${esc(_wsRelTime(it.ts))}</span>
         </div>
         <span class="wsh-mse2-open" aria-hidden="true">${esc(t('wsh_proj_open'))} →</span>
       </div>`;
@@ -19087,7 +19199,26 @@ function _renderWorkspaceHome(metrics) {
     // nada publicable que pueda llegar a poblarla, la columna NO se pinta y la
     // rejilla pasa a una sola columna (`is-single`). Cuando vuelva a haber
     // plantillas públicas, reaparece sola: la condición es el propio catálogo.
-    const _mseCols = [
+    // M.03 A — Y LA OTRA MITAD DE LA MISMA LECCIÓN: con las dos columnas ya
+    // publicables, un usuario que todavía no ha abierto nada veía DOS estados vacíos
+    // uno al lado del otro, que es la misma pobreza visual vista del otro lado. Si el
+    // espacio está genuinamente vacío se pinta UNA portada: una invitación, no dos.
+    // En cuanto hay actividad en cualquiera de las dos, vuelven las columnas.
+    const _mseEmpty = !tplList.length && !toolList.length;
+    const _mseCols = _mseEmpty ? [`
+      <section class="wsh-card wsh-mse2-col wsh-mse2-blank">
+        <header class="wsh-mse2-head">
+          <h3 class="wsh-title">${esc(t('wstab_space'))}</h3>
+          <span class="wsh-mse2-sub">${esc(t('wsmse2_empty_b'))}</span>
+        </header>
+        <div class="wsh-mse2-empty">
+          <p class="wsh-mse2-empty-t">${esc(t('wsmse2_empty_t'))}</p>
+          <div class="wsh-mse2-empty-ctas">
+            <button type="button" class="wsh-cta is-primary" data-wstab="tools">${esc(t('wsmse2_tool_empty_cta'))}</button>
+            <button type="button" class="wsh-cta" data-wstab="templates">${esc(t('wsmse2_tpl_empty_cta'))}</button>
+          </div>
+        </div>
+      </section>`] : [
       TPL_CAT.length ? column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates']) : '',
       // M.02 B4 · §14 — identidad visual coherente. Aquí se pintaba SÓLO el glyph
       // genérico `_wsTplViz`, así que Compound aparecía en Mi Espacio con un dibujo
@@ -19132,6 +19263,13 @@ function _renderWorkspaceHome(metrics) {
     // publicado sigue VACÍO (ninguna plantilla tiene matemática y persistencia
     // comprobadas), así que ve exactamente el mismo estado vacío premium que antes.
     // El founder ve el inventario interno para poder evaluarlo.
+    // M.03 A — se publica UNA: `tpl_realestate` (Real Estate Portfolio), gratuita,
+    // porque el SPEC de FREE V1 la declara. Y hay que decir en qué se aparta del
+    // criterio de WORKSPACE-LAUNCH-V1: esta plantilla SÍ guarda trabajo, y sus
+    // claves `aurix_ws_*_v1` no viajan en el sync. La permanencia no se promete —se
+    // declara en la propia plantilla (`wsre_local_note`)— y Workspace Sync sigue
+    // siendo el prerrequisito para publicar cualquier otra. Las once restantes
+    // siguen internas.
     const TPL_RENDER = {
       tpl_mbudget:     { nameKey: 'wstool_budget_n',      cta: 'tool',      arg: 'budget' },
       tpl_assets:      { nameKey: 'wsapp_assets_n',       cta: 'tool',      arg: 'assets' },
@@ -19163,7 +19301,11 @@ function _renderWorkspaceHome(metrics) {
     // sin banner de upgrade. Cuando el catálogo tenga una entrada, la galería
     // reaparece sola: la condición es el propio catálogo.
     const body = gallery.length
-      ? `<div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div>`
+      // M.03 A — con menos de tres tarjetas la rejilla de TRES columnas fijas deja
+      // una fila medio vacía y la tarjeta se estira: es la misma clase de defecto
+      // que ya se corrigió en la rejilla de herramientas (`is-sparse`), y ahora le
+      // toca a la galería porque el catálogo público de plantillas es de UNA.
+      ? `<div class="wsh-tpl-grid wsh-gallery${gallery.length < 3 ? ' is-sparse' : ''}">${gallery.map(card).join('')}</div>`
       : `<div class="wsh-tplarch">
           <p class="wsh-tplarch-t">${esc(t('wstpl_arch_t'))}</p>
           <p class="wsh-tplarch-b">${esc(t('wstpl_arch_b'))}</p>
@@ -21148,8 +21290,9 @@ function _renderRealEstateTool() {
     <div class="aurix-wsh wsh-tool-view wsh-re-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
         <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
-        <h2 class="wsb-title">${esc(t('wsre_n'))} <span class="wsh-pro-badge">Pro</span></h2>
+        <h2 class="wsb-title">${esc(t('wsre_n'))} <span class="wsb-title-tier">${_wsTierChip('tpl_realestate')}</span></h2>
         <p class="wsb-subtitle">${esc(t('wsre_d'))}</p>
+        <p class="wsb-note">${esc(t('wsre_local_note'))}</p>
       </section>
       <section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>
       <section class="wsh-card">
@@ -21517,7 +21660,7 @@ function _renderLoanTool() {
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
         <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
-        <h2 class="wsb-title">${esc(t('wsloan_n'))} <span class="wsh-pro-badge">Pro</span></h2>
+        <h2 class="wsb-title">${esc(t('wsloan_n'))} <span class="wsb-title-tier">${_wsTierChip('loan_simulation')}</span></h2>
         <p class="wsb-subtitle">${esc(t('wsloan_sub'))}</p>
       </section>
       <section class="wsh-card wsloan-inputs-card">
@@ -26683,6 +26826,7 @@ function _aurixInvestablePerformance(range) {
     externalFlowCount: 0, tradeFlowCount: 0, confidence: null, basis: 'investable-twr', fallbackReason: null,
     spanMs: null, nominalMs: null, coversNominal: null,
     unmatchedFlows: 0, unmatchedFlowTotal: 0,
+    index: null,                       // M.03 C — sólo se rellena si valid === true
   };
   try {
     // 1 · AUTHORITATIVE INVESTABLE SERIES (real estate already excluded).
@@ -26812,16 +26956,105 @@ function _aurixInvestablePerformance(range) {
     if (!Number.isFinite(pct)) { out.fallbackReason = 'not_finite'; return out; }
     out.returnPct = +pct.toFixed(4);
     out.confidence = (pts.length >= _AURIX_INVPERF_HIGH_CONFIDENCE_OBS) ? 'high' : 'medium';
+    // M.03 · C — SE PUBLICA EL ÍNDICE FLOW-NEUTRAL, no una segunda serie.
+    //
+    // `chain.values` es la MISMA cadena con la que se acaba de calcular
+    // `returnPct`: base 100, un punto por observación, con el flujo externo
+    // neutralizado y ponderado por tiempo. Se expone aquí, en la misma línea que
+    // el retorno y DESPUÉS de los siete guards, de modo que un consumidor sólo
+    // puede verlo cuando el retorno es publicable. Ningún return temprano lo
+    // rellena, y el `catch` lo anula igual que `returnPct`.
+    //
+    // La forma es AUTODESCRIPTIVA a propósito: los `timestamps` son idénticos a los
+    // de la serie de NIVEL, así que sin `basis`/`unit` un renderer podría pintarlo
+    // como patrimonio y publicar "100 €" en el primer punto. Nadie debe consumir
+    // este campo sin leer `basis`.
+    out.index = Object.freeze({
+      basis: 'flow_neutral_index', unit: 'index', base: 100,
+      intervals: Math.max(0, chain.values.length - 1),
+      timestamps: chain.timestamps.slice(), values: chain.values.slice(),
+    });
     out.valid = true;
     return out;
   } catch (e) {
-    out.valid = false; out.returnPct = null;
+    out.valid = false; out.returnPct = null; out.index = null;
     out.fallbackReason = 'error:' + ((e && e.message) || e);
     return out;
   }
 }
 if (typeof window !== 'undefined') {
   window.debugAurixInvestablePerformance = (range) => _aurixInvestablePerformance(range || 'all');
+}
+
+// ── PEAK RETENTION — cuánto del máximo ha conservado la cartera ─────────────
+// M.03 · C — el owner que le faltaba al eje ESTABILIDAD del radar semántico.
+//
+// QUÉ MIDE, literalmente: la mayor caída pico-valle del ÍNDICE FLOW-NEUTRAL, y
+// publica lo complementario — el porcentaje del máximo que la cartera conservó en
+// su peor momento. Es una CUOTA NATURAL, acotada 0..100 por construcción
+// ((pico−valle)/pico), sin una sola constante de escala inventada. No es una
+// medida de volatilidad y no se llama así: no hay motor de volatilidad en este
+// código y esto no lo sustituye.
+//
+// POR QUÉ SOBRE EL ÍNDICE Y NO SOBRE EL PATRIMONIO: una retirada hunde la curva de
+// nivel sin que la cartera haya caído. El índice tiene el flujo externo
+// neutralizado, así que la caída que mide es la del VALOR de lo invertido. La
+// consecuencia hay que aceptarla explícitamente: el usuario puede ver −30 % en su
+// curva de patrimonio y este eje decir 97, porque son dos preguntas distintas.
+//
+// MADUREZ, y es el guard que de verdad importa: el drawdown máximo es MONÓTONO en
+// la densidad de muestreo — más observaciones sólo pueden revelar más caída, nunca
+// menos. Con dos observaciones al alza saldría 100 = "estabilidad máxima" sobre
+// evidencia nula, que es exactamente la falsa precisión que el SPEC prohíbe. Así
+// que se exige la MISMA barra que este código ya adoptó para la confianza alta del
+// retorno (`_AURIX_INVPERF_HIGH_CONFIDENCE_OBS`), no un umbral nuevo. Por debajo el
+// estado es `immature` y NO se publica ningún número: se publica que falta
+// historia, que es una afirmación distinta de "no se puede medir nunca".
+//
+// Hereda TODA la validez de `_aurixInvestablePerformance`: si el retorno no es
+// publicable, esto tampoco existe.
+function _aurixPeakRetention(range) {
+  const out = { range: range || 'all', status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE,
+    reason: 'owner_unavailable', retentionPct: null, maxDrawdownPct: null,
+    observations: 0, intervals: 0, quality: null };
+  try {
+    if (typeof _aurixInvestablePerformance !== 'function') return out;
+    const perf = _aurixInvestablePerformance(out.range);
+    if (!perf || perf.valid !== true || !perf.index || perf.index.basis !== 'flow_neutral_index') {
+      out.status = _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY;
+      out.reason = (perf && perf.fallbackReason) || 'return_not_publishable';
+      return out;
+    }
+    if (perf.coversNominal === false) {
+      out.status = _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY; out.reason = 'window_not_covered'; return out;
+    }
+    const vals = perf.index.values;
+    out.observations = vals.length;
+    out.intervals = perf.index.intervals;
+    if (perf.confidence !== 'high') {
+      out.status = _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY;
+      out.reason = 'awaiting_observations';       // hay serie, falta historia: estado PROGRESIVO
+      out.quality = 'immature';
+      return out;
+    }
+    let peak = vals[0], worst = 0;
+    for (const v of vals) {
+      if (!Number.isFinite(v) || v <= 0) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'invalid_index_point'; return out; }
+      if (v > peak) peak = v;
+      const dd = (peak - v) / peak;
+      if (dd > worst) worst = dd;
+    }
+    if (!Number.isFinite(worst)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'drawdown_not_finite'; return out; }
+    out.maxDrawdownPct = +(worst * 100).toFixed(2);
+    out.retentionPct   = Math.max(0, Math.min(100, Math.round(100 - out.maxDrawdownPct)));
+    out.status = _AURIX_FACT_STATUS.AVAILABLE;
+    out.reason = '';
+    out.quality = 'measured';
+    return out;
+  } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixPeakRetention = (range) => _aurixPeakRetention(range || 'all');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -26892,6 +27125,11 @@ const _AURIX_FACT_MATERIAL = Object.freeze({
   concentrationPct: 25,     // a single position at/above this is structurally material
   returnPct:        1,      // |return| below this is not a story
   flowShareOfValue: 0.02,   // recorded capital ≥2% of investable value is material
+  // M.03 D — mismo umbral, concepto distinto: cuánto tiene que moverse el NIVEL
+  // observado para no ser ruido de precio. Se declara aparte de `flowShareOfValue`
+  // porque uno mide capital aportado y el otro la evolución del nivel; compartir
+  // el número no es compartir el significado.
+  levelDeltaShare:  0.02,
   effectiveNRatio:  0.6,    // effectiveN/positions below this means weights are lopsided
   // INT.05 — "your three largest positions add up to 100%" is TRUE and worthless:
   // with three or fewer holdings it is arithmetic, not information. A top-3 fact
@@ -27062,6 +27300,12 @@ function _aurixFactLedger(opts) {
   }
 
   // ── B · WEALTH LEVEL — level, highs, milestones (investable basis) ────────
+  // M.03 D — el ledger de flujos se carga AQUÍ (antes vivía en la sección C, que
+  // era su único consumidor) porque `investable_prior_high` necesita saber si una
+  // retirada registrada explica la caída desde el máximo. Una sola lectura,
+  // compartida por las dos secciones: no se duplica la fuente.
+  let flowLedger = [];
+  try { flowLedger = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { flowLedger = []; }
   let lvl = null;
   try { lvl = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries('all') : null; } catch (_) { lvl = null; }
   const lvlSeries = (lvl && Array.isArray(lvl.series)) ? lvl.series : [];
@@ -27096,13 +27340,115 @@ function _aurixFactLedger(opts) {
         materiality: 0.8, magnitude: 0.6, confidence: 1, utility: 0.6, rarity: 0.6,
       });
     }
+
+    // ── M.03 · D — TRAYECTORIA, no sólo el máximo ────────────────────────────
+    // La familia WEALTH_LEVEL emitía DOS hechos, y la Memoria patrimonial sólo
+    // puede consumir uno: `investable_level` tiene ventana 'now' y la Memoria la
+    // descarta con razón (el nivel actual es contexto, no memoria), y el máximo
+    // histórico sólo existe si el último punto ES el máximo. Consecuencia medida:
+    // una cartera que no está en máximos veía "Aurix está acumulando tu historial"
+    // PARA SIEMPRE, con semanas de observaciones en el disco. El estado vacío
+    // estaba bien escrito; lo que faltaba eran hechos.
+    //
+    // Los dos que siguen salen de la MISMA serie certificada, sin motor nuevo:
+    //
+    // (a) CAMBIO DE NIVEL. Es el hecho más confundible con rentabilidad de todo el
+    //     ledger, así que se publica en divisa base, SIN porcentaje, y `values` no
+    //     lleva juntos el valor inicial y el final —tenerlos invita a derivar el %
+    //     que este hecho no afirma—. `note` lo declara: es NIVEL, y el nivel sube
+    //     cuando ingresas dinero. Va con `recorded_capital_net`, que cubre la misma
+    //     ventana, para que "has aportado X" y "tu nivel ha subido Y" se lean
+    //     juntos en vez de que el segundo parezca rendimiento.
+    //
+    // (b) MÁXIMO ANTERIOR, el complemento exacto del ATH (peakIdx !== último). Y
+    //     falla CERRADO en el único caso en que mentiría: si entre el máximo y hoy
+    //     hay una RETIRADA registrada y material, "estás por debajo de tu máximo"
+    //     describe una decisión del usuario como si fuera una caída. Sin el hecho
+    //     de flujo al lado, no se publica.
+    //
+    // "Desde" es `meta.activeWindowStart`, no el inicio de la cuenta: el filtro de
+    // confianza y el recorte WN.12 pueden haber excluido puntos anteriores, así que
+    // la fecha que se afirma es la del primer punto FIABLE.
+    const lvlStartAt = (lvl && lvl.meta && Number.isFinite(lvl.meta.activeWindowStart))
+      ? lvl.meta.activeWindowStart : lvlSeries[0].ts;
+    if (lvlSeries.length >= 3) {
+      const first = lvlSeries[0].value, lastV = lvlSeries[lvlSeries.length - 1].value;
+      const delta = lastV - first;
+      const floor = _AURIX_FACT_MATERIAL.levelDeltaShare * lastV;
+      if (!(lastV > 0)) {
+        gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_level_change',
+          _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'end_value_not_positive');
+      } else if (Math.abs(delta) < floor) {
+        // MEDIDO y estable: no es lo mismo que "no medible". La Memoria lee este
+        // gap para decir "trayectoria estable" en vez de "estoy acumulando".
+        gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_level_change',
+          _AURIX_FACT_STATUS.AVAILABLE, 'no_material_level_change',
+          { startAt: lvlStartAt, endAt: lvlSeries[lvlSeries.length - 1].ts,
+            observations: lvlSeries.length });
+      } else {
+        push({
+          semanticKey: 'investable_level_change',
+          family: _AURIX_FACT_FAMILY.WEALTH_LEVEL,
+          causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
+          value: +delta.toFixed(2), unit: 'base_currency',
+          values: { delta: +delta.toFixed(2), observations: lvlSeries.length },
+          window: { range: 'observed', startAt: lvlStartAt,
+                    endAt: lvlSeries[lvlSeries.length - 1].ts },
+          source: 'aurixEligibleInvestableSeries',
+          direction: delta > 0 ? 'up' : 'down', positive: null,
+          note: 'level_claim_not_return',
+          changeFact: true,
+          materiality: 0.85, magnitude: _aurixFactClamp01(Math.abs(delta) / lastV),
+          confidence: 1, utility: 0.7, rarity: 0.2,
+        });
+      }
+      // El máximo anterior sólo es información si HOY estás materialmente por
+      // debajo de él. Sin este suelo, una serie plana emitía "tu máximo sigue
+      // siendo el del primer día" con un importe idéntico al de hoy: verdadero y
+      // vacío. Mismo umbral que el cambio de nivel — es la misma pregunta.
+      const belowPeakBy = peak - lastV;
+      if (peakIdx !== lvlSeries.length - 1 && lastV > 0
+          && belowPeakBy >= _AURIX_FACT_MATERIAL.levelDeltaShare * lastV) {
+        const peakTs = lvlSeries[peakIdx].ts, lastTs = lvlSeries[lvlSeries.length - 1].ts;
+        let netSincePeak = 0, netKnown = true;
+        try {
+          const since = flowLedger.filter(f => f && Number.isFinite(f.ts)
+            && Number.isFinite(f.amountUSD) && f.ts > peakTs && f.ts <= lastTs);
+          for (const f of since) {
+            const amt = (typeof toBase === 'function') ? toBase(f.amountUSD, 'USD') : f.amountUSD;
+            if (!Number.isFinite(amt)) { netKnown = false; break; }
+            netSincePeak += amt;
+          }
+        } catch (_) { netKnown = false; }
+        const withdrawalExplains = netKnown &&
+          netSincePeak < 0 && Math.abs(netSincePeak) >= _AURIX_FACT_MATERIAL.levelDeltaShare * lastV;
+        if (!netKnown) {
+          gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_prior_high',
+            _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'fx_unavailable');
+        } else if (withdrawalExplains) {
+          gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_prior_high',
+            _AURIX_FACT_STATUS.AVAILABLE, 'withdrawal_explains_decline');
+        } else {
+          push({
+            semanticKey: 'investable_prior_high',
+            family: _AURIX_FACT_FAMILY.WEALTH_LEVEL,
+            causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
+            value: +peak.toFixed(2), unit: 'base_currency',
+            values: { value: +peak.toFixed(2), at: lvlSeries[peakIdx].ts },
+            window: { range: 'observed', startAt: lvlSeries[peakIdx].ts, endAt: lastTs },
+            source: 'aurixEligibleInvestableSeries', direction: 'flat', positive: null,
+            note: 'level_claim_not_return',
+            materiality: 0.6, magnitude: 0.35, confidence: 1, utility: 0.5, rarity: 0.3,
+          });
+        }
+      }
+    }
   }
 
   // ── C · CAPITAL FLOW — recorded capital, explicitly NOT performance ───────
   // The same perimeter INT.02 neutralises out of the return, so the pair
   // "you added X / your investments returned Y" is internally consistent.
-  let flowLedger = [];
-  try { flowLedger = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { flowLedger = []; }
+  // (`flowLedger` se carga en la sección B — ver la nota de M.03 D.)
   if (lvlSeries.length >= 2) {
     const t0 = lvlSeries[0].ts, t1 = lvlSeries[lvlSeries.length - 1].ts;
     const inWin = flowLedger.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 && f.ts <= t1);
@@ -27304,7 +27650,22 @@ function _aurixFactLedger(opts) {
   gap(_AURIX_FACT_FAMILY.DATA_QUALITY, 'per_asset_attribution',
     _AURIX_FACT_STATUS.NOT_YET_SUPPORTED, 'asset_level_history_too_short');
 
-  return { facts, gaps, generatedAt: nowTs };
+  // ── M.03 · D/E — CUÁNTA EVIDENCIA HAY, como dato estructurado ─────────────
+  // Las superficies necesitaban distinguir dos cosas que hasta ahora decían igual:
+  // "Aurix todavía no puede medir esto" y "Aurix lo ha medido y no hay nada
+  // material". La segunda exige saber que EXISTE historia, y eso no estaba
+  // publicado en ninguna parte del contrato. No es un hecho (no afirma nada sobre
+  // el patrimonio): es la cobertura de la observación.
+  const observation = {
+    observations: lvlSeries.length,
+    startAt: lvlSeries.length ? ((lvl && lvl.meta && Number.isFinite(lvl.meta.activeWindowStart))
+      ? lvl.meta.activeWindowStart : lvlSeries[0].ts) : null,
+    endAt: lvlSeries.length ? lvlSeries[lvlSeries.length - 1].ts : null,
+  };
+  observation.spanMs = (Number.isFinite(observation.startAt) && Number.isFinite(observation.endAt))
+    ? Math.max(0, observation.endAt - observation.startAt) : null;
+
+  return { facts, gaps, observation, generatedAt: nowTs };
 }
 
 // ── RELATION / DEDUPLICATION — ONE ROOT → ONE PRIMARY STORY ────────────────
@@ -27500,7 +27861,11 @@ function _aurixContextualQuestions(ledger, opts) {
 function _aurixWhatChanged(ledger) {
   const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
   return facts
-    .filter(f => f.unit === 'percentage_points' || f.family === _AURIX_FACT_FAMILY.PERFORMANCE
+    // M.03 E — `changeFact` es la marca explícita de "este hecho ES un cambio
+    // medido". Se añade en vez de ensanchar el filtro por familia: WEALTH_LEVEL
+    // contiene además el nivel actual y el máximo, que son estados, no cambios.
+    .filter(f => f.changeFact === true
+              || f.unit === 'percentage_points' || f.family === _AURIX_FACT_FAMILY.PERFORMANCE
               || f.family === _AURIX_FACT_FAMILY.CAPITAL_FLOW)
     .filter(f => f.window && (f.window.startAt != null || f.window.range))
     .map(f => ({
@@ -27539,6 +27904,9 @@ function _aurixIntelligenceCore(opts) {
       gaps: ledger.gaps,
       factCount: ledger.facts.length,
       roots: Array.from(new Set(ledger.facts.map(f => f.causalRoot))).sort(),
+      // M.03 D/E — cobertura de observación: lo que permite a una superficie decir
+      // "no hay cambio material" en vez de "todavía no puedo medirlo".
+      observation: ledger.observation || { observations: 0, startAt: null, endAt: null, spanMs: null },
     },
     ledger,
   };
@@ -51832,6 +52200,13 @@ function _intv4FactText(fact) {
   if (k === 'return_positive')         return _intv4T('intv4_f_return_pos', _intv4Num(fact.value, 2));
   if (k === 'investable_level')        return _intv4T('intv4_f_level', _intv4Money(fact.value));
   if (k === 'investable_all_time_high') return _intv4T('intv4_f_ath', _intv4Money(fact.value));
+  // M.03 D — TRAYECTORIA. El cambio de nivel se dice en dinero y con su fecha de
+  // inicio real, y la copy nombra la causa que el hecho NO descarta (aportaciones),
+  // porque es la única forma de que un importe no se lea como rentabilidad.
+  if (k === 'investable_level_change') return fact.value >= 0
+    ? _intv4T('intv4_f_level_up',   _intv4Money(Math.abs(fact.value)), _intccDate(fact.window && fact.window.startAt))
+    : _intv4T('intv4_f_level_down', _intv4Money(Math.abs(fact.value)), _intccDate(fact.window && fact.window.startAt));
+  if (k === 'investable_prior_high')   return _intv4T('intv4_f_prior_high', _intv4Money(fact.value), _intccDate((fact.values || {}).at));
   if (k === 'recorded_capital_net')    return fact.value >= 0
     ? _intv4T('intv4_f_capital_in',  _intv4Money(Math.abs(fact.value)))
     : _intv4T('intv4_f_capital_out', _intv4Money(Math.abs(fact.value)));
@@ -51942,15 +52317,27 @@ function _intv4ChangedHtml(core, esc, alreadyPublished) {
     })
     .filter(x => !!x.txt)
     .slice(0, 4);
+  // ── M.03 · E — "SIN CAMBIO MATERIAL" ≠ "NO PUEDO MEDIRLO" ─────────────────
+  // El estado vacío decía "Todavía no hay cambios que Aurix pueda medir", y eso
+  // afirma una INCAPACIDAD. Con semanas de snapshots en el disco es falso: Aurix
+  // sí puede medir, y lo que ocurre es que nada supera el umbral de materialidad —o
+  // que lo único material ya lo ha titulado el Brief justo encima. Son tres
+  // situaciones distintas y ahora se dicen distinto. La medida de "hay evidencia"
+  // es la cobertura de observación del Core, no una heurística de esta capa.
+  const obs = (core.dataAvailability && core.dataAvailability.observation) || {};
+  const hasEvidence = Number(obs.observations) >= 2;
+  const emptyKey = !hasEvidence ? 'intv4_changed_empty'
+    : (published.size ? 'intv4_changed_all_published' : 'intv4_changed_stable');
   return `
-    <section class="intcc-card intv4-changed">
+    <section class="intcc-card intv4-changed" data-evidence="${hasEvidence ? '1' : '0'}"
+             data-obs="${esc(String(obs.observations || 0))}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_changed_title'))}</h3>
       ${rows.length ? `<ul class="intv4-chg-list">${rows.map(x => `
         <li class="intv4-chg is-${esc(x.w.change.direction || 'flat')}" data-root="${esc(x.w.causalRoot)}">
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
         </li>`).join('')}</ul>`
-      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_changed_empty'))}</p>`}
+      : `<p class="intcc-empty-body">${esc(_intv4T(emptyKey))}</p>`}
     </section>`;
 }
 
@@ -52054,9 +52441,31 @@ function _intv4MemoryHtml(core, esc, alreadyPublished) {
   // timeline with observation nodes that accumulate: a temporal signal, not a
   // spinner, not a skeleton, and not a claim of intelligence. CSS-only, and the
   // motion is disabled under prefers-reduced-motion.
+  // ── M.03 · D — EL ESTADO "ACUMULANDO" SE RESERVA A QUIEN NO TIENE HISTORIAL ─
+  // Era el estado permanente de cualquiera que no estuviese en máximos, porque la
+  // familia WEALTH_LEVEL sólo emitía un hecho fechado y ese hecho era el máximo. Ya
+  // no: el ledger emite trayectoria (cambio de nivel, máximo anterior). Y cuando
+  // esa trayectoria existe pero es ESTABLE, se dice — con su fecha de inicio y su
+  // número de observaciones —, que es una afirmación verdadera y distinta de "estoy
+  // acumulando tu historial".
+  const obs = (core.dataAvailability && core.dataAvailability.observation) || {};
   if (!events.length) {
+    const nObs = Number(obs.observations) || 0;
+    if (nObs >= 3 && Number.isFinite(obs.startAt)) {
+      const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
+      return `
+        <section class="intcc-card intcc-timeline intv4-memory is-stable"
+                 data-obs="${esc(String(nObs))}">
+          <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
+          <p class="intv4-mem-stable-t">${esc(_intv4T('intv4_memory_stable_t', _intccDate(obs.startAt)))}</p>
+          <p class="intv4-mem-stable-b">${esc(days
+            ? _intv4T('intv4_memory_stable_b', nObs, days)
+            : _intv4T('intv4_memory_stable_b_nodays', nObs))}</p>
+        </section>`;
+    }
     return `
-      <section class="intcc-card intcc-timeline intv4-memory is-accruing">
+      <section class="intcc-card intcc-timeline intv4-memory is-accruing"
+               data-obs="${esc(String(nObs))}">
         <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
         <div class="intv6-accrue" aria-hidden="true">
           <span class="intv6-accrue-line"></span>
@@ -52293,16 +52702,43 @@ function _intv5StructureHtml(core, esc) {
 // The order does NOT depend on which axes happen to be certified today: it is
 // frozen, so when Estabilidad and Crecimiento acquire owners the radar fills in
 // WITHOUT restructuring, exactly as the founder required.
+// ── M.03 · C — ESTABILIDAD COBRA VIDA (y Crecimiento no) ────────────────────
+//
+// INT.07 dejó los dos ejes en `unavailable` con una razón cada uno, y M.03 las
+// revisa con la evidencia que HOY existe. El resultado es asimétrico a propósito:
+//
+// · ESTABILIDAD pasa a tener owner: `_aurixPeakRetention`, el máximo conservado
+//   sobre el índice flow-neutral que `_aurixInvestablePerformance` ya calculaba y
+//   ahora expone. Es una cuota natural, de la misma familia que los otros tres
+//   ejes (todos son un porcentaje de su propia magnitud), hereda íntegra la
+//   validez del owner certificado y NO es un motor de volatilidad: por debajo de
+//   la barra de confianza alta no publica número, porque el drawdown máximo crece
+//   con el muestreo y con dos puntos al alza diría "100 = calma total".
+//
+// · CRECIMIENTO sigue sin owner, y ahora se sabe MEJOR por qué. Se evaluaron tres
+//   escalas naturales antes de descartarlas: la frecuencia de intervalos positivos
+//   depende de la CADENCIA DE MUESTREO (los snapshots son event-driven, no una
+//   malla temporal: al densificar converge a ~50 para cualquier activo con
+//   deriva), el percentil frente a su propia historia es degenerado (en máximo,
+//   siempre 100), y la posición dentro del rango observado también. Todas medirían
+//   la sesión del usuario, no su crecimiento, y "Crecimiento 60 %" chocaría con el
+//   `investable_return_*` que la MISMA superficie publica desde el MISMO motor:
+//   dos números incompatibles con la misma palabra. Lo que falta no es un cálculo,
+//   es un índice de referencia — y INT.01 prohíbe el benchmark. Se mantiene el
+//   disclosure, ahora nombrando la evidencia exacta que falta.
+//
+// El orden de dibujo NO se toca: sigue intercalando, así que el eje que se activa
+// rellena su vértice sin reestructurar la figura, exactamente como se diseñó.
 const _INTV7_RADAR_DIMS = Object.freeze([
   Object.freeze({ key: 'diversification', labelKey: 'intcc_dim_div',    owner: 'aurixEffectiveDiversification' }),
-  Object.freeze({ key: 'stability',       labelKey: 'intcc_dim_stab',   owner: null, pending: 'no_volatility_owner' }),
+  Object.freeze({ key: 'stability',       labelKey: 'intcc_dim_stab',   owner: 'aurixPeakRetention' }),
   Object.freeze({ key: 'liquidity',       labelKey: 'intcc_dim_liq',    owner: 'aurixHealthSnapshot' }),
   Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: null, pending: 'no_certifiable_scale' }),
   Object.freeze({ key: 'concentration',   labelKey: 'intcc_dim_conc',   owner: 'aurixHealthSnapshot' }),
 ]);
 
 function _intv7RadarAxes() {
-  const out = { dims: [], values: {}, measured: 0, unavailable: [], pending: {} };
+  const out = { dims: [], values: {}, measured: 0, unavailable: [], pending: {}, quality: {} };
   let snap = null, div = null;
   try { snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null; } catch (_) { snap = null; }
   try { div  = (typeof _aurixEffectiveDiversification === 'function') ? _aurixEffectiveDiversification() : null; } catch (_) { div = null; }
@@ -52318,6 +52754,18 @@ function _intv7RadarAxes() {
   }
   const top1 = haveSnap && snap.topInvestedAsset ? snap.topInvestedAsset.pctTotal : null;
   if (Number.isFinite(top1)) certified.concentration = Math.round(top1);
+  // M.03 C — Estabilidad. El owner ya devuelve la CUOTA (0..100): aquí no se
+  // normaliza nada, no hay escala y no hay una segunda multiplicación. Su `reason`
+  // viaja tal cual al disclosure, de modo que "falta historia" y "no hay escala
+  // certificable" nunca se cuentan como el mismo estado.
+  let ret = null;
+  try { ret = (typeof _aurixPeakRetention === 'function') ? _aurixPeakRetention('all') : null; } catch (_) { ret = null; }
+  if (ret && ret.status === 'available' && Number.isFinite(ret.retentionPct)) {
+    certified.stability = ret.retentionPct;
+    out.quality.stability = ret.quality || 'measured';
+  } else if (ret) {
+    out.quality.stability = ret.quality || 'unavailable';
+  }
 
   for (const d of _INTV7_RADAR_DIMS) {
     const v = Object.prototype.hasOwnProperty.call(certified, d.key) ? certified[d.key] : null;
@@ -52326,10 +52774,21 @@ function _intv7RadarAxes() {
     if (ok) { out.values[d.key] = Math.max(0, Math.min(100, v)); out.measured++; }
     else {
       out.unavailable.push(d.key);
-      out.pending[d.key] = d.pending || 'owner_unavailable';
+      out.pending[d.key] = (d.key === 'stability' && ret && ret.reason) ? ret.reason
+                         : (d.pending || 'owner_unavailable');
     }
   }
   return out;
+}
+// M.03 C — el disclosure DEJA DE SER UNA SOLA FRASE PARA TODO. "Todavía sin datos:
+// Estabilidad · Crecimiento" trataba igual dos situaciones que no lo son: una espera
+// historia y la otra espera una referencia que el producto ha decidido no tener. Se
+// nombra por eje y por causa, que es lo que el SPEC pide documentar.
+function _intv7PendingReasonKey(reason) {
+  if (reason === 'no_certifiable_scale') return 'intv7_pending_scale';
+  if (reason === 'awaiting_observations' || reason === 'window_not_covered'
+      || reason === 'insufficient_observations' || reason === 'window_too_short') return 'intv7_pending_obs';
+  return 'intv7_pending_generic';
 }
 
 function _intv7RadarHtml(esc) {
@@ -52340,18 +52799,28 @@ function _intv7RadarHtml(esc) {
   // Named in the founder's own enumeration order, which is the reading order of
   // the product, not the drawing order of the figure.
   const ENUM = ['diversification', 'liquidity', 'concentration', 'stability', 'growth'];
-  const pendingNames = ENUM.filter(k => r.unavailable.indexOf(k) !== -1)
-    .map(k => (_INTV7_RADAR_DIMS.find(d => d.key === k) || {}).labelKey)
-    .filter(Boolean).map(lk => _intv4T(lk));
+  // M.03 C — una línea POR EJE pendiente, con su causa real. El orden sigue siendo
+  // la enumeración del founder, no el orden de dibujo.
+  const pendingLines = ENUM.filter(k => r.unavailable.indexOf(k) !== -1)
+    .map(k => {
+      const dim = _INTV7_RADAR_DIMS.find(d => d.key === k);
+      if (!dim) return '';
+      return _intv4T(_intv7PendingReasonKey(r.pending[k]), _intv4T(dim.labelKey));
+    })
+    .filter(Boolean);
   return `
     <section class="intcc-card intcc-radar intv6-radar intv7-radar"
              data-axes="${r.dims.length}" data-measured="${r.measured}"
-             data-unavailable="${esc(r.unavailable.join(','))}" data-state="radar">
+             data-unavailable="${esc(r.unavailable.join(','))}"
+             data-quality="${esc(Object.keys(r.quality).map(k => k + ':' + r.quality[k]).join(','))}"
+             data-state="radar">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
       <p class="intv6-radar-legend">${esc(_intv4T('intv7_radar_legend'))}</p>
       <div class="intcc-radar-wrap">${svg}</div>
-      ${pendingNames.length ? `<p class="intv7-radar-pending">${
-        esc(_intv4T('intv7_radar_pending', pendingNames.join(' · ')))}</p>` : ''}
+      ${Number.isFinite(r.values.stability)
+        ? `<p class="intv7-radar-mean">${esc(_intv4T('intv7_stab_meaning'))}</p>` : ''}
+      ${pendingLines.length ? `<ul class="intv7-radar-pending">${
+        pendingLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
     </section>`;
 }
 

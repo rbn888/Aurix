@@ -635,5 +635,95 @@ console.log('\nO · un flujo sin contrapartida observable NO se publica:');
     'documentado como residual, no como contrato deseado');
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// P · M.03 · C — ÍNDICE FLOW-NEUTRAL PUBLICADO Y MÁXIMO CONSERVADO
+// ════════════════════════════════════════════════════════════════════════════
+// Dos cosas nuevas y una condición que las une: el owner EXPONE la cadena
+// flow-neutral con la que ya calculaba el retorno, y `_aurixPeakRetention` la
+// convierte en el eje Estabilidad del radar. La condición es que el índice sólo
+// exista cuando el retorno es publicable — si el retorno falla cerrado, el eje no
+// puede existir por otra vía.
+console.log('\nP · índice flow-neutral + máximo conservado (M.03 C):');
+{
+  const withRet = (o, range) => {
+    const c = makeCtx(Object.assign({}, o, {
+      extra: [konstSrc('_AURIX_FACT_STATUS'), fnSrc('_aurixPeakRetention')].concat(o.extra || []),
+    }));
+    return run('_aurixPeakRetention(' + JSON.stringify(range || 'all') + ')', c);
+  };
+  // 12 observaciones ⇒ confianza alta (≥ _AURIX_INVPERF_HIGH_CONFIDENCE_OBS).
+  const rise   = inv([10000, 10200, 10400, 10600, 10800, 11000, 11200, 11400, 11600, 11800, 12000, 12200]);
+  // Sube a 12000 y cae a 9600: máxima caída pico-valle = 20 %.
+  const dipped = inv([10000, 10500, 11000, 11500, 12000, 11000, 10000,  9600, 10000, 10400, 10800, 11000]);
+  const short  = inv([10000, 11000, 9000]);
+  // Mismas fixtures de flujo que la sección O (ámbito de bloque distinto).
+  const flat50 = inv(Array.from({ length: 10 }, () => 50000));
+  const fl = (dayOffset, amountUSD, kind) => [{ id: (kind || 'k') + ':' + dayOffset, ts: T0 + dayOffset * DAY,
+    amountUSD: amountUSD, kind: kind || 'deposit' }];
+
+  ok('P.1 el índice se publica con su BASE declarada, no como una segunda serie de patrimonio',
+    (() => { const x = perf({ rows: rise });
+      return x.valid === true && !!x.index && x.index.basis === 'flow_neutral_index'
+        && x.index.unit === 'index' && x.index.base === 100
+        && x.index.values.length === x.observations
+        && x.index.intervals === x.observations - 1
+        && x.index.values[0] === 100; })());
+  ok('P.2 el último punto del índice ES el retorno publicado (una sola cadena, no dos)',
+    (() => { const x = perf({ rows: dipped });
+      return x.valid === true
+        && near(x.index.values[x.index.values.length - 1] - 100, x.returnPct, 0.001); })());
+  ok('P.3 si el retorno NO es publicable, el índice NO existe (todas las salidas cerradas)',
+    (() => {
+      const a = perf({ rows: inv([10000]) });                                   // insufficient_observations
+      const b = perf({ rows: flat50, flows: fl(5, -25000, 'asset_remove') });   // unexplained_capital_event
+      const c = perf({ rows: flat50, flows: fl(5, -10000, 'deposit') });        // pending_flow_reconciliation
+      const d = perf({ rows: rise }, '7d');                                     // ventana nominal
+      return [a, b, c].every(x => x.valid === false && x.index === null)
+        && (d.valid === false ? d.index === null : true); })(),
+    JSON.stringify([perf({ rows: inv([10000]) }), perf({ rows: flat50, flows: fl(5, -25000, 'asset_remove') }),
+      perf({ rows: flat50, flows: fl(5, -10000, 'deposit') })].map(x => ({ v: x.valid, r: x.fallbackReason, i: x.index === null }))));
+  ok('P.4 ESTABILIDAD = 100 − máxima caída pico-valle del índice (cuota natural, sin escala inventada)',
+    (() => { const r = withRet({ rows: dipped });
+      return r.status === 'available' && r.quality === 'measured'
+        && near(r.maxDrawdownPct, 20, 0.2) && r.retentionPct === 80; })(),
+    JSON.stringify(withRet({ rows: dipped })));
+  ok('P.5 una serie que sólo sube conserva el 100 % de su máximo',
+    (() => { const r = withRet({ rows: rise });
+      return r.status === 'available' && r.maxDrawdownPct === 0 && r.retentionPct === 100; })());
+  // EL GUARD QUE IMPORTA: el drawdown máximo es monótono en la densidad de
+  // muestreo, así que con poca historia un 100 no es calma, es ignorancia.
+  ok('P.6 con historia inmadura NO publica número: publica que falta historia',
+    (() => { const r = withRet({ rows: short });
+      return r.status === 'insufficient_history' && r.reason === 'awaiting_observations'
+        && r.quality === 'immature' && r.retentionPct === null; })(),
+    JSON.stringify(withRet({ rows: short })));
+  ok('P.7 la barra de madurez es la que este código YA usaba, no un umbral nuevo',
+    /perf\.confidence !== 'high'/.test(fnSrc('_aurixPeakRetention')) &&
+    (app.match(/_AURIX_INVPERF_HIGH_CONFIDENCE_OBS = /g) || []).length === 1);
+  ok('P.8 hereda la validez del owner certificado: sin retorno publicable, sin eje',
+    (() => { const r = withRet({ rows: flat50, flows: fl(5, -10000, 'deposit') });
+      return r.status === 'insufficient_history' && r.reason === 'pending_flow_reconciliation'
+        && r.retentionPct === null; })());
+  ok('P.9 la caída se mide sobre el ÍNDICE, no sobre el patrimonio: una retirada no la fabrica',
+    (() => { // −5.000 con su caída observable: el nivel cae un 10 %, el índice no.
+      const rows = inv([50000, 50000, 50000, 50000, 50000, 45000, 45000, 45000, 45000, 45000, 45000, 45000]);
+      const r = withRet({ rows, flows: fl(5, -5000, 'withdrawal') });
+      return r.status === 'available' && r.retentionPct === 100 && r.maxDrawdownPct === 0; })(),
+    JSON.stringify(withRet({ rows: inv([50000,50000,50000,50000,50000,45000,45000,45000,45000,45000,45000,45000]), flows: fl(5, -5000, 'withdrawal') })));
+  ok('P.10 no se llama ni se calcula "volatilidad", y no hay constante de escala',
+    (() => { const src = fnSrc('_aurixPeakRetention');
+      return !/volatil/i.test(src) && !/55\s*\+/.test(src) && !/\*\s*2\.2/.test(src)
+        && !/45\s*\+/.test(src); })());
+  // NO-VACUIDAD: sin el guard de madurez, la serie corta publicaría un número.
+  ok('P.11 NON-VACUITY — sin el guard de madurez la serie corta publicaría 82 (18 % de caída)',
+    (() => { const c = makeCtx({ rows: short, extra: [konstSrc('_AURIX_FACT_STATUS'),
+        fnSrc('_aurixPeakRetention').replace(/if \(perf\.confidence !== 'high'\) \{[\s\S]*?\n    \}/, '')] });
+      const r = run('_aurixPeakRetention("all")', c);
+      return r.status === 'available' && r.retentionPct === 82; })(),
+    JSON.stringify((() => { const c = makeCtx({ rows: short, extra: [konstSrc('_AURIX_FACT_STATUS'),
+        fnSrc('_aurixPeakRetention').replace(/if \(perf\.confidence !== 'high'\) \{[\s\S]*?\n    \}/, '')] });
+      return run('_aurixPeakRetention("all")', c); })()));
+}
+
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

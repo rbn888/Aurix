@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v697-product-entitlement-integration';
-      var APPJS_V = '658';
+      var BUILD = 'v698-premium-ux-intelligence-activation';
+      var APPJS_V = '659';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -268,11 +268,13 @@
         try { var k = '__aurix_probe2__'; sessionStorage.setItem(k, '1'); var ok = sessionStorage.getItem(k) === '1'; sessionStorage.removeItem(k); return ok; } catch (_) { return false; }
       }
       // The recovery screen must never be Spanish-only: ?lang= wins, then the persisted app
-      // preference (LANG_KEY in app.js), then the device language. All readable pre-bootstrap.
+      // preference (LANG_KEY in app.js), then ?langhint=, then the device language. All
+      // readable pre-bootstrap. Same precedence as the language owner below (M.03 · B).
       function bootLang() {
         var l = null;
         try { var m = (location.search || '').match(/[?&]lang=(es|en)\b/i); if (m) l = m[1].toLowerCase(); } catch (_) {}
         if (!l) { try { var s = localStorage.getItem('portfolio_lang'); if (s === 'es' || s === 'en') l = s; } catch (_) {} }
+        if (!l) { try { var mh = (location.search || '').match(/[?&]langhint=(es|en)\b/i); if (mh) l = mh[1].toLowerCase(); } catch (_) {} }
         if (!l) { try { l = ((navigator.language || '') + '').toLowerCase().indexOf('es') === 0 ? 'es' : 'en'; } catch (_) { l = 'en'; } }
         return l === 'es' ? 'es' : 'en';
       }
@@ -461,7 +463,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=663">
+  <link rel="stylesheet" href="styles.css?v=664">
 </head>
 <body style="background:#040507">
 
@@ -506,8 +508,21 @@
       // AURIX-WAITLIST-1: honor a cross-origin ?lang= handoff from the landing
       // (localStorage is not shared across origins). Persist it so the app and
       // a login bounce both render in the chosen language.
-      var _p = new URLSearchParams(location.search).get('lang');
+      //
+      // M.03 · B — PRECEDENCIA DETERMINISTA, UNA SOLA AUTORIDAD (`portfolio_lang`):
+      //   1. `?lang=`     · elección EXPLÍCITA del usuario (landing) → gana siempre.
+      //   2. preferencia ya persistida (la elegida dentro de Aurix) → gana al hint.
+      //   3. `?langhint=` · idioma con el que la landing se mostraba → sólo si no
+      //                     hay preferencia previa en este contenedor.
+      //   4. español.
+      // Antes el handoff era un único `?lang=` que la landing ponía SIEMPRE con su
+      // idioma por defecto (inglés): volver a entrar por la landing borraba el
+      // español que el usuario había elegido dentro de la app.
+      var _qs = new URLSearchParams(location.search);
+      var _p = _qs.get('lang'), _h = _qs.get('langhint');
+      var _s = localStorage.getItem('portfolio_lang');
       if (_p === 'en' || _p === 'es') localStorage.setItem('portfolio_lang', _p);
+      else if ((_h === 'en' || _h === 'es') && _s !== 'en' && _s !== 'es') localStorage.setItem('portfolio_lang', _h);
       var lang = localStorage.getItem('portfolio_lang') || 'es';
       document.documentElement.lang = lang;
     } catch (_) {}
@@ -1687,7 +1702,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=658"
+  <script src="app.js?v=659"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

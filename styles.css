@@ -20797,6 +20797,21 @@ body.gs-open { overflow: hidden; }
   margin: 8px 0 0; font-size: 11.5px; line-height: 1.5;
   color: rgba(198,214,246,0.60);
 }
+/* M.03 · C — el disclosure pasa de una frase para todo a una línea POR EJE con su
+   causa: "falta historia" y "falta una referencia" son límites distintos y ahora se
+   leen distintos. Lista sin viñeta de disco (el guion es más sobrio en una nota) y
+   con la misma tinta que la nota anterior. `.intv7-radar-mean` explica la unidad del
+   eje recién activado, porque "92 %" sin unidad se lee como un score inventado. */
+ul.intv7-radar-pending { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+ul.intv7-radar-pending > li { position: relative; padding-left: 11px; }
+ul.intv7-radar-pending > li::before {
+  content: '—'; position: absolute; left: 0; top: 0;
+  color: rgba(150,180,240,0.42);
+}
+.intv7-radar-mean {
+  margin: 6px 0 0; font-size: 11.5px; line-height: 1.5;
+  color: rgba(150,180,240,0.68);
+}
 /* A certified vertex stays readable at the low end of its axis. */
 .intv6-radar .intcc-radar-dot { r: 2.6; }
 
@@ -20833,6 +20848,12 @@ body.gs-open { overflow: hidden; }
 }
 .intv6-accrue-text { margin: 8px 0 0; font-size: 13.5px; font-weight: 600; color: var(--text-bright); }
 .intv6-accrue-sub  { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: rgba(198,214,246,0.72); }
+/* M.03 · D — estado INTERMEDIO de la Memoria: hay historial y es estable. No es el
+   vacío (no lleva la línea de nodos que acumula, porque no está acumulando: ya
+   observó) y no es la memoria con acontecimientos. Misma tipografía que el estado
+   vacío para que la tarjeta no cambie de peso al pasar de uno a otro. */
+.intv4-mem-stable-t { margin: 2px 0 0; font-size: 13.5px; font-weight: 600; color: var(--text-bright); }
+.intv4-mem-stable-b { margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; color: rgba(198,214,246,0.72); }
 @media (prefers-reduced-motion: reduce) {
   .intv6-accrue-node { animation: none; opacity: 0.55; }
 }
@@ -21454,6 +21475,12 @@ body.gs-open { overflow: hidden; }
 .wsb-back:hover { background: rgba(74,130,240,0.20); color: #cfe0ff; border-color: rgba(74,130,240,0.5); }
 .wsb-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-bright, #fff); }
 .wsb-subtitle { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
+/* M.03 · A — la cabecera de una herramienta pinta su ESTADO COMERCIAL REAL en vez
+   de un "Pro" decorativo: el chip sale de `_wsTierChip`, es decir del catálogo, así
+   que no puede volver a decir Pro/Premium sobre algo incluido en el plan Free.
+   `.wsb-note` declara la permanencia real de la plantilla que guarda trabajo. */
+.wsb-title-tier { display: inline-block; vertical-align: middle; margin-left: 7px; }
+.wsb-note { margin: 5px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--text-dim, #8a96aa); }
 .wsb-horizon { font-size: 11px; font-weight: 600; color: rgba(159,194,255,0.8); letter-spacing: 0.02em; }
 .wsb-note { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); }
 
@@ -22246,6 +22273,11 @@ body.gs-open { overflow: hidden; }
    catálogo obliga a revisar quién pinta columnas FIJAS a partir de él). Con menos de
    tres tarjetas la rejilla deja de ser fija y las tarjetas conservan su ancho. */
 .wsh-toolbox.is-sparse { grid-template-columns: repeat(auto-fit, minmax(150px, 190px)); justify-content: start; }
+/* M.03 · A — misma regla para la GALERÍA de plantillas: el catálogo público es de
+   una entrada, y en una rejilla de tres columnas fijas eso es una tarjeta estirada
+   con dos huecos al lado. `auto-fit` con tope de ancho la deja con su tamaño real
+   alineada a la izquierda; con tres o más, la rejilla de siempre. */
+.wsh-gallery.is-sparse { grid-template-columns: repeat(auto-fit, minmax(220px, 300px)); justify-content: start; }
 .wsh-toolcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(165,196,255,0.025); cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
 .wsh-toolcard:hover { transform: translateY(-2px); }
 .wsh-toolcard.is-soon { cursor: default; opacity: 0.85; }
@@ -23737,6 +23769,18 @@ body.aurix-skeleton #totalValue::after {
   .wsh-mse2-card{ transition:none; }
   .wsh-mse2-card:hover{ transform:none; }
 }
+
+/* ── M.03 · A — MI ESPACIO: portada útil ──────────────────────────────────────
+   1. Espacio genuinamente vacío = UNA invitación a ancho completo, no dos estados
+      vacíos en paralelo (la misma pobreza visual que corrigió GLOBAL-POLISH-V1,
+      vista desde el otro lado). Llega con `is-single`, así que ya ocupa el ancho.
+   2. `is-saved` marca el FAVORITO con el mismo lenguaje cromático que el toggle
+      (`.wsh-pin.is-on`, oro): un solo idioma para un solo estado. No es un botón:
+      el toggle vive en la tarjeta del catálogo. */
+.wsh-mse2-blank .wsh-mse2-empty{ align-items:flex-start; padding:14px 4px 8px; gap:8px; }
+.wsh-mse2-empty-ctas{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+.wsh-mse2-card.is-saved{ border-color:rgba(233,168,87,.28); }
+.wsh-mse2-card.is-saved:hover{ border-color:rgba(233,168,87,.5); }
 
 /* ══════════════════════════════════════════════════════════════
    WN.P1 — Aurix Premium modal (reusable conversion layer)

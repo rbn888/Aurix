@@ -68,7 +68,11 @@ function extractDict(langIdx) {
     // INT.07 — the semantic pentagon publishes these, so the gate must see the
     // REAL strings from BOTH dictionaries (a missing one blanks an axis label).
     'intcc_dim_div','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
-    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending'];
+    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
+    // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
+    // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
+    // y 13B.9 dejaría de ver los nombres.
+    'intv7_pending_obs','intv7_pending_scale','intv7_pending_generic','intv7_stab_meaning'];
   const missing = [];
   const extras = extraKeys.map(k => {
     const occ = keyOccurrences(k);
@@ -107,7 +111,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -303,12 +307,22 @@ console.log('\n3 · One fact is never sold as several discoveries:');
         && !/\*\s*2\.2/.test(src)                    // saturating slope
         && !/crypto\w*\s*\*\s*0\.25/i.test(src)
         && !/volatil/i.test(src); })());               // no invented stability
-  ok('3.5d each certified axis declares the OWNER it reads, and there are exactly three',
+  // ── RE-DECIDIDO EN M.03 C ──────────────────────────────────────────────────
+  // Eran "exactamente TRES owners y dos nulls". Ese recuento era el estado de
+  // INT.07, no el contrato: el contrato es que TODO eje con valor declara el owner
+  // certificado del que lo lee, y que un eje sin owner no dibuja número. M.03 activa
+  // Estabilidad con `_aurixPeakRetention` (máximo conservado sobre el índice
+  // flow-neutral), así que son CUATRO owners y UN null — Crecimiento, que sigue sin
+  // escala certificable. El assert pasa a fijar el mapa eje→owner completo, que es
+  // más fuerte que un recuento: activar un eje sin owner nombrado lo rompe.
+  ok('3.5d each axis with a value declares the OWNER it reads (four owned, growth pending)',
     (() => { const src = konstSrc('_INTV7_RADAR_DIMS');
       const owned = (src.match(/owner: '/g) || []).length;
-      return owned === 3 && /owner: 'aurixEffectiveDiversification'/.test(src)
+      return owned === 4 && /owner: 'aurixEffectiveDiversification'/.test(src)
+        && /key: 'stability',\s+labelKey: 'intcc_dim_stab',\s+owner: 'aurixPeakRetention'/.test(src)
         && (src.match(/owner: 'aurixHealthSnapshot'/g) || []).length === 2
-        && (src.match(/owner: null/g) || []).length === 2; })(),
+        && (src.match(/owner: null/g) || []).length === 1
+        && /key: 'growth',[\s\S]{0,60}owner: null/.test(src); })(),
     konstSrc('_INTV7_RADAR_DIMS'));
   ok('3.5e the five dimensions are FIXED and frozen (not data-derived)',
     /_INTV7_RADAR_DIMS = Object\.freeze\(\[/.test(app)
@@ -851,6 +865,136 @@ console.log('\n14 · Non-vacuity: the protections are load-bearing:');
   ok('14.6 a young account really produces fewer facts than a mature one (' +
      coreOf(YOUNG).ledger.facts.length + ' vs ' + core.ledger.facts.length + ')',
     coreOf(YOUNG).ledger.facts.length < core.ledger.facts.length);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 15 · M.03 — INTELLIGENCE COBRA VIDA CON LA EVIDENCIA QUE HAY
+// ════════════════════════════════════════════════════════════════════════════
+// Tres superficies se quedaban congeladas en su estado vacío durante semanas: el
+// radar (dos ejes "sin datos" para siempre), la Memoria patrimonial ("Aurix está
+// acumulando…") y Qué ha cambiado ("todavía no hay cambios que Aurix pueda
+// medir"). Ninguna era un problema de copy: faltaban hechos, y faltaba distinguir
+// "no hay nada material" de "no puedo medir". Lo que NO cambia: nada se inventa —
+// un usuario nuevo sigue viendo los mismos estados honestos.
+console.log('\n15 · M.03 — estados progresivos (C/D/E):');
+{
+  // Cartera MADURA de verdad: 12 observaciones diarias con una caída real del 20 %
+  // en medio, así que el retorno es publicable con confianza alta y el máximo
+  // conservado existe. Sin flujos: el eje mide mercado, no aportaciones.
+  const DIPPED = {
+    rows: inv([10000, 10500, 11000, 11500, 12000, 11000, 10000, 9600, 10000, 10400, 10800, 11000]),
+    flows: [],
+    serverRows: srvHistory(NOW, 10, { crypto: 31000, stock: 40000, liquidity: 29000 },
+                                     { crypto: 39000, stock: 40000, liquidity: 21000 }),
+    assets: LOPSIDED, snap: SNAP, drivers: DRIVERS,
+  };
+  const dipped = render(DIPPED);
+  const young  = render(YOUNG);
+  const mature = render(MATURE);
+  const axesOf = (o) => { const c = makeCtx(o); return run('_intv7RadarAxes()', c); };
+
+  // ── C · RADAR ────────────────────────────────────────────────────────────
+  ok('15.1 con historia madura el radar mide CUATRO ejes, no tres',
+    (() => { const a = axesOf(DIPPED);
+      return a.measured === 4 && a.dims.length === 5
+        && a.unavailable.join(',') === 'growth'
+        && Number.isFinite(a.values.stability); })(),
+    JSON.stringify(axesOf(DIPPED)));
+  ok('15.2 Estabilidad es el número del owner declarado, no una segunda cuenta',
+    (() => { const c = makeCtx(DIPPED);
+      const ret = run('_aurixPeakRetention("all")', c);
+      const a = run('_intv7RadarAxes()', c);
+      return ret.status === 'available' && a.values.stability === ret.retentionPct
+        && a.quality.stability === 'measured'; })());
+  // Historia corta y SIN flujos: la única razón posible es que falte historia.
+  // (Con un flujo sin conciliar la razón sería otra, y también es correcta: el eje
+  // hereda la validez del owner del retorno — ver P.8 del gate de performance.)
+  const SHORT = Object.assign({}, MATURE, { rows: inv([10000, 10500, 11000]), flows: [] });
+  ok('15.3 y con historia corta vuelve a "sin datos", con la causa real',
+    (() => { const a = axesOf(SHORT);
+      return a.measured === 3 && a.unavailable.slice().sort().join(',') === 'growth,stability'
+        && a.pending.stability === 'awaiting_observations'
+        && a.quality.stability === 'immature'; })(),
+    JSON.stringify(axesOf(SHORT)));
+  ok('15.4 Crecimiento sigue SIN owner y su causa es la escala, no la falta de historia',
+    (() => { const a = axesOf(DIPPED);
+      return a.pending.growth === 'no_certifiable_scale'
+        && /owner: null/.test(konstSrc('_INTV7_RADAR_DIMS')); })());
+  ok('15.5 el disclosure nombra cada eje pendiente con SU causa (dos límites distintos)',
+    (() => { const a = section(render(SHORT).html, 'intcc-radar');
+      return /intv7-radar-pending/.test(a)
+        && /Estabilidad: hay historial/.test(a)
+        && /Crecimiento: el dato existe/.test(a); })(),
+    section(render(SHORT).html, 'intcc-radar').slice(0, 700));
+  ok('15.6 un eje medido no se dibuja sin decir QUÉ mide',
+    /intv7-radar-mean/.test(dipped.html) && /máximo que tu cartera conservó/.test(dipped.html)
+    && !/intv7-radar-mean/.test(render(SHORT).html));
+  ok('15.7 el eje nuevo respeta el contrato: porcentaje en rango y sin vértice si no está medido',
+    (() => { const vals = attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
+      const measured = vals.filter(v => /^\d+%$/.test(v));
+      return vals.length === 5 && measured.length === 4
+        && vals.filter(v => v === 'sin datos').length === 1
+        && (dipped.html.match(/class="intcc-radar-dot"/g) || []).length === 4; })(),
+    JSON.stringify(attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
+
+  // ── D · MEMORIA PATRIMONIAL ──────────────────────────────────────────────
+  ok('15.8 con trayectoria observada la Memoria PUBLICA eventos (ya no "acumulando")',
+    (() => { const m = section(dipped.html, 'intcc-timeline');
+      return !/is-accruing/.test(m) && /intcc-tl-item/.test(m)
+        && /data-fact="investable_/.test(m); })(),
+    section(dipped.html, 'intcc-timeline').slice(0, 300));
+  ok('15.9 y lo que publica es NIVEL con su fecha, nunca un porcentaje',
+    (() => { const m = section(dipped.html, 'intcc-timeline');
+      const item = m.slice(m.indexOf('intcc-tl-item'), m.indexOf('</ul>'));
+      return /patrimonio invertible/.test(item) && !/%/.test(item); })(),
+    section(dipped.html, 'intcc-timeline').slice(0, 600));
+  ok('15.10 un usuario NUEVO conserva el estado honesto de siempre',
+    /intv4-memory is-accruing/.test(young.html) &&
+    /acumulando tu historia patrimonial/.test(young.html));
+  ok('15.11 historia SÍ pero estable ⇒ estado propio, con fecha y observaciones',
+    (() => { const flat = render(Object.assign({}, MATURE, {
+        rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] }));
+      const m = section(flat.html, 'intcc-timeline');
+      return /intv4-memory is-stable/.test(m) && !/is-accruing/.test(m)
+        && /se mantiene estable desde el/.test(m) && /observaciones/.test(m); })(),
+    section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] })).html, 'intcc-timeline').slice(0, 400));
+
+  // ── E · QUÉ HA CAMBIADO ──────────────────────────────────────────────────
+  ok('15.12 "sin cambio material" y "sin evidencia" son estados DISTINTOS',
+    (() => { const yc = section(young.html, 'intv4-changed');
+      const flat = render(Object.assign({}, MATURE, {
+        rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] }));
+      const fc = section(flat.html, 'intv4-changed');
+      return /data-evidence="0"/.test(yc) && /todavía no hay cambios/i.test(yc)
+        && /data-evidence="1"/.test(fc)
+        && (/no detecta ningún cambio material/.test(fc) || /cambio material de tu cartera es el que/.test(fc)); })(),
+    section(young.html, 'intv4-changed').slice(0, 260) + ' ||| ' +
+    section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] })).html, 'intv4-changed').slice(0, 260));
+  ok('15.13 y con cambios reales sigue publicando la lista, no un estado vacío',
+    (() => { const c = section(dipped.html, 'intv4-changed');
+      return /intv4-chg-list/.test(c) && !/intcc-empty-body/.test(c); })());
+  ok('15.14 el estado vacío se elige por la COBERTURA del Core, no por una heurística local',
+    /core\.dataAvailability && core\.dataAvailability\.observation/.test(fnSrc('_intv4ChangedHtml')) &&
+    /core\.dataAvailability && core\.dataAvailability\.observation/.test(fnSrc('_intv4MemoryHtml')));
+
+  // ── NO-VACUIDAD ──────────────────────────────────────────────────────────
+  ok('15.15 NON-VACUITY — la MISMA cartera madura, sin los hechos de trayectoria, se queda en "acumulando"',
+    (() => { const c = makeCtx(DIPPED);
+      const core0 = run('_aurixIntelligenceCore({ presentationHistory: [] })', c);
+      const stripped = Object.assign({}, core0, {
+        temporalEvents: (core0.temporalEvents || []).filter(f =>
+          f.semanticKey !== 'investable_level_change' && f.semanticKey !== 'investable_prior_high'),
+        dataAvailability: Object.assign({}, core0.dataAvailability,
+          { observation: { observations: 0, startAt: null, endAt: null, spanMs: null } }),
+      });
+      c.__stripped = stripped;
+      const html = run('_intv4MemoryHtml(__stripped, _intccEsc, [])', c);
+      return /is-accruing/.test(html); })());
+  ok('15.16 NON-VACUITY — y el radar sin el owner nuevo volvería a tres ejes',
+    (() => { const c = makeCtx(DIPPED);
+      run('_aurixPeakRetention = () => ({ status: "unavailable_source", reason: "owner_unavailable", retentionPct: null, quality: null })', c);
+      const a = run('_intv7RadarAxes()', c);
+      return a.measured === 3 && a.unavailable.indexOf('stability') !== -1; })());
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
