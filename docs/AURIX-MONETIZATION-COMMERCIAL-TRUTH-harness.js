@@ -675,13 +675,30 @@ ok('L.3 los previews siguen siendo el fallback (no se retiraron)',
   /_aurixPremiumPreviewHTML/.test(app) && /_aurixIntelligencePreviewHTML/.test(app));
 ok('M.1 ENFORCE_ENTITLEMENTS sigue en false', /ENFORCE_ENTITLEMENTS\s*=\s*false/.test(app));
 ok('M.2 AURIX_PREMIUM_UI_ENABLED sigue en false', /AURIX_PREMIUM_UI_ENABLED\s*=\s*false/.test(app));
-ok('N.1 Stripe sigue sin implementar: sólo aparece como valor de enum/documentación',
-  !/require\(['"]stripe['"]\)|from ['"]stripe['"]|api\.stripe\.com|pk_live|sk_live/.test(app + sql) &&
+// ── RE-DECIDIDO EN M.04 ──────────────────────────────────────────────────────
+// N.1 y N.3 afirmaban "todavía no hay Stripe". Era verdad y era ALCANCE, no un
+// invariante: M.04 es justo el bloque que lo implementa. El invariante que sí
+// hay que conservar —y que ahora se comprueba mejor— es que Stripe vive SÓLO en
+// el servidor: el bundle del cliente no trae SDK, no llama a la API del
+// proveedor y no contiene ninguna clave.
+ok('N.1 Stripe vive SÓLO en el servidor: el bundle del cliente no habla con el proveedor',
+  !/require\(['"]stripe['"]\)|from ['"]stripe['"]|api\.stripe\.com|pk_live|sk_live|sk_test|whsec_/.test(app) &&
   !fs.existsSync(path.join(root, 'api', 'stripe-webhook.js')));
 ok('N.2 Apple IAP sigue sin implementar',
   !/verifyReceipt|storekit|in_app_purchase|appstoreconnect/i.test(app + sql));
-ok('N.3 no hay checkout ni webhook de facturación en api/',
-  !fs.readdirSync(path.join(root, 'api')).some(f => /stripe|checkout|billing|webhook|subscri/i.test(f)));
+ok('N.3 el billing del servidor está acotado a api/billing/ y su webhook verifica firma',
+  (() => {
+    const flat = fs.readdirSync(path.join(root, 'api')).filter(f => f.endsWith('.js'));
+    // Ningún endpoint de facturación suelto en la raíz de api/: sólo bajo api/billing/.
+    if (flat.some(f => /stripe|checkout|billing|webhook|subscri/i.test(f))) return false;
+    const dir = path.join(root, 'api', 'billing');
+    if (!fs.existsSync(dir)) return true;                       // sin billing: también válido
+    const files = fs.readdirSync(dir).sort().join(',');
+    if (files !== 'checkout.js,portal.js,webhook.js') return false;
+    const wh = fs.readFileSync(path.join(dir, 'webhook.js'), 'utf8');
+    return /stripe-signature/.test(wh) && /crypto\.subtle\.sign/.test(wh)
+        && /STRIPE_WEBHOOK_SECRET/.test(wh);
+  })());
 ok('N.4 provider=\'none\' es el default honesto mientras no haya integración',
   /provider\s+text\s+not null default 'none'/i.test(CLEAN));
 

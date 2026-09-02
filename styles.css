@@ -23947,6 +23947,29 @@ body.aurix-premium-lock{ overflow:hidden; }
 /* Trust block — reassuring, primary line emphasized. */
 .aurix-premium-trust-1{ font-size:13px !important; font-weight:700 !important; color:#e7ecf5 !important; }
 
+/* ── M.04 · PAYWALL REAL ─────────────────────────────────────────────────────
+   El modal pasa de una comparativa de dos planes inventados (Premium 59 € +
+   Founder 39 € con barra de escasez) a DOS PRECIOS REALES del catálogo, anual
+   primero. Se reutiliza toda la retícula existente; sólo hacen falta tres
+   estados que antes no existían:
+     · `is-featured`  el plan destacado (anual) — el énfasis deja de estar
+                      atado a la clase del plan Founder, que ya no existe.
+     · `is-managed`   ya es cliente: una sola tarjeta, "gestionar mi plan".
+     · `is-empty`     no hay catálogo: se dice, y no se ofrece comprar.
+   Ninguna regla nueva usa alfa BLANCO (la lección de DASHBOARD EXCELLENCE):
+   el énfasis viene del azul de acento que ya usa `.aurix-premium-standard`. */
+.aurix-premium-plan.is-featured{
+  border-color:rgba(77,141,255,.72);
+  box-shadow:0 0 40px rgba(77,141,255,.18), inset 0 1px 0 rgba(125,184,255,.10);
+}
+.aurix-premium-plans.is-managed,
+.aurix-premium-plans.is-empty{ grid-template-columns:1fr; }
+.aurix-premium-plans.is-empty .aurix-premium-plan-note{ margin:0; text-align:center; }
+/* El bloque de precios va primero en el DOM y en la lectura: el usuario viene a
+   ver cuánto cuesta, no a leer una tabla comparativa. */
+.aurix-premium-plans{ margin-bottom:18px; }
+.aurix-premium-cta[disabled]{ opacity:.62; cursor:default; }
+
 @media (max-width:720px){
   .aurix-premium-list.is-2col{ grid-template-columns:1fr; }
   .aurix-premium-tagline{ font-size:23px; }

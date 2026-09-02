@@ -128,14 +128,35 @@ ok('header: el full-bleed depende sólo de la pestaña, y una sola expresión lo
 ok('i18n by lang (ES default)', /typeof lang !== 'undefined' && lang === 'en'/.test(app));
 ok('payments untouched (entitlement enforcement still off)', /const ENFORCE_ENTITLEMENTS = false;/.test(app));
 
-console.log('\nFree "Aurix Premium" menu item — intrigue/coming-soon (owner = normal):');
-ok('click on menuPremium NO-OPs for Free (no modal, no navigation)',
-  /const _premiumUser = hasFeature\('premium\.settings'\);[^\n]*\n\s*if \(!_premiumUser\) \{ e\.preventDefault\(\); return; \}/.test(app));
-ok('owner branch still opens the premium modal', /if \(!_premiumUser\) \{ e\.preventDefault\(\); return; \}[\s\S]{0,600}openAurixPremiumModal\(\{ source: 'settings-menu' \}\)/.test(app));
-ok('menu identity: Free → menu-item--coming-soon; owner → normal (removed)', /premiumEl\.classList\.add\('menu-item--coming-soon'\)/.test(app) && /premiumEl\.classList\.remove\('menu-item--coming-soon'\)/.test(app));
-ok('Free label = ONLY PRÓXIMAMENTE / COMING SOON (never reveals "Aurix Premium")', /premiumEl\.textContent = _en \? 'COMING SOON' : 'PRÓXIMAMENTE';/.test(app));
+// ── RE-DECIDIDO EN M.04 (SPEC · cobro real) ──────────────────────────────────
+// Estas cuatro aserciones certificaban el TEASER: el item "Aurix Premium" del
+// menú se pintaba "PRÓXIMAMENTE / COMING SOON" para Free y el click no hacía
+// nada. Era la conducta correcta mientras NO existía checkout —prometer un
+// producto que no se puede comprar es peor que insinuarlo—, y desde M.04 es lo
+// contrario: hay dos precios reales y una ruta de pago, así que un punto de
+// conversión que no hace nada es un punto de conversión roto.
+// Lo que se conserva —y es lo que de verdad protegía este gate— es que el ACCESO
+// al producto siga decidiéndolo `hasFeature`, y que el item no mienta sobre el
+// plan del usuario. Eso se re-apunta abajo.
+console.log('\nFree "Aurix Premium" menu item — real paywall entry (M.04):');
+ok('el item abre el paywall para TODOS (ya no es un teaser muerto)',
+  /M\.04 — abre para TODOS/.test(app) &&
+  !/if \(!_premiumUser\) \{ e\.preventDefault\(\); return; \}/.test(app) &&
+  /openAurixPremiumModal\(\{ source: 'settings-menu' \}\)/.test(app));
+ok('el paywall decide comprar-vs-gestionar por ENTITLEMENT, no por el render del menú',
+  /const managed = \(\(typeof hasFeature === 'function'\) && hasFeature\('premium\.settings'\)\)/.test(app) &&
+  /_aurixBillingIsCustomer\(\)/.test(app) &&
+  /data-premium-portal/.test(app) && /data-premium-buy=/.test(app));
+ok('el item ya no afirma un estado comercial: sólo declara el plan como dato',
+  /premiumEl\.setAttribute\('data-plan', _premiumUser \? 'premium' : 'free'\)/.test(app) &&
+  !/premiumEl\.textContent = _en \? 'COMING SOON' : 'PRÓXIMAMENTE';/.test(app));
+ok('y el acceso al PRODUCTO sigue gateado por hasFeature (esto no ha cambiado)',
+  /function hasFeature\(featureKey\)/.test(app) &&
+  /return _aurixEnt\.features\[featureKey\] === true;/.test(app));
 ok('Free branch does NOT emit "Aurix Premium"', !/premiumEl\.(innerHTML|textContent)[^\n]*Aurix Premium[^\n]*coming soon/i.test(app));
 ok('owner branch keeps normal "Aurix Premium" (clickable)', /premiumEl\.textContent = \(typeof t === 'function'\) \? t\('menuPremium'\) : '✨ Aurix Premium';/.test(app));
+// El estado teaser sigue EXISTIENDO en CSS y en el preview (otras superficies lo
+// usan); lo que se retiró es su uso en el item del menú.
 ok('coming-soon state does NOT read as pay/unlock/denied', !/pagar|\bpay\b|desbloquea|unlock|acceso denegado|access denied/i.test(app.slice(app.indexOf("menu-item--coming-soon'"), app.indexOf("menu-item--coming-soon'") + 500)));
 ok('CSS: .menu-item--coming-soon uppercase teaser, not-allowed, cool (not gold pay-now)', /\.menu-item--coming-soon\{[\s\S]{0,320}cursor:not-allowed/.test(css) && /\.menu-item--coming-soon\{[\s\S]{0,320}text-transform:uppercase/.test(css));
 ok('CSS: .premium-preview-coming-soon editorial label exists', /\.premium-preview-coming-soon\{/.test(app));

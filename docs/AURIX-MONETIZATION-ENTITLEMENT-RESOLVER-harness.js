@@ -309,9 +309,12 @@ ok('G.2 hasAurixPremiumAccess ya NO es autoridad (B3): delega en el entitlement 
   !/rbn892/.test(app.replace(/^\s*\/\/.*$/gm, '')));
 ok('G.3 los previews siguen siendo el fallback',
   /_aurixPremiumPreviewHTML/.test(app) && /_aurixIntelligencePreviewHTML/.test(app));
-ok('G.4 sin Stripe / Apple / checkout / webhook',
-  !/require\(['"]stripe['"]\)|api\.stripe\.com|sk_live|verifyReceipt|storekit/i.test(app + sql) &&
-  !fs.readdirSync(path.join(root, 'api')).some(f => /stripe|checkout|billing|webhook|subscri/i.test(f)));
+// M.04 — re-decidido con la misma razón que N.1/N.3 del gate de B1: el alcance
+// cambió, el invariante no. B2 sigue sin conocer al proveedor: el resolver no
+// nombra Stripe ni Apple, y el cliente no habla con ninguno.
+ok('G.4 el resolver sigue sin conocer al proveedor, y el cliente no habla con él',
+  !/stripe|apple|verifyReceipt|storekit|checkout/i.test(sql) &&
+  !/require\(['"]stripe['"]\)|api\.stripe\.com|sk_live|verifyReceipt|storekit/i.test(app));
 // Sobre las FILAS del seed, no sobre el fichero: el comentario de B1 nombra por
 // fuerza las claves que excluye, y buscarlas ahí es buscar su propia negación.
 const B1_SEED = (() => { const src = stripInline(b1); const i = src.indexOf('insert into public.plan_features');

@@ -106,7 +106,8 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml',
+  '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
   '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown',
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
@@ -967,12 +968,19 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
       const fc = section(flat.html, 'intv4-changed');
       return /data-evidence="0"/.test(yc) && /todavía no hay cambios/i.test(yc)
         && /data-evidence="1"/.test(fc)
-        && (/no detecta ningún cambio material/.test(fc) || /cambio material de tu cartera es el que/.test(fc)); })(),
+        // M.04 · 0 — con cambios MEDIDOS que ya cuenta otra superficie, el estado
+        // honesto es "no hay OTROS", no "no puedo medir".
+        && (/no detecta ningún cambio material/.test(fc) || /cambio material de tu cartera es el que/.test(fc)
+            || /No se detectan otros cambios relevantes/.test(fc)); })(),
     section(young.html, 'intv4-changed').slice(0, 260) + ' ||| ' +
     section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] })).html, 'intv4-changed').slice(0, 260));
+  // M.04 · 0 — la lista se publica cuando NADIE MÁS ha reclamado el hecho. Se
+  // ejecuta el owner sin reclamaciones para separar las dos causas posibles de un
+  // bloque vacío: "no hay cambios" y "ya los cuenta otra superficie".
   ok('15.13 y con cambios reales sigue publicando la lista, no un estado vacío',
-    (() => { const c = section(dipped.html, 'intv4-changed');
-      return /intv4-chg-list/.test(c) && !/intcc-empty-body/.test(c); })());
+    (() => { const c = makeCtx(DIPPED);
+      const html = run('_intv4ChangedHtml(_aurixIntelligenceCore({ presentationHistory: [] }), _intccEsc, [], null)', c);
+      return /intv4-chg-list/.test(html) && !/intcc-empty-body/.test(html); })());
   ok('15.14 el estado vacío se elige por la COBERTURA del Core, no por una heurística local',
     /core\.dataAvailability && core\.dataAvailability\.observation/.test(fnSrc('_intv4ChangedHtml')) &&
     /core\.dataAvailability && core\.dataAvailability\.observation/.test(fnSrc('_intv4MemoryHtml')));
@@ -995,6 +1003,88 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
       run('_aurixPeakRetention = () => ({ status: "unavailable_source", reason: "owner_unavailable", retentionPct: null, quality: null })', c);
       const a = run('_intv7RadarAxes()', c);
       return a.measured === 3 && a.unavailable.indexOf('stability') !== -1; })());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 16 · M.04 · 0 — MEMORIA Y QUÉ HA CAMBIADO NO PUBLICAN EL MISMO HECHO
+// ════════════════════════════════════════════════════════════════════════════
+// El defecto observado en producción: "Tu patrimonio invertible ha subido
+// 40.818,17 US$ desde el 18 ago 2026" en Memoria patrimonial, y el MISMO hecho
+// otra vez en Qué ha cambiado. Contrato: Memoria = hitos históricos que merece la
+// pena recordar; Qué ha cambiado = novedades frente a una referencia anterior.
+console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
+{
+  // Reproduce la forma del caso real: una subida de nivel material y sostenida.
+  const RISEN = {
+    rows: inv([120000, 128000, 134000, 141000, 148000, 152000, 156000, 158000, 160818, 160818]),
+    flows: [], serverRows: srvHistory(NOW, 10, { crypto: 31000, stock: 40000, liquidity: 29000 },
+                                               { crypto: 39000, stock: 40000, liquidity: 21000 }),
+    assets: LOPSIDED, snap: SNAP, drivers: DRIVERS,
+  };
+  const c = makeCtx(RISEN);
+  const cr = run('_aurixIntelligenceCore({ presentationHistory: [] })', c);
+  c.__core = cr;
+  const claims = run('_intv4MemoryClaims(__core, [])', c);
+  const memHtml = run('_intv4MemoryHtml(__core, _intccEsc, [])', c);
+  const chgHtml = run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
+  const chgNoClaims = run('_intv4ChangedHtml(__core, _intccEsc, [], null)', c);
+  const factsIn = html => (html.match(/data-fact="([\w]+)"/g) || []).map(m => m.slice(11, -1));
+  const rootsIn = html => (html.match(/data-root="([\w]+)"/g) || []).map(m => m.slice(11, -1));
+
+  ok('16.1 el hecho del caso real EXISTE y lo reclama la Memoria (es un hito, no una novedad)',
+    claims.keys.indexOf('investable_level_change') !== -1 &&
+    claims.roots.indexOf('wealth_level') !== -1 &&
+    /data-fact="investable_level_change"/.test(memHtml),
+    JSON.stringify(claims));
+  ok('16.2 y por tanto Qué ha cambiado NO lo republica',
+    !/investable_level_change/.test(chgHtml),
+    chgHtml.slice(0, 300));
+  ok('16.3 SIN el contrato, el MISMO hecho sale en las dos superficies (no-vacuidad)',
+    /investable_level_change/.test(chgNoClaims) ||
+    rootsIn(chgNoClaims).indexOf('wealth_level') !== -1,
+    chgNoClaims.slice(0, 500));
+  ok('16.4 la exclusión es por TIPO/HECHO/RAÍZ, nunca comparando textos renderizados',
+    (() => { const src = fnSrc('_intv4ChangedHtml');
+      return /claimedKeys\.has\(x\.w\.semanticKey\)/.test(src)
+        && /claimedRoots\.has\(x\.w\.causalRoot\)/.test(src)
+        && !/toLowerCase\(\)|replace\(\/\[\^a-z0-9\]/.test(src); })());
+  ok('16.5 ni una clave ni una raíz compartida entre las dos superficies',
+    (() => { const mf = factsIn(memHtml), cf = factsIn(chgHtml).concat(rootsIn(chgHtml));
+      const mr = claims.roots;
+      return mf.length >= 1 && mf.every(k => cf.indexOf(k) === -1)
+        && mr.every(r => rootsIn(chgHtml).indexOf(r) === -1); })(),
+    JSON.stringify({ mem: factsIn(memHtml), chgRoots: rootsIn(chgHtml) }));
+  ok('16.6 si queda otro cambio material DISTINTO, se publica (no se silencia el bloque)',
+    (() => { const roots = rootsIn(chgHtml);
+      return roots.length === 0 || roots.every(r => claims.roots.indexOf(r) === -1); })(),
+    JSON.stringify(rootsIn(chgHtml)));
+  // Y si NO queda ninguno, el estado es honesto y no se fabrica un segundo hecho.
+  ok('16.7 sin otro cambio material se dice "no hay OTROS", y no se inventa un relleno',
+    (() => { const only = { ledger: cr.ledger, whatChanged: (cr.whatChanged || [])
+        .filter(w => w.semanticKey === 'investable_level_change'),
+        dataAvailability: cr.dataAvailability };
+      c.__only = only;
+      const h = run('_intv4ChangedHtml(__only, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
+      return /No se detectan otros cambios relevantes/.test(h)
+        && !/intv4-chg-list/.test(h)
+        && (h.match(/intv4-chg /g) || []).length === 0; })(),
+    run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ')', c).slice(0, 200));
+  ok('16.8 la selección de la Memoria es un OWNER puro y determinista, no lógica de renderer',
+    (() => { const a = run('JSON.stringify(_intv4MemoryClaims(__core, []))', c);
+      const b = run('JSON.stringify(_intv4MemoryClaims(__core, []))', c);
+      return a === b && /function _intv4MemoryEvents\(/.test(app)
+        && /_intv4MemoryEvents\(core, alreadyPublished\)/.test(fnSrc('_intv4MemoryHtml')); })());
+  ok('16.9 ordenada por relevancia y, a igualdad, por RECENCIA (preparada para más histórico)',
+    /\(b\.priority - a\.priority\) \|\| \(endAt\(b\) - endAt\(a\)\)/.test(fnSrc('_intv4MemoryEvents')));
+  ok('16.10 y el renderer pasa las reclamaciones de la Memoria a Qué ha cambiado',
+    /_intv4MemoryClaims\(core, publishedKeys\)/.test(fnSrc('_renderIntelligenceCommandCenter')) &&
+    /_intv4ChangedHtml\(core, esc, publishedKeys, memoryClaims\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
+  // Cada superficie conserva su propósito: la Memoria sigue fechando, y Qué ha
+  // cambiado sigue siendo una lista de novedades con dirección.
+  ok('16.11 cada superficie conserva su propósito (Memoria fecha; cambios llevan dirección)',
+    /intcc-tl-date/.test(memHtml) && (/is-up|is-down|is-flat/.test(chgHtml) || !/intv4-chg-list/.test(chgHtml)));
+  ok('16.12 y ningún cálculo financiero se ha tocado en este arreglo',
+    !/investableValue|assetValueUSD|_aurixTwrChain|returnPct \*/.test(fnSrc('_intv4ChangedHtml') + fnSrc('_intv4MemoryEvents') + fnSrc('_intv4MemoryClaims')));
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);

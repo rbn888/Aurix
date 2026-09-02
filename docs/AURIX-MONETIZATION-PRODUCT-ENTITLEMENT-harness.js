@@ -678,8 +678,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     V.appjsIdx === V.src && V.src === V.inApp && String(V.manifest.appjs) === V.src,
     JSON.stringify(V));
   ok('H.5 el BUILD se bumpeó y coincide con el manifiesto',
-    /^v698/.test(V.build || '') && V.manifest.build === V.build);
-  ok('H.6 styles.css?v= bumpeado (hay cambio de CSS en este bloque)', Number(V.css) >= 664);
+    /^v699/.test(V.build || '') && V.manifest.build === V.build);
+  ok('H.6 styles.css?v= bumpeado (hay cambio de CSS en este bloque)', Number(V.css) >= 665);
 
   console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
   if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }

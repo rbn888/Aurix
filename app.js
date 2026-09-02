@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '659'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '660'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -1696,10 +1696,21 @@ function _touchSubscription() {
 function _collectSubscription() {
   try { return (typeof getPlan === 'function') ? getPlan() : null; } catch (_) { return null; }
 }
-// Apply a remote plan object into localStorage (last-write-wins adoption).
-function _applyRemoteSubscription(sub) {
-  if (!sub || typeof sub !== 'object' || typeof sub.tier !== 'string') return;
-  try { localStorage.setItem('aurix_plan', JSON.stringify(sub)); } catch (_) {}
+// M.04 · §8 — NO-OP DELIBERADO, y se conserva la función a propósito.
+//
+// Adoptaba `user_portfolios.subscription` (escrito por el propio cliente) en
+// `localStorage.aurix_plan`. Ese rail era el camino por el que un tier
+// autoconcedido en un dispositivo aparecía en los demás con aspecto de venir del
+// servidor. La verdad comercial es `aurix_entitlements()` desde M.02 y el
+// proveedor la escribe desde M.04, así que aquí no hay nada que adoptar.
+//
+// Se mantiene la función (y su llamada) en vez de borrar el rail entero porque
+// el merge de estado es una ruta certificada y crítica: convertirla en un no-op
+// es un cambio de UNA línea de efecto, mientras arrancar el bloque toca el
+// orden del LWW de watchlist/prefs/ui_state. La lectura remota sigue ocurriendo
+// y su timestamp sigue avanzando; simplemente no se aplica.
+function _applyRemoteSubscription(_sub) {
+  return;
 }
 
 // Union two history arrays by timestamp (last write per ts wins), keep only
@@ -3614,7 +3625,18 @@ async function _flushStatePersistence(reason) {
       preferences_updated_at: localPrefsTs > 0 ? new Date(localPrefsTs).toISOString() : null,
       ui_state:             _collectUiState(),
       ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
-      subscription:            _collectSubscription(),
+      // ── M.04 · §8 — LEGACY RETIRADO DEL RAÍL DE SYNC ─────────────────────
+      // `subscription` viajaba aquí desde `localStorage.aurix_plan`, es decir: el
+      // CLIENTE escribía su propio plan en un campo con aspecto de verdad de
+      // servidor y lo propagaba a todos sus dispositivos. Desde M.02 no concede
+      // nada (`hasFeature` sólo lee `aurix_entitlements()`), pero mientras
+      // siguiera escribiéndose seguía siendo una afirmación comercial falsa en la
+      // base de datos, y con billing real sería la que contradice a Stripe.
+      // Se deja de ESCRIBIR. La columna no se toca —omitir la clave en el upsert
+      // no la sobrescribe— así que no hay migración destructiva: queda congelada
+      // con su último valor legacy y nadie la lee. Retirarla del esquema es
+      // limpieza final, no este bloque.
+      // subscription: <retirado en M.04 · §8>
       subscription_updated_at: localSubTs > 0 ? new Date(localSubTs).toISOString() : null,
       // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — performance_state is NO LONGER in this coupled payload. The
       // first upsert errors whenever ui_state/subscription columns are unmigrated, and the retry then STRIPPED
@@ -4946,6 +4968,9 @@ const T = {
     // M.03 E — tres estados vacíos, tres afirmaciones distintas.
     intv4_changed_stable: 'Aurix ha comparado tu historia y no detecta ningún cambio material.',
     intv4_changed_all_published: 'El único cambio material de tu cartera es el que Aurix te cuenta arriba.',
+    // M.04 · 0 — había cambios, pero ya los cuenta otra superficie. No se repiten
+    // ni se rellena el bloque: se dice que no hay OTROS.
+    intv4_changed_others_none: 'No se detectan otros cambios relevantes.',
     intv4_discovery_title: 'Puede que no hayas visto esto',
     intv4_explore_title: 'Explora tu patrimonio',
     intv4_memory_title: 'Memoria patrimonial',
@@ -6079,6 +6104,48 @@ const T = {
     menuCurrLabel:            'Moneda',
     menuLogout:               'Cerrar sesión',
     // WN.P1 refinement — Aurix Premium modal (fully localized)
+    // ── M.04 · PAYWALL REAL ─────────────────────────────────────────────────
+    // Precios: no están aquí. Vienen de `billing_prices`, que es lo que se cobra.
+    pw_open:           'Ver Aurix Premium',
+    pw_eyebrow:        'AURIX PREMIUM',
+    pw_title:          'Toda la inteligencia de tu patrimonio',
+    pw_sub:            'Un plan, sin complementos. Cancelas cuando quieras.',
+    pw_annual:         'Anual',
+    pw_monthly:        'Mensual',
+    pw_per_year:       'al año',
+    pw_per_month:      'al mes',
+    pw_annual_note:    (perMonth, pct) => `Equivale a ${perMonth} al mes · ahorras un ${pct}%`,
+    pw_trial:          (d) => `Incluye ${d} días de prueba`,
+    pw_cta:            'Continuar',
+    pw_opening:        'Abriendo…',
+    pw_manage:         'Gestionar mi plan',
+    pw_active_title:   'Tu plan Premium está activo',
+    pw_active_note:    'Gestiona tu método de pago o cancela cuando quieras.',
+    pw_unavailable:    'La compra todavía no está disponible. Vuelve en unos minutos.',
+    pw_problem_title:  'Hay un problema con tu suscripción',
+    pw_past_due_note:  'No hemos podido cobrar tu último pago. Actualiza tu método de pago o cancela desde el portal.',
+    pw_canceled_note:  'Tu suscripción está cancelada. Puedes revisarla o reactivarla desde el portal.',
+    pw_err_already:    'Ya tienes una suscripción activa. Gestiónala desde tu plan.',
+    pw_prem_tier:      'Con Premium',
+    pw_free_tier:      'Ya incluido en Free',
+    pw_b_intel:        'Intelligence completa: radar, memoria patrimonial y qué ha cambiado',
+    pw_b_loan:         'Simulador de préstamos en Workspace',
+    pw_b_plan:         'Gestión de tu plan y facturación',
+    pw_b_future:       'Y lo que Aurix publique en Premium a partir de ahora',
+    pw_fb_dash:        'Dashboard y evolución de tu patrimonio',
+    pw_fb_market:      'Market con seguimiento y búsqueda',
+    pw_fb_compound:    'Calculadora de interés compuesto',
+    pw_fb_re:          'Plantilla de portfolio inmobiliario',
+    pw_fb_preview:     'Vista previa de Intelligence',
+    pw_trust:          'Pago gestionado por Stripe. Aurix no almacena tu tarjeta.',
+    pw_micro:          'Tu plan se activa cuando el pago se confirma, no antes.',
+    pw_confirming:     'Confirmando tu pago…',
+    pw_active:         '¡Premium activado!',
+    pw_pending:        'El pago se está confirmando. Tu plan se activará en unos minutos.',
+    pw_cancelled:      'Has salido del pago. No se ha cobrado nada.',
+    pw_err_auth:       'Inicia sesión para continuar.',
+    pw_err_soon:       'La compra todavía no está disponible.',
+    pw_err_generic:    'No hemos podido abrir el pago. Inténtalo de nuevo.',
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'LA INTELIGENCIA DE TU PATRIMONIO',
     ap_hero_sub:       'Comprende qué impulsa tu patrimonio, dónde existen riesgos y cómo evoluciona tu riqueza en el tiempo.',
@@ -6087,7 +6154,6 @@ const T = {
     ap_demo_risk_v:    'Moderado',
     ap_demo_div_v:     'Alta',
     ap_demo_liq_v:     'Correcta',
-    ap_founder_seat:   'Plaza Founder #{n} de {tot}',
     ap_pos_title:      'LA CAPA DE INTELIGENCIA PATRIMONIAL DE AURIX',
     ap_pos_text:       'Diseñada para ayudarte a comprender qué impulsa realmente tu patrimonio.',
     ap_ind_risk:       'Riesgo',
@@ -6140,7 +6206,6 @@ const T = {
     ap_founder_note:   'Tu plaza Founder permanecerá activa mientras mantengas tu suscripción.',
     ap_founder_cta:    'Unirme como Founder',
     ap_per_year:       '/año',
-    ap_scarcity:       '{taken} de {total} plazas ocupadas · Quedan {rem} plazas Founder',
     ap_trust_1:        'Aurix Free te muestra tu patrimonio. Aurix Premium te ayuda a entenderlo.',
     ap_trust_2:        'Tus activos, tus datos y tu acceso seguirán siendo siempre tuyos.',
     ap_close:          'Cerrar',
@@ -7268,6 +7333,7 @@ const T = {
     intv4_changed_empty: 'There are no changes Aurix can measure with the history available yet.',
     intv4_changed_stable: 'Aurix compared your history and detects no material change.',
     intv4_changed_all_published: 'The only material change in your portfolio is the one Aurix reports above.',
+    intv4_changed_others_none: 'No other relevant changes detected.',
     intv4_discovery_title: 'You may not have seen this',
     intv4_explore_title: 'Explore your wealth',
     intv4_memory_title: 'Wealth memory',
@@ -8354,6 +8420,46 @@ const T = {
     menuCurrLabel:            'Currency',
     menuLogout:               'Sign out',
     // WN.P1 refinement — Aurix Premium modal (fully localized)
+    pw_open:           'See Aurix Premium',
+    pw_eyebrow:        'AURIX PREMIUM',
+    pw_title:          'All the intelligence of your wealth',
+    pw_sub:            'One plan, no add-ons. Cancel whenever you want.',
+    pw_annual:         'Annual',
+    pw_monthly:        'Monthly',
+    pw_per_year:       'per year',
+    pw_per_month:      'per month',
+    pw_annual_note:    (perMonth, pct) => `That is ${perMonth} a month · you save ${pct}%`,
+    pw_trial:          (d) => `Includes a ${d}-day trial`,
+    pw_cta:            'Continue',
+    pw_opening:        'Opening…',
+    pw_manage:         'Manage my plan',
+    pw_active_title:   'Your Premium plan is active',
+    pw_active_note:    'Manage your payment method or cancel whenever you want.',
+    pw_unavailable:    'Purchasing is not available yet. Please check back in a few minutes.',
+    pw_problem_title:  'There is a problem with your subscription',
+    pw_past_due_note:  "We couldn't take your last payment. Update your payment method or cancel from the portal.",
+    pw_canceled_note:  'Your subscription is cancelled. You can review or restart it from the portal.',
+    pw_err_already:    'You already have an active subscription. Manage it from your plan.',
+    pw_prem_tier:      'With Premium',
+    pw_free_tier:      'Already in Free',
+    pw_b_intel:        'Full Intelligence: radar, wealth memory and what changed',
+    pw_b_loan:         'Loan simulator in Workspace',
+    pw_b_plan:         'Plan and billing management',
+    pw_b_future:       'And whatever Aurix ships in Premium from now on',
+    pw_fb_dash:        'Dashboard and your wealth evolution',
+    pw_fb_market:      'Market with tracking and search',
+    pw_fb_compound:    'Compound interest calculator',
+    pw_fb_re:          'Real estate portfolio template',
+    pw_fb_preview:     'Intelligence preview',
+    pw_trust:          'Payments handled by Stripe. Aurix never stores your card.',
+    pw_micro:          'Your plan activates when the payment is confirmed, not before.',
+    pw_confirming:     'Confirming your payment…',
+    pw_active:         'Premium activated!',
+    pw_pending:        'Your payment is being confirmed. Your plan will activate in a few minutes.',
+    pw_cancelled:      'You left the payment. Nothing was charged.',
+    pw_err_auth:       'Sign in to continue.',
+    pw_err_soon:       'Purchasing is not available yet.',
+    pw_err_generic:    "We couldn't open the payment. Please try again.",
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'THE INTELLIGENCE OF YOUR WEALTH',
     ap_hero_sub:       'Understand what drives your wealth, where risks exist and how your wealth evolves over time.',
@@ -8362,7 +8468,6 @@ const T = {
     ap_demo_risk_v:    'Moderate',
     ap_demo_div_v:     'High',
     ap_demo_liq_v:     'Healthy',
-    ap_founder_seat:   'Founder seat #{n} of {tot}',
     ap_pos_title:      "AURIX'S WEALTH INTELLIGENCE LAYER",
     ap_pos_text:       'Designed to help you understand what truly drives your wealth.',
     ap_ind_risk:       'Risk',
@@ -8415,7 +8520,6 @@ const T = {
     ap_founder_note:   'Your Founder seat stays active while you keep your subscription.',
     ap_founder_cta:    'Join as Founder',
     ap_per_year:       '/year',
-    ap_scarcity:       '{taken} of {total} seats taken · {rem} Founder seats left',
     ap_trust_1:        'Aurix Free shows you your wealth. Aurix Premium helps you understand it.',
     ap_trust_2:        'Your assets, your data and your access remain always yours.',
     ap_close:          'Close',
@@ -52302,20 +52406,32 @@ function _intv4BriefHtml(core, esc, depth) {
 // WHAT CHANGED — only Core-certified changes. CAUSE is never asserted: the Core
 // reports causeKnown:false, so this surface shows CHANGE and lets the story's
 // "why it matters" carry the (prudent) impact. No per-position attribution.
-function _intv4ChangedHtml(core, esc, alreadyPublished) {
+function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   const seen = new Set();
   // Same rule as Memory: what the Brief already headlined is not repeated here.
   // Without this the same percentage appeared in the conclusion AND in the change
   // list on one screen — the repetition this surface exists to remove.
   const published = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
-  const rows = (core.whatChanged || [])
-    .filter(w => !published.has(w.semanticKey))
-    .filter(w => { if (seen.has(w.causalRoot)) return false; seen.add(w.causalRoot); return true; })
+  // ── M.04 · 0 — Y LO MISMO CON LA MEMORIA ──────────────────────────────────
+  // El contrato de las dos superficies: la Memoria guarda HITOS históricos que
+  // merece la pena recordar; ésta publica NOVEDADES frente a una referencia
+  // anterior. Un hecho no puede estar en las dos a la vez, y la exclusión es por
+  // clave Y por RAÍZ CAUSAL: dos claves distintas de la misma raíz (el cambio de
+  // nivel y el máximo anterior, por ejemplo) son el MISMO fenómeno contado de dos
+  // maneras, que es justo lo que la deduplicación por raíz del Core existe para
+  // evitar. La Memoria se pinta antes, así que elige primero.
+  const claimedKeys  = new Set((memoryClaims && memoryClaims.keys)  || []);
+  const claimedRoots = new Set((memoryClaims && memoryClaims.roots) || []);
+  const candidates = (core.whatChanged || [])
     .map(w => {
       const f = (core.ledger && core.ledger.facts || []).find(x => x.semanticKey === w.semanticKey);
       return { w, txt: f ? _intv4FactText(f) : '' };
     })
-    .filter(x => !!x.txt)
+    .filter(x => !!x.txt);
+  const rows = candidates
+    .filter(x => !published.has(x.w.semanticKey))
+    .filter(x => !claimedKeys.has(x.w.semanticKey) && !claimedRoots.has(x.w.causalRoot))
+    .filter(x => { if (seen.has(x.w.causalRoot)) return false; seen.add(x.w.causalRoot); return true; })
     .slice(0, 4);
   // ── M.03 · E — "SIN CAMBIO MATERIAL" ≠ "NO PUEDO MEDIRLO" ─────────────────
   // El estado vacío decía "Todavía no hay cambios que Aurix pueda medir", y eso
@@ -52326,11 +52442,17 @@ function _intv4ChangedHtml(core, esc, alreadyPublished) {
   // es la cobertura de observación del Core, no una heurística de esta capa.
   const obs = (core.dataAvailability && core.dataAvailability.observation) || {};
   const hasEvidence = Number(obs.observations) >= 2;
+  // M.04 · 0 — CUATRO situaciones, cuatro frases. La que faltaba es la del
+  // defecto: había cambios medidos, pero otra superficie los publica ya. Decir
+  // "todavía no hay cambios que Aurix pueda medir" ahí es simplemente falso, y
+  // repetirlos es peor. No se rellena el bloque con contenido fabricado.
   const emptyKey = !hasEvidence ? 'intv4_changed_empty'
-    : (published.size ? 'intv4_changed_all_published' : 'intv4_changed_stable');
+    : (candidates.length ? 'intv4_changed_others_none'
+      : (published.size ? 'intv4_changed_all_published' : 'intv4_changed_stable'));
   return `
     <section class="intcc-card intv4-changed" data-evidence="${hasEvidence ? '1' : '0'}"
-             data-obs="${esc(String(obs.observations || 0))}">
+             data-obs="${esc(String(obs.observations || 0))}"
+             data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_changed_title'))}</h3>
       ${rows.length ? `<ul class="intv4-chg-list">${rows.map(x => `
         <li class="intv4-chg is-${esc(x.w.change.direction || 'flat')}" data-root="${esc(x.w.causalRoot)}">
@@ -52422,20 +52544,50 @@ function _intv4AnswerHtml(q, core, esc) {
 // is not there. Sources are the Core's publishable wealth-level facts only, so
 // the events INT.01 removed (gross-value drawdown, non-authoritative category
 // history) cannot come back, and no retroactive causality is invented.
-function _intv4MemoryHtml(core, esc, alreadyPublished) {
+// ── M.04 · 0 — LA SELECCIÓN DE LA MEMORIA, COMO OWNER ───────────────────────
+// Estaba embebida en el renderer, así que NADIE MÁS podía saber qué hechos había
+// reclamado la Memoria. Resultado observado en producción: "tu patrimonio
+// invertible ha subido 40.818,17 US$ desde el 18 ago" aparecía en Memoria y otra
+// vez en Qué ha cambiado. Un mismo hecho semántico en dos superficies con
+// propósitos distintos no es redundancia cosmética: vacía de sentido a las dos.
+//
+// Ahora la selección es una función PURA que devuelve los hechos elegidos, y el
+// renderer la usa para dos cosas: pintar la Memoria y decirle a Qué ha cambiado
+// qué NO le corresponde. La equivalencia se decide por `semanticKey` y por RAÍZ
+// CAUSAL —tipo/hecho/origen—, nunca comparando textos renderizados.
+//
+// ORDEN, y está pensado para cuando el histórico crezca: prioridad (relevancia,
+// que el Core ya calcula) y a igualdad, RECENCIA de la ventana. Determinista, con
+// la clave como último desempate, así que la misma entrada da siempre la misma
+// Memoria.
+function _intv4MemoryEvents(core, alreadyPublished) {
   const seen = new Set();
-  // Anything the Brief already said above is NOT repeated here. Memory is the
-  // record of what is NOT in today's conclusion; showing the same sentence twice
-  // on one screen is the repetition this whole block exists to remove.
   const published = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
-  const events = (core.temporalEvents || [])
+  const endAt = f => (f.window && Number.isFinite(f.window.endAt)) ? f.window.endAt : 0;
+  return ((core && core.temporalEvents) || [])
     .filter(f => !published.has(f.semanticKey))
     // An EVENT has a date. The current level ('now') is context, not memory.
     .filter(f => f.window && f.window.range !== 'now' && Number.isFinite(f.window.endAt))
+    .slice()
+    .sort((a, b) => (b.priority - a.priority) || (endAt(b) - endAt(a))
+                 || (a.semanticKey < b.semanticKey ? -1 : 1))
     .map(f => ({ f, txt: _intv4FactText(f) }))
     .filter(x => !!x.txt)
     .filter(x => { const k = x.f.semanticKey; if (seen.has(k)) return false; seen.add(k); return true; })
     .slice(0, _INTV4_MEMORY_MAX);
+}
+// Lo que la Memoria RECLAMA: sus claves y sus raíces causales. Es el contrato que
+// consume Qué ha cambiado para no republicar el mismo hecho.
+function _intv4MemoryClaims(core, alreadyPublished) {
+  const ev = _intv4MemoryEvents(core, alreadyPublished);
+  return { keys: ev.map(x => x.f.semanticKey),
+           roots: Array.from(new Set(ev.map(x => x.f.causalRoot).filter(Boolean))) };
+}
+function _intv4MemoryHtml(core, esc, alreadyPublished) {
+  // Anything the Brief already said above is NOT repeated here. Memory is the
+  // record of what is NOT in today's conclusion; showing the same sentence twice
+  // on one screen is the repetition this whole block exists to remove.
+  const events = _intv4MemoryEvents(core, alreadyPublished);
   // PREMIUM EMPTY STATE (SPEC §12). The honest semantics are "the history does not
   // yet contain enough events" — NOT "Aurix is analysing". So the visual is a faint
   // timeline with observation nodes that accumulate: a temporal signal, not a
@@ -52991,9 +53143,12 @@ function _renderIntelligenceCommandCenter() {
     .map(st => _intv4FactText(st))
     .filter(Boolean);
   const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys);
+  // M.04 · 0 — la Memoria se pinta antes, así que RECLAMA primero. Sus claves y
+  // raíces viajan a Qué ha cambiado para que la misma verdad no ocupe las dos.
+  const memoryClaims = _intv4MemoryClaims(core, publishedKeys);
 
   // ── Row 4 — WHAT CHANGED, an integrated band (not another big board) ────
-  const changedHtml   = _intv4ChangedHtml(core, esc, publishedKeys);
+  const changedHtml   = _intv4ChangedHtml(core, esc, publishedKeys, memoryClaims);
   const discoveryHtml = _intv4DiscoveryHtml(core, esc, publishedTexts);
 
   // Data honesty stays available but does not occupy a permanent giant card: it
@@ -58965,6 +59120,11 @@ function _aurixPreloadBootIcons() {
           // getter y no repintaba nada.
           if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
         } catch (_) {}
+        // M.04 — VUELTA DEL CHECKOUT. Se engancha DESPUÉS de la primera lectura del
+        // servidor, porque el flujo consiste precisamente en volver a preguntarle:
+        // el `?billing=success` no concede nada, sólo dice "vuelve a mirar". Si el
+        // webhook aún no ha llegado, reintenta y, si sigue Free, lo dice.
+        try { if (typeof _aurixBillingReturnFlow === 'function') _aurixBillingReturnFlow(); } catch (_) {}
       });
     } catch (_) {}
     window.__aurixBootReady.auth = true;
@@ -61217,18 +61377,15 @@ function _aurixRenderMenuIdentity() {
   const premiumEl = document.getElementById('menuPremium');
   if (premiumEl) {
     const _premiumUser = hasFeature('premium.settings');   // M.02 B3 — entitlement real
-    const _en = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
-    if (_premiumUser) {
-      premiumEl.classList.remove('menu-item--coming-soon');
-      premiumEl.removeAttribute('aria-disabled');
-      premiumEl.textContent = (typeof t === 'function') ? t('menuPremium') : '✨ Aurix Premium';
-    } else {
-      // FREE — teaser only: NEVER reveal "Aurix Premium". A mysterious uppercase "PRÓXIMAMENTE / COMING SOON",
-      // not clickable (the click handler no-ops for non-premium), no modal, no navigation, no error.
-      premiumEl.classList.add('menu-item--coming-soon');
-      premiumEl.setAttribute('aria-disabled', 'true');
-      premiumEl.textContent = _en ? 'COMING SOON' : 'PRÓXIMAMENTE';
-    }
+    // M.04 — YA HAY PRODUCTO QUE VENDER, así que el teaser muerto se retira. Un
+    // usuario Free veía "PRÓXIMAMENTE" y un item que no hacía nada: era honesto
+    // cuando no existía checkout y ahora sería un punto de conversión roto. El
+    // item es el MISMO para los dos; lo que cambia es el estado del paywall
+    // (comprar / gestionar plan), que decide el entitlement, no este render.
+    premiumEl.classList.remove('menu-item--coming-soon');
+    premiumEl.removeAttribute('aria-disabled');
+    premiumEl.textContent = (typeof t === 'function') ? t('menuPremium') : '✨ Aurix Premium';
+    premiumEl.setAttribute('data-plan', _premiumUser ? 'premium' : 'free');
   }
 }
 
@@ -63741,6 +63898,218 @@ try {
 // Ahora es una capacidad explícita que ningún plan concede (ver
 // db/monetization_catalog_preview_key_1.sql). Fail-closed por construcción: sin
 // override no hay catálogo interno, y ni siquiera pagando se obtiene.
+// ════════════════════════════════════════════════════════════════════════════
+// M.04 · BILLING CLIENT — el navegador PIDE, nunca CONCEDE
+// ════════════════════════════════════════════════════════════════════════════
+// Todo lo que este bloque puede hacer es (a) leer el catálogo público de precios
+// y (b) abrir un checkout. No escribe estado comercial, no lo deduce y no lo
+// cachea como autoridad: después de pagar, Premium aparece porque
+// `aurix_entitlements()` lo dice, y eso sólo cambia cuando el webhook ha escrito
+// `subscriptions`. La URL de éxito, el parámetro `?billing=success`,
+// localStorage y esta misma sesión NO son prueba de compra en ningún punto del
+// código de abajo — el parámetro sólo dispara una REVALIDACIÓN contra el
+// servidor, que es libre de responder "sigues siendo Free".
+const _AURIX_BILLING_PROVIDER = 'stripe';
+const _AURIX_BILLING_INTERVALS = Object.freeze(['year', 'month']);   // anual primero, por producto
+// Los precios son un CATÁLOGO del servidor (`public.billing_prices`), no una
+// constante del bundle. Es la misma fila que cobra Stripe y que el webhook usa
+// para escribir el importe canónico: no puede haber un precio en pantalla que no
+// exista, ni un precio cobrado que la app no pueda explicar.
+let _aurixBillingPrices = { loaded: false, loading: false, error: null, rows: [], fetchedAt: 0 };
+async function _aurixBillingPricesLoad(opts) {
+  const force = !!(opts && opts.force);
+  if (_aurixBillingPrices.loading) return _aurixBillingPrices;
+  if (!force && _aurixBillingPrices.loaded && (Date.now() - _aurixBillingPrices.fetchedAt) < 10 * 60 * 1000) {
+    return _aurixBillingPrices;
+  }
+  _aurixBillingPrices.loading = true;
+  try {
+    if (!supabaseClient || !supabaseClient.from) throw new Error('no-client');
+    const { data, error } = await supabaseClient
+      .from('billing_prices')
+      .select('provider,provider_price_id,plan,billing_interval,amount_cents,currency,trial_days')
+      .eq('provider', _AURIX_BILLING_PROVIDER)
+      .eq('plan', 'premium');
+    if (error) throw error;
+    const rows = (Array.isArray(data) ? data : []).filter(r =>
+      r && Number.isFinite(Number(r.amount_cents)) && Number(r.amount_cents) > 0 &&
+      typeof r.currency === 'string' && _AURIX_BILLING_INTERVALS.indexOf(r.billing_interval) !== -1);
+    _aurixBillingPrices = { loaded: true, loading: false, error: null, rows, fetchedAt: Date.now() };
+  } catch (e) {
+    // Sin catálogo NO se inventa un precio: la superficie comercial lo dice y no
+    // ofrece comprar. Un paywall con un importe adivinado es peor que sin paywall.
+    _aurixBillingPrices = { loaded: true, loading: false, error: String((e && e.message) || e),
+                            rows: [], fetchedAt: 0 };
+  }
+  return _aurixBillingPrices;
+}
+function _aurixBillingPriceFor(interval) {
+  return (_aurixBillingPrices.rows || []).find(r => r.billing_interval === interval) || null;
+}
+// El importe se muestra EN LA DIVISA QUE SE COBRA, nunca convertido a la divisa de
+// visualización del usuario: "7,99 €" es el cargo real, y "8,68 US$" sería una
+// cifra que ningún extracto va a confirmar.
+function _aurixBillingMoney(cents, currency) {
+  const n = Number(cents) / 100, cur = String(currency || 'EUR').toUpperCase();
+  try {
+    return new Intl.NumberFormat(lang === 'en' ? 'en-IE' : 'es-ES',
+      { style: 'currency', currency: cur, minimumFractionDigits: 2 }).format(n);
+  } catch (_) { return n.toFixed(2) + ' ' + cur; }
+}
+// Ahorro anual REAL, derivado de los dos importes del catálogo. No es un descuento
+// inventado ni un precio "antes/después": es aritmética sobre lo que se cobra, y si
+// alguna de las dos filas no existe no se afirma nada.
+function _aurixBillingAnnualSaving() {
+  const y = _aurixBillingPriceFor('year'), m = _aurixBillingPriceFor('month');
+  if (!y || !m || y.currency !== m.currency) return null;
+  const full = Number(m.amount_cents) * 12, paid = Number(y.amount_cents);
+  if (!(full > 0) || !(paid > 0) || paid >= full) return null;
+  return { pct: Math.round((1 - paid / full) * 100), currency: y.currency,
+           saved: full - paid, perMonth: Math.round(paid / 12) };
+}
+function _aurixBillingApi(path) { return AURIX_API_ORIGIN + '/api/billing/' + path; }
+async function _aurixBillingAccessToken() {
+  try {
+    if (!supabaseClient || !supabaseClient.auth) return null;
+    const { data } = await supabaseClient.auth.getSession();
+    return (data && data.session && data.session.access_token) || null;
+  } catch (_) { return null; }
+}
+// Abre el checkout del proveedor. Devuelve false SIEMPRE: esta función no concede
+// nada, y su valor de retorno no debe poder confundirse con "ya es premium".
+async function _aurixBillingCheckout(interval, source) {
+  const iv = (_AURIX_BILLING_INTERVALS.indexOf(interval) !== -1) ? interval : 'year';
+  const token = await _aurixBillingAccessToken();
+  if (!token) {
+    _aurixBillingToast(t('pw_err_auth'), 'error');
+    return false;
+  }
+  try {
+    const r = await fetch(_aurixBillingApi('checkout'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ interval: iv, locale: (lang === 'en' ? 'en' : 'es') }),
+    });
+    const j = await r.json().catch(() => null);
+    // El orden importa: `check_failed` también viaja como 503, y la rama genérica
+    // de 503 lo interpretaba como "todavía no se puede comprar" —que es falso— y
+    // dejaba esta rama muerta.
+    if (j && j.error === 'check_failed') {
+      _aurixBillingToast(t('pw_err_generic'), 'error');
+      return false;
+    }
+    if (r.status === 503 || (j && (j.error === 'billing_unconfigured' || j.error === 'price_unavailable'))) {
+      _aurixBillingToast(t('pw_err_soon'), 'info');
+      return false;
+    }
+    // 409 — ya hay una suscripción viva (posiblemente creada hace segundos y
+    // pendiente de webhook). NO se abre una segunda: eso es lo que evita el doble
+    // cargo. Se revalida el entitlement y se repinta el paywall, de modo que si el
+    // webhook ya llegó el usuario acaba en "Gestionar mi plan" en vez de en un
+    // aviso suelto — antes el comentario prometía el portal y sólo había un toast.
+    if (r.status === 409 || (j && j.error === 'already_subscribed')) {
+      _aurixBillingToast(t('pw_err_already'), 'info');
+      try {
+        _aurixEntitlementsLoad({ force: true }).then(() => {
+          if (window.openAurixPremiumModal) window.openAurixPremiumModal({ source: 'already-subscribed' });
+        });
+      } catch (_) {}
+      return false;
+    }
+    if (!r.ok || !j || !j.url) {
+      _aurixBillingToast(t('pw_err_generic'), 'error');
+      return false;
+    }
+    try { if (typeof _aurixUpgradeIntents !== 'undefined') _aurixUpgradeIntents.push({ featureKey: 'checkout:' + iv, source: source || 'paywall', ts: Date.now() }); } catch (_) {}
+    window.location.assign(j.url);
+  } catch (_) {
+    _aurixBillingToast(t('pw_err_generic'), 'error');
+  }
+  return false;
+}
+// ¿Esta cuenta TIENE historia comercial? No es lo mismo que "tiene acceso".
+// El resolver publica `subscription_status` con el status real cuando el plan de
+// la fila es premium, así que `past_due` y `canceled` se distinguen de "nunca ha
+// habido suscripción" ('none').
+function _aurixBillingIsCustomer() {
+  try {
+    if (!_aurixEnt.loaded) return false;
+    const st = String(_aurixEnt.status || 'none');
+    return st !== 'none' && st !== 'unrecognized';
+  } catch (_) { return false; }
+}
+// Portal del proveedor: es donde un cliente cambia de tarjeta o CANCELA.
+//
+// La primera versión lo gateaba con `premium.settings`, y eso dejaba tirado
+// exactamente al cliente que más lo necesita: cuando una tarjeta caduca, Stripe
+// pone `past_due`, el entitlement cae a Free y con él desaparecía el botón — de
+// modo que el usuario no tenía forma de arreglar el pago NI de cancelar mientras
+// Stripe le seguía reclamando, con un paywall que le prometía "cancelas cuando
+// quieras". El gate correcto es tener historia comercial; el servidor sigue
+// exigiendo un mapeo de customer real y responde 404 si no lo hay.
+async function _aurixBillingPortal() {
+  if (!_aurixBillingIsCustomer() && !hasFeature('premium.settings')) return false;
+  const token = await _aurixBillingAccessToken();
+  if (!token) { _aurixBillingToast(t('pw_err_auth'), 'error'); return false; }
+  try {
+    const r = await fetch(_aurixBillingApi('portal'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ locale: (lang === 'en' ? 'en' : 'es') }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.url) { _aurixBillingToast(t('pw_err_soon'), 'info'); return false; }
+    window.location.assign(j.url);
+  } catch (_) { _aurixBillingToast(t('pw_err_generic'), 'error'); }
+  return false;
+}
+function _aurixBillingToast(msg, variant) {
+  try { if (typeof _aurixShowToast === 'function') _aurixShowToast(msg, { variant: variant || 'info' }); }
+  catch (_) {}
+}
+// ── VUELTA DEL CHECKOUT ─────────────────────────────────────────────────────
+// El parámetro se limpia de la URL ANTES de hacer nada, para que no quede una URL
+// "de éxito" compartible, recargable ni cacheable. Y lo único que dispara es una
+// revalidación con reintentos: el webhook y la redirección del navegador son dos
+// caminos independientes y el primero puede llegar unos segundos después. Si tras
+// los reintentos el servidor sigue diciendo Free, la app dice exactamente eso —
+// no hay un estado intermedio "premium provisional".
+const _AURIX_BILLING_RETRY_MS = Object.freeze([0, 2500, 6000, 15000]);
+function _aurixBillingReturnFlow() {
+  let flag = null;
+  try {
+    const u = new URL(window.location.href);
+    flag = u.searchParams.get('billing');
+    if (flag) {
+      u.searchParams.delete('billing');
+      window.history.replaceState({}, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
+    }
+  } catch (_) { flag = null; }
+  if (!flag) return;
+  if (flag === 'cancelled') { _aurixBillingToast(t('pw_cancelled'), 'info'); return; }
+  if (flag !== 'success') return;
+  _aurixBillingToast(t('pw_confirming'), 'info');
+  let i = 0;
+  const tick = () => {
+    _aurixEntitlementsLoad({ force: true }).then((st) => {
+      if (st && st.loaded && st.plan === 'premium') {
+        _aurixBillingToast(t('pw_active'), 'success');
+        try {
+          _aurixEntLastSig = JSON.stringify(st.features);
+          if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
+          const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
+          if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
+        } catch (_) {}
+        return;
+      }
+      i++;
+      if (i < _AURIX_BILLING_RETRY_MS.length) setTimeout(tick, _AURIX_BILLING_RETRY_MS[i]);
+      else _aurixBillingToast(t('pw_pending'), 'info');
+    });
+  };
+  setTimeout(tick, _AURIX_BILLING_RETRY_MS[0]);
+}
+
 function _aurixEntIsCatalogPreview() {
   return hasFeature('workspace.catalog_preview');
 }
@@ -63818,7 +64187,15 @@ function _settingsT(key) {
   try { return (T && T[lang] && T[lang][key]) || key; } catch (_) { return key; }
 }
 function _settingsPopulate() {
-  const plan  = getPlan();
+  // M.04 · §8 — EL PLAN QUE SE MUESTRA ES EL DEL SERVIDOR.
+  // Esta tarjeta leía `getPlan()`, o sea `localStorage.aurix_plan`, que ningún
+  // servidor escribe: una cuenta con un tier legacy en disco leía "Premium" en
+  // Ajustes mientras el entitlement decía Free — y con billing real sería la
+  // superficie que contradice a Stripe. Ahora el nombre y la descripción salen
+  // del entitlement, que falla cerrado a Free sin lectura válida. `getPlan()`
+  // sigue existiendo para el backup local y no decide nada comercial.
+  const _entTier = (typeof _aurixMenuTier === 'function') ? _aurixMenuTier() : 'free';
+  const plan  = { tier: _entTier };
 
   const tierEl   = document.getElementById('planTierName');
   const emailEl  = document.getElementById('settingsAccountEmail');
@@ -64870,9 +65247,14 @@ function openUpgradeIntent(opts) {
     if (!ov) return false;
     const nameEl = document.getElementById('upgradeFeatureName');
     if (nameEl) nameEl.textContent = featureKey ? _featureLabel(featureKey) : (lang === 'en' ? 'Premium feature' : 'Función premium');
-    // Sin precios en B3/B4.
+    // Sin precios en B3/B4. M.04 — el precio sigue NO estando aquí: este overlay
+    // dice qué función es Premium y ofrece la ÚNICA ruta de compra, que es el
+    // paywall. Un precio duplicado en dos superficies es un precio que puede
+    // divergir del catálogo.
     const fBtn = document.getElementById('upgradeFounderBtn');
     if (fBtn) fBtn.style.display = 'none';
+    const pBtn = document.getElementById('upgradePaywallBtn');
+    if (pBtn) pBtn.setAttribute('data-feature', featureKey || '');
     if (typeof applyI18n === 'function') applyI18n();
     ov.classList.add('open');
     ov.setAttribute('aria-hidden', 'false');
@@ -64933,10 +65315,9 @@ try {
     // the settings plan card and the upgrade modal (those entrypoints unchanged).
     if (e.target.closest && e.target.closest('#menuPremium')) {
       e.stopPropagation();
-      // PREMIUM-PREVIEW-FINAL — Free users see an intrigue/coming-soon state: clicking does NOTHING
-      // (no modal, no navigation, no error). Owner (authenticated email) gets the normal clickable item.
-      const _premiumUser = hasFeature('premium.settings');   // M.02 B3 — entitlement real
-      if (!_premiumUser) { e.preventDefault(); return; }
+      // M.04 — abre para TODOS. Para Free es el paywall (el único sitio desde el
+      // que se puede comprar); para un cliente, la gestión de su plan. El gate de
+      // acceso al PRODUCTO sigue siendo `hasFeature`, que es otra pregunta.
       const panel = document.getElementById('menuPanel');
       const toggle = document.getElementById('menuToggle');
       if (panel && panel.classList.contains('open')) panel.classList.remove('open');
@@ -64947,6 +65328,17 @@ try {
     // Settings membership card CTA → canonical Aurix Premium modal (same surface
     // as the menu). DSH.SETTINGS.01 visual naming alignment; premium logic and
     // entitlements untouched. Founder page kept as fallback if the modal is absent.
+    // M.04 — desde el overlay de "esto es Premium" al paywall. Es el mismo modal
+    // canónico que abre el menú: un solo sitio con precios.
+    if (e.target.closest && e.target.closest('#upgradePaywallBtn')) {
+      const btn = e.target.closest('#upgradePaywallBtn');
+      const feat = (btn && btn.getAttribute('data-feature')) || '';
+      try { if (typeof closeUpgradeModal === 'function') closeUpgradeModal(); } catch (_) {}
+      if (typeof window !== 'undefined' && window.openAurixPremiumModal) {
+        window.openAurixPremiumModal({ source: 'upgrade-intent' + (feat ? ':' + feat : '') });
+      }
+      return;
+    }
     if (e.target.closest && e.target.closest('#planFounderCta')) {
       if (typeof window !== 'undefined' && window.openAurixPremiumModal) {
         window.openAurixPremiumModal({ source: 'settings-membership' });
@@ -64986,94 +65378,165 @@ try {
 // in later. Self-contained: DOM is built lazily, all classes are .aurix-premium-*.
 (function _initAurixPremiumModal() {
   if (typeof document === 'undefined') return;
-  const FOUNDER = { founderSlotsTotal: 50, founderSlotsTaken: 10, founderSlotsRemaining: 40 };
+  // ── M.04 — ESTE MODAL PASA A SER EL PAYWALL REAL ─────────────────────────
+  // Lo que había aquí era una superficie de conversión SIN producto detrás, y
+  // arrastraba tres cosas que ahora son inaceptables porque ya se cobra de
+  // verdad: precios legacy (59 €/39 €) que no son los del catálogo, una ESCASEZ
+  // FABRICADA ("10 de 50 plazas Founder" con barra de progreso) y unos CTA que
+  // sólo respondían "te avisaremos pronto". Se retiran las tres. Se conserva
+  // todo el armazón —overlay perezoso, trampa de foco, Escape, reconstrucción
+  // por idioma en cada apertura, clases `.aurix-premium-*`— porque funciona y
+  // está estilado; lo que cambia es el CONTENIDO y el destino de los botones.
+  //
+  // Los precios NO viven aquí: se leen de `public.billing_prices`, la misma fila
+  // que cobra Stripe. Sin catálogo no se ofrece comprar.
   let _open = false, _lastSource = null, _trigger = null, _el = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const log = (action, extra) => { try { console.log('[premium-modal]', Object.assign({ action, source: _lastSource }, extra || {})); } catch (_) {} };
 
   // All copy is i18n-keyed → the modal renders 100% in the active language
   // (rebuilt on every open). Localized terms only (no hybrid ES/EN strings).
-  const FREE_K = ['ap_f_dash', 'ap_f_evo', 'ap_f_assets', 'ap_f_dist', 'ap_f_track', 'ap_f_market', 'ap_f_metals', 'ap_f_re', 'ap_f_liq', 'ap_f_wsbasic', 'ap_f_viz'];
-  const PREM_K = ['ap_p_health', 'ap_p_intel', 'ap_p_risk', 'ap_p_conc', 'ap_p_div', 'ap_p_drivers', 'ap_p_liq', 'ap_p_timeline', 'ap_p_ws', 'ap_p_goals', 'ap_p_reports', 'ap_p_future'];
-  const IND_K = ['ap_ind_risk', 'ap_ind_conc', 'ap_ind_liq', 'ap_ind_div', 'ap_ind_evo'];
-  const STD_B = ['ap_std_b1', 'ap_std_b2', 'ap_std_b3', 'ap_std_b4'];
-  const FND_B = ['ap_founder_b1', 'ap_founder_b2', 'ap_founder_b3', 'ap_founder_b4'];
+  // Lo que Premium concede HOY, y nada más. Las tres claves del catálogo de
+  // features (`plan_features`) más la que el producto ya publica como Premium.
+  // Deliberadamente NO se listan Objetivos, Informes, Diario ni el resto del
+  // inventario interno: no están publicados, así que prometerlos aquí sería
+  // vender producto inexistente.
+  const PREM_B = ['pw_b_intel', 'pw_b_loan', 'pw_b_plan', 'pw_b_future'];
+  const FREE_B = ['pw_fb_dash', 'pw_fb_market', 'pw_fb_compound', 'pw_fb_re', 'pw_fb_preview'];
   const li = (keys, cls) => keys.map(k => `<li class="${cls}">${esc(t(k))}</li>`).join('');
 
+  // ANUAL PRIMERO: es la decisión de producto, así que es la tarjeta destacada y
+  // la primera del DOM (también en lectores de pantalla y en móvil, donde el
+  // orden visual es el orden del documento).
+  function _planCard(row, featured) {
+    const isYear = row.billing_interval === 'year';
+    const saving = isYear ? _aurixBillingAnnualSaving() : null;
+    const per = isYear ? t('pw_per_year') : t('pw_per_month');
+    return `
+      <div class="aurix-premium-plan aurix-premium-standard${featured ? ' is-featured' : ''}">
+        <h3 class="aurix-premium-plan-title">${esc(isYear ? t('pw_annual') : t('pw_monthly'))}</h3>
+        <div class="aurix-premium-price">
+          <span class="aurix-premium-price-amount">${esc(_aurixBillingMoney(row.amount_cents, row.currency))}</span>
+          <span class="aurix-premium-price-per">${esc(per)}</span>
+        </div>
+        ${saving ? `<p class="aurix-premium-plan-note">${esc(t('pw_annual_note')(
+            _aurixBillingMoney(saving.perMonth, saving.currency), saving.pct))}</p>` : ''}
+        ${Number(row.trial_days) > 0
+          ? `<p class="aurix-premium-plan-note">${esc(t('pw_trial')(Math.floor(Number(row.trial_days))))}</p>` : ''}
+        <button type="button" class="aurix-premium-cta${featured ? ' is-premium' : ' is-monthly'}"
+                data-premium-buy="${esc(row.billing_interval)}">${esc(t('pw_cta'))}</button>
+      </div>`;
+  }
+
   function _buildHtml() {
-    const tk = FOUNDER.founderSlotsTaken, tot = FOUNDER.founderSlotsTotal, rem = FOUNDER.founderSlotsRemaining;
-    const pct = Math.round((tk / tot) * 100);
-    const scar = esc(t('ap_scarcity')).replace('{taken}', tk).replace('{total}', tot).replace('{rem}', rem);
+    const year = _aurixBillingPriceFor('year'), month = _aurixBillingPriceFor('month');
+    // GESTIONAR en vez de COMPRAR siempre que haya historia comercial, no sólo
+    // con acceso vigente: un `past_due` necesita la ruta de pago/cancelación más
+    // que nadie (ver `_aurixBillingPortal`).
+    const managed = ((typeof hasFeature === 'function') && hasFeature('premium.settings')) ||
+                    ((typeof _aurixBillingIsCustomer === 'function') && _aurixBillingIsCustomer());
+    // `past_due` es el caso vivo: la tarjeta falló, el acceso ya no se concede y el
+    // cliente necesita el portal. `canceled` con plan premium NO lo produce el
+    // escritor automático —una cancelación programada llega como `updated` con
+    // `cancel_at_period_end` y el acceso se conserva hasta el final del periodo, y
+    // el `deleted` del final ya escribe plan free—, así que sólo aparece en una
+    // fila reparada a mano (`provider='manual'`, que B1 admite). Se cubre por eso.
+    const problem = (typeof _aurixEnt !== 'undefined' && _aurixEnt.loaded &&
+                     (_aurixEnt.status === 'past_due' || _aurixEnt.status === 'canceled'))
+                    ? _aurixEnt.status : null;
+    // Tres estados honestos, y ninguno inventa un precio:
+    //   · ya es cliente        → gestionar plan (cambiar tarjeta, cancelar)
+    //   · catálogo disponible  → tarjetas de compra, anual primero
+    //   · catálogo vacío       → todavía no se puede comprar, y se dice
+    const plans = managed
+      ? `<div class="aurix-premium-plans is-managed">
+           <div class="aurix-premium-plan aurix-premium-standard is-featured">
+             <h3 class="aurix-premium-plan-title">${esc(problem ? t('pw_problem_title') : t('pw_active_title'))}</h3>
+             <p class="aurix-premium-plan-note">${esc(problem === 'past_due' ? t('pw_past_due_note')
+               : problem === 'canceled' ? t('pw_canceled_note') : t('pw_active_note'))}</p>
+             <button type="button" class="aurix-premium-cta is-premium" data-premium-portal="1">${esc(t('pw_manage'))}</button>
+           </div>
+         </div>`
+      : (year || month)
+        ? `<div class="aurix-premium-plans">
+             ${year ? _planCard(year, true) : ''}
+             ${month ? _planCard(month, !year) : ''}
+           </div>`
+        : `<div class="aurix-premium-plans is-empty">
+             <p class="aurix-premium-plan-note">${esc(t('pw_unavailable'))}</p>
+           </div>`;
     return `
       <div class="aurix-premium-modal" role="dialog" aria-modal="true" aria-labelledby="aurixPremiumTitle">
         <button type="button" class="aurix-premium-close" aria-label="${esc(t('ap_close'))}">✕</button>
         <header class="aurix-premium-header">
-          <span class="aurix-premium-eyebrow">${esc(t('ap_eyebrow'))}</span>
-          <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">${esc(t('ap_hero_title'))}</h2>
-          <p class="aurix-premium-sub">${esc(t('ap_hero_sub'))}</p>
+          <span class="aurix-premium-eyebrow">${esc(t('pw_eyebrow'))}</span>
+          <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">${esc(t('pw_title'))}</h2>
+          <p class="aurix-premium-sub">${esc(t('pw_sub'))}</p>
         </header>
 
+        ${plans}
+
         <div class="aurix-premium-comparison">
-          <div class="aurix-premium-compare-col is-free">
-            <span class="aurix-premium-compare-tier">${esc(t('ap_free_tier'))}</span>
-            <p class="aurix-premium-card-desc">${esc(t('ap_free_desc'))}</p>
-            <ul class="aurix-premium-list is-2col">${li(FREE_K, 'is-free')}</ul>
-          </div>
           <div class="aurix-premium-compare-col is-premium">
-            <span class="aurix-premium-compare-tier">${esc(t('ap_premium_tier'))}</span>
-            <p class="aurix-premium-card-desc">${esc(t('ap_std_text'))}</p>
-            <ul class="aurix-premium-list is-2col">${li(PREM_K, 'is-prem')}</ul>
+            <span class="aurix-premium-compare-tier">${esc(t('pw_prem_tier'))}</span>
+            <ul class="aurix-premium-list">${li(PREM_B, 'is-prem')}</ul>
           </div>
-        </div>
-
-        <div class="aurix-premium-plans">
-          <div class="aurix-premium-plan aurix-premium-standard">
-            <h3 class="aurix-premium-plan-title">${esc(t('ap_std_title'))}</h3>
-            <ul class="aurix-premium-benefits">${li(STD_B, 'is-prem')}</ul>
-            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">59€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>
-            <p class="aurix-premium-plan-note">${esc(t('ap_std_sub'))}</p>
-            <button type="button" class="aurix-premium-cta is-premium" data-premium-cta="premium_annual">${esc(t('ap_std_cta'))}</button>
-            <button type="button" class="aurix-premium-cta is-monthly" data-premium-cta="premium_monthly">${esc(t('ap_std_monthly'))}</button>
-          </div>
-
-          <div class="aurix-premium-plan aurix-premium-founder">
-            <div class="aurix-premium-plan-top">
-              <h3 class="aurix-premium-plan-title">${esc(t('ap_founder_title'))}</h3>
-              <span class="aurix-premium-badge">${esc(t('ap_founder_badge'))}</span>
-            </div>
-            <span class="aurix-premium-seat">${esc(t('ap_founder_seat')).replace('{n}', tk).replace('{tot}', tot)}</span>
-            <p class="aurix-premium-plan-desc">${esc(t('ap_founder_text'))}</p>
-            <ul class="aurix-premium-benefits">${li(FND_B, 'is-founder')}</ul>
-            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">39€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>
-            <p class="aurix-premium-plan-note">${esc(t('ap_founder_note'))}</p>
-            <div class="aurix-premium-scarcity">
-              <div class="aurix-premium-scarcity-bar"><span style="width:${pct}%"></span></div>
-              <span class="aurix-premium-scarcity-txt">${scar}</span>
-            </div>
-            <button type="button" class="aurix-premium-cta is-founder" data-premium-cta="founder">${esc(t('ap_founder_cta'))}</button>
+          <div class="aurix-premium-compare-col is-free">
+            <span class="aurix-premium-compare-tier">${esc(t('pw_free_tier'))}</span>
+            <ul class="aurix-premium-list">${li(FREE_B, 'is-free')}</ul>
           </div>
         </div>
 
         <footer class="aurix-premium-footer">
-          <p class="aurix-premium-trust-1">${esc(t('ap_trust_1'))}</p>
-          <p class="aurix-premium-microcopy">${esc(t('ap_trust_2'))}</p>
+          <p class="aurix-premium-trust-1">${esc(t('pw_trust'))}</p>
+          <p class="aurix-premium-microcopy">${esc(t('pw_micro'))}</p>
         </footer>
       </div>`;
   }
 
-  function _ctaState(btn) {
-    if (!btn || btn.dataset.done === '1') return;
-    btn.dataset.done = '1';
-    btn.textContent = (typeof lang !== 'undefined' && lang === 'en') ? "We'll notify you soon" : 'Te avisaremos pronto';
+  // El botón entra en estado "abriendo…" y se DESHABILITA: un segundo click
+  // durante el viaje al proveedor creaba una segunda sesión de checkout (y, sin
+  // la clave de idempotencia del endpoint, un segundo cliente).
+  function _ctaBusy(btn) {
+    if (!btn || btn.disabled) return false;
+    btn.disabled = true;
+    btn.dataset.prev = btn.textContent;
+    btn.textContent = t('pw_opening');
     btn.classList.add('is-done');
+    return true;
+  }
+  function _ctaRelease(btn) {
+    if (!btn) return;
+    btn.disabled = false;
+    if (btn.dataset.prev) btn.textContent = btn.dataset.prev;
+    btn.classList.remove('is-done');
   }
 
   function _wire(el) {
     el.addEventListener('click', e => {
       if (e.target === el) { closeAurixPremiumModal(); return; }                 // outside click
       if (e.target.closest('.aurix-premium-close')) { closeAurixPremiumModal(); return; }
-      const cta = e.target.closest('[data-premium-cta]');
-      if (cta) { log('cta_click', { plan: cta.getAttribute('data-premium-cta') }); _ctaState(cta); return; }
+      // M.04 — el CTA ahora COMPRA de verdad. `_aurixBillingCheckout` devuelve
+      // siempre false y no concede nada: si algo va mal, el botón se libera y la
+      // app sigue diciendo Free, que es la verdad hasta que lo diga el servidor.
+      const buy = e.target.closest('[data-premium-buy]');
+      if (buy) {
+        const iv = buy.getAttribute('data-premium-buy');
+        log('checkout_click', { interval: iv });
+        if (!_ctaBusy(buy)) return;
+        _aurixBillingCheckout(iv, 'paywall:' + (_lastSource || 'unknown'))
+          .then(() => { setTimeout(() => _ctaRelease(buy), 1200); })
+          .catch(() => _ctaRelease(buy));
+        return;
+      }
+      const portal = e.target.closest('[data-premium-portal]');
+      if (portal) {
+        log('portal_click');
+        if (!_ctaBusy(portal)) return;
+        _aurixBillingPortal().then(() => { setTimeout(() => _ctaRelease(portal), 1200); })
+                             .catch(() => _ctaRelease(portal));
+        return;
+      }
     });
     // Focus trap (Tab cycles within the modal while open).
     el.addEventListener('keydown', e => {
@@ -65100,6 +65563,14 @@ try {
     // Rebuild every open so the modal renders in the CURRENTLY active language
     // (and starts from a fresh, un-clicked CTA state).
     _el.innerHTML = _buildHtml();
+    // M.04 — los precios son del servidor, así que la primera apertura puede
+    // pintar el estado "todavía no disponible" y repintarse al llegar el
+    // catálogo. Nunca al revés: no hay importe por defecto en el bundle.
+    try {
+      if (typeof _aurixBillingPricesLoad === 'function') {
+        _aurixBillingPricesLoad().then(() => { if (_open && _el) _el.innerHTML = _buildHtml(); });
+      }
+    } catch (_) {}
     _el.style.display = 'flex';
     requestAnimationFrame(() => _el.classList.add('is-open'));
     document.body.classList.add('aurix-premium-lock');
@@ -65128,10 +65599,15 @@ try {
   window.openAurixPremiumModal = openAurixPremiumModal;
   window.closeAurixPremiumModal = closeAurixPremiumModal;
   window.aurixPremiumModal = { open: openAurixPremiumModal, close: closeAurixPremiumModal };
+  // M.04 — el debug dejaba vivo el único resto de las plazas Founder (y anunciaba
+  // tres CTA que ya no existen). Ahora refleja el paywall real: qué precios ha
+  // podido leer del catálogo, no un cupo inventado.
   window.debugAurixPremiumModal = () => ({
     installed: true, isOpen: _open, lastSource: _lastSource,
-    founderSlotsTotal: FOUNDER.founderSlotsTotal, founderSlotsTaken: FOUNDER.founderSlotsTaken, founderSlotsRemaining: FOUNDER.founderSlotsRemaining,
-    ctasAvailable: ['founder', 'premium_annual', 'premium_monthly'],
+    catalogLoaded: !!(typeof _aurixBillingPrices !== 'undefined' && _aurixBillingPrices.loaded),
+    intervalsAvailable: (typeof _aurixBillingPrices !== 'undefined' ? (_aurixBillingPrices.rows || []) : [])
+      .map(r => r.billing_interval).sort(),
+    managed: (typeof hasFeature === 'function') && hasFeature('premium.settings'),
     menuHookInstalled: !!document.getElementById('menuPremium'),
   });
 })();
