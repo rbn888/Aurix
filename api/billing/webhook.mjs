@@ -16,11 +16,13 @@
 // límite se valida en SERVIDOR: `vercel build` en local pasa con "status: ok", así
 // que el fallo es invisible en una reproducción local y el warning de ESM→CommonJS
 // del log no tiene nada que ver (aparece igual en los deployments que sí están
-// READY). Se cerró subiendo el proyecto a Pro (tope 1000, y Hobby es no comercial:
-// con Stripe cobrando, este proyecto ya es comercial). CERO cambios de código.
-// CONSECUENCIA VIVA: añadir un fichero a `api/` es una decisión de PLAN, no sólo de
-// código. Si el proyecto volviera a Hobby, cualquier deployment con >12 funciones
-// Serverless muere sin mensaje útil.
+// READY). Cómo se cerró: la directiva del proyecto es MANTENER HOBBY / coste cero,
+// así que no se sube de plan — se baja el conteo. `api/debug/health.js` (diagnóstico
+// puro, cero consumidores) pasa a `_health.js`, y `checkout` + `portal` comparten
+// una sola función, `api/billing/[op].js`, conservando sus dos rutas públicas.
+// Cuenta final: 12 Serverless + 1 Edge (este fichero).
+// CONSECUENCIA VIVA: `api/` está EN el tope. Añadir un fichero que no empiece por
+// `_` rompe el deployment ENTERO, no sólo esa ruta. Fijado por gate (J.6).
 //
 // ── POR QUÉ ESTE FICHERO ES `.mjs` Y NO `.js` ────────────────────────────────
 // Se mantiene, pero por su propio motivo, no por el deployment de arriba.

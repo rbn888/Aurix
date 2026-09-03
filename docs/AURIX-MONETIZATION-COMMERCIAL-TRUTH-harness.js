@@ -696,8 +696,12 @@ ok('N.3 el billing del servidor está acotado a api/billing/ y su webhook verifi
     // El webhook es `.mjs` a propósito: es una función Edge y Vercel transpila los
     // `.js` de api/ a CommonJS, que el runtime Edge no puede ejecutar (ver la
     // cabecera del fichero y la sección J del gate de billing).
+    // Una sola función Node para las dos operaciones (`[op].js`) porque `api/`
+    // está en el tope de 12 Serverless del plan Hobby; los dos contratos siguen
+    // en ficheros separados, con prefijo `_` para que Vercel no les cree
+    // entrypoint. Ver la sección J del gate de billing.
     const files = fs.readdirSync(dir).sort().join(',');
-    if (files !== 'checkout.js,portal.js,webhook.mjs') return false;
+    if (files !== ['[op].js', '_checkout.js', '_portal.js', 'webhook.mjs'].sort().join(',')) return false;
     const wh = fs.readFileSync(path.join(dir, 'webhook.mjs'), 'utf8');
     return /stripe-signature/.test(wh) && /crypto\.subtle\.sign/.test(wh)
         && /STRIPE_WEBHOOK_SECRET/.test(wh);

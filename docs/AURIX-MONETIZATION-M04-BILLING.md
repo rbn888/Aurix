@@ -30,9 +30,9 @@ sólo dispara una revalidación contra el servidor, que es libre de responder "s
 | `public.billing_events` | si un evento ya se aplicó | service_role |
 | `aurix_billing_link_customer()` | vincula customer↔usuario, sin re-apuntar ajenos | service_role |
 | `aurix_billing_apply_event()` | **todo lo demás** | service_role |
-| `api/billing/checkout.js` | abre sesión de pago (Node) | — |
-| `api/billing/webhook.js` | autenticidad + extracción (**Edge**, cuerpo crudo) | — |
-| `api/billing/portal.js` | portal del proveedor: tarjeta y **cancelación** | — |
+| `api/billing/[op].js` | única función Node: reparte a `_checkout.js` / `_portal.js` | — |
+| `api/billing/webhook.mjs` | autenticidad + extracción (**Edge**, cuerpo crudo) | — |
+| `api/billing/_portal.js` | portal del proveedor: tarjeta y **cancelación** | — |
 
 ## Precios canónicos
 
@@ -48,15 +48,17 @@ y **apagado** (`trial_days = 0`). Se enciende con un UPDATE en la tabla, sin dep
 
 ## PASOS MANUALES DEL FOUNDER (uno cada vez, en este orden)
 
-0. **Vercel → plan Pro.** *Prerrequisito de despliegue, no opcional.* Hobby admite **12
-   Serverless Functions por deployment** y `api/` tenía exactamente 12: `checkout` y
-   `portal` la suben a 14, así que en Hobby el deployment se rechaza **entero** y las
-   tres rutas de billing responden 404. El límite se valida en servidor —`vercel build`
-   en local pasa con `status: ok`— y en el log sólo se ve el aviso irrelevante de
-   ESM→CommonJS antes del `Build Failed`, así que es fácil diagnosticarlo mal.
-   Independientemente del cupo, Hobby es **no comercial** en los términos de Vercel y
-   cobrar con Stripe hace comercial este proyecto. **Regla que queda viva: añadir un
-   fichero a `api/` es una decisión de plan, no sólo de código.**
+0. **NADA que hacer en Vercel — pero hay que saberlo antes de tocar `api/`.**
+   *El plan se queda en Hobby (coste cero), por directiva de proyecto.* Hobby admite
+   **12 Serverless Functions por deployment** y `api/` estaba exactamente en 12:
+   `checkout` y `portal` la subían a 14, así que el deployment se rechazaba **entero**
+   y las tres rutas de billing respondían 404. No se ve venir: el build termina bien
+   (`Build Completed`) y el rechazo llega después, en `Deploying outputs...`, con el
+   motivo **fuera** del Deploy Log. Cerrado bajando el conteo, no el plan: `debug/health`
+   retirado a `_health.js` y las dos operaciones de billing compartiendo
+   `api/billing/[op].js`. **Cuenta actual: 12 Serverless + 1 Edge, o sea CERO margen.
+   Añadir un fichero a `api/` que no empiece por `_` rompe el deployment entero.**
+   El gate lo fija (J.6).
 
 1. **Stripe → Productos.** Crear un producto "Aurix Premium" con **dos precios
    recurrentes**: 7,99 € / mes y 59,99 € / año, ambos en EUR. Copiar los dos

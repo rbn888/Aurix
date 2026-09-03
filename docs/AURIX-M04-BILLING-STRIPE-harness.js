@@ -21,8 +21,9 @@ const css  = read('styles.css');
 const idx  = read('index.html');
 const SQL  = read('db/monetization_m04_billing_stripe_1.sql');
 const WH   = read('api/billing/webhook.mjs');
-const CO   = read('api/billing/checkout.js');
-const PO   = read('api/billing/portal.js');
+const CO   = read('api/billing/_checkout.js');
+const PO   = read('api/billing/_portal.js');
+const DISP = read('api/billing/[op].js');
 
 let pass = 0, fail = 0; const failed = [];
 function ok(n, c, info) {
@@ -781,13 +782,67 @@ console.log('\nJ · desplegabilidad en Vercel');
         .filter(f => f.endsWith('.js'))
         .every(f => !/runtime:\s*'edge'/.test(fs.readFileSync(f, 'utf8')));
     })());
-  ok('J.4 las otras dos funciones de billing son Node normales (mismo formato que las 14 que ya despliegan)',
-    ['checkout.js', 'portal.js'].every(f => fs.existsSync(path.join(dir, f))) &&
+  ok('J.4 checkout y portal son Node normales y NINGUNO es ya un entrypoint propio',
+    ['_checkout.js', '_portal.js'].every(f => fs.existsSync(path.join(dir, f))) &&
+    ['checkout.js', 'portal.js'].every(f => !fs.existsSync(path.join(dir, f))) &&
     !/runtime:\s*'edge'/.test(CO) && !/runtime:\s*'edge'/.test(PO));
-  ok('J.5 la ruta pública NO cambia con la extensión',
+  ok('J.5 la ruta pública NO cambia',
     /\/api\/billing\/webhook/.test(read('docs/AURIX-MONETIZATION-M04-BILLING.md')) &&
     /_aurixBillingApi\('checkout'\)/.test(app) &&
     /AURIX_API_ORIGIN \+ '\/api\/billing\/'/.test(app));
+
+  // ── J.6 · EL PRESUPUESTO DE FUNCIONES ES UN INVARIANTE DE DESPLIEGUE ──────
+  // Vercel Hobby admite 12 Serverless Functions por deployment. `api/` está EN
+  // el tope: un fichero nuevo que no empiece por `_` rompe el deployment ENTERO
+  // (build correcto y rechazo posterior, en `Deploying outputs...`, con las tres
+  // rutas de billing en 404). Se cuenta como cuenta Vercel: entrypoints de
+  // `api/` sin prefijo `_`, descontando las Edge, que van a otro cupo.
+  const apiEntrypoints = (() => {
+    const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e =>
+      e.name.startsWith('_') ? []
+        : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+    return walk(path.join(root, 'api')).filter(f => /\.(js|mjs)$/.test(f));
+  })();
+  const edgeCount = apiEntrypoints.filter(f => /runtime:\s*'edge'/.test(fs.readFileSync(f, 'utf8'))).length;
+  const serverless = apiEntrypoints.length - edgeCount;
+  ok(`J.6 el proyecto no pasa de 12 Serverless Functions (hay ${serverless} + ${edgeCount} Edge)`,
+    serverless <= 12, `serverless=${serverless}`);
+
+  // ── J.7 · EL DISPATCHER SÓLO ELIGE OWNER (ejecutado, no descrito) ─────────
+  // Las dos operaciones comparten una función, así que el reparto es ahora una
+  // pieza con la que se puede fallar: si `op` resolviera a algo distinto de su
+  // owner, /api/billing/portal ejecutaría checkout. Se ejecuta el fichero real
+  // con los dos owners sustituidos por espías.
+  {
+    const calls = [];
+    const spy = (name) => (req, res) => { calls.push(name); return res.status(200).json({ ok: true, who: name }); };
+    const mkRes = () => { const r = { code: 0, body: null, setHeader() {},
+      status(n) { r.code = n; return r; }, json(o) { r.body = o; return r; }, end() { return r; } }; return r; };
+    const load = () => loadHandler(DISP.replace(/^import .*$/gm, ''),
+      { checkout: spy('checkout'), portal: spy('portal') });
+
+    const hit = async (op) => {
+      calls.length = 0;
+      const { handler } = load();
+      const res = mkRes();
+      await handler({ query: op === undefined ? {} : { op }, method: 'POST', headers: {} }, res);
+      return { code: res.code, body: res.body, calls: calls.slice() };
+    };
+
+    const rCheckout = await hit('checkout');
+    const rPortal   = await hit('portal');
+    ok('J.7 op=checkout ejecuta checkout y op=portal ejecuta portal, cada uno el suyo',
+      rCheckout.calls.join() === 'checkout' && rPortal.calls.join() === 'portal',
+      `checkout→${rCheckout.calls.join()||'nada'} portal→${rPortal.calls.join()||'nada'}`);
+
+    const bad = [];
+    for (const op of [undefined, '', 'webhook', 'Checkout', 'constructor', '__proto__', 'toString']) {
+      const r = await hit(op);
+      if (r.code !== 404 || r.calls.length) bad.push(`${String(op)}→${r.code}/${r.calls.join()||'-'}`);
+    }
+    ok('J.8 cualquier otro `op` es 404 y NO ejecuta owner (incluido constructor/__proto__)',
+      bad.length === 0, bad.join(' '));
+  }
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
