@@ -48,6 +48,16 @@ y **apagado** (`trial_days = 0`). Se enciende con un UPDATE en la tabla, sin dep
 
 ## PASOS MANUALES DEL FOUNDER (uno cada vez, en este orden)
 
+0. **Vercel → plan Pro.** *Prerrequisito de despliegue, no opcional.* Hobby admite **12
+   Serverless Functions por deployment** y `api/` tenía exactamente 12: `checkout` y
+   `portal` la suben a 14, así que en Hobby el deployment se rechaza **entero** y las
+   tres rutas de billing responden 404. El límite se valida en servidor —`vercel build`
+   en local pasa con `status: ok`— y en el log sólo se ve el aviso irrelevante de
+   ESM→CommonJS antes del `Build Failed`, así que es fácil diagnosticarlo mal.
+   Independientemente del cupo, Hobby es **no comercial** en los términos de Vercel y
+   cobrar con Stripe hace comercial este proyecto. **Regla que queda viva: añadir un
+   fichero a `api/` es una decisión de plan, no sólo de código.**
+
 1. **Stripe → Productos.** Crear un producto "Aurix Premium" con **dos precios
    recurrentes**: 7,99 € / mes y 59,99 € / año, ambos en EUR. Copiar los dos
    `price_…`.

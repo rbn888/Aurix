@@ -9,31 +9,35 @@
 // from Aurix's own tables, inside one transaction. This function's whole job is
 // authenticity + extraction, which is why it can be read in one sitting.
 //
-// ── WHY THIS FILE IS `.mjs` AND NO LONGER `.js` ──────────────────────────────
-// NO ES COSMÉTICO: la extensión es lo que hacía FALLAR el deployment entero.
+// ── POR QUÉ FALLÓ EL PRIMER DEPLOYMENT DE M.04 (y no fue esto) ───────────────
+// La causa real, confirmada en el Deploy Log: el CUPO DE FUNCIONES del plan. Vercel
+// admite 12 Serverless Functions por deployment en Hobby. `api/` tenía EXACTAMENTE
+// 12; M.04 añadió checkout y portal → 14, y el deployment se rechazó entero. Ese
+// límite se valida en SERVIDOR: `vercel build` en local pasa con "status: ok", así
+// que el fallo es invisible en una reproducción local y el warning de ESM→CommonJS
+// del log no tiene nada que ver (aparece igual en los deployments que sí están
+// READY). Se cerró subiendo el proyecto a Pro (tope 1000, y Hobby es no comercial:
+// con Stripe cobrando, este proyecto ya es comercial). CERO cambios de código.
+// CONSECUENCIA VIVA: añadir un fichero a `api/` es una decisión de PLAN, no sólo de
+// código. Si el proyecto volviera a Hobby, cualquier deployment con >12 funciones
+// Serverless muere sin mensaje útil.
 //
-// `package.json` no declara `"type": "module"`, así que Vercel trata cualquier
-// `.js` de `api/` como CommonJS: detecta la sintaxis ESM y lo transpila con Babel
-// ("Warning: Node.js functions are compiled from ESM to CommonJS"). Ese transform
-// se aplica TAMBIÉN a una función Edge —`babelCompileEnabled = !isEdgeFunction ||
+// ── POR QUÉ ESTE FICHERO ES `.mjs` Y NO `.js` ────────────────────────────────
+// Se mantiene, pero por su propio motivo, no por el deployment de arriba.
+// `package.json` no declara `"type": "module"`, así que Vercel trata cualquier `.js`
+// de `api/` como CommonJS: detecta la sintaxis ESM y lo transpila con Babel
+// ("Warning: Node.js functions are compiled from ESM to CommonJS"). Ese transform se
+// aplica TAMBIÉN a una función Edge —`babelCompileEnabled = !isEdgeFunction ||
 // VERCEL_EDGE_NO_BABEL !== '1'`, o sea true por defecto—, y el runtime Edge sólo
-// ejecuta ESM: no existen `exports` ni `require`. Resultado: la build producía una
-// EdgeFunction en CommonJS, un artefacto inválido, y el deployment moría a los ~6 s
-// sin mensaje explícito (los tres ficheros de billing aparecían "compilados" en el
-// log y justo después Build Failed).
-//
-// Reproducido con el builder real (`@vercel/node`) sobre este mismo fichero:
+// ejecuta ESM: no existen `exports` ni `require`. Con `.js` la build emite una
+// EdgeFunction transpilada a CommonJS; con `.mjs` no hay ambigüedad ni transform:
 //   webhook.js  → EdgeFunction + "Compiling webhook.js from ESM to CommonJS…"
 //   webhook.mjs → EdgeFunction, sin transform, un solo fichero ESM de salida
+// La ruta pública NO cambia: sigue siendo /api/billing/webhook. La alternativa
+// —añadir `"type": "module"`— arregla lo mismo pero convierte de golpe las otras 16
+// funciones del proyecto: más radio de impacto por el mismo beneficio.
 //
-// `.mjs` es ESM sin ambigüedad, independientemente de `package.json`, así que no
-// hay transpilación. La ruta pública NO cambia: sigue siendo /api/billing/webhook.
-// La alternativa —añadir `"type": "module"` a package.json— arregla lo mismo pero
-// convierte de golpe las otras 16 funciones del proyecto: más radio de impacto por
-// el mismo beneficio.
-//
-// SI ALGUIEN LO RENOMBRA A `.js`, EL DEPLOYMENT VUELVE A FALLAR. Hay un assert que
-// lo fija (gate de billing, sección J).
+// NO LO RENOMBRES A `.js`. Hay un assert que lo fija (gate de billing, sección J).
 //
 // ── WHY THE EDGE RUNTIME ─────────────────────────────────────────────────────
 // Stripe signs the EXACT RAW BYTES of the body. The Node runtime here parses

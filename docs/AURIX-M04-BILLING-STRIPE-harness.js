@@ -744,11 +744,15 @@ console.log('\nH · legacy billing retirado');
 }
 
 // ══ J · DESPLEGABILIDAD (la extensión es contrato, no estilo) ═════════════
-// El primer deployment de M.04 falló entero. `package.json` no declara
+// El primer deployment de M.04 falló entero, pero NO por esto: la causa real fue el
+// cupo de 12 Serverless Functions por deployment del plan Hobby (api/ tenía justo
+// 12 y M.04 subió a 14), y se cerró pasando el proyecto a Pro. Se comprueba aquí
+// que esa causa quede escrita, porque `vercel build` en local PASA y el fallo sólo
+// existe en servidor: sin la nota, el siguiente diagnóstico vuelve a errar.
+// Lo que sí sigue siendo contrato de la extensión: `package.json` no declara
 // `"type": "module"`, así que Vercel trata un `.js` de `api/` como CommonJS y lo
 // transpila desde ESM — y ese transform se aplica también a una función Edge, que
-// sólo puede ejecutar ESM. Salía una EdgeFunction en CommonJS: artefacto inválido,
-// Build Failed a los ~6 s y sin mensaje. Reproducido con el builder real:
+// sólo puede ejecutar ESM. Reproducido con el builder real:
 //   webhook.js  → EdgeFunction + "Compiling webhook.js from ESM to CommonJS…"
 //   webhook.mjs → EdgeFunction, sin transform.
 console.log('\nJ · desplegabilidad en Vercel');
@@ -758,7 +762,13 @@ console.log('\nJ · desplegabilidad en Vercel');
     fs.existsSync(path.join(dir, 'webhook.mjs')) &&
     !fs.existsSync(path.join(dir, 'webhook.js')));
   ok('J.2 …y su motivo queda escrito en el propio fichero (para que nadie lo renombre)',
-    /WHY THIS FILE IS `\.mjs`/.test(WH) && /Build Failed/.test(WH));
+    /POR QUÉ ESTE FICHERO ES `\.mjs` Y NO `\.js`/.test(WH) &&
+    /NO LO RENOMBRES A `\.js`/.test(WH));
+  // La causa REAL del primer deployment fallido no es deducible del código ni
+  // reproducible en local: si no vive escrita, se vuelve a diagnosticar mal.
+  ok('J.2b la causa real del deployment fallido (cupo de funciones del plan) queda escrita',
+    /12 Serverless Functions por deployment en Hobby/.test(WH) &&
+    /se valida en SERVIDOR/.test(WH));
   // Si algún día se añade `"type": "module"`, el `.js` volvería a ser válido; hasta
   // entonces, la única función Edge del proyecto NO puede llevar extensión `.js`.
   ok('J.3 mientras package.json no declare `type: module`, ninguna función Edge usa `.js`',
