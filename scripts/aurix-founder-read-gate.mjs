@@ -116,7 +116,7 @@ check('no emite set-cookie', !('set-cookie' in ok.headers));
 // La ruta ÚNICA solo elige superficie: nada de lógica propia que el gate no
 // ejecute. Es un segmento dinámico porque `api/` está en el tope del plan
 // (ver sección G) y dos ficheros de ruta rechazarían el deployment entero.
-const ROUTE = 'api/read/[surface].js';
+const ROUTE = 'api/read/[surface].mjs';
 const routeSrc = read(ROUTE).replace(/\/\/.*$/gm, '').trim();
 check(`${ROUTE}: importa los dos handlers`,
   /import \{ overviewHandler, healthHandler \} from '\.\.\/_founder-read-handlers\.mjs';/.test(routeSrc));
@@ -138,6 +138,11 @@ check(`${ROUTE}: las dos superficies del contrato Founder están servidas`,
 for (const gone of ['api/read/overview.js', 'api/read/health.js']) {
   check(`${gone}: no existe (subiría el cupo a 14)`, !existsSync(path.join(ROOT, gone)));
 }
+// La cadena tiene que ser ESM de punta a punta: un `.js` sería CJS y su
+// `require()` de un `.mjs` revienta la función al invocarla (visto en producción).
+check('la ruta es .mjs (un .js no puede requerir los módulos .mjs)',
+  existsSync(path.join(ROOT, 'api/read/[surface].mjs')) &&
+  !existsSync(path.join(ROOT, 'api/read/[surface].js')));
 const handlers = read('api/_founder-read-handlers.mjs').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 check('handlers: ambos exigen el guard',
   (handlers.match(/guardFounderRead\(req, res\)/g) ?? []).length === 2);

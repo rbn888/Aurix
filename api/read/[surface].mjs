@@ -22,6 +22,16 @@
 // ESTE FICHERO SÓLO ELIGE SUPERFICIE. No hay ruta por defecto: una superficie
 // desconocida es 404 y nada más — la superficie Founder se mantiene estrecha.
 //
+// POR QUÉ `.mjs` Y NO `.js` — verificado en producción, no es preferencia:
+// el paquete no declara "type": "module", así que Vercel trata un `.js` como
+// CJS y transpila sus `import` a `require()`. Un `require()` de un `.mjs` es
+// ERR_REQUIRE_ESM: la función se cae al invocarse con FUNCTION_INVOCATION_FAILED
+// (500 en TODOS los métodos, fail-closed pero inservible). `api/billing/[op].js`
+// no lo sufre porque importa hermanos `.js`. Aquí la cadena es ESM de punta a
+// punta —y tiene que seguir siéndolo: los módulos `_founder-read-*.mjs` son
+// `.mjs` precisamente para que el gate local ejecute el código de producción
+// TAL CUAL, sin duplicarlo ni simularlo.
+//
 // AVISO PARA QUIEN AÑADA FUNCIONES: `api/` está en el tope del plan. Un fichero
 // nuevo en `api/` que no empiece por `_` rompe el deployment ENTERO.
 
