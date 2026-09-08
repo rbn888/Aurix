@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '660'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '661'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6109,7 +6109,7 @@ const T = {
     pw_open:           'Ver Aurix Premium',
     pw_eyebrow:        'AURIX PREMIUM',
     pw_title:          'Toda la inteligencia de tu patrimonio',
-    pw_sub:            'Un plan, sin complementos. Cancelas cuando quieras.',
+    pw_sub:            'Claridad total sobre tu patrimonio.',
     pw_annual:         'Anual',
     pw_monthly:        'Mensual',
     pw_per_year:       'al año',
@@ -8423,7 +8423,7 @@ const T = {
     pw_open:           'See Aurix Premium',
     pw_eyebrow:        'AURIX PREMIUM',
     pw_title:          'All the intelligence of your wealth',
-    pw_sub:            'One plan, no add-ons. Cancel whenever you want.',
+    pw_sub:            'Complete clarity on your wealth.',
     pw_annual:         'Annual',
     pw_monthly:        'Monthly',
     pw_per_year:       'per year',

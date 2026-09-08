@@ -23871,7 +23871,7 @@ body.aurix-skeleton #totalValue::after {
 }
 .aurix-premium-cta.is-founder{ color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d); box-shadow:0 10px 26px -12px rgba(212,175,93,.7); }
 .aurix-premium-cta.is-premium{ color:#fff; background:linear-gradient(180deg,rgba(77,141,255,.95),rgba(53,110,225,.95)); box-shadow:0 10px 26px -12px rgba(77,141,255,.7); }
-.aurix-premium-cta.is-monthly{ margin-top:8px; color:#aeb9cc; background:transparent; border:1px solid rgba(255,255,255,.14); font-weight:700; box-shadow:none; }
+.aurix-premium-cta.is-monthly{ margin-top:auto; color:#aeb9cc; background:transparent; border:1px solid rgba(255,255,255,.14); font-weight:700; box-shadow:none; }
 .aurix-premium-cta:hover{ transform:translateY(-2px); filter:brightness(1.05); }
 .aurix-premium-cta.is-monthly:hover{ background:rgba(255,255,255,.05); color:#fff; }
 .aurix-premium-cta.is-done{ opacity:.8; cursor:default; transform:none; filter:none; }

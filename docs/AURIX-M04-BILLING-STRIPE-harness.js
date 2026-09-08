@@ -845,6 +845,21 @@ console.log('\nJ · desplegabilidad en Vercel');
   }
 }
 
+// ── K · PAYWALL · los dos CTA alineados y encabezado sin cancelación ────────
+// La alineación NO es cosmética: `.aurix-premium-cta` ya empuja el botón al fondo
+// de la tarjeta (`margin-top:auto`) y las dos tarjetas son celdas de grid de la
+// misma altura, así que basta con que `.is-monthly` no reintroduzca un margen
+// fijo — que es lo que desalineaba el CTA mensual respecto al anual.
+{
+  const ctaBase = /\.aurix-premium-cta\{[^}]*margin-top:\s*auto/.test(css);
+  const monthly = (css.match(/\.aurix-premium-cta\.is-monthly\{[^}]*\}/) || [''])[0];
+  ok('K.1 los dos CTA del paywall se alinean por estructura (`is-monthly` sin margen fijo)',
+    ctaBase && /margin-top:\s*auto/.test(monthly) && !/margin-top:\s*\d/.test(monthly), monthly.slice(0, 90));
+  const subs = app.match(/pw_sub:\s*'([^']*)'/g) || [];
+  ok('K.2 el encabezado del paywall no menciona la cancelación (ES y EN)',
+    subs.length === 2 && !/cancel/i.test(subs.join(' ')), subs.join(' | '));
+}
+
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }
 process.exit(fail ? 1 : 0);
