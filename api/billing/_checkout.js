@@ -44,6 +44,20 @@ const PLAN     = 'premium';
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || '2024-06-20';
 const INTERVALS = ['month', 'year'];
 
+// `provider_error` era OPACO: las dos llamadas a Stripe —crear customer y crear
+// sesión— devolvían el mismo cuerpo, así que un rechazo del proveedor obligaba a
+// leer los logs de la plataforma para saber cuál de las dos había fallado y por
+// qué. Se publican SOLO los identificadores públicos del error de Stripe (`at`,
+// su status HTTP y su `code`/`type`, p. ej. `resource_missing` o
+// `invalid_api_key`): ni claves, ni mensajes con datos de cuenta, ni el objeto
+// del proveedor. El endpoint sigue exigiendo JWT válido y origen permitido, y el
+// cliente sigue pintando el mismo aviso genérico — esto es para diagnosticar.
+function providerError(at, status, payload) {
+  const e = (payload && payload.error) || null;
+  return { ok: false, error: 'provider_error', at,
+           stripe_status: Number(status) || 0,
+           stripe_code: String((e && (e.code || e.type)) || '').slice(0, 64) };
+}
 function isAllowedOrigin(o) {
   return !!o && (ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o));
 }
@@ -166,7 +180,7 @@ export default async function handler(req, res) {
       const c = await r.json().catch(() => null);
       if (!r.ok || !c || !c.id) {
         console.error('[billing/checkout] customer create failed', r.status);
-        return res.status(502).json({ ok: false, error: 'provider_error' });
+        return res.status(502).json(providerError('customer', r.status, c));
       }
       customerId = c.id;
     } catch (e) {
@@ -270,7 +284,7 @@ export default async function handler(req, res) {
     const s = await r.json().catch(() => null);
     if (!r.ok || !s || !s.url) {
       console.error('[billing/checkout] session failed', r.status, (s && s.error && s.error.code) || '');
-      return res.status(502).json({ ok: false, error: 'provider_error' });
+      return res.status(502).json(providerError('session', r.status, s));
     }
     // Only the redirect URL leaves this function. No keys, no customer id, no
     // price object: the client has no use for them and every one of them is a leak.

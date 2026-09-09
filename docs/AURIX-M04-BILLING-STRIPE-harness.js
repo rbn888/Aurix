@@ -349,7 +349,11 @@ console.log('\nD · checkout · identidad y precio de record');
         return { ok: opts.linkFails ? false : true, status: opts.linkFails ? 409 : 200, json: async () => 'cus_new' };
       }
       if (u.includes('checkout/sessions')) {
-        return { ok: true, status: 200, json: async () => ({ url: 'https://checkout.stripe.com/s/1' }) };
+        return opts.sessionFails
+          ? { ok: false, status: 400, json: async () => ({ error: { type: 'invalid_request_error',
+              code: 'resource_missing',
+              message: 'No such price: price_annual_real; a similar object exists in test mode, key sk_test_x' } }) }
+          : { ok: true, status: 200, json: async () => ({ url: 'https://checkout.stripe.com/s/1' }) };
       }
       return { ok: false, status: 404, json: async () => null };
     };
@@ -460,6 +464,19 @@ console.log('\nD · checkout · identidad y precio de record');
   ok('D.16 …y con 14 días en el catálogo, el trial viaja al proveedor',
     decodeBody(withTrial.calls.find(c => c.url.includes('checkout/sessions')).init.body)
       .includes('subscription_data[trial_period_days]=14'));
+  // Un rechazo del proveedor era OPACO: mismo cuerpo para "falló crear el
+  // customer" y "falló crear la sesión", así que la causa sólo vivía en los logs
+  // de la plataforma. Ahora se publica DÓNDE falló y el código PÚBLICO de Stripe,
+  // y nada más: ni la clave, ni el mensaje (que puede citarla), ni el objeto.
+  const sessFail = await callCheckout({ sessionFails: true });
+  ok('D.19 un rechazo de Stripe publica dónde falló y su código público, y NADA más',
+    sessFail.res.code === 502 && sessFail.res.payload &&
+    sessFail.res.payload.error === 'provider_error' &&
+    sessFail.res.payload.at === 'session' &&
+    sessFail.res.payload.stripe_status === 400 &&
+    sessFail.res.payload.stripe_code === 'resource_missing' &&
+    !/sk_test|No such price/.test(JSON.stringify(sessFail.res.payload)),
+    JSON.stringify(sessFail.res.payload));
   // PORTAL — la ruta de cancelación.
   ok('D.17 el portal resuelve el cliente del USUARIO autenticado, no de un body',
     /billing_customers[\s\S]{0,120}user_id=eq\.\$\{user\.id\}/.test(PO) &&
