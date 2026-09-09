@@ -148,7 +148,12 @@ function safeDetail(txt) {
 export default async function handler(request) {
   if (request.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
 
-  const SECRET      = process.env.STRIPE_WEBHOOK_SECRET;
+  // `.trim()` NO es cosmético aquí: el secreto es la CLAVE del HMAC, así que un
+  // espacio o un salto de línea arrastrado al pegarlo en el panel produce una
+  // firma distinta y TODAS las entregas de Stripe caen en `bad_signature` — un
+  // 400 indistinguible de un secreto equivocado, que es el modo de fallo más
+  // caro de diagnosticar que tiene este endpoint.
+  const SECRET      = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   // Unconfigured ⇒ 503, never "accepted". An endpoint that answers 200 without
   // verifying anything is an open grant path.

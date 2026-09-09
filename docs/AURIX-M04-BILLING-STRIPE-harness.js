@@ -878,6 +878,25 @@ console.log('\nJ · desplegabilidad en Vercel');
   }
 }
 
+// ── K1 · EL SECRETO ES LA CLAVE DEL HMAC ───────────────────────────────────
+// Un espacio o un salto de línea pegado con el secreto en el panel de la
+// plataforma cambia la clave y tira TODAS las entregas con `bad_signature`.
+console.log('\nK1 · webhook · el secreto se normaliza antes de firmar');
+{
+  const padded = await callWebhook(SUB_EVENT({ id: 'evt_padded' }),
+    { env: { STRIPE_WEBHOOK_SECRET: '  ' + SECRET + '\n' } });
+  ok('K1.1 un secreto con espacios/salto de línea verifica una firma legítima',
+    padded.status === 200 && padded.json && padded.json.ok === true &&
+    padded.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
+    JSON.stringify(padded.json));
+  const wrong = await callWebhook(SUB_EVENT({ id: 'evt_wrong' }),
+    { env: { STRIPE_WEBHOOK_SECRET: 'whsec_otro_endpoint' } });
+  ok('K1.2 …y un secreto de OTRO endpoint sigue siendo 400 sin escribir nada',
+    wrong.status === 400 && wrong.json && wrong.json.error === 'bad_signature' &&
+    !wrong.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
+    JSON.stringify(wrong.json));
+}
+
 // ── K0 · EL HUECO ENTRE STRIPE Y EL WEBHOOK ────────────────────────────────
 // Stripe tiene la suscripción antes de que el webhook la escriba. En ese hueco el
 // 409 del proveedor NO convierte al usuario en cliente gestionable: si se le
