@@ -878,6 +878,22 @@ console.log('\nJ · desplegabilidad en Vercel');
   }
 }
 
+// ── K0 · EL HUECO ENTRE STRIPE Y EL WEBHOOK ────────────────────────────────
+// Stripe tiene la suscripción antes de que el webhook la escriba. En ese hueco el
+// 409 del proveedor NO convierte al usuario en cliente gestionable: si se le
+// anuncia "ya tienes una suscripción, gestiónala", contradice al menú, que sigue
+// diciendo Free con razón. El mensaje lo decide el entitlement del servidor.
+{
+  const branch = (app.match(/if \(r\.status === 409[\s\S]{0,1200}?\n    \}/) || [''])[0];
+  ok('K0.1 ante un 409, el mensaje lo decide el ENTITLEMENT, no el proveedor',
+    /_aurixEntitlementsLoad\(\{ force: true \}\)/.test(branch) &&
+    /st\.plan === 'premium'/.test(branch) &&
+    /premium \? 'pw_err_already' : 'pw_pending'/.test(branch), branch.slice(0, 80));
+  ok('K0.2 …y sin entitlement premium NO se ofrece gestionar el plan ni se concede nada',
+    /if \(premium && window\.openAurixPremiumModal\)/.test(branch) &&
+    !/aurix_plan|localStorage/.test(branch), branch.slice(0, 80));
+}
+
 // ── K · PAYWALL · los dos CTA alineados y encabezado sin cancelación ────────
 // La alineación NO es cosmética: `.aurix-premium-cta` ya empuja el botón al fondo
 // de la tarjeta (`margin-top:auto`) y las dos tarjetas son celdas de grid de la

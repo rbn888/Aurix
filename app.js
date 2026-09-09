@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '661'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '662'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -64008,12 +64008,24 @@ async function _aurixBillingCheckout(interval, source) {
     // webhook ya llegó el usuario acaba en "Gestionar mi plan" en vez de en un
     // aviso suelto — antes el comentario prometía el portal y sólo había un toast.
     if (r.status === 409 || (j && j.error === 'already_subscribed')) {
-      _aurixBillingToast(t('pw_err_already'), 'info');
+      // El 409 lo decide el PROVEEDOR, y Stripe tiene la suscripción antes de que
+      // el webhook la escriba. En ese hueco el usuario NO es todavía un cliente
+      // gestionable: anunciarle "ya tienes una suscripción, gestiónala desde tu
+      // plan" contradice al menú, que sigue diciendo Free con razón. Así que el
+      // mensaje lo elige el ENTITLEMENT del servidor, nunca este 409, y mientras
+      // la verdad comercial no diga premium se publica que el pago se confirma.
+      // Esto NO concede nada: sólo elige qué estado real se cuenta.
+      const _already = (premium) => {
+        _aurixBillingToast(t(premium ? 'pw_err_already' : 'pw_pending'), 'info');
+        if (premium && window.openAurixPremiumModal) {
+          window.openAurixPremiumModal({ source: 'already-subscribed' });
+        }
+      };
       try {
-        _aurixEntitlementsLoad({ force: true }).then(() => {
-          if (window.openAurixPremiumModal) window.openAurixPremiumModal({ source: 'already-subscribed' });
-        });
-      } catch (_) {}
+        _aurixEntitlementsLoad({ force: true })
+          .then((st) => _already(!!(st && st.loaded && st.plan === 'premium')))
+          .catch(() => _already(false));
+      } catch (_) { _already(false); }
       return false;
     }
     if (!r.ok || !j || !j.url) {
