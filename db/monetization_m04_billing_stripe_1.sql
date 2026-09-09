@@ -4,6 +4,45 @@
 -- Apply: paste this whole file into the Supabase SQL editor for the project
 -- referenced by SUPABASE_URL in config.js, then run.   *** NOT YET APPLIED ***
 --
+-- RUN IT WHOLE, IN ONE GO. Never in chunks. It is now wrapped in an explicit
+-- `begin; … commit;` and it ENDS WITH ITS OWN VERIFICATION, so either the five
+-- objects exist with the expected shape or NOTHING is committed.
+--
+-- From psql:  psql -v ON_ERROR_STOP=1 -f db/monetization_m04_billing_stripe_1.sql
+-- WITHOUT `-1`: this file owns its transaction; nesting a BEGIN over another one
+-- makes its own commit stop meaning what it says.
+--
+-- ----------------------------------------------------------------------------
+-- ATOMICITY + SELF-VERIFICATION (added 2026-09-07, pre-rehearsal correction)
+-- ----------------------------------------------------------------------------
+-- Two things were added to this file and NOTHING else changed. No table, no
+-- column, no constraint, no policy, no grant and no function body was touched.
+--
+--   D1 · `begin;` before section 1 and `commit;` after section 5. Postgres runs
+--        DDL transactionally, so the five objects and their grants now land
+--        all-or-nothing. WHAT RISK THIS REMOVES: this file is idempotent
+--        (`create table if not exists`), and idempotent is NOT the same as
+--        atomic. Run in chunks — or through a client that autocommits each
+--        statement — it could leave a PARTIAL M.04: tables created, grants or
+--        the writer missing. A later re-run would then NO-OP over the wrong
+--        shape and report success. That partial state is the one this block was
+--        frozen for.
+--
+--   D2 · A verification block at the end, INSIDE the transaction. It asserts
+--        existence AND shape (per-table CHECK counts, the two unique indexes,
+--        RLS on all three, exactly ONE client grant, both functions with their
+--        exact signature, `security definer`, a pinned `search_path`, and
+--        execute granted to service_role only). Finishing without an error is
+--        no longer evidence of anything: either it prints `M.04 APPLY VERIFIED`
+--        or it raises and the whole APPLY rolls back.
+--
+-- WHAT BEHAVIOUR IS PRESERVED: everything. The file stays idempotent and
+-- additive, re-running it over a correct M.04 is still a no-op, and it still
+-- does not touch B1/B2. The verification only READS catalogues.
+--
+-- NOT included here on purpose: `notify pgrst, 'reload schema'` (D3). It is a
+-- visibility concern, not a safety or reversibility one, and it is deferred.
+--
 -- Idempotent + ADDITIVE. Creates three NEW tables and two functions. It does not
 -- touch, drop, rename or migrate anything from B1/B2: `subscriptions`,
 -- `entitlement_overrides`, `plan_features`, `aurix_commercial_state()` and
@@ -70,6 +109,11 @@
 --   · Billing history / MRR aggregates. `billing_events` is an append-only
 --     ledger, not a report.
 -- ============================================================================
+
+
+-- ── D1 · ATOMICITY ──────────────────────────────────────────────────────────
+-- Everything from here to the `commit;` after section 5 is one transaction.
+begin;
 
 
 -- ============================================================================
@@ -632,6 +676,170 @@ revoke all     on function public.aurix_billing_apply_event(text, text, text, te
   timestamptz, timestamptz, boolean, timestamptz, timestamptz, timestamptz, timestamptz) from public, anon, authenticated;
 grant  execute on function public.aurix_billing_apply_event(text, text, text, text, text, text, text,
   timestamptz, timestamptz, boolean, timestamptz, timestamptz, timestamptz, timestamptz) to service_role;
+
+
+-- ============================================================================
+-- D2 · SELF-VERIFICATION — runs INSIDE the transaction, before the commit.
+-- ============================================================================
+-- "It finished without an error" is not a result. `create table if not exists`
+-- NO-OPS over a pre-existing table, so a previous half-applied attempt would
+-- sail through every statement above and never get its missing CHECKs, its
+-- unique index or its RLS. This block is what makes the difference between
+-- "ran" and "APPLY VERIFIED", and because it sits before the `commit;`, a shape
+-- that does not match means NOTHING is committed at all.
+--
+-- It only READS catalogues, and it is self-contained: no dependency on the
+-- rehearsal scaffolding, so it behaves identically wherever this file is run.
+do $$
+declare
+  v_n  int;
+  v_fl oid;
+  v_fa oid;
+begin
+  -- ── the three tables exist ────────────────────────────────────────────────
+  if to_regclass('public.billing_customers') is null
+     or to_regclass('public.billing_prices') is null
+     or to_regclass('public.billing_events') is null then
+    raise exception 'M.04 APPLY FAIL: at least one of the three tables is missing';
+  end if;
+
+  -- ── CHECK constraints, counted from this file's own DDL ───────────────────
+  --    billing_customers: provider, handle                        = 2
+  --    billing_prices:    provider, plan, interval, amount,
+  --                       currency, trial, handle                 = 7
+  --    billing_events:    provider, outcome                       = 2
+  -- A pre-existing table without them is the exact partial state D2 exists for.
+  select count(*) into v_n from pg_constraint
+   where conrelid = 'public.billing_customers'::regclass and contype = 'c';
+  if v_n <> 2 then
+    raise exception 'M.04 APPLY FAIL: billing_customers has % CHECK, expected 2', v_n;
+  end if;
+  select count(*) into v_n from pg_constraint
+   where conrelid = 'public.billing_prices'::regclass and contype = 'c';
+  if v_n <> 7 then
+    raise exception 'M.04 APPLY FAIL: billing_prices has % CHECK, expected 7', v_n;
+  end if;
+  select count(*) into v_n from pg_constraint
+   where conrelid = 'public.billing_events'::regclass and contype = 'c';
+  if v_n <> 2 then
+    raise exception 'M.04 APPLY FAIL: billing_events has % CHECK, expected 2', v_n;
+  end if;
+
+  -- ── the primary keys. billing_events' PK **is** the idempotency ───────────
+  if (select pg_get_constraintdef(oid) from pg_constraint
+       where conrelid = 'public.billing_events'::regclass and contype = 'p')
+     is distinct from 'PRIMARY KEY (provider, event_id)' then
+    raise exception 'M.04 APPLY FAIL: billing_events PK is not (provider, event_id) — '
+                    'without it a re-delivered event conflicts with nothing';
+  end if;
+  if (select pg_get_constraintdef(oid) from pg_constraint
+       where conrelid = 'public.billing_customers'::regclass and contype = 'p')
+     is distinct from 'PRIMARY KEY (provider, user_id)' then
+    raise exception 'M.04 APPLY FAIL: billing_customers PK is not (provider, user_id)';
+  end if;
+  if (select pg_get_constraintdef(oid) from pg_constraint
+       where conrelid = 'public.billing_prices'::regclass and contype = 'p')
+     is distinct from 'PRIMARY KEY (provider, provider_price_id)' then
+    raise exception 'M.04 APPLY FAIL: billing_prices PK is not (provider, provider_price_id)';
+  end if;
+
+  -- ── the two unique indexes that stop cross-user leakage and an ambiguous
+  --    catalogue ──────────────────────────────────────────────────────────────
+  if not exists (select 1 from pg_indexes where schemaname = 'public'
+                   and indexname = 'billing_customers_handle_uidx') then
+    raise exception 'M.04 APPLY FAIL: billing_customers_handle_uidx missing — one '
+                    'provider customer could entitle two accounts';
+  end if;
+  if not exists (select 1 from pg_indexes where schemaname = 'public'
+                   and indexname = 'billing_prices_active_uidx') then
+    raise exception 'M.04 APPLY FAIL: billing_prices_active_uidx missing — two active '
+                    'prices for the same interval';
+  end if;
+
+  -- ── RLS on all three ──────────────────────────────────────────────────────
+  select count(*) into v_n from pg_class
+   where oid in ('public.billing_customers'::regclass,
+                 'public.billing_prices'::regclass,
+                 'public.billing_events'::regclass)
+     and relrowsecurity;
+  if v_n <> 3 then
+    raise exception 'M.04 APPLY FAIL: only % of 3 tables have RLS enabled', v_n;
+  end if;
+
+  -- ── EXACTLY ONE client privilege in the whole block: the catalogue read ───
+  select count(*) into v_n from information_schema.role_table_grants
+   where table_schema = 'public'
+     and table_name in ('billing_customers','billing_prices','billing_events')
+     and grantee in ('anon','authenticated');
+  if v_n <> 1 then
+    raise exception 'M.04 APPLY FAIL: % client grants, expected exactly 1 '
+                    '(billing_prices/SELECT to authenticated)', v_n;
+  end if;
+  if not has_table_privilege('authenticated','public.billing_prices','select') then
+    raise exception 'M.04 APPLY FAIL: authenticated cannot read the price catalogue';
+  end if;
+
+  -- ── both functions, by EXACT ARGUMENT TYPES ───────────────────────────────
+  -- `to_regprocedure`, NOT pg_get_function_identity_arguments. That function
+  -- renders the PARAMETER NAMES too ('p_user_id uuid, …'), so comparing it
+  -- against a list of bare types fails even against a perfectly applied M.04 —
+  -- a false FAIL, which in a fail-closed gate is as harmful as a false PASS.
+  -- The identity of a function in Postgres is (name, argument TYPES); parameter
+  -- names are not part of it, and `to_regprocedure` resolves exactly that.
+  v_fl := to_regprocedure('public.aurix_billing_link_customer(uuid,text,text)')::oid;
+  if v_fl is null then
+    raise exception 'M.04 APPLY FAIL: aurix_billing_link_customer(uuid,text,text) missing';
+  end if;
+  v_fa := to_regprocedure(
+            'public.aurix_billing_apply_event(text,text,text,text,text,text,text,'
+            'timestamptz,timestamptz,boolean,timestamptz,timestamptz,'
+            'timestamptz,timestamptz)')::oid;
+  if v_fa is null then
+    raise exception 'M.04 APPLY FAIL: aurix_billing_apply_event/14 missing or with a '
+                    'different signature';
+  end if;
+
+  -- security definer + pinned search_path. A definer function without a pinned
+  -- search_path is a privilege-escalation surface, not a detail.
+  if not (select prosecdef from pg_proc where oid = v_fl)
+     or not (select prosecdef from pg_proc where oid = v_fa) then
+    raise exception 'M.04 APPLY FAIL: a writer function is not security definer';
+  end if;
+  if (select coalesce(array_to_string(proconfig, ','), '') from pg_proc where oid = v_fl)
+       <> 'search_path=public, pg_temp'
+     or (select coalesce(array_to_string(proconfig, ','), '') from pg_proc where oid = v_fa)
+       <> 'search_path=public, pg_temp' then
+    raise exception 'M.04 APPLY FAIL: a writer function has no pinned search_path';
+  end if;
+
+  -- the boundary: service_role writes, the client cannot even call it
+  if not has_function_privilege('service_role', v_fl, 'execute')
+     or not has_function_privilege('service_role', v_fa, 'execute') then
+    raise exception 'M.04 APPLY FAIL: service_role cannot execute the writer';
+  end if;
+  if has_function_privilege('anon', v_fl, 'execute')
+     or has_function_privilege('authenticated', v_fl, 'execute')
+     or has_function_privilege('anon', v_fa, 'execute')
+     or has_function_privilege('authenticated', v_fa, 'execute') then
+    raise exception 'M.04 APPLY FAIL: the client can execute a billing writer';
+  end if;
+
+  -- ── no leftovers: no stray overload, no stray billing_* relation ──────────
+  -- A surplus overload is not harmless: it would survive the paired rollback
+  -- and leave M.04 half-removed with nothing to flag it.
+  select count(*) into v_n from pg_proc p
+   where p.pronamespace = 'public'::regnamespace
+     and p.proname like 'aurix_billing%'
+     and p.oid not in (v_fl, v_fa);
+  if v_n <> 0 then
+    raise exception 'M.04 APPLY FAIL: % unexpected aurix_billing* overloads', v_n;
+  end if;
+
+  raise notice 'M.04 APPLY VERIFIED — 3 tables + 2 functions, expected shape, '
+               '1 client grant, writer restricted to service_role';
+end $$;
+
+commit;
 
 
 -- ============================================================================
