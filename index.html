@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v702-membership-entry';
-      var APPJS_V = '663';
+      var BUILD = 'v703-membership-visible';
+      var APPJS_V = '664';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -565,14 +565,14 @@
           <!-- ACCOUNT-CENTER-V1 — seis destinos, cada uno abre DIRECTAMENTE su sección
                del modal de configuración ya existente (data-account-section = data-pane).
                Sin pantalla intermedia: no hay una opción "Configuración" genérica. -->
-          <!-- M.04 — ACCOUNT-CENTER-V1 publicó seis destinos y dejó fuera `plan`: la
-               sección Membresía existía (data-pane="plan") pero NINGUNA entrada del
-               menú la abría, así que un cliente no tenía ruta visible a su plan ni al
-               portal de facturación. Es el mismo mecanismo que sus hermanas. -->
-          <button class="menu-item" data-account-section="plan"          role="menuitem" data-i18n="settingsPlanTitle">Membresía</button>
           <button class="menu-item" data-account-section="account"       role="menuitem" data-i18n="acProfile">Perfil</button>
           <button class="menu-item" data-account-section="notifications" role="menuitem" data-i18n="acNotifications">Notificaciones</button>
           <button class="menu-item" data-account-section="prefs"         role="menuitem" data-i18n="acPreferences">Preferencias</button>
+          <!-- M.04 — ACCOUNT-CENTER-V1 publicó seis destinos y dejó fuera `plan`: la
+               sección Membresía existía (data-pane="plan"), con su pestaña en el rail y
+               su tarjeta, pero ninguna entrada del menú la abría. Posición decidida por
+               el founder: después de Preferencias, igual que en el rail. -->
+          <button class="menu-item" data-account-section="plan"          role="menuitem" data-i18n="settingsPlanTitle">Membresía</button>
           <button class="menu-item" data-account-section="data"          role="menuitem" data-i18n="acSecurity">Seguridad</button>
           <button class="menu-item" data-account-section="help"          role="menuitem" data-i18n="acHelp">Ayuda y soporte</button>
           <div class="menu-divider"></div>
@@ -1707,7 +1707,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=663"
+  <script src="app.js?v=664"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

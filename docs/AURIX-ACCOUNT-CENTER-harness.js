@@ -27,13 +27,13 @@ console.log('AURIX-ACCOUNT-CENTER — SPEC ACCOUNT CENTER V1\n');
 // ── 1. Menú: seis destinos, orden exacto, sin genéricos ─────────────────────
 console.log('1 — Menú superior: seis opciones en el orden definitivo:');
 const items = [...html.matchAll(/data-account-section="([a-z]+)"/g)].map(m => m[1]);
-// M.04 — `plan` se INCORPORA al contrato del menú, primero y como hermana de las
-// demás: la sección Membresía ya existía (`data-pane="plan"`) pero ningún destino
+// M.04 — `plan` se INCORPORA al contrato del menú, DESPUÉS de Preferencias (decisión
+// del founder) y como hermana de las demás: la sección Membresía ya existía (`data-pane="plan"`) pero ningún destino
 // la abría, así que un cliente que paga no tenía ruta visible a su plan ni al
 // portal de facturación. No es el CTA Premium que V1 retiró (eso lo sigue
 // afirmando 1.3): es un destino de cuenta más, con el mismo mecanismo.
 ok('1.1 el menú declara exactamente las seis secciones + Salir aparte',
-   JSON.stringify(items) === JSON.stringify(['plan', 'account', 'notifications', 'prefs', 'data', 'help']),
+   JSON.stringify(items) === JSON.stringify(['account', 'notifications', 'prefs', 'plan', 'data', 'help']),
    items.join(','));
 ok('1.2 "Cerrar sesión" es la última opción y mantiene su owner (#menuExit)',
    /data-account-section="help"[\s\S]{0,400}id="menuExit"/.test(html) &&

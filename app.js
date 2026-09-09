@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '663'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '664'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -64187,11 +64187,17 @@ try {
   }
 } catch (_) {}
 
-// SETTINGS-MOBILE-V2 — SINGLE premium-visibility owner. Launch 1 is free, so ALL
-// Membresía/Premium UI (rail tab + plan section + cards + CTA) is hidden by this one
-// flag via `html[data-aurix-premium-ui="off"]`. Flip to true for Launch 2 — no markup,
-// handler, translation or plan-card architecture is removed anywhere.
-const AURIX_PREMIUM_UI_ENABLED = false;
+// SETTINGS-MOBILE-V2 — SINGLE premium-visibility owner. La UI de Membresía (pestaña
+// del rail + sección `data-pane="plan"` + tarjetas + CTA) se oculta ENTERA con este
+// flag vía `html[data-aurix-premium-ui="off"]`.
+//
+// M.04 — SE ENCIENDE. El flag decía "Launch 1 es gratis", y eso era ALCANCE, no un
+// invariante: ahora hay checkout real, suscripciones reales y un Customer Portal, y
+// un cliente que paga tiene que poder ver y gestionar su plan. Apagado, el destino
+// de menú abría Configuración con el rail sin Membresía y el panel vacío — el plan
+// era inalcanzable. Sigue siendo UN solo owner: apagarlo vuelve a ocultarlo todo sin
+// tocar markup, handlers, traducciones ni la arquitectura de las tarjetas.
+const AURIX_PREMIUM_UI_ENABLED = true;
 try { if (typeof document !== 'undefined') document.documentElement.setAttribute('data-aurix-premium-ui', AURIX_PREMIUM_UI_ENABLED ? 'on' : 'off'); } catch (_) {}
 
 // ── Settings panel open / close + populate ────────────────────────

@@ -674,7 +674,16 @@ ok('L.2 la frontera Free/Premium visible no se movió: Workspace sigue tras hasA
 ok('L.3 los previews siguen siendo el fallback (no se retiraron)',
   /_aurixPremiumPreviewHTML/.test(app) && /_aurixIntelligencePreviewHTML/.test(app));
 ok('M.1 ENFORCE_ENTITLEMENTS sigue en false', /ENFORCE_ENTITLEMENTS\s*=\s*false/.test(app));
-ok('M.2 AURIX_PREMIUM_UI_ENABLED sigue en false', /AURIX_PREMIUM_UI_ENABLED\s*=\s*false/.test(app));
+// RE-DECIDIDO EN M.04, por la misma razón que N.1/N.3 más abajo: "Launch 1 es gratis"
+// era ALCANCE, no un invariante. Con checkout, suscripciones y Customer Portal reales,
+// un cliente que paga tiene que poder VER y GESTIONAR su plan; apagado, el destino de
+// menú abría Configuración con el rail sin Membresía y el panel vacío. Lo que sí es
+// invariante —y es lo que se afirma ahora— es que la visibilidad siga teniendo UN solo
+// owner: un flag, un atributo en <html>, y el markup/handlers intactos detrás.
+ok('M.2 la visibilidad de Membresía tiene UN solo owner, y en M.04 está encendido',
+  /AURIX_PREMIUM_UI_ENABLED\s*=\s*true/.test(app) &&
+  /setAttribute\('data-aurix-premium-ui', AURIX_PREMIUM_UI_ENABLED \? 'on' : 'off'\)/.test(app) &&
+  (app.match(/AURIX_PREMIUM_UI_ENABLED/g) || []).length === 2);
 // ── RE-DECIDIDO EN M.04 ──────────────────────────────────────────────────────
 // N.1 y N.3 afirmaban "todavía no hay Stripe". Era verdad y era ALCANCE, no un
 // invariante: M.04 es justo el bloque que lo implementa. El invariante que sí

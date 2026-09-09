@@ -944,6 +944,9 @@ console.log('\nK4 · producto · el plan y el portal son ALCANZABLES');
     /planOfferDesc/.test(idx) &&
     /_offerPrem = isPremiumTier\(plan\.tier\)/.test(app) &&
     /_offerPrem \? 'pw_manage' : 'settingsFounderCta'/.test(app));
+  ok('K4.1b …y esa sección es VISIBLE: el owner único de la UI de Membresía está on',
+    /AURIX_PREMIUM_UI_ENABLED = true/.test(app) &&
+    /html\[data-aurix-premium-ui="off"\][^{]*data-settings-pane="plan"/.test(css));
   ok('K4.4 …y ese CTA abre el modal canónico, que es el único dueño del portal',
     /#planFounderCta[\s\S]{0,200}openAurixPremiumModal/.test(app) &&
     /data-premium-portal/.test(app) && /_aurixBillingPortal/.test(app));
