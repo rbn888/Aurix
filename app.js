@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '665'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '666'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2105,7 +2105,7 @@ async function _aurixFetchBackendSnapshots() {
     // Observabilidad: que un recorte por presupuesto sea AUDITABLE y no invisible como lo era el de 1000.
     try { _aurixBackendSnapshotsTruncated = _truncated; if (typeof window !== 'undefined') window.aurixBackendSnapshotsTruncated = _truncated; } catch (_) {}
     if (_truncated) { try { console.warn('[BACKEND-SNAPSHOTS] cobertura recortada por presupuesto de páginas: ' + data.length + ' filas; falta historia ANTIGUA (la reciente está completa)'); } catch (_) {} }
-    return data.map(r => ({
+    return _aurixRejectStalePriceSpikes(data.map(r => ({
       ts: (typeof r.ts === 'number') ? r.ts : Date.parse(r.ts),
       total_value_usd: Number(r.total_value_usd), real_estate: Number(r.real_estate) || 0,
       category_values: r.category_values || {}, source: 'backend_snapshot',
@@ -2114,9 +2114,74 @@ async function _aurixFetchBackendSnapshots() {
       // La lectura es ahora DESCENDENTE y por páginas: se reordena ASCENDENTE y se deduplica por ts
       // para devolver exactamente el mismo contrato que consumía el merge (orden estable, sin repes).
       .sort((a, b) => a.ts - b.ts)
-      .filter((p, i, arr) => i === 0 || p.ts !== arr[i - 1].ts);
+      .filter((p, i, arr) => i === 0 || p.ts !== arr[i - 1].ts));
   } catch (_) { return null; }
 }
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC P0 CHART · INTEGRIDAD DE VALORACIÓN — un precio ausente NO es una pérdida
+// ════════════════════════════════════════════════════════════════════════════
+// FORENSE SOBRE PRODUCCIÓN (2026-09-09, 44.015 snapshots, 14 cuentas). El gráfico
+// dibujaba caídas verticales de −18% con recuperación completa en el tick siguiente.
+// No eran económicas: en el punto que colapsa, `price_staleness` vale 'stale' —el
+// propio captador declara que sus precios no eran vivos—, `asset_count` NO cambia, y
+// la caída se concentra en UNA clase de activo. Ejemplo real medido: 82.661 → 67.876
+// → 82.367 en 45 minutos, con la cripto pasando de 79.499 a 64.714 y volviendo.
+//
+// Medida de la clase en TODA la base: 1.123 puntos se desvían >5% del punto medio de
+// sus vecinos; 546 de ellos REVIERTEN (el movimiento neto que los atraviesa es <2%),
+// y 491 de esos 546 —el 90%— están marcados 'stale'. Los otros 577 son ESCALONES
+// reales (movimiento de mercado o flujo de capital) y no se tocan.
+//
+// El daño no era sólo estético: cada artefacto es una discontinuidad, el detector de
+// escalones de capital la lee como un flujo, `continuityState` deja de ser
+// 'continuous' y la insignia pierde elegibilidad ⇒ "Historial parcial" y % suprimido
+// en 7D/30D con 2.787 puntos y cobertura 1.000 en la base de datos. 328 de esos
+// artefactos caen en los últimos 30 días: son también la maraña de líneas verticales.
+//
+// QUÉ HACE ESTA FUNCIÓN, EXACTAMENTE: descarta el punto. No interpola, no suaviza, no
+// fabrica nada, y nunca toca el primero ni el último (los ancla y los extremos de
+// ventana siguen siendo datos reales). Exige LAS DOS evidencias a la vez —la
+// declaración del captador y el desmentido de sus dos vecinos—, así que una pérdida
+// real, que no revierte, sobrevive intacta. Y si alguna vez quisiera descartar más
+// del 5% de la serie, no descarta NADA: eso significaría que la hipótesis sobre el
+// régimen de datos ya no se sostiene, y ante la duda se publica el dato honesto.
+const _AURIX_SPIKE_MIN_DEV   = 0.05;   // desviación mínima frente al punto medio de los vecinos
+const _AURIX_SPIKE_MAX_NET   = 0.02;   // movimiento neto que ATRAVIESA el punto: si es real, no revierte
+const _AURIX_SPIKE_MAX_SHARE = 0.05;   // válvula de seguridad: por encima de esto no se descarta nada
+const _AURIX_SPIKE_MIN_ALLOW  = 3;     // …pero SIEMPRE se permiten hasta 3: en una serie corta —la cuenta
+                                       // nueva, o quien vuelve tras semanas fuera— un solo artefacto ya
+                                       // supera cualquier porcentaje, y esa es justo la serie que menos
+                                       // puede permitirse publicar una pérdida que no existió.
+let _aurixSpikePointsRejected = 0;     // observabilidad: nunca un descarte silencioso
+function _aurixRejectStalePriceSpikes(rows) {
+  if (!Array.isArray(rows)) return [];
+  if (rows.length < 3) return rows;
+  const drop = new Set();
+  for (let i = 1; i < rows.length - 1; i++) {
+    const p = rows[i];
+    if (!p || p.price_staleness !== 'stale') continue;   // sin la declaración del captador NO se toca
+    const v = Number(p.total_value_usd);
+    const prev = Number(rows[i - 1].total_value_usd);
+    const next = Number(rows[i + 1].total_value_usd);
+    if (!Number.isFinite(v) || !(prev > 0) || !(next > 0)) continue;
+    const mid = (prev + next) / 2;
+    if (!(mid > 0)) continue;
+    const dev = Math.abs(v - mid) / mid;
+    const net = Math.abs(next - prev) / prev;
+    if (dev > _AURIX_SPIKE_MIN_DEV && net < _AURIX_SPIKE_MAX_NET) drop.add(i);
+  }
+  if (!drop.size) { _aurixSpikePointsRejected = 0; return rows; }
+  if (drop.size > Math.max(_AURIX_SPIKE_MIN_ALLOW, rows.length * _AURIX_SPIKE_MAX_SHARE)) {
+    _aurixSpikePointsRejected = 0;
+    try { console.warn('[CHART-INTEGRITY] ' + drop.size + '/' + rows.length + ' puntos candidatos a artefacto (>' +
+      (_AURIX_SPIKE_MAX_SHARE * 100) + '%): no se descarta ninguno, el régimen de datos no encaja con la hipótesis'); } catch (_) {}
+    return rows;
+  }
+  _aurixSpikePointsRejected = drop.size;
+  try { if (typeof window !== 'undefined') window.aurixSpikePointsRejected = drop.size; } catch (_) {}
+  return rows.filter((_, i) => !drop.has(i));
+}
+try { if (typeof window !== 'undefined') window._aurixRejectStalePriceSpikes = _aurixRejectStalePriceSpikes; } catch (_) {}
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.BACKEND_SNAPSHOT_HYDRATION_RELIABILITY — deterministic backend-snapshot hydration
 // ════════════════════════════════════════════════════════════════════════════

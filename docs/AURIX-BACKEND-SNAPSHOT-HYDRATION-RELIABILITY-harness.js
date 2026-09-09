@@ -62,7 +62,8 @@ vm.createContext(ctx);
 ['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS',
  '_AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES', '_AURIX_CHART_BLOCK_ON_CANONICAL_READ_FAILED',
  '_AURIX_PUBLICATION_STATE', '_AURIX_LB2_BLOCK_ON_HYDRATION_FAILED',
- '_AURIX_BACKEND_SNAPSHOT_PAGE', '_AURIX_BACKEND_SNAPSHOT_MAX_PAGES'].forEach(c => { try { vm.runInContext(konstSrc(c), ctx); } catch (e) { console.log('(const ' + c + ' fail ' + e.message + ')'); } });
+ '_AURIX_BACKEND_SNAPSHOT_PAGE', '_AURIX_BACKEND_SNAPSHOT_MAX_PAGES',
+ '_AURIX_SPIKE_MIN_DEV', '_AURIX_SPIKE_MAX_NET', '_AURIX_SPIKE_MAX_SHARE', '_AURIX_SPIKE_MIN_ALLOW'].forEach(c => { try { vm.runInContext(konstSrc(c), ctx); } catch (e) { console.log('(const ' + c + ' fail ' + e.message + ')'); } });
 // ONE script so the module `let` state + functions share a lexical scope, exposed via __hyd
 const bundle = [
   letSrc('_aurixBackendSnapshots'),
@@ -72,7 +73,11 @@ const bundle = [
   letSrc('_aurixChartPublicationWasPending'),
   fnSrc('_aurixResolvePublicationReadiness'), fnSrc('_aurixChartPublicationSourcesPending'),
   fnSrc('_aurixNoteCanonicalOutcome'),
-  fnSrc('_aurixScheduleBackendHydrateRetry'), asyncFnSrc('_aurixHydrateBackendSnapshots'), asyncFnSrc('_aurixFetchBackendSnapshots'),
+  fnSrc('_aurixScheduleBackendHydrateRetry'),
+  // SPEC P0 CHART · INTEGRIDAD DE VALORACIÓN — owner del descarte de artefactos, que el
+  // loader invoca antes de devolver la serie.
+  letSrc('_aurixSpikePointsRejected'), fnSrc('_aurixRejectStalePriceSpikes'),
+  asyncFnSrc('_aurixHydrateBackendSnapshots'), asyncFnSrc('_aurixFetchBackendSnapshots'),
   'globalThis.__hyd = { hydrate:_aurixHydrateBackendSnapshots, fetch:_aurixFetchBackendSnapshots, reHydrate:function(r){ if(_aurixBackendSnapshotsState!=="ready") return _aurixHydrateBackendSnapshots(r); },'
   + ' state:function(){return _aurixBackendSnapshotsState;}, snaps:function(){return _aurixBackendSnapshots;}, seq:function(){return _aurixBackendHydrateSeq;},'
   + ' setSnaps:function(v){_aurixBackendSnapshots=v;}, clearInFlight:function(){_aurixBackendHydrateInFlight=false;},'

@@ -104,7 +104,13 @@ console.log('\nRead-only loader (NO-OP until activation) + security:');
 // behavioural: _aurixFetchBackendSnapshots with a mock supabase client
 const LS = { console, Math, JSON, Array, Number, isFinite, Infinity, Date };
 vm.createContext(LS);
-['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS'].forEach(c => vm.runInContext(konst(c), LS));
+['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS',
+ '_AURIX_SPIKE_MIN_DEV', '_AURIX_SPIKE_MAX_NET', '_AURIX_SPIKE_MAX_SHARE', '_AURIX_SPIKE_MIN_ALLOW'].forEach(c => vm.runInContext(konst(c), LS));
+// SPEC P0 CHART · INTEGRIDAD DE VALORACIÓN — el loader descarta ahora los artefactos de
+// precio ausente ANTES de devolver la serie, así que su owner tiene que estar en el
+// sandbox: sin él la llamada real caería al catch y este harness certificaría el fallback.
+vm.runInContext('let _aurixSpikePointsRejected = 0;', LS);
+vm.runInContext(fn('_aurixRejectStalePriceSpikes'), LS);
 vm.runInContext('async ' + fn('_aurixFetchBackendSnapshots'), LS);   // fn() extractor drops the async keyword
 function mockClient(result) {
   const chain = {}; ['from', 'select', 'eq', 'gte', 'lt', 'order', 'limit'].forEach(m => chain[m] = () => chain);   // `lt` = cursor de paginación
