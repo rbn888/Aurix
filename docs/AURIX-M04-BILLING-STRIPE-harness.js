@@ -914,6 +914,21 @@ console.log('\nK2 · webhook · la autorización de eventos TEST se normaliza');
     JSON.stringify(off.json));
 }
 
+// ── K3 · LO QUE LA CERTIFICACIÓN TEST DEJA ABIERTO ─────────────────────────
+// La guarda de MODO del webhook es TEMPORAL y su retirada no la puede afirmar
+// ningún test (es una variable de entorno). Lo que sí se puede afirmar es que el
+// requisito está ESCRITO donde alguien lo va a leer antes del cutover.
+console.log('\nK3 · pre-LIVE · los requisitos temporales quedan documentados');
+{
+  let doc = ''; try { doc = read('docs/AURIX-M04-PRE-LIVE-CHECKLIST.md'); } catch (_) { doc = ''; }
+  ok('K3.1 existe checklist pre-LIVE y nombra la retirada de BILLING_ALLOW_TEST_EVENTS',
+    /BILLING_ALLOW_TEST_EVENTS/.test(doc) && /RETIRAR|retirar|borrarla/.test(doc));
+  ok('K3.2 …y la rotación de los dos secretos de Stripe',
+    /ROTAR|rotar/.test(doc) && /STRIPE_SECRET_KEY/.test(doc) && /STRIPE_WEBHOOK_SECRET/.test(doc));
+  ok('K3.3 …y que TEST y LIVE no pueden coexistir activos para el mismo intervalo',
+    /billing_prices_active_uidx/.test(doc) && /active = false|active=false/.test(doc));
+}
+
 // ── K0 · EL HUECO ENTRE STRIPE Y EL WEBHOOK ────────────────────────────────
 // Stripe tiene la suscripción antes de que el webhook la escriba. En ese hueco el
 // 409 del proveedor NO convierte al usuario en cliente gestionable: si se le
