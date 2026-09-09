@@ -108,6 +108,21 @@ console.log('\n4 · el contrato es global, sin excepciones por cuenta');
     /return _aurixRejectStalePriceSpikes\(data\.map/.test(app));
 }
 
+console.log('\n5 · la caché persistida tampoco puede contradecir al pipeline');
+{
+  const sel = fn('_aurixSelectRemotePerformance');
+  ok('5.1 el consumo rechaza una fila cuyo span no cubre el rango pedido',
+    /_aurixRangeSpanShortfall\(rk, Date\.now\(\) - _psBaseTs\)/.test(sel) &&
+    /out\.reason = 'cached_range_coverage_insufficient'; return out;/.test(sel));
+  ok('5.2 …sólo cuando la fila publica un número (una fila pendiente no se re-juzga)',
+    /row\.displayedReturnPct != null/.test(sel));
+  ok('5.3 …y sigue exigiendo usuario, lifecycle y revisión antes que nada',
+    sel.indexOf("user_mismatch") < sel.indexOf('cached_range_coverage_insufficient') &&
+    sel.indexOf('lifecycle_mismatch') < sel.indexOf('cached_range_coverage_insufficient'));
+  ok('5.4 el rechazo cae a PENDIENTE: no publica fila (out.row sigue null)',
+    /out\.reason = 'cached_range_coverage_insufficient'; return out;[\s\S]{0,120}out\.row = row/.test(sel));
+}
+
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }
 process.exit(fail ? 1 : 0);

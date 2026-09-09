@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '667'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '668'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2776,6 +2776,21 @@ function _aurixSelectRemotePerformance(range) {
     out.rangeEntryExists = !!row;
     if (!row) { out.reason = 'range_entry_missing'; return out; }
     if (row.performanceHash == null) { out.reason = 'no_performance_hash'; return out; }
+    // SPEC P0 PERFORMANCE TRUTH — LA CACHÉ TAMBIÉN TIENE QUE DEMOSTRAR COBERTURA.
+    // Las guardas de escritura sólo curan una fila cuando su cliente vuelve a calcular,
+    // y hay filas escritas hace SEMANAS: medidas en producción, siete cuentas tenían un
+    // 1Y `ready` sin tener un año, con `calculatedAt` desde julio. Una cuenta dormida
+    // seguiría publicando ese número al abrir la app. Así que el consumo también lo
+    // exige, y con el dato que la propia fila ya lleva: el span entre su
+    // `baselineSnapshotId` y ahora. No se recalcula nada ni se inventa nada — se
+    // RECHAZA lo que no puede demostrar que cubre el rango pedido, y el rango cae a
+    // pendiente, nunca a una cifra.
+    const _psBaseTs = Number(row.baselineSnapshotId);
+    if (Number.isFinite(_psBaseTs) && _psBaseTs > 0 && row.displayedReturnPct != null &&
+        typeof _aurixRangeSpanShortfall === 'function' &&
+        _aurixRangeSpanShortfall(rk, Date.now() - _psBaseTs)) {
+      out.reason = 'cached_range_coverage_insufficient'; return out;
+    }
     out.row = row; out.ok = true; out.reason = out.acceptedDespiteRevisionLag ? out.revisionAcceptanceReason : 'ok';
     return out;
   } catch (e) { out.reason = 'error'; return out; }
