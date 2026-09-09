@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '662'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '663'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -64226,6 +64226,25 @@ function _settingsPopulate() {
     const descKey = isPremiumTier(plan.tier) ? 'settingsPlanDescPremium' : 'settingsPlanDescFree';
     try { descEl.setAttribute('data-i18n', descKey); } catch (_) {}
     descEl.textContent = _settingsT(descKey);
+  }
+
+  // M.04 — la tarjeta de oferta era un cartel de "Próximamente" de cuando no había
+  // checkout; ahora hay compra real, y para un CLIENTE la acción no es conocer el
+  // plan sino GESTIONARLO (portal de facturación). Quién es cliente lo dice el
+  // entitlement del servidor vía `isPremiumTier`, nunca esta superficie, y el CTA
+  // sigue abriendo el mismo modal canónico: un solo sitio con precios y con portal.
+  const offerDesc = document.getElementById('planOfferDesc');
+  const offerCta  = document.getElementById('planFounderCta');
+  const _offerPrem = isPremiumTier(plan.tier);
+  if (offerDesc) {
+    const k = _offerPrem ? 'pw_active_note' : 'settingsFounderDesc';
+    try { offerDesc.setAttribute('data-i18n', k); } catch (_) {}
+    offerDesc.textContent = _settingsT(k);
+  }
+  if (offerCta) {
+    const k = _offerPrem ? 'pw_manage' : 'settingsFounderCta';
+    try { offerCta.setAttribute('data-i18n', k); } catch (_) {}
+    offerCta.textContent = _settingsT(k);
   }
 
   // AURIX-MONETIZATION-1 · Phase 7 — Account reflects the REAL Supabase session.

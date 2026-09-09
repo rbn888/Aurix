@@ -929,6 +929,26 @@ console.log('\nK3 · pre-LIVE · los requisitos temporales quedan documentados')
     /billing_prices_active_uidx/.test(doc) && /active = false|active=false/.test(doc));
 }
 
+// ── K4 · RUTA VISIBLE AL PLAN Y AL PORTAL ──────────────────────────────────
+// Un cliente que paga tiene que poder llegar a su plan. ACCOUNT-CENTER-V1 publicó
+// seis destinos de menú y dejó fuera `plan`: la sección Membresía existía pero
+// ninguna entrada la abría, así que la cadena menú → Membresía → modal →
+// "Gestionar mi plan" → /api/billing/portal estaba cortada en el primer eslabón.
+console.log('\nK4 · producto · el plan y el portal son ALCANZABLES');
+{
+  ok('K4.1 el menú tiene un destino que abre la sección Membresía',
+    /data-account-section="plan"/.test(idx) && /data-settings-pane="plan"/.test(idx));
+  ok('K4.2 la tarjeta de membresía ya no promete "Próximamente" (hay compra real)',
+    !/settingsFounderSoon/.test(idx));
+  ok('K4.3 para un cliente el CTA de esa tarjeta es GESTIONAR, y lo decide el entitlement',
+    /planOfferDesc/.test(idx) &&
+    /_offerPrem = isPremiumTier\(plan\.tier\)/.test(app) &&
+    /_offerPrem \? 'pw_manage' : 'settingsFounderCta'/.test(app));
+  ok('K4.4 …y ese CTA abre el modal canónico, que es el único dueño del portal',
+    /#planFounderCta[\s\S]{0,200}openAurixPremiumModal/.test(app) &&
+    /data-premium-portal/.test(app) && /_aurixBillingPortal/.test(app));
+}
+
 // ── K0 · EL HUECO ENTRE STRIPE Y EL WEBHOOK ────────────────────────────────
 // Stripe tiene la suscripción antes de que el webhook la escriba. En ese hueco el
 // 409 del proveedor NO convierte al usuario en cliente gestionable: si se le

@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v701-billing-pending-truth';
-      var APPJS_V = '662';
+      var BUILD = 'v702-membership-entry';
+      var APPJS_V = '663';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -565,6 +565,11 @@
           <!-- ACCOUNT-CENTER-V1 — seis destinos, cada uno abre DIRECTAMENTE su sección
                del modal de configuración ya existente (data-account-section = data-pane).
                Sin pantalla intermedia: no hay una opción "Configuración" genérica. -->
+          <!-- M.04 — ACCOUNT-CENTER-V1 publicó seis destinos y dejó fuera `plan`: la
+               sección Membresía existía (data-pane="plan") pero NINGUNA entrada del
+               menú la abría, así que un cliente no tenía ruta visible a su plan ni al
+               portal de facturación. Es el mismo mecanismo que sus hermanas. -->
+          <button class="menu-item" data-account-section="plan"          role="menuitem" data-i18n="settingsPlanTitle">Membresía</button>
           <button class="menu-item" data-account-section="account"       role="menuitem" data-i18n="acProfile">Perfil</button>
           <button class="menu-item" data-account-section="notifications" role="menuitem" data-i18n="acNotifications">Notificaciones</button>
           <button class="menu-item" data-account-section="prefs"         role="menuitem" data-i18n="acPreferences">Preferencias</button>
@@ -1702,7 +1707,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=662"
+  <script src="app.js?v=663"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1958,9 +1963,8 @@
             <!-- DSH.SETTINGS.04 — price removed; no price shown until it is final. -->
           </div>
           <div class="plan-card-body">
-            <p class="plan-card-desc" data-i18n="settingsFounderDesc">Acceso anticipado, herramientas avanzadas y ventajas premium.</p>
+            <p class="plan-card-desc" id="planOfferDesc" data-i18n="settingsFounderDesc">Acceso anticipado, herramientas avanzadas y ventajas premium.</p>
             <button type="button" class="btn-submit btn-submit--plan" id="planFounderCta" data-i18n="settingsFounderCta">Conocer Aurix Premium</button>
-            <p class="plan-card-note" data-i18n="settingsFounderSoon">Próximamente</p>
           </div>
         </div>
       </section>
