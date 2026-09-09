@@ -13,6 +13,13 @@ puesta, una suscripción de prueba entitlea una cuenta de la BD de PRODUCCIÓN.
 **Acción:** borrarla de Vercel (Production) antes del cutover LIVE. Sin ella, el
 webhook responde `200 ignored_testmode` a cualquier evento de test y no escribe.
 
+**Bloqueo estructural (M.04, ya en producción):** olvidarla dejó de ser un agujero.
+El permiso se **anula** en cuanto la `STRIPE_SECRET_KEY` configurada no es de TEST
+(`sk_test_`/`rk_test_`), y también si no hay clave — fail-closed. En un deployment
+LIVE la variable no tiene efecto: un evento de prueba no puede conceder Premium real
+aunque nadie se acuerde de borrarla. Lo afirman K2.3 y K2.4 del gate de M.04.
+Borrarla sigue siendo lo correcto; ya no es lo único que nos protege.
+
 ## 2 · ROTAR LOS SECRETOS DE STRIPE
 
 Durante M.04 se manipularon en pantalla la secret key y el signing secret, y

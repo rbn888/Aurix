@@ -218,8 +218,18 @@ export default async function handler(request) {
   // Misma normalización que el secreto, y por la misma razón: este valor también
   // se teclea en el panel de la plataforma, y un ' 1' silencioso convertiría toda
   // la certificación TEST en `ignored_testmode` sin dejar rastro en la BD.
-  if (event.livemode === false &&
-      String(process.env.BILLING_ALLOW_TEST_EVENTS || '').trim() !== '1') {
+  //
+  // Y la autorización SÓLO vale en un deployment de TEST. La variable es temporal
+  // por diseño, pero "temporal" dependía de que alguien se acordara de borrarla
+  // antes del cutover; si no, un evento de prueba concedería Premium real. Ahora
+  // el permiso se ANULA en cuanto la clave de Stripe configurada es de LIVE, así
+  // que olvidarla deja de ser un agujero: pasa a no tener efecto. Sin clave
+  // configurada también se anula — fail-closed.
+  const _stripeKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
+  const _testDeployment = /^(sk|rk)_test_/.test(_stripeKey);
+  const _allowTestEvents = _testDeployment &&
+    String(process.env.BILLING_ALLOW_TEST_EVENTS || '').trim() === '1';
+  if (event.livemode === false && !_allowTestEvents) {
     return json({ ok: true, outcome: 'ignored_testmode' });
   }
 

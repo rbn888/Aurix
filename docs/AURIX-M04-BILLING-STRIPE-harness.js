@@ -287,8 +287,10 @@ console.log('\nC · webhook · extrae, no decide');
   ok('C.13 un evento de TEST no concede Premium real (salvo permiso explícito)',
     testMode.status === 200 && testMode.json.outcome === 'ignored_testmode' &&
     testMode.calls.length === 0);
+  // El permiso exige además un deployment de TEST (clave `sk_test`/`rk_test`): en
+  // LIVE la variable no tiene efecto. Lo afirma K2.3.
   const testAllowed = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_test2' }), { livemode: false }),
-    { env: { BILLING_ALLOW_TEST_EVENTS: '1' } });
+    { env: { BILLING_ALLOW_TEST_EVENTS: '1', STRIPE_SECRET_KEY: 'sk_test_x' } });
   ok('C.13b …y con el permiso puesto (compra de prueba del founder) sí se aplica',
     testAllowed.status === 200 && testAllowed.json.outcome === 'applied');
   ok('C.14 el log de un fallo del escritor no arrastra identificadores del proveedor',
@@ -901,13 +903,26 @@ console.log('\nK1 · webhook · el secreto se normaliza antes de firmar');
 console.log('\nK2 · webhook · la autorización de eventos TEST se normaliza');
 {
   const padded = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_tm_ok' }), { livemode: false }),
-    { env: { BILLING_ALLOW_TEST_EVENTS: ' 1 ' } });
+    { env: { BILLING_ALLOW_TEST_EVENTS: ' 1 ', STRIPE_SECRET_KEY: 'sk_test_x' } });
   ok('K2.1 `BILLING_ALLOW_TEST_EVENTS=" 1 "` autoriza igual que "1"',
     padded.status === 200 && padded.json && padded.json.outcome !== 'ignored_testmode' &&
     padded.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
     JSON.stringify(padded.json));
   const off = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_tm_off' }), { livemode: false }),
     { env: { BILLING_ALLOW_TEST_EVENTS: '' } });
+  // El permiso es TEMPORAL por diseño, y ahora también por construcción: en un
+  // deployment LIVE la variable no tiene efecto, así que olvidarla en el cutover
+  // deja de poder conceder Premium real con un evento de prueba.
+  const live = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_tm_live' }), { livemode: false }),
+    { env: { BILLING_ALLOW_TEST_EVENTS: '1', STRIPE_SECRET_KEY: 'sk_live_x' } });
+  ok('K2.3 con clave LIVE la variable NO autoriza eventos de TEST (bloqueo estructural)',
+    live.status === 200 && live.json && live.json.outcome === 'ignored_testmode' &&
+    !live.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
+    JSON.stringify(live.json));
+  const nokey = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_tm_nokey' }), { livemode: false }),
+    { env: { BILLING_ALLOW_TEST_EVENTS: '1', STRIPE_SECRET_KEY: '' } });
+  ok('K2.4 …y sin clave configurada también se anula (fail-closed)',
+    nokey.status === 200 && nokey.json && nokey.json.outcome === 'ignored_testmode');
   ok('K2.2 …y sin esa variable un evento de TEST sigue ignorado y sin escribir nada',
     off.status === 200 && off.json && off.json.outcome === 'ignored_testmode' &&
     !off.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
