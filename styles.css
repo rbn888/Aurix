@@ -24079,6 +24079,12 @@ body.aurix-premium-lock{ overflow:hidden; }
 .menu-identity-badge[data-tier="premium"]{ color:#0a1124; background:linear-gradient(180deg,#6ba4ff,#3f74e6); box-shadow:0 0 14px rgba(107,164,255,.4); }
 .menu-identity-badge[data-tier="founder"]{ color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d); box-shadow:0 0 14px rgba(212,175,93,.34); }
 .menu-identity-badge[data-tier="free"]{ color:#d6e3f6; background:rgba(120,160,255,.06); border:1px solid rgba(150,180,255,.20); box-shadow:inset 0 1px 0 rgba(255,255,255,.05); text-transform:uppercase; }
+/* M.05 — el badge sólo es accionable cuando ES una acción: `data-premium-cta` lo
+   pone el render únicamente para Free. Un cliente ve el mismo badge sin afordancia
+   porque para él es estado, no una compra pendiente. */
+.menu-identity-badge[data-premium-cta]{ cursor:pointer; transition:border-color .18s, background .18s, color .18s; }
+.menu-identity-badge[data-premium-cta]:hover{ color:#fff; background:rgba(120,160,255,.12); border-color:rgba(150,180,255,.38); }
+.menu-identity-badge[data-premium-cta]:focus-visible{ outline:2px solid rgba(120,170,255,.7); outline-offset:2px; }
 
 /* More air between sections. */
 .menu-divider{ margin:8px 6px; }

@@ -412,7 +412,14 @@ console.log('\n19–23 · Chart, Performance, Reader, Preview, User Health:');
     const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
       'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
       '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
-      '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+      '_aurixIntelligencePreviewFacts'];
+    // M.05 PREMIUM CONVERSION — `_aurixIntelligencePreviewHTML` SALE de esta lista con causa,
+    // igual que salió `_aurixCatHistWindow`: M.05 edita legítimamente su CTA (mandaba al
+    // Dashboard en el momento de mayor intención; ahora ofrece ver el análisis completo por el
+    // paywall canónico) y su CSS inline. Lo que este gate protege de verdad —que los HECHOS del
+    // preview no se muevan— lo sigue afirmando `_aurixIntelligencePreviewFacts`, que sí queda
+    // fijado byte a byte. Un renderizador de copy no es un owner de datos.
+
     // SPEC P0 HISTORICAL CONTINUITY — `_aurixCatHistWindow` SALE de esta lista con causa: ese bloque lo
     // edita legítimamente. `coverage.truncated` dejó de re-derivarse contando filas contra un umbral
     // propio y pasa a leer `_aurixBackendSnapshotsTruncated`, el ÚNICO owner que sabe si el loader

@@ -585,7 +585,12 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
     skip('17.3 byte-identity vs ' + BASELINE + ' (9 owners)', BASELINE + ' not in this clone (shallow checkout)');
     skip('18.1 additive-diff vs ' + BASELINE, BASELINE + ' not in this clone (shallow checkout)');
   } else {
-    untouched.forEach(n => ok('17.3 ' + n + ' byte-identical to ' + BASELINE, fnSrcIn(base, n) === fnSrc(n)));
+    // M.05 PREMIUM CONVERSION — `_aurixIntelligencePreviewHTML` queda fuera de la comparación
+    // byte a byte (no de 17.1/17.2, que le siguen aplicando): M.05 edita su CTA y su CSS inline
+    // con causa. Es exactamente el caso que anticipa el comentario de arriba. Los HECHOS del
+    // preview los sigue fijando `_aurixIntelligencePreviewFacts`.
+    untouched.filter(n => n !== '_aurixIntelligencePreviewHTML')
+      .forEach(n => ok('17.3 ' + n + ' byte-identical to ' + BASELINE, fnSrcIn(base, n) === fnSrc(n)));
     // CONTAINMENT, stated exactly: remove the reader block from app.js, normalise the build
     // self-version (which the cache-bust contract forces to move on every bundle change),
     // and what remains must be the baseline BYTE FOR BYTE. That proves the whole of this

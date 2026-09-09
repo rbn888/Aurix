@@ -967,6 +967,44 @@ console.log('\nK4 · producto · el plan y el portal son ALCANZABLES');
     /data-premium-portal/.test(app) && /_aurixBillingPortal/.test(app));
 }
 
+// ── M5 · CONVERSIÓN · SUPERFICIES FREE, UNA SOLA PUERTA ────────────────────
+// M.05 no añade producto: conecta el que ya está certificado. Lo que se afirma aquí
+// es que cada superficie de conversión lleva al MISMO paywall, con su origen medido,
+// y que a un cliente no se le vende lo que ya paga.
+console.log('\nM5 · conversión · superficies Free y medición del embudo');
+{
+  const prev = fnSrc(app, '_aurixIntelligencePreviewHTML');
+  ok('M5.1 el preview de Intelligence ofrece VER EL ANÁLISIS, no sólo volver al Dashboard',
+    /data-premium-cta="intelligence\.full"/.test(prev) &&
+    /data-premium-source="intelligence-preview"/.test(prev) &&
+    /intprev_cta_full/.test(prev) && /intprev_cta'/.test(prev) &&
+    /switchTab/.test(prev));
+  ok('M5.2 …y no publica ningún precio: los precios viven en el catálogo',
+    !/7[.,]99|59[.,]99|amount_cents/.test(prev));
+  const ident = fnSrc(app, '_aurixRenderMenuIdentity');
+  ok('M5.3 el badge es accionable SÓLO para Free; para un cliente vuelve a ser estado',
+    /tier === 'free'/.test(ident) &&
+    /setAttribute\('data-premium-cta', 'menu\.badge'\)/.test(ident) &&
+    /removeAttribute\('data-premium-cta'\)/.test(ident) &&
+    /setAttribute\('role', 'button'\)/.test(ident) && /removeAttribute\('tabindex'\)/.test(ident));
+  ok('M5.4 UNA sola puerta: toda superficie marcada abre el paywall canónico',
+    /\[data-premium-cta\]/.test(app) &&
+    /_pcta[\s\S]{0,900}openAurixPremiumModal\(\{ source: src \}\)/.test(app) &&
+    /e\.key !== 'Enter'[\s\S]{0,300}data-premium-cta/.test(app));
+  ok('M5.5 el embudo se registra en el owner único, sin PII y sin salir del dispositivo',
+    /function _aurixRecordUpgradeIntent\(featureKey, source\)/.test(app) &&
+    /_aurixRecordUpgradeIntent\('paywall:open', _lastSource\)/.test(app) &&
+    /_aurixRecordUpgradeIntent\('checkout:' \+ iv/.test(app) &&
+    /_AURIX_UPGRADE_INTENT_KEY \+ \(_aurixActiveUserId/.test(app) &&
+    !/fetch\([^)]*upgrade_intent/.test(app));
+  // Sólo la tarjeta de PLAN: "Acceso anticipado" sigue siendo legítimo en la página
+  // Founder, que es otra superficie y otra promesa.
+  ok('M5.6 no queda copy comercial obsoleto en la superficie de plan',
+    !/settingsFounderDesc:\s*'[^']*(Acceso anticipado|Early access)/.test(app) &&
+    /settingsFounderDesc:\s*'[^']*(Intelligence)/.test(app) &&
+    !/settingsFounderSoon/.test(idx));
+}
+
 // ── K0 · EL HUECO ENTRE STRIPE Y EL WEBHOOK ────────────────────────────────
 // Stripe tiene la suscripción antes de que el webhook la escriba. En ese hueco el
 // 409 del proveedor NO convierte al usuario en cliente gestionable: si se le

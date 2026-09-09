@@ -535,7 +535,14 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
     const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
       'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
       '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
-      '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+      '_aurixIntelligencePreviewFacts'];
+    // M.05 PREMIUM CONVERSION — `_aurixIntelligencePreviewHTML` SALE de esta lista con causa,
+    // igual que salió `_aurixCatHistWindow`: M.05 edita legítimamente su CTA (mandaba al
+    // Dashboard en el momento de mayor intención; ahora ofrece ver el análisis completo por el
+    // paywall canónico) y su CSS inline. Lo que este gate protege de verdad —que los HECHOS del
+    // preview no se muevan— lo sigue afirmando `_aurixIntelligencePreviewFacts`, que sí queda
+    // fijado byte a byte. Un renderizador de copy no es un owner de datos.
+
     const bodyOf = (src, n) => { const s = 'function ' + n + '('; const i = src.indexOf(s); if (i < 0) return null;
       let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } return null; };
     ok('22.1 Chart, Performance, Reader and Preview are byte-identical to ' + BASELINE + ' (they cannot have moved)',

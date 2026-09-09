@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '664'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '665'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5071,6 +5071,7 @@ const T = {
     intprev_q:          '¿Cómo ha cambiado esta exposición en el tiempo?',
     intprev_premium:    'Aurix ya lee tu estructura. El movimiento de esa estructura, su causa y su vigilancia continua llegan con Aurix Premium.',
     intprev_cta:        'Volver al Dashboard',
+    intprev_cta_full:   'Ver el análisis completo',
     intprev_hold_empty_t: 'Aurix todavía no tiene con qué leer tu patrimonio',
     intprev_hold_empty_b: 'Registra tu primer activo y esta lectura aparecerá aquí, calculada sobre tus datos reales.',
     intprev_hold_inc_t:   'Aurix no puede confirmar ahora la valoración completa de tu cartera',
@@ -6210,7 +6211,7 @@ const T = {
     ap_trust_2:        'Tus activos, tus datos y tu acceso seguirán siendo siempre tuyos.',
     ap_close:          'Cerrar',
     settingsFounderPrice:     '14,99€ / año',
-    settingsFounderDesc:      'Acceso anticipado, herramientas avanzadas y ventajas premium.',
+    settingsFounderDesc:      'El análisis completo de Intelligence y las herramientas avanzadas del Espacio de trabajo.',
     settingsFounderCta:       'Conocer Aurix Premium',
     settingsFounderSoon:      'Próximamente',
     // AURIX-MONETIZATION-1 — Founder page
@@ -7422,6 +7423,7 @@ const T = {
     intprev_q:          'How has this exposure changed over time?',
     intprev_premium:    'Aurix already reads your structure. The movement of that structure, its cause and its ongoing monitoring come with Aurix Premium.',
     intprev_cta:        'Back to Dashboard',
+    intprev_cta_full:   'See the full analysis',
     intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
     intprev_hold_empty_b: 'Add your first asset and this reading will appear here, computed on your real data.',
     intprev_hold_inc_t:   'Aurix cannot confirm a complete valuation of your portfolio right now',
@@ -8524,7 +8526,7 @@ const T = {
     ap_trust_2:        'Your assets, your data and your access remain always yours.',
     ap_close:          'Close',
     settingsFounderPrice:     '€14.99 / year',
-    settingsFounderDesc:      'Early access, advanced tools and premium perks.',
+    settingsFounderDesc:      'The full Intelligence analysis and the advanced Workspace tools.',
     settingsFounderCta:       'Discover Aurix Premium',
     settingsFounderSoon:      'Coming soon',
     // AURIX-MONETIZATION-1 — Founder page
@@ -51342,16 +51344,31 @@ function _aurixIntelligencePreviewHTML() {
     + '.intprev-premium{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 22px;}'
     + '.intprev-cta{width:100%;font-size:14px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.10);border:1px solid rgba(120,170,255,0.34);border-radius:14px;height:46px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
     + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
+    + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;}'
+    + '.intprev-cta--ghost{background:transparent;border-color:rgba(120,170,255,0.16);color:rgba(255,255,255,0.62);font-weight:600;}'
+    + '.intprev-cta--ghost:hover{background:rgba(255,255,255,0.04);border-color:rgba(120,170,255,0.28);color:rgba(255,255,255,0.85);}'
     + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
     + '.intprev-hold-body{font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 22px;}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-stage{padding:32px 24px;}.intprev-card{padding:38px 36px 30px;}.intprev-title{font-size:24px;}.intprev-q{font-size:18px;}.intprev-cta{width:auto;min-width:220px;}}'
+    + '@media (min-width:768px){.intprev-stage{padding:32px 24px;}.intprev-card{padding:38px 36px 30px;}.intprev-title{font-size:24px;}.intprev-q{font-size:18px;}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-cta--ghost{min-width:0;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 
-  const ctaLabel = tx('intprev_cta', 'Volver al Dashboard');
-  const cta = '<button type="button" class="intprev-cta" data-preview-event="preview_cta_click"'
-    + ' onclick="try{switchTab(\'home\')}catch(_){}">' + esc(ctaLabel) + '</button>';
+  // M.05 — el ÚNICO CTA de esta superficie mandaba al Dashboard justo en el momento
+  // de mayor intención: el usuario acaba de leer hechos ciertos sobre su propio
+  // patrimonio y la pregunta que Aurix todavía no le responde. La acción primaria
+  // pasa a ser ver ese análisis, por el paywall canónico y con su featureKey/source;
+  // volver al Dashboard sigue ahí como salida secundaria, así que nadie queda
+  // atrapado y esto no se convierte en una pared publicitaria. Sólo lo ve Free: la
+  // superficie entera vive detrás de `hasFeature('intelligence.full')`.
+  const cta = '<div class="intprev-ctas">'
+    + '<button type="button" class="intprev-cta" data-preview-event="preview_cta_premium"'
+    +   ' data-premium-cta="intelligence.full" data-premium-source="intelligence-preview">'
+    +   esc(tx('intprev_cta_full', 'Ver el análisis completo')) + '</button>'
+    + '<button type="button" class="intprev-cta intprev-cta--ghost" data-preview-event="preview_cta_click"'
+    +   ' onclick="try{switchTab(\'home\')}catch(_){}">' + esc(tx('intprev_cta', 'Volver al Dashboard'))
+    +   '</button>'
+    + '</div>';
 
   let body;
   if (res.state === 'ok' && res.facts.length) {
@@ -61371,6 +61388,24 @@ function _aurixRenderMenuIdentity() {
     const tier = _aurixMenuTier();
     badgeEl.setAttribute('data-tier', tier);
     badgeEl.textContent = tier === 'founder' ? 'FOUNDER' : tier === 'premium' ? 'PREMIUM' : 'FREE';
+    // M.05 — para Free el badge es la superficie comercial más honesta que hay: el
+    // usuario está mirando su propio plan. Se vuelve accionable y lleva al paywall
+    // canónico (no duplica navegación ni crea un segundo sitio con precios). Para
+    // un cliente vuelve a ser lo que debe ser: ESTADO, no un intento de venderle
+    // algo que ya paga.
+    if (tier === 'free') {
+      badgeEl.setAttribute('data-premium-cta', 'menu.badge');
+      badgeEl.setAttribute('data-premium-source', 'menu-badge');
+      badgeEl.setAttribute('role', 'button');
+      badgeEl.setAttribute('tabindex', '0');
+      try { badgeEl.setAttribute('title', t('pw_open')); } catch (_) {}
+    } else {
+      badgeEl.removeAttribute('data-premium-cta');
+      badgeEl.removeAttribute('data-premium-source');
+      badgeEl.removeAttribute('role');
+      badgeEl.removeAttribute('tabindex');
+      badgeEl.removeAttribute('title');
+    }
   }
   // PREMIUM-PREVIEW-FINAL — Aurix Premium menu item state. Owner (authenticated email) → normal, clickable.
   // Free → intrigue/coming-soon: subtly blurred golden, not clickable, no modal/navigation (guarded above).
@@ -64032,7 +64067,9 @@ async function _aurixBillingCheckout(interval, source) {
       _aurixBillingToast(t('pw_err_generic'), 'error');
       return false;
     }
-    try { if (typeof _aurixUpgradeIntents !== 'undefined') _aurixUpgradeIntents.push({ featureKey: 'checkout:' + iv, source: source || 'paywall', ts: Date.now() }); } catch (_) {}
+    // Último punto fiable antes de salir del dominio: el intervalo ya está elegido y
+    // la sesión de checkout existe. Lo que pase en Stripe no lo mide el cliente.
+    try { if (typeof _aurixRecordUpgradeIntent === 'function') _aurixRecordUpgradeIntent('checkout:' + iv, source || 'paywall'); } catch (_) {}
     window.location.assign(j.url);
   } catch (_) {
     _aurixBillingToast(t('pw_err_generic'), 'error');
@@ -65258,10 +65295,14 @@ function closeFounderPage() {
 // es analítica: no sale del dispositivo.
 const _AURIX_UPGRADE_INTENT_KEY = 'aurix_upgrade_intent_v1';
 let _aurixUpgradeIntents = [];
-function openUpgradeIntent(opts) {
-  const featureKey = String((opts && opts.featureKey) || '').trim();
-  const source     = String((opts && opts.source) || 'unknown').trim();
-  const entry = { featureKey, source, ts: Date.now() };
+// M.05 — el registro de intención pasa a ser un owner PROPIO. Antes vivía dentro de
+// `openUpgradeIntent`, así que sólo se medía el overlay de "esto es Premium": la
+// apertura del paywall y la elección de intervalo se iban a la consola y no dejaban
+// rastro. Mismo almacén, misma cota, mismas reglas (nada de PII, nada sale del
+// dispositivo); lo único que cambia es que ahora hay más de un emisor.
+function _aurixRecordUpgradeIntent(featureKey, source) {
+  const entry = { featureKey: String(featureKey || '').trim(),
+                  source: String(source || 'unknown').trim(), ts: Date.now() };
   // Durante la ventana de boot `hasFeature()` es false para todos (fail-closed), así
   // que un Premium DE PAGO que pulse antes de que resuelva el RPC llegaría aquí. Se
   // le muestra la superficie —no puede abrir la herramienta todavía— pero NO se
@@ -65278,7 +65319,14 @@ function openUpgradeIntent(opts) {
     // Cota dura: es un registro de intención, no un historial.
     localStorage.setItem(K, JSON.stringify(arr.slice(-50)));
   } catch (_) {}
-  if (IS_DEV) console.log('[UPGRADE-INTENT]', featureKey, source);
+  if (IS_DEV) console.log('[UPGRADE-INTENT]', entry.featureKey, entry.source);
+  return entry;
+}
+try { if (typeof window !== 'undefined') window._aurixRecordUpgradeIntent = _aurixRecordUpgradeIntent; } catch (_) {}
+function openUpgradeIntent(opts) {
+  const featureKey = String((opts && opts.featureKey) || '').trim();
+  const source     = String((opts && opts.source) || 'unknown').trim();
+  _aurixRecordUpgradeIntent(featureKey, source);
   try {
     const ov = document.getElementById('upgradeOverlay');
     if (!ov) return false;
@@ -65346,10 +65394,40 @@ try {
 
 (function _initFounderUI() {
   if (typeof document === 'undefined') return;
+  // M.05 — el badge del menú es un <span> con role="button": sin esto sería
+  // alcanzable con Tab y no activable con teclado, que es peor que no ser
+  // alcanzable. Los <button> ya emiten click por sí solos y se dejan en paz.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    const el = e.target && e.target.closest && e.target.closest('[data-premium-cta]');
+    if (!el || el.tagName === 'BUTTON') return;
+    e.preventDefault();
+    try { el.click(); } catch (_) {}
+  });
   document.addEventListener('click', e => {
     // WN.P1 — Menu entry → Aurix Premium modal (also closes the hamburger menu).
     // Repointed from the old Founder page; the Founder page stays reachable from
     // the settings plan card and the upgrade modal (those entrypoints unchanged).
+    // M.05 — UNA sola puerta para todas las superficies de conversión (preview de
+    // Intelligence, badge del menú, y lo que venga): marca el elemento con
+    // `data-premium-cta` y su `data-premium-source`. Registra la intención con su
+    // featureKey y abre el paywall CANÓNICO — ni un segundo modal, ni un segundo
+    // precio. Cierra el menú si estaba abierto, igual que #menuPremium.
+    const _pcta = e.target.closest && e.target.closest('[data-premium-cta]');
+    if (_pcta) {
+      e.stopPropagation();
+      const fk  = _pcta.getAttribute('data-premium-cta') || '';
+      const src = _pcta.getAttribute('data-premium-source') || 'unknown';
+      try { if (typeof _aurixRecordUpgradeIntent === 'function') _aurixRecordUpgradeIntent(fk, src); } catch (_) {}
+      const _panel = document.getElementById('menuPanel');
+      const _toggle = document.getElementById('menuToggle');
+      if (_panel && _panel.classList.contains('open')) _panel.classList.remove('open');
+      if (_toggle) { _toggle.classList.remove('open'); _toggle.setAttribute('aria-expanded', 'false'); }
+      if (typeof window !== 'undefined' && window.openAurixPremiumModal) {
+        window.openAurixPremiumModal({ source: src });
+      }
+      return;
+    }
     if (e.target.closest && e.target.closest('#menuPremium')) {
       e.stopPropagation();
       // M.04 — abre para TODOS. Para Free es el paywall (el único sitio desde el
@@ -65590,6 +65668,9 @@ try {
     options = options || {};
     _lastSource = options.source || 'unknown';
     log('open');
+    // M.05 — la apertura del paywall es el eslabón que faltaba del embudo: sin él no
+    // se puede saber qué superficie trae gente aquí ni cuánta se queda en la puerta.
+    try { if (typeof _aurixRecordUpgradeIntent === 'function') _aurixRecordUpgradeIntent('paywall:open', _lastSource); } catch (_) {}
     _trigger = (document.activeElement && document.activeElement.focus) ? document.activeElement : null;
     if (!_el) {
       _el = document.createElement('div');
