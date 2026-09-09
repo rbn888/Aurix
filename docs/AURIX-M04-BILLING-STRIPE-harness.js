@@ -477,6 +477,22 @@ console.log('\nD · checkout · identidad y precio de record');
     sessFail.res.payload.stripe_code === 'resource_missing' &&
     !/sk_test|No such price/.test(JSON.stringify(sessFail.res.payload)),
     JSON.stringify(sessFail.res.payload));
+  // Y la configuración que produjo ese 403 en producción: una PUBLISHABLE key en
+  // `STRIPE_SECRET_KEY`. Se declara inválida ANTES de llamar al proveedor.
+  const pubKey = await callCheckout({ env: { STRIPE_SECRET_KEY: 'pk_test_x' } });
+  ok('D.20 una publishable key es configuración inválida y NO se llama a Stripe',
+    pubKey.res.code === 503 && pubKey.res.payload &&
+    pubKey.res.payload.error === 'billing_unconfigured' &&
+    !pubKey.calls.some(c => c.url.includes('api.stripe.com')),
+    JSON.stringify(pubKey.res.payload));
+  // Una restringida `rk_` SÍ es secret-side, y los espacios de un copiar-pegar no
+  // pueden convertirse en un rechazo del proveedor.
+  const rkKey = await callCheckout({ env: { STRIPE_SECRET_KEY: '  rk_test_x\n' } });
+  ok('D.22 una `rk_` con espacios es válida y la clave viaja recortada',
+    rkKey.res.code === 200 &&
+    (rkKey.calls.find(c => c.url.includes('api.stripe.com/v1/customers')) || { init: { headers: {} } })
+      .init.headers.Authorization === 'Bearer rk_test_x',
+    String(rkKey.res.code));
   // PORTAL — la ruta de cancelación.
   ok('D.17 el portal resuelve el cliente del USUARIO autenticado, no de un body',
     /billing_customers[\s\S]{0,120}user_id=eq\.\$\{user\.id\}/.test(PO) &&

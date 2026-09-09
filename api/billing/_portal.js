@@ -39,9 +39,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
   if (!isAllowedOrigin(origin)) return res.status(403).json({ ok: false, error: 'forbidden_origin' });
 
-  const STRIPE_KEY  = process.env.STRIPE_SECRET_KEY;
+  const STRIPE_KEY  = String(process.env.STRIPE_SECRET_KEY || '').trim();
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!STRIPE_KEY || !SERVICE_KEY) return res.status(503).json({ ok: false, error: 'billing_unconfigured' });
+  // Misma regla que en checkout: una publishable key no es configuración válida.
+  if (!STRIPE_KEY || !SERVICE_KEY || /^pk_/.test(STRIPE_KEY)) return res.status(503).json({ ok: false, error: 'billing_unconfigured' });
 
   const auth = (req.headers && req.headers.authorization) || '';
   const token = /^Bearer\s+(.+)$/i.test(auth) ? auth.replace(/^Bearer\s+/i, '').trim() : '';

@@ -98,11 +98,19 @@ export default async function handler(req, res) {
   const origin = (req.headers && req.headers.origin) || '';
   if (!isAllowedOrigin(origin)) return res.status(403).json({ ok: false, error: 'forbidden_origin' });
 
-  const STRIPE_KEY  = process.env.STRIPE_SECRET_KEY;
+  // `.trim()` porque una clave pegada en el panel de la plataforma arrastra
+  // espacios o un salto de línea con una facilidad incómoda, y Stripe la
+  // rechazaría sin decir que el problema era invisible.
+  const STRIPE_KEY  = String(process.env.STRIPE_SECRET_KEY || '').trim();
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   // FAIL CLOSED AND SAY SO. A missing secret must not degrade into a broken
   // checkout that looks like a payment problem.
-  if (!STRIPE_KEY || !SERVICE_KEY) {
+  // Una PUBLISHABLE key (`pk_…`) en esta variable no es una configuración
+  // válida: Stripe la rechaza con 403 `secret_key_required` DESPUÉS de la
+  // llamada, y eso llega al usuario como "no hemos podido abrir el pago", que
+  // culpa al pago de un error de configuración. Se declara aquí, antes de
+  // hablar con el proveedor. `sk_` y `rk_` (restringida) sí son válidas.
+  if (!STRIPE_KEY || !SERVICE_KEY || /^pk_/.test(STRIPE_KEY)) {
     return res.status(503).json({ ok: false, error: 'billing_unconfigured' });
   }
 
