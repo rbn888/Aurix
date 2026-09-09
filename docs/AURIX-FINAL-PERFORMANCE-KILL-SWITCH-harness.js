@@ -41,6 +41,10 @@ function makeEnv(){
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('_aurixReturnSnapshotStats'), sb);
   vm.runInContext(fnSrc('_aurixPostConstructionBaseline'), sb);
+  // SPEC P0 PERFORMANCE TRUTH — dependencias de getValidReturnBaseline (las dos guardas de
+  // cobertura y de régimen de construcción). Sin sus entradas en este sandbox quedan inertes.
+  vm.runInContext(fnSrc('_aurixRangeSpanShortfall'), sb);
+  vm.runInContext(fnSrc('_aurixBaselineInConstructionRegime'), sb);
   vm.runInContext(fnSrc('getValidReturnBaseline'), sb);   // canDisplayCanonicalReturn NOT loaded ⇒ _disp.ok=true (isolate the PS gate)
   return sb;
 }

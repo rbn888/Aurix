@@ -60,7 +60,7 @@ const CONSTS = ['_WSC_INTERNAL_KINDS', '_AURIX_RETURN_MIN_HISTORY_MS', '_AURIX_R
   '_AURIX_LIVE_DATA_REVISION_REASONS'];
 const FNS = ['_aurixLiveReturnReferenceValue', '_aurixFlowIsInternal', '_aurixPointValuationIncomplete',
   '_aurixInvestableSnapshots', '_aurixEligibleInvestableSeries', '_aurixFlowNeutralize', '_aurixRangeReturn',
-  '_aurixPortfolioCreatedAt', '_aurixReturnSnapshotStats', '_aurixPostConstructionBaseline', 'getValidReturnBaseline',
+  '_aurixPortfolioCreatedAt', '_aurixReturnSnapshotStats', '_aurixPostConstructionBaseline', 'getValidReturnBaseline', '_aurixRangeSpanShortfall', '_aurixBaselineInConstructionRegime',
   '_aurix24hRowIsReady', '_aurix24hRowOf', '_aurix24hMonotonicPublication'];
 // A rollback flag is a `const` in app.js, so it cannot be reassigned inside a live context: the OFF
 // variants get their OWN context built from the SAME production source with the literal overridden.

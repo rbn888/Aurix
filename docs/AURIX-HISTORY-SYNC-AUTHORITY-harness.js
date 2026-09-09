@@ -36,6 +36,10 @@ function makeEnv(){
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('_aurixReturnSnapshotStats'), sb);
   vm.runInContext(fnSrc('_aurixPostConstructionBaseline'), sb);
+  // SPEC P0 PERFORMANCE TRUTH — dependencias de getValidReturnBaseline (las dos guardas de
+  // cobertura y de régimen de construcción). Sin sus entradas en este sandbox quedan inertes.
+  vm.runInContext(fnSrc('_aurixRangeSpanShortfall'), sb);
+  vm.runInContext(fnSrc('_aurixBaselineInConstructionRegime'), sb);
   vm.runInContext(fnSrc('getValidReturnBaseline'), sb);
   // a clean, established, post-reset return that WOULD be valid once history is loaded
   sb._cfg = { valid:true, deltaPct:3.0, deltaAbs:120, startValue:4000, baselineTs:NOW-10*DAY, lastTs:NOW, netFlowsNeutralized:10 };

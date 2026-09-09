@@ -68,6 +68,10 @@ function makeAuthedEnv(byRange){
   sb._aurixRemotePerformanceState = { userId:'u1', lifecycleId:'L1', portfolioRevision:5, calculatedAt:NOW, byRange:byRange };
   vm.runInContext(fnSrc('_aurixSelectRemotePerformance'), sb);
   vm.runInContext(fnSrc('_aurixRemotePerformanceForRange'), sb);
+  // SPEC P0 PERFORMANCE TRUTH — dependencias de getValidReturnBaseline (las dos guardas de
+  // cobertura y de régimen de construcción). Sin sus entradas en este sandbox quedan inertes.
+  vm.runInContext(fnSrc('_aurixRangeSpanShortfall'), sb);
+  vm.runInContext(fnSrc('_aurixBaselineInConstructionRegime'), sb);
   vm.runInContext(fnSrc('getValidReturnBaseline'), sb);
   return sb;
 }

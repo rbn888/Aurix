@@ -68,7 +68,7 @@ const FNS = ['_aurixCategoryPointValid', '_aurixFilterAfterEpoch', '_aurixCanoni
   '_aurixSelectRemotePerformance', '_aurixRemotePerformanceForRange', '_aurixFlowIsInternal', '_aurixPointValuationIncomplete',
   '_aurixInvestableSnapshots', '_aurixEligibleInvestableSeries', '_aurixFlowNeutralize', '_aurixRangeReturn',
   '_aurixPortfolioCreatedAt', '_aurixReturnSnapshotStats', '_aurixPostConstructionBaseline', 'canDisplayCanonicalReturn',
-  '_aurixLiveReturnReferenceValue', 'getValidReturnBaseline', '_aurixSeriesWithinRange', '_aurixPerformanceSanityCheck',
+  '_aurixLiveReturnReferenceValue', 'getValidReturnBaseline', '_aurixRangeSpanShortfall', '_aurixBaselineInConstructionRegime', '_aurixSeriesWithinRange', '_aurixPerformanceSanityCheck',
   '_aurixCanonicalPerformance', '_aurixComputePerformanceStateCandidate', '_aurix24hRowIsReady', '_aurix24hRowOf',
   '_aurix24hMonotonicPublication'];
 

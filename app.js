@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '666'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '667'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26938,6 +26938,41 @@ const _AURIX_RETURN_STABLE_STEP = 0.40;               // consecutive post-anchor
 // value/current ratio exceeds these belongs to a different capital regime (construction / large inflow /
 // import) and must be REJECTED → pending_baseline, never an absurd return (e.g. a 3× baseline → −67% on 7D).
 const _AURIX_RETURN_COMPARABLE_RATIO = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC P0 PERFORMANCE TRUTH · UNA SOLA VERDAD FINANCIERA AUTORITATIVA
+// ════════════════════════════════════════════════════════════════════════════
+// FORENSE SOBRE PRODUCCIÓN (2026-09-09, 27 filas de `performance_state`, lectura
+// read-only). Aurix tenía DOS motores respondiendo a la misma pregunta con reglas
+// distintas, y las superficies renderizan el segundo:
+//
+//   A) el gráfico (`buildProductionPortfolioChart`): para un rango finito exige
+//      `coverageRatio ≥ 0.8` y recorta el régimen de construcción. Sobre la cuenta
+//      forense devuelve 1Y = `insufficient_return_history` y ALL = +15,71%.
+//   B) este owner (`getValidReturnBaseline` → `_aurixComputePerformanceStateCandidate`
+//      → `performance_state` remoto): su única exigencia de antigüedad era
+//      `_AURIX_RETURN_MIN_HISTORY_MS` = **90 segundos**, para CUALQUIER rango.
+//      Sobre la misma cuenta publicaba 1Y = `ready` +36,3638%.
+//
+// Y no era el caso raro de una cuenta: en las 27 filas medidas, `base_1y` es SIEMPRE
+// idéntico a `base_all` —1Y cae a "toda la historia disponible" en cuanto la cuenta
+// tiene menos de un año, que hoy son todas—, y SEIS cuentas publicaban un % anual sin
+// tener un año. La más nítida: una cuenta de CINCO DÍAS publicando 1Y = −2,16%.
+//
+// Segundo defecto, distinto: el baseline podía caer en el RÉGIMEN DE CONSTRUCCIÓN. El
+// 85.465,43 de la cuenta forense se rastreó exactamente a su propio
+// `category_history` del 30-07 a las 16:45 —total 520.248,04 menos inmueble
+// 434.782,61—, es decir el instante entre añadir el segundo activo y el tercero. Es
+// dato real y propio (no hay contaminación entre cuentas: las 27 filas llevan su
+// `userId` correcto y magnitudes propias), pero como baseline mide FORMACIÓN DE
+// CAPITAL, no mercado. Pasaba porque el único guard era el ratio de magnitud
+// (227.682/85.465 = 2,66 ≤ 3,00).
+//
+// Las dos guardas de abajo NO son criterios nuevos: son los del motor A, que es la
+// autoridad, aplicados aquí para que ambos respondan lo mismo. Se leen de la MISMA
+// serie invertible elegible del usuario (`_aurixEligibleInvestableSeries`), así que
+// cada cuenta sigue calculando exclusivamente con sus propios datos.
+const _AURIX_RETURN_RANGE_COVERAGE_MIN   = 0.80;   // misma autoridad que `historyTooShortForRange` del gráfico
+const _AURIX_BASELINE_CONSTRUCTION_FRAC  = 0.55;   // misma autoridad que `baseline_construction_low` de ALL
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC INT.02 · INVESTABLE PERFORMANCE TRUTH — the publishable return owner
@@ -28167,6 +28202,36 @@ function _aurixPostConstructionBaseline(range, currentValue, lifecycleStart) {
   } catch (_) {}
   return out;
 }
+// SPEC P0 PERFORMANCE TRUTH — las dos guardas, como owners propios y testables.
+// `_aurixRangeSpanShortfall`: ¿la historia REALMENTE cubierta alcanza para el rango
+// que se pide? Rango infinito (ALL) ⇒ nunca falta cobertura.
+function _aurixRangeSpanShortfall(range, windowMs) {
+  try {
+    const tbl = (typeof _AURIX_EMG_RANGE_MS === 'object' && _AURIX_EMG_RANGE_MS) ? _AURIX_EMG_RANGE_MS : null;
+    const need = tbl ? tbl[String(range || '').toLowerCase()] : null;
+    if (!Number.isFinite(need) || !(need > 0)) return false;          // 'all' / rango desconocido ⇒ exento
+    if (!Number.isFinite(windowMs) || windowMs < 0) return true;      // sin span demostrable ⇒ fail-closed
+    return (windowMs / need) < _AURIX_RETURN_RANGE_COVERAGE_MIN;
+  } catch (_) { return false; }
+}
+// `_aurixBaselineInConstructionRegime`: ¿el ancla está muy por debajo del cuerpo de la
+// serie? Se mide contra la MEDIANA de la propia serie elegible del usuario, que es lo
+// que distingue una rampa de construcción de una subida real.
+function _aurixBaselineInConstructionRegime(range, baselineValue) {
+  try {
+    if (!(Number(baselineValue) > 0)) return false;
+    const el = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(range) : null;
+    const vals = ((el && Array.isArray(el.series)) ? el.series : [])
+      .map(p => Number(p && (p.value != null ? p.value : p.total)))
+      .filter(v => Number.isFinite(v) && v > 0)
+      .sort((x, y) => x - y);
+    if (vals.length < 3) return false;                                // sin cuerpo de serie no se juzga
+    const median = vals[vals.length >> 1];
+    if (!(median > 0)) return false;
+    return Number(baselineValue) < (_AURIX_BASELINE_CONSTRUCTION_FRAC * median);
+  } catch (_) { return false; }
+}
+try { if (typeof window !== 'undefined') { window._aurixRangeSpanShortfall = _aurixRangeSpanShortfall; window._aurixBaselineInConstructionRegime = _aurixBaselineInConstructionRegime; } } catch (_) {}
 function getValidReturnBaseline(range, opts) {
   opts = opts || {};   // opts.raw = the LOCAL deterministic result, bypassing the remote performance_state gate (used by the writer/candidate only)
   const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
@@ -28213,6 +28278,14 @@ function getValidReturnBaseline(range, opts) {
   else if (!(Number.isFinite(currentValue) && currentValue > 0)) invalidReason = 'no_current_value';
   else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
   else if (windowMs < _AURIX_RETURN_MIN_HISTORY_MS) invalidReason = 'insufficient_history';
+  // COBERTURA PROPORCIONAL AL RANGO PEDIDO. 90 s de historia no son un año: sin esto,
+  // una cuenta de días publicaba un rendimiento anual. ALL está exento por definición
+  // (su ventana es la vida económica de la cuenta, no un periodo fijo).
+  else if (_aurixRangeSpanShortfall(r, windowMs)) invalidReason = 'insufficient_range_coverage';
+  // BASELINE EN RÉGIMEN DE CONSTRUCCIÓN. Un ancla muy por debajo del cuerpo de la
+  // serie no mide mercado, mide el alta de la cartera. No censura una subida real: en
+  // una cartera que se dobla de verdad el ancla queda cerca de la mediana.
+  else if (_aurixBaselineInConstructionRegime(r, baselineValue)) invalidReason = 'baseline_construction_regime';
   else if (!_baselineComparable) invalidReason = 'baseline_not_comparable';   // construction/inflow/import regime ⇒ pending
   else if (netFlows >= _AURIX_RETURN_FLOW_DOMINANCE * currentValue) invalidReason = 'flows_dominate_baseline';
   // RETURN-BASELINE-EXIT — flows_dominate is a one-time onboarding/reset construction artifact. If the
