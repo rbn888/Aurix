@@ -215,7 +215,11 @@ export default async function handler(request) {
   // esta URL (o el secreto de test conviviera con la clave live), una suscripción
   // de prueba entitlearía una cuenta real. Se permite explícitamente durante la
   // compra de prueba del founder con `BILLING_ALLOW_TEST_EVENTS=1`, y se quita.
-  if (event.livemode === false && process.env.BILLING_ALLOW_TEST_EVENTS !== '1') {
+  // Misma normalización que el secreto, y por la misma razón: este valor también
+  // se teclea en el panel de la plataforma, y un ' 1' silencioso convertiría toda
+  // la certificación TEST en `ignored_testmode` sin dejar rastro en la BD.
+  if (event.livemode === false &&
+      String(process.env.BILLING_ALLOW_TEST_EVENTS || '').trim() !== '1') {
     return json({ ok: true, outcome: 'ignored_testmode' });
   }
 

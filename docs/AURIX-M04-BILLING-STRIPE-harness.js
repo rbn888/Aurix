@@ -897,6 +897,23 @@ console.log('\nK1 · webhook · el secreto se normaliza antes de firmar');
     JSON.stringify(wrong.json));
 }
 
+// ── K2 · LA PUERTA DE LOS EVENTOS DE TEST ──────────────────────────────────
+console.log('\nK2 · webhook · la autorización de eventos TEST se normaliza');
+{
+  const padded = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_tm_ok' }), { livemode: false }),
+    { env: { BILLING_ALLOW_TEST_EVENTS: ' 1 ' } });
+  ok('K2.1 `BILLING_ALLOW_TEST_EVENTS=" 1 "` autoriza igual que "1"',
+    padded.status === 200 && padded.json && padded.json.outcome !== 'ignored_testmode' &&
+    padded.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
+    JSON.stringify(padded.json));
+  const off = await callWebhook(Object.assign(SUB_EVENT({ id: 'evt_tm_off' }), { livemode: false }),
+    { env: { BILLING_ALLOW_TEST_EVENTS: '' } });
+  ok('K2.2 …y sin esa variable un evento de TEST sigue ignorado y sin escribir nada',
+    off.status === 200 && off.json && off.json.outcome === 'ignored_testmode' &&
+    !off.calls.some(c => String(c.url).includes('aurix_billing_apply_event')),
+    JSON.stringify(off.json));
+}
+
 // ── K0 · EL HUECO ENTRE STRIPE Y EL WEBHOOK ────────────────────────────────
 // Stripe tiene la suscripción antes de que el webhook la escriba. En ese hueco el
 // 409 del proveedor NO convierte al usuario en cliente gestionable: si se le
