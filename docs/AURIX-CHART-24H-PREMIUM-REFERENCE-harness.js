@@ -17,7 +17,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 function fn(name) { const s = 'function ' + name + '('; const i = src.indexOf(s); if (i < 0) throw new Error('missing ' + name);
   let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { const c = src[k]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { k++; break; } } } return src.slice(i, k); }
 
-const ENGINE_FNS = ['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', 'downsampleAurixAdaptive',
+const ENGINE_FNS = ['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', '_aurixRenderBucketPolicyOn', '_aurixRenderBucketReduce', 'downsampleAurixAdaptive',
   'computeAurixTimeScale', 'computeAurixAdaptiveXScale', 'computeAurixValueScale', '_aurixArrConfig', '_aurixArrRepresentVertices',
   '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath', '_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps',
   '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixStructuralBreaks',
@@ -31,7 +31,10 @@ const sb = { console, Math, JSON, Array, Number, isFinite, Infinity, Date, activ
 vm.createContext(sb);
 AUX_CONSTS.forEach(c => { const m = src.match(new RegExp('const ' + c + '\\s*=[^;]*?(\\{[\\s\\S]*?\\}\\s*;|[^;]*;)', 's')); if (m) { try { vm.runInContext(m[0], sb); } catch (_) {} } });
 // _AURIX_VP_DENSITY / _AURIX_X_FILL_BETA are object literals — grab them explicitly.
-['_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA', '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_BRIDGE_SEG_FRAC'].forEach(c => { const i = src.indexOf('const ' + c + ' ='); if (i >= 0) { const j = src.indexOf('};', i); vm.runInContext(src.slice(i, j + 2), sb); } });
+// SPEC P0 CHART · DENSIDAD DE RENDER ADAPTATIVA AL RANGO — los TRES escalares de la política se cargan
+// con corte por ';': este lector recorta hasta el siguiente '};' y un escalar arrastraría a los siguientes.
+['_AURIX_RENDER_BUCKET_ENABLED', '_AURIX_RENDER_BUCKET_CLOSE_FRAC', '_AURIX_RENDER_BUCKET_PROM_FRAC'].forEach(c => { const i = src.indexOf('const ' + c + ' ='); if (i >= 0) { const j = src.indexOf(';', i); vm.runInContext(src.slice(i, j + 1), sb); } });
+['_AURIX_RENDER_BUCKET_EXEMPT_RANGES', '_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA', '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_BRIDGE_SEG_FRAC'].forEach(c => { const i = src.indexOf('const ' + c + ' ='); if (i >= 0) { const j = src.indexOf('};', i); vm.runInContext(src.slice(i, j + 2), sb); } });
 ENGINE_FNS.forEach(n => { try { vm.runInContext(fn(n), sb); } catch (e) {} });
 
 const MIN = 60e3;

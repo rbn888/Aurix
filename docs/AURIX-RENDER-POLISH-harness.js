@@ -37,9 +37,12 @@ const sb = { console, activeRange: '30d', getAurixRenderSeries: () => SERIES, in
 sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
 vm.runInContext(src.slice(src.indexOf('const _AURIX_PATH_RENDER_SPACING'), src.indexOf('function _aurixArrConfig')), sb);  // ARR v2 — range+shape constants block
-vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb); vm.runInContext(RP_BOX, sb);
+vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb);
+// SPEC P0 CHART · DENSIDAD DE RENDER ADAPTATIVA AL RANGO — la nueva ruta de reducción entra REAL en
+// este sandbox, para que la cadena que este gate certifica sea la que corre en producción.
+vm.runInContext(block('const _AURIX_RENDER_BUCKET_ENABLED', "const _AURIX_RENDER_BUCKET_EXEMPT_RANGES = { '24h': 1 };"), sb); vm.runInContext(RP_BOX, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
-  fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'),
+  fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('_aurixRenderBucketPolicyOn'), fn('_aurixRenderBucketReduce'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'),
   fn('computeAurixValueScale'), fn('_aurixArrConfig'), fn('_aurixArrRepresentVertices'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
   fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('renderAurixInstitutionalChart'),
   fn('auditAurixRenderPrecision') ].forEach(c => vm.runInContext(c, sb));

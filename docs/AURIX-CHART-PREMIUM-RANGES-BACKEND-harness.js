@@ -23,8 +23,11 @@ const RS = { console, Math, JSON, Array, Number, isFinite, Infinity, Date, activ
 vm.createContext(RS);
 ['_AURIX_RC_ASPECT', '_AURIX_RC_PAD_FRAC', '_AURIX_RC_VPAD_FRAC', '_AURIX_IR_VALUE_MARGIN', '_AURIX_IR_VPAD_FRAC', '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA', '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_BRIDGE_SEG_ENABLED'].forEach(c => vm.runInContext(konst(c), RS));
 ['_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA', '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_BRIDGE_SEG_FRAC'].forEach(c => vm.runInContext(objConst(c), RS));
+// SPEC P0 CHART · DENSIDAD DE RENDER ADAPTATIVA AL RANGO — las 4 constantes de la política se cargan
+// como UN bloque contiguo: cargarlas por nombre las re-declaraba (el escalar arrastra a las siguientes).
+vm.runInContext(block('const _AURIX_RENDER_BUCKET_ENABLED', "const _AURIX_RENDER_BUCKET_EXEMPT_RANGES = { '24h': 1 };"), RS);
 vm.runInContext(block('const _AURIX_CAPITAL_STEP_SEG_ENABLED', 'const _AURIX_ALL_MIN_TRUST_SPAN_MS = 21 * 864e5;'), RS);
-['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', 'downsampleAurixAdaptive', 'computeAurixTimeScale', 'computeAurixAdaptiveXScale', 'computeAurixValueScale', '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath', '_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixStructuralBreaks', 'renderValidatedPortfolioChartWithInstitutionalRenderer'].forEach(n => vm.runInContext(fn(n), RS));
+['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', '_aurixRenderBucketPolicyOn', '_aurixRenderBucketReduce', 'downsampleAurixAdaptive', 'computeAurixTimeScale', 'computeAurixAdaptiveXScale', 'computeAurixValueScale', '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath', '_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixStructuralBreaks', 'renderValidatedPortfolioChartWithInstitutionalRenderer'].forEach(n => vm.runInContext(fn(n), RS));
 const box = { left: 6, right: 994, top: 16, bottom: 404 };
 function render(points, range) { RS.__p = points; return vm.runInContext('renderValidatedPortfolioChartWithInstitutionalRenderer(__p, { range:"' + (range || '30d') + '", vw:1000, vh:420, box:' + JSON.stringify(box) + ' })', RS); }
 const countM = s => (String(s).match(/M /g) || []).length;

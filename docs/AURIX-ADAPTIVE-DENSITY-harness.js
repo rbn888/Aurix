@@ -25,6 +25,11 @@ const VP_CONSTS = block('const _AURIX_VP_DENSITY', 'const _AURIX_VP_VALUE_EPS = 
 const IR_CONSTS = block('const _AURIX_IR_VALUE_MARGIN', '= 0.08;');
 const Y_CONSTS  = block('const _AURIX_Y_JUMP_DOMINANCE', 'const _AURIX_Y_LEGIBLE_ALPHA  = 0.35;');
 const X_CONSTS  = block('const _AURIX_X_FILL_BETA', '};');
+// SPEC P0 CHART · DENSIDAD DE RENDER ADAPTATIVA AL RANGO — la nueva ruta de reducción se carga REAL
+// en este sandbox: es el gate cuyo objeto ES el reductor, así que aquí no puede quedar sin ejercer
+// (una guarda typeof en el owner la haría caer a LTTB y este gate daría verde sobre código muerto).
+const BK_CONSTS = block('const _AURIX_RENDER_BUCKET_ENABLED', "const _AURIX_RENDER_BUCKET_EXEMPT_RANGES = { '24h': 1 };");
+
 
 const DAY = 86400e3, HOUR = 36e5, NOW = 1000 * DAY;
 
@@ -35,9 +40,10 @@ sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
 vm.runInContext(src.slice(src.indexOf('const _AURIX_PATH_RENDER_SPACING'), src.indexOf('function _aurixArrConfig')), sb);  // ARR v2 — range+shape constants block
 vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb);
+vm.runInContext(BK_CONSTS, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
   fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'),
-  fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'), fn('computeAurixValueScale'),
+  fn('_aurixRenderBucketPolicyOn'), fn('_aurixRenderBucketReduce'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'), fn('computeAurixValueScale'),
   fn('_aurixArrConfig'), fn('_aurixArrRepresentVertices'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'), fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'),
   fn('renderAurixInstitutionalChart'), fn('_aurixCompareRenderToCanonical'), fn('auditAurixRenderVsCanonical') ].forEach(c => vm.runInContext(c, sb));
 

@@ -26,12 +26,12 @@ const CONSTS = ['_AURIX_VP_GAP_FLOOR_MS', '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_O
   '_AURIX_SPARSE_RAMP_SEG_ENABLED', '_AURIX_VJUMP_MIN_FRAC', '_AURIX_VJUMP_P95_MULT', '_AURIX_CAPSTEP_RATIO_LO',
   '_AURIX_CAPSTEP_RATIO_HI', '_AURIX_CAPSTEP_TS_PAD_MS', '_AURIX_SPARSE_RAMP_MULT', '_AURIX_SPARSE_RAMP_MIN_MS',
   '_AURIX_CHART_CONTINUITY_UNIFICATION', '_AURIX_EMG_RANGE_MS', '_AURIX_ORPHAN_CLEANUP_ENABLED', '_AURIX_ORPHAN_MAX_PTS',
-  '_AURIX_RC_ASPECT', '_AURIX_CHART_UNIFIED_REAL_POINT_DENSITY', '_AURIX_UNIFIED_VP_DENSITY', '_AURIX_VP_DENSITY',
+  '_AURIX_RC_ASPECT', '_AURIX_CHART_UNIFIED_REAL_POINT_DENSITY', '_AURIX_UNIFIED_VP_DENSITY', '_AURIX_RENDER_BUCKET_ENABLED', '_AURIX_RENDER_BUCKET_CLOSE_FRAC', '_AURIX_RENDER_BUCKET_PROM_FRAC', '_AURIX_RENDER_BUCKET_EXEMPT_RANGES', '_AURIX_VP_DENSITY',
   '_AURIX_CHART_UNIFIED_X_PROJECTION_POLICY', '_AURIX_RC_PAD_FRAC', '_AURIX_UNIFIED_X_FILL_BETA', '_AURIX_X_FILL_BETA',
   '_AURIX_IR_VALUE_MARGIN', '_AURIX_IR_VPAD_FRAC', '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA'];
 const FNS = ['_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps', '_aurixCapitalStepBreaks',
   '_aurixSparseRampBreaks', '_aurixRealGapFloorMs', '_aurixBuildContinuityValidatedSeries', '_aurixStructuralBreaks',
-  '_aurixRegimeBoundaryBreaks', '_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', 'downsampleAurixAdaptive', 'computeAurixAdaptiveXScale',
+  '_aurixRegimeBoundaryBreaks', '_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', '_aurixRenderBucketPolicyOn', '_aurixRenderBucketReduce', 'downsampleAurixAdaptive', 'computeAurixAdaptiveXScale',
   'computeAurixValueScale', '_aurixMonotonePath', 'buildAurixAreaPath', 'renderValidatedPortfolioChartWithInstitutionalRenderer',
   '_aurixEmergencyHash'];
 

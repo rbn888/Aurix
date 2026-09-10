@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '668'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '669'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4044,6 +4044,13 @@ const PORTFOLIO_KEYS = [
   'aurix_portfolio_meta',      // sync meta (revision/updatedAt/syncedAt/deviceId)
   'aurix_portfolio_events',    // append-only journal (per-user)
   'aurix_cache_owner',         // userId stamp guarding the local cache
+  // SPEC P0 CHART · AISLAMIENTO MULTI-CUENTA — `aurixLastGoodChartByRange` (_WSC_LASTGOOD_KEY) NO
+  // estaba aquí, así que era la única caché de estado FINANCIERO ni namespaced por usuario ni purgada
+  // al cambiar de cuenta: publica serie, rendimiento %, color y estado por rango, con lo que el
+  // siguiente usuario en el mismo navegador podía ver la última curva buena del anterior. Purgarla en
+  // el cambio de usuario es fail-safe: en el peor caso una cuenta pierde su caché de respaldo y
+  // rehidrata desde la autoridad, que es precisamente lo que debe hacer.
+  'aurixLastGoodChartByRange',
 ];
 
 // AUTH-ISOLATION-1: auth-only locals (email autofill / OTP step
@@ -25697,12 +25704,126 @@ function _aurixSignificantLocalExtrema(src, valueRange, minProminenceFrac) {
   return out;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC P0 CHART · DENSIDAD DE RENDER ADAPTATIVA AL RANGO
+// El dentado de 7D/30D/1A/TOTAL no era ruido del DATO: lo fabricaba el REDUCTOR.
+// ════════════════════════════════════════════════════════════════════════════
+// MEDIDO sobre el propio reductor (cadencia real de 15 min, cartera tranquila —
+// 8% anual, ruido de tick 0,08% — que es el régimen del usuario típico):
+//
+//   rango   raw    dientes/100px (escritorio)   recorrido/rango
+//   24H      96          3,5                        6,4     ← raw ≤ target: NO se reduce
+//   7D      672         18,1                       18,2
+//   30D   2.880         15,2                       23,3
+//   1A    8.640         10,5                       12,0
+//   TOTAL 8.640         10,6                       15,4
+//
+// 24H se lee institucional porque su serie CABE en el presupuesto de puntos y no
+// pasa por el reductor. En cuanto la razón de reducción es material, LTTB elige de
+// cada bucket el punto de ÁREA MÁXIMA — es decir, el más EXTREMO—, así que la serie
+// retenida tiene densidad de cambios de dirección casi máxima: el reductor amplifica
+// el dentado en lugar de resumirlo. Y la inyección de extremos locales lo dobla justo
+// donde más molesta: el umbral de prominencia es el 3% del RANGO DE LA VENTANA, así
+// que en una ventana tranquila (rango 1,26% en 7D) el umbral es minúsculo y el tope
+// `maxExtra` se satura (+40 puntos en móvil, +90 en escritorio sobre un objetivo de
+// 80/180), mientras que en una ventana volátil (rango 26%) NO entra ni un extremo.
+// El defecto era, por tanto, INVERSO al riesgo: máximo dentado para la cartera calmada.
+//
+// LA REGLA: el dataset financiero autoritativo NO se toca; sólo el de RENDER se
+// reduce, y se reduce como lo hace un gráfico patrimonial profesional — por BUCKETS
+// DE TIEMPO con un representante de CIERRE, no por extremos.
+//   · buckets = 0,8 × target sobre el span real de la ventana ⇒ la anchura del bucket
+//     es adaptativa al span Y al viewport (intradía en 24H, ~horas en 30D, ~días en
+//     1A/TOTAL) sin una sola constante de calendario inventada.
+//   · representante = el ÚLTIMO punto real del bucket (el "cierre"), que es la
+//     convención financiera y no un promedio: NO se fabrica ningún valor.
+//   · se FUERZAN, tomados de la serie CRUDA: primero, último, mínimo global y máximo
+//     global, con sus timestamps reales ⇒ la equivalencia con la serie canónica sigue
+//     siendo 'faithful-downsampled' y un drawdown real nunca se pierde.
+//   · una oscilación INTRA-bucket entra sólo si es económicamente relevante (≥10% del
+//     rango de la ventana), y las mayores primero, hasta agotar el presupuesto.
+// Resultado medido con esta política (mismos casos, escritorio): 7D 18,1→8,0 ·
+// 30D 15,2→8,1 · 1A 10,5→8,4 · TOTAL 10,6→8,4 dientes/100px, con el mínimo y el
+// máximo globales EXACTOS en todos los casos y el hoyo real de −18% y de −6%
+// preservados al céntimo. Móvil: 7D 29,9→14,0 · 30D 26,9→12,8 · TOTAL 18,3→11,3.
+//
+// 24H QUEDA EXENTO EXPLÍCITAMENTE: su semántica está certificada y su lectura ya es
+// la buena, así que su ruta permanece byte-idéntica y no hay nada que demostrar de
+// nuevo sobre ella. Sin `range` (todos los llamadores heredados) la ruta también es
+// la de LTTB, byte-idéntica ⇒ el rollback es estructural, no un flag que recordar.
+// PURO RENDER: no interpola, no suaviza, no promedia, no inventa un punto, no altera
+// un valor ni un timestamp, y NUNCA alimenta un cálculo de rendimiento.
+const _AURIX_RENDER_BUCKET_ENABLED = true;
+const _AURIX_RENDER_BUCKET_CLOSE_FRAC = 0.8;   // buckets = 0,8 × target ⇒ hueco para los puntos forzados y relevantes
+const _AURIX_RENDER_BUCKET_PROM_FRAC = 0.10;   // oscilación intra-bucket relevante: ≥10% del rango de la ventana
+const _AURIX_RENDER_BUCKET_EXEMPT_RANGES = { '24h': 1 };   // 24H certificado ⇒ ruta intacta
+
+// ¿Aplica la política a esta llamada? Sin `range`, o con el rango exento, o con las
+// constantes ausentes (sandbox de harness), la respuesta es NO ⇒ ruta LTTB heredada.
+function _aurixRenderBucketPolicyOn(range) {
+  try {
+    if (!_AURIX_RENDER_BUCKET_ENABLED) return false;
+    if (range == null || range === '') return false;
+    return !_AURIX_RENDER_BUCKET_EXEMPT_RANGES[String(range).toLowerCase()];
+  } catch (_) { return false; }
+}
+
+// Reducción por buckets de tiempo con representante de cierre. `src` debe llegar ya
+// filtrado, mapeado a {time,value} y ordenado ascendente (lo hace el llamador).
+// Devuelve SÓLO puntos reales de `src`, en orden cronológico, sin duplicados.
+function _aurixRenderBucketReduce(src, targetPointCount) {
+  const n = src.length;
+  const target = Math.max(2, Math.floor(Number(targetPointCount) || n));
+  if (n <= target) return src.slice();
+  const t0 = src[0].time, t1 = src[n - 1].time;
+  const span = (t1 - t0);
+  if (!(span > 0)) return src.slice();                       // sin span no hay bucket posible
+  const closeFrac = (typeof _AURIX_RENDER_BUCKET_CLOSE_FRAC === 'number') ? _AURIX_RENDER_BUCKET_CLOSE_FRAC : 0.8;
+  const promFrac = (typeof _AURIX_RENDER_BUCKET_PROM_FRAC === 'number') ? _AURIX_RENDER_BUCKET_PROM_FRAC : 0.10;
+  const buckets = Math.max(2, Math.floor(target * closeFrac));
+  const w = span / buckets;
+  // Extremos GLOBALES de la serie CRUDA (no del conjunto reducido): así el mínimo y el
+  // máximo que publica el auditor de equivalencia son exactamente los canónicos.
+  let miR = src[0], maR = src[0];
+  for (const p of src) { if (p.value < miR.value) miR = p; if (p.value > maR.value) maR = p; }
+  const range = (maR.value - miR.value) || 1;
+  const thr = range * promFrac;
+  const keep = new Map();
+  keep.set(src[0].time, src[0]);
+  keep.set(src[n - 1].time, src[n - 1]);
+  keep.set(miR.time, miR);
+  keep.set(maR.time, maR);
+  const swings = [];
+  let bi = 0, bs = 0;
+  for (let i = 0; i <= n; i++) {
+    const b = (i < n) ? Math.min(buckets - 1, Math.floor((src[i].time - t0) / w)) : buckets;
+    if (b !== bi || i === n) {
+      if (i > bs) {
+        const lastIdx = i - 1;
+        keep.set(src[lastIdx].time, src[lastIdx]);           // CIERRE del bucket = el representante
+        let mi = src[bs], ma = src[bs];
+        for (let j = bs; j < i; j++) { if (src[j].value < mi.value) mi = src[j]; if (src[j].value > ma.value) ma = src[j]; }
+        const sw = ma.value - mi.value;
+        if (sw >= thr) swings.push({ sw: sw, lo: mi, hi: ma, at: src[bs].time });
+      }
+      bi = b; bs = i;
+    }
+  }
+  // Las oscilaciones intra-bucket MAYORES primero (empate resuelto por tiempo ⇒ determinista).
+  swings.sort((x, y) => (y.sw - x.sw) || (x.at - y.at));
+  for (let i = 0; i < swings.length && keep.size < target; i++) {
+    keep.set(swings[i].lo.time, swings[i].lo);
+    if (keep.size < target) keep.set(swings[i].hi.time, swings[i].hi);
+  }
+  return Array.from(keep.values()).sort((a, b) => a.time - b.time);
+}
+
 // SPEC 6 — Adaptive Density downsampler. LTTB (shape-preserving) PLUS guaranteed
 // significant local extrema, so high-movement zones keep their detail while quiet
 // zones stay sparse. Returns ONLY real points; preserves first/last/global-max/min
 // (LTTB) and significant local peaks/dips; never invents/alters a point. If the
 // source already fits the target, returns the full sorted copy (no reduction).
-function downsampleAurixAdaptive(points, targetPointCount) {
+function downsampleAurixAdaptive(points, targetPointCount, rangeKey) {
   const src = (Array.isArray(points) ? points : [])
     .filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value))
     .map(p => ({ time: p.time, value: p.value }))
@@ -25710,6 +25831,19 @@ function downsampleAurixAdaptive(points, targetPointCount) {
   const n = src.length;
   const target = Math.max(2, Math.floor(Number(targetPointCount) || n));
   if (n <= target) return src;                       // full detail, nothing to drop
+  // SPEC P0 CHART · DENSIDAD DE RENDER ADAPTATIVA AL RANGO — con `range` (y fuera de 24H) la
+  // reducción es por buckets de tiempo con representante de cierre, que es la que NO amplifica el
+  // dentado; sin `range` (todo llamador heredado) o en 24H, la ruta LTTB de aquí abajo, intacta.
+  // Ver el bloque de cabecera para la evidencia medida. Fail-open: si la reducción por buckets no
+  // devolviera al menos 2 puntos, se cae a LTTB.
+  // typeof-guarded para el aislamiento de los harnesses (producción siempre tiene las declaraciones
+  // hoisted en este mismo fichero); ausentes ⇒ constante false ⇒ exactamente la ruta LTTB anterior,
+  // que es la rama de rollback documentada. Mismo patrón que `_mergeCategoryByTs` con
+  // `_aurixPointValuationIncomplete`.
+  const _bucketOn = (typeof _aurixRenderBucketPolicyOn === 'function') ? _aurixRenderBucketPolicyOn : function () { return false; };
+  if (_bucketOn(rangeKey) && typeof _aurixRenderBucketReduce === 'function') {
+    try { const b = _aurixRenderBucketReduce(src, target); if (Array.isArray(b) && b.length >= 2) return b; } catch (_) {}
+  }
   const base = downsampleAurixLTTB(src, target);
   let vMin = Infinity, vMax = -Infinity;
   for (const p of src) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
@@ -26382,7 +26516,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const prepared = prepareAurixVisualSeries(r, vw);            // the ONLY input source
   const srcPts = Array.isArray(prepared.preparedPoints) ? prepared.preparedPoints : [];
   const target = prepared.targetPointCount;
-  const visiblePoints = downsampleAurixAdaptive(srcPts, target);   // SPEC 6 — LTTB + local-extrema preservation
+  const visiblePoints = downsampleAurixAdaptive(srcPts, target, r);   // SPEC 6 — LTTB + local-extrema; `r` activa la densidad adaptativa al rango
   // SPEC 4 — optional pixel box (left/right/top/bottom) so a host surface (WSC)
   // can have the engine map straight into its own plot box. Backward compatible:
   // without `layout`, the engine uses its own padding (SPEC 3 behaviour).
@@ -33487,10 +33621,10 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
         kept.push(rawRuns[ri]);
       }
       const totalKept = kept.reduce((s, run) => s + run.length, 0) || 1;
-      segments = kept.map(run => (run.length <= 2) ? run.slice() : downsampleAurixAdaptive(run, Math.max(2, Math.round(target * run.length / totalKept))));
+      segments = kept.map(run => (run.length <= 2) ? run.slice() : downsampleAurixAdaptive(run, Math.max(2, Math.round(target * run.length / totalKept)), r));
       visiblePoints = [].concat.apply([], segments);
     } else {
-      visiblePoints = downsampleAurixAdaptive(src, target);                            // LTTB + local-extrema (unchanged whole-series path)
+      visiblePoints = downsampleAurixAdaptive(src, target, r);                         // densidad adaptativa al rango (24H y llamadores sin rango: LTTB intacto)
     }
     const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, box, r);             // perceptual X
     const yScale = computeAurixValueScale(visiblePoints, vh, box);                    // regime-relative Y

@@ -17,16 +17,16 @@ function fn(name) { const s = 'function ' + name + '('; const i = src.indexOf(s)
 function objConst(name) { const i = src.indexOf('const ' + name + ' ='); if (i < 0) throw new Error('missing obj const ' + name); const j = src.indexOf('};', i); return src.slice(i, j + 2); }
 function scalarConst(name) { const m = src.match(new RegExp('const ' + name + '\\s*=.*?;')); if (!m) throw new Error('missing const ' + name); return m[0]; }
 
-const ENGINE_FNS = ['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', 'downsampleAurixAdaptive',
+const ENGINE_FNS = ['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', '_aurixRenderBucketPolicyOn', '_aurixRenderBucketReduce', 'downsampleAurixAdaptive',
   'computeAurixAdaptiveXScale', 'computeAurixValueScale', '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath',
   '_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps',
   '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixStructuralBreaks',
   'renderValidatedPortfolioChartWithInstitutionalRenderer'];
 const SCALARS = ['_AURIX_RC_ASPECT', '_AURIX_RC_PAD_FRAC', '_AURIX_RC_VPAD_FRAC', '_AURIX_IR_VALUE_MARGIN', '_AURIX_IR_VPAD_FRAC',
   '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA', '_AURIX_VP_GAP_MEDIAN_MULT',
-  '_AURIX_CAPITAL_STEP_SEG_ENABLED', '_AURIX_SPARSE_RAMP_SEG_ENABLED', '_AURIX_VJUMP_MIN_FRAC', '_AURIX_VJUMP_P95_MULT',
+  '_AURIX_RENDER_BUCKET_ENABLED', '_AURIX_RENDER_BUCKET_CLOSE_FRAC', '_AURIX_RENDER_BUCKET_PROM_FRAC', '_AURIX_CAPITAL_STEP_SEG_ENABLED', '_AURIX_SPARSE_RAMP_SEG_ENABLED', '_AURIX_VJUMP_MIN_FRAC', '_AURIX_VJUMP_P95_MULT',
   '_AURIX_CAPSTEP_RATIO_LO', '_AURIX_CAPSTEP_RATIO_HI', '_AURIX_CAPSTEP_TS_PAD_MS', '_AURIX_SPARSE_RAMP_MULT', '_AURIX_SPARSE_RAMP_MIN_MS'];
-const OBJS = ['_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA', '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_BRIDGE_SEG_FRAC'];
+const OBJS = ['_AURIX_RENDER_BUCKET_EXEMPT_RANGES', '_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA', '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_BRIDGE_SEG_FRAC'];
 
 function mkSandbox(segEnabled) {
   const sb = { console, Math, JSON, Array, Number, isFinite, Infinity, Date, activeRange: '24h', window: undefined };
