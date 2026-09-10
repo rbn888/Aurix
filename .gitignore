@@ -19,3 +19,6 @@ supabase/.temp/
 # (agents/, skills/ y demás infraestructura compartida deben poder commitearse).
 .claude/settings.local.json
 .claude/settings.local.json.bak-*
+
+# M.06 — ensamblado del sitio publicable (generado en CI, nunca commiteado)
+_site/

@@ -46,12 +46,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - name: Configure Pages
         uses: actions/configure-pages@v5
-      - name: Upload artifact (repo root; .git/.github auto-excluded)
+      # M.06 · SUPERFICIE DE RELEASE — P0. Esto subía `path: '.'`, y como `.nojekyll` desactiva el
+      # filtrado de Jekyll, el REPO ENTERO quedaba publicado en el dominio del cliente. Verificado en
+      # vivo con HTTP 200 sobre CLAUDE.md, db/supabase_rls.sql, el checklist pre-LIVE de M.04 (con una
+      # dirección real del founder), api/billing/webhook.mjs, los runbooks de db/m04_prod/ con price IDs
+      # de Stripe y .claude/agents/. Sin credenciales expuestas, pero sí el mapa de la frontera de
+      # autorización y material interno en la puerta del producto — y páginas de diagnóstico como
+      # boot-check.html, que borra el almacenamiento local sin confirmación ni auth.
+      # Ahora se publica un ensamblado por ALLOWLIST que además FALLA CERRADO si una referencia local
+      # de un HTML no resuelve o si se cuela material interno: olvidar un asset bloquea el deploy en
+      # vez de romper producción en silencio. `api/` y `landing/` los sirve Vercel, no Pages.
+      - name: Assemble publishable site (allowlist, fail-closed)
+        run: node scripts/aurix-build-site.mjs _site
+      - name: Upload artifact (publishable site only)
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
