@@ -123,7 +123,9 @@ ok('23 remote-reset is an allowed destructive context (integrity lock permits cl
 ok('24 boot + resync apply a remote reset with the reset-aware context (not blocked)',
    /_aurixBootMergeReason === 'remote-reset' \? 'remote-reset' : 'boot-load'/.test(app) &&
    /decision\.reason === 'remote-reset'\) \? 'remote-reset' : 'remote-sync'/.test(app) &&
-   /if \(decision\.reason === 'remote-reset'\) \{[\s\S]*?_clearLocalUserState\(\);/.test(app));
+   // M.06 · un reset propagado es el MISMO usuario: purga sólo lo recuperable del servidor y conserva
+   // sus lápidas (que SON el reset) y su ledger local no confirmado.
+   /if \(decision\.reason === 'remote-reset'\) \{[\s\S]*?_clearLocalUserState\(_AURIX_PURGE\.SAME_USER\);/.test(app));
 ok('25 window.aurixSyncTrace() exposes the full pipeline state',
    /window\.aurixSyncTrace = async function/.test(app) &&
    ['currentUserId','currentEmail','deviceId','localRevision','localUpdatedAt','remoteUpdatedAt','localAssetCount','remoteAssetCount','localSymbols','remoteSymbols','pendingSync','lastSaveContext','lastRemoteSaveStatus','lastRemoteLoadStatus','lastMergeDecision','lastAppliedSource','lastError','verdict']

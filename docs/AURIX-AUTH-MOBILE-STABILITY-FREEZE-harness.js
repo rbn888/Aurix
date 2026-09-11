@@ -70,7 +70,10 @@ const schedule = (sb, reason, opts) => vm.runInContext('aurixScheduleLoginRedire
 
   console.log('A/B/C/D — login.html contract (invite → email → OTP → confirm → single nav):');
   // 1. valid invite → email step opens (unlockAuth on valid).
-  ok('1 valid invite unlocks the email step', /if \(result\.valid\) \{ _authTrace\('invite:ok'[\s\S]{0,40}unlockAuth\(\)/.test(login) && /function unlockAuth\(\)/.test(login));
+  // M.06 · la rama de invitación válida enciende además `_inviteValidated`, que es donde vive
+  // ahora la ADMISIÓN a la beta privada (antes estaba en una clase CSS del DOM).
+  ok('1 valid invite unlocks the email step', /if \(result\.valid\) \{ _inviteValidated = true; _authTrace\('invite:ok'[\s\S]{0,40}unlockAuth\(\)/.test(login) && /function unlockAuth\(\)/.test(login));
+  ok('1b …y una invitación inválida o corta lo APAGA', (login.match(/_inviteValidated = false;/g) || []).length >= 2);
   // 2/3. OTP send: bounded timeout + busy always closes + OTP step on success + visible error on failure.
   ok('2 OTP send opens OTP step on success', /email:send-ok/.test(login) && /email:send-ok[\s\S]{0,900}showOtpStep\(\)/.test(login));
   ok('3 OTP send is bounded + spinner always closes + visible error on failure',

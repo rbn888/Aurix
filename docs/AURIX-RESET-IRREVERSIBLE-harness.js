@@ -78,7 +78,8 @@ ok('12 portfolio sync discards stale-generation responses (_aurixIsResetStale in
 // 13. Cache owner is keyed on the real auth user id (currentUser.id), foreign cache purged.
 ok('13 account isolation: cache owner keyed on currentUser.id; foreign cache purged',
   /_aurixActiveUserId\s*=\s*currentUser && currentUser\.id/.test(app) &&
-  /owner\s*!==\s*_aurixActiveUserId/.test(app) && /_clearLocalUserState\(\)/.test(fn('_aurixEnforceCacheOwner')));
+  /owner\s*!==\s*_aurixActiveUserId/.test(app) && // M.06 · la llamada DECLARA su ciclo de vida y el propietario ANTERIOR (para aparcar lo suyo).
+  /_clearLocalUserState\(_AURIX_PURGE\.USER_SWITCH, owner\)/.test(fn('_aurixEnforceCacheOwner')));
 
 // ── NO DEMO/FALLBACK FILL FOR AUTHENTICATED EMPTY ACCOUNT ────────────────────
 const init = fn('initPortfolioData');

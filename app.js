@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '669'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '670'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -3970,7 +3970,11 @@ async function initPortfolioData(userId) {
     // A remote RESET propagated from another device: purge the local cache so the empty state
     // sticks (the boot writer skips empty sets), then re-stamp owner + synced marker.
     if (decision.reason === 'remote-reset') {
-      try { _clearLocalUserState(); } catch (_) {}
+      // MISMO usuario, reset propagado desde otro de sus dispositivos: sus lápidas SON el reset
+      // y su ledger local puede tener un flujo que nunca llegó al servidor. Coincide con lo que
+      // hace `performSafeReset` en el dispositivo de origen, que tampoco borra el ledger: los
+      // flujos pre-reset los neutraliza el EPOCH, no un borrado.
+      try { _clearLocalUserState(_AURIX_PURGE.SAME_USER); } catch (_) {}
       try { _aurixStampCacheOwner(); } catch (_) {}
     }
     _aurixMarkSynced(_aurixRemoteUpdatedMs(backendData));
@@ -4043,7 +4047,8 @@ const PORTFOLIO_KEYS = [
   // inherits the previous user's sync state, event journal or cache-owner stamp (isolation leak).
   'aurix_portfolio_meta',      // sync meta (revision/updatedAt/syncedAt/deviceId)
   'aurix_portfolio_events',    // append-only journal (per-user)
-  'aurix_cache_owner',         // userId stamp guarding the local cache
+  // `aurix_cache_owner` SALE de esta lista: el logout la purga entera y sin sello el cambio de
+  // usuario deja de ser detectable. Vive ahora en `USER_SCOPED_LOCAL_KEYS`.
   // SPEC P0 CHART · AISLAMIENTO MULTI-CUENTA — `aurixLastGoodChartByRange` (_WSC_LASTGOOD_KEY) NO
   // estaba aquí, así que era la única caché de estado FINANCIERO ni namespaced por usuario ni purgada
   // al cambiar de cuenta: publica serie, rendimiento %, color y estado por rango, con lo que el
@@ -4053,7 +4058,219 @@ const PORTFOLIO_KEYS = [
   'aurixLastGoodChartByRange',
 ];
 
+// ════════════════════════════════════════════════════════════════════════════
+// M.06 · CICLO DE VIDA DEL ESTADO LOCAL — TRES EVENTOS, TRES CONTRATOS
+// ════════════════════════════════════════════════════════════════════════════
+// `_clearLocalUserState` servía al CAMBIO DE USUARIO y al CIERRE DE SESIÓN DEL MISMO
+// USUARIO con una sola lista, y esos dos eventos piden lo contrario:
+//   · CAMBIO DE USUARIO necesita purgar MÁS. Conservar la lápida de reset de A era peor
+//     que la fuga: el flush escribía `portfolio_history: []` con el `user_id` de B.
+//   · CIERRE DE SESIÓN necesita purgar MENOS. `_aurixCaptureFlow` empuja un flujo UNA
+//     vez, sin cola ni reintento, y `_aurixBackfillCapitalFlows` no tiene llamadores: si
+//     el push falló, el ledger LOCAL es el único testigo. Borrarlo al salir hacía que el
+//     siguiente pull demostrara «completitud» contra un `count` que nunca vio la fila ⇒
+//     un DEPÓSITO publicado como RENDIMIENTO, sin fallar cerrado.
+// El RESET de cuenta es el tercero y sigue aparte, en `performSafeReset`: sus lápidas son
+// justo lo que impide resucitar lo borrado, así que no se mezcla con ninguno de los dos.
+const _AURIX_PURGE = { USER_SWITCH: 'user_switch', SAME_USER: 'same_user' };
+
+// Estado del usuario recuperable del servidor va en `PORTFOLIO_KEYS` (se purga en los DOS
+// modos). Aquí va lo que sólo puede irse en un CAMBIO DE USUARIO.
+const USER_SCOPED_LOCAL_KEYS = [
+  // EL SELLO DE PROPIETARIO. Estaba en `PORTFOLIO_KEYS`, así que el logout lo borraba; y
+  // `_aurixCacheIsForeign` exige un sello NO nulo. Tras cerrar sesión, el siguiente usuario
+  // entraba con `owner === null` ⇒ la rama de cambio de usuario NUNCA disparaba ⇒ cero
+  // purga en la ruta MÁS COMÚN (A sale, B entra), y ahí `_aurixCapitalFlowsPull` subía los
+  // flujos de A con el `user_id` de B. Sobreviviendo al logout, el cambio vuelve a ser
+  // detectable — y de paso se cierra el «agujero de owner nulo».
+  'aurix_cache_owner',
+  // FINANCIERO · lápidas y epochs POR USUARIO: el epoch de A no puede filtrar la historia
+  // de B ni hacer que su fila remota se declare indigna de confianza.
+  'aurix_reset_at', 'aurix_portfolio_epoch',
+  // PREFERENCIA CON RE-SELLO. No basta con purgar el sello LWW: con el idioma y la divisa
+  // vivos, el guard legacy de `_mergeRemoteState` re-sella con `Date.now()` y A gana
+  // SIEMPRE ⇒ B veía su patrimonio en la DIVISA BASE de A y el flush escribía las
+  // preferencias de A en la fila de B. En el logout del MISMO usuario sobreviven, que es
+  // el contrato certificado de M.03 (el idioma persiste al salir).
+  'portfolio_lang', 'portfolio_base_currency',
+  'aurix_prefs_updated_at', 'aurix_ui_state_updated_at', 'aurix_subscription_updated_at',
+  // IDENTIDAD y rastro de navegación.
+  'aurix_display_name', 'aurix.gs.recent.v1',
+  'aurix_intv4_shown_v1', 'aurix_intcc_last_visit_v1',
+  // FUERA de ambos modos, con causa: `aurix_investable_chart_epoch` está declarado POR
+  // DISPOSITIVO y `Math.max` significa que conservarlo sólo puede SUBIR el suelo, nunca
+  // readmitir los snapshots contaminados que mitiga. `aurix_plan` tampoco: es un rail
+  // muerto (`_applyRemoteSubscription` es un `return;`) y la autoridad es el RPC.
+];
+// Nombre con sufijo variable: ninguna lista literal lo cubre. Duplicado verbatim de la
+// cartera, CERO lectores, y ningún camino lo borraba.
+const USER_SCOPED_LOCAL_PREFIXES = ['aurix_portfolio_backup_before_migration_'];
+
+// ── LO QUE NO SE PUEDE BORRAR: SE APARCA Y SE DES-APARCA ────────────────────────────
+// Local-only o de recuperación no garantizada. Dejarlo es fuga; borrarlo es pérdida
+// irreversible. Al cambiar de usuario se renombra con un hash de su propietario —deja de
+// ser legible por la cuenta nueva, porque todos sus lectores leen por nombre EXACTO— y
+// cuando ese propietario vuelve se restaura ANTES de su primer pull.
+// El ledger va PRIMERO porque es el único dato a la vez FINANCIERO e IRRECUPERABLE.
+// Las preferencias de disposición y uso de Workspace también se aparcan y no se borran:
+// son local-only, así que borrarlas perdía la personalización de A sin remedio.
+const USER_SCOPED_WORK_KEYS = [
+  'aurixCapitalFlows', 'aurixFlowLedgerRevision',
+  'aurix_ws_goals_v1', 'aurix_ws_goal_funding_v1', 'aurix_ws_scenarios_v1',
+  'aurix_ws_projects_v1', 'aurix_ws_planning_v1', 'aurix_ws_tool_state_v1',
+  'aurix_ws_pinned_v1', 'aurix_ws_recent_v1', 'aurix_ws_space_hidden_v1',
+  'aurix_ws_space_top_v1', 'aurix_workspace_mode',
+];
+const USER_SCOPED_WORK_PREFIXES = ['aurix_ws2_'];
+const _AURIX_PARKED_SUFFIX = '__parked_';
+// Política de crecimiento. Con des-aparcado, lo aparcado se consume al volver su dueño, así
+// que crece sólo por usuarios que no vuelven. Dos topes, y agotar cualquiera de los dos NO
+// destruye nada: se conserva la clave viva y la fuga de ESA clave queda anotada en consola.
+const _AURIX_PARKED_MAX_SLOTS = 2;
+const _AURIX_PARKED_MAX_TOTAL = 30;
+// Sufijo de hueco: `_2`, `_3`… Se construye y se reconoce con el MISMO literal, sin
+// expresión regular escrita a mano — un `\d` mal escapado convirtió antes el segundo hueco
+// en sólo-escritura, y este helper hace imposible que las dos mitades divergan.
+function _aurixParkedSlotName(base, n) { return (n <= 1) ? base : (base + '_' + n); }
+function _aurixParkedSlotIndex(tail) {
+  if (tail === '') return 1;
+  for (let n = 2; n <= _AURIX_PARKED_MAX_SLOTS; n++) if (tail === '_' + n) return n;
+  return 0;                                                   // no es un hueco reconocible
+}
+// Hash del propietario, no su id: `aurixRuntimeDiagnostics` volca `Object.keys(localStorage)`
+// y es PII-free por diseño. Distinguir propietarios es obligatorio (sin ello el trabajo del
+// segundo se perdería al encontrar el hueco ocupado). FNV-1a, el mismo hasher puro del fichero.
+function _aurixParkedOwnerTag(ownerId) {
+  const raw = String(ownerId == null ? 'unknown' : ownerId);
+  try { if (typeof _aurixHistoryHash === 'function') return _aurixHistoryHash(raw); } catch (_) {}
+  let h = 0x811c9dc5 >>> 0;
+  for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
+  return ('00000000' + h.toString(16)).slice(-8);
+}
+function _aurixParkedCount() {
+  let n = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(_AURIX_PARKED_SUFFIX) >= 0) n++; } } catch (_) {}
+  return n;
+}
+// ── Aparcado con EVICCIÓN y con una invariante absoluta ────────────────────────────
+// Tras un CAMBIO DE USUARIO, ninguna clave de trabajo del propietario ANTERIOR puede quedar
+// LEGIBLE por el entrante. Eso obliga a corregir la dirección del fail-safe anterior: si
+// aparcar fallaba, se conservaba la clave VIVA, y el des-aparcado del entrante la respetaba
+// por «lo vivo manda» ⇒ su ledger quedaba vivo en la sesión ajena y `_aurixCapitalFlowsPull`
+// lo empujaba a la fila remota del entrante con SU `user_id`. Es decir, el fail-safe pensado
+// para no perder un dato producía exactamente la corrupción financiera cruzada que este
+// bloque existe para impedir.
+// Jerarquía correcta, escrita porque es una decisión y no un detalle: un ledger AJENO vivo
+// corrompe la verdad financiera de otra persona y se persiste en el servidor; un flujo propio
+// no empujado es un artefacto best-effort que ya podía perderse. Así que primero se intenta
+// APARCAR (sin pérdida), luego se hace sitio EVICCIONANDO, y si aún no cabe se BORRA — nunca
+// se deja vivo.
+function _aurixParkedEvictOne(protectTags) {
+  const protect = Array.isArray(protectTags) ? protectTags.filter(Boolean) : (protectTags ? [protectTags] : []);
+  try {
+    let victim = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const at = k.indexOf(_AURIX_PARKED_SUFFIX);
+      if (at <= 0) continue;
+      // No se desaloja ni al usuario que ENTRA —sería absurdo hacerle sitio borrando lo que
+      // estamos a punto de devolverle— ni al que SALE, porque le estamos aparcando justo ahora y
+      // su clave puede ganar el orden por nombre y auto-desalojarse (`aurixCapitalFlows` empieza
+      // por 'a'): el primer aparcado se perdía al aparcar el siguiente.
+      if (protect.some(t => k.indexOf(_AURIX_PARKED_SUFFIX + t) === at)) continue;
+      // Determinista: el primero por orden de nombre. No hay marca de tiempo en la clave y
+      // añadir una obligaría a parsearla; lo que importa es que el tope sea REAL y estable.
+      if (victim == null || k < victim) victim = k;
+    }
+    if (victim == null) return false;
+    localStorage.removeItem(victim);
+    try { console.warn('[ISOLATION] presupuesto de aparcados lleno; desalojado el más antiguo por nombre: ' + victim); } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
+function _aurixParkKeyForOwner(key, ownerId, protectTag) {
+  const _protect = [protectTag, _aurixParkedOwnerTag(ownerId)];
+  let raw = null;
+  try { raw = localStorage.getItem(key); } catch (_) { return false; }
+  if (raw == null) return false;
+  try {
+    const base = key + _AURIX_PARKED_SUFFIX + _aurixParkedOwnerTag(ownerId);
+    // Hueco libre para este propietario: el segundo aparcado no sobrescribe el primero.
+    let slot = null;
+    for (let n = 1; n <= _AURIX_PARKED_MAX_SLOTS; n++) {
+      const cand = _aurixParkedSlotName(base, n);
+      if (localStorage.getItem(cand) == null) { slot = cand; break; }
+    }
+    if (slot != null) {
+      // Sitio global: si el tope está lleno se desaloja, de forma acotada.
+      let guard = _AURIX_PARKED_MAX_TOTAL;
+      while (_aurixParkedCount() >= _AURIX_PARKED_MAX_TOTAL && guard-- > 0) {
+        if (!_aurixParkedEvictOne(_protect)) break;
+      }
+      if (_aurixParkedCount() < _AURIX_PARKED_MAX_TOTAL) {
+        localStorage.setItem(slot, raw);
+        localStorage.removeItem(key);
+        return true;
+      }
+    }
+  } catch (_) { /* cuota u otro fallo del contenedor: se cae al borrado de abajo */ }
+  // No se pudo aparcar. La clave NO puede quedar viva para el entrante.
+  try {
+    localStorage.removeItem(key);
+    console.warn('[ISOLATION] no se pudo aparcar ' + key + '; se retira para no dejarla legible por la cuenta entrante');
+  } catch (_) {}
+  return false;
+}
+// DES-APARCADO. Sin esto, aparcar cierra la fuga pero para el MOTOR el ledger sigue vacío: al
+// volver su dueño, el pull demuestra «completitud» contra un `count` que nunca vio la fila y el
+// escalón se publica como RENDIMIENTO. Se restaura SÓLO si la clave viva está AUSENTE, que es
+// exactamente el caso tras un cambio de cuenta; si el dueño ya generó datos nuevos se respeta
+// lo vivo y lo aparcado se queda donde está (nunca se pierde, nunca se sobrescribe).
+// Corre ANTES del primer `_aurixCapitalFlowsPull` y en LAS DOS ramas del cambio de propietario,
+// porque en A→B→A el sello es B y la rama foránea era la única alcanzable: restaurar sólo en la
+// rama propia dejaba el aparcado huérfano para siempre.
+function _aurixUnparkKeysForOwner(ownerId) {
+  const out = { restored: 0, keys: [] };
+  try {
+    if (!ownerId) return out;
+    const tag = _AURIX_PARKED_SUFFIX + _aurixParkedOwnerTag(ownerId);
+    const found = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const at = k.indexOf(tag);
+      if (at <= 0) continue;
+      const slot = _aurixParkedSlotIndex(k.slice(at + tag.length));
+      if (!slot) continue;
+      found.push({ parked: k, live: k.slice(0, at), slot: slot });
+    }
+    // Recolectar y DESPUÉS mutar: mutar mientras se recorre desplaza los índices.
+    // Gana el hueco de MAYOR índice, que es el aparcado más RECIENTE. Con el orden inverso, el
+    // slot 1 se restauraba primero y el `_2` —que contiene el estado más nuevo— caía en «lo
+    // vivo manda» en esa misma pasada, así que no se consumía NUNCA por ningún camino real y
+    // ocupaba presupuesto para siempre. Los huecos inferiores, ya superados, se retiran.
+    found.sort((a, b) => (a.live < b.live ? -1 : a.live > b.live ? 1 : b.slot - a.slot));
+    const done = Object.create(null);
+    for (const f of found) {
+      try {
+        if (done[f.live]) { localStorage.removeItem(f.parked); continue; }   // hueco superado
+        if (localStorage.getItem(f.live) != null) continue;     // lo vivo manda
+        const raw = localStorage.getItem(f.parked);
+        if (raw == null) continue;
+        localStorage.setItem(f.live, raw);
+        localStorage.removeItem(f.parked);
+        done[f.live] = true;
+        out.restored++; out.keys.push(f.live);
+      } catch (_) {}
+    }
+    if (out.restored) { try { console.warn('[ISOLATION] estado propio restaurado tras un cambio de cuenta previo: ' + out.keys.join(', ')); } catch (_) {} }
+  } catch (_) {}
+  return out;
+}
+
 // AUTH-ISOLATION-1: auth-only locals (email autofill / OTP step
+
 // restore). Cleared on SIGNED_OUT so the next user does not see
 // the previous user's email pre-filled or land mid-OTP.
 const AUTH_LOCAL_KEYS = [
@@ -4061,11 +4278,36 @@ const AUTH_LOCAL_KEYS = [
   'aurix_otp_email',
 ];
 
-function _clearLocalUserState() {
+// `mode` decide CUÁNTO se purga. Por defecto —y ante un modo desconocido— `SAME_USER`, el
+// contrato MENOS destructivo: un llamador que se olvide de declararlo nunca podrá borrar
+// estado financiero local no recuperable.
+function _clearLocalUserState(mode, previousOwnerId) {
+  const userSwitch = (mode === _AURIX_PURGE.USER_SWITCH);
+  // Respaldado por servidor ⇒ se purga SIEMPRE: se vuelve a descargar, y así ninguna cuenta
+  // arranca leyendo la cartera, el historial o la curva de la anterior.
   PORTFOLIO_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
   AUTH_LOCAL_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
   try { sessionStorage.removeItem('otp_sent'); } catch (_) {}
+  if (!userSwitch) return;
+  USER_SCOPED_LOCAL_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+  // `incomingTag` protege del desalojo lo que el usuario que ENTRA tenga aparcado: sería absurdo
+  // hacerle sitio al saliente borrando justo lo que estamos a punto de devolverle.
+  const incomingTag = (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixParkedOwnerTag(_aurixActiveUserId) : null;
+  USER_SCOPED_WORK_KEYS.forEach(k => { try { _aurixParkKeyForOwner(k, previousOwnerId, incomingTag); } catch (_) {} });
+  try {
+    const doomed = [], parked = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf(_AURIX_PARKED_SUFFIX) >= 0) continue;   // lo ya aparcado no se re-aparca ni se borra
+      if (USER_SCOPED_LOCAL_PREFIXES.some(p => k.indexOf(p) === 0)) doomed.push(k);
+      else if (USER_SCOPED_WORK_PREFIXES.some(p => k.indexOf(p) === 0)) parked.push(k);
+    }
+    // Recolectar y DESPUÉS actuar: mutar mientras se recorre desplaza los índices.
+    doomed.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+    parked.forEach(k => { try { _aurixParkKeyForOwner(k, previousOwnerId, incomingTag); } catch (_) {} });
+  } catch (_) {}
 }
+
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC AUTH.MOBILE.POST-LOGIN-BOUNCE.03 — single guarded login-redirect owner
@@ -4089,7 +4331,9 @@ function _aurixCancelLoginRedirect(reason) {
 }
 function _aurixDoLoginRedirect(reason, clearState) {
   try { if (window.location.pathname.includes('login.html')) return false; } catch (_) {}
-  if (clearState) { try { _clearLocalUserState(); } catch (_) {} }
+  // Cierre de sesión del MISMO usuario: sólo lo recuperable del servidor. El sello de
+  // propietario SOBREVIVE, que es lo que hace detectable el siguiente cambio de cuenta.
+  if (clearState) { try { _clearLocalUserState(_AURIX_PURGE.SAME_USER); } catch (_) {} }
   return safeRedirect('login.html', reason || 'auth');
 }
 // The ONE owner. opts.force = explicit logout (immediate). Returns a promise.
@@ -9310,13 +9554,46 @@ function _aurixEnforceCacheOwner(userId) {
     if (_aurixActiveUserId && owner && owner !== _aurixActiveUserId) {
       try { console.warn('[SYNC][USER_SWITCH] foreign cache purged', { was: owner, now: _aurixActiveUserId }); } catch (_) {}
       try { _aurixCanonicalHistoryLoaded = false; } catch (_) {}   // P0-HISTORY-SYNC-AUTHORITY — new user must re-download canonical history before showing return
-      try { _clearLocalUserState(); } catch (_) {}
+      try { _clearLocalUserState(_AURIX_PURGE.USER_SWITCH, owner); } catch (_) {}
+      // Las copias EN MEMORIA, que se cargan a nivel de módulo ANTES de que exista sesión y
+      // que esta ruta no limpiaba: con ellas vivas, `_mergeRemoteState` hacía union-by-ts de
+      // la serie de A con la remota de B, la persistía bajo B y la programaba para subir; y la
+      // watchlist entraba por la rama «local sin marca» —su sello sí se purgaba, la lista no—
+      // haciendo autoritativos los símbolos de A en la cuenta de B. `performSafeReset` ya
+      // limpiaba este conjunto: las dos rutas eran asimétricas y ésta era la incompleta.
       try { assets = []; } catch (_) {}
+      try { portfolioHistory = []; } catch (_) {}
+      try { categoryHistory = []; } catch (_) {}
+      try { _aurixCanonicalCatHistory = null; } catch (_) {}
+      try { _cardOrder = []; } catch (_) {}
+      try { _catOrder = []; } catch (_) {}
+      try { activeCategory = null; } catch (_) {}
+      try { if (typeof watchlistStore === 'object' && watchlistStore && typeof watchlistStore._resetForUserSwitch === 'function') watchlistStore._resetForUserSwitch(); } catch (_) {}
+      // `baseCurrency` también se lee a nivel de módulo, así que borrar la clave del disco no
+      // cambia la copia viva y los importes de B se pintarían en la divisa base de A. Se
+      // devuelve al defecto y se re-sincronizan LOS DOS indicadores: el selector del menú
+      // (`.menu-curr-btn`, que es donde vive el estado activo) y los botones de la hoja de
+      // rendimiento. `_applyRemotePrefs` sólo los togglea cuando el valor CAMBIA, así que sin
+      // esto Ajustes podía seguir marcando EUR mientras todo se pintaba en USD.
+      // El IDIOMA no se toca aquí: su owner único es `switchLang()`, y mover la variable sin
+      // re-renderizar la desincronizaría del DOM.
+      try { baseCurrency = 'USD'; } catch (_) {}
+      try { if (typeof document !== 'undefined') document.querySelectorAll('.menu-curr-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency)); } catch (_) {}
+      try { if (typeof _syncPerfCurrencyButtons === 'function') _syncPerfCurrencyButtons(); } catch (_) {}
       try { _aurixMiniDonutDrawn = false; _aurixMiniSig = ''; } catch (_) {}
       _aurixStampCacheOwner();
+      // DES-APARCADO EN LA RAMA FORÁNEA, y después de re-sellar. Ésta era la pieza que faltaba:
+      // en A→B→A el sello es B, así que la entrada de A SIEMPRE cae aquí y nunca en la rama
+      // propia — restaurar sólo allí dejaba el estado aparcado de A huérfano para siempre, y su
+      // depósito no empujado se publicaba como RENDIMIENTO de forma permanente. Se restaura
+      // AQUÍ, con el sello ya actualizado al usuario que entra, y antes de su primer pull.
+      try { if (_aurixActiveUserId) _aurixUnparkKeysForOwner(_aurixActiveUserId); } catch (_) {}
       return true;
     }
     _aurixStampCacheOwner();
+    // Rama PROPIA (mismo usuario, o primer login sin sello): si dejó estado aparcado en un
+    // cambio de cuenta anterior, se le devuelve AHORA, antes de su primer pull.
+    try { if (_aurixActiveUserId) _aurixUnparkKeysForOwner(_aurixActiveUserId); } catch (_) {}
     return false;
   } catch (_) { return false; }
 }
@@ -62114,6 +62391,11 @@ const watchlistStore = (() => {
     remove(key)       { _list = _list.filter(k => k !== key); _persist(); _touch(); _notify(); },
     // Bulk-replace from remote without bumping the user-edit timestamp.
     _hydrate(list)    { _list = Array.isArray(list) ? [...list] : []; _persist(); _notify(); },
+    // `_list` se carga a nivel de módulo, antes de que exista sesión, así que la purga limpiaba
+    // el disco y el sello pero dejaba viva la lista de la cuenta anterior. Vacía sin persistir
+    // (el disco ya se purgó) y sin sellar (no es una edición del usuario), así que la siguiente
+    // hidratación remota manda. Sólo lo llama el cambio de usuario.
+    _resetForUserSwitch() { _list = []; _notify(); },
     subscribe:    fn  => _subs.push(fn),
   };
 })();

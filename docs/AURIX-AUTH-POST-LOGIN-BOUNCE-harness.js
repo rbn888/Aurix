@@ -30,7 +30,9 @@ function makeEnv(getSessionImpl, recent) {
     setTimeout: (fn, ms) => { const id = global.setTimeout(fn, Math.min(ms || 0, 5)); timers.add(id); return id; },   // collapse delays for speed
     clearTimeout: (id) => { global.clearTimeout(id); timers.delete(id); },
     _aurixAuthTrace: () => {},
-    _clearLocalUserState: () => { cleared.count++; },
+    // M.06 · el redirect declara su ciclo de vida, así que el doble recibe el modo.
+    _AURIX_PURGE: { USER_SWITCH: 'user_switch', SAME_USER: 'same_user' },
+    _clearLocalUserState: (mode) => { cleared.count++; cleared.lastMode = mode; },
     safeRedirect: (target, reason) => { navs.push({ target, reason }); return true; },
     supabaseClient: { auth: { getSession() { getCalls++; return Promise.resolve({ data: { session: getSessionImpl(getCalls) } }); } } },
     sessionStorage: { _s: {}, getItem(k) { return this._s[k] || null; }, setItem(k, v) { this._s[k] = String(v); }, removeItem(k) { delete this._s[k]; } },

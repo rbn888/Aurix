@@ -59,15 +59,37 @@ ok('14 locked-CTA CSS is real (pointer-events:none + disabled look)',
   /\.btn\.is-launch-locked\s*\{[^}]*pointer-events:\s*none/.test(lCss));
 
 // ── 5. APP OTP GATE (login.html) — public opens at launch, private preserved ─
-ok('15 second-check gate before OTP send (blocks public with no invite until launch)',
-  /if \(!isPublicLaunchOpen\(\) && authSection\.classList\.contains\('locked'\)\) return;/.test(login));
-ok('16 post-launch: email/OTP unlocked for everyone + invite UI hidden + public copy',
-  /function _applyPublicLaunchAccess\(\)[\s\S]{0,400}unlockAuth\(\)[\s\S]{0,400}invite-section[\s\S]{0,200}display = 'none'/.test(login) &&
-  /lg\.publicAccess/.test(login) && /lg\.publicHint/.test(login));
+// RE-DECIDIDA 15 (M.06 · IDENTITY). Este guard comprobaba `authSection.classList.contains('locked')`,
+// o sea la ADMISIÓN a la beta privada vivía en una clase CSS. Al dejar de servirse el markup
+// bloqueado, pasaba a depender de que `lockAuth()` llegara a ejecutarse: un fallo suyo habría
+// permitido `signInWithOtp` con `shouldCreateUser: true` y por tanto crear cuenta SIN invitación
+// antes del lanzamiento. Ahora comprueba ESTADO —`_inviteValidated`, que sólo enciende el RPC de
+// invitación— y el control de admisión ya no puede perderse por un fallo de presentación.
+ok('15 second-check gate before OTP send — por ESTADO de invitación, no por una clase del DOM',
+  /if \(!isPublicLaunchOpen\(\) && !_inviteValidated\) return;/.test(login) &&
+  /let _inviteValidated = false;/.test(login) &&
+  !/classList\.contains\('locked'\)/.test(login.replace(/^\s*\/\/.*$/gm, '')));
+// ── RE-DECIDIDAS 16/17/18 (M.06 · IDENTITY) ────────────────────────────────────────────────
+// Estas tres fijaban el diseño INVERSO: markup servido en BETA PRIVADA (`auth-section locked`,
+// controles `disabled`, copy de invitación) y un script inline POSTERIOR que lo abría. Ese
+// reparto convertía cualquier fallo de ese script —un error anterior en el mismo bloque, una
+// extensión, CSP— en una DENEGACIÓN permanente para un cliente con derecho a entrar, y en el
+// mejor caso en un destello visible de copy de beta privada en la puerta del producto.
+// El muro es CLIENT-ONLY y no concede acceso a nada: la frontera real es el OTP del servidor
+// (asserts 18b/19). Así que el DEFECTO pasa a ser ABIERTO y el muro a ser la EXCEPCIÓN que
+// aplica el JS. El modo de fallo pasa de «denegación permanente» a «muro no aplicado».
+ok('16 post-launch: el markup se SIRVE abierto (sin locked, sin disabled) y con copy público',
+  /<div id="authSection" class="auth-section unlocked">/.test(login) &&
+  !/id="email"[^>]*disabled/.test(login) && !/id="auth-submit"[^>]*disabled/.test(login) &&
+  /<div class="invite-section" style="display:none">/.test(login) &&
+  /data-i18n="lg\.publicAccess"/.test(login) && /data-i18n="lg\.publicHint"/.test(login));
 ok('17 launch access re-checked on visibility/focus (device suspended across launch)',
-  /visibilitychange[\s\S]{0,80}_applyPublicLaunchAccess\(\)/.test(login) && /'focus', _applyPublicLaunchAccess/.test(login));
-ok('18 PRIVATE path preserved: invite RPC + email lock unchanged (pre-launch = private)',
-  /validate_invite_code/.test(login) && /function lockAuth\(\)/.test(login) && /class="auth-section locked"/.test(login));
+  /visibilitychange[\s\S]{0,120}_applyPrivateBetaGate\(\)/.test(login) && /'focus', _applyPrivateBetaGate/.test(login));
+ok('18 PRIVATE path preserved: el muro sigue existiendo y lo aplica el JS antes del lanzamiento',
+  /validate_invite_code/.test(login) && /function lockAuth\(\)/.test(login) &&
+  /function _applyPrivateBetaGate\(\)[\s\S]{0,200}if \(isPublicLaunchOpen\(\)\)[\s\S]{0,200}lockAuth\(\)/.test(login));
+ok('18b la frontera real NO cambia: el muro nunca fue autorización, lo es el OTP del servidor',
+  /signInWithOtp\(/.test(login) && /verifyOtp\(/.test(login));
 ok('19 OTP engine reused unchanged (signInWithOtp shouldCreateUser + verifyOtp)',
   /signInWithOtp\(\{[\s\S]{0,80}shouldCreateUser: true/.test(login) && /verifyOtp\(/.test(login));
 ok('20 public i18n copy present ES + EN (Accede a Aurix / Access Aurix)',

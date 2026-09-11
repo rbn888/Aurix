@@ -272,11 +272,20 @@
     </div>
 
     <div class="beta-card">
-      <div class="beta-access-label" data-i18n="lg.access">Acceso privado</div>
-      <p class="beta-hint" data-i18n="lg.hint">Aurix se encuentra actualmente en beta privada. Introduce tu código de invitación para continuar.</p>
+      <!-- M.06 · IDENTITY — este markup servía el estado de BETA PRIVADA (etiqueta y copy de
+           invitación, `authSection` con clase `locked`, y `#email`/`#auth-submit` con `disabled`)
+           y sólo un script inline POSTERIOR lo abría. Si ese script fallaba —un error anterior en
+           el mismo bloque, una extensión, CSP— un cliente legítimo quedaba BLOQUEADO por un muro
+           que no le corresponde, y en el mejor caso veía un destello de copy de beta privada.
+           El muro es CLIENT-ONLY y no concede acceso a nada: la frontera real es el OTP del
+           servidor. Así que el DEFECTO correcto es ABIERTO, y `_applyPrivateBetaGate()` lo CIERRA
+           sólo si el lanzamiento público no está abierto. Un fallo de presentación ya no puede
+           convertirse en denegación de servicio para quien sí tiene derecho a entrar. -->
+      <div class="beta-access-label" data-i18n="lg.publicAccess">Accede a Aurix</div>
+      <p class="beta-hint" data-i18n="lg.publicHint">Introduce tu correo para iniciar sesión o crear tu cuenta.</p>
 
-      <!-- Invite gate -->
-      <div class="invite-section">
+      <!-- Invite gate — oculto por defecto; `_applyPrivateBetaGate()` lo muestra si hace falta. -->
+      <div class="invite-section" style="display:none">
         <div class="invite-row">
           <input id="inviteCode" class="auth-input" type="text"
                  placeholder="Código de invitación" data-i18n-ph="lg.invitePh"
@@ -287,13 +296,13 @@
         </div>
       </div>
 
-      <!-- Email step (locked until invite) -->
-      <div id="authSection" class="auth-section locked">
+      <!-- Email step — ABIERTO por defecto (ver la nota de arriba). -->
+      <div id="authSection" class="auth-section unlocked">
         <h2 class="auth-title" data-i18n="lg.signin">Acceder</h2>
         <input id="email" type="email" class="auth-input"
                placeholder="correo electrónico" data-i18n-ph="lg.emailPh"
-               autocomplete="email" disabled>
-        <button id="auth-submit" class="auth-btn" data-i18n="lg.sendCode" disabled>Enviar código de acceso</button>
+               autocomplete="email">
+        <button id="auth-submit" class="auth-btn" data-i18n="lg.sendCode">Enviar código de acceso</button>
         <p id="auth-error" class="auth-error"></p>
       </div>
 
@@ -327,7 +336,9 @@
         <p class="otp-hint" data-i18n="lg.emb.micro">Solo tendrás que iniciar sesión una vez en ese navegador.</p>
       </div>
 
-      <p class="beta-version"><span data-i18n="lg.privateBeta">Private Beta</span> &bull; v0.1</p>
+      <!-- M.06 · el sello `Private Beta • v0.1` era PERMANENTE en la puerta de un producto que
+           cobra: la función que abría el formulario reescribía la etiqueta y el copy pero nunca esto. -->
+      <p class="beta-version">Aurix &bull; v1.0</p>
     </div>
 
   </div>
@@ -471,7 +482,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 489;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 490;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -994,6 +1005,7 @@
         // Below the minimum length we never call the RPC; explicitly
         // re-lock so a prior unlock state from a longer string can't
         // linger after a delete.
+        _inviteValidated = false;
         lockAuth();
         return;
       }
@@ -1006,8 +1018,8 @@
         // verify the user hasn't edited the input mid-flight.
         if (seq !== _inviteSeq) return;
         if (myCode !== inviteInput.value.trim().toUpperCase()) return;
-        if (result.valid) { _authTrace('invite:ok', { valid: true }); unlockAuth(); }
-        else              { _authTrace('invite:invalid', { valid: false, errorName: result.error || null }); lockAuth(); }
+        if (result.valid) { _inviteValidated = true; _authTrace('invite:ok', { valid: true }); unlockAuth(); }
+        else              { _inviteValidated = false; _authTrace('invite:invalid', { valid: false, errorName: result.error || null }); lockAuth(); }
       }, 250);
     });
 
@@ -1019,6 +1031,14 @@
     let _cooldownTimer = null;
 
     // ── Auth lock / unlock ─────────────────────────────────────
+    // ADMISIÓN a la beta privada, en ESTADO y no en el DOM. El guard previo al envío del OTP
+    // miraba `authSection.classList.contains('locked')`, así que cuando el markup dejó de
+    // servirse bloqueado ese guard pasó a depender de que `lockAuth()` llegara a ejecutarse.
+    // Un fallo suyo —excepción tragada, extensión, CSP— habría permitido `signInWithOtp` con
+    // `shouldCreateUser: true` y por tanto crear cuenta SIN invitación antes del lanzamiento.
+    // No es una fuga de sesión (el código va al buzón del propio solicitante), pero sí una
+    // pérdida del control de ADMISIÓN, y ese control no puede vivir en una clase CSS.
+    let _inviteValidated = false;
     function lockAuth() {
       emailEl.disabled   = true;
       submitBtn.disabled = true;
@@ -1079,7 +1099,13 @@
       if (e.key === 'Enter') submitBtn.click();
     });
 
-    lockAuth();
+    // Aquí había un `lockAuth()` incondicional: era la inicialización «empezar cerrado» del
+    // diseño anterior, en el que el markup venía bloqueado y un script posterior lo abría. Con
+    // el markup ya abierto, esta llamada volvía a cerrar el formulario para TODOS —incluido un
+    // cliente con derecho a entrar— y `_applyPrivateBetaGate()`, que ahora sólo CIERRA, lo
+    // dejaba así. El estado inicial lo decide el markup; cerrar es responsabilidad exclusiva
+    // de `_applyPrivateBetaGate()`, y sólo antes del lanzamiento público.
+    updateSubmitState();
 
     // SPEC LANZAMIENTO 1 — public launch access. After PUBLIC_LAUNCH_AT the email
     // step opens for EVERYONE (no invite); the private-beta invite UI is hidden and
@@ -1087,18 +1113,23 @@
     // invite gate (owner / testers / whitelist) stays byte-identical. Re-checked on
     // visibility/focus so a device suspended across the launch instant converges —
     // no reload, no new deploy. The OTP send/verify + profile flow are unchanged.
-    function _applyPublicLaunchAccess() {
-      if (!isPublicLaunchOpen()) return;
-      try { unlockAuth(); } catch (_) {}
+    // INVERTIDA (M.06 · identity). Antes esta función ABRÍA el formulario y el markup lo servía
+    // cerrado, así que su fallo dejaba fuera a un cliente con derecho a entrar. Ahora el markup
+    // sirve abierto y esto sólo CIERRA cuando el lanzamiento público NO está abierto. El modo de
+    // fallo pasa de «denegación permanente» a «muro no aplicado», y eso no concede nada: el muro
+    // es client-only y la autorización real es el OTP del servidor.
+    function _applyPrivateBetaGate() {
+      if (isPublicLaunchOpen()) { try { updateSubmitState(); } catch (_) {} return; }
+      try { lockAuth(); } catch (_) {}
       try {
-        const _inv = document.querySelector('.invite-section'); if (_inv) _inv.style.display = 'none';
-        const _lbl = document.querySelector('.beta-access-label'); if (_lbl) { _lbl.setAttribute('data-i18n', 'lg.publicAccess'); _lbl.textContent = tL('lg.publicAccess'); }
-        const _hint = document.querySelector('.beta-hint'); if (_hint) { _hint.setAttribute('data-i18n', 'lg.publicHint'); _hint.textContent = tL('lg.publicHint'); }
+        const _inv = document.querySelector('.invite-section'); if (_inv) _inv.style.display = '';
+        const _lbl = document.querySelector('.beta-access-label'); if (_lbl) { _lbl.setAttribute('data-i18n', 'lg.access'); _lbl.textContent = tL('lg.access'); }
+        const _hint = document.querySelector('.beta-hint'); if (_hint) { _hint.setAttribute('data-i18n', 'lg.hint'); _hint.textContent = tL('lg.hint'); }
       } catch (_) {}
     }
-    _applyPublicLaunchAccess();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) _applyPublicLaunchAccess(); });
-    window.addEventListener('focus', _applyPublicLaunchAccess);
+    _applyPrivateBetaGate();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) _applyPrivateBetaGate(); });
+    window.addEventListener('focus', _applyPrivateBetaGate);
 
     // ── Submit button state (single UI authority) ─────────────
     function updateSubmitState() {
@@ -1167,7 +1198,9 @@
       // (a valid invite unlocked the email step). Public callers with no invite
       // are blocked until PUBLIC_LAUNCH_AT — no OTP, no account creation. After
       // launch the email step is unlocked for everyone so this passes.
-      if (!isPublicLaunchOpen() && authSection.classList.contains('locked')) return;
+      // Antes del lanzamiento público sólo pasa quien haya validado su invitación contra el RPC.
+      // Se comprueba el ESTADO, no la clase del DOM (ver la nota de `_inviteValidated`).
+      if (!isPublicLaunchOpen() && !_inviteValidated) return;
       isSubmitting = true;
 
       try {

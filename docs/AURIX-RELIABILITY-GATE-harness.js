@@ -13,6 +13,16 @@ function fnSrc(name){ const s='function '+name+'('; const i=app.indexOf(s); if(i
   let k=app.indexOf('{',p), d=0; for(;k<app.length;k++){ if(app[k]==='{')d++; else if(app[k]==='}'){d--; if(!d){k++;break;}}}
   return app.slice(i,k); }
 const PORTFOLIO_KEYS_SRC = app.slice(app.indexOf('const PORTFOLIO_KEYS = ['), app.indexOf('];', app.indexOf('const PORTFOLIO_KEYS = [')) + 2);
+// M.06 · AISLAMIENTO POR CICLO DE VIDA — la purga ya no es una lista única: distingue CAMBIO DE
+// USUARIO de CIERRE DE SESIÓN, aparca lo irrecuperable y lo des-aparca al volver su dueño. Este
+// sandbox recibe la fuente COMPLETA (listas, topes, hasher, park y unpark): con una parcial,
+// `_aurixEnforceCacheOwner` lanzaba a mitad de la purga y los asserts se evaluaban sobre un store
+// a medio purgar — exactamente la clase de stub que la lección prohíbe.
+const _sl = (o, c) => app.slice(app.indexOf(o), app.indexOf(c, app.indexOf(o)) + c.length);
+const _sc = n => app.slice(app.indexOf('const ' + n + ' ='), app.indexOf(';', app.indexOf('const ' + n + ' =')) + 1);
+const ISOLATION_SRC = [_sl('const USER_SCOPED_LOCAL_KEYS = [', '];'), _sl('const USER_SCOPED_LOCAL_PREFIXES = [', '];'),
+  _sl('const USER_SCOPED_WORK_KEYS = [', '];'), _sl('const USER_SCOPED_WORK_PREFIXES = [', '];'),
+  _sl('const _AURIX_PURGE = {', '};'), _sc('_AURIX_PARKED_SUFFIX'), _sc('_AURIX_PARKED_MAX_SLOTS'), _sc('_AURIX_PARKED_MAX_TOTAL')].join('\n');
 let pass=0,fail=0; function ok(n,c,i){ if(c){pass++;console.log('  ✓ '+n+(i?'  ['+i+']':''));}else{fail++;console.log('  ✗ '+n+(i?'  ['+i+']':''));} }
 
 function makeStore(){
@@ -22,9 +32,11 @@ function makeStore(){
     console:{ log:()=>{}, warn:()=>{}, error:()=>{} }, STORAGE_KEY:'portfolio_assets', _mem:mem };
   vm.createContext(sb);
   vm.runInContext(PORTFOLIO_KEYS_SRC, sb);
+  vm.runInContext(ISOLATION_SRC, sb);
   vm.runInContext('const AUTH_LOCAL_KEYS = []; let _aurixActiveUserId = null; let assets = []; let _aurixMiniDonutDrawn=false; let _aurixMiniSig="";', sb);
   vm.runInContext("const _AURIX_LIVE_DATA_REVISION_REASONS = ['price-refresh','market-update','snapshot','live-data','perf-state','price','history-maintenance'];", sb);
-  ['_clearLocalUserState','_aurixDeviceId','_aurixCacheOwner','_aurixStampCacheOwner','_aurixCacheIsForeign','_aurixEnforceCacheOwner',
+  ['_aurixParkedOwnerTag','_aurixParkedCount','_aurixParkKeyForOwner','_aurixUnparkKeysForOwner',
+   '_clearLocalUserState','_aurixDeviceId','_aurixCacheOwner','_aurixStampCacheOwner','_aurixCacheIsForeign','_aurixEnforceCacheOwner',
    '_aurixReadPortfolioMeta','_aurixWritePortfolioMeta','_aurixBumpPortfolioMeta','_aurixMarkSynced','_aurixPortfolioRevision','_aurixPendingSync',
    'inferPriceSource','inferProviderId','convertToNewModel','convertFromNewToFlat','convertToLegacyFormat','_aurixSalvageHolding','_aurixLegacyFallbackById','getPortfolioData']
     .forEach(n=>{ try{ vm.runInContext(fnSrc(n), sb); }catch(e){ console.log('load fail '+n+': '+e.message); } });
@@ -63,13 +75,33 @@ console.log('\nFASE 1 — user switch purges the previous user cache (logout/log
   ok('5 same user → cache kept (no purge)', purged2===false && ('aurix_assets' in sb._mem)); }
 
 console.log('\nFASE 1 — isolation keys cleared on logout:');
-ok('6 meta + journal + cache-owner are in PORTFOLIO_KEYS (cleared by _clearLocalUserState on SIGNED_OUT)',
-   /'aurix_portfolio_meta'/.test(PORTFOLIO_KEYS_SRC) && /'aurix_portfolio_events'/.test(PORTFOLIO_KEYS_SRC) && /'aurix_cache_owner'/.test(PORTFOLIO_KEYS_SRC) &&
+// RE-DECIDIDA · M.06 pieza 2. `aurix_cache_owner` SALE de `PORTFOLIO_KEYS` con causa demostrada: esa
+// lista la purga también el CIERRE DE SESIÓN, y sin sello `_aurixCacheIsForeign` (que exige un sello
+// NO nulo) nunca detecta el cambio ⇒ tras un logout el siguiente usuario entraba con `owner === null`
+// y la purga por cambio de cuenta NUNCA disparaba en la ruta más común. Ahora vive en
+// `USER_SCOPED_LOCAL_KEYS`, que sólo purga el CAMBIO DE USUARIO — y el assert 4 de aquí mismo sigue
+// demostrando que en ese evento se purga y se re-sella al usuario nuevo.
+ok('6b el sello de propietario SOBREVIVE al cierre de sesión (o el cambio de usuario no se detecta)',
+  (() => { const k = _sl('const USER_SCOPED_LOCAL_KEYS = [', '];');
+    return k.indexOf("'aurix_cache_owner'") >= 0 && PORTFOLIO_KEYS_SRC.indexOf("'aurix_cache_owner'") < 0; })());
+ok('6 meta + journal are in PORTFOLIO_KEYS (cleared by _clearLocalUserState on SIGNED_OUT)',
+   /'aurix_portfolio_meta'/.test(PORTFOLIO_KEYS_SRC) && /'aurix_portfolio_events'/.test(PORTFOLIO_KEYS_SRC) &&
    /aurix_assets/.test(PORTFOLIO_KEYS_SRC) && /aurix_holdings/.test(PORTFOLIO_KEYS_SRC));
+// M.06 · dos eventos, dos contratos. El CIERRE DE SESIÓN barre lo respaldado por servidor y
+// CONSERVA el sello (sin él, el siguiente cambio de cuenta sería indetectable); el CAMBIO DE
+// USUARIO barre además el sello y lo re-sella al usuario nuevo (assert 4).
 { const sb = makeStore();
   ['aurix_assets','aurix_holdings','aurix_portfolio_meta','aurix_portfolio_events','aurix_cache_owner'].forEach(k=>sb._mem[k]='x');
-  vm.runInContext('_clearLocalUserState();', sb);
-  ok('7 _clearLocalUserState wipes all portfolio + isolation keys', !['aurix_assets','aurix_holdings','aurix_portfolio_meta','aurix_portfolio_events','aurix_cache_owner'].some(k=>k in sb._mem)); }
+  vm.runInContext('_clearLocalUserState(_AURIX_PURGE.SAME_USER);', sb);
+  ok('7 el cierre de sesión barre cartera + estado de sync',
+    !['aurix_assets','aurix_holdings','aurix_portfolio_meta','aurix_portfolio_events'].some(k=>k in sb._mem));
+  ok('7b …y CONSERVA el sello de propietario, que es lo que hace detectable el cambio de cuenta',
+    sb._mem['aurix_cache_owner'] === 'x'); }
+{ const sb = makeStore();
+  ['aurix_assets','aurix_cache_owner'].forEach(k=>sb._mem[k]='x');
+  vm.runInContext('_clearLocalUserState(_AURIX_PURGE.USER_SWITCH, "userA");', sb);
+  ok('7c el cambio de usuario sí barre el sello (y el llamador lo re-sella al usuario nuevo)',
+    !('aurix_assets' in sb._mem) && !('aurix_cache_owner' in sb._mem)); }
 
 console.log('\nFASE 2 — identity/sync fields (revision · updatedAt · deviceId · pendingSync):');
 { const sb = makeStore();

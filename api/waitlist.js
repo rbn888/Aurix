@@ -141,26 +141,70 @@ export default async function handler(req, res) {
     return res.status(502).json({ ok: false, error: 'store_failed' });
   }
 
-  // ── Welcome email (one only) ───────────────────────────────────────────────
+  // ── Welcome email · UNA sola, con la reserva ANTES del envío ──────────────
+  // DEFECTO CORREGIDO (M.06 · identity/transactional): la idempotencia era
+  // «claim-after-send». Se enviaba primero y sólo DESPUÉS se sellaba
+  // `welcome_email_sent_at`, con el fallo del sellado tragado por su propio
+  // `catch`. Dos consecuencias, ambas reproducibles:
+  //   1. El camino de inserción nueva (201) no consultaba el sello en absoluto.
+  //   2. Si el PATCH fallaba, el sello quedaba NULL para siempre, así que CADA
+  //      reenvío del formulario volvía a mandar la bienvenida — sin límite.
+  // Y entre el envío y el sellado había una ventana abierta: dos peticiones
+  // concurrentes (doble clic, reintento del cliente, re-invocación de la
+  // función) leían ambas NULL y enviaban las dos.
+  //
+  // Ahora la reserva es un UPDATE CONDICIONAL, que en Postgres es atómico:
+  //   UPDATE ... SET welcome_email_sent_at = now() WHERE email = ? AND welcome_email_sent_at IS NULL
+  // Si devuelve una fila, esta invocación GANÓ la reserva y es la única que
+  // puede enviar. Si devuelve cero, otra ya la tiene y aquí no se envía nada.
+  // La idempotencia pasa a ser del SERVIDOR, no del orden de las llamadas.
+  //
+  // Si el envío falla DESPUÉS de reservar, la reserva se LIBERA (vuelve a NULL)
+  // para que un intento posterior pueda reintentar: un fallo transitorio del
+  // proveedor no puede dejar a un usuario legítimo sin su bienvenida.
   let emailed = false;
+  let claimed = false;
   if (needsEmail) {
+    try {
+      const claim = await fetch(
+        `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}&welcome_email_sent_at=is.null`,
+        {
+          method: 'PATCH',
+          headers: { ...sbHeaders, Prefer: 'return=representation' },
+          body: JSON.stringify({ welcome_email_sent_at: new Date().toISOString() }),
+        }
+      );
+      if (claim.ok) {
+        const rows = await claim.json().catch(() => []);
+        claimed = Array.isArray(rows) && rows.length === 1;
+      } else {
+        // No se pudo reservar ⇒ NO se envía. Fallar cerrado aquí sólo cuesta una
+        // bienvenida que un intento posterior recuperará; fallar abierto costaría
+        // un duplicado que no se puede deshacer.
+        console.error('[waitlist] welcome claim failed', claim.status);
+      }
+    } catch (e) {
+      console.error('[waitlist] welcome claim error', (e && e.message) || e);
+    }
+  }
+  if (claimed) {
     emailed = await sendWelcomeEmail({ email, locale }).catch((e) => {
       console.error('[waitlist] welcome email error', (e && e.message) || e);
-      return false; // lead is stored regardless — never fail the request on email
+      return false; // el lead queda guardado igual — el email nunca tumba la petición
     });
-    if (emailed) {
-      // Stamp idempotently: only set if still null (guards against races/retries).
+    if (!emailed) {
+      // Liberar la reserva para que un intento futuro pueda reintentar.
       try {
         await fetch(
-          `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}&welcome_email_sent_at=is.null`,
+          `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}`,
           {
             method: 'PATCH',
             headers: { ...sbHeaders, Prefer: 'return=minimal' },
-            body: JSON.stringify({ welcome_email_sent_at: new Date().toISOString() }),
+            body: JSON.stringify({ welcome_email_sent_at: null }),
           }
         );
       } catch (e) {
-        console.error('[waitlist] stamp welcome_email_sent_at failed', (e && e.message) || e);
+        console.error('[waitlist] release welcome claim failed', (e && e.message) || e);
       }
     }
   }
