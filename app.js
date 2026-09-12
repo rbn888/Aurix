@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '670'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '671'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -23206,10 +23206,30 @@ function getInvestableDistribution(opts) {
   // real-estate asset whose `type` casing didn't match the literal slipped into
   // the donut numerator but was excluded from the hero denominator (donut and
   // hero disagreeing on what counts as inmueble).
+  // M.06 · BLOQUE 4/5 — EL CONJUNTO DE ACTIVOS TIENE QUE SER EL MISMO QUE EL DEL HERO.
+  // Este agregador alimenta el donut, su leyenda Y las tarjetas de categoría, pero era el
+  // ÚNICO que no aplicaba los dos guards canónicos que `investableValueUSD`/`totalValueUSD`
+  // sí aplican, así que publicaba una descomposición de un conjunto DISTINTO al del total:
+  //   · VALOR NO FINITO. `assetValueUSD` devuelve NaN para una divisa sin cobertura FX. Los
+  //     totales lo SALTAN («sólo la porción cubierta»); aquí se sumaba, y `(groups[key]||0) +
+  //     NaN` envenenaba el grupo ENTERO. Después `.filter(v > 0)` descarta NaN, así que la
+  //     categoría DESAPARECÍA del donut y su tarjeta se pintaba vacía — mientras el hero
+  //     seguía contando a sus hermanos perfectamente valorados. Un solo activo en una divisa
+  //     exótica borraba «Acciones» de la vista con el dinero intacto en el total.
+  //   · CANTIDAD INVÁLIDA. `_aurixUsableQuantity` es la regla canónica de UNKNOWN ≠ ZERO. Los
+  //     totales saltan la posición; aquí se valoraba, así que una qty negativa restaba de su
+  //     categoría (y podía hundirla por debajo de 0 y hacerla desaparecer) sin tocar el hero.
+  // El hermano más nuevo de esta misma familia, `getLocationDistribution`, ya salta los
+  // valores no finitos: la asimetría estaba sólo aquí. Se REUTILIZAN las dos reglas
+  // canónicas — no se define una tercera valoración — así que para una cartera sana la
+  // salida es byte a byte la de antes y la identidad «Σ porciones == hero» pasa a ser
+  // estructural, no una coincidencia.
   const groups    = {};   // investable assets, grouped by display key
   const nonInvest = {};   // non-investable (real_estate) assets, by display key
   assets.forEach(a => {
+    if (!Number.isFinite(_aurixUsableQuantity(a && a.qty))) return;
     const valUSD = assetValueUSD(a);
+    if (!Number.isFinite(valUSD)) return;
     const key    = _aurixDisplayCategory(a.type);
     if (isInvestableAsset(a)) groups[key]    = (groups[key]    || 0) + valUSD;
     else                      nonInvest[key] = (nonInvest[key] || 0) + valUSD;

@@ -490,6 +490,14 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
     // …y el owner de la superficie VIVA de Workspace, donde `assetCount` se contaba sobre la
     // lista sin filtrar mientras el total ya venía filtrado. Mismo gate que _aw8Qty.
     '_aurixHealthSnapshot',
+    // M.06 · BLOQUES 4/5 (Dashboard + Portfolio) — el agregador que alimenta el donut, su
+    // leyenda Y las tarjetas de categoría era el ÚNICO que publicaba una descomposición de un
+    // conjunto de activos DISTINTO al del hero: valoraba una cantidad que la regla canónica
+    // declara inválida, y sumaba un `assetValueUSD` no finito que envenenaba el grupo entero
+    // (haciendo DESAPARECER la categoría completa de la vista con su dinero intacto en el
+    // total). Lee la regla para ver exactamente el mismo conjunto que `investableValueUSD`.
+    // Su gate propio es docs/AURIX-M06-DASHBOARD-PORTFOLIO-harness.js.
+    'getInvestableDistribution',
     // SPEC INT.03 — el owner de diversificación efectiva (HHI / effective holdings) del
     // Intelligence Core. Lee la cantidad certificada por AQUÍ para FALLAR CERRADO: una
     // posición con cantidad no usable invalidaría el denominador y sobrestimaría la
