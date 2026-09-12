@@ -157,7 +157,22 @@ section('C — P1 · el host histórico sale de la allowlist CORS:');
      /origin: 'https:\/\/app\.aurixsystem\.io'/.test(R('supabase/functions/portfolio-snapshot/index.ts')));
   ok('C.6 no se ha ampliado el CORS ni se ha usado comodín',
      !/Access-Control-Allow-Origin[^\n]*\*/.test(apiFiles.map(f => R(f)).join('\n')));
-  ok('C.7 NO-VACUIDAD · ANTES estaba en 13 sitios y era el primero de la lista', (() => {
+  // ── LO QUE EL CÓDIGO NO PUEDE CERRAR, Y HAY QUE DECIRLO ───────────────────────────
+  // Verificado EN VIVO tras desplegar: `/api/waitlist` y `/api/billing/*` ya RECHAZAN el host
+  // histórico con 403 (su allowlist sale del defecto del código, que este cambio tensó). Pero
+  // los cinco endpoints de datos de mercado —prices, prices/snapshot, prices/history,
+  // search/assets, search/crypto— siguen devolviéndolo, porque leen `ALLOWED_ORIGINS` de una
+  // VARIABLE DE ENTORNO de Vercel que TIENE PRECEDENCIA sobre el defecto y aún lo lista (se
+  // demuestra: un origen arbitrario recibe el host histórico como valor de respaldo).
+  // Cerrarlo es una acción de entorno, no de código: `ALLOWED_ORIGINS=https://app.aurixsystem.io`
+  // en el proyecto de Vercel. Queda como P1 con excepción explícita: esos endpoints sirven datos
+  // de mercado PÚBLICOS, sin datos de usuario ni superficie de autenticación, y el host es del
+  // propio founder. Este assert fija la precedencia para que nadie la olvide.
+  ok('C.7b el defecto del código es el mínimo, y se documenta que el ENTORNO puede ampliarlo',
+     /process\.env\.ALLOWED_ORIGINS \|\| process\.env\.ALLOWED_ORIGIN \|\| 'https:\/\/app\.aurixsystem\.io'/.test(R('api/prices/snapshot.js')) &&
+     /process\.env\.WAITLIST_ALLOWED_ORIGINS \|\|/.test(R('api/waitlist.js')) &&
+     /process\.env\.BILLING_ALLOWED_ORIGINS \|\|/.test(R('api/billing/_checkout.js')));
+  ok('C.8 NO-VACUIDAD · ANTES estaba en 13 sitios y era el primero de la lista', (() => {
     try {
       const prevSnap = execFileSync('git', ['show', 'HEAD:api/prices/snapshot.js'], { cwd: root, encoding: 'utf8' });
       if (!/rbn888/.test(bare(prevSnap))) return true;
