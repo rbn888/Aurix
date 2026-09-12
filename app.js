@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '672'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '673'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -63747,7 +63747,22 @@ function _mktHistoryAdaptersReady() {
 const _AURIX_MKT_SNAP_KEY     = 'aurix.market.snapshots.v1';
 const _AURIX_MKT_SNAP_SCHEMA  = 1;
 const _AURIX_MKT_SNAP_RANGE   = '24h';          // sólo el rango del mini gráfico de la fila
-const _AURIX_MKT_SNAP_MAX     = 40;             // ≈ 44 KB medidos
+// M.06 · BLOQUE 8 — LA CACHÉ SE DESALOJABA A SÍ MISMA DENTRO DE UNA SOLA VISITA.
+// El tope era 40 registros y el catálogo visible de UNA pestaña ya lo supera: cripto ~43,
+// acciones ~54, fondos/ETF ~68, índices ~31; y la pestaña «Todo» agrega cinco de ellas. La poda
+// es LRU por `savedAt`, así que al recorrer una lista de 60 filas las primeras ~20 perdían su
+// serie ANTES de que el usuario saliera de la pantalla, y al volver (recarga, o Market →
+// Workspace → Market) esas filas no tenían último-dato-conocido que pintar: esqueleto/placeholder
+// monocromo hasta que la cola de 3 las alcanzaba de nuevo. Eso es exactamente lo que se percibe
+// como «la sparkline se queda gris demasiado tiempo» y «Market parece reiniciarse», con el
+// retorno 24H ya pintado en verde o rojo al lado (viene de las cotizaciones, que son un lote
+// rápido, no del histórico por activo).
+// El presupuesto REAL nunca fue el número de registros sino los bytes, y estaba 10× por encima:
+// 40 registros ≈ 44 KB medidos frente a un tope duro de 512 KB. Se sube el tope de registros para
+// cubrir la pantalla agregada completa (~240 × ~1,1 KB ≈ 264 KB, holgado bajo el límite), y el
+// límite de bytes pasa a imponerse RECORTANDO (ver _aurixMktSnapshotStoreWrite), que es lo que
+// debe hacer un presupuesto. Ni un dato nuevo, ni una serie inventada, ni un owner financiero.
+const _AURIX_MKT_SNAP_MAX     = 240;            // cubre la vista agregada; los bytes son el límite real
 const _AURIX_MKT_SNAP_MAX_AGE = 24 * 3600 * 1000;
 const _AURIX_MKT_SNAP_MAX_PTS = 120;            // cota dura por registro (una serie 24h trae ~47)
 const _AURIX_MKT_SNAP_MAX_BYTES = 512 * 1024;   // cota dura del almacén completo
@@ -63859,11 +63874,23 @@ function _aurixMktSnapshotStoreWrite() {
   const st = _aurixMktSnapStorage();
   if (!st || !_aurixMktSnapCache) return false;
   try {
-    const entries = _aurixMktSnapshotStorePrune(Array.from(_aurixMktSnapCache.values()));
-    // La poda vuelve a la caché en memoria: almacén y memoria no pueden divergir.
+    let entries = _aurixMktSnapshotStorePrune(Array.from(_aurixMktSnapCache.values()));
+    let payload = JSON.stringify({ schemaVersion: _AURIX_MKT_SNAP_SCHEMA, entries });
+    // EL TOPE DE BYTES ES UN PRESUPUESTO, NO UN ACANTILADO. Antes, pasarse de 512 KB ABANDONABA
+    // la escritura entera: el almacén se quedaba congelado en su contenido anterior y el
+    // último-dato-conocido dejaba de actualizarse PARA SIEMPRE, sin que nada lo delatara. Con el
+    // tope de 40 registros eso era inalcanzable (≈44 KB), así que al subirlo pasaría a ser el
+    // modo de fallo real. Ahora se recorta lo más ANTIGUO hasta que entra —que es justo la
+    // semántica LRU que ya tiene la poda— y sólo se renuncia si ni un registro cabe.
+    while (payload.length > _AURIX_MKT_SNAP_MAX_BYTES && entries.length > 1) {
+      entries = entries.slice(0, Math.max(1, Math.floor(entries.length * 0.8)));
+      payload = JSON.stringify({ schemaVersion: _AURIX_MKT_SNAP_SCHEMA, entries });
+    }
+    if (payload.length > _AURIX_MKT_SNAP_MAX_BYTES) return false;   // un solo registro desmedido
+    // La poda vuelve a la caché en memoria DESPUÉS de saber qué se escribe de verdad: hacerlo
+    // antes dejaba memoria y almacén divergiendo justo en el camino de fallo, contradiciendo el
+    // invariante que este propio comentario declara.
     _aurixMktSnapCache = new Map(entries.map(r => [r.identityKey, r]));
-    const payload = JSON.stringify({ schemaVersion: _AURIX_MKT_SNAP_SCHEMA, entries });
-    if (payload.length > _AURIX_MKT_SNAP_MAX_BYTES) return false;
     return st.set(_AURIX_MKT_SNAP_KEY, payload);
   } catch (_) { return false; }   // cuota llena / storage caído ⇒ Market sigue funcionando igual
 }

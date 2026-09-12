@@ -196,15 +196,26 @@ console.log('\n5 — Corrupción: se descarta la entrada, no el resto ni el arra
 console.log('\n6 — El almacenamiento no puede crecer sin límite:');
 {
   LS = {}; const S = mkSandbox();
-  for (let i = 0; i < 120; i++) S._aurixMktSnapshotCapture({ symbol: 'SYM' + i, type: 'stock', currency: 'USD', current_price: 10 + i }, '24h', ENTRY());
-  const stored = JSON.parse(LS['aurix.market.snapshots.v1']).entries;
   const MAX = cval(S, '_AURIX_MKT_SNAP_MAX'), MAXB = cval(S, '_AURIX_MKT_SNAP_MAX_BYTES');
-  ok('6.1 el almacén queda acotado al máximo declarado (120 capturados → MAX)', stored.length === MAX, stored.length + '/' + MAX);
-  ok('6.2 el máximo es 40 (≈44 KB con series reales de producción)', MAX === 40);
-  ok('6.3 la poda es LRU: sobrevive lo más reciente', stored.every(r => r.savedAt >= Math.min(...stored.map(x => x.savedAt))) && stored.length === 40);
+  const OVER = MAX + 80;
+  for (let i = 0; i < OVER; i++) S._aurixMktSnapshotCapture({ symbol: 'SYM' + i, type: 'stock', currency: 'USD', current_price: 10 + i }, '24h', ENTRY());
+  const stored = JSON.parse(LS['aurix.market.snapshots.v1']).entries;
+  ok('6.1 el almacén queda acotado al máximo declarado (' + OVER + ' capturados → MAX)', stored.length === MAX, stored.length + '/' + MAX);
+  // M.06 · BLOQUE 8 — EL TOPE ERA 40 Y UNA SOLA PANTALLA YA NO CABÍA. Los catálogos visibles por
+  // pestaña son cripto ~43, acciones ~54, fondos/ETF ~68, índices ~31, y «Todo» agrega cinco de
+  // ellas; con poda LRU, recorrer una lista de 60 filas expulsaba la serie de las primeras ~20
+  // ANTES de salir de la pantalla. Al volver (recarga, o Market → Workspace → Market) esas filas
+  // no tenían último-dato-conocido y caían al placeholder monocromo con el % 24H ya en color al
+  // lado: exactamente «la sparkline se queda gris demasiado tiempo» y «Market parece reiniciarse».
+  // El presupuesto REAL siempre fueron los bytes, y estaba 10× por encima. Medido con series de
+  // producción (47 puntos): 240 registros ≈ 319 KB de los 512 KB de cota dura.
+  // Su ejecución y su no-vacuidad viven en AURIX-M06-MARKET-SEARCH-WATCHLIST.
+  ok('6.2 el tope cabe el catálogo visible más grande Y la vista agregada', MAX >= 220, 'MAX=' + MAX);
+  ok('6.3 la poda es LRU: sobrevive lo más reciente',
+     stored.every(r => r.savedAt >= Math.min(...stored.map(x => x.savedAt))) && stored.length === MAX);
   const bytes = LS['aurix.market.snapshots.v1'].length;
-  ok('6.4 el tamaño real se mantiene muy por debajo de la cota dura', bytes < MAXB, bytes + ' B < ' + MAXB + ' B');
-  ok('6.5 la memoria no diverge del almacén tras podar', S._aurixMktSnapshotStoreRead().size === 40);
+  ok('6.4 el tamaño real se mantiene por debajo de la cota dura', bytes < MAXB, bytes + ' B < ' + MAXB + ' B');
+  ok('6.5 la memoria no diverge del almacén tras podar', S._aurixMktSnapshotStoreRead().size === MAX);
   ok('6.6 un almacén gigantesco se descarta sin parsearlo', (() => { LS['aurix.market.snapshots.v1'] = 'x'.repeat(600 * 1024); const S2 = mkSandbox(); return S2._aurixMktSnapshotStoreRead().size === 0; })());
 }
 
