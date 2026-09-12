@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '673'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '674'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -1679,8 +1679,8 @@ function _applyRemoteUiState(ui) {
 // fact, so it rides the same last-write-wins remote-sync rail as preferences /
 // ui_state. Storage + tier logic live with the plan model (PLAN_KEY, defined in
 // the SETTINGS-1 block); here we only expose the timestamp + collect/apply
-// helpers the sync layer uses. This is pure persistence — it never reads or
-// flips ENFORCE_ENTITLEMENTS and never gates a feature.
+// helpers the sync layer uses. This is pure persistence — nunca gatea una feature
+// (el gate es `hasFeature()` contra el RPC del servidor).
 const SUBSCRIPTION_TS_KEY = 'aurix_subscription_updated_at';
 function _aurixSubscriptionTs() {
   try { return parseInt(localStorage.getItem(SUBSCRIPTION_TS_KEY) || '0', 10) || 0; }
@@ -6543,7 +6543,6 @@ const T = {
     ap_trust_1:        'Aurix Free te muestra tu patrimonio. Aurix Premium te ayuda a entenderlo.',
     ap_trust_2:        'Tus activos, tus datos y tu acceso seguirán siendo siempre tuyos.',
     ap_close:          'Cerrar',
-    settingsFounderPrice:     '14,99€ / año',
     settingsFounderDesc:      'El análisis completo de Intelligence y las herramientas avanzadas del Espacio de trabajo.',
     settingsFounderCta:       'Conocer Aurix Premium',
     settingsFounderSoon:      'Próximamente',
@@ -6563,7 +6562,6 @@ const T = {
     // AURIX-MONETIZATION-1 — Upgrade screen (dormant)
     upgradeTitle:             'Función premium',
     upgradeLead:              'Esta herramienta forma parte del plan premium de Aurix.',
-    upgradeSeeFounder:        'Ver Aurix Founder',
     settingsData:             'Datos y seguridad',
     settingsDangerZone:       'Zona peligrosa',
     settingsExport:           'Exportar datos',
@@ -8860,7 +8858,6 @@ const T = {
     ap_trust_1:        'Aurix Free shows you your wealth. Aurix Premium helps you understand it.',
     ap_trust_2:        'Your assets, your data and your access remain always yours.',
     ap_close:          'Close',
-    settingsFounderPrice:     '€14.99 / year',
     settingsFounderDesc:      'The full Intelligence analysis and the advanced Workspace tools.',
     settingsFounderCta:       'Discover Aurix Premium',
     settingsFounderSoon:      'Coming soon',
@@ -8880,7 +8877,6 @@ const T = {
     // AURIX-MONETIZATION-1 — Upgrade screen (dormant)
     upgradeTitle:             'Premium feature',
     upgradeLead:              'This tool is part of Aurix premium.',
-    upgradeSeeFounder:        'See Aurix Founder',
     settingsData:             'Data & security',
     settingsDangerZone:       'Danger zone',
     settingsExport:           'Export data',
@@ -64400,29 +64396,23 @@ if (typeof window !== 'undefined') {
    ══════════════════════════════════════════════════════════════════ */
 
 /* ──────────────────────────────────────────────────────────────────
-   AURIX-MONETIZATION-1 — Plans & entitlements (built, kept DORMANT).
+   Planes y entitlements — MODELO LOCAL DE PRESENTACIÓN, no la autoridad.
    --------------------------------------------------------------------
-   The full commercial model (Free / Founder / Premium) lives here as a
-   real, launch-ready product skeleton. It is wired end-to-end but stays
-   completely inert until launch, governed by ONE compile-time switch:
+   M.06 · BLOQUE 9/10/11 — AQUÍ HABÍA UN INTERRUPTOR MAESTRO QUE YA NO DECIDÍA NADA, Y
+   UNA DOCUMENTACIÓN QUE AFIRMABA LO CONTRARIO. El bloque declaraba
+   `ENFORCE_ENTITLEMENTS = false` como «la única fuente de verdad de si el gating está
+   vivo» y prometía que «mientras el interruptor sea false, TODA feature está
+   desbloqueada para TODO tier». Ninguna de las dos cosas era cierta desde M.02 B3: el
+   gate real es `hasFeature()`, que lee EXCLUSIVAMENTE `_aurixEnt.features[key] === true`
+   —el resultado de `public.aurix_entitlements()`, autoridad del servidor y FAIL CLOSED—
+   y no consulta ese flag en ningún punto. Un flag muerto cuya documentación miente es
+   peor que ningún flag: la siguiente persona que lea esto decidirá con él. Retirado.
 
-       ENFORCE_ENTITLEMENTS = false
-
-   Design contract (do not break):
-   • While the switch is false, EVERY feature is unlocked for EVERY tier.
-     Total access in prelaunch depends on this switch ALONE — never on a
-     user's tier. Nobody is silently forced to 'founder' to keep access.
-   • Tiers stay honest: a user's stored tier is their real commercial tier
-     (default 'free'). Flipping the switch to true at launch activates the
-     real Free/Founder/Premium gating with zero rearchitecture — no data
-     migration, no feature rewrites; call sites already use hasFeature().
-   • This module performs NO payments, NO Stripe, NO real subscriptions,
-     NO paywalls. Those are separate, later, signalled steps.
+   Lo que SÍ vive aquí: el catálogo de tiers y sus features (presentación), el plan
+   local (`aurix_plan`) que ningún servidor escribe y que NO concede nada, y los límites
+   —deliberadamente sin tope para todos los tiers, porque Aurix diferencia por
+   inteligencia y no por cuánto patrimonio te deja registrar.
    ────────────────────────────────────────────────────────────────── */
-
-// MASTER SWITCH — the single source of truth for whether gating is live.
-// false = prelaunch / development: everything unlocked. Flip to true to launch.
-const ENFORCE_ENTITLEMENTS = false;
 
 const PLAN_KEY = 'aurix_plan';
 
@@ -64453,10 +64443,15 @@ const PLAN_CATALOG = Object.freeze({
   free: {
     id: 'free', name: 'Aurix Free', price: null, period: null,
   },
+  // M.06 · BLOQUE 9/10/11 — EL TIER SE QUEDA, SU PRECIO SE RETIRA. Había cuentas con
+  // tier 'founder', así que el tier sigue siendo válido y conserva sus features. Pero
+  // `price`/`priceLabel` eran la fuente que pintaba «14,99 € / año» en una página de
+  // venta ALCANZABLE desde el modal de función premium, ofreciendo un plan que no se
+  // vende a un precio que no existe. Los precios vivos son los del catálogo del
+  // servidor, y el paywall canónico es el único sitio que los muestra.
   founder: {
-    id: 'founder', name: 'Aurix Founder', price: 14.99, period: 'year',
-    priceLabel: { es: '14,99 € / año', en: '€14.99 / year' },
-    lifetimePrice: true, earlyAccess: true,
+    id: 'founder', name: 'Aurix Founder', price: null, period: null,
+    earlyAccess: true,
   },
   premium: {
     id: 'premium', name: 'Aurix Premium', price: null, period: 'year',
@@ -64535,10 +64530,8 @@ function isPremiumTier(tier) {
 function planStatus() { return getPlan().status || 'active'; }
 
 // ── THE entitlement gate ──────────────────────────────────────────
-// Every premium surface asks this one question. While ENFORCE_ENTITLEMENTS is
-// false it always returns true (prelaunch: everything unlocked for everyone,
-// regardless of tier). When true, the real per-tier entitlement applies. No
-// other code in the app needs to know the switch exists.
+// Toda superficie premium hace esta única pregunta, y la respuesta sale SIEMPRE del
+// servidor (ver el bloque de abajo). No hay interruptor de compilación en el camino.
 // ════════════════════════════════════════════════════════════════════════════
 // MONETIZATION V1 · M.02 B3 — CLIENT ENTITLEMENT STATE
 // ════════════════════════════════════════════════════════════════════════════
@@ -64926,11 +64919,14 @@ function _aurixEntIsCatalogPreview() {
 // Expose the entitlement surface for other modules (premium features, the
 // future checkout bridge) without reaching into internals.
 try {
+  // M.06 — FUERA `ENFORCE_ENTITLEMENTS` (flag muerto) y FUERA `setPlanTier`: era un
+  // ESCRITOR de tier comercial expuesto en `window`, así que desde la consola se podía
+  // sellar un plan falso en `aurix_plan` y hacerlo viajar al servidor por el sync. No
+  // concedía features (la autoridad es el RPC, fail-closed), pero corrompía el registro
+  // comercial del usuario, que es lo que luego se le enseña y lo que contradice a Stripe.
   window.aurixEntitlements = {
-    ENFORCE_ENTITLEMENTS: ENFORCE_ENTITLEMENTS,
     hasFeature: hasFeature,
     getPlan: getPlan,
-    setPlanTier: setPlanTier,
     isPremiumTier: isPremiumTier,
     planStatus: planStatus,
     PREMIUM_FEATURES: PREMIUM_FEATURES,
@@ -64939,51 +64935,21 @@ try {
 } catch (_) {}
 
 /* ──────────────────────────────────────────────────────────────────
-   AURIX-MONETIZATION-1 · Phase 3 — Promo codes (architecture, DORMANT).
+   M.06 · BLOQUE 9/10/11 — CÓDIGOS PROMOCIONALES RETIRADOS DEL CLIENTE.
    --------------------------------------------------------------------
-   The redemption schema and resolver are defined now so codes can be
-   honoured the day checkout goes live, with no rearchitecture. Nothing
-   here charges money or flips entitlements on its own; applyPromoCode is
-   the single, explicit entry point and it only mutates the local plan
-   (which then syncs). Real validation will move server-side alongside
-   Stripe — resolvePromoCode is the seam for that swap.
+   Aquí vivían `PROMO_CODES` (FOUNDER100, EARLYACCESS, PARTNER — todos al 100 %),
+   `resolvePromoCode` y `applyPromoCode`, y su propio comentario los declaraba
+   «INERT: no prelaunch UI redeems these». No lo eran: `applyPromoCode` estaba
+   EXPUESTO en `window.aurixEntitlements`, así que era un camino EJECUTABLE que
+   llamaba a `setPlanTier('premium')` y sellaba un tier comercial falso en
+   `aurix_plan`, y de ahí al servidor por el sync. No concedía ni una feature —la
+   autoridad es `public.aurix_entitlements()`, fail-closed— pero sí escribía en el
+   registro comercial del usuario: justo la superficie que después se le muestra y
+   que tendría que coincidir con Stripe.
+   Los descuentos reales son **promotion codes de Stripe**, validados en el checkout
+   del servidor, que es donde siempre estuvo previsto que acabaran. El cliente no
+   necesita catálogo de códigos, y tenerlo sólo ofrecía una vía de autoelevación.
    ────────────────────────────────────────────────────────────────── */
-const PROMO_CODE_TYPES = Object.freeze(['percent', 'fixed', 'free', 'founder']);
-
-// Seed catalog — illustrative and INERT. No prelaunch UI redeems these; real
-// codes will be validated server-side. Shape: { type, value, grantsTier, expiresAt? }.
-const PROMO_CODES = Object.freeze({
-  FOUNDER100:  { type: 'founder', value: 0,   grantsTier: 'founder', note: 'Founder access, 100% off' },
-  EARLYACCESS: { type: 'percent', value: 100, grantsTier: 'premium', note: 'Early-access full unlock' },
-  PARTNER:     { type: 'free',    value: 0,   grantsTier: 'premium', note: 'Partner comp access' },
-});
-
-// Resolve a code to its effect WITHOUT applying it. Returns null if unknown,
-// malformed or expired. This is the seam to later swap for a server-side check.
-function resolvePromoCode(code) {
-  if (!code || typeof code !== 'string') return null;
-  const key = code.trim().toUpperCase();
-  const def = PROMO_CODES[key];
-  if (!def) return null;
-  if (def.expiresAt && Date.now() > def.expiresAt) return null;
-  if (!PROMO_CODE_TYPES.includes(def.type)) return null;
-  return Object.assign({ code: key }, def);
-}
-
-// Apply a resolved code to the local plan. Explicit, opt-in, dormant: nothing in
-// the prelaunch UI calls this yet. When wired, it records the grant + promo code
-// on the plan and lets the normal sync carry it. Returns the updated plan or null.
-function applyPromoCode(code) {
-  const effect = resolvePromoCode(code);
-  if (!effect) return null;
-  return setPlanTier(effect.grantsTier, { promoCode: effect.code, source: 'promo' });
-}
-try {
-  if (window.aurixEntitlements) {
-    window.aurixEntitlements.resolvePromoCode = resolvePromoCode;
-    window.aurixEntitlements.applyPromoCode = applyPromoCode;
-  }
-} catch (_) {}
 
 // SETTINGS-MOBILE-V2 — SINGLE premium-visibility owner. La UI de Membresía (pestaña
 // del rail + sección `data-pane="plan"` + tarjetas + CTA) se oculta ENTERA con este
@@ -65947,13 +65913,13 @@ function exportPortfolioBackup() {
 })();
 
 /* ──────────────────────────────────────────────────────────────────
-   AURIX-MONETIZATION-1 · Phases 4/5/6/8 — Founder page + upgrade gate.
+   Upgrade gate — el destino de una capacidad denegada.
    --------------------------------------------------------------------
-   Presentation + a dormant gate. No payments, no Stripe, no paywall.
-   requireFeature() is the seam premium surfaces will call; while
-   ENFORCE_ENTITLEMENTS=false it always runs the allowed path, so the
-   upgrade modal never appears. The Founder page is reachable from the
-   menu and the settings plan card. The main dashboard is left untouched.
+   `requireFeature()` es el punto único que consultan las superficies premium, y
+   pregunta a `hasFeature()`, que es el entitlement del SERVIDOR (fail-closed). Si
+   deniega, abre el modal de función premium, cuya única ruta de compra es el paywall
+   canónico. M.06 — la página «Aurix Founder» que este bloque describía (alcanzable
+   desde el menú y desde la tarjeta de plan) se retiró con su precio obsoleto.
    ────────────────────────────────────────────────────────────────── */
 
 // Localized labels for premium features — drives the Founder benefits list and
@@ -65999,45 +65965,12 @@ function _featureLabel(key) {
   return (typeof lang !== 'undefined' && l[lang]) ? l[lang] : l.es;
 }
 
-function _renderFounderBenefits() {
-  const ul = document.getElementById('founderBenefitsList');
-  if (!ul) return;
-  const futureLabel = (typeof lang !== 'undefined' && lang === 'en')
-    ? 'Future premium tools' : 'Futuras herramientas premium';
-  const items = FOUNDER_BENEFIT_ORDER.map(k => _featureLabel(k)).concat([futureLabel]);
-  ul.innerHTML = items.map(() =>
-    '<li class="founder-benefit"><span class="founder-benefit-check" aria-hidden="true">✓</span>' +
-    '<span class="founder-benefit-label"></span></li>').join('');
-  // Set text safely (labels are trusted, but textContent keeps it injection-proof).
-  const labels = ul.querySelectorAll('.founder-benefit-label');
-  items.forEach((label, i) => { if (labels[i]) labels[i].textContent = label; });
-}
-
-function openFounderPage() {
-  const ov = document.getElementById('founderOverlay');
-  if (!ov) return;
-  _renderFounderBenefits();
-  const priceEl = document.getElementById('founderPriceAmount');
-  try {
-    const c = (typeof PLAN_CATALOG !== 'undefined') ? PLAN_CATALOG.founder : null;
-    if (priceEl && c && c.priceLabel) priceEl.textContent = c.priceLabel[lang] || c.priceLabel.es;
-  } catch (_) {}
-  if (typeof applyI18n === 'function') applyI18n();
-  ov.classList.add('open');
-  ov.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('modal-open');
-}
-function closeFounderPage() {
-  const ov = document.getElementById('founderOverlay');
-  if (!ov) return;
-  ov.classList.remove('open');
-  ov.setAttribute('aria-hidden', 'true');
-  // Keep the body lock if the settings panel that launched it is still open.
-  const settings = document.getElementById('settingsOverlay');
-  if (!settings || !settings.classList.contains('open')) {
-    document.body.classList.remove('modal-open');
-  }
-}
+// M.06 · BLOQUE 9/10/11 — `_renderFounderBenefits` / `openFounderPage` / `closeFounderPage`
+// RETIRADAS con su markup. Pintaban la página «Aurix Founder» (precio anual obsoleto +
+// CTA «Early Access · Próximamente») y eran alcanzables desde el modal de función premium,
+// desde el CTA de Membresía como fallback y desde `window.aurixEntitlements.openFounderPage`.
+// El único punto de conversión es ahora el paywall canónico `openAurixPremiumModal`, cuyos
+// precios salen del catálogo del servidor.
 
 // ════════════════════════════════════════════════════════════════════════════
 // MONETIZATION V1 · M.02 B3 — UPGRADE INTENT (seam, NO paywall)
@@ -66047,9 +65980,8 @@ function closeFounderPage() {
 // — eso es M.03/M.04.
 //
 // Reutiliza `#upgradeOverlay`, que ya existe y ya es honesto ("esta herramienta
-// forma parte del plan premium de Aurix"), y OCULTA su botón "Ver Aurix Founder",
-// porque ese camino sí pinta un precio (`openFounderPage` lee PLAN_CATALOG) y este
-// bloque no publica precios.
+// forma parte del plan premium de Aurix"). M.06 — el botón "Ver Aurix Founder" que este
+// bloque ocultaba ya no existe: se retiró la página legacy entera con su precio.
 //
 // La intención se registra en memoria y en un log local acotado, sin PII, para que
 // M.03 tenga una línea base de conversión en lugar de descubrirla desde cero. No
@@ -66097,8 +66029,11 @@ function openUpgradeIntent(opts) {
     // dice qué función es Premium y ofrece la ÚNICA ruta de compra, que es el
     // paywall. Un precio duplicado en dos superficies es un precio que puede
     // divergir del catálogo.
-    const fBtn = document.getElementById('upgradeFounderBtn');
-    if (fBtn) fBtn.style.display = 'none';
+    // M.06 — aquí había un `display:none` sobre el botón «Ver Aurix Founder». Era lo
+    // ÚNICO que impedía que un usuario viera una oferta de un plan retirado a un precio
+    // obsoleto, y sólo actuaba en ESTE opener: `openUpgradeModal` (el otro, sin llamadores
+    // y expuesto en `window`) no lo ocultaba. Ocultar no es retirar: el botón, su página y
+    // su precio ya no existen, así que la garantía dejó de depender de una línea de estilo.
     const pBtn = document.getElementById('upgradePaywallBtn');
     if (pBtn) pBtn.setAttribute('data-feature', featureKey || '');
     if (typeof applyI18n === 'function') applyI18n();
@@ -66131,10 +66066,9 @@ function closeUpgradeModal() {
   document.body.classList.remove('modal-open');
 }
 
-// The seam every premium surface will call. While ENFORCE_ENTITLEMENTS=false,
-// hasFeature() is always true → onAllowed runs and the upgrade modal never
-// shows. Returns true if access was granted. Deliberately NOT wired into the
-// dashboard in prelaunch (the main dashboard stays untouched).
+// El punto único que consultan las superficies premium. Pregunta a `hasFeature()`,
+// que es el entitlement del servidor y falla CERRADO: sin lectura válida, no hay
+// acceso. Devuelve true si se concedió; si no, abre el modal de función premium.
 // M.02 B3 — el seam real. `hasFeature` ya es el entitlement server-side, y la
 // rama denegada abre el upgrade INTENT (sin precio), no el modal comercial.
 function requireFeature(feature, onAllowed, opts) {
@@ -66148,7 +66082,6 @@ function requireFeature(feature, onAllowed, opts) {
 try {
   if (window.aurixEntitlements) {
     window.aurixEntitlements.requireFeature = requireFeature;
-    window.aurixEntitlements.openFounderPage = openFounderPage;
     window.aurixEntitlements.openUpgradeModal = openUpgradeModal;
   }
 } catch (_) {}
@@ -66216,23 +66149,16 @@ try {
       return;
     }
     if (e.target.closest && e.target.closest('#planFounderCta')) {
+      // M.06 — sin fallback a la página legacy: si el paywall canónico no estuviera,
+      // no hacer nada es mejor que ofrecer un plan retirado a un precio obsoleto.
       if (typeof window !== 'undefined' && window.openAurixPremiumModal) {
         window.openAurixPremiumModal({ source: 'settings-membership' });
-      } else {
-        openFounderPage();
       }
       return;
     }
-    // Upgrade modal → Founder page.
-    if (e.target.closest && e.target.closest('#upgradeFounderBtn')) {
-      closeUpgradeModal(); openFounderPage(); return;
-    }
     // Closes.
-    if (e.target.closest && e.target.closest('#founderClose')) { closeFounderPage(); return; }
     if (e.target.closest && e.target.closest('#upgradeClose'))  { closeUpgradeModal(); return; }
     // Backdrop closes.
-    const fov = document.getElementById('founderOverlay');
-    if (fov && fov.classList.contains('open') && e.target === fov) { closeFounderPage(); return; }
     const uov = document.getElementById('upgradeOverlay');
     if (uov && uov.classList.contains('open') && e.target === uov) { closeUpgradeModal(); return; }
   });
@@ -66240,9 +66166,7 @@ try {
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     const uov = document.getElementById('upgradeOverlay');
-    const fov = document.getElementById('founderOverlay');
     if (uov && uov.classList.contains('open')) { closeUpgradeModal(); return; }
-    if (fov && fov.classList.contains('open')) { closeFounderPage();  return; }
   });
 })();
 

@@ -145,7 +145,15 @@ console.log('\n8 — i18n completo: cero literales y cambio inmediato ES↔EN:')
 
 // Bloques exactos del Account Center en el markup.
 const acMenu  = html.slice(html.indexOf('<div id="menuPanel"'), html.indexOf('</header>'));
-const acModal = html.slice(html.indexOf('<div class="modal-overlay" id="settingsOverlay">'), html.indexOf('id="founderOverlay"'));
+// M.06 · BLOQUE 9/10/11 — el marcador de FIN era `id="founderOverlay"`, y esa superficie
+// comercial se retiró (página «Aurix Founder» con un precio obsoleto). Con el marcador
+// ausente, `indexOf` devolvía -1 y el corte se llevaba TODO el resto del documento: los
+// literales legítimos del modal de idioma y del de reset entraban en el Account Center y
+// tumbaban 8.4/8.5. Se ancla en el siguiente overlay REAL, y si algún día también se
+// moviera, el corte revienta en vez de medir otra cosa.
+const _acEnd = html.indexOf('id="upgradeOverlay"');
+if (_acEnd < 0) throw new Error('marcador de fin del Account Center ausente: revisar el corte');
+const acModal = html.slice(html.indexOf('<div class="modal-overlay" id="settingsOverlay">'), _acEnd);
 const acHtml  = acMenu + acModal;
 
 // Diccionarios ES / EN tal y como los declara app.js (una sola fuente, sin duplicar).

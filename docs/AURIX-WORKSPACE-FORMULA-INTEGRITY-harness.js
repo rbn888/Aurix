@@ -605,8 +605,23 @@ function catalog() {
      /openUpgradeIntent\(/.test(fn('_wsOpenTool')));
   OK('M11b el gate vive en el OWNER de apertura, no duplicado en cada tarjeta',
      !/hasFeature\(/.test(home));
-  OK('M12 no se ha fabricado gating comercial: el master switch sigue apagado',
-     /const ENFORCE_ENTITLEMENTS = false;/.test(app));
+  // M.06 · BLOQUE 9/10/11 — ESTE ASSERT FIJABA UN FLAG MUERTO COMO CONTRATO.
+  // `ENFORCE_ENTITLEMENTS = false` no gateaba nada desde M.02 B3: `hasFeature()` lee
+  // EXCLUSIVAMENTE el entitlement del servidor (`_aurixEnt.features[key] === true`,
+  // fail-closed) y jamás consultó ese flag. Su documentación, además, afirmaba lo
+  // contrario («mientras sea false, TODA feature está desbloqueada»), así que el flag
+  // era una trampa para quien lo leyera. Se retiró, y con él la vía de autoelevación
+  // que lo acompañaba (`applyPromoCode` expuesto en `window` escribía un tier falso).
+  // El invariante REAL, que es el que importa, se afirma ahora directamente.
+  OK('M12 no se ha fabricado gating comercial: no existe interruptor local de entitlements',
+     !/const ENFORCE_ENTITLEMENTS\s*=/.test(app) &&
+     /_aurixEnt\.features\[featureKey\] === true/.test(app) &&
+     /if \(!_aurixEnt\.loaded\) return false;/.test(app));
+  OK('M12b ni catálogo de códigos promocionales en el cliente que pueda conceder tier',
+     !/PROMO_CODES\s*=/.test(app) && !/function applyPromoCode/.test(app) &&
+     !/aurixEntitlements\.applyPromoCode/.test(app));
+  OK('M12c ni un escritor de tier comercial expuesto en `window`',
+     !/setPlanTier: setPlanTier/.test(app));
   OK('M13 loan NO parece deshabilitada: publicada, con ruta de apertura y sin soon/lock',
      (() => { const e = catalog().find(x => x.id === 'loan_simulation');
        if (!e || !e.published || e.featureKey !== 'workspace.loan') return false;

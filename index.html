@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v712-market-lkg-capacity';
-      var APPJS_V = '673';
+      var BUILD = 'v713-commercial-truth-cleanup';
+      var APPJS_V = '674';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1707,7 +1707,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=673"
+  <script src="app.js?v=674"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -2114,65 +2114,35 @@
   </div>
 </div>
 
-<!-- AURIX-MONETIZATION-1 · Phases 4/5/8 — Aurix Founder page. Commercial
-     presentation only. No checkout: the CTA shows Early Access until Stripe is
-     wired (no real payment, no subscription). Reuses .modal-overlay / .modal. -->
-<div class="modal-overlay" id="founderOverlay" aria-hidden="true">
-  <div class="modal modal--founder" role="dialog" aria-modal="true" aria-labelledby="founderTitle">
-    <div class="modal-header">
-      <div class="modal-title-block">
-        <h3 id="founderTitle" data-i18n="founderTitle">Aurix Founder</h3>
-        <p class="modal-subtitle" data-i18n="founderSubtitle">Acceso anticipado a la plataforma de inteligencia patrimonial.</p>
-      </div>
-      <button class="modal-close" id="founderClose" aria-label="Close">✕</button>
-    </div>
-    <div class="modal-body founder-body">
-      <div class="founder-hero">
-        <span class="founder-badge" data-i18n="founderBadge">Oferta fundador</span>
-        <div class="founder-price"><span class="founder-price-amount" id="founderPriceAmount">14,99 € / año</span></div>
-        <p class="founder-price-note" data-i18n="founderPriceNote">Precio fundador de por vida.</p>
-      </div>
+<!-- M.06 · BLOQUE 9/10/11 — SUPERFICIE COMERCIAL RETIRADA. Aquí vivía la página
+     «Aurix Founder» con un precio anual obsoleto y un CTA «Early Access · Próximamente».
+     No era código muerto: el modal de función premium tenía un botón «Ver Aurix Founder»
+     por ENCIMA del real, así que cualquier usuario Free que tocara una capacidad Premium
+     recibía primero una oferta de un plan que no se vende, a un precio que ya no existe y
+     con un CTA que prometía que aún no se puede comprar — cuando Premium SÍ se compra.
+     El paywall canónico (openAurixPremiumModal) es la única ruta de compra y sus precios
+     salen del catálogo del servidor. El TIER «founder» sigue existiendo para las cuentas
+     que lo tengan; lo que se retira es su escaparate y su precio. -->
 
-      <div class="founder-section">
-        <h4 class="founder-section-title" data-i18n="founderIncludesTitle">Incluye</h4>
-        <ul class="founder-benefits" id="founderBenefitsList"><!-- rendered by _renderFounderBenefits() --></ul>
-      </div>
-
-      <div class="founder-section">
-        <h4 class="founder-section-title" data-i18n="founderPerksTitle">Ventajas de fundador</h4>
-        <ul class="founder-perks">
-          <li data-i18n="founderPerkLifetime">Precio fundador de por vida</li>
-          <li data-i18n="founderPerkPremium">Acceso a todas las funciones premium actuales</li>
-          <li data-i18n="founderPerkPriority">Acceso prioritario a futuras funciones</li>
-          <li data-i18n="founderPerkSupport">Soporte temprano al desarrollo</li>
-        </ul>
-      </div>
-
-      <div class="founder-cta-wrap">
-        <button type="button" class="btn-submit btn-submit--plan founder-cta" id="founderCta" data-i18n="founderCta">Early Access · Próximamente</button>
-        <p class="founder-cta-note" id="founderCtaNote" data-i18n="founderCtaNote">Aún no está abierto. Te avisaremos al activar el acceso fundador.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- AURIX-MONETIZATION-1 · Phase 6 — Premium upgrade screen. DORMANT: with
-     ENFORCE_ENTITLEMENTS=false, requireFeature() never opens this. It exists so
-     gated surfaces have a destination the day enforcement is switched on. -->
+<!-- Premium upgrade screen — el destino de una capacidad denegada. El gate real es
+     `hasFeature()` contra `public.aurix_entitlements()` (autoridad del servidor,
+     fail-closed): la vieja nota sobre ENFORCE_ENTITLEMENTS describía un interruptor
+     que ya no decidía nada y se retiró con él. -->
 <div class="modal-overlay" id="upgradeOverlay" aria-hidden="true">
   <div class="modal modal--upgrade" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle">
     <div class="modal-header">
       <div class="modal-title-block">
         <h3 id="upgradeTitle" data-i18n="upgradeTitle">Función premium</h3>
-        <p class="modal-subtitle" id="upgradeFeatureName">Aurix Founder</p>
+        <p class="modal-subtitle" id="upgradeFeatureName"></p>
       </div>
       <button class="modal-close" id="upgradeClose" aria-label="Close">✕</button>
     </div>
     <div class="modal-body upgrade-body">
       <p class="upgrade-lead" data-i18n="upgradeLead">Esta herramienta forma parte del plan premium de Aurix.</p>
-      <button type="button" class="btn-submit btn-submit--plan" id="upgradeFounderBtn" data-i18n="upgradeSeeFounder">Ver Aurix Founder</button>
       <!-- M.04 — la ÚNICA ruta de compra desde un punto de conversión: abre el
-           paywall, que es donde viven los precios (del catálogo del servidor). -->
+           paywall, que es donde viven los precios (del catálogo del servidor).
+           M.06 — y ahora es de verdad la única: el botón «Ver Aurix Founder» que
+           estaba AQUÍ ARRIBA ofrecía primero un plan retirado, a un precio obsoleto. -->
       <button type="button" class="btn-submit btn-submit--plan" id="upgradePaywallBtn" data-i18n="pw_open">Ver Aurix Premium</button>
     </div>
   </div>

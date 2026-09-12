@@ -643,9 +643,18 @@ ok('J.3 la migración es no destructiva: ni DROP TABLE, ni DROP COLUMN, ni DELET
   !STMTS.some(s => /^delete\s+from/i.test(s)) && !STMTS.some(s => /^update\s+public\./i.test(s)));
 ok('J.4 la columna legacy user_portfolios.subscription sigue existiendo intacta',
   /add column if not exists\s+subscription\s/i.test(read('db/persistence_remote_subscription_1.sql')));
-ok('J.5 los owners legacy del cliente siguen presentes (B1 no retira nada)',
+// M.06 · BLOQUE 9/10/11 — B1 no retiraba nada, y eso era correcto ENTONCES. Pero
+// `PROMO_CODES` no era un owner legacy inerte: `applyPromoCode` estaba expuesto en
+// `window.aurixEntitlements`, así que era un camino EJECUTABLE que escribía un tier
+// comercial falso en `aurix_plan` y lo subía al servidor por el sync. Retirado junto al
+// flag muerto `ENFORCE_ENTITLEMENTS`. Los demás owners legacy siguen intactos: lo que
+// se conserva es el MODELO (tiers, features, plan local), no la vía de autoelevación.
+ok('J.5 los owners legacy del cliente siguen presentes (el modelo se conserva)',
   /const PLAN_KEY/.test(app) && /function hasAurixPremiumAccess/.test(app) &&
-  /PLAN_FEATURES =/.test(app) && /PROMO_CODES =/.test(app) && /_collectSubscription/.test(app));
+  /PLAN_FEATURES =/.test(app) && /_collectSubscription/.test(app));
+ok('J.5b …pero SIN catálogo de promos en el cliente ni escritor de tier en `window`',
+  !/PROMO_CODES\s*=/.test(app) && !/function applyPromoCode/.test(app) &&
+  !/setPlanTier: setPlanTier/.test(app));
 ok('J.6 el inventario B0 es READ-ONLY (cero sentencias mutantes)',
   b0.length > 500 && !/^\s*(insert|update|delete|alter|drop|grant|revoke|truncate)\b/im.test(b0));
 ok('J.7 B0 declara explícitamente que sus valores NO se migran',

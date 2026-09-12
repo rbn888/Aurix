@@ -126,7 +126,14 @@ ok('header: el full-bleed depende sólo de la pestaña, y una sola expresión lo
   /const _wsFullBleed = \(tab === 'workspace'\);/.test(app) &&
   /classList\.toggle\('workspace-active', _wsFullBleed\)/.test(app));
 ok('i18n by lang (ES default)', /typeof lang !== 'undefined' && lang === 'en'/.test(app));
-ok('payments untouched (entitlement enforcement still off)', /const ENFORCE_ENTITLEMENTS = false;/.test(app));
+// M.06 · BLOQUE 9/10/11 — este assert fijaba `ENFORCE_ENTITLEMENTS = false`, un flag
+// que no gateaba nada desde M.02 B3 (el gate es `hasFeature()` contra el RPC del
+// servidor, fail-closed) y cuya documentación afirmaba lo contrario. Retirado. El
+// invariante que de verdad importa aquí es que este bloque no toca el cobro.
+ok('payments untouched (el gate es server-authoritative y fail-closed)',
+  !/const ENFORCE_ENTITLEMENTS\s*=/.test(app) &&
+  /if \(!_aurixEnt\.loaded\) return false;/.test(app) &&
+  /_aurixEnt\.features\[featureKey\] === true/.test(app));
 
 // ── RE-DECIDIDO EN M.04 (SPEC · cobro real) ──────────────────────────────────
 // Estas cuatro aserciones certificaban el TEASER: el item "Aurix Premium" del

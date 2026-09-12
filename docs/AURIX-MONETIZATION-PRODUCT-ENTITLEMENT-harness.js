@@ -399,9 +399,15 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
         const got = b.requireFeature('workspace.loan', () => { ran = true; });
         return !ran && got === false && JSON.parse(st['aurix_upgrade_intent_v1_uidA'] || '[]').length === 1; })());
   }
-  ok('F.7 el intent NO publica precio: oculta el botón que abre la página con precio',
-    /getElementById\('upgradeFounderBtn'\)/.test(fnSource('openUpgradeIntent')) &&
-    /fBtn\.style\.display = 'none'/.test(fnSource('openUpgradeIntent')));
+  // M.06 · BLOQUE 9/10/11 — OCULTAR NO ES RETIRAR. Este assert certificaba un
+  // `display:none` sobre el botón «Ver Aurix Founder», y ese estilo era lo ÚNICO que
+  // impedía ofrecer un plan retirado a un precio obsoleto… y sólo actuaba en ESTE
+  // opener: `openUpgradeModal` (sin llamadores, expuesto en `window`) no lo ocultaba.
+  // La página, el botón y el precio ya no existen, así que la garantía dejó de
+  // depender de una línea de estilo y pasa a ser estructural.
+  ok('F.7 el intent NO publica precio: el botón con precio ya no existe en ninguna parte',
+    !/upgradeFounderBtn/.test(app) && !/upgradeFounderBtn/.test(idx) &&
+    !/founderOverlay/.test(idx) && !/14[,.]99/.test(idx));
   ok('F.8 openFounderPage (que sí pinta precio) no se invoca desde el intent',
     !/openFounderPage/.test(fnSource('openUpgradeIntent')));
   ok('F.9 sin checkout, sin Stripe, sin Apple, sin trial en este bloque',

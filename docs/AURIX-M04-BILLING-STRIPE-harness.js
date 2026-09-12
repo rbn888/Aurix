@@ -962,9 +962,14 @@ console.log('\nK4 · producto · el plan y el portal son ALCANZABLES');
   ok('K4.1b …y esa sección es VISIBLE: el owner único de la UI de Membresía está on',
     /AURIX_PREMIUM_UI_ENABLED = true/.test(app) &&
     /html\[data-aurix-premium-ui="off"\][^{]*data-settings-pane="plan"/.test(css));
+  // M.06 — el rango se amplía porque el fallback a la página legacy («si no existe el
+  // modal canónico, abre Aurix Founder») se retiró con su precio obsoleto: ahora entre
+  // el selector y la llamada hay un comentario que explica por qué NO hay fallback.
   ok('K4.4 …y ese CTA abre el modal canónico, que es el único dueño del portal',
-    /#planFounderCta[\s\S]{0,200}openAurixPremiumModal/.test(app) &&
+    /#planFounderCta[\s\S]{0,400}openAurixPremiumModal/.test(app) &&
     /data-premium-portal/.test(app) && /_aurixBillingPortal/.test(app));
+  ok('K4.5 y sin fallback a una página de precio retirada',
+    !/openFounderPage\(\)/.test(app));
 }
 
 // ── M5 · CONVERSIÓN · SUPERFICIES FREE, UNA SOLA PUERTA ────────────────────
