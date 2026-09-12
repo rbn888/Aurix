@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v713-commercial-truth-cleanup';
-      var APPJS_V = '674';
+      var BUILD = 'v714-membership-copy-truth';
+      var APPJS_V = '675';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1707,7 +1707,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=674"
+  <script src="app.js?v=675"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -2062,12 +2062,15 @@
         <div class="settings-actions">
           <!-- SPEC 67 — "Exportar datos" TEMPORARILY DISABLED before launch: kept in place + same
                design, shown as "Próximamente" via `disabled` (mirrors #settingsImportBtn). Re-enable:
-               remove `disabled` and restore the sub to data-i18n="settingsExportSub". -->
+               remove `disabled` and restore the sub to data-i18n="settingsExportSub".
+               M.06 — el subtítulo usa ahora `settingsComingSoon`, una clave NEUTRA. Antes pintaba
+               `settingsImportSub`, la clave de OTRA acción: el texto era correcto en los dos
+               idiomas, pero habilitar Importar habría cambiado el subtítulo de Exportar con ella. -->
           <button type="button" class="settings-action" id="settingsExportBtn" disabled>
             <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/></svg></span>
             <span class="settings-action-text">
               <span class="settings-action-label" data-i18n="settingsExport">Exportar datos</span>
-              <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
+              <span class="settings-action-sub" data-i18n="settingsComingSoon">Próximamente</span>
             </span>
             <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>
@@ -2075,7 +2078,7 @@
             <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 20h14"/></svg></span>
             <span class="settings-action-text">
               <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
-              <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
+              <span class="settings-action-sub" data-i18n="settingsComingSoon">Próximamente</span>
             </span>
             <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>

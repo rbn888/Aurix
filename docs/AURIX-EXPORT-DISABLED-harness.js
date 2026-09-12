@@ -23,7 +23,15 @@ const btnBlock = btnIdx >= 0 ? html.slice(html.lastIndexOf('<button', btnIdx), h
 ok('1 export option STILL PRESENT (visible, same place)', btnIdx >= 0 && /class="settings-action"/.test(btnBlock));
 ok('2 export label unchanged ("Exportar datos")', /data-i18n="settingsExport"/.test(btnBlock));
 ok('3 export button is DISABLED', /id="settingsExportBtn"\s+disabled/.test(html));
-ok('4 shown as "Próximamente" (sub reuses settingsImportSub)', /data-i18n="settingsImportSub"/.test(btnBlock) && !/data-i18n="settingsExportSub"/.test(btnBlock));
+// M.06 · BLOQUE 12/13 — este assert fijaba como CONTRATO que el subtítulo de Exportar
+// REUTILIZARA `settingsImportSub`, la clave de otra acción. El texto renderizado era
+// correcto en los dos idiomas, así que no había defecto visible; pero el día que Importar
+// se habilite y su subtítulo cambie, el de Exportar cambiaría CON ella, en silencio. Ahora
+// cada acción usa `settingsComingSoon`, una clave NEUTRA propia, y `settingsExportSub`
+// sigue reservada para cuando Exportar se reactive (ver assert 5).
+ok('4 shown as "Próximamente" via a NEUTRAL key (not another action\'s)',
+   /data-i18n="settingsComingSoon"/.test(btnBlock) && !/data-i18n="settingsExportSub"/.test(btnBlock) &&
+   !/data-i18n="settingsImportSub"/.test(btnBlock));
 
 // The Settings click handler must NOT invoke the export flow while disabled.
 const handlerHasExportCall = /#settingsExportBtn'\)\)\s*\{[\s\S]{0,240}exportPortfolioBackup\(\)/.test(app);

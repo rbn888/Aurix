@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '674'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '675'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6568,6 +6568,11 @@ const T = {
     settingsExportSub:        'Descarga un JSON con toda tu cartera',
     settingsImport:           'Importar datos',
     settingsImportSub:        'Próximamente',
+    // M.06 · BLOQUE 12/13 — clave NEUTRA para «aún no disponible». «Exportar datos» pintaba
+    // su subtítulo con `settingsImportSub`, la clave de OTRA acción: el texto renderizado era
+    // correcto en los dos idiomas, así que no había defecto visible, pero el día que Importar
+    // se habilite y su subtítulo cambie, el de Exportar cambiaría CON ella, en silencio.
+    settingsComingSoon:       'Próximamente',
     settingsReset:            'Resetear cartera',
     settingsResetSub:         'Borra activos, historial y seguimiento',
     // SPEC PLATFORM-HARDENING.3 — user-safe diagnostics access
@@ -8883,6 +8888,7 @@ const T = {
     settingsExportSub:        'Download a JSON file with your portfolio',
     settingsImport:           'Import data',
     settingsImportSub:        'Coming soon',
+    settingsComingSoon:       'Coming soon',
     settingsReset:            'Reset portfolio',
     settingsResetSub:         'Erase assets, history and watchlist',
     // SPEC PLATFORM-HARDENING.3 — user-safe diagnostics access
