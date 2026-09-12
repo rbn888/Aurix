@@ -122,8 +122,16 @@ console.log('\nLIVE FILES — watchdog + instrumentation present:');
   ck('index.html: panel is retired if the bundle arrives late',
      /removeChild\(p\)/.test(idx) && /boot_diag_retired/.test(idx));
   // The recovery screen must never be Spanish-only.
+  // M.06 · CIERRE — este assert fijaba los TÍTULOS LITERALES de la pantalla como prueba de
+  // localización. El diagnóstico interno dejó de ser la pantalla (ahora es un mensaje honesto
+  // + reintentar, con los ~30 campos internos detrás de «Ver detalles técnicos»), así que esos
+  // literales cambiaron. El invariante —la pantalla de recuperación NUNCA puede ser sólo en
+  // español— se afirma ahora por ESTRUCTURA: los dos idiomas declaran las cinco piezas de copy.
   ck('index.html: recovery screen is localised (en/es)',
-     /startup diagnostics/.test(idx) && /diagnóstico de arranque/.test(idx) && /Retry \(clean reload\)/.test(idx) && /function bootLang/.test(idx));
+     /function bootLang/.test(idx) &&
+     ['title', 'hint', 'retry', 'details', 'detailsHint']
+       .every(k => (idx.match(new RegExp('\\b' + k + ": '", 'g')) || []).length >= 2) &&
+     /Retry \(clean reload\)/.test(idx) && /Reintentar \(recarga limpia\)/.test(idx));
   // The old retry wiped sessionStorage wholesale, taking app session state with it.
   ck('index.html: retry never wipes sessionStorage wholesale',
      !/sessionStorage\.clear\(\)/.test(idx.replace(/\/\/[^\n]*/g, '')));

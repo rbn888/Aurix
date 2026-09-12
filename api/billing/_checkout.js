@@ -33,7 +33,7 @@ const ANON_KEY     = process.env.SUPABASE_ANON_KEY || 'sb_publishable_wlZsjnPGXa
 const APP_ORIGIN   = 'https://app.aurixsystem.io';
 
 const ALLOWED_ORIGINS = (process.env.BILLING_ALLOWED_ORIGINS ||
-  [APP_ORIGIN, 'https://rbn888.github.io'].join(','))
+  APP_ORIGIN)   // M.06 — fuera el host histórico: billing sólo desde el dominio canónico
   .split(',').map(s => s.trim()).filter(Boolean);
 
 const PROVIDER = 'stripe';

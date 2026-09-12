@@ -17,7 +17,7 @@
 // Optional env:           RESEND_API_KEY, WAITLIST_FROM, WAITLIST_ALLOWED_ORIGINS
 
 const ALLOWED_ORIGINS = (process.env.WAITLIST_ALLOWED_ORIGINS ||
-  'https://aurixsystem.io,https://www.aurixsystem.io,https://rbn888.github.io')
+  'https://aurixsystem.io,https://www.aurixsystem.io')
   .split(',').map(s => s.trim()).filter(Boolean);
 
 function corsOrigin(req) {

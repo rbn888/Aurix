@@ -3,10 +3,11 @@
 // Response: { prices: { [provider_id]: { price: number, change24h: number|null } } }
 
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
-// origin, so the GitHub Pages app (rbn888.github.io) and the future
+// origin. M.06 — el host histórico de GitHub Pages (rbn888.github.io) SALIÓ de la
+// allowlist: el dominio canónico es app.aurixsystem.io y el antiguo redirige. El futuro
 // app.aurixsystem.io app are both accepted during migration. ALLOWED_ORIGINS
 // overrides the legacy ALLOWED_ORIGIN env var when present.
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io,https://app.aurixsystem.io')
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'https://app.aurixsystem.io')
   .split(',').map(s => s.trim()).filter(Boolean);
 // Reflect the request Origin only when it is allow-listed (never wildcard '*');
 // localhost (any port) is accepted for local dev. Unknown origins fall back to

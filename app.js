@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '675'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '676'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6626,9 +6626,22 @@ const T = {
     mktFilterSortLabel:       'Ordenar',
     mktFilterHelperExtended:  'Más periodos estarán disponibles cuando activemos histórico avanzado.',
     mktSortWatchlist:         'Seguimiento',
-    mktSortName:              'Nombre',
-    mktSortPrice:             'Precio',
-    mktSortChange:            'Cambio',
+    // M.06 · CIERRE TRANSVERSAL — EL DESPLEGABLE DE ORDEN NO DECÍA EN QUÉ DIRECCIÓN ORDENA,
+    // Y TRES DE SUS SIETE OPCIONES NO ESTABAN TRADUCIDAS EN ABSOLUTO.
+    // `mktSortRelevance`, `mktSortChangeAsc` y `mktSortPriceAsc` no existían en NINGÚN
+    // diccionario, así que conservaban el texto español del markup: en inglés el desplegable
+    // mezclaba «Featured / Change / Price» con «Relevancia / Mayor caída 24H / Precio: menor a
+    // mayor». Y las cuatro que sí existían pisaban el markup con una forma CORTA sin dirección
+    // («Precio», «Cambio»), dejando «Precio» al lado de «Precio: menor a mayor» — con lo que ni
+    // en español se podía saber qué hacía cada opción. Se recupera la copy descriptiva que el
+    // propio markup ya declaraba como intención, y se traduce. Estas claves sólo las consume
+    // este desplegable.
+    mktSortName:              'Nombre A–Z',
+    mktSortPrice:             'Precio: mayor a menor',
+    mktSortPriceAsc:          'Precio: menor a mayor',
+    mktSortChange:            'Mayor subida 24H',
+    mktSortChangeAsc:         'Mayor caída 24H',
+    mktSortRelevance:         'Relevancia',
     mktSortFeatured:          'Destacados',
     mktSort24h:               'Cambio 24H',
     mktSortType:              'Tipo',
@@ -8940,9 +8953,12 @@ const T = {
     mktFilterSortLabel:       'Sort',
     mktFilterHelperExtended:  'More periods will unlock when advanced history is enabled.',
     mktSortWatchlist:         'Watchlist',
-    mktSortName:              'Name',
-    mktSortPrice:             'Price',
-    mktSortChange:            'Change',
+    mktSortName:              'Name A–Z',
+    mktSortPrice:             'Price: high to low',
+    mktSortPriceAsc:          'Price: low to high',
+    mktSortChange:            'Biggest 24H gain',
+    mktSortChangeAsc:         'Biggest 24H drop',
+    mktSortRelevance:         'Relevance',
     mktSortFeatured:          'Featured',
     mktSort24h:               '24H change',
     mktSortType:              'Type',
@@ -48328,11 +48344,34 @@ window.addEventListener("touchmove", (e) => {
 
 let _hoverListenerAdded = false;
 
+// ════════════════════════════════════════════════════════════════════════════
+// M.06 · CIERRE TRANSVERSAL — ESTE BUCLE CORRÍA PARA SIEMPRE SIN NADA QUE PINTAR
+// ════════════════════════════════════════════════════════════════════════════
+// `monsterLoop()` se invocaba SIN CONDICIÓN al cargar el módulo y, cuando `.monster-orb`
+// no estaba en el DOM, su rama de salida volvía a armar `requestAnimationFrame`. El orbe
+// sólo lo produce `renderInsights()`, es decir la pestaña legacy 'insights' — que la
+// navegación de cuatro verbos YA NO EXPONE (`data-tab="insights"` no existe en el markup
+// y su único disparador, `toggleAllTx`, no tiene llamadores). Resultado en producción: un
+// fotograma cada ~16 ms, indefinidamente, en TODAS las superficies, ejecutando un
+// `querySelector` para no pintar nada. El navegador pausa rAF con la pestaña oculta, así
+// que no era una fuga en segundo plano, pero sí trabajo continuo e inútil en primer plano.
+// AHORA: si el orbe no está, el bucle PARA (no se rearma), y sólo arranca donde el orbe
+// NACE. Si esa superficie vuelve a ser alcanzable, la animación es idéntica a la de antes.
+// No se sustituye un bucle infinito por otro temporizador: no hay temporizador nuevo.
+let _monsterRafOn = false;
+function _monsterStart() {
+  try {
+    if (_monsterRafOn) return;
+    if (!document.querySelector('.monster-orb')) return;   // sin orbe no se arma nada
+    _monsterRafOn = true;
+    requestAnimationFrame(monsterLoop);
+  } catch (_) { _monsterRafOn = false; }
+}
 function monsterLoop() {
   const orb = document.querySelector(".monster-orb");
 
   if (!orb) {
-    requestAnimationFrame(monsterLoop);
+    _monsterRafOn = false;   // el orbe ya no está: el bucle TERMINA
     return;
   }
 
@@ -48397,10 +48436,13 @@ function monsterLoop() {
   const ai = +(0.2 + g * 0.2).toFixed(2);
   orb.style.boxShadow = `0 0 ${r1}px rgba(${color},${a1}), 0 0 ${r2}px rgba(${color},${a2}), inset 0 0 ${ri}px rgba(${color},${ai})`;
 
+  _monsterRafOn = true;
   requestAnimationFrame(monsterLoop);
 }
 
-monsterLoop();
+// M.06 — antes aquí había un `monsterLoop();` incondicional. El arranque pasa al punto
+// donde el orbe se CREA (ver `renderInsights` en el owner de pestañas).
+_monsterStart();
 
 function monsterReact() {
   monsterState.targetScale = 1.06;
@@ -51812,6 +51854,8 @@ function _applyTab(tab) {
     if (tab === 'insights') {
       placeholder.innerHTML = renderInsights();
       startInsightRotation();
+      // M.06 · CIERRE — el orbe acaba de entrar en el DOM: AQUÍ se arma su animación.
+      try { if (typeof _monsterStart === 'function') _monsterStart(); } catch (_) {}
     } else if (tab === 'market') {
       renderMarket();
     } else if (tab === 'intelligence') {

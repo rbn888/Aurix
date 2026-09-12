@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v714-membership-copy-truth';
-      var APPJS_V = '675';
+      var BUILD = 'v715-m06-closure';
+      var APPJS_V = '676';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -279,8 +279,8 @@
         return l === 'es' ? 'es' : 'en';
       }
       var DIAG_T = {
-        es: { title: 'AURIX · diagnóstico de arranque', hint: 'No se ha podido cargar la aplicación. Tu cartera, tu sesión y tus preferencias están intactas.', retry: 'Reintentar (recarga limpia)', retrying: 'Reintentando…' },
-        en: { title: 'AURIX · startup diagnostics', hint: 'The application could not be loaded. Your portfolio, session and preferences are intact.', retry: 'Retry (clean reload)', retrying: 'Retrying…' }
+        es: { title: 'No hemos podido cargar Aurix', hint: 'Tu cartera, tu sesión y tus preferencias están intactas. Vuelve a intentarlo.', retry: 'Reintentar (recarga limpia)', retrying: 'Reintentando…', details: 'Ver detalles técnicos', detailsHint: 'Información técnica para soporte. No contiene datos personales ni de tu cartera.' },
+        en: { title: 'We could not load Aurix', hint: 'Your portfolio, session and preferences are intact. Please try again.', retry: 'Retry (clean reload)', retrying: 'Retrying…', details: 'Show technical details', detailsHint: 'Technical information for support. It contains no personal or portfolio data.' }
       };
 
       function purgeAurixCaches() {
@@ -372,10 +372,27 @@
           var bl = document.getElementById('bootLoader'); if (bl) bl.style.display = 'none';
           var p = document.createElement('div'); p.id = 'aurixBootDiag'; p.setAttribute('lang', info.lang);
           p.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:2147483647;background:#070a14;color:#cdd9ef;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:20px 14px;overflow:auto;-webkit-overflow-scrolling:touch';
-          p.innerHTML = '<div style="font:700 16px/1.3 -apple-system,system-ui;color:#7fb0ff;margin-bottom:6px">' + esc(L.title) + '</div>'
-            + '<div style="font:400 13px/1.45 -apple-system,system-ui;color:#8fa3c4;margin-bottom:10px">' + esc(L.hint) + '</div>'
-            + '<div style="white-space:pre-wrap;word-break:break-word;background:#0c1426;border:1px solid #1c2b49;border-radius:8px;padding:12px">' + esc(JSON.stringify(info, null, 2)) + '</div>'
-            + '<button id="aurixBootRetry" style="margin-top:16px;width:100%;padding:13px 18px;background:#1b3a6b;color:#fff;border:0;border-radius:9px;font:600 15px/1 -apple-system,system-ui">' + esc(L.retry) + '</button>';
+          // M.06 · CIERRE TRANSVERSAL — EL DIAGNÓSTICO INTERNO YA NO ES LA PANTALLA.
+          // Antes esto volcaba ~30 campos internos (build, URL del bundle, pasos de arranque,
+          // nombres de cachés y de Service Worker, estado de transporte, errores, UA) A PANTALLA
+          // COMPLETA, en monoespaciada, como PRIMERA y única cosa que veía un cliente cuyo
+          // arranque había fallado. Es PII-free por construcción —y eso se conserva— pero sigue
+          // siendo arquitectura interna expuesta sin necesidad, y para la persona que lo lee es
+          // un muro de JSON en el peor momento posible.
+          // Ahora la superficie de cliente es un mensaje honesto y un botón de reintento; el
+          // volcado sigue EXISTIENDO, íntegro, detrás de una acción explícita («Ver detalles
+          // técnicos»), que es lo que soporte necesita. Cero observabilidad perdida, cero
+          // exposición por defecto. El <details> nativo no necesita JS ni CSS nuevos.
+          p.innerHTML = '<div style="max-width:560px;margin:0 auto">'
+            + '<div style="font:700 18px/1.3 -apple-system,system-ui;color:#e8eefb;margin-bottom:8px">' + esc(L.title) + '</div>'
+            + '<div style="font:400 14px/1.5 -apple-system,system-ui;color:#9db0cf;margin-bottom:18px">' + esc(L.hint) + '</div>'
+            + '<button id="aurixBootRetry" style="width:100%;padding:14px 18px;background:#1b3a6b;color:#fff;border:0;border-radius:10px;font:600 15px/1 -apple-system,system-ui">' + esc(L.retry) + '</button>'
+            + '<details style="margin-top:20px">'
+            +   '<summary style="cursor:pointer;font:500 13px/1.4 -apple-system,system-ui;color:#7fb0ff;padding:8px 0">' + esc(L.details) + '</summary>'
+            +   '<div style="font:400 12px/1.45 -apple-system,system-ui;color:#6f80a0;margin:6px 0 10px">' + esc(L.detailsHint) + '</div>'
+            +   '<div style="white-space:pre-wrap;word-break:break-word;background:#0c1426;border:1px solid #1c2b49;border-radius:8px;padding:12px">' + esc(JSON.stringify(info, null, 2)) + '</div>'
+            + '</details>'
+            + '</div>';
           document.body.appendChild(p);
           var btn = document.getElementById('aurixBootRetry');
           // Manual retry: purge Aurix caches + clear ONLY the boot markers (so the automatic
@@ -1707,7 +1724,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=675"
+  <script src="app.js?v=676"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

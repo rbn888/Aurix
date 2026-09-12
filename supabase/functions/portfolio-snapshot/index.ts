@@ -137,7 +137,13 @@ async function fetchPrices(symbols: string[]): Promise<Map<string, { price: numb
   if (!uniq.length) return map;
   try {
     const url = `${PRICE_API_BASE}/api/prices/snapshot?symbols=${encodeURIComponent(uniq.join(','))}`;
-    const res = await fetch(url, { headers: { origin: 'https://rbn888.github.io' } });
+    // M.06 · CIERRE — el `origin` que se anunciaba era el host HISTÓRICO de GitHub Pages, que
+    // acaba de salir de la allowlist del API. Es una llamada servidor-a-servidor y
+    // `/api/prices/snapshot` no RECHAZA por origin (sólo decide qué eco pone en
+    // `Access-Control-Allow-Origin`, que es un mecanismo de NAVEGADOR), así que esto no
+    // condicionaba el acceso — pero anunciar un dominio retirado es una mentira en un
+    // encabezado. Se declara el canónico.
+    const res = await fetch(url, { headers: { origin: 'https://app.aurixsystem.io' } });
     if (!res.ok) return map;
     const j = await res.json();
     for (const p of (j.snapshot || [])) {
