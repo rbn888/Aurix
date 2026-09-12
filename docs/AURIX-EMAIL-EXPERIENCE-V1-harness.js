@@ -74,9 +74,9 @@ ok('2 artefacts are exactly the renderer output (single owner, no drift)', (() =
     const out = execFileSync(process.execPath, ['--input-type=module', '-e',
       "import{renderOtpEmail,renderWelcomeEmail}from'./scripts/aurix-email.mjs';" +
       "import fs from 'node:fs';" +
-      "process.stdout.write(String(renderOtpEmail()===fs.readFileSync('email/aurix-otp-code.html','utf8'))+','+String(renderWelcomeEmail()===fs.readFileSync('email/aurix-welcome.html','utf8')));"],
+      "process.stdout.write(String(renderOtpEmail()===fs.readFileSync('email/aurix-otp-code.html','utf8'))+','+String(renderWelcomeEmail()===fs.readFileSync('email/aurix-welcome.html','utf8'))+','+String(renderWelcomeEmail('es')===fs.readFileSync('email/aurix-welcome-es.html','utf8')));"],
       { cwd: root, encoding: 'utf8' });
-    return out.trim() === 'true,true';
+    return out.trim() === 'true,true,true';
   } catch (e) { return false; }
 })());
 
@@ -85,9 +85,33 @@ console.log('3 — welcome automation (cron):');
 ok('3 campaign id aurix_welcome_v1', /aurix_welcome_v1/.test(cron));
 ok('3 ~30 min after first access (DELAY_MS = 30*60*1000)', /DELAY_MS\s*=\s*30 \* 60 \* 1000/.test(cron) && /windowMax = now - DELAY_MS/.test(cron));
 ok('3 trigger = first access via auth.users.created_at', /admin\/users/.test(cron) && /created = Date\.parse\(u\.created_at/.test(cron));
-ok('3 ONLY new accounts (created_at >= WELCOME_FLOOR_AT → excludes existing/historical/waitlist)', /created < FLOOR\) continue;/.test(cron) && /WELCOME_FLOOR_AT/.test(cron));
-ok('3 idempotent: check ledger status=sent before send; skip duplicate', /email_campaign_sends[\s\S]{0,90}status=eq\.sent/.test(cron) && /skipped_duplicate\+\+/.test(cron));
-ok('3 records sent (with provider id) after Resend confirms', /send\.ok && data\?\.id/.test(cron) && /status: 'sent', provider_message_id: data\.id/.test(cron));
+// M.06 · P0 — ESTOS DOS ASSERTS CERTIFICABAN EL DEFECTO. Describían literalmente el patrón
+// que mandaba una bienvenida cada 15 minutos: «comprueba el libro antes de enviar» (una lectura
+// FAIL-OPEN, que ante un error concluía "nunca enviada" y enviaba) y «registra después de que
+// Resend confirme» (claim-after-send: perder el registro = reenvío en la pasada siguiente, para
+// siempre). El contrato correcto es RESERVA ANTES DEL ENVÍO sobre el índice único parcial, y
+// FAIL-CLOSED en toda lectura. Se EJECUTA en AURIX-M06-ONBOARDING-LANGUAGE-EMAIL; aquí sólo se
+// pinan las señales de fuente para que el patrón viejo no pueda volver.
+// Las aserciones NEGATIVAS se evalúan sobre el código SIN comentarios: la cabecera del fichero
+// cita a propósito los patrones retirados para documentar el defecto, y no deben dar falso positivo.
+const cronCode = cron.replace(/^\s*\/\/.*$/gm, '');
+ok('3 ONLY new accounts — suelo DURO en código; el env sólo puede subirlo',
+   /const ACCOUNT_EPOCH_MS = Date\.parse\('/.test(cron) &&
+   /FLOOR\s*=\s*Math\.max\(ACCOUNT_EPOCH_MS,\s*Date\.parse\(process\.env\.WELCOME_FLOOR_AT/.test(cron) &&
+   /created < FLOOR\)\s*continue;/.test(cron));
+ok('3 idempotencia IMPUESTA: reserva atómica ANTES del envío (índice único parcial)',
+   cron.indexOf("status: 'sent' }") < cron.indexOf('api.resend.com/emails') &&
+   /claim\.status === 409/.test(cron) && /skipped_duplicate\+\+/.test(cron));
+ok('3 FAIL-CLOSED: sin prueba de que no se envió, no se envía',
+   /return Array\.isArray\(j\) \? j : null;/.test(cron) &&
+   (cron.match(/stats\.skipped_unverified\+\+/g) || []).length >= 4 &&
+   !/q\.ok \? await q\.json\(\) : \[\]/.test(cronCode));
+ok('3 un fallo TRANSITORIO libera la reserva; un 4xx permanente no se reintenta; y un 2xx sin id no la libera',
+   /retryable\s*=\s*st >= 500 \|\| st === 429 \|\| st === 401 \|\| st === 403/.test(cron) &&
+   /status: retryable \? 'failed_retryable' : 'sent'/.test(cron) &&
+   /if \(send\.ok\) \{/.test(cron) && !/send\.ok && data\?\.id/.test(cronCode));
+ok('3 un solo libro para los DOS senders (el otro es api/waitlist.js)',
+   /welcome_email_sent_at,locale/.test(cron) && /skipped_other_sender\+\+/.test(cron));
 ok('3 SAFE by default — disabled unless WELCOME_CRON_ENABLED=true', /WELCOME_CRON_ENABLED !== 'true'\) return[\s\S]{0,60}disabled: true/.test(cron));
 ok('3 dry mode (?dry=1) sends nothing', /const dry =[\s\S]{0,40}dry\b/.test(cron) && /if \(dry\) continue;/.test(cron));
 ok('3 CRON_SECRET auth guard', /CRON_SECRET/.test(cron) && /unauthorized/.test(cron));

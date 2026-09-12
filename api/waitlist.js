@@ -7,8 +7,11 @@
 //   2. Insert into public."Correos usuario" (historical table, renamed from waitlist) via the Supabase
 //      REST API using the service_role key (server-side only — RLS denies the public key).
 //   3. Duplicate email (unique) → friendly "already on the waitlist", no new row.
-//   4. Welcome email is sent only when welcome_email_sent_at IS NULL, then the
-//      column is stamped so it is never sent twice (one email per address).
+//   4. Welcome email: DOS puertas, las dos reservadas ANTES de enviar — la reserva
+//      condicional de `welcome_email_sent_at` (propia de esta captura) y la reserva
+//      CANÓNICA en public.email_campaign_sends, que se comparte con el otro sender
+//      (api/cron/welcome-email.js). Un email / un usuario ⇒ UNA bienvenida de por vida,
+//      la mande quien la mande.
 //
 // Required env (Vercel):  SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Optional env:           RESEND_API_KEY, WAITLIST_FROM, WAITLIST_ALLOWED_ORIGINS
@@ -35,6 +38,10 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ozcasyufbknnuemllwso.s
 // space → a quoted SQL identifier; percent-encoded here for the PostgREST path). Single source of truth for
 // every captured email — landing (here) and login OTP (public.persist_access_email RPC) both write to it.
 const WAITLIST_TABLE_PATH = 'Correos%20usuario';
+// Libro CANÓNICO de bienvenidas, compartido con el otro sender (api/cron/welcome-email.js).
+// Su índice único parcial sobre status='sent' es la única sección crítica que decide quién envía.
+const WELCOME_LEDGER_PATH  = 'email_campaign_sends';
+const WELCOME_CAMPAIGN_ID  = 'aurix_welcome_v1';
 
 // Lightweight in-memory per-IP rate limit — best-effort (per serverless
 // instance), same pattern as api/verify-pin.js. Max 5 submissions / IP / hour.
@@ -164,6 +171,7 @@ export default async function handler(req, res) {
   // proveedor no puede dejar a un usuario legítimo sin su bienvenida.
   let emailed = false;
   let claimed = false;
+  let canonClaimId = null;
   if (needsEmail) {
     try {
       const claim = await fetch(
@@ -187,25 +195,78 @@ export default async function handler(req, res) {
       console.error('[waitlist] welcome claim error', (e && e.message) || e);
     }
   }
+
+  // ── SEGUNDA PUERTA: UN SOLO LIBRO PARA LOS DOS SENDERS ────────────────────
+  // M.06 · P0 de bienvenidas repetidas. Este endpoint NO era el único sender: el
+  // otro es `api/cron/welcome-email.js`, un reloj de 15 minutos que llevaba su
+  // propio libro (`public.email_campaign_sends`, campaña 'aurix_welcome_v1'). Con
+  // dos libros distintos, la MISMA persona podía recibir dos bienvenidas de por
+  // vida, una de cada sender — y el contrato es UNA en toda la vida de la cuenta.
+  // Así que la reserva de `welcome_email_sent_at` (arriba, específica de la captura
+  // de la landing) ya no basta para enviar: hay que ganar además la reserva
+  // CANÓNICA, un INSERT sobre el índice único parcial
+  // `email_campaign_sends_sent_uniq (campaign_id, email) where status='sent'`.
+  // 201 ⇒ esta invocación es la única que puede enviar. 409 ⇒ el cron ya la envió,
+  // así que aquí no se envía nada y el sello se QUEDA (esa dirección está
+  // bienvenida, que es exactamente lo que el sello significa). Cualquier otro
+  // resultado ⇒ fail-closed: no se envía y se libera el sello para reintentar.
   if (claimed) {
+    try {
+      const canon = await fetch(`${SUPABASE_URL}/rest/v1/${WELCOME_LEDGER_PATH}`, {
+        method: 'POST',
+        headers: { ...sbHeaders, Prefer: 'return=representation' },
+        body: JSON.stringify({ campaign_id: WELCOME_CAMPAIGN_ID, email, status: 'sent' }),
+      });
+      if (canon.status === 409) {
+        console.warn('[waitlist] welcome already sent by the cron sender — skipping');
+      } else if (!canon.ok) {
+        console.error('[waitlist] canonical welcome claim failed', canon.status);
+        claimed = false;
+        await releaseCaptureStamp();
+      } else {
+        const rows = await canon.json().catch(() => []);
+        canonClaimId = (Array.isArray(rows) && rows[0] && rows[0].id) || null;
+        if (!canonClaimId) { claimed = false; await releaseCaptureStamp(); }
+      }
+    } catch (e) {
+      console.error('[waitlist] canonical welcome claim error', (e && e.message) || e);
+      claimed = false;
+      await releaseCaptureStamp();
+    }
+  }
+
+  if (canonClaimId) {
     emailed = await sendWelcomeEmail({ email, locale }).catch((e) => {
       console.error('[waitlist] welcome email error', (e && e.message) || e);
       return false; // el lead queda guardado igual — el email nunca tumba la petición
     });
     if (!emailed) {
-      // Liberar la reserva para que un intento futuro pueda reintentar.
+      // Liberar LAS DOS reservas para que un intento futuro pueda reintentar.
+      await releaseCaptureStamp();
       try {
-        await fetch(
-          `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}`,
-          {
-            method: 'PATCH',
-            headers: { ...sbHeaders, Prefer: 'return=minimal' },
-            body: JSON.stringify({ welcome_email_sent_at: null }),
-          }
-        );
+        await fetch(`${SUPABASE_URL}/rest/v1/${WELCOME_LEDGER_PATH}?id=eq.${canonClaimId}`, {
+          method: 'PATCH',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ status: 'failed_retryable', error: 'send_failed' }),
+        });
       } catch (e) {
-        console.error('[waitlist] release welcome claim failed', (e && e.message) || e);
+        console.error('[waitlist] release canonical welcome claim failed', (e && e.message) || e);
       }
+    }
+  }
+
+  async function releaseCaptureStamp() {
+    try {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}`,
+        {
+          method: 'PATCH',
+          headers: { ...sbHeaders, Prefer: 'return=minimal' },
+          body: JSON.stringify({ welcome_email_sent_at: null }),
+        }
+      );
+    } catch (e) {
+      console.error('[waitlist] release welcome claim failed', (e && e.message) || e);
     }
   }
 

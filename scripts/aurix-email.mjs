@@ -7,7 +7,7 @@
 // keeps structure/branding identical and content separate — no duplicated HTML.
 //
 //   renderEmail({ preheader, title, bodyParas, actionBlock, closing, unsubscribeUrl, year })
-//   ctaBlock(text, url, fallbackUrl)   → bulletproof button + fallback link
+//   ctaBlock(text, url, fallbackUrl, fallbackLabel) → bulletproof button + fallback link
 //   otpCodeBlock(codeHtml)             → the large, high-contrast verification code
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,8 +19,8 @@ const SHELL = path.join(ROOT, 'email', 'aurix-base-template.html');
 export function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 // Bulletproof CTA (Outlook VML + standard anchor) + visible fallback link.
-export function ctaBlock(text, url, fallbackUrl) {
-  const u = esc(url), ft = esc(fallbackUrl || url), t = esc(text);
+export function ctaBlock(text, url, fallbackUrl, fallbackLabel = 'Or paste this link into your browser:') {
+  const u = esc(url), ft = esc(fallbackUrl || url), t = esc(text), fl = esc(fallbackLabel);
   return `<tr>
             <td class="aurix-pad" align="left" style="padding:22px 40px 6px 40px;">
               <!--[if mso]>
@@ -36,7 +36,7 @@ export function ctaBlock(text, url, fallbackUrl) {
           </tr>
           <tr>
             <td class="aurix-pad" align="left" style="padding:6px 40px 30px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.5; color:#9FB0C7;">
-              Or paste this link into your browser:<br>
+              ${fl}<br>
               <a href="${u}" target="_blank" rel="noopener noreferrer" style="color:#2684FF; text-decoration:underline;">${ft}</a>
             </td>
           </tr>`;
@@ -76,7 +76,7 @@ export function marketingFooter(unsubscribeUrl = 'mailto:unsubscribe@aurixsystem
 
 // Render the full email from the shared shell. bodyParas → <p> blocks. actionBlock → CTA/code/''.
 // footerNote → marketing reason+unsubscribe, or '' for transactional (minimal) footer.
-export function renderEmail({ preheader = '', title = '', bodyParas = [], actionBlock = '', closing = '', footerNote = '', year = '2026' } = {}) {
+export function renderEmail({ preheader = '', title = '', bodyParas = [], actionBlock = '', closing = '', footerNote = '', signoff = 'The Aurix Team', year = '2026' } = {}) {
   const shell = fs.readFileSync(SHELL, 'utf8');
   const bodyHtml = (bodyParas || []).map(p => `<p style="margin:0 0 16px 0;">${esc(p)}</p>`).join('\n              ');
   return shell
@@ -85,6 +85,7 @@ export function renderEmail({ preheader = '', title = '', bodyParas = [], action
     .replaceAll('{{BODY_HTML}}', bodyHtml)
     .replaceAll('{{ACTION_BLOCK}}', actionBlock || '')
     .replaceAll('{{CLOSING}}', esc(closing))
+    .replaceAll('{{SIGNOFF}}', esc(signoff))
     .replaceAll('{{FOOTER_NOTE}}', footerNote || '')
     .replaceAll('{{YEAR}}', year);
 }
@@ -114,8 +115,14 @@ export function renderOtpEmail(codeVar = '{{ .Token }}') {
 // someone who just signed up. The launch campaign keeps marketingFooter(), which is where the
 // reason + one-click unsubscribe genuinely belong. `unsubscribeUrl` stays in the signature so the
 // existing call sites keep working unchanged.
-export function renderWelcomeEmail(unsubscribeUrl = 'mailto:unsubscribe@aurixsystem.io?subject=unsubscribe') {
-  return renderEmail({
+// ── M.06 · §3 — EL CORREO SALE EN EL IDIOMA DE LA CUENTA ────────────────────
+// El sender (api/cron/welcome-email.js) resuelve el idioma explícito de la cuenta y pide la
+// variante. `renderWelcomeEmail()` sin argumentos sigue devolviendo el inglés BYTE A BYTE, así
+// que el artefacto ya desplegado (email/aurix-welcome.html) no se mueve.
+// El parámetro `unsubscribeUrl` anterior se retira: nunca se leía — este correo es
+// TRANSACCIONAL (lo dispara el registro del propio usuario) y no lleva baja.
+const WELCOME_COPY = {
+  en: {
     preheader: 'Thank you for joining us. Your journey starts today.',
     title: 'Welcome to Aurix.',
     bodyParas: [
@@ -124,8 +131,34 @@ export function renderWelcomeEmail(unsubscribeUrl = 'mailto:unsubscribe@aurixsys
       'Track your stocks, ETFs, funds, crypto, precious metals, real estate and cash — all in one place.',
       'This is only the beginning: new intelligence and financial tools are coming over the next months.',
     ],
-    actionBlock: ctaBlock('Enter Aurix →', 'https://app.aurixsystem.io', 'https://app.aurixsystem.io'),
+    cta: 'Enter Aurix →',
+    ctaFallback: 'Or paste this link into your browser:',
+    signoff: 'The Aurix Team',
+  },
+  es: {
+    preheader: 'Gracias por unirte. Tu recorrido empieza hoy.',
+    title: 'Bienvenido a Aurix.',
+    bodyParas: [
+      'Gracias por unirte. Tu recorrido con Aurix empieza hoy.',
+      'Nuestra misión es simple: ayudarte a entender, organizar y hacer crecer tu patrimonio desde una sola plataforma privada e inteligente.',
+      'Sigue tus acciones, ETFs, fondos, cripto, metales preciosos, inmuebles y liquidez — todo en un mismo lugar.',
+      'Esto es solo el principio: en los próximos meses llegarán nuevas herramientas de inteligencia y análisis financiero.',
+    ],
+    cta: 'Entrar en Aurix →',
+    ctaFallback: 'O pega este enlace en tu navegador:',
+    signoff: 'El equipo de Aurix',
+  },
+};
+
+export function renderWelcomeEmail(lang = 'en') {
+  const c = WELCOME_COPY[lang] || WELCOME_COPY.en;
+  return renderEmail({
+    preheader: c.preheader,
+    title: c.title,
+    bodyParas: c.bodyParas,
+    actionBlock: ctaBlock(c.cta, 'https://app.aurixsystem.io', 'https://app.aurixsystem.io', c.ctaFallback),
     closing: '',                 // the duplicate "Welcome to Aurix." right above the footer is gone (it repeated the title)
     footerNote: '',              // transactional → minimal corporate footer, NO unsubscribe
+    signoff: c.signoff,
   });
 }
