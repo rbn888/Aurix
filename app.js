@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '671'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '672'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4565,6 +4565,8 @@ const T = {
     chartCalculatingAria:'Calculando rendimiento',
     chartPartialHistory: 'Historial parcial',
     chartAvailableHistory:'Historial disponible',
+    chartInsufficientHistory: 'Historial insuficiente',
+    chartReturnUnavailable:   'Rendimiento no disponible',
     chartTipValue:   'Valor cartera',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
@@ -6957,6 +6959,8 @@ const T = {
     chartCalculatingAria:'Calculating performance',
     chartPartialHistory: 'Partial history',
     chartAvailableHistory:'Available history',
+    chartInsufficientHistory: 'Insufficient history',
+    chartReturnUnavailable:   'Return unavailable',
     chartTipValue:   'Portfolio value',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
@@ -29039,17 +29043,106 @@ function _aurixReturnPendingHTML() {
 // (no CSS/layout change). Genuine loading/unresolved and unit contexts without the FRC keep "Calculando…".
 const _AURIX_HIST_PARTIAL_TEXT = 'Historial parcial';
 const _AURIX_HIST_AVAILABLE_TEXT = 'Historial disponible';
+// ════════════════════════════════════════════════════════════════════════════
+// M.06 · CHART INTEGRATION — «CALCULANDO…» NO PUEDE SER UN ESTADO TERMINAL
+// ════════════════════════════════════════════════════════════════════════════
+// EL DEFECTO (P1 de 30D, y el residual de copy de 1A). El motor YA sabe por qué no puede
+// publicar el retorno: `_aurixResolveFinalRenderSeriesContract` clasifica el bloqueo en códigos
+// explícitos (SPEC.21 C6 — INSUFFICIENT_REAL_SPAN, INSUFFICIENT_REAL_POINTS,
+// BOOTSTRAP_ONLY_HISTORY, CANONICAL_NOT_READY, CURRENT_VALUE_UNAVAILABLE,
+// NO_DETERMINISTIC_RETURN_ANCHOR, CANONICAL_SOURCE_CONFLICT, RETURN_NOT_RELIABLE) y su propio
+// comentario promete «never a bare generic Calculando». Pero esa clasificación se CALCULABA Y SE
+// TIRABA: la proyección de presentación sólo tenía tres salidas —% de confianza, «Historial
+// parcial»/«disponible», o «Calculando…»— y su caída final era, literalmente,
+// `return 'CALCULATING'`. Así que una serie ESTABLE, con línea dibujada, ventana COMPLETA y
+// fuentes ya asentadas, cuyo badge está bloqueado por una razón que no se va a resolver nunca,
+// se quedaba en «Calculando…» PARA SIEMPRE. Eso no es un estado de carga: es una afirmación
+// falsa sobre lo que la aplicación está haciendo.
+//
+// EL ARREGLO ES DE PRESENTACIÓN, NO DE VERDAD FINANCIERA. Aquí no se decide ningún número, ni
+// elegibilidad, ni baseline, ni punto, ni color direccional: se traduce a lenguaje humano la
+// evidencia que el contrato ya trae. `_aurixResolveFinalRenderSeriesContract` queda BYTE A BYTE
+// intacto, igual que el epoch, el reductor y los guards de cobertura.
+//
+// La partición es la única pregunta que importa: ¿esto se resuelve solo?
+//   · SÍ (algo en vuelo) ⇒ «Calculando…» sigue siendo VERDAD.
+//   · NO, y la causa es la HISTORIA ⇒ «Historial insuficiente». Se resolverá con el tiempo, no
+//     con esperar en esta pantalla, así que decirlo es lo honesto.
+//   · NO, y la causa es otra ⇒ «Rendimiento no disponible». No se inventa un motivo ni se
+//     insinúa un 0 %: se admite que no hay retorno publicable.
+// Sin códigos NO se declara nada terminal (contexto de unidad o contrato parcial): se conserva
+// exactamente el comportamiento certificado.
+const _AURIX_RETURN_INSUFFICIENT_HISTORY_TEXT = 'Historial insuficiente';
+const _AURIX_RETURN_UNAVAILABLE_TEXT = 'Rendimiento no disponible';
+// Se resuelven solos: algo está en vuelo y el número definitivo es inminente.
+const _AURIX_RETURN_TRANSIENT_CODES = ['CANONICAL_NOT_READY', 'CURRENT_VALUE_UNAVAILABLE'];
+// Atados a la HISTORIA: no se resuelven esperando en la pantalla, sólo con el paso del tiempo.
+const _AURIX_RETURN_HISTORY_CODES = ['INSUFFICIENT_REAL_SPAN', 'INSUFFICIENT_REAL_POINTS', 'BOOTSTRAP_ONLY_HISTORY'];
+const _AURIX_RETURN_HISTORY_REASON_RE = /insufficient|short_history|history_short|no_stable|bootstrap|construction/i;
+// UN SOLO owner de la proyección visible del retorno. Lo consumen el pintor del badge
+// (`_aurixHistoryPresentationBadge`) y la auditoría de DOM (`_aurixExpectedBadgeLabel`), así que
+// no pueden divergir: lo que se pinta y lo que la auditoría espera salen de la misma decisión.
+// Devuelve: TRUSTED_RETURN | PARTIAL_HISTORY | AVAILABLE_HISTORY | INSUFFICIENT_HISTORY |
+//           RETURN_UNAVAILABLE | CALCULATING.
+function _aurixResolveReturnPresentation(frc) {
+  frc = frc || {};
+  if (frc.badgeEligible) return 'TRUSTED_RETURN';
+  const hps = String(frc.historyPresentationState || '');
+  if (hps === 'PARTIAL_HISTORY' || hps === 'AVAILABLE_HISTORY') return hps;
+  const codes = []
+    .concat((frc.diagnostics && Array.isArray(frc.diagnostics.blockingReasonCodes)) ? frc.diagnostics.blockingReasonCodes : [])
+    .concat(Array.isArray(frc.reasonCodes) ? frc.reasonCodes : []);
+  const reason = String(frc.reason || '');
+  const mode = String(frc.mode || '');
+  // Sin evidencia no se afirma nada terminal — comportamiento certificado intacto.
+  if (!codes.length && !reason) return 'CALCULATING';
+  // 1 · Algo EN VUELO ⇒ «Calculando…» es literalmente verdad.
+  if (codes.some(c => _AURIX_RETURN_TRANSIENT_CODES.indexOf(c) >= 0)) return 'CALCULATING';
+  try {
+    if (typeof _aurixChartPublicationSourcesPending === 'function' && _aurixChartPublicationSourcesPending().pending) return 'CALCULATING';
+  } catch (_) {}
+  // 2 · La causa es la HISTORIA: no se resuelve esperando en esta pantalla, sólo con el tiempo.
+  if (codes.some(c => _AURIX_RETURN_HISTORY_CODES.indexOf(c) >= 0)) return 'INSUFFICIENT_HISTORY';
+  if (_AURIX_RETURN_HISTORY_REASON_RE.test(reason)) return 'INSUFFICIENT_HISTORY';
+  // 3 · Un error interno no va a publicar un retorno: admitirlo es lo honesto.
+  if (mode === 'error') return 'RETURN_UNAVAILABLE';
+  // 4 · SIN LÍNEA ESTABLE el contrato todavía se está construyendo (`building` por constructor
+  // no listo, `empty` por arranque en frío o cartera vacía) ⇒ sigue siendo TRANSITORIO, y es el
+  // comportamiento certificado: «genuine building/empty stays CALCULATING». El estado terminal
+  // RETURN_UNAVAILABLE queda reservado a lo que de verdad lo es: una línea YA DIBUJADA y estable,
+  // con las fuentes asentadas, cuyo retorno está bloqueado por algo que no es la historia — que
+  // es exactamente el régimen del P1 de 30D.
+  if (mode !== 'full' && mode !== 'partial_clean') return 'CALCULATING';
+  if (!codes.length) return 'CALCULATING';
+  return 'RETURN_UNAVAILABLE';
+}
+try { if (typeof window !== 'undefined') window._aurixResolveReturnPresentation = _aurixResolveReturnPresentation; } catch (_) {}
+// Texto visible de cada estado de presentación (uno solo, para pintor y auditoría).
+function _aurixReturnPresentationText(pres) {
+  const i18n = (k, f) => (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n(k, f) : f;
+  if (pres === 'PARTIAL_HISTORY')       return i18n('chartPartialHistory', _AURIX_HIST_PARTIAL_TEXT);
+  if (pres === 'AVAILABLE_HISTORY')     return i18n('chartAvailableHistory', _AURIX_HIST_AVAILABLE_TEXT);
+  if (pres === 'INSUFFICIENT_HISTORY')  return i18n('chartInsufficientHistory', _AURIX_RETURN_INSUFFICIENT_HISTORY_TEXT);
+  if (pres === 'RETURN_UNAVAILABLE')    return i18n('chartReturnUnavailable', _AURIX_RETURN_UNAVAILABLE_TEXT);
+  return i18n('chartCalculating', _AURIX_RETURN_PENDING_TEXT);
+}
 function _aurixHistoryPresentationBadge(emg, surface) {
   let pres = 'CALCULATING';
   try {
     if (typeof _aurixResolveFinalRenderSeriesContract === 'function') {
       const fp = _aurixResolveFinalRenderSeriesContract(emg, emg && emg.range, surface);
-      if (fp && fp.historyPresentationState) pres = fp.historyPresentationState;
+      // M.06 — la decisión la toma el owner único, que además distingue lo TRANSITORIO de lo
+      // TERMINAL a partir de los códigos que el contrato ya trae.
+      pres = _aurixResolveReturnPresentation(fp);
     }
   } catch (_) { pres = 'CALCULATING'; }
-  if (pres === 'PARTIAL_HISTORY') return { html: '<span class="wsc-metric-val">' + ((typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartPartialHistory', _AURIX_HIST_PARTIAL_TEXT) : _AURIX_HIST_PARTIAL_TEXT) + '</span>', className: 'chart-change flat', pres: pres };
-  if (pres === 'AVAILABLE_HISTORY') return { html: '<span class="wsc-metric-val">' + ((typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartAvailableHistory', _AURIX_HIST_AVAILABLE_TEXT) : _AURIX_HIST_AVAILABLE_TEXT) + '</span>', className: 'chart-change flat', pres: pres };
-  return { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating', pres: 'CALCULATING' };
+  if (pres === 'CALCULATING') {
+    return { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating', pres: 'CALCULATING' };
+  }
+  // Todo estado terminal comparte el mismo tratamiento visual que ya tenía «Historial parcial»:
+  // texto estático, tono plano, cero color direccional, cero porcentaje. Sin CSS nuevo.
+  return { html: '<span class="wsc-metric-val">' + _aurixReturnPresentationText(pres) + '</span>',
+           className: 'chart-change flat', pres: pres };
 }
 // ── P0-FINAL-UI-DOM-BINDING-FIX ──────────────────────────────────────────────────
 // The SINGLE canonical return-badge painter — shared by desktop (#chartChange) and mobile
@@ -33150,10 +33243,18 @@ try { if (typeof window !== 'undefined') window._aurixReadChartDom = _aurixReadC
 function _aurixExpectedBadgeLabel(frc) {
   frc = frc || {};
   if (frc.badgeEligible) return { kind: 'PERCENT', text: frc.badgeLabel || null };
-  const hps = frc.historyPresentationState;
-  if (hps === 'PARTIAL_HISTORY') return { kind: 'PARTIAL', text: (typeof _AURIX_HIST_PARTIAL_TEXT !== 'undefined') ? _AURIX_HIST_PARTIAL_TEXT : 'Historial parcial' };
-  if (hps === 'AVAILABLE_HISTORY') return { kind: 'AVAILABLE', text: (typeof _AURIX_HIST_AVAILABLE_TEXT !== 'undefined') ? _AURIX_HIST_AVAILABLE_TEXT : 'Historial disponible' };
-  return { kind: 'CALCULATING', text: (typeof _AURIX_RETURN_PENDING_TEXT !== 'undefined') ? _AURIX_RETURN_PENDING_TEXT : 'Calculando…' };
+  // M.06 — MISMO owner que el pintor. Antes esta proyección reimplementaba la decisión con tres
+  // salidas, así que en cuanto el badge publicara un estado terminal nuevo la auditoría de DOM
+  // habría reportado DOM_PRESENTATION_MISMATCH contra la propia verdad de la aplicación.
+  const pres = (typeof _aurixResolveReturnPresentation === 'function')
+    ? _aurixResolveReturnPresentation(frc)
+    : String(frc.historyPresentationState || 'CALCULATING');
+  const text = (typeof _aurixReturnPresentationText === 'function')
+    ? _aurixReturnPresentationText(pres)
+    : ((typeof _AURIX_RETURN_PENDING_TEXT !== 'undefined') ? _AURIX_RETURN_PENDING_TEXT : 'Calculando…');
+  const KIND = { PARTIAL_HISTORY: 'PARTIAL', AVAILABLE_HISTORY: 'AVAILABLE',
+                 INSUFFICIENT_HISTORY: 'INSUFFICIENT_HISTORY', RETURN_UNAVAILABLE: 'RETURN_UNAVAILABLE' };
+  return { kind: KIND[pres] || 'CALCULATING', text: text };
 }
 try { if (typeof window !== 'undefined') window._aurixExpectedBadgeLabel = _aurixExpectedBadgeLabel; } catch (_) {}
 
@@ -42109,8 +42210,45 @@ function _aurixReconRefresh() {
 // and behaviour is identical.
 // ════════════════════════════════════════════════════════════════════════════
 const _AURIX_PCE_FOUNDER_KEY = 'aurix_pce_founder';
+// ── M.06 · P1 CERRADO — UNA BANDERA DE DIAGNÓSTICO NO PUEDE QUEDARSE GUARDADA ──────
+// El defecto: `?aurix_pce_founder=1` escribía '1' en **localStorage**, así que encender el
+// modo founder una sola vez cambiaba la FUENTE DE DATOS del gráfico en ese dispositivo
+// PARA SIEMPRE (`window.__AURIX_PORTFOLIO_RECON = true` ⇒ la serie la reconstruye el PCE en
+// vez de leerse de los snapshots), y la única salida era el botón de su propio overlay. Con
+// una URL compartida, un marcador o un dispositivo prestado, un usuario normal se quedaba
+// mirando una historia calculada por otro camino sin haberlo pedido y sin saber salir — y la
+// bandera no era de nadie, así que sobrevivía al cambio de cuenta en la misma pestaña.
+// El contrato: una bandera founder/debug no contamina estado de usuario ni persiste sola.
+// Ahora vive en **sessionStorage** (muere al cerrar la pestaña; sobrevive a la recarga, que es
+// lo que el flujo del founder necesita) y lleva SELLADO el propietario que la encendió, así
+// que otra cuenta en la misma pestaña no la hereda. Y se RETIRA activamente la clave
+// persistida heredada, para liberar los dispositivos que ya la tenían latente.
+// No cambia el PCE, ni la validación, ni la persistencia, ni un solo dato financiero.
+function _aurixPceFounderStore() {
+  try { return (typeof window !== 'undefined' && window.sessionStorage) ? window.sessionStorage : null; } catch (_) { return null; }
+}
+function _aurixPceFounderOwner() {
+  try { return (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? String(_aurixActiveUserId) : null; } catch (_) { return null; }
+}
 function _aurixPceFounderMode() {
-  try { return localStorage.getItem(_AURIX_PCE_FOUNDER_KEY) === '1'; } catch (_) { return false; }
+  try {
+    const st = _aurixPceFounderStore();
+    if (!st) return false;
+    const raw = st.getItem(_AURIX_PCE_FOUNDER_KEY);
+    if (!raw || raw.charAt(0) !== '1') return false;
+    const i = raw.indexOf(':');
+    const stamped = (i > 0) ? raw.slice(i + 1) : null;     // propietario que la encendió
+    const active  = _aurixPceFounderOwner();
+    // Sellada por otra cuenta ⇒ no se hereda. Sin sello (se encendió antes de resolver auth)
+    // se respeta: es la misma pestaña y el mismo gesto explícito.
+    if (stamped && active && stamped !== active) return false;
+    return true;
+  } catch (_) { return false; }
+}
+function _aurixPceFounderClear() {
+  try { const st = _aurixPceFounderStore(); if (st) st.removeItem(_AURIX_PCE_FOUNDER_KEY); } catch (_) {}
+  // La clave PERSISTIDA heredada se retira siempre: es la que causaba el defecto.
+  try { localStorage.removeItem(_AURIX_PCE_FOUNDER_KEY); } catch (_) {}
 }
 // Gather the (read-only) reconstruction inputs for a range — mirrors the
 // dependency-gathering in _aurixReconRefresh; used by the overlay's range scan.
@@ -42320,7 +42458,7 @@ function _aurixPceOverlayMount() {
       btn.textContent = el.classList.contains('is-collapsed') ? '▲' : '▼';
     } else if (act === 'disable') {
       window.__AURIX_PORTFOLIO_RECON = false;
-      try { localStorage.removeItem(_AURIX_PCE_FOUNDER_KEY); } catch (_) {}
+      _aurixPceFounderClear();
       try { if (typeof _aurixReconInvalidate === 'function') _aurixReconInvalidate(); } catch (_) {}
       try { updateChart(true); } catch (_) {}
       try { el.remove(); } catch (_) {}
@@ -42336,7 +42474,14 @@ function _aurixPceFounderInit() {
   try {
     let qp = false;
     try { qp = /[?&]aurix_pce_founder=1\b/.test(window.location.search || ''); } catch (_) {}
-    if (qp) { try { localStorage.setItem(_AURIX_PCE_FOUNDER_KEY, '1'); } catch (_) {} }
+    // Cualquier resto persistido de la implementación anterior se retira SIEMPRE, con o sin
+    // query: es lo que mantenía el modo encendido en dispositivos que nadie volvió a tocar.
+    try { localStorage.removeItem(_AURIX_PCE_FOUNDER_KEY); } catch (_) {}
+    if (qp) {
+      const st = _aurixPceFounderStore();
+      const owner = _aurixPceFounderOwner();
+      try { if (st) st.setItem(_AURIX_PCE_FOUNDER_KEY, owner ? ('1:' + owner) : '1'); } catch (_) {}
+    }
     if (!_aurixPceFounderMode()) return;
     window.__AURIX_PORTFOLIO_RECON = true;   // device-only runtime flag
     _aurixPceOverlayMount();

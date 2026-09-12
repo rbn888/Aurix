@@ -42,7 +42,13 @@ const FNS = [
   '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixBuildContinuityValidatedSeries',
   '_aurixStructuralBreaks', '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
   '_aurixStableDisplayAnchor', '_aurixCanonicalReturnAnchorIndex', '_aurixResolveReliabilityDeadlock',
-  '_aurixResolveFinalRenderSeriesContract', '_aurixReturnPendingHTML', '_aurixHistoryPresentationBadge', '_aurixEmergencyPaintBadgeNode',
+  '_aurixResolveFinalRenderSeriesContract', '_aurixReturnPendingHTML',
+  // M.06 · bloque 7 — el pintor del badge ya NO decide por sí mismo: delega en el owner único
+  // de la presentación del retorno, que distingue lo TRANSITORIO de lo TERMINAL. Sin cargarlo,
+  // `_aurixHistoryPresentationBadge` lanza y cae a «Calculando…» ⇒ este gate certificaría un
+  // motor degradado (la lección de feedback_harness_no_stubear_lo_certificado).
+  '_aurixResolveReturnPresentation', '_aurixReturnPresentationText',
+  '_aurixHistoryPresentationBadge', '_aurixEmergencyPaintBadgeNode',
 ];
 const ctx = { console: { log() {} }, Math, JSON, Array, Number, isFinite, Infinity, Date, Set,
   _aurixEmergencyBadgeText: emg => ((emg.badgeReturnPct >= 0 ? '+' : '') + Number(emg.badgeReturnPct).toFixed(2) + '%'),

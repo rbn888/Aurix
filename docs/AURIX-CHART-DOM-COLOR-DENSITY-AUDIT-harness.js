@@ -54,6 +54,9 @@ const FNS = [
   '_aurixResolveFinalRenderSeriesContract', '_aurixClassifyCrossRangeSeriesProvenance', 'computeAurixAdaptiveXScale',
   // SPEC.30 new
   '_aurixComputeChartDensityMetrics', '_aurixProjectRenderPointsToPixels', '_aurixLineColorStateFromDom',
+  // M.06 · bloque 7 — `_aurixExpectedBadgeLabel` proyecta desde el MISMO owner que pinta el badge,
+  // así que sus dos dependencias tienen que viajar con él o la proyección cae a «Calculando…».
+  '_aurixResolveReturnPresentation', '_aurixReturnPresentationText',
   '_aurixReadChartDom', '_aurixExpectedBadgeLabel', '_aurixClassifyDomPresentation', '_aurixClassifyLineColorOwnership',
   '_aurixAuditChartDomColorDensityCore',
 ];
