@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '676'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '677'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -28591,6 +28591,624 @@ if (typeof window !== 'undefined') {
     families: _AURIX_FACT_FAMILY, status: _AURIX_FACT_STATUS, roots: _AURIX_CAUSAL_ROOT,
     rankWeights: _AURIX_RANK_WEIGHTS, materiality: _AURIX_FACT_MATERIAL,
     note: 'INT.03 — the Core emits structured facts only. No copy, no causality it cannot demonstrate.',
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC PC.01 · ADVANCED INTELLIGENCE FOUNDATION
+// ════════════════════════════════════════════════════════════════════════════
+// UN owner canónico que PROYECTA el Core certificado en un modelo direccionable.
+// Es una capa de DERIVACIÓN PURA, y cada restricción de abajo es deliberada:
+//
+//   · NO crea una segunda verdad financiera. Todo número que publica viene de un
+//     owner ya certificado: `_aurixIntelligenceCore` (INT.03, que a su vez es el
+//     único consumidor de los hechos de rendimiento de INT.02),
+//     `_aurixEffectiveDiversification` (HHI / N efectivo) y `_aurixHealthSnapshot`
+//     (estructura ahora). No suma, no promedia, no convierte divisas y no
+//     re-pondera dinero. Si una dimensión necesita algo que esas fuentes no dan,
+//     se declara `unavailable` con su código — no se redefine la fuente.
+//   · NO emite copy. `semanticLabel`, `explanationCode` y `reasonCode` son
+//     identificadores estables que la superficie mapea a ES/EN al renderizar, así
+//     que ninguna frase traducida se persiste ni se compara como verdad.
+//   · `unavailable` NUNCA se convierte en 0. Una dimensión sin evidencia publica
+//     `availability:'unavailable'` + `reason`, y su valor se queda en `null`.
+//   · NO prescribe. El vocabulario semántico es descriptivo (balanced /
+//     concentrated / increasing / decreasing / stable / notable_change /
+//     worth_reviewing / insufficient_evidence); no existe good/bad ni "deberías".
+//
+// POR QUÉ EL MODELO NO SE CONSTRUYE SÓLO CON LOS FACTS DEL LEDGER: los facts están
+// filtrados por MATERIALIDAD para contar historias (p. ej. `top_position_weight`
+// sólo entra si top1 ≥ 25%). Una cartera bien repartida no genera fact de
+// concentración, y derivar la dimensión de los facts la dejaría `unavailable`
+// cuando en realidad está medida y dice `balanced`. Así que el ESTADO de cada
+// dimensión se lee de los mismos readers certificados que usa el ledger, y los
+// CAMBIOS y el ranking se leen de los facts. Es la diferencia entre "no lo sé" y
+// "lo sé y no es noticia".
+
+const _AURIX_AI_AVAIL = Object.freeze({
+  AVAILABLE: 'available', PARTIAL: 'partial', UNAVAILABLE: 'unavailable',
+});
+// Cobertura = cuánta evidencia sostiene la conclusión. Es independiente de la
+// disponibilidad: una dimensión puede estar disponible con cobertura parcial.
+const _AURIX_AI_COVERAGE = Object.freeze({
+  SUFFICIENT: 'sufficient', PARTIAL: 'partial', UNAVAILABLE: 'unavailable',
+});
+const _AURIX_AI_DIM = Object.freeze({
+  STRUCTURE: 'structure', CONCENTRATION: 'concentration', DIVERSIFICATION: 'diversification',
+  LIQUIDITY: 'liquidity', EVOLUTION: 'evolution', STABILITY: 'stability', GROWTH: 'growth',
+});
+// Severidad SEMÁNTICA, no moral: mide cuánta atención merece, no si algo está
+// bien o mal. `insufficient_evidence` es un resultado de primera clase — un dato
+// que falta y limita una conclusión importante ES una conclusión.
+const _AURIX_AI_SEVERITY = Object.freeze({
+  NOTABLE_CHANGE: 'notable_change', WORTH_REVIEWING: 'worth_reviewing',
+  INFORMATIONAL: 'informational', INSUFFICIENT_EVIDENCE: 'insufficient_evidence',
+});
+const _AURIX_AI_LABEL = Object.freeze({
+  BALANCED: 'balanced', CONCENTRATED: 'concentrated', DOMINANT_POSITION: 'dominant_position',
+  SPREAD_EVEN: 'spread_even', SPREAD_LOPSIDED: 'spread_lopsided',
+  INCREASING: 'increasing', DECREASING: 'decreasing', STABLE: 'stable',
+  INSUFFICIENT_EVIDENCE: 'insufficient_evidence',
+});
+// Los tres niveles acceden a LA MISMA verdad: cambian lenguaje, densidad y
+// profundidad, nunca el cálculo, el acceso al dato ni la disponibilidad. El
+// contrato se declara aquí y la presentación completa es de PC.02.
+const _AURIX_AI_EXPERIENCE = Object.freeze(['guided', 'balanced', 'advanced']);
+const _AURIX_AI_ATTENTION_LIMIT = 3;
+// Un único umbral propio de esta capa: por encima de él una posición no sólo está
+// concentrada, DOMINA. El de 25% (concentración material) ya lo declara
+// `_AURIX_FACT_MATERIAL.concentrationPct` y se reutiliza tal cual.
+const _AURIX_AI_DOMINANT_PCT = 50;
+// Dimensiones que hoy NO son derivables honestamente, con su causa. No son un
+// hueco de implementación: son una limitación declarada de las fuentes.
+const _AURIX_AI_NOT_DERIVABLE = Object.freeze({
+  stability: 'no_volatility_engine',     // no existe motor de volatilidad certificado
+  growth: 'growth_scale_undefined',      // falta la ESCALA semántica, no el valor (INT.07)
+});
+
+function _aurixAiSafe(fn) { try { return fn(); } catch (_) { return null; } }
+function _aurixAiNum(n) { return Number.isFinite(n) ? n : null; }
+
+// Traduce el vocabulario de suficiencia del Core a cobertura de esta capa. Es un
+// mapeo explícito y no una coincidencia de strings: si el Core añade un estado
+// nuevo, cae en `partial` y no en `sufficient`.
+function _aurixAiCoverageFromStatus(status) {
+  if (status === _AURIX_FACT_STATUS.AVAILABLE) return _AURIX_AI_COVERAGE.SUFFICIENT;
+  if (status === _AURIX_FACT_STATUS.LOW_CONFIDENCE) return _AURIX_AI_COVERAGE.PARTIAL;
+  if (status === _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY) return _AURIX_AI_COVERAGE.PARTIAL;
+  if (!status) return _AURIX_AI_COVERAGE.UNAVAILABLE;
+  return _AURIX_AI_COVERAGE.UNAVAILABLE;
+}
+
+// ── A · WEALTH STRUCTURE ────────────────────────────────────────────────────
+function _aurixAiStructure(snap, weights) {
+  const out = { dimension: _AURIX_AI_DIM.STRUCTURE, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+    coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'no_snapshot',
+    totalInvestable: null, assetCount: null, categoryCount: null,
+    cashPct: null, realEstatePct: null, topCategory: null, topPosition: null,
+    categoryWeights: null, categoryWeightsReason: 'not_read' };
+  if (!snap || !(Number(snap.assetCount) > 0)) { out.reason = 'no_positions'; return out; }
+  if (!(Number(snap.totUSD) > 0)) { out.reason = 'no_valued_positions'; return out; }
+  out.availability = _AURIX_AI_AVAIL.AVAILABLE;
+  out.reason = '';
+  out.totalInvestable = _aurixAiNum(Number(snap.totUSD));
+  out.assetCount = Number(snap.assetCount);
+  out.categoryCount = _aurixAiNum(Number(snap.categoryCount));
+  out.cashPct = _aurixAiNum(Number(snap.cashPct));
+  out.realEstatePct = _aurixAiNum(Number(snap.realEstatePct));
+  out.topCategory = snap.topCategory
+    ? { type: snap.topCategory.type || null, pct: _aurixAiNum(Number(snap.topCategory.pctTotal)) } : null;
+  out.topPosition = snap.topInvestedAsset
+    ? { name: snap.topInvestedAsset.name || null, type: snap.topInvestedAsset.type || null,
+        pct: _aurixAiNum(Number(snap.topInvestedAsset.pctTotal)) } : null;
+  // Una posición que el snapshot no puede certificar degrada la COBERTURA sin
+  // tumbar la dimensión: la estructura sigue siendo legible, pero no completa.
+  const uncert = Number(snap.uncertifiablePositions || 0);
+  out.coverage = uncert > 0 ? _AURIX_AI_COVERAGE.PARTIAL : _AURIX_AI_COVERAGE.SUFFICIENT;
+  if (uncert > 0) out.reason = 'uncertifiable_positions';
+  if (weights && weights.rows && weights.rows.length) {
+    out.categoryWeights = weights.rows;
+    out.categoryWeightsReason = '';
+  } else {
+    out.categoryWeightsReason = (weights && weights.reason) || 'reader_unavailable';
+  }
+  return out;
+}
+
+// ── B · CONCENTRATION ───────────────────────────────────────────────────────
+// Publica el nivel SIEMPRE que se pueda medir, no sólo cuando es material: es lo
+// que permite decir `balanced` con evidencia en vez de callar.
+function _aurixAiConcentration(snap, div, top3Pct) {
+  const out = { dimension: _AURIX_AI_DIM.CONCENTRATION, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+    coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'no_source',
+    topWeightPct: null, top3Pct: null, positions: null,
+    semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE, dominant: null, topContributor: null };
+  const fromDiv = !!(div && div.status === _AURIX_FACT_STATUS.AVAILABLE && Number.isFinite(div.topWeightPct));
+  const fromSnap = !!(snap && snap.topInvestedAsset && Number.isFinite(Number(snap.topInvestedAsset.pctTotal)));
+  if (!fromDiv && !fromSnap) { out.reason = (div && div.reason) || 'no_positions'; return out; }
+  // `_aurixEffectiveDiversification` es la fuente preferente: su denominador es
+  // explícito (valor invertible) y falla cerrado si una posición no se puede
+  // valorar, así que un top-weight suyo nunca sale de un total parcial.
+  out.topWeightPct = fromDiv ? _aurixAiNum(div.topWeightPct)
+                             : _aurixAiNum(Number(snap.topInvestedAsset.pctTotal));
+  out.positions = fromDiv ? _aurixAiNum(div.positions) : _aurixAiNum(Number(snap && snap.assetCount));
+  out.top3Pct = _aurixAiNum(top3Pct);
+  out.availability = _AURIX_AI_AVAIL.AVAILABLE;
+  out.coverage = fromDiv ? _AURIX_AI_COVERAGE.SUFFICIENT : _AURIX_AI_COVERAGE.PARTIAL;
+  out.reason = fromDiv ? '' : 'snapshot_fallback';
+  const w = out.topWeightPct;
+  out.semanticLabel = (w >= _AURIX_AI_DOMINANT_PCT) ? _AURIX_AI_LABEL.DOMINANT_POSITION
+    : (w >= _AURIX_FACT_MATERIAL.concentrationPct) ? _AURIX_AI_LABEL.CONCENTRATED
+    : _AURIX_AI_LABEL.BALANCED;
+  out.dominant = (w >= _AURIX_AI_DOMINANT_PCT);
+  if (snap && snap.topInvestedAsset) {
+    out.topContributor = { name: snap.topInvestedAsset.name || null,
+      type: snap.topInvestedAsset.type || null,
+      pct: _aurixAiNum(Number(snap.topInvestedAsset.pctTotal)) };
+  }
+  return out;
+}
+
+// ── C · DIVERSIFICATION ─────────────────────────────────────────────────────
+// Distingue "muchos activos" de "patrimonio realmente repartido": el reparto lo
+// dice effectiveN/positions, no el número de posiciones. Y declara explícitamente
+// que las dimensiones PROFUNDAS (sector, geografía, correlación, divisa) no son
+// medibles hoy, para que nadie lea este número como un score de diversificación
+// real.
+function _aurixAiDiversification(div) {
+  const out = { dimension: _AURIX_AI_DIM.DIVERSIFICATION, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+    coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'no_source',
+    positions: null, effectiveN: null, hhi: null, effectiveRatio: null,
+    semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE,
+    depthLimitation: 'sector_geography_correlation_not_supported' };
+  if (!div) return out;
+  if (div.status !== _AURIX_FACT_STATUS.AVAILABLE) {
+    out.reason = div.reason || div.status || 'unavailable';
+    out.coverage = _aurixAiCoverageFromStatus(div.status);
+    // Cobertura parcial NO es disponibilidad: sin HHI no hay número que publicar.
+    return out;
+  }
+  if (!Number.isFinite(div.effectiveN) || !(Number(div.positions) > 0)) {
+    out.reason = 'effective_n_unavailable'; return out;
+  }
+  out.availability = _AURIX_AI_AVAIL.AVAILABLE;
+  out.coverage = _AURIX_AI_COVERAGE.SUFFICIENT;
+  out.reason = '';
+  out.positions = _aurixAiNum(div.positions);
+  out.effectiveN = _aurixAiNum(div.effectiveN);
+  out.hhi = _aurixAiNum(div.hhi);
+  out.effectiveRatio = +(div.effectiveN / div.positions).toFixed(4);
+  // Con UNA sola posición el ratio es 1 y "reparto perfecto" sería falso: no hay
+  // nada repartido. Se dice explícitamente en vez de premiar el caso degenerado.
+  out.semanticLabel = (div.positions < 2) ? _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE
+    : (out.effectiveRatio >= _AURIX_FACT_MATERIAL.effectiveNRatio) ? _AURIX_AI_LABEL.SPREAD_EVEN
+    : _AURIX_AI_LABEL.SPREAD_LOPSIDED;
+  if (div.positions < 2) out.reason = 'single_position';
+  return out;
+}
+
+// ── D · LIQUIDITY ──────────────────────────────────────────────────────────
+// Nivel + deriva medida. NO afirma que más o menos liquidez sea mejor: publica
+// dirección y magnitud, y el contexto lo pone quien renderiza.
+function _aurixAiLiquidity(snap, facts) {
+  const out = { dimension: _AURIX_AI_DIM.LIQUIDITY, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+    coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'no_snapshot',
+    cashPct: null, changePp: null, window: null, previousPct: null,
+    semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE, judgement: null };
+  if (!snap || !(Number(snap.assetCount) > 0) || !(Number(snap.totUSD) > 0)) return out;
+  out.availability = _AURIX_AI_AVAIL.AVAILABLE;
+  out.cashPct = _aurixAiNum(Number(snap.cashPct));
+  out.coverage = _AURIX_AI_COVERAGE.PARTIAL;       // nivel sí, deriva todavía no
+  out.reason = 'no_measured_drift';
+  out.semanticLabel = _AURIX_AI_LABEL.STABLE;
+  const drift = (facts || [])
+    .filter(f => f && typeof f.semanticKey === 'string' && f.semanticKey.indexOf('cash_drift_') === 0
+              && Number.isFinite(f.value))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0] || null;
+  if (drift) {
+    out.changePp = _aurixAiNum(drift.value);
+    out.window = (drift.window && drift.window.range) || null;
+    out.previousPct = (drift.values && Number.isFinite(drift.values.startPct))
+      ? _aurixAiNum(drift.values.startPct) : null;
+    out.coverage = _AURIX_AI_COVERAGE.SUFFICIENT;
+    out.reason = '';
+    out.semanticLabel = drift.value > 0 ? _AURIX_AI_LABEL.INCREASING : _AURIX_AI_LABEL.DECREASING;
+  }
+  return out;
+}
+
+// ── E · WEALTH EVOLUTION ───────────────────────────────────────────────────
+// Separa MERCADO de CAPITAL sólo donde la arquitectura certificada lo permite:
+// el rendimiento sale de los facts de INT.02 (flow-neutral) y el capital aportado
+// de `recorded_capital_net`. Cuando no hay historia suficiente, el rendimiento no
+// se sustituye por la variación del nivel — serían dos cosas distintas.
+function _aurixAiEvolution(facts, gaps, observation) {
+  const out = { dimension: _AURIX_AI_DIM.EVOLUTION, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+    coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'insufficient_history',
+    levelChange: null, returnPct: null, recordedCapitalNet: null,
+    marketVsFlowSeparable: false, window: null,
+    semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE };
+  const f = (k) => (facts || []).find(x => x && x.semanticKey === k) || null;
+  const level = (facts || []).filter(x => x && x.semanticKey === 'investable_level_change'
+                                       && Number.isFinite(x.value))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0] || null;
+  const ret = (facts || []).filter(x => x && typeof x.semanticKey === 'string'
+                                     && x.semanticKey.indexOf('investable_return_') === 0
+                                     && Number.isFinite(x.value))
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0)
+                 || Math.abs(b.value) - Math.abs(a.value))[0] || null;
+  const cap = f('recorded_capital_net');
+  if (!level && !ret && !cap) {
+    const g = (gaps || []).find(x => x && typeof x.semanticKey === 'string'
+                                  && x.semanticKey.indexOf('investable_return_') === 0);
+    out.reason = (g && g.reason) || 'insufficient_history';
+    return out;
+  }
+  out.availability = _AURIX_AI_AVAIL.AVAILABLE;
+  out.reason = '';
+  if (level) {
+    out.levelChange = { value: _aurixAiNum(level.value), unit: level.unit || null,
+      direction: level.direction || null,
+      previous: (level.values && Number.isFinite(level.values.startUSD)) ? level.values.startUSD : null };
+    out.window = (level.window && level.window.range) || out.window;
+  }
+  if (ret) {
+    out.returnPct = _aurixAiNum(ret.value);
+    out.window = (ret.window && ret.window.range) || out.window;
+  }
+  if (cap && Number.isFinite(cap.value)) out.recordedCapitalNet = _aurixAiNum(cap.value);
+  // Separable sólo si tenemos a la vez el retorno flow-neutral y el capital
+  // registrado: con uno de los dos no se puede atribuir el movimiento.
+  out.marketVsFlowSeparable = !!(ret && cap);
+  const obs = Number((observation && observation.observations) || 0);
+  out.coverage = (ret && obs >= _AURIX_INVPERF_HIGH_CONFIDENCE_OBS)
+    ? _AURIX_AI_COVERAGE.SUFFICIENT : _AURIX_AI_COVERAGE.PARTIAL;
+  if (out.coverage === _AURIX_AI_COVERAGE.PARTIAL && !out.reason) out.reason = 'low_observation_density';
+  const d = Number.isFinite(out.returnPct) ? out.returnPct
+          : (out.levelChange ? Number(out.levelChange.value) : null);
+  out.semanticLabel = !Number.isFinite(d) ? _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE
+    : (Math.abs(d) < _AURIX_FACT_MATERIAL.returnPct) ? _AURIX_AI_LABEL.STABLE
+    : (d > 0 ? _AURIX_AI_LABEL.INCREASING : _AURIX_AI_LABEL.DECREASING);
+  return out;
+}
+
+// ── F/G · STABILITY y GROWTH ───────────────────────────────────────────────
+// No se construyen, se DECLARAN. Devolver `unavailable` con causa es el contrato:
+// INT.07 ya congeló que un eje sin certificar no vale 0.
+function _aurixAiNotDerivable(dimension) {
+  return { dimension, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+    coverage: _AURIX_AI_COVERAGE.UNAVAILABLE,
+    reason: _AURIX_AI_NOT_DERIVABLE[dimension] || 'not_supported',
+    value: null, semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE };
+}
+
+// ── H · DATA CONFIDENCE / COVERAGE ─────────────────────────────────────────
+function _aurixAiConfidence(model, gaps, observation) {
+  const dims = [model.structure, model.concentration, model.diversification,
+                model.liquidity, model.evolution];
+  const avail = dims.filter(d => d.availability === _AURIX_AI_AVAIL.AVAILABLE);
+  const sufficient = avail.filter(d => d.coverage === _AURIX_AI_COVERAGE.SUFFICIENT);
+  let overall = _AURIX_AI_COVERAGE.UNAVAILABLE;
+  if (avail.length) {
+    overall = (sufficient.length === avail.length)
+      ? _AURIX_AI_COVERAGE.SUFFICIENT : _AURIX_AI_COVERAGE.PARTIAL;
+  }
+  return { overall, dimensionsAvailable: avail.length, dimensionsTotal: dims.length + 2,
+    observation: observation || { observations: 0, startAt: null, endAt: null, spanMs: null },
+    gapCount: (gaps || []).length,
+    // Los códigos de hueco, deduplicados: sirven para decir QUÉ falta sin volcar
+    // el ledger entero en la superficie.
+    gapReasons: Array.from(new Set((gaps || []).map(g => g && g.reason).filter(Boolean))).sort() };
+}
+
+// ── INSIGHT ENGINE ─────────────────────────────────────────────────────────
+// Determinista y con forma fija. `explanationCode` es un CÓDIGO: la frase la pone
+// la superficie en ES/EN, así que aquí no hay idioma y nada que traducir se
+// persiste. Ningún insight afirma causa que no se pueda demostrar.
+function _aurixAiInsight(spec) {
+  return {
+    id: spec.id,
+    dimension: spec.dimension,
+    category: spec.category || spec.dimension,
+    severity: spec.severity,
+    fact: spec.fact || null,
+    explanationCode: spec.explanationCode,
+    evidence: Array.isArray(spec.evidence) ? spec.evidence.slice() : [],
+    confidence: Number.isFinite(spec.confidence) ? spec.confidence : null,
+    coverage: spec.coverage,
+    availability: spec.availability,
+    currentValue: ('currentValue' in spec) ? spec.currentValue : null,
+    previousValue: ('previousValue' in spec) ? spec.previousValue : null,
+    change: ('change' in spec) ? spec.change : null,
+    unit: spec.unit || null,
+    semanticLabel: spec.semanticLabel || null,
+    reasonCode: spec.reasonCode || '',
+    materiality: Number.isFinite(spec.materiality) ? spec.materiality : 0,
+    priority: Number.isFinite(spec.priority) ? spec.priority : 0,
+  };
+}
+
+function _aurixAiInsights(model, core) {
+  const out = [];
+  const facts = (core && core.ledger && Array.isArray(core.ledger.facts)) ? core.ledger.facts : [];
+  const factByKey = (k) => facts.find(f => f && f.semanticKey === k) || null;
+  const prio = (k, dflt) => { const f = factByKey(k); return f && Number.isFinite(f.priority) ? f.priority : dflt; };
+
+  const c = model.concentration;
+  if (c.availability === _AURIX_AI_AVAIL.AVAILABLE && Number.isFinite(c.topWeightPct)) {
+    const material = c.topWeightPct >= _AURIX_FACT_MATERIAL.concentrationPct;
+    out.push(_aurixAiInsight({
+      id: 'ai_concentration_top_position',
+      dimension: _AURIX_AI_DIM.CONCENTRATION,
+      severity: material ? _AURIX_AI_SEVERITY.WORTH_REVIEWING : _AURIX_AI_SEVERITY.INFORMATIONAL,
+      explanationCode: c.dominant ? 'concentration_dominant_position'
+        : material ? 'concentration_material' : 'concentration_balanced',
+      evidence: ['effective_holdings', 'top_position_weight'].filter(k => !!factByKey(k)),
+      confidence: 1, coverage: c.coverage, availability: c.availability,
+      currentValue: c.topWeightPct, unit: 'percent_of_investable',
+      semanticLabel: c.semanticLabel, reasonCode: c.reason,
+      fact: { semanticKey: 'top_position_weight', holder: c.topContributor },
+      materiality: Math.min(1, c.topWeightPct / 100),
+      priority: prio('top_position_weight', Math.min(1, c.topWeightPct / 100) * 0.8),
+    }));
+  }
+
+  const d = model.diversification;
+  if (d.availability === _AURIX_AI_AVAIL.AVAILABLE) {
+    out.push(_aurixAiInsight({
+      id: 'ai_diversification_spread',
+      dimension: _AURIX_AI_DIM.DIVERSIFICATION,
+      severity: d.semanticLabel === _AURIX_AI_LABEL.SPREAD_LOPSIDED
+        ? _AURIX_AI_SEVERITY.WORTH_REVIEWING : _AURIX_AI_SEVERITY.INFORMATIONAL,
+      explanationCode: d.semanticLabel === _AURIX_AI_LABEL.SPREAD_LOPSIDED
+        ? 'diversification_weight_lopsided' : 'diversification_weight_even',
+      evidence: ['effective_holdings'].filter(k => !!factByKey(k)),
+      confidence: 1, coverage: d.coverage, availability: d.availability,
+      currentValue: d.effectiveN, unit: 'positions',
+      semanticLabel: d.semanticLabel, reasonCode: d.reason,
+      fact: { semanticKey: 'effective_holdings', positions: d.positions, hhi: d.hhi,
+              depthLimitation: d.depthLimitation },
+      materiality: d.semanticLabel === _AURIX_AI_LABEL.SPREAD_LOPSIDED ? 0.6 : 0.3,
+      priority: prio('effective_holdings', 0.45),
+    }));
+  }
+
+  const l = model.liquidity;
+  if (l.availability === _AURIX_AI_AVAIL.AVAILABLE) {
+    const moved = Number.isFinite(l.changePp) && Math.abs(l.changePp) >= _AURIX_FACT_MATERIAL.cashDeltaPp;
+    out.push(_aurixAiInsight({
+      id: 'ai_liquidity_level',
+      dimension: _AURIX_AI_DIM.LIQUIDITY,
+      severity: moved ? _AURIX_AI_SEVERITY.NOTABLE_CHANGE : _AURIX_AI_SEVERITY.INFORMATIONAL,
+      // Ninguno de los dos códigos afirma que la dirección sea buena o mala.
+      explanationCode: moved ? 'liquidity_weight_moved' : 'liquidity_weight_level',
+      evidence: facts.filter(f => f && typeof f.semanticKey === 'string'
+                               && (f.semanticKey === 'cash_weight'
+                                || f.semanticKey.indexOf('cash_drift_') === 0))
+        .map(f => f.semanticKey),
+      confidence: 1, coverage: l.coverage, availability: l.availability,
+      currentValue: l.cashPct, previousValue: l.previousPct,
+      change: Number.isFinite(l.changePp) ? { value: l.changePp, unit: 'percentage_points',
+        window: l.window, direction: l.semanticLabel } : null,
+      unit: 'percent_of_investable', semanticLabel: l.semanticLabel, reasonCode: l.reason,
+      fact: { semanticKey: 'cash_weight' },
+      materiality: moved ? 0.7 : 0.35,
+      priority: prio('cash_weight', moved ? 0.65 : 0.4),
+    }));
+  }
+
+  const e = model.evolution;
+  if (e.availability === _AURIX_AI_AVAIL.AVAILABLE) {
+    const notable = Number.isFinite(e.returnPct)
+      && Math.abs(e.returnPct) >= _AURIX_FACT_MATERIAL.returnPct;
+    out.push(_aurixAiInsight({
+      id: 'ai_evolution_wealth',
+      dimension: _AURIX_AI_DIM.EVOLUTION,
+      severity: notable ? _AURIX_AI_SEVERITY.NOTABLE_CHANGE : _AURIX_AI_SEVERITY.INFORMATIONAL,
+      explanationCode: e.marketVsFlowSeparable
+        ? 'evolution_market_and_capital_separable' : 'evolution_level_only',
+      evidence: facts.filter(f => f && typeof f.semanticKey === 'string'
+                               && (f.semanticKey.indexOf('investable_return_') === 0
+                                || f.semanticKey === 'investable_level_change'
+                                || f.semanticKey === 'recorded_capital_net'))
+        .map(f => f.semanticKey),
+      confidence: e.coverage === _AURIX_AI_COVERAGE.SUFFICIENT ? 1 : 0.6,
+      coverage: e.coverage, availability: e.availability,
+      currentValue: Number.isFinite(e.returnPct) ? e.returnPct
+        : (e.levelChange ? e.levelChange.value : null),
+      previousValue: e.levelChange ? e.levelChange.previous : null,
+      change: e.levelChange, unit: Number.isFinite(e.returnPct) ? 'percent' : (e.levelChange && e.levelChange.unit),
+      semanticLabel: e.semanticLabel, reasonCode: e.reason,
+      fact: { semanticKey: 'investable_evolution', window: e.window,
+              recordedCapitalNet: e.recordedCapitalNet },
+      materiality: notable ? 0.8 : 0.4,
+      priority: notable ? 0.78 : 0.42,
+    }));
+  }
+
+  // Un cambio de exposición por categoría YA medido y material es noticia por sí
+  // mismo, y su raíz causal (category_mix) es distinta de las de arriba.
+  const drift = facts.filter(f => f && typeof f.semanticKey === 'string'
+                                && f.semanticKey.indexOf('exposure_drift_') === 0
+                                && Number.isFinite(f.value))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0] || null;
+  if (drift) {
+    out.push(_aurixAiInsight({
+      id: 'ai_structure_category_drift',
+      dimension: _AURIX_AI_DIM.STRUCTURE, category: 'exposure',
+      severity: _AURIX_AI_SEVERITY.NOTABLE_CHANGE,
+      explanationCode: 'structure_category_weight_moved',
+      evidence: [drift.semanticKey],
+      confidence: Number.isFinite(drift.confidence) ? drift.confidence : 1,
+      coverage: _AURIX_AI_COVERAGE.SUFFICIENT, availability: _AURIX_AI_AVAIL.AVAILABLE,
+      currentValue: (drift.values && drift.values.endPct) != null ? drift.values.endPct : null,
+      previousValue: (drift.values && drift.values.startPct) != null ? drift.values.startPct : null,
+      change: { value: drift.value, unit: 'percentage_points',
+        window: (drift.window && drift.window.range) || null, direction: drift.direction || null },
+      unit: 'percent_of_investable',
+      semanticLabel: drift.value > 0 ? _AURIX_AI_LABEL.INCREASING : _AURIX_AI_LABEL.DECREASING,
+      reasonCode: '', fact: { semanticKey: drift.semanticKey,
+        category: (drift.values && drift.values.category) || null },
+      materiality: Number.isFinite(drift.materiality) ? drift.materiality : 0.5,
+      priority: Number.isFinite(drift.priority) ? drift.priority : 0.5,
+    }));
+  }
+
+  // §4 — "un dato insuficiente que limita una conclusión importante" ES una
+  // conclusión publicable. Sólo se emite cuando la dimensión que falta es de las
+  // que sostienen una lectura estructural, no por cualquier hueco del ledger.
+  const blocked = [model.diversification, model.evolution]
+    .filter(x => x.availability === _AURIX_AI_AVAIL.UNAVAILABLE);
+  if (blocked.length) {
+    const worst = blocked[0];
+    out.push(_aurixAiInsight({
+      id: 'ai_evidence_limit_' + worst.dimension,
+      dimension: worst.dimension, category: 'data_quality',
+      severity: _AURIX_AI_SEVERITY.INSUFFICIENT_EVIDENCE,
+      explanationCode: 'evidence_insufficient_for_dimension',
+      evidence: [], confidence: null,
+      coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
+      currentValue: null, semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE,
+      reasonCode: worst.reason || 'unavailable',
+      fact: { semanticKey: 'data_coverage_' + worst.dimension },
+      materiality: 0.5, priority: 0.5,
+    }));
+  }
+  return out;
+}
+
+// ATENCIÓN — pocas conclusiones, ordenadas. La selección la decide la
+// MATERIALIDAD (no la prioridad), por la misma razón que INT.04 separó las dos:
+// una prioridad alta por novedad no puede expulsar a algo más material. Una
+// dimensión aporta como máximo UN insight a la lista, así que tres tarjetas no
+// pueden ser tres formas de contar lo mismo.
+function _aurixAiAttention(insights, limit) {
+  const lim = Number.isFinite(limit) ? limit : _AURIX_AI_ATTENTION_LIMIT;
+  const byMateriality = (insights || []).slice().sort((a, b) =>
+    (b.materiality - a.materiality) || (b.priority - a.priority) || (a.id < b.id ? -1 : 1));
+  const seen = new Set(), picked = [];
+  for (const ins of byMateriality) {
+    const k = ins.dimension + '|' + ins.category;
+    if (seen.has(k)) continue;
+    seen.add(k); picked.push(ins);
+    if (picked.length >= lim) break;
+  }
+  picked.sort((a, b) => (b.priority - a.priority) || (a.id < b.id ? -1 : 1));
+  return picked;
+}
+
+// WEALTH HEALTH — deliberadamente SIN agregado. Ver el informe de PC.01: el
+// score vigente (`_aurixHealthScore`) es una escalera de penalizaciones fijas que
+// no cumple las condiciones del §7 (pesos no justificados, dato ausente que no
+// resta y por tanto se lee como salud, y juicios de dirección sobre la liquidez).
+// Se deja INTACTO donde ya está publicado —no hay regresión— y esta capa NO
+// construye un segundo agregado: publica las dimensiones por separado.
+function _aurixAiWealthHealth(model) {
+  const dims = [model.structure, model.concentration, model.diversification,
+                model.liquidity, model.evolution, model.stability, model.growth];
+  return {
+    aggregate: null,
+    aggregateDeferred: true,
+    aggregateDeferredReason: 'weights_not_justifiable_and_unavailable_must_not_score_zero',
+    legacyScoreOwner: '_aurixHealthScore',
+    legacyScoreConsumed: false,
+    dimensions: dims.map(d => ({ dimension: d.dimension, availability: d.availability,
+      coverage: d.coverage, semanticLabel: d.semanticLabel || null, reason: d.reason || '' })),
+  };
+}
+
+// PESOS POR CATEGORÍA — LIMITACIÓN DECLARADA, no un hueco de implementación.
+// El modelo tiene el slot (§3.A pide composición por categorías), pero el reader
+// certificado que los conoce —`_aurixCatExposureDelta`— vive bajo un contrato de
+// CONTENCIÓN con UN ÚNICO consumidor declarado por nombre (`_aurixFactLedger`), y
+// ese contrato está fijado por su propio gate. Llamarlo desde aquí habría exigido
+// ensanchar esa allowlist, es decir redefinir una fuente protegida para comodidad
+// de una capa nueva. PC.01 no hace eso: publica el slot con su causa y lo deja
+// INYECTABLE (`opts.categoryWeights`), así que quien tenga autoridad para declarar
+// un consumidor nuevo puede alimentarlo sin que esta capa toque la fuente.
+// Lo que el modelo SÍ publica de estructura sale del snapshot certificado:
+// total, nº de activos, nº de categorías, categoría principal, liquidez e inmueble.
+const _AURIX_AI_CATEGORY_WEIGHTS_UNAVAILABLE = Object.freeze({
+  rows: [], reason: 'category_reader_single_consumer_contract',
+});
+
+// ── EL OWNER CANÓNICO ──────────────────────────────────────────────────────
+// Puro y determinista: mismas entradas ⇒ misma salida. No escribe nada, no
+// registra listeners y no persiste: no hay estado nuevo que aislar por cuenta.
+// Todo lo inyectable (`core`, `snapshot`, `diversification`, `categoryWeights`)
+// existe para que el gate pueda fijar carteras deterministas SIN stubear lo que
+// se certifica: lo que se prueba aquí es la PROYECCIÓN, y esas cuatro cosas son
+// sus entradas certificadas, no el owner bajo prueba.
+function _aurixAdvancedIntelligence(opts) {
+  const o = opts || {};
+  const core = (o.core && typeof o.core === 'object') ? o.core
+    : ((typeof _aurixIntelligenceCore === 'function') ? _aurixAiSafe(() => _aurixIntelligenceCore(o)) : null);
+  const facts = (core && core.ledger && Array.isArray(core.ledger.facts)) ? core.ledger.facts : [];
+  const gaps = (core && core.ledger && Array.isArray(core.ledger.gaps)) ? core.ledger.gaps : [];
+  const observation = (core && core.dataAvailability && core.dataAvailability.observation) || null;
+  const snap = ('snapshot' in o) ? o.snapshot
+    : ((typeof _aurixHealthSnapshot === 'function') ? _aurixAiSafe(_aurixHealthSnapshot) : null);
+  const div = ('diversification' in o) ? o.diversification
+    : ((typeof _aurixEffectiveDiversification === 'function') ? _aurixAiSafe(_aurixEffectiveDiversification) : null);
+  const weights = ('categoryWeights' in o) ? o.categoryWeights
+    : _AURIX_AI_CATEGORY_WEIGHTS_UNAVAILABLE;
+  let top3 = null;
+  if ('top3Pct' in o) top3 = o.top3Pct;
+  else if (snap && typeof buildPortfolioDrivers === 'function') {
+    const dr = _aurixAiSafe(() => buildPortfolioDrivers(snap));
+    top3 = (dr && Number.isFinite(dr.pct)) ? dr.pct : null;
+  }
+
+  const model = {
+    structure: _aurixAiStructure(snap, weights),
+    concentration: _aurixAiConcentration(snap, div, top3),
+    diversification: _aurixAiDiversification(div),
+    liquidity: _aurixAiLiquidity(snap, facts),
+    evolution: _aurixAiEvolution(facts, gaps, observation),
+    stability: _aurixAiNotDerivable(_AURIX_AI_DIM.STABILITY),
+    growth: _aurixAiNotDerivable(_AURIX_AI_DIM.GROWTH),
+  };
+  model.confidence = _aurixAiConfidence(model, gaps, observation);
+
+  const insights = _aurixAiInsights(model, core);
+  const attention = _aurixAiAttention(insights, o.attentionLimit);
+
+  return {
+    version: 'pc01',
+    generatedAt: (core && core.generatedAt) || null,
+    model,
+    insights,
+    attention,
+    wealthHealth: _aurixAiWealthHealth(model),
+    // Los tres niveles leen ESTE mismo objeto. Se declara explícitamente qué
+    // pueden cambiar y qué no, para que PC.02 no pueda "adaptar" la verdad.
+    experience: {
+      levels: _AURIX_AI_EXPERIENCE,
+      requested: (_AURIX_AI_EXPERIENCE.indexOf(o.experience) !== -1) ? o.experience : 'balanced',
+      varies: ['language', 'density', 'depth', 'technical_detail'],
+      invariant: ['data_access', 'calculation', 'financial_result', 'availability'],
+      presentationOwner: 'pc02',
+    },
+    // Trazabilidad: de dónde salió cada cosa, sin volcar el ledger.
+    sources: {
+      core: (core && core.version) || null,
+      structure: 'aurixHealthSnapshot',
+      concentration: (model.concentration.reason === 'snapshot_fallback')
+        ? 'aurixHealthSnapshot' : 'aurixEffectiveDiversification',
+      diversification: 'aurixEffectiveDiversification',
+      evolution: 'aurixIntelligenceCore/int02',
+      categoryWeights: null,   // ver la limitación declarada arriba
+    },
+  };
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixAdvancedIntelligence = (opts) => _aurixAdvancedIntelligence(opts || {});
+  window.AURIX_ADVANCED_INTELLIGENCE_CONTRACT = Object.freeze({
+    availability: _AURIX_AI_AVAIL, coverage: _AURIX_AI_COVERAGE, dimensions: _AURIX_AI_DIM,
+    severity: _AURIX_AI_SEVERITY, labels: _AURIX_AI_LABEL, experience: _AURIX_AI_EXPERIENCE,
+    attentionLimit: _AURIX_AI_ATTENTION_LIMIT, notDerivable: _AURIX_AI_NOT_DERIVABLE,
+    note: 'PC.01 — pure projection of the certified Core. Codes only, never copy; '
+        + 'unavailable never becomes 0; no aggregate wealth-health score.',
   });
 }
 
