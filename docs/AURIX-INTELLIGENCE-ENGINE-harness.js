@@ -1,6 +1,6 @@
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
-// AURIX-AURI-INTELLIGENCE-ENGINE — el cerebro patrimonial y su honestidad
+// AURIX-INTELLIGENCE-ENGINE — el cerebro patrimonial y su honestidad
 // ════════════════════════════════════════════════════════════════════════════
 // La aserción que gobierna todo el fichero:
 //
@@ -42,7 +42,7 @@ const CORE   = block('const _AURIX_FACT_STATUS = Object.freeze({', '  effectiveN
 const OBS    = block('const _AURIX_INVPERF_HIGH_CONFIDENCE_OBS', ';');
 const PC01   = block('const _AURIX_AI_AVAIL = Object.freeze({',
   "        + 'unavailable never becomes 0; no aggregate wealth-health score.',\n  });\n}");
-const AURI_SRC = block('const _AURIX_AURI_FIELDS = Object.freeze({',
+const INTEL_SRC = block('const _AURIX_INTEL_FIELDS = Object.freeze({',
   "        + 'It may never change a financial value, its availability or its coverage.',\n  });\n}");
 
 // Storage de mentira PERO con la semántica real: un Map por clave. El owner y el
@@ -56,16 +56,21 @@ const sandbox = { console, Object, Number, Math, Array, Set, Map, JSON, isFinite
   _AURIX_CATHIST_INVESTABLE: ['stock', 'etf', 'fund', 'crypto', 'metal', 'liquidity', 'other'] };
 sandbox.window = undefined;
 vm.createContext(sandbox);
-vm.runInContext(CORE + '\n' + OBS + '\n' + PC01 + '\n' + AURI_SRC
+vm.runInContext(CORE + '\n' + OBS + '\n' + PC01 + '\n' + INTEL_SRC
   + '\nglobalThis.AI = _aurixAdvancedIntelligence;'
-  + '\nglobalThis.AURI = _aurixAuri;'
-  + '\nglobalThis.REC = _aurixAuriRecordAnswer;'
-  + '\nglobalThis.CTXREAD = _aurixAuriContext;'
-  + '\nglobalThis.DISP = _aurixAuriDispersion;'
-  + '\nglobalThis.MEMCOMMIT = _aurixAuriCommitMemory;'
-  + '\nglobalThis.FIELDS = _AURIX_AURI_FIELDS;'
+  + '\nglobalThis.INTEL = _aurixIntel;'
+  + '\nglobalThis.REC = _aurixIntelRecordAnswer;'
+  + '\nglobalThis.CTXREAD = _aurixIntelContext;'
+  + '\nglobalThis.DISP = _aurixIntelDispersion;'
+  + '\nglobalThis.MEMCOMMIT = _aurixIntelCommitMemory;'
+  + '\nglobalThis.FIELDS = _AURIX_INTEL_FIELDS;'
+  + '\nglobalThis._aurixIntelMarkAsked = _aurixIntelMarkAsked;'
+  + '\nglobalThis._aurixIntelDecline = _aurixIntelDecline;'
+  + '\nglobalThis._aurixIntelPauseQuestions = _aurixIntelPauseQuestions;'
+  + '\nglobalThis._aurixIntelHealth = _aurixIntelHealth;'
+  + '\nglobalThis.MERGE = _aurixIntelCtxMerge;'
   + '\nglobalThis.ST = _AURIX_FACT_STATUS;', sandbox);
-const { AURI, REC, CTXREAD, DISP, MEMCOMMIT, FIELDS, ST } = sandbox;
+const { INTEL, REC, CTXREAD, DISP, MEMCOMMIT, FIELDS, ST } = sandbox;
 
 let pass = 0, fail = 0;
 function ok(n, c, info) {
@@ -122,10 +127,35 @@ const P = {
   drawdown:   { snapshot: snap(), diversification: div(), core: core([RET(-14.5)]) },
   withdrawal: { snapshot: snap(), diversification: div(), core: core([RET(-2.1), CAP(-18000)]) },
 };
-const run = (prof, extra) => AURI(Object.assign({ now: 2000000000000, context: { fields: {}, answered: 0, source: 'none' },
+const run = (prof, extra) => INTEL(Object.assign({ now: 2000000000000, context: { fields: {}, answered: 0, source: 'none' },
   memory: null, depth: 'premium' }, prof, extra || {}));
 
 // ── A · LA SEPARACIÓN, DEMOSTRADA ───────────────────────────────────────────
+group('A0 · naming · la superficie es AURIX INTELLIGENCE, no un segundo producto');
+{
+  // Instrucción explícita del founder: no existe un segundo producto llamado AURI.
+  // Ni como copy, ni como namespace, ni como identificador. Esta aserción lo fija
+  // para que no vuelva a entrar por comodidad de nombres cortos.
+  const codeOnly = src.replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  const syms = (codeOnly.match(/\b[A-Za-z_$]*[Aa]uri(?![xX])[A-Za-z_$]*\b/g) || [])
+    .filter(x => !/^Auris$/.test(x));          // `Auris`: nombre heredado, preexistente
+  ok('A0.1 cero identificadores con namespace AURI en el código', syms.length === 0,
+    Array.from(new Set(syms)).slice(0, 8));
+  const cssSyms = (css.match(/\b[a-z-]*auri(?![xX])[a-z-]*\b/g) || []);
+  ok('A0.2 cero clases CSS con namespace AURI', cssSyms.length === 0,
+    Array.from(new Set(cssSyms)).slice(0, 8));
+  // Y lo que de verdad ve el usuario: ninguna cadena publicable lo menciona.
+  const strings = (src.match(/'[^'\n]{3,}'/g) || []).concat(src.match(/"[^"\n]{3,}"/g) || []);
+  const visible = strings.filter(x => /\s/.test(x));    // con espacios = frase, no identificador
+  ok('A0.3 ninguna frase publicable nombra AURI como producto',
+    visible.every(x => !/\bauri\b/i.test(x)),
+    visible.filter(x => /\bauri\b/i.test(x)).slice(0, 5));
+  ok('A0.4 la card de salud se llama SALUD en los dos idiomas',
+    /intcc_health_title:\s*'Salud'/.test(src) && /intcc_health_title:\s*'Health'/.test(src)
+    && /esc\(t\('intcc_health_title'\)\)/.test(src));
+}
+
 group('A · truth ≠ context ≠ interpretation · el contexto NO mueve una cifra');
 const ctxOf = (f) => ({ fields: f, answered: Object.keys(f).length, source: 'stored' });
 const CTX_DELIB = ctxOf({ concentration_intent: { value: 'deliberate', provenance: 'user_answer',
@@ -178,19 +208,19 @@ ok('B.4 la concentración exige SUJETO: un «es deliberada» sin decir de qué n
 const st1 = mkStore();
 ok('B.5 una respuesta se guarda con dueño, procedencia y timestamp',
   REC('primary_goal', 'preserve', { store: st1, owner: 'user-A', now: 111 })
-  && /"owner":"user-A"/.test(st1.getItem('aurix_auri_ctx_v1'))
-  && /"provenance":"user_answer"/.test(st1.getItem('aurix_auri_ctx_v1'))
-  && /"answeredAt":111/.test(st1.getItem('aurix_auri_ctx_v1')));
+  && /"owner":"user-A"/.test(st1.getItem('aurix_intel_ctx_v1'))
+  && /"provenance":"user_answer"/.test(st1.getItem('aurix_intel_ctx_v1'))
+  && /"answeredAt":111/.test(st1.getItem('aurix_intel_ctx_v1')));
 ok('B.6 …y es ACTUALIZABLE sin acumular un histórico de respuestas',
   (() => { REC('primary_goal', 'grow', { store: st1, owner: 'user-A', now: 222 });
     const c = CTXREAD({ store: st1, owner: 'user-A' });
     return c.fields.primary_goal.value === 'grow' && c.fields.primary_goal.answeredAt === 222
-      && (st1.getItem('aurix_auri_ctx_v1').match(/"provenance"/g) || []).length === 1; })());
+      && (st1.getItem('aurix_intel_ctx_v1').match(/"provenance"/g) || []).length === 1; })());
 ok('B.7 un valor fuera del catálogo se RECHAZA al escribir',
   REC('primary_goal', 'hodl', { store: st1, owner: 'user-A' }) === false);
 ok('B.8 …y un storage manipulado no puede inyectar opciones ni campos nuevos',
   (() => { const s = mkStore();
-    s.setItem('aurix_auri_ctx_v1', JSON.stringify({ owner: 'u', fields: {
+    s.setItem('aurix_intel_ctx_v1', JSON.stringify({ owner: 'u', fields: {
       primary_goal: { value: 'moon', provenance: 'user_answer', answeredAt: 1 },
       secret_field: { value: 'x', provenance: 'user_answer', answeredAt: 1 } } }));
     const c = CTXREAD({ store: s, owner: 'u' });
@@ -212,15 +242,15 @@ ok('C.4 la memoria observada de A tampoco la lee B', (() => {
   const s = mkStore();
   MEMCOMMIT({ seen: [{ id: 'ai_x', dimension: 'concentration', label: 'concentrated',
     firstSeenAt: 1, lastSeenAt: 1, observations: 2 }] }, { value: 60 }, 5, { store: s, owner: 'user-A' });
-  const asB = AURI(Object.assign({ now: 9, depth: 'premium', store: s, owner: 'user-B' }, P.concentr));
+  const asB = INTEL(Object.assign({ now: 9, depth: 'premium', store: s, owner: 'user-B' }, P.concentr));
   return asB.memory.hasHistory === false; })());
 ok('C.5 las dos claves están en el ciclo de vida de cambio de usuario',
-  /'aurix_auri_ctx_v1', 'aurix_auri_mem_v1'/.test(src)
-  && src.indexOf("'aurix_auri_ctx_v1'") > src.indexOf('const USER_SCOPED_LOCAL_KEYS'));
+  /'aurix_intel_ctx_v1', 'aurix_intel_mem_v1'/.test(src)
+  && src.indexOf("'aurix_intel_ctx_v1'") > src.indexOf('const USER_SCOPED_LOCAL_KEYS'));
 ok('C.6 el motor no lee identidad por su cuenta más que para SELLAR',
-  (() => { const f = bare(fnSrc('_aurixAuriOwner'));
+  (() => { const f = bare(fnSrc('_aurixIntelOwner'));
     return /_aurixActiveUserId|_aurixCacheOwner/.test(f)
-      && !/_aurixHealthScore|investableValueUSD/.test(bare(AURI_SRC)); })());
+      && !/_aurixHealthScore|investableValueUSD/.test(bare(INTEL_SRC)); })());
 
 // ── D · DISPERSIÓN DE PESOS (el Health retirado) ────────────────────────────
 group('D · dispersión · el índice se llama por lo que mide');
@@ -286,7 +316,7 @@ ok('E.6 un movimiento del índice de dispersión se registra con su dirección',
 ok('E.7 la memoria NO guarda ni una cifra de patrimonio ni nada identificable',
   (() => { const s = mkStore();
     MEMCOMMIT(second.memory, second.dispersion, 7, { store: s, owner: 'u' });
-    const raw = s.getItem('aurix_auri_mem_v1');
+    const raw = s.getItem('aurix_intel_mem_v1');
     return !/100000|VWCE|BTC|Piso|email|@/.test(raw); })());
 ok('E.8 lo que se repite cede prioridad a lo nuevo, sin dejar de ser verdad',
   (() => { const many = { observedAt: 1000, dispersion: first.dispersion.value, seen: first.memory.seen.map(e =>
@@ -338,10 +368,10 @@ ok('F.9 NINGÚN descubrimiento afirma causalidad',
 ok('F.10 …y todos llevan evidencia rastreable',
   dApparent.discoveries.every(d => Array.isArray(d.evidence)));
 ok('F.11 no se inventan benchmarks, correlaciones ni predicciones',
-  !/benchmark|forecast|predict|sp500|index_compare/i.test(bare(AURI_SRC))
+  !/benchmark|forecast|predict|sp500|index_compare/i.test(bare(INTEL_SRC))
   // La ÚNICA aparición de «correlation» permitida es la que declara que NO es medible.
-  && (bare(AURI_SRC).match(/correlation/g) || []).length
-     === (bare(AURI_SRC).match(/correlation_not_supported/g) || []).length);
+  && (bare(INTEL_SRC).match(/correlation/g) || []).length
+     === (bare(INTEL_SRC).match(/correlation_not_supported/g) || []).length);
 
 // ── G · PREGUNTAS ───────────────────────────────────────────────────────────
 group('G · preguntas · sólo cuando la respuesta cambia la interpretación');
@@ -445,7 +475,7 @@ ok('J.3 la elección explícita del usuario MANDA sobre lo inferido',
     explanation_depth: { value: 'advanced', provenance: 'user_answer', answeredAt: 2, purpose: 'explanation_density', changes: 'language' } }) })
     .experience.resolved === 'advanced');
 ok('J.4 el nivel NO se infiere del patrimonio: el dinero no dice cuánto sabes',
-  !/totUSD|totalInvestable|assetCount/.test(bare(fnSrc('_aurixAuri')).split('experience:')[1] || ''));
+  !/totUSD|totalInvestable|assetCount/.test(bare(fnSrc('_aurixIntel')).split('experience:')[1] || ''));
 ok('J.5 el nivel es siempre modificable por el usuario',
   run(P.concentr).experience.userOverridable === true);
 ok('J.6 y no cambia ni el modelo ni la disponibilidad',
@@ -489,11 +519,15 @@ ok('K.10 determinista: recargar con el mismo estado da el mismo resultado',
 // ── L · CUMPLIMIENTO ────────────────────────────────────────────────────────
 group('L · cumplimiento · informa, no aconseja');
 const allStrings = (() => { const s = [];
-  results.forEach(([, r]) => (function walk(v) {
+  results.forEach(([, r]) => (function walk(v, key) {
+    // `forbiddenFraming` ENUMERA los marcos prohibidos («grade», «quality»,
+    // «advice»): es lo contrario de una prescripción, así que no se audita como
+    // si lo fuera.
+    if (key === 'forbiddenFraming') return;
     if (typeof v === 'string') s.push(v);
-    else if (Array.isArray(v)) v.forEach(walk);
-    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
-  })(r)); return s; })();
+    else if (Array.isArray(v)) v.forEach(x => walk(x, key));
+    else if (v && typeof v === 'object') Object.keys(v).forEach(k => walk(v[k], k));
+  })(r, 'root')); return s; })();
 const PRESCRIPTIVE = ['buy', 'sell', 'reduce', 'trim', 'rebalance', 'recommend', 'recommended',
   'advice', 'advise', 'avoid', 'exit', 'diversify', 'should'];
 ok('L.1 ningún código emitido dirige un verbo de acción al usuario',
@@ -502,7 +536,7 @@ ok('L.1 ningún código emitido dirige un verbo de acción al usuario',
 ok('L.2 no se emite juicio moral sobre la estructura',
   allStrings.every(x => !/^(good|bad|poor|excellent|healthy|unhealthy)$/i.test(x)));
 ok('L.3 el motor no infiere tolerancia al riesgo',
-  !/riskTolerance|risk_tolerance|riskProfile/.test(bare(AURI_SRC)));
+  !/riskTolerance|risk_tolerance|riskProfile/.test(bare(INTEL_SRC)));
 ok('L.4 preferencia y capacidad no se confunden: el contexto sólo cualifica',
   Object.keys(FIELDS).every(k => FIELDS[k].changes !== 'coverage' || k === 'wealth_coverage'));
 ok('L.5 el patrimonio declarado PARCIAL cualifica el alcance de toda conclusión',
@@ -518,12 +552,12 @@ group('M · superficie · los tres defectos nombrados por el founder');
 const readingFn = bare(fnSrc('_intv5Reading'));
 ok('M.1 el header YA NO lo decide `score < 60`',
   !/score\.score\s*!=\s*null\s*&&\s*score\.score\s*<\s*60/.test(readingFn)
-  && /auri\.now|nowState/.test(readingFn));
-ok('M.2 …y el estado sale de AURI, con un hecho detrás',
-  /_aurixAuriNow/.test(bare(fnSrc('_aurixAuri'))) && /auri_now_/.test(readingFn));
+  && /intel\.now|nowState/.test(readingFn));
+ok('M.2 …y el estado sale del motor, con un hecho detrás',
+  /_aurixIntelNow/.test(bare(fnSrc('_aurixIntel'))) && /intel_now_/.test(readingFn));
 const hsFn = bare(fnSrc('_intccHealthScore'));
-ok('M.3 Intelligence ya no publica el score heredado: publica dispersión',
-  /_aurixAuriDispersion/.test(hsFn) && !/_aurixHealthScore\s*\(/.test(hsFn));
+ok('M.3 Intelligence ya no publica el score heredado: publica SALUD V2',
+  /_aurixIntelHealth\s*\(/.test(hsFn) && !/_aurixHealthScore\s*\(/.test(hsFn));
 ok('M.4 …y el score heredado sigue INTACTO para Dashboard/Workspace (cero regresión)',
   /function _aurixHealthScore\(snap\)/.test(src)
   && (src.match(/_aurixHealthScore\(/g) || []).length >= 4);
@@ -540,16 +574,35 @@ ok('M.8 …sin perder una palabra: leyenda, significado y ejes pendientes siguen
 ok('M.9 …y la limitación se sigue VIENDO sin abrir nada (ejes atenuados en el SVG)',
   /is-unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
 ok('M.10 la pregunta se pinta con la primitiva de chip existente, sin slot nuevo',
-  /intv8-auri-q/.test(src) && /class="intcc-chip intv8-auri-opt"/.test(src));
+  /intv8-intel-q/.test(src) && /class="intcc-chip intv8-intel-opt"/.test(src));
 ok('M.11 responder tiene efecto inmediato: se guarda y se repinta',
-  /_aurixAuriRecordAnswer/.test(src) && /renderIntelligenceTab\(\);/.test(src));
+  /_aurixIntelRecordAnswer/.test(src) && /renderIntelligenceTab\(\);/.test(src));
 ok('M.12 y si no hay sesión, la escritura falla cerrada y se DICE',
-  /saved \? _intv4T\('auri_q_thanks'\)/.test(src));
+  /saved \? _intv4T\(msg\) : _intv4T\('intel_disp_na_generic'\)/.test(src));
 ok('M.13 la memoria se consolida con throttle: no se vacía al repintar',
-  /30 \* 60 \* 1000/.test(src) && /_aurixAuriCommitMemory/.test(src));
+  /30 \* 60 \* 1000/.test(src) && /_aurixIntelCommitMemory/.test(src));
+
+// ── T · RENDIMIENTO ────────────────────────────────────────────────────────
+group('T · rendimiento · una pintura, una agregación');
+ok('T.1 la Salud RECIBE el modelo ya calculado en vez de recomputar el ledger',
+  /function _intccHealthScore\(snap, drivers, intel\)/.test(src)
+  && /let model = \(intel && intel\.model\) \|\| null;/.test(src));
+ok('T.2 …y el renderer calcula el motor ANTES de la Salud, una sola vez',
+  (() => { const r = fnSrc('_renderIntelligenceCommandCenter');
+    return r.indexOf('_aurixIntel({') < r.indexOf('_intccHealthScore(snap, null, intel)')
+      && (r.match(/_aurixIntel\(\{/g) || []).length === 1
+      && (r.match(/_intccHealthScore\(/g) || []).length === 1; })());
+ok('T.3 el motor no registra listeners ni timers propios',
+  !/addEventListener|setInterval|setTimeout|requestAnimationFrame/.test(bare(INTEL_SRC)));
+ok('T.4 la sincronización cross-device no hace polling: un tirón con suelo',
+  !/setInterval/.test(src.slice(src.indexOf('_aurixIntelCtxPull'), src.indexOf('_aurixIntelCtxPull') + 4000))
+  && /_nowPull - _aurixIntelCtxPulledAt > _AURIX_INTEL_CTX_PULL_FLOOR_MS/.test(src));
+ok('T.5 hay UN solo listener delegado nuevo, y se arma una vez',
+  (src.match(/_intelAnswerWired = true/g) || []).length === 1
+  && /if \(!_intelAnswerWired\)/.test(src));
 
 group('N · CSS · clases nuevas, sin alfa blanco y con foco visible');
-const newCss = css.slice(css.indexOf('SPEC AURI · INTELLIGENCE ENGINE'));
+const newCss = css.slice(css.indexOf('SPEC AURIX INTELLIGENCE · INTELLIGENCE ENGINE'));
 ok('N.1 el bloque nuevo no introduce alfa blanco (= gris neutro sobre el lienzo)',
   !/rgba\(255,\s*255,\s*255/.test(newCss));
 ok('N.2 usa la escalera --elev-* y el azul institucional por token',
@@ -561,25 +614,49 @@ ok('N.4 los controles nuevos tienen foco visible (teclado)',
 ok('N.5 el disclosure no depende de hover, que en móvil no existe',
   /\.intv8-radar-summary\s*\{[\s\S]*?cursor: pointer/.test(newCss));
 ok('N.6 hay ruta móvil declarada para lo táctil',
-  /@media \(max-width: 640px\)[\s\S]*intv8-auri-opt/.test(newCss));
-ok('N.7 no se modifica ninguna regla existente: todas las nuevas son .intv8-* o is-tone-neutral',
-  newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()))
-    .every(l => /intv8-|is-tone-neutral/.test(l)));
+  /@media \(max-width: 640px\)[\s\S]*intv8-intel-opt/.test(newCss));
+// El §12 del SPEC exige tocar la composición del hero (safe-zone de la esfera y
+// altura adaptativa), así que una prohibición total de tocar reglas existentes
+// dejaría de ser cierta. Se sustituye por una ALLOWLIST explícita: sólo estos tres
+// selectores heredados, y sólo para propiedades de composición.
+const TOUCHED_EXISTING = ['.intcc-hero-body', '.intcc-hero-orb-wrap', '.intcc-hero[data-has-question',
+  '.intcc-m-hero-text[data-has-question'];
+ok('N.7 sólo se tocan 4 selectores heredados, y son los que exige el hero adaptativo',
+  newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
+    .every(l => /intv8-|is-tone-neutral/.test(l)
+      || TOUCHED_EXISTING.some(t => l.trim().startsWith(t))),
+  newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
+    .filter(l => !/intv8-|is-tone-neutral/.test(l) && !TOUCHED_EXISTING.some(t => l.trim().startsWith(t))));
+ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipografía',
+  (() => { const bad = [];
+    newCss.split(/(?<=\})/).forEach(rule => {
+      const head = (rule.match(/^[\s]*([^{]+)\{/) || [])[1] || '';
+      if (!TOUCHED_EXISTING.some(t => head.trim().startsWith(t))) return;
+      const props = (rule.match(/[a-z-]+\s*:/g) || []).map(x => x.replace(/\s*:$/, ''));
+      props.forEach(pr => { if (!['padding-right', 'padding-top', 'padding-bottom', 'position',
+        'z-index', 'pointer-events', 'align-items'].includes(pr)) bad.push(head.trim() + ' → ' + pr); });
+    });
+    return bad.length === 0 ? true : bad; })() === true);
+ok('N.9 la esfera no puede robar un click a la pregunta',
+  /\.intcc-hero-orb-wrap \{[^}]*pointer-events: none/.test(newCss));
+ok('N.10 el hero se compacta sin pregunta y crece sólo con ella',
+  /data-has-question="0"\] \{[^}]*padding-top: 16px/.test(newCss)
+  && /data-has-question="1"\] \{[^}]*padding-top: 22px/.test(newCss));
 
 // ── O · LA SUPERFICIE SE EJECUTA ────────────────────────────────────────────
 // La revisión adversarial encontró un TypeError que este harness no podía ver: el
 // grupo M certificaba la superficie con REGEX SOBRE EL FUENTE. `_intv4T('k')(args)`
 // parece razonable leyéndolo y estalla al ejecutarlo —`_intv4T` ya invoca la
 // función del diccionario—, y `renderIntelligenceTab` se tragaba la excepción
-// dejando la pestaña en el layout legacy SIN AURI y en silencio. Es exactamente
+// dejando la pestaña en el layout legacy SIN el motor y en silencio. Es exactamente
 // `feedback_harness_no_stubear_lo_certificado`. Así que aquí se cargan las
 // funciones REALES de presentación con los diccionarios REALES y se ejercen TODOS
 // los estados en los DOS idiomas.
 group('O · presentación · ejecutada de verdad, en ES y EN');
 {
-  // Diccionarios reales: se extraen las líneas `auri_*` y las `intcc_*` que la
+  // Diccionarios reales: se extraen las líneas `intel_*` y las `intcc_*` que la
   // lectura consume, de cada uno de los dos bloques de idioma.
-  const NEEDED = /^\s*(auri_[a-z0-9_]+|intcc_(read|sub)_[a-z_]+|intcc_health_title|intcc_health_suffix|intcc_band_empty):/;
+  const NEEDED = /^\s*(intel_[a-z0-9_]+|intcc_(read|sub)_[a-z_]+|intcc_health_title|intcc_health_suffix|intcc_band_empty):/;
   // Se agrupa POR CLAVE y se toma la 1ª aparición para ES y la 2ª para EN. Un
   // límite de línea global no sirve: los dos diccionarios no declaran las claves
   // en el mismo orden, así que partir el fichero por una clave concreta atribuía
@@ -607,10 +684,10 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
   const sb2 = { console, Object, Number, Math, Array, JSON, isFinite, window: undefined };
   vm.createContext(sb2);
   vm.runInContext(fnSrc('_intv4T') + '\n' + fnSrc('_intv4Num') + '\n'
-    + fnSrc('_auriDiscoveryText') + '\n' + fnSrc('_auriQuestionText') + '\n'
+    + fnSrc('_intelDiscoveryText') + '\n' + fnSrc('_intelQuestionText') + '\n'
     + fnSrc('_intv5Reading') + '\n'
-    + 'globalThis.READ = _intv5Reading; globalThis.DT = _auriDiscoveryText;'
-    + 'globalThis.QT = _auriQuestionText;', sb2);
+    + 'globalThis.READ = _intv5Reading; globalThis.DT = _intelDiscoveryText;'
+    + 'globalThis.QT = _intelQuestionText;', sb2);
 
   const STATES = ['no_data', 'material_change', 'discovery', 'attention_material_fact',
     'readings_changed', 'context_needed', 'insufficient_history', 'stable_no_change', 'stable'];
@@ -623,12 +700,12 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
   ['es', 'en'].forEach(lang => {
     sb2.t = k => (lang === 'es' ? ES : EN)[k];
     STATES.forEach(st => {
-      const auri = { now: { state: st, changeCount: 2 },
+      const intel = { now: { state: st, changeCount: 2 },
         discoveries: [{ code: 'apparent_vs_effective_diversification', values: { positions: 7, effectiveN: 2.5 } }],
         questions: [{ field: 'concentration_intent', subject: 'BTC' }],
         context: { fields: {} } };
       let r = null;
-      try { r = sb2.READ(null, {}, null, auri); } catch (e) { badStates.push([lang, st, 'THROW ' + e.message]); return; }
+      try { r = sb2.READ(null, {}, null, intel); } catch (e) { badStates.push([lang, st, 'THROW ' + e.message]); return; }
       if (!r || !r.title || !r.sub || /undefined|\[object/.test(r.title + r.sub)) badStates.push([lang, st, r && r.title, r && r.sub]);
     });
     DISCOVERY_CODES.forEach(code => {
@@ -653,14 +730,14 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
     (() => { sb2.t = k => ES[k]; return /BTC/.test(sb2.QT({ field: 'concentration_intent', subject: 'BTC' }).text); })());
   ok('O.6 el contexto «patrimonio parcial» CUALIFICA el subtítulo renderizado',
     (() => { sb2.t = k => ES[k];
-      const auri = { now: { state: 'stable', changeCount: 0 }, discoveries: [], questions: [],
+      const intel = { now: { state: 'stable', changeCount: 0 }, discoveries: [], questions: [],
         context: { fields: { wealth_coverage: { value: 'partial' } } } };
-      const r = sb2.READ(null, {}, null, auri);
-      return r.sub.includes(ES.auri_ctx_partial); })());
-  ok('O.7 sin motor AURI la lectura NO afirma estabilidad: falla cerrada',
+      const r = sb2.READ(null, {}, null, intel);
+      return r.sub.includes(ES.intel_ctx_partial); })());
+  ok('O.7 sin motor la lectura NO afirma estabilidad: falla cerrada',
     (() => { sb2.t = k => ES[k]; const r = sb2.READ(null, {}, null, null);
-      return r.auriState === 'insufficient_history' && r.title === ES.auri_now_history; })());
-  ok('O.8 ningún estado publica urgencia en su clase visual sin venir de AURI',
+      return r.intelState === 'insufficient_history' && r.title === ES.intel_now_history; })());
+  ok('O.8 ningún estado publica urgencia en su clase visual sin venir del motor',
     (() => { sb2.t = k => ES[k];
       const r = sb2.READ(null, {}, null, { now: { state: 'stable_no_change', changeCount: 0 },
         discoveries: [], questions: [], context: { fields: {} } });
@@ -712,6 +789,265 @@ group('P · memoria · sin cambios fabricados por repetición');
           firstSeenAt: 1, lastSeenAt: 1, observations: 9, resolvedAt: null })) };
       const r = run(prof, { memory: many, context: FULL_CTX });
       return r.now.urgencyClaimed === true && r.now.supportedByFact === true; })());
+}
+
+// ── Q · CICLO DE VIDA DE PREGUNTAS ─────────────────────────────────────────
+group('Q · preguntas · no se repiten, se pueden declinar y se pueden pausar');
+{
+  const DAY = 864e5, T0 = 2000000000000;
+  const ask = (ctxExtra, now) => run(P.concentr, { context: Object.assign(
+    { fields: {}, answered: 0, source: 'stored', asked: {}, declined: {}, pausedAt: null },
+    ctxExtra || {}), now: Number.isFinite(now) ? now : T0 });
+  ok('Q.1 una concentración material dispara la pregunta la primera vez',
+    ask().questions.length === 1 && ask().questions[0].field === 'concentration_intent');
+  ok('Q.2 recién PREGUNTADA no se repite (ni al recargar ni al día siguiente)',
+    ask({ asked: { q_concentration_intent: { at: T0, count: 1 } } }).questions
+      .every(q => q.field !== 'concentration_intent')
+    && ask({ asked: { q_concentration_intent: { at: T0 - DAY, count: 1 } } }, T0).questions
+      .every(q => q.field !== 'concentration_intent'));
+  ok('Q.3 …tampoco a la semana justa; vuelve a estar elegible pasado el cooldown',
+    ask({ asked: { q_concentration_intent: { at: T0 - 6 * DAY, count: 1 } } }, T0).questions
+      .every(q => q.field !== 'concentration_intent')
+    && ask({ asked: { q_concentration_intent: { at: T0 - 8 * DAY, count: 1 } } }, T0).questions
+      .some(q => q.field === 'concentration_intent'));
+  ok('Q.4 en cooldown CEDE EL TURNO a otra útil en vez de callar a todas',
+    ask({ asked: { q_concentration_intent: { at: T0, count: 1 } } }).questions.length === 1);
+  ok('Q.5 «prefiero no responder» la cierra 90 días, sin guardar ningún valor',
+    (() => { const c = ask({ declined: { concentration_intent: T0 - 30 * DAY } }, T0);
+      return c.questions.every(q => q.field !== 'concentration_intent')
+        && !c.context.fields.concentration_intent; })());
+  ok('Q.6 …y a los 90+ días vuelve a ser elegible',
+    ask({ declined: { concentration_intent: T0 - 100 * DAY } }, T0).questions
+      .some(q => q.field === 'concentration_intent'));
+  ok('Q.7 PAUSA: cero preguntas mientras está activa',
+    ask({ pausedAt: T0 - DAY }, T0).questions.length === 0);
+  ok('Q.8 …y la pausa NO borra respuestas, ni memoria, ni desactiva Intelligence',
+    (() => { const r = run(P.concentr, { context: { fields: CTX_DELIB.fields, answered: 1,
+        source: 'stored', asked: {}, declined: {}, pausedAt: T0 - DAY }, memory: storedMem, now: T0 });
+      return r.context.answered === 1 && r.model.concentration.availability === 'available'
+        && r.attention.length > 0 && r.questions.length === 0; })());
+  ok('Q.9 la pausa expira sola tras 30 días',
+    ask({ pausedAt: T0 - 40 * DAY }, T0).questions.length === 1);
+  ok('Q.10 un cambio EXTRAORDINARIAMENTE material la levanta, y es determinista',
+    (() => { const prof = { snapshot: snap({ cashPct: 24 }),
+        diversification: div({ positions: 5, hhi: 0.49, effectiveN: 2.04, topWeightPct: 68 }),
+        core: core([CASHDRIFT(14, 10)]) };
+      const memSinLiquidez = { observedAt: 1, dispersion: 26, seen: [{ id: 'ai_concentration_top_position',
+        dimension: 'concentration', label: 'dominant_position', firstSeenAt: 1, lastSeenAt: 1,
+        observations: 2, resolvedAt: null }] };
+      const r = run(prof, { context: { fields: {}, answered: 0, source: 'stored', asked: {},
+        declined: {}, pausedAt: T0 - DAY }, memory: memSinLiquidez, now: T0 });
+      return r.questionPolicy.materialReopen === true && r.questions.length >= 1; })());
+  ok('Q.11 …y un cambio cualquiera NO la levanta',
+    ask({ pausedAt: T0 - DAY }, T0).questionPolicy.materialReopen === false);
+  ok('Q.12 el contrato de la pregunta ofrece SIEMPRE declinar y pausar',
+    ask().questions.every(q => q.canDecline === true && q.canPause === true));
+  ok('Q.13 la política se publica, así que la superficie no la reinventa',
+    (() => { const p2 = ask().questionPolicy;
+      return p2.cooldownMs === 7 * DAY && p2.declinedMs === 90 * DAY && p2.paused === false; })());
+  // Persistencia real de las tres mutaciones
+  const st = mkStore(), env = { store: st, owner: 'user-A', now: T0 };
+  ok('Q.14 marcar PREGUNTADA persiste con su contador y no toca las respuestas',
+    (() => { REC('primary_goal', 'grow', env);
+      sandbox._aurixIntelMarkAsked('q_concentration_intent', env);
+      sandbox._aurixIntelMarkAsked('q_concentration_intent', env);
+      const c = CTXREAD(env);
+      return c.asked.q_concentration_intent.count === 2 && c.fields.primary_goal.value === 'grow'; })());
+  ok('Q.15 declinar persiste el campo y NO escribe valor',
+    (() => { sandbox._aurixIntelDecline('concentration_intent', env);
+      const c = CTXREAD(env);
+      return Number.isFinite(c.declined.concentration_intent)
+        && !c.fields.concentration_intent; })());
+  ok('Q.16 pausar persiste y CONSERVA lo ya respondido',
+    (() => { sandbox._aurixIntelPauseQuestions(env);
+      const c = CTXREAD(env);
+      return Number.isFinite(c.pausedAt) && c.fields.primary_goal.value === 'grow'; })());
+  ok('Q.17 un campo inventado no se puede declinar',
+    sandbox._aurixIntelDecline('nope', env) === false);
+}
+
+// ── R · SALUD V2 ───────────────────────────────────────────────────────────
+group('R · Salud V2 · vuelve a llamarse Salud y sigue sin ser una nota');
+{
+  const H = sandbox._aurixIntelHealth;
+  const m = (prof) => run(prof).model;
+  ok('R.1 con reparto medible publica anillo, estado y confianza',
+    (() => { const h = H(div({ positions: 9, hhi: 0.12, effectiveN: 8.33 }), snap({ assetCount: 9 }), m(P.diversified), null);
+      return h.ring === 92 && h.state === 'weight_spread' && h.confidence === 'sufficient'; })());
+  ok('R.2 UNA posición NO es «sin medir»: es el extremo definicional, y se dice',
+    (() => { const h = H(div({ positions: 1, hhi: 1, effectiveN: 1, topWeightPct: 100 }),
+        snap({ assetCount: 1 }), m(P.one), null);
+      return h.state === 'single_position' && h.ring === 0 && h.ringPublishable === true; })());
+  ok('R.3 cero posiciones: se dice que todavía no hay nada que analizar',
+    H(div({ status: ST.UNAVAILABLE_SOURCE, positions: 0, effectiveN: null }),
+      snap({ assetCount: 0, totUSD: 0 }), m(P.empty), null).state === 'no_positions');
+  ok('R.4 posición no valorable: NO hay anillo y el estado dice qué lo limita',
+    (() => { const h = H(div(), snap({ uncertifiablePositions: 1 }), m(P.partialVal), null);
+      return h.ringPublishable === false && h.ring === null
+        && h.state === 'coverage_limited' && h.reason === 'uncertifiable_positions'; })());
+  ok('R.5 un dato que FALTA baja la confianza y NUNCA sube el anillo',
+    (() => { const h = H(div(), snap({ uncertifiablePositions: 1 }), m(P.partialVal), null);
+      return h.confidence === 'partial' && h.ring === null; })());
+  ok('R.6 el patrimonio declarado PARCIAL también baja la confianza, sin tocar el anillo',
+    (() => { const base = H(div({ positions: 9, effectiveN: 8.33 }), snap({ assetCount: 9 }), m(P.diversified), null);
+      const partial = H(div({ positions: 9, effectiveN: 8.33 }), snap({ assetCount: 9 }), m(P.diversified),
+        ctxOf({ wealth_coverage: { value: 'partial', provenance: 'user_answer', answeredAt: 1,
+          purpose: 'scope_qualifier', changes: 'coverage' } }));
+      return base.confidence === 'sufficient' && partial.confidence === 'partial'
+        && base.ring === partial.ring; })());
+  ok('R.7 el CONTEXTO no mueve ni el anillo, ni la confianza, ni los componentes',
+    (() => { const base = H(div({ positions: 5, hhi: 0.49, effectiveN: 2.04, topWeightPct: 68 }),
+        snap({ assetCount: 5 }), m(P.concentr), null);
+      const withCtx2 = H(div({ positions: 5, hhi: 0.49, effectiveN: 2.04, topWeightPct: 68 }),
+        snap({ assetCount: 5 }), m(P.concentr), CTX_DELIB);
+      return base.ring === withCtx2.ring && base.confidence === withCtx2.confidence
+        && JSON.stringify(base.components) === JSON.stringify(withCtx2.components)
+        && base.contextNote === null
+        && withCtx2.contextNote === 'concentration_declared_deliberate'; })());
+  ok('R.8 nadie puede autoconcederse «buena salud» declarando experiencia',
+    (() => { const exp = H(div({ positions: 5, hhi: 0.49, effectiveN: 2.04, topWeightPct: 68 }),
+        snap({ assetCount: 5 }), m(P.concentr), ctxOf({ experience: { value: 'experienced',
+          provenance: 'user_answer', answeredAt: 1, purpose: 'explanation_language', changes: 'language' } }));
+      return exp.ring === 26 && exp.state === 'weight_in_few'; })());
+  ok('R.9 estado y anillo salen de la MISMA magnitud: no pueden contradecirse',
+    (() => { const vals = [[9, 8.33, 'weight_spread'], [5, 2.04, 'weight_in_few'], [4, 2.6, 'weight_uneven']];
+      return vals.every(([n, eff, st2]) => H(div({ positions: n, effectiveN: eff }),
+        snap({ assetCount: n }), null, null).state === st2); })());
+  ok('R.10 los componentes se publican UNO A UNO, con su disponibilidad',
+    (() => { const h = H(div({ positions: 9, effectiveN: 8.33 }), snap({ assetCount: 9 }), m(P.diversified), null);
+      return h.components.length === 4
+        && h.components.every(c => !!c.id && !!c.unit && !!c.availability)
+        && h.components.some(c => c.id === 'liquidity'); })());
+  ok('R.11 la liquidez se publica como NIVEL y no puntúa en ninguna dirección',
+    (() => { const alta = H(div({ positions: 5, effectiveN: 3.5 }), snap({ assetCount: 5, cashPct: 80 }), m(P.cashHeavy), null);
+      const baja = H(div({ positions: 5, effectiveN: 3.5 }), snap({ assetCount: 5, cashPct: 0 }), m(P.noCash), null);
+      return alta.ring === baja.ring; })());
+  ok('R.11b UNA posición con otra sin valorar NO afirma «todo depende de una sola»',
+    (() => { const h = H(div({ positions: 1, hhi: 1, effectiveN: 1, topWeightPct: 100 }),
+        snap({ assetCount: 2, uncertifiablePositions: 1 }), null, null);
+      return h.state === 'coverage_limited' && h.ringPublishable === false
+        && h.confidence === 'partial'; })());
+  ok('R.12 el marco prohibido viaja con el owner',
+    H(div(), snap(), null, null).forbiddenFraming.join(',') === 'grade,quality,advice');
+}
+
+// ── S · CROSS-DEVICE ───────────────────────────────────────────────────────
+group('S · cross-device · contrato, fail-closed y legacy-safe');
+{
+  const pullFn = fnSrc('_aurixIntelCtxPull'), pushFn = fnSrc('_aurixIntelCtxPush');
+  ok('S.1 la AUTORIDAD es la tabla por usuario, no el navegador',
+    /_AURIX_INTEL_CTX_TABLE/.test(pullFn) && /intelligence_context/.test(src));
+  ok('S.2 se filtra SIEMPRE por el usuario leído, y se re-verifica tras el await',
+    /\.eq\('user_id', uid\)/.test(pullFn) && /_aurixActiveUserId !== uid\) return/.test(pullFn)
+    && /user_id: uid/.test(pushFn) && /_aurixActiveUserId !== uid\) return/.test(pushFn));
+  // ── CONVERGENCIA REAL, EJECUTANDO EL MERGE ──
+  // Aquí estaba el agujero de cobertura que encontró la revisión adversarial: los
+  // asserts eran REGEX sobre el fuente, así que habrían pasado en verde sobre un
+  // diseño que BORRABA la respuesta del otro dispositivo. Ahora se ejecuta.
+  const MG = sandbox.MERGE;
+  const ANS = (v, at) => ({ value: v, provenance: 'user_answer', answeredAt: at });
+  ok('S.5 EL CRÍTICO: un dispositivo que sólo MIRÓ no puede borrar una respuesta',
+    (() => {
+      // A abrió la pantalla: sólo tiene `asked`, con `fields` vacío.
+      const soloMiro = { fields: {}, asked: { q_primary_goal: { at: 500, count: 1 } }, declined: {}, pausedAt: null };
+      // B respondió: la fila del servidor tiene la respuesta.
+      const remoto = { fields: { primary_goal: ANS('income', 900) }, asked: {}, declined: {}, pausedAt: null };
+      const m = MG(soloMiro, remoto);
+      return m.fields.primary_goal && m.fields.primary_goal.value === 'income'
+        && m.asked.q_primary_goal.at === 500;
+    })());
+  ok('S.5b el merge es CONMUTATIVO: da igual quién sincronice primero',
+    (() => { const a = { fields: { primary_goal: ANS('grow', 100), horizon: ANS('long', 300) },
+        asked: { q1: { at: 10, count: 2 } }, declined: { liquidity_need: 50 }, pausedAt: 70 };
+      const b = { fields: { primary_goal: ANS('income', 200) },
+        asked: { q1: { at: 40, count: 1 }, q2: { at: 5, count: 1 } }, declined: {}, pausedAt: 20 };
+      return JSON.stringify(MG(a, b)) === JSON.stringify(MG(b, a)); })());
+  ok('S.5c …e IDEMPOTENTE: sincronizar dos veces no cambia nada',
+    (() => { const a = { fields: { horizon: ANS('short', 5) }, asked: {}, declined: {}, pausedAt: null };
+      const b = { fields: { primary_goal: ANS('grow', 9) }, asked: {}, declined: {}, pausedAt: null };
+      const once = MG(a, b);
+      return JSON.stringify(MG(once, b)) === JSON.stringify(once)
+        && JSON.stringify(MG(once, a)) === JSON.stringify(once); })());
+  ok('S.5d LWW POR CAMPO: gana la respuesta más reciente, campo a campo',
+    (() => { const m = MG(
+        { fields: { primary_goal: ANS('grow', 100), horizon: ANS('long', 900) }, asked: {}, declined: {}, pausedAt: null },
+        { fields: { primary_goal: ANS('income', 500), horizon: ANS('short', 200) }, asked: {}, declined: {}, pausedAt: null });
+      return m.fields.primary_goal.value === 'income' && m.fields.horizon.value === 'long'; })());
+  ok('S.5e un empate de timestamp resuelve igual en los dos dispositivos',
+    (() => { const a = { fields: { primary_goal: ANS('grow', 7) } }, b = { fields: { primary_goal: ANS('income', 7) } };
+      return MG(a, b).fields.primary_goal.value === MG(b, a).fields.primary_goal.value; })());
+  ok('S.5f `asked` toma el máximo, así que una pregunta no reaparece en el otro dispositivo',
+    (() => { const m = MG({ asked: { q1: { at: 10, count: 1 } } }, { asked: { q1: { at: 99, count: 3 } } });
+      return m.asked.q1.at === 99 && m.asked.q1.count === 3; })());
+  ok('S.5g declinar y pausar también convergen al máximo: no se «des-declinan»',
+    (() => { const m = MG({ declined: { concentration_intent: 10 }, pausedAt: 5 },
+        { declined: { concentration_intent: 80 }, pausedAt: 2 });
+      return m.declined.concentration_intent === 80 && m.pausedAt === 5; })());
+  ok('S.5h el merge NUNCA pierde un campo que exista en alguno de los dos lados',
+    (() => { const a = { fields: { horizon: ANS('long', 1) } }, b = { fields: { experience: ANS('some', 2) } };
+      const m = MG(a, b);
+      return !!m.fields.horizon && !!m.fields.experience; })());
+  ok('S.5i MOSTRAR una pregunta no vuelve autoritativo al dispositivo',
+    !/dirty: true/.test(fnSrc('_aurixIntelMarkAsked')));
+  ok('S.5j …y las mutaciones REALES del usuario sí quedan pendientes de subir',
+    ['_aurixIntelRecordAnswer', '_aurixIntelDecline', '_aurixIntelPauseQuestions']
+      .every(fn => /dirty: true/.test(fnSrc(fn))));
+  ok('S.5k la marca de pendiente sólo se limpia si el registro NO mutó en el viaje',
+    /Number\(cur\.updatedAt \|\| 0\) !== stamp\) return;/.test(pushFn));
+  ok('S.5l el pull FUSIONA y sube el resultado si aporta algo, en vez de elegir un ganador',
+    /_aurixIntelCtxMerge\(local, data\.payload\)/.test(pullFn)
+    && /differsFromRemote/.test(pullFn));
+  ok('S.5m un payload de un esquema FUTURO no se interpreta con las reglas de hoy',
+    /Number\(data\.schema_version \|\| 1\) > _AURIX_INTEL_CTX_SCHEMA\) return null/.test(pullFn));
+  ok('S.6 sólo viaja contexto de presentación: ni importes ni posiciones ni precios',
+    /payload = _aurixIntelCtxMerge\(local, null\)/.test(pushFn)
+    && !/totUSD|assetValue|price|amount|holdings/.test(pushFn)
+    && (() => { const keys = Object.keys(MG({ fields: { horizon: ANS('long', 1) },
+        asked: {}, declined: {}, pausedAt: null, owner: 'u', dirty: true, updatedAt: 9 }, null));
+      // El merge define el payload, así que `owner`, `dirty` y `updatedAt` NO pueden
+      // viajar al servidor por descuido: no existen en su salida.
+      return JSON.stringify(keys.sort()) === JSON.stringify(['asked', 'declined', 'fields', 'pausedAt']); })());
+  ok('S.7 el dueño NO lo manda el cliente en el payload',
+    !/owner:/.test(pushFn.slice(pushFn.indexOf('const payload'))));
+  ok('S.8 un solo tirón por apertura, con suelo: no hay polling',
+    /_AURIX_INTEL_CTX_PULL_FLOOR_MS/.test(src)
+    && !/setInterval[\s\S]{0,200}_aurixIntelCtxPull/.test(src));
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'intelligence_context_1.sql'), 'utf8');
+  ok('S.9 la migración es ADITIVA e idempotente: no borra ni renombra nada',
+    /create table if not exists/.test(sql)
+    && !/\bdrop table\b(?![^\n]*--)/.test(sql.split('-- ── ROLLBACK')[0])
+    && !/\balter table [^\n]*drop\b/.test(sql) && !/\brename\b/.test(sql));
+  ok('S.10 RLS activa y una política POR operación, todas ligadas a auth.uid()',
+    /enable row level security/.test(sql)
+    && (sql.match(/^create policy/gm) || []).length === 3
+    && (sql.match(/auth\.uid\(\) = user_id/g) || []).length >= 4);
+  ok('S.11 sin política de DELETE: el borrado va por cascade de la cuenta',
+    !/for delete/.test(sql) && /on delete cascade/.test(sql));
+  ok('S.12 el grant es SÓLO para `authenticated` (ni anon ni service en el cliente)',
+    /grant select, insert, update on public\.intelligence_context to authenticated/.test(sql)
+    && !/to anon/.test(sql));
+  ok('S.13 trae rollback y una verificación que se ejecuta APARTE',
+    /-- ── ROLLBACK/.test(sql) && /nunca en la misma transacción/.test(sql));
+  ok('S.14 hay cota de tamaño: el contexto no puede volverse un vertedero',
+    /pg_column_size\(payload\) < 64 \* 1024/.test(sql));
+  ok('S.15b el contexto guardado con el NOMBRE ANTERIOR de la clave se adopta una vez',
+    (() => { const st2 = mkStore();
+      st2.setItem('aurix_auri_ctx_v1', JSON.stringify({ owner: 'u1', fields: {
+        primary_goal: { value: 'preserve', provenance: 'user_answer', answeredAt: 5 } } }));
+      const c = CTXREAD({ store: st2, owner: 'u1' });
+      return c.fields.primary_goal.value === 'preserve'
+        && /primary_goal/.test(st2.getItem('aurix_intel_ctx_v1') || ''); })());
+  ok('S.15c …pero NUNCA el de otro usuario: la adopción exige el mismo sello',
+    (() => { const st2 = mkStore();
+      st2.setItem('aurix_auri_ctx_v1', JSON.stringify({ owner: 'u1', fields: {
+        primary_goal: { value: 'preserve', provenance: 'user_answer', answeredAt: 5 } } }));
+      return CTXREAD({ store: st2, owner: 'u2' }).answered === 0; })());
+  ok('S.15d y las claves antiguas se purgan en un cambio de usuario',
+    /'aurix_auri_ctx_v1', 'aurix_auri_mem_v1'/.test(src)
+    && src.indexOf("'aurix_auri_ctx_v1'") > src.indexOf('const USER_SCOPED_LOCAL_KEYS'));
+  ok('S.15 una cuenta LEGACY sin fila funciona igual (el motor lee local y síncrono)',
+    (() => { const r = run(P.concentr, { context: undefined, store: mkStore(), owner: 'legacy-user' });
+      return !!r && r.context.answered === 0 && r.model.concentration.availability === 'available'; })());
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '678'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '679'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4097,11 +4097,15 @@ const USER_SCOPED_LOCAL_KEYS = [
   // IDENTIDAD y rastro de navegación.
   'aurix_display_name', 'aurix.gs.recent.v1',
   'aurix_intv4_shown_v1', 'aurix_intcc_last_visit_v1',
-  // AURI — contexto aprendido del usuario y memoria de observación. Van AQUÍ y no en
+  // Intelligence — contexto aprendido del usuario y memoria de observación. Van AQUÍ y no en
   // `PORTFOLIO_KEYS` porque no son estado recuperable del servidor: son locales, y lo
   // único inaceptable es que sobrevivan a un CAMBIO de usuario. Además cada registro
   // va sellado con su dueño y la lectura falla cerrada sin sello, así que el
   // aislamiento no depende sólo de que esta purga corra.
+  'aurix_intel_ctx_v1', 'aurix_intel_mem_v1',
+  // Nombres ANTERIORES de las dos claves (una hora en producción). Se purgan igual:
+  // una clave huérfana que ya nadie lee sigue siendo estado del usuario A vivo en el
+  // navegador, y el aislamiento no admite excepciones por obsolescencia.
   'aurix_auri_ctx_v1', 'aurix_auri_mem_v1',
   // FUERA de ambos modos, con causa: `aurix_investable_chart_epoch` está declarado POR
   // DISPOSITIVO y `Math.max` significa que conservarlo sólo puede SUBIR el suelo, nunca
@@ -5184,64 +5188,86 @@ const T = {
     intcc_chip_conc:   'Concentración controlada',
     intcc_chip_growth: 'Crecimiento elevado',
     intcc_chip_watch:  'A vigilar',
-    // ── AURI ─────────────────────────────────────────────────────────────
+    // ── AURIX INTELLIGENCE ─────────────────────────────────────────────────────────────
     // El «Health 0–100» se RETIRA de Intelligence: la revisión financiera lo
     // declaró indefendible (misma causa penalizada cuatro veces, dato ausente que
     // no resta y por tanto sube la nota, una caída de 24 h moviendo un índice
     // estructural). Lo sustituye un índice que se llama por lo que mide de verdad.
-    auri_disp_title:      'Dispersión de pesos',
-    auri_disp_even:       'Reparto parejo',
-    auri_disp_lopsided:   'Reparto desigual',
-    auri_disp_detail:     (eff, pos) => `Tu peso se comporta como ${eff} posiciones de ${pos}.`,
-    auri_disp_na:         'Sin medir',
-    auri_disp_na_single:  'Con menos de tres posiciones no hay reparto que publicar como cifra.',
-    auri_disp_na_uncert:  'Hay una posición que Aurix no puede valorar, así que no publica el índice sobre un patrimonio incompleto.',
-    auri_disp_na_generic: 'Aurix todavía no puede medir el reparto con rigor.',
-    auri_disp_depth:      'Mide cómo se reparte el peso entre tus posiciones. No es una nota ni una medida de riesgo: sector, geografía, correlación y divisa no son medibles todavía.',
+    intel_h_no_positions: 'Aún no hay patrimonio que analizar',
+    intel_h_single:       'Todo depende de una sola posición',
+    intel_h_coverage:     'Cobertura limitada',
+    intel_h_few:          'Tu peso se apoya en pocas posiciones',
+    intel_h_uneven:       'Tu peso está repartido de forma desigual',
+    intel_h_spread:       'Tu peso está repartido',
+    intel_h_d_single:     'Todo tu patrimonio invertible se mueve con ella.',
+    intel_h_d_empty:      'Añade tu primera posición y Aurix empezará a leer tu estructura.',
+    intel_h_note_deliberate: 'Marcaste esta concentración como deliberada.',
+    intel_h_conf_high:    'Cobertura completa',
+    intel_h_conf_partial: 'Cobertura parcial',
+    intel_h_conf_low:     'Cobertura insuficiente',
+    intel_h_method:       'Cómo se calcula',
+    intel_h_c_dispersion: 'Reparto del peso',
+    intel_h_c_effective:  'Posiciones efectivas',
+    intel_h_c_top:        'Posición principal',
+    intel_h_c_liquidity:  'Liquidez',
+    intel_h_c_na:         'no certificable',
+    intel_disp_title:      'Dispersión de pesos',
+    intel_disp_even:       'Reparto parejo',
+    intel_disp_lopsided:   'Reparto desigual',
+    intel_disp_detail:     (eff, pos) => `Tu peso se comporta como ${eff} posiciones de ${pos}.`,
+    intel_disp_na:         'Sin medir',
+    intel_disp_na_single:  'Con menos de tres posiciones no hay reparto que publicar como cifra.',
+    intel_disp_na_uncert:  'Hay una posición que Aurix no puede valorar, así que no publica el índice sobre un patrimonio incompleto.',
+    intel_disp_na_generic: 'Aurix todavía no puede medir el reparto con rigor.',
+    intel_disp_depth:      'Mide cómo se reparte el peso entre tus posiciones. No es una nota ni una medida de riesgo: sector, geografía, correlación y divisa no son medibles todavía.',
     // Estados de «qué importa ahora». Emergen de los datos y del contexto, no de
     // una rotación de frases, y ninguno afirma urgencia sin un hecho material.
-    auri_now_material:    'Ha cambiado algo que importa',
-    auri_now_discovery:   'Aurix ha visto algo en tu estructura',
-    auri_now_changed:     'Tu estructura se ha movido',
-    auri_now_stable_nc:   'Sin cambios materiales desde tu última visita',
-    auri_now_stable:      'Tu estructura se mantiene',
-    auri_now_history:     'Aurix necesita más historia para leer tu evolución',
-    auri_now_context:     'Aurix puede leerlo mejor con un dato tuyo',
-    auri_sub_material:    n => `${n} ${n === 1 ? 'lectura ha cambiado' : 'lecturas han cambiado'} desde la última vez que Aurix miró.`,
-    auri_sub_changed:     n => `${n} ${n === 1 ? 'lectura ha cambiado' : 'lecturas han cambiado'}, y ninguna es material por sí sola.`,
-    auri_sub_stable_nc:   'Aurix ha comparado tu estructura con la de tu última visita y no ha encontrado nada material.',
-    auri_sub_history:     'Las conclusiones de evolución aparecerán solas en cuanto haya observaciones suficientes.',
+    intel_now_material:    'Ha cambiado algo que importa',
+    intel_now_discovery:   'Aurix ha visto algo en tu estructura',
+    intel_now_changed:     'Tu estructura se ha movido',
+    intel_now_stable_nc:   'Sin cambios materiales desde tu última visita',
+    intel_now_stable:      'Tu estructura se mantiene',
+    intel_now_history:     'Aurix necesita más historia para leer tu evolución',
+    intel_now_context:     'Aurix puede leerlo mejor con un dato tuyo',
+    intel_sub_material:    n => `${n} ${n === 1 ? 'lectura ha cambiado' : 'lecturas han cambiado'} desde la última vez que Aurix miró.`,
+    intel_sub_changed:     n => `${n} ${n === 1 ? 'lectura ha cambiado' : 'lecturas han cambiado'}, y ninguna es material por sí sola.`,
+    intel_sub_stable_nc:   'Aurix ha comparado tu estructura con la de tu última visita y no ha encontrado nada material.',
+    intel_sub_history:     'Las conclusiones de evolución aparecerán solas en cuanto haya observaciones suficientes.',
     // Descubrimientos: cada uno nace de una RELACIÓN entre hechos, nunca de una causa inventada.
-    auri_d_apparent:      (pos, eff) => `Tienes ${pos} posiciones, pero tu peso se reparte como si tuvieras ${eff}.`,
-    auri_d_conc_rising:   pct => `Tu posición principal ha pasado a pesar el ${pct}% y ha cruzado el umbral de concentración.`,
-    auri_d_capital:       'Tu patrimonio ha subido por el capital que has aportado, no por rendimiento del mercado.',
-    auri_d_intent:        pct => `Dijiste que tu prioridad es preservar, y hoy una sola posición pesa el ${pct}%.`,
-    auri_d_liq_need:      'Dijiste que vas a necesitar liquidez y tu peso en liquidez ha bajado.',
-    auri_d_persisting:    n => `Esta lectura sigue igual tras ${n} observaciones: ya no es una novedad.`,
-    auri_d_combined:      n => `${n} lecturas se han movido a la vez. Por separado ninguna destacaba.`,
+    intel_d_apparent:      (pos, eff) => `Tienes ${pos} posiciones, pero tu peso se reparte como si tuvieras ${eff}.`,
+    intel_d_conc_rising:   pct => `Tu posición principal ha pasado a pesar el ${pct}% y ha cruzado el umbral de concentración.`,
+    intel_d_capital:       'Tu patrimonio ha subido por el capital que has aportado, no por rendimiento del mercado.',
+    intel_d_intent:        pct => `Dijiste que tu prioridad es preservar, y hoy una sola posición pesa el ${pct}%.`,
+    intel_d_liq_need:      'Dijiste que vas a necesitar liquidez y tu peso en liquidez ha bajado.',
+    intel_d_persisting:    n => `Esta lectura sigue igual tras ${n} observaciones: ya no es una novedad.`,
+    intel_d_combined:      n => `${n} lecturas se han movido a la vez. Por separado ninguna destacaba.`,
     // Preguntas: sólo cuando un hecho real las necesita, y siempre con su porqué.
-    auri_q_conc_intent:   name => `¿Tu posición en ${name} es una exposición que has elegido a propósito?`,
-    auri_q_conc_why:      'El dato no cambia. Cambia que Aurix deje de señalarlo como un descuido.',
-    auri_q_coverage:      '¿Está todo tu patrimonio registrado en Aurix?',
-    auri_q_coverage_why:  'Si falta una parte, Aurix lo dirá al hablar de tu estructura en lugar de tratarla como el total.',
-    auri_q_liq_need:      '¿Vas a necesitar liquidez próximamente?',
-    auri_q_liq_why:       'Decide si un cambio en tu liquidez merece tu atención o no.',
-    auri_q_goal:          '¿Qué es hoy tu prioridad con este patrimonio?',
-    auri_q_goal_why:      'Ordena qué te enseña Aurix primero.',
-    auri_opt_deliberate:  'Sí, es deliberada',
-    auri_opt_not_deliberate: 'No, no lo había decidido',
-    auri_opt_complete:    'Sí, está todo',
-    auri_opt_partial:     'No, falta una parte',
-    auri_opt_none_known:  'No lo tengo previsto',
-    auri_opt_planned:     'Sí, lo tengo previsto',
-    auri_opt_imminent:    'Sí, pronto',
-    auri_opt_preserve:    'Preservarlo',
-    auri_opt_grow:        'Hacerlo crecer',
-    auri_opt_income:      'Generar ingresos',
-    auri_opt_undecided:   'Todavía no lo sé',
-    auri_q_thanks:        'Anotado. Aurix ya lo tiene en cuenta.',
-    auri_ctx_partial:     'Sobre el patrimonio que tienes registrado.',
-    auri_radar_more:      'Qué mide cada eje',
+    intel_q_conc_intent:   name => `¿Tu posición en ${name} es una exposición que has elegido a propósito?`,
+    intel_q_conc_why:      'El dato no cambia. Cambia que Aurix deje de señalarlo como un descuido.',
+    intel_q_coverage:      '¿Está todo tu patrimonio registrado en Aurix?',
+    intel_q_coverage_why:  'Si falta una parte, Aurix lo dirá al hablar de tu estructura en lugar de tratarla como el total.',
+    intel_q_liq_need:      '¿Vas a necesitar liquidez próximamente?',
+    intel_q_liq_why:       'Decide si un cambio en tu liquidez merece tu atención o no.',
+    intel_q_goal:          '¿Qué es hoy tu prioridad con este patrimonio?',
+    intel_q_goal_why:      'Ordena qué te enseña Aurix primero.',
+    intel_opt_deliberate:  'Sí, es deliberada',
+    intel_opt_not_deliberate: 'No, no lo había decidido',
+    intel_opt_complete:    'Sí, está todo',
+    intel_opt_partial:     'No, falta una parte',
+    intel_opt_none_known:  'No lo tengo previsto',
+    intel_opt_planned:     'Sí, lo tengo previsto',
+    intel_opt_imminent:    'Sí, pronto',
+    intel_opt_preserve:    'Preservarlo',
+    intel_opt_grow:        'Hacerlo crecer',
+    intel_opt_income:      'Generar ingresos',
+    intel_opt_undecided:   'Todavía no lo sé',
+    intel_q_thanks:        'Anotado. Aurix ya lo tiene en cuenta.',
+    intel_opt_decline:     'Prefiero no responder',
+    intel_q_pause:         'No hacer más preguntas por ahora',
+    intel_q_paused:        'De acuerdo. Aurix no volverá a preguntar por ahora, y conserva lo que ya sabe.',
+    intel_q_declined:      'Entendido. Aurix no volverá a preguntarlo.',
+    intel_ctx_partial:     'Sobre el patrimonio que tienes registrado.',
+    intel_radar_more:      'Qué mide cada eje',
     intcc_mhint_liq:   'La liquidez actual te da margen para reaccionar ante oportunidades.',
     intcc_mhint_cash:  'El peso de efectivo aporta estabilidad y flexibilidad.',
     intcc_mhint_div:   'Tu cartera mantiene una diversificación razonable entre varias categorías.',
@@ -7631,56 +7657,78 @@ const T = {
     intcc_chip_conc:   'Concentration in check',
     intcc_chip_growth: 'High growth',
     intcc_chip_watch:  'To watch',
-    // ── AURI ─────────────────────────────────────────────────────────────
-    auri_disp_title:      'Weight dispersion',
-    auri_disp_even:       'Evenly spread',
-    auri_disp_lopsided:   'Unevenly spread',
-    auri_disp_detail:     (eff, pos) => `Your weight behaves like ${eff} of ${pos} positions.`,
-    auri_disp_na:         'Not measured',
-    auri_disp_na_single:  'With fewer than three positions there is no spread to publish as a figure.',
-    auri_disp_na_uncert:  'One position cannot be valued, so Aurix will not publish the index over an incomplete portfolio.',
-    auri_disp_na_generic: 'Aurix cannot measure the spread rigorously yet.',
-    auri_disp_depth:      'It measures how weight is spread across your positions. It is not a grade or a risk measure: sector, geography, correlation and currency are not measurable yet.',
-    auri_now_material:    'Something that matters has changed',
-    auri_now_discovery:   'Aurix spotted something in your structure',
-    auri_now_changed:     'Your structure has moved',
-    auri_now_stable_nc:   'No material change since your last visit',
-    auri_now_stable:      'Your structure is holding',
-    auri_now_history:     'Aurix needs more history to read your evolution',
-    auri_now_context:     'Aurix can read this better with one detail from you',
-    auri_sub_material:    n => `${n} ${n === 1 ? 'reading has' : 'readings have'} changed since Aurix last looked.`,
-    auri_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} changed, and none is material on its own.`,
-    auri_sub_stable_nc:   'Aurix compared your structure with your last visit and found nothing material.',
-    auri_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
-    auri_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
-    auri_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
-    auri_d_capital:       'Your wealth rose on the capital you added, not on market return.',
-    auri_d_intent:        pct => `You said preserving is your priority, and today one position weighs ${pct}%.`,
-    auri_d_liq_need:      'You said you will need liquidity and your liquidity weight has fallen.',
-    auri_d_persisting:    n => `This reading is unchanged after ${n} observations: it is no longer news.`,
-    auri_d_combined:      n => `${n} readings moved at the same time. Individually none stood out.`,
-    auri_q_conc_intent:   name => `Is your position in ${name} an exposure you chose on purpose?`,
-    auri_q_conc_why:      'The figure does not change. What changes is Aurix no longer flagging it as an oversight.',
-    auri_q_coverage:      'Is all of your wealth recorded in Aurix?',
-    auri_q_coverage_why:  'If part is missing, Aurix will say so when it talks about your structure instead of treating it as the whole.',
-    auri_q_liq_need:      'Will you need liquidity soon?',
-    auri_q_liq_why:       'It decides whether a change in your liquidity deserves your attention.',
-    auri_q_goal:          'What is your priority for this wealth today?',
-    auri_q_goal_why:      'It orders what Aurix shows you first.',
-    auri_opt_deliberate:  'Yes, deliberate',
-    auri_opt_not_deliberate: 'No, I had not decided it',
-    auri_opt_complete:    'Yes, all of it',
-    auri_opt_partial:     'No, part is missing',
-    auri_opt_none_known:  'Not planned',
-    auri_opt_planned:     'Yes, it is planned',
-    auri_opt_imminent:    'Yes, soon',
-    auri_opt_preserve:    'Preserve it',
-    auri_opt_grow:        'Grow it',
-    auri_opt_income:      'Generate income',
-    auri_opt_undecided:   'I do not know yet',
-    auri_q_thanks:        'Noted. Aurix already takes it into account.',
-    auri_ctx_partial:     'Over the wealth you have recorded.',
-    auri_radar_more:      'What each axis measures',
+    // ── AURIX INTELLIGENCE ─────────────────────────────────────────────────────────────
+    intel_h_no_positions: 'Nothing to analyse yet',
+    intel_h_single:       'Everything rides on a single position',
+    intel_h_coverage:     'Limited coverage',
+    intel_h_few:          'Your weight leans on a few positions',
+    intel_h_uneven:       'Your weight is unevenly spread',
+    intel_h_spread:       'Your weight is spread',
+    intel_h_d_single:     'All of your investable wealth moves with it.',
+    intel_h_d_empty:      'Add your first position and Aurix will start reading your structure.',
+    intel_h_note_deliberate: 'You marked this concentration as deliberate.',
+    intel_h_conf_high:    'Full coverage',
+    intel_h_conf_partial: 'Partial coverage',
+    intel_h_conf_low:     'Insufficient coverage',
+    intel_h_method:       'How it is calculated',
+    intel_h_c_dispersion: 'Weight spread',
+    intel_h_c_effective:  'Effective positions',
+    intel_h_c_top:        'Main position',
+    intel_h_c_liquidity:  'Liquidity',
+    intel_h_c_na:         'not certifiable',
+    intel_disp_title:      'Weight dispersion',
+    intel_disp_even:       'Evenly spread',
+    intel_disp_lopsided:   'Unevenly spread',
+    intel_disp_detail:     (eff, pos) => `Your weight behaves like ${eff} of ${pos} positions.`,
+    intel_disp_na:         'Not measured',
+    intel_disp_na_single:  'With fewer than three positions there is no spread to publish as a figure.',
+    intel_disp_na_uncert:  'One position cannot be valued, so Aurix will not publish the index over an incomplete portfolio.',
+    intel_disp_na_generic: 'Aurix cannot measure the spread rigorously yet.',
+    intel_disp_depth:      'It measures how weight is spread across your positions. It is not a grade or a risk measure: sector, geography, correlation and currency are not measurable yet.',
+    intel_now_material:    'Something that matters has changed',
+    intel_now_discovery:   'Aurix spotted something in your structure',
+    intel_now_changed:     'Your structure has moved',
+    intel_now_stable_nc:   'No material change since your last visit',
+    intel_now_stable:      'Your structure is holding',
+    intel_now_history:     'Aurix needs more history to read your evolution',
+    intel_now_context:     'Aurix can read this better with one detail from you',
+    intel_sub_material:    n => `${n} ${n === 1 ? 'reading has' : 'readings have'} changed since Aurix last looked.`,
+    intel_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} changed, and none is material on its own.`,
+    intel_sub_stable_nc:   'Aurix compared your structure with your last visit and found nothing material.',
+    intel_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
+    intel_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
+    intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
+    intel_d_capital:       'Your wealth rose on the capital you added, not on market return.',
+    intel_d_intent:        pct => `You said preserving is your priority, and today one position weighs ${pct}%.`,
+    intel_d_liq_need:      'You said you will need liquidity and your liquidity weight has fallen.',
+    intel_d_persisting:    n => `This reading is unchanged after ${n} observations: it is no longer news.`,
+    intel_d_combined:      n => `${n} readings moved at the same time. Individually none stood out.`,
+    intel_q_conc_intent:   name => `Is your position in ${name} an exposure you chose on purpose?`,
+    intel_q_conc_why:      'The figure does not change. What changes is Aurix no longer flagging it as an oversight.',
+    intel_q_coverage:      'Is all of your wealth recorded in Aurix?',
+    intel_q_coverage_why:  'If part is missing, Aurix will say so when it talks about your structure instead of treating it as the whole.',
+    intel_q_liq_need:      'Will you need liquidity soon?',
+    intel_q_liq_why:       'It decides whether a change in your liquidity deserves your attention.',
+    intel_q_goal:          'What is your priority for this wealth today?',
+    intel_q_goal_why:      'It orders what Aurix shows you first.',
+    intel_opt_deliberate:  'Yes, deliberate',
+    intel_opt_not_deliberate: 'No, I had not decided it',
+    intel_opt_complete:    'Yes, all of it',
+    intel_opt_partial:     'No, part is missing',
+    intel_opt_none_known:  'Not planned',
+    intel_opt_planned:     'Yes, it is planned',
+    intel_opt_imminent:    'Yes, soon',
+    intel_opt_preserve:    'Preserve it',
+    intel_opt_grow:        'Grow it',
+    intel_opt_income:      'Generate income',
+    intel_opt_undecided:   'I do not know yet',
+    intel_q_thanks:        'Noted. Aurix already takes it into account.',
+    intel_opt_decline:     'I prefer not to answer',
+    intel_q_pause:         'No more questions for now',
+    intel_q_paused:        'Fine. Aurix will not ask again for now, and keeps what it already knows.',
+    intel_q_declined:      'Understood. Aurix will not ask that again.',
+    intel_ctx_partial:     'Over the wealth you have recorded.',
+    intel_radar_more:      'What each axis measures',
     intcc_mhint_liq:   'Your current liquidity gives you room to act on opportunities.',
     intcc_mhint_cash:  'Your cash position adds stability and flexibility.',
     intcc_mhint_div:   'Your portfolio keeps a reasonable spread across several categories.',
@@ -29327,9 +29375,9 @@ if (typeof window !== 'undefined') {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// SPEC AURI · INTELLIGENCE ENGINE
+// SPEC AURIX INTELLIGENCE · INTELLIGENCE ENGINE
 // ════════════════════════════════════════════════════════════════════════════
-// AURI es el cerebro patrimonial: convierte el modelo de PC.01 en una lectura que
+// Esta capa es el cerebro patrimonial de Aurix Intelligence: convierte el modelo de
 // conoce al usuario, recuerda lo que ya observó y descubre lo que los números no
 // dicen por separado. La separación que lo gobierna es ESTRICTA y está fijada por
 // el gate:
@@ -29347,7 +29395,7 @@ if (typeof window !== 'undefined') {
 //   truth (PC.01) → context → observations → change/pattern → interpretation
 //   → materiality/priority → memory → presentation
 //
-// Todo lo que AURI emite son CÓDIGOS. La copy ES/EN vive en la superficie, así que
+// Todo lo que este motor emite son CÓDIGOS. La copy ES/EN vive en la superficie, así que
 // ninguna frase traducida se persiste ni se compara como verdad.
 
 // ── CATÁLOGO DE CONTEXTO ────────────────────────────────────────────────────
@@ -29360,7 +29408,7 @@ if (typeof window !== 'undefined') {
 // está prohibido, y preguntarla sería afirmar un perfil que Aurix no puede
 // honrar), ingresos o edad (PII innecesaria — el horizonte mide lo que de verdad
 // importa y es menos invasivo), residencia fiscal (Aurix no hace fiscalidad).
-const _AURIX_AURI_FIELDS = Object.freeze({
+const _AURIX_INTEL_FIELDS = Object.freeze({
   // El PRIMERO en importancia: sin él, toda conclusión de estructura puede estar
   // midiendo una parte y hablando como si fuera el total.
   wealth_coverage:      { purpose: 'scope_qualifier',               changes: 'coverage',
@@ -29380,15 +29428,29 @@ const _AURIX_AURI_FIELDS = Object.freeze({
   explanation_depth:    { purpose: 'explanation_density',           changes: 'language',
                           options: ['guided', 'balanced', 'advanced'] },
 });
-const _AURIX_AURI_CTX_KEY = 'aurix_auri_ctx_v1';
-const _AURIX_AURI_MEM_KEY = 'aurix_auri_mem_v1';
-const _AURIX_AURI_PROVENANCE = Object.freeze(['user_answer', 'inferred', 'default']);
+const _AURIX_INTEL_CTX_KEY = 'aurix_intel_ctx_v1';
+const _AURIX_INTEL_MEM_KEY = 'aurix_intel_mem_v1';
+const _AURIX_INTEL_PROVENANCE = Object.freeze(['user_answer', 'inferred', 'default']);
 // Horizonte de la memoria. No es «memoria ilimitada»: lo que dejó de ser
 // relevante deja de ocupar atención, y lo que no se vuelve a observar caduca.
-const _AURIX_AURI_MEM_MAX_ENTRIES = 40;
-const _AURIX_AURI_STALE_MS = 45 * 864e5;
-const _AURIX_AURI_QUESTION_LIMIT = 1;
-const _AURIX_AURI_DEPTH = Object.freeze(['free', 'premium']);
+const _AURIX_INTEL_MEM_MAX_ENTRIES = 40;
+const _AURIX_INTEL_STALE_MS = 45 * 864e5;
+const _AURIX_INTEL_QUESTION_LIMIT = 1;
+// POLÍTICA CENTRAL DE PREGUNTAS. Sin esto, Intelligence vuelve a preguntar lo
+// mismo al recargar, al día siguiente y cada vez que entras — que es la forma más
+// rápida de que nadie responda nunca. Las tres reglas:
+//   · una pregunta HECHA no se repite durante el cooldown, aunque no se responda;
+//   · «prefiero no responder» es una respuesta válida: cierra la pregunta sin
+//     guardar ningún valor, y se respeta mucho más tiempo;
+//   · «no hacer más preguntas por ahora» PAUSA las preguntas y no toca nada más:
+//     no borra respuestas, no desactiva Intelligence y no vacía la memoria.
+// Una respondida sólo vuelve si el usuario la cambia, si su contexto cambia
+// materialmente, o tras un periodo largo Y con motivo real para revalidar.
+const _AURIX_INTEL_Q_COOLDOWN_MS   = 7 * 864e5;    // preguntada y sin responder
+const _AURIX_INTEL_Q_DECLINED_MS   = 90 * 864e5;   // «prefiero no responder»
+const _AURIX_INTEL_Q_REVALIDATE_MS = 180 * 864e5;  // respondida: revalidar sólo con motivo
+const _AURIX_INTEL_PAUSE_MS        = 30 * 864e5;   // pausa explícita del usuario
+const _AURIX_INTEL_DEPTH = Object.freeze(['free', 'premium']);
 
 // ── PERSISTENCIA CON DUEÑO ──────────────────────────────────────────────────
 // Sellada con el propietario y FAIL-CLOSED: sin sello o con sello ajeno, AURI
@@ -29396,18 +29458,18 @@ const _AURIX_AURI_DEPTH = Object.freeze(['free', 'premium']);
 // agujero no fue un sello distinto, fue un sello NULO — así que aquí un owner
 // desconocido tampoco concede lectura. Las dos claves están además en
 // `USER_SCOPED_LOCAL_KEYS`, o sea que un cambio de usuario las purga.
-function _aurixAuriOwner(env) {
+function _aurixIntelOwner(env) {
   if (env && 'owner' in env) return env.owner;
   try { return (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId)
     ? _aurixActiveUserId : ((typeof _aurixCacheOwner === 'function') ? _aurixCacheOwner() : null); }
   catch (_) { return null; }
 }
-function _aurixAuriStore(env) {
+function _aurixIntelStore(env) {
   if (env && env.store) return env.store;
   try { return (typeof localStorage !== 'undefined') ? localStorage : null; } catch (_) { return null; }
 }
-function _aurixAuriReadOwned(key, env) {
-  const store = _aurixAuriStore(env), owner = _aurixAuriOwner(env);
+function _aurixIntelReadOwned(key, env) {
+  const store = _aurixIntelStore(env), owner = _aurixIntelOwner(env);
   if (!store || !owner) return null;                    // fail closed, no "shared" state
   try {
     const raw = store.getItem(key);
@@ -29417,8 +29479,8 @@ function _aurixAuriReadOwned(key, env) {
     return obj;
   } catch (_) { return null; }
 }
-function _aurixAuriWriteOwned(key, payload, env) {
-  const store = _aurixAuriStore(env), owner = _aurixAuriOwner(env);
+function _aurixIntelWriteOwned(key, payload, env) {
+  const store = _aurixIntelStore(env), owner = _aurixIntelOwner(env);
   if (!store || !owner) return false;
   try { store.setItem(key, JSON.stringify(Object.assign({ owner }, payload))); return true; }
   catch (_) { return false; }
@@ -29427,15 +29489,31 @@ function _aurixAuriWriteOwned(key, payload, env) {
 // declaradas, y cada uno con su procedencia. Un valor que no esté en el catálogo
 // se DESCARTA en la lectura, así que un storage manipulado no puede inyectar un
 // campo nuevo ni una opción inventada.
-function _aurixAuriContext(env) {
+const _AURIX_INTEL_CTX_KEY_LEGACY = 'aurix_auri_ctx_v1';
+// ADOPCIÓN ÚNICA del nombre anterior de la clave, en UN solo sitio del que dependen
+// TANTO el lector como las mutaciones. Vivía sólo en el lector, así que una mutación
+// que corriera antes de la primera lectura creaba la clave nueva y bloqueaba la
+// adopción para siempre. Se exige el MISMO sello de dueño: no puede adoptar el
+// contexto de otro usuario.
+function _aurixIntelCtxRecord(env) {
+  let rec = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, env);
+  if (rec) return rec;
+  const legacy = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY_LEGACY, env);
+  if (legacy && legacy.fields) {
+    _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, Object.assign({}, legacy, { dirty: true }), env);
+    return legacy;
+  }
+  return null;
+}
+function _aurixIntelContext(env) {
   const out = { fields: {}, answered: 0, source: 'none' };
-  const rec = _aurixAuriReadOwned(_AURIX_AURI_CTX_KEY, env);
+  const rec = _aurixIntelCtxRecord(env);
   if (!rec || !rec.fields || typeof rec.fields !== 'object') return out;
-  Object.keys(_AURIX_AURI_FIELDS).forEach(k => {
-    const spec = _AURIX_AURI_FIELDS[k], v = rec.fields[k];
+  Object.keys(_AURIX_INTEL_FIELDS).forEach(k => {
+    const spec = _AURIX_INTEL_FIELDS[k], v = rec.fields[k];
     if (!v || typeof v !== 'object') return;
     if (spec.options.indexOf(v.value) === -1) return;
-    if (_AURIX_AURI_PROVENANCE.indexOf(v.provenance) === -1) return;
+    if (_AURIX_INTEL_PROVENANCE.indexOf(v.provenance) === -1) return;
     if (spec.subjectRequired && !v.subject) return;
     out.fields[k] = { value: v.value, provenance: v.provenance,
       answeredAt: Number.isFinite(v.answeredAt) ? v.answeredAt : null,
@@ -29443,21 +29521,73 @@ function _aurixAuriContext(env) {
   });
   out.answered = Object.keys(out.fields).length;
   out.source = out.answered ? 'stored' : 'none';
+  // Historial de preguntas: se sanea igual que los campos — sólo ids y timestamps.
+  out.asked = {}; out.declined = {};
+  if (rec.asked && typeof rec.asked === 'object') {
+    Object.keys(rec.asked).forEach(k => {
+      const v = rec.asked[k];
+      if (v && Number.isFinite(v.at)) out.asked[k] = { at: v.at, count: Number(v.count) || 1 };
+    });
+  }
+  if (rec.declined && typeof rec.declined === 'object') {
+    Object.keys(rec.declined).forEach(k => {
+      if (_AURIX_INTEL_FIELDS[k] && Number.isFinite(rec.declined[k])) out.declined[k] = rec.declined[k];
+    });
+  }
+  out.pausedAt = Number.isFinite(rec.pausedAt) ? rec.pausedAt : null;
+  out.updatedAt = Number.isFinite(rec.updatedAt) ? rec.updatedAt : null;
   return out;
+}
+// Las tres mutaciones del ciclo de vida. Todas ADITIVAS sobre el mismo registro:
+// ninguna borra una respuesta ya dada.
+function _aurixIntelMarkAsked(qid, opts) {
+  const o = opts || {}, now = Number.isFinite(o.now) ? o.now : Date.now();
+  const cur = _aurixIntelCtxRecord(o) || {};
+  const asked = Object.assign({}, cur.asked);
+  const prev = asked[qid];
+  asked[qid] = { at: now, count: (prev && Number(prev.count) || 0) + 1 };
+  // NO marca `dirty`: haber MOSTRADO una pregunta es contabilidad de presentación,
+  // no contexto declarado por el usuario. Marcarla convertía en autoritativo a un
+  // dispositivo que sólo abrió la pantalla. Viaja de todas formas en el siguiente
+  // push, y el merge por campo se queda con el `at` más reciente de los dos.
+  return _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, Object.assign({}, cur,
+    { asked, updatedAt: now }), o);
+}
+function _aurixIntelDecline(field, opts) {
+  const o = opts || {}, now = Number.isFinite(o.now) ? o.now : Date.now();
+  if (!_AURIX_INTEL_FIELDS[field]) return false;
+  const cur = _aurixIntelCtxRecord(o) || {};
+  const declined = Object.assign({}, cur.declined); declined[field] = now;
+  const okw = _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, Object.assign({}, cur,
+    { declined, updatedAt: now, dirty: true }), o);
+  if (okw && !o.store && typeof _aurixIntelCtxPush === 'function') _aurixIntelCtxPush();
+  return okw;
+}
+function _aurixIntelPauseQuestions(opts) {
+  const o = opts || {}, now = Number.isFinite(o.now) ? o.now : Date.now();
+  const cur = _aurixIntelCtxRecord(o) || {};
+  // NO se toca `fields` ni nada más: pausar no es olvidar.
+  const okw = _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, Object.assign({}, cur,
+    { pausedAt: now, updatedAt: now, dirty: true }), o);
+  if (okw && !o.store && typeof _aurixIntelCtxPush === 'function') _aurixIntelCtxPush();
+  return okw;
 }
 // Toda respuesta es ACTUALIZABLE: se reescribe el campo con su nuevo timestamp y
 // procedencia, nunca se acumula un histórico de respuestas (no aporta y es PII).
-function _aurixAuriRecordAnswer(field, value, opts) {
-  const o = opts || {}, spec = _AURIX_AURI_FIELDS[field];
+function _aurixIntelRecordAnswer(field, value, opts) {
+  const o = opts || {}, spec = _AURIX_INTEL_FIELDS[field];
   if (!spec || spec.options.indexOf(value) === -1) return false;
   if (spec.subjectRequired && !o.subject) return false;
-  const prov = (_AURIX_AURI_PROVENANCE.indexOf(o.provenance) !== -1) ? o.provenance : 'user_answer';
-  const cur = _aurixAuriReadOwned(_AURIX_AURI_CTX_KEY, o) || { fields: {} };
+  const prov = (_AURIX_INTEL_PROVENANCE.indexOf(o.provenance) !== -1) ? o.provenance : 'user_answer';
+  const cur = _aurixIntelCtxRecord(o) || { fields: {} };
   const fields = Object.assign({}, cur.fields);
   fields[field] = { value, provenance: prov,
     answeredAt: Number.isFinite(o.now) ? o.now : Date.now(),
     subject: o.subject || null, purpose: spec.purpose };
-  return _aurixAuriWriteOwned(_AURIX_AURI_CTX_KEY, { fields, updatedAt: Number.isFinite(o.now) ? o.now : Date.now() }, o);
+  const okw = _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, Object.assign({}, cur,
+    { fields, updatedAt: Number.isFinite(o.now) ? o.now : Date.now(), dirty: true }), o);
+  if (okw && !o.store && typeof _aurixIntelCtxPush === 'function') _aurixIntelCtxPush();
+  return okw;
 }
 
 // ── DISPERSIÓN DE PESOS — el índice que SUSTITUYE al «Health» ───────────────
@@ -29485,7 +29615,7 @@ function _aurixAuriRecordAnswer(field, value, opts) {
 //     /divisa no son medibles), y
 //   · está PROHIBIDO llamarlo salud, riesgo o calidad: no es una nota a las
 //     decisiones del usuario, y por eso no es asesoramiento.
-function _aurixAuriDispersion(div, snap) {
+function _aurixIntelDispersion(div, snap) {
   const out = { metric: 'weight_dispersion', value: null, positions: null, effectiveN: null,
     availability: _AURIX_AI_AVAIL.UNAVAILABLE, coverage: _AURIX_AI_COVERAGE.UNAVAILABLE,
     reason: 'no_source', semanticLabel: _AURIX_AI_LABEL.INSUFFICIENT_EVIDENCE,
@@ -29517,11 +29647,256 @@ function _aurixAuriDispersion(div, snap) {
   return out;
 }
 
+// ── CROSS-DEVICE · el contexto deja de ser del DISPOSITIVO ─────────────────
+// El contexto que el usuario le enseña a Intelligence no puede vivir sólo en el
+// navegador: Aurix conocería al usuario en el portátil y no en el móvil, y para una
+// superficie cuyo valor es «Aurix me conoce» eso no vale.
+//
+// AUTORIDAD = `public.intelligence_context` (una fila por usuario, RLS propia).
+// localStorage pasa a ser LKG/caché, nunca la fuente cross-device.
+//
+// FAIL-CLOSED Y LEGACY-SAFE, que es lo que permite desplegar esto ANTES de aplicar
+// el SQL: si la tabla no existe, la lectura falla y `_aurixIntelCtxRemoteState`
+// queda en `unavailable`; la app se comporta EXACTAMENTE como hoy (local). Una
+// cuenta antigua sin fila funciona igual: no hay fila que migrar y la primera
+// escritura la crea. Nada depende de datos nuevos para seguir funcionando.
+//
+// CONFLICTO entre dos dispositivos: LWW por `updated_at`, y lo pone el SERVIDOR con
+// un trigger — un reloj de cliente desajustado no puede ganarle a otro. Es el mismo
+// criterio que ya usa el resto de la persistencia de Aurix.
+const _AURIX_INTEL_CTX_TABLE = 'intelligence_context';
+const _AURIX_INTEL_CTX_SCHEMA = 1;
+// MERGE POR CAMPO, no sustitución de registro. La primera versión subía el registro
+// LOCAL COMPLETO, y eso abría una pérdida de datos real: un dispositivo que sólo
+// ABRÍA la superficie escribía `asked` (con `fields` vacío), quedaba «pendiente de
+// subir» y en el siguiente ciclo empujaba su registro vacío, BORRANDO en el servidor
+// —y después en el otro dispositivo— una respuesta que el usuario ya había dado.
+//
+// Se resuelve con el mismo criterio que el resto de la persistencia de Aurix:
+// UNION-BY-TS y LWW POR CAMPO. Cada respuesta lleva su `answeredAt`, cada declinada
+// su timestamp y cada pregunta su `at`, así que dos dispositivos convergen sin que
+// ninguno pueda borrar lo que el otro sabe. El merge es PURO y determinista: el
+// mismo par de entradas da el mismo resultado en cualquier orden.
+function _aurixIntelCtxMerge(a, b) {
+  const A = a || {}, B = b || {};
+  const out = { fields: {}, asked: {}, declined: {}, pausedAt: null };
+  const fa = A.fields || {}, fb = B.fields || {};
+  Object.keys(Object.assign({}, fa, fb)).forEach(k => {
+    const x = fa[k], y = fb[k];
+    if (!x) { if (y) out.fields[k] = y; return; }
+    if (!y) { out.fields[k] = x; return; }
+    // Empate de timestamp ⇒ orden estable por valor, para que el merge sea
+    // conmutativo y dos dispositivos no oscilen entre dos respuestas.
+    const tx = Number(x.answeredAt) || 0, ty = Number(y.answeredAt) || 0;
+    out.fields[k] = (tx > ty) ? x : (ty > tx) ? y
+      : (String(x.value) <= String(y.value) ? x : y);
+  });
+  const aa = A.asked || {}, ab = B.asked || {};
+  Object.keys(Object.assign({}, aa, ab)).forEach(k => {
+    const x = aa[k] || { at: 0, count: 0 }, y = ab[k] || { at: 0, count: 0 };
+    out.asked[k] = { at: Math.max(Number(x.at) || 0, Number(y.at) || 0),
+                     count: Math.max(Number(x.count) || 0, Number(y.count) || 0) };
+  });
+  const da = A.declined || {}, db2 = B.declined || {};
+  Object.keys(Object.assign({}, da, db2)).forEach(k => {
+    out.declined[k] = Math.max(Number(da[k]) || 0, Number(db2[k]) || 0);
+  });
+  const pa = Number(A.pausedAt) || 0, pb = Number(B.pausedAt) || 0;
+  out.pausedAt = Math.max(pa, pb) || null;
+  return out;
+}
+let _aurixIntelCtxRemoteState = 'unknown';   // unknown | ready | unavailable
+// Sin polling: un tirón por apertura, con suelo de 5 min. El re-render que puede
+// provocar el propio tirón no dispara otro (ver el guard de comparación).
+let _aurixIntelCtxPulledAt = 0;
+const _AURIX_INTEL_CTX_PULL_FLOOR_MS = 5 * 60 * 1000;
+function _aurixIntelCtxRemoteReady() { return _aurixIntelCtxRemoteState === 'ready'; }
+async function _aurixIntelCtxPull() {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.from) return null;
+    if (typeof _aurixActiveUserId === 'undefined' || !_aurixActiveUserId) return null;
+    const uid = _aurixActiveUserId;
+    const { data, error } = await supabaseClient
+      .from(_AURIX_INTEL_CTX_TABLE)
+      .select('payload,updated_at,schema_version')
+      .eq('user_id', uid)
+      .maybeSingle();
+    if (error) {
+      // Tabla ausente / no expuesta / sin permiso ⇒ local-only, sin ruido.
+      _aurixIntelCtxRemoteState = 'unavailable';
+      return null;
+    }
+    _aurixIntelCtxRemoteState = 'ready';
+    // La sesión pudo cambiar durante el viaje de red: lo que se leyó pertenece a
+    // `uid`, así que si ya no es el usuario activo se descarta en vez de mezclarlo.
+    if (_aurixActiveUserId !== uid) return null;
+    if (!data || !data.payload || typeof data.payload !== 'object') return null;
+    // Un payload de un esquema FUTURO no se interpreta con las reglas de hoy.
+    if (Number(data.schema_version || 1) > _AURIX_INTEL_CTX_SCHEMA) return null;
+    const local = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {});
+    const merged = _aurixIntelCtxMerge(local, data.payload);
+    const remoteTs = Date.parse(data.updated_at || '') || 0;
+    // El merge es la UNIÓN: ni el remoto pierde lo local ni lo local pierde el
+    // remoto, así que ya no hay nada que «ganar» — sólo queda decidir si hay algo
+    // que subir. Se sube cuando el resultado difiere del remoto.
+    const differsFromRemote = JSON.stringify(merged) !== JSON.stringify(
+      _aurixIntelCtxMerge(data.payload, null));
+    _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, Object.assign({}, local, merged,
+      { updatedAt: Math.max(Number((local && local.updatedAt) || 0), remoteTs),
+        dirty: differsFromRemote }), {});
+    if (differsFromRemote) _aurixIntelCtxPush();
+    return merged;
+  } catch (_) { _aurixIntelCtxRemoteState = 'unavailable'; return null; }
+}
+function _aurixIntelCtxPush() {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient || !supabaseClient.from) return;
+    if (typeof _aurixActiveUserId === 'undefined' || !_aurixActiveUserId) return;
+    if (_aurixIntelCtxRemoteState === 'unavailable') return;      // no se insiste
+    const local = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {});
+    if (!local) return;
+    // Se sube SÓLO el contexto de presentación. `owner` no viaja: el dueño lo
+    // decide la fila y la RLS, no el cliente.
+    const payload = _aurixIntelCtxMerge(local, null);
+    const uid = _aurixActiveUserId;
+    // Sello del registro que se está subiendo: si cambia mientras el push viaja,
+    // la marca de pendiente NO se limpia. Antes se limpiaba sobre el registro
+    // re-leído, así que una segunda respuesta escrita durante el viaje se quedaba
+    // local, sin subir y sin marca — invisible para el siguiente ciclo.
+    const stamp = Number((local && local.updatedAt) || 0);
+    supabaseClient.from(_AURIX_INTEL_CTX_TABLE)
+      .upsert({ user_id: uid, payload, schema_version: _AURIX_INTEL_CTX_SCHEMA },
+              { onConflict: 'user_id' })
+      .then(({ error }) => {
+        if (error) { _aurixIntelCtxRemoteState = 'unavailable'; return; }
+        if (_aurixActiveUserId !== uid) return;            // cambió de usuario en el viaje
+        const cur = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {});
+        if (!cur || Number(cur.updatedAt || 0) !== stamp) return;   // mutó: sigue pendiente
+        _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY,
+          Object.assign({}, cur, { dirty: false }), {});
+      })
+      .catch(() => { _aurixIntelCtxRemoteState = 'unavailable'; });
+  } catch (_) {}
+}
+
+// ── SALUD V2 ───────────────────────────────────────────────────────────────
+// La superficie vuelve a llamarse SALUD, y sigue NO siendo una nota. Lo que se
+// retiró —y no vuelve— es el 0–100 agregado del score viejo: penalizaba cuatro
+// veces la misma causa (100% BTC = 10/100), subía cuando FALTABA un dato, ignoraba
+// las posiciones no valorables y movía un índice «estructural» con una caída de 24 h.
+//
+// QUÉ MIDE el anillo: la DISPERSIÓN DE PESOS reescalada, (effectiveN−1)/(N−1) ∈ [0,1].
+// Un solo eje, un solo vector de pesos, una sola fuente ⇒ imposible contar dos veces
+// la misma causa. 0 = todo el patrimonio depende de una posición; 100 = el peso está
+// repartido por igual entre las que hay.
+// QUÉ NO MIDE: calidad de las decisiones, riesgo absoluto, volatilidad, sector,
+// geografía, correlación ni divisa. Y no es asesoramiento.
+//
+// POR QUÉ ES DEFENDIBLE, punto por punto del SPEC:
+//   · cada componente tiene significado y se publica por separado;
+//   · `unavailable` NO vale 0: si la dispersión no es publicable, NO hay anillo —
+//     lo que cambia es el ESTADO, que dice qué falta;
+//   · un dato que falta NUNCA mejora nada: baja la CONFIANZA, que es un eje aparte
+//     y jamás suma al anillo;
+//   · el estado y el anillo salen de LA MISMA magnitud, así que no pueden
+//     contradecirse entre sí;
+//   · la escala es explicable con una frase y se puede comprobar con el detalle
+//     («tu peso se comporta como N efectivas de N»);
+//   · el contexto del usuario NO toca el anillo ni los componentes, y sólo puede
+//     añadir una NOTA de interpretación — es lo que impide que alguien se
+//     autoconceda «buena salud» declarando experiencia. ÚNICA excepción, y va en
+//     una sola dirección: declarar que el patrimonio está INCOMPLETO baja la
+//     confianza. Eso no es un privilegio, es lo contrario — el usuario puede
+//     empeorar la cobertura declarada, nunca mejorarla.
+//
+// Y lo que el founder pidió explícitamente: la experiencia principal NUNCA es
+// «Sin medir». Con UNA posición el estado no es desconocido, es el EXTREMO
+// definicional —todo depende de ella— y eso sí se puede decir. Con cobertura
+// limitada se dice QUÉ la limita. Con cero posiciones, que todavía no hay nada
+// que analizar.
+const _AURIX_INTEL_HEALTH_STATES = Object.freeze(['no_positions', 'single_position',
+  'coverage_limited', 'weight_in_few', 'weight_uneven', 'weight_spread']);
+const _AURIX_INTEL_HEALTH_BANDS = Object.freeze({ few: 40, spread: 60 });
+function _aurixIntelHealth(div, snap, model, ctx) {
+  const out = { metric: 'weight_dispersion', state: 'no_positions',
+    ring: null, ringPublishable: false,
+    confidence: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'no_positions',
+    components: [], contextNote: null, positions: null, effectiveN: null, topWeightPct: null,
+    forbiddenFraming: ['grade', 'quality', 'advice'] };
+  const disp = _aurixIntelDispersion(div, snap);
+  const conc = (model && model.concentration) || null;
+  const liq = (model && model.liquidity) || null;
+  const hasPositions = !!(snap && Number(snap.assetCount) > 0 && Number(snap.totUSD) > 0);
+  if (!hasPositions) return out;
+
+  out.positions = (div && Number.isFinite(div.positions)) ? div.positions
+    : (snap ? Number(snap.assetCount) : null);
+  out.effectiveN = (div && Number.isFinite(div.effectiveN)) ? div.effectiveN : null;
+  out.topWeightPct = (conc && Number.isFinite(conc.topWeightPct)) ? conc.topWeightPct : null;
+
+  // UNA posición: el extremo definicional, no una incógnita. Pero con el MISMO
+  // guard que la vía de dispersión: si hay una posición que Aurix no puede valorar,
+  // «todo depende de una sola» puede ser falso —la que falta podría pesar más— y
+  // afirmarlo con confianza suficiente sería publicar sobre patrimonio parcial.
+  const uncertHere = Number((snap && snap.uncertifiablePositions) || 0);
+  if (out.positions === 1 && uncertHere === 0) {
+    out.state = 'single_position'; out.ring = 0; out.ringPublishable = true;
+    out.reason = ''; out.confidence = _AURIX_AI_COVERAGE.SUFFICIENT;
+  } else if (out.positions === 1) {
+    out.state = 'coverage_limited'; out.reason = 'uncertifiable_positions';
+    out.confidence = _AURIX_AI_COVERAGE.PARTIAL;
+  } else if (disp.availability === _AURIX_AI_AVAIL.AVAILABLE) {
+    out.ring = disp.value; out.ringPublishable = true; out.reason = '';
+    out.state = disp.value < _AURIX_INTEL_HEALTH_BANDS.few ? 'weight_in_few'
+      : disp.value >= _AURIX_INTEL_HEALTH_BANDS.spread ? 'weight_spread' : 'weight_uneven';
+    out.confidence = _AURIX_AI_COVERAGE.SUFFICIENT;
+  } else {
+    // No hay anillo, pero SÍ hay algo que decir: qué lo limita.
+    out.state = 'coverage_limited'; out.reason = disp.reason || 'unavailable';
+    out.confidence = _AURIX_AI_COVERAGE.PARTIAL;
+  }
+  // COBERTURA — baja la confianza, nunca sube el anillo.
+  const structCoverage = (model && model.structure && model.structure.coverage) || null;
+  if (structCoverage === _AURIX_AI_COVERAGE.PARTIAL && out.confidence === _AURIX_AI_COVERAGE.SUFFICIENT) {
+    out.confidence = _AURIX_AI_COVERAGE.PARTIAL;
+  }
+  const covField = ctx && ctx.fields && ctx.fields.wealth_coverage;
+  if (covField && covField.value === 'partial') out.confidence = _AURIX_AI_COVERAGE.PARTIAL;
+
+  // COMPONENTES: cada uno con su disponibilidad. Se publican por separado justo
+  // para que nadie tenga que confiar en un número compuesto.
+  const comp = (id, value, unit, availability, reason) =>
+    ({ id, value: Number.isFinite(value) ? value : null, unit,
+       availability: availability || _AURIX_AI_AVAIL.AVAILABLE, reason: reason || '' });
+  out.components = [
+    comp('dispersion', out.ring, 'index', out.ringPublishable
+      ? _AURIX_AI_AVAIL.AVAILABLE : _AURIX_AI_AVAIL.UNAVAILABLE, out.reason),
+    comp('effective_holdings', out.effectiveN, 'positions',
+      Number.isFinite(out.effectiveN) ? _AURIX_AI_AVAIL.AVAILABLE : _AURIX_AI_AVAIL.UNAVAILABLE),
+    comp('top_position', out.topWeightPct, 'percent_of_investable',
+      Number.isFinite(out.topWeightPct) ? _AURIX_AI_AVAIL.AVAILABLE : _AURIX_AI_AVAIL.UNAVAILABLE,
+      (conc && conc.reason) || ''),
+    // La liquidez se publica como NIVEL y sin dirección: sin horizonte de gasto ni
+    // pasivos no existe un óptimo que normalizar, así que no puntúa.
+    comp('liquidity', (liq && Number.isFinite(liq.cashPct)) ? liq.cashPct : null,
+      'percent_of_investable',
+      (liq && liq.availability === _AURIX_AI_AVAIL.AVAILABLE)
+        ? _AURIX_AI_AVAIL.AVAILABLE : _AURIX_AI_AVAIL.UNAVAILABLE, (liq && liq.reason) || ''),
+  ];
+  // CONTEXTO: sólo una nota de interpretación. Ni un decimal del anillo.
+  const intent = ctx && ctx.fields && ctx.fields.concentration_intent;
+  if (intent && intent.value === 'deliberate'
+      && (out.state === 'weight_in_few' || out.state === 'single_position')) {
+    out.contextNote = 'concentration_declared_deliberate';
+  }
+  return out;
+}
+
 // ── INTERPRETACIÓN ─────────────────────────────────────────────────────────
 // La única capa donde el contexto entra, y entra SIN TOCAR NADA NUMÉRICO: devuelve
 // un insight nuevo con los mismos valores y con `relevance`, `qualifiers` e
 // `interpretationCode` añadidos. Si el contexto desaparece, el hecho es idéntico.
-function _aurixAuriInterpret(insights, ctx) {
+function _aurixIntelInterpret(insights, ctx) {
   const f = (ctx && ctx.fields) || {};
   const goal = f.primary_goal && f.primary_goal.value;
   const horizon = f.horizon && f.horizon.value;
@@ -29575,7 +29950,7 @@ function _aurixAuriInterpret(insights, ctx) {
 //   stale      → llevaba demasiado sin volver a observarse
 // NO se guarda ninguna cifra de patrimonio ni nada identificable: sólo la clave
 // semántica, su etiqueta y cuándo se vio.
-function _aurixAuriMemory(insights, dispersion, stored, now) {
+function _aurixIntelMemory(insights, dispersion, stored, now) {
   const t = Number.isFinite(now) ? now : 0;
   const prev = (stored && Array.isArray(stored.seen)) ? stored.seen : [];
   const prevBy = new Map(prev.map(e => [e.id, e]));
@@ -29610,7 +29985,7 @@ function _aurixAuriMemory(insights, dispersion, stored, now) {
   for (const p of prev) {
     if (liveIds.has(p.id)) continue;
     const age = t - Number(p.lastSeenAt || 0);
-    if (age > _AURIX_AURI_STALE_MS) continue;                       // caduca y deja de ocupar atención
+    if (age > _AURIX_INTEL_STALE_MS) continue;                       // caduca y deja de ocupar atención
     // UN CAMBIO SE ANUNCIA UNA VEZ. La primera versión persistía el entry resuelto
     // con su `lastSeenAt` viejo, así que la visita siguiente lo volvía a «resolver»:
     // `changeCount` se quedaba en 1 y el hero publicaba «ha cambiado algo que
@@ -29634,20 +30009,20 @@ function _aurixAuriMemory(insights, dispersion, stored, now) {
     lastObservedAt: (stored && Number.isFinite(stored.observedAt)) ? stored.observedAt : null,
     changesSinceLastObservation: changes,
     changeCount: changes.length,
-    seen: seen.slice(0, _AURIX_AURI_MEM_MAX_ENTRIES),
+    seen: seen.slice(0, _AURIX_INTEL_MEM_MAX_ENTRIES),
     // Lo que YA se mostró y sigue siendo verdad no merece el mismo espacio que
     // algo nuevo: esto es lo que consume la priorización.
     persisting: seen.filter(e => e.state === 'persisting' && e.observations >= 3).map(e => e.id),
   };
 }
-function _aurixAuriCommitMemory(memory, dispersion, now, env) {
-  return _aurixAuriWriteOwned(_AURIX_AURI_MEM_KEY, {
+function _aurixIntelCommitMemory(memory, dispersion, now, env) {
+  return _aurixIntelWriteOwned(_AURIX_INTEL_MEM_KEY, {
     observedAt: Number.isFinite(now) ? now : Date.now(),
     dispersion: Number.isFinite(dispersion && dispersion.value) ? dispersion.value : null,
     seen: (memory && memory.seen ? memory.seen : []).map(e => ({
       id: e.id, dimension: e.dimension, label: e.label,
       firstSeenAt: e.firstSeenAt, lastSeenAt: e.lastSeenAt, observations: e.observations,
-      // Sin esto el cambio se re-anuncia en cada visita (ver `_aurixAuriMemory`).
+      // Sin esto el cambio se re-anuncia en cada visita (ver `_aurixIntelMemory`).
       resolvedAt: Number.isFinite(e.resolvedAt) ? e.resolvedAt : null })),
   }, env);
 }
@@ -29658,7 +30033,7 @@ function _aurixAuriCommitMemory(memory, dispersion, now, env) {
 // sola, lleva su evidencia, y ninguno afirma causalidad, benchmark ni correlación
 // de mercado. Si un cruce necesitara una causa que Aurix no puede demostrar, se
 // degrada a la observación que sí puede.
-function _aurixAuriDiscoveries(model, memory, ctx) {
+function _aurixIntelDiscoveries(model, memory, ctx) {
   const out = [];
   const add = (spec) => out.push(Object.assign({
     kind: 'discovery', availability: _AURIX_AI_AVAIL.AVAILABLE,
@@ -29745,8 +30120,19 @@ function _aurixAuriDiscoveries(model, memory, ctx) {
 // futura —y el catálogo declara qué cambia—; (3) Aurix no lo sabe ya; (4) no puede
 // deducirlo honestamente. Una sola pregunta a la vez: un cuestionario es la forma
 // de que nadie responda.
-function _aurixAuriQuestions(model, ctx, limit) {
+function _aurixIntelQuestions(model, ctx, limit, policy) {
   const known = (ctx && ctx.fields) || {};
+  const pol = policy || {};
+  const now = Number.isFinite(pol.now) ? pol.now : 0;
+  const asked = (ctx && ctx.asked) || {};
+  const declined = (ctx && ctx.declined) || {};
+  // PAUSA. Sólo la levanta un cambio EXTRAORDINARIAMENTE material, y el criterio
+  // es determinista: un hecho material cuya RAÍZ no se había observado nunca. Un
+  // cambio cualquiera no basta — si no, «pausar» duraría hasta el siguiente tick.
+  if (Number.isFinite(ctx && ctx.pausedAt)) {
+    const expired = now - ctx.pausedAt > _AURIX_INTEL_PAUSE_MS;
+    if (!expired && !pol.materialReopen) return [];
+  }
   const q = [];
   const c = model.concentration, l = model.liquidity, d = model.diversification;
   // La concentración material es el hecho que MÁS cambia de lectura con contexto,
@@ -29757,9 +30143,9 @@ function _aurixAuriQuestions(model, ctx, limit) {
     q.push({ id: 'q_concentration_intent', field: 'concentration_intent',
       trigger: 'top_position_weight',
       subject: (c.topContributor && c.topContributor.name) || null,
-      options: _AURIX_AURI_FIELDS.concentration_intent.options,
-      changes: _AURIX_AURI_FIELDS.concentration_intent.changes,
-      purpose: _AURIX_AURI_FIELDS.concentration_intent.purpose,
+      options: _AURIX_INTEL_FIELDS.concentration_intent.options,
+      changes: _AURIX_INTEL_FIELDS.concentration_intent.changes,
+      purpose: _AURIX_INTEL_FIELDS.concentration_intent.purpose,
       whyCode: 'question_why_concentration_intent', priority: 0.9 });
   }
   // El alcance: sólo se pregunta si hay una conclusión de ESTRUCTURA que podría
@@ -29767,9 +30153,9 @@ function _aurixAuriQuestions(model, ctx, limit) {
   if (!known.wealth_coverage && model.structure.availability === _AURIX_AI_AVAIL.AVAILABLE
       && d.availability === _AURIX_AI_AVAIL.AVAILABLE) {
     q.push({ id: 'q_wealth_coverage', field: 'wealth_coverage', trigger: 'effective_holdings',
-      subject: null, options: _AURIX_AURI_FIELDS.wealth_coverage.options,
-      changes: _AURIX_AURI_FIELDS.wealth_coverage.changes,
-      purpose: _AURIX_AURI_FIELDS.wealth_coverage.purpose,
+      subject: null, options: _AURIX_INTEL_FIELDS.wealth_coverage.options,
+      changes: _AURIX_INTEL_FIELDS.wealth_coverage.changes,
+      purpose: _AURIX_INTEL_FIELDS.wealth_coverage.purpose,
       whyCode: 'question_why_wealth_coverage', priority: 0.75 });
   }
   // La liquidez sólo se pregunta si se ha MOVIDO: preguntar por un nivel estable
@@ -29777,9 +30163,9 @@ function _aurixAuriQuestions(model, ctx, limit) {
   if (!known.liquidity_need && l.availability === _AURIX_AI_AVAIL.AVAILABLE
       && Number.isFinite(l.changePp) && Math.abs(l.changePp) >= _AURIX_FACT_MATERIAL.cashDeltaPp) {
     q.push({ id: 'q_liquidity_need', field: 'liquidity_need', trigger: 'cash_weight',
-      subject: null, options: _AURIX_AURI_FIELDS.liquidity_need.options,
-      changes: _AURIX_AURI_FIELDS.liquidity_need.changes,
-      purpose: _AURIX_AURI_FIELDS.liquidity_need.purpose,
+      subject: null, options: _AURIX_INTEL_FIELDS.liquidity_need.options,
+      changes: _AURIX_INTEL_FIELDS.liquidity_need.changes,
+      purpose: _AURIX_INTEL_FIELDS.liquidity_need.purpose,
       whyCode: 'question_why_liquidity_need', priority: 0.6 });
   }
   // El objetivo cualifica la prioridad de TODO, pero no vale preguntarlo sin un
@@ -29787,13 +30173,27 @@ function _aurixAuriQuestions(model, ctx, limit) {
   if (!known.primary_goal && (c.availability === _AURIX_AI_AVAIL.AVAILABLE
       || model.evolution.availability === _AURIX_AI_AVAIL.AVAILABLE)) {
     q.push({ id: 'q_primary_goal', field: 'primary_goal', trigger: 'investable_level',
-      subject: null, options: _AURIX_AURI_FIELDS.primary_goal.options,
-      changes: _AURIX_AURI_FIELDS.primary_goal.changes,
-      purpose: _AURIX_AURI_FIELDS.primary_goal.purpose,
+      subject: null, options: _AURIX_INTEL_FIELDS.primary_goal.options,
+      changes: _AURIX_INTEL_FIELDS.primary_goal.changes,
+      purpose: _AURIX_INTEL_FIELDS.primary_goal.purpose,
       whyCode: 'question_why_primary_goal', priority: 0.55 });
   }
   q.sort((a, b) => (b.priority - a.priority) || (a.id < b.id ? -1 : 1));
-  return q.slice(0, Number.isFinite(limit) ? limit : _AURIX_AURI_QUESTION_LIMIT);
+  // COOLDOWN y DECLINADAS. Se filtra DESPUÉS de ordenar, así que una pregunta en
+  // cooldown no bloquea a la siguiente: cede su turno en vez de callar a todas.
+  const eligible = q.filter(item => {
+    const d = declined[item.field];
+    if (Number.isFinite(d) && now - d < _AURIX_INTEL_Q_DECLINED_MS) return false;
+    const a = asked[item.id];
+    if (a && Number.isFinite(a.at) && now - a.at < _AURIX_INTEL_Q_COOLDOWN_MS) return false;
+    return true;
+  }).map(item => Object.assign({}, item, {
+    // La superficie necesita saber qué opciones extra ofrecer, y son parte del
+    // contrato de la pregunta, no decoración.
+    canDecline: true, canPause: true,
+    askedCount: (asked[item.id] && asked[item.id].count) || 0,
+  }));
+  return eligible.slice(0, Number.isFinite(limit) ? limit : _AURIX_INTEL_QUESTION_LIMIT);
 }
 
 // ── QUÉ IMPORTA AHORA ──────────────────────────────────────────────────────
@@ -29801,7 +30201,7 @@ function _aurixAuriQuestions(model, ctx, limit) {
 // se fabrica urgencia: `attention_*` exige un hecho material de verdad, que es
 // justo lo que el score viejo no exigía —bastaba con caer por debajo de 60, y la
 // escalera de penalizaciones lo hacía casi siempre cierto—.
-function _aurixAuriNow(model, insights, discoveries, memory, ctx, questions) {
+function _aurixIntelNow(model, insights, discoveries, memory, ctx, questions) {
   const persistingIds = new Set((memory && memory.persisting) || []);
   const top = (insights || [])[0] || null;
   const disc = (discoveries || [])[0] || null;
@@ -29851,50 +30251,61 @@ function _aurixAuriNow(model, insights, discoveries, memory, ctx, questions) {
     supportedByFact: !!anchor };
 }
 
-// ── EL OWNER ÚNICO DE AURI ─────────────────────────────────────────────────
+// ── EL OWNER ÚNICO DEL MOTOR ─────────────────────────────────────────────────
 // Un solo punto de entrada, el pipeline en orden y la profundidad como PARÁMETRO:
 // Free y Premium leen LA MISMA verdad y se diferencian en cuánto de ella se
 // entrega. Free nunca ve una cifra falsa, degradada ni censurada — ve MENOS
 // profundidad. Y la pregunta NUNCA se gatea: pedir trabajo al usuario y no
 // devolverle nada es la forma más rápida de que no vuelva a responder.
-function _aurixAuri(opts) {
+function _aurixIntel(opts) {
   const o = opts || {};
   const now = Number.isFinite(o.now) ? o.now : ((typeof Date !== 'undefined') ? Date.now() : 0);
-  const depth = (_AURIX_AURI_DEPTH.indexOf(o.depth) !== -1) ? o.depth : 'free';
+  const depth = (_AURIX_INTEL_DEPTH.indexOf(o.depth) !== -1) ? o.depth : 'free';
   const ai = (o.advanced && typeof o.advanced === 'object') ? o.advanced
     : ((typeof _aurixAdvancedIntelligence === 'function') ? _aurixAdvancedIntelligence(o) : null);
   if (!ai || !ai.model) return null;
   const ctx = ('context' in o) ? (o.context || { fields: {}, answered: 0, source: 'none' })
-                               : _aurixAuriContext(o);
+                               : _aurixIntelContext(o);
   const snap = ('snapshot' in o) ? o.snapshot
     : ((typeof _aurixHealthSnapshot === 'function') ? _aurixAiSafe(_aurixHealthSnapshot) : null);
   const div = ('diversification' in o) ? o.diversification
     : ((typeof _aurixEffectiveDiversification === 'function') ? _aurixAiSafe(_aurixEffectiveDiversification) : null);
 
-  const dispersion = _aurixAuriDispersion(div, snap);
-  const interpreted = _aurixAuriInterpret(ai.insights, ctx);
+  const dispersion = _aurixIntelDispersion(div, snap);
+  const health = _aurixIntelHealth(div, snap, ai.model, ctx);
+  const interpreted = _aurixIntelInterpret(ai.insights, ctx);
   // PRIORIDAD tras interpretar: la relevancia contextual reordena, y lo que ya se
   // ha observado varias veces cede sitio a lo nuevo. Ninguna de las dos cosas
   // cambia un valor.
-  const stored = ('memory' in o) ? o.memory : _aurixAuriReadOwned(_AURIX_AURI_MEM_KEY, o);
-  const memory = _aurixAuriMemory(interpreted, dispersion, stored, now);
+  const stored = ('memory' in o) ? o.memory : _aurixIntelReadOwned(_AURIX_INTEL_MEM_KEY, o);
+  const memory = _aurixIntelMemory(interpreted, dispersion, stored, now);
   const persisting = new Set(memory.persisting || []);
   const ranked = interpreted.slice().sort((a, b) =>
     ((b.relevance || 0) - (persisting.has(b.id) ? 0.15 : 0))
     - ((a.relevance || 0) - (persisting.has(a.id) ? 0.15 : 0))
     || (a.id < b.id ? -1 : 1));
-  const discoveries = _aurixAuriDiscoveries(ai.model, memory, ctx);
-  const questions = _aurixAuriQuestions(ai.model, ctx, o.questionLimit);
-  const nowState = _aurixAuriNow(ai.model, ranked, discoveries, memory, ctx, questions);
+  const discoveries = _aurixIntelDiscoveries(ai.model, memory, ctx);
+  // REOPEN determinista: un hecho material cuya raíz NO estaba en la memoria
+  // ALMACENADA. Ojo: tiene que salir de `stored`, no de `memory.seen` — esta última
+  // se RECONSTRUYE en cada ejecución e incluye el insight nuevo, así que usarla
+  // hacía que la condición no pudiera cumplirse nunca y la pausa fuese eterna.
+  const knownRoots = new Set(((stored && stored.seen) || []).map(e => e.dimension));
+  const materialReopen = interpreted.some(i =>
+    i.severity === _AURIX_AI_SEVERITY.NOTABLE_CHANGE
+    && i.availability === _AURIX_AI_AVAIL.AVAILABLE
+    && memory.hasHistory && !knownRoots.has(i.dimension));
+  const questions = _aurixIntelQuestions(ai.model, ctx, o.questionLimit, { now, materialReopen });
+  const nowState = _aurixIntelNow(ai.model, ranked, discoveries, memory, ctx, questions);
 
   const isPremium = depth === 'premium';
   return {
-    version: 'auri1',
+    version: 'intel1',
     generatedAt: ai.generatedAt,
     depth,
     // VERDAD — idéntica en los dos niveles, sin excepción.
     model: ai.model,
     dispersion,
+    health,
     // LECTURA — la profundidad decide CUÁNTA, nunca CUÁL.
     now: nowState,
     attention: isPremium ? ranked.slice(0, _AURIX_AI_ATTENTION_LIMIT) : ranked.slice(0, 1),
@@ -29911,12 +30322,16 @@ function _aurixAuri(opts) {
       changesSinceLastObservation: [], seen: [], persisting: [],
     },
     questions,                                  // NUNCA gateadas
+    questionPolicy: { paused: Number.isFinite(ctx.pausedAt),
+      pausedAt: Number.isFinite(ctx.pausedAt) ? ctx.pausedAt : null,
+      materialReopen, cooldownMs: _AURIX_INTEL_Q_COOLDOWN_MS,
+      declinedMs: _AURIX_INTEL_Q_DECLINED_MS },
     context: { answered: ctx.answered, source: ctx.source,
       fields: Object.keys(ctx.fields).reduce((acc, k) => {
         acc[k] = { value: ctx.fields[k].value, provenance: ctx.fields[k].provenance,
           answeredAt: ctx.fields[k].answeredAt, purpose: ctx.fields[k].purpose,
           changes: ctx.fields[k].changes }; return acc; }, {}),
-      catalogue: Object.keys(_AURIX_AURI_FIELDS) },
+      catalogue: Object.keys(_AURIX_INTEL_FIELDS) },
     // El nivel sale del contexto si el usuario lo eligió; si no, se PROPONE desde
     // la experiencia declarada y nunca desde el patrimonio (el dinero de alguien
     // no dice cuánto sabe).
@@ -29939,13 +30354,13 @@ function _aurixAuri(opts) {
   };
 }
 if (typeof window !== 'undefined') {
-  window.debugAurixAuri = (opts) => _aurixAuri(opts || {});
-  window.AURIX_AURI_CONTRACT = Object.freeze({
-    fields: _AURIX_AURI_FIELDS, provenance: _AURIX_AURI_PROVENANCE, depth: _AURIX_AURI_DEPTH,
-    questionLimit: _AURIX_AURI_QUESTION_LIMIT, staleMs: _AURIX_AURI_STALE_MS,
+  window.debugAurixIntelligenceEngine = (opts) => _aurixIntel(opts || {});
+  window.AURIX_INTELLIGENCE_ENGINE_CONTRACT = Object.freeze({
+    fields: _AURIX_INTEL_FIELDS, provenance: _AURIX_INTEL_PROVENANCE, depth: _AURIX_INTEL_DEPTH,
+    questionLimit: _AURIX_INTEL_QUESTION_LIMIT, staleMs: _AURIX_INTEL_STALE_MS,
     pipeline: ['truth', 'context', 'observations', 'change', 'interpretation',
                'priority', 'memory', 'presentation'],
-    note: 'AURI — context may change relevance, priority, language and explanation. '
+    note: 'Intelligence — context may change relevance, priority, language and explanation. '
         + 'It may never change a financial value, its availability or its coverage.',
   });
 }
@@ -53835,11 +54250,11 @@ function _renderPremiumIntelligence() {
    a neutral secondary note ("N inmuebles registrados"). */
 
 let _intccExploreWired = false;
-// SPEC AURI — el último run, sólo para que el hook de post-render pueda CONSOLIDAR
+// SPEC Intelligence — el último run, sólo para que el hook de post-render pueda CONSOLIDAR
 // la memoria de observación. El motor sigue siendo puro: esto es estado de
 // presentación, y si es null simplemente no se consolida nada.
-let _auriLastRun = null;
-let _auriAnswerWired = false;
+let _intelLastRun = null;
+let _intelAnswerWired = false;
 const _INTCC_VISIT_KEY  = 'aurix_intcc_last_visit_v1';
 
 function _intccEsc(s) {
@@ -53974,8 +54389,8 @@ function _intccRadar(snap, drivers, growthPct) {
 // Fail closed: no canonical engine, or no canonical score, ⇒ no score.
 // `drivers` is kept in the signature for call-site compatibility; top-3
 // concentration is the canonical engine's business now, not a second opinion.
-function _intccHealthScore(snap, drivers) {   // eslint-disable-line no-unused-vars
-  // SPEC AURI · FASE 6 — ESTA SUPERFICIE YA NO PUBLICA UN «HEALTH 0–100».
+function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-unused-vars
+  // SPEC AURIX INTELLIGENCE · FASE 6 — ESTA SUPERFICIE YA NO PUBLICA UN «HEALTH 0–100».
   //
   // La revisión financiera lo declaró NOT COMPUTABLE, y no por falta de pulido:
   //   · una cartera 100% BTC recibe −25 (dominante) −20 (categoría) −15 (crypto)
@@ -53994,34 +54409,59 @@ function _intccHealthScore(snap, drivers) {   // eslint-disable-line no-unused-v
   // DEL MISMO VECTOR DE PESOS: agregarlas cuenta un eje dos veces.
   //
   // Lo sustituye un índice que se llama por lo que mide: DISPERSIÓN DE PESOS. El
-  // owner es `_aurixAuriDispersion`, que falla cerrado con una sola posición o con
+  // owner es `_aurixIntelDispersion`, que falla cerrado con una sola posición o con
   // cualquier posición no valorable. `_aurixHealthScore` NO se toca: sigue sirviendo
   // al Dashboard y a Workspace, y retirarlo de ahí es una decisión de producto
   // aparte (cuatro superficies certificadas más).
   const div  = (typeof _aurixEffectiveDiversification === 'function') ? _aurixEffectiveDiversification() : null;
-  const disp = (typeof _aurixAuriDispersion === 'function') ? _aurixAuriDispersion(div, snap) : null;
-  if (!disp || disp.availability !== _AURIX_AI_AVAIL.AVAILABLE) {
-    const why = disp && disp.reason === 'too_few_positions' ? 'auri_disp_na_single'
-              : disp && disp.reason === 'uncertifiable_positions' ? 'auri_disp_na_uncert'
-              : 'auri_disp_na_generic';
-    return { score: null, band: 'empty', tone: 'neutral', metric: 'weight_dispersion',
-             label: t('auri_disp_na'), detail: t(why), reasons: [], explain: t('auri_disp_depth'),
-             availability: 'unavailable', reason: (disp && disp.reason) || 'no_source' };
+  // El modelo y el contexto se RECIBEN del run que ya los calculó. Calcularlos otra
+  // vez aquí significaba recorrer el fact ledger DOS veces más por render: la misma
+  // agregación financiera tres veces en la misma pintura. El fallback existe para
+  // llamadores que no pasan `intel` (un gate, por ejemplo).
+  let model = (intel && intel.model) || null;
+  let ctx = (intel && intel.context) || null;
+  if (!model) {
+    try {
+      const ai = (typeof _aurixAdvancedIntelligence === 'function') ? _aurixAdvancedIntelligence({}) : null;
+      model = ai && ai.model;
+      ctx = (typeof _aurixIntelContext === 'function') ? _aurixIntelContext({}) : null;
+    } catch (_) { model = null; ctx = null; }
   }
-  // UN SOLO TONO, deliberadamente. Pintar el reparto en una escalera verde→roja
-  // volvería a convertir una descripción en una nota, y en esta UI el rojo es
-  // pérdida. La diferenciación se queda en la etiqueta, igual que se resolvió en
-  // los badges de índice de Market.
+  const h = (typeof _aurixIntelHealth === 'function') ? _aurixIntelHealth(div, snap, model, ctx) : null;
+  if (!h) return { score: null, band: 'empty', tone: 'neutral', label: t('intcc_band_empty'),
+                   reasons: [], explain: '', state: 'no_positions', confidence: 'unavailable' };
+  const STATE_LABEL = {
+    no_positions:     'intel_h_no_positions',
+    single_position:  'intel_h_single',
+    coverage_limited: 'intel_h_coverage',
+    weight_in_few:    'intel_h_few',
+    weight_uneven:    'intel_h_uneven',
+    weight_spread:    'intel_h_spread',
+  };
+  // El DETALLE es lo que hace auditable el anillo: se puede comprobar contando.
+  let detail = '';
+  if (h.state === 'single_position') detail = t('intel_h_d_single');
+  else if (h.ringPublishable && Number.isFinite(h.effectiveN)) {
+    detail = t('intel_disp_detail')(_intv4Num(h.effectiveN, 1), h.positions);
+  } else if (h.state === 'coverage_limited') {
+    detail = h.reason === 'uncertifiable_positions' ? t('intel_disp_na_uncert')
+           : h.reason === 'too_few_positions' ? t('intel_disp_na_single')
+           : t('intel_disp_na_generic');
+  } else if (h.state === 'no_positions') detail = t('intel_h_d_empty');
   return {
-    score:   disp.value,
-    band:    disp.semanticLabel === _AURIX_AI_LABEL.SPREAD_EVEN ? 'even' : 'lopsided',
+    score:   h.ringPublishable ? h.ring : null,
+    band:    h.state,
     tone:    'neutral',
-    metric:  'weight_dispersion',
-    label:   t(disp.semanticLabel === _AURIX_AI_LABEL.SPREAD_EVEN ? 'auri_disp_even' : 'auri_disp_lopsided'),
-    detail:  t('auri_disp_detail')(_intv4Num(disp.effectiveN, 1), disp.positions),
+    metric:  h.metric,
+    label:   t(STATE_LABEL[h.state] || 'intel_h_coverage'),
+    detail,
+    confidence: h.confidence,
+    contextNote: h.contextNote ? t('intel_h_note_deliberate') : '',
+    components: h.components,
     reasons: [],
-    explain: t('auri_disp_depth'),
-    availability: 'available', reason: '',
+    explain: t('intel_disp_depth'),
+    availability: h.ringPublishable ? 'available' : 'unavailable',
+    reason: h.reason,
   };
 }
 
@@ -54909,57 +55349,57 @@ function _intv4RecordShown(keys) {
 // The hero reading: a STATE, not a fact — so it never competes with, or repeats,
 // a Brief conclusion. Same state machine the previous hero used, but every input
 // now comes from the Core instead of the old radar.
-// SPEC AURI · FASE 5 — EL ESTADO EMERGE DE LOS DATOS Y DEL CONTEXTO.
+// SPEC AURIX INTELLIGENCE · FASE 5 — EL ESTADO EMERGE DE LOS DATOS Y DEL CONTEXTO.
 //
 // Antes: `if (score.score != null && score.score < 60) state = 'attention'`. Con la
 // escalera de penalizaciones del score viejo eso era cierto en casi cualquier
 // cartera real, así que la cabecera decía «Tu patrimonio requiere atención» casi
 // siempre. Una alarma que suena siempre no informa: es ruido con tipografía.
 //
-// Ahora el estado lo decide `_aurixAuriNow`, que exige un HECHO MATERIAL para
+// Ahora el estado lo decide `_aurixIntelNow`, que exige un HECHO MATERIAL para
 // afirmar atención y sabe distinguir «no ha cambiado nada» de «no puedo medirlo».
 // El contexto del usuario puede reordenar y cualificar el texto; no puede mover
 // ninguna cifra.
-function _auriDiscoveryText(d) {
+function _intelDiscoveryText(d) {
   if (!d) return '';
   const v = d.values || {};
   switch (d.code) {
     case 'apparent_vs_effective_diversification':
-      return _intv4T('auri_d_apparent', v.positions, _intv4Num(v.effectiveN, 1));
-    case 'concentration_crossed_upward':   return _intv4T('auri_d_conc_rising', _intv4Num(v.topWeightPct, 0));
-    case 'level_rose_on_capital_not_return': return _intv4T('auri_d_capital');
+      return _intv4T('intel_d_apparent', v.positions, _intv4Num(v.effectiveN, 1));
+    case 'concentration_crossed_upward':   return _intv4T('intel_d_conc_rising', _intv4Num(v.topWeightPct, 0));
+    case 'level_rose_on_capital_not_return': return _intv4T('intel_d_capital');
     case 'declared_goal_distant_from_observed_structure':
-      return _intv4T('auri_d_intent', _intv4Num(v.topWeightPct, 0));
-    case 'liquidity_fell_while_need_declared': return _intv4T('auri_d_liq_need');
-    case 'reading_persists_across_observations': return _intv4T('auri_d_persisting', v.observations);
-    case 'several_readings_moved_together':  return _intv4T('auri_d_combined', v.count);
+      return _intv4T('intel_d_intent', _intv4Num(v.topWeightPct, 0));
+    case 'liquidity_fell_while_need_declared': return _intv4T('intel_d_liq_need');
+    case 'reading_persists_across_observations': return _intv4T('intel_d_persisting', v.observations);
+    case 'several_readings_moved_together':  return _intv4T('intel_d_combined', v.count);
     default: return '';
   }
 }
-function _auriQuestionText(q) {
+function _intelQuestionText(q) {
   if (!q) return { text: '', why: '' };
   switch (q.field) {
     case 'concentration_intent':
-      return { text: _intv4T('auri_q_conc_intent', q.subject || '—'), why: _intv4T('auri_q_conc_why') };
+      return { text: _intv4T('intel_q_conc_intent', q.subject || '—'), why: _intv4T('intel_q_conc_why') };
     case 'wealth_coverage':
-      return { text: _intv4T('auri_q_coverage'), why: _intv4T('auri_q_coverage_why') };
+      return { text: _intv4T('intel_q_coverage'), why: _intv4T('intel_q_coverage_why') };
     case 'liquidity_need':
-      return { text: _intv4T('auri_q_liq_need'), why: _intv4T('auri_q_liq_why') };
+      return { text: _intv4T('intel_q_liq_need'), why: _intv4T('intel_q_liq_why') };
     case 'primary_goal':
-      return { text: _intv4T('auri_q_goal'), why: _intv4T('auri_q_goal_why') };
+      return { text: _intv4T('intel_q_goal'), why: _intv4T('intel_q_goal_why') };
     default: return { text: '', why: '' };
   }
 }
-function _intv5Reading(core, score, snap, auri) {
-  // FAIL CLOSED. Si AURI no ha podido correr, la lectura NO puede caer en «Tu
+function _intv5Reading(core, score, snap, intel) {
+  // FAIL CLOSED. Si el motor no ha podido correr, la lectura NO puede caer en «Tu
   // estructura se mantiene»: eso es una afirmación estructural POSITIVA sostenida
   // sobre cero evidencia, y precisamente en el caso en que no hay motor que la
   // certifique. Sin motor se dice que falta base para leer, que es la verdad.
-  const nowState = (auri && auri.now) ? auri.now.state : 'insufficient_history';
-  const changeCount = (auri && auri.now) ? auri.now.changeCount : 0;
-  const disc = (auri && auri.discoveries && auri.discoveries[0]) || null;
-  const q = (auri && auri.questions && auri.questions[0]) || null;
-  // El estado semántico de AURI se mapea a la clase visual que ya existe, así que
+  const nowState = (intel && intel.now) ? intel.now.state : 'insufficient_history';
+  const changeCount = (intel && intel.now) ? intel.now.changeCount : 0;
+  const disc = (intel && intel.discoveries && intel.discoveries[0]) || null;
+  const q = (intel && intel.questions && intel.questions[0]) || null;
+  // El estado semántico del motor se mapea a la clase visual que ya existe, así que
   // no hay lenguaje visual nuevo que mantener.
   const CLASS = { material_change: 'attention', attention_material_fact: 'attention',
     discovery: 'concentrated', context_needed: 'balanced', insufficient_history: 'balanced',
@@ -54968,31 +55408,31 @@ function _intv5Reading(core, score, snap, auri) {
   let title, sub;
   switch (nowState) {
     case 'material_change':
-      title = _intv4T('auri_now_material'); sub = _intv4T('auri_sub_material', changeCount); break;
+      title = _intv4T('intel_now_material'); sub = _intv4T('intel_sub_material', changeCount); break;
     case 'discovery':
-      title = _intv4T('auri_now_discovery'); sub = _auriDiscoveryText(disc) || _intv4T('intcc_sub_balanced'); break;
+      title = _intv4T('intel_now_discovery'); sub = _intelDiscoveryText(disc) || _intv4T('intcc_sub_balanced'); break;
     case 'attention_material_fact':
       title = _intv4T('intcc_read_attention'); sub = _intv4T('intcc_sub_attention'); break;
     case 'context_needed':
-      title = _intv4T('auri_now_context'); sub = _auriQuestionText(q).why || _intv4T('intcc_sub_balanced'); break;
+      title = _intv4T('intel_now_context'); sub = _intelQuestionText(q).why || _intv4T('intcc_sub_balanced'); break;
     case 'insufficient_history':
     case 'no_data':
-      title = _intv4T('auri_now_history'); sub = _intv4T('auri_sub_history'); break;
+      title = _intv4T('intel_now_history'); sub = _intv4T('intel_sub_history'); break;
     case 'readings_changed':
-      title = _intv4T('auri_now_changed'); sub = _intv4T('auri_sub_changed', changeCount); break;
+      title = _intv4T('intel_now_changed'); sub = _intv4T('intel_sub_changed', changeCount); break;
     case 'stable_no_change':
-      title = _intv4T('auri_now_stable_nc'); sub = _intv4T('auri_sub_stable_nc'); break;
+      title = _intv4T('intel_now_stable_nc'); sub = _intv4T('intel_sub_stable_nc'); break;
     default:
-      title = _intv4T('auri_now_stable'); sub = _intv4T('intcc_sub_balanced'); break;
+      title = _intv4T('intel_now_stable'); sub = _intv4T('intcc_sub_balanced'); break;
   }
   // LA PRUEBA VISIBLE de que el contexto cambia la lectura sin tocar el dato: si
   // el usuario ha declarado que su patrimonio está incompleto, toda conclusión de
   // estructura lo dice en vez de tratar la parte como el total.
-  const ctxFields = (auri && auri.context && auri.context.fields) || {};
+  const ctxFields = (intel && intel.context && intel.context.fields) || {};
   if (ctxFields.wealth_coverage && ctxFields.wealth_coverage.value === 'partial') {
-    sub = sub + ' ' + _intv4T('auri_ctx_partial');
+    sub = sub + ' ' + _intv4T('intel_ctx_partial');
   }
-  return { state: CLASS[nowState] || 'balanced', auriState: nowState, title, sub };
+  return { state: CLASS[nowState] || 'balanced', intelState: nowState, title, sub };
 }
 
 // Hero chips: short confirmations derived from Core facts. Never a metric — the
@@ -55218,7 +55658,7 @@ function _intv7RadarHtml(esc) {
              data-state="radar">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
       <div class="intcc-radar-wrap">${svg}</div>
-      ${/* SPEC AURI · FASE 7 — la card principal RESPIRA. Tres párrafos permanentes
+      ${/* SPEC AURIX INTELLIGENCE · FASE 7 — la card principal RESPIRA. Tres párrafos permanentes
             (la leyenda de las cinco dimensiones, el significado de Estabilidad y la
             lista de ejes pendientes) explicaban el mismo contexto en cada apertura,
             y un texto que ya has leído deja de ser información. Pasan a un
@@ -55228,7 +55668,7 @@ function _intv7RadarHtml(esc) {
             datos siguen atenuados EN EL PROPIO RADAR, así que la limitación se ve
             sin abrir nada: lo que se pliega es la explicación, no el límite. */''}
       <details class="intv8-radar-more">
-        <summary class="intv8-radar-summary">${esc(_intv4T('auri_radar_more'))}</summary>
+        <summary class="intv8-radar-summary">${esc(_intv4T('intel_radar_more'))}</summary>
         <div class="intv8-radar-more-body">
           <p class="intv6-radar-legend">${esc(_intv4T('intv7_radar_legend'))}</p>
           ${Number.isFinite(r.values.stability)
@@ -55326,47 +55766,83 @@ function _renderIntelligenceCommandCenter() {
   }
   const depth = _INTV4_DEFAULT_DEPTH;
 
-  // ── COCKPIT (row 1) — the canonical score ONCE, plus the state reading ────
-  const score   = _intccHealthScore(snap, null);
-  // AURI — contexto, memoria, descubrimientos y preguntas sobre el modelo de PC.01.
+  // ── COCKPIT (row 1) — ORDEN: primero el motor, después la Salud, así el fact
+  // ledger se recorre UNA vez por pintura.
+  // Intelligence — contexto, memoria, descubrimientos y preguntas sobre el modelo de PC.01.
   // Esta superficie es Premium por el gate de `intelligence.full` de arriba, así que
   // entra con `depth:'premium'`; el reparto Free/Premium vive en el motor, no aquí.
   // Un fallo suyo NO puede dejar la pestaña en blanco: la lectura cae al estado
   // estable, que es lo que el motor devuelve sin contexto ni memoria.
-  let auri = null;
+  let intel = null;
   try {
-    auri = (typeof _aurixAuri === 'function')
-      ? _aurixAuri({ depth: 'premium', presentationHistory: _intv4ReadShown() }) : null;
-  } catch (_) { auri = null; }
-  _auriLastRun = auri;
-  const reading = _intv5Reading(core, score, snap, auri);
+    intel = (typeof _aurixIntel === 'function')
+      ? _aurixIntel({ depth: 'premium', presentationHistory: _intv4ReadShown() }) : null;
+  } catch (_) { intel = null; }
+  const score   = _intccHealthScore(snap, null, intel);
+  _intelLastRun = intel;
+  // Se registra que la pregunta SE MOSTRÓ, no que se respondió: es lo que hace que
+  // no vuelva a aparecer en cada recarga aunque el usuario la ignore.
+  try {
+    if (intel && intel.questions && intel.questions[0] && typeof _aurixIntelMarkAsked === 'function') {
+      _aurixIntelMarkAsked(intel.questions[0].id, {});
+    }
+  } catch (_) {}
+  const reading = _intv5Reading(core, score, snap, intel);
   const chips   = _intv5Chips(core, score);
-  const auriQ   = (auri && auri.questions && auri.questions[0]) || null;
+  const intelQ  = (intel && intel.questions && intel.questions[0]) || null;
   // La pregunta NUNCA se gatea: pedirle trabajo al usuario y no devolverle nada es
   // la forma más rápida de que no vuelva a responder ninguna. Se pinta con las
   // clases de chip que ya existen, así que no hay lenguaje visual nuevo.
-  const auriQHtml = auriQ ? (() => {
-    const qt = _auriQuestionText(auriQ);
+  const intelQHtml = intelQ ? (() => {
+    const qt = _intelQuestionText(intelQ);
     if (!qt.text) return '';
     return `
-      <div class="intv8-auri-q" data-auri-q="${esc(auriQ.field)}"${
-        auriQ.subject ? ` data-auri-subject="${esc(auriQ.subject)}"` : ''}>
-        <p class="intv8-auri-q-text">${esc(qt.text)}</p>
-        <div class="intv8-auri-q-opts">${auriQ.options.map(o =>
-          `<button type="button" class="intcc-chip intv8-auri-opt" data-auri-answer="${esc(o)}">${
-            esc(_intv4T('auri_opt_' + o))}</button>`).join('')}</div>
+      <div class="intv8-intel-q" data-intel-q="${esc(intelQ.field)}"${
+        intelQ.subject ? ` data-intel-subject="${esc(intelQ.subject)}"` : ''}>
+        <p class="intv8-intel-q-text">${esc(qt.text)}</p>
+        <div class="intv8-intel-q-opts">${intelQ.options.map(o =>
+          `<button type="button" class="intcc-chip intv8-intel-opt" data-intel-answer="${esc(o)}">${
+            esc(_intv4T('intel_opt_' + o))}</button>`).join('')}
+          <button type="button" class="intcc-chip intv8-intel-opt is-quiet" data-intel-answer="__decline">${
+            esc(_intv4T('intel_opt_decline'))}</button></div>
+        <button type="button" class="intv8-intel-pause" data-intel-answer="__pause">${
+          esc(_intv4T('intel_q_pause'))}</button>
       </div>`;
   })() : '';
   const heroHtml = `
-    <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}" data-state="${esc(reading.state)}">
+    <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}"
+             data-state="${esc(reading.state)}"
+             data-has-question="${intelQHtml ? '1' : '0'}"
+             data-health-state="${esc(score.band || '')}" data-health-conf="${esc(score.confidence || '')}">
       <div class="intcc-hero-score">
-        <span class="intcc-hero-health-label">${esc(t('auri_disp_title'))}</span>
+        <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
         <div class="intcc-score-ring">
           ${_intccScoreRingHtml(score)}
           <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${score.score != null ? '%' : ''}</span></div>
         </div>
         <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
         ${score.detail ? `<span class="intv8-disp-detail">${esc(score.detail)}</span>` : ''}
+        ${score.contextNote ? `<span class="intv8-h-note">${esc(score.contextNote)}</span>` : ''}
+        ${score.confidence ? `<span class="intv8-h-conf is-${esc(score.confidence)}">${esc(
+          t(score.confidence === 'sufficient' ? 'intel_h_conf_high'
+            : score.confidence === 'partial' ? 'intel_h_conf_partial' : 'intel_h_conf_low'))}</span>` : ''}
+        ${(score.components && score.components.length) ? `
+          <details class="intv8-h-method">
+            <summary class="intv8-radar-summary">${esc(t('intel_h_method'))}</summary>
+            <div class="intv8-radar-more-body">
+              <ul class="intv8-h-comps">${score.components.map(c => {
+                const lbl = t('intel_h_c_' + (c.id === 'effective_holdings' ? 'effective'
+                  : c.id === 'top_position' ? 'top' : c.id === 'liquidity' ? 'liquidity' : 'dispersion'));
+                const val = (c.availability === 'available' && c.value != null)
+                  ? (c.unit === 'percent_of_investable' ? _intv4Num(c.value, 0) + '%'
+                     : c.unit === 'positions' ? _intv4Num(c.value, 1)
+                     : _intv4Num(c.value, 0))
+                  : t('intel_h_c_na');
+                return `<li class="intv8-h-comp"><span>${esc(lbl)}</span><b>${esc(String(val))}</b></li>`;
+              }).join('')}</ul>
+              <p class="intv6-radar-legend">${esc(score.explain)}</p>
+            </div>
+          </details>` : ''}
       </div>
       <div class="intcc-hero-intel">
         <div class="intcc-hero-body">
@@ -55374,7 +55850,7 @@ function _renderIntelligenceCommandCenter() {
           <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
           <p class="intcc-hero-sub">${esc(reading.sub)}</p>
           ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
-          ${auriQHtml}
+          ${intelQHtml}
         </div>
         <div class="intcc-hero-orb-wrap">${_intccOrbHtml()}</div>
       </div>
@@ -55384,17 +55860,18 @@ function _renderIntelligenceCommandCenter() {
   // cards take over. Same engines, same numbers — only the arrangement differs.
   const mHeroHtml = `
     <section class="intcc-card intcc-m-card intcc-m-hero is-${esc(reading.state)}">
-      <div class="intcc-m-hero-text">
+      <div class="intcc-m-hero-text" data-has-question="${intelQHtml ? '1' : '0'}">
         <h3 class="intcc-card-title">${esc(t('intcc_eyebrow'))}</h3>
         <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
         <p class="intcc-m-hero-hint">${esc(reading.sub)}</p>
-        ${auriQHtml}
+        ${intelQHtml}
       </div>
       <div class="intcc-m-orb">${_intccOrbHtml()}</div>
     </section>`;
   const mHealthHtml = `
-    <section class="intcc-card intcc-m-card intcc-m-health is-tone-${esc(score.tone)}">
-      <h3 class="intcc-card-title">${esc(t('auri_disp_title'))}</h3>
+    <section class="intcc-card intcc-m-card intcc-m-health is-tone-${esc(score.tone)}"
+             data-health-state="${esc(score.band || '')}">
+      <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
       <div class="intcc-m-health-body">
         <div class="intcc-m-health-score">
           <div class="intcc-score-ring">
@@ -55403,10 +55880,31 @@ function _renderIntelligenceCommandCenter() {
           </div>
           <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
           ${score.detail ? `<span class="intv8-disp-detail">${esc(score.detail)}</span>` : ''}
+          ${score.contextNote ? `<span class="intv8-h-note">${esc(score.contextNote)}</span>` : ''}
+          ${score.confidence ? `<span class="intv8-h-conf is-${esc(score.confidence)}">${esc(
+          t(score.confidence === 'sufficient' ? 'intel_h_conf_high'
+            : score.confidence === 'partial' ? 'intel_h_conf_partial' : 'intel_h_conf_low'))}</span>` : ''}
         </div>
         ${chips.length ? `<ul class="intcc-m-concl">
           ${chips.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}
         </ul>` : ''}
+        ${(score.components && score.components.length) ? `
+          <details class="intv8-h-method">
+            <summary class="intv8-radar-summary">${esc(t('intel_h_method'))}</summary>
+            <div class="intv8-radar-more-body">
+              <ul class="intv8-h-comps">${score.components.map(c => {
+                const lbl = t('intel_h_c_' + (c.id === 'effective_holdings' ? 'effective'
+                  : c.id === 'top_position' ? 'top' : c.id === 'liquidity' ? 'liquidity' : 'dispersion'));
+                const val = (c.availability === 'available' && c.value != null)
+                  ? (c.unit === 'percent_of_investable' ? _intv4Num(c.value, 0) + '%'
+                     : c.unit === 'positions' ? _intv4Num(c.value, 1)
+                     : _intv4Num(c.value, 0))
+                  : t('intel_h_c_na');
+                return `<li class="intv8-h-comp"><span>${esc(lbl)}</span><b>${esc(String(val))}</b></li>`;
+              }).join('')}</ul>
+              <p class="intv6-radar-legend">${esc(score.explain)}</p>
+            </div>
+          </details>` : ''}
       </div>
     </section>`;
 
@@ -55549,17 +56047,38 @@ function _initIntelligenceCommandCenter() {
     }
   } catch (_) {}
 
-  // CONSOLIDACIÓN DE LA MEMORIA DE AURI. Con el MISMO umbral de 30 min que el
+  // CROSS-DEVICE · UN solo tirón al abrir, sin polling. Si trae contexto más
+  // reciente que el local, se repinta una vez; si la tabla no existe, no vuelve a
+  // intentarlo y la app se queda local, igual que hoy.
+  try {
+    const _nowPull = Date.now();
+    if (typeof _aurixIntelCtxPull === 'function' && _aurixIntelCtxRemoteState !== 'unavailable'
+        && _nowPull - _aurixIntelCtxPulledAt > _AURIX_INTEL_CTX_PULL_FLOOR_MS) {
+      _aurixIntelCtxPulledAt = _nowPull;
+      const _before = JSON.stringify((_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {}) || {}).fields || {});
+      _aurixIntelCtxPull().then(() => {
+        const _after = JSON.stringify((_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {}) || {}).fields || {});
+        if (_after === _before) return;
+        const ph = document.getElementById('tabPlaceholder');
+        if (ph && ph.querySelector('.aurix-intcc') && typeof renderIntelligenceTab === 'function') {
+          ph.innerHTML = renderIntelligenceTab();
+          if (typeof _initIntelligenceCommandCenter === 'function') _initIntelligenceCommandCenter();
+        }
+      }).catch(() => {});
+    }
+  } catch (_) {}
+
+  // CONSOLIDACIÓN DE LA MEMORIA DE INTELLIGENCE. Con el MISMO umbral de 30 min que el
   // marcador de visita, y por la misma razón: si se consolidara en cada render,
   // «lo que ha cambiado desde tu última visita» se vaciaría al volver a pintar —
   // incluso al responder una pregunta— y la memoria se volvería inútil
   // precisamente cuando el usuario está mirando.
   try {
-    if (_auriLastRun && typeof _aurixAuriCommitMemory === 'function') {
-      const prevMem = _aurixAuriReadOwned(_AURIX_AURI_MEM_KEY, {});
+    if (_intelLastRun && typeof _aurixIntelCommitMemory === 'function') {
+      const prevMem = _aurixIntelReadOwned(_AURIX_INTEL_MEM_KEY, {});
       const nowTs = Date.now();
       if (!prevMem || !Number.isFinite(prevMem.observedAt) || nowTs - prevMem.observedAt > 30 * 60 * 1000) {
-        _aurixAuriCommitMemory(_auriLastRun.memory, _auriLastRun.dispersion, nowTs, {});
+        _aurixIntelCommitMemory(_intelLastRun.memory, _intelLastRun.dispersion, nowTs, {});
       }
     }
   } catch (_) {}
@@ -55567,25 +56086,35 @@ function _initIntelligenceCommandCenter() {
   // LA RESPUESTA TIENE EFECTO INMEDIATO. Un progressive profiling que pide un dato
   // y no cambia nada visible enseña al usuario a no volver a responder, así que al
   // guardar se repinta la pestaña y la nueva interpretación ya está aplicada.
-  if (!_auriAnswerWired) {
-    _auriAnswerWired = true;
+  if (!_intelAnswerWired) {
+    _intelAnswerWired = true;
     document.addEventListener('click', e => {
-      const btn = e.target && e.target.closest ? e.target.closest('[data-auri-answer]') : null;
+      const btn = e.target && e.target.closest ? e.target.closest('[data-intel-answer]') : null;
       if (!btn) return;
-      const box = btn.closest('[data-auri-q]');
+      const box = btn.closest('[data-intel-q]');
       if (!box) return;
-      const field = box.getAttribute('data-auri-q');
-      const value = btn.getAttribute('data-auri-answer');
-      const subject = box.getAttribute('data-auri-subject') || null;
-      let saved = false;
+      const field = box.getAttribute('data-intel-q');
+      const value = btn.getAttribute('data-intel-answer');
+      const subject = box.getAttribute('data-intel-subject') || null;
+      let saved = false, msg = 'intel_q_thanks';
       try {
-        saved = (typeof _aurixAuriRecordAnswer === 'function')
-          ? _aurixAuriRecordAnswer(field, value, { subject, provenance: 'user_answer' }) : false;
+        if (value === '__decline') {
+          // Declinar NO guarda ningún valor: sólo cierra la pregunta.
+          saved = (typeof _aurixIntelDecline === 'function') ? _aurixIntelDecline(field, {}) : false;
+          msg = 'intel_q_declined';
+        } else if (value === '__pause') {
+          // Pausar no borra respuestas, no desactiva Intelligence y no vacía la memoria.
+          saved = (typeof _aurixIntelPauseQuestions === 'function') ? _aurixIntelPauseQuestions({}) : false;
+          msg = 'intel_q_paused';
+        } else {
+          saved = (typeof _aurixIntelRecordAnswer === 'function')
+            ? _aurixIntelRecordAnswer(field, value, { subject, provenance: 'user_answer' }) : false;
+        }
       } catch (_) { saved = false; }
       // Sin sesión resuelta la escritura falla CERRADA (no hay dueño al que
       // atribuir el dato). Se dice, en vez de fingir que se guardó.
-      box.innerHTML = '<p class="intv8-auri-q-text">'
-        + _intccEsc(saved ? _intv4T('auri_q_thanks') : _intv4T('auri_disp_na_generic')) + '</p>';
+      box.innerHTML = '<p class="intv8-intel-q-text">'
+        + _intccEsc(saved ? _intv4T(msg) : _intv4T('intel_disp_na_generic')) + '</p>';
       if (!saved) return;
       try {
         const ph = document.getElementById('tabPlaceholder') || document.querySelector('.tab-placeholder--intel');

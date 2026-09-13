@@ -143,7 +143,7 @@ console.log('AURIX-INT-TRUTH-FOUNDATION — SPEC INT.01 · Intelligence Truth Fo
 // ════════════════════════════════════════════════════════════════════════════
 // 1 · ONE HEALTH SCORE — Intelligence cannot contradict the canonical owner
 // ════════════════════════════════════════════════════════════════════════════
-// RE-DECIDIDO POR SPEC AURI · FASE 6, y conviene dejar escrito POR QUÉ.
+// RE-DECIDIDO POR SPEC AURIX INTELLIGENCE · FASE 6, y conviene dejar escrito POR QUÉ.
 //
 // Este bloque certificaba «un solo Health Score canónico: las dos superficies
 // publican el MISMO número para el mismo snapshot». Era el invariante correcto
@@ -161,13 +161,13 @@ console.log('AURIX-INT-TRUTH-FOUNDATION — SPEC INT.01 · Intelligence Truth Fo
 //
 // Lo que ya NO se afirma: que Intelligence delegue en `_aurixHealthScore`. La
 // matemática del índice nuevo se certifica ejecutándola en
-// `AURIX-AURI-INTELLIGENCE-ENGINE-harness` (D.1–D.4b), no aquí.
+// `AURIX-INTELLIGENCE-INTELLIGENCE-ENGINE-harness` (D.1–D.4b), no aquí.
 console.log('1 · Concept ownership after AURI (SPEC 5.A re-decided):');
 {
   ok('1.1 Intelligence YA NO publica el score heredado: no lo invoca',
     !/_aurixHealthScore\s*\(/.test(fnSrc('_intccHealthScore')));
-  ok('1.1b …y delegar en el dueño ÚNICO del índice que sí publica',
-    /_aurixAuriDispersion\s*\(/.test(fnSrc('_intccHealthScore')));
+  ok('1.1b …y delegar en el dueño ÚNICO de la Salud V2 que sí publica',
+    /_aurixIntelHealth\s*\(/.test(fnSrc('_intccHealthScore')));
   ok('1.2 _intccHealthScore no corre ninguna escalera de penalizaciones propia',
     !/s\s*-=\s*\d/.test(fnSrc('_intccHealthScore')));
   ok('1.3 el motor canónico conserva su metodología INTACTA (Dashboard/Workspace)',
@@ -207,9 +207,19 @@ console.log('1 · Concept ownership after AURI (SPEC 5.A re-decided):');
     toneLeak === 0, 'leaks=' + toneLeak);
   ok('1.6 el motor canónico sigue produciendo su score para el resto de superficies',
     canonAlive > 0, 'alive=' + canonAlive);
-  ok('1.7 el índice publicado declara su magnitud, así que nadie puede leerlo como salud',
-    /metric:\s*'weight_dispersion'/.test(fnSrc('_intccHealthScore'))
-    && /forbiddenFraming/.test(fnSrc('_aurixAuriDispersion')));
+  // La card vuelve a llamarse SALUD (decisión de producto del founder), así que lo
+  // que la hace defendible ya no es el nombre: es que la MAGNITUD viaje declarada
+  // (`metric`), que los componentes se publiquen uno a uno con su disponibilidad, y
+  // que el marco prohibido esté escrito en el owner.
+  ok('1.7 la Salud publicada declara su magnitud y sus componentes, uno a uno',
+    /metric:\s*h\.metric/.test(fnSrc('_intccHealthScore'))
+    && /components:\s*h\.components/.test(fnSrc('_intccHealthScore'))
+    && /forbiddenFraming/.test(fnSrc('_aurixIntelDispersion'))
+    && /forbiddenFraming: \['grade', 'quality', 'advice'\]/.test(fnSrc('_aurixIntelHealth')));
+  ok('1.7b el contexto del usuario NO puede tocar el anillo ni la confianza',
+    (() => { const f = fnSrc('_aurixIntelHealth');
+      const ctxPart = f.slice(f.indexOf('// CONTEXTO:'));
+      return /contextNote/.test(ctxPart) && !/out\.ring|out\.confidence|out\.components/.test(ctxPart); })());
 
   ok('1.8 fail closed: an empty snapshot publishes no score on either surface',
     run('_intccHealthScore(' + JSON.stringify(snapOf({ assetCount: 0, totUSD: 0 })) + ', null)').score === null

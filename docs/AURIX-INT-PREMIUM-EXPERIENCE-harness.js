@@ -73,23 +73,30 @@ function extractDict(langIdx) {
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
     // y 13B.9 dejaría de ver los nombres.
     'intv7_pending_obs','intv7_pending_scale','intv7_pending_generic','intv7_stab_meaning',
-    // SPEC AURI — la lectura del hero, el índice de dispersión, los descubrimientos y
+    // SPEC AURIX INTELLIGENCE — la lectura del hero, el índice de dispersión, los descubrimientos y
     // la pregunta contextual publican estas claves. Si falta una en CUALQUIERA de los
     // dos idiomas, `extractDict` revienta aquí y 13.6 ve el texto vacío: es
     // exactamente para eso.
-    'auri_disp_title','auri_disp_even','auri_disp_lopsided','auri_disp_detail','auri_disp_na',
-    'auri_disp_na_single','auri_disp_na_uncert','auri_disp_na_generic','auri_disp_depth',
-    'auri_now_material','auri_now_discovery','auri_now_changed','auri_now_stable_nc',
-    'auri_now_stable','auri_now_history','auri_now_context',
-    'auri_sub_material','auri_sub_changed','auri_sub_stable_nc','auri_sub_history',
-    'auri_d_apparent','auri_d_conc_rising','auri_d_capital','auri_d_intent','auri_d_liq_need',
-    'auri_d_persisting','auri_d_combined',
-    'auri_q_conc_intent','auri_q_conc_why','auri_q_coverage','auri_q_coverage_why',
-    'auri_q_liq_need','auri_q_liq_why','auri_q_goal','auri_q_goal_why','auri_q_thanks',
-    'auri_opt_deliberate','auri_opt_not_deliberate','auri_opt_complete','auri_opt_partial',
-    'auri_opt_none_known','auri_opt_planned','auri_opt_imminent','auri_opt_preserve',
-    'auri_opt_grow','auri_opt_income','auri_opt_undecided',
-    'auri_ctx_partial','auri_radar_more'];
+    'intel_disp_title','intel_disp_even','intel_disp_lopsided','intel_disp_detail','intel_disp_na',
+    'intel_disp_na_single','intel_disp_na_uncert','intel_disp_na_generic','intel_disp_depth',
+    'intel_now_material','intel_now_discovery','intel_now_changed','intel_now_stable_nc',
+    'intel_now_stable','intel_now_history','intel_now_context',
+    'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
+    'intel_d_apparent','intel_d_conc_rising','intel_d_capital','intel_d_intent','intel_d_liq_need',
+    'intel_d_persisting','intel_d_combined',
+    'intel_q_conc_intent','intel_q_conc_why','intel_q_coverage','intel_q_coverage_why',
+    'intel_q_liq_need','intel_q_liq_why','intel_q_goal','intel_q_goal_why','intel_q_thanks',
+    'intel_opt_deliberate','intel_opt_not_deliberate','intel_opt_complete','intel_opt_partial',
+    'intel_opt_none_known','intel_opt_planned','intel_opt_imminent','intel_opt_preserve',
+    'intel_opt_grow','intel_opt_income','intel_opt_undecided',
+    'intel_ctx_partial','intel_radar_more',
+    // SPEC AURIX INTELLIGENCE · SALUD V2 — la card vuelve a llamarse Salud y publica
+    // estado + confianza + componentes; y las preguntas ganan declinar y pausar.
+    'intel_h_no_positions','intel_h_single','intel_h_coverage','intel_h_few','intel_h_uneven',
+    'intel_h_spread','intel_h_d_single','intel_h_d_empty','intel_h_note_deliberate',
+    'intel_h_conf_high','intel_h_conf_partial','intel_h_conf_low','intel_h_method',
+    'intel_h_c_dispersion','intel_h_c_effective','intel_h_c_top','intel_h_c_liquidity','intel_h_c_na',
+    'intel_opt_decline','intel_q_pause','intel_q_paused','intel_q_declined'];
   const missing = [];
   const extras = extraKeys.map(k => {
     const occ = keyOccurrences(k);
