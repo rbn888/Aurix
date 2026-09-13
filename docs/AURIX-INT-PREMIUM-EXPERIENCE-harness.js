@@ -22,6 +22,8 @@ const fs = require('fs'), vm = require('vm'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
+function blockOf(a,z){ const i=app.indexOf(a); if(i<0) throw new Error('missing '+a);
+  const e=app.indexOf(z,i); return app.slice(i,e+z.length); }
 function fnSrc(name){ const s='function '+name+'('; const i=app.indexOf(s); if(i<0) throw new Error('missing '+name);
   let p=app.indexOf('(',i), pd=0; for(;p<app.length;p++){ if(app[p]==='(')pd++; else if(app[p]===')'){pd--; if(!pd){p++;break;}}}
   let k=app.indexOf('{',p), d=0; for(;k<app.length;k++){ if(app[k]==='{')d++; else if(app[k]==='}'){d--; if(!d){k++;break;}}}
@@ -118,7 +120,8 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
-  '_INTV4_SHOWN_KEY'];
+  '_INTV4_SHOWN_KEY','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -131,12 +134,18 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
   '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
+  // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
+  // Memoria. Sin ellos el render lanza y este gate se cae entero.
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intelDiscoveryText',
+  '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned',
+  '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
   '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown',
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -985,19 +994,29 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
     section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] })).html, 'intcc-timeline').slice(0, 400));
 
   // ── E · QUÉ HA CAMBIADO ──────────────────────────────────────────────────
+  // SPEC FINAL SURFACE · §4 — el estado vacío ya NO ocupa una card con título:
+  // reservar la zona más visible de la pantalla para decir que no hay noticias era
+  // gastar espacio en una no-noticia. La DISTINCIÓN entre las cuatro situaciones
+  // —que es el contenido real de esta aserción— se conserva íntegra; lo que cambió
+  // es el contenedor, que pasa a ser una línea discreta. Así que se lee de donde
+  // esté: de la card cuando hay filas, y de la línea compacta cuando no.
+  const quiet = (html) => { const i = html.indexOf('class="intv9-changed-quiet"');
+    if (i < 0) return ''; const a = html.lastIndexOf('<', i); return html.slice(a, html.indexOf('</p>', i) + 4); };
+  const changedAny = (html) => { const c = section(html, 'intv4-changed'); return c || quiet(html); };
   ok('15.12 "sin cambio material" y "sin evidencia" son estados DISTINTOS',
-    (() => { const yc = section(young.html, 'intv4-changed');
+    (() => { const yc = changedAny(young.html);
       const flat = render(Object.assign({}, MATURE, {
         rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] }));
-      const fc = section(flat.html, 'intv4-changed');
+      const fc = changedAny(flat.html);
       return /data-evidence="0"/.test(yc) && /todavía no hay cambios/i.test(yc)
         && /data-evidence="1"/.test(fc)
-        // M.04 · 0 — con cambios MEDIDOS que ya cuenta otra superficie, el estado
-        // honesto es "no hay OTROS", no "no puedo medir".
         && (/no detecta ningún cambio material/.test(fc) || /cambio material de tu cartera es el que/.test(fc)
             || /No se detectan otros cambios relevantes/.test(fc)); })(),
-    section(young.html, 'intv4-changed').slice(0, 260) + ' ||| ' +
-    section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] })).html, 'intv4-changed').slice(0, 260));
+    changedAny(young.html).slice(0, 260) + ' ||| ' +
+    changedAny(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] })).html).slice(0, 260));
+  ok('15.12b …y cuando no hay nada material NO se pinta una card con título',
+    (() => { const yc = section(young.html, 'intv4-changed');
+      return yc === '' && /intv9-changed-quiet/.test(young.html); })());
   // M.04 · 0 — la lista se publica cuando NADIE MÁS ha reclamado el hecho. Se
   // ejecuta el owner sin reclamaciones para separar las dos causas posibles de un
   // bloque vacío: "no hay cambios" y "ya los cuenta otra superficie".

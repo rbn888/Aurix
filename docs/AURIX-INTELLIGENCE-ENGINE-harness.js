@@ -605,6 +605,8 @@ group('N · CSS · clases nuevas, sin alfa blanco y con foco visible');
 const newCss = css.slice(css.indexOf('SPEC AURIX INTELLIGENCE · INTELLIGENCE ENGINE'));
 ok('N.1 el bloque nuevo no introduce alfa blanco (= gris neutro sobre el lienzo)',
   !/rgba\(255,\s*255,\s*255/.test(newCss));
+ok('N.1b la superficie nueva de descubrimientos usa el azul de marca POR TOKEN',
+  /\.intv9-disc-mark \{[\s\S]{0,200}var\(--aurix-blue\)/.test(newCss));
 ok('N.2 usa la escalera --elev-* y el azul institucional por token',
   /var\(--elev-1\)/.test(newCss) && /var\(--aurix-blue-rgb\)/.test(newCss));
 ok('N.3 el anillo del índice deja de ser verde de «bien»',
@@ -620,13 +622,20 @@ ok('N.6 hay ruta móvil declarada para lo táctil',
 // dejaría de ser cierta. Se sustituye por una ALLOWLIST explícita: sólo estos tres
 // selectores heredados, y sólo para propiedades de composición.
 const TOUCHED_EXISTING = ['.intcc-hero-body', '.intcc-hero-orb-wrap', '.intcc-hero[data-has-question',
-  '.intcc-m-hero-text[data-has-question'];
+  '.intcc-m-hero-text[data-has-question',
+  // El aviso legal baja una fila para que la línea compacta de «Qué ha cambiado»
+  // no cierre la pantalla por debajo de él. Se reubica la FILA y nada más.
+  '.aurix-intv6 .intcc-disclaimer'];
+// `.intcc-tl-item.is-declared …` es un selector COMPUESTO que exige una clase
+// NUEVA: no puede alterar el render de un item de memoria existente, así que es
+// scoping y no modificación. Se lista aparte para que quede explícito.
+const NEW_SCOPED = ['.intcc-tl-item.is-declared'];
+const isNew = l => /intv8-|intv9-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t));
 ok('N.7 sólo se tocan 4 selectores heredados, y son los que exige el hero adaptativo',
   newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
-    .every(l => /intv8-|is-tone-neutral/.test(l)
-      || TOUCHED_EXISTING.some(t => l.trim().startsWith(t))),
+    .every(l => isNew(l) || TOUCHED_EXISTING.some(t => l.trim().startsWith(t))),
   newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
-    .filter(l => !/intv8-|is-tone-neutral/.test(l) && !TOUCHED_EXISTING.some(t => l.trim().startsWith(t))));
+    .filter(l => !isNew(l) && !TOUCHED_EXISTING.some(t => l.trim().startsWith(t))));
 ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipografía',
   (() => { const bad = [];
     newCss.split(/(?<=\})/).forEach(rule => {
@@ -634,9 +643,19 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
       if (!TOUCHED_EXISTING.some(t => head.trim().startsWith(t))) return;
       const props = (rule.match(/[a-z-]+\s*:/g) || []).map(x => x.replace(/\s*:$/, ''));
       props.forEach(pr => { if (!['padding-right', 'padding-top', 'padding-bottom', 'position',
-        'z-index', 'pointer-events', 'align-items'].includes(pr)) bad.push(head.trim() + ' → ' + pr); });
+        'z-index', 'pointer-events', 'align-items', 'grid-row'].includes(pr)) bad.push(head.trim() + ' → ' + pr); });
     });
     return bad.length === 0 ? true : bad; })() === true);
+ok('N.8b las dos superficies nuevas declaran `order` en móvil y tablet',
+  // Sin esto valían `order: 0` en un contenedor flex-column cuyos hijos van de 1 a
+  // 10, así que se pintaban ANTES DEL HERO. Fue un FAIL real de la revisión.
+  /@media \(max-width: 1023px\)[\s\S]{0,900}\.intv9-disc\s*\{ order: 9; \}/.test(newCss)
+  && /\.intv9-changed-quiet \{ order: 9\.5; \}/.test(newCss));
+ok('N.8c la línea compacta va ANTES del aviso legal, no después',
+  /\.intv9-changed-quiet \{ grid-column: 1 \/ 13; grid-row: 6/.test(newCss)
+  && /\.aurix-intv6 \.intcc-disclaimer \{ grid-row: 7; \}/.test(newCss));
+ok('N.8d la celda de «descubrimientos» no puede tener dos ocupantes',
+  /const discoveryHtml = discHtml \? '' :/.test(src));
 ok('N.9 la esfera no puede robar un click a la pregunta',
   /\.intcc-hero-orb-wrap \{[^}]*pointer-events: none/.test(newCss));
 ok('N.10 el hero se compacta sin pregunta y crece sólo con ella',
@@ -1048,6 +1067,163 @@ group('S · cross-device · contrato, fail-closed y legacy-safe');
   ok('S.15 una cuenta LEGACY sin fila funciona igual (el motor lee local y síncrono)',
     (() => { const r = run(P.concentr, { context: undefined, store: mkStore(), owner: 'legacy-user' });
       return !!r && r.context.answered === 0 && r.model.concentration.availability === 'available'; })());
+}
+
+// ── U · SUPERFICIES FINALES ─────────────────────────────────────────────────
+// Se EJECUTAN las funciones de superficie con fixtures; nada de regex para
+// afirmar comportamiento (la lección ya cuesta tres repeticiones).
+group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubrimientos');
+{
+  const sb3 = { console, Object, Number, Math, Array, Set, Map, JSON, isFinite, window: undefined };
+  vm.createContext(sb3);
+  // Copy real ES para que el texto emitido sea el de producción.
+  const NEED = /^\s*(intv9_[a-z0-9_]+|intel_d_[a-z_]+|intv4_(explore_title|brief_title|memory_title|memory_empty|changed_title|changed_others_none|changed_stable|changed_all_published|changed_empty)):/;
+  const byKey = new Map();
+  src.split('\n').forEach(l => { const m = l.match(NEED); if (!m) return;
+    if (!byKey.has(m[1])) byKey.set(m[1], []); byKey.get(m[1]).push(l.trim().replace(/,$/, '')); });
+  const twice = Array.from(byKey.keys()).filter(k => byKey.get(k).length === 2);
+  ok('U.0 toda la copy nueva de superficie existe en LOS DOS idiomas',
+    twice.length === byKey.size, Array.from(byKey.keys()).filter(k => byKey.get(k).length !== 2));
+  // eslint-disable-next-line no-new-func
+  const ES = new Function('return ({' + twice.map(k => byKey.get(k)[0]).join(',\n') + '})')();
+  sb3.t = k => ES[k];
+  sb3._AURIX_CAUSAL_ROOT = sandbox._AURIX_CAUSAL_ROOT || { TOP_POSITION: 'top_position',
+    CATEGORY_MIX: 'category_mix', CASH_WEIGHT: 'cash_weight', INVESTABLE_RETURN: 'investable_return',
+    EXTERNAL_CAPITAL: 'external_capital', WEALTH_LEVEL: 'wealth_level', DATA_COVERAGE: 'data_coverage' };
+  vm.runInContext(block('const _INTV4_BRIEF_MAX = 3;', '});')
+    + '\n' + fnSrc('_aurixIntelRootsOf') + '\n' + fnSrc('_intv4T') + '\n' + fnSrc('_intv4Num')
+    + '\nconst _AURIX_INTEL_DISC_MAX = 3;'
+    + '\n' + fnSrc('_intelDiscoveryText') + '\n' + fnSrc('_intv9DiscoveriesHtml')
+    + '\n' + fnSrc('_intv4MemoryDeclared') + '\n' + fnSrc('_intccEsc')
+    + '\nglobalThis.DISC = _intv9DiscoveriesHtml; globalThis.DECL = _intv4MemoryDeclared;'
+    + '\nglobalThis.ROOTS = _aurixIntelRootsOf; globalThis.BRIEF_MAX = _INTV4_BRIEF_MAX;'
+    + '\nglobalThis.EXPLORE_MAX = _INTV4_EXPLORE_MAX;', sb3);
+
+  ok('U.1 «Lo que importa» está acotado a 1–3 y Explora a 4',
+    sb3.BRIEF_MAX === 3 && sb3.EXPLORE_MAX === 4);
+  ok('U.2 el puente dimensión→raíz cubre las cinco dimensiones publicables',
+    (() => { const r = sb3.ROOTS({ attention: [{ dimension: 'concentration' }, { dimension: 'liquidity' },
+        { dimension: 'evolution' }, { dimension: 'structure' }, { dimension: 'diversification' }], discoveries: [] });
+      return new Set(r).size === 4 && r.length === 5; })());
+  // ── DESCUBRIMIENTOS ──
+  const D = (code, dim, ev) => ({ code, dimension: dim, evidence: ev || ['effective_holdings'],
+    values: { positions: 7, effectiveN: 2.5, topWeightPct: 68, observations: 4, count: 3,
+      recordedCapitalNet: 25000 } });
+  ok('U.3 sin descubrimientos NO se pinta card: no se rellena por rellenar',
+    sb3.DISC({ discoveries: [] }, sb3._intccEsc, []) === '');
+  ok('U.4 con descubrimientos se pinta, con su procedencia visible',
+    (() => { const h = sb3.DISC({ discoveries: [D('apparent_vs_effective_diversification', 'diversification')] },
+        sb3._intccEsc, []);
+      return /intv9-disc/.test(h) && /intv9-disc-ev/.test(h)
+        && h.includes('7 posiciones') && h.includes(ES.intv9_disc_evidence); })());
+  ok('U.5 NO duplica lo que «Lo que importa» ya encabeza (exclusión por raíz)',
+    sb3.DISC({ discoveries: [D('apparent_vs_effective_diversification', 'diversification')] },
+      sb3._intccEsc, ['top_position']) === '');
+  ok('U.5b …ni lo que el HERO ya publica como lectura (exclusión por id)',
+    (() => { const d = D('apparent_vs_effective_diversification', 'diversification');
+      d.id = 'disc_apparent_vs_effective';
+      return sb3.DISC({ discoveries: [d] }, sb3._intccEsc, [], ['disc_apparent_vs_effective']) === ''; })());
+  ok('U.5c …y `skipRoots` (la raíz que Factores publica) TAMBIÉN excluye',
+    /mattersRoots\.concat\(skipRoots\)/.test(src));
+  ok('U.5d un descubrimiento CONTEXTUAL retira su mitad declarativa de la Memoria',
+    /discFields\.push\('primary_goal'\)/.test(src) && /discFields\.push\('liquidity_need'\)/.test(src)
+    && (() => { const d = sb3.DECL({ context: { fields: { liquidity_need: { value: 'imminent',
+        provenance: 'user_answer', answeredAt: 1 } } } }, ['liquidity_need']);
+      return d.length === 0; })());
+  ok('U.6 tope de 3 descubrimientos activos',
+    (() => { const many = ['apparent_vs_effective_diversification', 'level_rose_on_capital_not_return',
+        'reading_persists_across_observations', 'several_readings_moved_together']
+        .map((c, i) => D(c, ['diversification', 'evolution', 'liquidity', 'structure'][i]));
+      const h = sb3.DISC({ discoveries: many }, sb3._intccEsc, []);
+      return (h.match(/intv9-disc-item/g) || []).length === 3 && /data-count="3"/.test(h); })());
+  ok('U.7 un descubrimiento sin texto soportado no se publica',
+    sb3.DISC({ discoveries: [D('codigo_inventado', 'liquidity')] }, sb3._intccEsc, []) === '');
+  // ── MEMORIA · contexto declarado ──
+  const ctxF = (f) => ({ context: { fields: f } });
+  ok('U.8 la Memoria publica lo que el usuario DECLARÓ, y sólo eso',
+    (() => { const d = sb3.DECL(ctxF({ concentration_intent: { value: 'deliberate',
+        provenance: 'user_answer', answeredAt: 500 } }));
+      return d.length === 1 && d[0].field === 'concentration_intent'
+        && d[0].txt === ES.intv9_mem_intent_deliberate; })());
+  ok('U.9 un valor INFERIDO o por defecto no se presenta como un recuerdo',
+    sb3.DECL(ctxF({ primary_goal: { value: 'grow', provenance: 'inferred', answeredAt: 1 } })).length === 0);
+  ok('U.10 sin contexto no se fabrica ningún recuerdo',
+    sb3.DECL(ctxF({})).length === 0 && sb3.DECL(null).length === 0);
+  ok('U.11 lo declarado se ordena por lo más reciente y lleva su fecha',
+    (() => { const d = sb3.DECL(ctxF({
+        primary_goal: { value: 'grow', provenance: 'user_answer', answeredAt: 100 },
+        horizon: { value: 'long', provenance: 'user_answer', answeredAt: 900 } }));
+      return d[0].field === 'horizon' && d[1].field === 'primary_goal' && d[0].at === 900; })());
+  ok('U.12 los cinco campos recordables tienen copy para TODOS sus valores',
+    (() => { const F = sandbox.FIELDS;
+      const MAP = { concentration_intent: 'intv9_mem_intent', primary_goal: 'intv9_mem_goal',
+        horizon: 'intv9_mem_horizon', liquidity_need: 'intv9_mem_liq', wealth_coverage: 'intv9_mem_coverage' };
+      const missing = [];
+      Object.keys(MAP).forEach(k => F[k].options.forEach(o => {
+        if (!ES[MAP[k] + '_' + o]) missing.push(MAP[k] + '_' + o); }));
+      return missing.length === 0 ? true : missing; })() === true);
+  // ── QUÉ HA CAMBIADO · compacto ──
+  const chgFn = fnSrc('_intv4ChangedHtml');
+  ok('U.13 sin filas NO se pinta una card con título: una línea discreta',
+    /intv9-changed-quiet/.test(chgFn)
+    && chgFn.indexOf('intv9-changed-quiet') < chgFn.indexOf('intcc-card intv4-changed'));
+  ok('U.14 …y las cuatro frases distintas del estado vacío se conservan',
+    /intv4_changed_empty/.test(chgFn) && /intv4_changed_others_none/.test(chgFn)
+    && /intv4_changed_all_published/.test(chgFn) && /intv4_changed_stable/.test(chgFn));
+  ok('U.15 con filas SÍ se pinta la card completa',
+    /data-state="rows"/.test(chgFn) && /intv4-chg-list/.test(chgFn));
+  ok('U.16 la rejilla ya recompone sola cuando la card desaparece',
+    /:not\(:has\(\.intv4-changed\)\) \.intv5-structure \{ grid-column: 1 \/ 13/.test(css));
+  ok('U.17 la línea compacta vive FUERA de las filas de cards (1–4) y antes del aviso legal',
+    /\.intv9-changed-quiet \{ grid-column: 1 \/ 13; grid-row: 6/.test(css)
+    && /\.aurix-intv6 \.intcc-disclaimer \{ grid-row: 7; \}/.test(css));
+  // ── EXPLORA · deja de ser fija ──
+  const expFn = fnSrc('_intv4ExploreHtml');
+  ok('U.18 Explora ordena por relevancia AHORA y por lo menos visto, sin azar',
+    /hot\.has\(a\.q\.causalRoot\)/.test(expFn) && /shownAt\[a\.q\.id\]/.test(expFn)
+    && !/Math\.random/.test(expFn));
+  ok('U.19 …y registra lo mostrado con prefijo `x:` para que la próxima visita cambie',
+    // `data-intcc-q="` son 14 caracteres. Con 15 se comía el primer carácter del
+    // id, nunca coincidía con `q.id` y la señal quedaba MUERTA: FAIL de la revisión.
+    /'x:' \+ m\.slice\(14, -1\)/.test(src) && /indexOf\('x:'\) === 0/.test(expFn));
+  ok('U.19b el id anotado coincide EXACTAMENTE con el que lee Explora',
+    (() => { const m = 'data-intcc-q="top_position_intent"';
+      return ('x:' + m.slice(14, -1)).slice(2) === 'top_position_intent'; })());
+  ok('U.19c el desempate por «lo menos visto» se agrupa por DÍA, no por render',
+    /Math\.floor\(Number\(shownAt\[a\.q\.id\] \|\| 0\) \/ 864e5\)/.test(expFn));
+  ok('U.19d las anotaciones se filtran en LAS DOS puertas al Core',
+    (src.match(/indexOf\('x:'\) === 0\)\)/g) || []).length >= 2);
+  ok('U.20 el desempate final es el id: mismo estado ⇒ mismo orden',
+    /a\.q\.id < b\.q\.id \? -1 : 1/.test(expFn));
+  // ── PRIORIDAD ──
+  const mSel = fnSrc('_intv5MattersStories'), mFn = fnSrc('_intv5MattersHtml');
+  ok('U.21 el orden de «Lo que importa» lo pone el motor, con caída al Core',
+    /intel && intel\.attention/.test(mSel) && /rank\.size \? 'intelligence' : 'core'/.test(mSel)
+    && /b\.priority - a\.priority/.test(mSel));
+  ok('U.22 …usando la RELEVANCIA contextual, no sólo la prioridad del Core',
+    /Number\.isFinite\(i\.relevance\)/.test(mSel));
+  // La selección se corta UNA vez (en el owner). La otra aparición de
+  // `_INTV4_BRIEF_MAX` es el límite del Brief legacy de `_intv4ChangedHtml`, que no
+  // pinta esta superficie.
+  ok('U.22b UNA sola selección alimenta la card, Memoria, Cambios y Descubrimientos',
+    /_intv5MattersStories\(core, skipRoots, intel\)/.test(mFn)
+    && /const mattersSel = _intv5MattersStories\(core, skipRoots, intel\)\.stories/.test(src)
+    && /const mattersRoots = mattersSel\.map/.test(src)
+    && /const publishedTexts = mattersSel\.map/.test(src)
+    && /const shown = mattersSel\.map/.test(src)
+    && /mattersSel\.forEach/.test(src)
+    // Cero derivaciones paralelas de `topStories` con el límite del Brief.
+    && !/\(core\.topStories \|\| \[\]\)[\s\S]{0,200}slice\(0, _INTV4_BRIEF_MAX\)/.test(
+        fnSrc('_renderIntelligenceCommandCenter')));
+  ok('U.22c las anotaciones de Explora no llegan a la novedad del Core',
+    /indexOf\('x:'\) === 0\) \}\)/.test(src.replace(/\s+/g, ' ').replace(/ \}\)/g, ' })'))
+    || /presentationHistory: _intv4ReadShown\(\)\s*\n?\s*\.filter\(e => !\(e && typeof e\.semanticKey === 'string' && e\.semanticKey\.indexOf\('x:'\) === 0\)\)/.test(src));
+  ok('U.23 las cuatro superficies reciben el motor desde el renderer',
+    (() => { const r = fnSrc('_renderIntelligenceCommandCenter');
+      return /_intv4ExploreHtml\(core, esc, intel\)/.test(r)
+        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel\)/.test(r)
+        && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields\)/.test(r)
+        && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

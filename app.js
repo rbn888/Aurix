@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '679'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '680'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5262,6 +5262,22 @@ const T = {
     intel_opt_income:      'Generar ingresos',
     intel_opt_undecided:   'Todavía no lo sé',
     intel_q_thanks:        'Anotado. Aurix ya lo tiene en cuenta.',
+    intv9_disc_title:      'Lo que Aurix ha visto',
+    intv9_disc_evidence:   'Sobre datos de tu propia cartera',
+    intv9_mem_intent_deliberate:     'Marcaste que tu mayor concentración es deliberada.',
+    intv9_mem_intent_not_deliberate: 'Marcaste que tu mayor concentración no fue una decisión.',
+    intv9_mem_goal_preserve: 'Tu prioridad declarada es preservar este patrimonio.',
+    intv9_mem_goal_grow:     'Tu prioridad declarada es hacerlo crecer.',
+    intv9_mem_goal_income:   'Tu prioridad declarada es generar ingresos.',
+    intv9_mem_goal_undecided:'Todavía no has decidido tu prioridad con este patrimonio.',
+    intv9_mem_horizon_short: 'Declaraste un horizonte corto.',
+    intv9_mem_horizon_medium:'Declaraste un horizonte medio.',
+    intv9_mem_horizon_long:  'Declaraste un horizonte largo.',
+    intv9_mem_liq_none_known:'Dijiste que no tienes prevista una necesidad de liquidez.',
+    intv9_mem_liq_planned:   'Dijiste que tienes prevista una necesidad de liquidez.',
+    intv9_mem_liq_imminent:  'Dijiste que vas a necesitar liquidez pronto.',
+    intv9_mem_coverage_complete: 'Confirmaste que todo tu patrimonio está registrado en Aurix.',
+    intv9_mem_coverage_partial:  'Nos dijiste que parte de tu patrimonio no está registrado en Aurix.',
     intel_opt_decline:     'Prefiero no responder',
     intel_q_pause:         'No hacer más preguntas por ahora',
     intel_q_paused:        'De acuerdo. Aurix no volverá a preguntar por ahora, y conserva lo que ya sabe.',
@@ -7723,6 +7739,22 @@ const T = {
     intel_opt_income:      'Generate income',
     intel_opt_undecided:   'I do not know yet',
     intel_q_thanks:        'Noted. Aurix already takes it into account.',
+    intv9_disc_title:      'What Aurix noticed',
+    intv9_disc_evidence:   'From your own portfolio data',
+    intv9_mem_intent_deliberate:     'You marked your largest concentration as deliberate.',
+    intv9_mem_intent_not_deliberate: 'You marked your largest concentration as unintended.',
+    intv9_mem_goal_preserve: 'Your stated priority is preserving this wealth.',
+    intv9_mem_goal_grow:     'Your stated priority is growing it.',
+    intv9_mem_goal_income:   'Your stated priority is generating income.',
+    intv9_mem_goal_undecided:'You have not decided your priority for this wealth yet.',
+    intv9_mem_horizon_short: 'You stated a short horizon.',
+    intv9_mem_horizon_medium:'You stated a medium horizon.',
+    intv9_mem_horizon_long:  'You stated a long horizon.',
+    intv9_mem_liq_none_known:'You said you have no liquidity need planned.',
+    intv9_mem_liq_planned:   'You said you have a liquidity need planned.',
+    intv9_mem_liq_imminent:  'You said you will need liquidity soon.',
+    intv9_mem_coverage_complete: 'You confirmed all of your wealth is recorded in Aurix.',
+    intv9_mem_coverage_partial:  'You told us part of your wealth is not recorded in Aurix.',
     intel_opt_decline:     'I prefer not to answer',
     intel_q_pause:         'No more questions for now',
     intel_q_paused:        'Fine. Aurix will not ask again for now, and keeps what it already knows.',
@@ -54873,8 +54905,31 @@ function buildMobileIntelligenceHint(snap, liq, radar) {
 // duplicate facts or engines.
 const _INTV4_DEPTH = Object.freeze({ GUIDED: 'guided', BALANCED: 'balanced', ADVANCED: 'advanced' });
 const _INTV4_DEFAULT_DEPTH = _INTV4_DEPTH.BALANCED;
-const _INTV4_BRIEF_MAX = 5;          // 3–5 prioritised stories, distinct roots
-const _INTV4_EXPLORE_MAX = 6;        // 4–6 eligible questions, distinct roots
+// SPEC FINAL SURFACE — «Lo que importa» es una superficie de PRIORIDAD, no un
+// listado: 1–3 elementos. Cinco conclusiones no priorizan, reparten. Y Explora
+// muestra 4 como máximo.
+const _INTV4_BRIEF_MAX = 3;
+const _INTV4_EXPLORE_MAX = 4;
+// Mapa dimensión→raíz causal. Es el puente entre el ranking del motor (que razona
+// por dimensión) y las superficies heredadas (que agrupan por raíz). Explícito y
+// en un solo sitio para que nadie lo reinvente por su cuenta.
+const _AURIX_INTEL_DIM_ROOT = Object.freeze({
+  concentration:   _AURIX_CAUSAL_ROOT.TOP_POSITION,
+  diversification: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+  liquidity:       _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+  evolution:       _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
+  structure:       _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
+});
+function _aurixIntelRootsOf(intel) {
+  const out = [];
+  ((intel && intel.attention) || []).forEach(i => {
+    const r = _AURIX_INTEL_DIM_ROOT[i.dimension]; if (r) out.push(r);
+  });
+  ((intel && intel.discoveries) || []).forEach(d => {
+    const r = _AURIX_INTEL_DIM_ROOT[d.dimension]; if (r) out.push(r);
+  });
+  return out;
+}
 const _INTV4_MEMORY_MAX = 6;
 
 function _intv4T(key, ...args) {
@@ -55076,17 +55131,29 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   const emptyKey = !hasEvidence ? 'intv4_changed_empty'
     : (candidates.length ? 'intv4_changed_others_none'
       : (published.size ? 'intv4_changed_all_published' : 'intv4_changed_stable'));
+  // SIN CAMBIO MATERIAL, LA SUPERFICIE SE ENCOGE. Reservar una card entera con
+  // título para decir «no se detectan otros cambios relevantes» es gastar la zona
+  // más visible de la pantalla en una no-noticia. La frase NO se pierde —las cuatro
+  // situaciones distintas siguen distinguiéndose, que fue trabajo deliberado— pero
+  // pasa a una línea discreta en vez de un bloque.
+  if (!rows.length) {
+    return `
+      <p class="intv9-changed-quiet" data-evidence="${hasEvidence ? '1' : '0'}"
+         data-obs="${esc(String(obs.observations || 0))}"
+         data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
+         data-state="compact">${esc(_intv4T(emptyKey))}</p>`;
+  }
   return `
     <section class="intcc-card intv4-changed" data-evidence="${hasEvidence ? '1' : '0'}"
              data-obs="${esc(String(obs.observations || 0))}"
-             data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}">
+             data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
+             data-state="rows">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_changed_title'))}</h3>
-      ${rows.length ? `<ul class="intv4-chg-list">${rows.map(x => `
+      <ul class="intv4-chg-list">${rows.map(x => `
         <li class="intv4-chg is-${esc(x.w.change.direction || 'flat')}" data-root="${esc(x.w.causalRoot)}">
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
-        </li>`).join('')}</ul>`
-      : `<p class="intcc-empty-body">${esc(_intv4T(emptyKey))}</p>`}
+        </li>`).join('')}</ul>
     </section>`;
 }
 
@@ -55120,14 +55187,50 @@ function _intv4DiscoveryHtml(core, esc, publishedTexts) {
 
 // EXPLORE — the Core's contextual questions. Reuses the existing
 // [data-intcc-q] delegation contract so the interaction is unchanged.
-function _intv4ExploreHtml(core, esc) {
+// EXPLORA · de FAQ fija a exploración dinámica.
+//
+// El contenido ya salía de hechos certificados, así que el problema no era la
+// verdad: era que el ORDEN no dependía de nada, de modo que toda cuenta veía
+// eternamente las mismas cuatro. Se ordena por dos señales REALES, ninguna
+// aleatoria —un carrusel que rota por rotar es peor que una lista fija—:
+//   1 · RELEVANCIA AHORA: primero las preguntas cuya raíz causal coincide con lo
+//       que el motor está priorizando o descubriendo en esta cuenta.
+//   2 · NO REPETICIÓN: las ya mostradas recientemente bajan, usando la MISMA
+//       memoria de presentación que ya existe (`aurix_intv4_shown_v1`), con el
+//       prefijo `x:` para no mezclarse con las claves de hechos.
+// Empate ⇒ id, así que la misma entrada da siempre el mismo orden: cambia cuando
+// cambia la cartera o cuando el usuario ya ha visto algo, no al azar.
+function _intv4ExploreHtml(core, esc, intel) {
+  const hot = new Set(_aurixIntelRootsOf(intel));
+  let shownAt = {};
+  try {
+    (_intv4ReadShown() || []).forEach(e => {
+      if (typeof e.semanticKey === 'string' && e.semanticKey.indexOf('x:') === 0) {
+        shownAt[e.semanticKey.slice(2)] = e.shownAt;
+      }
+    });
+  } catch (_) { shownAt = {}; }
   const qs = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
     .map(q => ({ q, label: _intv4T('intv4_q_' + q.id), answer: _intv4AnswerHtml(q, core, esc) }))
     .filter(x => !!x.label && !!x.answer)
+    .sort((a, b) => {
+      const ha = hot.has(a.q.causalRoot) ? 1 : 0, hb = hot.has(b.q.causalRoot) ? 1 : 0;
+      if (ha !== hb) return hb - ha;
+      // Granularidad de DÍA a propósito: con el timestamp exacto, todas las
+      // mostradas comparten el mismo `Date.now()` y las no mostradas valen 0, así
+      // que el conjunto se daba la vuelta en cada repintado. Por día, el orden es
+      // estable dentro de una sesión y cambia entre visitas.
+      const sa = Math.floor(Number(shownAt[a.q.id] || 0) / 864e5);
+      const sb = Math.floor(Number(shownAt[b.q.id] || 0) / 864e5);
+      if (sa !== sb) return sa - sb;                 // lo menos visto, primero
+      return a.q.id < b.q.id ? -1 : 1;
+    })
     .slice(0, _INTV4_EXPLORE_MAX);
   if (!qs.length) return '';
   return `
-    <section class="intcc-card intcc-explore intv4-explore">
+    <section class="intcc-card intcc-explore intv4-explore"
+             data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
+             data-hot="${qs.filter(x => hot.has(x.q.causalRoot)).length}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intcc-explore-list">
         ${qs.map(x => `
@@ -55210,7 +55313,28 @@ function _intv4MemoryClaims(core, alreadyPublished) {
   return { keys: ev.map(x => x.f.semanticKey),
            roots: Array.from(new Set(ev.map(x => x.f.causalRoot).filter(Boolean))) };
 }
-function _intv4MemoryHtml(core, esc, alreadyPublished) {
+// LO QUE AURIX RECUERDA QUE LE DIJISTE. Es la función que hace de la Memoria una
+// superficie DISTINTA y no una tercera forma de contar el mismo cambio: ni «Lo que
+// importa» ni «Qué ha cambiado» pueden saber esto, porque no sale de un hecho
+// financiero sino del contexto que el usuario declaró — y que ahora viaja entre
+// dispositivos. No se fabrica ningún recuerdo: sólo se publica lo que está
+// GUARDADO, y cada línea lleva la fecha en que se respondió.
+function _intv4MemoryDeclared(intel, excludeFields) {
+  const f = (intel && intel.context && intel.context.fields) || {};
+  const skip = new Set(excludeFields || []);
+  const COPY = { concentration_intent: 'intv9_mem_intent', primary_goal: 'intv9_mem_goal',
+    horizon: 'intv9_mem_horizon', liquidity_need: 'intv9_mem_liq',
+    wealth_coverage: 'intv9_mem_coverage' };
+  return Object.keys(COPY)
+    .filter(k => !skip.has(k))
+    .filter(k => f[k] && f[k].provenance === 'user_answer')
+    .map(k => ({ field: k, at: f[k].answeredAt,
+      txt: _intv4T(COPY[k] + '_' + f[k].value) }))
+    .filter(x => !!x.txt)
+    .sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
+}
+function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
+  const declared = _intv4MemoryDeclared(intel, excludeFields);
   // Anything the Brief already said above is NOT repeated here. Memory is the
   // record of what is NOT in today's conclusion; showing the same sentence twice
   // on one screen is the repetition this whole block exists to remove.
@@ -55228,7 +55352,9 @@ function _intv4MemoryHtml(core, esc, alreadyPublished) {
   // número de observaciones —, que es una afirmación verdadera y distinta de "estoy
   // acumulando tu historial".
   const obs = (core.dataAvailability && core.dataAvailability.observation) || {};
-  if (!events.length) {
+  // Si Aurix RECUERDA algo que el usuario le dijo, la Memoria ya tiene contenido
+  // propio: el estado «acumulando historial» sería falso.
+  if (!events.length && !declared.length) {
     const nObs = Number(obs.observations) || 0;
     if (nObs >= 3 && Number.isFinite(obs.startAt)) {
       const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
@@ -55255,8 +55381,16 @@ function _intv4MemoryHtml(core, esc, alreadyPublished) {
       </section>`;
   }
   return `
-    <section class="intcc-card intcc-timeline intv4-memory">
+    <section class="intcc-card intcc-timeline intv4-memory"
+             data-declared="${declared.length}" data-events="${events.length}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
+      ${declared.length ? `<ul class="intcc-tl-list intv9-mem-declared">${declared.map(d => `
+        <li class="intcc-tl-item is-declared" data-declared-field="${esc(d.field)}">
+          <span class="intcc-tl-node" aria-hidden="true"></span>
+          <div class="intcc-tl-text">
+            <span class="intv4-mem-what">${esc(d.txt)}</span>
+            ${Number.isFinite(d.at) ? `<span class="intcc-tl-date">${esc(_intccDate(d.at))}</span>` : ''}
+          </div></li>`).join('')}</ul>` : ''}
       ${events.length ? `<ul class="intcc-tl-list">${events.map(x => {
         const at = x.f.window && (x.f.window.endAt || x.f.window.startAt);
         const why = _intv4WhyText(x.f);
@@ -55268,7 +55402,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished) {
             ${why ? `<span class="intv4-mem-why">${esc(why)}</span>` : ''}
           </div></li>`;
       }).join('')}</ul>`
-      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>`}
+      : (declared.length ? '' : `<p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>`)}
     </section>`;
 }
 
@@ -55715,18 +55849,88 @@ function _intv5DriversHtml(snap, esc) {
 // WHAT MATTERS TODAY — the Core's prioritised stories, in the original
 // "areas to watch" slot. 2 to 5, never padded: the Core drops anything under its
 // priority floor, so two real conclusions render as two.
-function _intv5MattersHtml(core, esc, depth, skipRoots) {
+// LO QUE IMPORTA · superficie de PRIORIDAD.
+//
+// El contenido (las historias del Core, deduplicadas por raíz) no cambia: cambia
+// QUIÉN decide el orden. Antes era la prioridad del Core, que no conoce el
+// contexto del usuario ni cuántas veces se ha visto ya algo, así que una
+// concentración conocida, deliberada y estable podía encabezar la pantalla para
+// siempre. Ahora el orden lo pone el motor —materialidad × novedad × relevancia
+// contextual × confianza × no repetición— y lo ya reconocido como deliberado cede
+// el sitio a lo nuevo SIN dejar de publicarse.
+// LA SELECCIÓN, COMO OWNER. Calcularla dos veces era un defecto silencioso: el
+// renderer derivaba las raíces «ya publicadas» del orden del CORE y la card las
+// pintaba con el orden del MOTOR, así que con límite 3 las dos listas podían no
+// coincidir — Descubrimientos excluía una raíz que «Lo que importa» no mostraba y
+// dejaba pasar otra que sí. Una función, una lista, dos consumidores.
+// (Límite: `_INTV4_BRIEF_MAX` = 3. Prioriza, no reparte.)
+function _intv5MattersStories(core, skipRoots, intel) {
   const skip = new Set(skipRoots || []);
+  const rank = new Map();
+  ((intel && intel.attention) || []).forEach((i, idx) => {
+    const r = _AURIX_INTEL_DIM_ROOT[i.dimension];
+    if (!r) return;
+    const w = (Number.isFinite(i.relevance) ? i.relevance : 0) + (1 - idx * 0.01);
+    if (!rank.has(r) || rank.get(r) < w) rank.set(r, w);
+  });
   const stories = (core.topStories || [])
     .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
     .filter(st => !skip.has(st.causalRoot))
+    .slice()
+    .sort((a, b) => {
+      const ra = rank.has(a.causalRoot) ? rank.get(a.causalRoot) : -1;
+      const rb = rank.has(b.causalRoot) ? rank.get(b.causalRoot) : -1;
+      if (ra !== rb) return rb - ra;
+      // Sin señal del motor se conserva el orden certificado del Core.
+      return (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1);
+    })
     .slice(0, _INTV4_BRIEF_MAX);
-  const cards = stories.map(st => _intv4StoryHtml(st, esc, depth)).filter(Boolean);
+  return { stories, rankedBy: rank.size ? 'intelligence' : 'core' };
+}
+function _intv5MattersHtml(core, esc, depth, skipRoots, intel) {
+  const sel = _intv5MattersStories(core, skipRoots, intel);
+  const cards = sel.stories.map(st => _intv4StoryHtml(st, esc, depth)).filter(Boolean);
   return `
-    <section class="intcc-card intcc-watch intv4-brief intv5-matters">
+    <section class="intcc-card intcc-watch intv4-brief intv5-matters"
+             data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_brief_title'))}</h3>
       ${cards.length ? `<div class="intv4-story-list">${cards.join('')}</div>`
                      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_brief_empty'))}</p>`}
+    </section>`;
+}
+
+// DESCUBRIMIENTOS · «esto no lo había visto».
+//
+// Se pinta SÓLO si hay algo que decir, y con dos exclusiones que son lo que evita
+// que sea una cuarta forma de contar lo mismo: no entra un descubrimiento cuya
+// dimensión ya encabeza «Lo que importa», y no se rellena nunca por rellenar.
+// Máximo 3. La ausencia de sorpresa es preferible a una sorpresa débil.
+const _AURIX_INTEL_DISC_MAX = 3;
+function _intv9DiscoveriesHtml(intel, esc, claimedRoots, claimedIds) {
+  const claimed = new Set(claimedRoots || []);
+  // El HERO publica `discoveries[0]` cuando su estado es `discovery`, así que sin
+  // esta exclusión la misma frase salía dos veces en la misma pantalla a media
+  // pantalla de distancia. Se excluye por ID, no por texto: comparar cadenas
+  // renderizadas es frágil en dos idiomas.
+  const heroClaimed = new Set(claimedIds || []);
+  const items = ((intel && intel.discoveries) || [])
+    .filter(d => !heroClaimed.has(d.id))
+    .filter(d => !claimed.has(_AURIX_INTEL_DIM_ROOT[d.dimension]))
+    .map(d => ({ d, txt: _intelDiscoveryText(d) }))
+    .filter(x => !!x.txt)
+    .slice(0, _AURIX_INTEL_DISC_MAX);
+  if (!items.length) return '';
+  return `
+    <section class="intcc-card intv9-disc" data-count="${items.length}">
+      <h3 class="intcc-card-title">${esc(_intv4T('intv9_disc_title'))}</h3>
+      <ul class="intv9-disc-list">${items.map(x => `
+        <li class="intv9-disc-item" data-disc="${esc(x.d.code)}" data-dim="${esc(x.d.dimension)}">
+          <span class="intv9-disc-mark" aria-hidden="true"></span>
+          <div class="intv9-disc-body">
+            <span class="intv9-disc-text">${esc(x.txt)}</span>
+            ${(x.d.evidence && x.d.evidence.length)
+              ? `<span class="intv9-disc-ev">${esc(_intv4T('intv9_disc_evidence'))}</span>` : ''}
+          </div></li>`).join('')}</ul>
     </section>`;
 }
 
@@ -55752,7 +55956,10 @@ function _renderIntelligenceCommandCenter() {
   let core = null;
   try {
     core = (typeof _aurixIntelligenceCore === 'function')
-      ? _aurixIntelligenceCore({ presentationHistory: _intv4ReadShown() })
+      // Las anotaciones de Explora (`x:…`) se filtran: la novedad del Core razona
+      // sobre claves de HECHOS, y un id de pregunta ahí no significa nada.
+      ? _aurixIntelligenceCore({ presentationHistory: _intv4ReadShown()
+          .filter(e => !(e && typeof e.semanticKey === 'string' && e.semanticKey.indexOf('x:') === 0)) })
       : null;
   } catch (_) { core = null; }
   if (!core) {
@@ -55776,7 +55983,9 @@ function _renderIntelligenceCommandCenter() {
   let intel = null;
   try {
     intel = (typeof _aurixIntel === 'function')
-      ? _aurixIntel({ depth: 'premium', presentationHistory: _intv4ReadShown() }) : null;
+      ? _aurixIntel({ depth: 'premium', presentationHistory: _intv4ReadShown()
+          .filter(e => !(e && typeof e.semanticKey === 'string' && e.semanticKey.indexOf('x:') === 0)) })
+      : null;
   } catch (_) { intel = null; }
   const score   = _intccHealthScore(snap, null, intel);
   _intelLastRun = intel;
@@ -55914,35 +56123,53 @@ function _renderIntelligenceCommandCenter() {
   //   (estructura · cambios). The grid pins each slot; the mobile order mirrors it.
   const radarHtml     = _intv7RadarHtml(esc);
   const driversHtml   = _intv5DriversHtml(snap, esc);
-  const exploreHtml   = _intv4ExploreHtml(core, esc);
+  const exploreHtml   = _intv4ExploreHtml(core, esc, intel);
   const structureHtml = _intv5StructureHtml(core, esc);
 
   // ── Row 3 — WHAT MATTERS TODAY · WEALTH MEMORY ──────────────────────────
   // The drivers module already publishes the top-3 breakdown, so the Brief does
   // not ALSO headline the concentration root: one phenomenon, one place.
   const skipRoots = (driversHtml && /intcc-drv-row/.test(driversHtml)) ? [_AURIX_CAUSAL_ROOT.TOP_POSITION] : [];
-  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots);
+  // UNA SOLA SELECCIÓN, y de ella salen TODAS las exclusiones. Antes había cuatro
+  // derivaciones distintas de «lo que el Brief publica», todas con el orden del
+  // CORE mientras la card pinta con el orden del MOTOR: con límite 3 eso hacía que
+  // Memoria, Qué ha cambiado y Descubrimientos suprimieran un hecho que nadie
+  // estaba mostrando y republicaran otro que sí. Es exactamente la duplicación que
+  // estas superficies existen para evitar.
+  const mattersSel = _intv5MattersStories(core, skipRoots, intel).stories;
+  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel);
   const publishedKeys = [];
-  (core.topStories || [])
-    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && skipRoots.indexOf(st.causalRoot) === -1)
-    .slice(0, _INTV4_BRIEF_MAX)
-    .forEach(st => {
-      publishedKeys.push(st.semanticKey);
-      (st.supporting || []).forEach(sp => publishedKeys.push(sp.semanticKey));
-    });
-  const publishedTexts = (core.topStories || [])
-    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && skipRoots.indexOf(st.causalRoot) === -1)
-    .slice(0, _INTV4_BRIEF_MAX)
-    .map(st => _intv4FactText(st))
-    .filter(Boolean);
-  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys);
+  mattersSel.forEach(st => {
+    publishedKeys.push(st.semanticKey);
+    (st.supporting || []).forEach(sp => publishedKeys.push(sp.semanticKey));
+  });
+  const publishedTexts = mattersSel.map(st => _intv4FactText(st)).filter(Boolean);
+  const mattersRoots = mattersSel.map(st => st.causalRoot);
+  // `skipRoots` TAMBIÉN excluye: es la raíz que Factores ya publica, así que sin
+  // ella `top_position` no entraba nunca en la lista de reclamadas y un
+  // descubrimiento de concentración se sumaba a Factores y a Estructura.
+  // Y el hero reclama su propio descubrimiento cuando lo publica como lectura.
+  const heroDiscId = (reading.intelState === 'discovery' && intel && intel.discoveries
+    && intel.discoveries[0]) ? [intel.discoveries[0].id] : [];
+  const discHtml = _intv9DiscoveriesHtml(intel, esc, mattersRoots.concat(skipRoots), heroDiscId);
+  // Un descubrimiento CONTEXTUAL ya dice en voz alta lo que el usuario declaró, así
+  // que la Memoria no repite esa mitad. Se excluye por CAMPO de contexto.
+  const discFields = [];
+  if (/declared_goal_distant_from_observed_structure/.test(discHtml)) discFields.push('primary_goal');
+  if (/liquidity_fell_while_need_declared/.test(discHtml)) discFields.push('liquidity_need');
+  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys, intel, discFields);
   // M.04 · 0 — la Memoria se pinta antes, así que RECLAMA primero. Sus claves y
   // raíces viajan a Qué ha cambiado para que la misma verdad no ocupe las dos.
   const memoryClaims = _intv4MemoryClaims(core, publishedKeys);
 
   // ── Row 4 — WHAT CHANGED, an integrated band (not another big board) ────
   const changedHtml   = _intv4ChangedHtml(core, esc, publishedKeys, memoryClaims);
-  const discoveryHtml = _intv4DiscoveryHtml(core, esc, publishedTexts);
+  // UN SOLO SITIO PARA «esto no lo había visto». El slot legacy (wow insight del
+  // Core) y el nuevo son el mismo concepto, y las dos cards estaban pineadas a la
+  // MISMA celda de la rejilla: se apilaban una sobre otra cuando ambas existían.
+  // El nuevo tiene prioridad —cruza hechos y conoce el contexto— y el legacy queda
+  // como respaldo cuando no hay descubrimiento del motor.
+  const discoveryHtml = discHtml ? '' : _intv4DiscoveryHtml(core, esc, publishedTexts);
 
   // Data honesty stays available but does not occupy a permanent giant card: it
   // is a quiet line beside the disclaimer, and the Explore catalogue still offers
@@ -55954,11 +56181,19 @@ function _renderIntelligenceCommandCenter() {
     .filter(Boolean)))[0] || '';
 
   try {
-    const shown = (core.topStories || [])
-      .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && skipRoots.indexOf(st.causalRoot) === -1)
-      .slice(0, _INTV4_BRIEF_MAX).map(st => st.semanticKey);
+    const shown = mattersSel.map(st => st.semanticKey);
     const wow = (core.wowInsights || [])[0];
     if (wow && discoveryHtml) shown.push(wow.semanticKey);
+    // Las preguntas de Explora mostradas se anotan con prefijo `x:`, que es lo que
+    // hace que la próxima visita ofrezca otras y deje de parecer un FAQ fijo.
+    try {
+      // `data-intcc-q="` son 14 caracteres. Con 15 se perdía el primer carácter del
+      // id, el lector nunca encontraba coincidencia y la señal de «lo menos visto»
+      // quedaba muerta: Explora volvía a ser una lista fija con otro orden.
+      const xIds = (exploreHtml.match(/data-intcc-q="([^"]+)"/g) || [])
+        .map(m => 'x:' + m.slice(14, -1));
+      if (xIds.length) shown.push.apply(shown, xIds);
+    } catch (_) {}
     _intv4RecordShown(shown);
   } catch (_) {}
 
@@ -55973,6 +56208,7 @@ function _renderIntelligenceCommandCenter() {
       ${mattersHtml}
       ${memoryHtml}
       ${structureHtml}
+      ${discHtml}
       ${changedHtml}
       ${discoveryHtml}
       <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}${honestyLine ? ` <span class="intv5-honesty">${esc(honestyLine)}</span>` : ''}</p>

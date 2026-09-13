@@ -26159,3 +26159,73 @@ button.intv8-intel-pause {
 }
 button.intv8-intel-pause:hover { color: var(--text-bright); }
 button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   AURIX INTELLIGENCE · FINAL SURFACE COMPLETION
+   Clases nuevas `.intv9-*` y DOS pins de rejilla. Ninguna regla existente se
+   modifica: la recomposición data-adaptive que ya existe
+   (`:not(:has(.intv4-changed)) .intv5-structure { 1/13 }`) hace el resto sola
+   cuando «Qué ha cambiado» se encoge.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* DESCUBRIMIENTOS. Marca de acento a la izquierda, no un badge: la sorpresa la
+   da el contenido, no la decoración. */
+.intv9-disc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.intv9-disc-item { display: flex; align-items: flex-start; gap: 10px; }
+.intv9-disc-mark {
+  flex: 0 0 auto; width: 3px; align-self: stretch; min-height: 20px; border-radius: 2px;
+  background: linear-gradient(180deg, var(--aurix-blue), rgba(var(--aurix-blue-rgb), 0.25));
+}
+.intv9-disc-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.intv9-disc-text { font-size: 13px; line-height: 1.45; color: var(--text-bright); font-weight: 500; }
+/* La procedencia va SIEMPRE con el descubrimiento: es lo que lo separa de una
+   frase de marketing. */
+.intv9-disc-ev { font-size: 10.5px; color: var(--text-dim); letter-spacing: 0.01em; }
+
+/* «Qué ha cambiado» cuando no hay nada material: una línea, no un bloque. */
+.intv9-changed-quiet {
+  margin: 0; padding: 2px 4px;
+  font-size: 11.5px; line-height: 1.4; color: var(--text-dim); text-align: center;
+}
+
+/* MEMORIA · lo que Aurix recuerda que le dijiste. Nodo en azul de marca para
+   distinguirlo de un hito temporal, que es un hecho medido y no una declaración. */
+.intv9-mem-declared { margin-bottom: 10px; }
+.intcc-tl-item.is-declared .intcc-tl-node {
+  background: var(--aurix-blue);
+  box-shadow: 0 0 0 3px rgba(var(--aurix-blue-rgb), 0.16);
+}
+
+@media (min-width: 1024px) {
+  /* Fila 5 = «esto no lo había visto». El slot legacy `.intv4-discovery` está
+     pineado a la MISMA celda, así que las dos cards se apilaban una sobre otra
+     cuando ambas existían; ahora el renderer publica UNA sola (el legacy queda de
+     respaldo), de modo que la celda nunca tiene dos ocupantes. */
+  .intv9-disc { grid-column: 1 / 13; grid-row: 5; }
+  .aurix-intv6 .intv9-disc { display: flex; flex-direction: column; }
+  /* La línea compacta va ANTES del aviso legal, no después: el disclaimer tiene que
+     cerrar la pantalla. Es el ÚNICO pin heredado que se reubica, y sólo la fila. */
+  .intv9-changed-quiet { grid-column: 1 / 13; grid-row: 6; }
+  .aurix-intv6 .intcc-disclaimer { grid-row: 7; }
+}
+@media (max-width: 1023px) {
+  /* CRÍTICO en móvil y tablet: el contenedor es flex-column y TODOS los hijos
+     llevan `order` explícito 1…10. Sin declararlo, las dos superficies nuevas
+     valían `order: 0` y se pintaban ANTES DEL HERO. Se insertan donde les
+     corresponde en el orden de lectura: …estructura → qué ha cambiado →
+     descubrimientos → línea compacta → aviso legal. */
+  .intv9-disc          { order: 9; }
+  .intv9-changed-quiet { order: 9.5; }
+}
+@media (max-width: 640px) {
+  .intv9-disc-text { font-size: 12.5px; }
+  .intv9-changed-quiet { padding: 6px 10px; }
+}
+
+/* El bloque declarado y el de eventos son dos `.intcc-tl-list`, y el raíl se dibuja
+   con `border-left` por ítem: entre los dos quedaba un corte y la card cuya
+   metáfora es una línea continua aparecía con dos raíles desconectados. Con la
+   lista declarada seguida de eventos, su último ítem recupera el raíl y el hueco
+   entre bloques desaparece. */
+.intv9-mem-declared { margin-bottom: 0; }
+.intv9-mem-declared:has(+ .intcc-tl-list) > .intcc-tl-item:last-child { border-left-color: inherit; }
