@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '681'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '682'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5194,21 +5194,10 @@ const T = {
     // no resta y por tanto sube la nota, una caída de 24 h moviendo un índice
     // estructural). Lo sustituye un índice que se llama por lo que mide de verdad.
     intel_h_no_positions: 'Aún no hay patrimonio que analizar',
-    intel_h_single:       'Todo depende de una sola posición',
     intel_h_coverage:     'Cobertura limitada',
-    intel_h_few:          'Tu peso se apoya en pocas posiciones',
-    intel_h_uneven:       'Tu peso está repartido de forma desigual',
-    intel_h_spread:       'Tu peso está repartido',
-    intel_h_d_single:     'Todo tu patrimonio invertible se mueve con ella.',
     intel_h_d_empty:      'Añade tu primera posición y Aurix empezará a leer tu estructura.',
     intel_h_note_deliberate: 'Marcaste esta concentración como deliberada.',
-    intel_h_conf_high:    'Cobertura completa',
-    intel_h_conf_partial: 'Cobertura parcial',
-    intel_h_conf_low:     'Cobertura insuficiente',
     intel_disp_title:      'Dispersión de pesos',
-    intel_disp_even:       'Reparto parejo',
-    intel_disp_lopsided:   'Reparto desigual',
-    intel_disp_detail:     (eff, pos) => `Tu peso se comporta como ${eff} posiciones de ${pos}.`,
     intel_disp_na:         'Sin medir',
     intel_disp_na_single:  'Con menos de tres posiciones no hay reparto que publicar como cifra.',
     intel_disp_na_uncert:  'Hay una posición que Aurix no puede valorar, así que no publica el índice sobre un patrimonio incompleto.',
@@ -5272,6 +5261,15 @@ const T = {
     intv9_mem_liq_imminent:  'Dijiste que vas a necesitar liquidez pronto.',
     intv9_mem_coverage_complete: 'Confirmaste que todo tu patrimonio está registrado en Aurix.',
     intv9_mem_coverage_partial:  'Nos dijiste que parte de tu patrimonio no está registrado en Aurix.',
+    intel_dock_label:      'Para conocerte mejor',
+    intel_h_v_weak:        'Débil',
+    intel_h_v_watch:       'A vigilar',
+    intel_h_v_stable:      'Estable',
+    intel_h_v_balanced:    'Equilibrada',
+    intel_h_v_solid:       'Sólida',
+    intel_h_v_excellent:   'Excelente',
+    intel_now_monitoring:  'Tu patrimonio mantiene un buen equilibrio',
+    intel_sub_monitoring:  'Hay algunos aspectos que Aurix seguirá de cerca.',
     intel_opt_decline:     'Prefiero no responder',
     intel_q_pause:         'No hacer más preguntas por ahora',
     intel_q_paused:        'De acuerdo. Aurix no volverá a preguntar por ahora, y conserva lo que ya sabe.',
@@ -7669,21 +7667,10 @@ const T = {
     intcc_chip_watch:  'To watch',
     // ── AURIX INTELLIGENCE ─────────────────────────────────────────────────────────────
     intel_h_no_positions: 'Nothing to analyse yet',
-    intel_h_single:       'Everything rides on a single position',
     intel_h_coverage:     'Limited coverage',
-    intel_h_few:          'Your weight leans on a few positions',
-    intel_h_uneven:       'Your weight is unevenly spread',
-    intel_h_spread:       'Your weight is spread',
-    intel_h_d_single:     'All of your investable wealth moves with it.',
     intel_h_d_empty:      'Add your first position and Aurix will start reading your structure.',
     intel_h_note_deliberate: 'You marked this concentration as deliberate.',
-    intel_h_conf_high:    'Full coverage',
-    intel_h_conf_partial: 'Partial coverage',
-    intel_h_conf_low:     'Insufficient coverage',
     intel_disp_title:      'Weight dispersion',
-    intel_disp_even:       'Evenly spread',
-    intel_disp_lopsided:   'Unevenly spread',
-    intel_disp_detail:     (eff, pos) => `Your weight behaves like ${eff} of ${pos} positions.`,
     intel_disp_na:         'Not measured',
     intel_disp_na_single:  'With fewer than three positions there is no spread to publish as a figure.',
     intel_disp_na_uncert:  'One position cannot be valued, so Aurix will not publish the index over an incomplete portfolio.',
@@ -7743,6 +7730,15 @@ const T = {
     intv9_mem_liq_imminent:  'You said you will need liquidity soon.',
     intv9_mem_coverage_complete: 'You confirmed all of your wealth is recorded in Aurix.',
     intv9_mem_coverage_partial:  'You told us part of your wealth is not recorded in Aurix.',
+    intel_dock_label:      'To know you better',
+    intel_h_v_weak:        'Weak',
+    intel_h_v_watch:       'Worth watching',
+    intel_h_v_stable:      'Stable',
+    intel_h_v_balanced:    'Balanced',
+    intel_h_v_solid:       'Solid',
+    intel_h_v_excellent:   'Excellent',
+    intel_now_monitoring:  'Your wealth keeps a good balance',
+    intel_sub_monitoring:  'There are a few aspects Aurix will keep an eye on.',
     intel_opt_decline:     'I prefer not to answer',
     intel_q_pause:         'No more questions for now',
     intel_q_paused:        'Fine. Aurix will not ask again for now, and keeps what it already knows.',
@@ -54450,20 +54446,36 @@ function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-u
   const h = (typeof _aurixIntelHealth === 'function') ? _aurixIntelHealth(div, snap, model, ctx) : null;
   if (!h) return { score: null, band: 'empty', tone: 'neutral', label: t('intcc_band_empty'),
                    reasons: [], explain: '', state: 'no_positions', confidence: 'unavailable' };
+  // VOCABULARIO CANÓNICO, y es un MAPEO DE PRESENTACIÓN sobre los estados que la
+  // verdad de hoy ya produce. NO se inventa ni un umbral: las bandas siguen siendo
+  // las de `_aurixIntelHealth` (40/60 sobre la dispersión reescalada), sólo cambia
+  // cómo se nombran.
+  //   single_position  → DÉBIL      (anillo 0: todo depende de una posición)
+  //   weight_in_few    → A VIGILAR  (<40)
+  //   weight_uneven    → ESTABLE    (40–60)
+  //   weight_spread    → EQUILIBRADA(≥60)
+  // SÓLIDA y EXCELENTE quedan DECLARADAS Y SIN USAR a propósito: hoy no hay tercer
+  // eje que permita distinguirlas de EQUILIBRADA, y fabricar una banda nueva para
+  // poder escribirlas sería exactamente el defecto del score viejo. Pertenecen a
+  // Advanced Intelligence.
+  //   `coverage_limited` y `no_positions` NO reciben palabra del vocabulario: todas
+  // son juicios de salud, y «no puedo medirlo» no es un juicio de salud. Se nombran
+  // con su propio texto neutral.
   const STATE_LABEL = {
     no_positions:     'intel_h_no_positions',
-    single_position:  'intel_h_single',
+    single_position:  'intel_h_v_weak',
     coverage_limited: 'intel_h_coverage',
-    weight_in_few:    'intel_h_few',
-    weight_uneven:    'intel_h_uneven',
-    weight_spread:    'intel_h_spread',
+    weight_in_few:    'intel_h_v_watch',
+    weight_uneven:    'intel_h_v_stable',
+    weight_spread:    'intel_h_v_balanced',
   };
-  // El DETALLE es lo que hace auditable el anillo: se puede comprobar contando.
+  // SALUD queda deliberadamente minimalista: título + anillo + % + UN estado. El
+  // detalle («tu peso se comporta como 2,5 de 3») y el chip de cobertura se
+  // RETIRAN de la superficie — eran tres textos compitiendo con el donut y
+  // empujaban la composición contra el borde inferior. Cuando el anillo NO es
+  // publicable sí se dice por qué, porque ahí el estado solo no basta.
   let detail = '';
-  if (h.state === 'single_position') detail = t('intel_h_d_single');
-  else if (h.ringPublishable && Number.isFinite(h.effectiveN)) {
-    detail = t('intel_disp_detail')(_intv4Num(h.effectiveN, 1), h.positions);
-  } else if (h.state === 'coverage_limited') {
+  if (!h.ringPublishable && h.state === 'coverage_limited') {
     detail = h.reason === 'uncertifiable_positions' ? t('intel_disp_na_uncert')
            : h.reason === 'too_few_positions' ? t('intel_disp_na_single')
            : t('intel_disp_na_generic');
@@ -55527,12 +55539,52 @@ function _intelQuestionText(q) {
     default: return { text: '', why: '' };
   }
 }
+// COHERENCIA SEMÁNTICA. Defecto real de la captura de producción: SALUD 74 ·
+// EQUILIBRADA, con «Diversificación adecuada» y «Liquidez suficiente» en verde, y
+// el titular diciendo «Tu patrimonio requiere atención». Las dos cosas eran
+// ciertas por separado —el estado de Salud mide el reparto de pesos y el titular
+// venía de un insight con severidad `worth_reviewing`— pero juntas en la misma
+// pantalla se contradicen, y el usuario no lee dos owners: lee una frase.
+//
+// La regla NO es cambiar una frase fija por otra: es que un estado POSITIVO de
+// Salud no pueda convivir con un titular de atención A MENOS QUE haya un CAMBIO
+// material que lo justifique. Un nivel estático que ya está publicado en el propio
+// anillo no es una razón para alarmar.
+const _AURIX_INTEL_HEALTH_POSITIVE = Object.freeze(['weight_spread', 'weight_uneven']);
+// `justified` es la clave, y la revisión encontró que mi primera versión la definía
+// demasiado estrecha. `attention_material_fact` también se dispara por un insight
+// `worth_reviewing` RECIÉN APARECIDO, no sólo por un `notable_change`: degradarlo
+// habría silenciado un hecho NUEVO mientras seguía publicado en «Lo que importa»
+// — la misma contradicción que este fix existe para quitar, sólo que al revés.
+// Así que sólo se degrada cuando el ancla es un NIVEL ESTÁTICO QUE EL USUARIO YA
+// HA VISTO varias veces, que es el único caso en que alarmar no aporta nada. Y si
+// no se puede saber si es nuevo, se falla hacia MOSTRAR, nunca hacia callar.
+function _intelCoherentState(nowState, healthBand, justified) {
+  const positive = _AURIX_INTEL_HEALTH_POSITIVE.indexOf(String(healthBand || '')) !== -1;
+  if (!positive) return nowState;
+  // `material_change` y `discovery` SÍ sobreviven: ahí hay evidencia concreta.
+  if (nowState === 'attention_material_fact' && !justified) return 'monitoring';
+  return nowState;
+}
 function _intv5Reading(core, score, snap, intel) {
   // FAIL CLOSED. Si el motor no ha podido correr, la lectura NO puede caer en «Tu
   // estructura se mantiene»: eso es una afirmación estructural POSITIVA sostenida
   // sobre cero evidencia, y precisamente en el caso en que no hay motor que la
   // certifique. Sin motor se dice que falta base para leer, que es la verdad.
-  const nowState = (intel && intel.now) ? intel.now.state : 'insufficient_history';
+  const rawState = (intel && intel.now) ? intel.now.state : 'insufficient_history';
+  // Justifican el titular de atención DOS cosas: un cambio material medido, o que
+  // el hecho que lo ancla sea NUEVO. Lo único que no lo justifica es un nivel que
+  // el usuario ya ha visto repetido, y eso lo dice `memory.persisting`.
+  const hasMaterialChange = !!(intel && intel.now && intel.now.changeCount > 0
+    && (intel.attention || []).some(i => i.severity === _AURIX_AI_SEVERITY.NOTABLE_CHANGE));
+  const anchorId = (intel && intel.now && intel.now.anchor) || null;
+  const persisting = (intel && intel.memory && Array.isArray(intel.memory.persisting))
+    ? intel.memory.persisting : null;
+  // FAIL TOWARDS SHOWING: sin lista de persistentes no se puede afirmar que el
+  // hecho sea viejo, así que se trata como nuevo y el titular se respeta.
+  const anchorIsRepeated = !!(anchorId && persisting && persisting.indexOf(anchorId) !== -1);
+  const nowState = _intelCoherentState(rawState, score && score.band,
+    hasMaterialChange || !anchorIsRepeated);
   const changeCount = (intel && intel.now) ? intel.now.changeCount : 0;
   const disc = (intel && intel.discoveries && intel.discoveries[0]) || null;
   const q = (intel && intel.questions && intel.questions[0]) || null;
@@ -55541,7 +55593,7 @@ function _intv5Reading(core, score, snap, intel) {
   const CLASS = { material_change: 'attention', attention_material_fact: 'attention',
     discovery: 'concentrated', context_needed: 'balanced', insufficient_history: 'balanced',
     readings_changed: 'concentrated', stable_no_change: 'healthy', stable: 'balanced',
-    no_data: 'balanced' };
+    monitoring: 'healthy', no_data: 'balanced' };
   let title, sub;
   switch (nowState) {
     case 'material_change':
@@ -55555,6 +55607,8 @@ function _intv5Reading(core, score, snap, intel) {
     case 'insufficient_history':
     case 'no_data':
       title = _intv4T('intel_now_history'); sub = _intv4T('intel_sub_history'); break;
+    case 'monitoring':
+      title = _intv4T('intel_now_monitoring'); sub = _intv4T('intel_sub_monitoring'); break;
     case 'readings_changed':
       title = _intv4T('intel_now_changed'); sub = _intv4T('intel_sub_changed', changeCount); break;
     case 'stable_no_change':
@@ -55763,6 +55817,11 @@ function _intv7RadarAxes() {
 // Estabilidad · Crecimiento" trataba igual dos situaciones que no lo son: una espera
 // historia y la otra espera una referencia que el producto ha decidido no tener. Se
 // nombra por eje y por causa, que es lo que el SPEC pide documentar.
+// SE CONSERVA a propósito, aunque el disclosure que lo consumía se haya retirado:
+// mapea la CAUSA de que un eje no sea certificable a su explicación, y eso es
+// exactamente lo que Advanced Intelligence —el bloque declarado como siguiente—
+// necesita para razonar sobre disponibilidad. Sus claves de copy se conservan por
+// la misma razón. Lo que se retiró es el CONTROL de la card, no el conocimiento.
 function _intv7PendingReasonKey(reason) {
   if (reason === 'no_certifiable_scale') return 'intv7_pending_scale';
   if (reason === 'awaiting_observations' || reason === 'window_not_covered'
@@ -55795,25 +55854,13 @@ function _intv7RadarHtml(esc) {
              data-state="radar">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
       <div class="intcc-radar-wrap">${svg}</div>
-      ${/* SPEC AURIX INTELLIGENCE · FASE 7 — la card principal RESPIRA. Tres párrafos permanentes
-            (la leyenda de las cinco dimensiones, el significado de Estabilidad y la
-            lista de ejes pendientes) explicaban el mismo contexto en cada apertura,
-            y un texto que ya has leído deja de ser información. Pasan a un
-            disclosure NATIVO: se conserva CADA palabra —no se oculta ninguna
-            limitación, se pide un toque— y sin JavaScript, sin dependencia de
-            hover (que en móvil no existe) y accesible por teclado. Los ejes sin
-            datos siguen atenuados EN EL PROPIO RADAR, así que la limitación se ve
-            sin abrir nada: lo que se pliega es la explicación, no el límite. */''}
-      <details class="intv8-radar-more">
-        <summary class="intv8-radar-summary">${esc(_intv4T('intel_radar_more'))}</summary>
-        <div class="intv8-radar-more-body">
-          <p class="intv6-radar-legend">${esc(_intv4T('intv7_radar_legend'))}</p>
-          ${Number.isFinite(r.values.stability)
-            ? `<p class="intv7-radar-mean">${esc(_intv4T('intv7_stab_meaning'))}</p>` : ''}
-          ${pendingLines.length ? `<ul class="intv7-radar-pending">${
-            pendingLines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}
-        </div>
-      </details>
+      ${/* SPEC HERO FINALIZATION · «Qué mide cada eje» se RETIRA por decisión del
+            founder. El disclosure resolvía un problema real —tres párrafos
+            permanentes que ya nadie leía— pero seguía siendo un control, un hueco
+            reservado y un elemento enfocable al pie de la card. Y la limitación NO
+            se pierde: los ejes sin datos siguen ATENUADOS y rotulados «sin datos»
+            en el propio SVG, que es donde el usuario los está mirando. El radar
+            queda limpio y autosuficiente. */''}
     </section>`;
 }
 
@@ -56005,12 +56052,17 @@ function _renderIntelligenceCommandCenter() {
   // La pregunta NUNCA se gatea: pedirle trabajo al usuario y no devolverle nada es
   // la forma más rápida de que no vuelva a responder ninguna. Se pinta con las
   // clases de chip que ya existen, así que no hay lenguaje visual nuevo.
+  // QUESTION DOCK. La pregunta deja de ir pegada al bloque de texto y pasa a una
+  // dock al PIE del contenido: es donde la captura demuestra que hay espacio, y
+  // así ni empuja el titular ni compite con la esfera. Lleva su propio rótulo
+  // para que se lea como una capa nativa de Intelligence y no como una encuesta.
   const intelQHtml = intelQ ? (() => {
     const qt = _intelQuestionText(intelQ);
     if (!qt.text) return '';
     return `
-      <div class="intv8-intel-q" data-intel-q="${esc(intelQ.field)}"${
+      <div class="intv11-dock" data-intel-q="${esc(intelQ.field)}"${
         intelQ.subject ? ` data-intel-subject="${esc(intelQ.subject)}"` : ''}>
+        <span class="intv11-dock-label">${esc(_intv4T('intel_dock_label'))}</span>
         <p class="intv8-intel-q-text">${esc(qt.text)}</p>
         <div class="intv8-intel-q-opts">${intelQ.options.map(o =>
           `<button type="button" class="intcc-chip intv8-intel-opt" data-intel-answer="${esc(o)}">${
@@ -56035,9 +56087,6 @@ function _renderIntelligenceCommandCenter() {
         <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
         ${score.detail ? `<span class="intv8-disp-detail">${esc(score.detail)}</span>` : ''}
         ${score.contextNote ? `<span class="intv8-h-note">${esc(score.contextNote)}</span>` : ''}
-        ${score.confidence ? `<span class="intv8-h-conf is-${esc(score.confidence)}">${esc(
-          t(score.confidence === 'sufficient' ? 'intel_h_conf_high'
-            : score.confidence === 'partial' ? 'intel_h_conf_partial' : 'intel_h_conf_low'))}</span>` : ''}
         </div>
       <div class="intcc-hero-intel">
         <div class="intcc-hero-body">
@@ -56076,9 +56125,6 @@ function _renderIntelligenceCommandCenter() {
           <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
           ${score.detail ? `<span class="intv8-disp-detail">${esc(score.detail)}</span>` : ''}
           ${score.contextNote ? `<span class="intv8-h-note">${esc(score.contextNote)}</span>` : ''}
-          ${score.confidence ? `<span class="intv8-h-conf is-${esc(score.confidence)}">${esc(
-          t(score.confidence === 'sufficient' ? 'intel_h_conf_high'
-            : score.confidence === 'partial' ? 'intel_h_conf_partial' : 'intel_h_conf_low'))}</span>` : ''}
         </div>
         ${chips.length ? `<ul class="intcc-m-concl">
           ${chips.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}

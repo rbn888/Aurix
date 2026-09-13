@@ -20740,11 +20740,6 @@ body.gs-open { overflow: hidden; }
   line-height: 1.1;                 /* one optical baseline for both eyebrows */
 }
 
-/* ── INT.07 · SEMANTIC RADAR (five fixed conceptual axes) ────────────────────*/
-.intv6-radar-legend {
-  margin: 4px 0 2px; font-size: 11.5px; line-height: 1.45;
-  color: rgba(150,180,240,0.68);
-}
 .intv6-radar .intcc-radar-wrap { margin-top: 2px; }
 /* The radar is a map of structure, not a verdict: the fill stays calm and the
    accent is reserved for real signals elsewhere. A bigger polygon is not "better". */
@@ -20793,25 +20788,6 @@ body.gs-open { overflow: hidden; }
 /* The measured length along each axis: legible with one or two certified
    dimensions, where a closed polygon would be a line or a dot. */
 .intcc-radar-spoke { stroke: rgba(122,162,255,0.55); stroke-width: 1.4; stroke-linecap: round; }
-.intv7-radar-pending {
-  margin: 8px 0 0; font-size: 11.5px; line-height: 1.5;
-  color: rgba(198,214,246,0.60);
-}
-/* M.03 · C — el disclosure pasa de una frase para todo a una línea POR EJE con su
-   causa: "falta historia" y "falta una referencia" son límites distintos y ahora se
-   leen distintos. Lista sin viñeta de disco (el guion es más sobrio en una nota) y
-   con la misma tinta que la nota anterior. `.intv7-radar-mean` explica la unidad del
-   eje recién activado, porque "92 %" sin unidad se lee como un score inventado. */
-ul.intv7-radar-pending { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-ul.intv7-radar-pending > li { position: relative; padding-left: 11px; }
-ul.intv7-radar-pending > li::before {
-  content: '—'; position: absolute; left: 0; top: 0;
-  color: rgba(150,180,240,0.42);
-}
-.intv7-radar-mean {
-  margin: 6px 0 0; font-size: 11.5px; line-height: 1.5;
-  color: rgba(150,180,240,0.68);
-}
 /* A certified vertex stays readable at the low end of its axis. */
 .intv6-radar .intcc-radar-dot { r: 2.6; }
 
@@ -26037,27 +26013,10 @@ summary:focus-visible,
   color: var(--text-dim); text-align: center;
 }
 
-/* RADAR · disclosure nativo. La card principal respira y no se pierde una
-   sola palabra: lo que se pliega es la EXPLICACIÓN, nunca la limitación —los
-   ejes sin datos siguen atenuados en el propio radar. */
-.intv8-radar-more { margin: 10px 0 0; }
-.intv8-radar-summary {
-  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11.5px; font-weight: 600; color: var(--text-dim);
-  padding: 4px 2px; border-radius: 8px;
-  transition: color 160ms var(--ease-premium, ease);
-}
-.intv8-radar-summary::-webkit-details-marker { display: none; }
-.intv8-radar-summary::after {
-  content: '›'; font-size: 14px; line-height: 1;
-  transition: transform 200ms var(--ease-premium, ease);
-}
-.intv8-radar-more[open] > .intv8-radar-summary { color: var(--text-bright); }
-.intv8-radar-more[open] > .intv8-radar-summary::after { transform: rotate(90deg); }
-.intv8-radar-summary:hover { color: var(--text-bright); }
-.intv8-radar-summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
-.intv8-radar-more-body { padding-top: 6px; }
-.intv8-radar-more-body > :first-child { margin-top: 0; }
+/* El disclosure «Qué mide cada eje» del RADAR se RETIRÓ por decisión del founder:
+   era un control, un hueco reservado y un elemento enfocable al pie de la card, y
+   la limitación ya se ve en el propio SVG (ejes atenuados, rótulo «sin datos»).
+   Su CSS se va con él. */
 
 /* PREGUNTA CONTEXTUAL. Vive dentro del hero que ya existe, con la primitiva de
    chip que ya existe: ni card nueva, ni slot nuevo de rejilla, ni lenguaje
@@ -26111,17 +26070,10 @@ button.intv8-intel-opt:focus-visible { outline: 2px solid var(--focus-ring-color
 .intcc-hero[data-has-question="1"] { padding-top: 22px; padding-bottom: 22px; }
 .intcc-hero[data-has-question="1"] .intcc-hero-intel { align-items: center; }
 
-/* SALUD · confianza y nota de contexto. La confianza es un EJE APARTE del
-   anillo: un dato que falta la baja y nunca sube el número. */
-.intv8-h-conf {
-  display: inline-flex; align-items: center; gap: 5px;
-  margin-top: 4px; padding: 2px 9px; border-radius: 999px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
-}
-.intv8-h-conf::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.intv8-h-conf.is-sufficient { color: #9fc2ff; background: var(--aurix-blue-soft); }
-.intv8-h-conf.is-partial    { color: #f3cf9a; background: rgba(233,168,87,0.13); }
-.intv8-h-conf.is-unavailable{ color: var(--text-dim); background: var(--elev-1); }
+/* La chip de COBERTURA salió de la superficie con el resto de textos: SALUD es
+   título + anillo + % + UN estado. La confianza sigue publicándose en el contrato
+   del owner, que es donde se audita. Se conserva la nota de contexto, que es lo
+   único que el usuario DECLARÓ y no un derivado. */
 .intv8-h-note {
   display: block; max-width: 24ch; margin: 6px auto 0;
   font-size: 10.5px; line-height: 1.35; color: #9fc2ff; text-align: center;
@@ -26286,4 +26238,72 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   /* En móvil el orbe vive en su propia card, así que no hay corredor que reservar. */
   .aurix-intv6 { --intel-orb-overlap: 0px; --intel-orb-gap: 0px; }
   .intv10-mem-scroll { max-height: 260px; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   AURIX INTELLIGENCE · HERO FINALIZATION V1
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* SALUD MINIMALISTA. Título + anillo + % + UN estado, con aire por arriba y por
+   abajo para que nada quede pegado al borde inferior — que es como se veía en la
+   captura con tres textos apilados bajo el donut. */
+.intcc-hero-score { justify-content: center; gap: 12px; padding-top: 18px; padding-bottom: 18px; }
+.intcc-hero-score .intcc-health-badge { margin: 0; font-size: 12.5px; letter-spacing: 0.04em; }
+
+/* QUESTION DOCK · al PIE del contenido, que es donde la captura demuestra que hay
+   espacio libre. El cuerpo pasa a columna y la dock se empuja abajo con
+   `margin-top: auto`, así que el espacio negativo cuando NO hay pregunta es
+   INTENCIONADO y no un agujero donde falta algo.
+   `min-height` es lo que garantiza CERO SALTOS: la altura del hero es la misma con
+   y sin pregunta, así que Salud, Radar, Factores y Explora no se mueven nunca. */
+.intcc-hero-body { display: flex; flex-direction: column; }
+.intv11-dock {
+  margin-top: auto; padding: 12px 14px 10px; border-radius: 14px;
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+  /* La dock vive DENTRO del cuerpo, que ya reserva el corredor de la esfera
+     (--intel-orb-overlap + --intel-orb-gap), así que su borde derecho termina
+     antes del halo por construcción y no por un ajuste a ojo. */
+  max-width: 100%; box-sizing: border-box;
+}
+.intv11-dock-label {
+  display: block; margin-bottom: 6px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: rgba(159, 194, 255, 0.85);
+}
+.intv11-dock .intv8-intel-q-text { margin: 0 0 8px; font-size: 13px; line-height: 1.4; }
+/* La pausa entra en la MISMA fila que las opciones. Cada línea que la dock ahorra
+   es altura que el hero no tiene que reservar, y el `min-height` de abajo es lo
+   que evita el salto: cuanto más compacta la dock, menos espacio negativo queda
+   cuando no hay pregunta. */
+.intv11-dock .intv8-intel-q-opts { align-items: center; }
+.intv11-dock .intv8-intel-pause { margin: 0 0 0 4px; }
+/* Aparición sutil, y sólo la dock: nada que mueva otras cards. */
+@media (prefers-reduced-motion: no-preference) {
+  .intv11-dock { animation: intv11DockIn 220ms var(--ease-premium, ease) both; }
+  @keyframes intv11DockIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+
+@media (min-width: 1024px) {
+  /* Altura estable del hero, y conviene ser EXACTO sobre su alcance: `min-height`
+     es un SUELO, así que garantiza que no haya salto mientras el bloque de texto
+     quepa dentro —el caso normal y el de la captura de producción: titular de una
+     o dos líneas y hasta cuatro señales—. Con un titular de tres líneas Y cuatro
+     señales envueltas el cuerpo puede superarlo y entonces el hero sí crece con la
+     dock. No se fuerza un techo porque eso exigiría recortar contenido, que está
+     prohibido. El único instante en que un desplazamiento es perceptible es justo
+     al responder la última pregunta. */
+  .intcc-hero-body { min-height: 228px; }
+  /* Las señales admiten 2–4 sin romper: envuelven en su propio espacio y nunca
+     alcanzan el corredor de la esfera. */
+  .intcc-hero .intcc-chips { flex-wrap: wrap; row-gap: 6px; }
+}
+@media (max-width: 1023px) and (min-width: 641px) {
+  .intcc-hero-body { min-height: 216px; }
+}
+@media (max-width: 640px) {
+  /* En móvil la esfera vive en su propia card, así que la dock no compite con ella
+     por el espacio: ocupa el ancho completo y no se reserva altura. */
+  .intcc-hero-body { min-height: 0; }
+  .intv11-dock { margin-top: 12px; padding: 12px; }
+  .intv11-dock .intv8-intel-q-text { font-size: 12.5px; }
 }

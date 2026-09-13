@@ -79,8 +79,15 @@ function extractDict(langIdx) {
     // la pregunta contextual publican estas claves. Si falta una en CUALQUIERA de los
     // dos idiomas, `extractDict` revienta aquí y 13.6 ve el texto vacío: es
     // exactamente para eso.
-    'intel_disp_title','intel_disp_even','intel_disp_lopsided','intel_disp_detail','intel_disp_na',
-    'intel_disp_na_single','intel_disp_na_uncert','intel_disp_na_generic','intel_disp_depth',
+    // HERO FINALIZATION · SALUD quedó minimalista (título + anillo + % + UN estado),
+    // así que las claves del detalle, de las etiquetas de reparto y de la chip de
+    // cobertura se retiraron con su superficie. Las que quedan son las que se
+    // publican de verdad.
+    'intel_disp_title','intel_disp_na','intel_disp_na_single','intel_disp_na_uncert',
+    'intel_disp_na_generic','intel_disp_depth',
+    'intel_h_v_weak','intel_h_v_watch','intel_h_v_stable','intel_h_v_balanced',
+    'intel_h_v_solid','intel_h_v_excellent','intel_dock_label',
+    'intel_now_monitoring','intel_sub_monitoring',
     'intel_now_material','intel_now_discovery','intel_now_changed','intel_now_stable_nc',
     'intel_now_stable','intel_now_history','intel_now_context',
     'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
@@ -94,9 +101,7 @@ function extractDict(langIdx) {
     'intel_ctx_partial','intel_radar_more',
     // SPEC AURIX INTELLIGENCE · SALUD V2 — la card vuelve a llamarse Salud y publica
     // estado + confianza + componentes; y las preguntas ganan declinar y pausar.
-    'intel_h_no_positions','intel_h_single','intel_h_coverage','intel_h_few','intel_h_uneven',
-    'intel_h_spread','intel_h_d_single','intel_h_d_empty','intel_h_note_deliberate',
-    'intel_h_conf_high','intel_h_conf_partial','intel_h_conf_low',
+    'intel_h_no_positions','intel_h_coverage','intel_h_d_empty','intel_h_note_deliberate',
     'intel_opt_decline','intel_q_pause','intel_q_paused','intel_q_declined'];
   const missing = [];
   const extras = extraKeys.map(k => {
@@ -119,7 +124,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
-  '_INTV4_SHOWN_KEY','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
+  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
@@ -144,7 +149,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -772,9 +777,14 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.8 the uncertified axes are visually attenuated, and only those two',
     [five, founder, one].every(x => x.dimAxes === 2
       && (x.html.match(/class="intcc-radar-label is-unavailable"/g) || []).length === 2));
+  // RE-DECIDIDO · HERO FINALIZATION: el founder retiró «Qué mide cada eje». Lo que
+  // esta aserción protege —que un eje pendiente NO se quede en silencio— sigue
+  // siendo cierto y de forma más directa: su nombre y la marca «sin datos» están
+  // en el propio SVG, donde el usuario está mirando, sin abrir nada.
   ok('13B.9 the pending dimensions are NAMED in words, not left silent',
-    /intv7-radar-pending/.test(founder.html)
-    && /Estabilidad/.test(founder.html) && /Crecimiento/.test(founder.html));
+    /Estabilidad/.test(founder.html) && /Crecimiento/.test(founder.html)
+    && /intcc-radar-val is-unavailable/.test(founder.html)
+    && /sin datos/.test(founder.html));
   // With NO valuation the whole surface is the pre-existing honest empty state —
   // there is no cockpit to put a radar in, and that is correct. So the radar's own
   // "one certified axis" path is exercised at the MODULE level, where it lives.
@@ -961,15 +971,21 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
     (() => { const a = axesOf(DIPPED);
       return a.pending.growth === 'no_certifiable_scale'
         && /owner: null/.test(konstSrc('_INTV7_RADAR_DIMS')); })());
-  ok('15.5 el disclosure nombra cada eje pendiente con SU causa (dos límites distintos)',
+  // RE-DECIDIDO · la CAUSA por eje deja de publicarse en la card (era el contenido
+  // del disclosure retirado). El mapeo de causas SE CONSERVA porque Advanced
+  // Intelligence lo necesita, y el eje sigue rotulado y atenuado en el radar.
+  ok('15.5 cada eje pendiente sigue nombrado y atenuado, y su causa sigue mapeada',
     (() => { const a = section(render(SHORT).html, 'intcc-radar');
-      return /intv7-radar-pending/.test(a)
-        && /Estabilidad: hay historial/.test(a)
-        && /Crecimiento: el dato existe/.test(a); })(),
-    section(render(SHORT).html, 'intcc-radar').slice(0, 700));
-  ok('15.6 un eje medido no se dibuja sin decir QUÉ mide',
-    /intv7-radar-mean/.test(dipped.html) && /máximo que tu cartera conservó/.test(dipped.html)
-    && !/intv7-radar-mean/.test(render(SHORT).html));
+      return /is-unavailable/.test(a) && /sin datos/.test(a)
+        && !/intv7-radar-pending/.test(a)
+        && /function _intv7PendingReasonKey\(reason\)/.test(app); })(),
+    section(render(SHORT).html, 'intcc-radar').slice(0, 400));
+  // RE-DECIDIDO · el párrafo permanente que explicaba la unidad de Estabilidad se
+  // retiró con el disclosure. Un eje MEDIDO sigue publicando su cifra, que es la
+  // forma en que el radar dice qué mide sin un párrafo debajo.
+  ok('15.6 un eje medido publica su cifra, y uno sin medir su marca de ausencia',
+    /intcc-radar-val/.test(dipped.html) && !/intv7-radar-mean/.test(dipped.html)
+    && /sin datos/.test(render(SHORT).html));
   ok('15.7 el eje nuevo respeta el contrato: porcentaje en rango y sin vértice si no está medido',
     (() => { const vals = attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
       const measured = vals.filter(v => /^\d+%$/.test(v));

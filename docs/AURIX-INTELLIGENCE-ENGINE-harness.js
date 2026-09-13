@@ -566,11 +566,21 @@ ok('M.5 un solo tono para el índice: no vuelve a ser una escalera verde→roja'
 ok('M.6 el chip «A vigilar» deja de depender de un score retirado',
   !/score\.score/.test(bare(fnSrc('_intv5Chips'))));
 const radarFn = bare(fnSrc('_intv7RadarHtml'));
-ok('M.7 el radar pliega sus tres párrafos permanentes en un disclosure NATIVO',
-  /<details class="intv8-radar-more"/.test(radarFn) && /<summary/.test(radarFn));
-ok('M.8 …sin perder una palabra: leyenda, significado y ejes pendientes siguen ahí',
-  /intv7_radar_legend/.test(radarFn) && /intv7_stab_meaning/.test(radarFn)
-  && /intv7-radar-pending/.test(radarFn));
+// RE-DECIDIDO · HERO FINALIZATION: el founder retira «Qué mide cada eje». El
+// disclosure resolvió un problema real (tres párrafos permanentes) pero seguía
+// siendo un control, un hueco reservado y un elemento enfocable al pie de la card.
+// Lo que estas aserciones protegían de verdad —que la LIMITACIÓN se vea— se
+// comprueba ahora donde el usuario la está mirando: en el propio SVG.
+ok('M.7 el radar ya no tiene disclosure ni control alguno al pie',
+  !/<details/.test(radarFn) && !/<summary/.test(radarFn)
+  && !/intv7-radar-pending|intv6-radar-legend|intv7-radar-mean/.test(radarFn));
+ok('M.8 …y la limitación sigue VISIBLE sin abrir nada: eje atenuado y «sin datos»',
+  /is-unavailable/.test(bare(fnSrc('_intccRadarSvg')))
+  && /intv7_axis_unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
+ok('M.8b el radar no deja CSS huérfano de la superficie retirada',
+  !/intv8-radar-|intv7-radar-pending|intv6-radar-legend|intv7-radar-mean/.test(css));
+ok('M.8c …y conserva el mapeo de causas, que Advanced Intelligence necesitará',
+  /function _intv7PendingReasonKey\(reason\)/.test(src));
 ok('M.9 …y la limitación se sigue VIENDO sin abrir nada (ejes atenuados en el SVG)',
   /is-unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
 ok('M.10 la pregunta se pinta con la primitiva de chip existente, sin slot nuevo',
@@ -613,8 +623,8 @@ ok('N.3 el anillo del índice deja de ser verde de «bien»',
   /--health-ring-color:\s*var\(--aurix-blue\)/.test(newCss));
 ok('N.4 los controles nuevos tienen foco visible (teclado)',
   (newCss.match(/:focus-visible/g) || []).length >= 2);
-ok('N.5 el disclosure no depende de hover, que en móvil no existe',
-  /\.intv8-radar-summary\s*\{[\s\S]*?cursor: pointer/.test(newCss));
+ok('N.5 la dock de preguntas no depende de hover, que en móvil no existe',
+  /button\.intv8-intel-opt \{[\s\S]{0,200}cursor: pointer/.test(css));
 ok('N.6 hay ruta móvil declarada para lo táctil',
   /@media \(max-width: 640px\)[\s\S]*intv8-intel-opt/.test(newCss));
 // El §12 del SPEC exige tocar la composición del hero (safe-zone de la esfera y
@@ -623,14 +633,16 @@ ok('N.6 hay ruta móvil declarada para lo táctil',
 // selectores heredados, y sólo para propiedades de composición.
 const TOUCHED_EXISTING = ['.intcc-hero-body', '.intcc-hero-orb-wrap', '.intcc-hero[data-has-question',
   '.intcc-m-hero-text[data-has-question',
-  // El aviso legal baja una fila para que la línea compacta de «Qué ha cambiado»
-  // no cierre la pantalla por debajo de él. Se reubica la FILA y nada más.
-  '.aurix-intv6 .intcc-disclaimer'];
+  // SALUD minimalista: sólo composición vertical de su columna y el tamaño del
+  // badge de estado, que ahora es el único texto bajo el donut.
+  '.intcc-hero-score', '.intcc-hero .intcc-chips',
+  // Tokens del corredor de la esfera en el contenedor de la rejilla.
+  '.aurix-intv6 {'];
 // `.intcc-tl-item.is-declared …` es un selector COMPUESTO que exige una clase
 // NUEVA: no puede alterar el render de un item de memoria existente, así que es
 // scoping y no modificación. Se lista aparte para que quede explícito.
 const NEW_SCOPED = ['.intcc-tl-item.is-declared'];
-const isNew = l => /intv8-|intv9-|intv10-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
+const isNew = l => /intv8-|intv9-|intv10-|intv11-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
   // El contenedor de la rejilla sólo recibe TOKENS del corredor de la esfera.
   || l.trim().startsWith('.aurix-intv6 {');
 ok('N.7 sólo se tocan 4 selectores heredados, y son los que exige el hero adaptativo',
@@ -644,8 +656,11 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
       const head = (rule.match(/^[\s]*([^{]+)\{/) || [])[1] || '';
       if (!TOUCHED_EXISTING.some(t => head.trim().startsWith(t))) return;
       const props = (rule.match(/[a-z-]+\s*:/g) || []).map(x => x.replace(/\s*:$/, ''));
-      props.forEach(pr => { if (!['padding-right', 'padding-top', 'padding-bottom', 'position',
-        'z-index', 'pointer-events', 'align-items', 'grid-row'].includes(pr)) bad.push(head.trim() + ' → ' + pr); });
+      const OK_PROPS = ['padding-right', 'padding-top', 'padding-bottom', 'position', 'z-index',
+        'pointer-events', 'align-items', 'grid-row', 'justify-content', 'gap', 'display',
+        'flex-direction', 'min-height', 'margin', 'font-size', 'letter-spacing',
+        'flex-wrap', 'row-gap'];
+      props.forEach(pr => { if (!OK_PROPS.includes(pr)) bad.push(head.trim() + ' → ' + pr); });
     });
     return bad.length === 0 ? true : bad; })() === true);
 ok('N.8b la superficie nueva declara `order` en móvil y tablet',
@@ -701,13 +716,17 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
   const sb2 = { console, Object, Number, Math, Array, JSON, isFinite, window: undefined };
   vm.createContext(sb2);
   vm.runInContext(fnSrc('_intv4T') + '\n' + fnSrc('_intv4Num') + '\n'
+    + block('const _AURIX_INTEL_HEALTH_POSITIVE = Object.freeze(', ');') + '\n'
+    + "const _AURIX_AI_SEVERITY = { NOTABLE_CHANGE: 'notable_change' };\n"
+    + fnSrc('_intelCoherentState') + '\n'
     + fnSrc('_intelDiscoveryText') + '\n' + fnSrc('_intelQuestionText') + '\n'
     + fnSrc('_intv5Reading') + '\n'
     + 'globalThis.READ = _intv5Reading; globalThis.DT = _intelDiscoveryText;'
     + 'globalThis.QT = _intelQuestionText;', sb2);
 
   const STATES = ['no_data', 'material_change', 'discovery', 'attention_material_fact',
-    'readings_changed', 'context_needed', 'insufficient_history', 'stable_no_change', 'stable'];
+    'readings_changed', 'context_needed', 'insufficient_history', 'stable_no_change', 'stable',
+    'monitoring'];
   const DISCOVERY_CODES = ['apparent_vs_effective_diversification', 'concentration_crossed_upward',
     'level_rose_on_capital_not_return', 'declared_goal_distant_from_observed_structure',
     'liquidity_fell_while_need_declared', 'reading_persists_across_observations',
@@ -1247,16 +1266,22 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
     !/intv8-h-comp|intv8-h-method/.test(cssRules)
     && !/<details class="intv8-h-method"/.test(src)
     && !/intel_h_method|intel_h_c_dispersion|intel_h_c_na/.test(src));
-  ok('V.2b …y el disclosure del RADAR, que el founder aprobó, sigue intacto',
-    /<details class="intv8-radar-more">/.test(src) && /intv7_radar_legend/.test(src)
-    && /\.intv8-radar-summary/.test(css));
+  // RE-DECIDIDO · el founder retiró también el del RADAR en esta intervención. Lo
+  // que queda certificado es que NO sobrevive ningún disclosure en Intelligence.
+  ok('V.2b ningún disclosure sobrevive en la superficie de Intelligence',
+    !/<details/.test(fnSrc('_intv7RadarHtml')) && !/<details/.test(fnSrc('_intccHealthScore')));
   ok('V.3 la METODOLOGÍA sigue publicándose en el contrato del owner',
     /components:\s*h\.components/.test(hs) && /explain:\s*t\('intel_disp_depth'\)/.test(hs)
     && /forbiddenFraming: \['grade', 'quality', 'advice'\]/.test(fnSrc('_aurixIntelHealth')));
-  ok('V.4 Salud conserva nombre, porcentaje, anillo, estado, efectivas y confianza',
+  // SALUD queda deliberadamente minimalista: título + anillo + % + UN estado.
+  // El detalle y la chip de cobertura se retiraron de la SUPERFICIE (siguen en el
+  // contrato del owner), así que lo que se certifica es justo esa reducción.
+  ok('V.4 Salud conserva nombre, anillo, porcentaje y UN estado',
     /esc\(t\('intcc_health_title'\)\)/.test(src) && /intcc-score-ring/.test(src)
-    && /intv8-disp-detail/.test(src) && /intv8-h-conf/.test(src)
-    && /score\.score != null \? '%' : ''/.test(src));
+    && /intcc-health-badge/.test(src) && /score\.score != null \? '%' : ''/.test(src));
+  ok('V.4b …y ya NO publica el detalle de posiciones ni la chip de cobertura',
+    !/intv8-h-conf/.test(src) && !/intel_disp_detail'\)\(/.test(src)
+    && !/intel_h_conf_high/.test(src));
   ok('V.5 el cálculo de Salud NO se tocó (mismo owner, misma fórmula reescalada)',
     /\(div\.effectiveN - 1\) \/ \(div\.positions - 1\)/.test(fnSrc('_aurixIntelDispersion')));
   // SAFE-ZONE
@@ -1343,8 +1368,7 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
     /\.intcc-tl-item:last-child \{ padding-bottom: 4px; \}/.test(css));
   ok('V.21 con pocos recuerdos NO se reserva hueco: es max-height, nunca height fija',
     /\.intv10-mem-scroll \{ max-height: 268px/.test(css)
-    && !/\.intv10-mem-scroll \{[^}]*[^-]height: \d/.test(css)
-    && !/min-height/.test(css.slice(css.indexOf('.intv10-mem-scroll'))));
+    && !/\.intv10-mem-scroll \{[^}]*[^-]height: \d/.test(css));
   ok('V.22 la card declara cuántos recuerdos hay y si va a hacer scroll',
     /data-rows="\$\{rows\.length\}"/.test(src) && /data-scroll=/.test(src));
   // NAMING
@@ -1359,6 +1383,93 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
   ok('V.23b …y esas dos siguen en la purga de cambio de usuario y en la adopción',
     /'aurix_auri_ctx_v1', 'aurix_auri_mem_v1'/.test(src)
     && /_AURIX_INTEL_CTX_KEY_LEGACY = 'aurix_auri_ctx_v1'/.test(src));
+}
+
+// ── W · HERO FINALIZATION ───────────────────────────────────────────────────
+group('W · finalización del hero · lo que la captura de producción demostró');
+{
+  // SALUD · vocabulario canónico SIN inventar umbrales
+  const hs2 = fnSrc('_intccHealthScore');
+  ok('W.1 el vocabulario canónico está declarado completo, de peor a mejor',
+    ['weak', 'watch', 'stable', 'balanced', 'solid', 'excellent']
+      .every(k => (src.match(new RegExp("intel_h_v_" + k + ":", 'g')) || []).length === 2));
+  ok('W.2 el mapeo usa los estados que la verdad YA produce: cero umbrales nuevos',
+    /single_position:  'intel_h_v_weak'/.test(hs2)
+    && /weight_in_few:    'intel_h_v_watch'/.test(hs2)
+    && /weight_uneven:    'intel_h_v_stable'/.test(hs2)
+    && /weight_spread:    'intel_h_v_balanced'/.test(hs2)
+    // Las bandas siguen siendo las del owner, intactas.
+    && /_AURIX_INTEL_HEALTH_BANDS = Object\.freeze\(\{ few: 40, spread: 60 \}\)/.test(src));
+  ok('W.3 SÓLIDA y EXCELENTE quedan declaradas y SIN USAR: no hay banda que las distinga',
+    !/'intel_h_v_solid'/.test(hs2) && !/'intel_h_v_excellent'/.test(hs2));
+  ok('W.4 «no puedo medirlo» NO recibe palabra del vocabulario de salud',
+    /coverage_limited: 'intel_h_coverage'/.test(hs2)
+    && /no_positions:     'intel_h_no_positions'/.test(hs2));
+  ok('W.5 fail-closed: sin datos no hay NaN, undefined ni geometría inválida',
+    (() => { const H = sandbox._aurixIntelHealth;
+      const bad = [H(null, null, null, null), H(undefined, undefined, null, null),
+        H({ status: 'x' }, { assetCount: 0, totUSD: 0 }, null, null)];
+      return bad.every(h => h.ring === null && h.ringPublishable === false
+        && typeof h.state === 'string' && !/NaN|undefined/.test(JSON.stringify(h))); })());
+  // COHERENCIA SEMÁNTICA
+  const CS = (() => { const sb5 = { Object, String };
+    vm.createContext(sb5);
+    vm.runInContext(block('const _AURIX_INTEL_HEALTH_POSITIVE = Object.freeze(', ');')
+      + '\n' + fnSrc('_intelCoherentState') + '\nglobalThis.f = _intelCoherentState;', sb5);
+    return sb5.f; })();
+  ok('W.6 EL DEFECTO DE LA CAPTURA: Salud equilibrada + nivel REPETIDO ya NO alarma',
+    CS('attention_material_fact', 'weight_spread', false) === 'monitoring');
+  ok('W.7 …pero un cambio material O un hecho NUEVO sí sostienen el titular',
+    CS('attention_material_fact', 'weight_spread', true) === 'attention_material_fact');
+  // Hallazgo de la revisión: mi primera versión sólo aceptaba `notable_change`, así
+  // que un `worth_reviewing` RECIÉN aparecido se degradaba mientras seguía
+  // publicado en «Lo que importa» — la misma contradicción al revés.
+  ok('W.7b el ancla se considera justificada salvo que el usuario YA la haya visto',
+    /persisting\.indexOf\(anchorId\) !== -1/.test(src)
+    && /hasMaterialChange \|\| !anchorIsRepeated/.test(src));
+  ok('W.7c …y sin lista de persistentes se FALLA HACIA MOSTRAR, nunca hacia callar',
+    /\? intel\.memory\.persisting : null/.test(src)
+    && /!!\(anchorId && persisting && persisting\.indexOf\(anchorId\) !== -1\)/.test(src));
+  ok('W.8 con Salud NO positiva el titular de atención se respeta tal cual',
+    CS('attention_material_fact', 'weight_in_few', false) === 'attention_material_fact'
+    && CS('attention_material_fact', 'single_position', false) === 'attention_material_fact');
+  ok('W.9 la coherencia no toca ningún otro estado',
+    ['material_change', 'discovery', 'readings_changed', 'context_needed',
+     'insufficient_history', 'stable_no_change', 'stable', 'no_data']
+      .every(st => CS(st, 'weight_spread', false) === st));
+  ok('W.10 y el estado nuevo tiene copy en los dos idiomas',
+    (src.match(/intel_now_monitoring:/g) || []).length === 2
+    && (src.match(/intel_sub_monitoring:/g) || []).length === 2);
+  // QUESTION DOCK
+  ok('W.11 la dock lleva su rótulo y vive al PIE del contenido',
+    /<div class="intv11-dock"/.test(src) && /intv11-dock-label/.test(src)
+    && /\.intv11-dock \{[\s\S]{0,120}margin-top: auto/.test(css));
+  ok('W.12 …dentro del cuerpo, que ya reserva el corredor de la esfera',
+    /\.intcc-hero-body \{ padding-right: calc\(var\(--intel-orb-overlap\) \+ var\(--intel-orb-gap\)\)/.test(css)
+    && /\.intv11-dock \{[\s\S]{0,400}max-width: 100%; box-sizing: border-box/.test(css));
+  // Enunciado honesto: `min-height` es un SUELO, así que la garantía vale mientras
+  // el bloque de texto quepa dentro (el caso normal y el de la captura). No se
+  // fuerza un techo porque eso exigiría recortar contenido.
+  ok('W.13 el hero reserva la altura de la dock: sin salto mientras el texto quepa',
+    /@media \(min-width: 1024px\)[\s\S]{0,900}\.intcc-hero-body \{ min-height: 228px; \}/.test(css)
+    && /@media \(max-width: 1023px\) and \(min-width: 641px\)[\s\S]{0,200}min-height: 216px/.test(css));
+  ok('W.13b …y el CSS declara el alcance real de esa garantía, sin prometer un techo',
+    /es un SUELO, así que garantiza/.test(css) && /al responder la última pregunta/.test(css));
+  ok('W.13c la dock se compacta para que el espacio reservado sea el mínimo',
+    /\.intv11-dock \.intv8-intel-pause \{ margin: 0 0 0 4px; \}/.test(css)
+    && /\.intv11-dock \.intv8-intel-q-opts \{ align-items: center; \}/.test(css));
+  ok('W.14 sin pregunta NO se pinta caja vacía ni texto de relleno',
+    /const intelQHtml = intelQ \? \(\(\) => \{/.test(src)
+    && !/no hay preguntas|No questions/i.test(src));
+  ok('W.15 en móvil la dock no compite con la esfera ni reserva altura',
+    /@media \(max-width: 640px\)[\s\S]{0,500}\.intcc-hero-body \{ min-height: 0; \}/.test(css));
+  ok('W.16 la animación es sutil y respeta reduced-motion',
+    /@media \(prefers-reduced-motion: no-preference\)[\s\S]{0,200}intv11DockIn/.test(css)
+    && /220ms/.test(css));
+  ok('W.17 las opciones certificadas siguen ahí: responder, declinar y pausar',
+    /data-intel-answer="__decline"/.test(src) && /data-intel-answer="__pause"/.test(src));
+  ok('W.18 las señales admiten 2–4 sin romper: envuelven en su propio espacio',
+    /\.intcc-hero \.intcc-chips \{ flex-wrap: wrap; row-gap: 6px; \}/.test(css));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');
