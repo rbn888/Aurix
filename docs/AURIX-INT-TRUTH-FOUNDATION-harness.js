@@ -143,17 +143,40 @@ console.log('AURIX-INT-TRUTH-FOUNDATION — SPEC INT.01 · Intelligence Truth Fo
 // ════════════════════════════════════════════════════════════════════════════
 // 1 · ONE HEALTH SCORE — Intelligence cannot contradict the canonical owner
 // ════════════════════════════════════════════════════════════════════════════
-console.log('1 · Single canonical health score (SPEC 5.A):');
+// RE-DECIDIDO POR SPEC AURI · FASE 6, y conviene dejar escrito POR QUÉ.
+//
+// Este bloque certificaba «un solo Health Score canónico: las dos superficies
+// publican el MISMO número para el mismo snapshot». Era el invariante correcto
+// mientras las dos publicaran SALUD. La revisión financiera de AURI declaró ese
+// agregado NOT COMPUTABLE (la misma causa penalizada cuatro veces —100% BTC =
+// 10/100—, el dato ausente que no resta y por tanto sube la nota, una caída de 24 h
+// moviendo un índice estructural, y un `cashPct === 0 → −5` que afirma que estar
+// invertido es menos sano). Intelligence dejó de publicar salud y publica DISPERSIÓN
+// DE PESOS, que es otra magnitud.
+//
+// Así que comparar las dos superficies ya no mide coherencia: mide dos cosas
+// distintas. Lo que se conserva —porque es la intención real del bloque— es que
+// NINGUNA superficie publique una cifra cuyo concepto no sea su dueño único, y que
+// el motor canónico siga INTACTO para Dashboard y Workspace: cero regresión ahí.
+//
+// Lo que ya NO se afirma: que Intelligence delegue en `_aurixHealthScore`. La
+// matemática del índice nuevo se certifica ejecutándola en
+// `AURIX-AURI-INTELLIGENCE-ENGINE-harness` (D.1–D.4b), no aquí.
+console.log('1 · Concept ownership after AURI (SPEC 5.A re-decided):');
 {
-  ok('1.1 _intccHealthScore delegates to the canonical _aurixHealthScore',
-    /_aurixHealthScore\(snap\)/.test(fnSrc('_intccHealthScore')));
-  ok('1.2 _intccHealthScore no longer runs a private deduction ladder',
+  ok('1.1 Intelligence YA NO publica el score heredado: no lo invoca',
+    !/_aurixHealthScore\s*\(/.test(fnSrc('_intccHealthScore')));
+  ok('1.1b …y delegar en el dueño ÚNICO del índice que sí publica',
+    /_aurixAuriDispersion\s*\(/.test(fnSrc('_intccHealthScore')));
+  ok('1.2 _intccHealthScore no corre ninguna escalera de penalizaciones propia',
     !/s\s*-=\s*\d/.test(fnSrc('_intccHealthScore')));
-  ok('1.3 the canonical engine keeps its own methodology (unchanged deductions)',
+  ok('1.3 el motor canónico conserva su metodología INTACTA (Dashboard/Workspace)',
     /s\s*-=\s*topIsRE\s*\?\s*8\s*:\s*25/.test(fnSrc('_aurixHealthScore')));
+  ok('1.3b …y sigue teniendo consumidores: retirarlo de Intelligence no lo desconectó',
+    (app.match(/_aurixHealthScore\(/g) || []).length >= 4);
 
-  // Sweep a grid of real snapshot shapes. The two surfaces must agree on the
-  // NUMBER and on the published SEMANTIC LABEL, for every one of them.
+  // Barrido de formas reales de snapshot. Ahora se comprueba que Intelligence NO
+  // publique salud en ninguna de ellas, y que el canónico sí la siga publicando.
   const grid = [];
   [null, 30, 45, 55, 65, 80, 95].forEach(top1 => {
     [1, 2, 3, 5].forEach(cats => {
@@ -168,32 +191,25 @@ console.log('1 · Single canonical health score (SPEC 5.A):');
       });
     });
   });
-  let maxDelta = 0, labelMismatch = 0, bandMismatch = 0;
+  const HEALTH_BANDS = ['solid', 'moderate', 'elevated', 'high'];
+  let healthLeak = 0, toneLeak = 0, canonAlive = 0;
   for (const s of grid) {
     const canon = run('_aurixHealthScore(' + JSON.stringify(s) + ')');
     const intel = run('_intccHealthScore(' + JSON.stringify(s) + ', { pct: 72 })');
-    const d = Math.abs((canon.score || 0) - (intel.score || 0));
-    if (d > maxDelta) maxDelta = d;
-    if (canon.label !== intel.label) labelMismatch++;
-    const expect = intel.score == null ? 'empty'
-      : (intel.score >= 80 ? 'solid' : intel.score >= 60 ? 'moderate' : intel.score >= 40 ? 'elevated' : 'high');
-    if (intel.band !== expect) bandMismatch++;
+    if (HEALTH_BANDS.includes(intel.band)) healthLeak++;
+    if (intel.score != null && intel.metric !== 'weight_dispersion') healthLeak++;
+    if (intel.tone !== 'neutral' && intel.score != null) toneLeak++;
+    if (canon.score != null) canonAlive++;
   }
-  ok('1.4 same snapshot ⇒ identical score on both surfaces (' + grid.length + ' snapshots, max Δ = ' + maxDelta + ')',
-    maxDelta === 0, 'maxDelta=' + maxDelta);
-  ok('1.5 same snapshot ⇒ identical published semantic label', labelMismatch === 0, 'mismatches=' + labelMismatch);
-  ok('1.6 the Intelligence band token IS the canonical 80/60/40 partition', bandMismatch === 0, 'mismatches=' + bandMismatch);
-
-  let toneCross = 0;
-  for (const s of grid) {
-    const r = run('_intccHealthScore(' + JSON.stringify(s) + ', { pct: 72 })');
-    if (r.score == null) continue;
-    const toneExpect = r.score >= 80 ? 'green' : r.score >= 60 ? 'lime' : r.score >= 40 ? 'amber' : r.score >= 20 ? 'orange' : 'red';
-    if (r.tone !== toneExpect) toneCross++;
-    if ((r.band === 'solid') !== (r.tone === 'green')) toneCross++;
-  }
-  ok('1.7 label band and visual tone come from the SAME split (no internal crossing)',
-    toneCross === 0, 'crossings=' + toneCross);
+  ok('1.4 Intelligence no publica una banda de SALUD en ninguna de las ' + grid.length + ' formas',
+    healthLeak === 0, 'leaks=' + healthLeak);
+  ok('1.5 …y su tono es UNO, neutro: no vuelve a ser una escalera verde→roja',
+    toneLeak === 0, 'leaks=' + toneLeak);
+  ok('1.6 el motor canónico sigue produciendo su score para el resto de superficies',
+    canonAlive > 0, 'alive=' + canonAlive);
+  ok('1.7 el índice publicado declara su magnitud, así que nadie puede leerlo como salud',
+    /metric:\s*'weight_dispersion'/.test(fnSrc('_intccHealthScore'))
+    && /forbiddenFraming/.test(fnSrc('_aurixAuriDispersion')));
 
   ok('1.8 fail closed: an empty snapshot publishes no score on either surface',
     run('_intccHealthScore(' + JSON.stringify(snapOf({ assetCount: 0, totUSD: 0 })) + ', null)').score === null

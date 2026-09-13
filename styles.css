@@ -26003,3 +26003,84 @@ summary:focus-visible,
   #marketPreviewOverlay .mkt-prv-ranges .aurix-chart-range { transition: none; }
   #marketPreviewOverlay .mkt-prv-change--pending::after { animation: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   SPEC AURI · INTELLIGENCE ENGINE — clases NUEVAS, cero reglas existentes
+   modificadas. Todas usan la escalera `--elev-*` (hue 165,196,255) en vez de
+   alfa blanco, que sobre el lienzo se lee como gris neutro; y el tono del
+   índice es UNO, institucional, porque pintar el reparto de pesos en una
+   escalera verde→roja convertiría una descripción en una nota.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* El índice de dispersión no es una nota: ni verde de «bien» ni rojo de
+   «mal». Azul institucional, el mismo de la marca, y la lectura la da la
+   etiqueta. El anillo hereda ese tono por la variable que ya consume. */
+.intcc-health-badge.is-tone-neutral {
+  color: #aecbff;
+  background: var(--aurix-blue-soft);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.34);
+}
+.intcc-hero.is-tone-neutral .intcc-score-ring,
+.intcc-m-health.is-tone-neutral .intcc-score-ring {
+  --health-ring-color: var(--aurix-blue);
+}
+/* El HECHO comprobable debajo del índice («tu peso se comporta como 5,6 de 9
+   posiciones»): es lo que hace auditable el número, así que acompaña siempre
+   al badge en vez de esconderse en una explicación. */
+.intv8-disp-detail {
+  display: block; max-width: 22ch; margin: 2px auto 0;
+  font-size: 11px; line-height: 1.35; font-weight: 500;
+  color: var(--text-dim); text-align: center;
+}
+
+/* RADAR · disclosure nativo. La card principal respira y no se pierde una
+   sola palabra: lo que se pliega es la EXPLICACIÓN, nunca la limitación —los
+   ejes sin datos siguen atenuados en el propio radar. */
+.intv8-radar-more { margin: 10px 0 0; }
+.intv8-radar-summary {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 600; color: var(--text-dim);
+  padding: 4px 2px; border-radius: 8px;
+  transition: color 160ms var(--ease-premium, ease);
+}
+.intv8-radar-summary::-webkit-details-marker { display: none; }
+.intv8-radar-summary::after {
+  content: '›'; font-size: 14px; line-height: 1;
+  transition: transform 200ms var(--ease-premium, ease);
+}
+.intv8-radar-more[open] > .intv8-radar-summary { color: var(--text-bright); }
+.intv8-radar-more[open] > .intv8-radar-summary::after { transform: rotate(90deg); }
+.intv8-radar-summary:hover { color: var(--text-bright); }
+.intv8-radar-summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+.intv8-radar-more-body { padding-top: 6px; }
+.intv8-radar-more-body > :first-child { margin-top: 0; }
+
+/* PREGUNTA CONTEXTUAL. Vive dentro del hero que ya existe, con la primitiva de
+   chip que ya existe: ni card nueva, ni slot nuevo de rejilla, ni lenguaje
+   visual nuevo que mantener. */
+.intv8-auri-q {
+  margin: 12px 0 0; padding: 10px 12px; border-radius: 12px;
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.16);
+}
+.intv8-auri-q-text {
+  margin: 0 0 8px; font-size: 12.5px; line-height: 1.4; font-weight: 600;
+  color: var(--text-bright);
+}
+.intv8-auri-q-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+button.intv8-auri-opt {
+  cursor: pointer; font-family: inherit;
+  background: var(--elev-2); border: 1px solid rgba(var(--aurix-blue-rgb), 0.22);
+  transition: border-color 160ms var(--ease-premium, ease), background 160ms var(--ease-premium, ease);
+}
+button.intv8-auri-opt:hover {
+  border-color: rgba(var(--aurix-blue-rgb), 0.5); background: var(--aurix-blue-soft);
+}
+button.intv8-auri-opt:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  /* Móvil primero para lo táctil: el objetivo de toque sube a 32px sin cambiar
+     la primitiva, y la pregunta ocupa el ancho de la card. */
+  button.intv8-auri-opt { height: 32px; font-size: 12px; }
+  .intv8-auri-q { margin-top: 10px; }
+  .intv8-disp-detail { max-width: 26ch; font-size: 10.5px; }
+}

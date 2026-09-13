@@ -72,7 +72,24 @@ function extractDict(langIdx) {
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
     // y 13B.9 dejaría de ver los nombres.
-    'intv7_pending_obs','intv7_pending_scale','intv7_pending_generic','intv7_stab_meaning'];
+    'intv7_pending_obs','intv7_pending_scale','intv7_pending_generic','intv7_stab_meaning',
+    // SPEC AURI — la lectura del hero, el índice de dispersión, los descubrimientos y
+    // la pregunta contextual publican estas claves. Si falta una en CUALQUIERA de los
+    // dos idiomas, `extractDict` revienta aquí y 13.6 ve el texto vacío: es
+    // exactamente para eso.
+    'auri_disp_title','auri_disp_even','auri_disp_lopsided','auri_disp_detail','auri_disp_na',
+    'auri_disp_na_single','auri_disp_na_uncert','auri_disp_na_generic','auri_disp_depth',
+    'auri_now_material','auri_now_discovery','auri_now_changed','auri_now_stable_nc',
+    'auri_now_stable','auri_now_history','auri_now_context',
+    'auri_sub_material','auri_sub_changed','auri_sub_stable_nc','auri_sub_history',
+    'auri_d_apparent','auri_d_conc_rising','auri_d_capital','auri_d_intent','auri_d_liq_need',
+    'auri_d_persisting','auri_d_combined',
+    'auri_q_conc_intent','auri_q_conc_why','auri_q_coverage','auri_q_coverage_why',
+    'auri_q_liq_need','auri_q_liq_why','auri_q_goal','auri_q_goal_why','auri_q_thanks',
+    'auri_opt_deliberate','auri_opt_not_deliberate','auri_opt_complete','auri_opt_partial',
+    'auri_opt_none_known','auri_opt_planned','auri_opt_imminent','auri_opt_preserve',
+    'auri_opt_grow','auri_opt_income','auri_opt_undecided',
+    'auri_ctx_partial','auri_radar_more'];
   const missing = [];
   const extras = extraKeys.map(k => {
     const occ = keyOccurrences(k);

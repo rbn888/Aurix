@@ -651,7 +651,16 @@ console.log('\n15 — Market V2 bloque 2A (view model de Asset Detail):');
 console.log('\n16 — Market V2 bloque 2B (header, precio y temporalidades):');
 {
   const vm2 = require('vm');
-  const b2 = cssCode.slice(cssCode.indexOf('#marketPreviewOverlay .mkt-prv-icon .asset-icon'));
+  // `b2` llegaba hasta EL FINAL DEL FICHERO, así que asumía que la ficha de Market
+  // es lo último de styles.css. Cualquier bloque añadido después caía dentro y 16.28
+  // lo leía como una fuga de la ficha: una trampa para el siguiente que añada CSS,
+  // no un defecto de Market. Se acota al propio bloque — hasta el siguiente
+  // encabezado de sección o el final, lo que llegue primero.
+  const _b2From = cssCode.indexOf('#marketPreviewOverlay .mkt-prv-icon .asset-icon');
+  // El marcador tiene que ser un SELECTOR, no un comentario: `cssCode` ya los ha
+  // eliminado (línea 13). Se usa el primer selector de la sección siguiente.
+  const _b2Next = cssCode.indexOf('.intcc-health-badge.is-tone-neutral', _b2From);
+  const b2 = cssCode.slice(_b2From, _b2Next === -1 ? undefined : _b2Next);
   const codeOf = (s) => String(s || '').replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
   const head   = codeOf(fnSource('_aurixMktRenderHead'));
