@@ -630,7 +630,9 @@ const TOUCHED_EXISTING = ['.intcc-hero-body', '.intcc-hero-orb-wrap', '.intcc-he
 // NUEVA: no puede alterar el render de un item de memoria existente, así que es
 // scoping y no modificación. Se lista aparte para que quede explícito.
 const NEW_SCOPED = ['.intcc-tl-item.is-declared'];
-const isNew = l => /intv8-|intv9-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t));
+const isNew = l => /intv8-|intv9-|intv10-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
+  // El contenedor de la rejilla sólo recibe TOKENS del corredor de la esfera.
+  || l.trim().startsWith('.aurix-intv6 {');
 ok('N.7 sólo se tocan 4 selectores heredados, y son los que exige el hero adaptativo',
   newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
     .every(l => isNew(l) || TOUCHED_EXISTING.some(t => l.trim().startsWith(t))),
@@ -646,14 +648,10 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
         'z-index', 'pointer-events', 'align-items', 'grid-row'].includes(pr)) bad.push(head.trim() + ' → ' + pr); });
     });
     return bad.length === 0 ? true : bad; })() === true);
-ok('N.8b las dos superficies nuevas declaran `order` en móvil y tablet',
-  // Sin esto valían `order: 0` en un contenedor flex-column cuyos hijos van de 1 a
-  // 10, así que se pintaban ANTES DEL HERO. Fue un FAIL real de la revisión.
-  /@media \(max-width: 1023px\)[\s\S]{0,900}\.intv9-disc\s*\{ order: 9; \}/.test(newCss)
-  && /\.intv9-changed-quiet \{ order: 9\.5; \}/.test(newCss));
-ok('N.8c la línea compacta va ANTES del aviso legal, no después',
-  /\.intv9-changed-quiet \{ grid-column: 1 \/ 13; grid-row: 6/.test(newCss)
-  && /\.aurix-intv6 \.intcc-disclaimer \{ grid-row: 7; \}/.test(newCss));
+ok('N.8b la superficie nueva declara `order` en móvil y tablet',
+  // Sin esto valía `order: 0` en un contenedor flex-column cuyos hijos van de 1 a
+  // 10, así que se pintaba ANTES DEL HERO. Fue un FAIL real de la revisión.
+  /@media \(max-width: 1023px\)[\s\S]{0,900}\.intv9-disc\s*\{ order: 9; \}/.test(newCss));
 ok('N.8d la celda de «descubrimientos» no puede tener dos ocupantes',
   /const discoveryHtml = discHtml \? '' :/.test(src));
 ok('N.9 la esfera no puede robar un click a la pregunta',
@@ -1164,9 +1162,16 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
       return missing.length === 0 ? true : missing; })() === true);
   // ── QUÉ HA CAMBIADO · compacto ──
   const chgFn = fnSrc('_intv4ChangedHtml');
-  ok('U.13 sin filas NO se pinta una card con título: una línea discreta',
-    /intv9-changed-quiet/.test(chgFn)
-    && chgFn.indexOf('intv9-changed-quiet') < chgFn.indexOf('intcc-card intv4-changed'));
+  // RE-DECIDIDO · STABILIZATION V1: «ausencia de novedad = ausencia de superficie».
+  // Antes esto certificaba una línea compacta; ahora no se emite NADA, ni card ni
+  // línea. La distinción entre las cuatro situaciones NO se pierde —sigue siendo
+  // verdad y sigue siendo diagnosticable— pero viaja en `data-changed-state` del
+  // contenedor raíz en vez de ocupar píxeles.
+  ok('U.13 sin cambio material no se emite NINGUNA superficie',
+    /if \(!rows\.length\) return \{ html: '', state: emptyKey/.test(chgFn));
+  ok('U.13b …y el estado viaja en el contenedor raíz, no en pantalla',
+    /data-changed-state="\$\{esc\(changed\.state\)\}"/.test(src)
+    && /data-changed-evidence=/.test(src));
   ok('U.14 …y las cuatro frases distintas del estado vacío se conservan',
     /intv4_changed_empty/.test(chgFn) && /intv4_changed_others_none/.test(chgFn)
     && /intv4_changed_all_published/.test(chgFn) && /intv4_changed_stable/.test(chgFn));
@@ -1174,9 +1179,11 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
     /data-state="rows"/.test(chgFn) && /intv4-chg-list/.test(chgFn));
   ok('U.16 la rejilla ya recompone sola cuando la card desaparece',
     /:not\(:has\(\.intv4-changed\)\) \.intv5-structure \{ grid-column: 1 \/ 13/.test(css));
-  ok('U.17 la línea compacta vive FUERA de las filas de cards (1–4) y antes del aviso legal',
-    /\.intv9-changed-quiet \{ grid-column: 1 \/ 13; grid-row: 6/.test(css)
-    && /\.aurix-intv6 \.intcc-disclaimer \{ grid-row: 7; \}/.test(css));
+  ok('U.17 el aviso legal recupera su fila: ya no hay línea que lo desplace',
+    !/intv9-changed-quiet/.test(css) && !/\.aurix-intv6 \.intcc-disclaimer \{ grid-row: 7/.test(css));
+  ok('U.17b la rejilla recompone sola al retirar ESTRUCTURA y «Qué ha cambiado»',
+    /:not\(:has\(\.intv5-structure\)\) \.intv4-changed \{ grid-column: 1 \/ 13/.test(css)
+    && /:not\(:has\(\.intv4-changed\)\) \.intv5-structure \{ grid-column: 1 \/ 13/.test(css));
   // ── EXPLORA · deja de ser fija ──
   const expFn = fnSrc('_intv4ExploreHtml');
   ok('U.18 Explora ordena por relevancia AHORA y por lo menos visto, sin azar',
@@ -1224,6 +1231,134 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
         && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel\)/.test(r)
         && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields\)/.test(r)
         && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
+}
+
+// ── V · STABILIZATION V1 ────────────────────────────────────────────────────
+group('V · estabilización · lo que el founder reprodujo en QA autenticada');
+{
+  const hs = fnSrc('_intccHealthScore');
+  ok('V.1 «Cómo se calcula» ya NO existe como interacción pública',
+    !/intv8-h-method/.test(src) && !/\.intv8-h-method/.test(css)
+    && !/intel_h_method'\)\)/.test(src));
+  // Se comprueba que no quede REGLA (selector + bloque), no que no se mencione en
+  // un comentario que documenta la retirada.
+  const cssRules = css.split('\n').filter(l => /^\s*[.#][a-z]/i.test(l)).join('\n');
+  ok('V.2 …y no queda CSS huérfano, ni copy muerta, ni control invisible enfocable',
+    !/intv8-h-comp|intv8-h-method/.test(cssRules)
+    && !/<details class="intv8-h-method"/.test(src)
+    && !/intel_h_method|intel_h_c_dispersion|intel_h_c_na/.test(src));
+  ok('V.2b …y el disclosure del RADAR, que el founder aprobó, sigue intacto',
+    /<details class="intv8-radar-more">/.test(src) && /intv7_radar_legend/.test(src)
+    && /\.intv8-radar-summary/.test(css));
+  ok('V.3 la METODOLOGÍA sigue publicándose en el contrato del owner',
+    /components:\s*h\.components/.test(hs) && /explain:\s*t\('intel_disp_depth'\)/.test(hs)
+    && /forbiddenFraming: \['grade', 'quality', 'advice'\]/.test(fnSrc('_aurixIntelHealth')));
+  ok('V.4 Salud conserva nombre, porcentaje, anillo, estado, efectivas y confianza',
+    /esc\(t\('intcc_health_title'\)\)/.test(src) && /intcc-score-ring/.test(src)
+    && /intv8-disp-detail/.test(src) && /intv8-h-conf/.test(src)
+    && /score\.score != null \? '%' : ''/.test(src));
+  ok('V.5 el cálculo de Salud NO se tocó (mismo owner, misma fórmula reescalada)',
+    /\(div\.effectiveN - 1\) \/ \(div\.positions - 1\)/.test(fnSrc('_aurixIntelDispersion')));
+  // SAFE-ZONE
+  ok('V.6 el corredor de la esfera se CALCULA, no se estima a ojo',
+    /--intel-orb-overlap: 20px; --intel-orb-gap: 34px;/.test(css)
+    && /\.intcc-hero-body \{ padding-right: calc\(var\(--intel-orb-overlap\) \+ var\(--intel-orb-gap\)\)/.test(css));
+  ok('V.6b …y cubre el HALO, que se extiende más allá de la caja del orbe',
+    (() => { // Geometría real leída del CSS, no un número inventado.
+      const orb = parseInt((css.match(/\.intcc-hero-orb-wrap \.intcc-orb \{ width: (\d+)px/) || [, '0'])[1], 10);
+      const inset = parseFloat((css.match(/\.intcc-orb-glow \{[\s\S]{0,80}inset: -([\d.]+)%/) || [, '0'])[1]);
+      const blur = parseFloat((css.match(/\.intcc-orb-glow \{[\s\S]{0,300}filter: blur\(([\d.]+)px\)/) || [, '0'])[1]);
+      const stop = parseFloat((css.match(/transparent (\d+)%\)/) || [, '74'])[1]) / 100;
+      // Radio del halo, punto en que su degradado es transparente, y cuánto de eso
+      // sobresale del borde del orbe.
+      const glowR = (orb * (1 + 2 * inset / 100)) / 2;
+      const visible = Math.max(0, glowR * stop - orb / 2) + blur;
+      const corridor = 20 + 34;
+      return orb === 112 && inset > 0 && corridor >= 20 + visible; })());
+  ok('V.7 la pregunta no puede rebasar su contenedor ni recortarse con overflow',
+    /\.intv8-intel-q \{ max-width: 100%; box-sizing: border-box; \}/.test(css)
+    && !/\.intv8-intel-q \{[^}]*overflow: hidden/.test(css));
+  ok('V.8 en móvil el corredor es 0: el orbe vive en su propia card',
+    /@media \(max-width: 640px\)[\s\S]{0,400}--intel-orb-overlap: 0px; --intel-orb-gap: 0px;/.test(css));
+  ok('V.9 la esfera sigue sin poder robar un click',
+    /\.intcc-hero-orb-wrap \{[^}]*pointer-events: none/.test(css));
+  // HERO · dos composiciones
+  // Enunciado corregido tras la revisión: `align-items: stretch` iguala columnas y
+  // la altura la fija Salud, así que esto NO contrae el hero — deja de reservar el
+  // espacio de la pregunta. Lo que bajó la altura de verdad fue retirar el
+  // disclosure de Salud. El assert dice exactamente eso y ni una palabra más.
+  ok('V.10 el hero deja de reservar el espacio de la pregunta cuando no hay ninguna',
+    /\[data-has-question="0"\] \.intcc-hero-intel \{ padding-top: 12px/.test(css)
+    && /\[data-has-question="1"\] \.intcc-hero-intel \{ padding-top: 16px/.test(css)
+    && /\[data-has-question="0"\] \.intcc-hero-body \{ padding-top: 0/.test(css));
+  ok('V.10b …y el CSS no afirma una contracción que no hace',
+    !/se contrae de verdad/.test(css));
+  ok('V.10c el corredor también cubre la sombra del núcleo del orbe',
+    (() => { // núcleo `inset: 29%` sobre 112px ⇒ 32.5px de margen interior; su
+      // sombra base de 38px sobresale ~5.5px, muy por debajo del corredor.
+      const core = parseFloat((css.match(/\.intcc-orb-core \{[\s\S]{0,60}inset: (\d+)%/) || [, '0'])[1]);
+      return core === 29 && (38 - 112 * core / 100) < 34; })());
+  ok('V.11 …y el estado viaja en el DOM para que el CSS pueda distinguirlos',
+    /data-has-question="\$\{intelQHtml \? '1' : '0'\}"/.test(src));
+  // ESTRUCTURA retirada
+  ok('V.12 ESTRUCTURA ya no se renderiza como card',
+    /const structureHtml = '';/.test(src));
+  ok('V.13 …pero su owner y sus datos siguen INTACTOS para el motor y los gates',
+    /function _intv5StructureHtml\(core, esc\)/.test(src)
+    && /effective_holdings/.test(fnSrc('_intv5StructureHtml')));
+  // MEMORIA V2 · se EJECUTA
+  const sb4 = { console, Object, Number, Math, Array, Set, JSON, isFinite, window: undefined };
+  vm.createContext(sb4);
+  sb4.t = k => ({ intv9_mem_goal_grow: 'g', intv9_mem_horizon_long: 'h' })[k];
+  sb4._INTV4_MEMORY_MAX = 8;
+  sb4._intv4MemoryEvents = (core) => ((core && core.ev) || []).map((e, i) =>
+    ({ f: { semanticKey: 'k' + i, window: { endAt: e }, causalRoot: 'wealth_level' }, txt: 'E' + i }));
+  sb4._intv4WhyText = () => '';
+  vm.runInContext(fnSrc('_intv4T') + '\n' + fnSrc('_intv4MemoryDeclared')
+    + '\n' + fnSrc('_intv4MemoryRows') + '\nglobalThis.ROWS = _intv4MemoryRows;', sb4);
+  const ctx9 = { context: { fields: {
+    primary_goal: { value: 'grow', provenance: 'user_answer', answeredAt: 5000 },
+    horizon: { value: 'long', provenance: 'user_answer', answeredAt: 100 } } } };
+  ok('V.14 la memoria presentada se acota a 8 recuerdos',
+    sb4.ROWS({ ev: [9000, 8000, 7000, 6000, 4000, 3000, 2000, 1000, 900, 800] }, [], ctx9).length === 8);
+  ok('V.15 …ordenada por lo más RECIENTE arriba, mezclando declarados e hitos',
+    (() => { const r = sb4.ROWS({ ev: [9000, 200] }, [], ctx9);
+      return r[0].at === 9000 && r[1].at === 5000 && r[1].kind === 'declared'
+        && r[2].at === 200 && r[3].at === 100; })());
+  ok('V.16 …y sólo con recuerdos REALES: nada que no venga de una fuente o del usuario',
+    (() => { const r = sb4.ROWS({ ev: [] }, [], { context: { fields: {
+        primary_goal: { value: 'grow', provenance: 'inferred', answeredAt: 1 } } } });
+      return r.length === 0; })());
+  ok('V.17 UNA sola lista: la unión blanca del raíl se resuelve por estructura',
+    (() => { const m = fnSrc('_intv4MemoryHtml');
+      return (m.match(/class="intcc-tl-list"/g) || []).length === 1
+        && !/intv9-mem-declared/.test(m); })());
+  ok('V.18 scroll interno vertical, acotado, sin barra horizontal',
+    /\.intv10-mem-scroll \{ max-height: 268px; overflow-y: auto; overflow-x: hidden/.test(css)
+    && /<div class="intv10-mem-scroll">/.test(src));
+  ok('V.19 la barra es discreta y aparece al interactuar; en táctil no hay barra',
+    /\.intv10-mem-scroll:hover, \.intv10-mem-scroll:focus-within/.test(css)
+    && /@media \(max-width: 1023px\)[\s\S]{0,400}\.intv10-mem-scroll::-webkit-scrollbar \{ width: 0; \}/.test(css));
+  ok('V.20 el último recuerdo no queda cortado a ras del borde',
+    /\.intcc-tl-item:last-child \{ padding-bottom: 4px; \}/.test(css));
+  ok('V.21 con pocos recuerdos NO se reserva hueco: es max-height, nunca height fija',
+    /\.intv10-mem-scroll \{ max-height: 268px/.test(css)
+    && !/\.intv10-mem-scroll \{[^}]*[^-]height: \d/.test(css)
+    && !/min-height/.test(css.slice(css.indexOf('.intv10-mem-scroll'))));
+  ok('V.22 la card declara cuántos recuerdos hay y si va a hacer scroll',
+    /data-rows="\$\{rows\.length\}"/.test(src) && /data-scroll=/.test(src));
+  // NAMING
+  // Las ÚNICAS apariciones permitidas son los nombres ANTERIORES de las dos claves
+  // de storage, que deben permanecer para purgarlas y adoptar el contexto que un
+  // usuario real ya pudo guardar. Son identificadores de DATO, no naming de
+  // producto, y retirarlos perdería contexto de usuarios en producción.
+  ok('V.23 cero naming de la familia AURI salvo las dos claves de storage heredadas',
+    (() => { const hits = (src.match(/[A-Za-z_$0-9]*[Aa]uri(?![xX])[A-Za-z_$0-9]*/g) || []);
+      return hits.every(h => h === 'aurix_auri_ctx_v1' || h === 'aurix_auri_mem_v1'); })(),
+    Array.from(new Set((src.match(/[A-Za-z_$0-9]*[Aa]uri(?![xX])[A-Za-z_$0-9]*/g) || []))));
+  ok('V.23b …y esas dos siguen en la purga de cambio de usuario y en la adopción',
+    /'aurix_auri_ctx_v1', 'aurix_auri_mem_v1'/.test(src)
+    && /_AURIX_INTEL_CTX_KEY_LEGACY = 'aurix_auri_ctx_v1'/.test(src));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

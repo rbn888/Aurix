@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '680'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '681'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5205,12 +5205,6 @@ const T = {
     intel_h_conf_high:    'Cobertura completa',
     intel_h_conf_partial: 'Cobertura parcial',
     intel_h_conf_low:     'Cobertura insuficiente',
-    intel_h_method:       'Cómo se calcula',
-    intel_h_c_dispersion: 'Reparto del peso',
-    intel_h_c_effective:  'Posiciones efectivas',
-    intel_h_c_top:        'Posición principal',
-    intel_h_c_liquidity:  'Liquidez',
-    intel_h_c_na:         'no certificable',
     intel_disp_title:      'Dispersión de pesos',
     intel_disp_even:       'Reparto parejo',
     intel_disp_lopsided:   'Reparto desigual',
@@ -7686,12 +7680,6 @@ const T = {
     intel_h_conf_high:    'Full coverage',
     intel_h_conf_partial: 'Partial coverage',
     intel_h_conf_low:     'Insufficient coverage',
-    intel_h_method:       'How it is calculated',
-    intel_h_c_dispersion: 'Weight spread',
-    intel_h_c_effective:  'Effective positions',
-    intel_h_c_top:        'Main position',
-    intel_h_c_liquidity:  'Liquidity',
-    intel_h_c_na:         'not certifiable',
     intel_disp_title:      'Weight dispersion',
     intel_disp_even:       'Evenly spread',
     intel_disp_lopsided:   'Unevenly spread',
@@ -27943,7 +27931,7 @@ if (typeof window !== 'undefined') {
 // structured GAP (family + reason), never as 0 / neutral / an estimate.
 //
 // THE CORE EMITS NO COPY. Every fact is structured data with stable keys and
-// units; INT.04 renders it and Auris may INTERPRET it. Auris never owns a
+// units; INT.04 renders it and Intelligence may INTERPRET it. It never owns a
 // number. This is also why language cannot alter any figure or any selection:
 // there is no text in this layer to vary.
 //
@@ -29485,7 +29473,7 @@ const _AURIX_INTEL_PAUSE_MS        = 30 * 864e5;   // pausa explícita del usuar
 const _AURIX_INTEL_DEPTH = Object.freeze(['free', 'premium']);
 
 // ── PERSISTENCIA CON DUEÑO ──────────────────────────────────────────────────
-// Sellada con el propietario y FAIL-CLOSED: sin sello o con sello ajeno, AURI
+// Sellada con el propietario y FAIL-CLOSED: sin sello o con sello ajeno, el motor
 // actúa SIN contexto en vez de heredar el de otro. Es la lección de M.06 — el
 // agujero no fue un sello distinto, fue un sello NULO — así que aquí un owner
 // desconocido tampoco concede lectura. Las dos claves están además en
@@ -54485,6 +54473,11 @@ function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-u
     band:    h.state,
     tone:    'neutral',
     metric:  h.metric,
+    // `components` y `explain` SIGUEN publicándose: la metodología no se retira, se
+    // retira su DISCLOSURE. Al abrirlo, la columna de Salud se expandía en
+    // horizontal y comprimía Inteligencia en una columna estrecha — la composición
+    // del hero dejaba de ser aceptable. Quien necesite auditar el índice lo tiene
+    // en el contrato del owner y en el gate, no en una card que rompe el hero.
     label:   t(STATE_LABEL[h.state] || 'intel_h_coverage'),
     detail,
     confidence: h.confidence,
@@ -54895,7 +54888,7 @@ function buildMobileIntelligenceHint(snap, liq, radar) {
 // say it. Fail closed: an unmapped fact renders nothing rather than guessing.
 //
 // It is also fully deterministic and free: no generative call on render, so
-// opening Intelligence costs nothing. Auris may later INTERPRET these same
+// opening Intelligence costs nothing. Intelligence may later INTERPRET these same
 // structured facts; it is not needed to make the surface premium.
 
 // Progressive depth over the SAME facts (SPEC §10). One markup, three reading
@@ -54930,7 +54923,9 @@ function _aurixIntelRootsOf(intel) {
   });
   return out;
 }
-const _INTV4_MEMORY_MAX = 6;
+// Límite de la memoria PRESENTADA. No toca snapshots, historial, facts ni
+// `intelligence_context`: es cuántos recuerdos caben en la card.
+const _INTV4_MEMORY_MAX = 8;
 
 function _intv4T(key, ...args) {
   try {
@@ -55136,14 +55131,12 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   // más visible de la pantalla en una no-noticia. La frase NO se pierde —las cuatro
   // situaciones distintas siguen distinguiéndose, que fue trabajo deliberado— pero
   // pasa a una línea discreta en vez de un bloque.
-  if (!rows.length) {
-    return `
-      <p class="intv9-changed-quiet" data-evidence="${hasEvidence ? '1' : '0'}"
-         data-obs="${esc(String(obs.observations || 0))}"
-         data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
-         data-state="compact">${esc(_intv4T(emptyKey))}</p>`;
-  }
-  return `
+  // AUSENCIA DE NOVEDAD = AUSENCIA DE SUPERFICIE. Ni card ni línea: nada. La
+  // distinción entre las cuatro situaciones —que fue trabajo deliberado y sigue
+  // siendo verdad— no se pierde: viaja en `data-changed-state` del contenedor raíz,
+  // que es diagnosticable y ejecutable por el gate sin ocupar un píxel de pantalla.
+  if (!rows.length) return { html: '', state: emptyKey, evidence: hasEvidence };
+  return { state: 'rows', evidence: hasEvidence, html: `
     <section class="intcc-card intv4-changed" data-evidence="${hasEvidence ? '1' : '0'}"
              data-obs="${esc(String(obs.observations || 0))}"
              data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
@@ -55154,7 +55147,7 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
         </li>`).join('')}</ul>
-    </section>`;
+    </section>` };
 }
 
 // DISCOVERY — rendered ONLY when a strong enough insight exists. Absence of
@@ -55333,8 +55326,26 @@ function _intv4MemoryDeclared(intel, excludeFields) {
     .filter(x => !!x.txt)
     .sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
 }
+// UNA SOLA LISTA, y eso resuelve dos cosas a la vez. La unión visual blanca que
+// vio el founder venía de pintar DOS `.intcc-tl-list` seguidas: el raíl se dibuja
+// con `border-left` por ítem y el último de cada lista lo apaga, así que entre los
+// dos bloques quedaba un corte. Fusionando declarados y hitos en una única lista
+// ordenada por fecha, la continuidad del raíl es estructural y no hay nada que
+// parchear con CSS. Y el orden cronológico mezclado es además el correcto: un
+// recuerdo es un recuerdo, venga de una respuesta del usuario o de un hito medido.
+function _intv4MemoryRows(core, alreadyPublished, intel, excludeFields) {
+  const declared = _intv4MemoryDeclared(intel, excludeFields)
+    .map(d => ({ kind: 'declared', at: Number(d.at) || 0, txt: d.txt, field: d.field }));
+  const events = _intv4MemoryEvents(core, alreadyPublished)
+    .map(x => ({ kind: 'event', at: (x.f.window && (x.f.window.endAt || x.f.window.startAt)) || 0,
+      txt: x.txt, why: _intv4WhyText(x.f), key: x.f.semanticKey }));
+  return declared.concat(events)
+    .sort((a, b) => (b.at - a.at) || (a.kind < b.kind ? -1 : 1))
+    .slice(0, _INTV4_MEMORY_MAX);
+}
 function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
   const declared = _intv4MemoryDeclared(intel, excludeFields);
+  const rows = _intv4MemoryRows(core, alreadyPublished, intel, excludeFields);
   // Anything the Brief already said above is NOT repeated here. Memory is the
   // record of what is NOT in today's conclusion; showing the same sentence twice
   // on one screen is the repetition this whole block exists to remove.
@@ -55354,7 +55365,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
   const obs = (core.dataAvailability && core.dataAvailability.observation) || {};
   // Si Aurix RECUERDA algo que el usuario le dijo, la Memoria ya tiene contenido
   // propio: el estado «acumulando historial» sería falso.
-  if (!events.length && !declared.length) {
+  if (!rows.length) {
     const nObs = Number(obs.observations) || 0;
     if (nObs >= 3 && Number.isFinite(obs.startAt)) {
       const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
@@ -55382,27 +55393,19 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
   }
   return `
     <section class="intcc-card intcc-timeline intv4-memory"
-             data-declared="${declared.length}" data-events="${events.length}">
+             data-declared="${declared.length}" data-events="${events.length}"
+             data-rows="${rows.length}" data-scroll="${rows.length > 4 ? '1' : '0'}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-      ${declared.length ? `<ul class="intcc-tl-list intv9-mem-declared">${declared.map(d => `
-        <li class="intcc-tl-item is-declared" data-declared-field="${esc(d.field)}">
+      ${rows.length ? `<div class="intv10-mem-scroll"><ul class="intcc-tl-list">${rows.map(r => `
+        <li class="intcc-tl-item${r.kind === 'declared' ? ' is-declared' : ''}"${
+          r.kind === 'declared' ? ` data-declared-field="${esc(r.field)}"` : ` data-fact="${esc(r.key)}"`}>
           <span class="intcc-tl-node" aria-hidden="true"></span>
           <div class="intcc-tl-text">
-            <span class="intv4-mem-what">${esc(d.txt)}</span>
-            ${Number.isFinite(d.at) ? `<span class="intcc-tl-date">${esc(_intccDate(d.at))}</span>` : ''}
-          </div></li>`).join('')}</ul>` : ''}
-      ${events.length ? `<ul class="intcc-tl-list">${events.map(x => {
-        const at = x.f.window && (x.f.window.endAt || x.f.window.startAt);
-        const why = _intv4WhyText(x.f);
-        return `<li class="intcc-tl-item" data-fact="${esc(x.f.semanticKey)}">
-          <span class="intcc-tl-node" aria-hidden="true"></span>
-          <div class="intcc-tl-text">
-            <span class="intv4-mem-what">${esc(x.txt)}</span>
-            ${at ? `<span class="intcc-tl-date">${esc(_intccDate(at))}</span>` : ''}
-            ${why ? `<span class="intv4-mem-why">${esc(why)}</span>` : ''}
-          </div></li>`;
-      }).join('')}</ul>`
-      : (declared.length ? '' : `<p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>`)}
+            <span class="intv4-mem-what">${esc(r.txt)}</span>
+            ${r.at ? `<span class="intcc-tl-date">${esc(_intccDate(r.at))}</span>` : ''}
+            ${r.why ? `<span class="intv4-mem-why">${esc(r.why)}</span>` : ''}
+          </div></li>`).join('')}</ul></div>`
+      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>`}
     </section>`;
 }
 
@@ -56035,24 +56038,7 @@ function _renderIntelligenceCommandCenter() {
         ${score.confidence ? `<span class="intv8-h-conf is-${esc(score.confidence)}">${esc(
           t(score.confidence === 'sufficient' ? 'intel_h_conf_high'
             : score.confidence === 'partial' ? 'intel_h_conf_partial' : 'intel_h_conf_low'))}</span>` : ''}
-        ${(score.components && score.components.length) ? `
-          <details class="intv8-h-method">
-            <summary class="intv8-radar-summary">${esc(t('intel_h_method'))}</summary>
-            <div class="intv8-radar-more-body">
-              <ul class="intv8-h-comps">${score.components.map(c => {
-                const lbl = t('intel_h_c_' + (c.id === 'effective_holdings' ? 'effective'
-                  : c.id === 'top_position' ? 'top' : c.id === 'liquidity' ? 'liquidity' : 'dispersion'));
-                const val = (c.availability === 'available' && c.value != null)
-                  ? (c.unit === 'percent_of_investable' ? _intv4Num(c.value, 0) + '%'
-                     : c.unit === 'positions' ? _intv4Num(c.value, 1)
-                     : _intv4Num(c.value, 0))
-                  : t('intel_h_c_na');
-                return `<li class="intv8-h-comp"><span>${esc(lbl)}</span><b>${esc(String(val))}</b></li>`;
-              }).join('')}</ul>
-              <p class="intv6-radar-legend">${esc(score.explain)}</p>
-            </div>
-          </details>` : ''}
-      </div>
+        </div>
       <div class="intcc-hero-intel">
         <div class="intcc-hero-body">
           <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
@@ -56097,24 +56083,7 @@ function _renderIntelligenceCommandCenter() {
         ${chips.length ? `<ul class="intcc-m-concl">
           ${chips.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}
         </ul>` : ''}
-        ${(score.components && score.components.length) ? `
-          <details class="intv8-h-method">
-            <summary class="intv8-radar-summary">${esc(t('intel_h_method'))}</summary>
-            <div class="intv8-radar-more-body">
-              <ul class="intv8-h-comps">${score.components.map(c => {
-                const lbl = t('intel_h_c_' + (c.id === 'effective_holdings' ? 'effective'
-                  : c.id === 'top_position' ? 'top' : c.id === 'liquidity' ? 'liquidity' : 'dispersion'));
-                const val = (c.availability === 'available' && c.value != null)
-                  ? (c.unit === 'percent_of_investable' ? _intv4Num(c.value, 0) + '%'
-                     : c.unit === 'positions' ? _intv4Num(c.value, 1)
-                     : _intv4Num(c.value, 0))
-                  : t('intel_h_c_na');
-                return `<li class="intv8-h-comp"><span>${esc(lbl)}</span><b>${esc(String(val))}</b></li>`;
-              }).join('')}</ul>
-              <p class="intv6-radar-legend">${esc(score.explain)}</p>
-            </div>
-          </details>` : ''}
-      </div>
+        </div>
     </section>`;
 
   // ── COGNITIVE ORDER (SPEC §14) ───────────────────────────────────────────
@@ -56124,7 +56093,13 @@ function _renderIntelligenceCommandCenter() {
   const radarHtml     = _intv7RadarHtml(esc);
   const driversHtml   = _intv5DriversHtml(snap, esc);
   const exploreHtml   = _intv4ExploreHtml(core, esc, intel);
-  const structureHtml = _intv5StructureHtml(core, esc);
+  // ESTRUCTURA se RETIRA de la presentación por decisión de producto: republicaba
+  // diversificación efectiva, equivalencia de posiciones y concentración principal,
+  // que ya publican Salud, Radar y Factores. `_intv5StructureHtml` y todo lo que la
+  // alimenta quedan INTACTOS —los consumen el motor y los gates—, así que esto es
+  // una retirada de superficie, no de dominio. La rejilla se recompone sola:
+  // `:not(:has(.intv5-structure)) .intv4-changed { grid-column: 1/13 }` ya existe.
+  const structureHtml = '';
 
   // ── Row 3 — WHAT MATTERS TODAY · WEALTH MEMORY ──────────────────────────
   // The drivers module already publishes the top-3 breakdown, so the Brief does
@@ -56163,7 +56138,8 @@ function _renderIntelligenceCommandCenter() {
   const memoryClaims = _intv4MemoryClaims(core, publishedKeys);
 
   // ── Row 4 — WHAT CHANGED, an integrated band (not another big board) ────
-  const changedHtml   = _intv4ChangedHtml(core, esc, publishedKeys, memoryClaims);
+  const changed       = _intv4ChangedHtml(core, esc, publishedKeys, memoryClaims);
+  const changedHtml   = changed.html;
   // UN SOLO SITIO PARA «esto no lo había visto». El slot legacy (wow insight del
   // Core) y el nuevo son el mismo concepto, y las dos cards estaban pineadas a la
   // MISMA celda de la rejilla: se apilaban una sobre otra cuando ambas existían.
@@ -56198,7 +56174,10 @@ function _renderIntelligenceCommandCenter() {
   } catch (_) {}
 
   return `
-    <div class="aurix-intcc aurix-intv5 aurix-intv6">
+    <div class="aurix-intcc aurix-intv5 aurix-intv6"
+         data-changed-state="${esc(changed.state)}"
+         data-changed-evidence="${changed.evidence ? '1' : '0'}"
+         data-has-question="${intelQHtml ? '1' : '0'}">
       ${heroHtml}
       ${mHeroHtml}
       ${mHealthHtml}

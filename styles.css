@@ -20934,6 +20934,10 @@ ul.intv7-radar-pending > li::before {
   .intcc-explore   { grid-column: 9 / 13; grid-row: 2; }
   .intcc-watch     { grid-column: 1 / 7;  grid-row: 3; }
   .intcc-timeline  { grid-column: 7 / 13; grid-row: 3; }
+  /* STABILIZATION V1 — la card ESTRUCTURA se retiró de la presentación, pero su
+     pin se CONSERVA a propósito: reponerla es una línea en el renderer y sin su
+     composición volvería mal colocada. La rejilla no sufre por tenerlo, porque
+     `:not(:has(.intv5-structure))` de abajo ya recompone la fila sin ella. */
   .intv5-structure { grid-column: 1 / 7;  grid-row: 4; }
   .intv4-changed   { grid-column: 7 / 13; grid-row: 4; }
   .intv4-discovery { grid-column: 1 / 13; grid-row: 5; }
@@ -26123,22 +26127,14 @@ button.intv8-intel-opt:focus-visible { outline: 2px solid var(--focus-ring-color
   font-size: 10.5px; line-height: 1.35; color: #9fc2ff; text-align: center;
 }
 
-/* METODOLOGÍA detrás de una interacción secundaria: la card no se llena de
-   explicaciones técnicas, y quien quiera auditar el número tiene los componentes
-   uno a uno, incluidos los que NO son certificables. */
-.intv8-h-method { margin-top: 8px; width: 100%; }
-.intv8-h-comps { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
-.intv8-h-comp {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  font-size: 11.5px; color: var(--text-dim);
-  padding: 3px 8px; border-radius: 7px; background: var(--elev-1);
-}
-.intv8-h-comp b { color: var(--text-bright); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* El disclosure «Cómo se calcula» SE RETIRÓ de la superficie: al abrirlo, la
+   columna de Salud crecía en horizontal y comprimía Inteligencia en una columna
+   estrecha. Su CSS se elimina con él —no se dejan reglas huérfanas— y la
+   metodología sigue viva en el contrato del owner y en el gate. */
 
 @media (max-width: 640px) {
   .intcc-hero-body { padding-right: 0; }
   .intv8-h-note { max-width: none; }
-  .intv8-h-method { margin-top: 10px; }
   .intcc-m-hero-text[data-has-question="1"] { padding-bottom: 2px; }
 }
 
@@ -26182,15 +26178,12 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
    frase de marketing. */
 .intv9-disc-ev { font-size: 10.5px; color: var(--text-dim); letter-spacing: 0.01em; }
 
-/* «Qué ha cambiado» cuando no hay nada material: una línea, no un bloque. */
-.intv9-changed-quiet {
-  margin: 0; padding: 2px 4px;
-  font-size: 11.5px; line-height: 1.4; color: var(--text-dim); text-align: center;
-}
+/* «Qué ha cambiado» sin nada material ya no emite NADA —ni card ni línea—, así que
+   su CSS también se retira. El estado viaja en `data-changed-state` del contenedor. */
 
 /* MEMORIA · lo que Aurix recuerda que le dijiste. Nodo en azul de marca para
-   distinguirlo de un hito temporal, que es un hecho medido y no una declaración. */
-.intv9-mem-declared { margin-bottom: 10px; }
+   distinguirlo de un hito temporal, que es un hecho medido y no una declaración.
+   (`.intv9-mem-declared` se retiró con la fusión en una sola lista.) */
 .intcc-tl-item.is-declared .intcc-tl-node {
   background: var(--aurix-blue);
   box-shadow: 0 0 0 3px rgba(var(--aurix-blue-rgb), 0.16);
@@ -26205,8 +26198,8 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   .aurix-intv6 .intv9-disc { display: flex; flex-direction: column; }
   /* La línea compacta va ANTES del aviso legal, no después: el disclaimer tiene que
      cerrar la pantalla. Es el ÚNICO pin heredado que se reubica, y sólo la fila. */
-  .intv9-changed-quiet { grid-column: 1 / 13; grid-row: 6; }
-  .aurix-intv6 .intcc-disclaimer { grid-row: 7; }
+  /* El aviso legal vuelve a su fila original: la línea compacta que lo desplazaba
+     ya no existe. */
 }
 @media (max-width: 1023px) {
   /* CRÍTICO en móvil y tablet: el contenedor es flex-column y TODOS los hijos
@@ -26215,17 +26208,82 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
      corresponde en el orden de lectura: …estructura → qué ha cambiado →
      descubrimientos → línea compacta → aviso legal. */
   .intv9-disc          { order: 9; }
-  .intv9-changed-quiet { order: 9.5; }
 }
 @media (max-width: 640px) {
   .intv9-disc-text { font-size: 12.5px; }
-  .intv9-changed-quiet { padding: 6px 10px; }
 }
 
-/* El bloque declarado y el de eventos son dos `.intcc-tl-list`, y el raíl se dibuja
-   con `border-left` por ítem: entre los dos quedaba un corte y la card cuya
-   metáfora es una línea continua aparecía con dos raíles desconectados. Con la
-   lista declarada seguida de eventos, su último ítem recupera el raíl y el hueco
-   entre bloques desaparece. */
-.intv9-mem-declared { margin-bottom: 0; }
-.intv9-mem-declared:has(+ .intcc-tl-list) > .intcc-tl-item:last-child { border-left-color: inherit; }
+/* La unión blanca del raíl se resolvió en la ESTRUCTURA, no con CSS: declarados y
+   hitos se fusionan en UNA sola `.intcc-tl-list` ordenada por fecha, así que no hay
+   dos bloques entre los que el raíl pueda cortarse. Se retiran los parches. */
+
+/* ════════════════════════════════════════════════════════════════════════
+   AURIX INTELLIGENCE · SURFACE STABILIZATION V1
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* SAFE-ZONE REAL DE LA ESFERA, con la aritmética escrita porque «a ojo» es lo que
+   falló dos veces. La reserva anterior (26px) era decorativa: al cuerpo le
+   quedaban 6px de holgura y el recuadro de la pregunta llegaba bajo la esfera.
+   Y el orbe NO acaba en su caja: `.intcc-orb-glow` es `inset: -28%` con
+   `blur(10px)`, así que sobre los 112px del hero su halo se extiende ~31px por
+   lado; su degradado llega a transparente al 74% del radio, o sea que la parte
+   PERCEPTIBLE son ~9px + los 10px de blur ≈ 19px.
+   Corredor = solape del orbe (20) + halo perceptible (19) + separación premium
+   (15) = 54px. El `margin-left: -20px` del orbe es una decisión de composición
+   aprobada y no se toca: lo que se reserva es el espacio en el CUERPO. */
+.aurix-intv6 { --intel-orb-overlap: 20px; --intel-orb-gap: 34px; }
+.intcc-hero-body { padding-right: calc(var(--intel-orb-overlap) + var(--intel-orb-gap)); }
+/* El recuadro de la pregunta NO puede rebasar ese corredor por su cuenta: se
+   limita a la anchura de contenido de su contenedor, así que un texto largo
+   envuelve DENTRO de su espacio en vez de invadir el de la esfera, y sin recortar
+   nada con overflow. */
+.intv8-intel-q { max-width: 100%; box-sizing: border-box; }
+.intv8-intel-q-opts { max-width: 100%; }
+
+/* HERO · dos composiciones, y conviene ser exacto sobre lo que cada una hace.
+   La ALTURA del hero la fija la columna de Salud —anillo de 116px + etiqueta +
+   badge + detalle + confianza— porque `align-items: stretch` iguala las dos
+   columnas. Así que esto NO es una contracción del hero: es dejar de reservar el
+   espacio vertical que la pregunta necesitaba dentro de la columna de
+   Inteligencia. Lo que de verdad bajó la altura fue retirar el disclosure «Cómo
+   se calcula» de Salud, que era el añadido más alto de esa columna y al abrirse
+   la ensanchaba además en horizontal. Si tras esto el hueco sigue pareciendo
+   grande, la palanca es la composición de Salud, no este padding — y eso es una
+   decisión visual que necesita el ojo del founder, no otra iteración a ciegas. */
+.intcc-hero[data-has-question="0"] .intcc-hero-intel { padding-top: 12px; padding-bottom: 12px; }
+.intcc-hero[data-has-question="1"] .intcc-hero-intel { padding-top: 16px; padding-bottom: 16px; }
+.intcc-hero[data-has-question="0"] .intcc-hero-body { padding-top: 0; padding-bottom: 0; }
+
+/* MEMORIA V2 · hasta 8 recuerdos, el más reciente arriba, con scroll interno
+   cuando no caben. La altura se acota para que la card no crezca como un log. */
+.intv10-mem-scroll { max-height: 268px; overflow-y: auto; overflow-x: hidden; padding-right: 6px; }
+/* Sin desbordamiento no hay barra ni hueco reservado: `max-height` sólo actúa
+   cuando de verdad sobra contenido. */
+.intv10-mem-scroll > .intcc-tl-list { margin-bottom: 0; }
+/* Escritorio: barra discreta que aparece al interactuar. */
+.intv10-mem-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.intv10-mem-scroll:hover, .intv10-mem-scroll:focus-within {
+  scrollbar-color: rgba(var(--aurix-blue-rgb), 0.35) transparent;
+}
+.intv10-mem-scroll::-webkit-scrollbar { width: 6px; }
+.intv10-mem-scroll::-webkit-scrollbar-track { background: transparent; }
+.intv10-mem-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
+.intv10-mem-scroll:hover::-webkit-scrollbar-thumb,
+.intv10-mem-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: rgba(var(--aurix-blue-rgb), 0.32);
+}
+/* El último recuerdo no puede quedar cortado a ras del borde. */
+.intv10-mem-scroll > .intcc-tl-list > .intcc-tl-item:last-child { padding-bottom: 4px; }
+
+@media (max-width: 1023px) {
+  /* Táctil: scroll natural, sin barra invasiva, y algo menos de alto porque la
+     card comparte pantalla en vertical. */
+  .intv10-mem-scroll { max-height: 232px; -webkit-overflow-scrolling: touch; }
+  .intv10-mem-scroll::-webkit-scrollbar { width: 0; }
+  .intv10-mem-scroll { scrollbar-width: none; }
+}
+@media (max-width: 640px) {
+  /* En móvil el orbe vive en su propia card, así que no hay corredor que reservar. */
+  .aurix-intv6 { --intel-orb-overlap: 0px; --intel-orb-gap: 0px; }
+  .intv10-mem-scroll { max-height: 260px; }
+}

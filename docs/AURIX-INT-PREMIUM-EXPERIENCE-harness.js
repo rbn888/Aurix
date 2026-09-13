@@ -96,8 +96,7 @@ function extractDict(langIdx) {
     // estado + confianza + componentes; y las preguntas ganan declinar y pausar.
     'intel_h_no_positions','intel_h_single','intel_h_coverage','intel_h_few','intel_h_uneven',
     'intel_h_spread','intel_h_d_single','intel_h_d_empty','intel_h_note_deliberate',
-    'intel_h_conf_high','intel_h_conf_partial','intel_h_conf_low','intel_h_method',
-    'intel_h_c_dispersion','intel_h_c_effective','intel_h_c_top','intel_h_c_liquidity','intel_h_c_na',
+    'intel_h_conf_high','intel_h_conf_partial','intel_h_conf_low',
     'intel_opt_decline','intel_q_pause','intel_q_paused','intel_q_declined'];
   const missing = [];
   const extras = extraKeys.map(k => {
@@ -137,7 +136,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
-  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intelDiscoveryText',
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryRows','_intelDiscoveryText',
   '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned',
   '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
@@ -311,9 +310,16 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   ok('3.2 the concentration phenomenon never leads a Brief story when the cockpit shows it',
     /intcc-drv-row/.test(html) && concKeys.every(k => headFacts.indexOf(k) === -1),
     JSON.stringify(headFacts));
+  // RE-DECIDIDO · STABILIZATION V1: la card ESTRUCTURA se RETIRÓ de la superficie
+  // porque republicaba diversificación efectiva, equivalencia de posiciones y
+  // concentración principal — lo mismo que ya publican Salud, Radar y Factores.
+  // Lo que esta aserción protege de verdad es que el desglose top-3 SE PUBLIQUE,
+  // y eso lo sigue haciendo Factores. `_intv5StructureHtml` sigue existiendo como
+  // owner (13B.11 comprueba que no se convirtió en una segunda verdad).
   ok('3.3 …and it IS published, as the real top-3 breakdown',
-    (html.match(/class="intcc-drv-row[^"]*"/g) || []).length >= 1
-    && /intv5-eff-desc/.test(html));
+    (html.match(/class="intcc-drv-row[^"]*"/g) || []).length >= 1);
+  ok('3.3b …y ESTRUCTURA ya no republica lo mismo en una card aparte',
+    !/intv5-structure/.test(html) && !/intv5-eff-desc/.test(html));
   ok('3.4 no fact is rendered twice as a headline',
     new Set(headFacts).size === headFacts.length);
   // The retired blocks were the duplication mechanism.
@@ -792,12 +798,13 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.11 Diversificación is the declared OWNER\'s number, not a second computation',
     (() => { const d = run('_aurixEffectiveDiversification()', founder.ctx);
       const expected = Math.round((d.effectiveN / d.positions) * 100);
-      // …and the structure card reads the same owner, so the two surfaces agree
-      // by construction rather than by coincidence.
-      const st5 = section(founder.html, 'intv5-structure');
-      const pos = parseInt((st5.match(/class="intcc-score-suffix">\/ (\d+)</) || [, ''])[1], 10);
-      return founder.nums[0] === expected && pos === d.positions
-        && /_aurixEffectiveDiversification/.test(fnSrc('_intv7RadarAxes')); })(),
+      // El cruce con la card de ESTRUCTURA desaparece con ella: ya no hay dos
+      // superficies publicando el mismo número, que es justamente lo que se buscaba.
+      // Queda lo esencial —el radar lee el OWNER declarado y no recalcula— y se
+      // añade que el owner tampoco lo recalcula por su cuenta.
+      return founder.nums[0] === expected
+        && /_aurixEffectiveDiversification/.test(fnSrc('_intv7RadarAxes'))
+        && !/hhi|effectiveN\s*=/.test(fnSrc('_intv7RadarAxes')); })(),
     JSON.stringify({ radar: founder.nums[0], owner: run('_aurixEffectiveDiversification()', founder.ctx) }));
   ok('13B.11b Liquidez and Concentración are the snapshot owner\'s numbers',
     (() => { const snap = MATURE.snap;
@@ -1000,30 +1007,36 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
   // —que es el contenido real de esta aserción— se conserva íntegra; lo que cambió
   // es el contenedor, que pasa a ser una línea discreta. Así que se lee de donde
   // esté: de la card cuando hay filas, y de la línea compacta cuando no.
-  const quiet = (html) => { const i = html.indexOf('class="intv9-changed-quiet"');
-    if (i < 0) return ''; const a = html.lastIndexOf('<', i); return html.slice(a, html.indexOf('</p>', i) + 4); };
-  const changedAny = (html) => { const c = section(html, 'intv4-changed'); return c || quiet(html); };
-  ok('15.12 "sin cambio material" y "sin evidencia" son estados DISTINTOS',
-    (() => { const yc = changedAny(young.html);
-      const flat = render(Object.assign({}, MATURE, {
+  // RE-DECIDIDO (segunda y última vez) · STABILIZATION V1: «ausencia de novedad =
+  // ausencia de superficie». Ni card ni línea: cuando no hay cambio material no se
+  // emite NADA. La distinción entre las cuatro situaciones no se pierde —sigue
+  // calculándose y sigue siendo verdad— pero viaja en `data-changed-state` del
+  // contenedor raíz, que es diagnosticable sin ocupar un píxel. Lo que esta
+  // aserción protege pasa a ser eso: que los estados sigan siendo DISTINTOS y que
+  // ninguno de ellos gaste superficie.
+  const rootState = (html) => (html.match(/data-changed-state="([^"]+)"/) || [, ''])[1];
+  const rootEv = (html) => (html.match(/data-changed-evidence="([^"]+)"/) || [, ''])[1];
+  ok('15.12 "sin cambio material" y "sin evidencia" siguen siendo estados DISTINTOS',
+    (() => { const flat = render(Object.assign({}, MATURE, {
         rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] }));
-      const fc = changedAny(flat.html);
-      return /data-evidence="0"/.test(yc) && /todavía no hay cambios/i.test(yc)
-        && /data-evidence="1"/.test(fc)
-        && (/no detecta ningún cambio material/.test(fc) || /cambio material de tu cartera es el que/.test(fc)
-            || /No se detectan otros cambios relevantes/.test(fc)); })(),
-    changedAny(young.html).slice(0, 260) + ' ||| ' +
-    changedAny(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [], serverRows: [] })).html).slice(0, 260));
-  ok('15.12b …y cuando no hay nada material NO se pinta una card con título',
+      return rootState(young.html) === 'intv4_changed_empty' && rootEv(young.html) === '0'
+        && rootEv(flat.html) === '1'
+        && ['intv4_changed_others_none', 'intv4_changed_all_published', 'intv4_changed_stable']
+             .includes(rootState(flat.html)); })(),
+    JSON.stringify({ young: [rootState(young.html), rootEv(young.html)] }));
+  ok('15.12b …y ninguno de ellos gasta superficie: sin cambio material, cero DOM',
     (() => { const yc = section(young.html, 'intv4-changed');
-      return yc === '' && /intv9-changed-quiet/.test(young.html); })());
+      return yc === '' && !/intv9-changed-quiet/.test(young.html)
+        && !/intv4_changed_empty/.test(young.html.replace(/data-changed-state="[^"]*"/, '')); })());
   // M.04 · 0 — la lista se publica cuando NADIE MÁS ha reclamado el hecho. Se
   // ejecuta el owner sin reclamaciones para separar las dos causas posibles de un
   // bloque vacío: "no hay cambios" y "ya los cuenta otra superficie".
+  // El owner devuelve ahora `{ html, state, evidence }`: el HTML es sólo una de las
+  // tres cosas que publica, porque el estado tiene que viajar aunque no haya DOM.
   ok('15.13 y con cambios reales sigue publicando la lista, no un estado vacío',
     (() => { const c = makeCtx(DIPPED);
-      const html = run('_intv4ChangedHtml(_aurixIntelligenceCore({ presentationHistory: [] }), _intccEsc, [], null)', c);
-      return /intv4-chg-list/.test(html) && !/intcc-empty-body/.test(html); })());
+      const r = run('_intv4ChangedHtml(_aurixIntelligenceCore({ presentationHistory: [] }), _intccEsc, [], null)', c);
+      return r.state === 'rows' && /intv4-chg-list/.test(r.html) && !/intcc-empty-body/.test(r.html); })());
   ok('15.14 el estado vacío se elige por la COBERTURA del Core, no por una heurística local',
     /core\.dataAvailability && core\.dataAvailability\.observation/.test(fnSrc('_intv4ChangedHtml')) &&
     /core\.dataAvailability && core\.dataAvailability\.observation/.test(fnSrc('_intv4MemoryHtml')));
@@ -1069,8 +1082,9 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
   c.__core = cr;
   const claims = run('_intv4MemoryClaims(__core, [])', c);
   const memHtml = run('_intv4MemoryHtml(__core, _intccEsc, [])', c);
-  const chgHtml = run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
-  const chgNoClaims = run('_intv4ChangedHtml(__core, _intccEsc, [], null)', c);
+  // El owner devuelve `{ html, state, evidence }`; esta comprobación mira el DOM.
+  const chgHtml = run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ').html', c);
+  const chgNoClaims = run('_intv4ChangedHtml(__core, _intccEsc, [], null).html', c);
   const factsIn = html => (html.match(/data-fact="([\w]+)"/g) || []).map(m => m.slice(11, -1));
   const rootsIn = html => (html.match(/data-root="([\w]+)"/g) || []).map(m => m.slice(11, -1));
 
@@ -1107,11 +1121,15 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
         .filter(w => w.semanticKey === 'investable_level_change'),
         dataAvailability: cr.dataAvailability };
       c.__only = only;
-      const h = run('_intv4ChangedHtml(__only, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
-      return /No se detectan otros cambios relevantes/.test(h)
-        && !/intv4-chg-list/.test(h)
-        && (h.match(/intv4-chg /g) || []).length === 0; })(),
-    run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ')', c).slice(0, 200));
+      // RE-DECIDIDO · STABILIZATION V1: «no hay OTROS cambios» sigue siendo el
+      // estado correcto y distinto, pero YA NO SE DICE EN PANTALLA — no merece
+      // superficie. Se comprueba en el estado que publica el owner, y que no se
+      // inventa ningún relleno.
+      const r7 = run('_intv4ChangedHtml(__only, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
+      return r7.state === 'intv4_changed_others_none'
+        && r7.html === ''
+        && (r7.html.match(/intv4-chg /g) || []).length === 0; })(),
+    JSON.stringify(run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ')', c).state));
   ok('16.8 la selección de la Memoria es un OWNER puro y determinista, no lógica de renderer',
     (() => { const a = run('JSON.stringify(_intv4MemoryClaims(__core, []))', c);
       const b = run('JSON.stringify(_intv4MemoryClaims(__core, []))', c);
