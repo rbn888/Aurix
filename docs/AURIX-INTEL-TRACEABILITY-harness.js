@@ -132,8 +132,8 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT'];
-const FNS = ['_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER'];
+const FNS = ['_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveAbsent','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -520,6 +520,117 @@ console.log('\n7 · Episodios pasivos, acuse de recibo y profundidad:');
       return rows.length > 0 && rows.every(r =>
         /data-diluted="(pure|mixed)"/.test(r) || !/no ha bajado|has not fallen/i.test(r)); })(),
     JSON.stringify(attrs(section(h, 'intv4-changed'), 'data-diluted="([^"]*)"')));
+}
+
+console.log('\n8 · Política de reapertura y retención del acuse:');
+{
+  const h = render(MOVED).html;
+  // Un hecho que publica CONCEPTO lleva además su FIRMA; uno legacy que no lo
+  // publica se identifica por su propia identidad de evento y su firma va vacía —
+  // y entonces el acuse se compara por episodio, que es el criterio anterior.
+  ok('8.1 el control acusa el CONCEPTO, y todo concepto declarado lleva su FIRMA',
+    (() => { const ids = attrs(h, 'data-intel-ack="([^"]+)"');
+      const sigs = attrs(h, 'data-intel-sig="([^"]*)"');
+      if (!(ids.length > 0 && ids.length === sigs.length)) return false;
+      return ids.every((x, i) => /^(drift|pos|ob|st|tx):/.test(x)
+        && (/^(drift|pos):/.test(x) ? sigs[i].length > 0 : true)); })(),
+    JSON.stringify({ ids: attrs(h, 'data-intel-ack="([^"]+)"'), sigs: attrs(h, 'data-intel-sig="([^"]*)"') }));
+  ok('8.1b y acusar un hecho SIN firma sigue funcionando (el concepto ES el episodio)',
+    (() => { const c = makeCtx(MATURE);
+      const st = {}; c.__sl = st;
+      run('var __el = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__sl, k) ? __sl[k] : null),'
+        + ' setItem: (k, v) => { __sl[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      run('_aurixIntelAcknowledge("ob:investable_return", Object.assign({}, __el, { now: 3 }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __el)', c);
+      const legacy = { semanticKey: 'investable_return_24h', family: 'performance', value: 5,
+        causalRoot: 'investable_return', window: { range: '24h', startAt: 1, endAt: 2 },
+        eventId: 'ob:investable_return', materiality: 1, novelty: 1, confidence: 1, values: {} };
+      c.__lg = { facts: [legacy], gaps: [] };
+      const hidden = run('_aurixCanonicalFindings(__lg, { acknowledged: '
+        + JSON.stringify(rec.ack) + ' })', c);
+      return rec.ack['ob:investable_return'].episodeId === 'ob:investable_return'
+        && hidden.length === 0; })());
+  ok('8.2 el nivel de severidad de una pérdida se decide con umbrales YA declarados',
+    (() => { const c = makeCtx(MATURE);
+      const minor = run('_aurixLossSeverityTier(-50, 0.01)', c);        // 0,5 % del patrimonio
+      const mat   = run('_aurixLossSeverityTier(-25, 0.45)', c);        // 11,25 %
+      const str   = run('_aurixLossSeverityTier(-60, 0.45)', c);        // 27 %
+      const edgeL = run('_aurixLossSeverityTier(-4, 0.5)', c);          // 2,00 % · frontera
+      const edgeS = run('_aurixLossSeverityTier(-50, 0.5)', c);         // 25,00 % · frontera
+      return minor === 'minor' && mat === 'material' && str === 'structural'
+        && edgeL === 'material' && edgeS === 'structural'; })(),
+    JSON.stringify(['minor', 'material', 'structural'].map((_, i) => i)));
+  ok('8.3 …y no hay ninguna constante nueva: las dos fronteras están en `_AURIX_FACT_MATERIAL`',
+    /_AURIX_FACT_MATERIAL\.concentrationPct \/ 100/.test(fnSrc('_aurixLossSeverityTier'))
+    && /_AURIX_FACT_MATERIAL\.flowShareOfValue/.test(fnSrc('_aurixLossSeverityTier'))
+    && !/0\.(?:0[5-9]|[1-9])/.test(fnSrc('_aurixLossSeverityTier').replace(/\/ 100/g, '')));
+  ok('8.4 el acuse NO se guarda por banda de precio: un concepto, un registro',
+    /ack\[key\] = \{/.test(fnSrc('_aurixIntelAcknowledge'))
+    && /const key = String\(conceptId\);/.test(fnSrc('_aurixIntelAcknowledge')));
+  ok('8.5 la retención NO usa tiempo transcurrido ni cupo numérico',
+    (() => { const src = fnSrc('_aurixIntelAcknowledge') + fnSrc('_aurixIntelResolveAbsent');
+      return !/_AURIX_INTEL_MEM_MAX_ENTRIES|_AURIX_INTEL_STALE_MS|864e5/.test(src); })());
+  ok('8.6 un dispositivo MÁS ANTIGUO no puede sobreescribir un acuse más nuevo',
+    (() => { const c = makeCtx(MATURE);
+      const a = { ack: { 'pos:btc': { at: 900, state: 'acknowledged', signature: 'material:0' } } };
+      const b = { ack: { 'pos:btc': { at: 100, state: 'acknowledged', signature: 'minor:0' } } };
+      const ab = run('_aurixIntelCtxMerge(' + JSON.stringify(a) + ', ' + JSON.stringify(b) + ')', c);
+      const ba = run('_aurixIntelCtxMerge(' + JSON.stringify(b) + ', ' + JSON.stringify(a) + ')', c);
+      return ab.ack['pos:btc'].at === 900 && ba.ack['pos:btc'].at === 900
+        && ab.ack['pos:btc'].signature === 'material:0'
+        && JSON.stringify(ab.ack) === JSON.stringify(ba.ack); })());
+  ok('8.7 y un dispositivo nuevo hereda la línea base autoritativa, no una lista de episodios',
+    (() => { const c = makeCtx(MATURE);
+      const merged = run('_aurixIntelCtxMerge({ ack: { "pos:btc":'
+        + ' { at: 500, state: "acknowledged", signature: "structural:2", episodeId: "pos:btc#structural:2" } } }, null)', c);
+      const r = merged.ack['pos:btc'];
+      return Object.keys(merged.ack).length === 1 && r.signature === 'structural:2'
+        && r.episodeId === 'pos:btc#structural:2'; })());
+  ok('8.8 el acuse no viaja con nada patrimonial: sólo identidad, firma, nivel e instante',
+    (() => { const c = makeCtx(MATURE);
+      const st = {}; c.__s8 = st;
+      run('var __e8 = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s8, k) ? __s8[k] : null),'
+        + ' setItem: (k, v) => { __s8[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e8, { now: 7, signature: "material:0", tier: "material" }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e8)', c);
+      const keys = Object.keys(rec.ack['pos:btc']).sort();
+      return JSON.stringify(keys) === JSON.stringify(['at', 'episodeId', 'signature', 'state', 'tier', 'v']); })(),
+    JSON.stringify((() => { const c = makeCtx(MATURE);
+      const st = {}; c.__s8 = st;
+      run('var __e8 = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s8, k) ? __s8[k] : null),'
+        + ' setItem: (k, v) => { __s8[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e8, { now: 7, signature: "material:0", tier: "material" }))', c);
+      return Object.keys(run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e8)', c).ack['pos:btc']).sort(); })()));
+  ok('8.9 el acuse no puede cruzar de usuario: sin sello propio no se lee',
+    (() => { const c = makeCtx(MATURE);
+      const st = {}; c.__s9 = st;
+      run('var __u1 = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s9, k) ? __s9[k] : null),'
+        + ' setItem: (k, v) => { __s9[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      run('var __u2 = Object.assign({}, __u1, { owner: "u2" });', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __u1, { now: 1, signature: "material:0" }))', c);
+      return run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __u2)', c) === null; })());
+  ok('8.10 el hecho y la memoria financiera siguen intactos tras el acuse',
+    (() => { const c = makeCtx(MATURE);
+      const mk = (sig) => ({ semanticKey: 'position_below_cost_btc', family: 'performance',
+        causalRoot: 'position_result', unit: 'percent_of_cost', value: -30, changeFact: true,
+        window: { range: 'observed', startAt: 1, endAt: 2 }, conceptId: 'pos:btc',
+        episodeSignature: sig, eventId: 'pos:btc#' + sig, materiality: 0.4, novelty: 1,
+        confidence: 1, values: {} });
+      c.__l8 = { facts: [mk('material:0')], gaps: [] };
+      const acked = run('_aurixCanonicalFindings(__l8, { acknowledged: { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "material:0" } }, includeAcknowledged: true })', c);
+      const hidden = run('_aurixCanonicalFindings(__l8, { acknowledged: { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "material:0" } } })', c);
+      const ledgerIntact = run('__l8.facts.length', c);
+      return hidden.length === 0 && acked.length === 1
+        && acked[0].presentationState === 'acknowledged' && ledgerIntact === 1; })());
+  ok('8.11 el contador del hero y las filas siguen siendo la MISMA lista',
+    (() => { const rows = (h.match(/class="intv4-chg /g) || []).length;
+      const declared = Number((h.match(/data-findings="(\d+)"/) || [, '0'])[1]);
+      const heroN = Number(num(h, /data-intel-see-changes="desktop"\s+data-count="(\d+)"/) || 0);
+      return rows === declared && rows === heroN; })(),
+    JSON.stringify({ rows: (h.match(/class="intv4-chg /g) || []).length,
+                     declared: num(h, /data-findings="(\d+)"/), hero: num(h, /data-count="(\d+)"/) }));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

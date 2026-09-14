@@ -81,8 +81,8 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_INTEL_MEM_MAX_ENTRIES','_AURI
   '_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS',
   '_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
   '_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT',
-  '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_INTEL_DIM_ROOT','_INTV4_BRIEF_MAX'];
-const FNS = ['toBase','_intv5MattersStories','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_nativeToUSD','_intv4T','_intv4Num','_intv4Money','_intv4CatLabel','_intv5CatLabel','_intv4RangeLabel','_intv4WindowLabel','_intv4FactText','_intv4WhyText','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+  '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_INTEL_DIM_ROOT','_INTV4_BRIEF_MAX','_AURIX_LOSS_TIER'];
+const FNS = ['_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveAbsent','toBase','_intv5MattersStories','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_nativeToUSD','_intv4T','_intv4Num','_intv4Money','_intv4CatLabel','_intv5CatLabel','_intv4RangeLabel','_intv4WindowLabel','_intv4FactText','_intv4WhyText','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixFlowIntentOf',
   '_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
@@ -916,18 +916,54 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
     (() => { const r = lossCtx([POS('btc', 'crypto', 1, 49700, 50000),
         POS('eur', 'cash', 50300, 1, 50300)], { totUSD: 100000 });
       return !r.ledger.facts.some(f => /^position_below_cost_/.test(f.semanticKey)); })());
-  ok('9.12 su identidad es de BANDA: −52 % y −53 % son el mismo episodio',
+  // ── DECISIÓN DE PRODUCTO DEL FOUNDER · RE-DECIDIDO ──────────────────────
+  // La identidad de episodio era un CUBO DE 1 pp, y con eso una pérdida que se
+  // mueve despacio —−25 % → −26 % → −27 %— reaparecía en cada paso después de que
+  // el usuario la hubiera dado por vista. Medir con la unidad correcta y REABRIR
+  // con ella son dos cosas distintas. El episodio pasa a ser un NIVEL DE
+  // SEVERIDAD sobre la parte del patrimonio que la pérdida representa, con las dos
+  // fronteras ya declaradas (`flowShareOfValue` 2 %, `concentrationPct` 25 %).
+  ok('9.12 −52 % y −53 % son el MISMO episodio (mismo nivel de severidad)',
     (() => { const a = lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 });
       const b = lossCtx([POS('btc', 'crypto', 1, 47500, 100000), POS('eur', 'cash', 52500, 1, 52500)], { totUSD: 100000 });
       const fa = a.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
       const fb = b.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
-      return !!fa && !!fb && fa.eventId === fb.eventId; })());
-  ok('9.13 …y una banda materialmente nueva es un episodio NUEVO',
-    (() => { const a = lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 });
-      const b = lossCtx([POS('btc', 'crypto', 1, 30000, 100000), POS('eur', 'cash', 70000, 1, 70000)], { totUSD: 100000 });
+      return !!fa && !!fb && fa.eventId === fb.eventId
+        && fa.values.severityTier === fb.values.severityTier; })());
+  ok('9.13 …y un NIVEL DE SEVERIDAD materialmente nuevo sí es un episodio nuevo',
+    (() => { // 24,96 % del patrimonio (material) → 40,5 % (estructural)
+      const a = lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 });
+      const b = lossCtx([POS('btc', 'crypto', 1, 45000, 145000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
       const fa = a.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
       const fb = b.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
-      return !!fa && !!fb && fa.eventId !== fb.eventId; })());
+      return !!fa && !!fb && fa.values.severityTier === 'material'
+        && fb.values.severityTier === 'structural' && fa.eventId !== fb.eventId; })(),
+    JSON.stringify([
+      (lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 })
+        .ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc') || {}).values,
+      (lossCtx([POS('btc', 'crypto', 1, 45000, 145000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 })
+        .ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc') || {}).values]));
+  ok('9.13b y un deterioro CONTINUADO dentro del mismo nivel NO crea episodio (−25 → −26 → −27)',
+    (() => { const at = (px) => { const r = lossCtx([POS('btc', 'crypto', 1, px, Math.round(px / 0.75)),
+        POS('eur', 'cash', 100000 - px, 1, 100000 - px)], { totUSD: 100000 });
+      return r.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc'); };
+      const a = at(45000), b = at(44550), c = at(44100);   // ≈ −25 %, −26 %, −27 %
+      return !!a && !!b && !!c && a.eventId === b.eventId && b.eventId === c.eventId; })(),
+    JSON.stringify([45000, 44550, 44100].map(px => { const r = lossCtx([POS('btc', 'crypto', 1, px, Math.round(px / 0.75)),
+        POS('eur', 'cash', 100000 - px, 1, 100000 - px)], { totUSD: 100000 });
+      const f = r.ledger.facts.find(x => x.semanticKey === 'position_below_cost_btc');
+      return f && f.eventId; })));
+  ok('9.13c una acción del USUARIO sobre la posición sí es un estado nuevo (reabre una vez)',
+    (() => { const base = lossCtx([POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
+      const acted = core({ rows: inv([100000, 100000, 100000]),
+        assets: [POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)],
+        snap: Object.assign({}, SNAP, { totUSD: 100000 }), drivers: DRIVERS, serverRows: [],
+        flows: [{ id: 'b1', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add', source: 'user',
+                  intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }] });
+      const fa = base.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      const fb = acted.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      return !!fa && !!fb && fa.values.userActions === 0 && fb.values.userActions === 1
+        && fa.eventId !== fb.eventId; })());
   ok('9.14 una RECUPERACIÓN completa retira la afirmación (no queda un aviso huérfano)',
     (() => { const r = lossCtx([POS('btc', 'crypto', 1, 120000, 90000), POS('eur', 'cash', 10000, 1, 10000)],
         { totUSD: 130000 });
@@ -1037,8 +1073,20 @@ console.log('\n10 · Un aviso material no puede volverse un reproche permanente:
         rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
         { ranges: ['7D'], pausedAt: endTs });
       return paused.findings.length > 0 && paused.findings.every(f => f.presentationState === 'paused'); })());
-  ok('10.10 el acuse es IDEMPOTENTE: no se re-sella con un instante nuevo',
-    /if \(ack\[String\(episodeId\)\]\) return true;/.test(fnSrc('_aurixIntelAcknowledge')));
+  ok('10.10 el acuse es IDEMPOTENTE para el MISMO episodio, y se EJECUTA para probarlo',
+    (() => { const c = makeCtx({});
+      const st = {}; c.__s10 = st;
+      run('var __e10 = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s10, k) ? __s10[k] : null),'
+        + ' setItem: (k, v) => { __s10[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e10, { now: 100, signature: "material:0" }))', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e10, { now: 999, signature: "material:0" }))', c);
+      const r1 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e10)', c);
+      // Mismo episodio ⇒ no se re-sella. Episodio NUEVO ⇒ sustituye el registro.
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e10, { now: 1500, signature: "structural:0" }))', c);
+      const r2 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e10)', c);
+      return r1.ack['pos:btc'].at === 100 && Object.keys(r1.ack).length === 1
+        && r2.ack['pos:btc'].at === 1500 && r2.ack['pos:btc'].signature === 'structural:0'
+        && Object.keys(r2.ack).length === 1; })());
   ok('10.11 y viaja entre dispositivos por el merge que ya existía, sin memoria nueva',
     /out\.ack\[k\] = \(x >= y\) \? ka\[k\] : kb\[k\];/.test(fnSrc('_aurixIntelCtxMerge')));
 }
@@ -1184,23 +1232,66 @@ console.log('\n12 · Fronteras exactas y los casos que no estaban cubiertos:');
     /const visible = out\.filter\(fd => o\.includeAcknowledged === true/.test(fnSrc('_aurixCanonicalFindings')));
 
   // ── F14/F15 · EJECUTADOS, no comprobados con regex ─────────────────────
-  ok('12.16 el mapa de acuses está ACOTADO: la entrada 41 desaloja, y cae la más antigua',
+  // ── RE-DECIDIDO · EL CUPO NUMÉRICO SE RETIRA ────────────────────────────
+  // El tope desalojaba por antigüedad, así que el primero en volver a hablar era
+  // justo el que el usuario llevaba más tiempo habiendo dado por visto. Y con
+  // cubos de 1 pp el almacén crecía con cada movimiento de precio. Ahora hay UN
+  // registro por CONCEPTO: el almacén está acotado por el número de posiciones y
+  // raíces, no por el de movimientos, así que no hace falta cupo — y un acuse
+  // VIGENTE no se puede perder por haber llegado a un número.
+  ok('12.16 un CONCEPTO guarda un solo acuse, así que 100 episodios no hacen crecer el almacén',
     (() => { const c = makeCtx({});
       const store = {}; c.__s = store;
       run('var __e = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s, k) ? __s[k] : null),'
         + ' setItem: (k, v) => { __s[k] = String(v); }, removeItem: k => { delete __s[k]; } }, owner: "u1" };', c);
-      for (let i = 0; i < 45; i++) run('_aurixIntelAcknowledge("ep:' + i + '", Object.assign({}, __e, { now: ' + (1000 + i) + ' }))', c);
+      // Cien episodios del MISMO concepto — lo que antes eran cien claves.
+      for (let i = 0; i < 100; i++) {
+        run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e, { now: ' + (1000 + i)
+          + ', signature: "material:' + i + '" }))', c);
+      }
       const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e)', c);
-      const keys = Object.keys(rec.ack);
-      const cap = run('_AURIX_INTEL_MEM_MAX_ENTRIES', c);
-      return keys.length === cap && !keys.some(k => k === 'ep:0') && keys.indexOf('ep:44') !== -1; })(),
+      return Object.keys(rec.ack).length === 1
+        && rec.ack['pos:btc'].signature === 'material:99'
+        && rec.ack['pos:btc'].at === 1099; })(),
     JSON.stringify((() => { const c = makeCtx({});
       const store = {}; c.__s = store;
       run('var __e = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s, k) ? __s[k] : null),'
         + ' setItem: (k, v) => { __s[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
-      for (let i = 0; i < 45; i++) run('_aurixIntelAcknowledge("ep:' + i + '", Object.assign({}, __e, { now: ' + (1000 + i) + ' }))', c);
+      for (let i = 0; i < 100; i++) run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e, { now: '
+        + (1000 + i) + ', signature: "material:' + i + '" }))', c);
       const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e)', c);
-      return { kept: Object.keys(rec.ack).length, hasFirst: !!rec.ack['ep:0'], hasLast: !!rec.ack['ep:44'] }; })()));
+      return { keys: Object.keys(rec.ack).length, sig: rec.ack['pos:btc'].signature }; })()));
+  ok('12.16b y NINGÚN acuse vigente se desaloja por cupo (el tope numérico ya no existe)',
+    !/_AURIX_INTEL_MEM_MAX_ENTRIES/.test(fnSrc('_aurixIntelAcknowledge')));
+  ok('12.16c la RESOLUCIÓN es lo que permite reabrir tras una recuperación, y sólo alcanza a lo resuelto',
+    (() => { const c = makeCtx({});
+      const store = {}; c.__s3 = store;
+      run('var __e3 = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s3, k) ? __s3[k] : null),'
+        + ' setItem: (k, v) => { __s3[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e3, { now: 10, signature: "material:0" }))', c);
+      // El concepto desaparece del ledger (la posición recuperó) ⇒ resuelto.
+      const n = run('_aurixIntelResolveAbsent([], Object.assign({}, __e3, { now: 20 }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e3)', c);
+      // Con el mismo concepto vivo, resolver no toca nada.
+      run('_aurixIntelAcknowledge("pos:eth", Object.assign({}, __e3, { now: 30, signature: "material:0" }))', c);
+      const n2 = run('_aurixIntelResolveAbsent(["pos:eth"], Object.assign({}, __e3, { now: 40 }))', c);
+      const rec2 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e3)', c);
+      return n === 1 && rec.ack['pos:btc'].state === 'resolved'
+        && Number.isFinite(rec.ack['pos:btc'].resolvedAt)
+        && n2 === 0 && rec2.ack['pos:eth'].state === 'acknowledged'; })());
+  ok('12.16d un registro RESUELTO deja de cubrir, así que el deterioro posterior habla',
+    (() => { const c = makeCtx({});
+      const mk = (sig) => ({ semanticKey: 'position_below_cost_btc', family: 'performance',
+        causalRoot: 'position_result', unit: 'percent_of_cost', value: -30, changeFact: true,
+        window: { range: 'observed', startAt: NOW - DAY, endAt: NOW },
+        conceptId: 'pos:btc', episodeSignature: sig, eventId: 'pos:btc#' + sig,
+        materiality: 0.45, novelty: 1, confidence: 1, values: {} });
+      c.__l4 = { facts: [mk('material:0')], gaps: [] };
+      const silent = run('_aurixCanonicalFindings(__l4, { acknowledged: { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "material:0" } } })', c);
+      const afterResolve = run('_aurixCanonicalFindings(__l4, { acknowledged: { "pos:btc":'
+        + ' { at: 1, state: "resolved", signature: "material:0" } } })', c);
+      return silent.length === 0 && afterResolve.length === 1; })());
   // La versión anterior inyectaba `store`, y con `store` propio el push ya está
   // excluido por contrato (`!o.store`): `pushes === 0` se cumplía sin que la guarda
   // interviniera, así que quitarla no habría hecho fallar el test. Se ejercita SIN
@@ -1312,11 +1403,14 @@ console.log('\n13 · Las dos cosas que la revisión final encontró:');
         family: 'performance', causalRoot: 'position_result', unit: 'percent_of_cost',
         value: -10 * band, materiality: mat, magnitude: 0.5, confidence: 1, novelty: 1,
         priority: mat, direction: 'down', values: { name: id, weightPct: mat * 100 },
-        window: { range: 'since_cost' }, eventId: 'st:position_result:' + id + '>' + band });
+        window: { range: 'since_cost' }, conceptId: 'pos:' + id,
+        episodeSignature: (band === 1 ? 'structural' : 'material') + ':0',
+        eventId: 'pos:' + id + '#' + (band === 1 ? 'structural' : 'material') + ':0' });
       const core2 = { topStories: [Object.assign({}, mk('btc', 0.45, 1), {
         rootMateriality: 0.45, supporting: [mk('eth', 0.20, 2)] })], findings: [] };
       c.__c2 = core2;
-      const withAck = run('_intv5MattersStories(__c2, [], null, { "st:position_result:btc>1": { at: 1 } })', c);
+      const withAck = run('_intv5MattersStories(__c2, [], null, { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "structural:0" } })', c);
       const without = run('_intv5MattersStories(__c2, [], null, {})', c);
       return without.stories.length === 1 && without.stories[0].semanticKey === 'position_below_cost_btc'
         && withAck.stories.length === 1
@@ -1331,15 +1425,18 @@ console.log('\n13 · Las dos cosas que la revisión final encontró:');
         window: { range: 'since_cost' }, eventId: 'st:position_result:' + id + '>' + band });
       c.__c2 = { topStories: [Object.assign({}, mk('btc', 0.45, 1), {
         rootMateriality: 0.45, supporting: [mk('eth', 0.20, 2)] })], findings: [] };
-      const r = run('_intv5MattersStories(__c2, [], null, { "st:position_result:btc>1": { at: 1 } })', c);
+      const r = run('_intv5MattersStories(__c2, [], null, { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "structural:0" } })', c);
       return r.stories.map(x => x.semanticKey); })()));
   ok('13.4 …y si NO queda ningún hermano vivo, la raíz sí desaparece (el acuse se respeta)',
     (() => { const c = makeCtx({});
       const only = { topStories: [{ semanticKey: 'position_below_cost_btc', causalRoot: 'position_result',
         materiality: 0.45, priority: 0.45, rootMateriality: 0.45, values: {},
-        window: { range: 'since_cost' }, eventId: 'st:position_result:btc>1', supporting: [] }], findings: [] };
+        window: { range: 'since_cost' }, conceptId: 'pos:btc', episodeSignature: 'structural:0',
+        eventId: 'pos:btc#structural:0', supporting: [] }], findings: [] };
       c.__c3 = only;
-      const r = run('_intv5MattersStories(__c3, [], null, { "st:position_result:btc>1": { at: 1 } })', c);
+      const r = run('_intv5MattersStories(__c3, [], null, { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "structural:0" } })', c);
       return r.stories.length === 0; })());
   ok('13.5 los apoyos llevan su IDENTIDAD, sin la cual no se podría promover ninguno',
     /eventId: f\.eventId \|\| null/.test(fnSrc('_aurixIntelligenceStories')));

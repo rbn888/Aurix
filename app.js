@@ -28753,14 +28753,20 @@ const _AURIX_CAUSAL_ROOT = Object.freeze({
 const _AURIX_FACT_MATERIAL = Object.freeze({
   exposureDeltaPp:  3,      // pp of investable wealth — below this a drift is noise
   cashDeltaPp:      3,
-  concentrationPct: 25,     // a single position at/above this is structurally material
+  // a single position at/above this is structurally material — y el MISMO 25 %
+  // clasifica como estructuralmente material una PÉRDIDA que represente esa parte
+  // del patrimonio. Misma unidad, misma pregunta, mismo número.
+  concentrationPct: 25,
   returnPct:        1,      // |return| below this is not a story
   // recorded capital ≥2% of investable value is material — y, EN LA ATRIBUCIÓN DE
   // DILUCIÓN, la misma cuota aplicada al CRECIMIENTO del denominador: acota tanto
   // si un flujo puede explicar una transición como si un segundo motor aportó una
-  // parte material de ella. Dos bases, una cuota, y ahora dicho: este bloque
-  // existe para que los umbrales sean revisables y no queden enterrados en una
-  // expresión, así que un segundo uso no declarado lo contradice.
+  // parte material de ella. Y, EN LA SEVERIDAD DE UNA PÉRDIDA, la misma cuota
+  // sobre la PARTE DEL PATRIMONIO que esa pérdida representa. Tres bases, UNA
+  // cuota, y las tres en la misma unidad y para la misma pregunta: ¿es este
+  // importe una parte material del patrimonio? Este bloque existe para que los
+  // umbrales sean revisables y no queden enterrados en una expresión, así que un
+  // uso no declarado lo contradice.
   flowShareOfValue: 0.02,
   // M.03 D — mismo umbral, concepto distinto: cuánto tiene que moverse el NIVEL
   // observado para no ser ruido de precio. Se declara aparte de `flowShareOfValue`
@@ -28791,6 +28797,55 @@ const _AURIX_INTCORE_STORY_LIMIT = 5;          // 3–5 primary stories with DIS
 const _AURIX_INTCORE_STORY_MIN_PRIORITY = 0.42;
 
 function _aurixFactClamp01(n) { return Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0)); }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC LIFECYCLE · POLÍTICA DE REAPERTURA — NIVEL, NO CUBO DE 1 pp
+// ════════════════════════════════════════════════════════════════════════════
+// DEFECTO DE PRODUCTO, decisión del founder. La identidad de episodio de una
+// pérdida usaba cubos del umbral de rendimiento declarado (1 %), y eso era la
+// unidad CORRECTA para medir y la política EQUIVOCADA para reabrir: una pérdida
+// que se mueve despacio —−25 % → −26 % → −27 %— generaba un episodio nuevo en cada
+// paso, así que reaparecía una y otra vez después de que el usuario la hubiera
+// dado por vista. Eso contradice el decaimiento, el silencio tras el acuse y la
+// regla de que sólo una evidencia materialmente nueva reabre.
+//
+// SE SEPARAN LAS DOS COSAS:
+//   · DETECCIÓN — el motor sigue midiendo el porcentaje exacto con su unidad
+//     financiera correcta. No se toca ni una cifra.
+//   · REAPERTURA — la identidad de presentación pasa a ser un NIVEL, y el nivel
+//     cambia sólo cuando cambia el ESTADO RELEVANTE PARA DECIDIR.
+//
+// EL NIVEL SE MIDE SOBRE LA PARTE DEL PATRIMONIO QUE LA PÉRDIDA REPRESENTA
+// (`|retorno| × peso`), que es la magnitud de la que depende una decisión: un
+// −50 % en el 1 % del patrimonio no pide la misma revisión que un −25 % en el
+// 45 %. Y sus dos fronteras son umbrales YA DECLARADOS, en la MISMA UNIDAD y para
+// la MISMA pregunta —¿es este importe una parte material del patrimonio?—:
+//   `flowShareOfValue` (2 %)  → material
+//   `concentrationPct`  (25 %) → estructuralmente material
+// Cero constantes nuevas, y cada frontera se puede auditar donde se declara.
+//
+// CONSECUENCIA MEDIDA: −25 % → −27 % sobre el 45 % del patrimonio mueve la cuota
+// del 11,25 % al 12,15 % ⇒ MISMO nivel ⇒ silencio. Llegar al −60 % la lleva al
+// 27 % ⇒ cruza a estructural ⇒ reabre UNA vez.
+const _AURIX_LOSS_TIER = Object.freeze({ MINOR: 'minor', MATERIAL: 'material', STRUCTURAL: 'structural' });
+function _aurixLossSeverityTier(returnPct, weight) {
+  const r = Math.abs(Number(returnPct));
+  const w = Number(weight);
+  if (!Number.isFinite(r) || !Number.isFinite(w)) return _AURIX_LOSS_TIER.MINOR;
+  const shareOfWealth = (r / 100) * w;                       // parte del patrimonio
+  if (shareOfWealth >= _AURIX_FACT_MATERIAL.concentrationPct / 100) return _AURIX_LOSS_TIER.STRUCTURAL;
+  if (shareOfWealth >= _AURIX_FACT_MATERIAL.flowShareOfValue)       return _AURIX_LOSS_TIER.MATERIAL;
+  return _AURIX_LOSS_TIER.MINOR;
+}
+// CONCEPTO vs EPISODIO. El CONCEPTO es estable —una posición, una raíz sobre una
+// categoría— y es la clave de retención: un concepto guarda UN acuse, el último.
+// El EPISODIO es el estado relevante para decidir dentro de ese concepto, y es lo
+// que decide si un acuse sigue valiendo. Separarlos es lo que impide que un
+// concepto acumule acuses sin límite mientras sigue permitiendo que una evidencia
+// materialmente nueva vuelva a hablar.
+function _aurixEpisodeOf(conceptId, signature) {
+  return String(conceptId) + '#' + String(signature);
+}
 
 // ── EFFECTIVE DIVERSIFICATION ───────────────────────────────────────────────
 // HHI over REAL position weights plus the effective number of equally-weighted
@@ -29649,6 +29704,13 @@ function _aurixFactLedger(opts) {
         // Deriva pasiva = OBSERVACIÓN de estado, no evento discreto: su identidad
         // es sólo la raíz y la ventana viaja como dato, que es lo que colapsa 7D y
         // 30D en una sola entidad en vez de dos hallazgos.
+        // CONCEPTO: esta raíz sobre esta categoría. FIRMA: la banda de NIVEL en
+        // pasos del umbral de materialidad de ESTA pregunta (3 pp de patrimonio,
+        // declarado para exactamente esto) más la dirección. A diferencia de la
+        // pérdida, aquí la banda sí es la unidad correcta y no se toca.
+        conceptId: 'drift:' + rootKey + ':' + cat,
+        episodeSignature: Math.floor(Math.max(0, Number(d.endPct) || 0) / thr)
+                        + ':' + (d.deltaPp > 0 ? 'up' : 'down'),
         eventId: _cause ? _cause.eventId
                         : _aurixEventIdentity('observation', { causalRoot: rootKey,
                             band: Math.floor(Math.max(0, Number(d.endPct) || 0) / thr),
@@ -29761,6 +29823,9 @@ function _aurixFactLedger(opts) {
           f.values.causeLicensed = causeLicensed;
           if (pure) {
             f.causalRoot = driver.root;
+            f.conceptId = 'drift:' + driver.root + ':' + driver.cat;
+            f.episodeSignature = Math.floor(Math.max(0, Number(driver.endPct) || 0) / driver.thr)
+                               + ':' + (driver.deltaPp > 0 ? 'up' : 'down');
             f.eventId = _aurixEventIdentity('observation', { causalRoot: driver.root,
               band: Math.floor(Math.max(0, Number(driver.endPct) || 0) / driver.thr),
               direction: driver.deltaPp > 0 ? 'up' : 'down' });
@@ -30025,6 +30090,21 @@ function _aurixFactLedger(opts) {
       const _top1Pct = Number((snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0);
       const _isTop = (String(a.id) === String(_topId))
         && _top1Pct >= _AURIX_FACT_MATERIAL.concentrationPct;
+      // CONCEPTO: esta posición. FIRMA: su nivel de severidad más el número de
+      // acciones del usuario sobre ella. Lo segundo es lo que hace que ampliar o
+      // reducir la posición durante la caída pueda volver a hablar una vez: es una
+      // decisión suya, y cambia la interpretación aunque el porcentaje no se mueva.
+      // Se cuenta sobre el ledger canónico ya deduplicado, así que una fila
+      // derivada duplicada no inventa una acción.
+      const _tier = _aurixLossSeverityTier(perf.returnPct, weight);
+      let _actions = 0;
+      try {
+        const _fl = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+        _actions = _fl.filter(fx => fx && String(fx.assetId || '') === String(a.id)
+          && (fx.kind === 'asset_add' || fx.kind === 'asset_remove')).length;
+      } catch (_) { _actions = 0; }
+      const _conceptId = 'pos:' + String(a.id);
+      const _signature = _tier + ':' + _actions;
       push({
         semanticKey: 'position_below_cost_' + String(a.id),
         family: _AURIX_FACT_FAMILY.PERFORMANCE,
@@ -30046,7 +30126,9 @@ function _aurixFactLedger(opts) {
                   isTopPosition: _isTop,
                   // Lo que NO se afirma, dicho en el hecho para que la superficie
                   // no pueda deducirlo: cuánto lleva así, y cuánto es divisa.
-                  durationKnown: false, fxAttributed: false },
+                  durationKnown: false, fxAttributed: false,
+                  severityTier: _tier, userActions: _actions,
+                  lossShareOfWealth: +(((Math.abs(Number(perf.returnPct)) / 100) * weight) * 100).toFixed(2) },
         // LA PUERTA TIENE QUE PODER CERRARSE. Sin extremos no se evaluaba el epoch,
         // no se pedía clasificación y `ok` era true SIEMPRE: el filtro de
         // `_aurixCanonicalFindings` era una tautología aquí. Ahora los dos extremos
@@ -30069,17 +30151,12 @@ function _aurixFactLedger(opts) {
           confidence: 1,
           extraGaps: denomComplete ? [] : [_AURIX_EV_GAP.DENOMINATOR_PARTIAL],
         }),
-        eventId: _aurixEventIdentity('band', { causalRoot: _AURIX_CAUSAL_ROOT.POSITION_RESULT,
-          fromBand: String(a.id),
-          // LA BANDA, CON LA MAGNITUD CORRECTA. Usaba `exposureDeltaPp`, que está
-          // declarado como «pp de patrimonio invertible»: el número servía y el
-          // SIGNIFICADO no. El umbral de esta misma pregunta —¿cuánto tiene que
-          // moverse un rendimiento para ser noticia?— es `returnPct`. Consecuencia
-          // declarada: con pasos de 1 % una caída lenta genera episodios nuevos con
-          // frecuencia. Es el precio de usar la unidad correcta en vez de inventar
-          // un ancho de banda, y es una decisión de ajuste del founder, no un
-          // defecto de verdad financiera.
-          toBand: String(Math.floor(Math.abs(perf.returnPct) / _AURIX_FACT_MATERIAL.returnPct)) }),
+        conceptId: _conceptId,
+        episodeSignature: _signature,
+        // El id es CONCEPTO#FIRMA. Ya no hay cubos de 1 pp: la firma sólo cambia
+        // cuando cambia el nivel de severidad o cuando el usuario actúa sobre la
+        // posición, que son los dos estados que de verdad piden otra lectura.
+        eventId: _aurixEpisodeOf(_conceptId, _signature),
         eventClass: 'market_driven',
         window: { range: 'since_cost', startAt: null, endAt: null },
         source: 'computePositionPerformance', direction: 'down', positive: false,
@@ -30193,6 +30270,7 @@ function _aurixIntelligenceStories(ledger, opts) {
           // nada porque todos los hechos con identidad valen `confidence: 1`, pero
           // eso es una coincidencia entre constantes, no una garantía.
           direction: f.direction, eventId: f.eventId || null, materiality: f.materiality,
+          conceptId: f.conceptId || null, episodeSignature: (f.episodeSignature != null) ? f.episodeSignature : null,
           confidence: f.confidence, positive: f.positive, note: f.note || null,
         })),
     }));
@@ -30412,6 +30490,20 @@ function _aurixCanonicalFindings(ledger, opts) {
   // decaimiento de PRESENTACIÓN, no pérdida de memoria financiera.
   const acks = (o.acknowledged && typeof o.acknowledged === 'object') ? o.acknowledged : {};
   const paused = Number.isFinite(Number(o.pausedAt)) ? Number(o.pausedAt) : null;
+  // El concepto de un hecho legacy sin `conceptId` es su propia identidad de
+  // evento: así el contrato sigue funcionando para todo lo que no lo publica.
+  const conceptOf = f => String(f.conceptId || f.eventId
+    || _aurixEventIdentity('observation', { causalRoot: f.causalRoot }));
+  const ackCovers = f => {
+    const r = acks[conceptOf(f)];
+    if (!r || r.state !== 'acknowledged') return false;      // resuelto ⇒ no cubre
+    // Sin firma en ninguno de los dos lados se cae al criterio anterior (identidad
+    // de evento), que es el comportamiento legacy y sigue siendo correcto.
+    if (r.signature == null || f.episodeSignature == null) {
+      return !r.episodeId || String(r.episodeId) === String(f.eventId);
+    }
+    return String(r.signature) === String(f.episodeSignature);
+  };
   const out = [];
   const seenEvent = new Map();
   for (const f of facts) {
@@ -30464,13 +30556,17 @@ function _aurixCanonicalFindings(ledger, opts) {
       confidence: Number.isFinite(f.confidence) ? f.confidence : 0,
       causeKnown: !!(f.values && f.values.causeKnown),
       provenance: (f.evidence && f.evidence.observationClass) || _AURIX_OBS_CLASS.DERIVED,
-      // NEW mientras nadie lo haya visto; ACKNOWLEDGED en cuanto lo dio por visto.
-      // `REOPENED_BY_NEW_EVIDENCE` no necesita marca propia: un episodio nuevo
-      // tiene un id nuevo, así que no está en el mapa de acuses y vuelve como NEW.
-      // Eso es lo que hace que reabra UNA vez y no en cada pintura ni por device.
-      presentationState: acks[eventId] ? 'acknowledged'
+      conceptId: conceptOf(f),
+      episodeSignature: (f.episodeSignature != null) ? String(f.episodeSignature) : null,
+      // EL ACUSE SE BUSCA POR CONCEPTO Y VALE SÓLO PARA SU FIRMA. Un episodio
+      // materialmente nuevo —otro nivel de severidad, o una acción del usuario
+      // sobre la posición— tiene otra firma, así que el acuse deja de cubrirlo y
+      // vuelve como NEW: reabre UNA vez, no en cada pintura ni por dispositivo. Y
+      // un registro RESUELTO tampoco cubre nada, que es lo que permite que un
+      // deterioro posterior a una recuperación hable aunque su firma coincida.
+      presentationState: ackCovers(f) ? 'acknowledged'
         : (paused !== null ? 'paused' : 'new'),
-      acknowledgedAt: acks[eventId] ? Number(acks[eventId].at) : null,
+      acknowledgedAt: ackCovers(f) ? Number((acks[conceptOf(f)] || {}).at) : null,
     };
     if (!prev) { seenEvent.set(eventId, finding); out.push(finding); continue; }
     prev.windows.push(f.window);
@@ -31317,7 +31413,13 @@ function _aurixIntelContext(env) {
   if (rec && rec.ack && typeof rec.ack === 'object') {
     Object.keys(rec.ack).forEach(k => {
       const v = rec.ack[k];
-      if (v && Number.isFinite(Number(v.at))) out.ack[k] = { at: Number(v.at), state: String(v.state || 'acknowledged') };
+      if (v && Number.isFinite(Number(v.at))) out.ack[k] = {
+        at: Number(v.at), state: String(v.state || 'acknowledged'),
+        episodeId: v.episodeId ? String(v.episodeId) : null,
+        signature: (v.signature != null) ? String(v.signature) : null,
+        tier: v.tier ? String(v.tier) : null,
+        resolvedAt: Number.isFinite(Number(v.resolvedAt)) ? Number(v.resolvedAt) : null,
+      };
     });
   }
   if (!rec || !rec.fields || typeof rec.fields !== 'object') return out;
@@ -31380,25 +31482,49 @@ function _aurixIntelDecline(field, opts) {
 // DE PRESENTACIÓN, que es lo que evita que un aviso material se convierta en un
 // reproche permanente. Y se acusa el EPISODIO, así que un nivel materialmente
 // nuevo vuelve a hablar — una vez — sin necesidad de ningún temporizador.
-function _aurixIntelAcknowledge(episodeId, opts) {
+// ════════════════════════════════════════════════════════════════════════════
+// RETENCIÓN DEL ACUSE — UN REGISTRO POR CONCEPTO, EL ÚLTIMO
+// ════════════════════════════════════════════════════════════════════════════
+// El acuse es ESTADO OPERATIVO DE PRESENTACIÓN, no memoria financiera, y estaba
+// guardado como una clave por EPISODIO: con cubos de 1 pp, una posición podía
+// acumular decenas de acuses de por vida, y el tope los desalojaba por antigüedad
+// —o sea que el primero en volver a hablar era justo el que el usuario llevaba más
+// tiempo habiendo dado por visto—.
+//
+// Ahora hay UN registro por CONCEPTO (posición, o raíz sobre categoría) con el
+// último acuse y su LÍNEA BASE: el episodio acusado, su firma, su nivel de
+// severidad y cuándo. Un episodio posterior se compara contra esa línea base, así
+// que:
+//   · el almacén está acotado por el número de CONCEPTOS —posiciones y raíces—, no
+//     por el de movimientos de precio: no crece con el tiempo;
+//   · no hay desalojo por cupo, así que un acuse VIGENTE no se pierde nunca;
+//   · no hay retención por tiempo transcurrido: el paso del tiempo no reabre nada;
+//   · la compactación es determinista y sólo alcanza a lo RESUELTO, y resolver ya
+//     permite reabrir, así que no puede resucitar un aviso viejo.
+// El hecho certificado y la memoria financiera no se tocan en ningún caso.
+function _aurixIntelAcknowledge(conceptId, opts) {
   const o = opts || {};
-  if (!episodeId) return false;
+  if (!conceptId) return false;
   const cur = _aurixIntelCtxRecord(o) || {};
   const ack = Object.assign({}, cur.ack || {});
   const now = Number.isFinite(o.now) ? o.now : Date.now();
-  if (ack[String(episodeId)]) return true;                  // idempotente: un acuse, una vez
-  ack[String(episodeId)] = { at: now, state: 'acknowledged' };
-  // ACOTADO, como sus hermanos. Sin tope las claves se acumulaban por (raíz ×
-  // banda) y por (activo × banda) de por vida, y el payload entero se re-sube en
-  // cada push. Se conserva lo MÁS RECIENTE con el mismo horizonte ya declarado
-  // para la memoria de observación: un acuse antiguo cuyo episodio nadie ha vuelto
-  // a ver no tiene nada que silenciar.
-  const keys = Object.keys(ack);
-  if (keys.length > _AURIX_INTEL_MEM_MAX_ENTRIES) {
-    keys.sort((x, y) => (Number((ack[y] || {}).at) || 0) - (Number((ack[x] || {}).at) || 0))
-        .slice(_AURIX_INTEL_MEM_MAX_ENTRIES)
-        .forEach(k => { delete ack[k]; });
-  }
+  const key = String(conceptId);
+  const sig = (o.signature != null) ? String(o.signature) : null;
+  const prev = ack[key];
+  // Idempotente para el MISMO episodio: acusar dos veces no re-sella el instante.
+  if (prev && prev.state === 'acknowledged' && String(prev.signature) === String(sig)) return true;
+  ack[key] = {
+    at: now, state: 'acknowledged',
+    // LÍNEA BASE del acuse: contra esto se compara un episodio posterior.
+    // Sin firma el concepto ES el episodio: un hecho legacy que no publica firma se
+    // identifica por su propia identidad de evento, y `conceptOf` la usa como
+    // concepto, así que la comparación legacy casa. Construir `concepto#null` habría
+    // hecho que acusar esos hechos no sirviera de nada.
+    episodeId: o.episodeId ? String(o.episodeId) : (sig === null ? key : _aurixEpisodeOf(key, sig)),
+    signature: sig,
+    tier: o.tier ? String(o.tier) : null,
+    v: 1,
+  };
   const okw = _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY,
     Object.assign({}, cur, { ack, updatedAt: now, dirty: true }), o);
   // NO SE EMPUJA ANTES DE HABER LEÍDO. El push sube `merge(local, null)`, o sea el
@@ -31412,6 +31538,35 @@ function _aurixIntelAcknowledge(episodeId, opts) {
     _aurixIntelCtxPush();
   }
   return okw;
+}
+// RESOLUCIÓN. Cuando un concepto deja de producir hecho —la posición recuperó, la
+// deriva dejó de ser material— su acuse se marca RESUELTO. Eso es lo que permite
+// que un deterioro POSTERIOR vuelva a hablar aunque su firma coincida con la del
+// episodio anterior: sin esta marca, recuperarse y volver a caer al mismo nivel
+// habría quedado silenciado para siempre. Y un registro resuelto puede compactarse
+// sin riesgo, porque resuelto ya significa «vuelve a poder hablar».
+// Se escribe SÓLO en la transición, así que no es una escritura por pintura.
+function _aurixIntelResolveAbsent(liveConceptIds, opts) {
+  const o = opts || {};
+  try {
+    const cur = _aurixIntelCtxRecord(o);
+    if (!cur || !cur.ack) return 0;
+    const live = new Set((liveConceptIds || []).map(String));
+    const ack = Object.assign({}, cur.ack);
+    let changed = 0;
+    Object.keys(ack).forEach(k => {
+      const r = ack[k];
+      if (!r || r.state !== 'acknowledged') return;
+      if (live.has(k)) return;
+      ack[k] = Object.assign({}, r, { state: 'resolved', resolvedAt: Number.isFinite(o.now) ? o.now : Date.now() });
+      changed++;
+    });
+    if (!changed) return 0;
+    const now = Number.isFinite(o.now) ? o.now : Date.now();
+    _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY,
+      Object.assign({}, cur, { ack, updatedAt: now, dirty: true }), o);
+    return changed;
+  } catch (_) { return 0; }
 }
 function _aurixIntelPauseQuestions(opts) {
   const o = opts || {}, now = Number.isFinite(o.now) ? o.now : Date.now();
@@ -57135,7 +57290,8 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
             data-diluted="${(x.f && x.f.values && x.f.values.dilutedBy) ? esc(x.f.values.dilutionKind || 'pure') : ''}">
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
-          <button type="button" class="intv12-ack" data-intel-ack="${esc(x.fd.episodeId)}"
+          <button type="button" class="intv12-ack" data-intel-ack="${esc(x.fd.conceptId || x.fd.episodeId)}"
+                  data-intel-sig="${esc(x.fd.episodeSignature == null ? '' : x.fd.episodeSignature)}"
                   aria-label="${esc(_intv4T('intel_ack_aria'))}">${esc(_intv4T('intel_ack'))}</button>
         </li>`).join('')}</ul>
     </section>` };
@@ -57991,8 +58147,19 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
     // El hermano ya viaja en `supporting`, así que la superficie puede promoverlo:
     // el acuse cede el puesto, no silencia la raíz.
     .map(st => {
-      if (!(st.eventId && ack[st.eventId])) return st;
-      const alt = (st.supporting || []).find(sp => sp && sp.eventId && !ack[sp.eventId]);
+      // Mismo criterio que el conjunto canónico: el acuse vive por CONCEPTO y sólo
+      // cubre SU firma; un registro resuelto no cubre nada.
+      const covered = (x) => {
+        if (!x) return false;
+        const r = ack[String(x.conceptId || x.eventId || '')];
+        if (!r || r.state !== 'acknowledged') return false;
+        if (r.signature == null || x.episodeSignature == null) {
+          return !r.episodeId || String(r.episodeId) === String(x.eventId);
+        }
+        return String(r.signature) === String(x.episodeSignature);
+      };
+      if (!covered(st)) return st;
+      const alt = (st.supporting || []).find(sp => sp && sp.eventId && !covered(sp));
       if (!alt) return null;                                  // nada vivo que promover
       return Object.assign({}, st, alt, {
         causalRoot: st.causalRoot,
@@ -58025,7 +58192,8 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks) {
   // El control va por historia, con su episodio: una sola delegación ya lo resuelve.
   const withAck = sel.stories.map((st, i) => cards[i]
     ? cards[i].replace('</article>',
-        (st.eventId ? `<button type="button" class="intv12-ack" data-intel-ack="${esc(st.eventId)}"
+        (st.eventId ? `<button type="button" class="intv12-ack" data-intel-ack="${esc(st.conceptId || st.eventId)}"
+           data-intel-sig="${esc(st.episodeSignature == null ? '' : st.episodeSignature)}"
            aria-label="${esc(_intv4T('intel_ack_aria'))}">${esc(_intv4T('intel_ack'))}</button>` : '')
         + '</article>')
     : '').filter(Boolean);
@@ -58167,6 +58335,22 @@ function _renderIntelligenceCommandCenter() {
   try {
     if (typeof _intv4SetFactDepth === 'function') {
       _intv4SetFactDepth((intel && intel.experience && intel.experience.resolved) || depth);
+    }
+  } catch (_) {}
+  // RESOLUCIÓN, una vez por pintura y sólo en la TRANSICIÓN: los conceptos que ya
+  // no producen hecho pasan a `resolved`, que es lo que permite que un deterioro
+  // POSTERIOR vuelva a hablar. `_aurixIntelResolveAbsent` no escribe si nada
+  // cambió, así que esto no es una escritura por repintado.
+  try {
+    if (typeof _aurixIntelResolveAbsent === 'function') {
+      const _liveConcepts = ((core.ledger && core.ledger.facts) || [])
+        .map(f => f.conceptId).filter(Boolean);
+      // NO se recomputa el Core: se recorre UNA vez por pintura y ese invariante
+      // está certificado (el ledger se llegó a recorrer tres veces por pintura y
+      // costó un gate). La resolución surte efecto en la PINTURA SIGUIENTE, y eso
+      // basta: sólo importa cuando el usuario vuelva a ver un deterioro nuevo, y
+      // para entonces habrá habido otra pintura.
+      _aurixIntelResolveAbsent(_liveConcepts, {});
     }
   } catch (_) {}
   const findingCount = (typeof _intv4FindingRows === 'function') ? _intv4FindingRows(core).length : 0;
@@ -58470,7 +58654,10 @@ function _initIntelSeeChanges(root) {
         ev.preventDefault();
         try {
           const id = ack.getAttribute('data-intel-ack');
-          if (id && typeof _aurixIntelAcknowledge === 'function') _aurixIntelAcknowledge(id, {});
+          const sig = ack.getAttribute('data-intel-sig');
+          if (id && typeof _aurixIntelAcknowledge === 'function') {
+            _aurixIntelAcknowledge(id, { signature: (sig === null || sig === '') ? null : sig });
+          }
           if (typeof renderIntelligence === 'function') renderIntelligence();
           else if (typeof render === 'function') render(false);
         } catch (_) {}
