@@ -303,9 +303,18 @@ const moved = run(P.diversified, { memory: storedMem });
 ok('E.3 si la LECTURA cambia, se dice de qué a qué',
   moved.memory.changesSinceLastObservation.some(c => c.kind === 'reading_changed'
     && c.from === 'dominant_position' && c.to === 'balanced'));
-ok('E.4 un insight que desaparece se marca RESUELTO, no se borra en silencio',
-  run(P.empty, { memory: storedMem }).memory.changesSinceLastObservation
-    .some(c => c.kind === 'insight_resolved'));
+// LA VERSIÓN ANTERIOR DE ESTA ASERCIÓN FIJABA EL DEFECTO COMO CONTRATO: exigía
+// que una lectura DESAPARECIDA se marcase RESUELTA. Desaparecer no prueba nada
+// —hidratación, FX, esquema, supresión por evidencia, cambio de cuenta— así que
+// ahora se exige lo contrario: ni se afirma, ni se pierde la línea base.
+ok('E.4 un insight que desaparece NO se marca resuelto, y su línea base sobrevive',
+  (() => { const r = run(P.empty, { memory: storedMem });
+    const gone = r.memory.seen.find(e => e.id === 'ai_concentration_top_position');
+    return !r.memory.changesSinceLastObservation.some(c => c.kind === 'insight_resolved')
+      && r.memory.changeCount === 0
+      && !!gone && gone.state === 'unobserved' && gone.resolvedAt === null
+      && gone.observations === (storedMem.seen.find(e => e.id === 'ai_concentration_top_position') || {}).observations; })(),
+  JSON.stringify(run(P.empty, { memory: storedMem }).memory));
 ok('E.5 lo demasiado viejo CADUCA: la memoria no es ilimitada',
   (() => { const old = { observedAt: 1, dispersion: null, seen: [{ id: 'ai_ghost',
       dimension: 'liquidity', label: 'stable', firstSeenAt: 1, lastSeenAt: 1, observations: 9 }] };
@@ -821,8 +830,10 @@ group('P · memoria · sin cambios fabricados por repetición');
   const v2 = run(P.empty, { memory: commit(base) });
   const v3 = run(P.empty, { memory: commit(v2) });
   const v4 = run(P.empty, { memory: commit(v3) });
-  ok('P.1 la resolución se anuncia en la visita en que ocurre',
-    v2.memory.changesSinceLastObservation.some(c => c.kind === 'insight_resolved'));
+  ok('P.1 la desaparición NO anuncia nada, ni en la visita en que ocurre',
+    v2.memory.changeCount === 0
+    && !v2.memory.changesSinceLastObservation.some(c => c.kind === 'insight_resolved'),
+    JSON.stringify(v2.memory.changesSinceLastObservation));
   ok('P.2 …y NO se vuelve a anunciar en las visitas siguientes (era un cambio fabricado 45 días)',
     v3.memory.changeCount === 0 && v4.memory.changeCount === 0);
   ok('P.3 …así que el hero deja de publicar urgencia en bucle',
@@ -831,12 +842,19 @@ group('P · memoria · sin cambios fabricados por repetición');
   const r1 = run(P.concentr);
   const gone = run(P.empty, { memory: commit(r1) });
   const back = run(P.concentr, { memory: commit(gone) });
-  ok('P.4 reaparecer se cuenta como APARICIÓN, no como que nunca se fue',
-    back.memory.changesSinceLastObservation.some(c => c.kind === 'insight_appeared'
-      && c.id === 'ai_concentration_top_position'));
-  ok('P.5 …y el contador de observaciones se reinicia, así que no se afirma «sigue igual»',
+  // UN DATO QUE VUELVE IGUAL NO ES UN DATO NUEVO. Antes se anunciaba como
+  // APARICIÓN, porque la ausencia lo había sellado como resuelto: una pintura sin
+  // datos bastaba para que la misma lectura, sin cambiar, se presentase como algo
+  // que acaba de ocurrir.
+  ok('P.4 un dato que vuelve SIN CAMBIAR no se anuncia como nuevo',
+    !back.memory.changesSinceLastObservation.some(c => c.id === 'ai_concentration_top_position'),
+    JSON.stringify(back.memory.changesSinceLastObservation));
+  ok('P.5 …y su línea base sobrevive intacta: sigue siendo la MISMA observación',
     (() => { const e = back.memory.seen.find(x => x.id === 'ai_concentration_top_position');
-      return e.observations === 1 && e.state === 'new'; })());
+      const e0 = r1.memory.seen.find(x => x.id === 'ai_concentration_top_position');
+      return !!e && e.state === 'persisting' && e.resolvedAt === null
+        && e.firstSeenAt === e0.firstSeenAt && e.observations > e0.observations; })(),
+    JSON.stringify(back.memory.seen));
   // Nivel estático ya visto
   ok('P.6 un NIVEL estático ya visto varias veces deja de reclamar atención',
     (() => { const many = { observedAt: 1, dispersion: r1.dispersion.value,
@@ -853,6 +871,150 @@ group('P · memoria · sin cambios fabricados por repetición');
           firstSeenAt: 1, lastSeenAt: 1, observations: 9, resolvedAt: null })) };
       const r = run(prof, { memory: many, context: FULL_CTX });
       return r.now.urgencyClaimed === true && r.now.supportedByFact === true; })());
+}
+
+// ── X · MEMORIA LEGACY · DESAPARECER NO ES RESOLVERSE ───────────────────────
+// La resolución por desaparición se RETIRÓ. Estas aserciones recorren las causas
+// reales por las que una lectura deja de estar en la lista viva: ninguna prueba
+// que el patrimonio del usuario haya cambiado, ninguna puede publicar un evento
+// resuelto y ninguna puede destruir la observación anterior.
+group('X · memoria legacy · la ausencia no cura nada');
+{
+  const MEMSRC = block('function _aurixIntelCoverageRank', '\nfunction _aurixIntelCommitMemory');
+  const seenOf = (r) => ({ observedAt: 1, dispersion: r.dispersion.value,
+    seen: r.memory.seen.map(e => ({ id: e.id, dimension: e.dimension, label: e.label,
+      coverage: e.coverage || null, firstSeenAt: e.firstSeenAt, lastSeenAt: e.lastSeenAt,
+      observations: e.observations, resolvedAt: Number.isFinite(e.resolvedAt) ? e.resolvedAt : null })) });
+  const observed = run(P.concentr);
+  const baseline = seenOf(observed);
+  const ids = baseline.seen.map(e => e.id).sort();
+  // Lo que NINGUNA desaparición puede hacer: anunciar una resolución, perder una
+  // entrada previa o sellar una fecha de resolución.
+  const survives = (r) => {
+    const got = r.memory.seen.map(e => e.id).sort();
+    return !r.memory.changesSinceLastObservation.some(c => c.kind === 'insight_resolved')
+      && JSON.stringify(got) === JSON.stringify(ids)
+      && r.memory.seen.every(e => e.resolvedAt === null)
+      && r.memory.seen.some(e => e.state === 'unobserved');
+  };
+
+  // HIDRATACIÓN PENDIENTE: todavía no hay snapshot ni diversificación que leer.
+  const hydrating = run({ snapshot: null, diversification: null, core: core([]) },
+    { memory: baseline });
+  ok('X.1 hidratación pendiente ⇒ ningún evento resuelto, y ni un cambio anunciado',
+    survives(hydrating) && hydrating.memory.changeCount === 0,
+    JSON.stringify(hydrating.memory));
+  // DATOS INCOMPLETOS: hay posiciones, pero no se pueden valorar todas.
+  const partial = run({ snapshot: snap({ topInvestedAsset: null, uncertifiablePositions: 2 }),
+    diversification: div({ status: ST.LOW_CONFIDENCE, reason: 'unvalued_position',
+      hhi: null, effectiveN: null, topWeightPct: null }), core: core([]) }, { memory: baseline });
+  ok('X.2 datos incompletos ⇒ ningún evento resuelto', survives(partial),
+    JSON.stringify(partial.memory));
+  // FX / ESQUEMA / FUENTE: la fuente no responde. No es una recuperación.
+  const brokenFx = run({ snapshot: null,
+    diversification: div({ status: ST.UNAVAILABLE_SOURCE, reason: 'fx_unavailable',
+      positions: 0, hhi: null, effectiveN: null, topWeightPct: null }), core: core([]) },
+    { memory: baseline });
+  ok('X.3 FX / esquema / fallo de fuente ⇒ ningún evento resuelto', survives(brokenFx),
+    JSON.stringify(brokenFx.memory));
+  // EL HECHO QUE SOSTENÍA LA LECTURA DESAPARECE del ledger —deduplicación por raíz
+  // causal, filtro de materialidad, supresión por la puerta de evidencia— con la
+  // MISMA estructura de cartera. Ni resolución, ni cambio: sólo cobertura peor.
+  const withFact = run({ snapshot: snap({ cashPct: 85 }), diversification: div(),
+    core: core([CASHDRIFT(9, 76)]) });
+  const factGone = run({ snapshot: snap({ cashPct: 85 }), diversification: div(),
+    core: core([]) }, { memory: seenOf(withFact) });
+  ok('X.4 un hecho que desaparece del ledger (dedup, materialidad, evidencia) no resuelve ni cambia nada',
+    factGone.memory.changeCount === 0
+    && !factGone.memory.changesSinceLastObservation.some(c => c.kind === 'insight_resolved'),
+    JSON.stringify(factGone.memory.changesSinceLastObservation));
+  ok('X.4b …y la lectura conserva la última versión BIEN respaldada, no la degradada',
+    (() => { const e = factGone.memory.seen.find(x => x.id === 'ai_liquidity_level');
+      const e0 = withFact.memory.seen.find(x => x.id === 'ai_liquidity_level');
+      return !!e && !!e0 && e.label === e0.label && e.coverage === e0.coverage; })(),
+    JSON.stringify({ before: withFact.memory.seen.find(x => x.id === 'ai_liquidity_level'),
+      after: factGone.memory.seen.find(x => x.id === 'ai_liquidity_level') }));
+  ok('X.4c …y cuando el hecho vuelve IGUAL, tampoco se anuncia nada',
+    (() => { const back = run({ snapshot: snap({ cashPct: 85 }), diversification: div(),
+        core: core([CASHDRIFT(9, 76)]) }, { memory: seenOf(factGone) });
+      return back.memory.changeCount === 0; })());
+  ok('X.4d …pero un cambio REAL de lectura sigue anunciándose una vez',
+    (() => { const other = run({ snapshot: snap({ cashPct: 85 }), diversification: div(),
+        core: core([CASHDRIFT(-9, 76)]) }, { memory: seenOf(withFact) });
+      return other.memory.changesSinceLastObservation.filter(c => c.kind === 'reading_changed'
+        && c.id === 'ai_liquidity_level').length === 1; })(),
+    JSON.stringify(run({ snapshot: snap({ cashPct: 85 }), diversification: div(),
+      core: core([CASHDRIFT(-9, 76)]) }, { memory: seenOf(withFact) }).memory.changesSinceLastObservation));
+  // TOPE DE RANKING Y PRIORIZACIÓN: la memoria se alimenta de la lista
+  // INTERPRETADA, no de la recortada. El tope acota la ATENCIÓN, nunca la memoria.
+  ok('X.5 el tope de ranking recorta la atención y no borra nada de la memoria',
+    (() => { const prof = P.cashHeavy;
+      const r = run(prof);
+      const live = sandbox.AI(Object.assign({ now: 2000000000000 }, prof)).insights
+        .filter(i => i.availability === 'available').map(i => i.id).sort();
+      const mem = r.memory.seen.map(e => e.id).sort();
+      return r.attention.length < r.attentionTotal
+        && JSON.stringify(mem) === JSON.stringify(live); })(),
+    JSON.stringify({ att: run(P.cashHeavy).attention.length, total: run(P.cashHeavy).attentionTotal,
+      mem: run(P.cashHeavy).memory.seen.map(e => e.id) }));
+  // EL DATO QUE VUELVE tras una desaparición: es la MISMA observación, no una
+  // nueva, y no se anuncia nada por el camino.
+  ok('X.6 el dato que vuelve sin cambiar no produce transición alguna',
+    (() => { const back = run(P.concentr, { memory: seenOf(hydrating) });
+      const e = back.memory.seen.find(x => x.id === 'ai_concentration_top_position');
+      const e0 = baseline.seen.find(x => x.id === 'ai_concentration_top_position');
+      return back.memory.changeCount === 0 && !!e && e.state === 'persisting'
+        && e.firstSeenAt === e0.firstSeenAt && e.observations === e0.observations + 1; })(),
+    JSON.stringify(run(P.concentr, { memory: seenOf(hydrating) }).memory));
+  // Un `resolvedAt` HEREDADO de la versión anterior era una ausencia, no una
+  // prueba: no puede fabricar hoy una aparición ni reiniciar el recuento.
+  ok('X.7 un sello de resolución ANTIGUO se ignora: no inventa una aparición',
+    (() => { const legacy = { observedAt: 1, dispersion: observed.dispersion.value,
+        seen: baseline.seen.map(e => Object.assign({}, e, { resolvedAt: 1999999999999 })) };
+      const r = run(P.concentr, { memory: legacy });
+      const e = r.memory.seen.find(x => x.id === 'ai_concentration_top_position');
+      return r.memory.changeCount === 0 && e.state === 'persisting' && e.resolvedAt === null; })(),
+    JSON.stringify((() => { const legacy = { observedAt: 1, dispersion: observed.dispersion.value,
+        seen: baseline.seen.map(e => Object.assign({}, e, { resolvedAt: 1999999999999 })) };
+      return run(P.concentr, { memory: legacy }).memory; })()));
+  // AISLAMIENTO POR CUENTA. La memoria se lee por PROPIETARIO: la de otra cuenta
+  // no es legible, así que una transición de cuenta no resuelve ni hereda nada.
+  ok('X.8 la memoria de otra cuenta no es legible: una transición de cuenta no resuelve ni hereda',
+    (() => { const st = mkStore();
+      MEMCOMMIT(observed.memory, observed.dispersion, 7, { store: st, owner: 'u1' });
+      const asOwner = (o) => INTEL(Object.assign({ now: 2000000000000, depth: 'premium',
+        context: { fields: {}, answered: 0, source: 'none' }, store: st, owner: o }, P.empty));
+      const u2 = asOwner('u2'), u1 = asOwner('u1');
+      return u2.memory.hasHistory === false && u2.memory.changeCount === 0
+        && u1.memory.hasHistory === true && u1.memory.changeCount === 0
+        && !u1.memory.changesSinceLastObservation.some(c => c.kind === 'insight_resolved'); })(),
+    JSON.stringify((() => { const st = mkStore();
+      MEMCOMMIT(observed.memory, observed.dispersion, 7, { store: st, owner: 'u1' });
+      const asOwner = (o) => INTEL(Object.assign({ now: 2000000000000, depth: 'premium',
+        context: { fields: {}, answered: 0, source: 'none' }, store: st, owner: o }, P.empty));
+      return { u2: asOwner('u2').memory, u1: asOwner('u1').memory }; })()));
+  // LA TRANSICIÓN ESTÁ RETIRADA EN EL OWNER, no sólo inalcanzable en estas
+  // fixtures: ni el evento ni el sello existen en el fuente de la memoria.
+  ok('X.9 el owner de la memoria ya no emite `insight_resolved` ni sella por ausencia',
+    !/kind: 'insight_resolved'/.test(MEMSRC) && !/state: 'resolved'/.test(MEMSRC)
+    && /state: 'unobserved'/.test(MEMSRC));
+  // Y NO DUPLICA una resolución que ya tiene dueño: la memoria legacy no conoce
+  // `resolvedConcepts` ni fabrica un puente hacia sus identidades canónicas.
+  ok('X.10 la memoria legacy no consume `resolvedConcepts` ni traduce identidades canónicas',
+    !/resolvedConcepts/.test(MEMSRC) && !/'pos:'|'drift:'/.test(MEMSRC));
+  // LA MEMORIA FINANCIERA (la card) no sale de aquí: se construye desde el Core.
+  // Esta retirada no la toca, y el contrato de la memoria legacy sigue sin
+  // guardar ni una cifra.
+  ok('X.11 la memoria legacy sigue sin guardar nada patrimonial ni identificable',
+    (() => { const st = mkStore();
+      MEMCOMMIT(run(P.concentr, { memory: baseline }).memory, observed.dispersion, 7,
+        { store: st, owner: 'u' });
+      const raw = st.getItem('aurix_intel_mem_v1');
+      return !/100000|VWCE|BTC|Piso|@/.test(raw) && /"coverage"/.test(raw); })(),
+    (() => { const st = mkStore();
+      MEMCOMMIT(run(P.concentr, { memory: baseline }).memory, observed.dispersion, 7,
+        { store: st, owner: 'u' });
+      return st.getItem('aurix_intel_mem_v1'); })());
 }
 
 // ── Q · CICLO DE VIDA DE PREGUNTAS ─────────────────────────────────────────

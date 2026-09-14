@@ -32138,10 +32138,40 @@ function _aurixIntelInterpret(insights, ctx) {
 // mentalmente en cada apertura:
 //   new        → no se había observado
 //   persisting → se observó y sigue siendo verdad (lleva cuántas observaciones)
-//   resolved   → se observó, ya no aparece: dejó de ser cierto
+//   unobserved → se observó antes y hoy no se puede leer: NO se afirma nada
 //   stale      → llevaba demasiado sin volver a observarse
 // NO se guarda ninguna cifra de patrimonio ni nada identificable: sólo la clave
 // semántica, su etiqueta y cuándo se vio.
+//
+// ── LA AUSENCIA NO ERA UNA RESOLUCIÓN ──────────────────────────────────────
+// Existía un cuarto estado, `resolved`, y se alcanzaba por DESAPARICIÓN: si la
+// lectura no estaba en la lista viva, se sellaba como «dejó de ser cierto» y se
+// publicaba un cambio `insight_resolved` que engordaba `changeCount` y las
+// dimensiones cambiadas. Pero un insight desaparece por muchas razones que no
+// tienen nada que ver con el patrimonio del usuario: hidratación pendiente, datos
+// incompletos, historia rancia, FX no disponible, la puerta de evidencia
+// suprimiendo el hecho que lo sostenía, una transición de cuenta o de epoch, el
+// filtro de materialidad, la deduplicación por raíz causal o un fallo temporal de
+// la fuente. Ninguno de esos estados prueba una resolución financiera.
+//
+// Y NO se conecta con la resolución certificada del motor canónico: sus conceptos
+// son `pos:<activo>` y `drift:<raíz>:<categoría>` —posiciones y derivas medidas—
+// mientras estas lecturas son dimensiones estructurales (`ai_concentration_*`,
+// `ai_liquidity_*`). No existe relación de identidad entre unas y otras, y
+// fabricar un puente sería inventar exactamente la afirmación que se viene a
+// retirar. Duplicaría además una resolución que ya tiene dueño
+// (`resolvedConcepts`). Así que la transición se RETIRA: la entrada conserva su
+// línea base intacta —cuándo se vio por primera vez, cuántas veces, con qué
+// etiqueta— y no se afirma nada. Callar es preferible a decir que algo se
+// resolvió cuando no se sabe.
+// El ORDEN de la cobertura ya declarada, para poder decir «esto se mide peor que
+// antes». Lo desconocido es el suelo: un registro viejo sin cobertura anotada no
+// puede hacer que una lectura peor parezca igual de respaldada.
+function _aurixIntelCoverageRank(c) {
+  if (c === _AURIX_AI_COVERAGE.SUFFICIENT) return 2;
+  if (c === _AURIX_AI_COVERAGE.PARTIAL) return 1;
+  return 0;
+}
 function _aurixIntelMemory(insights, dispersion, stored, now) {
   const t = Number.isFinite(now) ? now : 0;
   const prev = (stored && Array.isArray(stored.seen)) ? stored.seen : [];
@@ -32155,22 +32185,37 @@ function _aurixIntelMemory(insights, dispersion, stored, now) {
   const seen = [], changes = [];
   for (const ins of live) {
     const p = prevBy.get(ins.id) || null;
-    // REAPARECER NO ES PERSISTIR. Un insight que se resolvió y vuelve había quedado
-    // sellado como «persiste» sin anunciar nada, y con tres observaciones disparaba
-    // el descubrimiento «esta lectura sigue igual tras N observaciones» — falso:
-    // había cambiado dos veces. Al reaparecer se cuenta como aparición y el
-    // contador de observaciones vuelve a empezar.
-    const reappeared = !!(p && Number.isFinite(p.resolvedAt));
-    const entry = { id: ins.id, dimension: ins.dimension, label: ins.semanticLabel,
+    // UN DATO QUE VUELVE IGUAL NO ES UN DATO NUEVO. Antes, una lectura que había
+    // sido sellada como «resuelta» se contaba como APARICIÓN al volver y su
+    // contador de observaciones empezaba de cero. Pero el sello lo ponía la
+    // ausencia, así que bastaba una pintura sin datos —o un FX caído— para que la
+    // misma lectura, sin haber cambiado, se anunciase como algo que acaba de
+    // aparecer. Al retirar la resolución por ausencia la línea base sobrevive
+    // intacta: la lectura PERSISTE, con su primera observación y su recuento.
+    // Un `resolvedAt` de un registro ANTIGUO se ignora por lo mismo: era una
+    // ausencia, no una prueba, y no puede fabricar hoy una aparición.
+    // ── UNA COBERTURA QUE CAE NO ES UNA LECTURA QUE CAMBIA ────────────────
+    // La misma trampa un nivel más arriba. La liquidez se lee «creciente» con su
+    // deriva medida y «estable» cuando NO hay deriva que medir: el mismo insight,
+    // con la cobertura bajando de `sufficient` a `partial`. Comparando sólo
+    // etiquetas, perder el hecho se anunciaba como «tu lectura pasó de creciente a
+    // estable» — un cambio que nadie observó. Si la cobertura EMPEORA se conserva
+    // la última lectura bien respaldada y no se emite nada; cuando vuelva a haber
+    // evidencia se comparará contra ella, así que un dato que regrese igual seguirá
+    // sin anunciar nada y un cambio REAL se anunciará una vez.
+    const degraded = !!p && _aurixIntelCoverageRank(ins.coverage) < _aurixIntelCoverageRank(p.coverage);
+    const label = degraded ? p.label : ins.semanticLabel;
+    const entry = { id: ins.id, dimension: ins.dimension, label: label,
+      coverage: degraded ? p.coverage : (ins.coverage || null),
       firstSeenAt: (p && Number.isFinite(p.firstSeenAt)) ? p.firstSeenAt : t,
       lastSeenAt: t, resolvedAt: null,
-      observations: (p && !reappeared) ? Number(p.observations || 1) + 1 : 1 };
-    entry.state = (!p || reappeared) ? 'new' : 'persisting';
+      observations: p ? Number(p.observations || 1) + 1 : 1 };
+    entry.state = p ? 'persisting' : 'new';
     seen.push(entry);
     if (!hadHistory) continue;                                     // primera visita: nada que comparar
-    if (!p || reappeared) changes.push({ kind: 'insight_appeared', id: ins.id, dimension: ins.dimension,
+    if (!p) changes.push({ kind: 'insight_appeared', id: ins.id, dimension: ins.dimension,
       label: ins.semanticLabel, reasonCode: '' });
-    else if (p.label !== ins.semanticLabel) changes.push({ kind: 'reading_changed', id: ins.id,
+    else if (!degraded && p.label !== ins.semanticLabel) changes.push({ kind: 'reading_changed', id: ins.id,
       dimension: ins.dimension, from: p.label, to: ins.semanticLabel, reasonCode: '' });
   }
   const liveIds = new Set(live.map(i => i.id));
@@ -32178,16 +32223,14 @@ function _aurixIntelMemory(insights, dispersion, stored, now) {
     if (liveIds.has(p.id)) continue;
     const age = t - Number(p.lastSeenAt || 0);
     if (age > _AURIX_INTEL_STALE_MS) continue;                       // caduca y deja de ocupar atención
-    // UN CAMBIO SE ANUNCIA UNA VEZ. La primera versión persistía el entry resuelto
-    // con su `lastSeenAt` viejo, así que la visita siguiente lo volvía a «resolver»:
-    // `changeCount` se quedaba en 1 y el hero publicaba «ha cambiado algo que
-    // importa» durante 45 días seguidos sobre un cambio que ya se contó. Ahora el
-    // entry lleva `resolvedAt`, y sólo se emite el cambio cuando se sella.
-    const already = Number.isFinite(p.resolvedAt);
-    seen.push(Object.assign({}, p, { state: 'resolved', resolvedAt: already ? p.resolvedAt : t }));
-    if (already) continue;
-    changes.push({ kind: 'insight_resolved', id: p.id, dimension: p.dimension,
-      label: p.label, reasonCode: '' });
+    // NO SE AFIRMA NADA, Y NO SE PIERDE NADA. La entrada viaja TAL CUAL —su
+    // primera observación, su recuento, su etiqueta y su `lastSeenAt` de
+    // entonces— sólo marcada como no observada hoy. Eso hace tres cosas: el
+    // horizonte de caducidad sigue contando desde la ÚLTIMA observación real, el
+    // dato que vuelva se reconoce como el mismo, y no se emite ningún cambio, así
+    // que `changeCount` no puede subir por una desaparición. Si la lectura vuelve
+    // sin cambiar, nadie se enterará — que es exactamente lo correcto.
+    seen.push(Object.assign({}, p, { state: 'unobserved', resolvedAt: null }));
   }
   if (Number.isFinite(dispersion && dispersion.value) && stored && Number.isFinite(stored.dispersion)) {
     const d = dispersion.value - stored.dispersion;
@@ -32213,8 +32256,13 @@ function _aurixIntelCommitMemory(memory, dispersion, now, env) {
     dispersion: Number.isFinite(dispersion && dispersion.value) ? dispersion.value : null,
     seen: (memory && memory.seen ? memory.seen : []).map(e => ({
       id: e.id, dimension: e.dimension, label: e.label,
+      // Aditivo: sin esto, una cobertura que cae no se puede distinguir de una
+      // lectura que cambia, y la caída se anuncia como cambio (ver `_aurixIntelMemory`).
+      coverage: e.coverage || null,
       firstSeenAt: e.firstSeenAt, lastSeenAt: e.lastSeenAt, observations: e.observations,
-      // Sin esto el cambio se re-anuncia en cada visita (ver `_aurixIntelMemory`).
+      // Se sigue escribiendo —la forma persistida no cambia, y un registro viejo
+      // puede traerlo— pero ya nadie lo sella: la resolución por ausencia se
+      // retiró y `_aurixIntelMemory` ignora el valor heredado.
       resolvedAt: Number.isFinite(e.resolvedAt) ? e.resolvedAt : null })),
   }, env);
 }
