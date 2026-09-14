@@ -5284,7 +5284,7 @@ const T = {
     // §8 — «Entendido» no borra nada: baja la prioridad de presentación. El hecho
     // sigue certificado y en el ledger, y un episodio materialmente nuevo vuelve.
     intel_ack:             'Entendido',
-    intel_ack_aria:        'Marcar como entendido: deja de mostrarse hasta que haya un cambio material nuevo',
+    intel_ack_aria:        'Marcar como entendido: deja de mostrarse hasta que haya evidencia material nueva',
     intel_now_material:    'Ha cambiado algo que importa',
     intel_now_discovery:   'Aurix ha visto algo en tu estructura',
     intel_now_changed:     'Tu estructura se ha movido',
@@ -5549,16 +5549,29 @@ const T = {
     // SPEC LIFECYCLE · A3 — DILUCIÓN, no descenso. El importe no se movió: lo que
     // cambió es su PESO, porque otra parte del patrimonio creció. Decir «bajó»
     // afirma un hecho que no ocurrió y sugiere una decisión que nadie tomó.
+    // A3 · CON CAUSA LICENCIADA. Nombrar el motor exige ledger completo, motor
+    // inequívoco y cero movimientos materiales tuyos en la ventana.
     intv4_f_expo_diluted: (cat, start, end, driver) => `Tu ${cat} no ha bajado: sigue igual en importe, pero ha pasado del ${start}% al ${end}% de tu patrimonio porque ${driver} ha crecido`,
-    intv4_f_expo_diluted_mixed: (cat, start, end, driver) => `Tu ${cat} pesa ahora el ${end}% en vez del ${start}%: en parte porque bajó y en parte porque ${driver} ha crecido`,
-    intv4_why_dilution: 'Es un cambio de reparto, no una decisión tuya: cuando una parte crece, el resto pesa menos aunque no se toque.',
-    intv4_f_expo_grew: (cat, pp, end, win) => `${cat} ha crecido y ahora pesa el ${end}% de tu patrimonio, ${pp} pp más que en ${win}`,
+    // SIN LICENCIA. Los dos componentes son observados y se publican; la causa no
+    // se nombra. Mover capital entre categorías es una tercera causa que Aurix no
+    // puede descartar, así que aquí no hay «porque» ni «no es una decisión tuya».
+    intv4_f_expo_diluted_nc: (cat, start, end) => `Tu ${cat} no ha bajado: sigue igual en importe, pero ha pasado del ${start}% al ${end}% de tu patrimonio`,
+    // MIXTO. Bajó Y se diluyó, y separar las dos mitades exigiría una atribución
+    // que no existe: se enuncian los dos hechos sin repartir la culpa entre ellos.
+    intv4_f_expo_diluted_mixed: (cat, start, end) => `Tu ${cat} pesa ahora el ${end}% en vez del ${start}%, y su importe también ha bajado`,
+    intv4_why_dilution: 'Cuando una parte del patrimonio crece, el resto pesa menos aunque no se toque. Cambia cuánto influye cada parte en tu resultado, no lo que tienes en ella.',
+    intv4_why_dilution_nc: 'Cambia cuánto influye cada parte en tu resultado, no lo que tienes en ella. Aurix no puede determinar qué lo ha movido con la evidencia disponible.',
     // SPEC LIFECYCLE · A3 — PÉRDIDA CONTRA COSTE. Dice contra QUÉ se mide, que es
     // lo que impide leerlo como la caída de 30 días o como el drawdown. No dice
     // «has perdido»: dice dónde está la posición respecto a lo que costó, que es
     // el hecho. Y no juzga ni a la inversión ni al inversor.
-    intv4_f_pos_below_cost: (name, pct, w) => `${name} está un ${pct}% por debajo de su coste de adquisición y representa el ${w}% de tu patrimonio`,
-    intv4_f_pos_below_cost_amt: (name, pct, w, amt) => `${name} está un ${pct}% por debajo de su coste de adquisición (${amt}) y representa el ${w}% de tu patrimonio`,
+    intv4_f_pos_below_cost: (name, pct, w) => `${name} está un ${pct}% por debajo del coste que registraste y representa el ${w}% de tu patrimonio`,
+    // EL IMPORTE LLEVA ETIQUETA. Iba entre paréntesis pegado a «coste de
+    // adquisición», así que se leía como el coste y no como la diferencia.
+    intv4_f_pos_below_cost_amt: (name, pct, w, amt) => `${name} está un ${pct}% por debajo del coste que registraste —una diferencia de ${amt}— y representa el ${w}% de tu patrimonio`,
+    // Cuando el peso ya lo publica la superficie de concentración, no se repite.
+    intv4_f_pos_below_cost_top: (name, pct) => `${name} está un ${pct}% por debajo del coste que registraste`,
+    intv4_f_pos_below_cost_top_amt: (name, pct, amt) => `${name} está un ${pct}% por debajo del coste que registraste —una diferencia de ${amt}—`,
     // SIGNIFICADO PATRIMONIAL, no consejo: por qué ese peso importa.
     intv4_why_position_result: 'Cuanto más pesa una posición, más influye su resultado en el de tu patrimonio. Puede ser útil revisar si su tesis, su horizonte y su tamaño siguen encajando con tu estrategia.',
     // Lo que Aurix NO sabe, dicho una vez y sin disculparse.
@@ -8028,11 +8041,14 @@ const T = {
     intv4_f_expo_down: (cat, pp, end, win) => `Your exposure to ${cat} fell ${pp} pp over ${win}, to ${end}%`,
     intv4_f_expo_move: (cat, start, end, win) => `Your exposure to ${cat} went from ${start}% to ${end}% over ${win}`,
     intv4_f_expo_diluted: (cat, start, end, driver) => `Your ${cat} has not fallen: the amount is unchanged, but it went from ${start}% to ${end}% of your wealth because ${driver} grew`,
-    intv4_f_expo_diluted_mixed: (cat, start, end, driver) => `Your ${cat} now weighs ${end}% instead of ${start}%: partly because it fell and partly because ${driver} grew`,
-    intv4_why_dilution: 'This is a change in the mix, not a decision of yours: when one part grows, the rest weighs less even if untouched.',
-    intv4_f_expo_grew: (cat, pp, end, win) => `${cat} has grown and now weighs ${end}% of your wealth, ${pp} pp more than over ${win}`,
-    intv4_f_pos_below_cost: (name, pct, w) => `${name} is ${pct}% below its acquisition cost and represents ${w}% of your wealth`,
-    intv4_f_pos_below_cost_amt: (name, pct, w, amt) => `${name} is ${pct}% below its acquisition cost (${amt}) and represents ${w}% of your wealth`,
+    intv4_f_expo_diluted_nc: (cat, start, end) => `Your ${cat} has not fallen: the amount is unchanged, but it went from ${start}% to ${end}% of your wealth`,
+    intv4_f_expo_diluted_mixed: (cat, start, end) => `Your ${cat} now weighs ${end}% instead of ${start}%, and its amount has fallen too`,
+    intv4_why_dilution: 'When one part of your wealth grows, the rest weighs less even if untouched. What changes is how much each part influences your result, not what you hold in it.',
+    intv4_why_dilution_nc: 'What changes is how much each part influences your result, not what you hold in it. Aurix cannot determine what moved it with the evidence available.',
+    intv4_f_pos_below_cost: (name, pct, w) => `${name} is ${pct}% below the cost you recorded and represents ${w}% of your wealth`,
+    intv4_f_pos_below_cost_amt: (name, pct, w, amt) => `${name} is ${pct}% below the cost you recorded —a difference of ${amt}— and represents ${w}% of your wealth`,
+    intv4_f_pos_below_cost_top: (name, pct) => `${name} is ${pct}% below the cost you recorded`,
+    intv4_f_pos_below_cost_top_amt: (name, pct, amt) => `${name} is ${pct}% below the cost you recorded —a difference of ${amt}—`,
     intv4_why_position_result: 'The more a position weighs, the more its result influences your overall wealth. It may be useful to review whether its thesis, horizon and size still fit your strategy.',
     intv4_gap_position_below_cost: 'Without a recorded acquisition cost, Aurix cannot say how much you are up or down on a position.',
     intv4_gap_position_period_decline: 'Aurix does not store per-asset history yet, so it cannot separate a period decline from your loss since purchase.',
@@ -28739,7 +28755,13 @@ const _AURIX_FACT_MATERIAL = Object.freeze({
   cashDeltaPp:      3,
   concentrationPct: 25,     // a single position at/above this is structurally material
   returnPct:        1,      // |return| below this is not a story
-  flowShareOfValue: 0.02,   // recorded capital ≥2% of investable value is material
+  // recorded capital ≥2% of investable value is material — y, EN LA ATRIBUCIÓN DE
+  // DILUCIÓN, la misma cuota aplicada al CRECIMIENTO del denominador: acota tanto
+  // si un flujo puede explicar una transición como si un segundo motor aportó una
+  // parte material de ella. Dos bases, una cuota, y ahora dicho: este bloque
+  // existe para que los umbrales sean revisables y no queden enterrados en una
+  // expresión, así que un segundo uso no declarado lo contradice.
+  flowShareOfValue: 0.02,
   // M.03 D — mismo umbral, concepto distinto: cuánto tiene que moverse el NIVEL
   // observado para no ser ruido de precio. Se declara aparte de `flowShareOfValue`
   // porque uno mide capital aportado y el otro la evolución del nivel; compartir
@@ -28848,6 +28870,10 @@ const _AURIX_EV_GAP = Object.freeze({
   FLOW_INTENT_UNKNOWN:      'flow_intent_unknown',
   EXTERNAL_TRANSFER_UNSUPPORTED: 'external_transfer_not_capturable',
   RECONCILIATION_NOT_COMPUTABLE: 'money_identity_not_conservative',
+  // El denominador de un PESO tiene que estar completo. Si una sola posición del
+  // perímetro no se puede valorar, el porcentaje publicado describe una parte y se
+  // lee como el total — la misma clase de defecto que el −24 %.
+  DENOMINATOR_PARTIAL:      'investable_denominator_partial',
 });
 // EL BLOQUE DE EVIDENCIA. `ok` es el AND de todas sus condiciones, así que un
 // consumidor no puede olvidarse de comprobar una: si la usa, ya está comprobada.
@@ -29130,8 +29156,15 @@ function _aurixEventIdentity(domain, spec) {
   // final —el más reciente válido— así que comparten banda y son UN hallazgo;
   // reabrir la app o que pase el tiempo no mueve la banda; el ruido dentro de la
   // banda tampoco; y un nivel materialmente nuevo sí la mueve, una vez.
+  // LA DIRECCIÓN ENTRA EN LA IDENTIDAD. Sin ella la banda es sólo el NIVEL, y un
+  // episodio material de signo contrario heredaba el acuse de uno anterior: la
+  // cripto termina en 85,7 % (`#28`), el usuario lo da por visto, sube a 89 %
+  // (`#29`), lo da por visto, y al CAER a 85,5 % —3,5 pp, material, dirección
+  // opuesta— volvía a `#28`, ya acusado, y no se mostraba nunca. Un descenso
+  // material silenciado por el acuse de una subida.
   if (domain === 'observation')  return 'ob:' + S(s.causalRoot)
-    + (Number.isFinite(Number(s.band)) ? '#' + Math.trunc(Number(s.band)) : '');
+    + (Number.isFinite(Number(s.band)) ? '#' + Math.trunc(Number(s.band)) : '')
+    + (s.direction ? ':' + S(s.direction) : '');
   return 'ob:' + S(s.causalRoot || 'unknown');
 }
 
@@ -29510,6 +29543,9 @@ function _aurixFactLedger(opts) {
     const invStart = winOk ? Number(win.start.investableValue) : NaN;
     const invEnd   = winOk ? Number(win.end.investableValue)   : NaN;
     const rangeDrifts = [];
+    // Todos los buckets con importes en los dos extremos, HAYAN PRODUCIDO HECHO O
+    // NO: es el universo donde se busca el motor del denominador.
+    const rangeAbs = [];
     for (const cat of invBuckets) {
       let d = null;
       try { d = (typeof _aurixCatExposureDelta === 'function') ? _aurixCatExposureDelta(winOk ? win : range, cat) : null; } catch (_) { d = null; }
@@ -29523,6 +29559,21 @@ function _aurixFactLedger(opts) {
         continue;
       }
       const thr = isCash ? _AURIX_FACT_MATERIAL.cashDeltaPp : _AURIX_FACT_MATERIAL.exposureDeltaPp;
+      // ── EL MOVIMIENTO ABSOLUTO SE RECOGE ANTES DEL UMBRAL ─────────────────
+      // El denominador crece por IMPORTES, y el bucket que más aporta puede tener
+      // su propio PESO bajando: acciones 50.000 → 95.000 es +45.000 con el peso
+      // cayendo del 50 % al 47,5 %, es decir −2,5 pp, por debajo del umbral de
+      // materialidad y por tanto SIN HECHO. Buscar el motor entre los hechos ya
+      // emitidos lo excluía por construcción y nombraba a la cripto. Los candidatos
+      // se recogen aquí, antes de decidir si el bucket es NOTICIA.
+      const _aS = winOk ? absOf(win.start, cat) : NaN;
+      const _aE = winOk ? absOf(win.end, cat)   : NaN;
+      const _abs = (Number.isFinite(_aS) && Number.isFinite(_aE))
+        ? { startValue: +_aS.toFixed(2), endValue: +_aE.toFixed(2),
+            absoluteDelta: +(_aE - _aS).toFixed(2),
+            absoluteDirection: (_aE > _aS) ? 'up' : (_aE < _aS ? 'down' : 'flat') }
+        : { startValue: null, endValue: null, absoluteDelta: null, absoluteDirection: null };
+      rangeAbs.push({ cat: cat, abs: _abs, root: rootKey, endPct: d.endPct, thr: thr, deltaPp: d.deltaPp });
       if (Math.abs(d.deltaPp) < thr) continue;             // measured, but not material — no story
       // ══ A1 · P0 EXPOSICIÓN — LA VERDAD DE LA TRANSICIÓN Y SU CAUSA SON DOS ══
       // La captura del founder mostró «Tu exposición a los ETF bajó 16,8 pp en los
@@ -29583,14 +29634,8 @@ function _aurixFactLedger(opts) {
       // los importes del propio bucket en los dos extremos certificados, sin
       // tolerancia inventada: o subió, o bajó, o no se movió. `null` cuando la
       // ventana no publica sus puntos, y entonces no se afirma nada sobre lo
-      // absoluto — sólo el peso, que es lo único medido.
-      const _aStart = winOk ? absOf(win.start, cat) : NaN;
-      const _aEnd   = winOk ? absOf(win.end, cat)   : NaN;
-      const _abs = (Number.isFinite(_aStart) && Number.isFinite(_aEnd))
-        ? { startValue: +_aStart.toFixed(2), endValue: +_aEnd.toFixed(2),
-            absoluteDelta: +(_aEnd - _aStart).toFixed(2),
-            absoluteDirection: (_aEnd > _aStart) ? 'up' : (_aEnd < _aStart ? 'down' : 'flat') }
-        : { startValue: null, endValue: null, absoluteDelta: null, absoluteDirection: null };
+      // absoluto — sólo el peso, que es lo único medido. (Se calculó arriba, antes
+      // del umbral, porque el motor del denominador puede no ser noticia.)
       rangeDrifts.push({ sk: sk, cat: cat, deltaPp: d.deltaPp, abs: _abs, root: rootKey,
                          endPct: d.endPct, thr: thr });
       push({
@@ -29606,7 +29651,8 @@ function _aurixFactLedger(opts) {
         // 30D en una sola entidad en vez de dos hallazgos.
         eventId: _cause ? _cause.eventId
                         : _aurixEventIdentity('observation', { causalRoot: rootKey,
-                            band: Math.floor(Math.max(0, Number(d.endPct) || 0) / thr) }),
+                            band: Math.floor(Math.max(0, Number(d.endPct) || 0) / thr),
+                            direction: d.deltaPp > 0 ? 'up' : 'down' }),
         eventClass: _cause ? 'user_driven' : 'market_driven',
         window: { range, startAt: d.startAt, endAt: d.endAt },
         source: 'aurixCatExposureDelta',
@@ -29636,49 +29682,111 @@ function _aurixFactLedger(opts) {
     // tal y la causa se queda desconocida, porque separar las dos mitades exigiría
     // una atribución que Aurix no puede demostrar.
     if (winOk && Number.isFinite(invStart) && Number.isFinite(invEnd) && invEnd > invStart) {
-      const risers = rangeDrifts.filter(x => x.deltaPp > 0 && x.abs.absoluteDirection === 'up');
+      const risers = rangeAbs.filter(x => x.abs.absoluteDirection === 'up');
       const driver = risers.length
-        ? risers.reduce((a, b) => (b.deltaPp > a.deltaPp ? b : a)) : null;
+        // ── EL MOTOR DEL DENOMINADOR ES EL DEL IMPORTE, NO EL DEL PESO ────────
+        // Se elegía por `max(deltaPp)` ENTRE LOS QUE SUBIERON DE PESO, y eso no es
+        // el motor material: excluye por construcción al mayor contribuyente
+        // absoluto cuando su propio peso cae. Medido — total 100.000 → 200.000:
+        // acciones 50.000 → 95.000 (+45.000, peso 50 % → 47,5 % ⇒ NI CANDIDATO) y
+        // cripto 10.000 → 40.000 (+30.000, +10 pp ⇒ elegida). Se publicaba «porque
+        // la cripto ha crecido» cuando la mayor parte del crecimiento fue de
+        // acciones. El denominador crece por IMPORTES, así que el motor se elige
+        // por el importe que más aportó, entre los que crecieron en importe.
+        ? risers.reduce((a, b) => (Number(b.abs.absoluteDelta) > Number(a.abs.absoluteDelta) ? b : a)) : null;
+      // ── ¿ES UN MOTOR ÚNICO? ───────────────────────────────────────────────
+      // Con dos subidas casi iguales, nombrar una sola es elegir. El segundo se
+      // considera indistinguible cuando su aporte está dentro de la misma cuota
+      // DECLARADA de materialidad (`flowShareOfValue`) del crecimiento del
+      // denominador — ningún umbral nuevo. Si hay empate, no hay causa única.
+      const _grow = (Number.isFinite(invEnd) && Number.isFinite(invStart)) ? (invEnd - invStart) : NaN;
+      const _tol = (Number.isFinite(_grow) && _grow > 0) ? _AURIX_FACT_MATERIAL.flowShareOfValue * _grow : Infinity;
+      const _runnerUp = driver
+        ? risers.filter(x => x.cat !== driver.cat)
+            .reduce((m, x) => (Number(x.abs.absoluteDelta) > Number((m && m.abs.absoluteDelta) || -Infinity) ? x : m), null)
+        : null;
+      // POR CUOTA, NO POR DIFERENCIA. La primera versión medía la DISTANCIA entre
+      // el primero y el segundo, y eso deja pasar el caso que importa: crecimiento
+      // 30.000, cripto +15.350, acciones +14.650 ⇒ diferencia 700 > 600 ⇒ «causa
+      // única» afirmada mientras las acciones aportaron el 48,8 % de ese
+      // crecimiento. La pregunta correcta no es si el segundo está cerca del
+      // primero: es si el segundo aportó por SÍ MISMO una parte material del
+      // crecimiento. Si la aportó, no hay una sola causa, por mucho que el primero
+      // aporte algo más. Mismo umbral declarado, otra pregunta.
+      const _driverUnique = !!driver && (!_runnerUp
+        || Number(_runnerUp.abs.absoluteDelta) < _tol);
+      // ── ¿SE PUEDE ATRIBUIR A MERCADO? ────────────────────────────────────
+      // Tres reglas, y la primera es la que faltaba: SIN COMPLETITUD DEMOSTRABLE
+      // del ledger no se afirma nada. Se leía `localStorage` sin pasar por
+      // `_aurixCapitalFlowsComplete()` —el gate que la sección C sí aplica— así que
+      // un dispositivo nuevo, o cualquier instante antes de que el pull resolviera,
+      // veía `[]` y certificaba «nadie tocó nada» sobre un ledger sin leer.
+      //
+      // Y la atribución es POR BUCKET, no global: un depósito de 200 € en una
+      // cartera de 40.000 no puede borrar «el importe de la cripto pasó de 30.000 a
+      // 60.000», que son dos extremos observados directamente. Sólo desmiente el
+      // movimiento del bucket B un flujo que TOQUE B y sea material respecto al
+      // crecimiento del denominador. Mismo predicado de bucket que la corroboración
+      // de causa, mismo umbral declarado.
+      let flowsKnown = false, driverTouched = false, anyMaterialFlow = false;
+      try {
+        flowsKnown = (typeof _aurixCapitalFlowsComplete === 'function') ? !!_aurixCapitalFlowsComplete() : false;
+        const fl = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+        const inWin = fl.filter(fx => fx && Number.isFinite(fx.ts) && Number.isFinite(fx.amountUSD)
+          && fx.ts > win.startAt && fx.ts <= win.endAt);
+        for (const fx of inWin) {
+          const material = Math.abs(Number(fx.amountUSD)) >= _tol;
+          if (material) anyMaterialFlow = true;
+          if (material && driver && typeof _aurixAssetBucketById === 'function'
+              && fx.assetId && _aurixAssetBucketById(fx.assetId) === driver.cat) driverTouched = true;
+        }
+      } catch (_) { flowsKnown = false; anyMaterialFlow = true; driverTouched = true; }
+      // LA LICENCIA DE CAUSA ÚNICA. Es lo que autoriza «porque X ha crecido» y la
+      // frase «no es una decisión tuya». Exige: ledger demostrablemente completo,
+      // motor inequívoco, y NINGÚN movimiento material del usuario en la ventana —
+      // porque mover capital ENTRE categorías es la tercera causa, y con los datos
+      // de hoy es indescartable. Los COMPONENTES (el importe quieto, el importe que
+      // se duplicó) se publican siempre: ningún flujo los invalida.
+      const causeLicensed = !!driver && _driverUnique && flowsKnown && !anyMaterialFlow;
       if (driver) {
         for (const x of rangeDrifts) {
-          if (x === driver || x.deltaPp >= 0) continue;
+          if (x.cat === driver.cat || x.deltaPp >= 0) continue;
           if (x.abs.absoluteDirection === null) continue;         // sin importes no se afirma nada
           const pure = x.abs.absoluteDirection !== 'down';
           const f = facts.find(y => y.semanticKey === x.sk);
           if (!f) continue;
           f.values.dilutedBy = driver.cat;
           f.values.dilutionKind = pure ? 'pure' : 'mixed';
-          // LA RAÍZ PASA A SER LA DEL MOTOR. Sólo en la dilución PURA: en el caso
-          // mixto el bucket sí perdió importe, así que conserva su propia raíz.
+          // Y la copy sabrá si puede nombrar la causa o sólo describir el reparto.
+          f.values.causeLicensed = causeLicensed;
           if (pure) {
             f.causalRoot = driver.root;
             f.eventId = _aurixEventIdentity('observation', { causalRoot: driver.root,
-              band: Math.floor(Math.max(0, Number(driver.endPct) || 0) / driver.thr) });
+              band: Math.floor(Math.max(0, Number(driver.endPct) || 0) / driver.thr),
+              direction: driver.deltaPp > 0 ? 'up' : 'down' });
             // Y no puede seguir siendo un cambio «suyo»: es una consecuencia.
             f.values.causeKnown = false;
             f.values.cause = null;
-            f.utility = 0.5;
           }
         }
-        // El motor declara que arrastra consecuencias, para que la superficie pueda
-        // decir «una causa, dos efectos» sin recalcular nada.
-        const df = facts.find(y => y.semanticKey === driver.sk);
+        // El motor puede no tener hecho propio (su peso no llegó al umbral). Cuando
+        // lo tiene, se le cuelgan sus diagnósticos; cuando no, la consecuencia
+        // diluida los lleva igualmente y la superficie no se queda sin saber.
+        const df = facts.find(y => y.values && y.values.category === driver.cat
+          && /drift/.test(y.semanticKey) && y.window && y.window.range === range);
         if (df) {
           df.values.dilutes = rangeDrifts
-            .filter(x => x !== driver && x.deltaPp < 0 && x.abs.absoluteDirection !== null
+            .filter(x => x.cat !== driver.cat && x.deltaPp < 0 && x.abs.absoluteDirection !== null
                       && x.abs.absoluteDirection !== 'down')
             .map(x => x.cat);
-          // ATRIBUCIÓN DE MERCADO: sólo si NADIE tocó nada en la ventana. Un solo
-          // evento de usuario sobre cualquier bucket la invalida — y entonces la
-          // deriva es real pero su causa queda DESCONOCIDA, que es la verdad.
-          let userTouched = false;
-          try {
-            const fl = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
-            userTouched = fl.some(fx => fx && Number.isFinite(fx.ts)
-              && fx.ts > win.startAt && fx.ts <= win.endAt);
-          } catch (_) { userTouched = true; }                      // no poder comprobarlo no autoriza
-          df.values.marketAttributed = !userTouched;
-          df.eventClass = userTouched ? 'cause_unknown' : 'market_driven';
+          // ATRIBUCIÓN POR BUCKET: el movimiento del IMPORTE del motor se atribuye a
+          // mercado si el ledger es completo y nadie tocó ESE bucket. Es
+          // independiente de la licencia de causa única, que es más estricta.
+          df.values.marketAttributed = flowsKnown && !driverTouched;
+          df.values.driverUnique = _driverUnique;
+          df.values.causeLicensed = causeLicensed;
+          df.values.flowsKnown = flowsKnown;
+          df.eventClass = (flowsKnown && !driverTouched) ? 'market_driven' : 'cause_unknown';
         }
       }
     }
@@ -29831,24 +29939,92 @@ function _aurixFactLedger(opts) {
       && typeof computePositionPerformance === 'function' && typeof _aurixPositionFromAsset === 'function') {
     let invList = [];
     try { invList = investableAssets() || []; } catch (_) { invList = []; }
-    const invTotal = Number(snap.totUSD) || 0;
+    // ── EL DENOMINADOR SE CALCULA AQUÍ, Y FALLA CERRADO ─────────────────────
+    // Leía `snap.totUSD`, y `investableValueUSD()` OMITE del sumatorio cualquier
+    // posición cuyo `assetValueUSD` no sea finito (una divisa sin tasa FX, por
+    // ejemplo) sin contarla en `uncertifiablePositions`. El denominador quedaba
+    // PARCIAL y el peso publicado se sobreestimaba — y el suelo de publicación se
+    // evaluaba sobre ese peso inflado. Medido: BTC de 45.000 más una posición CHF
+    // de 55.000 sin tasa habría publicado «representa el 100 % de tu patrimonio».
+    // Es la clase de defecto del −24 %: una cifra publicada sobre una valoración
+    // parcial. Se recorre el mismo universo que `_aurixEffectiveDiversification` y
+    // se aplica su misma barrera: si UNA posición no se puede valorar, no hay peso.
+    let invTotal = 0, denomComplete = true;
+    for (const a of invList) {
+      if (!a) { denomComplete = false; continue; }
+      if (typeof _aurixUsableQuantity === 'function' && !Number.isFinite(_aurixUsableQuantity(a.qty))) { denomComplete = false; break; }
+      let v = NaN;
+      try { v = assetValueUSD(a); } catch (_) { v = NaN; }
+      if (!Number.isFinite(v)) { denomComplete = false; break; }
+      if (v > 0) invTotal += v;
+    }
+    if (Number(snap.uncertifiablePositions || 0) > 0) denomComplete = false;
+    if (!(invTotal > 0)) denomComplete = false;
     let noCostBasis = 0, realisedSeen = 0;
+    // El activo dominante por VALOR, por id — y con EL MISMO PERÍMETRO que
+    // `topInvestedAsset`, que es la única superficie que publica ese peso. Ella
+    // EXCLUYE la liquidez (app.js:71707), y al no excluirla aquí el desajuste de
+    // nombre se convertía en un desajuste de perímetro: con BTC de 45.000 y caja
+    // de 55.000 —la forma de la propia fixture— el «dominante» era la caja, así
+    // que la pérdida de BTC volvía a llevar su cláusula de peso mientras
+    // `top_position_weight` publicaba el mismo 45 %. Dos veces la misma cifra, y
+    // en MÁS carteras que antes: cualquiera cuya fila mayor sea el efectivo.
+    let _topId = null, _topVal = -Infinity;
+    for (const a of invList) {
+      if (!a || !a.id) continue;
+      if (String(a.type || '').toLowerCase() === 'cash') continue;
+      let v = NaN; try { v = assetValueUSD(a); } catch (_) { v = NaN; }
+      if (Number.isFinite(v) && v > _topVal) { _topVal = v; _topId = String(a.id); }
+    }
+    // PÉRDIDA REALIZADA — sobre TODOS los activos, no sólo los activos vivos: una
+    // venta TOTAL deja la posición `closed` con qty 0, que es precisamente el caso
+    // canónico de pérdida realizada y el que `investableAssets()` excluye. Declarar
+    // el hueco sólo cuando la posición sigue abierta era un fail-open de la propia
+    // declaración.
+    try {
+      const allList = (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : invList;
+      for (const a of allList) {
+        const rp0 = Number(a && a.realizedPnL);
+        if (Number.isFinite(rp0) && rp0 < 0) realisedSeen++;
+      }
+    } catch (_) {}
     for (const a of invList) {
       if (!a || !a.id) continue;
       let perf = null;
       try { perf = computePositionPerformance(_aurixPositionFromAsset(a)); } catch (_) { perf = null; }
       let val = NaN;
       try { val = assetValueUSD(a); } catch (_) { val = NaN; }
-      const weight = (Number.isFinite(val) && invTotal > 0) ? (val / invTotal) : NaN;
-      // PÉRDIDA REALIZADA — hecho consumado, independiente del coste vigente.
-      const rp = Number(a.realizedPnL);
-      if (Number.isFinite(rp) && rp < 0) realisedSeen++;
+      const weight = (denomComplete && Number.isFinite(val) && invTotal > 0) ? (val / invTotal) : NaN;
       if (!perf || perf.state !== 'ready') { noCostBasis++; continue; }
       if (!Number.isFinite(perf.returnPct) || perf.returnPct >= 0) continue;
       if (!Number.isFinite(weight)) continue;
       if (Math.abs(perf.returnPct) < _AURIX_FACT_MATERIAL.returnPct) continue;
       if (weight < _AURIX_FACT_MATERIAL.flowShareOfValue) continue;
       const nm = (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '');
+      let _absBase = null;
+      try {
+        const _usd = (typeof _nativeToUSD === 'function')
+          ? _nativeToUSD(perf.absolutePnL, a.assetCurrency) : NaN;
+        const _b = (Number.isFinite(_usd) && typeof toBase === 'function') ? Number(toBase(_usd, 'USD')) : NaN;
+        _absBase = Number.isFinite(_b) ? +_b.toFixed(2) : null;
+      } catch (_) { _absBase = null; }
+      // ── «YA LO PUBLICA OTRA SUPERFICIE» ES LA CONDICIÓN, NO «ES LA MAYOR» ──
+      // Dos correcciones sucesivas, y la segunda es la que cierra el hueco:
+      //  (a) comparaba `getDisplayName(a)` contra `snap.topInvestedAsset.name`, que
+      //      es el nombre CRUDO — `getDisplayName` recorta el sufijo legal, así que
+      //      «Apple» no casaba con «Apple Inc.»; ahora se compara por id, y `_topId`
+      //      excluye la liquidez igual que `topInvestedAsset`;
+      //  (b) «es la mayor posición no-efectivo» NO equivale a «su peso ya está
+      //      publicado»: `top_position_weight` sólo se emite a partir de
+      //      `concentrationPct`. Entre el suelo de participación (2 %) y ese 25 %
+      //      las dos condiciones se separan, y ahí se suprimía la cláusula de peso
+      //      sin que nadie más la dijera: «BTC está un 30 % por debajo del coste que
+      //      registraste», sin decir de cuánto patrimonio habla — y el peso ES la
+      //      materialidad de este hecho y la razón por la que se publica. La banda
+      //      2–25 % es la más común, no un borde.
+      const _top1Pct = Number((snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0);
+      const _isTop = (String(a.id) === String(_topId))
+        && _top1Pct >= _AURIX_FACT_MATERIAL.concentrationPct;
       push({
         semanticKey: 'position_below_cost_' + String(a.id),
         family: _AURIX_FACT_FAMILY.PERFORMANCE,
@@ -29856,23 +30032,54 @@ function _aurixFactLedger(opts) {
         value: +perf.returnPct.toFixed(2), unit: 'percent_of_cost',
         values: { returnPct: +perf.returnPct.toFixed(2), name: nm, assetId: String(a.id),
                   weightPct: +(weight * 100).toFixed(2),
-                  absoluteBase: (typeof toBase === 'function' && Number.isFinite(perf.absolutePnL))
-                    ? +Number(toBase(perf.absolutePnL, 'USD')).toFixed(2) : null,
-                  basis: 'certified_acquisition_cost',
+                  // EL IMPORTE VIVE EN LA DIVISA NATIVA DEL ACTIVO. `costBasis` y
+                  // `absolutePnL` los produce el owner en la moneda del activo —lo
+                  // declara su propio contrato— y se estaban convirtiendo como si
+                  // fueran USD: una acción en GBP publicaba su pérdida aplicándole
+                  // la tasa USD→EUR. Se pasa por el conversor nativo ANTES de la
+                  // divisa base, y sin las dos conversiones no hay importe.
+                  absoluteBase: _absBase,
+                  // NO «certified»: el coste lo REGISTRA el usuario (o se deriva de
+                  // su precio medio de compra). «Certified» describía la ruta de
+                  // cálculo y se leía como una observación independiente.
+                  basis: 'user_recorded_acquisition_cost',
+                  isTopPosition: _isTop,
                   // Lo que NO se afirma, dicho en el hecho para que la superficie
                   // no pueda deducirlo: cuánto lleva así, y cuánto es divisa.
                   durationKnown: false, fxAttributed: false },
+        // LA PUERTA TIENE QUE PODER CERRARSE. Sin extremos no se evaluaba el epoch,
+        // no se pedía clasificación y `ok` era true SIEMPRE: el filtro de
+        // `_aurixCanonicalFindings` era una tautología aquí. Ahora los dos extremos
+        // son reales —el coste registrado y el valor de hoy— y se exigen, y el
+        // denominador incompleto es un hueco que la cierra.
+        //
+        // `DECLARED`, no `DERIVED`: uno de los dos términos del cociente lo escribió
+        // el USUARIO, y la clase de un mixto es la más débil de las dos. `DERIVED`
+        // está definido como aritmética sobre valores OBSERVADOS, y el coste de
+        // adquisición no lo observó nadie más que quien lo escribió.
         evidence: _aurixEvidence({
           accountId: (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null,
           epoch: (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : null,
-          source: 'computePositionPerformance', observationClass: _AURIX_OBS_CLASS.DERIVED,
-          window: { range: 'since_cost' }, confidence: 1,
+          source: 'computePositionPerformance', observationClass: _AURIX_OBS_CLASS.DECLARED,
+          baseline:   { at: null, value: perf.costBasis },
+          comparison: { at: null, value: perf.currentValue },
+          requireEndpoints: true,
+          window: { range: 'since_cost' },
+          coverage: { denominatorComplete: denomComplete, positions: invList.length },
+          confidence: 1,
+          extraGaps: denomComplete ? [] : [_AURIX_EV_GAP.DENOMINATOR_PARTIAL],
         }),
         eventId: _aurixEventIdentity('band', { causalRoot: _AURIX_CAUSAL_ROOT.POSITION_RESULT,
           fromBand: String(a.id),
-          // La BANDA de la pérdida en pasos del umbral declarado: un −52 % y un
-          // −55 % son el mismo episodio; cruzar al siguiente paso es uno nuevo.
-          toBand: String(Math.floor(Math.abs(perf.returnPct) / _AURIX_FACT_MATERIAL.exposureDeltaPp)) }),
+          // LA BANDA, CON LA MAGNITUD CORRECTA. Usaba `exposureDeltaPp`, que está
+          // declarado como «pp de patrimonio invertible»: el número servía y el
+          // SIGNIFICADO no. El umbral de esta misma pregunta —¿cuánto tiene que
+          // moverse un rendimiento para ser noticia?— es `returnPct`. Consecuencia
+          // declarada: con pasos de 1 % una caída lenta genera episodios nuevos con
+          // frecuencia. Es el precio de usar la unidad correcta en vez de inventar
+          // un ancho de banda, y es una decisión de ajuste del founder, no un
+          // defecto de verdad financiera.
+          toBand: String(Math.floor(Math.abs(perf.returnPct) / _AURIX_FACT_MATERIAL.returnPct)) }),
         eventClass: 'market_driven',
         window: { range: 'since_cost', startAt: null, endAt: null },
         source: 'computePositionPerformance', direction: 'down', positive: false,
@@ -29882,11 +30089,27 @@ function _aurixFactLedger(opts) {
         confidence: 1, utility: 0.9,
         rarity: _aurixFactClamp01(Math.abs(perf.returnPct) / 100),
       });
+      // `utility` ya no se sobrescribe con un literal: 0,5 era una constante nueva
+      // sin declarar, fuera de `_AURIX_RANK_WEIGHTS` y de `_AURIX_FACT_MATERIAL`.
     }
     if (noCostBasis > 0) {
       gap(_AURIX_FACT_FAMILY.PERFORMANCE, 'position_below_cost',
         _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE, 'missing_cost_basis', { positions: noCostBasis });
     }
+    // LA SUPRESIÓN TIENE QUE DECIRSE. Con el denominador incompleto el `weight`
+    // sale NaN y el bucle salta la posición ANTES del `push`, así que no se emitía
+    // ningún hueco: lo que Aurix no podía saber no se declaraba en ninguna parte.
+    if (!denomComplete) {
+      gap(_AURIX_FACT_FAMILY.PERFORMANCE, 'position_below_cost',
+        _AURIX_FACT_STATUS.LOW_CONFIDENCE, _AURIX_EV_GAP.DENOMINATOR_PARTIAL,
+        { positions: invList.length });
+    }
+    // Y el límite que queda declarado: no hay owner certificado de FRESCURA de
+    // precio por activo, así que una afirmación contra coste se apoya en el último
+    // precio conocido. El owner de deriva sí refusa una ventana cuyo extremo está
+    // rancio; aquí no hay ventana, y suponer frescura sería inventarla.
+    gap(_AURIX_FACT_FAMILY.PERFORMANCE, 'position_price_freshness',
+      _AURIX_FACT_STATUS.NOT_YET_SUPPORTED, 'per_asset_price_freshness_not_certified');
     if (realisedSeen > 0) {
       // Se DECLARA que existe, y se declara que no se publica: el ledger de
       // realizado vive en la fila del activo y no tiene aquí un owner certificado
@@ -29951,10 +30174,27 @@ function _aurixIntelligenceStories(ledger, opts) {
     stories.push(Object.assign({}, primary, {
       causalRoot: root,
       rootMateriality,
-      supporting: ordered.slice(1).map(f => ({
-        semanticKey: f.semanticKey, family: f.family, value: f.value, unit: f.unit,
-        window: f.window, values: f.values, priority: f.priority,
-      })),
+      // LA MISMA PUERTA PARA LOS APOYOS. Se volcaba aquí todo lo no-primario sin
+      // mirar su evidencia, así que con varias posiciones bajo coste —misma raíz—
+      // sólo la primera pasaba por la puerta y las demás viajaban al consumidor
+      // sin ella. Un hecho de apoyo se lee igual que uno principal, sólo más
+      // pequeño: si no puede sostenerse, no viaja. Los hechos legacy sin bloque de
+      // evidencia se admiten igual que en el conjunto canónico.
+      supporting: ordered.slice(1)
+        .filter(f => !f.evidence || f.evidence.ok === true)
+        .map(f => ({
+          semanticKey: f.semanticKey, family: f.family, value: f.value, unit: f.unit,
+          window: f.window, values: f.values, priority: f.priority, evidence: f.evidence || null,
+          // Su IDENTIDAD viaja con él: sin ella la superficie no puede saber si un
+          // apoyo sigue vivo ni promoverlo cuando el primario queda acusado. Y
+          // también su CONFIANZA y su signo: al promoverlo, la historia heredaba
+          // `confidence`/`positive` del hecho ACUSADO, y `_intv4StoryHtml` pinta la
+          // etiqueta de confianza y la clase `is-positive` desde ahí. Hoy no rompe
+          // nada porque todos los hechos con identidad valen `confidence: 1`, pero
+          // eso es una coincidencia entre constantes, no una garantía.
+          direction: f.direction, eventId: f.eventId || null, materiality: f.materiality,
+          confidence: f.confidence, positive: f.positive, note: f.note || null,
+        })),
     }));
   }
   // SELECTION vs ORDERING — INT.04 §9 found a real defect here. `priority` is a
@@ -30182,6 +30422,13 @@ function _aurixCanonicalFindings(ledger, opts) {
       || f.family === _AURIX_FACT_FAMILY.PERFORMANCE
       || f.family === _AURIX_FACT_FAMILY.CAPITAL_FLOW;
     if (!isChange) continue;
+    // UN ESTADO NO ES UN CAMBIO. `position_below_cost_*` vive en la familia
+    // PERFORMANCE, así que entraba en la lista canónica y el hero lo contaba como
+    // «N cambios que merecen revisión». Una posición comprada hace dos años con el
+    // precio inmóvil esta semana anunciaba un cambio que no había ocurrido — y el
+    // propio hecho se llama `loss_vs_certified_cost_not_period_decline`. Su ventana
+    // lo dice: `since_cost` no tiene dos instantes que comparar.
+    if (f.window && f.window.range === 'since_cost') continue;
     // UN RENDIMIENTO MEDIDO Y PLANO ES UN HECHO, NO UN CAMBIO. Es lo que hace
     // posible «tu patrimonio subió pero tus inversiones no», así que se queda en
     // el ledger — pero no puede sumar al contador de «qué ha cambiado». El umbral
@@ -30228,6 +30475,10 @@ function _aurixCanonicalFindings(ledger, opts) {
     if (!prev) { seenEvent.set(eventId, finding); out.push(finding); continue; }
     prev.windows.push(f.window);
     if (finding.materiality > prev.materiality) {
+      // También la RAÍZ y la clase: sin esto `data-root` podía decir una cosa
+      // mientras la fila renderizaba la frase de otra.
+      prev.rootCause = finding.rootCause;
+      prev.eventClass = finding.eventClass;
       prev.semanticKey = finding.semanticKey;
       prev.fact = finding.fact;
       prev.materiality = finding.materiality;
@@ -30236,19 +30487,20 @@ function _aurixCanonicalFindings(ledger, opts) {
       prev.causeKnown = finding.causeKnown;
     }
   }
-  // UNA RAÍZ, UNA LECTURA PRIMARIA. Dos hallazgos de la misma raíz causal son el
-  // mismo fenómeno contado dos veces — la deduplicación por raíz que el Core ya
-  // aplica a las historias, aplicada también al contador.
+  // EL ORDEN IMPORTA, y estaba invertido. Se deduplicaba por raíz y DESPUÉS se
+  // filtraba lo acusado, así que dar por visto el representante de una raíz
+  // eliminaba la raíz ENTERA de la superficie: con BTC a −30 % y ETH a −25 %, dos
+  // episodios distintos de la misma raíz, acusar BTC hacía que la pérdida de ETH
+  // —que nadie había visto— no se publicara nunca. Primero sale lo ya visto, y
+  // luego se elige el primario entre lo que queda.
+  const visible = out.filter(fd => o.includeAcknowledged === true
+    || fd.presentationState !== 'acknowledged');
   const byRoot = new Map();
-  for (const fd of out) {
+  for (const fd of visible) {
     const cur = byRoot.get(fd.rootCause);
     if (!cur || fd.materiality > cur.materiality) byRoot.set(fd.rootCause, fd);
   }
-  // Fuera de la superficie lo ya visto. `o.includeAcknowledged` existe para que un
-  // diagnóstico o un gate pueda ver el conjunto COMPLETO y comprobar que el hecho
-  // no se ha destruido, sólo despriorizado.
-  const deduped = Array.from(byRoot.values())
-    .filter(fd => o.includeAcknowledged === true || fd.presentationState !== 'acknowledged');
+  const deduped = Array.from(byRoot.values());
   deduped.sort((a, b) =>
     (b.materiality - a.materiality)
     || (b.novelty - a.novelty)
@@ -31136,9 +31388,29 @@ function _aurixIntelAcknowledge(episodeId, opts) {
   const now = Number.isFinite(o.now) ? o.now : Date.now();
   if (ack[String(episodeId)]) return true;                  // idempotente: un acuse, una vez
   ack[String(episodeId)] = { at: now, state: 'acknowledged' };
+  // ACOTADO, como sus hermanos. Sin tope las claves se acumulaban por (raíz ×
+  // banda) y por (activo × banda) de por vida, y el payload entero se re-sube en
+  // cada push. Se conserva lo MÁS RECIENTE con el mismo horizonte ya declarado
+  // para la memoria de observación: un acuse antiguo cuyo episodio nadie ha vuelto
+  // a ver no tiene nada que silenciar.
+  const keys = Object.keys(ack);
+  if (keys.length > _AURIX_INTEL_MEM_MAX_ENTRIES) {
+    keys.sort((x, y) => (Number((ack[y] || {}).at) || 0) - (Number((ack[x] || {}).at) || 0))
+        .slice(_AURIX_INTEL_MEM_MAX_ENTRIES)
+        .forEach(k => { delete ack[k]; });
+  }
   const okw = _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY,
     Object.assign({}, cur, { ack, updatedAt: now, dirty: true }), o);
-  if (okw && !o.store && typeof _aurixIntelCtxPush === 'function') _aurixIntelCtxPush();
+  // NO SE EMPUJA ANTES DE HABER LEÍDO. El push sube `merge(local, null)`, o sea el
+  // registro local COMPLETO: hacerlo antes de que el tirón remoto resuelva
+  // sustituye la fila entera y pierde `fields`/`asked`/`declined`/`pausedAt` del
+  // servidor. Y este botón es la primera ruta de escritura alcanzable desde el
+  // estado más común: «no he respondido ninguna pregunta». Queda `dirty`, y el
+  // siguiente ciclo —tras el pull— lo sube con la unión ya hecha.
+  if (okw && !o.store && typeof _aurixIntelCtxPush === 'function'
+      && typeof _aurixIntelCtxRemoteReady === 'function' && _aurixIntelCtxRemoteReady()) {
+    _aurixIntelCtxPush();
+  }
   return okw;
 }
 function _aurixIntelPauseQuestions(opts) {
@@ -56606,6 +56878,25 @@ function _intv4FactText(fact) {
                    _intv4Money(Math.abs(Number(v.inUSD) || 0)),
                    _intv4Money(Math.abs(Number(v.outUSD) || 0)));
   }
+  // ── A3 · DILUCIÓN, ANTES DE LA BIFURCACIÓN CASH/EXPOSICIÓN ───────────────
+  // Estaba SÓLO dentro de la rama `exposure_drift_`, y la rama de liquidez se
+  // evalúa ANTES: el caso canónico —la liquidez quieta cuyo peso cae porque la
+  // cripto se duplicó— nunca la alcanzaba y se redactaba «Tu liquidez bajó 10,7
+  // pp». Exactamente la frase que esta función existe para no decir. Lo destapó el
+  // gate al pedirle la copy real en los dos idiomas; el assert visual anterior
+  // miraba una fixture en la que la liquidez SÍ había bajado, así que no podía
+  // verlo. La dilución es una propiedad del HECHO, no de su familia, así que se
+  // comprueba una vez y para todas.
+  if (v.dilutedBy && (/^cash_drift_/.test(k) || /^exposure_drift_/.test(k))) {
+    const dcat = _intv4CatLabel(v.category);
+    const dst = _intv4Num(v.startPct, 0), den = _intv4Num(v.endPct, 0);
+    if (v.dilutionKind !== 'pure') return _intv4T('intv4_f_expo_diluted_mixed', dcat, dst, den);
+    // NOMBRAR EL MOTOR EXIGE LICENCIA. Sin ella se publican los dos componentes
+    // observados —el importe quieto y el peso nuevo— y no se nombra la causa.
+    if (v.causeLicensed !== true) return _intv4T('intv4_f_expo_diluted_nc', dcat, dst, den);
+    const drv = _intv5CatLabel(v.dilutedBy) || _intv4CatLabel(v.dilutedBy);
+    return _intv4T('intv4_f_expo_diluted', dcat, dst, den, drv);
+  }
   if (k === 'cash_weight')             return _intv4T('intv4_f_cash', _intv4Num(fact.value, 0));
   if (k === 'liquidity_improved')      return _intv4T('intv4_f_liq_better', _intv4Num(Math.abs(fact.value), 1));
   if (/^cash_drift_liquidity_/.test(k)) return fact.value > 0
@@ -56614,13 +56905,6 @@ function _intv4FactText(fact) {
   if (/^exposure_drift_/.test(k)) {
     const cat = _intv4CatLabel(v.category);
     const end = _intv4Num(v.endPct, 0);
-    // A3 · DILUCIÓN PRIMERO. Si el importe no bajó, la frase no puede decir «bajó»:
-    // lo que cambió es el reparto, y la causa está en el bucket que creció.
-    if (v.dilutedBy) {
-      const drv = _intv5CatLabel(v.dilutedBy) || _intv4CatLabel(v.dilutedBy);
-      return _intv4T(v.dilutionKind === 'pure' ? 'intv4_f_expo_diluted' : 'intv4_f_expo_diluted_mixed',
-                     cat, _intv4Num(v.startPct, 0), end, drv);
-    }
     // A1 — sin causa corroborada, forma NEUTRAL. `subió`/`bajó` sólo cuando un
     // evento del usuario dentro de la ventana lo respalda.
     if (v.causeKnown !== true) return _intv4T('intv4_f_expo_move', cat, _intv4Num(v.startPct, 0), end, win);
@@ -56634,9 +56918,15 @@ function _intv4FactText(fact) {
   if (/^position_below_cost_/.test(k)) {
     const pct = _intv4Num(Math.abs(fact.value), 0), w = _intv4Num(v.weightPct, 0);
     const deep = (_intv4FactDepth === _INTV4_DEPTH.ADVANCED);
-    return (deep && Number.isFinite(Number(v.absoluteBase)))
-      ? _intv4T('intv4_f_pos_below_cost_amt', v.name || '—', pct, w, _intv4Money(Math.abs(v.absoluteBase)))
-      : _intv4T('intv4_f_pos_below_cost', v.name || '—', pct, w);
+    const amt = (deep && Number.isFinite(Number(v.absoluteBase))) ? _intv4Money(Math.abs(v.absoluteBase)) : null;
+    // Si la superficie de concentración ya publica el peso de esta posición, aquí
+    // no se repite: la misma cifra dos veces sigue siendo la misma cifra dos veces.
+    if (v.isTopPosition === true) {
+      return amt ? _intv4T('intv4_f_pos_below_cost_top_amt', v.name || '—', pct, amt)
+                 : _intv4T('intv4_f_pos_below_cost_top', v.name || '—', pct);
+    }
+    return amt ? _intv4T('intv4_f_pos_below_cost_amt', v.name || '—', pct, w, amt)
+               : _intv4T('intv4_f_pos_below_cost', v.name || '—', pct, w);
   }
   if (k === 'top_position_weight')     return _intv4T('intv4_f_top1', v.name || '—', _intv4Num(fact.value, 0));
   if (k === 'top3_weight')             return _intv4T('intv4_f_top3', _intv4Num(fact.value, 0));
@@ -56652,7 +56942,9 @@ function _intv4WhyText(factOrRoot) {
     // A3 — un hecho DILUIDO tiene su propio «por qué»: el reparto cambió sin que
     // el usuario tocara nada. Gana a la explicación de su raíz, que hablaría de la
     // causa del bucket que creció.
-    if (factOrRoot.values && factOrRoot.values.dilutedBy) return _intv4T('intv4_why_dilution');
+    if (factOrRoot.values && factOrRoot.values.dilutedBy) {
+      return _intv4T(factOrRoot.values.causeLicensed === true ? 'intv4_why_dilution' : 'intv4_why_dilution_nc');
+    }
     const specific = _intv4T('intv4_why_' + String(factOrRoot.semanticKey || ''));
     if (specific) return specific;
     return _intv4T('intv4_why_' + String(factOrRoot.causalRoot || ''));
@@ -56737,7 +57029,7 @@ function _intv4BriefHtml(core, esc, depth) {
   return `
     <section class="intcc-card intv4-brief">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_brief_title'))}</h3>
-      ${cards.length ? `<div class="intv4-story-list">${cards.join('')}</div>`
+      ${withAck.length ? `<div class="intv4-story-list">${withAck.join('')}</div>`
                      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_brief_empty'))}</p>`}
     </section>`;
 }
@@ -57669,7 +57961,15 @@ function _intv5DriversHtml(snap, esc) {
 // coincidir — Descubrimientos excluía una raíz que «Lo que importa» no mostraba y
 // dejaba pasar otra que sí. Una función, una lista, dos consumidores.
 // (Límite: `_INTV4_BRIEF_MAX` = 3. Prioriza, no reparte.)
-function _intv5MattersStories(core, skipRoots, intel) {
+// SPEC LIFECYCLE · §8 — EL ACUSE LLEGA TAMBIÉN AQUÍ. Corregir «un estado no es un
+// cambio» sacó `position_below_cost_*` del conjunto canónico, y con ello le quitó su
+// ÚNICA vía de acuse: el botón sólo existía en el destino del contador. Resultado
+// medido: la posición un 50 % por debajo de su coste, el 45 % del patrimonio, se
+// publicaba en «Lo que importa» en cada pintura, para siempre, sin forma de darla
+// por vista. El hecho más cargado del delta era el único irrenunciable.
+// El acuse se aplica por EPISODIO, igual que en el destino, y sigue sin borrar nada.
+function _intv5MattersStories(core, skipRoots, intel, acks) {
+  const ack = (acks && typeof acks === 'object') ? acks : {};
   const skip = new Set(skipRoots || []);
   const rank = new Map();
   ((intel && intel.attention) || []).forEach((i, idx) => {
@@ -57681,6 +57981,27 @@ function _intv5MattersStories(core, skipRoots, intel) {
   const stories = (core.topStories || [])
     .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
     .filter(st => !skip.has(st.causalRoot))
+    // ── SE RE-ELIGE, NO SE DESCARTA ────────────────────────────────────────
+    // Filtrar la historia acusada reintroducía en la capa de HISTORIAS el mismo
+    // defecto de orden que se acababa de corregir en la de hallazgos:
+    // `_aurixIntelligenceStories` elige el primario por raíz ANTES y sin conocer
+    // los acuses, y hay una sola historia por raíz. Con BTC a −50 % y ETH a −25 %
+    // —misma raíz, episodios distintos— acusar BTC borraba la historia entera y la
+    // pérdida de ETH, que nadie había visto, no aparecía en NINGUNA superficie.
+    // El hermano ya viaja en `supporting`, así que la superficie puede promoverlo:
+    // el acuse cede el puesto, no silencia la raíz.
+    .map(st => {
+      if (!(st.eventId && ack[st.eventId])) return st;
+      const alt = (st.supporting || []).find(sp => sp && sp.eventId && !ack[sp.eventId]);
+      if (!alt) return null;                                  // nada vivo que promover
+      return Object.assign({}, st, alt, {
+        causalRoot: st.causalRoot,
+        rootMateriality: st.rootMateriality,
+        promotedFrom: st.semanticKey,
+        supporting: (st.supporting || []).filter(sp => sp !== alt),
+      });
+    })
+    .filter(Boolean)
     .slice()
     .sort((a, b) => {
       const ra = rank.has(a.causalRoot) ? rank.get(a.causalRoot) : -1;
@@ -57692,8 +58013,8 @@ function _intv5MattersStories(core, skipRoots, intel) {
     .slice(0, _INTV4_BRIEF_MAX);
   return { stories, rankedBy: rank.size ? 'intelligence' : 'core' };
 }
-function _intv5MattersHtml(core, esc, depth, skipRoots, intel) {
-  const sel = _intv5MattersStories(core, skipRoots, intel);
+function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks) {
+  const sel = _intv5MattersStories(core, skipRoots, intel, acks);
   // A2 — qué hechos publica ya el destino del contador. Los que coinciden se
   // titulan aquí por su SIGNIFICADO y llevan el hecho como evidencia de apoyo,
   // para que la misma frase no salga dos veces en la misma pantalla.
@@ -57701,6 +58022,13 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel) {
   const cards = sel.stories
     .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
     .filter(Boolean);
+  // El control va por historia, con su episodio: una sola delegación ya lo resuelve.
+  const withAck = sel.stories.map((st, i) => cards[i]
+    ? cards[i].replace('</article>',
+        (st.eventId ? `<button type="button" class="intv12-ack" data-intel-ack="${esc(st.eventId)}"
+           aria-label="${esc(_intv4T('intel_ack_aria'))}">${esc(_intv4T('intel_ack'))}</button>` : '')
+        + '</article>')
+    : '').filter(Boolean);
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
              data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}">
@@ -57765,10 +58093,12 @@ function _renderIntelligenceCommandCenter() {
   // `presentationHistory` is this layer's only contribution and can move only
   // PRIORITY, never truth.
   let core = null;
+  // Se declara fuera del `try`: lo consumen el Core y la superficie de prioridad.
+  let _ackMap = {}, _pausedAt = null;
   try {
     // §8 — los acuses del usuario entran como ENTRADA del Core, igual que la
     // historia de presentación: mueven prioridad, nunca una cifra.
-    let _ackMap = {}, _pausedAt = null;
+    _ackMap = {}; _pausedAt = null;
     try {
       const _c = (typeof _aurixIntelContext === 'function') ? _aurixIntelContext({}) : null;
       _ackMap = (_c && _c.ack) ? _c.ack : {};
@@ -57988,8 +58318,8 @@ function _renderIntelligenceCommandCenter() {
   // Memoria, Qué ha cambiado y Descubrimientos suprimieran un hecho que nadie
   // estaba mostrando y republicaran otro que sí. Es exactamente la duplicación que
   // estas superficies existen para evitar.
-  const mattersSel = _intv5MattersStories(core, skipRoots, intel).stories;
-  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel);
+  const mattersSel = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
+  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap);
   const publishedKeys = [];
   mattersSel.forEach(st => {
     publishedKeys.push(st.semanticKey);

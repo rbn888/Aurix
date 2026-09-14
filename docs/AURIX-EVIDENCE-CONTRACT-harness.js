@@ -38,11 +38,41 @@ function konstSrc(name){ const s='const '+name+' ='; const i=app.indexOf(s); if(
   return app.slice(i,k); }
 let pass=0,fail=0; function ok(n,c,info){ if(c){pass++;console.log('  ✓ '+n);}else{fail++;console.log('  ✗ '+n+(info?'  ['+info+']':''));} }
 
+// ── COPY REAL, LOS DOS IDIOMAS ──────────────────────────────────────────────
+// Se extraen las cadenas de producción de las claves del ciclo de vida, en ES y
+// en EN, y se evalúan. Así una clave ausente o una redacción que cambie de
+// significado se ve aquí, no en la pantalla de un usuario.
+const LIFECYCLE_KEYS = ['intv4_f_expo_move','intv4_f_expo_diluted','intv4_f_expo_diluted_nc',
+  'intv4_f_expo_diluted_mixed','intv4_why_dilution','intv4_why_dilution_nc',
+  'intv4_f_pos_below_cost','intv4_f_pos_below_cost_amt','intv4_f_pos_below_cost_top',
+  'intv4_f_pos_below_cost_top_amt','intv4_why_position_result',
+  'intv4_gap_position_below_cost','intv4_gap_position_period_decline',
+  'intv4_gap_position_drawdown_from_peak','intv4_gap_position_fx_attribution',
+  'intel_ack','intel_ack_aria','intv4_f_expo_up','intv4_f_expo_down'];
+function keyOccurrences(key) {
+  const out = []; let i = 0;
+  for (;;) { const j = app.indexOf('\n    ' + key + ':', i); if (j < 0) break; out.push(j + 5); i = j + 1; }
+  return out;
+}
+function extractLifecycleDict(langIdx) {
+  const d = {};
+  LIFECYCLE_KEYS.forEach(k => {
+    const occ = keyOccurrences(k);
+    if (occ.length <= langIdx) return;
+    const start = occ[langIdx];
+    // hasta el final de la línea lógica: la coma de cierre al final de línea
+    let end = app.indexOf('\n', start);
+    const body = app.slice(start, end).replace(/,\s*$/, '');
+    try { d[k] = (new Function('return ({ ' + body + ' });'))()[k]; } catch (_) {}
+  });
+  return d;
+}
+const DICT = { es: extractLifecycleDict(0), en: extractLifecycleDict(1) };
 const DAY = 864e5, MIN = 60000;
 const NOW = Date.now();
 const T0 = NOW - 60 * DAY;
 
-const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_FIELDS','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
   '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS',
   '_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR','_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS',
   '_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD','_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES',
@@ -51,8 +81,8 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS',
   '_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
   '_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT',
-  '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX'];
-const FNS = ['toBase','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+  '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_INTEL_DIM_ROOT','_INTV4_BRIEF_MAX'];
+const FNS = ['toBase','_intv5MattersStories','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_nativeToUSD','_intv4T','_intv4Num','_intv4Money','_intv4CatLabel','_intv5CatLabel','_intv4RangeLabel','_intv4WindowLabel','_intv4FactText','_intv4WhyText','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixFlowIntentOf',
   '_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
@@ -90,6 +120,15 @@ function makeCtx(opts) {
   sb._aurixHealthSnapshot = () => (o.snap === undefined ? null : o.snap);
   sb.buildPortfolioDrivers = () => (o.drivers === undefined ? null : o.drivers);
   sb.IS_DEV = false;
+  // COPY REAL, los dos idiomas. Las frases nuevas del ciclo de vida se comprueban
+  // con las cadenas de producción, no con un sustituto: una clave ausente en EN
+  // renderizaría texto vacío y el gate lo vería verde.
+  sb.lang = o.lang || 'es';
+  sb.formatBase = v => String(Math.round(Number(v) || 0));
+  sb.t = k => { try { return DICT[sb.lang][k]; } catch (_) { return undefined; } };
+  sb._intccDate = () => '';
+  sb._INTV4_DEPTH = { GUIDED: 'guided', BALANCED: 'balanced', ADVANCED: 'advanced' };
+  sb._intv4FactDepth = o.depth || 'balanced';
   sb._aurixCapitalFlowsPush = () => true;
   // Autoridad del ledger remoto: arranca DEMOSTRADA salvo que el caso la niegue.
   sb._aurixCapitalFlowsComplete = () => (o.flowsComplete === undefined ? true : !!o.flowsComplete);
@@ -678,15 +717,137 @@ console.log('\n8 · Cuando la cripto sube, la liquidez no ha bajado:');
     JSON.stringify(base.findings.map(f => f.rootCause)));
   ok('8.8 sin ningún evento del usuario en la ventana, la atribución a MERCADO se certifica',
     !!cry && cry.values.marketAttributed === true && cry.eventClass === 'market_driven');
-  ok('8.9 un depósito dentro de la ventana la INVALIDA: la deriva es real, su causa desconocida',
+  // ── RE-DECIDIDO TRAS REVISIÓN ────────────────────────────────────────────
+  // La regla anterior («cualquier flujo borra la atribución de mercado») era a la
+  // vez demasiado gruesa y mal dirigida: un depósito de liquidez anulaba «el
+  // importe de la cripto pasó de 30.000 a 60.000», que son dos extremos observados
+  // directamente, y NO gateaba la única frase que de verdad afirma causalidad.
+  // Ahora la atribución es POR BUCKET y la licencia de CAUSA ÚNICA es aparte.
+  ok('8.9 un depósito de liquidez NO borra la atribución de mercado del bucket que creció',
     (() => { const d2 = drift([{ id: 'd1', ts: endTs - 3 * DAY, amountUSD: 5000,
         kind: 'deposit', source: 'user', assetId: 'eur', revision: 1 }]);
       const c2 = d2.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
-      return !!c2 && c2.values.marketAttributed === false && c2.eventClass === 'cause_unknown'; })());
-  ok('8.10 sin los importes de los extremos no se afirma NADA sobre lo absoluto',
-    (() => { const f = base.ledger.facts.find(x => /^exposure_drift_/.test(x.semanticKey)
-        && x.values.absoluteDirection === null);
-      return f === undefined || f.values.dilutedBy === undefined; })());
+      return !!c2 && c2.values.marketAttributed === true; })(),
+    JSON.stringify((() => { const d2 = drift([{ id: 'd1', ts: endTs - 3 * DAY, amountUSD: 5000,
+        kind: 'deposit', source: 'user', assetId: 'eur', revision: 1 }]);
+      const c2 = d2.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      return c2 && c2.values; })()));
+  ok('8.9b …pero SÍ retira la licencia de causa única: mover capital entre categorías es indescartable',
+    (() => { const d2 = drift([{ id: 'd1', ts: endTs - 3 * DAY, amountUSD: 5000,
+        kind: 'deposit', source: 'user', assetId: 'eur', revision: 1 }]);
+      const cash2 = d2.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return !!cash2 && cash2.values.causeLicensed === false; })());
+  ok('8.9c un flujo que SÍ toca el bucket motor desmiente su atribución a mercado',
+    (() => { const d3 = drift([{ id: 'b1', ts: endTs - 3 * DAY, amountUSD: 20000,
+        kind: 'asset_add', source: 'user', intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }]);
+      const c3 = d3.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      return !!c3 && c3.values.marketAttributed === false && c3.eventClass === 'cause_unknown'; })());
+  ok('8.9d un flujo INMATERIAL frente al crecimiento del denominador no desmiente nada',
+    (() => { const d4 = drift([{ id: 'd2', ts: endTs - 3 * DAY, amountUSD: 200,
+        kind: 'deposit', source: 'user', assetId: 'eur', revision: 1 }]);
+      const c4 = d4.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      const cash4 = d4.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return !!c4 && c4.values.marketAttributed === true && !!cash4 && cash4.values.causeLicensed === true; })());
+  ok('8.9e sin completitud DEMOSTRABLE del ledger no se atribuye nada a mercado',
+    (() => { const d5 = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                         { crypto: 60000, liquidity: 10000 }),
+        rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS,
+        flows: [], flowsComplete: false }, { ranges: ['7D'] });
+      const c5 = d5.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      const cash5 = d5.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return !!c5 && c5.values.marketAttributed === false
+        && !!cash5 && cash5.values.causeLicensed === false; })());
+  // 8.10 anterior era VACÍA: en esta fixture la ventana siempre es `ok`, así que
+  // `absoluteDirection === null` no ocurría nunca y la aserción era `undefined ||
+  // …` ⇒ siempre verdadera. Se sustituye por el invariante que sí se puede fallar:
+  // sin los importes no puede existir la marca de dilución EN NINGÚN hecho.
+  ok('8.10 la marca de dilución sólo existe donde hay importes en los dos extremos',
+    base.ledger.facts.filter(x => /drift/.test(x.semanticKey))
+      .every(x => x.values.dilutedBy === undefined || x.values.absoluteDirection !== null));
+  // ── EL MOTOR SE ELIGE POR IMPORTE, NO POR PESO ───────────────────────────
+  // El selector anterior tomaba `max(deltaPp)` entre los que SUBIERON DE PESO, y
+  // eso excluye por construcción al mayor contribuyente absoluto cuando su propio
+  // peso cae. Aquí las acciones aportan +45.000 con el peso BAJANDO del 50 % al
+  // 47,5 %, y la cripto +30.000 con +10 pp: la vieja regla decía «porque la cripto
+  // ha crecido» cuando la mayor parte del crecimiento fue de acciones.
+  ok('8.11 el motor es el del mayor IMPORTE aportado, aunque su propio peso caiga',
+    (() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { stock: 50000, crypto: 10000, liquidity: 10000 },
+                                         { stock: 95000, crypto: 40000, liquidity: 10000 }),
+        rows: inv([70000, 90000, 120000, 145000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'] });
+      const cash = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return !!cash && cash.values.dilutedBy === 'stock'; })(),
+    JSON.stringify((() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { stock: 50000, crypto: 10000, liquidity: 10000 },
+                                         { stock: 95000, crypto: 40000, liquidity: 10000 }),
+        rows: inv([70000, 90000, 120000, 145000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'] });
+      const c = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return c && { dilutedBy: c.values.dilutedBy, licensed: c.values.causeLicensed }; })()));
+  ok('8.12 con dos motores indistinguibles no se nombra ninguno (no hay causa única)',
+    (() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { stock: 20000, crypto: 20000, liquidity: 10000 },
+                                         { stock: 35000, crypto: 35000, liquidity: 10000 }),
+        rows: inv([50000, 60000, 70000, 80000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'] });
+      const cash = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      const drv = d.ledger.facts.find(f => Number.isFinite(Number(f.values && f.values.driverUnique))
+        || (f.values && f.values.driverUnique !== undefined));
+      return !!cash && cash.values.causeLicensed === false
+        && (!drv || drv.values.driverUnique === false); })(),
+    JSON.stringify((() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { stock: 20000, crypto: 20000, liquidity: 10000 },
+                                         { stock: 35000, crypto: 35000, liquidity: 10000 }),
+        rows: inv([50000, 60000, 70000, 80000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'] });
+      const c = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return c && c.values; })()));
+  ok('8.12b un segundo motor con CUOTA material rompe la causa única (48,8 % del crecimiento)',
+    (() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, stock: 30000, liquidity: 10000 },
+                                         { crypto: 45350, stock: 44650, liquidity: 10000 }),
+        rows: inv([70000, 80000, 90000, 100000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'] });
+      const cash = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      // La diferencia entre los dos motores es 700 sobre un crecimiento de 30.000
+      // (tolerancia 600), así que la regla ANTERIOR —por diferencia— habría dado
+      // causa única. Por CUOTA no: el segundo aportó el 48,8 %.
+      return !!cash && cash.values.causeLicensed === false; })(),
+    JSON.stringify((() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, stock: 30000, liquidity: 10000 },
+                                         { crypto: 45350, stock: 44650, liquidity: 10000 }),
+        rows: inv([70000, 80000, 90000, 100000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'] });
+      const c = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return c && { dilutedBy: c.values.dilutedBy, licensed: c.values.causeLicensed }; })()));
+  ok('8.13 y la copy NO nombra causa cuando no hay licencia (ni dice que no fue tu decisión)',
+    (() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                         { crypto: 60000, liquidity: 10000 }),
+        rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS,
+        flows: [{ id: 'd1', ts: endTs - 3 * DAY, amountUSD: 5000, kind: 'deposit',
+                  source: 'user', assetId: 'eur', revision: 1 }] }, { ranges: ['7D'] });
+      const cash = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      const txt = run('_intv4FactText(' + JSON.stringify(cash) + ')', makeCtx({}));
+      const why = run('_intv4WhyText(' + JSON.stringify(cash) + ')', makeCtx({}));
+      return !/porque/i.test(txt) && !/decisi[oó]n tuya/i.test(why)
+        && /no ha bajado/i.test(txt); })(),
+    JSON.stringify((() => { const d = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                         { crypto: 60000, liquidity: 10000 }),
+        rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS,
+        flows: [{ id: 'd1', ts: endTs - 3 * DAY, amountUSD: 5000, kind: 'deposit',
+                  source: 'user', assetId: 'eur', revision: 1 }] }, { ranges: ['7D'] });
+      const cash = d.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      return run('_intv4FactText(' + JSON.stringify(cash) + ')', makeCtx({})); })()));
+  ok('8.14 con licencia SÍ se nombra, y la frase de reparto vuelve a ser publicable',
+    (() => { const cash = base.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+      const txt = run('_intv4FactText(' + JSON.stringify(cash) + ')', makeCtx({}));
+      return cash.values.causeLicensed === true && /porque/i.test(txt); })(),
+    JSON.stringify(run('_intv4FactText(' + JSON.stringify(
+      base.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D')) + ')', makeCtx({}))));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -707,7 +868,7 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
     !!f1 && Math.round(f1.value) === -50 && Math.round(f1.values.weightPct) === 45,
     JSON.stringify(f1 && f1.values));
   ok('9.2 y declara contra QUÉ se mide, para que no se lea como la caída de un periodo',
-    !!f1 && f1.values.basis === 'certified_acquisition_cost'
+    !!f1 && f1.values.basis === 'user_recorded_acquisition_cost'
     && f1.note === 'loss_vs_certified_cost_not_period_decline'
     && f1.causalRoot === 'position_result');
   ok('9.3 dice explícitamente lo que NO sabe: duración y divisa',
@@ -737,12 +898,20 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
     (() => { const r = lossCtx([POS('x', 'stock', 1, 1000, 2000), POS('eur', 'cash', 99000, 1, 99000)],
         { totUSD: 100000 });
       return !r.ledger.facts.some(f => /^position_below_cost_x$/.test(f.semanticKey)); })());
-  ok('9.10 …y un −25 % en una del 45 % sí, con MÁS materialidad que un −50 % pequeño',
+  // Toleraba que el comparando NO existiera, y comparaba `materiality` en vez de la
+  // `priority` compuesta que es la que ordena la superficie. Ahora exige los DOS
+  // hechos y compara lo que de verdad decide el orden.
+  ok('9.10 …y un −25 % en una del 45 % gana en PRIORIDAD a un −50 % en una pequeña',
     (() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, 60000),
         POS('y', 'stock', 1, 2500, 5000), POS('eur', 'cash', 52500, 1, 52500)], { totUSD: 100000 });
       const big = r.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
       const small = r.ledger.facts.find(f => f.semanticKey === 'position_below_cost_y');
-      return !!big && (!small || big.materiality > small.materiality); })());
+      return !!big && !!small && big.priority > small.priority
+        && big.materiality > small.materiality && small.magnitude > big.magnitude; })(),
+    JSON.stringify((() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, 60000),
+        POS('y', 'stock', 1, 2500, 5000), POS('eur', 'cash', 52500, 1, 52500)], { totUSD: 100000 });
+      return r.ledger.facts.filter(f => /^position_below_cost_/.test(f.semanticKey))
+        .map(f => f.semanticKey + ':p=' + f.priority + ',m=' + f.materiality); })()));
   ok('9.11 un movimiento por debajo del suelo de rendimiento declarado no es noticia',
     (() => { const r = lossCtx([POS('btc', 'crypto', 1, 49700, 50000),
         POS('eur', 'cash', 50300, 1, 50300)], { totUSD: 100000 });
@@ -767,10 +936,30 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
     (() => { const a = POS('btc', 'crypto', 2, 45000, 180000);   // promedió comprando más
       const r = lossCtx([a, POS('eur', 'cash', 10000, 1, 10000)], { totUSD: 100000 });
       const f = r.ledger.facts.find(x => x.semanticKey === 'position_below_cost_btc');
-      return !!f && f.values.basis === 'certified_acquisition_cost'; })());
-  ok('9.16 aislamiento: la pérdida hereda el epoch y la cuenta en su evidencia',
-    !!f1 && f1.evidence && f1.evidence.source === 'computePositionPerformance'
-    && Object.prototype.hasOwnProperty.call(f1.evidence, 'epoch'));
+      return !!f && f.values.basis === 'user_recorded_acquisition_cost'; })());
+  // La anterior era VACÍA: `_aurixEvidence` escribe `epoch` SIEMPRE, así que
+  // `hasOwnProperty` no podía fallar y no afirmaba nada sobre aislamiento. Lo que
+  // sí se puede fallar es que la puerta pueda CERRARSE en este hecho — que era el
+  // otro defecto: sin extremos, `ok` era true por construcción.
+  // Era un regex sobre el fuente —el patrón que venía a retirar—. Se ejecuta la
+  // puerta: sin extremos NO pasa, que es el invariante que hacía falta.
+  ok('9.16 la puerta de este hecho PUEDE cerrarse: sin extremos no autoriza',
+    (() => { const c = makeCtx({});
+      const okEv = run('_aurixEvidence({ source: "computePositionPerformance",'
+        + ' observationClass: "declared", baseline: { at: null, value: 100 },'
+        + ' comparison: { at: null, value: 50 }, requireEndpoints: true })', c);
+      const noEv = run('_aurixEvidence({ source: "computePositionPerformance",'
+        + ' observationClass: "declared", requireEndpoints: true })', c);
+      const gapped = run('_aurixEvidence({ source: "computePositionPerformance",'
+        + ' observationClass: "declared", baseline: { at: null, value: 100 },'
+        + ' comparison: { at: null, value: 50 }, requireEndpoints: true,'
+        + ' extraGaps: [_AURIX_EV_GAP.DENOMINATOR_PARTIAL] })', c);
+      return okEv.ok === true && noEv.ok === false && gapped.ok === false
+        && gapped.gaps.indexOf('investable_denominator_partial') !== -1; })());
+  ok('9.16b y su clase de observación es DECLARED, no DERIVED: el coste lo escribió el usuario',
+    !!f1 && f1.evidence.observationClass === 'declared'
+    && f1.values.basis === 'user_recorded_acquisition_cost',
+    JSON.stringify(f1 && { c: f1.evidence.observationClass, b: f1.values.basis }));
   // Ni juicio, ni orden, ni inferencia sobre la persona.
   // El alcance es la COPY DE INTELLIGENCE, no el fichero entero: «Principiante»
   // existe en Ajustes y en el onboarding porque el usuario lo DECLARA de sí mismo,
@@ -857,6 +1046,305 @@ console.log('\n10 · Un aviso material no puede volverse un reproche permanente:
 // ════════════════════════════════════════════════════════════════════════════
 // 11 · La cartera plana EN SU MÁXIMO — cobertura que la revisión echó en falta
 // ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+// 12 · FRONTERAS, DIVISA, DENOMINADOR Y REVERSIÓN — lo que la revisión echó en falta
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n12 · Fronteras exactas y los casos que no estaban cubiertos:');
+{
+  const POS = (id, type, qty, price, cost, cur) => {
+    const a = A(id, type, qty, price, cur); if (cost != null) a.costBasis = cost; return a;
+  };
+  const lossCtx = (assets, tot) => core({ rows: inv([100000, 100000, 100000]),
+    assets: assets, snap: Object.assign({}, SNAP, { totUSD: tot }), drivers: DRIVERS, serverRows: [] });
+  const has = (r, id) => r.ledger.facts.some(f => f.semanticKey === 'position_below_cost_' + id);
+
+  // ── SUELO DE RENDIMIENTO: 0,99 / 1,00 / 1,01 ────────────────────────────
+  const atPct = (pct) => { const cost = 100000, val = Math.round(cost * (1 - pct / 100));
+    return lossCtx([POS('p', 'crypto', 1, val, cost), POS('eur', 'cash', 100000 - val, 1, 100000 - val)], 100000); };
+  ok('12.1 justo por DEBAJO del suelo de rendimiento declarado: no es noticia', !has(atPct(0.99), 'p'));
+  ok('12.2 justo EN el suelo: sí lo es', has(atPct(1.0), 'p'));
+  ok('12.3 justo por ENCIMA: sí lo es', has(atPct(1.01), 'p'));
+
+  // ── SUELO DE PARTICIPACIÓN: 1,99 % / 2,00 % / 2,01 % ────────────────────
+  const atWeight = (w) => { const tot = 1000000, val = Math.round(tot * w);
+    return lossCtx([POS('p', 'crypto', 1, val, val * 2), POS('eur', 'cash', tot - val, 1, tot - val)], tot); };
+  ok('12.4 justo por DEBAJO del suelo de participación: una posición diminuta no domina', !has(atWeight(0.0199), 'p'));
+  ok('12.5 justo EN el suelo: se publica', has(atWeight(0.0200), 'p'));
+  ok('12.6 justo por ENCIMA: se publica', has(atWeight(0.0201), 'p'));
+
+  // ── F1 · IMPORTE EN DIVISA NO-USD ───────────────────────────────────────
+  // `costBasis`/`absolutePnL` viven en la divisa NATIVA del activo. Se convertían
+  // como si fueran USD, así que una acción en EUR publicaba su pérdida con la tasa
+  // equivocada. Aquí 1 acción a 14.000 EUR con coste 20.000 EUR ⇒ −6.000 EUR, que
+  // en USD son −6.000/0,92 ≈ −6.521,74.
+  ok('12.7 el importe pasa por el conversor NATIVO antes de la divisa base',
+    (() => { const r = lossCtx([POS('gb', 'stock', 1, 14000, 20000, 'EUR'),
+        POS('usd', 'cash', 50000, 1, 50000)], 65217.39);
+      const f = r.ledger.facts.find(x => x.semanticKey === 'position_below_cost_gb');
+      return !!f && Math.abs(Math.abs(Number(f.values.absoluteBase)) - 6521.74) < 5; })(),
+    JSON.stringify((() => { const r = lossCtx([POS('gb', 'stock', 1, 14000, 20000, 'EUR'),
+        POS('usd', 'cash', 50000, 1, 50000)], 65217.39);
+      const f = r.ledger.facts.find(x => x.semanticKey === 'position_below_cost_gb');
+      return f && f.values.absoluteBase; })()));
+
+  // ── F2 · DENOMINADOR PARCIAL ⇒ PESO NO PUBLICABLE ───────────────────────
+  ok('12.8 una posición sin valorar deja el denominador PARCIAL y suprime el hecho',
+    (() => { const bad = A('x', 'stock', 1, NaN);
+      const r = lossCtx([POS('p', 'crypto', 1, 45000, 90000), bad], 45000);
+      return !has(r, 'p'); })());
+  // Las dos ramas eran siempre verdaderas. Lo que se exige es el hueco CONCRETO:
+  // la supresión era MUDA, y una supresión que no se declara es indistinguible de
+  // «aquí no había nada».
+  ok('12.9 …y lo DECLARA: el denominador parcial emite su propio hueco',
+    (() => { const bad = A('x', 'stock', 1, NaN);
+      const r = lossCtx([POS('p', 'crypto', 1, 45000, 90000), bad], 45000);
+      return r.ledger.gaps.some(g => g.semanticKey === 'position_below_cost'
+        && g.reason === 'investable_denominator_partial'); })(),
+    JSON.stringify((() => { const bad = A('x', 'stock', 1, NaN);
+      const r = lossCtx([POS('p', 'crypto', 1, 45000, 90000), bad], 45000);
+      return r.ledger.gaps.filter(g => /position/.test(g.semanticKey)).map(g => g.semanticKey + ':' + g.reason); })()));
+  ok('12.9b y la frescura de precio por activo se declara NO certificada en vez de suponerse',
+    (() => { const r = lossCtx([POS('p', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)], 100000);
+      return r.ledger.gaps.some(g => g.semanticKey === 'position_price_freshness'
+        && g.status === 'not_yet_supported'); })());
+  ok('12.10 `uncertifiablePositions > 0` también cierra la puerta',
+    (() => { const r = core({ rows: inv([100000, 100000, 100000]),
+        assets: [POS('p', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)],
+        snap: Object.assign({}, SNAP, { totUSD: 100000, uncertifiablePositions: 1 }),
+        drivers: DRIVERS, serverRows: [] });
+      return !has(r, 'p'); })());
+
+  // ── un estado NO es un cambio ───────────────────────────────────────────
+  ok('12.11 la pérdida contra coste NO entra en el contador de cambios (es un estado)',
+    (() => { const r = lossCtx([POS('p', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)], 100000);
+      return has(r, 'p') && !r.findings.some(f => /^position_below_cost_/.test(f.semanticKey)); })());
+
+  // ── F12 · REVERSIÓN DE DIRECCIÓN ────────────────────────────────────────
+  // La banda es el NIVEL. Sin la dirección en el id, una CAÍDA material hasta la
+  // misma banda heredaba el acuse de una SUBIDA anterior y no se mostraba nunca.
+  const endTs = NOW;
+  const at = (a, b) => core({ serverRows: srvHistory(endTs, 7, a, b),
+    rows: inv([100000, 100000, 100000, 100000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+    { ranges: ['7D'] });
+  ok('12.12 una subida y una caída al MISMO nivel son episodios distintos',
+    (() => { const up = at({ crypto: 55000, liquidity: 45000 }, { crypto: 85000, liquidity: 15000 });
+      const down = at({ crypto: 95000, liquidity: 5000 }, { crypto: 85000, liquidity: 15000 });
+      const fu = up.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      const fd = down.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      return !!fu && !!fd && fu.eventId !== fd.eventId
+        && /:up$/.test(fu.eventId) && /:down$/.test(fd.eventId); })(),
+    JSON.stringify([
+      (at({ crypto: 55000, liquidity: 45000 }, { crypto: 85000, liquidity: 15000 })
+        .ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D') || {}).eventId,
+      (at({ crypto: 95000, liquidity: 5000 }, { crypto: 85000, liquidity: 15000 })
+        .ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D') || {}).eventId]));
+  ok('12.13 …así que acusar la subida NO silencia la caída posterior',
+    (() => { const up = at({ crypto: 55000, liquidity: 45000 }, { crypto: 85000, liquidity: 15000 });
+      const upId = (up.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D') || {}).eventId;
+      const down = core({ serverRows: srvHistory(endTs, 7, { crypto: 95000, liquidity: 5000 },
+                                                            { crypto: 85000, liquidity: 15000 }),
+        rows: inv([100000, 100000, 100000, 100000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'], acknowledged: { [upId]: { at: endTs, state: 'acknowledged' } } });
+      return down.findings.some(f => f.rootCause === 'category_mix'); })());
+
+  // ── F13 · ACUSAR UNA RAÍZ NO PUEDE SILENCIAR A UN HERMANO NO VISTO ──────
+  // Estaba MUERTA: `findingsAll` también colapsa por raíz, así que `ids` tenía
+  // siempre longitud 1 y el escape se disparaba SIEMPRE. Se toma la identidad de
+  // los HECHOS, que es donde los dos episodios existen de verdad, y se ejecuta el
+  // conjunto canónico directamente sobre el ledger — que es el owner del fix.
+  ok('12.14 acusar un episodio no elimina otro episodio DISTINTO de la misma raíz',
+    (() => { const c = makeCtx({});
+      const mk = (id, band) => ({ semanticKey: 'position_below_cost_' + id,
+        family: 'performance', causalRoot: 'position_result', unit: 'percent_of_cost',
+        value: -10 * band, changeFact: true,
+        window: { range: 'observed', startAt: NOW - DAY, endAt: NOW },
+        eventId: 'st:position_result:' + id + '>' + band,
+        materiality: band === 1 ? 0.45 : 0.20, novelty: 1, confidence: 1, values: {} });
+      const ledger = { facts: [mk('btc', 1), mk('eth', 2)], gaps: [] };
+      c.__l = ledger;
+      const all = run('_aurixCanonicalFindings(__l, {})', c);
+      if (all.length !== 1) return false;               // la raíz colapsa: uno primario
+      const ackFirst = run('_aurixCanonicalFindings(__l, { acknowledged: { "'
+        + all[0].episodeId + '": { at: 1, state: "acknowledged" } } })', c);
+      // Con el primario acusado tiene que emerger el HERMANO, no el silencio.
+      return ackFirst.length === 1 && ackFirst[0].episodeId !== all[0].episodeId; })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      const mk = (id, band) => ({ semanticKey: 'position_below_cost_' + id,
+        family: 'performance', causalRoot: 'position_result', unit: 'percent_of_cost',
+        value: -10 * band, changeFact: true,
+        window: { range: 'observed', startAt: NOW - DAY, endAt: NOW },
+        eventId: 'st:position_result:' + id + '>' + band,
+        materiality: band === 1 ? 0.45 : 0.20, novelty: 1, confidence: 1, values: {} });
+      c.__l = { facts: [mk('btc', 1), mk('eth', 2)], gaps: [] };
+      const a = run('_aurixCanonicalFindings(__l, {})', c);
+      const b = run('_aurixCanonicalFindings(__l, { acknowledged: { "' + a[0].episodeId
+        + '": { at: 1, state: "acknowledged" } } })', c);
+      return { first: a.map(x => x.episodeId), afterAck: b.map(x => x.episodeId) }; })()));
+  ok('12.15 …y el orden es el que lo consigue: filtrar acusados y LUEGO deduplicar',
+    /const visible = out\.filter\(fd => o\.includeAcknowledged === true/.test(fnSrc('_aurixCanonicalFindings')));
+
+  // ── F14/F15 · EJECUTADOS, no comprobados con regex ─────────────────────
+  ok('12.16 el mapa de acuses está ACOTADO: la entrada 41 desaloja, y cae la más antigua',
+    (() => { const c = makeCtx({});
+      const store = {}; c.__s = store;
+      run('var __e = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s, k) ? __s[k] : null),'
+        + ' setItem: (k, v) => { __s[k] = String(v); }, removeItem: k => { delete __s[k]; } }, owner: "u1" };', c);
+      for (let i = 0; i < 45; i++) run('_aurixIntelAcknowledge("ep:' + i + '", Object.assign({}, __e, { now: ' + (1000 + i) + ' }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e)', c);
+      const keys = Object.keys(rec.ack);
+      const cap = run('_AURIX_INTEL_MEM_MAX_ENTRIES', c);
+      return keys.length === cap && !keys.some(k => k === 'ep:0') && keys.indexOf('ep:44') !== -1; })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      const store = {}; c.__s = store;
+      run('var __e = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s, k) ? __s[k] : null),'
+        + ' setItem: (k, v) => { __s[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
+      for (let i = 0; i < 45; i++) run('_aurixIntelAcknowledge("ep:' + i + '", Object.assign({}, __e, { now: ' + (1000 + i) + ' }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e)', c);
+      return { kept: Object.keys(rec.ack).length, hasFirst: !!rec.ack['ep:0'], hasLast: !!rec.ack['ep:44'] }; })()));
+  // La versión anterior inyectaba `store`, y con `store` propio el push ya está
+  // excluido por contrato (`!o.store`): `pushes === 0` se cumplía sin que la guarda
+  // interviniera, así que quitarla no habría hecho fallar el test. Se ejercita SIN
+  // `store` —sólo `owner`— y con las DOS ramas del estado remoto.
+  ok('12.17 sin el tirón remoto resuelto NO se empuja, y el acuse queda pendiente',
+    (() => { const c = makeCtx({});
+      let pushes = 0;
+      c.__count = () => { pushes++; };
+      run('var _aurixIntelCtxPush = function () { __count(); };', c);
+      run('var _aurixIntelCtxRemoteReady = function () { return false; };', c);
+      const okw = run('_aurixIntelAcknowledge("ep:x", { owner: "u1", now: 5 })', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, { owner: "u1" })', c);
+      return okw === true && pushes === 0 && !!rec.ack['ep:x'] && rec.dirty === true; })(),
+    'pushes con ready=false');
+  ok('12.17b …y con el tirón resuelto SÍ se empuja exactamente una vez',
+    (() => { const c = makeCtx({});
+      let pushes = 0;
+      c.__count = () => { pushes++; };
+      run('var _aurixIntelCtxPush = function () { __count(); };', c);
+      run('var _aurixIntelCtxRemoteReady = function () { return true; };', c);
+      run('_aurixIntelAcknowledge("ep:y", { owner: "u1", now: 6 })', c);
+      return pushes === 1; })());
+
+  // ── la copy, en los DOS idiomas, con las cadenas de producción ──────────
+  ok('12.18 las claves nuevas del ciclo de vida existen en ES y EN, sin texto vacío',
+    (() => { const missing = LIFECYCLE_KEYS.filter(k => DICT.es[k] === undefined || DICT.en[k] === undefined);
+      return missing.length === 0; })(),
+    JSON.stringify(LIFECYCLE_KEYS.filter(k => DICT.es[k] === undefined || DICT.en[k] === undefined)));
+  ok('12.19 la dilución se redacta SIN «bajó» en los dos idiomas',
+    (() => { const f = { semanticKey: 'cash_drift_liquidity_7D', value: -10,
+        values: { startPct: 25, endPct: 14, category: 'liquidity', dilutedBy: 'crypto',
+                  dilutionKind: 'pure', causeLicensed: true }, window: { range: '7D' } };
+      const es = run('_intv4FactText(' + JSON.stringify(f) + ')', makeCtx({ lang: 'es' }));
+      const en = run('_intv4FactText(' + JSON.stringify(f) + ')', makeCtx({ lang: 'en' }));
+      return es.length > 20 && en.length > 20 && !/bajó/i.test(es) && !/fallen:/.test(en.split('not')[0])
+        && /no ha bajado/i.test(es) && /has not fallen/i.test(en); })(),
+    JSON.stringify([run('_intv4FactText(' + JSON.stringify({ semanticKey: 'cash_drift_liquidity_7D', value: -10,
+        values: { startPct: 25, endPct: 14, category: 'liquidity', dilutedBy: 'crypto',
+                  dilutionKind: 'pure', causeLicensed: true }, window: { range: '7D' } }) + ')', makeCtx({ lang: 'en' }))]));
+  ok('12.20 el importe de la pérdida lleva ETIQUETA y no se lee como el coste, en los dos idiomas',
+    (() => { const pair = ['es', 'en'].map(L => String(DICT[L].intv4_f_pos_below_cost_amt('X', '50', '45', '1.000 €')));
+      return pair.every(t => /diferencia de|difference of/i.test(t))
+        && pair.every(t => !/coste de adquisición \(|acquisition cost \(/i.test(t)); })(),
+    JSON.stringify(['es', 'en'].map(L => String(DICT[L].intv4_f_pos_below_cost_amt('X', '50', '45', '1.000 €')))));
+  // Las claves de HUECO sí pueden nombrar «pérdida»: su trabajo es explicar la
+  // distinción entre la caída de un periodo y la pérdida desde la compra. Lo que
+  // no puede hacerlo es una AFIRMACIÓN, que es donde la palabra sería un salto.
+  ok('12.21 ninguna AFIRMACIÓN nueva dice «pérdida» (los huecos sí pueden explicar la distinción)',
+    (() => { const claims = LIFECYCLE_KEYS.filter(k => !/^intv4_gap_/.test(k));
+      const all = claims.map(k => [DICT.es[k], DICT.en[k]]).flat().filter(v => typeof v === 'string');
+      return !/\bp[eé]rdida\b/i.test(all.join(' ')) && !/\byou (?:have )?lost\b/i.test(all.join(' ')); })(),
+    JSON.stringify(LIFECYCLE_KEYS.filter(k => !/^intv4_gap_/.test(k)
+      && typeof DICT.es[k] === 'string' && /p[eé]rdida/i.test(DICT.es[k]))));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 13 · PERÍMETRO DEL DOMINANTE Y RE-ELECCIÓN TRAS EL ACUSE
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n13 · Las dos cosas que la revisión final encontró:');
+{
+  const POS = (id, type, qty, price, cost) => {
+    const a = A(id, type, qty, price); if (cost != null) a.costBasis = cost; return a;
+  };
+  // ── EL DOMINANTE EXCLUYE LA LIQUIDEZ, como `topInvestedAsset` ───────────
+  // Con la caja como fila MAYOR, el «dominante» calculado sin excluirla era el
+  // efectivo ⇒ la pérdida de BTC volvía a llevar su cláusula de peso mientras
+  // `top_position_weight` publicaba el mismo 45 %: la misma cifra dos veces.
+  const cashHeavy = core({ rows: inv([100000, 100000, 100000]),
+    assets: [POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)],
+    snap: Object.assign({}, SNAP, { totUSD: 100000,
+      topInvestedAsset: { name: 'BTC', type: 'crypto', pctTotal: 45 } }),
+    drivers: DRIVERS, serverRows: [] });
+  const btcLoss = cashHeavy.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+  ok('13.1 con la CAJA como fila mayor, el dominante sigue siendo la posición invertible',
+    !!btcLoss && btcLoss.values.isTopPosition === true,
+    JSON.stringify(btcLoss && { isTop: btcLoss.values.isTopPosition, w: btcLoss.values.weightPct }));
+  ok('13.2 …así que su frase NO repite el peso que publica la superficie de concentración',
+    (() => { const txt = run('_intv4FactText(' + JSON.stringify(btcLoss) + ')', makeCtx({}));
+      return txt.length > 10 && !/45\s*%/.test(txt) && /coste que registraste/.test(txt); })(),
+    JSON.stringify(run('_intv4FactText(' + JSON.stringify(btcLoss) + ')', makeCtx({}))));
+
+  // ── EL GEMELO POR DEBAJO DEL UMBRAL DE CONCENTRACIÓN ────────────────────
+  // §13.2 inyecta `pctTotal: 45`, así que «no repite el peso» es correcto PORQUE
+  // 45 ≥ 25. Sin este gemelo la aserción fosilizaría como contrato una limitación
+  // de la fixture: con la mayor posición no-efectivo al 20 %, la superficie de
+  // concentración NO publica nada y suprimir la cláusula haría desaparecer el peso
+  // de todas las superficies — el peso, que es la materialidad de este hecho.
+  const midBand = core({ rows: inv([100000, 100000, 100000]),
+    assets: [POS('btc', 'crypto', 1, 20000, 28600), POS('eur', 'cash', 80000, 1, 80000)],
+    snap: Object.assign({}, SNAP, { totUSD: 100000,
+      topInvestedAsset: { name: 'BTC', type: 'crypto', pctTotal: 20 } }),
+    drivers: DRIVERS, serverRows: [] });
+  const midLoss = midBand.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+  ok('13.2b por debajo del umbral de concentración el peso SÍ se dice (nadie más lo publica)',
+    !!midLoss && midLoss.values.isTopPosition === false
+    && !midBand.ledger.facts.some(f => f.semanticKey === 'top_position_weight'),
+    JSON.stringify(midLoss && { isTop: midLoss.values.isTopPosition, w: midLoss.values.weightPct }));
+  ok('13.2c …y su frase lleva el peso, que es la razón por la que el hecho se publica',
+    (() => { const txt = run('_intv4FactText(' + JSON.stringify(midLoss) + ')', makeCtx({}));
+      return /20\s*%/.test(txt) && /coste que registraste/.test(txt); })(),
+    JSON.stringify(run('_intv4FactText(' + JSON.stringify(midLoss) + ')', makeCtx({}))));
+  ok('13.2d la confianza y el signo viajan con el apoyo (una promoción no hereda los del acusado)',
+    /confidence: f\.confidence, positive: f\.positive/.test(fnSrc('_aurixIntelligenceStories')));
+
+  // ── ACUSAR EL PRIMARIO NO SILENCIA A SU HERMANO, en la capa de HISTORIAS ─
+  ok('13.3 acusar la historia primaria PROMUEVE a su hermano vivo en vez de borrar la raíz',
+    (() => { const c = makeCtx({});
+      const mk = (id, mat, band) => ({ semanticKey: 'position_below_cost_' + id,
+        family: 'performance', causalRoot: 'position_result', unit: 'percent_of_cost',
+        value: -10 * band, materiality: mat, magnitude: 0.5, confidence: 1, novelty: 1,
+        priority: mat, direction: 'down', values: { name: id, weightPct: mat * 100 },
+        window: { range: 'since_cost' }, eventId: 'st:position_result:' + id + '>' + band });
+      const core2 = { topStories: [Object.assign({}, mk('btc', 0.45, 1), {
+        rootMateriality: 0.45, supporting: [mk('eth', 0.20, 2)] })], findings: [] };
+      c.__c2 = core2;
+      const withAck = run('_intv5MattersStories(__c2, [], null, { "st:position_result:btc>1": { at: 1 } })', c);
+      const without = run('_intv5MattersStories(__c2, [], null, {})', c);
+      return without.stories.length === 1 && without.stories[0].semanticKey === 'position_below_cost_btc'
+        && withAck.stories.length === 1
+        && withAck.stories[0].semanticKey === 'position_below_cost_eth'
+        && withAck.stories[0].causalRoot === 'position_result'
+        && withAck.stories[0].promotedFrom === 'position_below_cost_btc'; })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      const mk = (id, mat, band) => ({ semanticKey: 'position_below_cost_' + id,
+        family: 'performance', causalRoot: 'position_result', unit: 'percent_of_cost',
+        value: -10 * band, materiality: mat, magnitude: 0.5, confidence: 1, novelty: 1,
+        priority: mat, direction: 'down', values: { name: id, weightPct: mat * 100 },
+        window: { range: 'since_cost' }, eventId: 'st:position_result:' + id + '>' + band });
+      c.__c2 = { topStories: [Object.assign({}, mk('btc', 0.45, 1), {
+        rootMateriality: 0.45, supporting: [mk('eth', 0.20, 2)] })], findings: [] };
+      const r = run('_intv5MattersStories(__c2, [], null, { "st:position_result:btc>1": { at: 1 } })', c);
+      return r.stories.map(x => x.semanticKey); })()));
+  ok('13.4 …y si NO queda ningún hermano vivo, la raíz sí desaparece (el acuse se respeta)',
+    (() => { const c = makeCtx({});
+      const only = { topStories: [{ semanticKey: 'position_below_cost_btc', causalRoot: 'position_result',
+        materiality: 0.45, priority: 0.45, rootMateriality: 0.45, values: {},
+        window: { range: 'since_cost' }, eventId: 'st:position_result:btc>1', supporting: [] }], findings: [] };
+      c.__c3 = only;
+      const r = run('_intv5MattersStories(__c3, [], null, { "st:position_result:btc>1": { at: 1 } })', c);
+      return r.stories.length === 0; })());
+  ok('13.5 los apoyos llevan su IDENTIDAD, sin la cual no se podría promover ninguno',
+    /eventId: f\.eventId \|\| null/.test(fnSrc('_aurixIntelligenceStories')));
+}
+
 console.log('\n11 · Empate en el máximo: silencio honesto, no un hito inventado:');
 {
   // Serie que termina con DOS puntos iguales en su valor más alto. `>` estricto

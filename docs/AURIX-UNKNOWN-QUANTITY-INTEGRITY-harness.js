@@ -504,6 +504,13 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
     // sobre un denominador parcial — el defecto exacto que esta regla existe para cerrar. Su
     // gate propio es docs/AURIX-EVIDENCE-CONTRACT-harness.js §4.6.
     '_aurixRegisteredCategoryBreadth',
+    // SPEC LIFECYCLE — el denominador del PESO de una pérdida contra coste se
+    // calcula en el propio fact ledger, sobre el mismo perímetro invertible, y
+    // hereda esta regla a propósito: leía `snap.totUSD`, que OMITE del sumatorio
+    // una posición no valorable, así que el peso publicado se sobreestimaba y el
+    // suelo de publicación se evaluaba sobre un peso inflado. Su gate propio es
+    // docs/AURIX-EVIDENCE-CONTRACT-harness.js §12.8-12.10.
+    '_aurixFactLedger',
     // SPEC INT.03 — el owner de diversificación efectiva (HHI / effective holdings) del
     // Intelligence Core. Lee la cantidad certificada por AQUÍ para FALLAR CERRADO: una
     // posición con cantidad no usable invalidaría el denominador y sobrestimaría la

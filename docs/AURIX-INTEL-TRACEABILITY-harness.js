@@ -123,7 +123,7 @@ function extractDict(langIdx) {
 }
 const DICT = { es: extractDict(0), en: extractDict(1) };
 
-const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
   '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR',
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
@@ -133,7 +133,7 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT'];
-const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -443,24 +443,61 @@ console.log('\n6 · ES y EN publican la misma verdad:');
 console.log('\n7 · Episodios pasivos, acuse de recibo y profundidad:');
 {
   const h = render(MOVED).html;
-  ok('7.1 la identidad de una deriva pasiva lleva su BANDA, no sólo la raíz',
+  // Las tres escapaban por `length === 0 ||`, así que pasaban aunque la fixture no
+  // pintara ninguna fila: no podían fallar. Ahora se exige que HAYA filas.
+  const chgRows = (h.match(/class="intv4-chg /g) || []).length;
+  ok('7.0 la fixture pinta filas de verdad (si no, las tres siguientes no probarían nada)',
+    chgRows > 0, String(chgRows));
+  ok('7.1 la identidad de una deriva pasiva lleva su BANDA y su DIRECCIÓN, no sólo la raíz',
     (() => { const ids = attrs(h, 'class="intv4-chg [^"]*"[^>]*data-finding="(ob:[^"]+)"');
-      return ids.length === 0 || ids.some(x => /#/.test(x)); })(),
+      const drift = ids.filter(x => /category_mix|cash_weight/.test(x));
+      return drift.length > 0 && drift.every(x => /#\d+:(up|down)$/.test(x)); })(),
     JSON.stringify(attrs(h, 'data-finding="([^"]+)"')));
   ok('7.2 cada fila ofrece «Entendido», y acusa el EPISODIO (no la raíz)',
-    (() => { const rows = (h.match(/class="intv4-chg /g) || []).length;
-      const acks = attrs(h, 'data-intel-ack="([^"]+)"');
-      return rows === 0 || (acks.length === rows && acks.every(a => a.length > 3)); })(),
+    (() => { const acks = attrs(h, 'data-intel-ack="([^"]+)"');
+      return chgRows > 0 && acks.length === chgRows && acks.every(a => a.length > 3); })(),
     JSON.stringify(attrs(h, 'data-intel-ack="([^"]+)"')));
   ok('7.3 el control es un botón real con etiqueta accesible (no un span clicable)',
-    (h.match(/class="intv12-ack"/g) || []).length === 0
-    || /<button type="button" class="intv12-ack"[^>]*aria-label="[^"]+"/.test(h));
+    (h.match(/class="intv12-ack"/g) || []).length === chgRows
+    && /<button type="button" class="intv12-ack"[^>]*aria-label="[^"]+"/.test(h));
   ok('7.4 «Entendido» lo resuelve la MISMA delegación única, sin listeners por nodo',
     /closest\('\[data-intel-ack\]'\)/.test(fnSrc('_initIntelSeeChanges'))
     && (app.match(/data-intel-ack\]/g) || []).length <= 2);
   ok('7.5 y no borra memoria financiera: el acuse sólo entra como ENTRADA del Core',
     /acknowledged: _ackMap/.test(app)
     && /includeAcknowledged/.test(fnSrc('_aurixCanonicalFindings')));
+  // ── LOS DOS OWNERS DEL ACUSE, EJECUTADOS ─────────────────────────────────
+  // Estaban comprobados con regex sobre el fuente, que es la lección ya registrada
+  // dos veces: «los asserts de sincronización eran regex, no comportamiento».
+  ok('7.5b `_aurixIntelAcknowledge` se EJECUTA: sella, es idempotente y queda acotado',
+    (() => { const c = makeCtx(MATURE);
+      const store = {};
+      c.__ackStore = store;
+      const env = 'var __env = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__ackStore, k) ? __ackStore[k] : null),'
+        + ' setItem: (k, v) => { __ackStore[k] = String(v); }, removeItem: k => { delete __ackStore[k]; } }, owner: "u1", now: 1000 };';
+      run(env, c);
+      const first = run('_aurixIntelAcknowledge("ob:category_mix#28:up", __env)', c);
+      const again = run('_aurixIntelAcknowledge("ob:category_mix#28:up", Object.assign({}, __env, { now: 9999 }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __env)', c);
+      return first === true && again === true
+        && rec && rec.ack && rec.ack['ob:category_mix#28:up'].at === 1000; })());
+  ok('7.5c y el acuse de OTRO dueño no se lee (aislamiento por cuenta, fail-closed)',
+    (() => { const c = makeCtx(MATURE);
+      const store = {}; c.__ackStore = store;
+      run('var __a = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__ackStore, k) ? __ackStore[k] : null),'
+        + ' setItem: (k, v) => { __ackStore[k] = String(v); }, removeItem: k => {} }, owner: "u1", now: 1 };', c);
+      run('var __b = Object.assign({}, __a, { owner: "u2" });', c);
+      run('_aurixIntelAcknowledge("ob:x#1:up", __a)', c);
+      const asB = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __b)', c);
+      return asB === null; })());
+  ok('7.5d el merge de DOS dispositivos conserva los dos acuses y no duplica ninguno',
+    (() => { const c = makeCtx(MATURE);
+      const out = run('_aurixIntelCtxMerge({ ack: { a: { at: 5, state: "acknowledged" } } },'
+        + ' { ack: { a: { at: 9, state: "acknowledged" }, b: { at: 2, state: "acknowledged" } } })', c);
+      const rev = run('_aurixIntelCtxMerge({ ack: { a: { at: 9, state: "acknowledged" }, b: { at: 2, state: "acknowledged" } } },'
+        + ' { ack: { a: { at: 5, state: "acknowledged" } } })', c);
+      return Object.keys(out.ack).length === 2 && out.ack.a.at === 9
+        && JSON.stringify(out.ack) === JSON.stringify(rev.ack); })());
   ok('7.6 la profundidad se resuelve UNA vez por pintura, desde el contexto declarado',
     /_intv4SetFactDepth\(\(intel && intel\.experience && intel\.experience\.resolved\)/.test(app));
   ok('7.7 …y sólo cambia CUÁNTO se enseña: el importe absoluto es lo único que gatea',
@@ -475,9 +512,14 @@ console.log('\n7 · Episodios pasivos, acuse de recibo y profundidad:');
       const rows = sec.split('<li class="intv4-chg');
       return rows.every(r => !/data-diluted="(pure|mixed)"/.test(r) || !/bajó|fell/i.test(r)); })(),
     JSON.stringify(attrs(section(h, 'intv4-changed'), 'data-diluted="([^"]*)"')));
-  ok('7.9 …y cuando SÍ bajó en importe, «bajó» es la palabra correcta y se usa',
+  // La anterior se satisfacía con `/pasó del/`, que es la forma NEUTRAL: no podía
+  // distinguir «bajó» de la neutra. Ahora se mira la fila concreta y su marcador.
+  ok('7.9 …y una fila NO diluida no puede llevar la frase de dilución',
     (() => { const sec = section(h, 'intv4-changed');
-      return !/data-fact="cash_drift_liquidity/.test(sec) || /bajó|pasó del/i.test(sec); })());
+      const rows = sec.split('<li class="intv4-chg').slice(1);
+      return rows.length > 0 && rows.every(r =>
+        /data-diluted="(pure|mixed)"/.test(r) || !/no ha bajado|has not fallen/i.test(r)); })(),
+    JSON.stringify(attrs(section(h, 'intv4-changed'), 'data-diluted="([^"]*)"')));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

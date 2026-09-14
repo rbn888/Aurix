@@ -1268,8 +1268,12 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
   // `_INTV4_BRIEF_MAX` es el límite del Brief legacy de `_intv4ChangedHtml`, que no
   // pinta esta superficie.
   ok('U.22b UNA sola selección alimenta la card, Memoria, Cambios y Descubrimientos',
-    /_intv5MattersStories\(core, skipRoots, intel\)/.test(mFn)
-    && /const mattersSel = _intv5MattersStories\(core, skipRoots, intel\)\.stories/.test(src)
+    // §8 — la selección recibe además el mapa de ACUSES: es la cuarta entrada que
+    // mueve PRIORIDAD (con la historia de presentación, el contexto y la memoria) y
+    // nunca una cifra. El invariante que esta prueba fija sigue siendo que hay UNA
+    // sola selección y que la alimentan los mismos argumentos en los dos sitios.
+    /_intv5MattersStories\(core, skipRoots, intel, acks\)/.test(mFn)
+    && /const mattersSel = _intv5MattersStories\(core, skipRoots, intel, _ackMap\)\.stories/.test(src)
     && /const mattersRoots = mattersSel\.map/.test(src)
     && /const publishedTexts = mattersSel\.map/.test(src)
     && /const shown = mattersSel\.map/.test(src)
@@ -1283,7 +1287,7 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
   ok('U.23 las cuatro superficies reciben el motor desde el renderer',
     (() => { const r = fnSrc('_renderIntelligenceCommandCenter');
       return /_intv4ExploreHtml\(core, esc, intel\)/.test(r)
-        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel\)/.test(r)
+        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap\)/.test(r)
         && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields\)/.test(r)
         && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
 }
