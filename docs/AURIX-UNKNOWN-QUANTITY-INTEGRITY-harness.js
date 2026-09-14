@@ -498,6 +498,12 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
     // total). Lee la regla para ver exactamente el mismo conjunto que `investableValueUSD`.
     // Su gate propio es docs/AURIX-M06-DASHBOARD-PORTFOLIO-harness.js.
     'getInvestableDistribution',
+    // SPEC ADVANCED INTELLIGENCE · A1 — la amplitud de categorías registradas HEREDA esta regla
+    // a propósito: es un reparto sobre el MISMO perímetro invertible que
+    // `_aurixEffectiveDiversification`, y sin ella publicaría un conteo de categorías calculado
+    // sobre un denominador parcial — el defecto exacto que esta regla existe para cerrar. Su
+    // gate propio es docs/AURIX-EVIDENCE-CONTRACT-harness.js §4.6.
+    '_aurixRegisteredCategoryBreadth',
     // SPEC INT.03 — el owner de diversificación efectiva (HHI / effective holdings) del
     // Intelligence Core. Lee la cantidad certificada por AQUÍ para FALLAR CERRADO: una
     // posición con cantidad no usable invalidaría el denominador y sobrestimaría la

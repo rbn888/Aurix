@@ -35,6 +35,9 @@ const sb = { console, Math, Number, Array, JSON, isFinite, parseFloat, Infinity,
   _aurixPortfolioEpoch: () => 0,
   _STORE: [],
   _aurixLoadCapitalFlows: function () { return sb._STORE.slice(); },
+  // A1 — la purga pasa a leer la lectura CRUDA a propósito: leyendo la filtrada
+  // destruía lápidas y filas pre-epoch al reescribir. Se inyecta el mismo store.
+  _aurixLoadCapitalFlowsRaw: function () { return sb._STORE.slice(); },
   _aurixSaveCapitalFlows: function (arr) { sb._STORE = arr.slice(); },
   _aurixCaptureFlow: function (kind, amountUSD, ts, assetId, note, source) {
     if (!Number.isFinite(amountUSD) || Math.round(Math.abs(amountUSD) * 100) === 0) return;

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '682'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '683'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -3499,8 +3499,15 @@ function _mergeRemoteState(remoteRow) {
       if (remoteRow && typeof remoteRow === 'object'
           && Object.prototype.hasOwnProperty.call(remoteRow, 'portfolio_epoch_ms')) {
         _aurixEpochColumnSeen = true;
+        // COTA SUPERIOR. Un dispositivo con el reloj adelantado que haga reset
+        // escribiría un epoch FUTURO en la cuenta, y al ser `max(servidor, local)`
+        // ocultaría TODA la historia en todos los dispositivos hasta esa fecha. Un
+        // epoch es un instante ya ocurrido: uno en el futuro no es autoridad, es un
+        // reloj mal puesto, y se ignora. El margen cubre el desajuste normal entre
+        // el reloj del cliente y el del servidor.
         const _re = Number(remoteRow.portfolio_epoch_ms);
-        if (Number.isFinite(_re) && _re > 0) _aurixRemotePortfolioEpochMs = _re;
+        const _nowMs = (function () { try { return Date.now(); } catch (_) { return 0; } })();
+        if (Number.isFinite(_re) && _re > 0 && _re <= _nowMs + 6 * 3600000) _aurixRemotePortfolioEpochMs = _re;
       }
       if (remoteRow && typeof remoteRow === 'object'
           && Object.prototype.hasOwnProperty.call(remoteRow, 'asset_classification_lineage')) {
@@ -5261,6 +5268,15 @@ const T = {
     intel_disp_depth:      'Mide cómo se reparte el peso entre tus posiciones. No es una nota ni una medida de riesgo: sector, geografía, correlación y divisa no son medibles todavía.',
     // Estados de «qué importa ahora». Emergen de los datos y del contexto, no de
     // una rotación de frases, y ninguno afirma urgencia sin un hecho material.
+    // A2 · TRAZABILIDAD — si Aurix dice que ha visto N cosas, tiene que poder
+    // llevarte a ellas. Enlace discreto, sin modal y sin página nueva.
+    // A2 · RE-DECIDIDO tras la revisión. Decía «desde tu última revisión», y el
+    // número NO es eso: son los hallazgos publicables de las ventanas del ledger
+    // (derivas 7D/30D, retorno), sin filtro de recencia. Abrir Intelligence dos
+    // veces en treinta segundos habría dicho las dos veces «2 cambios desde tu
+    // última revisión» sobre los mismos dos. Se dice lo que el número ES: cuántas
+    // cosas hay que merecen revisión, sin afirmar cuándo se vieron por última vez.
+    intel_see_changes:     n => `${n} ${n === 1 ? 'cambio que merece' : 'cambios que merecen'} revisión · Ver cambios ↓`,
     intel_now_material:    'Ha cambiado algo que importa',
     intel_now_discovery:   'Aurix ha visto algo en tu estructura',
     intel_now_changed:     'Tu estructura se ha movido',
@@ -5268,8 +5284,13 @@ const T = {
     intel_now_stable:      'Tu estructura se mantiene',
     intel_now_history:     'Aurix necesita más historia para leer tu evolución',
     intel_now_context:     'Aurix puede leerlo mejor con un dato tuyo',
-    intel_sub_material:    n => `${n} ${n === 1 ? 'lectura ha cambiado' : 'lecturas han cambiado'} desde la última vez que Aurix miró.`,
-    intel_sub_changed:     n => `${n} ${n === 1 ? 'lectura ha cambiado' : 'lecturas han cambiado'}, y ninguna es material por sí sola.`,
+    // A2 — las dos afirmaban RECENCIA («desde la última vez que Aurix miró») y una
+    // de ellas afirmaba además INMATERIALIDAD («ninguna es material por sí sola»),
+    // que es falso por construcción: un hallazgo entra en la lista precisamente
+    // porque pasó el umbral de materialidad. El número cambió de dueño, así que la
+    // frase también: dice cuántas cosas hay y que están abajo.
+    intel_sub_material:    n => `${n} ${n === 1 ? 'lectura' : 'lecturas'} que Aurix considera que merecen tu atención, justo abajo.`,
+    intel_sub_changed:     n => `${n} ${n === 1 ? 'lectura se ha movido' : 'lecturas se han movido'}. Las tienes detalladas abajo.`,
     intel_sub_stable_nc:   'Aurix ha comparado tu estructura con la de tu última visita y no ha encontrado nada material.',
     intel_sub_history:     'Las conclusiones de evolución aparecerán solas en cuanto haya observaciones suficientes.',
     // Descubrimientos: cada uno nace de una RELACIÓN entre hechos, nunca de una causa inventada.
@@ -7753,6 +7774,7 @@ const T = {
     intel_disp_na_uncert:  'One position cannot be valued, so Aurix will not publish the index over an incomplete portfolio.',
     intel_disp_na_generic: 'Aurix cannot measure the spread rigorously yet.',
     intel_disp_depth:      'It measures how weight is spread across your positions. It is not a grade or a risk measure: sector, geography, correlation and currency are not measurable yet.',
+    intel_see_changes:     n => `${n} ${n === 1 ? 'change worth' : 'changes worth'} reviewing · See changes ↓`,
     intel_now_material:    'Something that matters has changed',
     intel_now_discovery:   'Aurix spotted something in your structure',
     intel_now_changed:     'Your structure has moved',
@@ -7760,8 +7782,8 @@ const T = {
     intel_now_stable:      'Your structure is holding',
     intel_now_history:     'Aurix needs more history to read your evolution',
     intel_now_context:     'Aurix can read this better with one detail from you',
-    intel_sub_material:    n => `${n} ${n === 1 ? 'reading has' : 'readings have'} changed since Aurix last looked.`,
-    intel_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} changed, and none is material on its own.`,
+    intel_sub_material:    n => `${n} ${n === 1 ? 'reading' : 'readings'} Aurix thinks deserve your attention, right below.`,
+    intel_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} moved. They are detailed below.`,
     intel_sub_stable_nc:   'Aurix compared your structure with your last visit and found nothing material.',
     intel_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
     intel_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
@@ -9857,6 +9879,32 @@ function _aurixEnforceCacheOwner(userId) {
       // El IDIOMA no se toca aquí: su owner único es `switchLang()`, y mover la variable sin
       // re-renderizar la desincronizaría del DOM.
       try { baseCurrency = 'USD'; } catch (_) {}
+      // ── A1 · P0 · EL EPOCH DE UNA CUENTA NO PUEDE FILTRAR LA DE OTRA ────────
+      // `_aurixRemotePortfolioEpochMs` vive a nivel de módulo, exactamente como
+      // `assets` o `baseCurrency`, y por tanto SOBREVIVÍA al cambio de usuario.
+      // El escenario, confirmado en revisión: A hace reset (epoch E), sale, y B
+      // entra en el MISMO navegador sin recargar. La purga borra claves y copias
+      // vivas, pero no esta variable; la fila de B trae `portfolio_epoch_ms: null`
+      // (sólo se asigna cuando es > 0), así que `_aurixPortfolioEpoch()` devuelve E
+      // PARA B: su historia y su ledger de flujos se recortan, se publica retorno
+      // y exposición sobre series truncadas, y el siguiente flush PERSISTE el epoch
+      // de A en la fila de B — en todos sus dispositivos. Es la misma clase de
+      // defecto que este bloque ya corrige para el resto del estado en memoria.
+      //
+      // `columnSeen` también se reinicia: es una observación sobre el ESQUEMA que
+      // se hizo leyendo la fila de A, y la autorización para escribir columnas
+      // nuevas tiene que volver a ganarse leyendo la fila de B.
+      try { _aurixRemotePortfolioEpochMs = 0; } catch (_) {}
+      try { _aurixEpochColumnSeen = false; } catch (_) {}
+      try { _aurixLineageColumnSeen = false; } catch (_) {}
+      try { _aurixLineageDirty = false; } catch (_) {}
+      // Y el descubrimiento de la columna `intent`: es del esquema, no del usuario,
+      // pero re-descubrirlo cuesta un upsert y evita arrastrar un 'no' que en
+      // realidad fue un error de red de la sesión anterior.
+      try { _aurixFlowIntentColumn = 'unknown'; } catch (_) {}
+      // La guarda de impresión de la pregunta es por SESIÓN de usuario: si no se
+      // reinicia, la primera pregunta de B no se registraría como mostrada.
+      try { _intelMarkedQuestionId = null; } catch (_) {}
       try { if (typeof document !== 'undefined') document.querySelectorAll('.menu-curr-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency)); } catch (_) {}
       try { if (typeof _syncPerfCurrencyButtons === 'function') _syncPerfCurrencyButtons(); } catch (_) {}
       try { _aurixMiniDonutDrawn = false; _aurixMiniSig = ''; } catch (_) {}
@@ -10873,6 +10921,12 @@ function _aurixLedgerAssetRemoval(asset, ts) {
   // resto de la función: sin el owner del perímetro no se emite flujo, porque no
   // poder decidir si el activo está en el denominador no autoriza a suponerlo.
   if (typeof isInvestableAsset !== 'function' || !isInvestableAsset(asset)) return;
+  // GUARDA EXPLÍCITA. La rama de liquidez ya sale arriba por el owner económico,
+  // pero sin esto un cambio futuro podría hacer que una fila de caja llegase aquí
+  // y saliera etiquetada `INTERNAL_SELL`: dinero que abandona el perímetro
+  // descrito como rotación interna. Es la inferencia mecanismo→intención que el
+  // contrato prohíbe, y una baja de caja es una DESREGISTRACIÓN, no una venta.
+  if (String(asset.type || '').toLowerCase() === 'cash') return;
   const usd = assetValueUSD(asset);
   if (!Number.isFinite(usd) || usd <= 0) return;
   // `amount`/`currency` nativos junto al importe en USD, igual que los escribe el
@@ -10985,10 +11039,34 @@ function _aurixFlowIsDerived(f) {
   const s = String((f && f.source) || '');
   return s === 'tx-backfill' || s === 'inferred';
 }
+// La clave del par. INCLUÍA EL IMPORTE REDONDEADO, y eso dejaba escapar tres
+// casos reales que la revisión financiera confirmó: (a) caja en divisa — la fila
+// de usuario convirtió a USD en el instante del depósito y su gemela derivada lo
+// hizo en el backfill, con otro tipo de cambio, así que los redondeos difieren;
+// (b) un depósito EDITADO por `_aurixAmendFlow` — la gemela conserva el importe
+// viejo; (c) cualquier desajuste de céntimos. En los tres, las DOS filas llegaban
+// al paso 4 de `_aurixInvestablePerformance` y el mismo depósito se neutralizaba
+// dos veces, mientras la autoridad de liquidez veía `dupIn === 0` y publicaba el
+// importe.
+//
+// El importe SALE de la clave. Lo que queda ya es exacto y no es una heurística:
+// mismo activo, mismo signo y —el término que lo cierra— `originalTs` de la fila
+// derivada IDÉNTICO al `ts` de la fila de usuario. El backfill deriva precisamente
+// de la transacción que el owner de liquidez escribió, así que ese instante ES su
+// instante. Sin ventanas de tolerancia y sin comparar dinero.
 function _aurixFlowDupKey(f) {
   const amt = Number((f && f.amountUSD) || 0);
-  return String((f && f.assetId) || 'cash') + '|' + (amt >= 0 ? '+' : '-')
-       + '|' + Math.round(Math.abs(amt));
+  return String((f && f.assetId) || 'cash') + '|' + (amt >= 0 ? '+' : '-');
+}
+// Una fila DERIVADA sin `originalTs` no se puede emparejar con nada: es legacy,
+// escrita antes de que existiera el rastro de re-anclaje. No se excluye (no hay
+// prueba de que duplique) y por eso su simple presencia es un HUECO de autoridad:
+// una cuenta con estas filas no puede sostener una cifra de capital.
+function _aurixFlowUnpairableDerived(list) {
+  try {
+    return (list || []).filter(f => f && _aurixFlowIsDerived(f)
+      && !Number.isFinite(Number(f.originalTs))).length;
+  } catch (_) { return 0; }
 }
 // Devuelve el Set de ids DERIVADOS que duplican una fila de usuario ya presente.
 function _aurixFlowDuplicateIds(list) {
@@ -11023,7 +11101,8 @@ function _aurixFlowDuplicateReport() {
     .map(f => ({ kind: String(f.kind || ''), source: String(f.source || ''),
                  amountUSD: Number(f.amountUSD) || 0, ts: Number(f.ts) || 0,
                  originalTs: Number.isFinite(Number(f.originalTs)) ? Number(f.originalTs) : null }));
-  return { total: raw.length, excluded: rows.length, rows: rows };
+  return { total: raw.length, excluded: rows.length, rows: rows,
+           unpairableDerived: _aurixFlowUnpairableDerived(raw) };
 }
 // Las filas VIVAS sin canonicalizar: mismo contrato que la lectura histórica
 // (tombstones y pre-epoch fuera), y es sobre esto sobre lo que se detecta el
@@ -11205,7 +11284,16 @@ async function _aurixCapitalFlowsPush(flows) {
     let attemptIntent = (_aurixFlowIntentColumn !== 'no');
     let { error } = await send(attemptIntent);
     if (error && attemptIntent) {
-      _aurixFlowIntentColumn = 'no';
+      // SÓLO UN ERROR DE ESQUEMA retira la columna. Con cualquier error (un 5xx,
+      // un corte de red) se marcaba 'no' para TODA la sesión: las filas siguientes
+      // se escribían sin `intent`, un pull posterior lo quitaba también en local, y
+      // al ser UNKNOWN_LEGACY terminal y no promovible las etiquetas se perdían
+      // para siempre por un fallo transitorio. Un fallo de red no es una prueba
+      // sobre el esquema, así que el estado se queda en 'unknown' y se reintenta.
+      const _msg = String((error && (error.message || error.code || error.details)) || '').toLowerCase();
+      const _schema = /intent/.test(_msg) || /column/.test(_msg) || /pgrst204/.test(_msg)
+                   || /42703/.test(_msg) || /schema/.test(_msg);
+      if (_schema) _aurixFlowIntentColumn = 'no';
       const retry = await send(false);
       error = retry.error;
     } else if (!error && attemptIntent) {
@@ -11302,7 +11390,19 @@ async function _aurixCapitalFlowsPull() {
     return true;
   } catch (_) { _aurixCapitalFlowsIncomplete = true; return false; }
 }
-try { if (typeof window !== 'undefined') window._aurixCapitalFlowsComplete = function () { return !_aurixCapitalFlowsIncomplete; }; } catch (_) {}
+// A1 — la MISMA exención que `_aurixSourceSetComplete` (app.js:34014): en una
+// sesión ANÓNIMA no hay ledger remoto que esperar, así que el local ES la verdad.
+// Sin ella `_aurixCapitalFlowsIncomplete` arranca en true y no baja nunca —el pull
+// sale antes por falta de sesión— de modo que la frase de movimientos de liquidez
+// era estructuralmente inalcanzable para una cuenta local. Falla cerrado, sí, pero
+// cerrado POR EL MOTIVO EQUIVOCADO.
+function _aurixCapitalFlowsComplete() {
+  try {
+    if (!(typeof currentUser !== 'undefined' && currentUser && currentUser.id)) return true;
+    return !_aurixCapitalFlowsIncomplete;
+  } catch (_) { return false; }
+}
+try { if (typeof window !== 'undefined') window._aurixCapitalFlowsComplete = _aurixCapitalFlowsComplete; } catch (_) {}
 // Backfill idempotente del ledger histórico que hoy vive en localStorage. El id
 // legacy es DETERMINISTA (kind:asset:ts:importe), así que dos dispositivos que
 // vivieron la misma operación producen la misma fila y el upsert las colapsa:
@@ -13535,8 +13635,16 @@ function _aurixLineageMerge(a, b) {
   const nz = v => (v === null || v === undefined) ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
   const sa = nz(A.since);
   const sb = nz(B.since);
-  const since = (sa === null) ? sb : (sb === null) ? sa : Math.min(sa, sb);
-  return { since: since, entries: out.slice(-_AURIX_LINEAGE_MAX) };
+  let since = (sa === null) ? sb : (sb === null) ? sa : Math.min(sa, sb);
+  const kept = out.slice(-_AURIX_LINEAGE_MAX);
+  // DESALOJAR EVIDENCIA OBLIGA A ENCOGER LA COBERTURA. Si el tope descarta
+  // entradas antiguas y `since` se queda donde estaba, se afirma cobertura sobre
+  // una ventana cuya evidencia ya se tiró: exactamente un fail-open. Cuando se
+  // desaloja, `since` avanza a la entrada más antigua RETENIDA.
+  if (out.length > kept.length && kept.length && Number.isFinite(Number(kept[0].at))) {
+    since = Math.max(Number(since) || 0, Number(kept[0].at));
+  }
+  return { since: since, entries: kept };
 }
 function _aurixAdoptRemoteClassificationLineage(remoteEntries) {
   try {
@@ -13612,6 +13720,15 @@ function _aurixClassificationValidity(bucket, startTs, endTs) {
     const rec = _aurixLineageRead();
     out.observedSince = Number.isFinite(rec.since) ? rec.since : null;
     if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) { out.reason = 'no_window'; return out; }
+    // LA COBERTURA ES DE LA CUENTA, NO DEL DISPOSITIVO. Sin la columna remota el
+    // linaje NUNCA sincroniza, así que un portátil con tres meses de observación
+    // propia declararía «cubierto» una ventana en la que OTRO dispositivo hizo la
+    // reclasificación — y volvería a publicar «tu exposición a los ETF bajó hasta
+    // el 0 %». Es el P0 original entrando por la puerta de al lado. Hasta que la
+    // columna exista y se haya leído, la validez es DESCONOCIDA y la transición se
+    // suprime; el estado actual, que no compara nada, se sigue publicando.
+    const accountWide = (typeof _aurixLineageColumnSeen !== 'undefined') ? !!_aurixLineageColumnSeen : false;
+    if (!accountWide) { out.reason = 'lineage_not_account_wide'; return out; }
     if (!Number.isFinite(rec.since) || rec.since > startTs) {
       out.reason = 'coverage_starts_after_window'; return out;
     }
@@ -28790,7 +28907,12 @@ function _aurixCashLedgerAuthority(t0, t1) {
       const rep = _aurixFlowDuplicateReport();
       dupIn = (rep.rows || []).filter(r => r.ts > t0 && r.ts <= t1).length;
     } catch (_) { dupIn = 0; }
-    if (dupIn > 0) out.gaps.push(_AURIX_EV_GAP.FLOW_DUPLICATE_IDENTITY);
+    // Y las derivadas LEGACY sin `originalTs`: no se puede demostrar que dupliquen
+    // ni que no, así que no se excluyen del consumo pero sí bloquean el importe.
+    // «No puedo emparejarla» es un hueco de autoridad, no una licencia.
+    let unpairable = 0;
+    try { unpairable = _aurixFlowUnpairableDerived(all); } catch (_) { unpairable = 0; }
+    if (dupIn > 0 || unpairable > 0) out.gaps.push(_AURIX_EV_GAP.FLOW_DUPLICATE_IDENTITY);
     // C2 — heurísticos en la ventana.
     const inferred = win.filter(f => String(f.source || '') === 'inferred' || String(f.kind || '') === 'import_baseline');
     if (inferred.length) out.gaps.push(_AURIX_EV_GAP.FLOW_INFERRED_PRESENT);
@@ -29547,16 +29669,24 @@ function _aurixWowInsights(ledger) {
   }
   // 2 · Wealth rose while the investments themselves went nowhere — the growth
   //     came from contributions. This is the flagship honest insight.
-  const flow = byKey('recorded_capital_net');
-  const perfAll = byKey('investable_return_all');
-  if (flow && perfAll && flow.value > 0 &&
-      Math.abs(perfAll.value) < _AURIX_FACT_MATERIAL.returnPct) {
-    out.push({ semanticKey: 'wow_growth_from_capital_not_return', causalRoot: _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL,
-      values: { capitalNet: flow.value, returnPct: perfAll.value, window: perfAll.window },
-      supportingKeys: [flow.semanticKey, perfAll.semanticKey],
-      confidence: Math.min(flow.confidence, perfAll.confidence),
-      priority: Math.max(flow.priority, perfAll.priority) + 0.08 });
-  }
+  // ── A1 · P0 CAPITAL — LA DICOTOMÍA QUEDA RETIRADA ────────────────────────
+  // Decía «tu patrimonio creció, pero no por rendimiento: registraste X de
+  // liquidez y tus inversiones rindieron un Y%». Con el numerador corregido a
+  // MOVIMIENTOS DE LIQUIDEZ REGISTRADOS la frase es PEOR, no mejor, y la revisión
+  // financiera lo confirmó con un caso concreto: registras una posición de 50.000
+  // (`asset_add` — y una compra NO debita caja, que es justo por lo que la
+  // identidad de dinero se declara no conservativa) y además ingresas 2.000 de
+  // liquidez. El nivel sube 52.000, el retorno es ~0, y el neto de liquidez es
+  // material ⇒ Aurix atribuiría una subida de 52.000 a los 2.000 que sabe nombrar.
+  //
+  // Hay una TERCERA causa —la rotación interna, que en este modelo CREA valor
+  // registrado— y Aurix no puede descartarla. Estrechar el numerador sin
+  // estrechar la afirmación es exactamente lo que prohíbe el contrato, así que la
+  // afirmación se retira. Los dos hechos siguen publicándose POR SEPARADO (el
+  // cambio de nivel con su nota `level_claim_not_return`, y los movimientos de
+  // liquidez registrados), que es todo lo que la evidencia sostiene.
+  // Las claves de copy se CONSERVAN: su gate las exige y volverán a ser
+  // alcanzables cuando exista intención declarada por el usuario.
   // 3 · Liquidity falling while concentration is already material — two
   //     independent dimensions moving the same way.
   const cashDown = facts.filter(f => f.causalRoot === _AURIX_CAUSAL_ROOT.CASH_WEIGHT &&
@@ -31122,16 +31252,12 @@ function _aurixIntelDiscoveries(model, memory, ctx) {
       code: 'concentration_crossed_upward', values: { from: conc.from, to: conc.to,
         topWeightPct: c.topWeightPct }, evidence: ['top_position_weight'], materiality: 0.85 });
   }
-  // 3 · CAPITAL vs MERCADO. «Tu patrimonio subió» y «ganaste dinero» son cosas
-  // distintas, y sólo se puede decir cuando las DOS piezas existen.
-  if (e.availability === _AURIX_AI_AVAIL.AVAILABLE && e.marketVsFlowSeparable
-      && Number.isFinite(e.recordedCapitalNet) && Number.isFinite(e.returnPct)
-      && e.recordedCapitalNet > 0 && Math.abs(e.returnPct) < _AURIX_FACT_MATERIAL.returnPct) {
-    add({ id: 'disc_growth_is_capital', dimension: _AURIX_AI_DIM.EVOLUTION,
-      code: 'level_rose_on_capital_not_return',
-      values: { recordedCapitalNet: e.recordedCapitalNet, returnPct: e.returnPct, window: e.window },
-      evidence: ['recorded_capital_net', 'investable_return'], materiality: 0.8 });
-  }
+  // 3 · CAPITAL vs MERCADO — RETIRADO en A1, por la misma razón que su gemelo en
+  //     `_aurixWowInsights`: atribuiría toda la subida del nivel al único trozo
+  //     que Aurix sabe nombrar (la liquidez REGISTRADA), cuando una compra no
+  //     debita caja y la rotación interna crea valor registrado. La tercera causa
+  //     no se puede descartar, así que la dicotomía no se afirma. Los dos hechos
+  //     siguen disponibles por separado para quien los lea.
   // 4 · INTENCIÓN DECLARADA vs ESTRUCTURA OBSERVADA. Requiere contexto, y no
   // juzga: enuncia la distancia entre lo que el usuario dijo y lo que se mide.
   const goal = f.primary_goal && f.primary_goal.value;
@@ -55315,6 +55441,10 @@ let _intccExploreWired = false;
 // la memoria de observación. El motor sigue siendo puro: esto es estado de
 // presentación, y si es null simplemente no se consolida nada.
 let _intelLastRun = null;
+// A2 — guarda de IMPRESIÓN de la pregunta, por sesión. `_aurixIntelMarkAsked`
+// escribe contexto y empuja a `intelligence_context`, así que correrlo en cada
+// pintura era escritura y red por repintado. La misma pregunta se marca una vez.
+let _intelMarkedQuestionId = null;
 let _intelAnswerWired = false;
 const _INTCC_VISIT_KEY  = 'aurix_intcc_last_visit_v1';
 
@@ -56113,12 +56243,35 @@ function _intv4WowText(w) {
 
 // A story: ONE conclusion per causal root, its supporting facts nested. This is
 // the structural answer to "the same fact sold as three discoveries".
-function _intv4StoryHtml(story, esc, depth) {
-  const head = _intv4FactText(story);
-  if (!head) return '';                                          // no copy ⇒ no card
+// ── A2 · TRES TRABAJOS, NO TRES FORMAS DE DECIR LO MISMO ───────────────────
+// «Lo que importa» y el destino del contador titulaban los dos con
+// `_intv4FactText`, así que en cuanto un hecho era a la vez historia principal y
+// hallazgo, la MISMA frase aparecía literal en dos cards de la misma pantalla. El
+// filtro que lo evitaba antes suprimía filas en el destino, y eso es lo que
+// rompía el contador. La separación correcta ya existía en el dominio y no se
+// estaba usando: el destino publica el HECHO CERTIFICADO y esta superficie el
+// SIGNIFICADO. Así que cuando el hecho ya se publica abajo, aquí encabeza el
+// «por qué importa» y el hecho pasa a ser su evidencia de apoyo.
+// Si no hay significado que publicar, se conserva el hecho como titular: mejor
+// repetir una vez que dejar una card muda.
+function _intv4StoryHtml(story, esc, depth, publishedKeys) {
+  const factTxt = _intv4FactText(story);
+  if (!factTxt) return '';                                       // no copy ⇒ no card
   const why = _intv4WhyText(story);
+  const pub = (publishedKeys && typeof publishedKeys.has === 'function') ? publishedKeys : new Set();
+  const leadWithMeaning = pub.has(story.semanticKey) && !!why;
+  const head = leadWithMeaning ? why : factTxt;
   const seenTxt = new Set([head]);
+  // Cuando el hecho ya lo publica el destino del contador, NO se repite aquí ni
+  // como evidencia anidada: el número vive abajo y el significado vive arriba. Esa
+  // es la separación, y repetir la cifra «sólo dentro del desplegable» seguiría
+  // siendo la misma cifra dos veces en la misma pantalla.
   const support = (story.supporting || [])
+    // NI COMO EVIDENCIA ANIDADA. Un hecho que el destino del contador ya publica
+    // como fila certificada no vuelve a aparecer aquí dentro del desplegable: la
+    // misma cifra dos veces en la misma pantalla sigue siendo la misma cifra dos
+    // veces, y el desplegable no la convierte en otra cosa.
+    .filter(s => !pub.has(s.semanticKey))
     .map(s => ({ s, txt: _intv4FactText(s) }))
     .filter(x => !!x.txt)
     // Same sentence = repetition, even from a different fact key. A derived
@@ -56131,7 +56284,7 @@ function _intv4StoryHtml(story, esc, depth) {
     <article class="intv4-story is-${esc(story.direction || 'flat')}${story.positive === true ? ' is-positive' : ''}"
              data-root="${esc(story.causalRoot)}" data-fact="${esc(story.semanticKey)}">
       <p class="intv4-story-head">${esc(head)}</p>
-      ${why ? `<p class="intv4-story-why">${esc(why)}</p>` : ''}
+      ${(why && !leadWithMeaning) ? `<p class="intv4-story-why">${esc(why)}</p>` : ''}
       ${showWin ? `<p class="intv4-story-meta">${esc(_intv4T('intv4_window', _intv4WindowLabel(story.window)))}</p>` : ''}
       ${advanced && support.length ? `
         <details class="intv4-more">
@@ -56164,6 +56317,37 @@ function _intv4BriefHtml(core, esc, depth) {
 // WHAT CHANGED — only Core-certified changes. CAUSE is never asserted: the Core
 // reports causeKnown:false, so this surface shows CHANGE and lets the story's
 // "why it matters" carry the (prudent) impact. No per-position attribution.
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · A2 — EL DESTINO DEL CONTADOR
+// ════════════════════════════════════════════════════════════════════════════
+// Esta card era el DESTINO del número que el hero anuncia, y no lo era: el hero
+// contaba transiciones de insights y aquí se listaban HECHOS del ledger, filtrados
+// además por «lo que otra superficie ya publicó» y recortados a 4. Dos universos
+// sin relación, y en el peor caso —todo filtrado— devolvía '' mientras el hero
+// seguía diciendo N. El usuario se quedaba preguntándose qué eran esas N cosas.
+//
+// Ahora rinde EXACTAMENTE `core.findings`, la lista canónica, y el hero cuenta su
+// longitud. No hay dos derivaciones, así que no pueden divergir.
+//
+// Y LA REPETICIÓN NO SE RESUELVE SUPRIMIENDO. El filtro anterior escondía aquí lo
+// que «Lo que importa» ya decía, que es lo que rompía el contador. La separación
+// correcta es SEMÁNTICA y ya existe: el hero SINTETIZA («hay 3 cambios que
+// merecen revisión»), esta card publica el HECHO CERTIFICADO («la exposición a
+// cripto subió 29,7 pp hasta el 85 %») y «Lo que importa» publica el SIGNIFICADO
+// («esto aumenta cuánto influyen los movimientos de cripto en tu patrimonio»).
+// Tres trabajos distintos sobre la misma raíz es exactamente lo que el contrato
+// autoriza; tres formas de decir lo mismo es lo que prohíbe.
+function _intv4FindingRows(core) {
+  const facts = (core && core.ledger && core.ledger.facts) || [];
+  return ((core && core.findings) || [])
+    .map(fd => {
+      const f = facts.find(x => x.semanticKey === fd.semanticKey) || null;
+      return { fd, f, txt: f ? _intv4FactText(f) : '' };
+    })
+    // Sin copy no hay fila, y sin fila no puede contarse: el contador y el destino
+    // se derivan de ESTA lista, así que un hallazgo sin frase no infla el número.
+    .filter(x => !!x.txt);
+}
 function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   const seen = new Set();
   // Same rule as Memory: what the Brief already headlined is not repeated here.
@@ -56180,17 +56364,13 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   // evitar. La Memoria se pinta antes, así que elige primero.
   const claimedKeys  = new Set((memoryClaims && memoryClaims.keys)  || []);
   const claimedRoots = new Set((memoryClaims && memoryClaims.roots) || []);
-  const candidates = (core.whatChanged || [])
-    .map(w => {
-      const f = (core.ledger && core.ledger.facts || []).find(x => x.semanticKey === w.semanticKey);
-      return { w, txt: f ? _intv4FactText(f) : '' };
-    })
-    .filter(x => !!x.txt);
-  const rows = candidates
-    .filter(x => !published.has(x.w.semanticKey))
-    .filter(x => !claimedKeys.has(x.w.semanticKey) && !claimedRoots.has(x.w.causalRoot))
-    .filter(x => { if (seen.has(x.w.causalRoot)) return false; seen.add(x.w.causalRoot); return true; })
-    .slice(0, 4);
+  // A2 — LA LISTA CANÓNICA, sin volver a filtrarla. `published`/`claimedKeys` se
+  // conservan SÓLO como diagnóstico en los `data-*` (siguen diciendo qué otra
+  // superficie tocó la misma raíz, que es útil para el gate) pero ya no pueden
+  // vaciar el destino de un contador que el hero acaba de anunciar.
+  const rows = _intv4FindingRows(core);
+  const candidates = rows;
+  rows.forEach(x => seen.add(x.fd.rootCause));
   // ── M.03 · E — "SIN CAMBIO MATERIAL" ≠ "NO PUEDO MEDIRLO" ─────────────────
   // El estado vacío decía "Todavía no hay cambios que Aurix pueda medir", y eso
   // afirma una INCAPACIDAD. Con semanas de snapshots en el disco es falso: Aurix
@@ -56216,15 +56396,22 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   // distinción entre las cuatro situaciones —que fue trabajo deliberado y sigue
   // siendo verdad— no se pierde: viaja en `data-changed-state` del contenedor raíz,
   // que es diagnosticable y ejecutable por el gate sin ocupar un píxel de pantalla.
-  if (!rows.length) return { html: '', state: emptyKey, evidence: hasEvidence };
-  return { state: 'rows', evidence: hasEvidence, html: `
-    <section class="intcc-card intv4-changed" data-evidence="${hasEvidence ? '1' : '0'}"
+  if (!rows.length) return { html: '', state: emptyKey, evidence: hasEvidence, count: 0 };
+  // `id` + `tabindex` + `role="group"`: el hero navega HASTA AQUÍ y mueve el foco
+  // al encabezado, así que el destino tiene que ser direccionable y enfocable. Sin
+  // eso «Ver cambios ↓» sería un scroll decorativo que un teclado no puede seguir.
+  return { state: 'rows', evidence: hasEvidence, count: rows.length, html: `
+    <section class="intcc-card intv4-changed" id="aurix-intel-changes"
+             data-evidence="${hasEvidence ? '1' : '0'}"
              data-obs="${esc(String(obs.observations || 0))}"
              data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
-             data-state="rows">
-      <h3 class="intcc-card-title">${esc(_intv4T('intv4_changed_title'))}</h3>
+             data-findings="${rows.length}" data-state="rows">
+      <h3 class="intcc-card-title" id="aurix-intel-changes-title" tabindex="-1">${esc(_intv4T('intv4_changed_title'))}</h3>
       <ul class="intv4-chg-list">${rows.map(x => `
-        <li class="intv4-chg is-${esc(x.w.change.direction || 'flat')}" data-root="${esc(x.w.causalRoot)}">
+        <li class="intv4-chg is-${esc((x.f && x.f.direction) || 'flat')}"
+            data-root="${esc(x.fd.rootCause)}" data-finding="${esc(x.fd.findingId)}"
+            data-fact="${esc(x.fd.semanticKey)}"
+            data-cause="${x.fd.causeKnown ? 'user' : 'unknown'}">
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
         </li>`).join('')}</ul>
@@ -56364,12 +56551,35 @@ function _intv4AnswerHtml(q, core, esc) {
 // que el Core ya calcula) y a igualdad, RECENCIA de la ventana. Determinista, con
 // la clave como último desempate, así que la misma entrada da siempre la misma
 // Memoria.
+// ── A2 · SE INVIERTE LA PRECEDENCIA ────────────────────────────────────────
+// Antes la Memoria elegía primero y «Qué ha cambiado» se apartaba. Eso resolvía
+// la repetición de la única forma que rompe el contador: SUPRIMIENDO en el
+// destino de un número que el hero acaba de anunciar. Ahora manda la lista
+// canónica de hallazgos —el hero ha hecho una promesa sobre ella— y la Memoria
+// cede: un hito que ya se publica como cambio certificado no se repite aquí.
+//
+// La Memoria no pierde su razón de ser, porque su contenido propio es otro: los
+// HITOS con fecha y, sobre todo, lo que el usuario DECLARÓ, que ninguna otra
+// superficie puede saber. Y ceder un hito no incumple ninguna promesa numérica,
+// porque la Memoria nunca anunció un recuento.
 function _intv4MemoryEvents(core, alreadyPublished) {
   const seen = new Set();
   const published = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
+  // La lista canónica reclama PRIMERO, por clave Y por raíz causal: dos claves de
+  // la misma raíz son el mismo fenómeno contado de dos maneras.
+  const findings = (core && Array.isArray(core.findings)) ? core.findings : [];
+  // POR CLAVE, NO POR RAÍZ, y la diferencia es todo el contrato. El MISMO hecho no
+  // puede estar en las dos superficies. Pero dos hechos DISTINTOS de la raíz
+  // `wealth_level` sí pueden, porque dicen cosas distintas y ya no compiten:
+  // «tu nivel ha subido 40.818 US$ desde el 18 ago» es un CAMBIO y vive en el
+  // destino del contador; «tu máximo observado sigue siendo el del 3 sep» es un
+  // HITO y vive aquí. Excluir por raíz vaciaba la Memoria entera para evitar una
+  // repetición que ya no existe.
+  const findingKeys = new Set(findings.map(f => f.semanticKey));
   const endAt = f => (f.window && Number.isFinite(f.window.endAt)) ? f.window.endAt : 0;
   return ((core && core.temporalEvents) || [])
     .filter(f => !published.has(f.semanticKey))
+    .filter(f => !findingKeys.has(f.semanticKey))
     // An EVENT has a date. The current level ('now') is context, not memory.
     .filter(f => f.window && f.window.range !== 'now' && Number.isFinite(f.window.endAt))
     .slice()
@@ -56635,7 +56845,13 @@ function _intelCoherentState(nowState, healthBand, justified) {
   if (nowState === 'attention_material_fact' && !justified) return 'monitoring';
   return nowState;
 }
-function _intv5Reading(core, score, snap, intel) {
+// A2 — `findingCount` ENTRA COMO PARÁMETRO, no se deriva aquí. Es la longitud de
+// la lista canónica que el destino va a renderizar, calculada UNA vez por pintura
+// y pasada a los dos consumidores. Antes el hero contaba transiciones de insights
+// («N lecturas han cambiado») y la card listaba hechos del ledger: dos universos,
+// dos cardinalidades, y ninguna forma de que el usuario averiguara qué eran esas N
+// cosas. Un contador sin destino exacto es una promesa incumplida.
+function _intv5Reading(core, score, snap, intel, findingCount) {
   // FAIL CLOSED. Si el motor no ha podido correr, la lectura NO puede caer en «Tu
   // estructura se mantiene»: eso es una afirmación estructural POSITIVA sostenida
   // sobre cero evidencia, y precisamente en el caso en que no hay motor que la
@@ -56652,9 +56868,14 @@ function _intv5Reading(core, score, snap, intel) {
   // FAIL TOWARDS SHOWING: sin lista de persistentes no se puede afirmar que el
   // hecho sea viejo, así que se trata como nuevo y el titular se respeta.
   const anchorIsRepeated = !!(anchorId && persisting && persisting.indexOf(anchorId) !== -1);
-  const nowState = _intelCoherentState(rawState, score && score.band,
+  let nowState = _intelCoherentState(rawState, score && score.band,
     hasMaterialChange || !anchorIsRepeated);
-  const changeCount = (intel && intel.now) ? intel.now.changeCount : 0;
+  // EL CONTADOR ES LA LISTA. `intel.now.changeCount` sigue existiendo y sigue
+  // gobernando el ESTADO semántico del motor (qué titular corresponde), pero el
+  // NÚMERO que se pronuncia es el de los hallazgos publicables — los únicos que el
+  // usuario va a poder ver al bajar.
+  const changeCount = Number.isFinite(findingCount) ? findingCount
+    : ((intel && intel.now) ? intel.now.changeCount : 0);
   const disc = (intel && intel.discoveries && intel.discoveries[0]) || null;
   const q = (intel && intel.questions && intel.questions[0]) || null;
   // El estado semántico del motor se mapea a la clase visual que ya existe, así que
@@ -56663,6 +56884,14 @@ function _intv5Reading(core, score, snap, intel) {
     discovery: 'concentrated', context_needed: 'balanced', insufficient_history: 'balanced',
     readings_changed: 'concentrated', stable_no_change: 'healthy', stable: 'balanced',
     monitoring: 'healthy', no_data: 'balanced' };
+  // NINGÚN ESTADO PUEDE PRONUNCIAR UN NÚMERO QUE EL DESTINO NO PUEDA MOSTRAR. Si
+  // la lista canónica está vacía, los dos estados que dicen «N lecturas han
+  // cambiado» dejan de ser publicables y se cae al estado que describe la
+  // estructura sin contar nada. Es el invariante del contador, hecho estructura.
+  if (changeCount === 0 && (nowState === 'material_change' || nowState === 'readings_changed')) {
+    nowState = (score && _AURIX_INTEL_HEALTH_POSITIVE.indexOf(String(score.band || '')) !== -1)
+      ? 'monitoring' : 'stable';
+  }
   let title, sub;
   switch (nowState) {
     case 'material_change':
@@ -57034,7 +57263,13 @@ function _intv5MattersStories(core, skipRoots, intel) {
 }
 function _intv5MattersHtml(core, esc, depth, skipRoots, intel) {
   const sel = _intv5MattersStories(core, skipRoots, intel);
-  const cards = sel.stories.map(st => _intv4StoryHtml(st, esc, depth)).filter(Boolean);
+  // A2 — qué hechos publica ya el destino del contador. Los que coinciden se
+  // titulan aquí por su SIGNIFICADO y llevan el hecho como evidencia de apoyo,
+  // para que la misma frase no salga dos veces en la misma pantalla.
+  const publishedKeys = new Set(((core && core.findings) || []).map(f => f.semanticKey));
+  const cards = sel.stories
+    .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
+    .filter(Boolean);
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
              data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}">
@@ -57134,14 +57369,29 @@ function _renderIntelligenceCommandCenter() {
   } catch (_) { intel = null; }
   const score   = _intccHealthScore(snap, null, intel);
   _intelLastRun = intel;
+  // ── A2 · SE MARCA POR IMPRESIÓN, NO POR PINTURA ──────────────────────────
   // Se registra que la pregunta SE MOSTRÓ, no que se respondió: es lo que hace que
   // no vuelva a aparecer en cada recarga aunque el usuario la ignore.
+  //
+  // Pero corría en CADA pintura del tab, y cada pasada escribía el contexto y
+  // disparaba un push a `intelligence_context`. Repintar no es una impresión
+  // nueva: la pregunta es la misma, el usuario la ha visto una vez, y lo único
+  // que añadían las demás pasadas era escritura local y tráfico de red. Es
+  // IDEMPOTENTE por id dentro de la sesión, así que la primera impresión cuenta
+  // y las repinturas no cuentan nada.
   try {
-    if (intel && intel.questions && intel.questions[0] && typeof _aurixIntelMarkAsked === 'function') {
-      _aurixIntelMarkAsked(intel.questions[0].id, {});
+    const _qid = (intel && intel.questions && intel.questions[0]) ? String(intel.questions[0].id) : null;
+    if (_qid && _qid !== _intelMarkedQuestionId && typeof _aurixIntelMarkAsked === 'function') {
+      _intelMarkedQuestionId = _qid;
+      _aurixIntelMarkAsked(_qid, {});
     }
   } catch (_) {}
-  const reading = _intv5Reading(core, score, snap, intel);
+  // A2 — UNA SOLA LISTA, DOS CONSUMIDORES. Se calcula aquí, antes del hero, y la
+  // misma longitud alimenta el titular y el destino. `_intv4ChangedHtml` recorre
+  // la misma función pura con la misma entrada, así que no hay dos derivaciones
+  // que puedan desmentirse.
+  const findingCount = (typeof _intv4FindingRows === 'function') ? _intv4FindingRows(core).length : 0;
+  const reading = _intv5Reading(core, score, snap, intel, findingCount);
   const chips   = _intv5Chips(core, score);
   const intelQ  = (intel && intel.questions && intel.questions[0]) || null;
   // La pregunta NUNCA se gatea: pedirle trabajo al usuario y no devolverle nada es
@@ -57168,6 +57418,22 @@ function _renderIntelligenceCommandCenter() {
           esc(_intv4T('intel_q_pause'))}</button>
       </div>`;
   })() : '';
+  // ── A2 · TRAZABILIDAD — «VER CAMBIOS ↓» ──────────────────────────────────
+  // Si Aurix dice que ha visto N cosas, el usuario no puede quedarse sin saber
+  // cuáles. No hace falta un modal ni una página nueva: un enlace discreto que
+  // navega al destino y le mueve el FOCO, que es lo que lo hace utilizable con
+  // teclado en vez de un scroll decorativo. Se pinta SÓLO si hay lista que ver,
+  // así que no puede quedar un control que no lleve a ninguna parte.
+  // Se emite en los DOS heroes (el de escritorio y el de móvil), que son
+  // mutuamente excluyentes por CSS. A diferencia de la pregunta, aquí no hay
+  // estado ni identidad que pueda actuarse dos veces: es un ENLACE, la delegación
+  // resuelve por `closest` y los dos apuntan al mismo destino. Se marca la
+  // variante para que el gate y la QA puedan distinguirlos.
+  const seeChanges = (variant) => findingCount > 0 ? `
+      <a class="intv12-see-changes" href="#aurix-intel-changes" data-intel-see-changes="${esc(variant)}"
+         data-count="${findingCount}">${esc(_intv4T('intel_see_changes', findingCount))}</a>` : '';
+  const seeChangesHtml = seeChanges('desktop');
+  const seeChangesMobileHtml = seeChanges('mobile');
   const heroHtml = `
     <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}"
              data-state="${esc(reading.state)}"
@@ -57189,7 +57455,7 @@ function _renderIntelligenceCommandCenter() {
           <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
           <p class="intcc-hero-sub">${esc(reading.sub)}</p>
           ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
-          ${intelQHtml}
+          ${seeChangesHtml}
         </div>
         <div class="intcc-hero-orb-wrap">${_intccOrbHtml()}</div>
       </div>
@@ -57203,7 +57469,7 @@ function _renderIntelligenceCommandCenter() {
         <h3 class="intcc-card-title">${esc(t('intcc_eyebrow'))}</h3>
         <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
         <p class="intcc-m-hero-hint">${esc(reading.sub)}</p>
-        ${intelQHtml}
+        ${seeChangesMobileHtml}
       </div>
       <div class="intcc-m-orb">${_intccOrbHtml()}</div>
     </section>`;
@@ -57226,6 +57492,27 @@ function _renderIntelligenceCommandCenter() {
         </ul>` : ''}
         </div>
     </section>`;
+
+  // ── A2 · LA PREGUNTA, UN SOLO NODO ───────────────────────────────────────
+  // Se emitía DOS VECES —dentro del hero de escritorio y dentro del de móvil—
+  // con los mismos `data-intel-q` y los mismos botones, y CSS escondía uno. Dos
+  // nodos con la misma identidad en el DOM es una trampa: cualquier delegación
+  // que enlace por atributo actúa sobre el que encuentra primero.
+  //
+  // Ahora es UNA card independiente y condicional. Y no vuelve dentro del hero:
+  // el SPEC exige demostrar antes que la dock no choca con el halo de la esfera,
+  // que no comprime Salud y que aguanta la copy ES/EN más larga — y eso no se
+  // puede demostrar con fixtures locales. Mantenerla dentro por fe sería
+  // exactamente la clase de suposición que este trabajo existe para eliminar.
+  // Fuera, la composición del hero no puede romperse, y la card es reversible.
+  //
+  // Su sitio en móvil es el que pidió el founder: Hero → Salud → Pregunta →
+  // Radar. Lo decide `order` en `≤1023px`, declarado en styles.css — sin él se
+  // pintaría ANTES del hero, que es la invariante que ya nos costó una vez.
+  const intelQCardHtml = intelQHtml ? `
+    <section class="intcc-card intv12-qcard" data-state="question">
+      ${intelQHtml}
+    </section>` : '';
 
   // ── COGNITIVE ORDER (SPEC §14) ───────────────────────────────────────────
   //   ORIENTACIÓN (hero) → COMPRENSIÓN (radar) → DIAGNÓSTICO (factores) →
@@ -57322,6 +57609,7 @@ function _renderIntelligenceCommandCenter() {
       ${heroHtml}
       ${mHeroHtml}
       ${mHealthHtml}
+      ${intelQCardHtml}
       ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
@@ -57381,9 +57669,36 @@ function _intccAnimateScoreRings(root) {
   });
 }
 
+// ── A2 · «VER CAMBIOS ↓» — NAVEGACIÓN CON FOCO ─────────────────────────────
+// Un `href="#id"` ya salta sin JavaScript, y eso es el suelo: si esto falla, el
+// enlace sigue funcionando. Lo que añade la delegación es el desplazamiento suave
+// y —lo importante— MOVER EL FOCO al encabezado del destino, porque un salto que
+// no mueve el foco deja al teclado y al lector de pantalla donde estaban: el
+// usuario "llega" visualmente a un sitio en el que no está.
+// Delegación única en la raíz, sin listeners por nodo, y `preventDefault` sólo
+// cuando el destino existe de verdad.
+function _initIntelSeeChanges(root) {
+  if (!root || root.__aurixSeeChangesBound) return;
+  root.__aurixSeeChangesBound = true;
+  root.addEventListener('click', (ev) => {
+    try {
+      const a = ev.target && ev.target.closest ? ev.target.closest('[data-intel-see-changes]') : null;
+      if (!a) return;
+      const dest = document.getElementById('aurix-intel-changes');
+      if (!dest) return;                       // sin destino no se intercepta nada
+      ev.preventDefault();
+      try { dest.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }); }
+      catch (_) { dest.scrollIntoView(); }
+      const h = document.getElementById('aurix-intel-changes-title') || dest;
+      try { h.focus({ preventScroll: true }); } catch (_) { try { h.focus(); } catch (_) {} }
+    } catch (_) {}
+  });
+}
+
 function _initIntelligenceCommandCenter() {
   try {
     const root = document.querySelector('.aurix-intcc');
+    try { _initIntelSeeChanges(root); } catch (_) {}
     if (root && !root.classList.contains('is-empty')) {
       requestAnimationFrame(() => root.classList.add('is-revealed'));
       _intccAnimateScoreRings(root);

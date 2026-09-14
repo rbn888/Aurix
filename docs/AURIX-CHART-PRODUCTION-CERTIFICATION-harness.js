@@ -141,7 +141,11 @@ console.log('\nH) history validation (trust floor + sanitation + honest suppress
    '_AURIX_HPQ_FUTURE_MS', '_AURIX_HPQ_SPIKE_JUMP', '_AURIX_HPQ_SPIKE_REVERT_FRAC', '_AURIX_HPQ_MIN_POINTS', '_AURIX_EMG_RANGE_MS',
    '_AURIX_EMG_ADJ_JUMP', '_AURIX_EMG_FALLBACK_TAIL', '_AURIX_CHART_24H_FE_AUTHORITY', '_AURIX_CHART_EPOCH_TRUST',
   ].forEach(c => { try { vm.runInContext(konstSrc(c), hCtx); } catch (_) {} });
-  ['_aurixInvestableChartEpoch', '_aurixPortfolioEpoch', '_aurixTrustedChartSource', '_aurixSourceFamily',
+  // A1 — el epoch efectivo es `max(servidor, local)`. En un sandbox sin fila
+  // remota el valor es 0, que es exactamente el comportamiento de hoy: el módulo
+  // lo declara como `let`, así que hay que publicarlo en el contexto.
+  vm.runInContext('var _aurixRemotePortfolioEpochMs = 0;', hCtx);
+  ['_aurixInvestableChartEpoch', '_aurixLocalPortfolioEpoch', '_aurixPortfolioEpoch', '_aurixTrustedChartSource', '_aurixSourceFamily',
    '_aurixApplyRangeSourceAuthority', '_aurix24hSourceCoverage', '_aurixHpqIso', '_aurixHpqDiag', '_aurixHpqRawStages',
    '_aurixHpqQuarantineSpikes', '_aurixHpqTrimConstruction', '_aurixProdPlateauFilter',
    '_aurixHpqFirstInvalidStage', '_aurixHpqRangesContaining', 'buildValidatedHistoricalSeries',

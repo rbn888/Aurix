@@ -70,7 +70,7 @@ const _aurixCapitalFlowsPush   = (list) => { PUSHED.push(...(list || [])); retur
 // las filas DERIVADAS que duplican una fila de usuario (defecto D-1). Se inyectan
 // los owners reales, no un sustituto: lo que se certifica aquí sigue siendo el
 // código de producción.
-const _aurixLoadCapitalFlowsLive = new Function('localStorage', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
+const _aurixLoadCapitalFlowsLive = new Function('localStorage', '_aurixLocalPortfolioEpoch', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
   fnSource('_aurixLoadCapitalFlowsLive') + '\n;return _aurixLoadCapitalFlowsLive;')(
     { getItem: () => JSON.stringify(FLOWS) }, () => 0, 'aurixCapitalFlows');
 const _aurixFlowIsDerived = new Function(fnSource('_aurixFlowIsDerived') + '\n;return _aurixFlowIsDerived;')();

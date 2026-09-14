@@ -92,7 +92,7 @@ function makeCtx(opts) {
   // el ledger llegaría vacío y la neutralización no se estaría certificando.
   ['_aurixPointValuationIncomplete','_aurixFlowIsInternal',
    '_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
-   '_aurixFlowDuplicateIds','_aurixLoadCapitalFlows',
+   '_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixLoadCapitalFlows',
    '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain',
    '_aurixFlowCounterpartObserved','_aurixInvestablePerformance']
     .forEach(n => vm.runInContext(fnSrc(n), sb));

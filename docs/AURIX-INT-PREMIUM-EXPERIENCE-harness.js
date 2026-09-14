@@ -129,7 +129,7 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT'];
-const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -193,7 +193,16 @@ function makeCtx(opts) {
   // la evidencia que en producción aporta el observador de linaje. Los casos
   // adversariales las anulan con `o.lineage` / `o.flowsComplete`.
   sb._aurixCapitalFlowsComplete = () => (o.flowsComplete === undefined ? true : !!o.flowsComplete);
+  // Reserva declarada: en PRODUCCIÓN este predicado arranca CERRADO
+  // (`_aurixCapitalFlowsIncomplete = true` hasta el primer pull completo). Aquí se
+  // abre por defecto para poder llegar a lo que estas pruebas certifican, y el
+  // arranque cerrado se fija abajo sobre el fuente, no sobre el sandbox.
   sb.__lineage = (o.lineage === undefined) ? { since: 0, entries: [] } : o.lineage;
+  // A1 — la cobertura de linaje es de la CUENTA, no del dispositivo: sin la
+  // columna remota leída, la validez de clasificación es DESCONOCIDA y la
+  // transición se suprime. Aquí se declara vista salvo que el caso la niegue,
+  // que es la precondición equivalente a tener el SQL aplicado en producción.
+  vm.runInContext('var _aurixLineageColumnSeen = ' + ((o.lineageAccountWide === false) ? 'false' : 'true') + ';', sb);
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   if (o.flows) vm.runInContext('__store[_AURIX_CAPITAL_FLOWS_KEY] = ' + JSON.stringify(JSON.stringify(o.flows)), sb);
@@ -300,9 +309,20 @@ console.log('\n2 · The Brief is 3–5 stories with DISTINCT causal roots:');
   ok('2.4 each story leads with one conclusion', (html.match(/class="intv4-story-head"/g) || []).length === roots.length);
   ok('2.5 "why it matters" appears at most once per story',
     (html.match(/class="intv4-story-why"/g) || []).length <= roots.length);
+  // A2 · RE-DECIDIDO. El invariante es ESTRUCTURAL: una evidencia de apoyo va
+  // ANIDADA, nunca como card hermana. Exigir además que EXISTA al menos un
+  // desplegable fijaba una propiedad de la fixture, y desde A2 un hecho que el
+  // destino del contador ya publica no se repite aquí ni dentro del desplegable —
+  // así que una cartera cuyos apoyos son todos hallazgos legítimamente no tiene
+  // ninguno. Lo que sí se añade es que no quede un desplegable VACÍO: un control
+  // que no abre nada es un hueco reservado con otro nombre.
   ok('2.6 supporting facts are nested behind progressive disclosure, not new cards',
     !/class="intcc-card[^"]*"[^>]*>\s*<[^>]*class="intv4-sup/.test(html)
-    && (html.match(/class="intv4-more"/g) || []).length >= 1);
+    && ((html.match(/class="intv4-sup"/g) || []).length === 0
+        || (html.match(/class="intv4-more"/g) || []).length >= 1)
+    && !/class="intv4-more"[\s\S]{0,200}<\/details>/.test(html.replace(/class="intv4-sup"/g, 'X')),
+    JSON.stringify({ sup: (html.match(/class="intv4-sup"/g) || []).length,
+                     more: (html.match(/class="intv4-more"/g) || []).length }));
   // INT.05 — the Brief now occupies the restored cockpit slot; the invariant is
   // unchanged: ONE section, stories nested inside it, never sibling cards.
   ok('2.7 the Brief is one section, not a wall of cards',
@@ -1057,10 +1077,17 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
       return !/is-accruing/.test(m) && /intcc-tl-item/.test(m)
         && /data-fact="investable_/.test(m); })(),
     section(dipped.html, 'intcc-timeline').slice(0, 300));
+  // A2 · RE-DECIDIDO. El invariante es que la Memoria publica NIVEL en divisa y
+  // NUNCA un porcentaje; qué hito concreto le queda depende de la cartera, y con
+  // la precedencia invertida el CAMBIO de nivel vive en el destino del contador
+  // mientras el MÁXIMO —que es el hito— sigue aquí. Fijar una frase concreta era
+  // fijar la fixture, no el contrato.
   ok('15.9 y lo que publica es NIVEL con su fecha, nunca un porcentaje',
     (() => { const m = section(dipped.html, 'intcc-timeline');
-      const item = m.slice(m.indexOf('intcc-tl-item'), m.indexOf('</ul>'));
-      return /patrimonio invertible/.test(item) && !/%/.test(item); })(),
+      const i = m.indexOf('intcc-tl-item');
+      if (i < 0) return false;                                  // la Memoria no puede quedarse muda aquí
+      const item = m.slice(i, m.indexOf('</ul>'));
+      return /data-fact="investable_/.test(item) && !/%/.test(item); })(),
     section(dipped.html, 'intcc-timeline').slice(0, 600));
   ok('15.10 un usuario NUEVO conserva el estado honesto de siempre',
     /intv4-memory is-accruing/.test(young.html) &&
@@ -1145,7 +1172,11 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
 {
   // Reproduce la forma del caso real: una subida de nivel material y sostenida.
   const RISEN = {
-    rows: inv([120000, 128000, 134000, 141000, 148000, 152000, 156000, 158000, 160818, 160818]),
+    // El último punto tiene que ser el máximo ESTRICTO. Con la cola duplicada
+    // (…160818, 160818) `peakIdx` era el PRIMERO de los dos, así que no había
+    // máximo histórico y la cartera no tenía NINGÚN hito: la fixture era
+    // degenerada, no el contrato. Una subida real acaba en su punto más alto.
+    rows: inv([120000, 128000, 134000, 141000, 148000, 152000, 156000, 158000, 160818, 161500]),
     flows: [], serverRows: srvHistory(NOW, 10, { crypto: 31000, stock: 40000, liquidity: 29000 },
                                                { crypto: 39000, stock: 40000, liquidity: 21000 }),
     assets: LOPSIDED, snap: SNAP, drivers: DRIVERS,
@@ -1161,48 +1192,67 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
   const factsIn = html => (html.match(/data-fact="([\w]+)"/g) || []).map(m => m.slice(11, -1));
   const rootsIn = html => (html.match(/data-root="([\w]+)"/g) || []).map(m => m.slice(11, -1));
 
-  ok('16.1 el hecho del caso real EXISTE y lo reclama la Memoria (es un hito, no una novedad)',
-    claims.keys.indexOf('investable_level_change') !== -1 &&
-    claims.roots.indexOf('wealth_level') !== -1 &&
-    /data-fact="investable_level_change"/.test(memHtml),
-    JSON.stringify(claims));
-  ok('16.2 y por tanto Qué ha cambiado NO lo republica',
-    !/investable_level_change/.test(chgHtml),
+  // ── A2 · SE INVIERTE LA PRECEDENCIA, y la razón importa ──────────────────
+  // El defecto original (el MISMO hecho en Memoria y en Qué ha cambiado) sigue
+  // prohibido. Lo que cambia es QUIÉN cede. Antes cedía «Qué ha cambiado», y eso
+  // se resolvía SUPRIMIENDO filas en el destino de un número que el hero acababa
+  // de anunciar: el contador quedaba sin respaldo y el usuario sin saber qué eran
+  // esas N cosas. Ahora manda la lista canónica —el hero ha hecho una promesa
+  // sobre ella— y la Memoria cede el hecho, NO su razón de ser: conserva los
+  // hitos con fecha (el máximo observado) y lo que el usuario DECLARÓ, que es lo
+  // único que ninguna otra superficie puede saber.
+  ok('16.1 un CAMBIO de nivel es un hallazgo del contador, no un hito de la Memoria',
+    (() => { return (cr.findings || []).some(f => f.semanticKey === 'investable_level_change')
+        && claims.keys.indexOf('investable_level_change') === -1
+        && !/data-fact="investable_level_change"/.test(memHtml); })(),
+    JSON.stringify({ claims: claims.keys, findings: (cr.findings || []).map(f => f.semanticKey) }));
+  ok('16.2 y el destino del contador SÍ lo publica, con su identidad de hallazgo',
+    /data-finding="[^"]+"/.test(chgHtml)
+    && /data-finding="[^"]*"/.test(chgHtml)
+    && (chgHtml.match(/intv4-chg /g) || []).length >= 1,
     chgHtml.slice(0, 300));
   ok('16.3 SIN el contrato, el MISMO hecho sale en las dos superficies (no-vacuidad)',
     /investable_level_change/.test(chgNoClaims) ||
     rootsIn(chgNoClaims).indexOf('wealth_level') !== -1,
     chgNoClaims.slice(0, 500));
-  ok('16.4 la exclusión es por TIPO/HECHO/RAÍZ, nunca comparando textos renderizados',
-    (() => { const src = fnSrc('_intv4ChangedHtml');
-      return /claimedKeys\.has\(x\.w\.semanticKey\)/.test(src)
-        && /claimedRoots\.has\(x\.w\.causalRoot\)/.test(src)
-        && !/toLowerCase\(\)|replace\(\/\[\^a-z0-9\]/.test(src); })());
-  ok('16.5 ni una clave ni una raíz compartida entre las dos superficies',
-    (() => { const mf = factsIn(memHtml), cf = factsIn(chgHtml).concat(rootsIn(chgHtml));
-      const mr = claims.roots;
-      return mf.length >= 1 && mf.every(k => cf.indexOf(k) === -1)
-        && mr.every(r => rootsIn(chgHtml).indexOf(r) === -1); })(),
-    JSON.stringify({ mem: factsIn(memHtml), chgRoots: rootsIn(chgHtml) }));
-  ok('16.6 si queda otro cambio material DISTINTO, se publica (no se silencia el bloque)',
-    (() => { const roots = rootsIn(chgHtml);
-      return roots.length === 0 || roots.every(r => claims.roots.indexOf(r) === -1); })(),
-    JSON.stringify(rootsIn(chgHtml)));
+  ok('16.4 la exclusión es por CLAVE DE HECHO, nunca comparando textos renderizados',
+    (() => { const src = fnSrc('_intv4MemoryEvents');
+      return /findingKeys\.has\(f\.semanticKey\)/.test(src)
+        && !/toLowerCase\(\)|replace\(\/\[\^a-z0-9\]/.test(src); })(),
+    fnSrc('_intv4MemoryEvents').slice(0, 200));
+  // NINGÚN HECHO COMPARTIDO. La RAÍZ sí puede compartirse, y ahí está la
+  // diferencia: «tu nivel ha subido 40.818 US$ desde el 18 ago» (cambio) y «tu
+  // máximo observado sigue siendo el del 3 sep» (hito) son la misma raíz y dicen
+  // cosas distintas. Prohibir la raíz vaciaba la Memoria entera para evitar una
+  // repetición que ya no existe.
+  // NO-VACUIDAD. Sin ella la prueba pasa cuando la Memoria queda VACÍA, que es
+  // exactamente la regresión que invertir la precedencia arriesga. `RISEN` está en
+  // máximos por construcción (la serie termina en su punto más alto), así que
+  // `investable_all_time_high` EXISTE y la Memoria tiene que publicarlo: si algún
+  // día la Memoria se queda muda, esta prueba lo dice.
+  ok('16.5 ninguna CLAVE DE HECHO se publica en las dos superficies — y la Memoria NO queda vacía',
+    (() => { const mf = factsIn(memHtml), cf = factsIn(chgHtml);
+      return mf.length >= 1 && cf.length >= 1 && mf.every(k => cf.indexOf(k) === -1); })(),
+    JSON.stringify({ mem: factsIn(memHtml), chg: factsIn(chgHtml) }));
+  // Se compara contra el CORE, no contra el atributo que pinta la propia card:
+  // comparar dos lecturas del mismo array no puede fallar nunca.
+  ok('16.6 el destino publica EXACTAMENTE los hallazgos del Core (no se silencia ninguno)',
+    (() => { const rows = (chgHtml.match(/intv4-chg /g) || []).length;
+      const fromCore = run('_intv4FindingRows(__core).length', c);
+      return rows === fromCore && fromCore === (cr.findings || []).length; })(),
+    JSON.stringify({ rows: (chgHtml.match(/intv4-chg /g) || []).length,
+                     core: (cr.findings || []).length }));
   // Y si NO queda ninguno, el estado es honesto y no se fabrica un segundo hecho.
-  ok('16.7 sin otro cambio material se dice "no hay OTROS", y no se inventa un relleno',
-    (() => { const only = { ledger: cr.ledger, whatChanged: (cr.whatChanged || [])
-        .filter(w => w.semanticKey === 'investable_level_change'),
+  // A2 — este estado nacía de la SUPRESIÓN («había cambios, pero otra superficie
+  // los publica»), y la supresión es justo lo que se ha retirado. Lo que queda
+  // por comprobar es lo que de verdad importa: sin hallazgos NO HAY SUPERFICIE y
+  // tampoco relleno fabricado.
+  ok('16.7 sin hallazgos no hay card ni relleno inventado',
+    (() => { const empty = { ledger: { facts: [], gaps: [] }, findings: [], whatChanged: [],
         dataAvailability: cr.dataAvailability };
-      c.__only = only;
-      // RE-DECIDIDO · STABILIZATION V1: «no hay OTROS cambios» sigue siendo el
-      // estado correcto y distinto, pero YA NO SE DICE EN PANTALLA — no merece
-      // superficie. Se comprueba en el estado que publica el owner, y que no se
-      // inventa ningún relleno.
-      const r7 = run('_intv4ChangedHtml(__only, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
-      return r7.state === 'intv4_changed_others_none'
-        && r7.html === ''
-        && (r7.html.match(/intv4-chg /g) || []).length === 0; })(),
-    JSON.stringify(run('_intv4ChangedHtml(__core, _intccEsc, [], ' + JSON.stringify(claims) + ')', c).state));
+      c.__empty = empty;
+      const r7 = run('_intv4ChangedHtml(__empty, _intccEsc, [], ' + JSON.stringify(claims) + ')', c);
+      return r7.html === '' && r7.count === 0 && (r7.html.match(/intv4-chg /g) || []).length === 0; })());
   ok('16.8 la selección de la Memoria es un OWNER puro y determinista, no lógica de renderer',
     (() => { const a = run('JSON.stringify(_intv4MemoryClaims(__core, []))', c);
       const b = run('JSON.stringify(_intv4MemoryClaims(__core, []))', c);
@@ -1215,8 +1265,10 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
     /_intv4ChangedHtml\(core, esc, publishedKeys, memoryClaims\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
   // Cada superficie conserva su propósito: la Memoria sigue fechando, y Qué ha
   // cambiado sigue siendo una lista de novedades con dirección.
-  ok('16.11 cada superficie conserva su propósito (Memoria fecha; cambios llevan dirección)',
-    /intcc-tl-date/.test(memHtml) && (/is-up|is-down|is-flat/.test(chgHtml) || !/intv4-chg-list/.test(chgHtml)));
+  ok('16.11 cada superficie conserva su propósito (Memoria: hito CON fecha; cambios: dirección)',
+    /intcc-tl-item/.test(memHtml) && /intcc-tl-date/.test(memHtml)
+    && /is-up|is-down|is-flat/.test(chgHtml),
+    JSON.stringify({ hasItem: /intcc-tl-item/.test(memHtml), hasDate: /intcc-tl-date/.test(memHtml) }));
   ok('16.12 y ningún cálculo financiero se ha tocado en este arreglo',
     !/investableValue|assetValueUSD|_aurixTwrChain|returnPct \*/.test(fnSrc('_intv4ChangedHtml') + fnSrc('_intv4MemoryEvents') + fnSrc('_intv4MemoryClaims')));
 }

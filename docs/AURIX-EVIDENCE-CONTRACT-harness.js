@@ -56,7 +56,7 @@ const FNS = ['toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBuc
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixFlowIntentOf',
   '_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
-  '_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixLoadCapitalFlows','_aurixSaveCapitalFlows',
+  '_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixLoadCapitalFlows','_aurixSaveCapitalFlows',
   '_aurixNewFlowId','_aurixCaptureFlow','_aurixPurgeDerivedFlows',
   '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixFlowCounterpartObserved',
   '_aurixInvestablePerformance','_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct',
@@ -102,6 +102,11 @@ function makeCtx(opts) {
   // Cobertura de linaje: por defecto CUBRE toda la historia y sin cambios, que es
   // el estado de una cuenta cuyo linaje se observa desde antes de la ventana.
   sb.__lineage = (o.lineage === undefined) ? { since: 0, entries: [] } : o.lineage;
+  // A1 — la cobertura de linaje es de la CUENTA, no del dispositivo: sin la
+  // columna remota leída, la validez de clasificación es DESCONOCIDA y la
+  // transición se suprime. Aquí se declara vista salvo que el caso la niegue,
+  // que es la precondición equivalente a tener el SQL aplicado en producción.
+  vm.runInContext('var _aurixLineageColumnSeen = ' + ((o.lineageAccountWide === false) ? 'false' : 'true') + ';', sb);
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   if (o.flows) vm.runInContext('__store[_AURIX_CAPITAL_FLOWS_KEY] = ' + JSON.stringify(JSON.stringify(o.flows)), sb);
@@ -183,6 +188,19 @@ console.log('1 · Una transición histórica sólo se publica si sus dos extremo
     !noLineage.ledger.facts.some(x => x.semanticKey === 'exposure_drift_etf_7D')
     && !!ng && /classification_validity_unknown/.test(String(ng.reason)), JSON.stringify(ng));
 
+  // Y el caso que la revisión destapó: cobertura de DISPOSITIVO presentada como
+  // cobertura de CUENTA. Sin la columna remota el linaje nunca sincroniza, así que
+  // un portátil con meses de observación propia no sabe nada de la reclasificación
+  // que hizo OTRO dispositivo. Falla cerrado.
+  const deviceOnly = core(Object.assign({}, etfGone, { lineageAccountWide: false,
+      lineage: { since: 0, entries: [] } }), { ranges: ['7D'] });
+  const dg = deviceOnly.ledger.gaps.find(g => g.semanticKey === 'exposure_drift_etf_7D');
+  ok('1.5b cobertura sólo DE ESTE DISPOSITIVO ⇒ validez desconocida y transición suprimida',
+    !deviceOnly.ledger.facts.some(x => x.semanticKey === 'exposure_drift_etf_7D')
+    && !!dg && /classification_validity_unknown/.test(String(dg.reason)), JSON.stringify(dg));
+  ok('1.5c y el desalojo por tope encoge la cobertura declarada (no se afirma sobre evidencia tirada)',
+    /out\.length > kept\.length/.test(fnSrc('_aurixLineageMerge'))
+    && /since = Math\.max\(Number\(since\) \|\| 0, Number\(kept\[0\]\.at\)\)/.test(fnSrc('_aurixLineageMerge')));
   const lateLineage = core(Object.assign({}, etfGone, { lineage: { since: endTs - 2 * DAY, entries: [] } }), { ranges: ['7D'] });
   ok('1.6 cobertura que EMPIEZA DENTRO de la ventana no cubre su inicio ⇒ igualmente suprimida',
     !lateLineage.ledger.facts.some(x => x.semanticKey === 'exposure_drift_etf_7D'));
@@ -243,9 +261,42 @@ console.log('\n2 · El mismo hecho económico no puede contarse dos veces:');
   ok('2.2 D-1 · la lectura CANÓNICA excluye del consumo la fila DERIVADA, no la de usuario',
     canon.length === 1 && canon[0].kind === 'deposit' && canon[0].source === 'user',
     JSON.stringify(canon.map(f => f.kind + '/' + f.source)));
-  ok('2.3 D-1 · C11: el flujo del intervalo cae EXACTAMENTE el importe del depósito (100000 → 50000)',
+  // C11 · LO QUE ESTA FIXTURE DEMUESTRA Y LO QUE NO. Demuestra que la lectura
+  // canónica retira EXACTAMENTE el importe de la gemela. NO demuestra que las
+  // cuentas reales ya contaminadas queden curadas: eso depende de si sus filas
+  // derivadas cumplen el predicado, y sólo se puede medir en la cuenta real.
+  ok('2.3 D-1 · el flujo consumido cae EXACTAMENTE el importe de la gemela (100000 → 50000)',
     live.reduce((s, f) => s + f.amountUSD, 0) - canon.reduce((s, f) => s + f.amountUSD, 0) === 50000);
   ok('2.4 D-1 · el duplicado queda AUDITADO, no silenciado', rep.excluded === 1 && rep.total === 2);
+  // Los tres casos que el join ANTERIOR dejaba escapar, porque incluía el importe
+  // redondeado en la clave. Cada uno acababa con el MISMO depósito neutralizado
+  // dos veces en el paso 4 de `_aurixInvestablePerformance`.
+  ok('2.4a FX · la gemela convertida con otro tipo de cambio SÍ se empareja (el importe sale de la clave)',
+    (() => { const c = makeCtx({ flows: [
+        { id: 'flw_eur', ts: tsDep, amountUSD: 21740.55, kind: 'deposit', source: 'user',
+          assetId: 'eur', amount: 20000, currency: 'EUR', revision: 1 },
+        { id: 'asset_add:eur:' + tsDep + ':21619', ts: tsDep, originalTs: tsDep, amountUSD: 21618.90,
+          kind: 'asset_add', source: 'tx-backfill', assetId: 'eur', revision: 1 } ] });
+      const canon = run('_aurixLoadCapitalFlows()', c);
+      return canon.length === 1 && canon[0].source === 'user'; })());
+  ok('2.4b EDICIÓN · la gemela que conserva el importe viejo también se empareja',
+    (() => { const c = makeCtx({ flows: [
+        { id: 'flw_ed', ts: tsDep, amountUSD: 70000, kind: 'deposit', source: 'user',
+          assetId: 'eur', revision: 2 },
+        { id: 'asset_add:eur:' + tsDep + ':50000', ts: tsDep, originalTs: tsDep, amountUSD: 50000,
+          kind: 'asset_add', source: 'tx-backfill', assetId: 'eur', revision: 1 } ] });
+      return run('_aurixLoadCapitalFlows()', c).length === 1; })());
+  ok('2.4c LEGACY · una derivada SIN `originalTs` no se puede emparejar: no se excluye, pero BLOQUEA el importe',
+    (() => { const c = makeCtx({ flows: [
+        { id: 'flw_l', ts: tsDep, amountUSD: 30000, kind: 'deposit', source: 'user', assetId: 'eur', revision: 1 },
+        { id: 'legacy', ts: tsDep + 3 * MIN, amountUSD: 30000, kind: 'asset_add',
+          source: 'tx-backfill', assetId: 'eur', revision: 1 } ] });
+      const canon = run('_aurixLoadCapitalFlows()', c);
+      const rep = run('_aurixFlowDuplicateReport()', c);
+      const auth = run('_aurixCashLedgerAuthority(' + (tsDep - DAY) + ',' + (tsDep + DAY) + ')', c);
+      return canon.length === 2 && rep.unpairableDerived === 1
+        && auth.amountPublishable === false
+        && auth.gaps.indexOf('duplicate_flow_identity') !== -1; })());
   ok('2.5 la coincidencia exige `originalTs` EXACTO: un importe igual en otro instante NO es duplicado',
     (() => { const c2 = makeCtx({ flows: [dupLedger[0],
         Object.assign({}, dupLedger[1], { originalTs: tsDep + 5 * MIN, id: 'other' })] });
@@ -319,6 +370,11 @@ console.log('\n3 · «Has aportado X de capital nuevo» sólo puede decirse si X
     a5.amountPublishable === false && a5.gaps.indexOf('duplicate_flow_identity') !== -1,
     JSON.stringify(a5.gaps));
 
+  ok('3.7b el predicado de completitud arranca CERRADO para una sesión autenticada',
+    /let _aurixCapitalFlowsIncomplete = true;/.test(app)
+    && /return !_aurixCapitalFlowsIncomplete;/.test(fnSrc('_aurixCapitalFlowsComplete')));
+  ok('3.7c …y exime a la sesión ANÓNIMA, como su hermano `_aurixSourceSetComplete`',
+    /currentUser && currentUser\.id\)\)\s*return true;/.test(fnSrc('_aurixCapitalFlowsComplete')));
   ok('3.8 la intención LEGACY (sin campo) se lee como UNKNOWN_LEGACY y jamás como externa',
     (() => { const c = makeCtx({});
       return run("_aurixFlowIntentOf({ kind: 'deposit' })", c) === 'UNKNOWN_LEGACY'
@@ -472,6 +528,14 @@ console.log('\n6 · El epoch es de la CUENTA, y nada de esto puede filtrarse ent
     /_aurixEpochColumnSeen\) \{/.test(app) && /hasOwnProperty\.call\(remoteRow, 'portfolio_epoch_ms'\)/.test(app));
   ok('6.4 y entra en el desnudado defensivo del upsert, con el núcleo financiero a salvo',
     /portfolio_epoch_ms, portfolio_epoch_updated_at,[\s\S]{0,120}\.\.\.core \} = payload/.test(app));
+  ok('6.4b el epoch REMOTO se reinicia al cambiar de cuenta (vive a nivel de módulo y sobrevivía a la purga)',
+    (() => { const src = fnSrc('_aurixEnforceCacheOwner');
+      return /_aurixRemotePortfolioEpochMs = 0;/.test(src)
+        && /_aurixEpochColumnSeen = false;/.test(src)
+        && /_aurixLineageColumnSeen = false;/.test(src); })(),
+    fnSrc('_aurixEnforceCacheOwner').slice(-400));
+  ok('6.4c un epoch FUTURO no es autoridad: se ignora (un reloj adelantado ocultaría toda la historia)',
+    /_re <= _nowMs \+ 6 \* 3600000/.test(app));
   ok('6.5 el mapa de buckets y la bitácora de linaje son claves POR USUARIO (se purgan al cambiar de cuenta)',
     /'aurix_asset_bucket_map_v1', 'aurix_asset_lineage_v1'/.test(app));
   ok('6.6 el observador de linaje corre en la entrada UNIVERSAL de persistencia, una sola vez',

@@ -67,7 +67,7 @@ const _aurixLoadCapitalFlowsRaw = () => FLOWS.slice();
 const _aurixCapitalFlowsPush    = () => true;
 // A1 — lectura canónica = lectura VIVA menos las filas derivadas que duplican una
 // fila de usuario (defecto D-1). Owners reales inyectados, sin sustitutos.
-const _aurixLoadCapitalFlowsLive = new Function('localStorage', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
+const _aurixLoadCapitalFlowsLive = new Function('localStorage', '_aurixLocalPortfolioEpoch', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
   fnSource('_aurixLoadCapitalFlowsLive') + '\n;return _aurixLoadCapitalFlowsLive;')(
     { getItem: () => JSON.stringify(FLOWS) }, () => 0, 'aurixCapitalFlows');
 const _aurixFlowIsDerived = new Function(fnSource('_aurixFlowIsDerived') + '\n;return _aurixFlowIsDerived;')();

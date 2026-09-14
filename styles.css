@@ -20519,6 +20519,52 @@ body.gs-open { overflow: hidden; }
 /* ── Bloque 6 — Explore (inline) ── */
 .intcc-explore-hint { margin: -6px 0 14px; font-size: 12px; color: var(--text-muted); }
 .intcc-explore-list { display: flex; flex-direction: column; gap: 8px; }
+/* ════════════════════════════════════════════════════════════════════════════
+   SPEC ADVANCED INTELLIGENCE · A2 — TRAZABILIDAD Y PREGUNTA
+   ════════════════════════════════════════════════════════════════════════════
+   Clases NUEVAS, sin lógica y sin tocar ninguna regla existente. Dos piezas:
+
+   · `.intv12-see-changes` — el enlace discreto del hero al destino del contador.
+     Tiene que leerse como una capa nativa de Intelligence, no como un botón: sin
+     fondo, sin borde, y sólo el subrayado y el color de acento al interactuar.
+     `focus-visible` es obligatorio — es el control que el SPEC pide que sea
+     accesible, así que tiene que verse al llegar con teclado.
+
+   · `.intv12-qcard` — la pregunta como card independiente. Sale del hero a
+     propósito: dentro habría que demostrar que no choca con el halo de la esfera
+     ni comprime Salud, y eso no se demuestra con fixtures. Fuera, la composición
+     del hero no puede romperse.
+   ════════════════════════════════════════════════════════════════════════════ */
+.intv12-see-changes {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 2px 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.intv12-see-changes:hover { color: var(--color-text-primary); border-bottom-color: var(--color-border-subtle); }
+.intv12-see-changes:focus-visible {
+  outline: 2px solid var(--color-accent, #6ea8fe);
+  outline-offset: 3px;
+  border-radius: 4px;
+  color: var(--color-text-primary);
+}
+/* El encabezado del destino recibe el foco por programa (`tabindex="-1"`). No
+   puede dibujar un anillo al hacer clic con el ratón — sólo cuando la llegada es
+   por teclado, que es cuando el usuario necesita ver dónde ha aterrizado. */
+#aurix-intel-changes-title:focus { outline: none; }
+#aurix-intel-changes-title:focus-visible { outline: 2px solid var(--color-accent, #6ea8fe); outline-offset: 4px; border-radius: 6px; }
+.intv12-qcard { display: flex; flex-direction: column; }
+/* La dock ya trae su propio espaciado; dentro de la card no necesita el margen
+   superior que tenía cuando colgaba del bloque de texto del hero. */
+.intv12-qcard .intv11-dock { margin-top: 0; }
+
 .intcc-x-item { position: relative; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: rgba(255,255,255,0.03); }
 .intcc-x-q {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -20918,6 +20964,31 @@ body.gs-open { overflow: hidden; }
   .intv4-changed   { grid-column: 7 / 13; grid-row: 4; }
   .intv4-discovery { grid-column: 1 / 13; grid-row: 5; }
   .intcc-disclaimer { grid-column: 1 / 13; grid-row: 6; }
+  /* ── A2 · LA PREGUNTA EN ESCRITORIO, SIN HUECO RESERVADO ──────────────────
+     La rejilla fija cada card a una fila EXPLÍCITA, así que insertar una fila
+     nueva sin condición dejaría una fila vacía —y con `gap` eso es un agujero de
+     16px— justo en el caso más común: cuando no hay pregunta. Por eso el cambio
+     de rejilla está condicionado a que la card EXISTA (`:has`, que esta misma
+     superficie ya usa más abajo para recomponer la fila de ESTRUCTURA).
+
+     Sin pregunta: la rejilla es EXACTAMENTE la de hoy, byte por byte.
+     Con pregunta: entra como fila 2 a ancho completo y el resto baja una fila.
+
+     Va FUERA del hero a propósito. Dentro habría que demostrar antes que la dock
+     no choca con el halo de la esfera (que pide ~19px más que el solape de 20px),
+     que no comprime Salud y que aguanta la copy ES/EN más larga. Eso no se
+     demuestra con fixtures, y suponerlo es el tipo de suposición que este trabajo
+     existe para quitar. Aquí la composición del hero no puede romperse. */
+  .aurix-intcc:has(.intv12-qcard) .intv12-qcard   { grid-column: 1 / 13; grid-row: 2; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-radar    { grid-row: 3; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-drivers  { grid-row: 3; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-explore  { grid-row: 3; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-watch    { grid-row: 4; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-timeline { grid-row: 4; }
+  .aurix-intcc:has(.intv12-qcard) .intv5-structure { grid-row: 5; }
+  .aurix-intcc:has(.intv12-qcard) .intv4-changed  { grid-row: 5; }
+  .aurix-intcc:has(.intv12-qcard) .intv4-discovery { grid-row: 6; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-disclaimer { grid-row: 8; }
   /* ROW SYMMETRY (INT.07 §14). INT.06 sized each card by its own content to kill
      dead space — and that produced the broken mosaic the founder photographed:
      cards ending at different baselines with black holes between them. A row must
@@ -20992,15 +21063,21 @@ body.gs-open { overflow: hidden; }
      estructura → qué ha cambiado → descubrimiento. One column, natural heights:
      equal heights stop making sense once the cards are stacked. */
   .intcc-hero      { order: 1; }
-  .intcc-radar     { order: 2; }
-  .intcc-drivers   { order: 3; }
-  .intcc-explore   { order: 4; }
-  .intcc-watch     { order: 5; }
-  .intcc-timeline  { order: 6; }
-  .intv5-structure { order: 7; }
-  .intv4-changed   { order: 8; }
-  .intv4-discovery { order: 9; }
-  .intcc-disclaimer { order: 10; }
+  /* A2 — INVARIANTE: toda card de Intelligence tiene que declarar su `order` en
+     este rango o se pinta ANTES del hero (flex-column con orders 1…10). La
+     pregunta va justo detrás del hero, que es su sitio en la lectura: primero
+     qué pasa, después qué te pregunta Aurix. En ≤640px el bloque de abajo la
+     recoloca detrás de Salud, que es la composición que pidió el founder. */
+  .intv12-qcard    { order: 2; }
+  .intcc-radar     { order: 3; }
+  .intcc-drivers   { order: 4; }
+  .intcc-explore   { order: 5; }
+  .intcc-watch     { order: 6; }
+  .intcc-timeline  { order: 7; }
+  .intv5-structure { order: 8; }
+  .intv4-changed   { order: 9; }
+  .intv4-discovery { order: 11; }
+  .intcc-disclaimer { order: 12; }
 }
 @media (max-width: 640px) {
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
@@ -21019,6 +21096,12 @@ body.gs-open { overflow: hidden; }
   .intcc-m-card { display: block; }
   .intcc-m-hero   { order: 0; }
   .intcc-m-health { order: 1; }
+  /* A2 · EL ORDEN QUE PIDIÓ EL FOUNDER: Hero → Salud → Pregunta → Radar. La
+     card es CONDICIONAL en el HTML, así que cuando no hay pregunta no existe: no
+     queda hueco reservado y la columna se cierra sola. `.intcc-radar` ya declara
+     order 3 en el bloque ≤1023px, así que la pregunta cabe en el 2 sin desplazar
+     nada. */
+  .intv12-qcard   { order: 2; }
 
   /* Card 1 — Inteligencia: reading + smart hint on the left, blue orb on the
      right. No health score here. INT.2ZA — the "Inteligencia" title now uses the
@@ -26147,6 +26230,11 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
      cuando ambas existían; ahora el renderer publica UNA sola (el legacy queda de
      respaldo), de modo que la celda nunca tiene dos ocupantes. */
   .intv9-disc { grid-column: 1 / 13; grid-row: 5; }
+  /* A2 — con la card de pregunta presente TODA la rejilla baja una fila. Este pin
+     faltaba en el remapeo condicional, así que Descubrimientos se quedaba en la
+     fila 5 mientras «Qué ha cambiado» pasaba a la 5 también: dos ocupantes en la
+     misma celda, que es justo el apilamiento que la nota de arriba describe. */
+  .aurix-intcc:has(.intv12-qcard) .intv9-disc { grid-row: 6; }
   .aurix-intv6 .intv9-disc { display: flex; flex-direction: column; }
   /* La línea compacta va ANTES del aviso legal, no después: el disclaimer tiene que
      cerrar la pantalla. Es el ÚNICO pin heredado que se reubica, y sólo la fila. */
@@ -26159,7 +26247,12 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
      valían `order: 0` y se pintaban ANTES DEL HERO. Se insertan donde les
      corresponde en el orden de lectura: …estructura → qué ha cambiado →
      descubrimientos → línea compacta → aviso legal. */
-  .intv9-disc          { order: 9; }
+  /* A2 — la pregunta entra en `order: 2`, así que todo lo que iba detrás del hero
+     bajó una posición (ver el bloque de orden principal). Descubrimientos vivía en
+     el 9, que ahora lo ocupa «Qué ha cambiado»: dos hermanos con el mismo `order`
+     los resuelve el orden del DOM, y eso es precisamente lo que no puede decidir
+     una composición. */
+  .intv9-disc          { order: 10; }
 }
 @media (max-width: 640px) {
   .intv9-disc-text { font-size: 12.5px; }

@@ -140,8 +140,12 @@ console.log('\n4 — Añadir, editar o borrar liquidez no fabrica retorno:');
   ok('4.3 borrar la aportación deja 0 % y sin flujo colgando',
      Math.abs(d.deltaPct) < 0.01 && d.unmatchedFlows === 0 && gatePublishes(d),
      'pct=' + d.deltaPct + ' unmatched=' + d.unmatchedFlows);
+  // A1 — el filtro de lápidas vive ahora en la lectura VIVA y la canónica delega en
+  // ella (encima excluye del CONSUMO las filas derivadas duplicadas). El invariante
+  // es el mismo y se comprueba en su owner real, no en el que lo envuelve.
   ok('4.4 un flujo con tombstone no entra en la lectura económica',
-     _aurixLoadCapitalFlows().length === 0 && /!f\.deletedAt/.test(fnSource('_aurixLoadCapitalFlows')));
+     _aurixLoadCapitalFlows().length === 0 && (/!f\.deletedAt/.test(fnSource('_aurixLoadCapitalFlowsLive'))
+        && /_aurixLoadCapitalFlowsLive\(\)/.test(fnSource('_aurixLoadCapitalFlows'))));
 }
 
 // ── 5 · CAMBIO DE COMPOSICIÓN ───────────────────────────────────────────────
@@ -248,7 +252,9 @@ console.log('\n10 — Cash Ledger v668 y capital_flows están en el camino real:
 {
   ok('10.1 la neutralización lee el ledger de capital (único origen de flujos)',
      /_aurixLoadCapitalFlows\(\)/.test(fnSource('_aurixFlowNeutralize')));
-  ok('10.2 ese ledger excluye tombstones', /!f\.deletedAt/.test(fnSource('_aurixLoadCapitalFlows')));
+  ok('10.2 ese ledger excluye tombstones',
+     /!f\.deletedAt/.test(fnSource('_aurixLoadCapitalFlowsLive'))
+     && /_aurixLoadCapitalFlowsLive\(\)/.test(fnSource('_aurixLoadCapitalFlows')));
   ok('10.3 y se alimenta del ledger REMOTO (capital_flows), no sólo del dispositivo',
      /from\('capital_flows'\)\s*\n?\s*\.select\(/.test(app) && /function _aurixCapitalFlowsPull/.test(app));   // la lectura es ahora PAGINADA: `.select(` puede ir en otra línea
   ok('10.4 toda operación de liquidez pasa por el owner económico único',

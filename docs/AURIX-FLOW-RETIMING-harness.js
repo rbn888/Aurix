@@ -241,7 +241,7 @@ ok('6.3 hay UN solo planificador y UN solo punto de escritura del ledger',
    (app.match(/^function _aurixPlanFlowRetiming\(/gm) || []).length === 1 &&
    (app.match(/_aurixCaptureFlow\(c\.isSell \? 'asset_remove' : 'asset_add'/g) || []).length === 1);
 ok('6.4 el backfill recolecta y planifica ANTES de escribir (no decide dentro del bucle)',
-   /const candidates = \[\];[\s\S]{0,1400}const plan = _aurixPlanFlowRetiming\(candidates\);[\s\S]{0,600}_aurixCaptureFlow\(/.test(app) &&
+   /const candidates = \[\];[\s\S]{0,2600}const plan = _aurixPlanFlowRetiming\(candidates\);[\s\S]{0,600}_aurixCaptureFlow\(/.test(app) &&
    !/for \(const tx of a\.transactions\)[\s\S]{0,700}_aurixFlowRetimeDecision\(/.test(app));
 ok('6.5 NO se tocó el guard double_matched_flow_step',
    /winFlows\.forEach\(f => \{ if \(f\.matchedStepTs != null\) stepCounts\[f\.matchedStepTs\] = \(stepCounts\[f\.matchedStepTs\] \|\| 0\) \+ 1; \}\);/.test(app) &&

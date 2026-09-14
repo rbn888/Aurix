@@ -51,7 +51,7 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG'];
-const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal',
   '_aurixLoadCapitalFlows','_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain',
@@ -102,6 +102,11 @@ function makeCtx(opts) {
   // (`o.lineage`, `o.flowsComplete`) para comprobar que la puerta CIERRA.
   sb._aurixCapitalFlowsComplete = () => (o.flowsComplete === undefined ? true : !!o.flowsComplete);
   sb.__lineage = (o.lineage === undefined) ? { since: 0, entries: [] } : o.lineage;
+  // A1 — la cobertura de linaje es de la CUENTA, no del dispositivo: sin la
+  // columna remota leída, la validez de clasificación es DESCONOCIDA y la
+  // transición se suprime. Aquí se declara vista salvo que el caso la niegue,
+  // que es la precondición equivalente a tener el SQL aplicado en producción.
+  vm.runInContext('var _aurixLineageColumnSeen = ' + ((o.lineageAccountWide === false) ? 'false' : 'true') + ';', sb);
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   (o.extra || []).forEach(src => vm.runInContext(src, sb));
@@ -542,11 +547,20 @@ console.log('\n10 · Wow insights are traceable combinations of real facts:');
                    flows: [{ id: 'd1', ts: T0 + 2.5 * DAY, amountUSD: 10000, kind: 'deposit' }],
                    assets: LOPSIDED, snap: SNAP, drivers: DRIVERS });
   const growth = w.wowInsights.find(x => x.semanticKey === 'wow_growth_from_capital_not_return');
-  ok('10.1 "your wealth grew from contributions, not returns" is detected', !!growth,
-    JSON.stringify(w.wowInsights.map(x => x.semanticKey)));
-  ok('10.2 it decomposes into the exact facts that support it',
-    growth && growth.supportingKeys.every(k => w.ledger.facts.some(f => f.semanticKey === k)),
-    growth ? JSON.stringify(growth.supportingKeys) : 'absent');
+  // ── A1 · P0 CAPITAL — LA DICOTOMÍA QUEDA RETIRADA, y el gate la PROTEGE ───
+  // Decía «tu patrimonio creció, pero no por rendimiento». El numerador se
+  // corrigió a MOVIMIENTOS DE LIQUIDEZ REGISTRADOS y eso la empeora, no la
+  // mejora: una compra NO debita caja en este modelo, así que la rotación interna
+  // CREA valor registrado y es una tercera causa que Aurix no puede descartar.
+  // Registra una posición de 50.000 e ingresa 2.000 de liquidez, y la frase
+  // atribuiría una subida de 52.000 a los 2.000 que sabe nombrar. Lo que el gate
+  // fija ahora es que NO se afirme.
+  ok('10.1 la dicotomía capital-vs-mercado NO se afirma (una tercera causa no descartable la invalida)',
+    !growth, JSON.stringify(w.wowInsights.map(x => x.semanticKey)));
+  ok('10.2 y los dos hechos siguen publicándose POR SEPARADO, que es lo que la evidencia sostiene',
+    w.ledger.facts.some(f => f.semanticKey === 'recorded_capital_net')
+    || w.ledger.gaps.some(g => g.semanticKey === 'recorded_capital_net'),
+    JSON.stringify(w.ledger.facts.map(f => f.semanticKey)));
   const nominal = w.wowInsights.find(x => x.semanticKey === 'wow_nominal_vs_effective');
   ok('10.3 "many positions, few effective ones" is detected on a lopsided book', !!nominal);
   ok('10.4 …and states both real numbers',

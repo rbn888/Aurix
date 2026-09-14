@@ -332,9 +332,13 @@ const dApparent = run({ snapshot: snap({ assetCount: 7 }),
 ok('F.1 diversificación APARENTE vs EFECTIVA (7 posiciones, peso de 2,5)',
   dApparent.discoveries.some(d => d.code === 'apparent_vs_effective_diversification'
     && d.values.positions === 7 && d.evidence.includes('effective_holdings')));
-ok('F.2 el patrimonio que sube por CAPITAL y no por rendimiento',
-  run(P.bigInflow).discoveries.some(d => d.code === 'level_rose_on_capital_not_return'
-    && d.values.recordedCapitalNet === 25000));
+// A1 · RETIRADO. Ver la nota de `_aurixIntelDiscoveries` §3: atribuiría toda la
+// subida del nivel al único trozo que Aurix sabe nombrar (la liquidez REGISTRADA)
+// cuando la rotación interna crea valor registrado y no se puede descartar. El
+// gate pasa a fijar la RETIRADA, que es el invariante nuevo.
+ok('F.2 la dicotomía capital-vs-mercado NO se publica como descubrimiento',
+  !run(P.bigInflow).discoveries.some(d => d.code === 'level_rose_on_capital_not_return'),
+  JSON.stringify(run(P.bigInflow).discoveries.map(d => d.code)));
 ok('F.3 concentración CRECIENTE sólo si la memoria lo sostiene',
   (() => { const prev = { observedAt: 1, dispersion: 90, seen: [{ id: 'ai_concentration_top_position',
       dimension: 'concentration', label: 'balanced', firstSeenAt: 1, lastSeenAt: 1, observations: 2 }] };
@@ -445,10 +449,17 @@ ok('I.2 …y el índice de dispersión también', JSON.stringify(fr.dispersion) 
 ok('I.3 Free ve UN insight y sabe cuántos hay (nada oculto, menos profundidad)',
   fr.attention.length === 1 && fr.attentionTotal === pr.attentionTotal);
 ok('I.4 Premium ve hasta 3', pr.attention.length <= 3 && pr.attention.length >= 1);
+// El invariante es que Free ve un descubrimiento ENTERO, no recortado — no que
+// esa cartera concreta produzca uno. Se usa una que sí produce descubrimiento tras
+// la retirada de la dicotomía; si no hubiera ninguno, el contrato sigue siendo que
+// los totales coinciden y que lo que se muestra no está truncado.
 ok('I.5 Free ve UN descubrimiento entero, no un teaser recortado',
-  (() => { const f = run(P.bigInflow, { depth: 'free' }), p = run(P.bigInflow, { depth: 'premium' });
+  (() => { const f = run(P.concentr, { depth: 'free' }), p = run(P.concentr, { depth: 'premium' });
+    if (!p.discoveriesTotal) return f.discoveries.length === 0 && f.discoveriesTotal === 0;
     return f.discoveries.length === 1 && f.discoveriesTotal === p.discoveriesTotal
-      && JSON.stringify(f.discoveries[0]) === JSON.stringify(p.discoveries[0]); })());
+      && JSON.stringify(f.discoveries[0]) === JSON.stringify(p.discoveries[0]); })(),
+  JSON.stringify({ free: run(P.concentr, { depth: 'free' }).discoveries.length,
+                   total: run(P.concentr, { depth: 'premium' }).discoveriesTotal }));
 ok('I.6 Free ve el CONTADOR de cambios y en qué dimensiones, no el detalle',
   (() => { const f = run(P.diversified, { memory: storedMem, depth: 'free' });
     return Number.isFinite(f.memory.changeCount) && Array.isArray(f.memory.changedDimensions)
@@ -666,7 +677,24 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
 ok('N.8b la superficie nueva declara `order` en móvil y tablet',
   // Sin esto valía `order: 0` en un contenedor flex-column cuyos hijos van de 1 a
   // 10, así que se pintaba ANTES DEL HERO. Fue un FAIL real de la revisión.
-  /@media \(max-width: 1023px\)[\s\S]{0,900}\.intv9-disc\s*\{ order: 9; \}/.test(newCss));
+  // A2 — la card de PREGUNTA entra en `order: 2`, así que todo lo que iba detrás
+  // del hero bajó una posición y Descubrimientos pasó del 9 al 10. Lo que el gate
+  // fija es que DECLARE un `order` en el rango del contenedor, no el número
+  // concreto: sin declararlo valdría 0 y se pintaría antes del hero.
+  /@media \(max-width: 1023px\)[\s\S]{0,1200}\.intv9-disc\s*\{ order: (?:[1-9]|1[0-2]); \}/.test(newCss));
+ok('N.8c y ningún `order` de la columna de Intelligence se repite (un empate lo decide el DOM, no la composición)',
+  (() => { // el bloque compartido vive en la hoja PRINCIPAL, no en el corte de la
+    // superficie nueva; se recogen TODAS las declaraciones de orden de la columna
+    // de Intelligence en los tramos `≤1023px` y se exige que no haya empates.
+    const blocks = css.match(/@media \(max-width: 1023px\)[\s\S]*?\n\}/g) || [];
+    const orders = [];
+    blocks.forEach(b => (b.match(/\.(?:intcc|intv)[\w-]*\s*\{ order: (\d+); \}/g) || [])
+      .forEach(x => orders.push(Number((x.match(/order: (\d+)/) || [, -1])[1]))));
+    return orders.length >= 8 && new Set(orders).size === orders.length; })(),
+  (() => { const blocks = css.match(/@media \(max-width: 1023px\)[\s\S]*?\n\}/g) || [];
+    const o = []; blocks.forEach(b => (b.match(/\.(?:intcc|intv)[\w-]*\s*\{ order: (\d+); \}/g) || [])
+      .forEach(x => o.push(x.trim())));
+    return JSON.stringify(o); })());
 ok('N.8d la celda de «descubrimientos» no puede tener dos ocupantes',
   /const discoveryHtml = discHtml \? '' :/.test(src));
 ok('N.9 la esfera no puede robar un click a la pregunta',
