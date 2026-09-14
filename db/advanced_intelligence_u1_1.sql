@@ -196,6 +196,26 @@ comment on column public.capital_flows.intent is
   'Explicit, forward-only economic intent. NULL = UNKNOWN_LEGACY. Legacy rows are never upgraded by inference; unknown intent fails closed out of every external-capital claim.';
 
 
+-- ── 4 · MINIMO PRIVILEGIO PARA `anon` (PREEXISTENTE, NO CREADO POR U1) ──────
+-- Encontrado al verificar U1, no introducido por él: `anon` tenía 7 privilegios
+-- de tabla sobre `public.capital_flows` y otros 7 sobre
+-- `public.portfolio_snapshots` — las default privileges del proyecto, otorgadas
+-- cuando esas tablas se crearon. `public.user_portfolios` ya estaba a 0 porque
+-- db/supabase_rls.sql la revoca explícitamente; las otras dos nunca tuvieron ese
+-- revoke, así que la RLS era la ÚNICA barrera y el grant no. Con las políticas
+-- actuales (`auth.uid() = user_id`, y sin `to authenticated` en estas dos) un
+-- cliente sin sesión no alcanza ninguna fila porque `auth.uid()` es NULL, pero el
+-- margen lo sostenía un predicado en vez de un permiso: exactamente el riesgo que
+-- la memoria del proyecto ya tenía documentado.
+--
+-- Se cierra con el mismo patrón que `user_portfolios` y nada más. No toca
+-- `authenticated` (con el que opera la app autenticada: los lectores y escritores
+-- están cerrados tras `currentUser.id`) ni `service_role` (con el que operan el
+-- capturador de snapshots y el endpoint founder-read). REVOKE es idempotente.
+revoke all privileges on table public.capital_flows       from anon;
+revoke all privileges on table public.portfolio_snapshots from anon;
+
+
 -- ── SCHEMA CACHE ───────────────────────────────────────────────────────────
 -- PostgREST cachea el esquema. Una columna recién creada puede responder
 -- `PGRST204` durante unos segundos, y para el cliente eso es INDISTINGUIBLE de
