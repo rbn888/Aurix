@@ -20561,6 +20561,32 @@ body.gs-open { overflow: hidden; }
 #aurix-intel-changes-title:focus { outline: none; }
 #aurix-intel-changes-title:focus-visible { outline: 2px solid var(--color-accent, #6ea8fe); outline-offset: 4px; border-radius: 6px; }
 .intv12-qcard { display: flex; flex-direction: column; }
+/* «Entendido» — el control que evita que un aviso material se convierta en un
+   reproche permanente. Discreto por diseño: no compite con el hecho, aparece con
+   más presencia al pasar por encima y tiene anillo de foco propio, porque es un
+   control real y hay que poder llegar a él con teclado. */
+.intv12-ack {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.intv4-chg:hover .intv12-ack { opacity: 1; }
+.intv12-ack:hover { color: var(--color-text-primary); border-color: var(--color-border); }
+.intv12-ack:focus-visible { opacity: 1; outline: 2px solid var(--color-accent, #6ea8fe); outline-offset: 2px; }
+/* En móvil el objetivo táctil manda: 44px de alto sin engordar la fila. */
+@media (max-width: 640px) {
+  .intv12-ack { min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; }
+}
 /* La dock ya trae su propio espaciado; dentro de la card no necesita el margen
    superior que tenía cuando colgaba del bloque de texto del hero. */
 .intv12-qcard .intv11-dock { margin-top: 0; }
@@ -20988,7 +21014,7 @@ body.gs-open { overflow: hidden; }
   .aurix-intcc:has(.intv12-qcard) .intv5-structure { grid-row: 5; }
   .aurix-intcc:has(.intv12-qcard) .intv4-changed  { grid-row: 5; }
   .aurix-intcc:has(.intv12-qcard) .intv4-discovery { grid-row: 6; }
-  .aurix-intcc:has(.intv12-qcard) .intcc-disclaimer { grid-row: 8; }
+  .aurix-intcc:has(.intv12-qcard) .intcc-disclaimer { grid-row: 7; }
   /* ROW SYMMETRY (INT.07 §14). INT.06 sized each card by its own content to kill
      dead space — and that produced the broken mosaic the founder photographed:
      cards ending at different baselines with black holes between them. A row must

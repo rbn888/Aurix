@@ -36,7 +36,7 @@
 -- ============================================================================
 
 
--- ── 1 · SERVER-AUTHORITATIVE PORTFOLIO EPOCH ────────────────────────────────
+-- ── 1 · ACCOUNT-SCOPED, CLIENT-ASSERTED, MONOTONIC PORTFOLIO EPOCH ─────────
 -- The defect this closes: `_aurixPortfolioEpoch()` (app.js:13109) reads ONLY
 -- localStorage (`aurix_portfolio_epoch`, fallback `aurix_reset_at`), so the
 -- lifecycle boundary of an ACCOUNT is a property of a DEVICE. A phone that never
@@ -61,8 +61,44 @@ alter table public.user_portfolios
   add column if not exists portfolio_epoch_ms         bigint,
   add column if not exists portfolio_epoch_updated_at timestamptz;
 
+-- COTA ESTÁTICA. El cliente acota al LEER (+6 h de margen de reloj), y eso no
+-- basta: el flush persiste `max(local, remoto)` SIN cota, así que un dispositivo
+-- con el reloj adelantado escribe un epoch futuro en la fila de la cuenta. Hoy los
+-- demás dispositivos lo descartan… hasta que el tiempo real alcanza esa fecha, y
+-- entonces el MISMO valor pasa el clamp en todos y oculta toda la historia
+-- anterior — de forma irreversible desde el cliente, porque `max()` no baja.
+-- El rango admite NULL, así que valida al instante contra toda fila existente, y
+-- de paso atrapa el error de escribir SEGUNDOS donde van milisegundos.
+alter table public.user_portfolios
+  drop constraint if exists user_portfolios_epoch_sane;
+alter table public.user_portfolios
+  add  constraint user_portfolios_epoch_sane check (
+    portfolio_epoch_ms is null
+    or (portfolio_epoch_ms between 1262304000000 and 4102444800000)   -- 2010-01-01 … 2100-01-01
+  );
+
+-- LA COTA REAL NO PUEDE SER UN CHECK: `now()` no es inmutable y un CHECK con reloj
+-- rompería un restore. Va en un trigger que RECHAZA, no que recorta: recortar en
+-- silencio reescribiría una aseveración del usuario, y un epoch es la frontera que
+-- decide qué historia financiera se ve.
+create or replace function public.aurix_reject_future_epoch()
+  returns trigger language plpgsql as $$
+begin
+  if new.portfolio_epoch_ms is not null
+     and new.portfolio_epoch_ms > (extract(epoch from now()) * 1000)::bigint + 21600000 then
+    raise exception 'portfolio_epoch_ms is in the future (%): a lifecycle epoch is an instant that already happened', new.portfolio_epoch_ms
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists user_portfolios_epoch_not_future on public.user_portfolios;
+create trigger user_portfolios_epoch_not_future
+  before insert or update of portfolio_epoch_ms on public.user_portfolios
+  for each row execute function public.aurix_reject_future_epoch();
+
 comment on column public.user_portfolios.portfolio_epoch_ms is
-  'Server-authoritative portfolio lifecycle epoch, unix ms. Client uses max(server, local) so a local epoch never regresses. NULL = unknown, client falls back to device-local behaviour.';
+  'Account-scoped, CLIENT-ASSERTED, monotonic portfolio lifecycle epoch (unix ms). NOT server-authoritative: the server neither computes nor validates it beyond the static CHECK and the reject trigger below. Client adopts max(server, local), so it never regresses. NULL = unknown, client falls back to device-local behaviour.';
 
 
 -- ── 2 · FORWARD-ONLY ASSET CLASSIFICATION LINEAGE ───────────────────────────
@@ -75,23 +111,34 @@ comment on column public.user_portfolios.portfolio_epoch_ms is
 --
 -- This column records type changes GOING FORWARD so a window that spans one can
 -- be refused instead of published. It cannot be reconstructed for the past, and
--- it is not backfilled: a window with no lineage coverage resolves to
--- classificationValidity = 'unknown' and the TRANSITION is suppressed (the
--- current STATE may still be published if independently certified).
+-- it is not backfilled: a window not covered by account lineage resolves to
+-- `unknown` and the TRANSITION is suppressed (the current STATE may still be
+-- published if independently certified).
 --
 -- Shape — append-only, bounded by the client, no PII:
 --   [{ "a": "<assetId>", "f": "<fromBucket>", "t": "<toBucket>", "at": <ms> }]
--- jsonb rather than a table because it rides the existing last-writer-wins
--- upsert of user_portfolios, and unlike an economic ledger a LOST lineage entry
--- is SAFE: it degrades a claim to 'unknown' and suppresses it. Fail-closed data
--- may live in a fail-closed store; a capital event may not (which is exactly why
--- capital_flows is a table — see db/capital_flows_1.sql).
+--
+-- CORRECTED AFTER REVIEW. An earlier draft of this note claimed that "losing a
+-- lineage entry is SAFE because it degrades the claim to unknown". THAT IS FALSE:
+-- losing one ENTRY does not move `since`, so coverage keeps being asserted and the
+-- claim survives — it fails OPEN, not closed. What actually bounds the risk is
+-- three separate things, and they should not be confused with each other:
+--   · ACCOUNT coverage begins at the FIRST remote adoption of this column, so
+--     nothing a single browser observed before that can license a comparison;
+--   · the client's `_AURIX_LINEAGE_MAX` eviction RAISES `since` to the oldest
+--     retained entry, so discarded evidence shrinks the declared coverage;
+--   · a device can only push after a remote READ has switched the column on, so
+--     what it writes is always the UNION with what was there.
+-- And the resulting state is named `no_reclassification_recorded`, never `stable`:
+-- this log is CLIENT-ASSERTED (jsonb, last-writer-wins), not an independent server
+-- observation. That is also why an economic ledger may NOT live here — see
+-- db/capital_flows_1.sql.
 alter table public.user_portfolios
   add column if not exists asset_classification_lineage            jsonb not null default '[]'::jsonb,
   add column if not exists asset_classification_lineage_updated_at  timestamptz;
 
 comment on column public.user_portfolios.asset_classification_lineage is
-  'Forward-only append log of asset type/bucket changes: [{a,f,t,at}]. Never backfilled. Absence of coverage degrades a historical exposure claim to unknown and suppresses the transition.';
+  'Forward-only append log of asset type/bucket changes: [{a,f,t,at}], CLIENT-ASSERTED (jsonb, last-writer-wins) — not an independent server observation. Never backfilled. The client only treats a window as licensed when account coverage (`since`) starts before it, and account coverage begins at the FIRST remote adoption of this column; the resulting state is named `no_reclassification_recorded`, never `stable`.';
 
 
 -- ── 3 · EXPLICIT FLOW INTENT ────────────────────────────────────────────────
@@ -149,8 +196,17 @@ comment on column public.capital_flows.intent is
   'Explicit, forward-only economic intent. NULL = UNKNOWN_LEGACY. Legacy rows are never upgraded by inference; unknown intent fails closed out of every external-capital claim.';
 
 
+-- ── SCHEMA CACHE ───────────────────────────────────────────────────────────
+-- PostgREST cachea el esquema. Una columna recién creada puede responder
+-- `PGRST204` durante unos segundos, y para el cliente eso es INDISTINGUIBLE de
+-- «no existe»: marcaría `intent` como ausente para toda la sesión y esas filas
+-- quedarían `UNKNOWN_LEGACY`, que por contrato es TERMINAL y no promovible. Se
+-- recarga explícitamente, y conviene no operar la app durante el apply.
+notify pgrst, 'reload schema';
+
+
 -- ============================================================================
--- VERIFICATION — run these three after applying. All must hold.
+-- VERIFICATION — run these after applying. All must hold.
 -- ============================================================================
 --
 -- 1 · the five columns exist (expect 5 rows):
@@ -172,6 +228,19 @@ comment on column public.capital_flows.intent is
 --   from pg_constraint
 --  where conrelid = 'public.capital_flows'::regclass
 --    and conname  = 'capital_flows_intent_vocab';
+--
+-- 2b · la cota estática y el trigger de rechazo existen (expect 1 + 1):
+--
+-- select conname, convalidated from pg_constraint
+--  where conrelid = 'public.user_portfolios'::regclass and conname = 'user_portfolios_epoch_sane';
+-- select tgname from pg_trigger
+--  where tgrelid = 'public.user_portfolios'::regclass and tgname = 'user_portfolios_epoch_not_future';
+--
+-- 2c · y el rechazo funciona (expect ERROR, no una fila escrita):
+--
+-- update public.user_portfolios
+--    set portfolio_epoch_ms = (extract(epoch from now())*1000)::bigint + 86400000
+--  where user_id = auth.uid();
 --
 -- 3 · `anon` gained NOTHING. This file adds no table, so default privileges
 --     cannot apply — but verify rather than assume, because the grant, not the

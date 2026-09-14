@@ -52,7 +52,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
   '_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT',
   '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX'];
-const FNS = ['toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+const FNS = ['toBase','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixFlowIntentOf',
   '_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
@@ -198,6 +198,52 @@ console.log('1 · Una transición histórica sólo se publica si sus dos extremo
   ok('1.5b cobertura sólo DE ESTE DISPOSITIVO ⇒ validez desconocida y transición suprimida',
     !deviceOnly.ledger.facts.some(x => x.semanticKey === 'exposure_drift_etf_7D')
     && !!dg && /classification_validity_unknown/.test(String(dg.reason)), JSON.stringify(dg));
+  // ── LA RUTA DE ADOPCIÓN, EJERCITADA DE VERDAD ────────────────────────────
+  // La revisión encontró que nadie la ejecutaba: los casos inyectaban el registro
+  // y encendían la columna a mano, así que se certificaba el LECTOR y se stubeaba
+  // la PUERTA. Es la lección de `feedback_harness_no_stubear_lo_certificado`, y
+  // aquí destapó un defecto real — la marca de «primera adopción» era un flag en
+  // memoria, así que se re-sellaba en CADA carga y la cobertura no podía envejecer.
+  {
+    const c = makeCtx({});                                   // sin registro previo
+    run('_aurixAdoptRemoteClassificationLineage([])', c);
+    const first = run('_aurixLineageRead()', c);
+    ok('1.5d la PRIMERA adopción sella `adoptedAt` y recorta la cobertura a ese instante',
+      Number.isFinite(first.adoptedAt) && first.since === first.adoptedAt,
+      JSON.stringify(first));
+    // Segunda «carga de página»: el flag en memoria valdría false otra vez, pero el
+    // sello vive en el REGISTRO, así que la cobertura no puede volver a recortarse.
+    run('_aurixAdoptRemoteClassificationLineage([])', c);
+    const again = run('_aurixLineageRead()', c);
+    ok('1.5e una adopción POSTERIOR no vuelve a recortarla (el sello es del registro, no de la sesión)',
+      again.adoptedAt === first.adoptedAt && again.since === first.since,
+      JSON.stringify({ first: first.adoptedAt, again: again.adoptedAt }));
+    // Y un dispositivo NUEVO hereda la adopción de la cuenta por el push/pull.
+    const fresh = makeCtx({});
+    const payload = run('_aurixLineageForBackend()', c);
+    run('_aurixAdoptRemoteClassificationLineage(' + JSON.stringify(payload) + ')', fresh);
+    const inherited = run('_aurixLineageRead()', fresh);
+    ok('1.5f un dispositivo NUEVO hereda la adopción de la cuenta en vez de recortar a su propio arranque',
+      inherited.adoptedAt === first.adoptedAt,
+      JSON.stringify({ account: first.adoptedAt, device: inherited.adoptedAt }));
+    ok('1.5g …y con cobertura heredada una ventana POSTERIOR a la adopción sí queda licenciada',
+      (() => { const v = run('_aurixClassificationValidity("etf", ' +
+          (Number(first.adoptedAt) + 1000) + ', ' + (Number(first.adoptedAt) + 2000) + ')', fresh);
+        return v.validity === 'no_reclassification_recorded'; })(),
+      JSON.stringify(run('_aurixClassificationValidity("etf", ' +
+        (Number(first.adoptedAt) + 1000) + ', ' + (Number(first.adoptedAt) + 2000) + ')', fresh)));
+    ok('1.5h …y una ANTERIOR a la adopción sigue suprimida (lo vio un navegador, no la cuenta)',
+      (() => { const v = run('_aurixClassificationValidity("etf", ' +
+          (Number(first.adoptedAt) - 20 * DAY) + ', ' + (Number(first.adoptedAt) - 1000) + ')', fresh);
+        return v.validity === 'unknown' && v.reason === 'coverage_starts_after_window'; })());
+    ok('1.5i el escenario de la revisión: linaje local de meses, reclasificación hecha en OTRO dispositivo',
+      (() => { const laptop = makeCtx({});
+        // el portátil lleva 90 días observando SU propio linaje, sin entradas
+        run('_aurixLineageWrite({ since: ' + (NOW - 90 * DAY) + ', adoptedAt: null, entries: [] })', laptop);
+        run('_aurixAdoptRemoteClassificationLineage([])', laptop);
+        const v = run('_aurixClassificationValidity("etf", ' + (NOW - 30 * DAY) + ', ' + NOW + ')', laptop);
+        return v.validity === 'unknown'; })());
+  }
   ok('1.5c y el desalojo por tope encoge la cobertura declarada (no se afirma sobre evidencia tirada)',
     /out\.length > kept\.length/.test(fnSrc('_aurixLineageMerge'))
     && /since = Math\.max\(Number\(since\) \|\| 0, Number\(kept\[0\]\.at\)\)/.test(fnSrc('_aurixLineageMerge')));
@@ -374,7 +420,9 @@ console.log('\n3 · «Has aportado X de capital nuevo» sólo puede decirse si X
     /let _aurixCapitalFlowsIncomplete = true;/.test(app)
     && /return !_aurixCapitalFlowsIncomplete;/.test(fnSrc('_aurixCapitalFlowsComplete')));
   ok('3.7c …y exime a la sesión ANÓNIMA, como su hermano `_aurixSourceSetComplete`',
-    /currentUser && currentUser\.id\)\)\s*return true;/.test(fnSrc('_aurixCapitalFlowsComplete')));
+    /return _known \? false : true;/.test(fnSrc('_aurixCapitalFlowsComplete')));
+  ok('3.7d …pero NO durante el arranque: con sesión conocida y `currentUser` sin resolver, cerrado',
+    /_aurixActiveUserId/.test(fnSrc('_aurixCapitalFlowsComplete')));
   ok('3.8 la intención LEGACY (sin campo) se lee como UNKNOWN_LEGACY y jamás como externa',
     (() => { const c = makeCtx({});
       return run("_aurixFlowIntentOf({ kind: 'deposit' })", c) === 'UNKNOWN_LEGACY'
@@ -593,6 +641,236 @@ console.log('\n7 · Las formas de cartera del contrato siguen respondiendo:');
   ok('7.10 y FX: una cartera en EUR no cambia la estructura del contrato',
     (() => { const eur = core(Object.assign({}, shapes['multiactivo'], { baseCurrency: 'EUR' }));
       return Array.isArray(eur.findings) && eur.ledger.facts.length > 0; })());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 8 · SPEC LIFECYCLE · DERIVA ESTRUCTURAL DE MERCADO
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n8 · Cuando la cripto sube, la liquidez no ha bajado:');
+{
+  const endTs = NOW;
+  // El caso canónico: liquidez 10.000 QUIETA, cripto 30.000 → 60.000, cero flujos.
+  const drift = (flows) => core({
+    serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                     { crypto: 60000, liquidity: 10000 }),
+    rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS,
+    flows: flows || [] }, { ranges: ['7D'] });
+  const base = drift();
+  const cash = base.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_7D');
+  const cry  = base.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+  ok('8.1 el importe absoluto de la liquidez NO se movió, y el hecho lo publica',
+    !!cash && cash.values.startValue === 10000 && cash.values.endValue === 10000
+    && cash.values.absoluteDirection === 'flat', JSON.stringify(cash && cash.values));
+  ok('8.2 su PESO sí cayó, del 25 % al 14 % (dos hechos distintos, no uno)',
+    !!cash && Math.round(cash.values.startPct) === 25 && Math.round(cash.values.endPct) === 14,
+    JSON.stringify(cash && { s: cash.values.startPct, e: cash.values.endPct }));
+  ok('8.3 se marca como DILUCIÓN PURA por el bucket que creció',
+    !!cash && cash.values.dilutedBy === 'crypto' && cash.values.dilutionKind === 'pure');
+  ok('8.4 y deja de ser un cambio «suyo»: la causa no se le atribuye al usuario',
+    !!cash && cash.values.causeKnown === false && cash.values.cause === null);
+  ok('8.5 la concentración sube: la cripto pasa del 75 % al 85 %',
+    !!cry && Math.round(cry.values.startPct) === 75 && Math.round(cry.values.endPct) === 86,
+    JSON.stringify(cry && { s: cry.values.startPct, e: cry.values.endPct }));
+  ok('8.6 UNA CAUSA, UNA LECTURA PRIMARIA: el hecho diluido adopta la raíz del motor',
+    !!cash && !!cry && cash.causalRoot === cry.causalRoot);
+  ok('8.7 …y por tanto UN SOLO hallazgo, no tres avisos de lo mismo',
+    base.findings.filter(f => f.rootCause === (cry && cry.causalRoot)).length === 1,
+    JSON.stringify(base.findings.map(f => f.rootCause)));
+  ok('8.8 sin ningún evento del usuario en la ventana, la atribución a MERCADO se certifica',
+    !!cry && cry.values.marketAttributed === true && cry.eventClass === 'market_driven');
+  ok('8.9 un depósito dentro de la ventana la INVALIDA: la deriva es real, su causa desconocida',
+    (() => { const d2 = drift([{ id: 'd1', ts: endTs - 3 * DAY, amountUSD: 5000,
+        kind: 'deposit', source: 'user', assetId: 'eur', revision: 1 }]);
+      const c2 = d2.ledger.facts.find(f => f.semanticKey === 'exposure_drift_crypto_7D');
+      return !!c2 && c2.values.marketAttributed === false && c2.eventClass === 'cause_unknown'; })());
+  ok('8.10 sin los importes de los extremos no se afirma NADA sobre lo absoluto',
+    (() => { const f = base.ledger.facts.find(x => /^exposure_drift_/.test(x.semanticKey)
+        && x.values.absoluteDirection === null);
+      return f === undefined || f.values.dilutedBy === undefined; })());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 9 · SPEC LIFECYCLE · PÉRDIDA CONTRA COSTE — Y LAS TRES QUE NO SON ELLA
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
+{
+  const POS = (id, type, qty, price, cost) => {
+    const a = A(id, type, qty, price); if (cost != null) a.costBasis = cost; return a;
+  };
+  const lossCtx = (assets, snapOver) => core({ rows: inv([100000, 100000, 100000]),
+    assets: assets, snap: Object.assign({}, SNAP, snapOver || {}), drivers: DRIVERS, serverRows: [] });
+  // Posición dominante: 45.000 de 100.000, un 50 % por debajo de coste.
+  const dominant = [POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)];
+  const r1 = lossCtx(dominant, { totUSD: 100000 });
+  const f1 = r1.ledger.facts.find(f => /^position_below_cost_btc$/.test(f.semanticKey));
+  ok('9.1 con coste certificado se publica la pérdida CONTRA COSTE, con su peso',
+    !!f1 && Math.round(f1.value) === -50 && Math.round(f1.values.weightPct) === 45,
+    JSON.stringify(f1 && f1.values));
+  ok('9.2 y declara contra QUÉ se mide, para que no se lea como la caída de un periodo',
+    !!f1 && f1.values.basis === 'certified_acquisition_cost'
+    && f1.note === 'loss_vs_certified_cost_not_period_decline'
+    && f1.causalRoot === 'position_result');
+  ok('9.3 dice explícitamente lo que NO sabe: duración y divisa',
+    !!f1 && f1.values.durationKnown === false && f1.values.fxAttributed === false);
+  ok('9.4 SIN coste registrado no hay afirmación de pérdida, hay HUECO',
+    (() => { const r = lossCtx([A('btc', 'crypto', 1, 45000), POS('eur', 'cash', 55000, 1, 55000)],
+        { totUSD: 100000 });
+      return !r.ledger.facts.some(f => /^position_below_cost_/.test(f.semanticKey))
+        && r.ledger.gaps.some(g => g.semanticKey === 'position_below_cost'
+             && g.reason === 'missing_cost_basis'); })());
+  ok('9.5 la caída de un PERIODO por posición se declara no soportada (no hay historia por activo)',
+    r1.ledger.gaps.some(g => g.semanticKey === 'position_period_decline'
+      && g.status === 'not_yet_supported'));
+  ok('9.6 el DRAWDOWN desde máximo se declara de CARTERA, no de posición',
+    r1.ledger.gaps.some(g => g.semanticKey === 'position_drawdown_from_peak'
+      && g.reason === 'peak_is_portfolio_level_only'));
+  ok('9.7 la parte de DIVISA se declara no soportada (no se guarda el cambio del día de compra)',
+    r1.ledger.gaps.some(g => g.semanticKey === 'position_fx_attribution'
+      && g.reason === 'purchase_date_fx_rate_not_stored'));
+  ok('9.8 la pérdida REALIZADA se declara, y no se agrega sin owner certificado',
+    (() => { const a = POS('btc', 'crypto', 1, 45000, 90000); a.realizedPnL = -1200;
+      const r = lossCtx([a, POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
+      return r.ledger.gaps.some(g => g.semanticKey === 'position_realised_loss'
+        && g.status === 'not_yet_supported'); })());
+  // EL ORDEN QUE PEDÍA EL CONTRATO: un −50 % en el 1 % no puede dominar.
+  ok('9.9 un −50 % en una posición del 1 % NO se publica (por debajo del suelo de participación)',
+    (() => { const r = lossCtx([POS('x', 'stock', 1, 1000, 2000), POS('eur', 'cash', 99000, 1, 99000)],
+        { totUSD: 100000 });
+      return !r.ledger.facts.some(f => /^position_below_cost_x$/.test(f.semanticKey)); })());
+  ok('9.10 …y un −25 % en una del 45 % sí, con MÁS materialidad que un −50 % pequeño',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, 60000),
+        POS('y', 'stock', 1, 2500, 5000), POS('eur', 'cash', 52500, 1, 52500)], { totUSD: 100000 });
+      const big = r.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      const small = r.ledger.facts.find(f => f.semanticKey === 'position_below_cost_y');
+      return !!big && (!small || big.materiality > small.materiality); })());
+  ok('9.11 un movimiento por debajo del suelo de rendimiento declarado no es noticia',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 49700, 50000),
+        POS('eur', 'cash', 50300, 1, 50300)], { totUSD: 100000 });
+      return !r.ledger.facts.some(f => /^position_below_cost_/.test(f.semanticKey)); })());
+  ok('9.12 su identidad es de BANDA: −52 % y −53 % son el mismo episodio',
+    (() => { const a = lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 });
+      const b = lossCtx([POS('btc', 'crypto', 1, 47500, 100000), POS('eur', 'cash', 52500, 1, 52500)], { totUSD: 100000 });
+      const fa = a.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      const fb = b.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      return !!fa && !!fb && fa.eventId === fb.eventId; })());
+  ok('9.13 …y una banda materialmente nueva es un episodio NUEVO',
+    (() => { const a = lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 });
+      const b = lossCtx([POS('btc', 'crypto', 1, 30000, 100000), POS('eur', 'cash', 70000, 1, 70000)], { totUSD: 100000 });
+      const fa = a.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      const fb = b.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
+      return !!fa && !!fb && fa.eventId !== fb.eventId; })());
+  ok('9.14 una RECUPERACIÓN completa retira la afirmación (no queda un aviso huérfano)',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 120000, 90000), POS('eur', 'cash', 10000, 1, 10000)],
+        { totUSD: 130000 });
+      return !r.ledger.facts.some(f => /^position_below_cost_/.test(f.semanticKey)); })());
+  ok('9.15 comprar más durante la caída no fabrica una pérdida distinta: sigue siendo coste vs valor',
+    (() => { const a = POS('btc', 'crypto', 2, 45000, 180000);   // promedió comprando más
+      const r = lossCtx([a, POS('eur', 'cash', 10000, 1, 10000)], { totUSD: 100000 });
+      const f = r.ledger.facts.find(x => x.semanticKey === 'position_below_cost_btc');
+      return !!f && f.values.basis === 'certified_acquisition_cost'; })());
+  ok('9.16 aislamiento: la pérdida hereda el epoch y la cuenta en su evidencia',
+    !!f1 && f1.evidence && f1.evidence.source === 'computePositionPerformance'
+    && Object.prototype.hasOwnProperty.call(f1.evidence, 'epoch'));
+  // Ni juicio, ni orden, ni inferencia sobre la persona.
+  // El alcance es la COPY DE INTELLIGENCE, no el fichero entero: «Principiante»
+  // existe en Ajustes y en el onboarding porque el usuario lo DECLARA de sí mismo,
+  // y eso es legítimo. Lo prohibido es que Aurix lo AFIRME — inferir novato a
+  // partir de una pérdida— y que ordene, juzgue o avergüence.
+  ok('9.17 ninguna copy de Intelligence ordena vender, juzga la inversión ni infiere al inversor',
+    (() => { const noComments = app.replace(/^\s*\/\/.*$/gm, '');
+      const lines = noComments.split('\n')
+        .filter(l => /^\s*(intel_|intv[0-9]*_|intcc_)[a-z0-9_]*\s*:/.test(l));
+      const copy = lines.join('\n');
+      return lines.length > 50
+        && !/(?:deberías|deberías|debes|should)\s+(?:vender|sell|salir|reducir|reduce)/i.test(copy)
+        && !/mala inversión|bad investment|novato|novice|principiante|beginner/i.test(copy)
+        && !/\bvende\b|\bsell now\b|\bpivota\b/i.test(copy); })(),
+    String(app.replace(/^\s*\/\/.*$/gm, '').split('\n')
+      .filter(l => /^\s*(intel_|intv[0-9]*_|intcc_)[a-z0-9_]*\s*:/.test(l)).length) + ' claves revisadas');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 10 · SPEC LIFECYCLE · DECAIMIENTO Y SEGURIDAD EMOCIONAL
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n10 · Un aviso material no puede volverse un reproche permanente:');
+{
+  const endTs = NOW;
+  const shape = (acks) => core({
+    serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                     { crypto: 60000, liquidity: 10000 }),
+    rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+    { ranges: ['7D'], acknowledged: acks || {} });
+  const before = shape();
+  ok('10.1 un hallazgo nuevo nace NEW', before.findings.length > 0
+    && before.findings.every(f => f.presentationState === 'new'),
+    JSON.stringify(before.findings.map(f => f.presentationState)));
+  const id = before.findings[0] && before.findings[0].episodeId;
+  const after = shape({ [id]: { at: endTs, state: 'acknowledged' } });
+  ok('10.2 dado por visto, DEJA de ocupar superficie (y por tanto de contar)',
+    after.findings.length === before.findings.length - 1
+    && !after.findings.some(f => f.episodeId === id),
+    JSON.stringify({ before: before.findings.length, after: after.findings.length }));
+  ok('10.3 pero el HECHO sigue intacto en el ledger: no se borra memoria financiera',
+    after.ledger.facts.length === before.ledger.facts.length);
+  ok('10.4 …y el conjunto completo lo sigue publicando, marcado como acusado',
+    (after.findingsAll || []).some(f => f.episodeId === id
+      && f.presentationState === 'acknowledged' && Number.isFinite(f.acknowledgedAt)));
+  ok('10.5 REABRIR la app no lo reabre: mismos hechos ⇒ mismo episodio ⇒ sigue acusado',
+    shape({ [id]: { at: endTs, state: 'acknowledged' } }).findings
+      .every(f => f.episodeId !== id));
+  ok('10.6 el paso del TIEMPO por sí solo tampoco',
+    (() => { const later = run('_aurixIntelligenceCore(' + JSON.stringify({ now: NOW + 40 * DAY,
+        ranges: ['7D'], acknowledged: { [id]: { at: endTs, state: 'acknowledged' } } }) + ')',
+        makeCtx({ serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                                   { crypto: 60000, liquidity: 10000 }),
+          rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS }));
+      return later.findings.every(f => f.episodeId !== id); })());
+  ok('10.7 el RUIDO dentro de la misma banda tampoco lo reabre',
+    (() => { const noisy = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                         { crypto: 60600, liquidity: 10000 }),
+        rows: inv([40000, 45000, 55000, 70600]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'], acknowledged: { [id]: { at: endTs, state: 'acknowledged' } } });
+      return noisy.findings.every(f => f.episodeId !== id); })());
+  ok('10.8 una EVIDENCIA materialmente nueva sí lo reabre, y como episodio NUEVO',
+    (() => { const worse = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                         { crypto: 140000, liquidity: 10000 }),
+        rows: inv([40000, 60000, 100000, 150000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'], acknowledged: { [id]: { at: endTs, state: 'acknowledged' } } });
+      const same = worse.findings.filter(f => f.episodeId === id);
+      const fresh = worse.findings.filter(f => f.rootCause === 'category_mix' && f.presentationState === 'new');
+      return same.length === 0 && fresh.length === 1; })());
+  ok('10.9 la PAUSA se refleja en el estado de presentación, sin tocar el hecho',
+    (() => { const paused = core({
+        serverRows: srvHistory(endTs, 7, { crypto: 30000, liquidity: 10000 },
+                                         { crypto: 60000, liquidity: 10000 }),
+        rows: inv([40000, 45000, 55000, 70000]), assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS },
+        { ranges: ['7D'], pausedAt: endTs });
+      return paused.findings.length > 0 && paused.findings.every(f => f.presentationState === 'paused'); })());
+  ok('10.10 el acuse es IDEMPOTENTE: no se re-sella con un instante nuevo',
+    /if \(ack\[String\(episodeId\)\]\) return true;/.test(fnSrc('_aurixIntelAcknowledge')));
+  ok('10.11 y viaja entre dispositivos por el merge que ya existía, sin memoria nueva',
+    /out\.ack\[k\] = \(x >= y\) \? ka\[k\] : kb\[k\];/.test(fnSrc('_aurixIntelCtxMerge')));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 11 · La cartera plana EN SU MÁXIMO — cobertura que la revisión echó en falta
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n11 · Empate en el máximo: silencio honesto, no un hito inventado:');
+{
+  // Serie que termina con DOS puntos iguales en su valor más alto. `>` estricto
+  // deja `peakIdx` en el PRIMERO, así que no hay máximo histórico — y el suelo de
+  // materialidad tampoco deja emitir «máximo anterior». La Memoria se queda sin
+  // hito, y eso es fail-closed: preferible a fabricar uno.
+  const tie = core({ rows: inv([120000, 128000, 134000, 141000, 160818, 160818]),
+    assets: BTC_ETH_CASH, snap: SNAP, drivers: DRIVERS, serverRows: [] });
+  ok('11.1 con empate en el máximo no se publica ni máximo histórico ni máximo anterior',
+    !tie.ledger.facts.some(f => f.semanticKey === 'investable_all_time_high')
+    && !tie.ledger.facts.some(f => f.semanticKey === 'investable_prior_high'),
+    JSON.stringify(tie.ledger.facts.map(f => f.semanticKey)));
+  ok('11.2 y el contrato sigue siendo válido (silencio, no excepción)',
+    Array.isArray(tie.findings) && Array.isArray(tie.ledger.gaps));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

@@ -1070,7 +1070,15 @@ group('S · cross-device · contrato, fail-closed y legacy-safe');
         asked: {}, declined: {}, pausedAt: null, owner: 'u', dirty: true, updatedAt: 9 }, null));
       // El merge define el payload, así que `owner`, `dirty` y `updatedAt` NO pueden
       // viajar al servidor por descuido: no existen en su salida.
-      return JSON.stringify(keys.sort()) === JSON.stringify(['asked', 'declined', 'fields', 'pausedAt']); })());
+      // §8 añade `ack`: identificadores de EPISODIO y un timestamp, nada más — ni
+      // importes, ni posiciones, ni precios. El invariante que esta prueba fija es
+      // ese, y sigue siendo el conjunto CERRADO de claves, no un subconjunto.
+      return JSON.stringify(keys.sort()) === JSON.stringify(['ack', 'asked', 'declined', 'fields', 'pausedAt']); })());
+  ok('S.6b y un acuse de recibo sólo lleva episodio + instante (ningún dato patrimonial)',
+    (() => { const out = MG({ ack: { 'ob:category_mix#28': { at: 7, state: 'acknowledged' } } }, null);
+      const k = Object.keys(out.ack['ob:category_mix#28']).sort();
+      return JSON.stringify(k) === JSON.stringify(['at', 'state']); })(),
+    JSON.stringify(MG({ ack: { 'ob:category_mix#28': { at: 7, state: 'acknowledged' } } }, null).ack));
   ok('S.7 el dueño NO lo manda el cliente en el payload',
     !/owner:/.test(pushFn.slice(pushFn.indexOf('const payload'))));
   ok('S.8 un solo tirón por apertura, con suelo: no hay polling',

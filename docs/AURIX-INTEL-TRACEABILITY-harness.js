@@ -76,7 +76,7 @@ function extractDict(langIdx) {
     'intcc_dim_breadth',
     // A2 — el enlace de trazabilidad del hero. Sin la clave el renderer emite un
     // enlace VACÍO, que es peor que no tenerlo.
-    'intel_see_changes',
+    'intel_see_changes','intel_ack','intel_ack_aria',
     'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
@@ -438,6 +438,46 @@ console.log('\n6 · ES y EN publican la misma verdad:');
       return a.length > 5 && b.length > 5 && a !== b; })());
   ok('6.4 la copy de capital retirada no reaparece en ninguno de los dos',
     !/de capital nuevo|of new capital/.test(es + en));
+}
+
+console.log('\n7 · Episodios pasivos, acuse de recibo y profundidad:');
+{
+  const h = render(MOVED).html;
+  ok('7.1 la identidad de una deriva pasiva lleva su BANDA, no sólo la raíz',
+    (() => { const ids = attrs(h, 'class="intv4-chg [^"]*"[^>]*data-finding="(ob:[^"]+)"');
+      return ids.length === 0 || ids.some(x => /#/.test(x)); })(),
+    JSON.stringify(attrs(h, 'data-finding="([^"]+)"')));
+  ok('7.2 cada fila ofrece «Entendido», y acusa el EPISODIO (no la raíz)',
+    (() => { const rows = (h.match(/class="intv4-chg /g) || []).length;
+      const acks = attrs(h, 'data-intel-ack="([^"]+)"');
+      return rows === 0 || (acks.length === rows && acks.every(a => a.length > 3)); })(),
+    JSON.stringify(attrs(h, 'data-intel-ack="([^"]+)"')));
+  ok('7.3 el control es un botón real con etiqueta accesible (no un span clicable)',
+    (h.match(/class="intv12-ack"/g) || []).length === 0
+    || /<button type="button" class="intv12-ack"[^>]*aria-label="[^"]+"/.test(h));
+  ok('7.4 «Entendido» lo resuelve la MISMA delegación única, sin listeners por nodo',
+    /closest\('\[data-intel-ack\]'\)/.test(fnSrc('_initIntelSeeChanges'))
+    && (app.match(/data-intel-ack\]/g) || []).length <= 2);
+  ok('7.5 y no borra memoria financiera: el acuse sólo entra como ENTRADA del Core',
+    /acknowledged: _ackMap/.test(app)
+    && /includeAcknowledged/.test(fnSrc('_aurixCanonicalFindings')));
+  ok('7.6 la profundidad se resuelve UNA vez por pintura, desde el contexto declarado',
+    /_intv4SetFactDepth\(\(intel && intel\.experience && intel\.experience\.resolved\)/.test(app));
+  ok('7.7 …y sólo cambia CUÁNTO se enseña: el importe absoluto es lo único que gatea',
+    (() => { const src = fnSrc('_intv4FactText');
+      return /_intv4FactDepth === _INTV4_DEPTH\.ADVANCED/.test(src)
+        && !/_intv4FactDepth[\s\S]{0,80}returnPct/.test(src); })());
+  // Se comprueba sobre el marcador de DILUCIÓN, no sobre la presencia del hecho:
+  // en esta fixture la liquidez bajó de verdad (25.000 → 5.000), así que «bajó» es
+  // la palabra correcta. Lo que no puede pasar es decirlo cuando NO bajó.
+  ok('7.8 una dilución NUNCA se redacta como «bajó»',
+    (() => { const sec = section(h, 'intv4-changed');
+      const rows = sec.split('<li class="intv4-chg');
+      return rows.every(r => !/data-diluted="(pure|mixed)"/.test(r) || !/bajó|fell/i.test(r)); })(),
+    JSON.stringify(attrs(section(h, 'intv4-changed'), 'data-diluted="([^"]*)"')));
+  ok('7.9 …y cuando SÍ bajó en importe, «bajó» es la palabra correcta y se usa',
+    (() => { const sec = section(h, 'intv4-changed');
+      return !/data-fact="cash_drift_liquidity/.test(sec) || /bajó|pasó del/i.test(sec); })());
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');
