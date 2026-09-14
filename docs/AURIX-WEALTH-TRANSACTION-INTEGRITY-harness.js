@@ -32,6 +32,19 @@ function ok(n, c, extra) {
   if (c) { pass++; console.log('  ✓ ' + n); }
   else { fail++; failed.push(n); console.log('  ✗ ' + n + (extra ? '  →  ' + extra : '')); }
 }
+// A1 — extractor del fuente de una constante, mismo criterio que `fnSource`: se
+// certifica la declaración REAL de producción, no una copia escrita a mano aquí.
+function konstSource(name) {
+  const s = 'const ' + name + ' =';
+  const i = app.indexOf(s);
+  if (i < 0) throw new Error('missing const ' + name);
+  let d = 0, st = false;
+  for (let k = i; k < app.length; k++) {
+    if (app[k] === '(' || app[k] === '{' || app[k] === '[') { d++; st = true; }
+    else if (app[k] === ')' || app[k] === '}' || app[k] === ']') { d--; if (st && !d) return app.slice(i, app.indexOf(';', k) + 1); }
+  }
+  throw new Error('unterminated const ' + name);
+}
 function fnSource(name) {
   const i = app.indexOf('function ' + name + '(');
   if (i < 0) return '';
@@ -52,13 +65,25 @@ const usdToEur = 0.92;                                  // 1 USD = 0,92 EUR
 const _aurixSaveCapitalFlows    = (arr) => { FLOWS = arr; };
 const _aurixLoadCapitalFlowsRaw = () => FLOWS.slice();
 const _aurixCapitalFlowsPush    = () => true;
-const _aurixLoadCapitalFlows = new Function('localStorage', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
-  fnSource('_aurixLoadCapitalFlows') + '\n;return _aurixLoadCapitalFlows;')(
+// A1 — lectura canónica = lectura VIVA menos las filas derivadas que duplican una
+// fila de usuario (defecto D-1). Owners reales inyectados, sin sustitutos.
+const _aurixLoadCapitalFlowsLive = new Function('localStorage', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
+  fnSource('_aurixLoadCapitalFlowsLive') + '\n;return _aurixLoadCapitalFlowsLive;')(
     { getItem: () => JSON.stringify(FLOWS) }, () => 0, 'aurixCapitalFlows');
+const _aurixFlowIsDerived = new Function(fnSource('_aurixFlowIsDerived') + '\n;return _aurixFlowIsDerived;')();
+const _aurixFlowDupKey    = new Function(fnSource('_aurixFlowDupKey') + '\n;return _aurixFlowDupKey;')();
+const _aurixFlowDuplicateIds = new Function('_aurixFlowIsDerived', '_aurixFlowDupKey',
+  fnSource('_aurixFlowDuplicateIds') + '\n;return _aurixFlowDuplicateIds;')(_aurixFlowIsDerived, _aurixFlowDupKey);
+const _aurixLoadCapitalFlows = new Function('_aurixLoadCapitalFlowsLive', '_aurixFlowDuplicateIds',
+  fnSource('_aurixLoadCapitalFlows') + '\n;return _aurixLoadCapitalFlows;')(
+    _aurixLoadCapitalFlowsLive, _aurixFlowDuplicateIds);
 const _aurixNewFlowId   = new Function(fnSource('_aurixNewFlowId') + '\n;return _aurixNewFlowId;')();
-const _aurixCaptureFlow = new Function('_aurixLoadCapitalFlowsRaw', '_aurixSaveCapitalFlows', '_aurixCapitalFlowsPush', 'IS_DEV',
+// A1 — el vocabulario de intención es una dependencia REAL de la captura: sin él
+// `_aurixCaptureFlow` no puede validar la intención declarada por el mecanismo.
+const _AURIX_FLOW_INTENT = new Function(konstSource('_AURIX_FLOW_INTENT') + '\n;return _AURIX_FLOW_INTENT;')();
+const _aurixCaptureFlow = new Function('_aurixLoadCapitalFlowsRaw', '_aurixSaveCapitalFlows', '_aurixCapitalFlowsPush', 'IS_DEV', '_AURIX_FLOW_INTENT',
   fnSource('_aurixCaptureFlow') + '\n;return _aurixCaptureFlow;')(
-    _aurixLoadCapitalFlowsRaw, _aurixSaveCapitalFlows, _aurixCapitalFlowsPush, false);
+    _aurixLoadCapitalFlowsRaw, _aurixSaveCapitalFlows, _aurixCapitalFlowsPush, false, _AURIX_FLOW_INTENT);
 const _aurixAmendFlow = new Function('_aurixLoadCapitalFlowsRaw', '_aurixSaveCapitalFlows', '_aurixCapitalFlowsPush',
   fnSource('_aurixAmendFlow') + '\n;return _aurixAmendFlow;')(
     _aurixLoadCapitalFlowsRaw, _aurixSaveCapitalFlows, _aurixCapitalFlowsPush);

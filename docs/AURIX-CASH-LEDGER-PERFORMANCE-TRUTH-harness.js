@@ -28,6 +28,19 @@ function ok(n, c, extra) {
   if (c) { pass++; console.log('  ✓ ' + n); }
   else { fail++; failed.push(n); console.log('  ✗ ' + n + (extra ? '  →  ' + extra : '')); }
 }
+// A1 — extractor del fuente de una constante, mismo criterio que `fnSource`: se
+// certifica la declaración REAL de producción, no una copia escrita a mano aquí.
+function konstSource(name) {
+  const s = 'const ' + name + ' =';
+  const i = app.indexOf(s);
+  if (i < 0) throw new Error('missing const ' + name);
+  let d = 0, st = false;
+  for (let k = i; k < app.length; k++) {
+    if (app[k] === '(' || app[k] === '{' || app[k] === '[') { d++; st = true; }
+    else if (app[k] === ')' || app[k] === '}' || app[k] === ']') { d--; if (st && !d) return app.slice(i, app.indexOf(';', k) + 1); }
+  }
+  throw new Error('unterminated const ' + name);
+}
 function fnSource(name) {
   const i = app.indexOf('function ' + name + '(');
   if (i < 0) return '';
@@ -53,13 +66,27 @@ let FLOWS = [], PUSHED = [], BUMPS = [];
 const _aurixSaveCapitalFlows   = (arr) => { FLOWS = arr; };
 const _aurixLoadCapitalFlowsRaw = () => FLOWS.slice();
 const _aurixCapitalFlowsPush   = (list) => { PUSHED.push(...(list || [])); return true; };
-const _aurixLoadCapitalFlows   = new Function('localStorage', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
-  fnSource('_aurixLoadCapitalFlows') + '\n;return _aurixLoadCapitalFlows;')(
+// A1 — la lectura canónica delega ahora en la lectura VIVA y excluye del consumo
+// las filas DERIVADAS que duplican una fila de usuario (defecto D-1). Se inyectan
+// los owners reales, no un sustituto: lo que se certifica aquí sigue siendo el
+// código de producción.
+const _aurixLoadCapitalFlowsLive = new Function('localStorage', '_aurixPortfolioEpoch', '_AURIX_CAPITAL_FLOWS_KEY',
+  fnSource('_aurixLoadCapitalFlowsLive') + '\n;return _aurixLoadCapitalFlowsLive;')(
     { getItem: () => JSON.stringify(FLOWS) }, () => 0, 'aurixCapitalFlows');
+const _aurixFlowIsDerived = new Function(fnSource('_aurixFlowIsDerived') + '\n;return _aurixFlowIsDerived;')();
+const _aurixFlowDupKey    = new Function(fnSource('_aurixFlowDupKey') + '\n;return _aurixFlowDupKey;')();
+const _aurixFlowDuplicateIds = new Function('_aurixFlowIsDerived', '_aurixFlowDupKey',
+  fnSource('_aurixFlowDuplicateIds') + '\n;return _aurixFlowDuplicateIds;')(_aurixFlowIsDerived, _aurixFlowDupKey);
+const _aurixLoadCapitalFlows  = new Function('_aurixLoadCapitalFlowsLive', '_aurixFlowDuplicateIds',
+  fnSource('_aurixLoadCapitalFlows') + '\n;return _aurixLoadCapitalFlows;')(
+    _aurixLoadCapitalFlowsLive, _aurixFlowDuplicateIds);
 const _aurixNewFlowId = new Function(fnSource('_aurixNewFlowId') + '\n;return _aurixNewFlowId;')();
-const _aurixCaptureFlow = new Function('_aurixLoadCapitalFlowsRaw', '_aurixSaveCapitalFlows', '_aurixCapitalFlowsPush', 'IS_DEV',
+// A1 — el vocabulario de intención es una dependencia REAL de la captura: sin él
+// `_aurixCaptureFlow` no puede validar la intención declarada por el mecanismo.
+const _AURIX_FLOW_INTENT = new Function(konstSource('_AURIX_FLOW_INTENT') + '\n;return _AURIX_FLOW_INTENT;')();
+const _aurixCaptureFlow = new Function('_aurixLoadCapitalFlowsRaw', '_aurixSaveCapitalFlows', '_aurixCapitalFlowsPush', 'IS_DEV', '_AURIX_FLOW_INTENT',
   fnSource('_aurixCaptureFlow') + '\n;return _aurixCaptureFlow;')(
-    _aurixLoadCapitalFlowsRaw, _aurixSaveCapitalFlows, _aurixCapitalFlowsPush, false);
+    _aurixLoadCapitalFlowsRaw, _aurixSaveCapitalFlows, _aurixCapitalFlowsPush, false, _AURIX_FLOW_INTENT);
 const _aurixAmendFlow = new Function('_aurixLoadCapitalFlowsRaw', '_aurixSaveCapitalFlows', '_aurixCapitalFlowsPush',
   fnSource('_aurixAmendFlow') + '\n;return _aurixAmendFlow;')(
     _aurixLoadCapitalFlowsRaw, _aurixSaveCapitalFlows, _aurixCapitalFlowsPush);
@@ -413,6 +440,12 @@ console.log('\n6 · lectura paginada del ledger (completitud demostrable):');
       _aurixSaveCapitalFlows: (l) => { env.saved = l; },
       _aurixCapitalFlowsPush: async (l) => { env.pushed = l; return true; },
       _aurixCapitalFlowsIncomplete: true,
+      // A1 — estado de descubrimiento de la columna `intent`. Arranca en
+      // 'unknown', así que la lectura NO la pide: nombrar una columna ausente
+      // haría fallar el select entero y marcaría el ledger como incompleto, y eso
+      // detendría la publicación de rentabilidad. Es parte del contrato.
+      _aurixFlowIntentColumn: 'unknown',
+      _AURIX_FLOW_INTENT: _AURIX_FLOW_INTENT,
     };
     vm.createContext(ctx);
     ['_AURIX_CAPITAL_FLOWS_PAGE','_AURIX_CAPITAL_FLOWS_MAX_PAGES'].forEach(c => {

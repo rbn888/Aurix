@@ -86,7 +86,13 @@ function makeCtx(opts) {
   vm.runInContext(konstSrc('_AURIX_FLOW_MATCH_REL_TOL'), sb);
   // `_aurixFlowCounterpartObserved` es REAL: es el contrato de la sección O y el
   // predicado que Pass B ya usaba. Stubearlo desactivaría justo lo que se certifica.
-  ['_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
+  // A1 — la lectura canónica del ledger delega ahora en la lectura VIVA y excluye
+  // del consumo las filas derivadas que duplican una fila de usuario (defecto
+  // D-1). Las tres funciones son código de producción, no sustitutos: sin ellas
+  // el ledger llegaría vacío y la neutralización no se estaría certificando.
+  ['_aurixPointValuationIncomplete','_aurixFlowIsInternal',
+   '_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
+   '_aurixFlowDuplicateIds','_aurixLoadCapitalFlows',
    '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain',
    '_aurixFlowCounterpartObserved','_aurixInvestablePerformance']
     .forEach(n => vm.runInContext(fnSrc(n), sb));

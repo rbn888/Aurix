@@ -3488,6 +3488,28 @@ function _mergeRemoteState(remoteRow) {
     // and is now reconciled into local cache (union-by-ts below). A null row = remote unavailable
     // (offline / load failure) ⇒ leave the flag so the device stays in "Calculando…" (test 8).
     if (remoteRow && typeof remoteRow === 'object') _aurixCanonicalHistoryLoaded = true;
+    // SPEC ADVANCED INTELLIGENCE · A1 — ADOPCIÓN DEL EPOCH SERVER-AUTHORITATIVE.
+    // Aquí, en la ÚNICA lectura remota reconciliada, y antes de que cualquier
+    // filtro por epoch corra sobre `remoteHist`/`remoteCat` más abajo. `max` con
+    // lo local vive en `_aurixPortfolioEpoch`, así que esto sólo PUBLICA lo que
+    // el servidor sabe; no decide. `columnSeen` se marca por presencia de la
+    // CLAVE, no por su valor: `null` es una respuesta legítima («sin reset») y
+    // autoriza a escribir, mientras una columna ausente no.
+    try {
+      if (remoteRow && typeof remoteRow === 'object'
+          && Object.prototype.hasOwnProperty.call(remoteRow, 'portfolio_epoch_ms')) {
+        _aurixEpochColumnSeen = true;
+        const _re = Number(remoteRow.portfolio_epoch_ms);
+        if (Number.isFinite(_re) && _re > 0) _aurixRemotePortfolioEpochMs = _re;
+      }
+      if (remoteRow && typeof remoteRow === 'object'
+          && Object.prototype.hasOwnProperty.call(remoteRow, 'asset_classification_lineage')) {
+        _aurixLineageColumnSeen = true;
+        if (Array.isArray(remoteRow.asset_classification_lineage)) {
+          _aurixAdoptRemoteClassificationLineage(remoteRow.asset_classification_lineage);
+        }
+      }
+    } catch (_) {}
     // P0-FINAL-PERFORMANCE-KILL-SWITCH — adopt the REMOTE canonical performance_state (the ONLY object an
     // authed client may render real performance from). Set ONLY here (a remote READ), never from local
     // compute. Absent column / null ⇒ stays null ⇒ authed users see "Calculando…" (no divergence possible).
@@ -3718,6 +3740,12 @@ async function _flushStatePersistence(reason) {
       // limpieza final, no este bloque.
       // subscription: <retirado en M.04 · §8>
       subscription_updated_at: localSubTs > 0 ? new Date(localSubTs).toISOString() : null,
+      // SPEC ADVANCED INTELLIGENCE · A1 — epoch y linaje de clasificación. Se
+      // añaden CONDICIONALMENTE más abajo (`_aurixAttachA1Columns`): nombrar una
+      // columna que todavía no existe hace fallar el upsert COMPLETO, y eso
+      // rompería la persistencia de historia, watchlist y preferencias de todo el
+      // mundo hasta aplicar el SQL. Sólo se escriben cuando una lectura previa
+      // demostró que la columna está.
       // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — performance_state is NO LONGER in this coupled payload. The
       // first upsert errors whenever ui_state/subscription columns are unmigrated, and the retry then STRIPPED
       // performance_state too ⇒ it never persisted (the root cause of hasRemotePerformanceState:false). It now
@@ -3735,16 +3763,39 @@ async function _flushStatePersistence(reason) {
     // so a partial/unhydrated client can never clobber a populated remote history. Defense-in-depth behind
     // the reconcile barrier above; the payload keeps the columns by default so the format is unchanged.
     if (!_aurixHistoryColumnsSafe()) { delete payload.category_history; delete payload.portfolio_history; }
+    // SPEC ADVANCED INTELLIGENCE · A1 — las dos columnas nuevas viajan SÓLO si una
+    // lectura anterior demostró que existen. Sin esa guarda, desplegar el cliente
+    // antes del SQL haría fallar TODO el upsert y la historia dejaría de
+    // sincronizar: el mismo patrón defensivo que ya protege `ui_state`, aplicado
+    // antes del error en vez de después.
+    try {
+      if (_aurixEpochColumnSeen) {
+        const _ep = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+        if (_ep > 0) {
+          payload.portfolio_epoch_ms = _ep;
+          payload.portfolio_epoch_updated_at = new Date().toISOString();
+        }
+      }
+      if (_aurixLineageColumnSeen && _aurixLineageDirty) {
+        payload.asset_classification_lineage = _aurixLineageForBackend();
+        payload.asset_classification_lineage_updated_at = new Date().toISOString();
+      }
+    } catch (_) {}
     let { error } = await supabaseClient
       .from('user_portfolios')
       .upsert(payload, { onConflict: 'user_id' });
+    if (!error) { try { _aurixLineageDirty = false; } catch (_) {} }
     if (error) {
       // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: push-safe. If the ui_state OR
       // the subscription columns are not migrated yet, the whole upsert errors —
       // retry WITHOUT them so core data (assets/history/watchlist/preferences)
       // still persists. Once the SQL is applied, the first branch succeeds and
       // this never runs. (AURIX-MONETIZATION-1 adds subscription to the strip.)
-      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at, ...core } = payload;
+      // A1 — las columnas nuevas entran en el mismo desnudado defensivo: si el
+      // upsert falla por un esquema incompleto, el núcleo financiero se guarda.
+      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at,
+              portfolio_epoch_ms, portfolio_epoch_updated_at,
+              asset_classification_lineage, asset_classification_lineage_updated_at, ...core } = payload;
       const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
       if (retry.error) throw retry.error;
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
@@ -4103,6 +4154,11 @@ const USER_SCOPED_LOCAL_KEYS = [
   // va sellado con su dueño y la lectura falla cerrada sin sello, así que el
   // aislamiento no depende sólo de que esta purga corra.
   'aurix_intel_ctx_v1', 'aurix_intel_mem_v1',
+  // SPEC ADVANCED INTELLIGENCE · A1 — linaje de clasificación. Es el mapa
+  // activo→bucket de UNA cartera y su bitácora de cambios: con el de A vivo, una
+  // afirmación de exposición histórica de B podría declararse «clasificación
+  // estable» apoyándose en observaciones que nunca fueron de su cuenta.
+  'aurix_asset_bucket_map_v1', 'aurix_asset_lineage_v1',
   // Nombres ANTERIORES de las dos claves (una hora en producción). Se purgan igual:
   // una clave huérfana que ya nadie lee sigue siendo estado del usuario A vivo en el
   // navegador, y el aislamiento no admite excepciones por obsolescencia.
@@ -5219,7 +5275,10 @@ const T = {
     // Descubrimientos: cada uno nace de una RELACIÓN entre hechos, nunca de una causa inventada.
     intel_d_apparent:      (pos, eff) => `Tienes ${pos} posiciones, pero tu peso se reparte como si tuvieras ${eff}.`,
     intel_d_conc_rising:   pct => `Tu posición principal ha pasado a pesar el ${pct}% y ha cruzado el umbral de concentración.`,
-    intel_d_capital:       'Tu patrimonio ha subido por el capital que has aportado, no por rendimiento del mercado.',
+    // A1 — «aportado» afirma INTENCIÓN (dinero nuevo desde fuera) y el ledger
+    // sólo certifica MECANISMO: un `deposit` puede ser el registro de efectivo
+    // que ya tenías. Se dice lo que se sabe: se registró liquidez.
+    intel_d_capital:       'Tu patrimonio ha subido por la liquidez que registraste, no por rendimiento del mercado.',
     intel_d_intent:        pct => `Dijiste que tu prioridad es preservar, y hoy una sola posición pesa el ${pct}%.`,
     intel_d_liq_need:      'Dijiste que vas a necesitar liquidez y tu peso en liquidez ha bajado.',
     intel_d_persisting:    n => `Esta lectura sigue igual tras ${n} observaciones: ya no es una novedad.`,
@@ -5310,6 +5369,10 @@ const T = {
     intcc_slv_topcat:  label => `${label} ha pasado a ser tu mayor exposición.`,
     intcc_radar_title: 'Radar',
     intcc_dim_div:    'Diversificación',
+    // A2 — la etiqueta exacta que la revisión financiera aceptó. Dice
+    // «registradas» porque eso es lo que mide: la categoría con la que el
+    // usuario dio de alta cada activo, NO una clase de activo económica.
+    intcc_dim_breadth: 'Amplitud de categorías',
     intcc_dim_liq:    'Liquidez',
     intcc_dim_conc:   'Concentración',
     intcc_dim_stab:   'Estabilidad',
@@ -5430,16 +5493,30 @@ const T = {
     intv4_f_level_up:   (amt, since) => `Tu patrimonio invertible ha subido ${amt} desde el ${since}`,
     intv4_f_level_down: (amt, since) => `Tu patrimonio invertible ha bajado ${amt} desde el ${since}`,
     intv4_f_prior_high: (amt, at) => `Tu máximo observado sigue siendo el del ${at}: ${amt}`,
-    intv4_why_investable_level_change: 'Es la evolución del nivel, no una rentabilidad: incluye el dinero que has aportado o retirado.',
+    intv4_why_investable_level_change: 'Es la evolución del nivel, no una rentabilidad: incluye los movimientos de liquidez que has registrado.',
     intv4_why_investable_prior_high: 'El máximo es una referencia de nivel; no dice por qué estás por debajo.',
-    intv4_f_capital_in: amt => `Has aportado ${amt} de capital nuevo`,
-    intv4_f_capital_out: amt => `Has retirado ${amt} de capital`,
+    // A1 · P0 CAPITAL — «Has aportado X de capital nuevo» QUEDA RETIRADA. Fallaba
+    // por cuatro vías independientes: la suma no filtraba por kind (sumaba
+    // compraventa interna), D-1 duplicaba cada depósito, D-2 convertía un asiento
+    // de cuadre en aportación, e `import_baseline` es heurístico. 159.381,97 US$
+    // sobre ~75k fue la prueba. Lo que Aurix SÍ puede decir es lo que REGISTRÓ, y
+    // «registrado» no afirma de dónde vino el dinero.
+    intv4_f_cashmov: (n, inAmt, outAmt) => `Has registrado ${n} movimientos de liquidez: ${inAmt} en entradas y ${outAmt} en salidas`,
+    // Degradación: el importe no es publicable (ledger incompleto, duplicados o
+    // filas heurísticas en la ventana). La dirección y el recuento siguen siendo
+    // verdad, y una cifra precisa equivocada con caveat sigue siendo equivocada.
+    intv4_f_cashmov_nc: n => `Has registrado ${n} movimientos de liquidez en este periodo`,
     intv4_f_cash: pct => `Tu liquidez es el ${pct}% del patrimonio invertible`,
     intv4_f_cash_up: (pp, win) => `Tu liquidez subió ${pp} pp en ${win}`,
     intv4_f_cash_down: (pp, win) => `Tu liquidez bajó ${pp} pp en ${win}`,
     intv4_f_liq_better: pp => `Tu liquidez ha mejorado ${pp} pp`,
+    // A1 — VERDAD DE LA TRANSICIÓN vs ATRIBUCIÓN DE CAUSA. `subió`/`bajó` describe
+    // la MAGNITUD y se usa cuando un evento del usuario corrobora el movimiento.
+    // Sin corroboración la forma es NEUTRAL: se dice que pasó de X a Y y no se
+    // insinúa ninguna acción suya. Ninguna de las dos afirma que vendiera.
     intv4_f_expo_up: (cat, pp, end, win) => `Tu exposición a ${cat} subió ${pp} pp en ${win}, hasta el ${end}%`,
     intv4_f_expo_down: (cat, pp, end, win) => `Tu exposición a ${cat} bajó ${pp} pp en ${win}, hasta el ${end}%`,
+    intv4_f_expo_move: (cat, start, end, win) => `Tu exposición a ${cat} pasó del ${start}% al ${end}% en ${win}`,
     intv4_f_top1: (name, pct) => `${name} concentra el ${pct}% de tu patrimonio invertible`,
     intv4_f_top3: pct => `Tus tres mayores posiciones suman el ${pct}%`,
     intv4_f_eff: (n, eff) => `Tienes ${n} posiciones, pero por cómo están repartidas tu diversificación efectiva equivale a unas ${eff} posiciones igualmente ponderadas`,
@@ -5449,12 +5526,12 @@ const T = {
     intv4_why_category_mix: 'La composición por clase de activo define a qué está expuesto realmente tu patrimonio.',
     intv4_why_cash_weight: 'La liquidez es lo que te permite decidir sin vender otra cosa.',
     intv4_why_investable_return: 'Es el rendimiento de tus inversiones, ya neutralizadas tus aportaciones y retiradas.',
-    intv4_why_external_capital: 'El capital que aportas mueve tu patrimonio, pero no es rendimiento.',
+    intv4_why_external_capital: 'Los movimientos de liquidez que registras mueven tu patrimonio, pero no son rendimiento.',
     intv4_why_wealth_level: 'El nivel es una afirmación sobre dónde estás, no sobre cómo has llegado.',
     intv4_why_data_coverage: 'Aurix prefiere explicarte un límite antes que darte una cifra que no pueda demostrar.',
     // descubrimientos
     intv4_w_eff: (n, eff) => `Tienes ${n} posiciones, pero tu diversificación efectiva equivale a unas ${eff}`,
-    intv4_w_capital: (amt, pct) => `Tu patrimonio creció, pero no por rendimiento: aportaste ${amt} y tus inversiones rindieron un ${pct}%`,
+    intv4_w_capital: (amt, pct) => `Tu patrimonio creció, pero no por rendimiento: registraste ${amt} de liquidez y tus inversiones rindieron un ${pct}%`,
     intv4_w_liqconc: (pp, top) => `Tu liquidez bajó ${pp} pp mientras tu posición principal ya pesa el ${top}%`,
     intv4_w_multi: n => `Han mejorado ${n} dimensiones independientes de tu patrimonio a la vez`,
     // preguntas
@@ -7689,7 +7766,7 @@ const T = {
     intel_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
     intel_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
     intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
-    intel_d_capital:       'Your wealth rose on the capital you added, not on market return.',
+    intel_d_capital:       'Your wealth rose on the cash you recorded, not on market return.',
     intel_d_intent:        pct => `You said preserving is your priority, and today one position weighs ${pct}%.`,
     intel_d_liq_need:      'You said you will need liquidity and your liquidity weight has fallen.',
     intel_d_persisting:    n => `This reading is unchanged after ${n} observations: it is no longer news.`,
@@ -7779,6 +7856,7 @@ const T = {
     intcc_slv_topcat:  label => `${label} has become your largest exposure.`,
     intcc_radar_title: 'Radar',
     intcc_dim_div:    'Diversification',
+    intcc_dim_breadth: 'Category breadth',
     intcc_dim_liq:    'Liquidity',
     intcc_dim_conc:   'Concentration',
     intcc_dim_stab:   'Stability',
@@ -7886,16 +7964,17 @@ const T = {
     intv4_f_level_up:   (amt, since) => `Your investable wealth is up ${amt} since ${since}`,
     intv4_f_level_down: (amt, since) => `Your investable wealth is down ${amt} since ${since}`,
     intv4_f_prior_high: (amt, at) => `Your observed high is still the one from ${at}: ${amt}`,
-    intv4_why_investable_level_change: 'This is how the level moved, not a return: it includes the money you added or withdrew.',
+    intv4_why_investable_level_change: 'This is how the level moved, not a return: it includes the cash movements you recorded.',
     intv4_why_investable_prior_high: 'A high is a level reference; it does not say why you are below it.',
-    intv4_f_capital_in: amt => `You have added ${amt} of new capital`,
-    intv4_f_capital_out: amt => `You have withdrawn ${amt} of capital`,
+    intv4_f_cashmov: (n, inAmt, outAmt) => `You recorded ${n} cash movements: ${inAmt} in and ${outAmt} out`,
+    intv4_f_cashmov_nc: n => `You recorded ${n} cash movements in this period`,
     intv4_f_cash: pct => `Cash is ${pct}% of your investable wealth`,
     intv4_f_cash_up: (pp, win) => `Your cash weight rose ${pp} pp over ${win}`,
     intv4_f_cash_down: (pp, win) => `Your cash weight fell ${pp} pp over ${win}`,
     intv4_f_liq_better: pp => `Your liquidity has improved ${pp} pp`,
     intv4_f_expo_up: (cat, pp, end, win) => `Your exposure to ${cat} rose ${pp} pp over ${win}, to ${end}%`,
     intv4_f_expo_down: (cat, pp, end, win) => `Your exposure to ${cat} fell ${pp} pp over ${win}, to ${end}%`,
+    intv4_f_expo_move: (cat, start, end, win) => `Your exposure to ${cat} went from ${start}% to ${end}% over ${win}`,
     intv4_f_top1: (name, pct) => `${name} holds ${pct}% of your investable wealth`,
     intv4_f_top3: pct => `Your three largest positions add up to ${pct}%`,
     intv4_f_eff: (n, eff) => `You hold ${n} positions, but given how they are weighted your effective diversification is about ${eff} equally weighted positions`,
@@ -7904,11 +7983,11 @@ const T = {
     intv4_why_category_mix: 'Your asset-class mix defines what your wealth is actually exposed to.',
     intv4_why_cash_weight: 'Cash is what lets you decide without having to sell something else.',
     intv4_why_investable_return: 'This is the return of your investments, with contributions and withdrawals already neutralised.',
-    intv4_why_external_capital: 'Capital you add moves your wealth, but it is not return.',
+    intv4_why_external_capital: 'Cash movements you record move your wealth, but they are not return.',
     intv4_why_wealth_level: 'A level is a statement about where you are, not about how you got there.',
     intv4_why_data_coverage: 'Aurix would rather explain a limit than give you a figure it cannot prove.',
     intv4_w_eff: (n, eff) => `You hold ${n} positions, but your effective diversification is about ${eff}`,
-    intv4_w_capital: (amt, pct) => `Your wealth grew, but not from return: you added ${amt} and your investments returned ${pct}%`,
+    intv4_w_capital: (amt, pct) => `Your wealth grew, but not from return: you recorded ${amt} of cash and your investments returned ${pct}%`,
     intv4_w_liqconc: (pp, top) => `Your cash fell ${pp} pp while your main position already weighs ${top}%`,
     intv4_w_multi: n => `${n} independent dimensions of your wealth improved at the same time`,
     intv4_q_q_performance: 'How much have my investments actually returned?',
@@ -10642,6 +10721,14 @@ function save(context) {
     // P0-SYNC-INTEGRITY — a local user change marks local ahead of the last synced state, so the
     // cross-device merge knows this device has unuploaded edits. (remote-sync writes don't bump.)
     if (context !== 'remote-sync' && context !== 'boot-load') { try { _aurixBumpPortfolioMeta(context || 'mutation'); } catch (_) {} }
+    // SPEC ADVANCED INTELLIGENCE · A1 — OBSERVADOR DE LINAJE DE CLASIFICACIÓN.
+    // Un activo puede cambiar de tipo por varias rutas (edición, reidentificación,
+    // catálogo) y cablearlas todas sería ancho y frágil. En vez de eso se DIFERENCIA
+    // el mapa activo→bucket contra el último observado, aquí, en la entrada
+    // universal de persistencia. Una sola llamada, guardada, sin efecto si nada
+    // cambió, y su ausencia sólo puede hacer que una afirmación histórica se
+    // SUPRIMA — nunca que se publique.
+    try { if (typeof _aurixObserveClassificationLineage === 'function') _aurixObserveClassificationLineage(); } catch (_) {}
     scheduleSave();
     // Portfolio mutation invariant: derived financial state must reflect
     // the new asset set immediately so workspace PORTFOLIO.* / EXPOSURE /
@@ -10697,8 +10784,12 @@ function _ledgerTrade(asset, type, qty, price, ts, realized) {
     if (asset) {
       const usd = _nativeToUSD((Number(qty) || 0) * (Number(price) || 0), asset.assetCurrency);
       if (Number.isFinite(usd) && usd > 0) {
+        // A1 — la intención aquí la determina el MECANISMO sin ambigüedad: ésta es
+        // la ruta interna de compraventa, declarada interna por el propio contrato
+        // del ledger (app.js:11062-11068). No es una inferencia.
         _aurixCaptureFlow(type === 'sell' ? 'asset_remove' : 'asset_add',
-          type === 'sell' ? -usd : usd, ts, asset.id, null, 'user');
+          type === 'sell' ? -usd : usd, ts, asset.id, null, 'user',
+          { intent: type === 'sell' ? 'INTERNAL_SELL' : 'INTERNAL_BUY' });
       }
     }
   } catch (_) {}
@@ -10787,7 +10878,8 @@ function _aurixLedgerAssetRemoval(asset, ts) {
   // `amount`/`currency` nativos junto al importe en USD, igual que los escribe el
   // owner de liquidez: la fila del ledger queda completa y editable.
   _aurixCaptureFlow('asset_remove', -usd, when, asset.id, 'asset-removed', 'user',
-                    { flowId, amount: -assetNativeValue(asset), currency: (asset.assetCurrency || 'USD') });
+                    { flowId, amount: -assetNativeValue(asset), currency: (asset.assetCurrency || 'USD'),
+                      intent: 'INTERNAL_SELL' });
 }
 
 // ── WN.4A — Local capital-flow ledger (localStorage only) ───────────────────
@@ -10798,6 +10890,38 @@ function _aurixLedgerAssetRemoval(asset, ts) {
 // fire on price refresh / market movement / currency-rate updates. amountUSD is
 // signed: + capital entering the portfolio, − capital leaving.
 const _AURIX_CAPITAL_FLOWS_KEY = 'aurixCapitalFlows';
+// SPEC ADVANCED INTELLIGENCE · A1 — VOCABULARIO CERRADO DE INTENCIÓN ECONÓMICA.
+// Espejo exacto del CHECK de db/advanced_intelligence_u1_1.sql, para que una
+// escritura del cliente no pueda ser rechazada por la base de datos ni quedar
+// fuera de contrato. Ausencia ⇒ UNKNOWN_LEGACY: TERMINAL, jamás promovible por
+// inferencia posterior. Ésa es la regla que impide que el mecanismo vuelva a
+// leerse como intención.
+const _AURIX_FLOW_INTENT = Object.freeze({
+  OPENING_BALANCE: 1,              // patrimonio que YA existía cuando se registró
+  EXTERNAL_CASH_CONTRIBUTION: 1,   // dinero nuevo desde fuera del perímetro
+  EXTERNAL_CASH_WITHDRAWAL: 1,     // dinero que sale del perímetro
+  INTERNAL_BUY: 1,                 // recomposición dentro del perímetro
+  INTERNAL_SELL: 1,
+  EXTERNAL_ASSET_TRANSFER_IN: 1,   // requiere captura explícita (no existe hoy)
+  EXTERNAL_ASSET_TRANSFER_OUT: 1,
+  CORRECTION: 1,
+  IMPORT_OR_MIGRATION: 1,
+  UNKNOWN_LEGACY: 1,
+  UNKNOWN_DECLINED: 1,             // el usuario no quiso declararla — se excluye igual
+});
+// La intención EFECTIVA de una fila. Sin campo explícito la respuesta es
+// UNKNOWN_LEGACY y no se deduce del kind: deducirla es precisamente el defecto.
+function _aurixFlowIntentOf(f) {
+  const v = f && f.intent;
+  return (v && _AURIX_FLOW_INTENT[v]) ? String(v) : 'UNKNOWN_LEGACY';
+}
+// Las dos únicas intenciones que pueden sostener una afirmación de capital EXTERNO.
+const _AURIX_FLOW_INTENT_EXTERNAL = Object.freeze(['EXTERNAL_CASH_CONTRIBUTION', 'EXTERNAL_CASH_WITHDRAWAL']);
+// Estado de la columna remota `intent`: 'unknown' hasta que un push lo demuestre.
+// No se puede SELECT-ear una columna inexistente (PostgREST responde error y la
+// lectura entera fallaría), así que la presencia se descubre en la ESCRITURA, que
+// ya sabe reintentar, y sólo entonces se empieza a leer.
+let _aurixFlowIntentColumn = 'unknown';   // unknown | yes | no
 // SPEC CIERRE PRE-FREEZE — la lectura del ledger sufría la MISMA clase de truncamiento silencioso que
 // se eliminó de `portfolio_snapshots`: `.select(...).eq('user_id', …)` sin `order`, sin `limit` y sin
 // paginación. PostgREST devuelve como mucho `max-rows` (1000) SIN señalarlo como error y, al no haber
@@ -10814,7 +10938,97 @@ const _AURIX_CAPITAL_FLOWS_MAX_PAGES = 12;     // presupuesto explícito: 12 000
 // anónimas no se ven afectadas: `_aurixSourceSetComplete` devuelve true cuando no hay usuario.
 let _aurixCapitalFlowsIncomplete = true;       // fail-closed: sin completitud demostrable no se publica rentabilidad
 
-function _aurixLoadCapitalFlows() {
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · A1 — D-1 / D-2, EL MISMO HECHO ECONÓMICO DOS VECES
+// ════════════════════════════════════════════════════════════════════════════
+// DEFECTO D-1, demostrado en el código y confirmado por revisión financiera.
+// `aurixCashOperation('deposit')` hace DOS cosas atómicamente: emite un flujo
+// `kind:'deposit'` con identidad opaca estable, y escribe una transacción
+// `{type:'buy', qty, price:1}` en la fila de liquidez para que el saldo sea
+// reconstruible. Después `_aurixBackfillFlowsFromTransactions` —que corre 5 s
+// tras CADA arranque— recorre TODOS los activos, liquidez incluida, sin filtro de
+// tipo, y DERIVA de esa misma transacción un flujo `kind:'asset_add'`. El dedup es
+// `kind:assetId:ts:round(|amountUSD|)`, así que al diferir el kind NO colapsan:
+// dos filas para un solo hecho económico.
+//
+// Consecuencias medidas, las dos graves:
+//   · `recorded_capital_net` (sin filtro de kind) suma el depósito DOS VECES, y
+//     sobre eso se escribía «Has aportado X de capital nuevo»;
+//   · el paso 4 de `_aurixInvestablePerformance` neutraliza el ledger COMPLETO sin
+//     filtrar por kind, así que NEUTRALIZA EL MISMO DEPÓSITO DOS VECES. El guard
+//     6b netea por intervalo, de modo que puede voltear en los dos sentidos: hay
+//     intervalos suprimidos sin motivo y otros publicados con doble
+//     neutralización. No es sólo una frase mal escrita: es rentabilidad.
+//
+// DEFECTO D-2. La misma función escribe una transacción SINTÉTICA de cuadre
+// (`opening:true`, app.js:11096) para que el saldo case con su ledger. Su flag no
+// tenía NINGÚN consumidor, así que el backfill la derivaba también: el REGISTRO de
+// patrimonio preexistente entraba como aportación. Es dato fabricado dentro de un
+// owner financiero; su exclusión es obligatoria.
+//
+// CÓMO SE CORRIGE, y por qué así:
+//   1. EN EL ESCRITOR — el backfill deja de derivar de liquidez y de asientos de
+//      apertura. Corta la hemorragia, pero no cura lo ya escrito.
+//   2. EN EL LECTOR — canonicalización. Una fila DERIVADA (`source:'tx-backfill'`)
+//      es un duplicado de una fila de USUARIO cuando coinciden activo, signo e
+//      importe redondeado Y `derived.originalTs === user.ts`. Ese último término es
+//      lo que lo hace EXACTO y no heurístico: el backfill deriva precisamente de la
+//      transacción que el owner de liquidez escribió, así que su `originalTs` ES el
+//      `ts` del flujo de usuario. Nada de ventanas de tolerancia, nada de adivinar.
+//   3. NADA SE BORRA. La historia financiera no se destruye: el duplicado sigue en
+//      el almacén y en `capital_flows`, y sale sólo del CONSUMO. Es reversible y
+//      auditable (`_aurixFlowDuplicateReport`), y cura cuentas ya contaminadas sin
+//      una migración destructiva.
+// La autoridad es siempre la fila de USUARIO: el hecho lo registró el usuario, la
+// otra es una derivación de su propio rastro.
+function _aurixFlowIsDerived(f) {
+  const s = String((f && f.source) || '');
+  return s === 'tx-backfill' || s === 'inferred';
+}
+function _aurixFlowDupKey(f) {
+  const amt = Number((f && f.amountUSD) || 0);
+  return String((f && f.assetId) || 'cash') + '|' + (amt >= 0 ? '+' : '-')
+       + '|' + Math.round(Math.abs(amt));
+}
+// Devuelve el Set de ids DERIVADOS que duplican una fila de usuario ya presente.
+function _aurixFlowDuplicateIds(list) {
+  const out = new Set();
+  try {
+    const userByKey = new Map();
+    for (const f of list) {
+      if (!f || _aurixFlowIsDerived(f)) continue;
+      const k = _aurixFlowDupKey(f);
+      if (!userByKey.has(k)) userByKey.set(k, []);
+      userByKey.get(k).push(f);
+    }
+    if (!userByKey.size) return out;
+    for (const f of list) {
+      if (!f || !_aurixFlowIsDerived(f)) continue;
+      const origin = Number.isFinite(Number(f.originalTs)) ? Number(f.originalTs) : Number(f.ts);
+      const twins = userByKey.get(_aurixFlowDupKey(f));
+      if (!twins) continue;
+      // Coincidencia EXACTA de instante original: es la misma transacción.
+      if (twins.some(u => Number(u.ts) === origin)) out.add(String(f.id));
+    }
+  } catch (_) {}
+  return out;
+}
+// Informe de sólo lectura: cuántas filas se excluyen del consumo y por qué. Lo
+// consume la puerta de evidencia (una cuenta con duplicados no puede sostener una
+// cifra de capital) y el harness.
+function _aurixFlowDuplicateReport() {
+  const raw = _aurixLoadCapitalFlowsLive();
+  const dup = _aurixFlowDuplicateIds(raw);
+  const rows = raw.filter(f => dup.has(String(f.id)))
+    .map(f => ({ kind: String(f.kind || ''), source: String(f.source || ''),
+                 amountUSD: Number(f.amountUSD) || 0, ts: Number(f.ts) || 0,
+                 originalTs: Number.isFinite(Number(f.originalTs)) ? Number(f.originalTs) : null }));
+  return { total: raw.length, excluded: rows.length, rows: rows };
+}
+// Las filas VIVAS sin canonicalizar: mismo contrato que la lectura histórica
+// (tombstones y pre-epoch fuera), y es sobre esto sobre lo que se detecta el
+// duplicado — hace falta ver las dos caras para poder excluir una.
+function _aurixLoadCapitalFlowsLive() {
   try {
     const raw = localStorage.getItem(_AURIX_CAPITAL_FLOWS_KEY);
     const arr = raw ? JSON.parse(raw) : [];
@@ -10828,6 +11042,17 @@ function _aurixLoadCapitalFlows() {
     return arr.filter(f => f && typeof f.ts === 'number' && Number.isFinite(f.amountUSD)
                         && !f.deletedAt && (!epoch || f.ts >= epoch));
   } catch (_) { return []; }
+}
+// LA LECTURA CANÓNICA. Un solo punto: todo lo que consume flujos —neutralización
+// de rentabilidad, hechos de capital, WN.11— pasa por aquí, así que la corrección
+// llega a todos los consumidores sin editar ninguno. Era la única forma de que
+// «el mismo depósito no se neutralice dos veces» no dependiera de recordar
+// filtrarlo en cada llamada.
+function _aurixLoadCapitalFlows() {
+  const live = _aurixLoadCapitalFlowsLive();
+  if (!live.length) return live;
+  const dup = _aurixFlowDuplicateIds(live);
+  return dup.size ? live.filter(f => !dup.has(String(f.id))) : live;
 }
 
 // Lectura CRUDA (incluye tombstones): sólo para sync/backfill/auditoría, nunca
@@ -10865,11 +11090,27 @@ function _aurixCaptureFlow(kind, amountUSD, ts, assetId, note, source, extra) {
     const flows = _aurixLoadCapitalFlowsRaw();
     if (flows.some(f => f.id === id)) return;                       // idempotent (id keyed on effective ts)
     const flow = { id, ts: t, amountUSD: +amountUSD.toFixed(2), kind, source: source || 'user', revision: 1 };
+    // SPEC ADVANCED INTELLIGENCE · A1 — INTENCIÓN EXPLÍCITA, NUNCA INFERIDA.
+    // `kind` describe el MECANISMO, no la intención económica, y ahí nace la frase
+    // falsa: `deposit` se emite tanto cuando entra dinero nuevo como cuando el
+    // usuario REGISTRA efectivo que ya tenía, y `withdrawal` tanto para una
+    // retirada real como para la baja de una fila de liquidez. Por eso «Has
+    // aportado X de capital nuevo» no es certificable y queda retirada.
+    // `intent` se escribe SÓLO donde el mecanismo la determina sin ambigüedad
+    // (una compra por la ruta interna ES una compra interna). Para
+    // `deposit`/`withdrawal` se deja AUSENTE a propósito: distinguir dinero nuevo
+    // de registro exige una declaración del usuario que todavía no se captura, y
+    // rellenarla por mecanismo sería repetir el error que esto corrige.
+    // Ausente ⇒ UNKNOWN_LEGACY ⇒ excluida de todo agregado externo, para siempre.
+    if (extra && extra.intent && _AURIX_FLOW_INTENT[extra.intent]) flow.intent = String(extra.intent);
     if (assetId) flow.assetId = assetId;
     if (note)    flow.note = note;
     // SPEC DSH.CHART.RETURNS.RETIMING.01 — optional re-time audit trail (originalTs/matchedStepTs/etc);
     // never affects the id or the amount, so idempotency and neutralisation are unchanged.
-    if (extra && typeof extra === 'object') { for (const k in extra) { if (extra[k] !== undefined) flow[k] = extra[k]; } }
+    // `intent` se excluye de la copia genérica: ya se validó arriba contra el
+    // vocabulario cerrado, y dejar que el bucle la sobrescriba con el valor crudo
+    // permitiría meter en el ledger una intención que la base de datos rechazaría.
+    if (extra && typeof extra === 'object') { for (const k in extra) { if (k !== 'intent' && extra[k] !== undefined) flow[k] = extra[k]; } }
     if (extra && extra.flowId) { flow.amount = extra.amount; flow.currency = extra.currency; }
     flows.push(flow);
     _aurixSaveCapitalFlows(flows);
@@ -10925,8 +11166,8 @@ function _aurixFlowLedgerRevision() {
 function _aurixBumpFlowLedgerRevision() {
   try { const n = _aurixFlowLedgerRevision() + 1; localStorage.setItem(_AURIX_FLOW_REVISION_KEY, String(n)); return n; } catch (_) { return 0; }
 }
-function _aurixFlowRowFromLocal(f) {
-  return {
+function _aurixFlowRowFromLocal(f, withIntent) {
+  const row = {
     flow_id:    String(f.id),
     ts:         new Date(Number(f.ts) || Date.now()).toISOString(),
     kind:       String(f.kind || 'deposit'),
@@ -10938,6 +11179,12 @@ function _aurixFlowRowFromLocal(f) {
     deleted_at: f.deletedAt ? new Date(Number(f.deletedAt)).toISOString() : null,
     updated_at: new Date().toISOString(),
   };
+  // A1 — la columna `intent` sólo viaja cuando se ha demostrado que existe. Un
+  // upsert que nombra una columna ausente falla COMPLETO, así que incluirla a
+  // ciegas rompería la persistencia del ledger de todo el mundo hasta aplicar el
+  // SQL. Se descubre escribiendo (ver `_aurixCapitalFlowsPush`), no leyendo.
+  if (withIntent) row.intent = _aurixFlowIntentOf(f);
+  return row;
 }
 async function _aurixCapitalFlowsPush(flows) {
   try {
@@ -10945,10 +11192,25 @@ async function _aurixCapitalFlowsPush(flows) {
     if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return false;
     const list = (Array.isArray(flows) ? flows : []).filter(Boolean);
     if (!list.length) return false;
-    const rows = list.map(f => Object.assign({ user_id: currentUser.id }, _aurixFlowRowFromLocal(f)));
-    // Idempotente por (user_id, flow_id): repetir el push de un mismo evento es
-    // un no-op, y una edición reescribe SU fila en vez de añadir otra.
-    const { error } = await supabaseClient.from('capital_flows').upsert(rows, { onConflict: 'user_id,flow_id' });
+    const send = async (withIntent) => {
+      const rows = list.map(f => Object.assign({ user_id: currentUser.id }, _aurixFlowRowFromLocal(f, withIntent)));
+      // Idempotente por (user_id, flow_id): repetir el push de un mismo evento es
+      // un no-op, y una edición reescribe SU fila en vez de añadir otra.
+      return await supabaseClient.from('capital_flows').upsert(rows, { onConflict: 'user_id,flow_id' });
+    };
+    // DESCUBRIMIENTO DE ESQUEMA EN LA ESCRITURA, una sola vez por sesión. Si la
+    // columna no está, se reintenta SIN ella y se recuerda: el ledger sigue
+    // sincronizando exactamente como hoy. Si está, se recuerda también y a partir
+    // de ahí la lectura puede pedirla.
+    let attemptIntent = (_aurixFlowIntentColumn !== 'no');
+    let { error } = await send(attemptIntent);
+    if (error && attemptIntent) {
+      _aurixFlowIntentColumn = 'no';
+      const retry = await send(false);
+      error = retry.error;
+    } else if (!error && attemptIntent) {
+      _aurixFlowIntentColumn = 'yes';
+    }
     if (error) { try { console.warn('[capital-flows][push]', error.message || error); } catch (_) {} return false; }
     _aurixBumpFlowLedgerRevision();
     return true;
@@ -10975,9 +11237,14 @@ async function _aurixCapitalFlowsPull() {
       // esta misma razón. Aquí el cursor es INCLUSIVO (`lte`) porque dos flujos pueden compartir `ts`:
       // con `lt` se perdería el resto del grupo empatado en la frontera de página. El solape que
       // introduce el `lte` lo limpia el dedupe por `flow_id`, y el avance se mide por IDS NUEVOS.
+      // A1 — `intent` se pide SÓLO si la escritura ya demostró que la columna
+      // existe. Nombrar una columna ausente en el select hace fallar la lectura
+      // completa, y una lectura fallida marca el ledger como incompleto ⇒ dejaría
+      // de publicarse rentabilidad. El coste de descubrirlo por aquí sería un P0.
+      const _cols = 'flow_id, ts, kind, amount, currency, amount_usd, asset_id, revision, deleted_at'
+                  + (_aurixFlowIntentColumn === 'yes' ? ', intent' : '');
       let _q = supabaseClient.from('capital_flows')
-        .select('flow_id, ts, kind, amount, currency, amount_usd, asset_id, revision, deleted_at',
-                _page === 0 ? { count: 'exact' } : undefined)
+        .select(_cols, _page === 0 ? { count: 'exact' } : undefined)
         .eq('user_id', currentUser.id);
       if (_cursorTs != null) _q = _q.lte('ts', _cursorTs);
       const { data: _rows, error, count: _count } = await _q
@@ -11016,6 +11283,10 @@ async function _aurixCapitalFlowsPull() {
       };
       if (r.asset_id)   remote.assetId  = String(r.asset_id);
       if (r.deleted_at) remote.deletedAt = new Date(r.deleted_at).getTime();
+      // A1 — la intención remota se adopta sólo si es del vocabulario cerrado. Un
+      // valor desconocido se trata como ausente (UNKNOWN_LEGACY), nunca como una
+      // intención nueva: el conjunto lo fija el contrato, no la fila.
+      if (r.intent && _AURIX_FLOW_INTENT[r.intent]) remote.intent = String(r.intent);
       if (!Number.isFinite(remote.ts) || !Number.isFinite(remote.amountUSD)) continue;
       const cur = byId.get(remote.id);
       // Autoridad por REVISIÓN, no por reloj: una edición posterior siempre gana,
@@ -11483,7 +11754,15 @@ function _aurixEffectiveFlowTs(amountUSD, ts) { return _aurixFlowRetimeDecision(
 // 'user') are the source of truth and are NEVER removed. Idempotent + reversible (re-derivable).
 function _aurixPurgeDerivedFlows() {
   try {
-    const flows = _aurixLoadCapitalFlows();
+    // SPEC ADVANCED INTELLIGENCE · A1 — SE PURGA SOBRE LA LECTURA CRUDA.
+    // Leía `_aurixLoadCapitalFlows()`, que YA filtra tombstones y filas pre-epoch,
+    // y escribía ese resultado de vuelta: cada purga DESTRUÍA permanentemente las
+    // lápidas y los marcadores pre-epoch del almacén local. En un ledger
+    // append-only eso es exactamente lo que no puede pasar — una lápida es la
+    // prueba de que un evento se anuló, y sin ella el siguiente `pull` reinserta
+    // la fila como si nunca se hubiera tocado. Se purga lo DERIVADO y se conserva
+    // absolutamente todo lo demás.
+    const flows = _aurixLoadCapitalFlowsRaw();
     const kept = flows.filter(f => f && f.source !== 'tx-backfill' && f.source !== 'inferred');
     if (kept.length !== flows.length) _aurixSaveCapitalFlows(kept);
     return flows.length - kept.length;
@@ -11597,8 +11876,23 @@ function _aurixBackfillFlowsFromTransactions() {
     const candidates = [];
     for (const a of list) {
       if (!a || !Array.isArray(a.transactions)) continue;
+      // SPEC ADVANCED INTELLIGENCE · A1 · D-1 — LA LIQUIDEZ NO SE DERIVA.
+      // `aurixCashOperation` es el owner económico ÚNICO de la liquidez: emite el
+      // flujo externo (`deposit`/`withdrawal`) Y escribe la transacción que hace
+      // el saldo reconstruible. Derivar un `asset_add` de esa misma transacción
+      // duplica el hecho, y como el kind difiere el dedup no lo colapsa. Aquí no
+      // se «filtra un caso raro»: se respeta una frontera de propiedad que ya
+      // estaba escrita (app.js:11062-11068) y que este bucle ignoraba.
+      if (String(a.type || '').toLowerCase() === 'cash') continue;
       for (const tx of a.transactions) {
         if (!tx || !Number.isFinite(tx.ts) || !Number.isFinite(tx.qty) || !Number.isFinite(tx.price)) continue;
+        // SPEC ADVANCED INTELLIGENCE · A1 · D-2 — EL ASIENTO DE APERTURA NO ES UN FLUJO.
+        // `opening:true` marca una transacción SINTÉTICA de cuadre: existe para que
+        // un saldo preexistente sea reconstruible, no porque haya entrado dinero.
+        // Su flag no tenía consumidor, así que el registro de patrimonio ya poseído
+        // se derivaba como aportación de capital. Dato fabricado dentro de un owner
+        // financiero: fuera, siempre.
+        if (tx.opening === true) continue;
         scanned++;
         const native = Math.abs(Number(tx.qty) * Number(tx.price));
         const usd = (typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native;
@@ -13106,7 +13400,36 @@ function gramsToDisplay(g) {
 // sync, or in-flight snapshots from before the reset can never leak
 // into the chart or PnL math.
 const PORTFOLIO_EPOCH_KEY = 'aurix_portfolio_epoch';
-function _aurixPortfolioEpoch() {
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · A1 — EL EPOCH DEJA DE SER DEL DISPOSITIVO
+// ════════════════════════════════════════════════════════════════════════════
+// El epoch marca la FRONTERA DE CICLO DE VIDA de una CARTERA, y vivía sólo en
+// el localStorage del navegador que hizo el reset. Consecuencia medida sobre el
+// propio contrato de `portfolio_snapshots` (db/portfolio_snapshots_1.sql: el
+// cliente tenía SELECT y NADA más, así que un reset no podía borrar la fuente):
+// un segundo dispositivo que nunca vio el reset tiene epoch 0 y lee filas
+// PRE-RESET que el primero esconde. Sobre esa historia ajena al ciclo actual se
+// construyen afirmaciones de exposición histórica — «tu exposición a los ETF
+// bajó 16,8 pp hasta el 0 %» — que el usuario no puede reconocer porque no son
+// de su cartera actual.
+//
+// AUTORIDAD = `user_portfolios.portfolio_epoch_ms` (db/advanced_intelligence_u1_1.sql).
+// La regla es `max(server, local)` y es deliberadamente asimétrica:
+//   · un epoch local NUNCA retrocede — si este dispositivo ya oculta historia,
+//     seguirá ocultándola aunque el servidor no lo sepa todavía;
+//   · un dispositivo en 0 ADOPTA la autoridad de la cuenta en cuanto la lee.
+// Sin columna (o sin fila) el remoto vale 0 y el comportamiento es EXACTAMENTE
+// el de hoy: es el mismo patrón fail-closed de `intelligence_context`, y es lo
+// que permite desplegar el cliente ANTES de aplicar el SQL.
+//
+// `_aurixEpochColumnSeen` existe por una razón operativa, no estética: incluir
+// una columna inexistente en el upsert de `user_portfolios` haría FALLAR el
+// upsert COMPLETO y rompería la persistencia de todo el mundo hasta aplicar el
+// SQL. Así que sólo se ESCRIBE el epoch cuando se ha OBSERVADO la columna en una
+// lectura. Orden de despliegue libre, sin ventana de rotura.
+let _aurixRemotePortfolioEpochMs = 0;
+let _aurixEpochColumnSeen = false;
+function _aurixLocalPortfolioEpoch() {
   try {
     const v = parseInt(localStorage.getItem(PORTFOLIO_EPOCH_KEY) || '0', 10) || 0;
     if (v > 0) return v;
@@ -13118,6 +13441,207 @@ function _aurixPortfolioEpoch() {
     return 0;
   }
 }
+function _aurixPortfolioEpoch() {
+  const local  = _aurixLocalPortfolioEpoch();
+  const remote = Number(_aurixRemotePortfolioEpochMs) || 0;
+  return Math.max(local > 0 ? local : 0, remote > 0 ? remote : 0);
+}
+// Read-only diagnosis of WHICH side is in force. The A0 probe and the evidence
+// harness both need to distinguish "this device hides history" from "the account
+// hides history" — they are different facts and only one is cross-device.
+function _aurixEpochAuthority() {
+  const local  = _aurixLocalPortfolioEpoch();
+  const remote = Number(_aurixRemotePortfolioEpochMs) || 0;
+  return {
+    effective: Math.max(local > 0 ? local : 0, remote > 0 ? remote : 0),
+    local: local, remote: remote,
+    source: (remote > 0 && remote >= local) ? 'server' : (local > 0 ? 'device' : 'none'),
+    columnSeen: !!_aurixEpochColumnSeen,
+  };
+}
+try { if (typeof window !== 'undefined') window.aurixEpochAuthority = () => _aurixEpochAuthority(); } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · A1 — LINAJE DE CLASIFICACIÓN (forward-only)
+// ════════════════════════════════════════════════════════════════════════════
+// El segundo camino por el que una exposición histórica puede ser falsa sin que
+// nadie haya mentido: el capturador de snapshots agrupa por `asset.type` EN EL
+// INSTANTE DE LA CAPTURA (supabase/functions/portfolio-snapshot/index.ts:106),
+// y ese tipo es MUTABLE. Si un instrumento se reidentifica (etf → fund,
+// metal → other), el bucket histórico se queda congelado en el valor viejo y el
+// de hoy es otro: «tu exposición a los ETF bajó hasta el 0 %» sin que se haya
+// vendido nada. La resta es correcta; la comparación no lo es.
+//
+// LO QUE ESTE MÓDULO NO HACE: no reconstruye el pasado. El linaje no existía, así
+// que no se puede saber qué tipo tenía un activo hace 30 días. Se observa desde
+// AHORA y se declara la cobertura, y una ventana que empieza antes de la primera
+// observación se resuelve como `unknown` ⇒ la TRANSICIÓN se suprime. Ése es el
+// comportamiento correcto hoy y deja de ser restrictivo por sí solo con el paso
+// del tiempo, sin ninguna migración.
+//
+// UN SOLO OBSERVADOR, UN SOLO SITIO. Un activo puede cambiar de tipo por muchas
+// rutas (edición, reidentificación, catálogo), y cablear todas sería ancho y
+// frágil. En vez de eso se DIFERENCIA el mapa activo→bucket contra el último
+// observado, en `save()`, que es la entrada universal de persistencia. Una sola
+// llamada, guardada, sin efectos si nada cambió.
+//
+// PERDER UNA ENTRADA ES SEGURO, y por eso el linaje puede viajar en el jsonb
+// last-writer-wins de `user_portfolios` mientras un ledger económico no puede
+// (db/capital_flows_1.sql explica por qué): una entrada ausente degrada la
+// afirmación a `unknown` y la calla. Falla hacia SUPRIMIR, nunca hacia publicar.
+const _AURIX_BUCKET_MAP_KEY = 'aurix_asset_bucket_map_v1';
+const _AURIX_LINEAGE_KEY = 'aurix_asset_lineage_v1';
+const _AURIX_LINEAGE_MAX = 200;          // bitácora acotada: lo más reciente manda
+let _aurixLineageColumnSeen = false;
+let _aurixLineageDirty      = false;
+
+function _aurixLineageRead() {
+  try {
+    const raw = localStorage.getItem(_AURIX_LINEAGE_KEY);
+    const o = raw ? JSON.parse(raw) : null;
+    if (!o || typeof o !== 'object') return { since: null, entries: [] };
+    // `Number(null)` es 0, y un 0 aquí significaría «cubierto desde el origen de
+    // los tiempos»: exactamente el fail-OPEN que esta cobertura existe para evitar.
+    // La ausencia se comprueba ANTES de convertir.
+    const rawSince = (o.since === null || o.since === undefined) ? null : Number(o.since);
+    return { since: Number.isFinite(rawSince) ? rawSince : null,
+             entries: Array.isArray(o.entries) ? o.entries : [] };
+  } catch (_) { return { since: null, entries: [] }; }
+}
+function _aurixLineageWrite(rec) {
+  try {
+    localStorage.setItem(_AURIX_LINEAGE_KEY, JSON.stringify({
+      since: rec.since, entries: (rec.entries || []).slice(-_AURIX_LINEAGE_MAX),
+    }));
+  } catch (_) {}
+}
+// Unión determinista por (activo, instante, origen, destino). Dos dispositivos
+// que observaron el mismo cambio producen la MISMA entrada, así que el merge las
+// colapsa; y `since` se queda con la observación MÁS ANTIGUA demostrable, porque
+// la cobertura de la cuenta es la de quien lleva más tiempo mirando.
+function _aurixLineageMerge(a, b) {
+  const A = a || { since: null, entries: [] }, B = b || { since: null, entries: [] };
+  const seen = new Set(), out = [];
+  [].concat(A.entries || [], B.entries || []).forEach(e => {
+    if (!e || !e.a || !Number.isFinite(Number(e.at))) return;
+    const k = String(e.a) + '|' + Number(e.at) + '|' + String(e.f || '') + '|' + String(e.t || '');
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({ a: String(e.a), f: String(e.f || ''), t: String(e.t || ''), at: Number(e.at) });
+  });
+  out.sort((x, y) => x.at - y.at || (x.a < y.a ? -1 : 1));
+  // Misma trampa que en la lectura: `Number(null)` es 0 y eso ampliaría la
+  // cobertura declarada hasta el origen de los tiempos al fusionar.
+  const nz = v => (v === null || v === undefined) ? null : (Number.isFinite(Number(v)) ? Number(v) : null);
+  const sa = nz(A.since);
+  const sb = nz(B.since);
+  const since = (sa === null) ? sb : (sb === null) ? sa : Math.min(sa, sb);
+  return { since: since, entries: out.slice(-_AURIX_LINEAGE_MAX) };
+}
+function _aurixAdoptRemoteClassificationLineage(remoteEntries) {
+  try {
+    const remote = { since: null, entries: [] };
+    (Array.isArray(remoteEntries) ? remoteEntries : []).forEach(e => {
+      if (e && e.__since != null && Number.isFinite(Number(e.__since))) { remote.since = Number(e.__since); return; }
+      remote.entries.push(e);
+    });
+    const merged = _aurixLineageMerge(_aurixLineageRead(), remote);
+    _aurixLineageWrite(merged);
+  } catch (_) {}
+}
+// Lo que viaja al servidor: las entradas más el marcador de cobertura como una
+// entrada sintética, para no necesitar una segunda columna sólo por un número.
+function _aurixLineageForBackend() {
+  const rec = _aurixLineageRead();
+  const out = (rec.entries || []).slice();
+  if (Number.isFinite(rec.since)) out.push({ __since: rec.since });
+  return out;
+}
+// EL OBSERVADOR. Puro salvo por su escritura local; nunca lanza; no toca activos.
+function _aurixObserveClassificationLineage(nowTs) {
+  try {
+    if (typeof _aurixCategoryBucket !== 'function') return 0;
+    let list = [];
+    try { list = (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []; } catch (_) { return 0; }
+    const now = Number.isFinite(nowTs) ? nowTs : Date.now();
+    const cur = {};
+    for (const a of list) {
+      if (!a || !a.id) continue;
+      cur[String(a.id)] = _aurixCategoryBucket(a);
+    }
+    let prev = null;
+    try { const raw = localStorage.getItem(_AURIX_BUCKET_MAP_KEY); prev = raw ? JSON.parse(raw) : null; } catch (_) { prev = null; }
+    const rec = _aurixLineageRead();
+    // PRIMERA OBSERVACIÓN: se sella la cobertura y NO se emite ningún cambio. Sin
+    // un mapa anterior no hay diferencia que observar, y registrar el estado
+    // inicial como «cambió a X» sería fabricar un evento de reclasificación.
+    if (!prev || typeof prev !== 'object') {
+      try { localStorage.setItem(_AURIX_BUCKET_MAP_KEY, JSON.stringify(cur)); } catch (_) {}
+      if (!Number.isFinite(rec.since)) { rec.since = now; _aurixLineageWrite(rec); _aurixLineageDirty = true; }
+      return 0;
+    }
+    const added = [];
+    Object.keys(cur).forEach(id => {
+      const before = prev[id];
+      if (before && before !== cur[id]) added.push({ a: id, f: String(before), t: String(cur[id]), at: now });
+    });
+    try { localStorage.setItem(_AURIX_BUCKET_MAP_KEY, JSON.stringify(cur)); } catch (_) {}
+    if (!Number.isFinite(rec.since)) rec.since = now;
+    if (added.length) {
+      _aurixLineageWrite(_aurixLineageMerge(rec, { since: rec.since, entries: added }));
+      _aurixLineageDirty = true;
+    } else if (!Number.isFinite(_aurixLineageRead().since)) {
+      _aurixLineageWrite(rec); _aurixLineageDirty = true;
+    }
+    return added.length;
+  } catch (_) { return 0; }
+}
+// EL LECTOR que consume la puerta de evidencia. Tres estados, nunca dos:
+//   'stable'  — hay cobertura sobre TODA la ventana y ninguna entrada toca este
+//               bucket dentro de ella;
+//   'changed' — una entrada lo toca (como origen o como destino);
+//   'unknown' — no hay cobertura que alcance el inicio de la ventana.
+// `unknown` no es un fallo: es la verdad de una cuenta cuyo linaje empezó a
+// observarse después. Y `unknown` suprime la transición.
+function _aurixClassificationValidity(bucket, startTs, endTs) {
+  const out = { validity: 'unknown', reason: 'no_lineage_coverage',
+                observedSince: null, entries: 0 };
+  try {
+    const b = String(bucket || '');
+    if (!b) { out.reason = 'no_bucket'; return out; }
+    const rec = _aurixLineageRead();
+    out.observedSince = Number.isFinite(rec.since) ? rec.since : null;
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) { out.reason = 'no_window'; return out; }
+    if (!Number.isFinite(rec.since) || rec.since > startTs) {
+      out.reason = 'coverage_starts_after_window'; return out;
+    }
+    const hits = (rec.entries || []).filter(e => e && Number.isFinite(e.at)
+      && e.at >= startTs && e.at <= endTs && (String(e.f) === b || String(e.t) === b));
+    out.entries = hits.length;
+    if (hits.length) { out.validity = 'changed'; out.reason = 'bucket_reclassified_in_window'; return out; }
+    out.validity = 'stable'; out.reason = '';
+    return out;
+  } catch (_) { return out; }
+}
+// El bucket ACTUAL de un activo por id, incluidas las filas cerradas (una venta
+// total conserva la fila con qty 0 — el historial financiero no se borra). Es lo
+// que permite preguntar «¿hay un evento del usuario sobre ESTA categoría dentro de
+// la ventana?» sin reconstruir nada: si el activo ya no existe, no hay respuesta y
+// la causa se queda en desconocida, que es la verdad.
+function _aurixAssetBucketById(assetId) {
+  try {
+    if (!assetId || typeof _aurixCategoryBucket !== 'function') return null;
+    const list = (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : [];
+    const a = list.find(x => x && String(x.id) === String(assetId));
+    return a ? _aurixCategoryBucket(a) : null;
+  } catch (_) { return null; }
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixClassificationLineage = () => _aurixLineageRead();
+    window.aurixClassificationValidity = (b, s, e) => _aurixClassificationValidity(b, s, e);
+  }
+} catch (_) {}
 function _aurixFilterAfterEpoch(arr, tsKey) {
   const epoch = _aurixPortfolioEpoch();
   if (!epoch || !Array.isArray(arr) || !arr.length) return Array.isArray(arr) ? arr : [];
@@ -27678,6 +28202,12 @@ function _aurixInvestablePerformance(range) {
     externalFlowCount: 0, tradeFlowCount: 0, confidence: null, basis: 'investable-twr', fallbackReason: null,
     spanMs: null, nominalMs: null, coversNominal: null,
     unmatchedFlows: 0, unmatchedFlowTotal: 0,
+    // SPEC ADVANCED INTELLIGENCE · A1 — DIAGNÓSTICOS, no valores publicables.
+    // La puerta de reconciliación necesita una tolerancia DERIVADA, no elegida, y
+    // la escala honesta del ruido de una serie es el mayor movimiento que ELLA
+    // MISMA hizo sin ningún flujo que lo explique. `_aurixTwrChain` ya lo calcula;
+    // lo único que faltaba era publicarlo. Aditivo: no cambia ninguna cifra.
+    maxNoFlowJumpPct: null, maxIntervalJumpPct: null,
     index: null,                       // M.03 C — sólo se rellena si valid === true
   };
   try {
@@ -27743,6 +28273,11 @@ function _aurixInvestablePerformance(range) {
 
     // 5 · ONE FORMULA — the shared chained-TWR core.
     const chain = _aurixTwrChain(pts, flows);
+    // Se publican ANTES de los guards: la puerta de reconciliación los necesita
+    // incluso cuando el retorno acaba no siendo publicable — es justo entonces
+    // cuando hay que decidir si la causa está en el ledger o en la serie.
+    if (Number.isFinite(chain.maxNoFlowJumpPct))   out.maxNoFlowJumpPct   = +chain.maxNoFlowJumpPct.toFixed(4);
+    if (Number.isFinite(chain.maxIntervalJumpPct)) out.maxIntervalJumpPct = +chain.maxIntervalJumpPct.toFixed(4);
     if (!chain.values.length) { out.fallbackReason = 'chain_empty'; return out; }
     if (chain.badDenom > 0) { out.fallbackReason = 'interval_fallback:' + chain.badDenom; return out; }
 
@@ -28045,6 +28580,312 @@ function _aurixEffectiveDiversification() {
   } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · A1 — CONTRATO DE EVIDENCIA FINANCIERA
+// ════════════════════════════════════════════════════════════════════════════
+// Lo que faltaba no era un motor: era la PUERTA. El ledger ya sabía que un hecho
+// no certificable no entra, pero «certificable» significaba «el owner devolvió un
+// número». Dos afirmaciones reales lo desmintieron:
+//
+//   «Tu exposición a los ETF bajó 16,8 pp en los últimos 30 días, hasta el 0 %»
+//   «Has aportado 159.381,97 US$ de capital nuevo»
+//
+// Las dos salían de owners certificados y las dos eran indefendibles, por la misma
+// razón de fondo: NADIE COMPROBABA QUE LOS DOS EXTREMOS DE LA COMPARACIÓN FUERAN
+// COMPARABLES. La primera puede estar comparando la cartera de hoy con una
+// PRE-RESET (el epoch era del dispositivo) o con la MISMA cartera clasificada de
+// otra forma (el bucket histórico se congela con el tipo de entonces). La segunda
+// sumaba mecanismos —compras internas, derivaciones, heurísticos— bajo una palabra
+// que significa intención («aportado»).
+//
+// LA PUERTA. Toda afirmación de usuario presenta este bloque, y lo que no lo
+// presenta completo se omite o se degrada. No se puede levantar la confianza
+// desde aquí: sólo bajarla.
+const _AURIX_OBS_CLASS = Object.freeze({
+  OBSERVED:      'observed',       // medido por un owner certificado en un instante real
+  DERIVED:       'derived',        // aritmética pura sobre valores observados
+  RECONSTRUCTED: 'reconstructed',  // rellenado desde otra fuente
+  INFERRED:      'inferred',       // heurístico
+  DECLARED:      'declared',       // lo dijo el usuario
+});
+// Razones de hueco. Son CÓDIGOS, no frases: la superficie decide si dice algo.
+const _AURIX_EV_GAP = Object.freeze({
+  EPOCH_CROSSED:            'epoch_boundary_crossed',
+  CLASSIFICATION_UNKNOWN:   'classification_validity_unknown',
+  CLASSIFICATION_CHANGED:   'classification_changed_in_window',
+  CAUSE_UNKNOWN:            'cause_not_corroborated',
+  FLOW_AUTHORITY_INCOMPLETE: 'capital_flow_authority_incomplete',
+  FLOW_DUPLICATE_IDENTITY:  'duplicate_flow_identity',
+  FLOW_INFERRED_PRESENT:    'inferred_flow_in_window',
+  FLOW_INTENT_UNKNOWN:      'flow_intent_unknown',
+  EXTERNAL_TRANSFER_UNSUPPORTED: 'external_transfer_not_capturable',
+  RECONCILIATION_NOT_COMPUTABLE: 'money_identity_not_conservative',
+});
+// EL BLOQUE DE EVIDENCIA. `ok` es el AND de todas sus condiciones, así que un
+// consumidor no puede olvidarse de comprobar una: si la usa, ya está comprobada.
+function _aurixEvidence(spec) {
+  const s = spec || {};
+  const ev = {
+    accountId: s.accountId || null,
+    epoch: Number.isFinite(s.epoch) ? s.epoch : null,
+    source: s.source || null,
+    observationClass: s.observationClass || null,
+    baseline:   s.baseline   || null,
+    comparison: s.comparison || null,
+    window: s.window || null,
+    classificationValidity: s.classificationValidity || null,
+    coverage: s.coverage || null,
+    confidence: Number.isFinite(s.confidence) ? s.confidence : null,
+    corroboration: s.corroboration || null,
+    gaps: [],
+    ok: false,
+  };
+  // El epoch de los DOS extremos tiene que ser el del ciclo de vida vigente. Un
+  // extremo anterior al epoch no es «poco fiable»: es de otra cartera, y no hay
+  // grado de confianza que arregle comparar dos carteras distintas.
+  if (Number.isFinite(ev.epoch) && ev.epoch > 0) {
+    const b = ev.baseline && Number.isFinite(ev.baseline.at) ? ev.baseline.at : null;
+    const c = ev.comparison && Number.isFinite(ev.comparison.at) ? ev.comparison.at : null;
+    if ((b !== null && b < ev.epoch) || (c !== null && c < ev.epoch)) ev.gaps.push(_AURIX_EV_GAP.EPOCH_CROSSED);
+  }
+  if (s.requireClassification) {
+    if (ev.classificationValidity === 'unknown') ev.gaps.push(_AURIX_EV_GAP.CLASSIFICATION_UNKNOWN);
+    else if (ev.classificationValidity === 'changed') ev.gaps.push(_AURIX_EV_GAP.CLASSIFICATION_CHANGED);
+  }
+  (s.extraGaps || []).forEach(g => { if (g) ev.gaps.push(g); });
+  ev.ok = ev.gaps.length === 0
+       && !!ev.source && !!ev.observationClass
+       && (!s.requireEndpoints || (!!ev.baseline && !!ev.comparison));
+  return ev;
+}
+
+// ── AMPLITUD DE CATEGORÍAS REGISTRADAS ──────────────────────────────────────
+// Sustituye al eje que el radar llamaba «Diversificación» y que publicaba
+// `effectiveN/positions*100`, es decir LA MISMA MAGNITUD que el anillo de Salud
+// con otra normalización: 83 % en el radar y 75 % en Salud, en la misma pantalla.
+// No era un problema de etiqueta, eran dos verdades a la vez.
+//
+// QUÉ MIDE, exactamente y nada más: en cuántas CATEGORÍAS REGISTRADAS —el tipo con
+// el que el usuario dio de alta cada activo— se reparte el patrimonio invertible.
+// effectiveN_cat = 1/Σw_cat². Se publica como CONTEO con su taxonomía declarada
+// («1,2 de 7»), NUNCA como porcentaje, y la revisión financiera es la que cierra
+// esa puerta: con denominador «categorías que tienes», BTC+ETH+caja al 50/50 daría
+// 2/2 = 100 % de amplitud para tres activos; y con denominador «las 7 canónicas»,
+// un 0-100 afirmaría que siete buckets equiponderados son el ideal — uno de ellos
+// es «Otros». Eso es una recomendación disfrazada de medida, y Aurix no la hace.
+//
+// QUÉ NO MIDE, y está prohibido insinuarlo: exposición económica subyacente,
+// sector, geografía, correlación, divisa, riesgo, calidad o «bien diversificado».
+// Un ETF puede ser renta variable, renta fija, materias primas o multiactivo, y
+// Aurix NO LO SABE. Por eso tampoco afirma que acciones, ETF y fondos sean
+// económicamente distintos, ni que sean lo mismo: no dice nada sobre su solape.
+//
+// LÍMITE DECLARADO (revisión, A7): el donut del Dashboard pliega `fund` dentro de
+// `etf`, así que el producto muestra 6 grupos mientras la historia certificada
+// maneja 7 buckets. Aquí se usa la taxonomía CERTIFICADA (la misma que el lector de
+// historia y los hechos de exposición) y se DECLARA su tamaño en la superficie,
+// que es la salida que la revisión autoriza sin tocar una superficie protegida.
+const _AURIX_CATBREADTH_TAXONOMY = Object.freeze(['stock', 'etf', 'fund', 'crypto', 'metal', 'liquidity', 'other']);
+// Bucket ESTRICTO: un tipo ausente o fuera de las canónicas NO se pliega a
+// «otros». Plegarlo es lo que produce un denominador parcial publicado como si
+// fuera el total — el defecto que la revisión prohíbe explícitamente.
+function _aurixStrictInvestableBucket(asset) {
+  const t = String((asset && asset.type) || '').toLowerCase();
+  if (!t) return null;
+  if (t === 'crypto' || t === 'stock' || t === 'etf' || t === 'fund' || t === 'other') return t;
+  if (t === 'metal' || t === 'commodity') return 'metal';
+  if (t === 'cash' || t === 'liquidity') return 'liquidity';
+  if (t === 'real_estate') return 'real_estate';     // no invertible: fuera del perímetro
+  return null;                                        // desconocido ⇒ falla cerrado
+}
+function _aurixRegisteredCategoryBreadth() {
+  const out = { metric: 'registered_category_breadth', status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE,
+    reason: 'no_source', effectiveCategories: null, taxonomySize: _AURIX_CATBREADTH_TAXONOMY.length,
+    categoriesHeld: 0, topCategory: null, topCategoryPct: null, unit: 'categories',
+    denominator: 'investable_value_usd',
+    forbiddenFraming: ['diversification', 'economic_exposure', 'sector', 'geography',
+                       'correlation', 'currency', 'risk', 'quality', 'health', 'grade'] };
+  try {
+    if (typeof investableAssets !== 'function' || typeof assetValueUSD !== 'function') return out;
+    const list = investableAssets();
+    if (!Array.isArray(list) || !list.length) { out.reason = 'no_positions'; return out; }
+    const byCat = {};
+    let total = 0;
+    for (const a of list) {
+      // Hereda ÍNTEGRAS las barreras de `_aurixEffectiveDiversification`: una
+      // cantidad no usable o una posición no valorable ⇒ no hay número. Un
+      // denominador parcial sobrestima siempre.
+      if (typeof _aurixUsableQuantity === 'function' && !Number.isFinite(_aurixUsableQuantity(a && a.qty))) {
+        out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'unusable_quantity'; return out;
+      }
+      const b = _aurixStrictInvestableBucket(a);
+      if (b === null) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'unclassifiable_type'; return out; }
+      if (b === 'real_estate') continue;
+      const v = assetValueUSD(a);
+      if (!Number.isFinite(v)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'unvalued_position'; return out; }
+      if (v <= 0) continue;
+      byCat[b] = (byCat[b] || 0) + v; total += v;
+    }
+    const keys = Object.keys(byCat);
+    if (!(total > 0) || !keys.length) { out.reason = 'no_valued_positions'; return out; }
+    let hhi = 0, topK = null, topW = 0;
+    for (const k of keys) { const w = byCat[k] / total; hhi += w * w; if (w > topW) { topW = w; topK = k; } }
+    if (!(hhi > 0) || !Number.isFinite(hhi)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'hhi_not_finite'; return out; }
+    out.categoriesHeld = keys.length;
+    out.topCategory = topK;
+    out.topCategoryPct = +(topW * 100).toFixed(2);
+    // SI «OTROS» ES EL BUCKET DE MAYOR PESO, NO SE PUBLICA. La mayor parte del
+    // patrimonio está sin clasificar, así que cualquier afirmación sobre amplitud
+    // de categorías es infundada — y decir «1,2 de 7» sobre eso sería presentar
+    // una taxonomía que el propio dato no sostiene.
+    if (topK === 'other') { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'unclassified_dominates'; return out; }
+    out.effectiveCategories = +(1 / hhi).toFixed(2);
+    out.status = _AURIX_FACT_STATUS.AVAILABLE; out.reason = '';
+    return out;
+  } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixRegisteredCategoryBreadth = () => _aurixRegisteredCategoryBreadth();
+}
+
+// ── AUTORIDAD DEL LEDGER DE LIQUIDEZ ────────────────────────────────────────
+// Lo único que Aurix puede afirmar hoy sobre movimientos de dinero, y la lista de
+// razones por las que no puede afirmar más. Devuelve cifras SÓLO si las cuatro
+// condiciones de la revisión se cumplen; si no, devuelve los huecos y nadie
+// publica un importe.
+//
+//   C1 · kind ∈ {deposit, withdrawal} — estricto. Ni compras ni ventas internas.
+//   C2 · cero filas heurísticas (`source:'inferred'` / `import_baseline`).
+//   C3 · D-1 y D-2 corregidos, y CERO duplicados de identidad vivos.
+//   C4 · ventana íntegramente cubierta: el ledger remoto tiene que estar
+//        DEMOSTRABLEMENTE completo (`_aurixCapitalFlowsComplete`, que arranca en
+//        falso y sólo pasa a cierto tras una lectura paginada con `count` exacto).
+//   C5 · vocabulario: «registrado», nunca «aportado» ni «capital nuevo».
+//
+// Y la frontera que no se cruza: esto NO es capital externo certificado. Un
+// `deposit` puede ser dinero nuevo o el REGISTRO de efectivo que ya tenías, y el
+// mecanismo no lo distingue. Distinguirlo exige una intención declarada por el
+// usuario que todavía no se captura, así que la cifra externa no existe y la
+// frase que la publicaba queda retirada.
+function _aurixCashLedgerAuthority(t0, t1) {
+  const out = { status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE, reason: 'no_window',
+    gaps: [], events: 0, inUSD: null, outUSD: null, netUSD: null,
+    intentKnown: 0, externalCertified: false, amountPublishable: false,
+    observationClass: _AURIX_OBS_CLASS.DERIVED };
+  try {
+    if (!Number.isFinite(t0) || !Number.isFinite(t1)) return out;
+    const all = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    const win = all.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD)
+                             && f.ts > t0 && f.ts <= t1);
+    // C4 — completitud remota demostrable. Sin ella no se sabe si falta un
+    // movimiento, y «has registrado X» sobre un ledger incompleto es falso.
+    let complete = false;
+    try { complete = (typeof _aurixCapitalFlowsComplete === 'function') ? !!_aurixCapitalFlowsComplete() : false; } catch (_) { complete = false; }
+    if (!complete) out.gaps.push(_AURIX_EV_GAP.FLOW_AUTHORITY_INCOMPLETE);
+    // C3 — duplicados de identidad vivos. Se excluyen del consumo, pero su
+    // presencia significa que la cuenta arrastra contaminación: no se publica
+    // importe hasta que no quede ninguno en la ventana.
+    let dupIn = 0;
+    try {
+      const rep = _aurixFlowDuplicateReport();
+      dupIn = (rep.rows || []).filter(r => r.ts > t0 && r.ts <= t1).length;
+    } catch (_) { dupIn = 0; }
+    if (dupIn > 0) out.gaps.push(_AURIX_EV_GAP.FLOW_DUPLICATE_IDENTITY);
+    // C2 — heurísticos en la ventana.
+    const inferred = win.filter(f => String(f.source || '') === 'inferred' || String(f.kind || '') === 'import_baseline');
+    if (inferred.length) out.gaps.push(_AURIX_EV_GAP.FLOW_INFERRED_PRESENT);
+    // C1 — sólo movimientos de liquidez registrados.
+    const cash = win.filter(f => f.kind === 'deposit' || f.kind === 'withdrawal');
+    out.events = cash.length;
+    let sIn = 0, sOut = 0;
+    for (const f of cash) {
+      const amt = (typeof toBase === 'function') ? toBase(f.amountUSD, 'USD') : f.amountUSD;
+      if (!Number.isFinite(amt)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'fx_unavailable'; return out; }
+      if (amt >= 0) sIn += amt; else sOut += amt;
+    }
+    out.inUSD = +sIn.toFixed(2); out.outUSD = +sOut.toFixed(2); out.netUSD = +(sIn + sOut).toFixed(2);
+    out.intentKnown = cash.filter(f => _AURIX_FLOW_INTENT_EXTERNAL.indexOf(_aurixFlowIntentOf(f)) !== -1).length;
+    // La afirmación EXTERNA exige intención declarada en TODOS los eventos de la
+    // ventana. Hoy no se captura, así que esto es falso por diseño y el hueco lo
+    // dice por su nombre en vez de callarlo.
+    out.externalCertified = cash.length > 0 && out.intentKnown === cash.length && !out.gaps.length;
+    if (cash.length && out.intentKnown !== cash.length) out.gaps.push(_AURIX_EV_GAP.FLOW_INTENT_UNKNOWN);
+    // El IMPORTE se publica sólo sin huecos que lo afecten. Con huecos queda la
+    // DIRECCIÓN y el RECUENTO, que siguen siendo verdad: es la degradación que la
+    // revisión pide en vez de una cifra precisa equivocada con caveat.
+    const blocking = out.gaps.filter(g => g !== _AURIX_EV_GAP.FLOW_INTENT_UNKNOWN);
+    out.amountPublishable = cash.length > 0 && blocking.length === 0;
+    out.status = _AURIX_FACT_STATUS.AVAILABLE; out.reason = '';
+    return out;
+  } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
+}
+
+// ── RECONCILIACIÓN · POR QUÉ NO EXISTE UNA IDENTIDAD DE DINERO ──────────────
+// Se evaluó y se declara NO COMPUTABLE, con su causa, en vez de fabricar una
+// puerta que no puede disparar (la revisión lo exige explícitamente: una
+// tolerancia tan ancha que nunca salta no es un gate, es decoración).
+//
+// DOS RAZONES INDEPENDIENTES:
+//  1. EL MODELO NO CONSERVA. Una compra no debita la caja, así que `asset_add`
+//     SUBE el valor invertible registrado sin dinero externo y sin decremento que
+//     lo compense. La rotación interna CREA valor registrado. El residuo mezcla
+//     error real, artefacto de registro y no-conservación del propio modelo, y no
+//     hay forma de separarlos desde dentro.
+//  2. EL TWR NO SE INVIERTE. `_aurixInvestablePerformance` publica un índice
+//     flow-neutral, no un importe de resultado; convertirlo en dinero exigiría
+//     asumir ausencia de flujos, que es justo lo que no se puede asumir aquí.
+// Lo que SÍ existe y no se duplica: el predicado de contrapartida por intervalo
+// (`_aurixFlowCounterpartObserved`, ya dentro del owner de rentabilidad) y su
+// recuento `unmatchedFlows`. Se CONSUME como señal de salud del ledger; no se
+// reimplementa. Y es asimétrico por contrato: un `unmatched > 0` prueba que algo
+// está mal; un 0 NO prueba que esté bien.
+function _aurixLedgerHealthSignal(range) {
+  const out = { available: false, unmatchedFlows: null, flowCount: null,
+                maxNoFlowJumpPct: null, reason: null, ledgerAttributable: false };
+  try {
+    if (typeof _aurixInvestablePerformance !== 'function') return out;
+    const p = _aurixInvestablePerformance(range || 'all');
+    if (!p) return out;
+    out.available = true;
+    out.unmatchedFlows = Number.isFinite(p.unmatchedFlows) ? p.unmatchedFlows : null;
+    out.flowCount = Number.isFinite(p.flowCount) ? p.flowCount : null;
+    out.maxNoFlowJumpPct = Number.isFinite(p.maxNoFlowJumpPct) ? p.maxNoFlowJumpPct : null;
+    out.reason = p.fallbackReason || null;
+    // Atribuible AL LEDGER: son las dos razones que nacen de los flujos, no de la
+    // serie. Importa porque si el ledger es la causa, el retorno que se neutraliza
+    // con él tampoco es de fiar (revisión, D9).
+    out.ledgerAttributable = out.reason === 'pending_flow_reconciliation'
+                          || out.reason === 'unexplained_capital_event';
+    return out;
+  } catch (_) { return out; }
+}
+
+// ── IDENTIDAD DE EVENTO ─────────────────────────────────────────────────────
+// Cuatro dominios, porque un solo hash no podía servir a los cuatro. La versión
+// anterior mezclaba la raíz causal con el punto base de la ventana, y eso hacía
+// imposible lo que pretendía: dos ventanas sobre la MISMA deriva tienen puntos
+// base distintos, así que producían dos eventos donde hay uno.
+//   · transacción autoritativa → su `flowId` opaco y estable. NUNCA el `ts`
+//     re-anclado (el re-anclaje mueve el instante, no el hecho).
+//   · transacción legacy       → identidad determinista original.
+//   · transición estructural   → raíz + identidad de la transición.
+//   · cruce de banda           → raíz + origen>destino (volver a cruzar SÍ es
+//     otro evento, y en sentido contrario).
+//   · deriva pasiva de mercado → NO es un evento discreto: es una OBSERVACIÓN de
+//     estado. Su identidad es sólo la raíz y las ventanas viajan como DATO, que es
+//     lo que colapsa 7D y 30D en una sola entidad.
+// La selección de ventana no es identidad. La deduplicación de presentación no es
+// identidad. El instante de pintado nunca es identidad.
+function _aurixEventIdentity(domain, spec) {
+  const s = spec || {};
+  const S = v => String(v == null ? '' : v);
+  if (domain === 'transaction')  return 'tx:' + (s.flowId ? S(s.flowId) : (S(s.kind) + ':' + S(s.assetId || 'cash') + ':' + S(s.originalTs)));
+  if (domain === 'structural')   return 'st:' + S(s.causalRoot) + ':' + S(s.transitionKey);
+  if (domain === 'band')         return 'st:' + S(s.causalRoot) + ':' + S(s.fromBand) + '>' + S(s.toBand);
+  if (domain === 'observation')  return 'ob:' + S(s.causalRoot);
+  return 'ob:' + S(s.causalRoot || 'unknown');
+}
+
 // ── FACT LEDGER ─────────────────────────────────────────────────────────────
 // Builds every certifiable fact once. `opts.ranges` bounds which windows are
 // asked for; `opts.presentationHistory` (array of { semanticKey, shownAt }) is
@@ -28297,36 +29138,77 @@ function _aurixFactLedger(opts) {
     }
   }
 
-  // ── C · CAPITAL FLOW — recorded capital, explicitly NOT performance ───────
-  // The same perimeter INT.02 neutralises out of the return, so the pair
-  // "you added X / your investments returned Y" is internally consistent.
-  // (`flowLedger` se carga en la sección B — ver la nota de M.03 D.)
+  // ── C · CAPITAL FLOW — MOVIMIENTOS DE LIQUIDEZ REGISTRADOS ───────────────
+  // A1 · P0 CAPITAL. Este bloque sumaba `_aurixLoadCapitalFlows()` SIN FILTRAR
+  // POR KIND y lo publicaba como «Has aportado X de capital nuevo». Es decir:
+  // metía compras y ventas internas —que el propio contrato del ledger declara
+  // INTERNAS (app.js:11062-11068)— y filas heurísticas `import_baseline` dentro
+  // de una palabra que significa intención. Sobre una cartera de ~75k publicó
+  // 159.381,97 US$.
+  //
+  // Lo que queda es lo único certificable hoy: `kind ∈ {deposit, withdrawal}`,
+  // es decir MOVIMIENTOS DE LIQUIDEZ REGISTRADOS. No es capital externo: un
+  // `deposit` puede ser dinero nuevo o el registro de efectivo que ya tenías, y
+  // el mecanismo no los distingue. Distinguirlos exige intención DECLARADA por el
+  // usuario, que todavía no se captura — así que la cifra externa no existe y
+  // `externalCertified` es falso por diseño, con su hueco nombrado.
+  //
+  // La clave semántica NO cambia: sus consumidores aguas abajo (PC.01 evolution,
+  // el descubrimiento capital-vs-mercado, el wow insight) están certificados
+  // sobre ella por sus propios gates. Cambia lo que CONTIENE y lo que DICE.
   if (lvlSeries.length >= 2) {
     const t0 = lvlSeries[0].ts, t1 = lvlSeries[lvlSeries.length - 1].ts;
-    const inWin = flowLedger.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 && f.ts <= t1);
-    let net = 0, bad = false;
-    for (const f of inWin) {
-      const amt = (typeof toBase === 'function') ? toBase(f.amountUSD, 'USD') : f.amountUSD;
-      if (!Number.isFinite(amt)) { bad = true; break; }
-      net += amt;
-    }
+    const cashAuth = _aurixCashLedgerAuthority(t0, t1);
+    const net = Number(cashAuth.netUSD);
     const endValue = lvlSeries[lvlSeries.length - 1].value;
-    if (bad) {
+    // Todo hueco de autoridad se publica como GAP ESTRUCTURADO, uno por causa: la
+    // superficie puede decir «no puedo medirlo» con precisión en vez de callar.
+    (cashAuth.gaps || []).forEach(g => {
+      gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'recorded_capital_net', _AURIX_FACT_STATUS.LOW_CONFIDENCE, g);
+    });
+    // La transferencia de activo desde/hacia fuera del perímetro NO es capturable
+    // hoy: una posición que aparece sin compra es indistinguible de un `asset_add`.
+    // Se declara como límite, no se infiere.
+    gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'external_asset_transfer',
+        _AURIX_FACT_STATUS.NOT_YET_SUPPORTED, _AURIX_EV_GAP.EXTERNAL_TRANSFER_UNSUPPORTED);
+    // Y la identidad de dinero completa se declara NO COMPUTABLE con su causa: el
+    // modelo no conserva (una compra no debita caja) y el TWR no se invierte en
+    // importe. Mejor un límite declarado que una puerta que no puede disparar.
+    gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'money_identity_reconciliation',
+        _AURIX_FACT_STATUS.NOT_YET_SUPPORTED, _AURIX_EV_GAP.RECONCILIATION_NOT_COMPUTABLE);
+    if (cashAuth.status === _AURIX_FACT_STATUS.LOW_CONFIDENCE && cashAuth.reason === 'fx_unavailable') {
       gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'recorded_capital_net', _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'fx_unavailable');
-    } else if (inWin.length && endValue > 0 && Math.abs(net) >= _AURIX_FACT_MATERIAL.flowShareOfValue * endValue) {
+    } else if (cashAuth.events && Number.isFinite(net) && endValue > 0
+               && Math.abs(net) >= _AURIX_FACT_MATERIAL.flowShareOfValue * endValue) {
       push({
         semanticKey: 'recorded_capital_net',
         family: _AURIX_FACT_FAMILY.CAPITAL_FLOW,
         causalRoot: _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL,
         value: +net.toFixed(2), unit: 'base_currency',
-        values: { net: +net.toFixed(2), events: inWin.length, shareOfValue: +(Math.abs(net) / endValue).toFixed(4) },
+        values: { net: +net.toFixed(2), events: cashAuth.events,
+                  inUSD: cashAuth.inUSD, outUSD: cashAuth.outUSD,
+                  amountPublishable: cashAuth.amountPublishable,
+                  externalCertified: cashAuth.externalCertified,
+                  intentKnown: cashAuth.intentKnown,
+                  perimeter: 'registered_cash_movements_only',
+                  shareOfValue: +(Math.abs(net) / endValue).toFixed(4) },
+        evidence: _aurixEvidence({
+          accountId: (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null,
+          epoch: (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : null,
+          source: 'capitalFlowsLedger', observationClass: _AURIX_OBS_CLASS.DERIVED,
+          baseline: { at: t0 }, comparison: { at: t1 }, requireEndpoints: true,
+          window: { range: 'observed', startAt: t0, endAt: t1 },
+          coverage: { complete: cashAuth.amountPublishable },
+          confidence: cashAuth.amountPublishable ? 1 : 0.5,
+          extraGaps: cashAuth.gaps,
+        }),
         window: { range: 'all', startAt: t0, endAt: t1 },
         source: 'capitalFlowsLedger', direction: net > 0 ? 'up' : 'down', positive: null,
         note: 'capital_not_return',
         materiality: 0.9, magnitude: _aurixFactClamp01(Math.abs(net) / endValue),
-        confidence: 1, utility: 0.9, rarity: 0.2,
+        confidence: cashAuth.amountPublishable ? 1 : 0.5, utility: 0.9, rarity: 0.2,
       });
-    } else if (!inWin.length) {
+    } else if (!cashAuth.events) {
       gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'recorded_capital_net', _AURIX_FACT_STATUS.AVAILABLE, 'no_flows_in_window');
     }
   }
@@ -28369,11 +29251,75 @@ function _aurixFactLedger(opts) {
       }
       const thr = isCash ? _AURIX_FACT_MATERIAL.cashDeltaPp : _AURIX_FACT_MATERIAL.exposureDeltaPp;
       if (Math.abs(d.deltaPp) < thr) continue;             // measured, but not material — no story
+      // ══ A1 · P0 EXPOSICIÓN — LA VERDAD DE LA TRANSICIÓN Y SU CAUSA SON DOS ══
+      // La captura del founder mostró «Tu exposición a los ETF bajó 16,8 pp en los
+      // últimos 30 días, hasta el 0 %» en una cuenta que quizá nunca tuvo ETF. El
+      // lector no puede haberlo inventado: los dos extremos son filas de servidor
+      // validadas (Σcategory_values ≡ total). Lo que NADIE comprobaba es si los dos
+      // extremos son COMPARABLES, y hay dos formas independientes de que no lo sean:
+      //
+      //   · EPOCH. El epoch era del DISPOSITIVO (localStorage), y el reset nunca
+      //     pudo borrar `portfolio_snapshots` (su RLS daba SELECT y nada más). Un
+      //     dispositivo sin reset lee la cartera PRE-RESET y la compara con la de
+      //     hoy. Dos carteras distintas: ningún grado de confianza lo arregla.
+      //   · CLASIFICACIÓN. El bucket histórico se congela con el `type` de entonces
+      //     y ese tipo es MUTABLE. Una reidentificación (etf → fund) hace que una
+      //     exposición «caiga al 0 %» sin que se haya vendido nada.
+      //
+      // Y una tercera cosa, distinta de las dos: aunque la transición sea cierta,
+      // AFIRMAR QUE EL USUARIO VENDIÓ exige un evento suyo que lo corrobore. Sin
+      // él la transición se publica y la CAUSA se declara desconocida. No se
+      // inventa una acción del usuario, y tampoco se calla un hecho medido.
+      const _evEpoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+      const _cls = (typeof _aurixClassificationValidity === 'function')
+        ? _aurixClassificationValidity(cat, d.startAt, d.endAt)
+        : { validity: 'unknown', reason: 'owner_unavailable' };
+      const _ev = _aurixEvidence({
+        accountId: (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null,
+        epoch: _evEpoch,
+        source: 'aurixCatExposureDelta', observationClass: _AURIX_OBS_CLASS.OBSERVED,
+        baseline:   { at: d.startAt, value: d.startPct },
+        comparison: { at: d.endAt,   value: d.endPct },
+        requireEndpoints: true, requireClassification: true,
+        classificationValidity: _cls.validity,
+        window: { range, startAt: d.startAt, endAt: d.endAt },
+        coverage: { lineageSince: _cls.observedSince },
+        confidence: 1,
+      });
+      if (!_ev.ok) {
+        // LA TRANSICIÓN SE SUPRIME con su causa nombrada. El ESTADO ACTUAL no se
+        // pierde: lo publica `cash_weight` / el snapshot, que no compara nada.
+        gap(famKey, sk, _AURIX_FACT_STATUS.LOW_CONFIDENCE, _ev.gaps.join('+'),
+          { range, category: cat, classificationValidity: _cls.validity,
+            lineageSince: _cls.observedSince || null });
+        continue;
+      }
+      // CORROBORACIÓN DE CAUSA. Un evento del usuario sobre la MISMA categoría
+      // dentro de la ventana. Sin él, `causeKnown:false` — y la copy neutral
+      // («pasó del X % al Y %») es la única que puede usarse.
+      let _cause = null;
+      try {
+        const _fl = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+        const _hit = _fl.find(f => f && Number.isFinite(f.ts) && f.ts > d.startAt && f.ts <= d.endAt
+          && (f.kind === 'asset_remove' || f.kind === 'asset_add')
+          && f.assetId && typeof _aurixAssetBucketById === 'function'
+          && _aurixAssetBucketById(f.assetId) === cat);
+        if (_hit) _cause = { kind: String(_hit.kind), eventId: _aurixEventIdentity('transaction', _hit) };
+      } catch (_) { _cause = null; }
       push({
         semanticKey: sk,
         family: famKey, causalRoot: rootKey,
         value: +d.deltaPp.toFixed(2), unit: 'percentage_points',
-        values: { startPct: d.startPct, endPct: d.endPct, deltaPp: +d.deltaPp.toFixed(2), category: cat },
+        values: { startPct: d.startPct, endPct: d.endPct, deltaPp: +d.deltaPp.toFixed(2), category: cat,
+                  causeKnown: !!_cause, cause: _cause ? _cause.kind : null,
+                  classificationValidity: _cls.validity },
+        evidence: _ev,
+        // Deriva pasiva = OBSERVACIÓN de estado, no evento discreto: su identidad
+        // es sólo la raíz y la ventana viaja como dato, que es lo que colapsa 7D y
+        // 30D en una sola entidad en vez de dos hallazgos.
+        eventId: _cause ? _cause.eventId
+                        : _aurixEventIdentity('observation', { causalRoot: rootKey }),
+        eventClass: _cause ? 'user_driven' : 'market_driven',
         window: { range, startAt: d.startAt, endAt: d.endAt },
         source: 'aurixCatExposureDelta',
         direction: d.deltaPp > 0 ? 'up' : 'down',
@@ -28732,6 +29678,100 @@ function _aurixWhatChanged(ledger) {
     .sort((a, b) => (b.impact.materiality - a.impact.materiality) || (a.semanticKey < b.semanticKey ? -1 : 1));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · A1/A2 — EL CONJUNTO CANÓNICO DE HALLAZGOS
+// ════════════════════════════════════════════════════════════════════════════
+// EL DEFECTO, estructural y garantizado: el contador del hero y la card que
+// debía detallarlo venían de DOS UNIVERSOS SIN RELACIÓN.
+//   · hero  N = `intel.now.changeCount` → transiciones de INSIGHTS de PC.01 más
+//     los movimientos de dispersión;
+//   · «Qué ha cambiado» → `core.whatChanged`, que son HECHOS del ledger, luego
+//     filtrados por publicado/reclamado/raíz y recortados a 4.
+// Fuentes distintas, cardinalidades distintas, cero identidad compartida. Y el
+// caso peor no es que difieran: es que la card devuelve '' cuando todo se filtra
+// (app.js, `if (!rows.length) return { html: '' }`) mientras el hero sigue
+// anunciando N. El usuario se queda preguntándose qué eran esas N cosas, que es
+// exactamente lo que destruye la confianza en una superficie de interpretación.
+//
+// LA REGLA, ahora estructural: EL CONTADOR ES LA LONGITUD DE ESTA LISTA, y el
+// destino la RENDERIZA. No pueden divergir porque no hay dos derivaciones.
+// Si la lista está vacía, el hero no puede afirmar un número.
+//
+// Un hallazgo sólo entra si su hecho PASÓ LA PUERTA DE EVIDENCIA. La materialidad
+// decide si algo es noticia; la evidencia decide si se puede decir.
+function _aurixCanonicalFindings(ledger, opts) {
+  const o = opts || {};
+  const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
+  const out = [];
+  const seenEvent = new Map();
+  for (const f of facts) {
+    // Sólo HECHOS DE CAMBIO. Un nivel o un máximo son estados: describen cómo
+    // están las cosas, no qué ha cambiado desde la última vez.
+    const isChange = f.changeFact === true
+      || f.unit === 'percentage_points'
+      || f.family === _AURIX_FACT_FAMILY.PERFORMANCE
+      || f.family === _AURIX_FACT_FAMILY.CAPITAL_FLOW;
+    if (!isChange) continue;
+    // UN RENDIMIENTO MEDIDO Y PLANO ES UN HECHO, NO UN CAMBIO. Es lo que hace
+    // posible «tu patrimonio subió pero tus inversiones no», así que se queda en
+    // el ledger — pero no puede sumar al contador de «qué ha cambiado». El umbral
+    // es el DECLARADO del ledger, no uno nuevo inventado aquí.
+    if (f.family === _AURIX_FACT_FAMILY.PERFORMANCE
+        && !(Math.abs(Number(f.value)) >= _AURIX_FACT_MATERIAL.returnPct)) continue;
+    if (!f.window || (f.window.startAt == null && !f.window.range)) continue;
+    // LA PUERTA. Un hecho sin bloque de evidencia es legacy y se admite (su
+    // familia ya tiene su propio gate certificado); uno CON bloque tiene que
+    // haberlo pasado. Así la puerta se puede adoptar familia a familia sin
+    // apagar nada, y lo que la tiene no puede saltársela.
+    if (f.evidence && f.evidence.ok !== true) continue;
+    // IDENTIDAD DE EVENTO. La misma deriva vista por 7D y por 30D es UNA entidad:
+    // se conserva la de mayor materialidad y la otra ventana viaja como dato. Es
+    // lo que impide que cambiar la ventana de comparación duplique un hallazgo.
+    const eventId = f.eventId || _aurixEventIdentity('observation', { causalRoot: f.causalRoot });
+    const prev = seenEvent.get(eventId);
+    const finding = {
+      findingId: eventId,
+      eventClass: f.eventClass || 'market_driven',
+      rootCause: f.causalRoot,
+      semanticKey: f.semanticKey,
+      family: f.family,
+      fact: { value: f.value, unit: f.unit, direction: f.direction },
+      windows: [f.window],
+      evidence: f.evidence || null,
+      materiality: Number.isFinite(f.materiality) ? f.materiality : 0,
+      novelty: Number.isFinite(f.novelty) ? f.novelty : 0,
+      confidence: Number.isFinite(f.confidence) ? f.confidence : 0,
+      causeKnown: !!(f.values && f.values.causeKnown),
+      provenance: (f.evidence && f.evidence.observationClass) || _AURIX_OBS_CLASS.DERIVED,
+    };
+    if (!prev) { seenEvent.set(eventId, finding); out.push(finding); continue; }
+    prev.windows.push(f.window);
+    if (finding.materiality > prev.materiality) {
+      prev.semanticKey = finding.semanticKey;
+      prev.fact = finding.fact;
+      prev.materiality = finding.materiality;
+      prev.novelty = finding.novelty;
+      prev.confidence = finding.confidence;
+      prev.causeKnown = finding.causeKnown;
+    }
+  }
+  // UNA RAÍZ, UNA LECTURA PRIMARIA. Dos hallazgos de la misma raíz causal son el
+  // mismo fenómeno contado dos veces — la deduplicación por raíz que el Core ya
+  // aplica a las historias, aplicada también al contador.
+  const byRoot = new Map();
+  for (const fd of out) {
+    const cur = byRoot.get(fd.rootCause);
+    if (!cur || fd.materiality > cur.materiality) byRoot.set(fd.rootCause, fd);
+  }
+  const deduped = Array.from(byRoot.values());
+  deduped.sort((a, b) =>
+    (b.materiality - a.materiality)
+    || (b.novelty - a.novelty)
+    || (a.findingId < b.findingId ? -1 : 1));
+  const limit = Number.isFinite(o.findingLimit) ? o.findingLimit : 6;
+  return deduped.slice(0, limit);
+}
+
 // ── THE CONSUMPTION CONTRACT FOR INT.04 ────────────────────────────────────
 // One entry point. INT.04 must never recompute a financial metric: everything
 // it can render is here, already certified, deduplicated and ranked.
@@ -28745,6 +29785,11 @@ function _aurixIntelligenceCore(opts) {
     topStories: stories,
     supportingFacts: stories.reduce((acc, s) => acc.concat(s.supporting || []), []),
     whatChanged: _aurixWhatChanged(ledger),
+    // A1/A2 — EL conjunto canónico. `whatChanged` se conserva (sus gates lo
+    // certifican y la card lo consume para la copy), pero el CONTADOR y el
+    // DESTINO derivan ya de esta única lista: si el hero dice N, aquí hay
+    // exactamente esos N, con su identidad de evento y su evidencia.
+    findings: _aurixCanonicalFindings(ledger, o),
     positiveDevelopments: ledger.facts.filter(f => f.positive === true)
       .sort((a, b) => (b.priority - a.priority) || (a.semanticKey < b.semanticKey ? -1 : 1)),
     wowInsights: _aurixWowInsights(ledger),
@@ -54831,8 +55876,16 @@ function _intccRadarSvg(radar, dimsOverride) {
     axes += `<line class="intcc-radar-axis${cls}" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
   // Vertices keep their real angular position inside the five-axis frame, so the
   // shape is an honest sub-figure of the pentagon rather than a re-scaled polygon.
+  // SPEC ADVANCED INTELLIGENCE · A2 — BAJO NO ES DESCONOCIDO.
+  // Un valor certificado muy bajo caía prácticamente sobre el centro y el radar
+  // parecía roto: visualmente idéntico a «no hay dato», que es justo la confusión
+  // que este contrato existe para evitar. Se le da un radio MÍNIMO VISIBLE, así
+  // que un 0 real es una MARCA cerca del centro y un eje sin dato sigue sin
+  // vértice ninguno. La cifra impresa no cambia: esto es geometría, no valor.
+  const RMIN = 0.06;
+  const rOf = key => R * Math.max(RMIN, Math.min(1, (radar[key] / 100)));
   const dp = dims
-    .map((d, i) => (measured.indexOf(d) === -1) ? null : pt(i, R * (radar[d.key] / 100)).map(v => v.toFixed(1)).join(','))
+    .map((d, i) => (measured.indexOf(d) === -1) ? null : pt(i, rOf(d.key)).map(v => v.toFixed(1)).join(','))
     .filter(Boolean).join(' ');
   // A filled area needs three vertices. With one or two certified dimensions we
   // draw the measured length ALONG each axis instead of closing a shape through
@@ -54852,11 +55905,15 @@ function _intccRadarSvg(radar, dimsOverride) {
     const isMeasured = measured.indexOf(d) !== -1;
     const dimCls = isMeasured ? '' : ' is-unavailable';
     labels += `<text class="intcc-radar-label${dimCls}" x="${lx.toFixed(1)}" y="${(ly + 1).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
+    // `display` permite que un eje publique algo que NO es un porcentaje (la
+    // amplitud de categorías se publica como CONTEO con su taxonomía: «1,2 de 7»).
+    // El radio sigue siendo geometría normalizada; el TEXTO es el dato.
     labels += `<text class="intcc-radar-val${dimCls}" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${
-      isMeasured ? (radar[d.key] + (d.suffix || '')) : _intccEsc(_intv4T('intv7_axis_unavailable'))}</text>`;
+      isMeasured ? _intccEsc(d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
+                 : _intccEsc(_intv4T('intv7_axis_unavailable'))}</text>`;
     // No vertex for an unmeasured axis: "unknown" must not look like zero.
     if (isMeasured) {
-      const [dx, dy] = pt(i, R * (radar[d.key] / 100));
+      const [dx, dy] = pt(i, rOf(d.key));
       dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
       if (!closeArea) spokes += `<line class="intcc-radar-spoke" x1="${cx}" y1="${cy}" x2="${dx.toFixed(1)}" y2="${dy.toFixed(1)}"/>`;
     }
@@ -55000,9 +56057,18 @@ function _intv4FactText(fact) {
     ? _intv4T('intv4_f_level_up',   _intv4Money(Math.abs(fact.value)), _intccDate(fact.window && fact.window.startAt))
     : _intv4T('intv4_f_level_down', _intv4Money(Math.abs(fact.value)), _intccDate(fact.window && fact.window.startAt));
   if (k === 'investable_prior_high')   return _intv4T('intv4_f_prior_high', _intv4Money(fact.value), _intccDate((fact.values || {}).at));
-  if (k === 'recorded_capital_net')    return fact.value >= 0
-    ? _intv4T('intv4_f_capital_in',  _intv4Money(Math.abs(fact.value)))
-    : _intv4T('intv4_f_capital_out', _intv4Money(Math.abs(fact.value)));
+  // A1 · P0 CAPITAL — el hecho conserva su clave (sus consumidores aguas abajo
+  // están certificados sobre ella) pero ya sólo contiene MOVIMIENTOS DE LIQUIDEZ
+  // REGISTRADOS, y su frase lo dice. Cuando el importe no es publicable —ledger
+  // remoto sin completitud demostrable, duplicados de identidad vivos o filas
+  // heurísticas en la ventana— se publica el RECUENTO sin cifra. Nunca un importe
+  // preciso con salvedad: una cifra equivocada con caveat sigue siendo equivocada.
+  if (k === 'recorded_capital_net') {
+    if (v.amountPublishable === false) return _intv4T('intv4_f_cashmov_nc', v.events || 0);
+    return _intv4T('intv4_f_cashmov', v.events || 0,
+                   _intv4Money(Math.abs(Number(v.inUSD) || 0)),
+                   _intv4Money(Math.abs(Number(v.outUSD) || 0)));
+  }
   if (k === 'cash_weight')             return _intv4T('intv4_f_cash', _intv4Num(fact.value, 0));
   if (k === 'liquidity_improved')      return _intv4T('intv4_f_liq_better', _intv4Num(Math.abs(fact.value), 1));
   if (/^cash_drift_liquidity_/.test(k)) return fact.value > 0
@@ -55011,6 +56077,9 @@ function _intv4FactText(fact) {
   if (/^exposure_drift_/.test(k)) {
     const cat = _intv4CatLabel(v.category);
     const end = _intv4Num(v.endPct, 0);
+    // A1 — sin causa corroborada, forma NEUTRAL. `subió`/`bajó` sólo cuando un
+    // evento del usuario dentro de la ventana lo respalda.
+    if (v.causeKnown !== true) return _intv4T('intv4_f_expo_move', cat, _intv4Num(v.startPct, 0), end, win);
     return fact.value > 0
       ? _intv4T('intv4_f_expo_up',   cat, _intv4Num(Math.abs(fact.value), 1), end, win)
       : _intv4T('intv4_f_expo_down', cat, _intv4Num(Math.abs(fact.value), 1), end, win);
@@ -55762,8 +56831,19 @@ function _intv5StructureHtml(core, esc) {
 //
 // El orden de dibujo NO se toca: sigue intercalando, así que el eje que se activa
 // rellena su vértice sin reestructurar la figura, exactamente como se diseñó.
+// SPEC ADVANCED INTELLIGENCE · A2 — EL EJE DEJA DE SER «DIVERSIFICACIÓN».
+// Publicaba `effectiveN/positions*100`: LA MISMA MAGNITUD que el anillo de Salud
+// con otra normalización (83 % aquí, 75 % allí, en la misma pantalla). No era una
+// etiqueta mal elegida, eran dos verdades a la vez sobre el mismo vector de pesos.
+// Y además no medía diversificación: medía reparto de pesos entre POSICIONES, así
+// que BTC + ETH + caja salía por encima del 80 %.
+// Ahora mide AMPLITUD DE CATEGORÍAS REGISTRADAS y se publica como CONTEO con su
+// taxonomía declarada («1,2 de 7»), nunca como porcentaje — la revisión financiera
+// descartó todo 0-100: con denominador «las que tienes», BTC+ETH+caja daría 100 %;
+// con las 7 canónicas, un % afirmaría que siete buckets equiponderados son el
+// ideal, y uno de ellos es «Otros». Eso sería una recomendación, no una medida.
 const _INTV7_RADAR_DIMS = Object.freeze([
-  Object.freeze({ key: 'diversification', labelKey: 'intcc_dim_div',    owner: 'aurixEffectiveDiversification' }),
+  Object.freeze({ key: 'diversification', labelKey: 'intcc_dim_breadth', owner: 'aurixRegisteredCategoryBreadth' }),
   Object.freeze({ key: 'stability',       labelKey: 'intcc_dim_stab',   owner: 'aurixPeakRetention' }),
   Object.freeze({ key: 'liquidity',       labelKey: 'intcc_dim_liq',    owner: 'aurixHealthSnapshot' }),
   Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: null, pending: 'no_certifiable_scale' }),
@@ -55771,16 +56851,29 @@ const _INTV7_RADAR_DIMS = Object.freeze([
 ]);
 
 function _intv7RadarAxes() {
-  const out = { dims: [], values: {}, measured: 0, unavailable: [], pending: {}, quality: {} };
+  const out = { dims: [], values: {}, measured: 0, unavailable: [], pending: {}, quality: {},
+                display: {}, breadth: null };
   let snap = null, div = null;
   try { snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null; } catch (_) { snap = null; }
   try { div  = (typeof _aurixEffectiveDiversification === 'function') ? _aurixEffectiveDiversification() : null; } catch (_) { div = null; }
   const haveSnap = !!(snap && snap.assetCount && snap.totUSD > 0);
 
   const certified = {};
-  // Diversification — the owner's own status decides; ratio is a measured share.
-  if (div && div.status === 'available' && div.positions > 0 && Number.isFinite(div.effectiveN)) {
-    certified.diversification = Math.round((div.effectiveN / div.positions) * 100);
+  // A2 — AMPLITUD DE CATEGORÍAS REGISTRADAS. Owner propio, barreras heredadas
+  // (posición no valorable o tipo no clasificable ⇒ nada; «Otros» dominante ⇒
+  // nada). `display` lleva el CONTEO con su taxonomía; el radio es sólo geometría.
+  let breadth = null;
+  try { breadth = (typeof _aurixRegisteredCategoryBreadth === 'function') ? _aurixRegisteredCategoryBreadth() : null; } catch (_) { breadth = null; }
+  if (breadth && breadth.status === 'available' && Number.isFinite(breadth.effectiveCategories)
+      && breadth.taxonomySize > 0) {
+    certified.diversification = Math.round((breadth.effectiveCategories / breadth.taxonomySize) * 100);
+    out.quality.diversification = 'measured';
+    out.display = out.display || {};
+    out.display.diversification = _intv4Num(breadth.effectiveCategories, 1) + ' / ' + breadth.taxonomySize;
+    out.breadth = { effectiveCategories: breadth.effectiveCategories, taxonomySize: breadth.taxonomySize,
+                    categoriesHeld: breadth.categoriesHeld, topCategory: breadth.topCategory };
+  } else if (breadth) {
+    out.quality.diversification = breadth.reason || 'unavailable';
   }
   if (haveSnap && Number.isFinite(snap.cashPct)) {
     certified.liquidity = Math.round(snap.cashPct);
@@ -55803,11 +56896,13 @@ function _intv7RadarAxes() {
   for (const d of _INTV7_RADAR_DIMS) {
     const v = Object.prototype.hasOwnProperty.call(certified, d.key) ? certified[d.key] : null;
     const ok = (d.owner !== null) && Number.isFinite(v);
-    out.dims.push({ key: d.key, label: _intv4T(d.labelKey), suffix: '%', unavailable: !ok });
+    out.dims.push({ key: d.key, label: _intv4T(d.labelKey), suffix: '%', unavailable: !ok,
+                    display: (out.display && out.display[d.key] != null) ? out.display[d.key] : null });
     if (ok) { out.values[d.key] = Math.max(0, Math.min(100, v)); out.measured++; }
     else {
       out.unavailable.push(d.key);
       out.pending[d.key] = (d.key === 'stability' && ret && ret.reason) ? ret.reason
+                         : (d.key === 'diversification' && breadth && breadth.reason) ? breadth.reason
                          : (d.pending || 'owner_unavailable');
     }
   }

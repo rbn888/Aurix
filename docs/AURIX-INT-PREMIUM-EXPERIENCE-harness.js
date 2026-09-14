@@ -70,6 +70,9 @@ function extractDict(langIdx) {
     // INT.07 — the semantic pentagon publishes these, so the gate must see the
     // REAL strings from BOTH dictionaries (a missing one blanks an axis label).
     'intcc_dim_div','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
+    // A2 — el primer eje ya no se llama «Diversificación». Sin esta clave el
+    // renderer produce una etiqueta VACÍA y el pentágono parece de cuatro ejes.
+    'intcc_dim_breadth',
     'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
@@ -116,7 +119,7 @@ function extractDict(langIdx) {
 }
 const DICT = { es: extractDict(0), en: extractDict(1) };
 
-const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
   '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR',
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
@@ -126,7 +129,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT'];
-const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -183,9 +186,18 @@ function makeCtx(opts) {
     setItem: (k, v) => { sb.__store[k] = String(v); },
     removeItem: k => { delete sb.__store[k]; },
   };
+  // SPEC ADVANCED INTELLIGENCE · A1 — PRECONDICIONES DE LA PUERTA DE EVIDENCIA.
+  // Una transición histórica de exposición sólo se publica si los dos extremos son
+  // COMPARABLES: mismo epoch y clasificación estable y cubierta por el linaje. No
+  // son stubs de lo que se certifica aquí (la superficie y su deduplicación): son
+  // la evidencia que en producción aporta el observador de linaje. Los casos
+  // adversariales las anulan con `o.lineage` / `o.flowsComplete`.
+  sb._aurixCapitalFlowsComplete = () => (o.flowsComplete === undefined ? true : !!o.flowsComplete);
+  sb.__lineage = (o.lineage === undefined) ? { since: 0, entries: [] } : o.lineage;
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   if (o.flows) vm.runInContext('__store[_AURIX_CAPITAL_FLOWS_KEY] = ' + JSON.stringify(JSON.stringify(o.flows)), sb);
+  if (sb.__lineage) vm.runInContext('__store[_AURIX_LINEAGE_KEY] = ' + JSON.stringify(JSON.stringify(sb.__lineage)), sb);
   if (o.shown) vm.runInContext('__store[_INTV4_SHOWN_KEY] = ' + JSON.stringify(JSON.stringify(o.shown)), sb);
   return sb;
 }
@@ -335,7 +347,12 @@ console.log('\n3 · One fact is never sold as several discoveries:');
     && /intcc-radar-axis/.test(html) && /intcc-radar-label/.test(html));
   ok('3.5b the five axes are the founder\'s five SEMANTIC dimensions, in the FIXED drawing order',
     JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<'))
-      === JSON.stringify(['Diversificación','Estabilidad','Liquidez','Crecimiento','Concentración']),
+      // A1/A2 — el primer eje DEJA DE LLAMARSE «Diversificación». Publicaba
+      // `effectiveN/positions*100`, la MISMA magnitud que el anillo de Salud con
+      // otra normalización (83 % vs 75 % en una pantalla), y además no medía
+      // diversificación sino reparto entre POSICIONES. Ahora mide amplitud de
+      // categorías REGISTRADAS y lo dice. El pentágono sigue siendo de cinco.
+      === JSON.stringify(['Amplitud de categorías','Estabilidad','Liquidez','Crecimiento','Concentración']),
     JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<')));
   ok('3.5b2 the radar is NOT a map of asset classes any more',
     (() => { const labels = attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<').map(x => x.trim());
@@ -363,7 +380,7 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   ok('3.5d each axis with a value declares the OWNER it reads (four owned, growth pending)',
     (() => { const src = konstSrc('_INTV7_RADAR_DIMS');
       const owned = (src.match(/owner: '/g) || []).length;
-      return owned === 4 && /owner: 'aurixEffectiveDiversification'/.test(src)
+      return owned === 4 && /owner: 'aurixRegisteredCategoryBreadth'/.test(src)
         && /key: 'stability',\s+labelKey: 'intcc_dim_stab',\s+owner: 'aurixPeakRetention'/.test(src)
         && (src.match(/owner: 'aurixHealthSnapshot'/g) || []).length === 2
         && (src.match(/owner: null/g) || []).length === 1
@@ -375,9 +392,14 @@ console.log('\n3 · One fact is never sold as several discoveries:');
          .every(k => new RegExp("key: '" + k + "'").test(konstSrc('_INTV7_RADAR_DIMS'))));
   ok('3.5f the radar does not restate Health or its weights',
     !/_aurixHealthScore|_AURIX_RANK_WEIGHTS/.test(fnSrc('_intv7RadarAxes') + fnSrc('_intv7RadarHtml')));
+  // A2 — un eje certificado lleva SU unidad, y no todas son porcentajes: la
+  // amplitud de categorías se publica como CONTEO con su taxonomía declarada
+  // («2,1 / 7») porque la revisión financiera descartó todo 0-100 para esa
+  // magnitud. Lo que el contrato exige es que un eje certificado lleve una CIFRA
+  // CON SU UNIDAD y uno sin certificar lleve una PALABRA.
   ok('3.5g a certified axis carries its unit; an uncertified one carries a WORD, not a figure',
     (() => { const vals = attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
-      const measured = vals.filter(v => /^\d+%$/.test(v));
+      const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v));
       const pending  = vals.filter(v => v === 'sin datos');
       return vals.length === 5 && measured.length === 3 && pending.length === 2; })(),
     JSON.stringify(attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
@@ -428,8 +450,17 @@ console.log('\n4 · What Changed is financially honest:');
     .replace(/<span class="intv5-honesty">[\s\S]*?<\/span>/g, '');
   ok('4.4 no per-position attribution of return is asserted',
     !/explic[oó]|explained by|atribu/i.test(withoutQuality));
-  ok('4.5 exposure changes are stated in pp, never as a relative %',
-    /pp/.test(sec) || !/exposici[oó]n/i.test(sec), sec.slice(0, 200));
+  // A1 · RE-DECIDIDO. El invariante real es que una deriva NUNCA se enuncie como
+  // el cambio RELATIVO del peso (31 % → 39 % no es «+25,8 %»). Dos formas lo
+  // respetan: los PUNTOS PORCENTUALES, y —cuando la causa no está corroborada— los
+  // DOS NIVELES («pasó del 31 % al 39 %»), que es estrictamente más honesto porque
+  // no insinúa ninguna acción del usuario y publica ambos extremos.
+  ok('4.5 exposure changes are stated in pp or as both endpoint levels, never as a relative %',
+    (() => { if (!/exposici[oó]n/i.test(sec)) return true;
+      const pp = /pp/.test(sec);
+      const twoLevels = /del\s*\d+(?:[.,]\d+)?%\s*al\s*\d+(?:[.,]\d+)?%/i.test(sec);
+      return pp || twoLevels; })(),
+    sec.slice(0, 260));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -728,6 +759,12 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
              labels: attrs(h, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<'),
              vals: vals,
              nums: vals.filter(v => /^\d+%$/.test(v)).map(v => parseInt(v, 10)),
+             // A2 — no todo eje certificado publica un PORCENTAJE: la amplitud de
+             // categorías publica un CONTEO con su taxonomía («2,1 / 7»). `nums`
+             // sigue siendo sólo porcentajes (los asserts de owner lo usan por
+             // índice) y `figures` cuenta TODO eje que lleva cifra, que es lo que
+             // el contrato «un eje certificado lleva cifra» quiere decir.
+             figures: vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v)),
              measured: (h.match(/data-measured="(\d+)"/) || [, null])[1],
              pending: (h.match(/data-unavailable="([^"]*)"/) || [, null])[1],
              dots: (h.match(/class="intcc-radar-dot"/g) || []).length,
@@ -751,7 +788,7 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.3 the radar NEVER disappears and never leaves a hole',
     [five, founder, one].every(x => x.hasCard && x.state === 'radar' && /intcc-radar-svg/.test(x.html)));
   ok('13B.4 exactly the three certifiable dimensions carry a value today',
-    [five, founder, one].every(x => x.measured === '3' && x.nums.length === 3),
+    [five, founder, one].every(x => x.measured === '3' && x.figures.length === 3),
     JSON.stringify([five.measured, founder.measured, one.measured]));
   ok('13B.5 Estabilidad and Crecimiento are reported as unavailable, not as 0',
     [five, founder, one].every(x => x.pending === 'stability,growth'
@@ -805,21 +842,35 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
         && (h.match(/class="intcc-radar-spoke"/g) || []).length === 1
         && (h.match(/class="intcc-radar-dot"/g) || []).length === 1; })(),
     run('_intv7RadarHtml(s => s)', makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }))));
-  ok('13B.11 Diversificación is the declared OWNER\'s number, not a second computation',
-    (() => { const d = run('_aurixEffectiveDiversification()', founder.ctx);
-      const expected = Math.round((d.effectiveN / d.positions) * 100);
-      // El cruce con la card de ESTRUCTURA desaparece con ella: ya no hay dos
-      // superficies publicando el mismo número, que es justamente lo que se buscaba.
-      // Queda lo esencial —el radar lee el OWNER declarado y no recalcula— y se
-      // añade que el owner tampoco lo recalcula por su cuenta.
-      return founder.nums[0] === expected
-        && /_aurixEffectiveDiversification/.test(fnSrc('_intv7RadarAxes'))
-        && !/hhi|effectiveN\s*=/.test(fnSrc('_intv7RadarAxes')); })(),
-    JSON.stringify({ radar: founder.nums[0], owner: run('_aurixEffectiveDiversification()', founder.ctx) }));
+  // A1/A2 · RE-DECIDIDO. El eje ya NO lee `_aurixEffectiveDiversification`: leerlo
+  // era publicar la MISMA magnitud que el anillo de Salud con otra normalización
+  // (83 % en el radar, 75 % en Salud) y además llamar «diversificación» a un
+  // reparto de pesos entre POSICIONES. Ahora lee su propio owner certificado y
+  // publica un CONTEO con su taxonomía — la revisión financiera descartó todo
+  // 0-100 para esta magnitud. El invariante que se conserva es el importante: el
+  // radar LEE un owner declarado y no recalcula nada por su cuenta.
+  ok('13B.11 la amplitud de categorías es el número del OWNER declarado, y se publica como CONTEO',
+    (() => { const b = run('_aurixRegisteredCategoryBreadth()', founder.ctx);
+      const shown = founder.vals[0];
+      const src = fnSrc('_intv7RadarAxes');
+      return b.status === 'available'
+        && new RegExp('^' + String(b.effectiveCategories).replace('.', '[.,]') + '\\s*/\\s*' + b.taxonomySize + '$').test(shown)
+        && /_aurixRegisteredCategoryBreadth/.test(src)
+        && !/effectiveN \/ div\.positions/.test(src)
+        && !/hhi/.test(src); })(),
+    JSON.stringify({ shown: founder.vals[0], owner: run('_aurixRegisteredCategoryBreadth()', founder.ctx) }));
+  ok('13B.11a BTC + ETH + caja NO recibe una amplitud alta (era >80 % con el reparto de pesos)',
+    (() => { const b = run('_aurixRegisteredCategoryBreadth()', founder.ctx);
+      // Dos categorías registradas (crypto, liquidez) muy desiguales ⇒ el conteo
+      // efectivo se queda cerca de 1. Es honesto y es informativo porque duele.
+      return b.status === 'available' && b.categoriesHeld === 2
+        && b.effectiveCategories < 2.5 && b.taxonomySize === 7; })(),
+    JSON.stringify(run('_aurixRegisteredCategoryBreadth()', founder.ctx)));
   ok('13B.11b Liquidez and Concentración are the snapshot owner\'s numbers',
     (() => { const snap = MATURE.snap;
-      return founder.nums[1] === Math.round(snap.cashPct)
-        && founder.nums[2] === Math.round(snap.topInvestedAsset.pctTotal); })(),
+      // Los índices se desplazan porque el primer eje ya no publica porcentaje.
+      return founder.nums[0] === Math.round(snap.cashPct)
+        && founder.nums[1] === Math.round(snap.topInvestedAsset.pctTotal); })(),
     JSON.stringify({ radar: founder.nums, snap: [MATURE.snap.cashPct, MATURE.snap.topInvestedAsset.pctTotal] }));
   ok('13B.12 real estate never enters the radar',
     (() => { const withRE = st(['crypto', 'crypto', 'cash', 'real_estate']);
@@ -831,17 +882,21 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.14 ES and EN publish the SAME numbers and the same pending dimensions',
     (() => { const en = st(['crypto', 'crypto', 'cash'], 'en');
       return JSON.stringify(en.nums) === JSON.stringify(founder.nums)
+        && en.figures.length === founder.figures.length
         && en.pending === founder.pending
         && en.vals.filter(v => v === 'no data').length === 2
         && JSON.stringify(en.labels)
-             === JSON.stringify(['Diversification','Stability','Liquidity','Growth','Concentration']); })(),
+             === JSON.stringify(['Category breadth','Stability','Liquidity','Growth','Concentration']); })(),
     JSON.stringify(st(['crypto', 'crypto', 'cash'], 'en').vals));
   ok('13B.15 no renderer arithmetic beyond the declared share transform',
     (() => { const src = fnSrc('_intv7RadarAxes');
       // the ONLY transform allowed is effectiveN/positions expressed as a share,
       // the same one the structure ring uses. Nothing else may scale a value.
+      // La ÚNICA transformación permitida es la cuota declarada del owner de
+      // amplitud (conteo efectivo / tamaño de taxonomía), y sirve sólo de
+      // GEOMETRÍA: el texto publicado es el conteo, no ese porcentaje.
       return (src.match(/\* 100/g) || []).length === 1
-        && /\(div\.effectiveN \/ div\.positions\) \* 100/.test(src)
+        && /\(breadth\.effectiveCategories \/ breadth\.taxonomySize\) \* 100/.test(src)
         && !/\* 2|\+ 55|\+ 45/.test(src); })(),
     fnSrc('_intv7RadarAxes'));
   ok('13B.16 the module occupies its column at every portfolio shape (no reserved hole)',
@@ -988,7 +1043,9 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
     && /sin datos/.test(render(SHORT).html));
   ok('15.7 el eje nuevo respeta el contrato: porcentaje en rango y sin vértice si no está medido',
     (() => { const vals = attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
-      const measured = vals.filter(v => /^\d+%$/.test(v));
+      // Un eje certificado lleva CIFRA CON SU UNIDAD: porcentaje, o conteo con su
+      // taxonomía cuando ningún 0-100 es defensible para esa magnitud.
+      const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v));
       return vals.length === 5 && measured.length === 4
         && vals.filter(v => v === 'sin datos').length === 1
         && (dipped.html.match(/class="intcc-radar-dot"/g) || []).length === 4; })(),

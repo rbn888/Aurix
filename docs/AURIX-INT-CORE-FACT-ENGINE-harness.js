@@ -44,14 +44,14 @@ const T0 = 1750000000000;                 // fixed anchor for the INVESTABLE his
 // wall-clock field.
 const NOW = Date.now();
 
-const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
   '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR',
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG'];
-const FNS = ['toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal',
   '_aurixLoadCapitalFlows','_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain',
@@ -93,12 +93,22 @@ function makeCtx(opts) {
     setItem: (k, v) => { sb.__store[k] = String(v); },
     removeItem: k => { delete sb.__store[k]; },
   };
+  // SPEC ADVANCED INTELLIGENCE · A1 — PRECONDICIONES DE LA PUERTA DE EVIDENCIA.
+  // No son stubs de lo que se certifica: son la EVIDENCIA que la puerta exige
+  // antes de dejar publicar una transición histórica. Lo que estas pruebas
+  // certifican es la aritmética de exposición y la deduplicación, y para llegar
+  // a ellas hay que presentar cobertura de linaje y completitud de ledger — igual
+  // que en producción. Los casos adversariales las anulan a propósito
+  // (`o.lineage`, `o.flowsComplete`) para comprobar que la puerta CIERRA.
+  sb._aurixCapitalFlowsComplete = () => (o.flowsComplete === undefined ? true : !!o.flowsComplete);
+  sb.__lineage = (o.lineage === undefined) ? { since: 0, entries: [] } : o.lineage;
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   (o.extra || []).forEach(src => vm.runInContext(src, sb));
   // Write the ledger under the REAL key (a `const` in a vm context is lexical,
   // NOT a sandbox property — getting this wrong silently empties the ledger).
   if (o.flows) vm.runInContext('__store[_AURIX_CAPITAL_FLOWS_KEY] = ' + JSON.stringify(JSON.stringify(o.flows)), sb);
+  if (sb.__lineage) vm.runInContext('__store[_AURIX_LINEAGE_KEY] = ' + JSON.stringify(JSON.stringify(sb.__lineage)), sb);
   return sb;
 }
 const run = (expr, ctx) => vm.runInContext(expr, ctx);
