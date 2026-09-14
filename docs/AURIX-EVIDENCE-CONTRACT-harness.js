@@ -642,10 +642,25 @@ console.log('\n6 · El epoch es de la CUENTA, y nada de esto puede filtrarse ent
   ok('6.9 U1 no crea NINGUNA tabla nueva (así el riesgo de privilegios por defecto de `anon` no existe)',
     (() => { const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'advanced_intelligence_u1_1.sql'), 'utf8');
       return !/create\s+table/i.test(sql.replace(/^\s*--.*$/gm, '')); })());
+  // LA ASERCIÓN MEDÍA EL PROXY, NO EL INVARIANTE. Exigía que el nombre
+  // `portfolio_snapshots` NO APARECIESE, y eso confunde «no toca ni una fila» con
+  // «no nombra la tabla». La verificación de U1 en producción encontró 7
+  // privilegios preexistentes de `anon` sobre esa tabla, así que U1 los revoca —y
+  // un REVOKE no lee, no borra y no reescribe ningún dato—. Se pasa a medir lo que
+  // de verdad importa: la ÚNICA sentencia que puede nombrarla es ese REVOKE, y no
+  // existe ningún DML, ningún DROP ni ninguna concesión contra ella.
   ok('6.10 y no toca el histórico de snapshots ni reinterpreta ninguna fila legacy',
     (() => { const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'advanced_intelligence_u1_1.sql'), 'utf8');
       const stripped = sql.replace(/^\s*--.*$/gm, '');
-      return !/portfolio_snapshots/i.test(stripped) && !/update\s+public\./i.test(stripped); })());
+      const named = stripped.split('\n').filter(l => /portfolio_snapshots/i.test(l));
+      const onlyRevoke = named.every(l =>
+        /^\s*revoke\s+all\s+privileges\s+on\s+table\s+public\.portfolio_snapshots\s+from\s+anon\s*;\s*$/i.test(l));
+      return onlyRevoke
+        && !/\b(delete\s+from|insert\s+into|update|truncate|drop|alter)\b[^;]{0,120}portfolio_snapshots/i.test(stripped)
+        && !/\bgrant\b[^;]{0,120}portfolio_snapshots/i.test(stripped)
+        && !/update\s+public\./i.test(stripped); })(),
+    JSON.stringify(fs.readFileSync(path.join(__dirname, '..', 'db', 'advanced_intelligence_u1_1.sql'), 'utf8')
+      .replace(/^\s*--.*$/gm, '').split('\n').filter(l => /portfolio_snapshots/i.test(l))));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
