@@ -75,16 +75,16 @@ function dict(langIdx){
 const DICT = { es: dict(0), en: dict(1) };
 
 const DAY = 864e5, HOUR = 36e5, T0 = 1750000000000, NOW = Date.now();
-const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
-  '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_SOURCE_ROW_CAP',
+const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+  '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL',
   '_AURIX_CATHIST_WINDOWS','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR','_AURIX_CAPITAL_FLOWS_KEY',
   '_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD','_AURIX_WN12_MIN_SPAN_RETENTION',
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
   '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
-  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY'];
-const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_DISC_MAX'];
+const FNS = ['_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
   'assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
   '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixInvestablePerformance',
@@ -100,7 +100,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
   '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
-  '_renderIntelligenceCommandCenter'];
+  '_renderIntelligenceCommandCenter','_intv7PendingReasonKey','_intv5MattersStories','_intv9DiscoveriesHtml','_intv4MemoryRows'];
 
 function srvRow(ts, cats){ let tot=0; for(const k in cats) tot+=cats[k];
   return { ts, total_value_usd:+tot.toFixed(2), real_estate: cats.real_estate||0, category_values: Object.assign({},cats) }; }
@@ -146,10 +146,14 @@ function buildHtml(lang) {
   sb.__store = {};
   sb.localStorage = { getItem:k=>(Object.prototype.hasOwnProperty.call(sb.__store,k)?sb.__store[k]:null),
     setItem:(k,v)=>{ sb.__store[k]=String(v); }, removeItem:k=>{ delete sb.__store[k]; } };
+  sb._aurixCapitalFlowsComplete = () => true;
+  vm.runInContext('var _aurixLineageColumnSeen = true;', sb);
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   vm.runInContext("__store[_AURIX_CAPITAL_FLOWS_KEY] = " + JSON.stringify(JSON.stringify(
-    [{ id:'d1', ts:T0+1.5*DAY, amountUSD:400, kind:'deposit' }])), sb);
+    [{ id:'d1', ts:T0+1.5*DAY, amountUSD:400, kind:'deposit', source:'user' }])), sb);
+  vm.runInContext("__store[_AURIX_LINEAGE_KEY] = " + JSON.stringify(JSON.stringify(
+    { since: 0, entries: [] })), sb);
   return vm.runInContext('_renderIntelligenceCommandCenter()', sb);
 }
 const HTML = { es: buildHtml('es'), en: buildHtml('en') };
@@ -164,6 +168,15 @@ async function wsUrl(){ for(let i=0;i<80;i++){ try{ const j=await (await fetch(`
 function mkClient(ws){ let id=0; const pend=new Map();
   ws.addEventListener('message', ev=>{ const m=JSON.parse(ev.data); if(m.id&&pend.has(m.id)){ const {res,rej}=pend.get(m.id); pend.delete(m.id); m.error?rej(new Error(m.error.message)):res(m.result);} });
   return { send:(a,b={},s)=>Promise.race([ new Promise((res,rej)=>{ const i=++id; pend.set(i,{res,rej}); ws.send(JSON.stringify({id:i,method:a,params:b,...(s?{sessionId:s}:{})})); }), sleep(30000).then(()=>{throw new Error('cdp timeout: '+a);}) ]) }; }
+// `WebSocket` es global desde Node 22 (el proyecto declara `engines: node 24.x`).
+// En un Node anterior este probe NO puede correr, y decirlo explícitamente vale
+// más que un ReferenceError crudo: el markup ya se generó y se validó arriba, lo
+// único que falta es la MEDIDA en el navegador.
+if (typeof WebSocket === 'undefined') {
+  console.error('\n[visual-qa] Node ' + process.versions.node + ' no trae WebSocket global (hace falta Node >= 22).');
+  console.error('[visual-qa] El markup ES/EN se generó correctamente; la geometría requiere el navegador.');
+  process.exit(2);
+}
 const ws = new WebSocket(await wsUrl());
 await new Promise(r => ws.addEventListener('open', r, { once: true }));
 const cdp = mkClient(ws);
