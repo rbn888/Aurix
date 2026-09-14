@@ -28827,14 +28827,52 @@ function _aurixFactClamp01(n) { return Math.max(0, Math.min(1, Number.isFinite(n
 // CONSECUENCIA MEDIDA: −25 % → −27 % sobre el 45 % del patrimonio mueve la cuota
 // del 11,25 % al 12,15 % ⇒ MISMO nivel ⇒ silencio. Llegar al −60 % la lleva al
 // 27 % ⇒ cruza a estructural ⇒ reabre UNA vez.
-const _AURIX_LOSS_TIER = Object.freeze({ MINOR: 'minor', MATERIAL: 'material', STRUCTURAL: 'structural' });
-function _aurixLossSeverityTier(returnPct, weight) {
-  const r = Math.abs(Number(returnPct));
-  const w = Number(weight);
-  if (!Number.isFinite(r) || !Number.isFinite(w)) return _AURIX_LOSS_TIER.MINOR;
-  const shareOfWealth = (r / 100) * w;                       // parte del patrimonio
-  if (shareOfWealth >= _AURIX_FACT_MATERIAL.concentrationPct / 100) return _AURIX_LOSS_TIER.STRUCTURAL;
-  if (shareOfWealth >= _AURIX_FACT_MATERIAL.flowShareOfValue)       return _AURIX_LOSS_TIER.MATERIAL;
+const _AURIX_LOSS_TIER = Object.freeze({ MINOR: 'minor', MATERIAL: 'material',
+  STRUCTURAL: 'structural', UNAVAILABLE: 'unavailable' });
+// ── FRONTERA DE IMPACTO ESTRUCTURAL · POLÍTICA DE PRODUCTO DECLARADA ────────
+// La primera versión reutilizaba `concentrationPct` (25 %), y eso NO se sostiene:
+// ese umbral está declarado como «una sola posición en/por encima de esto es
+// estructuralmente material», que es una pregunta sobre EXPOSICIÓN, no sobre
+// IMPACTO DE PÉRDIDA. Coincidir en el número no es coincidir en el significado —
+// es el mismo error que usar puntos de patrimonio para medir un porcentaje sobre
+// coste. Así que aquí se declara APARTE y por lo que es:
+//
+//   una pérdida registrada que se come una CUARTA PARTE del patrimonio actual
+//   cambia la conversación, y por eso merece volver a hablar una vez.
+//
+// Es una frontera de PRESENTACIÓN, conservadora a propósito, y no mueve ninguna
+// cifra financiera: sólo decide la cadencia con la que un aviso ya dado por visto
+// puede reaparecer. Si algún día se quiere más fina, es una decisión de producto
+// que se cambia aquí y en ningún otro sitio.
+const _AURIX_LOSS_IMPACT_STRUCTURAL_SHARE = 0.25;
+// ── LA CUOTA, CON DINERO CERTIFICADO ───────────────────────────────────────
+// DEFECTO DEMOSTRADO. Se calculaba `|retorno| × peso_actual`, y eso NO es la
+// pérdida como parte del patrimonio: posición a 45 con coste 60 sobre un
+// patrimonio de 100 es una pérdida registrada de 15, o sea el 15 %, y la
+// aproximación daba 11,25 %. El error crece con la magnitud, y cerca del −100 % el
+// peso ACTUAL tiende a cero mientras la pérdida registrada sigue siendo
+// económicamente material: la aproximación la haría desaparecer justo cuando más
+// importa.
+//
+// Se usa el resultado MONETARIO que el owner certificado ya produjo
+// (`computePositionPerformance` → `absolutePnL`), convertido una sola vez, sobre
+// el denominador de patrimonio ya validado. No se recalcula coste ni FX.
+// Sin importe, sin denominador completo o sin denominador positivo la severidad es
+// UNAVAILABLE: falla cerrado y nunca afirma un nivel que no puede respaldar.
+function _aurixLossImpactShare(recordedLossAmount, certifiedWealth) {
+  const l = Number(recordedLossAmount), w = Number(certifiedWealth);
+  if (!Number.isFinite(l) || !Number.isFinite(w) || !(w > 0)) return null;
+  const loss = Math.max(0, l);                               // sólo pérdida, nunca ganancia
+  const share = loss / w;
+  return Number.isFinite(share) ? share : null;
+}
+function _aurixLossSeverityTier(recordedLossAmount, certifiedWealth) {
+  const share = _aurixLossImpactShare(recordedLossAmount, certifiedWealth);
+  if (share === null) return _AURIX_LOSS_TIER.UNAVAILABLE;
+  if (share >= _AURIX_LOSS_IMPACT_STRUCTURAL_SHARE) return _AURIX_LOSS_TIER.STRUCTURAL;
+  // `flowShareOfValue` SÍ es la misma pregunta en la misma unidad —¿es este importe
+  // una parte material del patrimonio?— así que su reutilización se sostiene.
+  if (share >= _AURIX_FACT_MATERIAL.flowShareOfValue) return _AURIX_LOSS_TIER.MATERIAL;
   return _AURIX_LOSS_TIER.MINOR;
 }
 // CONCEPTO vs EPISODIO. El CONCEPTO es estable —una posición, una raíz sobre una
@@ -29233,6 +29271,18 @@ function _aurixFactLedger(opts) {
   const nowTs = Number.isFinite(o.now) ? o.now : ((typeof Date !== 'undefined') ? Date.now() : 0);
   const ranges = Array.isArray(o.ranges) ? o.ranges : ['24H', '7D', '30D', '90D'];
   const facts = [], gaps = [];
+  // ── RESOLUCIÓN CERTIFICADA · SÓLO EVIDENCIA POSITIVA ─────────────────────
+  // Candidatos a resolver un concepto del ciclo de vida. Cada entrada exige una
+  // MEDICIÓN que demuestre que el estado anterior terminó: una recuperación al
+  // coste, un cierre autoritativo, una deriva medida por debajo de su umbral.
+  // Que un hecho NO aparezca no entra nunca aquí: la ausencia significa
+  // hidratación pendiente, FX caído, esquema ausente, cambio de cuenta o la
+  // propia puerta de evidencia suprimiéndolo, y todo eso es DESCONOCIDO.
+  const resolvedCandidates = [];
+  const resolveCandidate = (conceptId, reason) => {
+    if (!conceptId) return;
+    resolvedCandidates.push({ conceptId: String(conceptId), reason: String(reason || '') });
+  };
   const seenHistory = Array.isArray(o.presentationHistory) ? o.presentationHistory : [];
   const lastShown = key => {
     let t0 = null;
@@ -29587,6 +29637,30 @@ function _aurixFactLedger(opts) {
   // como primer argumento) en vez de una por bucket: son los MISMOS extremos, y
   // así se pueden leer los valores ABSOLUTOS de cada bucket, que es exactamente
   // la pieza que permitía distinguir «bajó» de «se diluyó».
+  // UNA SOLA DERIVACIÓN DE LA EVIDENCIA DE DERIVA. Se necesita en dos sitios —para
+  // PUBLICAR la transición y para CERTIFICAR que dejó de ser material— y las dos
+  // preguntan exactamente lo mismo: si los dos extremos son comparables. Dos
+  // copias del mismo spec podrían desmentirse, y el lado de la resolución es el
+  // que borra una línea base del usuario: ahí una divergencia se paga caro.
+  const driftEvidence = (cat, d, range) => {
+    const _evEpoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const _cls = (typeof _aurixClassificationValidity === 'function')
+      ? _aurixClassificationValidity(cat, d.startAt, d.endAt)
+      : { validity: 'unknown', reason: 'owner_unavailable' };
+    const _ev = _aurixEvidence({
+      accountId: (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null,
+      epoch: _evEpoch,
+      source: 'aurixCatExposureDelta', observationClass: _AURIX_OBS_CLASS.OBSERVED,
+      baseline:   { at: d.startAt, value: d.startPct },
+      comparison: { at: d.endAt,   value: d.endPct },
+      requireEndpoints: true, requireClassification: true,
+      classificationValidity: _cls.validity,
+      window: { range, startAt: d.startAt, endAt: d.endAt },
+      coverage: { lineageSince: _cls.observedSince },
+      confidence: 1,
+    });
+    return { cls: _cls, ev: _ev };
+  };
   for (const range of ranges) {
     let win = null;
     try { win = (typeof _aurixCatHistWindow === 'function') ? _aurixCatHistWindow(range) : null; } catch (_) { win = null; }
@@ -29629,7 +29703,19 @@ function _aurixFactLedger(opts) {
             absoluteDirection: (_aE > _aS) ? 'up' : (_aE < _aS ? 'down' : 'flat') }
         : { startValue: null, endValue: null, absoluteDelta: null, absoluteDirection: null };
       rangeAbs.push({ cat: cat, abs: _abs, root: rootKey, endPct: d.endPct, thr: thr, deltaPp: d.deltaPp });
-      if (Math.abs(d.deltaPp) < thr) continue;             // measured, but not material — no story
+      if (Math.abs(d.deltaPp) < thr) {
+        // MEDIDO Y POR DEBAJO DEL UMBRAL. Esto sí es evidencia positiva: la misma
+        // ventana, los mismos dos extremos certificados, y el delta por debajo de
+        // su propio umbral de materialidad. Exige la MISMA puerta de evidencia que
+        // la publicación —si los extremos no son comparables, no se ha medido
+        // nada— y por eso no basta con que el lector responda `ok`.
+        try {
+          if (driftEvidence(cat, d, range).ev.ok) {
+            resolveCandidate('drift:' + rootKey + ':' + cat, 'drift_below_materiality');
+          }
+        } catch (_) {}
+        continue;                                          // measured, but not material — no story
+      }
       // ══ A1 · P0 EXPOSICIÓN — LA VERDAD DE LA TRANSICIÓN Y SU CAUSA SON DOS ══
       // La captura del founder mostró «Tu exposición a los ETF bajó 16,8 pp en los
       // últimos 30 días, hasta el 0 %» en una cuenta que quizá nunca tuvo ETF. El
@@ -29649,22 +29735,8 @@ function _aurixFactLedger(opts) {
       // AFIRMAR QUE EL USUARIO VENDIÓ exige un evento suyo que lo corrobore. Sin
       // él la transición se publica y la CAUSA se declara desconocida. No se
       // inventa una acción del usuario, y tampoco se calla un hecho medido.
-      const _evEpoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-      const _cls = (typeof _aurixClassificationValidity === 'function')
-        ? _aurixClassificationValidity(cat, d.startAt, d.endAt)
-        : { validity: 'unknown', reason: 'owner_unavailable' };
-      const _ev = _aurixEvidence({
-        accountId: (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null,
-        epoch: _evEpoch,
-        source: 'aurixCatExposureDelta', observationClass: _AURIX_OBS_CLASS.OBSERVED,
-        baseline:   { at: d.startAt, value: d.startPct },
-        comparison: { at: d.endAt,   value: d.endPct },
-        requireEndpoints: true, requireClassification: true,
-        classificationValidity: _cls.validity,
-        window: { range, startAt: d.startAt, endAt: d.endAt },
-        coverage: { lineageSince: _cls.observedSince },
-        confidence: 1,
-      });
+      const _de = driftEvidence(cat, d, range);
+      const _cls = _de.cls, _ev = _de.ev;
       if (!_ev.ok) {
         // LA TRANSICIÓN SE SUPRIME con su causa nombrada. El ESTADO ACTUAL no se
         // pierde: lo publica `cash_weight` / el snapshot, que no compara nada.
@@ -30051,6 +30123,15 @@ function _aurixFactLedger(opts) {
       for (const a of allList) {
         const rp0 = Number(a && a.realizedPnL);
         if (Number.isFinite(rp0) && rp0 < 0) realisedSeen++;
+        // CIERRE AUTORITATIVO = EVENTO TERMINAL. `lifecycleStatus === 'closed'` no
+        // es una ausencia: es el estado que escribe la venta total, y demuestra que
+        // la pérdida NO REALIZADA sobre la que el usuario acusó ya no existe. Y no
+        // se convierte en una pérdida realizada por la puerta de atrás: el
+        // agregado de realizado sigue declarado como hueco no certificado y nadie
+        // lo publica, así que resolver aquí no afirma ninguna cifra nueva.
+        if (typeof isClosedAsset === 'function' && isClosedAsset(a) && a && a.id) {
+          resolveCandidate('pos:' + String(a.id), 'position_closed');
+        }
       }
     } catch (_) {}
     for (const a of invList) {
@@ -30061,10 +30142,51 @@ function _aurixFactLedger(opts) {
       try { val = assetValueUSD(a); } catch (_) { val = NaN; }
       const weight = (denomComplete && Number.isFinite(val) && invTotal > 0) ? (val / invTotal) : NaN;
       if (!perf || perf.state !== 'ready') { noCostBasis++; continue; }
-      if (!Number.isFinite(perf.returnPct) || perf.returnPct >= 0) continue;
+      // RECUPERACIÓN CERTIFICADA. El owner del coste responde `ready` y el retorno
+      // contra ESE MISMO coste válido ya no es negativo: la pérdida registrada dejó
+      // de existir, medida, no ausente. Un retorno no finito NO resuelve —es
+      // desconocido— y una pérdida que sólo se encogió tampoco: sigue existiendo.
+      if (!Number.isFinite(perf.returnPct)) continue;
+      if (perf.returnPct >= 0) {
+        resolveCandidate('pos:' + String(a.id), 'recovered_to_cost_basis');
+        continue;
+      }
       if (!Number.isFinite(weight)) continue;
       if (Math.abs(perf.returnPct) < _AURIX_FACT_MATERIAL.returnPct) continue;
-      if (weight < _AURIX_FACT_MATERIAL.flowShareOfValue) continue;
+      // La PÉRDIDA REGISTRADA en USD, del owner certificado y convertida una vez.
+      // `absolutePnL` vive en la divisa NATIVA del activo; el denominador `invTotal`
+      // está en USD, así que la cuota se calcula en USD y no hace falta una segunda
+      // conversión. `_absBase` sigue existiendo aparte, sólo para MOSTRAR el importe.
+      let _lossUsd = NaN;
+      try {
+        const _u = (typeof _nativeToUSD === 'function')
+          ? _nativeToUSD(perf.absolutePnL, a.assetCurrency) : NaN;
+        _lossUsd = Number.isFinite(_u) ? Math.max(0, -_u) : NaN;
+      } catch (_) { _lossUsd = NaN; }
+      const _impactShare = denomComplete ? _aurixLossImpactShare(_lossUsd, invTotal) : null;
+      const _tier = denomComplete ? _aurixLossSeverityTier(_lossUsd, invTotal) : _AURIX_LOSS_TIER.UNAVAILABLE;
+      // SIN SEVERIDAD NO HAY HECHO. Sin importe o sin denominador respaldable no se
+      // puede decir de cuánto patrimonio habla esta pérdida, y publicarla sin eso
+      // sería publicar una cifra cuyo peso no se puede sostener.
+      if (_tier === _AURIX_LOSS_TIER.UNAVAILABLE) {
+        gap(_AURIX_FACT_FAMILY.PERFORMANCE, 'position_below_cost',
+          _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'loss_impact_not_computable', { assetId: String(a.id) });
+        continue;
+      }
+      // ── EL SUELO DE MATERIALIDAD: DOS PREGUNTAS, UNA CONSTANTE ────────────
+      // Era sólo `weight < flowShareOfValue`, es decir el valor que QUEDA sobre el
+      // patrimonio — y el valor que queda se encoge precisamente cuando la pérdida
+      // crece. Un coste de 100.000 que hoy vale 1.000 pesa un 1 % y quedaba
+      // suprimido con 99.000 perdidos; una posición barrida a cero pesaba 0 y no
+      // podía publicarse NUNCA, que es el caso en el que el usuario más necesita
+      // leerlo. Se publica si importa el PESO de hoy o si importa la PÉRDIDA que
+      // arrastra: son dos preguntas legítimas y distintas, medidas con el mismo
+      // umbral declarado (2 % del patrimonio) y ninguna nueva.
+      // El NIVEL de severidad no es un suelo: la detección de hechos y la
+      // reapertura de superficie son capas separadas por decisión del founder, así
+      // que una pérdida `minor` se DETECTA igual y sólo pesa menos al presentarse.
+      if (weight < _AURIX_FACT_MATERIAL.flowShareOfValue
+          && !(_impactShare !== null && _impactShare >= _AURIX_FACT_MATERIAL.flowShareOfValue)) continue;
       const nm = (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '');
       let _absBase = null;
       try {
@@ -30096,15 +30218,30 @@ function _aurixFactLedger(opts) {
       // decisión suya, y cambia la interpretación aunque el porcentaje no se mueva.
       // Se cuenta sobre el ledger canónico ya deduplicado, así que una fila
       // derivada duplicada no inventa una acción.
-      const _tier = _aurixLossSeverityTier(perf.returnPct, weight);
-      let _actions = 0;
+      // ── LA ÚLTIMA ACCIÓN MATERIAL DEL USUARIO, POR IDENTIDAD ───────────────
+      // Antes era el RECUENTO de `asset_add`/`asset_remove`, y eso reabre el aviso
+      // por un ajuste de un euro: cualquier movimiento, de cualquier tamaño, creaba
+      // un episodio nuevo. Ahora sólo cuenta un evento que (a) esté en el ledger
+      // CANÓNICO ya deduplicado, (b) no sea derivado ni inferido —una fila de
+      // backfill no es una decisión de nadie—, (c) tenga magnitud certificable, y
+      // (d) cruce el contrato de materialidad YA declarado respecto al patrimonio.
+      // Y lo que entra en la firma es su IDENTIDAD ESTABLE, no cuántos hubo: así
+      // hidratar el ledger otra vez no inventa un episodio.
+      let _lastAction = '';
       try {
         const _fl = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
-        _actions = _fl.filter(fx => fx && String(fx.assetId || '') === String(a.id)
-          && (fx.kind === 'asset_add' || fx.kind === 'asset_remove')).length;
-      } catch (_) { _actions = 0; }
+        const _floor = _AURIX_FACT_MATERIAL.flowShareOfValue * invTotal;
+        const _mine = _fl.filter(fx => fx && String(fx.assetId || '') === String(a.id)
+          && (fx.kind === 'asset_add' || fx.kind === 'asset_remove')
+          && !(typeof _aurixFlowIsDerived === 'function' && _aurixFlowIsDerived(fx))
+          && Number.isFinite(Number(fx.amountUSD))
+          && Math.abs(Number(fx.amountUSD)) >= _floor)
+          .sort((x, y) => (Number(x.ts) || 0) - (Number(y.ts) || 0));
+        const _last = _mine.length ? _mine[_mine.length - 1] : null;
+        _lastAction = _last ? String(_last.id) : '';
+      } catch (_) { _lastAction = ''; }              // no poder comprobarlo ⇒ no material
       const _conceptId = 'pos:' + String(a.id);
-      const _signature = _tier + ':' + _actions;
+      const _signature = _tier + ':' + _lastAction;
       push({
         semanticKey: 'position_below_cost_' + String(a.id),
         family: _AURIX_FACT_FAMILY.PERFORMANCE,
@@ -30127,8 +30264,13 @@ function _aurixFactLedger(opts) {
                   // Lo que NO se afirma, dicho en el hecho para que la superficie
                   // no pueda deducirlo: cuánto lleva así, y cuánto es divisa.
                   durationKnown: false, fxAttributed: false,
-                  severityTier: _tier, userActions: _actions,
-                  lossShareOfWealth: +(((Math.abs(Number(perf.returnPct)) / 100) * weight) * 100).toFixed(2) },
+                  severityTier: _tier, lastMaterialAction: _lastAction || null,
+                  // LA CIFRA REAL: pérdida registrada sobre patrimonio certificado.
+                  // La anterior multiplicaba porcentajes y, en el ejemplo del
+                  // founder —45 de valor, 60 de coste, 100 de patrimonio— daba
+                  // 11,25 % donde la verdad es 15 %.
+                  recordedLossBase: _absBase !== null ? Math.abs(_absBase) : null,
+                  lossShareOfWealthPct: +((_impactShare || 0) * 100).toFixed(2) },
         // LA PUERTA TIENE QUE PODER CERRARSE. Sin extremos no se evaluaba el epoch,
         // no se pedía clasificación y `ok` era true SIEMPRE: el filtro de
         // `_aurixCanonicalFindings` era una tautología aquí. Ahora los dos extremos
@@ -30217,7 +30359,20 @@ function _aurixFactLedger(opts) {
   observation.spanMs = (Number.isFinite(observation.startAt) && Number.isFinite(observation.endAt))
     ? Math.max(0, observation.endAt - observation.startAt) : null;
 
-  return { facts, gaps, observation, generatedAt: nowTs };
+  // ── LO VIVO MANDA SOBRE LO RESUELTO ──────────────────────────────────────
+  // Un concepto puede medir por debajo del umbral en 7D y seguir siendo material
+  // en 30D: resolverlo por la primera ventana habría borrado la línea base
+  // mientras el aviso seguía en pantalla por la segunda, y el usuario habría visto
+  // hablar otra vez algo que acaba de dar por visto. Si el concepto produce
+  // CUALQUIER hecho en esta pasada, no se resuelve.
+  const _liveConceptSet = new Set(facts.map(f => f && f.conceptId).filter(Boolean).map(String));
+  const _seenResolved = new Set();
+  const resolvedConcepts = resolvedCandidates.filter(r => {
+    if (_liveConceptSet.has(r.conceptId) || _seenResolved.has(r.conceptId)) return false;
+    _seenResolved.add(r.conceptId);
+    return true;
+  });
+  return { facts, gaps, observation, resolvedConcepts, generatedAt: nowTs };
 }
 
 // ── RELATION / DEDUPLICATION — ONE ROOT → ONE PRIMARY STORY ────────────────
@@ -30623,6 +30778,9 @@ function _aurixIntelligenceCore(opts) {
     // DESTINO derivan ya de esta única lista: si el hero dice N, aquí hay
     // exactamente esos N, con su identidad de evento y su evidencia.
     findings: _aurixCanonicalFindings(ledger, o),
+    // §3 — los conceptos que una MEDICIÓN demuestra terminados. Es lo único que
+    // puede resolver un acuse: la ausencia de un hecho no entra en esta lista.
+    resolvedConcepts: ledger.resolvedConcepts || [],
     // §8 — el conjunto COMPLETO, acuses incluidos. Es la prueba de que dar por
     // visto un hallazgo no destruye el hecho: sigue aquí, certificado, y sólo ha
     // dejado de ocupar superficie.
@@ -31539,25 +31697,44 @@ function _aurixIntelAcknowledge(conceptId, opts) {
   }
   return okw;
 }
-// RESOLUCIÓN. Cuando un concepto deja de producir hecho —la posición recuperó, la
-// deriva dejó de ser material— su acuse se marca RESUELTO. Eso es lo que permite
-// que un deterioro POSTERIOR vuelva a hablar aunque su firma coincida con la del
-// episodio anterior: sin esta marca, recuperarse y volver a caer al mismo nivel
-// habría quedado silenciado para siempre. Y un registro resuelto puede compactarse
-// sin riesgo, porque resuelto ya significa «vuelve a poder hablar».
-// Se escribe SÓLO en la transición, así que no es una escritura por pintura.
-function _aurixIntelResolveAbsent(liveConceptIds, opts) {
+// ════════════════════════════════════════════════════════════════════════════
+// RESOLUCIÓN CERTIFICADA — LA AUSENCIA NO RESUELVE NADA
+// ════════════════════════════════════════════════════════════════════════════
+// DEFECTO CORREGIDO. Resolvía un acuse porque el hecho no aparecía en UNA pintura,
+// y la ausencia de un hecho significa demasiadas cosas distintas: hidratación
+// pendiente, historia rancia, FX no disponible, esquema ausente, transición de
+// cuenta o de epoch, un fallo temporal de la fuente, o la propia puerta de
+// evidencia suprimiéndolo. Todos esos estados son DESCONOCIDO, no RESUELTO — y
+// tratarlos como resuelto tenía dos consecuencias malas a la vez: perdía la línea
+// base del acuse, y dejaba que el mismo aviso volviera a hablar en cuanto los
+// datos regresaran sin haber cambiado nada.
+//
+// Un concepto sólo se resuelve con EVIDENCIA POSITIVA, que el ledger de hechos
+// construye y publica en `resolvedConcepts`:
+//   · la pérdida registrada ya no existe contra el MISMO coste válido
+//     (`state === 'ready'` y `returnPct >= 0`): recuperación certificada;
+//   · la posición está cerrada de forma autoritativa — y cerrarla NO convierte en
+//     silencio una pérdida no realizada en realizada: el agregado de realizado
+//     sigue declarado como hueco y nadie lo publica;
+//   · una deriva MEDIDA que dejó de ser material (la ventana responde `ok` y el
+//     delta está por debajo de su umbral), que es una medición, no una ausencia.
+// Un dato que vuelve sin cambiar NO reabre: su acuse nunca se tocó.
+// Se escribe sólo en la transición, así que no es una escritura por pintura.
+function _aurixIntelResolveCertified(resolvedConceptIds, opts) {
   const o = opts || {};
   try {
     const cur = _aurixIntelCtxRecord(o);
     if (!cur || !cur.ack) return 0;
-    const live = new Set((liveConceptIds || []).map(String));
+    // SÓLO lo que llega en esta lista, y la lista se construye con EVIDENCIA
+    // POSITIVA. Nada se resuelve por no aparecer.
+    const resolved = new Set((resolvedConceptIds || []).map(String));
+    if (!resolved.size) return 0;
     const ack = Object.assign({}, cur.ack);
     let changed = 0;
     Object.keys(ack).forEach(k => {
       const r = ack[k];
       if (!r || r.state !== 'acknowledged') return;
-      if (live.has(k)) return;
+      if (!resolved.has(k)) return;
       ack[k] = Object.assign({}, r, { state: 'resolved', resolvedAt: Number.isFinite(o.now) ? o.now : Date.now() });
       changed++;
     });
@@ -58337,20 +58514,23 @@ function _renderIntelligenceCommandCenter() {
       _intv4SetFactDepth((intel && intel.experience && intel.experience.resolved) || depth);
     }
   } catch (_) {}
-  // RESOLUCIÓN, una vez por pintura y sólo en la TRANSICIÓN: los conceptos que ya
-  // no producen hecho pasan a `resolved`, que es lo que permite que un deterioro
-  // POSTERIOR vuelva a hablar. `_aurixIntelResolveAbsent` no escribe si nada
-  // cambió, así que esto no es una escritura por repintado.
+  // RESOLUCIÓN, una vez por pintura y sólo en la TRANSICIÓN: los conceptos que el
+  // ledger DEMUESTRA terminados pasan a `resolved`, que es lo que permite que un
+  // deterioro POSTERIOR vuelva a hablar. Antes se resolvía todo lo que no
+  // apareciera en la pintura, y eso convertía una hidratación lenta o un FX caído
+  // en «recuperado»: la lista viene ahora del propio ledger y lleva su motivo.
+  // `_aurixIntelResolveCertified` no escribe si nada cambió, así que esto no es
+  // una escritura por repintado.
   try {
-    if (typeof _aurixIntelResolveAbsent === 'function') {
-      const _liveConcepts = ((core.ledger && core.ledger.facts) || [])
-        .map(f => f.conceptId).filter(Boolean);
+    if (typeof _aurixIntelResolveCertified === 'function') {
+      const _resolved = ((core.ledger && core.ledger.resolvedConcepts) || [])
+        .map(r => r && r.conceptId).filter(Boolean);
       // NO se recomputa el Core: se recorre UNA vez por pintura y ese invariante
       // está certificado (el ledger se llegó a recorrer tres veces por pintura y
       // costó un gate). La resolución surte efecto en la PINTURA SIGUIENTE, y eso
       // basta: sólo importa cuando el usuario vuelva a ver un deterioro nuevo, y
       // para entonces habrá habido otra pintura.
-      _aurixIntelResolveAbsent(_liveConcepts, {});
+      _aurixIntelResolveCertified(_resolved, {});
     }
   } catch (_) {}
   const findingCount = (typeof _intv4FindingRows === 'function') ? _intv4FindingRows(core).length : 0;

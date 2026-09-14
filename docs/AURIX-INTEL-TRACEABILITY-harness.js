@@ -132,8 +132,8 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER'];
-const FNS = ['_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveAbsent','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE'];
+const FNS = ['_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -550,25 +550,37 @@ console.log('\n8 · Política de reapertura y retención del acuse:');
         + JSON.stringify(rec.ack) + ' })', c);
       return rec.ack['ob:investable_return'].episodeId === 'ob:investable_return'
         && hidden.length === 0; })());
-  ok('8.2 el nivel de severidad de una pérdida se decide con umbrales YA declarados',
+  // LA SEVERIDAD SE DECIDE CON IMPORTES. La versión anterior recibía
+  // `(returnPct, weight)` y multiplicaba: con un −25 % en una posición del 45 %
+  // daba 11,25 % cuando la pérdida real era el 15 % del patrimonio, porque el peso
+  // se mide sobre el valor que QUEDA y no sobre el coste. Ahora entran los dos
+  // importes certificados y la cuota es una división, no una aproximación.
+  ok('8.2 el nivel de severidad se decide con la cuota MONETARIA de la pérdida',
     (() => { const c = makeCtx(MATURE);
-      const minor = run('_aurixLossSeverityTier(-50, 0.01)', c);        // 0,5 % del patrimonio
-      const mat   = run('_aurixLossSeverityTier(-25, 0.45)', c);        // 11,25 %
-      const str   = run('_aurixLossSeverityTier(-60, 0.45)', c);        // 27 %
-      const edgeL = run('_aurixLossSeverityTier(-4, 0.5)', c);          // 2,00 % · frontera
-      const edgeS = run('_aurixLossSeverityTier(-50, 0.5)', c);         // 25,00 % · frontera
+      const minor = run('_aurixLossSeverityTier(500, 100000)', c);      // 0,5 % del patrimonio
+      const mat   = run('_aurixLossSeverityTier(15000, 100000)', c);    // 15 % · el caso del founder
+      const str   = run('_aurixLossSeverityTier(27000, 100000)', c);    // 27 %
+      const edgeL = run('_aurixLossSeverityTier(2000, 100000)', c);     // 2,00 % · frontera
+      const edgeS = run('_aurixLossSeverityTier(25000, 100000)', c);    // 25,00 % · frontera
+      const none  = run('_aurixLossSeverityTier(15000, 0)', c);         // sin denominador
       return minor === 'minor' && mat === 'material' && str === 'structural'
-        && edgeL === 'material' && edgeS === 'structural'; })(),
-    JSON.stringify(['minor', 'material', 'structural'].map((_, i) => i)));
-  ok('8.3 …y no hay ninguna constante nueva: las dos fronteras están en `_AURIX_FACT_MATERIAL`',
-    /_AURIX_FACT_MATERIAL\.concentrationPct \/ 100/.test(fnSrc('_aurixLossSeverityTier'))
-    && /_AURIX_FACT_MATERIAL\.flowShareOfValue/.test(fnSrc('_aurixLossSeverityTier'))
-    && !/0\.(?:0[5-9]|[1-9])/.test(fnSrc('_aurixLossSeverityTier').replace(/\/ 100/g, '')));
+        && edgeL === 'material' && edgeS === 'structural' && none === 'unavailable'; })(),
+    JSON.stringify(['minor', 'material', 'structural', 'unavailable'].map((_, i) => i)));
+  ok('8.3 …y sus dos fronteras están DECLARADAS: el 2 % del patrimonio y una política de producto explícita',
+    (() => { const c = makeCtx(MATURE);
+      const src = fnSrc('_aurixLossSeverityTier');
+      return run('_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE', c) === 0.25
+        && /_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE/.test(src)
+        && /_AURIX_FACT_MATERIAL\.flowShareOfValue/.test(src)
+        // ni la reutilización del umbral de CONCENTRACIÓN —que habla de exposición,
+        // no de impacto de pérdida— ni ningún número suelto en el owner.
+        && !/concentrationPct/.test(src)
+        && !/0\.(?:0[1-9]|[1-9])/.test(src); })());
   ok('8.4 el acuse NO se guarda por banda de precio: un concepto, un registro',
     /ack\[key\] = \{/.test(fnSrc('_aurixIntelAcknowledge'))
     && /const key = String\(conceptId\);/.test(fnSrc('_aurixIntelAcknowledge')));
   ok('8.5 la retención NO usa tiempo transcurrido ni cupo numérico',
-    (() => { const src = fnSrc('_aurixIntelAcknowledge') + fnSrc('_aurixIntelResolveAbsent');
+    (() => { const src = fnSrc('_aurixIntelAcknowledge') + fnSrc('_aurixIntelResolveCertified');
       return !/_AURIX_INTEL_MEM_MAX_ENTRIES|_AURIX_INTEL_STALE_MS|864e5/.test(src); })());
   ok('8.6 un dispositivo MÁS ANTIGUO no puede sobreescribir un acuse más nuevo',
     (() => { const c = makeCtx(MATURE);
@@ -631,6 +643,56 @@ console.log('\n8 · Política de reapertura y retención del acuse:');
       return rows === declared && rows === heroN; })(),
     JSON.stringify({ rows: (h.match(/class="intv4-chg /g) || []).length,
                      declared: num(h, /data-findings="(\d+)"/), hero: num(h, /data-count="(\d+)"/) }));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n9 · La ausencia no cura nada: sólo una medición resuelve un concepto:');
+{
+  // Deriva MEDIDA y por debajo de su umbral: 25.000 → 24.000 sobre 100.000 es
+  // −1 pp, y el umbral declarado son 3 pp. Eso es evidencia positiva de que la
+  // deriva dejó de ser material — no una ausencia.
+  const settled = Object.assign({}, MATURE, {
+    serverRows: srvHistory(Date.now(), 30, { crypto: 50000, stock: 25000, liquidity: 25000 },
+                                            { crypto: 51000, stock: 25000, liquidity: 24000 }) });
+  const rSettled = coreOf(settled);
+  ok('9.1 una deriva medida por debajo de su umbral RESUELVE, con su motivo',
+    (rSettled.resolvedConcepts || []).some(x => /^drift:/.test(x.conceptId)
+      && x.reason === 'drift_below_materiality'),
+    JSON.stringify(rSettled.resolvedConcepts));
+  ok('9.2 …y ninguna entrada resuelta viaja sin motivo auditable',
+    (rSettled.resolvedConcepts || []).every(x => x && x.conceptId && x.reason));
+  // SIN HISTORIA DE SERVIDOR la ventana no responde: no hay nada medido, así que
+  // no se resuelve ninguna deriva. Esto es el defecto que se viene a cerrar: antes
+  // «no aparece» bastaba, y una cuenta sin hidratar curaba todos los avisos.
+  const rQuiet = coreOf(QUIET);
+  ok('9.3 sin ventana medible no se resuelve ninguna deriva: eso es DESCONOCIDO',
+    !(rQuiet.resolvedConcepts || []).some(x => /^drift:/.test(x.conceptId)),
+    JSON.stringify(rQuiet.resolvedConcepts));
+  // Y una deriva que SIGUE siendo material no se resuelve por medirse también en
+  // otra ventana donde todavía no llega al umbral.
+  const rMoved = coreOf(MOVED);
+  ok('9.4 lo que sigue vivo no se resuelve, aunque otra ventana lo mida pequeño',
+    (() => { const live = new Set((rMoved.ledger.facts || []).map(f => f.conceptId).filter(Boolean));
+      return !(rMoved.resolvedConcepts || []).some(x => live.has(x.conceptId)); })(),
+    JSON.stringify({ live: Array.from(new Set((rMoved.ledger.facts || []).map(f => f.conceptId).filter(Boolean))),
+      resolved: rMoved.resolvedConcepts }));
+  // EL DATO QUE VUELVE IGUAL NO VUELVE A HABLAR. Mismo hecho, mismo concepto,
+  // misma firma, y el acuse sigue cubriéndolo: nadie tuvo que resolverlo ni
+  // re-acusarlo por el camino.
+  ok('9.5 un dato que regresa SIN CAMBIAR sigue acusado: no reabre',
+    (() => { const c = makeCtx(MATURE);
+      const f = { semanticKey: 'position_below_cost_btc', family: 'performance',
+        causalRoot: 'position_result', unit: 'percent_of_cost', value: -30, changeFact: true,
+        window: { range: 'observed', startAt: 1, endAt: 2 },
+        conceptId: 'pos:btc', episodeSignature: 'structural:', eventId: 'pos:btc#structural:',
+        materiality: 0.5, novelty: 1, confidence: 1, values: {} };
+      c.__l9 = { facts: [f], gaps: [] };
+      const ack = '{ "pos:btc": { at: 1, state: "acknowledged", signature: "structural:" } }';
+      const first  = run('_aurixCanonicalFindings(__l9, { acknowledged: ' + ack + ' })', c);
+      const second = run('_aurixCanonicalFindings(__l9, { acknowledged: ' + ack + ' })', c);
+      return first.length === 0 && second.length === 0; })());
+  ok('9.6 y el owner de la resolución no conoce la lista de conceptos vivos: no puede resolver por ausencia',
+    !/liveConceptIds|live\b/.test(fnSrc('_aurixIntelResolveCertified')));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

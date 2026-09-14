@@ -81,8 +81,8 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_INTEL_MEM_MAX_ENTRIES','_AURI
   '_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS',
   '_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
   '_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT',
-  '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_INTEL_DIM_ROOT','_INTV4_BRIEF_MAX','_AURIX_LOSS_TIER'];
-const FNS = ['_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveAbsent','toBase','_intv5MattersStories','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_nativeToUSD','_intv4T','_intv4Num','_intv4Money','_intv4CatLabel','_intv5CatLabel','_intv4RangeLabel','_intv4WindowLabel','_intv4FactText','_intv4WhyText','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+  '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_INTEL_DIM_ROOT','_INTV4_BRIEF_MAX','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE'];
+const FNS = ['_intv4FindingRows','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','toBase','_intv5MattersStories','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_nativeToUSD','_intv4T','_intv4Num','_intv4Money','_intv4CatLabel','_intv5CatLabel','_intv4RangeLabel','_intv4WindowLabel','_intv4FactText','_intv4WhyText','_aurixAdoptRemoteClassificationLineage','_aurixLineageWrite','_aurixLineageMerge','_aurixLineageForBackend','_aurixDisplayCategory','_aurixPositionFromAsset','computePositionPerformance','getDisplayName','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixFlowIntentOf',
   '_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey',
@@ -931,17 +931,20 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
       return !!fa && !!fb && fa.eventId === fb.eventId
         && fa.values.severityTier === fb.values.severityTier; })());
   ok('9.13 …y un NIVEL DE SEVERIDAD materialmente nuevo sí es un episodio nuevo',
-    (() => { // 24,96 % del patrimonio (material) → 40,5 % (estructural)
-      const a = lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 });
-      const b = lossCtx([POS('btc', 'crypto', 1, 45000, 145000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
+    (() => { // 10 % del patrimonio (material) → 30 % (estructural), con el IMPORTE real
+      const a = lossCtx([POS('btc', 'crypto', 1, 45000, 55000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
+      const b = lossCtx([POS('btc', 'crypto', 1, 45000, 75000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
       const fa = a.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
       const fb = b.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
       return !!fa && !!fb && fa.values.severityTier === 'material'
-        && fb.values.severityTier === 'structural' && fa.eventId !== fb.eventId; })(),
+        && fa.values.recordedLossBase === 10000 && fa.values.lossShareOfWealthPct === 10
+        && fb.values.severityTier === 'structural'
+        && fb.values.recordedLossBase === 30000 && fb.values.lossShareOfWealthPct === 30
+        && fa.eventId !== fb.eventId; })(),
     JSON.stringify([
-      (lossCtx([POS('btc', 'crypto', 1, 48000, 100000), POS('eur', 'cash', 52000, 1, 52000)], { totUSD: 100000 })
+      (lossCtx([POS('btc', 'crypto', 1, 45000, 55000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 })
         .ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc') || {}).values,
-      (lossCtx([POS('btc', 'crypto', 1, 45000, 145000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 })
+      (lossCtx([POS('btc', 'crypto', 1, 45000, 75000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 })
         .ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc') || {}).values]));
   ok('9.13b y un deterioro CONTINUADO dentro del mismo nivel NO crea episodio (−25 → −26 → −27)',
     (() => { const at = (px) => { const r = lossCtx([POS('btc', 'crypto', 1, px, Math.round(px / 0.75)),
@@ -953,7 +956,7 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
         POS('eur', 'cash', 100000 - px, 1, 100000 - px)], { totUSD: 100000 });
       const f = r.ledger.facts.find(x => x.semanticKey === 'position_below_cost_btc');
       return f && f.eventId; })));
-  ok('9.13c una acción del USUARIO sobre la posición sí es un estado nuevo (reabre una vez)',
+  ok('9.13c una acción MATERIAL del usuario sobre la posición sí es un estado nuevo (reabre una vez)',
     (() => { const base = lossCtx([POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)], { totUSD: 100000 });
       const acted = core({ rows: inv([100000, 100000, 100000]),
         assets: [POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)],
@@ -962,7 +965,8 @@ console.log('\n9 · «He perdido un 30 %» son cuatro cosas distintas:');
                   intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }] });
       const fa = base.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
       const fb = acted.ledger.facts.find(f => f.semanticKey === 'position_below_cost_btc');
-      return !!fa && !!fb && fa.values.userActions === 0 && fb.values.userActions === 1
+      return !!fa && !!fb && fa.values.lastMaterialAction === null
+        && fb.values.lastMaterialAction === 'b1'
         && fa.eventId !== fb.eventId; })());
   ok('9.14 una RECUPERACIÓN completa retira la afirmación (no queda un aviso huérfano)',
     (() => { const r = lossCtx([POS('btc', 'crypto', 1, 120000, 90000), POS('eur', 'cash', 10000, 1, 10000)],
@@ -1263,22 +1267,24 @@ console.log('\n12 · Fronteras exactas y los casos que no estaban cubiertos:');
       return { keys: Object.keys(rec.ack).length, sig: rec.ack['pos:btc'].signature }; })()));
   ok('12.16b y NINGÚN acuse vigente se desaloja por cupo (el tope numérico ya no existe)',
     !/_AURIX_INTEL_MEM_MAX_ENTRIES/.test(fnSrc('_aurixIntelAcknowledge')));
-  ok('12.16c la RESOLUCIÓN es lo que permite reabrir tras una recuperación, y sólo alcanza a lo resuelto',
+  ok('12.16c la RESOLUCIÓN sólo alcanza a lo que llega CERTIFICADO, y la lista vacía no resuelve nada',
     (() => { const c = makeCtx({});
       const store = {}; c.__s3 = store;
       run('var __e3 = { store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s3, k) ? __s3[k] : null),'
         + ' setItem: (k, v) => { __s3[k] = String(v); }, removeItem: k => {} }, owner: "u1" };', c);
       run('_aurixIntelAcknowledge("pos:btc", Object.assign({}, __e3, { now: 10, signature: "material:0" }))', c);
-      // El concepto desaparece del ledger (la posición recuperó) ⇒ resuelto.
-      const n = run('_aurixIntelResolveAbsent([], Object.assign({}, __e3, { now: 20 }))', c);
-      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e3)', c);
-      // Con el mismo concepto vivo, resolver no toca nada.
+      // LA LISTA VACÍA ES EL CASO PELIGROSO: antes significaba «nada apareció, así
+      // que todo se resolvió», y una hidratación lenta borraba la línea base.
+      const n0 = run('_aurixIntelResolveCertified([], Object.assign({}, __e3, { now: 20 }))', c);
+      const rec0 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e3)', c);
+      // Con la prueba positiva del ledger sí se resuelve, y sólo ese concepto.
       run('_aurixIntelAcknowledge("pos:eth", Object.assign({}, __e3, { now: 30, signature: "material:0" }))', c);
-      const n2 = run('_aurixIntelResolveAbsent(["pos:eth"], Object.assign({}, __e3, { now: 40 }))', c);
-      const rec2 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e3)', c);
-      return n === 1 && rec.ack['pos:btc'].state === 'resolved'
+      const n = run('_aurixIntelResolveCertified(["pos:btc"], Object.assign({}, __e3, { now: 40 }))', c);
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __e3)', c);
+      return n0 === 0 && rec0.ack['pos:btc'].state === 'acknowledged'
+        && n === 1 && rec.ack['pos:btc'].state === 'resolved'
         && Number.isFinite(rec.ack['pos:btc'].resolvedAt)
-        && n2 === 0 && rec2.ack['pos:eth'].state === 'acknowledged'; })());
+        && rec.ack['pos:eth'].state === 'acknowledged'; })());
   ok('12.16d un registro RESUELTO deja de cubrir, así que el deterioro posterior habla',
     (() => { const c = makeCtx({});
       const mk = (sig) => ({ semanticKey: 'position_below_cost_btc', family: 'performance',
@@ -1456,6 +1462,232 @@ console.log('\n11 · Empate en el máximo: silencio honesto, no un hito inventad
     JSON.stringify(tie.ledger.facts.map(f => f.semanticKey)));
   ok('11.2 y el contrato sigue siendo válido (silencio, no excepción)',
     Array.isArray(tie.findings) && Array.isArray(tie.ledger.gaps));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 14 · CORRECCIÓN FINANCIERA FINAL — CUOTA DE PÉRDIDA, ACCIÓN MATERIAL
+//      Y RESOLUCIÓN CERTIFICADA
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n14 · La cuota de pérdida se calcula con importes, no con una aproximación:');
+{
+  const POS = (id, type, qty, price, cost, cur) => {
+    const a = A(id, type, qty, price, cur); if (cost != null) a.costBasis = cost; return a;
+  };
+  const lossCtx = (assets, tot, extra) => core(Object.assign({ rows: inv([100000, 100000, 100000]),
+    assets: assets, snap: Object.assign({}, SNAP, { totUSD: tot }), drivers: DRIVERS, serverRows: [] },
+    extra || {}));
+  const lossOf = (r, id) => r.ledger.facts.find(f => f.semanticKey === 'position_below_cost_' + id);
+
+  // ── 14.1 · LA ARITMÉTICA EXACTA ────────────────────────────────────────
+  ok('14.1 la cuota es importe perdido / patrimonio certificado, sin intermediarios',
+    (() => { const c = makeCtx({});
+      return run('_aurixLossImpactShare(15000, 100000)', c) === 0.15
+        && run('_aurixLossImpactShare(0, 100000)', c) === 0
+        && run('_aurixLossImpactShare(-8000, 100000)', c) === 0        // nunca negativa
+        && run('_aurixLossImpactShare(50000, 100000)', c) === 0.5; })());
+  // EL EJEMPLO DEL FOUNDER. Coste 60.000, valor 45.000, patrimonio 100.000:
+  // la pérdida es 15.000, o sea el 15 % del patrimonio. La aproximación anterior
+  // —|retorno| × peso actual— daba 25 % × 45 % = 11,25 %, casi un tercio menos, y
+  // no es un redondeo: el peso se calcula sobre el valor que QUEDA, no sobre el
+  // coste, así que el error crece con la pérdida.
+  ok('14.2 el caso −25 %: la cuota real es 15 %, no el 11,25 % de multiplicar por el peso',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, 60000),
+        POS('eur', 'cash', 55000, 1, 55000)], 100000);
+      const f = lossOf(r, 'btc');
+      return !!f && f.values.recordedLossBase === 15000
+        && f.values.lossShareOfWealthPct === 15
+        && f.values.severityTier === 'material'
+        && Math.round(f.values.weightPct) === 45; })(),
+    JSON.stringify((lossOf(lossCtx([POS('btc', 'crypto', 1, 45000, 60000),
+      POS('eur', 'cash', 55000, 1, 55000)], 100000), 'btc') || {}).values));
+  ok('14.3 …y la aproximación por peso ya no existe en el ledger',
+    !/returnPct\s*\)\s*\*\s*.*weight|Math\.abs\(perf\.returnPct\)\s*\*\s*weight/.test(fnSrc('_aurixFactLedger')));
+  ok('14.4 el caso −50 %: 45.000 perdidos sobre 100.000 es estructural',
+    (() => { const f = lossOf(lossCtx([POS('btc', 'crypto', 1, 45000, 90000),
+        POS('eur', 'cash', 55000, 1, 55000)], 100000), 'btc');
+      return !!f && f.values.recordedLossBase === 45000
+        && f.values.lossShareOfWealthPct === 45 && f.values.severityTier === 'structural'; })());
+  // VALOR ACTUAL CERO. El peso es 0 y el suelo de participación lo suprimía: la
+  // posición barrida a cero era exactamente la que no podía hablar, y es donde el
+  // usuario más necesita leerlo.
+  ok('14.5 una posición cuyo valor actual es CERO se publica con toda su pérdida',
+    (() => { const f = lossOf(lossCtx([POS('btc', 'crypto', 0, 45000, 40000),
+        POS('eur', 'cash', 60000, 1, 60000)], 60000), 'btc');
+      return !!f && f.values.recordedLossBase === 40000 && f.values.weightPct === 0
+        && f.values.lossShareOfWealthPct > 25 && f.values.severityTier === 'structural'; })(),
+    JSON.stringify((lossOf(lossCtx([POS('btc', 'crypto', 0, 45000, 40000),
+      POS('eur', 'cash', 60000, 1, 60000)], 60000), 'btc') || {}).values));
+  ok('14.5b …y con el peso por los suelos manda la PÉRDIDA: 39.999 sobre 60.001 es noticia',
+    (() => { const f = lossOf(lossCtx([POS('btc', 'crypto', 1, 1, 40000),
+        POS('eur', 'cash', 60000, 1, 60000)], 60001), 'btc');
+      return !!f && f.values.weightPct === 0 && f.values.recordedLossBase === 39999
+        && f.values.severityTier === 'structural'; })());
+  // Y el otro lado del límite: un PRECIO de cero no es un valor de cero. El owner
+  // certificado responde `missing_price` —cero e «ilocalizable» son el mismo dato
+  // en esa entrada— y el ledger declara el hueco en vez de inventar un −100 %.
+  ok('14.5c un PRECIO ausente no se lee como valor cero: se declara, no se publica',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 0, 40000),
+        POS('eur', 'cash', 60000, 1, 60000)], 60000);
+      return !lossOf(r, 'btc')
+        && r.ledger.gaps.some(g => g.semanticKey === 'position_below_cost'
+             && g.reason === 'missing_cost_basis'); })());
+  ok('14.6 con el denominador de patrimonio INCOMPLETO no se publica ninguna cuota',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, 90000),
+        POS('eur', 'cash', 55000, 1, 55000)], 100000,
+        { snap: Object.assign({}, SNAP, { totUSD: 100000, uncertifiablePositions: 1 }) });
+      return !lossOf(r, 'btc')
+        && r.ledger.gaps.some(g => g.semanticKey === 'position_below_cost'
+             && g.reason === 'investable_denominator_partial'); })(),
+    JSON.stringify(lossCtx([POS('btc', 'crypto', 1, 45000, 90000), POS('eur', 'cash', 55000, 1, 55000)],
+      100000, { snap: Object.assign({}, SNAP, { totUSD: 100000, uncertifiablePositions: 1 }) })
+      .ledger.gaps.filter(g => g.semanticKey === 'position_below_cost')));
+  ok('14.6b y si el IMPORTE no se puede convertir, el hecho se declara y no se publica (guarda cerrada)',
+    /_AURIX_LOSS_TIER\.UNAVAILABLE\) \{\s*\n\s*gap\(_AURIX_FACT_FAMILY\.PERFORMANCE, 'position_below_cost',\s*\n\s*_AURIX_FACT_STATUS\.LOW_CONFIDENCE, 'loss_impact_not_computable'/
+      .test(fnSrc('_aurixFactLedger')));
+  ok('14.7 sin importe computable (nivel NO DISPONIBLE) el hecho no existe: no hay tier por defecto',
+    (() => { const c = makeCtx({});
+      return run('_aurixLossSeverityTier(NaN, 100000)', c) === 'unavailable'
+        && run('_aurixLossSeverityTier(15000, 0)', c) === 'unavailable'
+        && run('_aurixLossSeverityTier(15000, NaN)', c) === 'unavailable'
+        && run('_aurixLossImpactShare(NaN, 100000)', c) === null; })());
+  ok('14.8 la frontera estructural es una decisión de producto DECLARADA, no la de concentración',
+    (() => { const c = makeCtx({});
+      const v = run('_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE', c);
+      const src = fnSrc('_aurixLossSeverityTier');
+      return v === 0.25
+        && /_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE/.test(src)
+        && !/concentrationPct/.test(src); })());
+
+  // ── ACCIÓN DEL USUARIO: MATERIAL, DEDUPLICADA Y NO INFERIDA ────────────
+  const withFlows = (flows) => lossCtx([POS('btc', 'crypto', 1, 45000, 90000),
+    POS('eur', 'cash', 55000, 1, 55000)], 100000, { flows: flows });
+  const sigOf = (r) => { const f = lossOf(r, 'btc'); return f ? f.eventId : null; };
+  const baseSig = sigOf(withFlows([]));
+  ok('14.9 una acción DIMINUTA no reabre nada (por debajo del 2 % del patrimonio)',
+    (() => { const r = withFlows([{ id: 'tiny', ts: NOW - DAY, amountUSD: 500, kind: 'asset_add',
+        source: 'user', intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }]);
+      const f = lossOf(r, 'btc');
+      return !!f && f.values.lastMaterialAction === null && f.eventId === baseSig; })(),
+    JSON.stringify([baseSig, sigOf(withFlows([{ id: 'tiny', ts: NOW - DAY, amountUSD: 500,
+      kind: 'asset_add', source: 'user', intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }]))]));
+  ok('14.10 una acción MATERIAL reabre UNA vez, y repetir la pintura no vuelve a reabrir',
+    (() => { const flows = [{ id: 'big', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add',
+        source: 'user', intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }];
+      const a = withFlows(flows), b = withFlows(flows);
+      const fa = lossOf(a, 'btc'), fb = lossOf(b, 'btc');
+      return !!fa && fa.values.lastMaterialAction === 'big' && fa.eventId !== baseSig
+        && fb.eventId === fa.eventId; })());
+  ok('14.11 una fila DERIVADA o inferida no es una decisión de nadie: no reabre',
+    (() => { const r = withFlows([{ id: 'd1', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add',
+        source: 'tx-backfill', originalTs: NOW - DAY, assetId: 'btc', revision: 1 }]);
+      const f = lossOf(r, 'btc');
+      return !!f && f.values.lastMaterialAction === null && f.eventId === baseSig; })(),
+    JSON.stringify((lossOf(withFlows([{ id: 'd1', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add',
+      source: 'tx-backfill', originalTs: NOW - DAY, assetId: 'btc', revision: 1 }]), 'btc') || {}).values));
+  ok('14.12 y una acción DUPLICADA en el ledger no cuenta dos veces: la identidad es la última, no el recuento',
+    (() => { const one = withFlows([{ id: 'big', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add',
+        source: 'user', intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 }]);
+      const dup = withFlows([{ id: 'big', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add',
+        source: 'user', intent: 'INTERNAL_BUY', assetId: 'btc', revision: 1 },
+        { id: 'big-d', ts: NOW - DAY, amountUSD: 5000, kind: 'asset_add', source: 'tx-backfill',
+          originalTs: NOW - DAY, assetId: 'btc', revision: 1 }]);
+      return sigOf(one) === sigOf(dup); })());
+
+  // ── RESOLUCIÓN CERTIFICADA ────────────────────────────────────────────
+  ok('14.13 una RECUPERACIÓN medida contra el mismo coste resuelve el concepto',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 95000, 90000),
+        POS('eur', 'cash', 5000, 1, 5000)], 100000);
+      return (r.resolvedConcepts || []).some(x => x.conceptId === 'pos:btc'
+        && x.reason === 'recovered_to_cost_basis'); })(),
+    JSON.stringify(lossCtx([POS('btc', 'crypto', 1, 95000, 90000), POS('eur', 'cash', 5000, 1, 5000)], 100000)
+      .resolvedConcepts));
+  ok('14.14 un CIERRE autoritativo resuelve, y no publica ninguna pérdida realizada',
+    (() => { const closed = POS('btc', 'crypto', 0, 45000, 90000);
+      closed.lifecycleStatus = 'closed'; closed.realizedPnL = -45000;
+      const r = lossCtx([closed, POS('eur', 'cash', 55000, 1, 55000)], 55000);
+      return (r.resolvedConcepts || []).some(x => x.conceptId === 'pos:btc' && x.reason === 'position_closed')
+        && !r.ledger.facts.some(f => /realis|realiz/i.test(f.semanticKey))
+        && r.ledger.gaps.some(g => g.semanticKey === 'position_realised_loss'
+             && g.status === 'not_yet_supported'); })(),
+    JSON.stringify((() => { const closed = POS('btc', 'crypto', 0, 45000, 90000);
+      closed.lifecycleStatus = 'closed'; closed.realizedPnL = -45000;
+      return lossCtx([closed, POS('eur', 'cash', 55000, 1, 55000)], 55000).resolvedConcepts; })()));
+  ok('14.15 un hecho que NO se puede medir no resuelve: sin coste registrado nadie se cura',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, null),
+        POS('eur', 'cash', 55000, 1, 55000)], 100000);
+      return !(r.resolvedConcepts || []).some(x => x.conceptId === 'pos:btc')
+        && r.ledger.gaps.some(g => g.semanticKey === 'position_below_cost'
+             && g.reason === 'missing_cost_basis'); })(),
+    JSON.stringify(lossCtx([POS('btc', 'crypto', 1, 45000, null), POS('eur', 'cash', 55000, 1, 55000)], 100000)
+      .resolvedConcepts));
+  ok('14.16 una cartera SIN HIDRATAR no resuelve nada: la ausencia no es una medición',
+    (() => { const r = core({ rows: inv([100000, 100000, 100000]), assets: [],
+        snap: Object.assign({}, SNAP, { totUSD: 0 }), drivers: DRIVERS, serverRows: [] });
+      return (r.resolvedConcepts || []).length === 0; })(),
+    JSON.stringify(core({ rows: inv([100000, 100000, 100000]), assets: [],
+      snap: Object.assign({}, SNAP, { totUSD: 0 }), drivers: DRIVERS, serverRows: [] }).resolvedConcepts));
+  ok('14.17 con el patrimonio no certificable tampoco: eso es DESCONOCIDO, no recuperado',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 45000, 90000),
+        POS('eur', 'cash', 55000, 1, 55000)], 100000,
+        { snap: Object.assign({}, SNAP, { totUSD: 100000, uncertifiablePositions: 1 }) });
+      return !(r.resolvedConcepts || []).some(x => x.conceptId === 'pos:btc'); })());
+  ok('14.18 lo que sigue VIVO no se resuelve aunque otra ventana lo mida por debajo del umbral',
+    (() => { const src = fnSrc('_aurixFactLedger');
+      return /_liveConceptSet\.has\(r\.conceptId\)/.test(src)
+        && /new Set\(facts\.map\(f => f && f\.conceptId\)/.test(src); })());
+  ok('14.19 y el consumidor sólo resuelve lo que llega en la lista: no puede resolver por ausencia',
+    (() => { const src = fnSrc('_aurixIntelResolveCertified');
+      return /if \(!resolved\.size\) return 0;/.test(src)
+        && /if \(!resolved\.has\(k\)\) return;/.test(src)
+        && !/live/.test(src); })());
+  // Y el PUNTO DE LLAMADA: el renderer tiene que pasar la lista certificada del
+  // ledger, no los conceptos vivos. Un consumidor correcto con la entrada
+  // equivocada habría reintroducido el defecto entero.
+  ok('14.20 el renderer alimenta la resolución con `resolvedConcepts`, nunca con los conceptos vivos',
+    (() => { const i = app.indexOf('_aurixIntelResolveCertified(_resolved');
+      if (i < 0) return false;
+      const around = app.slice(Math.max(0, i - 900), i);
+      return /core\.ledger && core\.ledger\.resolvedConcepts/.test(around)
+        && !/\.map\(f => f\.conceptId\)/.test(around)
+        && app.indexOf('_aurixIntelResolveAbsent') === -1; })());
+  // DETERIORO POSTERIOR A UNA RECUPERACIÓN CERTIFICADA. El registro resuelto deja
+  // de cubrir, así que la pérdida nueva habla una vez — y sólo una.
+  ok('14.21 tras una recuperación certificada, un deterioro nuevo vuelve a hablar UNA vez',
+    (() => { const c = makeCtx({});
+      const mk = (sig) => ({ semanticKey: 'position_below_cost_btc', family: 'performance',
+        causalRoot: 'position_result', unit: 'percent_of_cost', value: -30, changeFact: true,
+        window: { range: 'observed', startAt: NOW - DAY, endAt: NOW },
+        conceptId: 'pos:btc', episodeSignature: sig, eventId: 'pos:btc#' + sig,
+        materiality: 0.45, novelty: 1, confidence: 1, values: {} });
+      c.__l14 = { facts: [mk('structural:')], gaps: [] };
+      const covered = run('_aurixCanonicalFindings(__l14, { acknowledged: { "pos:btc":'
+        + ' { at: 1, state: "acknowledged", signature: "structural:" } } })', c);
+      const afterRecovery = run('_aurixCanonicalFindings(__l14, { acknowledged: { "pos:btc":'
+        + ' { at: 1, state: "resolved", signature: "structural:", resolvedAt: 2 } } })', c);
+      return covered.length === 0 && afterRecovery.length === 1; })());
+  // AISLAMIENTO. La resolución escribe en el registro del PROPIETARIO, así que
+  // recuperarse en una cuenta no puede curar el aviso de otra.
+  ok('14.22 resolver en nombre de otra cuenta no lee ni muta el registro ajeno',
+    (() => { const c = makeCtx({});
+      const store = {}; c.__s14 = store;
+      run('var __mk = (o) => ({ store: { getItem: k => (Object.prototype.hasOwnProperty.call(__s14, k)'
+        + ' ? __s14[k] : null), setItem: (k, v) => { __s14[k] = String(v); }, removeItem: k => {} }, owner: o });', c);
+      // El dispositivo guarda el contexto de UN propietario: al entrar u2, el
+      // registro de u1 deja de ser legible (`_aurixIntelReadOwned` compara owner).
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign(__mk("u1"), { now: 10, signature: "structural:" }))', c);
+      run('_aurixIntelAcknowledge("pos:btc", Object.assign(__mk("u2"), { now: 11, signature: "structural:" }))', c);
+      const n = run('_aurixIntelResolveCertified(["pos:btc"], Object.assign(__mk("u1"), { now: 20 }))', c);
+      const r1 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __mk("u1"))', c);
+      const r2 = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, __mk("u2"))', c);
+      return n === 0 && r1 === null
+        && r2.ack['pos:btc'].state === 'acknowledged' && r2.ack['pos:btc'].at === 11; })());
+  // Y el contador del hero sigue siendo el MISMO conjunto que el destino pinta,
+  // con la aritmética nueva y con el suelo de materialidad movido.
+  ok('14.23 el contador del hero sigue coincidiendo con las filas publicadas',
+    (() => { const r = lossCtx([POS('btc', 'crypto', 1, 0, 40000),
+        POS('eth', 'crypto', 1, 45000, 60000), POS('eur', 'cash', 15000, 1, 15000)], 60000);
+      const rows = run('_intv4FindingRows(' + JSON.stringify({ findings: r.findings }) + ')', makeCtx({}));
+      return rows.length === r.findings.length; })());
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');
