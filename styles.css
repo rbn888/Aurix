@@ -26965,3 +26965,10 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
 .wsre-subkpi i { font-size: 11px; letter-spacing: 0.02em; }
 .wsloan-kpi-k  { font-size: 11px; letter-spacing: 0.02em; }
 .wsloan-donut-l { font-size: 11px; letter-spacing: 0.02em; }
+
+/* El `nowrap` de las filas de escenario necesitaba su `clamp()`, igual que las
+   demás cifras: sin escalar, «+129.978,75 US$» no cabe en una columna de tres a
+   768px y desborda 8px. Lo cazó la sonda precisamente porque el `nowrap` convierte
+   un corte silencioso en un desbordamiento medible, que era la intención. */
+.wsb-row b { font-size: clamp(12px, 3.2vw, 14px); }
+.wsb-row.is-cause b { font-size: clamp(11px, 3vw, 13px); }
