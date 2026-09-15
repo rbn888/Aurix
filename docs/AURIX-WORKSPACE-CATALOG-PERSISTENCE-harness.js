@@ -101,6 +101,17 @@ const CAT = run('_WS_CATALOG', FREE);
   ok('1.10 …y su excepción está EXPLICADA en el catálogo, no sólo aplicada',
     /§J · SE QUEDA INTERNA, Y LA EXCEPCIÓN SE EXPLICA/.test(app)
     && /no vender una copia/.test(app) && /la watchlist/i.test(app));
+  // ── LA CONDICIÓN DE DIVISAS, PEGADA A LA ENTRADA ──────────────────────────
+  // Los totales de Diario y Precios suman importes con `currency` POR FILA sin
+  // convertir. Hoy no hace daño (internas + formulario en EUR), pero el día que
+  // alguien las publique el campo ya estará ahí. La condición vive junto a la
+  // entrada del catálogo y no en un informe, y este gate impide que se pierda.
+  ok('1.10b la condición de divisas está escrita junto a las dos entradas afectadas',
+    /CONDICIÓN DE PUBLICACIÓN, Y VA AQUÍ A PROPÓSITO/.test(app)
+    && /sin cerrar antes/.test(app)
+    && /misma condición de divisas que `tpl_assets`/.test(app));
+  ok('1.10c y las dos siguen internas mientras la condición no se cierre',
+    ['tpl_assets', 'tpl_journal'].every(id => (CAT.find(e => e.id === id) || {}).published === false));
   ok('1.11 su matemática SÍ se corrigió, aunque siga interna',
     /§J \/ §E — EL AGREGADO SALE DE IMPORTES/.test(app)
     && /averageReturnBasis/.test(app));

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '685'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '686'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -20482,10 +20482,61 @@ function _wsNum(v) {
 function _wsCanonicalNumStr(n) {
   if (!Number.isFinite(Number(n))) return '';
   let out = String(Number(n));
-  if (out.indexOf('e') !== -1 || out.indexOf('E') !== -1) out = Number(n).toFixed(10).replace(/0+$/, '').replace(/\.$/, '');
+  if (out.indexOf('e') !== -1 || out.indexOf('E') !== -1) {
+    // `toFixed(10)` TAMBIÉN devuelve notación exponencial a partir de 1e21, así que
+    // el arreglo anterior no cubría ese tramo: «1e+21» se leía como 121. Se expande
+    // a dígitos con `toLocaleString` en la variante que no agrupa, que sí la
+    // desarrolla, y si tampoco se puede se devuelve vacío antes que una cifra falsa.
+    let expanded = '';
+    try { expanded = Number(n).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 10 }); } catch (_) { expanded = ''; }
+    if (!expanded || /[eE]/.test(expanded)) return '';
+    out = expanded;
+  }
   const dot = out.indexOf('.');
   if (dot !== -1 && (out.length - dot - 1) === 3) out += '0';
   return out;
+}
+// ── EL PARQUE INSTALADO, SIN ADIVINAR ───────────────────────────────────────
+// Los documentos y los borradores guardados ANTES de que el estado se canonizara
+// contienen texto localizado crudo (los handlers guardan `el.value` desde WS.15A,
+// que es anterior). Un usuario que escribió «250.000» en español y se pasa al
+// inglés sigue leyendo 250, y la corrección del `focusout` sólo cubre las
+// escrituras NUEVAS. La revisión financiera lo señaló como residual.
+//
+// Y no hay respuesta correcta para esas filas: nadie registró EN QUÉ IDIOMA se
+// escribieron, así que reinterpretarlas es adivinar. Lo que sí se puede hacer sin
+// adivinar es canonizar SÓLO las que se leen IGUAL en los dos idiomas —«250000»,
+// «3,5», «1.234,56»— y dejar intactas las ambiguas («250.000», «1,234»), que se
+// quedan exactamente como están hoy: no mejora, pero tampoco congela una
+// interpretación inventada. La ambigüedad se reduce al conjunto donde de verdad
+// existe, y ahí se declara en vez de resolverse a ciegas.
+function _wsCanonicalizeInputs(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const out = Array.isArray(obj) ? obj.slice() : Object.assign({}, obj);
+  for (const k in out) {
+    const v = out[k];
+    if (typeof v !== 'string' || v.trim() === '') continue;
+    if (!/^[\d.,\-\s]+$/.test(v)) continue;            // no es un número escrito
+    const a = _wsNumInLang(v, 'es'), b = _wsNumInLang(v, 'en');
+    if (a !== b) continue;                              // ambigua: se deja como está
+    if (!Number.isFinite(a)) continue;
+    const canon = _wsCanonicalNumStr(a);
+    if (canon) out[k] = canon;
+  }
+  return out;
+}
+// `_wsNum` con un idioma EXPLÍCITO, para poder comparar las dos lecturas sin tocar
+// el idioma activo de la aplicación.
+//
+// RESTRICCIÓN, y conviene que quede dicha: esto funciona porque la ventana es
+// SÍNCRONA y `_wsNum` es pura — el `finally` restaura `lang` antes de que nada más
+// pueda leerlo. Si alguien mete aquí dentro un render, un `await` o una llamada a
+// `t()`, el owner único del idioma (`switchLang`) se filtraría por esta rendija.
+// No se llama a nada más dentro, y no debe llamarse.
+function _wsNumInLang(v, langCode) {
+  const prev = (typeof lang !== 'undefined') ? lang : undefined;
+  try { lang = langCode; return _wsNum(v); }
+  finally { try { lang = prev; } catch (_) {} }
 }
 function _wsNumOrNull(v) {
   if (v == null) return null;
@@ -20832,9 +20883,27 @@ const _WS_CATALOG = Object.freeze([
   // porque §CONTINUIDAD pide mejorar los internos que reciben la corrección común.
   // Queda como decisión del founder: si quiere publicarla, el camino es fusionarla
   // con el Diario, no duplicarlo.
+  //
+  // ── CONDICIÓN DE PUBLICACIÓN, Y VA AQUÍ A PROPÓSITO ───────────────────────
+  // `calculateAssetPrices` y `calculateTradeJournal` llevan una DIVISA POR FILA y
+  // sus totales (`totalInvested`, `netProfitLoss`, `averageReturnPct`) se suman SIN
+  // convertir y se pintan con `formatBase`. Hoy no hace daño porque las dos
+  // superficies están internas y el formulario fija EUR, pero es una bomba armada:
+  // el día que alguien las publique, el `currency` por fila ya estará ahí y nadie
+  // recordará que los totales no convierten.
+  // Así que la condición queda escrita junto a la entrada y no en un informe que se
+  // pierde: NINGUNA de estas dos puede pasar a `published: true` sin cerrar antes
+  // una de las dos puertas —o UNA divisa por documento (que es lo que el formulario
+  // ya hace de hecho), o la base FX declarada con su FECHA en los supuestos—.
+  // Meter conversión ahora habría exigido elegir un owner de tipo de cambio y una
+  // política de fecha del tipo, y publicar un agregado con un tipo no declarado es
+  // exactamente el defecto que este bloque ha estado cerrando.
   { id: 'tpl_assets',            kind: 'template', published: false, featureKey: null,                    commercialTier: 'undecided' },
   { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: 'workspace.receivables', commercialTier: 'premium', opens: 'receivables' },
   { id: 'tpl_goals',             kind: 'template', published: false, featureKey: 'workspace.goals',       commercialTier: 'premium', opens: 'goals' },
+  // DIARIO · misma condición de divisas que `tpl_assets` (ver su bloque): sus
+  // totales suman importes con `currency` POR FILA sin convertir. Publicarla exige
+  // cerrar antes una divisa por documento o declarar la base FX con su fecha.
   { id: 'tpl_journal',           kind: 'template', published: false, featureKey: 'workspace.journal',     commercialTier: 'premium', opens: 'journal' },
   // INTERNA: Escenarios se publica como HERRAMIENTA (ver arriba). Dos entradas
   // publicadas para la misma superficie hacen que `_wsSurfaceEntry` falle CERRADO.
@@ -22781,12 +22850,21 @@ function _wsgCreate() {
   const val = sel => { const el = root.querySelector('[data-wsg-form="' + sel + '"]'); return el ? el.value : ''; };
   const type = val('type') || 'wealth';
   const name = (val('name') || '').trim() || t('wsg_type_' + type);
-  const target = Number(val('target')) || 0;
-  const current = Number(val('current')) || 0;
-  const monthly = Number(val('monthly')) || 0;
-  const year = Number(val('year')) || 0;
+  // ── UN SOLO OWNER DE LECTURA DEL FORMULARIO ───────────────────────────────
+  // Esto duplicaba ENTERA la lectura de `_wsgFormValues` con su propio
+  // `Number(val(...)) || 0`, así que el arreglo del parseo tolerante se aplicó a la
+  // vista previa y NO al camino que crea y persiste el objetivo. El resultado era
+  // peor que el defecto original: la previsualización decía 250.000 € y el
+  // documento guardado valía 250 €, así que las dos superficies del MISMO acto se
+  // contradecían. Y mi propio gate lo declaraba cerrado, porque su aserción era un
+  // regex sobre la forma exacta de la OTRA función.
+  // Dos derivaciones de una misma decisión siempre acaban divergiendo: ahora hay
+  // una, y lo que se previsualiza es literalmente lo que se guarda.
+  const v = _wsgFormValues(root);
   const now = Date.now();
-  const g = { id: 'wsg_' + now, type, name, target, current, monthly, targetYear: year > 0 ? year : null, mode: 'manual', createdAt: now, updatedAt: now };
+  const g = { id: 'wsg_' + now, type, name, target: v.target, current: v.current,
+              monthly: v.monthly, targetYear: v.targetYear, mode: 'manual',
+              createdAt: now, updatedAt: now };
   _wsgPersist(g);
   _wsgPrefill = null;
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
@@ -22875,15 +22953,27 @@ function _wsgStateMeta(state) {
 
 function _wsgCardOutHtml(g, prog) {
   const esc = _intccEsc;
-  const hasDate = g.targetYear && g.targetYear > _wsgThisYear();
+  // ── UNA SOLA DERIVACIÓN DE «TIENE PLAZO» ──────────────────────────────────
+  // Esto lo recalculaba con `g.targetYear > _wsgThisYear()` mientras el motor ya
+  // publica `prog.hasDate`, y las dos derivaciones DIVERGÍAN desde que el año en
+  // curso cuenta como plazo: el motor decía que sí y la tarjeta que no, así que la
+  // aportación necesaria —que sí estaba calculada— no se pintaba.
+  const hasDate = prog.hasDate === true;
   const sm = _wsgStateMeta(prog.state);
+  // ── Y `null` NO ES CERO NI DENTRO DE `formatBase` ─────────────────────────
+  // `Intl.NumberFormat.format(null)` coacciona a 0, así que los null nuevos de
+  // `target`/`remaining` se imprimían como «0,00 €»: el cero falso no se había
+  // eliminado, se había movido una capa. Y con `undefined` habría salido «NaN €»,
+  // que es peor. Un importe ausente se escribe con el guion, que es la convención
+  // declarada del producto para un dato que no existe.
+  const money = v => (v == null || !Number.isFinite(Number(v))) ? '—' : formatBase(v);
   const rows = [
-    { label: t('wsg_r_target'),    value: formatBase(prog.target) },
-    { label: t('wsg_r_current'),   value: formatBase(prog.current) },
-    { label: t('wsg_r_remaining'), value: formatBase(prog.remaining) },
+    { label: t('wsg_r_target'),    value: money(prog.target) },
+    { label: t('wsg_r_current'),   value: money(prog.current) },
+    { label: t('wsg_r_remaining'), value: money(prog.remaining) },
     { label: t('wsg_r_eta'),       value: prog.etaYear ? '~ ' + prog.etaYear : t('wsh_none') },
   ];
-  if (hasDate && prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: formatBase(prog.requiredMonthly) + t('ws4_permonth') });
+  if (hasDate && prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: money(prog.requiredMonthly) + t('ws4_permonth') });
   return `
     <div class="wsg-state-row">
       <span class="wsg-state is-${esc(prog.state)}">
@@ -23397,12 +23487,14 @@ function _wsOpenTool(toolKey, projectId) {
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);
-    if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), p.inputs); _wsToolEditId = projectId; _wsToolDirty = false; }
+    // Se canoniza al ABRIR lo que ya estaba guardado, en la medida en que se puede
+    // hacer sin adivinar (ver `_wsCanonicalizeInputs`).
+    if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(p.inputs)); _wsToolEditId = projectId; _wsToolDirty = false; }
     else { _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false; }
   } else {
     // WS.7A — quick access: restore the tool's last local state (NOT a project).
     const last = _wsToolStateGet(key);
-    _wsToolInputs = last ? Object.assign(_wsToolDefaultsFor(key), last) : _wsToolDefaultsFor(key);
+    _wsToolInputs = last ? Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(last)) : _wsToolDefaultsFor(key);
     _wsToolEditId = null; _wsToolDirty = false;
   }
   _wshView = 'tool'; renderWorkspaceHome();

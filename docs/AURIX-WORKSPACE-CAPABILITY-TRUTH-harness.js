@@ -41,7 +41,7 @@ function ctx(lang) {
   vm.createContext(sb);
   sb.lang = lang || 'es';
   ['_WSBUD_INCOME','_WSBUD_EXPENSES'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
-  ['_wsNum','_wsCanonicalNumStr','_wsNumOrNull','_wsJrnPct','calculateLoan',
+  ['_wsNum','_wsCanonicalNumStr','_wsNumInLang','_wsCanonicalizeInputs','_wsNumOrNull','_wsJrnPct','calculateLoan',
    'calculateRealEstatePortfolio','calculateMonthlyBudget','calculateAssetPrices','calculateTradeJournal']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
@@ -344,11 +344,77 @@ console.log('\n8 · Regresión de la revisión financiera:');
     && /if \(raw === ''\) return;/.test(app));
 
   // ── [alto] EL FORMULARIO DE OBJETIVOS TAMBIÉN PARSEA TOLERANTE ────────────
-  ok('8.13 crear un objetivo ya no lee con Number()',
-    !/target: Number\(v\('target'\)\) \|\| 0/.test(app)
-    && /target: _wsNum\(v\('target'\)\)/.test(app));
-  ok('8.14 …y el AÑO se limpia a dígitos, que es su formato real',
-    /String\(v\('year'\) \|\| ''\)\.replace\(\/\[\^\\d\]\/g, ''\)/.test(app));
+  // ── LA ASERCIÓN ES DE COMPORTAMIENTO, NO UN REGEX ─────────────────────────
+  // La versión anterior era un regex NEGATIVO sobre la forma exacta de
+  // `_wsgFormValues` (`/target: Number\(v\('target'\)\)/`). `_wsgCreate` —la función
+  // que de verdad PERSISTE el objetivo— duplicaba la lectura con `val` en vez de
+  // `v`, así que el gate no podía verla y declaraba cerrado un defecto vivo: una
+  // meta de 250.000 € se guardaba como 250 €. Tercera vez en este fichero que un
+  // assert mide una CADENA y no una CONDUCTA.
+  // Ahora se EJECUTA el camino de creación sobre un formulario simulado, así que
+  // sólo puede pasar si el objetivo guardado vale lo que el usuario escribió.
+  ok('8.13 crear un objetivo guarda lo que el usuario escribió, no una lectura inglesa',
+    (() => {
+      const sb = { Math, Number, String, Object, Array, JSON, Date, console: { warn(){} } };
+      vm.createContext(sb);
+      sb.lang = 'es'; sb.t = k => k;
+      // Un formulario REAL en miniatura: los mismos `data-wsg-form` y los valores
+      // tal como los deja el `focusout` que los formatea.
+      const fields = { type: 'wealth', name: 'Piso', target: '250.000', current: '10.000',
+                       monthly: '1.500', year: '2032' };
+      sb.document = {
+        querySelector: () => ({ querySelector: sel => {
+          const m = /data-wsg-form="([^"]+)"/.exec(sel);
+          return (m && fields[m[1]] != null) ? { value: fields[m[1]] } : null;
+        } }),
+        // `_wsgCreate` repinta el contenedor al terminar; devolver null hace que se
+        // salte esa rama sin tocar el DOM, que es lo que interesa aquí.
+        getElementById: () => null,
+      };
+      let saved = null;
+      sb._wsgPersist = g => { saved = g; };
+      sb._wshReveal = () => {};
+      sb._renderGoals = () => '';
+      vm.runInContext('var _wsgPrefill = null;', sb);
+      ['_wsNum', '_wsgFormValues', '_wsgCreate'].forEach(n => vm.runInContext(fnSrc(n), sb));
+      vm.runInContext('_wsgCreate()', sb);
+      return saved && saved.target === 250000 && saved.current === 10000
+          && saved.monthly === 1500 && saved.targetYear === 2032;
+    })(),
+    'la meta guardada tiene que ser 250000, no 250 ni 0');
+  ok('8.14 y los dos caminos leen el formulario por UN owner, no dos',
+    /const v = _wsgFormValues\(root\);/.test(fnSrc('_wsgCreate'))
+    && !/Number\(val\('target'\)\)/.test(app),
+    'dos derivaciones de una decisión siempre divergen');
+  // ── [medio] `formatBase(null)` ERA «0,00 €» ────────────────────────────────
+  // El null de `target`/`remaining` llegaba a `Intl.NumberFormat.format`, que
+  // coacciona a 0: el cero falso no se había eliminado, se había movido una capa.
+  ok('8.15b un importe ausente se escribe con guion, no como 0,00',
+    /const money = v => \(v == null \|\| !Number\.isFinite\(Number\(v\)\)\) \? '—' : formatBase\(v\);/.test(app)
+    && /value: money\(prog\.target\)/.test(app) && /value: money\(prog\.remaining\)/.test(app));
+  ok('8.15c y «tiene plazo» se deriva UNA vez, desde el motor',
+    /const hasDate = prog\.hasDate === true;/.test(fnSrc('_wsgCardOutHtml'))
+    && !/const hasDate = g\.targetYear && g\.targetYear > _wsgThisYear\(\);/.test(app));
+  // ── EL PARQUE INSTALADO, SIN ADIVINAR ─────────────────────────────────────
+  ok('8.15d lo guardado se canoniza sólo cuando NO es ambiguo entre idiomas',
+    (() => {
+      const sb = { Math, Number, String, Object, Array, JSON, isFinite, isNaN, parseFloat, console: { warn(){} } };
+      vm.createContext(sb);
+      vm.runInContext('var lang = "es";', sb);
+      ['_wsNum', '_wsCanonicalNumStr', '_wsNumInLang', '_wsCanonicalizeInputs'].forEach(n => vm.runInContext(fnSrc(n), sb));
+      const out = vm.runInContext('_wsCanonicalizeInputs(' + JSON.stringify({
+        claro: '250000', coma: '3,5', mixto: '1.234,56', ambiguo: '250.000',
+        ambiguo2: '1,234', texto: 'Piso centro' }) + ')', sb);
+      return out.claro === '250000' && out.coma === '3.5' && out.mixto === '1.234,56'
+        && out.ambiguo === '250.000' && out.ambiguo2 === '1,234' && out.texto === 'Piso centro'
+        && vm.runInContext('lang', sb) === 'es';
+    })(),
+    'las ambiguas se dejan intactas y el idioma activo no se toca');
+  ok('8.15e la canonización cubre también los valores enormes (1e21)',
+    (() => { const c = run('_wsCanonicalNumStr(1e21)');
+      return !/[eE]/.test(c) && run('_wsNum(' + JSON.stringify(c) + ')', ES) === 1e21
+        && run('_wsNum(' + JSON.stringify(c) + ')', EN) === 1e21; })(),
+    run('_wsCanonicalNumStr(1e21)'));
 
   // ── [medio] CEROS FALSOS QUE VOLVÍAN POR EL CAMINO DE GUARDADO ────────────
   ok('8.15 el presupuesto no persiste un 0 % donde dijo «no aplicable»',

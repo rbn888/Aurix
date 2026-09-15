@@ -26877,3 +26877,91 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
 /* Y el contenedor de la vista, que es quien propaga el desbordamiento. */
 .wsh-sb, .wsh-tool-view { min-width: 0; max-width: 100%; }
 .wsh-sb > *, .wsh-tool-view > * { min-width: 0; max-width: 100%; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE COMPLETION · BLOQUE 3 — CIERRE DE LA MATRIZ VISUAL
+   ════════════════════════════════════════════════════════════════════════════
+   Tres cosas que la segunda pasada de la sonda midió y que hay que cerrar. Todas
+   en superficies que el catálogo PUBLICA hoy (interés compuesto, préstamo,
+   portfolio inmobiliario y la portada Free), así que entran en este cierre. */
+
+/* ── 1 · LA CIFRA GRANDE DEL PRÉSTAMO ──────────────────────────────────────
+   `.wsloan-kpi` se corrigió y `.wsloan-hero-v` no estaba en la lista: 46px fijos
+   para «783,37 US$/mes» dan `scrollWidth` 307px contra 256px de caja en 360×740,
+   es decir 51px de desbordamiento en el elemento hoja que se filtraban como 11px
+   a la tarjeta y se veían cortados en pantalla.
+   Se arregla ESCALANDO la cifra, no partiéndola: `clamp()` la ajusta al ancho real
+   y en pantallas anchas sigue midiendo los 46px de siempre. Una cifra monetaria
+   grande no debe romperse en dos líneas. */
+.wsloan-hero { min-width: 0; }
+.wsloan-hero-v {
+  font-size: clamp(30px, 9.4vw, 46px);
+  min-width: 0; white-space: nowrap;
+}
+
+/* ── 2 · EL CORTE DENTRO DE «US$» ──────────────────────────────────────────
+   `overflow-wrap:anywhere` contenía el desbordamiento pero partía la unidad
+   monetaria por la mitad («1000,00 US» / «$»). `break-word` rompe primero en los
+   límites de palabra, así que parte por el espacio que ya hay entre la cifra y su
+   unidad y la unidad queda entera. Contiene igual y se lee bien. */
+.wstool-res-v, .wsloan-kpi-v, .wsb-row b, .wsre-layer b, .wsb-impact-val, .wsb-impact-cap {
+  overflow-wrap: break-word;
+}
+
+/* ── 3 · EL SUELO DE 11px EN LAS SUPERFICIES PUBLICADAS ────────────────────
+   La sonda las midió en vivo y confirmó que las cuatro aparecen en superficies
+   publicadas, no sólo en internas. Sube el tamaño y baja el `letter-spacing` donde
+   hacía falta para que la etiqueta siga cabiendo en una línea a 360px. */
+.wsh-tier { font-size: 11px; letter-spacing: 0.04em; }
+.wsre-type-chip { font-size: 11px; letter-spacing: 0.02em; }
+.wsre-form-sec-t { font-size: 11px; letter-spacing: 0.05em; }
+.wsfc-eyebrow { font-size: 11px; letter-spacing: 0.13em; }
+.wsfc-premium-label { font-size: 11px; letter-spacing: 0.11em; }
+/* Las leyendas dentro de los SVG (ejes del gráfico de compound y del donut de
+   préstamos) estaban entre 8 y 10px. En un SVG el tamaño escala con el viewBox,
+   así que se sube al suelo legible y el `viewBox` las sigue acomodando. */
+.wsp-axis, .wsb-bar-x, .wsloan-donut-lbl, .wstool-chart text, .wsloan-chart text {
+  font-size: 11px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE COMPLETION · CIERRE — LA CIFRA NO SE ROMPE, SE ESCALA
+   ════════════════════════════════════════════════════════════════════════════
+   LA CAUSA, medida carácter a carácter por la sonda: `formatBase()` usa
+   `Intl.NumberFormat`, que une la cifra y su moneda con un ESPACIO DE NO RUPTURA
+   (U+00A0). `overflow-wrap`, en cualquiera de sus variantes, NUNCA rompe en un
+   NBSP —para eso existe ese carácter—, así que cuando la caja se queda sin sitio
+   el navegador parte dentro de «US$», que es el único punto disponible. Por eso
+   cambiar `anywhere` por `break-word` no lo arregló: el problema no era la
+   propiedad, era que no hay ningún punto de ruptura legítimo entre la cifra y su
+   unidad. Y no debería haberlo: «1000,00 US» no es nada.
+   La solución es la que ya funcionó en `.wsloan-hero-v`: la cifra se ESCALA para
+   caber y no se rompe nunca. `white-space:nowrap` lo hace explícito, así que si
+   algún día una cifra no cupiera se vería desbordar y la sonda lo cazaría, en vez
+   de esconderse en un corte silencioso a mitad de la moneda. */
+.wstool-res-v, .wsloan-kpi-v {
+  font-size: clamp(15px, 4.6vw, 21px);
+  white-space: nowrap; overflow-wrap: normal;
+}
+.wsbud-split .wstool-res-v, .wstool-res-split.is-quad .wstool-res-v {
+  font-size: clamp(14px, 4.2vw, 19px);
+}
+/* La cifra grande de un resultado tiene su propio tamaño y su propia caja: se
+   escala igual, con su rango. */
+.wstool-res-final {
+  font-size: clamp(26px, 8.4vw, 38px);
+  white-space: nowrap; overflow-wrap: normal;
+}
+.wsb-impact-val, .wsb-row b, .wsre-layer b {
+  white-space: nowrap; overflow-wrap: normal;
+}
+.wsb-impact-val { font-size: clamp(16px, 4.8vw, 22px); }
+
+/* ── EL SUELO DE 11px · LOS TRES QUE MI LISTA NO ALCANZÓ ───────────────────
+   La sonda los nombró con su clase REAL: mi regla decía `.wsloan-donut-lbl`, que
+   no existe en el DOM, así que el selector no emparejaba nada y el texto del donut
+   seguía siendo el más pequeño de toda la matriz (8px). Las otras dos no tenían
+   clase propia en mi lista. Las tres están en superficies PUBLICADAS. */
+.wsre-subkpi i { font-size: 11px; letter-spacing: 0.02em; }
+.wsloan-kpi-k  { font-size: 11px; letter-spacing: 0.02em; }
+.wsloan-donut-l { font-size: 11px; letter-spacing: 0.02em; }
