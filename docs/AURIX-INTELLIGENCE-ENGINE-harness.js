@@ -632,7 +632,24 @@ ok('T.5 hay UN solo listener delegado nuevo, y se arma una vez',
   && /if \(!_intelAnswerWired\)/.test(src));
 
 group('N · CSS · clases nuevas, sin alfa blanco y con foco visible');
-const newCss = css.slice(css.indexOf('SPEC AURIX INTELLIGENCE · INTELLIGENCE ENGINE'));
+// ── ACOTADO AL BLOQUE PROPIO ──────────────────────────────────────────────
+// Esto cortaba desde su marca hasta el FINAL DEL FICHERO, así que cualquier bloque
+// de CSS añadido después heredaba las restricciones de Intelligence y las
+// aserciones N.x acusaban selectores que no son suyos (la portada Free de Workspace
+// fue el primer caso). El bloque termina donde empieza el siguiente banner, y eso
+// es lo que se mide: sus reglas, no todo lo que venga detrás.
+const newCss = (() => {
+  const from = css.indexOf('SPEC AURIX INTELLIGENCE · INTELLIGENCE ENGINE');
+  if (from < 0) return '';
+  // El bloque de Intelligence contiene sub-banners propios, así que no se puede
+  // cortar por «el siguiente ═══»: se corta por el marcador del BLOQUE SIGUIENTE,
+  // nombrado. Añadir un bloque nuevo detrás exige añadir su marca aquí, y eso es
+  // deliberado — es una línea, y a cambio ningún bloque hereda las reglas de otro.
+  const NEXT_BLOCKS = ['WORKSPACE COMPLETION · §2 — PORTADA FREE'];
+  let to = css.length;
+  NEXT_BLOCKS.forEach(m => { const i = css.indexOf(m, from); if (i > from && i < to) to = i; });
+  return css.slice(from, to);
+})();
 ok('N.1 el bloque nuevo no introduce alfa blanco (= gris neutro sobre el lienzo)',
   !/rgba\(255,\s*255,\s*255/.test(newCss));
 ok('N.1b la superficie nueva de descubrimientos usa el azul de marca POR TOKEN',

@@ -5890,10 +5890,23 @@ const T = {
     wsg_read_ontrack_date: 'Vas en línea para alcanzarlo en la fecha prevista.',
     wsg_read_ontrack_years: y => `A este ritmo, podrías alcanzarlo en aproximadamente ${y} ${y === 1 ? 'año' : 'años'}.`,
     wsg_read_ontrack: 'Este objetivo está avanzando a buen ritmo.',
+    // §D — las frases de los estados que antes se leían como éxito.
+    wsg_read_behind_req: 'Con el ritmo actual te faltarían {gap} en la fecha prevista. Harían falta {req} al mes.',
+    wsg_read_nodate:     'Sin fecha objetivo no se puede decir si llegarás a tiempo: define una y Aurix lo calcula.',
+    wsg_read_nosolution: 'Con este capital y sin aportación mensual, este objetivo no se alcanza. Define una aportación.',
+    wsg_read_needsrate:  'Para calcular tu número FIRE hace falta la tasa de retirada que supones.',
+    wsg_asm_norate:      'Sin rentabilidad supuesta: se proyecta sólo con lo que aportas.',
+    wsg_asm_rate:        'Rentabilidad supuesta: {r}% anual.',
     wsg_state_ontrack: 'Vas por buen camino',
     wsg_state_behind:  'Necesitas aumentar el ritmo',
     wsg_state_reached: 'Objetivo alcanzado',
     wsg_state_nodata:  'Faltan datos',
+    // §D — tres etiquetas nuevas, porque son tres situaciones distintas y ninguna
+    // es «va bien»: sin plazo no se puede afirmar cumplimiento, sin solución no se
+    // alcanza, y sin tasa de retirada una meta FIRE no tiene importe.
+    wsg_state_nodate:     'Sin fecha objetivo',
+    wsg_state_nosolution: 'No se alcanza',
+    wsg_state_needsrate:  'Falta la tasa de retirada',
     wsg_pv_title:      'Resultado',
     // WS.5A P5/P3/P4 — save model + projects
     wsg_save_pending:  'Cambios pendientes',
@@ -5938,6 +5951,35 @@ const T = {
     wstool_journal_d:  'Registra compras, ventas y rentabilidad.',
     // WS.6 — Compound Growth tool
     wstool_back:          'Volver a Herramientas',
+    // ── §4 · EL ESTADO DE GUARDADO, SIN AFIRMAR LO QUE NO SE PUEDE DEMOSTRAR ──
+    // Hay DOS estados de éxito porque son dos hechos distintos, y llamar
+    // «sincronizado» a un guardado local es exactamente lo que §4 prohíbe. El que
+    // se publica depende de si la escritura remota OCURRIÓ, no de si había sesión
+    // ni de si la tabla debería existir.
+    // ── §2 · PORTADA FREE DE WORKSPACE ───────────────────────────────────────
+    // El beneficio Premium nombra lo que EXISTE construido —presupuesto, cobros,
+    // diario, precios, objetivos y escenarios— y nada más. Ni una promesa de algo
+    // que no esté implementado, ni un precio: eso es del paywall.
+    wsfc_eyebrow:      'Workspace',
+    wsfc_title:        'Organiza, calcula y planifica tu patrimonio',
+    wsfc_sub:          'Herramientas y plantillas para trabajar tus números con criterio, no de memoria.',
+    wsfc_included:     'Incluido',
+    wsfc_n_compound:   'Interés compuesto',
+    wsfc_d_compound:   'Cuánto puede crecer tu capital con una aportación constante.',
+    wsfc_ico_compound: '∑',
+    wsfc_n_realestate: 'Portfolio inmobiliario',
+    wsfc_d_realestate: 'Tus inmuebles, su deuda y lo que rinden de verdad.',
+    wsfc_ico_realestate: '⌂',
+    wsfc_premium_label: 'Con Premium',
+    wsfc_premium_body: 'Presupuesto mensual, control de cobros, diario de operaciones, seguimiento de precios, objetivos y simulador de escenarios.',
+    wsfc_cta:          'Ver Premium',
+    wsfc_skip:         'Explorar Workspace',
+    ws_sync_idle:         'Sin cambios sin guardar',
+    ws_sync_saving:       'Guardando…',
+    ws_sync_saved_synced: 'Guardado y sincronizado',
+    ws_sync_saved_local:  'Guardado en este dispositivo',
+    ws_sync_error:        'No se ha podido guardar',
+    ws_sync_retry:        'Reintentar',
     wstool_in_initial:    'Capital inicial',
     wstool_in_monthly:    'Aportación mensual',
     wstool_in_return:     'Rentabilidad anual',
@@ -5945,6 +5987,18 @@ const T = {
     wstool_unit_years:    'años',
     wstool_res_final:     'Capital final estimado',
     wstool_res_contrib:   'Capital aportado',
+    // §A/§B — los supuestos de una proyección, dichos por su nombre.
+    wstool_res_initial:        'Capital inicial',
+    wstool_asm_title:          'Supuestos de este cálculo',
+    wstool_asm_rate:           'Rentabilidad supuesta: {r}% anual',
+    wstool_asm_conv_effective: 'Tasa anual efectiva',
+    wstool_asm_conv_nominal:   'Tasa anual nominal con capitalización mensual',
+    wstool_asm_timing_end:     'Aportación al final de cada mes',
+    wstool_asm_timing_begin:   'Aportación al principio de cada mes',
+    wstool_asm_cost:           'Costes: {c}% anual sobre el capital ⇒ {n}% neto',
+    wstool_asm_infl:           'Inflación supuesta: {i}% anual constante',
+    wstool_asm_real:           'En dinero de hoy: {v}',
+    wstool_asm_missing:        'Hay campos sin rellenar: no se han tomado como cero, simplemente no se han supuesto.',
     wstool_res_interest:  'Crecimiento generado',
     wstool_orient:        'Proyección orientativa',
     wstool_chart_title:   'Evolución del capital',
@@ -5953,7 +6007,9 @@ const T = {
     wstool_ms_title:      'Hitos',
     wstool_ms_cross:      (amt, y) => `Superas ${amt} en el año ${y}`,
     wstool_ms_crossover:  y => `El crecimiento generado supera tus aportaciones en el año ${y}`,
-    wstool_save:          'Guardar proyecto',
+    // §B — es una SIMULACIÓN, no un proyecto: lo que se guarda son unos supuestos y
+    // su resultado, no un trabajo en curso con estado.
+    wstool_save:          'Guardar simulación',
     // WS.7 — Monthly Budget tool
     wstool_budget_sec_income:   'Ingresos',
     wstool_budget_sec_expenses: 'Gastos',
@@ -8388,10 +8444,19 @@ const T = {
     wsg_read_ontrack_date: 'You are on track to reach it by the target date.',
     wsg_read_ontrack_years: y => `At this pace, you could reach it in about ${y} ${y === 1 ? 'year' : 'years'}.`,
     wsg_read_ontrack: 'This goal is progressing at a good pace.',
+    wsg_read_behind_req: 'At the current pace you would be {gap} short on the target date. It would take {req} a month.',
+    wsg_read_nodate:     'Without a target date there is no way to say whether you will make it: set one and Aurix will work it out.',
+    wsg_read_nosolution: 'With this capital and no monthly contribution, this goal is never reached. Set a contribution.',
+    wsg_read_needsrate:  'To work out your FIRE number, the withdrawal rate you assume is required.',
+    wsg_asm_norate:      'No assumed return: projected only from what you contribute.',
+    wsg_asm_rate:        'Assumed return: {r}% a year.',
     wsg_state_ontrack: 'On track',
     wsg_state_behind:  'Pick up the pace',
     wsg_state_reached: 'Goal reached',
     wsg_state_nodata:  'Missing data',
+    wsg_state_nodate:     'No target date',
+    wsg_state_nosolution: 'Not reachable',
+    wsg_state_needsrate:  'Withdrawal rate missing',
     wsg_pv_title:      'Result',
     // WS.5A P5/P3/P4 — save model + projects
     wsg_save_pending:  'Pending changes',
@@ -8436,6 +8501,26 @@ const T = {
     wstool_journal_d:  'Log buys, sells and returns.',
     // WS.6 — Compound Growth tool
     wstool_back:          'Back to Tools',
+    wsfc_eyebrow:      'Workspace',
+    wsfc_title:        'Organise, calculate and plan your wealth',
+    wsfc_sub:          'Tools and templates to work through your numbers with method, not from memory.',
+    wsfc_included:     'Included',
+    wsfc_n_compound:   'Compound interest',
+    wsfc_d_compound:   'How far your capital can grow with a steady contribution.',
+    wsfc_ico_compound: '∑',
+    wsfc_n_realestate: 'Property portfolio',
+    wsfc_d_realestate: 'Your properties, their debt and what they actually yield.',
+    wsfc_ico_realestate: '⌂',
+    wsfc_premium_label: 'With Premium',
+    wsfc_premium_body: 'Monthly budget, receivables tracking, trade journal, price watchlist, goals and the scenario simulator.',
+    wsfc_cta:          'See Premium',
+    wsfc_skip:         'Explore Workspace',
+    ws_sync_idle:         'No unsaved changes',
+    ws_sync_saving:       'Saving…',
+    ws_sync_saved_synced: 'Saved and synced',
+    ws_sync_saved_local:  'Saved on this device',
+    ws_sync_error:        'Could not save',
+    ws_sync_retry:        'Retry',
     wstool_in_initial:    'Initial capital',
     wstool_in_monthly:    'Monthly contribution',
     wstool_in_return:     'Annual return',
@@ -8443,6 +8528,17 @@ const T = {
     wstool_unit_years:    'years',
     wstool_res_final:     'Estimated final capital',
     wstool_res_contrib:   'Capital contributed',
+    wstool_res_initial:        'Initial capital',
+    wstool_asm_title:          'Assumptions behind this figure',
+    wstool_asm_rate:           'Assumed return: {r}% a year',
+    wstool_asm_conv_effective: 'Effective annual rate',
+    wstool_asm_conv_nominal:   'Nominal annual rate, compounded monthly',
+    wstool_asm_timing_end:     'Contribution at the end of each month',
+    wstool_asm_timing_begin:   'Contribution at the start of each month',
+    wstool_asm_cost:           'Costs: {c}% a year on capital ⇒ {n}% net',
+    wstool_asm_infl:           'Assumed inflation: {i}% a year, constant',
+    wstool_asm_real:           "In today's money: {v}",
+    wstool_asm_missing:        'Some fields are empty: they have not been taken as zero, they simply have not been assumed.',
     wstool_res_interest:  'Growth generated',
     wstool_orient:        'Indicative projection',
     wstool_chart_title:   'Capital over time',
@@ -8451,7 +8547,7 @@ const T = {
     wstool_ms_title:      'Milestones',
     wstool_ms_cross:      (amt, y) => `You pass ${amt} in year ${y}`,
     wstool_ms_crossover:  y => `Growth generated exceeds your contributions in year ${y}`,
-    wstool_save:          'Save project',
+    wstool_save:          'Save simulation',
     // WS.7 — Monthly Budget tool
     wstool_budget_sec_income:   'Income',
     wstool_budget_sec_expenses: 'Expenses',
@@ -19535,6 +19631,255 @@ function _wshReadStore(key) {
   catch (_) { return []; }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// WORKSPACE COMPLETION · §4 — PERSISTENCIA POR CUENTA, Y EL ESTADO QUE NO MIENTE
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE HABÍA: doce escrituras directas al almacén local repartidas, y nada más.
+// diez claves `aurix_ws_*_v1` viven en el navegador de UN dispositivo —lo declara
+// este fichero en dos sitios— y ésa fue la razón por la que WORKSPACE-LAUNCH-V1
+// publicó sólo las dos calculadoras: «sólo se publica lo que NO guarda trabajo del
+// usuario». Las seis plantillas del catálogo canónico guardan trabajo.
+//
+// LO QUE FALTA Y NO PUEDO APLICAR YO: la tabla. `db/workspace_documents_1.sql`
+// está escrita, es aditiva y está SIN APLICAR, pendiente de revisión del founder.
+// Así que esta capa se escribe COMPLETA y se DESCUBRE al escribir (el patrón ya
+// probado con la columna `intent` de `capital_flows`): si la tabla no está,
+// Workspace se comporta exactamente como hoy y lo DICE —«guardado en este
+// dispositivo»—; en cuanto el SQL se aplique, sincroniza de verdad sin desplegar
+// nada. §4 es explícito: no declarar sincronizado un guardado exclusivamente local.
+//
+// EL AISLAMIENTO POR CUENTA YA ESTABA RESUELTO, y mejor de lo que este bloque
+// necesitaba: las diez claves están en `USER_SCOPED_WORK_KEYS`, así que un cambio
+// de usuario las APARCA por dueño en vez de borrarlas y el usuario que vuelve
+// recupera su trabajo. No se reimplementa nada de eso.
+const _WS_DOC_TABLE = 'workspace_documents';
+// 'unknown' → todavía no se sabe · 'yes' → escribió bien una vez · 'no' → no existe
+let _wsDocTableState = 'unknown';
+let _wsDocSyncState = 'idle';         // idle | saving | saved | error | local_only
+let _wsDocSyncAt = 0;
+// Las claves que contienen DOCUMENTOS del usuario (una fila remota por documento,
+// direccionada por su id estable) frente a las que son PREFERENCIAS de la
+// superficie (una fila por clave). La diferencia importa: dos dispositivos
+// editando dos documentos distintos no pueden colisionar nunca, y ésa es la razón
+// de ser de la tabla. Las preferencias sí son last-writer-wins, y ahí es correcto.
+const _WS_DOC_KEYS = Object.freeze({
+  'aurix_ws_projects_v1':     { kind: 'ws_project',   idOf: x => x && x.id },
+  'aurix_ws_goals_v1':        { kind: 'ws_goal',      idOf: x => x && x.id },
+  'aurix_ws_goal_funding_v1': { kind: 'ws_funding',   idOf: x => x && x.id },
+  'aurix_ws_scenarios_v1':    { kind: 'ws_scenario',  idOf: x => x && (x.scenarioId || x.id) },
+});
+const _WS_PREF_KEYS = Object.freeze([
+  'aurix_ws_tool_state_v1', 'aurix_ws_pinned_v1', 'aurix_ws_recent_v1',
+  'aurix_ws_space_hidden_v1', 'aurix_ws_space_top_v1', 'aurix_ws_planning_v1',
+]);
+// ── EL OWNER ÚNICO DE ESCRITURA ─────────────────────────────────────────────
+// Todo lo que persiste Workspace pasa por aquí. Antes cada superficie hacía su
+// `setItem` y nadie podía saber que algo se había guardado, así que no había forma
+// de sincronizar ni de publicar un estado honesto sin tocar doce sitios.
+function _wshWriteStore(key, value) {
+  let ok = false;
+  try { localStorage.setItem(key, JSON.stringify(value)); ok = true; }
+  catch (_) { ok = false; }
+  if (!ok) { _wsDocSyncState = 'error'; try { _wsSyncBadgeRefresh(); } catch (_) {} return false; }
+  try { _wsDocsQueue(key); } catch (_) {}
+  return true;
+}
+// ── UNA SUBIDA POR PAUSA, NO UNA POR TECLA ──────────────────────────────────
+// `_wsToolStateSet` se llama en CADA evento de input —es el borrador de acceso
+// rápido de la herramienta abierta—, así que empujar desde `_wshWriteStore` sin
+// coalescer habría hecho un upsert por pulsación. §4 lo prohíbe por su nombre
+// («no polling continuo, nuevas consultas por render») y además sería una forma
+// rápida de agotar la cuota. Se agrupa por CLAVE con cola de cierre: el estado
+// local se escribe al instante (el usuario nunca espera a la red) y la subida sale
+// una vez cuando deja de escribir.
+const _WS_DOC_PUSH_DEBOUNCE_MS = 1200;
+const _wsDocTimers = Object.create(null);
+function _wsDocsQueue(key) {
+  if (typeof setTimeout !== 'function') { try { _wsDocsPush(key); } catch (_) {} return; }
+  // Que haya algo pendiente ES un estado, y el usuario tiene derecho a verlo: sin
+  // esto la insignia decía «guardado» mientras la subida aún no había salido.
+  if (_wsDocSyncState !== 'saving') { _wsDocSyncState = 'saving'; try { _wsSyncBadgeRefresh(); } catch (_) {} }
+  if (_wsDocTimers[key]) { try { clearTimeout(_wsDocTimers[key]); } catch (_) {} }
+  _wsDocTimers[key] = setTimeout(() => {
+    delete _wsDocTimers[key];
+    try { _wsDocsPush(key); } catch (_) {}
+  }, _WS_DOC_PUSH_DEBOUNCE_MS);
+}
+// Y el reintento explícito que §4 pide, sobre la MISMA cola.
+function _wsDocsRetry() {
+  const keys = Object.keys(_WS_DOC_KEYS).concat(_WS_PREF_KEYS);
+  // Un fallo transitorio no prueba nada sobre el esquema: si la tabla se marcó
+  // ausente por un error que NO era de esquema, el estado ya es 'error' y no 'no',
+  // así que reintentar vuelve a preguntar de verdad.
+  keys.forEach(k => { try { _wsDocsPush(k); } catch (_) {} });
+}
+// ¿Hay sesión con la que sincronizar? Sin ella el guardado es local y verdadero,
+// no un error: un usuario anónimo no tiene cuenta donde guardar.
+function _wsDocsSession() {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return null;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return null;
+    return currentUser.id;
+  } catch (_) { return null; }
+}
+function _wsDocRows(key, userId) {
+  const spec = _WS_DOC_KEYS[key];
+  const nowIso = new Date().toISOString();
+  const ccy = (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency) : 'EUR';
+  if (spec) {
+    // Un documento por elemento. Sin id estable NO se sube: una fila sin identidad
+    // no se puede volver a encontrar, así que subirla crearía duplicados en cada
+    // guardado. Se queda local y el estado lo refleja.
+    return _wshReadStore(key).map(item => {
+      const id = spec.idOf(item);
+      if (!id) return null;
+      return {
+        user_id: userId, doc_id: String(id), kind: spec.kind,
+        title: (item.customName || item.name || item.title || null),
+        body: item,
+        // §CONTINUIDAD — la procedencia viaja CON el documento. Un presupuesto es un
+        // PLAN y una proyección una SIMULACIÓN; nunca una medición.
+        nature: (spec.kind === 'ws_scenario' || spec.kind === 'ws_project') ? 'simulated' : 'declared',
+        currency: ccy,
+        body_version: Number(item.bodyVersion) || 1,
+        revision: Number(item.revision) || 1,
+        deleted_at: item.deletedAt ? new Date(Number(item.deletedAt)).toISOString() : null,
+        updated_at: nowIso,
+      };
+    }).filter(Boolean);
+  }
+  if (_WS_PREF_KEYS.indexOf(key) === -1) return [];
+  let raw = null;
+  try { raw = localStorage.getItem(key); } catch (_) { raw = null; }
+  if (raw == null) return [];
+  let parsed = null; try { parsed = JSON.parse(raw); } catch (_) { return []; }
+  return [{
+    user_id: userId, doc_id: 'pref:' + key, kind: 'ws_pref',
+    title: null, body: { key: key, value: parsed },
+    nature: 'declared', currency: ccy, body_version: 1,
+    // Las preferencias SÍ son last-writer-wins, y aquí eso es correcto: son
+    // ajustes de superficie, no trabajo del usuario. La revisión se deriva del
+    // instante para que el último ajuste gane sin inventar un contador.
+    revision: Math.max(1, Math.floor(Date.now() / 1000)),
+    deleted_at: null, updated_at: nowIso,
+  }];
+}
+async function _wsDocsPush(key) {
+  const userId = _wsDocsSession();
+  if (!userId) { _wsDocSyncState = 'local_only'; try { _wsSyncBadgeRefresh(); } catch (_) {} return false; }
+  if (_wsDocTableState === 'no') { _wsDocSyncState = 'local_only'; try { _wsSyncBadgeRefresh(); } catch (_) {} return false; }
+  const rows = _wsDocRows(key, userId);
+  if (!rows.length) return false;
+  _wsDocSyncState = 'saving'; try { _wsSyncBadgeRefresh(); } catch (_) {}
+  try {
+    const { error } = await supabaseClient.from(_WS_DOC_TABLE)
+      .upsert(rows, { onConflict: 'user_id,doc_id' });
+    if (error) {
+      // DESCUBRIMIENTO DE ESQUEMA EN LA ESCRITURA, y SÓLO un error de esquema
+      // retira la tabla. Con un 5xx o un corte de red se marcaba antes 'no' para
+      // toda la sesión y el usuario veía «local» el resto del día por un fallo
+      // transitorio: un fallo de red no es una prueba sobre el esquema. Es la
+      // misma corrección que ya se hizo en `_aurixCapitalFlowsPush`.
+      const msg = String((error && (error.message || error.code || error.details)) || '').toLowerCase();
+      const schema = /relation|does not exist|pgrst205|42p01|schema cache/.test(msg);
+      if (schema) _wsDocTableState = 'no';
+      _wsDocSyncState = schema ? 'local_only' : 'error';
+      try { _wsSyncBadgeRefresh(); } catch (_) {}
+      return false;
+    }
+    _wsDocTableState = 'yes';
+    _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now();
+    try { _wsSyncBadgeRefresh(); } catch (_) {}
+    return true;
+  } catch (_) {
+    _wsDocSyncState = 'error'; try { _wsSyncBadgeRefresh(); } catch (_) {}
+    return false;
+  }
+}
+// ── LA LECTURA, QUE NO PUEDE PERDER TRABAJO ─────────────────────────────────
+// Fusión por REVISIÓN, no por reloj, y por la misma razón que en `capital_flows`:
+// una edición posterior siempre gana y un cliente atrasado no puede resucitar un
+// cuerpo antiguo. Un documento que sólo existe en LOCAL no se toca: el remoto
+// añade y actualiza, nunca sustituye la lista entera — que es exactamente el
+// defecto de pérdida de datos que la sincronización de Intelligence ya pagó.
+async function _wsDocsPull() {
+  const userId = _wsDocsSession();
+  if (!userId || _wsDocTableState === 'no') return false;
+  try {
+    const { data, error } = await supabaseClient.from(_WS_DOC_TABLE)
+      .select('doc_id,kind,body,revision,deleted_at,body_version,currency')
+      .eq('user_id', userId);
+    if (error) {
+      const msg = String((error && (error.message || error.code)) || '').toLowerCase();
+      if (/relation|does not exist|pgrst205|42p01|schema cache/.test(msg)) _wsDocTableState = 'no';
+      return false;
+    }
+    _wsDocTableState = 'yes';
+    const rows = Array.isArray(data) ? data : [];
+    let touched = 0;
+    for (const key in _WS_DOC_KEYS) {
+      const spec = _WS_DOC_KEYS[key];
+      const mine = rows.filter(r => r && r.kind === spec.kind);
+      if (!mine.length) continue;
+      const local = _wshReadStore(key);
+      const byId = new Map();
+      local.forEach(item => { const id = spec.idOf(item); if (id) byId.set(String(id), item); });
+      let changed = false;
+      for (const r of mine) {
+        if (r.deleted_at) continue;                       // tombstone: no se resucita
+        const body = r.body && typeof r.body === 'object' ? r.body : null;
+        if (!body) continue;
+        const cur = byId.get(String(r.doc_id));
+        const remoteRev = Number(r.revision) || 1;
+        if (!cur) { local.push(body); byId.set(String(r.doc_id), body); changed = true; }
+        else if (remoteRev > (Number(cur.revision) || 1)) { Object.assign(cur, body); changed = true; }
+      }
+      if (changed) { try { localStorage.setItem(key, JSON.stringify(local)); touched++; } catch (_) {} }
+    }
+    // Las preferencias, una fila por clave, y sólo si el remoto es más reciente.
+    for (const r of rows.filter(x => x && x.kind === 'ws_pref')) {
+      const b = r.body || {};
+      if (!b.key || _WS_PREF_KEYS.indexOf(b.key) === -1) continue;
+      try { localStorage.setItem(b.key, JSON.stringify(b.value)); touched++; } catch (_) {}
+    }
+    if (touched) { _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now(); }
+    return true;
+  } catch (_) { return false; }
+}
+// ── EL ESTADO QUE SE PINTA, Y NO AFIRMA LO QUE NO PUEDE DEMOSTRAR ───────────
+// §4 pide estados reales: sin guardar / guardando / guardado / error / reintentar.
+// Y prohíbe llamar «sincronizado» a un guardado local. Así que hay DOS estados de
+// éxito distintos, y el que se publica depende de si la escritura remota ocurrió
+// DE VERDAD —no de si había sesión, ni de si la tabla debería existir—.
+function _wsSyncStatus() {
+  const synced = _wsDocTableState === 'yes';
+  return {
+    state: _wsDocSyncState,
+    synced: synced && _wsDocSyncState === 'saved',
+    at: _wsDocSyncAt,
+    labelKey: _wsDocSyncState === 'saving' ? 'ws_sync_saving'
+            : _wsDocSyncState === 'error' ? 'ws_sync_error'
+            : _wsDocSyncState === 'saved' ? (synced ? 'ws_sync_saved_synced' : 'ws_sync_saved_local')
+            : _wsDocSyncState === 'local_only' ? 'ws_sync_saved_local'
+            : 'ws_sync_idle',
+    canRetry: _wsDocSyncState === 'error',
+  };
+}
+function _wsSyncBadgeHtml() {
+  const st = _wsSyncStatus();
+  const esc = (typeof _intccEsc === 'function') ? _intccEsc : (x => String(x));
+  const txt = (typeof t === 'function' && t(st.labelKey)) || '';
+  if (!txt) return '';
+  return `<span class="ws-sync-badge is-${esc(st.state)}" data-ws-sync="${esc(st.state)}"
+    data-ws-synced="${st.synced ? '1' : '0'}" role="status" aria-live="polite">${esc(txt)}${
+    st.canRetry ? `<button type="button" class="ws-sync-retry" data-ws-sync-retry="1">${esc((typeof t === 'function' && t('ws_sync_retry')) || '')}</button>` : ''}</span>`;
+}
+function _wsSyncBadgeRefresh() {
+  try {
+    document.querySelectorAll('[data-ws-sync-slot]').forEach(el => { el.innerHTML = _wsSyncBadgeHtml(); });
+  } catch (_) {}
+}
+
 // Live, honest metrics for the hero. Wealth is the SAME investable figure the
 // Dashboard/Intelligence use (read-only); counts come from the WS stores.
 function _wshMetrics() {
@@ -19554,6 +19899,9 @@ function _wshMetrics() {
 // WS.2/WS.3/WS.4 — internal Workspace view state (no global nav change).
 // 'home' | 'scenario' | 'planning' | 'workspace'.
 let _wshView    = 'home';
+// §2 — de SESIÓN, no de disco: la portada no es una preferencia y no debe
+// convertirse en un muro dentro de la misma visita.
+let _wsFreeCoverSeen = false;
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
@@ -19645,6 +19993,37 @@ function renderWorkspaceHome(container) {
     _wshReveal(container);
     return;
   }
+  // ── §2 · LA PORTADA FREE ───────────────────────────────────────────────────
+  // «Free entra en una portada propia de Workspace; Premium entra directamente en
+  // Workspace.» El catálogo completo NO es la portada de un usuario Free: lo que
+  // ve es una propuesta y los dos recursos que SÍ tiene. Y no hay lecturas de
+  // patrimonio aquí — eso pertenece a Intelligence (§2).
+  //
+  // Es una PORTADA, no un muro: los dos accesos abren las superficies de verdad, y
+  // una vez dentro el usuario Free navega Workspace con normalidad. Por eso la
+  // vista se recuerda (`_wsFreeCoverSeen`): volver a la pestaña después de usar una
+  // herramienta lleva al catálogo, no otra vez a la portada.
+  // ── DÓNDE VIVE LA DECISIÓN, Y POR QUÉ NO EN `renderWorkspace` ─────────────
+  // M.02 B4 RETIRÓ el bloqueo global de Workspace a propósito: la sección entera se
+  // sustituía por el preview premium, así que ningún usuario Free llegó nunca a ver
+  // Compound. Dos gates certifican que eso no vuelva (`renderWorkspace` no puede
+  // nombrar `hasAurixPremiumAccess`), y tienen razón: la portada Free NO es un
+  // bloqueo de sección y no debe parecerlo ni en el código. Es una VISTA MÁS del
+  // despachador, con sus dos accesos vivos y su salida — así que se decide aquí,
+  // junto a las otras vistas, y la sección sigue abierta para todo el mundo.
+  if (_wshView === 'home' && !_wsFreeCoverSeen) {
+    let _premium = true;
+    try { _premium = hasAurixPremiumAccess(); } catch (_) { _premium = true; }
+    // Falla hacia NO mostrar la portada: si no se puede saber el plan, el usuario
+    // va al catálogo, que es lo que ya funcionaba.
+    if (!_premium) { _wsFreeCoverSeen = true; _wshView = 'free_cover'; }
+  }
+  if (_wshView === 'free_cover') {
+    if (shown === 'free_cover') return;
+    container.innerHTML = _renderWorkspaceFreeCover();
+    _wshReveal(container);
+    return;
+  }
   // Home
   const metrics = _wshMetrics();
   if (shown === 'home') { _wshRefreshMetrics(cur, metrics); return; }
@@ -19694,9 +20073,25 @@ function _wshWireOnce() {
       // en Mi Espacio un "último uso" de una herramienta que nunca llegó a abrir.
       if (cta !== 'tool' || _wsToolAccess(_carg).ok) _wsTouch(_wsCanonRef(cta, _carg));
     }
-    if (cta === 'scenario' || nav === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
-    if (cta === 'planning' || nav === 'planning') { _wshView = 'planning'; renderWorkspaceHome(); return; }
-    if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); if (ty) _wsgPrefill = ty; _wshView = 'goals'; renderWorkspaceHome(); return; }
+    if (cta === 'scenario' || nav === 'scenario') { _wsOpenSurface('scenario'); return; }
+    if (cta === 'planning' || nav === 'planning') { _wsOpenSurface('planning'); return; }
+    // §4 — el reintento explícito. Va aquí, en el dispatcher que ya existe, para
+    // que no haya un segundo camino de guardado.
+    if (t.getAttribute('data-ws-sync-retry')) { _wsDocsRetry(); return; }
+    // ── §2 · los tres controles de la portada Free ────────────────────────────
+    // El acceso abre la superficie por el OWNER de apertura, así que pasa por el
+    // mismo gate que cualquier otra entrada: la portada no puede conceder nada.
+    const _fcOpen = t.getAttribute('data-wsfc-open');
+    if (_fcOpen) { _wsReturnTab = 'tools'; _wsOpenTool(_fcOpen); return; }
+    // El CTA va al paywall CANÓNICO con su featureKey y su source. No hay un
+    // segundo camino de conversión ni se tocan precios aquí.
+    if (t.getAttribute('data-wsfc-upgrade')) {
+      try { openUpgradeIntent({ featureKey: 'workspace.templates', source: 'workspace:free_cover' }); } catch (_) {}
+      return;
+    }
+    // Y se puede pasar de largo: una portada que no se puede cerrar es un muro.
+    if (t.getAttribute('data-wsfc-skip')) { _wshView = 'home'; renderWorkspaceHome(); return; }
+    if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); _wsOpenSurface('goals', { before: () => { if (ty) _wsgPrefill = ty; } }); return; }
     if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
     if (cta === 'tool') { _wsOpenTool(t.getAttribute('data-wstool') || 'compound'); return; }
     // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
@@ -20002,7 +20397,7 @@ function _wsRename(ref, name) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { p.customName = name; p.updatedAt = Date.now(); _ws4Persist(p); } }
   else if (kind === 'goal') { const l = _wsgGoals(); const g = l.find(x => x && x.id === id); if (g) { g.name = name; g.updatedAt = Date.now(); _wsgSaveAll(l); delete _wsgWorking[id]; } }
-  else if (kind === 'scenario') { try { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { s.name = name; localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr)); } } catch (_) {} }
+  else if (kind === 'scenario') { try { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { s.name = name; _wshWriteStore(_WSH_SCENARIOS_KEY, arr); } } catch (_) {} }
 }
 // WS.12 (v2) — per-card context menu popover (Abrir / Renombrar / Fijar arriba /
 // Quitar de Mi Espacio / Eliminar proyecto). Pinned tools: Abrir / Fijar / Quitar.
@@ -20183,7 +20578,16 @@ const _WS_CATALOG = Object.freeze([
   { id: 'compound_growth',       kind: 'tool',     published: true,  featureKey: null,              commercialTier: 'free' },
   { id: 'loan_simulation',       kind: 'tool',     published: true,  featureKey: 'workspace.loan',  commercialTier: 'premium' },
   // ── herramientas INTERNAS (founder las evalúa; usuario normal NO las ve) ───
-  { id: 'scenario',              kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  // SPEC WORKSPACE COMPLETION · §1 — El SIMULADOR DE ESCENARIOS es una
+  // HERRAMIENTA Premium y su hogar público es la rejilla de Herramientas, así que
+  // `tpl_scenario` se queda interna: una capacidad, un ID, un hogar.
+  // `published` sigue en false hasta que existan sus filas de `plan_features`
+  // (db/workspace_premium_2_plan_features.sql, SIN APLICAR): la REGLA DE VERDAD de
+  // este catálogo prohíbe pintar «Premium» sin un derecho real que lo conceda.
+  { id: 'scenario',              kind: 'tool',     published: false, featureKey: 'workspace.scenarios',   commercialTier: 'premium' },
+  // OBJETIVOS es una PLANTILLA (§1), así que su hogar público es `tpl_goals` y esta
+  // entrada de herramienta se queda interna — el mismo patrón que ya resolvió
+  // `tpl_realestate` / `real_estate_portfolio` en M.03 A.
   { id: 'goal',                  kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'financial_calc',        kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'investment_analyzer',   kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
@@ -20201,12 +20605,27 @@ const _WS_CATALOG = Object.freeze([
   // la que decide el acceso es la PUBLICADA (ver `_wsSurfaceEntry`).
   { id: 'tpl_realestate',        kind: 'template', published: true,  featureKey: null,              commercialTier: 'free', opens: 'realestate' },
   // ── plantillas INTERNAS ────────────────────────────────────────────────────
-  { id: 'tpl_mbudget',           kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
-  { id: 'tpl_assets',            kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
-  { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
-  { id: 'tpl_goals',             kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
-  { id: 'tpl_journal',           kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  // ── LAS CINCO PLANTILLAS PREMIUM DEL CATÁLOGO CANÓNICO ────────────────────
+  // Declaran ya su `featureKey`, su tier y la superficie que abren, así que
+  // publicarlas es UNA línea por entrada en cuanto el founder aplique los dos SQL.
+  // Hasta entonces `published:false` las mantiene internas (sólo founder), que es
+  // lo que §3 pide: conservar el estado público previo mientras las capacidades
+  // nuevas están en preparación.
+  { id: 'tpl_mbudget',           kind: 'template', published: false, featureKey: 'workspace.budget',      commercialTier: 'premium', opens: 'budget' },
+  { id: 'tpl_assets',            kind: 'template', published: false, featureKey: 'workspace.prices',      commercialTier: 'premium', opens: 'assets' },
+  { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: 'workspace.receivables', commercialTier: 'premium', opens: 'receivables' },
+  { id: 'tpl_goals',             kind: 'template', published: false, featureKey: 'workspace.goals',       commercialTier: 'premium', opens: 'goals' },
+  { id: 'tpl_journal',           kind: 'template', published: false, featureKey: 'workspace.journal',     commercialTier: 'premium', opens: 'journal' },
+  // INTERNA: Escenarios se publica como HERRAMIENTA (ver arriba). Dos entradas
+  // publicadas para la misma superficie hacen que `_wsSurfaceEntry` falle CERRADO.
   { id: 'tpl_scenario',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
+  // ── PERMANECEN INTERNOS POR DECISIÓN DE LA SPEC ───────────────────────────
+  // Proyección patrimonial y Plan de independencia financiera se solapan con
+  // Objetivos (tipos «Patrimonio objetivo» y «FIRE») y con Escenarios: la SPEC pide
+  // examinarlos como posible solapamiento y NO crear otra superficie pública
+  // redundante. Su matemática se reusa desde el motor compartido; su superficie no
+  // se publica. Balance patrimonial, Flujo de caja empresarial y Analizador
+  // inmobiliario siguen internos por la misma regla de un solo hogar público.
   { id: 'tpl_projection',        kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_networth',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'tpl_property',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
@@ -20220,7 +20639,36 @@ const _WS_TOOLKEY_TO_ID = Object.freeze({
   compound: 'compound_growth', loan: 'loan_simulation', budget: 'monthly_budget',
   journal: 'trade_journal', realestate: 'real_estate_portfolio',
   receivables: 'receivables', assets: 'asset_prices',
+  // §1 — las superficies que NO son «herramientas» del despachador pero SÍ son
+  // capacidades del catálogo. Sin esta línea `_wsSurfaceEntry('goals')` devolvía
+  // null y el gate no podía decidir sobre Objetivos: se abrían por `_wshView`
+  // directo, sin comprobar publicación ni derecho.
+  goals: 'goal', scenario: 'scenario', projection: 'tpl_projection', planning: 'tpl_projection',
 });
+// §1 — LAS SUPERFICIES QUE NO PASAN POR `_wsOpenTool`. Objetivos, Escenarios y
+// Proyección se abrían asignando `_wshView` en SEIS sitios distintos (el catálogo,
+// Mi Espacio, un elemento fijado, un proyecto guardado…), y ninguno comprobaba
+// nada. `_wsOpenTool` sí tenía su gate desde M.02, así que la protección existía
+// para siete claves y no para estas tres. Un solo owner, todos los caminos.
+const _WS_VIEW_SURFACES = Object.freeze(['goals', 'scenario', 'projection', 'planning']);
+function _wsOpenSurface(key, opts) {
+  const k = String(key || '');
+  if (_WS_VIEW_SURFACES.indexOf(k) === -1) return false;
+  const acc = _wsToolAccess(k);
+  if (!acc.ok) {
+    // Mismo vocabulario que `_wsOpenTool`, literalmente: sólo se ofrece upgrade
+    // cuando la razón ES comercial. Si la superficie simplemente no está publicada,
+    // decir «esto es Premium» sería mentir sobre el producto.
+    if (acc.reason === 'entitlement') {
+      try { openUpgradeIntent({ featureKey: acc.featureKey, source: 'workspace:' + k }); } catch (_) {}
+    }
+    return false;
+  }
+  if (opts && opts.before) { try { opts.before(); } catch (_) {} }
+  _wshView = (k === 'projection') ? 'planning' : k;
+  renderWorkspaceHome();
+  return true;
+}
 // M.03 A — LA ENTRADA QUE DECIDE POR UNA SUPERFICIE.
 //
 // `_WS_TOOLKEY_TO_ID` es el mapa de IDENTIDAD histórico (clave de apertura →
@@ -20331,9 +20779,9 @@ const _WSH_SPACE_HIDDEN_KEY = 'aurix_ws_space_hidden_v1';
 const _WSH_SPACE_TOP_KEY    = 'aurix_ws_space_top_v1';
 function _wsSpaceHidden() { return _wshReadStore(_WSH_SPACE_HIDDEN_KEY); }
 function _wsSpaceIsHidden(ref) { return _wsSpaceHidden().indexOf(ref) >= 0; }
-function _wsSpaceHide(ref) { const l = _wsSpaceHidden(); if (l.indexOf(ref) < 0) l.push(ref); try { localStorage.setItem(_WSH_SPACE_HIDDEN_KEY, JSON.stringify(l)); } catch (_) {} }
+function _wsSpaceHide(ref) { const l = _wsSpaceHidden(); if (l.indexOf(ref) < 0) l.push(ref); _wshWriteStore(_WSH_SPACE_HIDDEN_KEY, l); }
 function _wsSpaceTop() { return _wshReadStore(_WSH_SPACE_TOP_KEY); }
-function _wsSpaceToggleTop(ref) { const l = _wsSpaceTop(); const i = l.indexOf(ref); if (i >= 0) l.splice(i, 1); else l.unshift(ref); try { localStorage.setItem(_WSH_SPACE_TOP_KEY, JSON.stringify(l)); } catch (_) {} }
+function _wsSpaceToggleTop(ref) { const l = _wsSpaceTop(); const i = l.indexOf(ref); if (i >= 0) l.splice(i, 1); else l.unshift(ref); _wshWriteStore(_WSH_SPACE_TOP_KEY, l); }
 function _wsSpaceTopRank(ref) { const i = _wsSpaceTop().indexOf(ref); return i < 0 ? 9999 : i; }
 
 // WS.6A — pinned quick-access items (tools/templates). Separate from saved
@@ -20345,7 +20793,7 @@ function _wsTogglePin(ref) {
   const list = _wsPinned();
   const i = list.findIndex(p => p && p.ref === ref);
   if (i >= 0) list.splice(i, 1); else list.push({ ref, ts: Date.now() });
-  try { localStorage.setItem(_WSH_PINNED_KEY, JSON.stringify(list)); } catch (_) {}
+  _wshWriteStore(_WSH_PINNED_KEY, list);
 }
 // ── DSH.WORKSPACE.01 — usage recency (Aurix learns from real behaviour) ─────
 // Every open records lastUsedAt for the item's canonical ref. Mi Espacio orders
@@ -20354,7 +20802,7 @@ function _wsTogglePin(ref) {
 const _WSH_RECENT_KEY = 'aurix_ws_recent_v1';
 function _wsRecentMap() { try { const raw = localStorage.getItem(_WSH_RECENT_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsRecentTs(ref) { const v = _wsRecentMap()[ref]; return typeof v === 'number' ? v : 0; }
-function _wsTouch(ref) { if (!ref) return; const m = _wsRecentMap(); m[ref] = Date.now(); try { localStorage.setItem(_WSH_RECENT_KEY, JSON.stringify(m)); } catch (_) {} }
+function _wsTouch(ref) { if (!ref) return; const m = _wsRecentMap(); m[ref] = Date.now(); _wshWriteStore(_WSH_RECENT_KEY, m); }
 // Map an open (cta,arg) → the canonical ref used for pinning + recency.
 function _wsCanonRef(cta, arg) {
   if (cta === 'tool') { const k = arg || 'compound'; return (k === 'compound' || k === 'loan') ? 'tool:' + k : 'tpl:' + (k === 'budget' ? 'mbudget' : k); }
@@ -20388,9 +20836,7 @@ function _wsPinOpen(ref) {
   _wsReturnTab = 'space';   // WS.14A — pinned items live in Mi Espacio
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') { _wsOpenTool(key); return; }
-  if (key === 'goals') { _wshView = 'goals'; renderWorkspaceHome(); return; }
-  if (key === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
-  if (key === 'projection') { _wshView = 'planning'; renderWorkspaceHome(); return; }
+  if (_WS_VIEW_SURFACES.indexOf(key) !== -1) { _wsOpenSurface(key); return; }
   _ws4OpenOrCreate(key);
 }
 // WS.7A — per-tool last state (quick-access scratch). NOT a project: opening a
@@ -20400,7 +20846,7 @@ const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
 function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : key === 'loan' ? 'loan_simulation' : key === 'assets' ? 'asset_prices' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
-function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
+function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); _wshWriteStore(_WSH_TOOL_STATE_KEY, s); }
 
 // WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
 const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house', receivables_app: 'table', loan_simulation: 'donut', asset_prices: 'table' };
@@ -20663,8 +21109,8 @@ function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? a
 function _wsxOpen(ref) {
   _wsReturnTab = 'space';   // WS.14A — opened from Mi Espacio → "Volver" returns there
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
-  if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
-  else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
+  if (kind === 'goal') { _wsOpenSurface('goals'); }
+  else if (kind === 'scenario') { _wsOpenSurface('scenario'); }
   else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else if (p.type === 'asset_prices') { _wsOpenTool('assets', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
@@ -20675,14 +21121,14 @@ function _wsxAct(act, ref) {
   const doDelete = () => {
     if (kind === 'goal') { _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id)); delete _wsgWorking[id]; delete _wsgDirty[id]; }
     else if (kind === 'workspace') { _ws4SaveAll(_ws4Projects().filter(p => p && p.id !== id)); }
-    else if (kind === 'scenario') { try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(_wshReadStore(_WSH_SCENARIOS_KEY).filter(s => (s.scenarioId || s.id) !== id))); } catch (_) {} }
+    else if (kind === 'scenario') { _wshWriteStore(_WSH_SCENARIOS_KEY, _wshReadStore(_WSH_SCENARIOS_KEY).filter(s => (s.scenarioId || s.id) !== id)); }
     rerender();
   };
   if (act === 'del') { _wsConfirm(doDelete); return; }
   if (act === 'dup') {
     if (kind === 'goal') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
     else if (kind === 'workspace') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), customName: (s.customName ? s.customName + ' ' + t('wsg_copy_suffix') : undefined), createdAt: now, updatedAt: now })); }
-    else if (kind === 'scenario') { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr)); } catch (_) {} } }
+    else if (kind === 'scenario') { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); _wshWriteStore(_WSH_SCENARIOS_KEY, arr); } }
     rerender();
   }
 }
@@ -21190,7 +21636,7 @@ function _wsbSaveScenario(id, btn) {
       diff: Math.round(p.projected - baseProj),
       createdAt: Date.now(),
     });
-    localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(store));
+    _wshWriteStore(_WSH_SCENARIOS_KEY, store);
     if (btn) { btn.textContent = t('wsb_saved'); btn.classList.add('is-saved'); btn.setAttribute('disabled', ''); }
   } catch (_) {}
 }
@@ -21415,7 +21861,7 @@ function _ws4Templates() {
 }
 
 function _ws4Projects() { return _wshReadStore(_WSH_PROJECTS_KEY); }
-function _ws4SaveAll(list) { try { localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify(list)); } catch (_) {} }
+function _ws4SaveAll(list) { _wshWriteStore(_WSH_PROJECTS_KEY, list); }
 function _ws4Get() { return _ws4Draft; }   // P5 — live working copy (may be unsaved)
 function _ws4Persist(p) { const list = _ws4Projects(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); _ws4SaveAll(list); }
 function _ws4Summarize(type, inputs) { const c = _ws4Templates()[type].compute(inputs); return { rows: c.rows, reading: c.reading }; }
@@ -21580,50 +22026,181 @@ function _renderWorkspaceDetail() {
 const _WSG_TYPES = ['wealth', 'emergency', 'home', 'fire', 'free'];
 function _wsgThisYear() { try { return new Date().getFullYear(); } catch (_) { return 2026; } }
 function _wsgGoals() { return _wshReadStore(_WSH_GOALS_KEY); }
-function _wsgSaveAll(list) { try { localStorage.setItem(_WSH_GOALS_KEY, JSON.stringify(list)); } catch (_) {} }
+function _wsgSaveAll(list) { _wshWriteStore(_WSH_GOALS_KEY, list); }
 // Working copy (unsaved edits) overrides the stored goal for display/edit.
 function _wsgGet(id) { return _wsgWorking[id] || _wsgGoals().find(g => g && g.id === id) || null; }
 function _wsgStored(id) { return _wsgGoals().find(g => g && g.id === id) || null; }
 function _wsgPersist(g) { const list = _wsgGoals(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); _wsgSaveAll(list); }
 
+// ════════════════════════════════════════════════════════════════════════════
+// WORKSPACE COMPLETION · §D — PROGRESO DE UN OBJETIVO
+// ════════════════════════════════════════════════════════════════════════════
+// TRES DEFECTOS REALES que esta reescritura cierra, y ninguno era visible:
+//
+// 1 · UNA RENTABILIDAD INVENTADA, PARA TODOS LOS TIPOS. Había un `const r =
+//     0.05 / 12` fijo: Aurix proyectaba un 5 % anual que el usuario no había
+//     elegido, y lo hacía también sobre un FONDO DE EMERGENCIA, que por definición
+//     está en liquidez. El efecto es una fecha estimada optimista y una aportación
+//     necesaria más baja que la real. §D es explícito: rentabilidad CERO por
+//     defecto en emergencia y libre, y sólo con elección explícita en los demás.
+//     Ahora la tasa la pone el usuario o no existe, y el supuesto viaja declarado.
+//
+// 2 · «EN CAMINO» SIN PLAZO QUE CUMPLIR. Sin fecha objetivo, el estado se decidía
+//     con `monthly > 0 ? 'on-track' : 'behind'`: aportar un euro al mes bastaba
+//     para que el objetivo se declarase en camino. §D: «En camino» exige ALCANZAR
+//     la meta al plazo, y sin fecha no se inventa cumplimiento. Ahora sin fecha el
+//     estado es `no-date` —con su tiempo estimado, que sí es computable— y nunca
+//     una afirmación de éxito.
+//
+// 3 · SIN SOLUCIÓN NO SE DECÍA. Si con el capital y la aportación actuales la meta
+//     no se alcanza nunca (aportación 0 y sin rentabilidad), el bucle terminaba con
+//     `months = null` pero el estado podía seguir siendo `on-track`. Ahora es
+//     `no-solution` y se dice.
+//
+// Y la proyección la hace el MOTOR COMPARTIDO (`_wsProject`), no una cuarta copia
+// de la misma matemática: misma convención declarada, mismos componentes separados.
+//
+// LO QUE NO HACE: sumar el capital asignado de varias metas como patrimonio nuevo.
+// `current` es de ESTA meta y no se agrega en ningún sitio (§D lo prohíbe).
+const _WSG_ZERO_RETURN_TYPES = Object.freeze(['emergency', 'free']);
+// La tasa SUPUESTA de un objetivo, en porcentaje anual, o null si no hay ninguna.
+// Null no es cero: significa «el usuario no ha supuesto rentabilidad», y por eso la
+// superficie puede decir «sin rentabilidad supuesta» en vez de callarlo.
+function _wsgAssumedRatePct(goal) {
+  const g = goal || {};
+  const declared = (typeof _wsNumOrNull === 'function') ? _wsNumOrNull(g.ret) : null;
+  if (declared != null) return declared;
+  // §D — en emergencia y libre el defecto es CERO, y no por prudencia decorativa:
+  // un fondo de emergencia vive en liquidez y un objetivo libre no declara dónde.
+  if (_WSG_ZERO_RETURN_TYPES.indexOf(String(g.type)) !== -1) return 0;
+  return null;
+}
+// ── EL OBJETIVO DE CADA TIPO, QUE NO ES EL MISMO NÚMERO ─────────────────────
+// §D pide tipos «funcionalmente diferentes». El importe meta se DERIVA de los
+// campos propios del tipo cuando los trae, y sólo cae a `target` cuando no.
+function _wsgTargetAmount(goal) {
+  const g = goal || {};
+  const n = v => { const x = (typeof _wsNumOrNull === 'function') ? _wsNumOrNull(v) : null; return x == null ? null : x; };
+  const ty = String(g.type || 'free');
+  if (ty === 'emergency') {
+    // gastos esenciales × meses de cobertura
+    const exp = n(g.monthlyExpenses), mo = n(g.coverMonths);
+    if (exp != null && mo != null) return { amount: Math.max(0, exp * mo), basis: 'expenses_x_months' };
+  }
+  if (ty === 'home') {
+    // precio COMPLETO o entrada + gastos, y son cosas distintas: una hipoteca no
+    // se ahorra, una entrada sí. Se declara cuál se está persiguiendo.
+    const down = n(g.downPayment), costs = n(g.purchaseCosts);
+    if (down != null) return { amount: Math.max(0, down + (costs || 0)), basis: 'down_payment_plus_costs' };
+    const price = n(g.price);
+    if (price != null) return { amount: Math.max(0, price), basis: 'full_price' };
+  }
+  if (ty === 'fire') {
+    // gasto anual / tasa de retirada SUPUESTA, y la tasa es explícita o no hay meta.
+    const spend = n(g.annualSpend), swr = n(g.withdrawalRatePct);
+    if (spend != null && swr != null && swr > 0) return { amount: Math.max(0, spend / (swr / 100)), basis: 'annual_spend_over_swr' };
+    if (spend != null && (swr == null || swr <= 0)) return { amount: null, basis: 'swr_missing' };
+  }
+  const t0 = n(g.target);
+  return { amount: t0 == null ? null : Math.max(0, t0), basis: 'declared_target' };
+}
 // Deterministic progress. currentWealth is the real read-only figure (for sync).
 function calculateGoalProgress(goal, currentWealth) {
-  const target = Math.max(0, _wsNum(goal.target));
-  const cur = goal.mode === 'sync' ? Math.max(0, Number(currentWealth) || 0) : Math.max(0, _wsNum(goal.current));
-  if (target <= 0) return { state: 'no-data', pct: 0, remaining: 0, months: null, etaYear: null, requiredMonthly: null, current: cur, target };
-  if (cur >= target) return { state: 'reached', pct: 100, remaining: 0, months: 0, etaYear: _wsgThisYear(), requiredMonthly: 0, current: cur, target };
-  const pct = Math.min(99, Math.round(cur / target * 100));
+  const g = goal || {};
+  const tgt = _wsgTargetAmount(g);
+  const target = tgt.amount;
+  const cur = g.mode === 'sync' ? Math.max(0, Number(currentWealth) || 0)
+                                : Math.max(0, _wsNum(g.current));
+  const monthly = Math.max(0, _wsNum(g.monthly));
+  const ratePct = _wsgAssumedRatePct(g);
+  const thisYear = _wsgThisYear();
+  const years = (g.targetYear && Number(g.targetYear) > thisYear) ? (Number(g.targetYear) - thisYear) : null;
+  const base = {
+    state: 'no-data', pct: 0, remaining: 0, months: null, etaYear: null,
+    requiredMonthly: null, current: cur, target: target || 0,
+    targetBasis: tgt.basis, assumedRatePct: ratePct, hasDate: years != null,
+    projectedAtDate: null, gapAtDate: null, horizonYears: years,
+  };
+  // Sin importe meta no hay progreso que calcular, y la razón se nombra: una meta
+  // FIRE sin tasa de retirada declarada NO es lo mismo que una meta vacía.
+  if (target == null || target <= 0) {
+    return Object.assign(base, { state: tgt.basis === 'swr_missing' ? 'needs-rate' : 'no-data' });
+  }
+  const pct = Math.min(100, Math.max(0, Math.round(cur / target * 100)));
+  if (cur >= target) {
+    return Object.assign(base, { state: 'reached', pct: 100, remaining: 0, months: 0,
+      etaYear: thisYear, requiredMonthly: 0, target: target,
+      projectedAtDate: cur, gapAtDate: cur - target });
+  }
   const remaining = target - cur;
-  const r = 0.05 / 12;
-  const monthly = Math.max(0, _wsNum(goal.monthly));
+  // La tasa mensual, por el MISMO owner que el resto de proyecciones. Sin tasa
+  // supuesta se proyecta a 0: es lo único honesto, no un 5 % de relleno.
+  const conv = (g.convention === _WS_PROJ_CONV.NOMINAL12) ? _WS_PROJ_CONV.NOMINAL12 : _WS_PROJ_CONV_DEFAULT;
+  const r = _wsProjMonthlyRate((ratePct == null ? 0 : ratePct) / 100, conv);
+  const fvAt = n => {
+    if (n <= 0) return cur;
+    const grown = cur * Math.pow(1 + r, n);
+    if (Math.abs(r) < 1e-12) return grown + monthly * n;
+    return grown + monthly * ((Math.pow(1 + r, n) - 1) / r);
+  };
+  // ── TIEMPO ESTIMADO SÓLO SI EXISTE SOLUCIÓN (§D) ──────────────────────────
+  // Con aportación 0 y sin rentabilidad supuesta, la meta no se alcanza nunca. Eso
+  // no es «dentro de mucho»: es que no hay solución, y se dice.
   let months = null;
-  if (monthly > 0 || cur > 0) {
-    for (let n = 1; n <= 600; n++) {
-      const fv = cur * Math.pow(1 + r, n) + (r > 0 ? monthly * ((Math.pow(1 + r, n) - 1) / r) : monthly * n);
-      if (fv >= target) { months = n; break; }
-    }
+  if (monthly > 0 || r > 0) {
+    for (let n = 1; n <= 600; n++) { if (fvAt(n) >= target) { months = n; break; } }
   }
-  const etaYear = months != null ? _wsgThisYear() + Math.ceil(months / 12) : null;
-  const N = (goal.targetYear && goal.targetYear > _wsgThisYear()) ? (goal.targetYear - _wsgThisYear()) * 12 : null;
-  let requiredMonthly = null, state;
-  if (N) {
+  const etaYear = months != null ? thisYear + Math.ceil(months / 12) : null;
+  let requiredMonthly = null, projectedAtDate = null, gapAtDate = null, state;
+  if (years != null) {
+    const N = years * 12;
+    projectedAtDate = fvAt(N);
+    gapAtDate = projectedAtDate - target;                 // >0 superávit · <0 déficit
     const fvCur = cur * Math.pow(1 + r, N);
-    const denom = r > 0 ? ((Math.pow(1 + r, N) - 1) / r) : N;
-    requiredMonthly = Math.max(0, (target - fvCur) / denom);
-    state = monthly >= requiredMonthly * 0.98 ? 'on-track' : 'behind';
+    const denom = (Math.abs(r) < 1e-12) ? N : ((Math.pow(1 + r, N) - 1) / r);
+    requiredMonthly = denom > 0 ? Math.max(0, (target - fvCur) / denom) : null;
+    // «EN CAMINO» EXIGE LLEGAR. Se compara la PROYECCIÓN con la meta, no la
+    // aportación con un umbral del 98 % de la necesaria —que era una tolerancia
+    // sin justificación y declaraba en camino a quien no llega—.
+    state = projectedAtDate >= target ? 'on-track' : 'behind';
+  } else if (months == null) {
+    state = 'no-solution';
   } else {
-    state = monthly > 0 ? 'on-track' : 'behind';
+    // Sin fecha NO se afirma cumplimiento: hay un tiempo estimado y se publica como
+    // tal, pero el objetivo no está «en camino» de nada porque no hay plazo.
+    state = 'no-date';
   }
-  return { state, pct, remaining, months, etaYear, requiredMonthly, current: cur, target };
+  return Object.assign(base, { state, pct, remaining, months, etaYear, requiredMonthly,
+    target: target, projectedAtDate, gapAtDate });
 }
 
+// ── LA LECTURA DE UN OBJETIVO, SIN AFIRMAR LO QUE NO SE HA DEMOSTRADO ───────
+// Cada estado tiene su frase, y las tres nuevas existen precisamente porque antes
+// se leían como éxito. La lectura NO recalcula nada: consume `prog`, que es el
+// único owner del progreso.
 function _wsgReading(goal, prog) {
-  if (prog.state === 'reached')  return t('wsg_read_reached');
-  if (prog.state === 'no-data')  return t('wsg_read_nodata');
-  const hasDate = goal.targetYear && goal.targetYear > _wsgThisYear();
-  if (prog.state === 'behind')   return hasDate ? t('wsg_read_behind_date') : t('wsg_read_behind_nomonthly');
-  if (hasDate)                   return t('wsg_read_ontrack_date');
-  return prog.months != null ? t('wsg_read_ontrack_years')(Math.max(1, Math.ceil(prog.months / 12))) : t('wsg_read_ontrack');
+  if (prog.state === 'reached')     return t('wsg_read_reached');
+  if (prog.state === 'no-data')     return t('wsg_read_nodata');
+  if (prog.state === 'needs-rate')  return t('wsg_read_needsrate');
+  if (prog.state === 'no-solution') return t('wsg_read_nosolution');
+  if (prog.state === 'behind') {
+    // Con plazo, el déficit es COMPUTABLE y se dice: cuánto falta al vencimiento y
+    // cuánto habría que aportar. Sin eso, «aumenta el ritmo» es un consejo vacío.
+    if (prog.hasDate && prog.requiredMonthly != null) {
+      return String(t('wsg_read_behind_req') || '')
+        .replace('{req}', formatBase(prog.requiredMonthly))
+        .replace('{gap}', formatBase(Math.abs(prog.gapAtDate || 0)));
+    }
+    return t('wsg_read_behind_nomonthly');
+  }
+  if (prog.state === 'on-track') {
+    // Y «en camino» se dice con el SUPERÁVIT que lo respalda, que es la prueba.
+    return String(t('wsg_read_ontrack_date') || '');
+  }
+  // no-date: hay tiempo estimado y se publica como estimación, no como cumplimiento.
+  return prog.months != null
+    ? t('wsg_read_ontrack_years')(Math.max(1, Math.ceil(prog.months / 12)))
+    : t('wsg_read_nodate');
 }
 
 // WS.5A P6 — live "Resultado" preview on the create form (real-time, no save).
@@ -21734,6 +22311,15 @@ function _wsgStateMeta(state) {
     'on-track': { key: 'ontrack',  icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
     'behind':   { key: 'behind',   icon: '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>' },
     'reached':  { key: 'reached',  icon: '<path d="M5 13l4 4L19 7"/>' },
+    // §D — los tres estados que faltaban, y cada uno dice algo DISTINTO de «no hay
+    // datos». Colapsarlos en `no-data` era lo que permitía que un objetivo sin
+    // plazo se leyese como si fuera bien.
+    //   no-date     · hay ritmo y hay tiempo estimado, pero NO hay plazo que cumplir
+    //   no-solution · con este capital y esta aportación no se alcanza nunca
+    //   needs-rate  · una meta FIRE sin tasa de retirada declarada no tiene importe
+    'no-date':     { key: 'nodate',    icon: '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>' },
+    'no-solution': { key: 'nosolution', icon: '<path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/>' },
+    'needs-rate':  { key: 'needsrate', icon: '<path d="M12 8h.01"/><path d="M11 12h1v4h1"/>' },
     'no-data':  { key: 'nodata',   icon: '<path d="M12 8h.01"/><path d="M11 12h1v4h1"/>' },
   };
   return M[state] || M['no-data'];
@@ -21772,7 +22358,7 @@ function _wsgCardOutHtml(g, prog) {
 // NEVER writes to portfolio / liquidez real / wealthEngine / Supabase.
 const _WSH_FUNDING_KEY = 'aurix_ws_goal_funding_v1';
 function _wsFundRead() { return _wshReadStore(_WSH_FUNDING_KEY); }
-function _wsFundSaveAll(list) { try { localStorage.setItem(_WSH_FUNDING_KEY, JSON.stringify(list)); } catch (_) {} }
+function _wsFundSaveAll(list) { _wshWriteStore(_WSH_FUNDING_KEY, list); }
 function _wsFundAdd(goalId, amount, type, note) {
   const list = _wsFundRead();
   list.push({ id: 'fnd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), goalId, amount: Math.max(0, Number(amount) || 0), type: type === 'remove' ? 'remove' : 'add', note: note || '', createdAt: Date.now() });
@@ -21963,6 +22549,136 @@ function _renderGoals() {
 // ── WS.6 — Compound Growth tool (Workspace > Herramientas) ───────────────────
 // Deterministic: initial compounded monthly + monthly contributions (ordinary
 // annuity). No APIs, no AI, no wealthEngine.
+// ════════════════════════════════════════════════════════════════════════════
+// WORKSPACE COMPLETION · §B-A — EL MOTOR COMPARTIDO DE PROYECCIÓN
+// ════════════════════════════════════════════════════════════════════════════
+// TRES MOTORES PARA LA MISMA MATEMÁTICA es lo que había: `calculateCompoundGrowth`
+// (interés compuesto), `projectScenario` (escenarios) y el solver de
+// `calculateGoalProgress` (objetivos). No es una redundancia estética: los tres
+// tenían el MISMO defecto de parseo de tasa y hubo que corregirlo tres veces, y dos
+// de ellos usan convenciones distintas sin declararlo en ningún sitio. Un usuario
+// que compara una proyección de Objetivos con una de Escenarios está comparando dos
+// matemáticas, y nada en la pantalla se lo dice.
+//
+// LA CONVENCIÓN, DECLARADA Y VERSIONADA. §A fija para las simulaciones NUEVAS:
+// tasa anual EFECTIVA y aportación al FINAL del mes. Pero `calculateCompoundGrowth`
+// lleva desde WORKSPACE-LAUNCH-V1 usando tasa NOMINAL capitalizada mensualmente
+// (`r = anual/12`), y su resultado está certificado en memoria con un valor exacto
+// (1.000 + 300/mes al 6 % en 20 años ⇒ 141.922,47). Cambiar la convención por
+// debajo habría movido en silencio el resultado de cada simulación GUARDADA, que es
+// exactamente lo que §A prohíbe: «no reinterpretar resultados silenciosamente».
+// Así que la convención viaja EN EL DOCUMENTO: lo guardado conserva la suya, lo
+// nuevo nace con la efectiva, y las dos se nombran.
+const _WS_PROJ_CONV = Object.freeze({
+  // r_mensual = R/12 — tasa nominal anual con capitalización mensual.
+  NOMINAL12:  'nominal_annual_monthly_compounding',
+  // r_mensual = (1+R)^(1/12) − 1 — tasa anual EFECTIVA. La de §A.
+  EFFECTIVE:  'effective_annual',
+});
+const _WS_PROJ_CONV_DEFAULT = _WS_PROJ_CONV.EFFECTIVE;
+const _WS_PROJ_TIMING = Object.freeze({ END: 'end_of_month', BEGIN: 'begin_of_month' });
+const _WS_PROJ_TIMING_DEFAULT = _WS_PROJ_TIMING.END;
+// El tipo mensual que corresponde a una convención. Un solo sitio, para que no haya
+// dos versiones de la misma fórmula.
+function _wsProjMonthlyRate(annualFraction, convention) {
+  const R = Number.isFinite(annualFraction) ? annualFraction : 0;
+  if (convention === _WS_PROJ_CONV.NOMINAL12) return R / 12;
+  // Efectiva. Con R ≤ −100 % la raíz no existe: se acota en −100 %, que es la
+  // pérdida total, en vez de devolver NaN.
+  if (R <= -1) return -1;
+  return Math.pow(1 + R, 1 / 12) - 1;
+}
+// ── EL MOTOR ────────────────────────────────────────────────────────────────
+// Determinista: la misma entrada da siempre la misma salida, y no lee reloj, ni
+// aleatoriedad, ni estado global. No hay Monte Carlo (la SPEC lo prohíbe) ni
+// ninguna recomendación: recibe una rentabilidad SUPUESTA y no opina sobre ella.
+//
+// `unknowns` es la mitad que faltaba en los tres motores viejos: VACÍO NO ES CERO.
+// Los tres hacían `Math.max(0, _wsNum(x))`, así que un campo sin rellenar entraba
+// como un cero DECLARADO y la proyección salía igual, sin que nada dijera que se
+// había asumido. Aquí el campo ausente se nombra y la superficie decide si puede
+// publicar. El cálculo sigue usando 0 para poder sumar; la diferencia es que ahora
+// se SABE.
+function _wsProject(spec) {
+  const o = spec || {};
+  const conv   = (o.convention === _WS_PROJ_CONV.NOMINAL12) ? _WS_PROJ_CONV.NOMINAL12 : _WS_PROJ_CONV_DEFAULT;
+  const timing = (o.contributionTiming === _WS_PROJ_TIMING.BEGIN) ? _WS_PROJ_TIMING.BEGIN : _WS_PROJ_TIMING_DEFAULT;
+  const unknowns = [];
+  const pick = (v, name) => {
+    const n = (typeof _wsNumOrNull === 'function') ? _wsNumOrNull(v) : (v == null ? null : Number(v));
+    if (n == null) { unknowns.push(name); return 0; }
+    return n;
+  };
+  const initial = Math.max(0, pick(o.initial, 'initial'));
+  const monthly = Math.max(0, pick(o.monthly, 'monthly'));
+  const yearsRaw = pick(o.years, 'years');
+  const years = Math.max(0, Math.round(Number.isFinite(yearsRaw) ? yearsRaw : 0));
+  // La tasa se recibe en PORCENTAJE o en fracción, y se declara cuál: pasar un 6
+  // donde se esperaba 0,06 fue el defecto que INT.01 documentó en otro motor.
+  const ratePct = (o.annualRatePct != null) ? pick(o.annualRatePct, 'rate')
+                : ((o.annualRate != null) ? pick(o.annualRate, 'rate') * 100 : (unknowns.push('rate'), 0));
+  // ── COSTES E INFLACIÓN: OPCIONES AVANZADAS CON BASE EXPLÍCITA (§A) ────────
+  // El coste es un LASTRE ANUAL SOBRE EL CAPITAL en puntos porcentuales, restado
+  // de la rentabilidad supuesta. Es la forma simple que §A pide («costes simples»),
+  // y su base se declara aquí y viaja en `assumptions` para que la superficie pueda
+  // decirla. No es una comisión sobre la aportación ni un gasto fijo.
+  const costPct = (o.costPct != null) ? Math.max(0, pick(o.costPct, 'cost')) : 0;
+  const netRatePct = ratePct - costPct;
+  const r = _wsProjMonthlyRate(netRatePct / 100, conv);
+  const n = years * 12;
+  // Valor futuro de la serie. La anualidad ORDINARIA (final de mes) es
+  // m·((1+r)^k − 1)/r; la anticipada multiplica por (1+r). Con r = 0 las dos
+  // degeneran en m·k, y se trata como rama propia para no dividir por cero.
+  const fvAt = k => {
+    const grown = initial * Math.pow(1 + r, k);
+    if (k <= 0) return initial;
+    if (Math.abs(r) < 1e-12) return grown + monthly * k;
+    const ann = monthly * ((Math.pow(1 + r, k) - 1) / r);
+    return grown + (timing === _WS_PROJ_TIMING.BEGIN ? ann * (1 + r) : ann);
+  };
+  const final = fvAt(n);
+  const contributed = monthly * n;
+  // LOS CUATRO COMPONENTES, SEPARADOS (§A). `growth` es lo ESTIMADO, y puede ser
+  // negativo: una rentabilidad supuesta negativa es una entrada válida y no se
+  // recorta a cero, porque eso ocultaría la pérdida que el usuario ha supuesto.
+  const growth = final - initial - contributed;
+  const series = [];
+  for (let y = 0; y <= years; y++) {
+    series.push({ year: y, value: fvAt(y * 12), initial: initial, contributed: monthly * y * 12 });
+  }
+  // ── INFLACIÓN: EN TÉRMINOS REALES, Y APARTE ──────────────────────────────
+  // No se mezcla en la serie nominal: se publica como una LECTURA adicional del
+  // mismo resultado, con su base dicha. Descontar la inflación dentro de la serie
+  // habría hecho imposible saber qué cifra se estaba leyendo.
+  let realFinal = null, inflationPct = null;
+  if (o.inflationPct != null) {
+    inflationPct = Math.max(0, pick(o.inflationPct, 'inflation'));
+    const defl = Math.pow(1 + inflationPct / 100, years);
+    realFinal = defl > 0 ? final / defl : null;
+  }
+  return {
+    initial, contributed, growth, final, series,
+    realFinal, 
+    // Todo supuesto que ha entrado en el número, por su nombre. §A: «no ocultar
+    // supuestos». La superficie los puede publicar sin recalcular nada.
+    assumptions: {
+      annualRatePct: ratePct,
+      costPct: costPct,
+      netAnnualRatePct: netRatePct,
+      costBase: costPct > 0 ? 'annual_on_capital' : null,
+      inflationPct: inflationPct,
+      inflationBase: inflationPct != null ? 'annual_constant' : null,
+      convention: conv,
+      contributionTiming: timing,
+      monthlyRate: r,
+      months: n,
+      currency: o.currency || ((typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'EUR'),
+    },
+    // VACÍO NO ES CERO: los campos que el usuario no ha declarado, nombrados.
+    unknowns: unknowns,
+    complete: unknowns.length === 0,
+  };
+}
 function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
   const init = Math.max(0, _wsNum(initial));        // WS.15A tolerant parse
   const m    = Math.max(0, _wsNum(monthly));
@@ -22015,12 +22731,85 @@ function _wsToolCcy() {
 }
 function _wsToolDefaults() {
   // WS.11A — autonomous defaults; NO Dashboard/portfolio read. Capital inicial 1.000 €.
-  return { initial: 1000, monthly: 300, ret: 6, years: 20 };
+  // §A — la convención viaja EN la simulación desde que nace. Una simulación nueva
+  // usa la tasa anual EFECTIVA; una guardada ANTES de este bloque no trae el campo
+  // y `_wsCompoundProjection` la computa con la que tenía (nominal/12), así que su
+  // resultado no se mueve. Ésa es toda la diferencia entre versionar y reinterpretar.
+  return { initial: 1000, monthly: 300, ret: 6, years: 20, convention: _WS_PROJ_CONV.EFFECTIVE };
 }
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
 // renderer so the shared open/input/save plumbing stays tool-agnostic.
 function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : key === 'receivables' ? _wsReceivablesDefaults() : key === 'loan' ? _wsLoanDefaults() : key === 'assets' ? _wsAssetPricesDefaults() : _wsToolDefaults(); }
+// ════════════════════════════════════════════════════════════════════════════
+// §2 · PORTADA FREE DE WORKSPACE
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE NO LLEVA, y cada ausencia es una regla de la SPEC:
+//   · el catálogo Premium completo — enseñar seis candados no es una propuesta;
+//   · ninguna lectura de patrimonio — eso es de Intelligence, y mezclarlas fue
+//     justo el defecto que el principio de separación de espacios corrigió;
+//   · ninguna promesa inventada: el beneficio Premium nombra lo que existe
+//     construido y nada más;
+//   · ningún precio ni condición comercial — el paywall canónico es el owner.
+//
+// CABE SIN SCROLL EN MÓVIL VERTICAL, y no por recorte: la altura se reparte con
+// `min-height:0` + `flex` sobre `100dvh` menos las barras, así que en una pantalla
+// pequeña se comprime el ESPACIO y no el contenido. Con zoom o texto ampliado el
+// contenedor permite scroll (`overflow:auto`), que es lo que §2 exige y lo que
+// `overflow:hidden` habría roto.
+function _renderWorkspaceFreeCover() {
+  const esc = _escapeWorkspaceText;
+  const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : (fb || ''); } catch (_) { return fb || ''; } };
+  // Los DOS recursos incluidos se LEEN DEL CATÁLOGO, no se escriben aquí: si mañana
+  // cambia qué entra en Free, esta portada lo refleja sin tocarla. Y se resuelven
+  // por su entrada publicada, así que nunca puede ofrecer algo que el gate deniegue.
+  let freeItems = [];
+  try {
+    freeItems = _WS_CATALOG
+      .filter(e => e.published === true && e.commercialTier === 'free')
+      .map(e => {
+        const surface = e.opens || (e.kind === 'tool' ? _wsCatalogSurfaceKey(e.id) : null);
+        return surface ? { id: e.id, surface: surface } : null;
+      })
+      .filter(Boolean);
+  } catch (_) { freeItems = []; }
+  const card = it => `
+        <button type="button" class="wsfc-item" data-wsfc-open="${esc(it.surface)}">
+          <span class="wsfc-item-ico" aria-hidden="true">${esc(tx('wsfc_ico_' + it.surface, '◈'))}</span>
+          <span class="wsfc-item-body">
+            <span class="wsfc-item-name">${esc(tx('wsfc_n_' + it.surface, it.surface))}</span>
+            <span class="wsfc-item-desc">${esc(tx('wsfc_d_' + it.surface, ''))}</span>
+          </span>
+          <span class="wsfc-item-tag">${esc(tx('wsfc_included', 'Incluido'))}</span>
+        </button>`;
+  return `
+    <div class="aurix-wsh wsfc" data-wsh-view="free_cover">
+      <section class="wsfc-stage">
+        <header class="wsfc-head">
+          <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'Workspace'))}</p>
+          <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
+          <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
+        </header>
+        <div class="wsfc-items" data-wsfc-count="${freeItems.length}">
+          ${freeItems.map(card).join('')}
+        </div>
+        <div class="wsfc-premium">
+          <p class="wsfc-premium-label">${esc(tx('wsfc_premium_label', 'Con Premium'))}</p>
+          <p class="wsfc-premium-body">${esc(tx('wsfc_premium_body', ''))}</p>
+        </div>
+        <div class="wsfc-cta-wrap">
+          <button type="button" class="wsfc-cta" data-wsfc-upgrade="1">${esc(tx('wsfc_cta', ''))}</button>
+          <button type="button" class="wsfc-skip" data-wsfc-skip="1">${esc(tx('wsfc_skip', ''))}</button>
+        </div>
+      </section>
+    </div>`;
+}
+// La clave de SUPERFICIE de una entrada de herramienta: es el inverso del mapa de
+// identidad, y se deriva de él para que no haya un segundo mapa que mantener.
+function _wsCatalogSurfaceKey(entryId) {
+  for (const k in _WS_TOOLKEY_TO_ID) { if (_WS_TOOLKEY_TO_ID[k] === entryId) return k; }
+  return null;
+}
 function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _wsToolActive === 'assets' ? _renderAssetPricesTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : key === 'loan' ? _wsLoanOutHtml(inp) : _wsToolOutHtml(inp); }
 
@@ -22173,21 +22962,76 @@ function _wsToolChartHtml(res, years) {
     </svg>`;
 }
 
+// §B — LA PROYECCIÓN DE INTERÉS COMPUESTO PASA POR EL MOTOR COMPARTIDO.
+// `inp.convention` viaja con la simulación GUARDADA: si la trae, se respeta; si no
+// la trae, es de antes de este bloque y se computa con la convención con la que se
+// calculó (nominal/12), porque reinterpretarla en silencio movería el resultado que
+// el usuario guardó. Las simulaciones NUEVAS nacen con la efectiva (§A).
+function _wsCompoundProjection(inp) {
+  const i = inp || {};
+  return _wsProject({
+    initial: i.initial, monthly: i.monthly, years: i.years, annualRatePct: i.ret,
+    convention: i.convention || _WS_PROJ_CONV.NOMINAL12,
+    costPct: (i.costPct != null && String(i.costPct) !== '') ? i.costPct : null,
+    inflationPct: (i.inflationPct != null && String(i.inflationPct) !== '') ? i.inflationPct : null,
+  });
+}
+// ── LOS SUPUESTOS, ACCESIBLES Y SIN OPINIÓN (§A/§B) ─────────────────────────
+// «No ocultar supuestos» y «supuestos accesibles». Se publica lo que ENTRÓ en el
+// número: la tasa supuesta, su convención por su nombre, cuándo se aporta, y los
+// costes y la inflación con su BASE cuando el usuario los ha activado. No hay
+// ninguna recomendación de rentabilidad aquí: la tasa la pone el usuario y Aurix
+// no opina sobre ella (§A lo prohíbe explícitamente).
+//
+// Y los campos que el usuario NO ha declarado se dicen: vacío no es cero, así que
+// una proyección incompleta lo anuncia en vez de presentar un supuesto invisible.
+function _wsAssumptionsHtml(p) {
+  if (!p || !p.assumptions) return '';
+  const esc = _intccEsc;
+  const a = p.assumptions;
+  const num = (v, d) => (typeof _intv4Num === 'function') ? _intv4Num(v, d == null ? 2 : d) : String(v);
+  const rows = [];
+  rows.push(String(t('wstool_asm_rate') || '').replace('{r}', num(a.annualRatePct, 2)));
+  rows.push(String(t(a.convention === _WS_PROJ_CONV.NOMINAL12 ? 'wstool_asm_conv_nominal' : 'wstool_asm_conv_effective') || ''));
+  rows.push(String(t(a.contributionTiming === _WS_PROJ_TIMING.BEGIN ? 'wstool_asm_timing_begin' : 'wstool_asm_timing_end') || ''));
+  if (a.costPct > 0) rows.push(String(t('wstool_asm_cost') || '').replace('{c}', num(a.costPct, 2)).replace('{n}', num(a.netAnnualRatePct, 2)));
+  if (a.inflationPct != null) rows.push(String(t('wstool_asm_infl') || '').replace('{i}', num(a.inflationPct, 2)));
+  const unknown = (p.unknowns || []).filter(u => u !== 'cost' && u !== 'inflation');
+  return `
+      <details class="wstool-asm">
+        <summary class="wstool-asm-sum">${esc(t('wstool_asm_title'))}</summary>
+        <ul class="wstool-asm-list">${rows.filter(Boolean).map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        ${unknown.length ? `<p class="wstool-asm-gap">${esc(t('wstool_asm_missing'))}</p>` : ''}
+        ${p.realFinal != null ? `<p class="wstool-asm-real">${esc(String(t('wstool_asm_real') || '').replace('{v}', formatBase(p.realFinal)))}</p>` : ''}
+      </details>`;
+}
 function _wsToolOutHtml(inp) {
   const esc = _intccEsc;
-  const res = calculateCompoundGrowth(inp.initial, inp.monthly, _wsNum(inp.ret) / 100, inp.years);
+  const p = _wsCompoundProjection(inp);
+  // El gráfico y los hitos siguen consumiendo la forma que ya conocían, DERIVADA
+  // del motor: no se recalcula nada por segunda vez (§B «gráfico y hitos derivados
+  // del cálculo»).
+  const res = { final: p.final, contributed: p.initial + p.contributed, interest: p.growth,
+                series: p.series.map(x => ({ year: x.year, total: x.value, contributed: x.initial + x.contributed })),
+                multiple: (p.initial + p.contributed) > 0 ? p.final / (p.initial + p.contributed) : 1,
+                gainPct: (p.initial + p.contributed) > 0 ? p.growth / (p.initial + p.contributed) * 100 : 0 };
   const ms = _wsToolMilestones(res);
+  // §B — LOS CUATRO COMPONENTES, SEPARADOS. La versión anterior metía el capital
+  // INICIAL dentro de «aportado», así que el usuario no podía saber cuánto había
+  // puesto de golpe y cuánto mes a mes: dos hechos distintos en una sola cifra.
   return `
     <div class="wstool-result">
       <div class="wstool-res-main">
         <span class="wstool-res-label">${esc(t('wstool_res_final'))}</span>
-        <span class="wstool-res-final">${esc(formatBase(res.final))}</span>
+        <span class="wstool-res-final">${esc(formatBase(p.final))}</span>
         <span class="wstool-res-orient">${esc(t('wstool_orient'))}</span>
       </div>
-      <div class="wstool-res-split">
-        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
-        <div class="wstool-res-cell is-gain"><span class="wstool-res-v">+${esc(formatBase(res.interest))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
+      <div class="wstool-res-split is-quad">
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(p.initial))}</span><span class="wstool-res-k">${esc(t('wstool_res_initial'))}</span></div>
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(p.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
+        <div class="wstool-res-cell${p.growth < 0 ? ' is-loss' : ' is-gain'}"><span class="wstool-res-v">${p.growth < 0 ? '−' : '+'}${esc(formatBase(Math.abs(p.growth)))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
       </div>
+      ${_wsAssumptionsHtml(p)}
     </div>
     <div class="wstool-chart">
       ${_wsToolChartHtml(res, Math.max(1, Math.round(inp.years || 0)))}
@@ -56744,32 +57588,50 @@ function _aurixIntelligencePreviewHTML() {
 
   const style = ''
     + '<style>'
-    + '.intprev-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    + '.intprev-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;align-items:stretch;justify-content:center;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+
     // Neutralize the Intelligence host (#tabPlaceholder) exactly like the shared
     // premium preview does, so the card sits on one clean field.
     + '.tab-placeholder:has(.intprev-stage){background:transparent!important;padding:0!important;margin:0!important;border:none!important;box-shadow:none!important;min-height:calc(100dvh - 116px)!important;display:flex!important;align-items:stretch!important;justify-content:center!important;}'
-    + '.intprev-card{position:relative;width:100%;max-width:620px;border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:30px 26px 26px;animation:intprevIn .22s ease-out both;}'
-    + '.intprev-badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
-    + '.intprev-title{font-size:20px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 20px;letter-spacing:-.01em;line-height:1.25;}'
-    + '.intprev-facts{list-style:none;padding:0;margin:0 0 22px;display:flex;flex-direction:column;gap:12px;}'
-    + '.intprev-fact{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid rgba(120,160,255,0.16);border-radius:14px;background:rgba(255,255,255,0.035);}'
+    // ── §2 · CABE SIN SCROLL EN MÓVIL VERTICAL ──────────────────────────────
+    // La sonda multi-viewport lo midió en vivo, en el peor caso legítimo del motor
+    // (tres hechos): en 360×740 el CTA caía 111 px POR DEBAJO del pliegue, tapado
+    // por la navegación inferior fija, con 286 px de scroll de página. El usuario
+    // Free leía hechos ciertos sobre su patrimonio y no veía el único botón.
+    //
+    // La causa era estructural, no de tamaños: la tarjeta no tenía tope de altura,
+    // así que crecía y el BODY entero scrolleaba. El arreglo es el patrón que la
+    // portada de Workspace midió PASS en los cinco viewports: altura acotada al
+    // viewport menos el cromo, CTA anclado abajo, y lo que cede es la LISTA DE
+    // HECHOS, que scrollea por dentro. Nada se recorta y ninguna fuente baja de
+    // 11 px: se comprime el espacio y lo que sobra se desplaza donde el usuario lo
+    // espera.
+    //
+    // Y va en la BASE, no detrás de un `max-width`: esta superficie es mobile-first
+    // por contrato —su gate lo exige y tiene razón— así que el móvil es el punto de
+    // partida y el escritorio RELAJA la restricción en su `min-width:768px`.
+    + '.intprev-card{position:relative;display:flex;flex-direction:column;width:100%;max-width:620px;max-height:calc(100dvh - 116px);border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:20px 18px 18px;animation:intprevIn .22s ease-out both;}'
+    + '.intprev-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
+    + '.intprev-title{flex:0 0 auto;font-size:18px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 14px;letter-spacing:-.01em;line-height:1.25;}'
+    + '.intprev-facts{list-style:none;padding:0;margin:0 0 14px;display:flex;flex-direction:column;gap:9px;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
+    + '.intprev-fact{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;flex:0 0 auto;border:1px solid rgba(120,160,255,0.16);border-radius:14px;background:rgba(255,255,255,0.035);}'
     + '.intprev-fact-dot{width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;margin-top:7px;}'
     + '.intprev-fact-body{min-width:0;}'
-    + '.intprev-fact-label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(150,185,255,0.8);margin-bottom:4px;}'
+    + '.intprev-fact-label{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(150,185,255,0.8);margin-bottom:4px;}'
     + '.intprev-fact-text{font-size:14.5px;line-height:1.5;color:rgba(255,255,255,0.9);}'
-    + '.intprev-sep{height:1px;background:linear-gradient(90deg,transparent,rgba(120,170,255,0.28),transparent);margin:0 0 18px;}'
-    + '.intprev-q-label{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.72);margin:0 0 6px;}'
-    + '.intprev-q{font-size:17px;font-weight:700;line-height:1.35;color:rgba(210,228,255,0.97);margin:0 0 14px;}'
-    + '.intprev-premium{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 22px;}'
+    + '.intprev-sep{flex:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(120,170,255,0.28),transparent);margin:0 0 12px;}'
+    + '.intprev-q-label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.72);margin:0 0 6px;}'
+    + '.intprev-q{flex:0 0 auto;font-size:15.5px;font-weight:700;line-height:1.35;color:rgba(210,228,255,0.97);margin:0 0 10px;}'
+    + '.intprev-premium{flex:0 0 auto;font-size:12.5px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
     + '.intprev-cta{width:100%;font-size:14px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.10);border:1px solid rgba(120,170,255,0.34);border-radius:14px;height:46px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
     + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
-    + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;}'
+    + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;flex:0 0 auto;margin-top:auto;}'
     + '.intprev-cta--ghost{background:transparent;border-color:rgba(120,170,255,0.16);color:rgba(255,255,255,0.62);font-weight:600;}'
     + '.intprev-cta--ghost:hover{background:rgba(255,255,255,0.04);border-color:rgba(120,170,255,0.28);color:rgba(255,255,255,0.85);}'
     + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
-    + '.intprev-hold-body{font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 22px;}'
+    + '.intprev-hold-body{flex:0 1 auto;min-height:0;overflow-y:auto;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-stage{padding:32px 24px;}.intprev-card{padding:38px 36px 30px;}.intprev-title{font-size:24px;}.intprev-q{font-size:18px;}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-cta--ghost{min-width:0;}}'
+    + '@media (min-width:768px){.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-cta--ghost{min-width:0;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-premium{font-size:13.5px;margin:0 0 22px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 

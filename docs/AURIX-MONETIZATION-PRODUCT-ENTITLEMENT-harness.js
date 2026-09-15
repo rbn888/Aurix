@@ -296,9 +296,37 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     fdr._wsCommercialLabel({ id: 'y', kind: 'tool', published: true, commercialTier: 'premium', featureKey: 'workspace.loan' }) === 'Premium');
   ok('D.4d no publicada gana sobre el tier: nunca se afirma un plan de algo interno',
     fdr._wsCommercialLabel({ id: 'z', kind: 'tool', published: false, commercialTier: 'premium', featureKey: 'workspace.loan' }) === 'Interno');
-  ok('D.5 toda entrada etiquetada Premium tiene una clave del catálogo de B1',
-    fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium')
-      .every(e => ['workspace.loan', 'intelligence.full', 'premium.settings'].includes(e.featureKey)));
+  // ── RE-DECIDIDO · WORKSPACE COMPLETION §1 ────────────────────────────────
+  // Esto era una LISTA BLANCA de tres claves, así que cada capacidad Premium nueva
+  // la habría hecho fallar por existir. Lo que de verdad protege —y es la REGLA DE
+  // VERDAD que `_WS_CATALOG` se declara a sí mismo: «si el founder ve Premium, es
+  // porque REALMENTE está incluido en Premium»— no es la lista, es que exista una
+  // fila que lo conceda. Así que se comprueba ESO, contra el SQL, que es donde vive
+  // la concesión. Más fuerte que la lista y no caduca al añadir una capacidad.
+  ok('D.5 toda entrada Premium tiene una clave CONCEDIDA al plan premium por un SQL del repo',
+    (() => {
+      const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
+                   'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql',
+                   'db/monetization_entitlement_resolver_1.sql']
+        .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
+      const premium = fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium');
+      if (!premium.length) return false;                       // anti-vacuidad
+      return premium.every(e => {
+        if (!e.featureKey) return false;
+        if (e.featureKey === 'intelligence.full' || e.featureKey === 'premium.settings') return true;
+        const re = new RegExp("'premium',\\s*'" + e.featureKey.replace('.', '\\.') + "',\\s*true");
+        return re.test(sql);
+      });
+    })(),
+    JSON.stringify(fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium').map(e => e.featureKey)));
+  // Y el corolario que impide vender antes de tiempo: mientras su SQL no esté
+  // aplicado, la entrada NO puede estar publicada. El catálogo lo declara con
+  // `published:false`, y esa es la única razón por la que hoy no se ven.
+  ok('D.5b ninguna capacidad Premium nueva está publicada antes de aplicar su SQL',
+    fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium'
+        && e.featureKey && e.featureKey !== 'workspace.loan')
+      .every(e => e.published === false),
+    JSON.stringify(fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium' && e.published).map(e => e.id)));
   ok('D.6 ninguna entrada publicada queda sin decidir',
     fdr._WS_CATALOG.filter(e => e.published).every(e => e.commercialTier !== 'undecided'));
   ok('D.7 una convención única de etiqueta: Incluido | Premium | Preview',
@@ -500,12 +528,28 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       TR && PR && MR && MP && TR.length === 11 && PR.length === 12 && MR.length === 2 && MP.length === 1 &&
       [...TR, ...PR, ...MR, ...MP].every(k => ids.has(k)),
       'huérfanos: ' + [...(TR || []), ...(PR || []), ...(MR || []), ...(MP || [])].filter(k => !ids.has(k)));
+    // RE-DECIDIDO (§1): `keys.length === 7` fosilizaba el inventario de M.02. El
+    // mapa tiene ahora también las superficies que NO pasan por `_wsOpenTool`
+    // (Objetivos, Escenarios, Proyección), que antes se abrían asignando `_wshView`
+    // sin comprobar NADA. El invariante real —toda clave de apertura usada está en
+    // el mapa— se conserva, y se le añade el recíproco, que es el que de verdad
+    // protege: toda clave del mapa resuelve a una entrada REAL del catálogo.
     ok('E.17 §18 y toda clave de apertura declarada existe en el mapa de herramientas',
       (() => { const i = app.indexOf('const _WS_TOOLKEY_TO_ID');
         const body = app.slice(i, app.indexOf('});', i));
         const keys = [...body.matchAll(/(\w+):\s*'[\w]+'/g)].map(m => m[1]);
+        const vals = [...body.matchAll(/\w+:\s*'([\w]+)'/g)].map(m => m[1]);
         const used = [...app.matchAll(/tool: '(\w+)'/g)].map(m => m[1]);
-        return keys.length === 7 && [...new Set(used)].every(u => keys.includes(u)); })());
+        return keys.length >= 7 && [...new Set(used)].every(u => keys.includes(u))
+          && [...new Set(vals)].every(v => ids.has(v)); })(),
+      (() => { const i = app.indexOf('const _WS_TOOLKEY_TO_ID');
+        const body = app.slice(i, app.indexOf('});', i));
+        return [...body.matchAll(/\w+:\s*'([\w]+)'/g)].map(m => m[1]).filter(v => !ids.has(v)).join(','); })());
+    // §1 — y NINGUNA superficie de vista puede abrirse sin pasar por el gate.
+    ok('E.17b Objetivos, Escenarios y Proyección no se abren asignando `_wshView` a mano',
+      !/_wshView = 'goals'/.test(app) && !/_wshView = 'scenario'/.test(app)
+      && !/_wshView = 'planning'/.test(app)
+      && /function _wsOpenSurface\(/.test(app) && /_wsToolAccess\(k\)/.test(app));
   }
   ok('G.5c el intent NO contamina la baseline durante la ventana de boot',
     /if \(_aurixEntLoaded\(\)\) _aurixUpgradeIntents\.push\(entry\);/.test(app) &&
@@ -666,8 +710,26 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // clave nueva, y es la excepción declarada: ningún plan la concede, no se vende y
   // no gatea nada del catálogo — sólo decide si se VE el inventario interno. El
   // assert distingue las dos cosas en vez de afirmar un "sólo 3" que ya no es cierto.
-  ok('H.2 ninguna feature VENDIBLE nueva: el catálogo sólo gatea con workspace.loan',
-    [...new Set(free._WS_CATALOG.map(e => e.featureKey).filter(Boolean))].join(',') === 'workspace.loan');
+  // ── RE-DECIDIDO · WORKSPACE COMPLETION §1 ────────────────────────────────
+  // «El catálogo sólo gatea con workspace.loan» era una aserción de ALCANCE del
+  // bloque M.02 («no añadimos features vendibles en ESTE bloque»), y este bloque
+  // añade seis a propósito: son el catálogo canónico que la SPEC declara. Dejarla
+  // habría bloqueado el encargo por cumplir el alcance del anterior. Lo que la
+  // sustituye es más estricto: toda clave vendible tiene que estar DECLARADA en un
+  // SQL del repo y su entrada NO puede estar publicada hasta aplicarlo.
+  ok('H.2 toda clave vendible del catálogo está declarada en un SQL del repo',
+    (() => {
+      const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
+                   'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql']
+        .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
+      const keys = [...new Set(free._WS_CATALOG.map(e => e.featureKey).filter(Boolean))];
+      return keys.length >= 1 && keys.every(k => sql.indexOf("'" + k + "'") !== -1);
+    })(),
+    JSON.stringify([...new Set(free._WS_CATALOG.map(e => e.featureKey).filter(Boolean))]));
+  ok('H.2a y el SQL que las concede sigue SIN APLICAR y lo dice en su cabecera',
+    (() => { const sql = read('db/workspace_premium_2_plan_features.sql');
+      return /SIN APLICAR/.test(sql) && /PENDIENTE DE REVISIÓN Y AUTORIZACIÓN DEL FOUNDER/.test(sql)
+        && /on conflict \(plan, feature_key\) do update/.test(sql); })());
   ok('H.2b la única clave nueva no es vendible por ningún plan',
     (() => { const sql = read('db/monetization_catalog_preview_key_1.sql');
       return /'workspace\.catalog_preview', false/.test(sql) &&
