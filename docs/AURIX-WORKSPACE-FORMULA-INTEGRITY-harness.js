@@ -407,9 +407,16 @@ function catalog() {
   console.log('\nWORKSPACE-LAUNCH-V1 \u2014 alcance de lanzamiento:');
 
   // ── Matemática de las dos publicadas, EJECUTADA ──────────────────────────
-  const _wsNum = v => { const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  // EL `_wsNum` REAL, no una aproximación. Aquí vivía un stub de una línea
+  // (`Number(String(v).replace(',','.'))`) que NO es lo que hace el parser de
+  // producción: no entiende la agrupación de miles y decide por posición, no por
+  // reemplazo ciego. Con el stub, este gate habría dado verde sobre un
+  // `calculateLoan` que leía «250.000» como 250 — es exactamente la lección de
+  // `formatBase`: un gate que stubea la integración que certifica no es evidencia.
+  // Y `calculateLoan` ya lo usa también, así que recibe la misma función.
+  const _wsNum = new Function('lang', fn('_wsNum') + ';return _wsNum;')('es');
   const calcComp = new Function('_wsNum', fn('calculateCompoundGrowth') + ';return calculateCompoundGrowth;')(_wsNum);
-  const calcLoan = new Function(fn('calculateLoan') + ';return calculateLoan;')();
+  const calcLoan = new Function('_wsNum', fn('calculateLoan') + ';return calculateLoan;')(_wsNum);
 
   OK('L1 compound \u00b7 1.000 + 300/mes al 6% en 20a \u21d2 aportado exacto 73.000',
      near(calcComp(1000, 300, 0.06, 20).contributed, 73000));

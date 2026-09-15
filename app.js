@@ -19836,16 +19836,64 @@ function _wshFuturePathHtml() {
 // so deleting / clearing / pasting all work; normalization happens on save.
 // WS.10A — locale-aware tolerant numeric parser. Accepts ES (10.000 / 10.000,50)
 // and EN (10,000 / 10,000.50) plus raw (10000). Returns a JS number.
+// ── EL PARSER DE UN NÚMERO ESCRITO A MANO ───────────────────────────────────
+// SPEC WORKSPACE COMPLETION · §4 «decimales ES/EN». La versión anterior decidía
+// por IDIOMA y sólo por idioma, y eso produce un error de 10× silencioso en el
+// campo más sensible que hay aquí: en español «3.5» se leía como 35, así que un
+// tipo de interés del 3,5 % se convertía en el 35 % y la cuota salía por 7.291,90
+// en vez de 1.122,61. No es un caso raro: muchos teclados decimales de Android
+// emiten PUNTO aunque el usuario esté en español, y el usuario no ve el error
+// porque el número resultante es plausible.
+//
+// La desambiguación es POSICIONAL, que es la única que no depende de adivinar el
+// teclado, y sólo se aplica cuando hay UN separador y aparece UNA vez:
+//   · tres dígitos detrás Y ese carácter es el de miles del idioma ⇒ MILES
+//     («250.000» en es, «250,000» en en)
+//   · en cualquier otro caso ⇒ DECIMAL («3.5», «3,5», «1,234» en es)
+// Con los dos separadores presentes manda la convención del idioma, que ya no es
+// ambigua («1.234,56» sólo puede leerse de una forma). Y un separador repetido es
+// siempre de miles («1.234.567»).
+//
+// Lo que NO cambia: vacío, basura y `-` siguen dando 0 aquí, porque este es el
+// parser del CÁLCULO. Distinguir vacío de cero es responsabilidad de quien
+// publica el hecho, no de quien lo suma (ver `_wsNumOrNull`).
 function _wsNum(v) {
   if (v == null) return 0;
   if (typeof v === 'number') return isFinite(v) ? v : 0;   // already a JS number (render values)
   let s = String(v).trim().replace(/[^\d.,\-]/g, '');
   if (!s || s === '-') return 0;
   const en = (typeof lang !== 'undefined' && lang === 'en');
-  if (en) s = s.replace(/,/g, '');                     // EN: ',' = thousands, '.' = decimal
-  else s = s.replace(/\./g, '').replace(',', '.');     // ES: '.' = thousands, ',' = decimal
+  const thou = en ? ',' : '.';                             // separador de MILES del idioma
+  const dec  = en ? '.' : ',';                             // separador DECIMAL del idioma
+  const nDot = (s.match(/\./g) || []).length;
+  const nCom = (s.match(/,/g) || []).length;
+  if (nDot > 0 && nCom > 0) {
+    // Los dos presentes: la convención del idioma decide y no hay ambigüedad.
+    s = s.split(thou).join('').replace(dec, '.');
+  } else if (nDot + nCom === 1) {
+    const ch = nDot === 1 ? '.' : ',';
+    const after = s.slice(s.indexOf(ch) + 1);
+    // Tres dígitos detrás y es el carácter de miles ⇒ miles. Si no, decimal.
+    if (ch === thou && /^\d{3}$/.test(after)) s = s.split(ch).join('');
+    else s = s.replace(ch, '.');
+  } else if (nDot + nCom > 1) {
+    // Repetido: sólo puede ser agrupación de miles.
+    s = s.replace(/[.,]/g, '');
+  }
   const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
+}
+// §4/§B «vacío/desconocido no equivale a cero». Mismo parseo, pero devuelve null
+// cuando el usuario no ha escrito nada: es lo que permite a una superficie decir
+// «sin dato» en vez de publicar un 0 que el usuario no ha declarado. El cálculo
+// sigue usando `_wsNum`; esto es para DECIDIR si se publica.
+function _wsNumOrNull(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  const raw = String(v).trim();
+  if (raw === '' || raw === '-') return null;
+  if (!/\d/.test(raw)) return null;
+  return _wsNum(raw);
 }
 // WS.10A — strip thousands separators (for natural editing while focused).
 function _wsStripThousands(str) {
@@ -20423,7 +20471,7 @@ function _wsToolPreviewHtml(toolKey) {
   try {
     if (toolKey === 'compound') {
       const inp = _wsToolStateGet('compound') || _wsToolDefaults();
-      const r = calculateCompoundGrowth(inp.initial, inp.monthly, (inp.ret || 0) / 100, inp.years);
+      const r = calculateCompoundGrowth(inp.initial, inp.monthly, _wsNum(inp.ret) / 100, inp.years);
       const W = 120, H = 30, n = r.series.length, max = Math.max.apply(null, r.series.map(s => s.total).concat([1]));
       const pts = r.series.map((s, i) => `${((i / ((n - 1) || 1)) * W).toFixed(1)},${(H - (s.total / max) * (H - 4) - 2).toFixed(1)}`).join(' ');
       return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,${H} ${pts} ${W},${H}"/><polyline class="wspv-spark-line" points="${pts}"/></svg></div>`;
@@ -20954,7 +21002,10 @@ function projectScenario(baseWealth, monthlyContribution, annualReturn, years, s
   const m    = Math.max(0, Number(monthlyContribution) || 0);
   const yr   = Math.max(0, Number(years) || 0);
   const n    = Math.round(yr * 12);
-  const r    = (Number(annualReturn) || 0) / 12;
+  // La tasa llega ya como FRACCIÓN anual (el caller divide por 100) y `_wsNum`
+  // devuelve un número finito tal cual, así que no cambia ninguna convención:
+  // sólo deja de convertir en 0 una tasa que venía como texto («6,5» ⇒ NaN ⇒ 0).
+  const r    = Math.max(0, _wsNum(annualReturn)) / 12;
   const fvBase    = base * Math.pow(1 + r, n);
   const fvContrib = r > 0 ? m * ((Math.pow(1 + r, n) - 1) / r) : m * n;
   const projected = fvBase + fvContrib;
@@ -21472,7 +21523,7 @@ function _renderWorkspaceDetail() {
       <span class="ws4-field-name">${esc(f.label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-ws4-input="${esc(f.k)}" value="${esc(_wsFormatInputNumber(p.inputs[f.k]))}">
-        <span class="ws4-field-unit">${esc(f.unit)}</span>
+        <span class="ws4-field-unit">${esc(_wsFieldUnit(f.unit))}</span>
       </span>
     </label>`).join('');
 
@@ -21804,7 +21855,7 @@ function _wsFundModal(goalId) {
         <button type="button" class="wsfund-type is-active" data-wsfund-type="add">${esc(t('wsfund_add'))}</button>
         <button type="button" class="wsfund-type" data-wsfund-type="remove">${esc(t('wsfund_remove'))}</button>
       </div>
-      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value=""><span class="ws4-field-unit">€</span></span></label>
+      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value=""><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
       <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_note'))}</span><input class="wsg-text" type="text" id="wsFundNote" placeholder="${esc(t('wsfund_note_ph'))}"></label>
       <p class="wsfund-disclaimer">${esc(t('wsfund_disclaimer'))}</p>
       <div class="ws-modal-actions">
@@ -21847,9 +21898,9 @@ function _renderGoals() {
         <div class="wsg-form">
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
         </div>
         <aside class="wsg-form-preview">
@@ -21877,8 +21928,8 @@ function _renderGoals() {
         <div class="wsg-card-edit">
           ${isSync
             ? `<div class="wsg-sync-note">${esc(real.hasReal ? t('wsg_sync_on')(formatBase(real.wealth)) : t('ws4_sync_none'))}</div>`
-            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>`}
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>`}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
         ${_wsFundBlockHtml(g)}
@@ -21916,7 +21967,10 @@ function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
   const init = Math.max(0, _wsNum(initial));        // WS.15A tolerant parse
   const m    = Math.max(0, _wsNum(monthly));
   const yrs  = Math.max(0, Math.round(_wsNum(years)));
-  const r    = (Number(annualReturn) || 0) / 12;
+  // La tasa llega ya como FRACCIÓN anual (el caller divide por 100) y `_wsNum`
+  // devuelve un número finito tal cual, así que no cambia ninguna convención:
+  // sólo deja de convertir en 0 una tasa que venía como texto («6,5» ⇒ NaN ⇒ 0).
+  const r    = Math.max(0, _wsNum(annualReturn)) / 12;
   const fv = (nn) => init * Math.pow(1 + r, nn) + (r > 0 ? m * ((Math.pow(1 + r, nn) - 1) / r) : m * nn);
   const n = yrs * 12;
   const final = fv(n);
@@ -21932,6 +21986,25 @@ function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
 // usuario en USD leía '€' arriba y '$' abajo en la misma tarjeta. Se delega en el owner
 // de símbolo que ya existe (`getCurrencySymbol` sobre `_AURIX_CCY_GLYPH`); sin mapa nuevo
 // y sin tocar ninguna fórmula.
+// ── LA UNIDAD DE UN CAMPO MONETARIO, EN UN SOLO SITIO ───────────────────────
+// SPEC WORKSPACE COMPLETION · §4 «moneda coherente». WORKSPACE-LAUNCH-V1 ya
+// corrigió esto en compound y loan —cinco campos que decían `€` mientras el
+// resultado salía por `formatBase()` y respetaba la divisa base—, pero el arreglo
+// fue por campo, no por causa: quedaron OCHO literales `€` más (aportar a un
+// objetivo, el formulario de metas, sus dos campos de revisión, el presupuesto) y
+// las DOCE declaraciones `unit: '€'` de `_ws4Templates`. Un usuario en dólares leía
+// `€` sobre el campo y `$` debajo, en la misma tarjeta.
+//
+// Aquí el `€` de una declaración de campo significa «la divisa base», no euros:
+// ninguno de esos campos es específicamente europeo. Así que se traduce al pasar
+// por el render, en un owner con nombre, y las declaraciones no se tocan. Cambiar
+// el símbolo NO convierte el importe —eso lo dice §4 y sigue siendo cierto—: esto
+// sólo deja de mentir sobre en qué moneda está el número que el usuario escribe.
+function _wsFieldUnit(u) {
+  const raw = (u == null) ? '' : String(u);
+  if (raw === '€') { try { return _wsToolCcy(); } catch (_) { return raw; } }
+  return raw;
+}
 function _wsToolCcy() {
   try {
     if (typeof getCurrencySymbol === 'function' && typeof baseCurrency !== 'undefined') {
@@ -22042,7 +22115,7 @@ function _wsToolSave() {
     type = 'monthly_budget';
     results = { income: Math.round(r.income), expenses: Math.round(r.expenses), free: Math.round(r.free), saveRate: Math.round(r.saveRate) };
   } else {
-    const r = calculateCompoundGrowth(_wsToolInputs.initial, _wsToolInputs.monthly, _wsToolInputs.ret / 100, _wsToolInputs.years);
+    const r = calculateCompoundGrowth(_wsToolInputs.initial, _wsToolInputs.monthly, _wsNum(_wsToolInputs.ret) / 100, _wsToolInputs.years);
     type = 'compound_growth';
     results = { final: Math.round(r.final), contributed: Math.round(r.contributed), interest: Math.round(r.interest) };
   }
@@ -22102,7 +22175,7 @@ function _wsToolChartHtml(res, years) {
 
 function _wsToolOutHtml(inp) {
   const esc = _intccEsc;
-  const res = calculateCompoundGrowth(inp.initial, inp.monthly, inp.ret / 100, inp.years);
+  const res = calculateCompoundGrowth(inp.initial, inp.monthly, _wsNum(inp.ret) / 100, inp.years);
   const ms = _wsToolMilestones(res);
   return `
     <div class="wstool-result">
@@ -22135,7 +22208,7 @@ function _renderCompoundTool() {
       <span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k]))}">
-        <span class="ws4-field-unit">${esc(unit)}</span>
+        <span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span>
       </span>
     </label>`;
   return `
@@ -22253,7 +22326,7 @@ function _renderBudgetTool() {
       <span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : 0))}">
-        <span class="ws4-field-unit">€</span>
+        <span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span>
       </span>
     </label>`;
   return `
@@ -22438,7 +22511,7 @@ function _wsJrnFormHtml() {
   const d = _wsJrnDraft || _wsJrnNewDraft();
   const editing = !!_wsJrnEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   const sel = (k, label, opts) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsjrn-input="${k}">${opts.map(o => `<option value="${esc(o.v)}"${d[k] === o.v ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></span></label>`;
   const types = [['stock', 'wsjrn_type_stock'], ['etf', 'wsjrn_type_etf'], ['crypto', 'wsjrn_type_crypto'], ['other', 'wsjrn_type_other']].map(([v, lk]) => ({ v, l: t(lk) }));
   const ccys = ['EUR', 'USD', 'GBP'].map(c => ({ v: c, l: c }));
@@ -22744,7 +22817,7 @@ function _wsReFormHtml() {
   const d = _wsReDraft || _wsReNewDraft();
   const editing = !!_wsReEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsre-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsre-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsre-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   const typeOpts = _WSRE_TYPES.map(ty => `<option value="${ty}"${d.ptype === ty ? ' selected' : ''}>${esc(t('wsre_t_' + ty))}</option>`).join('');
   return `
     <section class="wsh-card wsre-form-card">
@@ -23015,7 +23088,7 @@ function _wsRecvFormHtml() {
   const d = _wsRecvDraft || _wsRecvNewDraft();
   const editing = !!_wsRecvEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsrecv-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   return `
     <section class="wsh-card wsrecv-form-card">
       <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsrecv_add'))}</h3></header>
@@ -23081,11 +23154,23 @@ function _renderReceivablesTool() {
 // French amortization (constant payment). Deterministic, pure, no APIs/banks.
 function calculateLoan(o) {
   o = o || {};
-  const P = Math.max(0, Number(o.principal) || 0);
-  const annual = Math.max(0, Number(o.rate != null ? o.rate : o.interestRate) || 0);
-  const years = Math.max(0, Number(o.years) || 0);
-  const fees = Math.max(0, Number(o.fees) || 0);
-  const ins = Math.max(0, Number(o.insurance != null ? o.insurance : o.insuranceMonthly) || 0);
+  // ── EL PARSEO TOLERANTE LLEGA TAMBIÉN AQUÍ (SPEC WORKSPACE · §4) ───────────
+  // Esta función recibe el ESTADO DE EDICIÓN, que es TEXTO: los handlers guardan
+  // `el.value` crudo desde WS.15A, precisamente para que se pueda borrar un campo.
+  // Pero aquí se leía con `Number()`, que no entiende el formato español, y el
+  // resultado era un defecto financiero en una herramienta PREMIUM PUBLICADA:
+  //   · tipo «3,5» ⇒ `Number('3,5')` es NaN ⇒ 0 ⇒ la rama SIN INTERÉS (`P/n`).
+  //     250.000 a 30 años salían 694,44 al mes en vez de 1.122,61 — un 38 % menos,
+  //     presentado al usuario como su cuota.
+  //   · principal «250.000» ⇒ `Number` lo lee como 250 ⇒ cuota de 1,12.
+  // `_wsNum` es el parser que WS.15A creó para esto y que esta función nunca
+  // recibió. Los importes y los años SÍ lo tenían en compound; la TASA no lo tenía
+  // en ninguno de los tres motores. Es el mismo olvido y se cierra en los tres.
+  const P = Math.max(0, _wsNum(o.principal));
+  const annual = Math.max(0, _wsNum(o.rate != null ? o.rate : o.interestRate));
+  const years = Math.max(0, _wsNum(o.years));
+  const fees = Math.max(0, _wsNum(o.fees));
+  const ins = Math.max(0, _wsNum(o.insurance != null ? o.insurance : o.insuranceMonthly));
   const n = Math.round(years * 12);
   const r = annual / 12 / 100;
   let base = 0;
@@ -23176,7 +23261,14 @@ function _wsLoanCmpToggle() {
 }
 function _wsLoanCmpInput(el) {
   if (!_wsToolInputs) return;
-  _wsToolInputs[el.getAttribute('data-wsloan-cmp-input')] = _wsNum(el.value);
+  // VALOR CRUDO EN EDICIÓN, igual que los otros seis handlers (WS.15A). Éste era
+  // el único que seguía coaccionando a número en cada tecla, y `_wsNum('')` es 0:
+  // borrar el último dígito del campo de comparación escribía un CERO REAL en el
+  // estado, lo persistía (`_wsToolStateSet`) y al repintar el campo reaparecía con
+  // «0». Es el defecto que §4 describe como «impide borrar números», y sobrevivía
+  // sólo aquí. El texto en edición y el valor validado se separan: la lectura la
+  // sigue haciendo `_wsNum` donde se calcula.
+  _wsToolInputs[el.getAttribute('data-wsloan-cmp-input')] = el.value;
   _wsToolStateSet('loan', _wsToolInputs);
   const root = document.querySelector('.wsh-tool-view');
   const out = root && root.querySelector('[data-wsloan-cmp-out]');
@@ -23205,7 +23297,7 @@ function _wsLoanCmpOutHtml(inp) {
 function _wsLoanCmpInner(inp) {
   const esc = _intccEsc;
   if (!inp.cmpOpen) return `<button type="button" class="wsh-cta wsloan-cmp-btn" data-wsloan-cmp>${esc(t('wsloan_cmp_btn'))}</button>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsloan-cmp-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(unit)}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsloan-cmp-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   return `
     <div class="wsloan-cmp-head"><h3 class="wsh-title">${esc(t('wsloan_cmp_title'))}</h3><button type="button" class="wsre-mini" data-wsloan-cmp aria-label="${esc(t('wsjrn_cancel'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="wsloan-cmp-grid">${num('bPrincipal', t('wsloan_in_amount'), '€')}${num('bRate', t('wsloan_in_rate'), '%')}${num('bYears', t('wsloan_in_years'), t('wstool_unit_years'))}</div>
@@ -23215,7 +23307,7 @@ function _renderLoanTool() {
   const esc = _intccEsc;
   if (!_wsToolInputs) _wsToolInputs = _wsLoanDefaults();
   const inp = _wsToolInputs;
-  const field = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(unit)}</span></span></label>`;
+  const field = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
@@ -23383,7 +23475,7 @@ function _wsApFormHtml() {
   const d = _wsApDraft || _wsApNewDraft();
   const editing = !!_wsApEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsap-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsap-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsap-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   const typeOpts = _WSAP_TYPES.map(ty => `<option value="${ty}"${d.assetType === ty ? ' selected' : ''}>${esc(t('wsap_t_' + ty))}</option>`).join('');
   const ccyOpts = ['EUR', 'USD', 'GBP'].map(c => `<option value="${c}"${d.currency === c ? ' selected' : ''}>${c}</option>`).join('');
   return `
