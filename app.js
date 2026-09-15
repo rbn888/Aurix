@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '686'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '687'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6104,6 +6104,11 @@ const T = {
     wsjrn_st_loss:     'Operación perdedora',
     wsjrn_st_open:     'Operación abierta',
     wsjrn_sum_net:     'Beneficio neto',
+    // Un diario con operaciones en varias divisas no tiene total: sumarlas exigiría
+    // un tipo de cambio y una fecha que nadie ha declarado. Se dice cuáles hay.
+    wsjrn_mixed_ccy:   'Operaciones en {list}: el total no se suma sin un tipo de cambio declarado.',
+    wsjrn_doc_ccy:     'Divisa del diario',
+    wsjrn_doc_ccy_hint: 'Todas las operaciones de este diario usan esta divisa. Un diario, una moneda.',
     wsjrn_sum_avg:     'Rentabilidad media',
     wsjrn_sum_winrate: 'Operaciones ganadoras',
     wsjrn_sum_best:    'Mejor operación',
@@ -8703,6 +8708,9 @@ const T = {
     wsjrn_st_loss:     'Losing trade',
     wsjrn_st_open:     'Open trade',
     wsjrn_sum_net:     'Net profit',
+    wsjrn_mixed_ccy:   'Trades in {list}: the total is not summed without a declared exchange rate.',
+    wsjrn_doc_ccy:     'Journal currency',
+    wsjrn_doc_ccy_hint: 'Every trade in this journal uses this currency. One journal, one currency.',
     wsjrn_sum_avg:     'Average return',
     wsjrn_sum_winrate: 'Winning trades',
     wsjrn_sum_best:    'Best trade',
@@ -19781,8 +19789,33 @@ function _wshReadStore(key) {
 const _WS_DOC_TABLE = 'workspace_documents';
 // 'unknown' → todavía no se sabe · 'yes' → escribió bien una vez · 'no' → no existe
 let _wsDocTableState = 'unknown';
+// ── EL ESTADO ES POR DOCUMENTO, NO GLOBAL ───────────────────────────────────
+// Era una sola variable para todo Workspace, y eso permitía la afirmación falsa más
+// fácil de todas: sincronizas el presupuesto, abres el diario, y la insignia sigue
+// diciendo «guardado y sincronizado» sobre un documento que nunca se ha subido.
+// El estado vive por CLAVE de almacén, así que la insignia describe el documento
+// que el usuario está mirando y no el último que tocó el sistema.
+const _wsDocSync = Object.create(null);   // key → { state, at }
+// Y el estado global sigue existiendo SÓLO para el caso sin clave, donde se calcula
+// como el PEOR de los conocidos: nunca «sincronizado» si algo está pendiente.
 let _wsDocSyncState = 'idle';         // idle | saving | saved | error | local_only
 let _wsDocSyncAt = 0;
+function _wsDocSyncSet(key, state) {
+  const st = { state: state, at: (state === 'saved') ? Date.now() : 0 };
+  if (key) _wsDocSync[key] = st;
+  _wsDocSyncState = state; _wsDocSyncAt = st.at;
+  try { _wsSyncBadgeRefresh(); } catch (_) {}
+}
+// El peor estado conocido, para la insignia sin clave. El orden es deliberado: un
+// error o un guardado pendiente PESAN MÁS que un éxito, porque afirmar el éxito
+// mientras algo falla es la mentira que este bloque existe para evitar.
+const _WS_SYNC_SEVERITY = Object.freeze({ error: 0, saving: 1, local_only: 2, saved: 3, idle: 4 });
+function _wsDocSyncWorst() {
+  const all = Object.keys(_wsDocSync).map(k => _wsDocSync[k].state);
+  if (!all.length) return _wsDocSyncState;
+  return all.reduce((w, s) =>
+    (_WS_SYNC_SEVERITY[s] < _WS_SYNC_SEVERITY[w] ? s : w), 'idle');
+}
 // Las claves que contienen DOCUMENTOS del usuario (una fila remota por documento,
 // direccionada por su id estable) frente a las que son PREFERENCIAS de la
 // superficie (una fila por clave). La diferencia importa: dos dispositivos
@@ -19809,7 +19842,7 @@ function _wshWriteStore(key, value) {
   let ok = false;
   try { localStorage.setItem(key, JSON.stringify(value)); ok = true; }
   catch (_) { ok = false; }
-  if (!ok) { _wsDocSyncState = 'error'; try { _wsSyncBadgeRefresh(); } catch (_) {} return false; }
+  if (!ok) { _wsDocSyncSet(key, 'error'); return false; }
   try { _wsDocsQueue(key); } catch (_) {}
   return true;
 }
@@ -19827,7 +19860,8 @@ function _wsDocsQueue(key) {
   if (typeof setTimeout !== 'function') { try { _wsDocsPush(key); } catch (_) {} return; }
   // Que haya algo pendiente ES un estado, y el usuario tiene derecho a verlo: sin
   // esto la insignia decía «guardado» mientras la subida aún no había salido.
-  if (_wsDocSyncState !== 'saving') { _wsDocSyncState = 'saving'; try { _wsSyncBadgeRefresh(); } catch (_) {} }
+  // Que haya algo pendiente ES un estado, y es de ESTA clave.
+  _wsDocSyncSet(key, 'saving');
   if (_wsDocTimers[key]) { try { clearTimeout(_wsDocTimers[key]); } catch (_) {} }
   _wsDocTimers[key] = setTimeout(() => {
     delete _wsDocTimers[key];
@@ -19899,11 +19933,11 @@ function _wsDocRows(key, userId) {
 }
 async function _wsDocsPush(key) {
   const userId = _wsDocsSession();
-  if (!userId) { _wsDocSyncState = 'local_only'; try { _wsSyncBadgeRefresh(); } catch (_) {} return false; }
-  if (_wsDocTableState === 'no') { _wsDocSyncState = 'local_only'; try { _wsSyncBadgeRefresh(); } catch (_) {} return false; }
+  if (!userId) { _wsDocSyncSet(key, 'local_only'); return false; }
+  if (_wsDocTableState === 'no') { _wsDocSyncSet(key, 'local_only'); return false; }
   const rows = _wsDocRows(key, userId);
   if (!rows.length) return false;
-  _wsDocSyncState = 'saving'; try { _wsSyncBadgeRefresh(); } catch (_) {}
+  _wsDocSyncSet(key, 'saving');
   try {
     const { error } = await supabaseClient.from(_WS_DOC_TABLE)
       .upsert(rows, { onConflict: 'user_id,doc_id' });
@@ -19916,16 +19950,18 @@ async function _wsDocsPush(key) {
       const msg = String((error && (error.message || error.code || error.details)) || '').toLowerCase();
       const schema = /relation|does not exist|pgrst205|42p01|schema cache/.test(msg);
       if (schema) _wsDocTableState = 'no';
-      _wsDocSyncState = schema ? 'local_only' : 'error';
-      try { _wsSyncBadgeRefresh(); } catch (_) {}
+      _wsDocSyncSet(key, schema ? 'local_only' : 'error');
       return false;
     }
+    // SÓLO AQUÍ. Este punto se alcanza cuando el upsert VOLVIÓ SIN ERROR, es decir
+    // con confirmación del servidor. Marcar «sincronizado» en cualquier punto
+    // anterior —al encolar, al enviar, al suponer que la tabla existe— sería
+    // afirmar una sincronización que nadie ha confirmado.
     _wsDocTableState = 'yes';
-    _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now();
-    try { _wsSyncBadgeRefresh(); } catch (_) {}
+    _wsDocSyncSet(key, 'saved');
     return true;
   } catch (_) {
-    _wsDocSyncState = 'error'; try { _wsSyncBadgeRefresh(); } catch (_) {}
+    _wsDocSyncSet(key, 'error');
     return false;
   }
 }
@@ -19998,22 +20034,33 @@ async function _wsDocsPull() {
 // Y prohíbe llamar «sincronizado» a un guardado local. Así que hay DOS estados de
 // éxito distintos, y el que se publica depende de si la escritura remota ocurrió
 // DE VERDAD —no de si había sesión, ni de si la tabla debería existir—.
-function _wsSyncStatus() {
-  const synced = _wsDocTableState === 'yes';
+function _wsSyncStatus(key) {
+  // El estado de ESTE documento cuando se pide por clave; el PEOR de los conocidos
+  // cuando no hay clave. Nunca el último que tocó el sistema.
+  const entry = key ? _wsDocSync[key] : null;
+  const state = entry ? entry.state : (key ? 'idle' : _wsDocSyncWorst());
+  const at = entry ? entry.at : (key ? 0 : _wsDocSyncAt);
+  // ── «SINCRONIZADO» EXIGE DOS PRUEBAS, NO UNA ──────────────────────────────
+  // (1) que la tabla haya aceptado una escritura de verdad (`_wsDocTableState`
+  // sólo pasa a 'yes' tras un upsert sin error) y (2) que ESTE documento sea el
+  // que se guardó. Con una sola de las dos, la etiqueta es «guardado en este
+  // dispositivo», que es lo único demostrable.
+  const tableConfirmed = _wsDocTableState === 'yes';
+  const synced = tableConfirmed && state === 'saved';
   return {
-    state: _wsDocSyncState,
-    synced: synced && _wsDocSyncState === 'saved',
-    at: _wsDocSyncAt,
-    labelKey: _wsDocSyncState === 'saving' ? 'ws_sync_saving'
-            : _wsDocSyncState === 'error' ? 'ws_sync_error'
-            : _wsDocSyncState === 'saved' ? (synced ? 'ws_sync_saved_synced' : 'ws_sync_saved_local')
-            : _wsDocSyncState === 'local_only' ? 'ws_sync_saved_local'
+    state: state,
+    synced: synced,
+    at: at,
+    labelKey: state === 'saving' ? 'ws_sync_saving'
+            : state === 'error' ? 'ws_sync_error'
+            : state === 'saved' ? (synced ? 'ws_sync_saved_synced' : 'ws_sync_saved_local')
+            : state === 'local_only' ? 'ws_sync_saved_local'
             : 'ws_sync_idle',
-    canRetry: _wsDocSyncState === 'error',
+    canRetry: state === 'error',
   };
 }
-function _wsSyncBadgeHtml() {
-  const st = _wsSyncStatus();
+function _wsSyncBadgeHtml(key) {
+  const st = _wsSyncStatus(key);
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (x => String(x));
   const txt = (typeof t === 'function' && t(st.labelKey)) || '';
   if (!txt) return '';
@@ -20023,7 +20070,12 @@ function _wsSyncBadgeHtml() {
 }
 function _wsSyncBadgeRefresh() {
   try {
-    document.querySelectorAll('[data-ws-sync-slot]').forEach(el => { el.innerHTML = _wsSyncBadgeHtml(); });
+    // Cada hueco declara DE QUÉ documento habla, así que se repinta con su propio
+    // estado. Un hueco sin clave cae al peor estado conocido, nunca al mejor.
+    document.querySelectorAll('[data-ws-sync-slot]').forEach(el => {
+      const k = el.getAttribute('data-ws-sync-slot');
+      el.innerHTML = _wsSyncBadgeHtml(k && k !== '1' ? k : null);
+    });
   } catch (_) {}
 }
 
@@ -21375,8 +21427,9 @@ function _wsProjPreviewHtml(p) {
     return `<div class="wspv wspv-recvw"><div class="wspv-recvw-top"><span class="wspv-recvw-amt">${esc(formatBase(r.totalPendiente || 0))}</span><span class="wspv-recvw-lbl">${esc(t('wsrecv_kpi_pending'))}</span></div><div class="wspv-recvw-bar"><span class="wspv-recvw-fill" style="width:${pct}%"></span></div><div class="wspv-recvw-foot"><span>${(r.count != null ? r.count : 0)} · ${pct}% ${esc(t('wsrecv_kpi_collected').toLowerCase())}</span>${r.totalVencido ? `<span class="is-overdue">${esc(formatBase(r.totalVencido))} ${esc(t('wsrecv_st_vencido').toLowerCase())}</span>` : ''}</div></div>`;
   }
   if (p.type === 'asset_prices') {
-    const np = r.netProfitLoss || 0;
-    return `<div class="wspv wspv-ap"><div class="wspv-ap-top"><span class="wspv-ap-amt is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-ap-lbl">${esc(t('wsap_kpi_net'))}</span></div><div class="wspv-ap-foot"><span>${(r.openCount != null ? r.openCount : 0)} ${esc(t('wsap_kpi_open').toLowerCase())}</span>${(r.bestName && r.bestPct != null) ? `<span class="is-win">${esc(r.bestName)} ${esc(_wsJrnPct(r.bestPct))}</span>` : ''}</div></div>`;
+    // `|| 0` convertiría el null de divisas mezcladas en un cero afirmado.
+    const np = r.netProfitLoss;
+    return `<div class="wspv wspv-ap"><div class="wspv-ap-top"><span class="wspv-ap-amt${np == null ? '' : (np >= 0 ? ' is-win' : ' is-loss')}">${esc(np == null ? '—' : (np >= 0 ? '+' : '') + _wsJrnMoney(np, r.currency))}</span><span class="wspv-ap-lbl">${esc(t('wsap_kpi_net'))}</span></div><div class="wspv-ap-foot"><span>${(r.openCount != null ? r.openCount : 0)} ${esc(t('wsap_kpi_open').toLowerCase())}</span>${(r.bestName && r.bestPct != null) ? `<span class="is-win">${esc(r.bestName)} ${esc(_wsJrnPct(r.bestPct))}</span>` : ''}</div></div>`;
   }
   if (p.type === 'loan_simulation') {
     const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
@@ -23522,7 +23575,7 @@ function _wsToolSave() {
   if (_wsToolActive === 'assets') {
     const r = calculateAssetPrices(_wsToolInputs.rows);
     type = 'asset_prices';
-    results = { count: r.count, netProfitLoss: Math.round(r.netProfitLoss), averageReturnPct: r.averageReturnPct == null ? null : Math.round(r.averageReturnPct * 10) / 10, averageReturnBasis: r.averageReturnBasis, openCount: r.openCount, bestName: r.best ? r.best.assetName : '', bestPct: (r.best && r.best.returnPct != null) ? Math.round(r.best.returnPct) : null };
+    results = { count: r.count, netProfitLoss: r.netProfitLoss == null ? null : Math.round(r.netProfitLoss), currency: r.currency, currencyMixed: r.currencyMixed, averageReturnPct: r.averageReturnPct == null ? null : Math.round(r.averageReturnPct * 10) / 10, averageReturnBasis: r.averageReturnBasis, openCount: r.openCount, bestName: r.best ? r.best.assetName : '', bestPct: (r.best && r.best.returnPct != null) ? Math.round(r.best.returnPct) : null };
   } else if (_wsToolActive === 'loan') {
     const r = calculateLoan(_wsToolInputs);
     type = 'loan_simulation';
@@ -23916,8 +23969,27 @@ function calculateTradeJournal(trades) {
     return Object.assign({}, tr, { invested, exit, pl, ret, status, open });
   });
   const closed = list.filter(x => !x.open);
-  const totalInvested = list.reduce((s, x) => s + x.invested, 0);
-  const netProfit = closed.reduce((s, x) => s + x.pl, 0);
+  // ── UNA DIVISA POR DOCUMENTO, Y LA MEZCLA NO SE SUMA ──────────────────────
+  // SOLUCIÓN MÍNIMA SEGURA a la incoherencia multimoneda. Los totales
+  // (`totalInvested`, `netProfit`, `avgReturn`) sumaban importes de filas con
+  // divisas DISTINTAS sin convertir, y los pintaban con el símbolo de la divisa
+  // base: un total que no es de ninguna moneda.
+  //
+  // Convertir habría exigido elegir un owner de tipo de cambio Y una política de
+  // FECHA del tipo (¿el de hoy? ¿el de cada operación?), y publicar un agregado con
+  // un tipo no declarado es exactamente el defecto que este bloque ha estado
+  // cerrando. Así que no se convierte: se declara UNA divisa por documento.
+  //
+  // La divisa del documento es la de sus filas cuando todas coinciden. Si un
+  // documento heredado tiene filas mezcladas, los totales NO SE PUBLICAN y se dice
+  // por qué — cada operación sigue leyéndose en SU divisa, que es cierto, y lo que
+  // desaparece es la suma que no significaba nada.
+  const currencies = Array.from(new Set(list.map(x =>
+    String(x.currency || (typeof baseCurrency !== 'undefined' ? baseCurrency : 'EUR')))));
+  const currencyMixed = currencies.length > 1;
+  const currency = currencyMixed ? null : (currencies[0] || null);
+  const totalInvested = currencyMixed ? null : list.reduce((s, x) => s + x.invested, 0);
+  const netProfit = currencyMixed ? null : closed.reduce((s, x) => s + x.pl, 0);
   // ── EL AGREGADO SALE DE IMPORTES, AQUÍ TAMBIÉN ────────────────────────────
   // Era la MEDIA ARITMÉTICA de los porcentajes, y se publica bajo la etiqueta
   // «Rentabilidad media» — la MISMA etiqueta que Seguimiento de precios, donde sí
@@ -23926,9 +23998,11 @@ function calculateTradeJournal(trades) {
   // Precios para las MISMAS operaciones. Lo encontró la revisión financiera.
   // `null` cuando no hay invertido: dividir por cero no es un 0 %.
   const closedInvested = closed.reduce((s, x) => s + x.invested, 0);
-  const avgReturn = closedInvested > 0
+  // La razón tampoco se publica con divisas mezcladas: su numerador y su
+  // denominador serían sumas de monedas distintas.
+  const avgReturn = (!currencyMixed && closedInvested > 0)
     ? closed.reduce((s, x) => s + x.pl, 0) / closedInvested * 100 : null;
-  const avgReturnBasis = closedInvested > 0 ? 'pnl_over_invested' : null;
+  const avgReturnBasis = (!currencyMixed && closedInvested > 0) ? 'pnl_over_invested' : null;
   const winners = closed.filter(x => x.pl >= 0).length;
   const winRate = closed.length ? (winners / closed.length) * 100 : 0;
   let best = null, worst = null;
@@ -23938,10 +24012,22 @@ function calculateTradeJournal(trades) {
     if (best === null || x.ret > best.ret) best = x;
     if (worst === null || x.ret < worst.ret) worst = x;
   }
-  return { list, totalInvested, netProfit, avgReturn, avgReturnBasis, winners, closedCount: closed.length, winRate, best, worst };
+  return { list, totalInvested, netProfit, avgReturn, avgReturnBasis, winners,
+           closedCount: closed.length, winRate, best, worst,
+           currency, currencies, currencyMixed,
+           totalsPublishable: !currencyMixed };
 }
 
-function _wsJrnNewDraft() { return { asset: '', atype: 'stock', buy: '', sell: '', qty: '', fee: '', currency: 'EUR', notes: '', buyDate: '', sellDate: '' }; }
+function _wsJrnNewDraft() {
+  // La operación nueva hereda la divisa DEL DIARIO, no una constante: un documento,
+  // una moneda. Si el diario no la trae (documento heredado), la base del usuario.
+  let ccy = 'EUR';
+  try {
+    const st = _wsToolStateGet('journal');
+    ccy = (st && st.currency) || ((typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'EUR');
+  } catch (_) { ccy = 'EUR'; }
+  return { asset: '', atype: 'stock', buy: '', sell: '', qty: '', fee: '', currency: ccy, notes: '', buyDate: '', sellDate: '' };
+}
 function _wsJournalDefaults() {
   return { trades: [
     { id: 'tr_seed1', asset: 'BTC',  atype: 'crypto', buy: 52000, sell: 61000, qty: 0.5, fee: 20, currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
@@ -23963,7 +24049,18 @@ function _wsJrnPct(v) {
   const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
   return (n >= 0 ? '+' : '') + s.replace('.', sep) + '%';
 }
-function _wsJrnMoney(v, ccy, signed) { return ((signed && v >= 0) ? '+' : '') + formatBase(v); }
+// ── LA DIVISA QUE RECIBE, NO LA BASE ────────────────────────────────────────
+// Esta función ACEPTABA una divisa y la IGNORABA: siempre formateaba con
+// `formatBase`, así que una operación guardada en dólares se pintaba con el símbolo
+// de la divisa base del usuario. El campo existía, se guardaba, y se descartaba al
+// pintar — la peor combinación, porque el dato parecía respetado.
+// `formatCurrency(amount, currency)` ya existía; sólo había que usarlo.
+function _wsJrnMoney(v, ccy, signed) {
+  const c = String(ccy || (typeof baseCurrency !== 'undefined' ? baseCurrency : 'EUR'));
+  let out;
+  try { out = formatCurrency(v, c); } catch (_) { out = formatBase(v); }
+  return ((signed && v >= 0) ? '+' : '') + out;
+}
 
 function _wsJrnPreviewHtml(d) {
   const esc = _intccEsc;
@@ -24054,13 +24151,24 @@ function _wsJrnChartHtml(res) {
 function _wsJrnSummaryHtml(res) {
   const esc = _intccEsc;
   const hasClosed = res.closedCount > 0;
-  const npCls = res.netProfit >= 0 ? 'is-pos' : 'is-neg';
+  // ── CON DIVISAS MEZCLADAS NO HAY TOTAL QUE PUBLICAR ───────────────────────
+  // El resultado neto se sumaba entre filas de divisas distintas y se pintaba con
+  // el símbolo de la divisa BASE: un total que no es de ninguna moneda. No se
+  // convierte —eso exigiría un tipo y una fecha que nadie ha declarado— así que se
+  // dice. Cada operación sigue leyéndose en SU divisa en la lista, que es cierto.
+  const mixed = res.currencyMixed === true;
+  const npCls = (res.netProfit != null && res.netProfit >= 0) ? 'is-pos' : 'is-neg';
+  const netTxt = mixed || res.netProfit == null
+    ? '—'
+    : (res.netProfit >= 0 ? '+' : '') + _wsJrnMoney(res.netProfit, res.currency);
   const best = res.best ? `${res.best.asset} ${_wsJrnPct(res.best.ret)}` : '—';
   return `
     <div class="wstool-result wsjrn-summary">
       <div class="wstool-res-main">
         <span class="wstool-res-label">${esc(t('wsjrn_sum_net'))}</span>
-        <span class="wstool-res-final ${npCls}">${esc((res.netProfit >= 0 ? '+' : '') + formatBase(res.netProfit))}</span>
+        <span class="wstool-res-final ${mixed ? '' : npCls}">${esc(netTxt)}</span>
+        ${mixed ? `<span class="wstool-res-orient">${esc(String(t('wsjrn_mixed_ccy') || '').replace('{list}', (res.currencies || []).join(' · ')))}</span>`
+                : (res.currency ? `<span class="wstool-res-orient">${esc(String(t('wsjrn_doc_ccy') || '') + ': ' + res.currency)}</span>` : '')}
       </div>
       <div class="wsjrn-sum-grid">
         <div class="wstool-res-cell"><span class="wstool-res-v ${res.avgReturn == null ? '' : (res.avgReturn >= 0 ? 'is-up' : 'is-down')}">${esc(hasClosed ? _wsJrnPct(res.avgReturn) : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_avg'))}</span></div>
@@ -24089,7 +24197,9 @@ function _wsJrnFormHtml() {
         ${num('sell', t('wsjrn_f_sell'), '€')}
         ${num('qty', t('wsjrn_f_qty'))}
         ${num('fee', t('wsjrn_f_fee'), '€')}
-        ${sel('currency', t('wsjrn_f_ccy'), ccys)}
+        ${/* La divisa YA NO se elige por operación: es del DOCUMENTO, y el campo
+              nuevo hereda la del diario. Elegirla por fila era lo que permitía
+              construir un diario cuyos totales no eran de ninguna moneda. */''}
         ${txt('notes', t('wsjrn_f_notes'))}
       </div>
       <div class="wsjrn-form-foot">
@@ -25106,6 +25216,15 @@ function calculateAssetPrices(rows) {
     return Object.assign({}, rw, { qty, buy, fees, sell, investment, saleValue, profitLoss, returnPct, status, open });
   });
   const closed = list.filter(x => !x.open);
+  // ── UNA DIVISA POR DOCUMENTO, IGUAL QUE EN EL DIARIO ──────────────────────
+  // `totalInvested`, `totalSaleValue`, `netProfitLoss` y `averageReturnPct` sumaban
+  // importes de filas con divisas distintas sin convertir. Misma solución mínima
+  // segura: si el documento mezcla divisas, los totales NO se publican y se dice
+  // cuáles hay. No se inventa un tipo de cambio ni una fecha.
+  const currencies = Array.from(new Set(list.map(x =>
+    String(x.currency || (typeof baseCurrency !== 'undefined' ? baseCurrency : 'EUR')))));
+  const currencyMixed = currencies.length > 1;
+  const currency = currencyMixed ? null : (currencies[0] || null);
   // ── SÓLO COMPITE LO CALCULABLE ────────────────────────────────────────────
   // `best`/`worst` comparaban contra `null`, y en JavaScript `null < x` es cierto:
   // la fila SIN rentabilidad calculable (inversión 0, por ejemplo unas acciones
@@ -25122,20 +25241,22 @@ function calculateAssetPrices(rows) {
   }
   return {
     list, count: list.length,
-    totalInvested: list.reduce((s, x) => s + x.investment, 0),
-    totalSaleValue: closed.reduce((s, x) => s + x.saleValue, 0),
-    netProfitLoss: closed.reduce((s, x) => s + x.profitLoss, 0),
+    currency, currencies, currencyMixed, totalsPublishable: !currencyMixed,
+    totalInvested: currencyMixed ? null : list.reduce((s, x) => s + x.investment, 0),
+    totalSaleValue: currencyMixed ? null : closed.reduce((s, x) => s + x.saleValue, 0),
+    netProfitLoss: currencyMixed ? null : closed.reduce((s, x) => s + x.profitLoss, 0),
     // §J / §E — EL AGREGADO SALE DE IMPORTES. Era la media aritmética de los
     // porcentajes: una posición de 100.000 al 2 % junto a otra de 1.000 al 200 %
     // publicaba un «101 % de rentabilidad media». El agregado correcto es
     // Σ(resultado) / Σ(invertido) de las operaciones CERRADAS, y `null` cuando no
     // hay invertido, porque dividir por cero no es un 0 %.
     averageReturnPct: (() => {
+      if (currencyMixed) return null;               // numerador y denominador de monedas distintas
       const inv = closed.reduce((a, x) => a + x.investment, 0);
       if (!(inv > 0)) return null;
       return closed.reduce((a, x) => a + x.profitLoss, 0) / inv * 100;
     })(),
-    averageReturnBasis: closed.reduce((a, x) => a + x.investment, 0) > 0 ? 'pnl_over_invested' : null,
+    averageReturnBasis: (!currencyMixed && closed.reduce((a, x) => a + x.investment, 0) > 0) ? 'pnl_over_invested' : null,
     winningCount: closed.filter(x => x.profitLoss > 0).length,
     losingCount: closed.filter(x => x.profitLoss < 0).length,
     openCount: list.filter(x => x.open).length,
@@ -25211,13 +25332,14 @@ function _wsApCancel() { _wsApEditId = null; _wsApDraft = _wsApNewDraft(); _wsAp
 
 function _wsApSummaryHtml(r) {
   const esc = _intccEsc;
-  const npCls = r.netProfitLoss >= 0 ? 'is-pos' : 'is-neg';
+  const apMixed = r.currencyMixed === true;
+  const npCls = (r.netProfitLoss != null && r.netProfitLoss >= 0) ? 'is-pos' : 'is-neg';
   const best = r.best ? `${r.best.ticker || r.best.assetName} ${_wsJrnPct(r.best.returnPct)}` : '—';
   const hasClosed = r.count - r.openCount > 0;
   return `
     <div class="wsap-summary">
       <div class="wstool-result wsap-result">
-        <div class="wstool-res-main"><span class="wstool-res-label">${esc(t('wsap_kpi_net'))}</span><span class="wstool-res-final ${npCls}">${esc((r.netProfitLoss >= 0 ? '+' : '') + formatBase(r.netProfitLoss))}</span></div>
+        <div class="wstool-res-main"><span class="wstool-res-label">${esc(t('wsap_kpi_net'))}</span><span class="wstool-res-final ${apMixed ? '' : npCls}">${esc(apMixed || r.netProfitLoss == null ? '—' : (r.netProfitLoss >= 0 ? '+' : '') + _wsJrnMoney(r.netProfitLoss, r.currency))}</span>${apMixed ? `<span class="wstool-res-orient">${esc(String(t('wsjrn_mixed_ccy') || '').replace('{list}', (r.currencies || []).join(' · ')))}</span>` : ''}</div>
         <div class="wsap-sum-grid">
           <div class="wstool-res-cell"><span class="wstool-res-v ${r.averageReturnPct == null ? '' : (r.averageReturnPct >= 0 ? 'is-up' : 'is-down')}">${esc(hasClosed ? _wsJrnPct(r.averageReturnPct) : '—')}</span><span class="wstool-res-k">${esc(t('wsap_kpi_avg'))}</span></div>
           <div class="wstool-res-cell"><span class="wstool-res-v">${r.openCount}</span><span class="wstool-res-k">${esc(t('wsap_kpi_open'))}</span></div>

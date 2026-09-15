@@ -229,6 +229,11 @@ console.log('\n4 · Guardar, y decir la verdad sobre dónde:');
                    ws_sync_saved_synced: 'synced', ws_sync_saved_local: 'local',
                    ws_sync_error: 'error', ws_sync_retry: 'retry' })[k] || '';
     sb._intccEsc = x => String(x);
+    // El estado es ahora POR DOCUMENTO, así que su owner y su tabla de severidad
+    // entran también: sin ellos el estado global no se puede derivar.
+    vm.runInContext(konstSrc('_WS_SYNC_SEVERITY'), sb);
+    vm.runInContext('var _wsDocSync = Object.create(null);', sb);
+    vm.runInContext(fnSrc('_wsDocSyncWorst'), sb);
     vm.runInContext(fnSrc('_wsSyncStatus'), sb);
     vm.runInContext(fnSrc('_wsSyncBadgeHtml'), sb);
     vm.runInContext('var _wsDocTableState = ' + JSON.stringify(tableState)
@@ -300,6 +305,138 @@ console.log('\n5 · Las claves nuevas existen en los dos idiomas:');
   ok('5.2 y ninguna dice «sincronizado» en la variante local',
     !/ws_sync_saved_local:\s*'[^']*incroniz/.test(app)
     && !/ws_sync_saved_local:\s*'[^']*ynced/.test(app));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 6 · «SINCRONIZADO» ES POR DOCUMENTO Y EXIGE CONFIRMACIÓN DEL SERVIDOR
+// ════════════════════════════════════════════════════════════════════════════
+// El estado era UNA variable global para todo Workspace, y eso permitía la
+// afirmación falsa más fácil: sincronizas el presupuesto, abres el diario, y la
+// insignia sigue diciendo «guardado y sincronizado» sobre un documento que nunca
+// se ha subido.
+console.log('\n6 · La insignia habla del documento que se está mirando:');
+{
+  function syncCtx() {
+    const sb = { Math, Number, String, Object, Array, JSON, Date, console: { warn(){} } };
+    vm.createContext(sb);
+    sb.t = k => k; sb._intccEsc = x => String(x);
+    vm.runInContext(konstSrc('_WS_SYNC_SEVERITY'), sb);
+    vm.runInContext('var _wsDocSync = Object.create(null); var _wsDocTableState = "unknown";'
+      + ' var _wsDocSyncState = "idle"; var _wsDocSyncAt = 0;', sb);
+    ['_wsDocSyncWorst', '_wsSyncStatus', '_wsSyncBadgeHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
+    sb.set = (k, st) => { vm.runInContext('_wsDocSync[' + JSON.stringify(k) + '] = { state: '
+      + JSON.stringify(st) + ', at: 1 };', sb); };
+    sb.table = v => vm.runInContext('_wsDocTableState = ' + JSON.stringify(v) + ';', sb);
+    return sb;
+  }
+  const S = (c, k) => vm.runInContext('_wsSyncStatus(' + JSON.stringify(k == null ? null : k) + ')', c);
+  {
+    const c = syncCtx(); c.set('aurix_ws_goals_v1', 'saved');
+    ok('6.1 un documento guardado SIN confirmación de la tabla no está sincronizado',
+      S(c, 'aurix_ws_goals_v1').synced === false
+      && S(c, 'aurix_ws_goals_v1').labelKey === 'ws_sync_saved_local',
+      JSON.stringify(S(c, 'aurix_ws_goals_v1')));
+    c.table('yes');
+    ok('6.2 …y sólo con la confirmación del servidor se llama sincronizado',
+      S(c, 'aurix_ws_goals_v1').synced === true
+      && S(c, 'aurix_ws_goals_v1').labelKey === 'ws_sync_saved_synced');
+    ok('6.3 OTRO documento que nunca se subió no hereda ese «sincronizado»',
+      S(c, 'aurix_ws_projects_v1').synced === false
+      && S(c, 'aurix_ws_projects_v1').labelKey === 'ws_sync_idle',
+      JSON.stringify(S(c, 'aurix_ws_projects_v1')));
+  }
+  {
+    // La insignia sin clave toma el PEOR estado, nunca el mejor.
+    const c = syncCtx(); c.table('yes');
+    c.set('aurix_ws_goals_v1', 'saved'); c.set('aurix_ws_projects_v1', 'error');
+    ok('6.4 la insignia global publica el PEOR estado conocido, no el último',
+      S(c, null).labelKey === 'ws_sync_error' && S(c, null).synced === false,
+      JSON.stringify(S(c, null)));
+    c.set('aurix_ws_projects_v1', 'saving');
+    ok('6.5 con algo pendiente tampoco afirma sincronización',
+      S(c, null).labelKey === 'ws_sync_saving' && S(c, null).synced === false);
+    c.set('aurix_ws_projects_v1', 'saved');
+    ok('6.6 y sólo cuando TODOS están guardados lo afirma',
+      S(c, null).labelKey === 'ws_sync_saved_synced' && S(c, null).synced === true);
+  }
+  ok('6.7 «sincronizado» se marca SÓLO tras un upsert sin error del servidor',
+    (() => { const src = fnSrc('_wsDocsPush');
+      // el único `saved` del push va después de la comprobación de error
+      const i = src.indexOf("_wsDocSyncSet(key, 'saved')");
+      const j = src.indexOf('if (error)');
+      return i > j && j > -1
+        && /_wsDocTableState = 'yes';\s*\n\s*_wsDocSyncSet\(key, 'saved'\)/.test(src); })(),
+    'no puede marcarse al encolar ni al enviar');
+  ok('6.8 el hueco del DOM declara de qué documento habla',
+    /el\.getAttribute\('data-ws-sync-slot'\)/.test(fnSrc('_wsSyncBadgeRefresh')));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 7 · UNA DIVISA POR DOCUMENTO · LA SOLUCIÓN MÍNIMA SEGURA
+// ════════════════════════════════════════════════════════════════════════════
+// Los totales del Diario y de Precios sumaban importes de filas con divisas
+// DISTINTAS sin convertir, y los pintaban con el símbolo de la divisa base: un
+// total que no es de ninguna moneda. Convertir habría exigido elegir un owner de
+// tipo de cambio Y una política de fecha, y publicar un agregado con un tipo no
+// declarado es el defecto que este bloque ha estado cerrando.
+console.log('\n7 · Un documento, una moneda; y la mezcla no se suma:');
+{
+  function ccyCtx() {
+    const sb = { Math, Number, String, isFinite, isNaN, parseFloat, JSON, Array, Object, Set, Intl,
+                 console: { warn(){} } };
+    vm.createContext(sb);
+    sb.lang = 'es'; sb.baseCurrency = 'EUR';
+    ['_wsNum', 'formatCurrency', 'calculateTradeJournal', 'calculateAssetPrices']
+      .forEach(n => vm.runInContext(fnSrc(n), sb));
+    vm.runInContext('function formatBase(a){ return formatCurrency(a, baseCurrency); }', sb);
+    return sb;
+  }
+  const C = ccyCtx();
+  const TJ = rows => vm.runInContext('calculateTradeJournal(' + JSON.stringify(rows) + ')', C);
+  const AP = rows => vm.runInContext('calculateAssetPrices(' + JSON.stringify(rows) + ')', C);
+  const ONE = [{ qty: '10', buy: '100', sell: '120', currency: 'EUR' },
+               { qty: '5',  buy: '200', sell: '180', currency: 'EUR' }];
+  const MIX = [{ qty: '10', buy: '100', sell: '120', currency: 'EUR' },
+               { qty: '5',  buy: '200', sell: '180', currency: 'USD' }];
+  ok('7.1 con UNA divisa el diario publica sus totales y la declara',
+    (() => { const r = TJ(ONE);
+      return r.currencyMixed === false && r.currency === 'EUR'
+        && r.netProfit === 100 && r.totalsPublishable === true; })(),
+    JSON.stringify(TJ(ONE).currency));
+  ok('7.2 con divisas MEZCLADAS no publica ningún total',
+    (() => { const r = TJ(MIX);
+      return r.currencyMixed === true && r.currency === null
+        && r.netProfit === null && r.totalInvested === null && r.avgReturn === null
+        && r.totalsPublishable === false; })(),
+    JSON.stringify({ neto: TJ(MIX).netProfit, inv: TJ(MIX).totalInvested, avg: TJ(MIX).avgReturn }));
+  ok('7.3 …y dice CUÁLES hay, en vez de callarlo',
+    JSON.stringify(TJ(MIX).currencies.slice().sort()) === JSON.stringify(['EUR', 'USD']));
+  ok('7.4 cada operación sigue leyéndose en SU divisa (eso sí es cierto)',
+    TJ(MIX).list[0].currency === 'EUR' && TJ(MIX).list[1].currency === 'USD');
+  ok('7.5 Seguimiento de precios aplica la MISMA regla',
+    (() => { const one = AP([{ quantity: '10', buyPrice: '100', sellPrice: '120', currency: 'EUR' }]);
+      const mix = AP([{ quantity: '10', buyPrice: '100', sellPrice: '120', currency: 'EUR' },
+                      { quantity: '10', buyPrice: '100', sellPrice: '120', currency: 'GBP' }]);
+      return one.currencyMixed === false && one.netProfitLoss != null
+        && mix.currencyMixed === true && mix.netProfitLoss === null
+        && mix.totalInvested === null && mix.averageReturnPct === null; })(),
+    JSON.stringify(AP([{ quantity: '10', buyPrice: '100', sellPrice: '120', currency: 'EUR' },
+                       { quantity: '10', buyPrice: '100', sellPrice: '120', currency: 'GBP' }]).netProfitLoss));
+  ok('7.6 el formateador HONRA la divisa que recibe, no la base',
+    (() => { const es = vm.runInContext('_wsJrnMoney(1000, "USD")', (() => {
+        const sb = ccyCtx(); vm.runInContext(fnSrc('_wsJrnMoney'), sb); return sb; })());
+      return /US\$|\$/.test(es) && !/€/.test(es); })(),
+    'una operación en dólares no se pinta con el símbolo de la divisa base');
+  ok('7.7 no se ha introducido ninguna conversión FX ni ninguna fecha de tipo',
+    !/exchangeRate|fxRate|convertCurrency/.test(fnSrc('calculateTradeJournal'))
+    && !/exchangeRate|fxRate|convertCurrency/.test(fnSrc('calculateAssetPrices')),
+    'la solución mínima segura NO convierte: declara');
+  ok('7.8 y la divisa por operación ya no se elige en el formulario',
+    !/sel\('currency', t\('wsjrn_f_ccy'\), ccys\)/.test(app));
+  const CK = ['wsjrn_mixed_ccy', 'wsjrn_doc_ccy', 'wsjrn_doc_ccy_hint'];
+  const occ = k => (app.match(new RegExp('\\n    ' + k + ':', 'g')) || []).length;
+  ok('7.9 la copy de la mezcla existe en ES y EN',
+    CK.every(k => occ(k) === 2), JSON.stringify(CK.map(k => k + ':' + occ(k))));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

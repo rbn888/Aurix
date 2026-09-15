@@ -1,0 +1,51 @@
+-- ============================================================================
+-- AURIX WORKSPACE COMPLETION · §4  ·  ROLLBACK de workspace_documents
+-- Pareja explícita de: db/workspace_documents_1.sql
+-- ----------------------------------------------------------------------------
+-- *** NO EJECUTADO. Artefacto preparatorio. ***
+--
+-- ----------------------------------------------------------------------------
+-- POR QUÉ ESTE ROLLBACK NO BORRA LA TABLA
+-- ----------------------------------------------------------------------------
+-- `workspace_documents` contiene TRABAJO DEL USUARIO: presupuestos, objetivos,
+-- escenarios, cobros. Un `drop table` no es un rollback, es una pérdida de datos
+-- irreversible, y el cliente NO tiene copia autoritativa: el almacenamiento local
+-- se purga al cambiar de cuenta o al limpiar el navegador.
+--
+-- Así que el rollback SEGURO retira la CAPACIDAD DE ESCRITURA y deja los datos
+-- intactos. El cliente vuelve a comportarse como antes de la tabla —guardado
+-- local, y lo DICE, porque `_wsDocsPush` marca la tabla como ausente ante un error
+-- de esquema o de permisos y la insignia cae a «guardado en este dispositivo»— sin
+-- que nadie pierda nada. Si el derecho vuelve, los documentos siguen ahí.
+--
+-- PASO 1 · ROLLBACK SEGURO (reversible, sin pérdida de datos)
+-- ============================================================================
+
+revoke select, insert, update on table public.workspace_documents from authenticated;
+
+-- VERIFICACIÓN del paso 1 (sólo lectura)
+--   select count(*) as debe_ser_cero from information_schema.role_table_grants
+--    where table_schema = 'public' and table_name = 'workspace_documents'
+--      and grantee = 'authenticated';
+--   -- esperado: 0
+--   -- Y los datos siguen ahí:
+--   select count(*) as documentos_conservados from public.workspace_documents;
+
+-- ============================================================================
+-- PASO 2 · DESTRUCCIÓN · *** NO EJECUTAR SIN UNA COPIA VERIFICADA ***
+-- ----------------------------------------------------------------------------
+-- Esto SÍ borra el trabajo del usuario y NO se puede deshacer. Queda escrito para
+-- que exista, no para que se ejecute por rutina, y va comentado A PROPÓSITO: hay
+-- que descomentarlo a mano, que es exactamente la friccion que debe tener.
+--
+-- Antes de descomentar, exportar y VERIFICAR el contenido:
+--   copy (select * from public.workspace_documents) to stdout with csv header;
+--   -- y comprobar que el fichero tiene tantas filas como:
+--   select count(*) from public.workspace_documents;
+--
+-- drop policy if exists workspace_documents_select_own on public.workspace_documents;
+-- drop policy if exists workspace_documents_insert_own on public.workspace_documents;
+-- drop policy if exists workspace_documents_update_own on public.workspace_documents;
+-- drop index  if exists public.workspace_documents_user_kind_idx;
+-- drop table  if exists public.workspace_documents;
+-- ============================================================================
