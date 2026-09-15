@@ -67,6 +67,14 @@ function dict(langIdx){
     // INT.07 — the semantic pentagon's labels and its "no data" state live outside
     // the intv4/intv5 slice, so they must come in as extras or an axis renders blank.
     'intcc_dim_div','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
+    // A2 — el eje de DIVERSIFICACIÓN publica amplitud de categorías REGISTRADAS, y
+    // su clave vive fuera del corte: sin ella la etiqueta salía vacía en la sonda
+    // (no en producción) y el informe acusaba un defecto que no existía.
+    'intcc_dim_breadth',
+    // Cierre de QA: la bandeja de atención del hero y la marca de revisado.
+    'intel_now_novelty','intel_sub_review','intel_now_reviewed','intel_sub_reviewed',
+    'intel_now_no_news','intel_sub_no_news','intel_ack_done','intel_ack','intel_ack_aria',
+    'intel_see_changes','intel_now_material','intel_now_discovery','intel_now_changed',
     'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending']
     .map(k => { const i = keyOcc(k)[langIdx]; return i == null ? null : app.slice(i, app.indexOf('\n', i)).trim().replace(/,$/, ''); })
     .filter(Boolean).join(',\n');
@@ -83,8 +91,8 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
   '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
-  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_DISC_MAX'];
-const FNS = ['_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
   'assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
   '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixInvestablePerformance',
@@ -203,10 +211,13 @@ await S('Page.addScriptToEvaluateOnNewDocument', { source:
 // INT.06 cognitive order: orientación → comprensión → diagnóstico → exploración
 // → qué importa → evolución → profundidad. One column on mobile/tablet, the
 // 12-column grid on desktop; both must read in the SAME order.
+// ESTRUCTURA salió de la presentación por decisión de producto: republicaba lo
+// que ya dicen Salud, Radar y Factores. Su owner y sus datos siguen intactos para
+// el motor y los gates, así que esto es una retirada de superficie, no de dominio.
 const EXPECTED_ORDER = {
-  mobile:  ['intcc-m-hero','intcc-m-health','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
-  tablet:  ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
-  desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
+  mobile:  ['intcc-m-hero','intcc-m-health','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
+  tablet:  ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
+  desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
 };
 // INT.07 §14 — a row must behave like a ROW: every card in it shares one bottom
 // baseline. The founder photographed the opposite (a broken mosaic with black
@@ -383,7 +394,14 @@ const MEASURE = `(function(){
   out.radarMeasured = out.radarVals.filter(function(v){ return /^\\d+%$/.test(v); }).length;
   out.radarPending  = out.radarVals.filter(function(v){ return !/^\\d+%$/.test(v); });
   out.radarDimmed = host.querySelectorAll('.intcc-radar-axis.is-unavailable').length;
-  out.radarDots   = host.querySelectorAll('.intcc-radar-dot').length;
+  // Un eje certificado publica CIFRA (porcentaje o conteo); uno sin certificar
+  // publica la palabra. Se cuentan por separado porque son claims distintos.
+  out.radarFigures = out.radarVals.filter(function(v){
+    return /^\\d+%$/.test(v) || /^\\d+(?:[.,]\\d+)?\\s*\\/\\s*\\d+$/.test(v); }).length;
+  out.radarNoData = out.radarVals.filter(function(v){ return /sin datos|no data/i.test(v); }).length;
+  out.radarDots   = host.querySelectorAll('.intcc-radar-dot:not(.is-unknown)').length;
+  out.radarUnknownDots   = host.querySelectorAll('.intcc-radar-dot.is-unknown').length;
+  out.radarUnknownSpokes = host.querySelectorAll('.intcc-radar-spoke.is-unknown').length;
   out.radarArea   = host.querySelectorAll('.intcc-radar-area').length;
   out.radarAreaPts = (function(){ var a = host.querySelector('.intcc-radar-area');
     if (!a) return 0; var p = (a.getAttribute('points')||'').trim();
@@ -496,18 +514,28 @@ for (const vp of VIEWPORTS) {
   check(vp, 'the pentagon renders with its five fixed semantic axes',
     m.compState === 'radar' && m.radarAxes === 5 && m.radarLabels.length === 5,
     'state=' + m.compState + ' axes=' + m.radarAxes + ' ' + JSON.stringify(m.radarLabels));
+  // El primer eje dejó de llamarse «Diversificación» por corrección del founder:
+  // ese nombre afirmaba un conocimiento económico que Aurix no posee. Publica
+  // AMPLITUD DE CATEGORÍAS REGISTRADAS, y su valor es un CONTEO con su taxonomía.
   check(vp, 'the five axes are the semantic dimensions, not asset classes',
     JSON.stringify(m.radarLabels) === JSON.stringify(
-      ['Diversificación','Estabilidad','Liquidez','Crecimiento','Concentración']),
+      ['Amplitud de categorías','Estabilidad','Liquidez','Crecimiento','Concentración']),
     JSON.stringify(m.radarLabels));
+  // Un eje certificado lleva CIFRA: un porcentaje o un conteo («1,3 / 7»). Sólo
+  // los no certificados dicen «sin datos», y son exactamente los atenuados.
   check(vp, 'the uncertified axes say "sin datos" and are visibly attenuated',
-    m.radarVals.length === 5 && m.radarMeasured === 3
-    && m.radarPending.length === 2 && m.radarPending.every(function(v){ return v === 'sin datos'; })
-    && m.radarDimmed === 2,
-    JSON.stringify({ vals: m.radarVals, dimmed: m.radarDimmed }));
-  check(vp, 'no uncertified axis is drawn as a value (polygon joins only certified ones)',
-    m.radarArea === 1 && m.radarAreaPts === 3 && m.radarDots === 3,
-    JSON.stringify({ area: m.radarArea, pts: m.radarAreaPts, dots: m.radarDots }));
+    m.radarVals.length === 5 && m.radarFigures === 3
+    && m.radarNoData === 2 && m.radarDimmed === 2,
+    JSON.stringify({ vals: m.radarVals, figures: m.radarFigures, dimmed: m.radarDimmed }));
+  // CINCO MARCADORES DE DISPONIBILIDAD, TRES VALORES. El polígono une sólo los
+  // certificados; los otros dos llevan marcador HUECO en el extremo de su eje, que
+  // es lo que permite distinguir «no lo mide» de «no hay nada» sin puntuar un cero.
+  check(vp, 'five availability markers, three certified vertices (unknown never a value)',
+    m.radarArea === 1 && m.radarAreaPts === 3
+    && m.radarDots === 3 && m.radarUnknownDots === 2
+    && m.radarUnknownSpokes === 2,
+    JSON.stringify({ area: m.radarArea, pts: m.radarAreaPts, filled: m.radarDots,
+      hollow: m.radarUnknownDots, spokes: m.radarUnknownSpokes }));
   check(vp, 'no reserved column is left empty where a module fail-closed',
     m.emptyGridGap === false, 'gapPx=' + m.gapPx);
   if (!vp.mobile || vp.name === 'tablet') {
@@ -534,9 +562,13 @@ for (const vp of VIEWPORTS) {
     'n=' + m.percents.length);
   check(vp, 'the discovery does not repeat a Brief conclusion', m.wowRepeatsHead === false,
     JSON.stringify(m.wowText));
-  check(vp, 'supporting facts are hidden until opened, then all become visible',
-    m.disclosures > 0 && m.supTotal > 0 && m.supVisible === m.supTotal && m.supOverflow === 0,
-    `det=${m.disclosures} sup=${m.supVisible}/${m.supTotal} overflow=${m.supOverflow}`);
+  // «Hechos que lo sostienen» y todo desplegable salieron de la superficie: el
+  // hecho certificado lo publica «Qué ha cambiado» con su cifra y esta card
+  // explica el significado. Lo que se mide ahora es la AUSENCIA del disclosure y
+  // que no quede ningún apoyo invisible tras él.
+  check(vp, 'no disclosure left in the surface, and no fact hidden behind one',
+    m.disclosures === 0 && m.supTotal === 0,
+    `det=${m.disclosures} sup=${m.supVisible}/${m.supTotal}`);
   console.log(`   · stories=${m.stories} questions=${m.questions} fontMin=${m.fontMin}px textLen=${inj.textLen} percents=${JSON.stringify(m.percents)}`);
   rows.push({ vp: vp.name, ...m });
   const shot = await S('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
