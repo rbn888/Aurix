@@ -21752,8 +21752,14 @@ body.gs-open { overflow: hidden; }
 .ws4-field-name { font-size: 12px; color: var(--text-muted); }
 .ws4-field-input { position: relative; display: block; }
 .ws4-num {
+  /* ── OBJETIVO TÁCTIL DE 44px (SPEC · Bloque 3) ──────────────────────────────
+     La sonda multi-viewport lo midió en vivo: 40px en 360/390/430 y 42px en 768.
+     Es la clase COMPARTIDA de todos los campos numéricos de Workspace, así que el
+     defecto aparecía a la vez en Escenarios, Interés compuesto, Préstamos y
+     Presupuesto — una causa, cuatro superficies. `min-height` y no `height`: el
+     campo sigue creciendo si el texto lo necesita, y no se recorta nada. */
   -webkit-appearance: none; appearance: none; -moz-appearance: textfield;
-  width: 100%; box-sizing: border-box; padding: 10px 34px 10px 12px;
+  width: 100%; min-height: 44px; box-sizing: border-box; padding: 11px 34px 11px 12px;
   font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
   /* GLOBAL-POLISH-V1 — el input de las DOS herramientas públicas llevaba la misma
      alfa BLANCA (0.075) que se corrigió en el sheet de Add Asset. Mismo tono, misma
@@ -21918,13 +21924,25 @@ body.gs-open { overflow: hidden; }
 
 /* ── WS.6A — pinned items, saved/pinned states, featured tool, viz extras ── */
 .wsh-tpl, .wsh-tool { position: relative; }
-.wsh-pin { position: absolute; top: 10px; right: 10px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 8px; cursor: pointer; color: rgba(159,194,255,0.55); background: rgba(255,255,255,0.04); border: 1px solid rgba(120,160,255,0.14); transition: color 150ms ease, background 150ms ease, border-color 150ms ease; }
+/* ── §3 · EL DORADO ES COMERCIAL, EL FAVORITO ES TUYO ──────────────────────
+   «Dorado Premium y estrella favorito no deben significar lo mismo.» Y significaban
+   exactamente lo mismo: la estrella activa usaba `#f3cf9a` sobre
+   `rgba(233,168,87,…)` y el tier Premium `rgba(244,196,90,…)` — el mismo oro. Así
+   que en una rejilla de catálogo el usuario veía dos marcas doradas que quieren
+   decir cosas opuestas: una es «esto cuesta» y la otra «esto lo he elegido yo».
+   El oro se RESERVA a la frontera comercial (`.wsh-tier.is-premium`) y el favorito
+   pasa al azul de marca, que es el color de lo que el usuario controla. Sin alfa
+   blanco: la base es la escalera `--elev-*`. */
+.wsh-pin { position: absolute; top: 10px; right: 10px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 8px; cursor: pointer; color: rgba(159,194,255,0.55); background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.14); transition: color 150ms ease, background 150ms ease, border-color 150ms ease; }
 .wsh-pin svg { width: 15px; height: 15px; fill: none; }
-.wsh-pin:hover { color: #aecbff; background: rgba(74,130,240,0.16); }
-.wsh-pin.is-on { color: #f3cf9a; border-color: rgba(233,168,87,0.42); background: rgba(233,168,87,0.12); }
+.wsh-pin:hover { color: #aecbff; background: rgba(var(--aurix-blue-rgb), 0.16); }
+.wsh-pin.is-on { color: var(--aurix-blue); border-color: rgba(var(--aurix-blue-rgb), 0.46); background: rgba(var(--aurix-blue-rgb), 0.14); }
 .wsh-pin.is-on svg { fill: currentColor; }
+.wsh-pin:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.9); outline-offset: 2px; }
 .wsb-pill.is-saved  { color: #8fe6b6; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.30); }
-.wsb-pill.is-pinned { color: #f3cf9a; background: rgba(233,168,87,0.12); border-color: rgba(233,168,87,0.30); }
+/* §3 — la píldora de FIJADO comparte semántica con la estrella, así que comparte
+   color: azul. El oro sigue siendo sólo de la frontera comercial. */
+.wsb-pill.is-pinned { color: var(--aurix-blue); background: rgba(var(--aurix-blue-rgb),0.14); border-color: rgba(var(--aurix-blue-rgb),0.32); }
 .wsh-proj-type { font-size: 11px; color: var(--text-muted); }
 .wsh-proj.is-pinned { border-style: dashed; }
 .wsh-tool.is-featured { border-color: rgba(77,141,255,0.34); background: radial-gradient(130% 150% at 85% 0%, rgba(92,156,255,0.14), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.52), rgba(15,21,37,0.6)); box-shadow: 0 0 24px rgba(77,141,255,0.10); }
@@ -23914,12 +23932,17 @@ body.aurix-skeleton #totalValue::after {
       vacíos en paralelo (la misma pobreza visual que corrigió GLOBAL-POLISH-V1,
       vista desde el otro lado). Llega con `is-single`, así que ya ocupa el ancho.
    2. `is-saved` marca el FAVORITO con el mismo lenguaje cromático que el toggle
-      (`.wsh-pin.is-on`, oro): un solo idioma para un solo estado. No es un botón:
-      el toggle vive en la tarjeta del catálogo. */
+      (`.wsh-pin.is-on`): un solo idioma para un solo estado. No es un botón: el
+      toggle vive en la tarjeta del catálogo.
+      §3 — ese idioma pasa de ORO a AZUL con el toggle, y por la misma razón: el
+      oro queda reservado a la frontera comercial, así que un favorito dorado y un
+      Premium dorado decían lo mismo con colores idénticos. Si esta regla se hubiera
+      quedado en oro, el borde de la tarjeta habría seguido contradiciendo a su
+      propio icono. */
 .wsh-mse2-blank .wsh-mse2-empty{ align-items:flex-start; padding:14px 4px 8px; gap:8px; }
 .wsh-mse2-empty-ctas{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
-.wsh-mse2-card.is-saved{ border-color:rgba(233,168,87,.28); }
-.wsh-mse2-card.is-saved:hover{ border-color:rgba(233,168,87,.5); }
+.wsh-mse2-card.is-saved{ border-color:rgba(var(--aurix-blue-rgb),.32); }
+.wsh-mse2-card.is-saved:hover{ border-color:rgba(var(--aurix-blue-rgb),.54); }
 
 /* ══════════════════════════════════════════════════════════════
    WN.P1 — Aurix Premium modal (reusable conversion layer)
@@ -26676,3 +26699,181 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   .wsre-layers { grid-template-columns: 1fr 1fr; }
   .wsre-layer.is-total { grid-column: 1 / -1; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE COMPLETION · SUPUESTOS, PARÁMETROS Y ESTADO DE GUARDADO
+   ════════════════════════════════════════════════════════════════════════════
+   Clases NUEVAS, cero reglas existentes redefinidas. Todas usan la escalera
+   `--elev-*` y el azul por token: ningún alfa blanco, que sobre el lienzo oscuro
+   se lee como gris neutro (la lección de GLOBAL POLISH y DASHBOARD FAST-CLOSE).
+
+   Y todas las tipografías por encima de 11px, que es el suelo que la QA visual
+   mide en vivo. */
+
+/* ── LOS SUPUESTOS DE UN CÁLCULO (§A/§B/§E/§F/§G) ──────────────────────────
+   Un `<details>` cerrado por defecto: el supuesto está ACCESIBLE sin competir con
+   el resultado. «No ocultar supuestos» no significa gritarlos. */
+.wstool-asm {
+  margin-top: 12px; border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+  background: var(--elev-1);
+}
+.wstool-asm-sum {
+  cursor: pointer; list-style: none; padding: 10px 13px;
+  font-size: 12.5px; font-weight: 650; color: rgba(198,214,246,0.86);
+  display: flex; align-items: center; gap: 8px;
+}
+.wstool-asm-sum::-webkit-details-marker { display: none; }
+.wstool-asm-sum::after {
+  content: '›'; margin-left: auto; font-size: 15px; line-height: 1;
+  color: rgba(159,194,255,0.62); transition: transform 160ms ease;
+}
+.wstool-asm[open] > .wstool-asm-sum::after { transform: rotate(90deg); }
+.wstool-asm-sum:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.9); outline-offset: -2px; }
+.wstool-asm-list {
+  list-style: none; margin: 0; padding: 0 13px 12px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.wstool-asm-list li {
+  font-size: 12px; line-height: 1.5; color: rgba(198,214,246,0.74);
+  padding-left: 12px; position: relative;
+}
+.wstool-asm-list li::before {
+  content: ''; position: absolute; left: 0; top: 7px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(var(--aurix-blue-rgb), 0.55);
+}
+/* Un hueco declarado se lee distinto de un supuesto: es lo que NO se sabe. */
+.wstool-asm-gap {
+  margin: 0 13px 12px; padding: 8px 10px; border-radius: 9px;
+  font-size: 11.5px; line-height: 1.45; color: rgba(225,196,122,0.90);
+  background: rgba(190,160,90,0.08); border: 1px solid rgba(190,160,90,0.22);
+}
+.wstool-asm-real {
+  margin: 0 13px 12px; font-size: 12px; font-weight: 650;
+  color: rgba(214,226,255,0.88);
+}
+
+/* ── CUATRO COMPONENTES EN LUGAR DE DOS (§B) ────────────────────────────────
+   Inicial, aportado y crecimiento. En 360px caben tres columnas estrechas, así
+   que se envuelven a dos y el crecimiento ocupa la fila entera: la cifra que
+   importa no se comprime. */
+.wstool-res-split.is-quad {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.wstool-res-split.is-quad .wstool-res-cell:last-child { grid-column: 1 / -1; }
+@media (min-width: 480px) {
+  .wstool-res-split.is-quad { grid-template-columns: repeat(3, 1fr); }
+  .wstool-res-split.is-quad .wstool-res-cell:last-child { grid-column: auto; }
+}
+/* Una pérdida ESTIMADA no se pinta con el verde de una ganancia. */
+.wstool-res-cell.is-loss .wstool-res-v { color: rgba(240,170,110,0.98); }
+
+/* ── PARÁMETROS COMUNES DE LA COMPARACIÓN (§C) ──────────────────────────────
+   Visibles al entrar, arriba y no dentro de cada tarjeta: son comunes, y ponerlos
+   en la tarjeta sugeriría que cada escenario tiene el suyo. */
+.wsb-params-grid {
+  display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px;
+}
+@media (min-width: 560px) { .wsb-params-grid { grid-template-columns: repeat(3, 1fr); } }
+.wsb-note.is-warn {
+  margin-top: 10px; padding: 9px 11px; border-radius: 10px;
+  font-size: 12px; line-height: 1.45; color: rgba(225,196,122,0.92);
+  background: rgba(190,160,90,0.08); border: 1px solid rgba(190,160,90,0.24);
+}
+/* Las DOS CAUSAS de la diferencia, atenuadas respecto al total: son su desglose. */
+.wsb-row.is-cause {
+  font-size: 12px; color: rgba(198,214,246,0.66);
+}
+.wsb-row.is-cause b { font-weight: 650; color: rgba(214,226,255,0.82); }
+/* La píldora de la tarjeta dice la APORTACIÓN, no una propiedad de riesgo. */
+.wsb-pill.is-contrib {
+  color: rgba(180,208,255,0.95); background: rgba(var(--aurix-blue-rgb), 0.12);
+  border-color: rgba(var(--aurix-blue-rgb), 0.28);
+}
+/* «porcentaje no aplicable» no es un número: no se pinta como uno. */
+.wsb-impact-pct.is-na {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+  color: rgba(198,214,246,0.58); font-variant-numeric: normal;
+}
+
+/* ── ESTADO DE GUARDADO (§4) ────────────────────────────────────────────────
+   Cinco estados distinguibles, y los DOS de éxito se distinguen entre sí: el azul
+   es «guardado aquí» y el verde «guardado y sincronizado». Nunca al revés. */
+.ws-sync-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 650; white-space: nowrap;
+  color: rgba(198,214,246,0.74);
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.16);
+}
+.ws-sync-badge.is-saving { color: rgba(180,208,255,0.92); border-color: rgba(var(--aurix-blue-rgb), 0.30); }
+.ws-sync-badge.is-saved[data-ws-synced="1"] {
+  color: rgba(120,215,170,0.98); background: rgba(90,200,150,0.08);
+  border-color: rgba(120,200,160,0.30);
+}
+.ws-sync-badge.is-saved[data-ws-synced="0"],
+.ws-sync-badge.is-local_only {
+  color: rgba(180,208,255,0.88); background: rgba(var(--aurix-blue-rgb), 0.08);
+  border-color: rgba(var(--aurix-blue-rgb), 0.24);
+}
+.ws-sync-badge.is-error {
+  color: rgba(240,170,110,0.98); background: rgba(190,120,70,0.10);
+  border-color: rgba(220,150,90,0.32);
+}
+.ws-sync-retry {
+  min-height: 24px; padding: 0 8px; border-radius: 999px; cursor: pointer;
+  font-size: 11px; font-weight: 700; color: rgba(240,190,140,0.98);
+  background: transparent; border: 1px solid rgba(220,150,90,0.40);
+}
+.ws-sync-retry:hover { background: rgba(220,150,90,0.14); }
+.ws-sync-retry:focus-visible { outline: 2px solid rgba(240,190,140,0.9); outline-offset: 2px; }
+
+/* ── LA BARRA DE COBROS SIN PROPORCIÓN (§H) ─────────────────────────────────
+   Sin importe total no hay proporción, así que la barra no se rellena al 0 % —eso
+   sería un cero visual— sino que se marca como no aplicable. */
+.wsrecv-sumbar[data-ws-na="1"] {
+  background-image: repeating-linear-gradient(135deg,
+    rgba(159,194,255,0.10) 0 6px, transparent 6px 12px);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE COMPLETION · BLOQUE 3 — DESBORDAMIENTO HORIZONTAL MEDIDO EN VIVO
+   ════════════════════════════════════════════════════════════════════════════
+   La sonda multi-viewport encontró que varias rejillas de resultado sangran fuera
+   del viewport en las pantallas estrechas, y siempre por la misma causa: una
+   celda de rejilla tiene `min-width:auto` por defecto, así que un importe largo
+   («282.013,69 US$») ensancha la columna por debajo de su reparto y empuja la
+   tarjeta entera. La cura es declarar `min-width:0` en las celdas y permitir que
+   el número se ajuste, no reducir la fuente ni recortar con `overflow:hidden`
+   —las dos cosas están prohibidas por el SPEC—. */
+
+/* Las celdas de resultado: tres superficies comparten la clase. */
+.wstool-res-cell, .wsbud-split > .wstool-res-cell, .wsloan-kpi, .wsb-row, .wsre-layer {
+  min-width: 0;
+}
+.wstool-res-v, .wsloan-kpi-v, .wsb-row b, .wsre-layer b {
+  min-width: 0; overflow-wrap: anywhere;
+}
+/* Interés compuesto · las tres celdas. En 360 y en 768 la tercera no cabía a un
+   tercio (137px de desbordamiento a 768, el mayor de la matriz), así que la
+   rejilla deja de imponer tres columnas fijas y se adapta al ancho REAL. */
+.wstool-res-split.is-quad {
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+}
+@media (min-width: 480px) {
+  .wstool-res-split.is-quad { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+  .wstool-res-split.is-quad .wstool-res-cell:last-child { grid-column: auto; }
+}
+/* Préstamos · la rejilla de KPIs con cuatro importes largos. */
+.wsloan-kpis { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+/* Escenarios · el bloque de impacto. El pie («Rango de la comparación al final
+   del horizonte») no cabía en una línea a 360px y sangraba 29px. */
+.wsb-impact-row { min-width: 0; flex-wrap: wrap; }
+.wsb-impact-col { min-width: 0; }
+.wsb-impact-val { overflow-wrap: anywhere; }
+.wsb-impact-uplift { flex-wrap: wrap; min-width: 0; }
+.wsb-impact-cap { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+/* Y el contenedor de la vista, que es quien propaga el desbordamiento. */
+.wsh-sb, .wsh-tool-view { min-width: 0; max-width: 100%; }
+.wsh-sb > *, .wsh-tool-view > * { min-width: 0; max-width: 100%; }

@@ -5794,6 +5794,9 @@ const T = {
     wsb_stab_steady:   'Constante',
     wsb_stab_dynamic:  'Dinámico',
     wsb_stab_balanced: 'Equilibrado',
+    // §C — la conclusión, sin veredicto y sin umbral.
+    wsb_concl_spread:  'Aportar {m} al mes en vez de nada proyecta {amt} más al final de los {y} años.',
+    wsb_concl_flat:    'Con estos parámetros los escenarios no se separan de forma apreciable.',
     // §C — los parámetros comunes, las dos causas de la diferencia y el rango.
     wsb_params_title:  'Parámetros de la comparación',
     wsb_p_base:        'Patrimonio de partida',
@@ -5889,6 +5892,12 @@ const T = {
     ws4_read_nw_lo: 'Tu patrimonio está mayormente invertido.',
     ws4_read_fire_done: 'Ya alcanzas el patrimonio necesario para tu objetivo FIRE.',
     ws4_read_fire_dep: 'Este plan FIRE depende principalmente de tu ritmo de aportación.',
+    // La tasa de retirada y la rentabilidad, explícitas y sin garantía.
+    ws4_f_swr:              'Tasa de retirada supuesta',
+    ws4_f_ret:              'Rentabilidad supuesta',
+    ws4_r_noyears:          'no se alcanza',
+    ws4_read_fire_needsrate: 'Declara la tasa de retirada que supones: sin ella no hay número FIRE que calcular.',
+    ws4_read_fire_nosol:    'Con esta aportación y esta rentabilidad supuesta, la meta no se alcanza en 60 años.',
     // WS.5 — Goals Engine
     wsg_cta_create: 'Crear objetivo', wsg_cta_view: 'Ver objetivos',
     wsg_title: 'Objetivos', wsg_subtitle: 'Convierte tus metas en objetivos medibles.',
@@ -5913,6 +5922,7 @@ const T = {
     wsg_read_behind_req: 'Con el ritmo actual te faltarían {gap} en la fecha prevista. Harían falta {req} al mes.',
     wsg_read_nodate:     'Sin fecha objetivo no se puede decir si llegarás a tiempo: define una y Aurix lo calcula.',
     wsg_read_nosolution: 'Con este capital y sin aportación mensual, este objetivo no se alcanza. Define una aportación.',
+    wsg_read_far:        'A este ritmo el objetivo se alcanza, pero más allá de cien años: sube la aportación o revisa la meta.',
     wsg_read_needsrate:  'Para calcular tu número FIRE hace falta la tasa de retirada que supones.',
     wsg_asm_norate:      'Sin rentabilidad supuesta: se proyecta sólo con lo que aportas.',
     wsg_asm_rate:        'Rentabilidad supuesta: {r}% anual.',
@@ -5925,6 +5935,7 @@ const T = {
     // alcanza, y sin tasa de retirada una meta FIRE no tiene importe.
     wsg_state_nodate:     'Sin fecha objetivo',
     wsg_state_nosolution: 'No se alcanza',
+    wsg_state_far:        'Muy lejano',
     wsg_state_needsrate:  'Falta la tasa de retirada',
     wsg_pv_title:      'Resultado',
     // WS.5A P5/P3/P4 — save model + projects
@@ -5969,6 +5980,10 @@ const T = {
     wstool_journal_n:  'Diario de operaciones',
     wstool_journal_d:  'Registra compras, ventas y rentabilidad.',
     // WS.6 — Compound Growth tool
+    // §3 — las tres etiquetas de retorno, una por destino real.
+    wsback_tools:         'Volver a Herramientas',
+    wsback_templates:     'Volver a Plantillas',
+    wsback_space:         'Volver a Mi espacio',
     wstool_back:          'Volver a Herramientas',
     // ── §4 · EL ESTADO DE GUARDADO, SIN AFIRMAR LO QUE NO SE PUEDE DEMOSTRAR ──
     // Hay DOS estados de éxito porque son dos hechos distintos, y llamar
@@ -6225,6 +6240,7 @@ const T = {
     wsloan_cmp_btn:     'Comparar escenario',
     wsloan_cmp_title:   'Escenario B',
     wsloan_cmp_newpay:  'Cuota del escenario B',
+    wsloan_cmp_incomplete: 'Rellena el importe y el plazo del escenario B para compararlo.',
     wsloan_cmp_dcuota:  'Diferencia cuota',
     wsloan_cmp_dint:    'Diferencia intereses',
     wsloan_cmp_dyears:  'Diferencia plazo',
@@ -6288,6 +6304,7 @@ const T = {
     wsre_basis_appr:  'La apreciación es LATENTE: es la diferencia entre el valor que has declarado y lo que pagaste, y no entra en el flujo de caja porque no se ha cobrado.',
     wsre_basis_declared_all:  'Los valores actuales son los que TÚ has declarado, no una valoración certificada.',
     wsre_basis_declared_some: '{n} de {t} inmuebles tienen valor declarado; el resto se cuenta a coste de compra.',
+    wsre_basis_yield_partial: 'La rentabilidad sólo cubre {n} de {t} inmuebles: los que tienen precio de compra. Sin coste no hay denominador.',
     wsre_kpi_value:     'Valor actual',
     wsre_kpi_mortgage:  'Hipoteca',
     wsre_kpi_cf_annual: 'Cashflow anual',
@@ -8399,6 +8416,8 @@ const T = {
     wsb_stab_steady:   'Steady',
     wsb_stab_dynamic:  'Dynamic',
     wsb_stab_balanced: 'Balanced',
+    wsb_concl_spread:  'Contributing {m} a month instead of nothing projects {amt} more at the end of the {y} years.',
+    wsb_concl_flat:    'With these parameters the scenarios do not separate appreciably.',
     wsb_params_title:  'Comparison parameters',
     wsb_p_base:        'Starting wealth',
     wsb_p_years:       'Horizon',
@@ -8493,6 +8512,11 @@ const T = {
     ws4_read_nw_lo: 'Your wealth is mostly invested.',
     ws4_read_fire_done: 'You already reach the wealth needed for your FIRE goal.',
     ws4_read_fire_dep: 'This FIRE plan depends mainly on your contribution pace.',
+    ws4_f_swr:              'Assumed withdrawal rate',
+    ws4_f_ret:              'Assumed return',
+    ws4_r_noyears:          'not reachable',
+    ws4_read_fire_needsrate: 'Declare the withdrawal rate you assume: without it there is no FIRE number to work out.',
+    ws4_read_fire_nosol:    'With this contribution and this assumed return, the target is not reached within 60 years.',
     // WS.5 — Goals Engine
     wsg_cta_create: 'Create goal', wsg_cta_view: 'View goals',
     wsg_title: 'Goals', wsg_subtitle: 'Turn your aspirations into measurable goals.',
@@ -8516,6 +8540,7 @@ const T = {
     wsg_read_behind_req: 'At the current pace you would be {gap} short on the target date. It would take {req} a month.',
     wsg_read_nodate:     'Without a target date there is no way to say whether you will make it: set one and Aurix will work it out.',
     wsg_read_nosolution: 'With this capital and no monthly contribution, this goal is never reached. Set a contribution.',
+    wsg_read_far:        'At this pace the goal is reached, but beyond a hundred years: raise the contribution or revisit the target.',
     wsg_read_needsrate:  'To work out your FIRE number, the withdrawal rate you assume is required.',
     wsg_asm_norate:      'No assumed return: projected only from what you contribute.',
     wsg_asm_rate:        'Assumed return: {r}% a year.',
@@ -8525,6 +8550,7 @@ const T = {
     wsg_state_nodata:  'Missing data',
     wsg_state_nodate:     'No target date',
     wsg_state_nosolution: 'Not reachable',
+    wsg_state_far:        'Very distant',
     wsg_state_needsrate:  'Withdrawal rate missing',
     wsg_pv_title:      'Result',
     // WS.5A P5/P3/P4 — save model + projects
@@ -8569,6 +8595,9 @@ const T = {
     wstool_journal_n:  'Trade Journal',
     wstool_journal_d:  'Log buys, sells and returns.',
     // WS.6 — Compound Growth tool
+    wsback_tools:         'Back to Tools',
+    wsback_templates:     'Back to Templates',
+    wsback_space:         'Back to My space',
     wstool_back:          'Back to Tools',
     wsfc_eyebrow:      'Workspace',
     wsfc_title:        'Organise, calculate and plan your wealth',
@@ -8803,6 +8832,7 @@ const T = {
     wsloan_cmp_btn:     'Compare scenario',
     wsloan_cmp_title:   'Scenario B',
     wsloan_cmp_newpay:  'Scenario B payment',
+    wsloan_cmp_incomplete: 'Fill in scenario B\'s amount and term to compare it.',
     wsloan_cmp_dcuota:  'Payment difference',
     wsloan_cmp_dint:    'Interest difference',
     wsloan_cmp_dyears:  'Term difference',
@@ -8865,6 +8895,7 @@ const T = {
     wsre_basis_appr:  'Appreciation is UNREALISED: it is the difference between the value you declared and what you paid, and it does not enter cash flow because it has not been received.',
     wsre_basis_declared_all:  'Current values are the ones YOU declared, not a certified valuation.',
     wsre_basis_declared_some: '{n} of {t} properties have a declared value; the rest are counted at purchase cost.',
+    wsre_basis_yield_partial: 'The yield only covers {n} of {t} properties: those with a purchase price. Without cost there is no denominator.',
     wsre_kpi_value:     'Current value',
     wsre_kpi_mortgage:  'Mortgage',
     wsre_kpi_cf_annual: 'Annual cashflow',
@@ -19763,6 +19794,9 @@ const _WS_DOC_KEYS = Object.freeze({
   'aurix_ws_goal_funding_v1': { kind: 'ws_funding',   idOf: x => x && x.id },
   'aurix_ws_scenarios_v1':    { kind: 'ws_scenario',  idOf: x => x && (x.scenarioId || x.id) },
 });
+// La revisión APLICADA de cada preferencia, para poder comparar en el pull en vez
+// de sobrescribir a ciegas.
+const _WS_PREF_REV_PREFIX = 'aurix_ws_prefrev_';
 const _WS_PREF_KEYS = Object.freeze([
   'aurix_ws_tool_state_v1', 'aurix_ws_pinned_v1', 'aurix_ws_recent_v1',
   'aurix_ws_space_hidden_v1', 'aurix_ws_space_top_v1', 'aurix_ws_planning_v1',
@@ -19848,6 +19882,10 @@ function _wsDocRows(key, userId) {
   try { raw = localStorage.getItem(key); } catch (_) { raw = null; }
   if (raw == null) return [];
   let parsed = null; try { parsed = JSON.parse(raw); } catch (_) { return []; }
+  // La revisión que se sube se sella también en local: así el pull sabe que este
+  // dispositivo YA tiene esa versión y no se la vuelve a aplicar encima.
+  const prefRev = Math.max(1, Math.floor(Date.now() / 1000));
+  try { localStorage.setItem(_WS_PREF_REV_PREFIX + key, String(prefRev)); } catch (_) {}
   return [{
     user_id: userId, doc_id: 'pref:' + key, kind: 'ws_pref',
     title: null, body: { key: key, value: parsed },
@@ -19855,7 +19893,7 @@ function _wsDocRows(key, userId) {
     // Las preferencias SÍ son last-writer-wins, y aquí eso es correcto: son
     // ajustes de superficie, no trabajo del usuario. La revisión se deriva del
     // instante para que el último ajuste gane sin inventar un contador.
-    revision: Math.max(1, Math.floor(Date.now() / 1000)),
+    revision: prefRev,
     deleted_at: null, updated_at: nowIso,
   }];
 }
@@ -19931,11 +19969,25 @@ async function _wsDocsPull() {
       }
       if (changed) { try { localStorage.setItem(key, JSON.stringify(local)); touched++; } catch (_) {} }
     }
-    // Las preferencias, una fila por clave, y sólo si el remoto es más reciente.
+    // ── LAS PREFERENCIAS, Y LA REVISIÓN QUE SÍ SE COMPARA ────────────────────
+    // El comentario decía «sólo si el remoto es más reciente» y el código
+    // sobrescribía SIEMPRE: un dispositivo que sólo entraba pisaba el último ajuste
+    // del otro. No es dinero, pero es la misma clase de defecto que la sincronización
+    // de Intelligence ya pagó una vez, y la revisión financiera lo señaló.
+    // La revisión de una preferencia se deriva del instante de escritura
+    // (`_wsDocRows`), así que aquí se compara contra la última aplicada y se guarda.
     for (const r of rows.filter(x => x && x.kind === 'ws_pref')) {
       const b = r.body || {};
       if (!b.key || _WS_PREF_KEYS.indexOf(b.key) === -1) continue;
-      try { localStorage.setItem(b.key, JSON.stringify(b.value)); touched++; } catch (_) {}
+      const remoteRev = Number(r.revision) || 0;
+      let localRev = 0;
+      try { localRev = Number(localStorage.getItem(_WS_PREF_REV_PREFIX + b.key)) || 0; } catch (_) { localRev = 0; }
+      if (!(remoteRev > localRev)) continue;                 // el local es igual o más nuevo
+      try {
+        localStorage.setItem(b.key, JSON.stringify(b.value));
+        localStorage.setItem(_WS_PREF_REV_PREFIX + b.key, String(remoteRev));
+        touched++;
+      } catch (_) {}
     }
     if (touched) { _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now(); }
     return true;
@@ -20002,6 +20054,20 @@ let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
 let _wsTab = null;         // WS.5B/WS.6A — Home tab; null = smart default on entry
 let _wsReturnTab = 'tools'; // WS.14A — tab to return to from a tool/app/view ("Volver")
+// ── §3 · EL RETORNO DICE A DÓNDE VUELVE ─────────────────────────────────────
+// «Plantilla → Volver a Plantillas. Herramienta → Volver a Herramientas.» Estaba
+// hardcodeado: OCHO botones repartían dos literales fijos (`wstool_back` decía
+// siempre «Volver a Herramientas» y `wsb_back` siempre «Volver a Workspace»), así
+// que abrir el Presupuesto —que es una PLANTILLA— desde la galería de plantillas
+// ofrecía volver a Herramientas, y el usuario acababa en otra pestaña de la que
+// había salido. El destino YA se sabía (`_wsReturnTab`, que lo fija quien abre);
+// lo único que faltaba era que la etiqueta lo leyera.
+function _wsBackLabel() {
+  const tab = (_wsReturnTab === 'space' || _wsReturnTab === 'templates' || _wsReturnTab === 'tools')
+    ? _wsReturnTab : 'tools';
+  const k = tab === 'space' ? 'wsback_space' : tab === 'templates' ? 'wsback_templates' : 'wsback_tools';
+  return t(k) || t('wstool_back');
+}
 // WS.6 — Compound Growth tool working state.
 // WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
 // (Was gated false during the WS.5C-only deploy.)
@@ -20253,7 +20319,33 @@ function _wshWireOnce() {
     && el.getAttribute('inputmode') === 'decimal'
     && el.getAttribute('data-wsg-form') !== 'year';
   document.addEventListener('focusin', e => { const el = e.target; if (_wsFmtTarget(el)) el.value = _wsStripThousands(el.value); });
-  document.addEventListener('focusout', e => { const el = e.target; if (_wsFmtTarget(el) && String(el.value).trim() !== '') el.value = _wsFormatInputNumber(el.value); });
+  // ── AL PERDER EL FOCO, EL ESTADO GUARDA UN NÚMERO ─────────────────────────
+  // WS.15A guarda el valor CRUDO mientras se edita —es lo que permite borrar un
+  // campo— y eso es correcto. El problema es que ese texto se PERSISTE y `_wsNum`
+  // desambigua según el idioma ACTIVO, no según el idioma con el que se escribió:
+  // un usuario en español teclea «250.000», guarda el préstamo con cuota 1.122,61 €,
+  // cambia a inglés, y el MISMO documento se recomputa como 250 € ⇒ cuota 1,12 €.
+  // Lo encontró la revisión financiera leyendo el código.
+  //
+  // El arreglo es la separación que §4 pide: TEXTO en edición, VALOR VALIDADO al
+  // terminar. Al salir del campo se canoniza el estado a un NÚMERO —no a una cadena
+  // «canónica», porque «1234.567» volvería a ser ambigua bajo la regla posicional—,
+  // y `_wsNum` devuelve los números tal cual, así que ya no depende del idioma.
+  // El campo VACÍO se respeta: no se canoniza a 0, se queda vacío.
+  document.addEventListener('focusout', e => {
+    const el = e.target;
+    if (!_wsFmtTarget(el)) return;
+    const raw = String(el.value).trim();
+    if (raw === '') return;                       // vacío sigue siendo vacío
+    const n = _wsNumOrNull(raw);
+    if (n != null) {
+      // Se re-emite el valor CANÓNICO por el mismo dispatcher que ya escribe el
+      // estado, así que no hay un segundo camino de escritura que mantener.
+      el.value = _wsCanonicalNumStr(n);
+      try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    }
+    el.value = _wsFormatInputNumber(raw);
+  });
 }
 
 function _wshRefreshMetrics(root, metrics) {
@@ -20380,6 +20472,21 @@ function _wsNum(v) {
 // cuando el usuario no ha escrito nada: es lo que permite a una superficie decir
 // «sin dato» en vez de publicar un 0 que el usuario no ha declarado. El cálculo
 // sigue usando `_wsNum`; esto es para DECIDIR si se publica.
+// ── LA FORMA CANÓNICA DE UN NÚMERO, SIN AMBIGÜEDAD RESIDUAL ─────────────────
+// `String(n)` casi vale, pero deja UN caso ambiguo bajo la regla posicional de
+// `_wsNum`: un valor con exactamente TRES decimales («1234.567») se lee como
+// decimal en inglés y como agrupación de miles en español, que es el mismo defecto
+// que la canonización venía a cerrar. Se añade un cero: cuatro dígitos detrás del
+// separador ya no pueden ser una agrupación de miles, así que la cadena se lee
+// igual en los dos idiomas. No cambia el valor, sólo lo hace inequívoco.
+function _wsCanonicalNumStr(n) {
+  if (!Number.isFinite(Number(n))) return '';
+  let out = String(Number(n));
+  if (out.indexOf('e') !== -1 || out.indexOf('E') !== -1) out = Number(n).toFixed(10).replace(/0+$/, '').replace(/\.$/, '');
+  const dot = out.indexOf('.');
+  if (dot !== -1 && (out.length - dot - 1) === 3) out += '0';
+  return out;
+}
 function _wsNumOrNull(v) {
   if (v == null) return null;
   if (typeof v === 'number') return isFinite(v) ? v : null;
@@ -21030,7 +21137,16 @@ function _wsToolPreviewHtml(toolKey) {
   try {
     if (toolKey === 'compound') {
       const inp = _wsToolStateGet('compound') || _wsToolDefaults();
-      const r = calculateCompoundGrowth(inp.initial, inp.monthly, _wsNum(inp.ret) / 100, inp.years);
+      // UNA SOLA PROYECCIÓN POR DOCUMENTO. Esta vista previa llamaba directamente a
+      // `calculateCompoundGrowth`, que tiene la convención NOMINAL12 CABLEADA,
+      // mientras la herramienta pinta `_wsCompoundProjection` (efectiva para las
+      // simulaciones nuevas). Resultado medido por la revisión financiera: la
+      // pantalla decía 139.238,73 € y la tarjeta del catálogo 141.922 € para el
+      // MISMO documento — 2.684 € de diferencia, y exactamente la reinterpretación
+      // silenciosa que §A prohíbe. La convención es del DOCUMENTO, así que sólo
+      // puede leerla el owner que la conoce.
+      const pr = _wsCompoundProjection(inp);
+      const r = { final: pr.final, series: pr.series.map(x => ({ total: x.value })) };
       const W = 120, H = 30, n = r.series.length, max = Math.max.apply(null, r.series.map(s => s.total).concat([1]));
       const pts = r.series.map((s, i) => `${((i / ((n - 1) || 1)) * W).toFixed(1)},${(H - (s.total / max) * (H - 4) - 2).toFixed(1)}`).join(' ');
       return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,${H} ${pts} ${W},${H}"/><polyline class="wspv-spark-line" points="${pts}"/></svg></div>`;
@@ -21191,7 +21307,7 @@ function _wsProjPreviewHtml(p) {
   }
   if (p.type === 'asset_prices') {
     const np = r.netProfitLoss || 0;
-    return `<div class="wspv wspv-ap"><div class="wspv-ap-top"><span class="wspv-ap-amt is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-ap-lbl">${esc(t('wsap_kpi_net'))}</span></div><div class="wspv-ap-foot"><span>${(r.openCount != null ? r.openCount : 0)} ${esc(t('wsap_kpi_open').toLowerCase())}</span>${r.bestName ? `<span class="is-win">${esc(r.bestName)} ${esc((r.bestPct >= 0 ? '+' : '') + r.bestPct)}%</span>` : ''}</div></div>`;
+    return `<div class="wspv wspv-ap"><div class="wspv-ap-top"><span class="wspv-ap-amt is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-ap-lbl">${esc(t('wsap_kpi_net'))}</span></div><div class="wspv-ap-foot"><span>${(r.openCount != null ? r.openCount : 0)} ${esc(t('wsap_kpi_open').toLowerCase())}</span>${(r.bestName && r.bestPct != null) ? `<span class="is-win">${esc(r.bestName)} ${esc(_wsJrnPct(r.bestPct))}</span>` : ''}</div></div>`;
   }
   if (p.type === 'loan_simulation') {
     const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
@@ -21714,14 +21830,28 @@ function _wsbBaseline() {
 }
 
 // Deterministic Aurix conclusion from the projected set (no advice, no alarmism).
-function _wsbConclusion(results) {
-  if (!results || !results.length) return t('wsb_concl_steady');
-  const max = results.reduce((a, b) => (b.projected > a.projected ? b : a), results[0]);
-  // +500 scenarios lead; when the balanced one ties the top, frame it as balance.
-  const balanced = results.find(s => s.stabKey === 'balanced');
-  if (balanced && Math.abs(balanced.projected - max.projected) < 1) return t('wsb_concl_balanced');
-  if (max.monthly >= 500) return t('wsb_concl_more');
-  return t('wsb_concl_steady');
+// ── §C · LA CONCLUSIÓN DESCRIBE, NO DICTAMINA ───────────────────────────────
+// Esto decidía comparando la aportación mayor contra un umbral de quinientos: un
+// número no documentado, sobre un IMPORTE en divisa base, que repartía tres
+// veredictos distintos. Es la misma escalera sin criterio que §F eliminó del
+// presupuesto por ser «una opinión presentada como medición» — 200/300/400 daba un
+// veredicto y subir uno daba otro, sin que nada explicara por qué ese corte. Y la
+// rama «equilibrado» buscaba una etiqueta de estabilidad que `_wsbCompare` ya no
+// emite: era código MUERTO y no se alcanzaba nunca.
+//
+// Lo que queda es la consecuencia CALCULADA: cuánto separa al escenario de mayor
+// aportación del de no aportar nada, dicho en dinero. Sin juicio y sin umbral.
+function _wsbConclusion(cmp) {
+  const rows = (cmp && cmp.rows) || [];
+  if (!rows.length) return '';
+  const ref = (cmp && cmp.reference) ? cmp.reference.final : 0;
+  const top = rows.reduce((a, b) => (b.projected > a.projected ? b : a), rows[0]);
+  const spread = top.projected - ref;
+  if (!(Math.abs(spread) > 0.5)) return t('wsb_concl_flat');
+  return String(t('wsb_concl_spread') || '')
+    .replace('{amt}', formatBase(Math.abs(spread)))
+    .replace('{m}', formatBase(top.monthly))
+    .replace('{y}', String((cmp && cmp.years) || 0));
 }
 
 // Simple pure-SVG comparative bar chart (baseline + 3 scenarios). No libraries.
@@ -21823,6 +21953,30 @@ function _wsbParamInput(el) {
   if (grid) grid.innerHTML = _wsbCardsHtml(cmp);
   const imp = root.querySelector('[data-wsb-impact]');
   if (imp) imp.innerHTML = _wsbImpactInnerHtml(cmp);
+  const note = root.querySelector('[data-wsb-basenote]');
+  if (note) {
+    note.innerHTML = cmp.base.known ? ''
+      : `<p class="wsb-note is-warn">${_intccEsc(t('wsb_base_missing'))}</p>`;
+  }
+  // Y los supuestos, que también dependen de los parámetros (horizonte, tasa y
+  // origen de la base): dejarlos sin repintar habría publicado el supuesto viejo
+  // junto al resultado nuevo.
+  const asm = root.querySelector('[data-wsb-asm]');
+  if (asm) asm.innerHTML = _wsbAssumptionsListHtml(cmp);
+}
+// Los supuestos de la comparación, en su propio owner para que el render inicial y
+// el repintado por parámetro no puedan divergir.
+function _wsbAssumptionsListHtml(cmp) {
+  const esc = _intccEsc;
+  const rows = [
+    String(t('wstool_asm_rate') || '').replace('{r}', _intv4Num(cmp.ratePct, 2)),
+    t(cmp.convention === _WS_PROJ_CONV.NOMINAL12 ? 'wstool_asm_conv_nominal' : 'wstool_asm_conv_effective'),
+    t('wstool_asm_timing_end'),
+    String(t('wsb_asm_common') || '').replace('{y}', String(cmp.years)),
+    cmp.base.source === 'imported' ? String(t('wsb_asm_base_imported') || '').replace('{d}', _intccDate(cmp.base.at))
+      : cmp.base.known ? t('wsb_asm_base_declared') : t('wsb_asm_base_unknown'),
+  ];
+  return rows.filter(Boolean).map(r => `<li>${esc(r)}</li>`).join('');
 }
 function _renderScenarioBuilder() {
   const esc = _intccEsc;
@@ -21868,24 +22022,22 @@ function _renderScenarioBuilder() {
         <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_years'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="years" value="${esc(_wsFormatInputNumber(params.years))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(t('wstool_unit_years')))}</span></span></label>
         <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_ret'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="ret" value="${esc(_wsFormatInputNumber(params.ret))}"><span class="ws4-field-unit">${esc(_wsFieldUnit('%'))}</span></span></label>
       </div>
-      ${!cmp.base.known ? `<p class="wsb-note is-warn">${esc(t('wsb_base_missing'))}</p>` : ''}
+      ${/* El aviso se repinta con los parámetros: sin su propio hueco en el DOM,
+            declarar la base NO lo hacía desaparecer hasta un re-render completo de
+            la vista — lo encontró la QA visual. Se reserva el contenedor siempre y
+            se rellena (o se vacía) desde el mismo owner que recompone la
+            comparación, así que no puede quedar desincronizado. */''}
+      <div data-wsb-basenote>${!cmp.base.known ? `<p class="wsb-note is-warn">${esc(t('wsb_base_missing'))}</p>` : ''}</div>
       <details class="wstool-asm">
         <summary class="wstool-asm-sum">${esc(t('wstool_asm_title'))}</summary>
-        <ul class="wstool-asm-list">
-          <li>${esc(String(t('wstool_asm_rate') || '').replace('{r}', _intv4Num(cmp.ratePct, 2)))}</li>
-          <li>${esc(t(cmp.convention === _WS_PROJ_CONV.NOMINAL12 ? 'wstool_asm_conv_nominal' : 'wstool_asm_conv_effective'))}</li>
-          <li>${esc(t('wstool_asm_timing_end'))}</li>
-          <li>${esc(String(t('wsb_asm_common') || '').replace('{y}', String(cmp.years)))}</li>
-          <li>${esc(cmp.base.source === 'imported' ? String(t('wsb_asm_base_imported') || '').replace('{d}', _intccDate(cmp.base.at))
-                   : cmp.base.known ? t('wsb_asm_base_declared') : t('wsb_asm_base_unknown'))}</li>
-        </ul>
+        <ul class="wstool-asm-list" data-wsb-asm>${_wsbAssumptionsListHtml(cmp)}</ul>
       </details>
     </section>`;
 
   return `
     <div class="aurix-wsh wsh-sb is-revealed" data-wsh-view="scenario">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsb_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsb_subtitle'))}</p>
       </section>
@@ -21910,7 +22062,7 @@ function _renderScenarioBuilder() {
 
       <section class="wsh-card wsb-concl is-feature">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_concl_title'))}</h3></header>
-        <p class="wsb-concl-text">${esc(_wsbConclusion(results))}</p>
+        <p class="wsb-concl-text">${esc(_wsbConclusion(cmp))}</p>
       </section>
 
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
@@ -22079,7 +22231,7 @@ function _renderWealthProjection() {
   return `
     <div class="aurix-wsh wsh-wsp is-revealed" data-wsh-view="planning">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsp_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsp_subtitle'))}</p>
       </section>
@@ -22113,7 +22265,25 @@ function _ws4Real() {
   return { wealth: Math.round(wealth), liqPct: Math.round(liqPct), liquidity: Math.round(wealth * liqPct / 100), hasReal: wealth > 0 };
 }
 function _ws4Mortgage(loan, ratePct) { const r = (ratePct || 0) / 12 / 100, n = 360; return r > 0 ? loan * r / (1 - Math.pow(1 + r, -n)) : loan / n; }
-function _ws4FireYears(cur, monthly, needed) { if (cur >= needed) return 0; for (let y = 1; y <= 60; y++) { if (projectScenario(cur, monthly, 0.05, y).projected >= needed) return y; } return 60; }
+// ── EL 5 % INVENTADO, TAMBIÉN AQUÍ ──────────────────────────────────────────
+// La plantilla interna de FIRE proyectaba con `0.05` cableado: la MISMA
+// rentabilidad inventada que se retiró de Objetivos, en otra superficie. Y su meta
+// era `gasto × 25`, que asume una tasa de retirada del 4 % que el usuario no ha
+// declarado — mientras `_wsgTargetAmount`, para la misma pregunta, se NIEGA a dar
+// número sin tasa explícita. Dos respuestas distintas a la misma pregunta.
+// Ahora la tasa la pone el usuario. Sin ella no hay años: `null`, y la superficie
+// lo dice. §CONTINUIDAD pide mejorar los internos que reciben la corrección común,
+// y ésta es exactamente ella.
+function _ws4FireYears(cur, monthly, needed, annualRatePct) {
+  if (!(needed > 0)) return null;
+  if (cur >= needed) return 0;
+  const r = _wsNumOrNull(annualRatePct);
+  const rate = (r == null ? 0 : r) / 100;
+  for (let y = 1; y <= 60; y++) {
+    if (_wsProject({ initial: cur, monthly: monthly, years: y, annualRatePct: (r == null ? 0 : r) }).final >= needed) return y;
+  }
+  return null;                                  // no se alcanza en 60 años: se dice
+}
 
 function _ws4Templates() {
   const eur = v => formatBase(v);
@@ -22165,10 +22335,28 @@ function _ws4Templates() {
         { k: 'annualSpend',   label: t('ws4_f_annualspend'),   def: 24000, min: 0, max: 200000,  step: 1000, unit: '€' },
         { k: 'currentWealth', label: t('ws4_f_currentwealth'), def: 0,     min: 0, max: 10000000, step: 1000, unit: '€', sync: r => r.wealth },
         { k: 'monthly',       label: t('ws4_f_monthly'),       def: 500,   min: 0, max: 5000,    step: 50,   unit: '€' },
+        // LA TASA DE RETIRADA, EXPLÍCITA. El `× 25` implícito asumía un 4 % que el
+        // usuario no había declarado; ahora es un campo y sin él no hay meta.
+        { k: 'withdrawalRatePct', label: t('ws4_f_swr'),       def: 4,     min: 0, max: 10,      step: 0.1,  unit: '%' },
+        { k: 'ret',           label: t('ws4_f_ret'),           def: 0,     min: 0, max: 15,      step: 0.5,  unit: '%' },
       ],
-      compute: v => { const needed = (v.annualSpend || 0) * 25; const prog = needed > 0 ? Math.round((v.currentWealth || 0) / needed * 100) : 0; const yrs = _ws4FireYears(v.currentWealth || 0, v.monthly || 0, needed);
-        return { rows: [ { label: t('ws4_r_needed'), value: eur(needed) }, { label: t('ws4_r_progress'), value: needed > 0 ? prog + '%' : '—' }, { label: t('ws4_r_years'), value: prog >= 100 ? t('ws4_done') : t('wsp_unit_years')(yrs) } ],
-          reading: prog >= 100 ? t('ws4_read_fire_done') : t('ws4_read_fire_dep') }; } },
+      compute: v => {
+        const swr = _wsNumOrNull(v.withdrawalRatePct);
+        // Sin tasa de retirada NO hay número, igual que en Objetivos: la misma
+        // pregunta tiene que dar la misma respuesta en las dos superficies.
+        if (swr == null || !(swr > 0)) {
+          return { rows: [ { label: t('ws4_r_needed'), value: '—' }, { label: t('ws4_r_progress'), value: '—' }, { label: t('ws4_r_years'), value: '—' } ],
+                   reading: t('ws4_read_fire_needsrate') };
+        }
+        const needed = (_wsNum(v.annualSpend) || 0) / (swr / 100);
+        const cur = _wsNum(v.currentWealth) || 0;
+        const prog = needed > 0 ? Math.round(cur / needed * 100) : 0;
+        const yrs = _ws4FireYears(cur, _wsNum(v.monthly) || 0, needed, v.ret);
+        return { rows: [ { label: t('ws4_r_needed'), value: eur(needed) },
+                         { label: t('ws4_r_progress'), value: needed > 0 ? prog + '%' : '—' },
+                         { label: t('ws4_r_years'), value: prog >= 100 ? t('ws4_done') : (yrs == null ? t('ws4_r_noyears') : t('wsp_unit_years')(yrs)) } ],
+                 reading: prog >= 100 ? t('ws4_read_fire_done')
+                        : (yrs == null ? t('ws4_read_fire_nosol') : t('ws4_read_fire_dep')) }; } },
   };
 }
 
@@ -22294,7 +22482,7 @@ function _renderWorkspaceDetail() {
   return `
     <div class="aurix-wsh wsh-ws4 is-revealed" data-wsh-view="workspace" data-ws4-id="${esc(p.id)}">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(_wsLabel('workspace', p))}</h2>
         <p class="wsb-subtitle">${esc(tmpl.sub)}</p>
       </section>
@@ -22375,6 +22563,10 @@ function _wsgPersist(g) { const list = _wsgGoals(); const i = list.findIndex(x =
 // LO QUE NO HACE: sumar el capital asignado de varias metas como patrimonio nuevo.
 // `current` es de ESTA meta y no se agrega en ningún sitio (§D lo prohíbe).
 const _WSG_ZERO_RETURN_TYPES = Object.freeze(['emergency', 'free']);
+// Cien años. No es un límite de producto: es el techo de la iteración, y existir
+// más allá de él sigue siendo existir — por eso `far` y `no-solution` son estados
+// distintos.
+const _WSG_SOLVER_MAX_MONTHS = 1200;
 // La tasa SUPUESTA de un objetivo, en porcentaje anual, o null si no hay ninguna.
 // Null no es cero: significa «el usuario no ha supuesto rentabilidad», y por eso la
 // superficie puede decir «sin rentabilidad supuesta» en vez de callarlo.
@@ -22426,10 +22618,27 @@ function calculateGoalProgress(goal, currentWealth) {
   const monthly = Math.max(0, _wsNum(g.monthly));
   const ratePct = _wsgAssumedRatePct(g);
   const thisYear = _wsgThisYear();
-  const years = (g.targetYear && Number(g.targetYear) > thisYear) ? (Number(g.targetYear) - thisYear) : null;
+  // ── UN PLAZO EN EL AÑO EN CURSO SIGUE SIENDO UN PLAZO ─────────────────────
+  // Exigía `> thisYear`, así que fijar el objetivo para ESTE año se publicaba como
+  // «sin fecha objetivo» — «no has puesto plazo» a alguien que sí lo puso, y el
+  // plazo más apretado de todos. El año en curso vale y mide lo que queda de año;
+  // sólo una fecha PASADA deja de ser un plazo (no se puede cumplir hacia atrás).
+  // `monthsLeft` cuenta los meses que quedan de verdad, no doce.
+  const targetYearNum = Number(g.targetYear) || 0;
+  let years = null, monthsToDate = null;
+  if (targetYearNum > thisYear) {
+    years = targetYearNum - thisYear; monthsToDate = years * 12;
+  } else if (targetYearNum === thisYear) {
+    years = 0;
+    let m = 0; try { m = 11 - new Date().getMonth(); } catch (_) { m = 0; }
+    monthsToDate = Math.max(1, m);              // al menos el mes en curso
+  }
   const base = {
-    state: 'no-data', pct: 0, remaining: 0, months: null, etaYear: null,
-    requiredMonthly: null, current: cur, target: target || 0,
+    state: 'no-data', pct: 0, remaining: null, months: null, etaYear: null,
+    // `target || 0` publicaba «Objetivo 0 €» y «Restante 0 €» sobre un dato
+    // DECLARADAMENTE ausente: un cero afirmado donde no hay número. `null` viaja y
+    // la superficie escribe «—».
+    requiredMonthly: null, current: cur, target: (target == null ? null : target),
     targetBasis: tgt.basis, assumedRatePct: ratePct, hasDate: years != null,
     projectedAtDate: null, gapAtDate: null, horizonYears: years,
   };
@@ -22458,14 +22667,24 @@ function calculateGoalProgress(goal, currentWealth) {
   // ── TIEMPO ESTIMADO SÓLO SI EXISTE SOLUCIÓN (§D) ──────────────────────────
   // Con aportación 0 y sin rentabilidad supuesta, la meta no se alcanza nunca. Eso
   // no es «dentro de mucho»: es que no hay solución, y se dice.
-  let months = null;
+  // ── «NO SE ALCANZA» ≠ «NO SE ALCANZA EN EL HORIZONTE QUE MIRO» ────────────
+  // El solver cortaba en 600 meses y todo lo que tardase más se declaraba
+  // `no-solution`, es decir «no se alcanza nunca». Con meta 100.000, capital 0 y
+  // 150 €/mes sin rentabilidad se alcanza en 667 meses: existe solución y se
+  // afirmaba imposible. El horizonte sube a 1.200 meses (100 años, más allá de
+  // cualquier plan personal) y, cuando la aritmética demuestra que hay solución
+  // pero cae fuera, se dice que es MUY LEJANA en vez de negarla.
+  let months = null, beyondHorizon = false;
   if (monthly > 0 || r > 0) {
-    for (let n = 1; n <= 600; n++) { if (fvAt(n) >= target) { months = n; break; } }
+    for (let n = 1; n <= _WSG_SOLVER_MAX_MONTHS; n++) { if (fvAt(n) >= target) { months = n; break; } }
+    // Sin rentabilidad la solución es aritmética y no hace falta iterar para
+    // saber que existe: aportando algo, cualquier meta finita se alcanza.
+    if (months == null && monthly > 0) beyondHorizon = true;
   }
   const etaYear = months != null ? thisYear + Math.ceil(months / 12) : null;
   let requiredMonthly = null, projectedAtDate = null, gapAtDate = null, state;
   if (years != null) {
-    const N = years * 12;
+    const N = monthsToDate != null ? monthsToDate : years * 12;
     projectedAtDate = fvAt(N);
     gapAtDate = projectedAtDate - target;                 // >0 superávit · <0 déficit
     const fvCur = cur * Math.pow(1 + r, N);
@@ -22476,7 +22695,9 @@ function calculateGoalProgress(goal, currentWealth) {
     // sin justificación y declaraba en camino a quien no llega—.
     state = projectedAtDate >= target ? 'on-track' : 'behind';
   } else if (months == null) {
-    state = 'no-solution';
+    // Aportando algo SÍ hay solución, sólo que fuera del horizonte que se mira:
+    // eso es «muy lejana», no «imposible».
+    state = beyondHorizon ? 'far' : 'no-solution';
   } else {
     // Sin fecha NO se afirma cumplimiento: hay un tiempo estimado y se publica como
     // tal, pero el objetivo no está «en camino» de nada porque no hay plazo.
@@ -22495,6 +22716,7 @@ function _wsgReading(goal, prog) {
   if (prog.state === 'no-data')     return t('wsg_read_nodata');
   if (prog.state === 'needs-rate')  return t('wsg_read_needsrate');
   if (prog.state === 'no-solution') return t('wsg_read_nosolution');
+  if (prog.state === 'far')         return t('wsg_read_far');
   if (prog.state === 'behind') {
     // Con plazo, el déficit es COMPUTABLE y se dice: cuánto falta al vencimiento y
     // cuánto habría que aportar. Sin eso, «aumenta el ritmo» es un consejo vacío.
@@ -22533,8 +22755,19 @@ function _wsgPreviewHtml(prog) {
 }
 function _wsgFormValues(root) {
   const v = sel => { const el = root.querySelector('[data-wsg-form="' + sel + '"]'); return el ? el.value : ''; };
-  const year = Number(v('year')) || 0;
-  return { target: Number(v('target')) || 0, current: Number(v('current')) || 0, monthly: Number(v('monthly')) || 0, targetYear: year > 0 ? year : null, mode: 'manual' };
+  // ── EL PARSEO TOLERANTE TAMBIÉN EN EL CAMINO QUE CREA EL DOCUMENTO ─────────
+  // Esto leía con `Number()`, y los campos son `.ws4-num` con `inputmode="decimal"`
+  // cuyo `focusout` los FORMATEA a «250.000»: crear una meta de 250.000 € la
+  // guardaba como 250 €, y con 300 €/mes el objetivo salía «alcanzado» el primer
+  // mes. En inglés «250,000» daba NaN ⇒ 0 ⇒ «faltan datos». Lo encontró la revisión
+  // financiera, y es el mismo olvido que los motores: el parser existía y este
+  // camino no lo usaba. El AÑO se lee con `Number` a propósito —es un entero de
+  // cuatro cifras sin separadores y `_wsNum` podría leer «2.030» como 2030 o como
+  // 2,030 según el idioma—, así que se limpia a dígitos antes.
+  const yearRaw = String(v('year') || '').replace(/[^\d]/g, '');
+  const year = Number(yearRaw) || 0;
+  return { target: _wsNum(v('target')), current: _wsNum(v('current')), monthly: _wsNum(v('monthly')),
+           targetYear: year > 0 ? year : null, mode: 'manual' };
 }
 function _wsgFormPreview() {
   const root = document.querySelector('.wsh-wsg'); if (!root) return;
@@ -22631,6 +22864,9 @@ function _wsgStateMeta(state) {
     //   needs-rate  · una meta FIRE sin tasa de retirada declarada no tiene importe
     'no-date':     { key: 'nodate',    icon: '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>' },
     'no-solution': { key: 'nosolution', icon: '<path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/>' },
+    // `far` no es `no-solution`: hay solución y está fuera del horizonte que se
+    // mira. Negarla sería afirmar un imposible que la aritmética no respalda.
+    'far':         { key: 'far',        icon: '<path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>' },
     'needs-rate':  { key: 'needsrate', icon: '<path d="M12 8h.01"/><path d="M11 12h1v4h1"/>' },
     'no-data':  { key: 'nodata',   icon: '<path d="M12 8h.01"/><path d="M11 12h1v4h1"/>' },
   };
@@ -22845,7 +23081,7 @@ function _renderGoals() {
   return `
     <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsg_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsg_subtitle'))}</p>
       </section>
@@ -23218,15 +23454,35 @@ function _wsToolSave() {
   } else if (_wsToolActive === 'journal') {
     const r = calculateTradeJournal(_wsToolInputs.trades);
     type = 'trade_journal';
-    results = { netProfit: Math.round(r.netProfit), avgReturn: Math.round(r.avgReturn * 10) / 10, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
+    results = { netProfit: Math.round(r.netProfit), avgReturn: r.avgReturn == null ? null : Math.round(r.avgReturn * 10) / 10, avgReturnBasis: r.avgReturnBasis, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
   } else if (_wsToolActive === 'budget') {
     const r = calculateMonthlyBudget(_wsToolInputs);
     type = 'monthly_budget';
-    results = { income: Math.round(r.income), expenses: Math.round(r.expenses), free: Math.round(r.free), saveRate: Math.round(r.saveRate) };
+    // §F — `Math.round(null)` es 0, así que el «no aplicable» de la pantalla se
+    // PERSISTÍA como un 0 % y la tarjeta de Mi Espacio lo publicaba. El null viaja.
+    results = { income: Math.round(r.income), expenses: Math.round(r.expenses), free: Math.round(r.free),
+                saveRate: r.saveRate == null ? null : Math.round(r.saveRate),
+                saveRateBasis: r.saveRateBasis, deficit: r.deficit };
   } else {
-    const r = calculateCompoundGrowth(_wsToolInputs.initial, _wsToolInputs.monthly, _wsNum(_wsToolInputs.ret) / 100, _wsToolInputs.years);
+    // MISMO OWNER QUE LA PANTALLA, por la misma razón: guardar con una convención
+    // distinta de la que se está mostrando publica dos cifras para un documento.
+    const pr = _wsCompoundProjection(_wsToolInputs);
     type = 'compound_growth';
-    results = { final: Math.round(r.final), contributed: Math.round(r.contributed), interest: Math.round(r.interest) };
+    results = {
+      final: Math.round(pr.final),
+      // §B — los cuatro componentes SEPARADOS también en lo guardado. `contributed`
+      // conserva su clave y su significado histórico (inicial + aportaciones) para
+      // los consumidores que ya la leían, y el inicial se añade aparte.
+      initial: Math.round(pr.initial),
+      contributed: Math.round(pr.initial + pr.contributed),
+      contributedOnly: Math.round(pr.contributed),
+      interest: Math.round(pr.growth),
+      // Y la CONVENCIÓN con la que se calculó: sin ella, reabrir el documento otro
+      // día lo recomputaría con la vigente y movería el resultado en silencio.
+      convention: pr.assumptions.convention,
+      annualRatePct: pr.assumptions.annualRatePct,
+      currency: pr.assumptions.currency,
+    };
   }
   const proj = {
     id: existing ? existing.id : ('ws4_' + now + '_' + Math.random().toString(36).slice(2, 7)),
@@ -23378,7 +23634,7 @@ function _renderCompoundTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wstool_compound_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wstool_compound_d'))}</p>
       </section>
@@ -23525,7 +23781,7 @@ function _renderBudgetTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wstool_budget_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wstool_budget_d'))}</p>
       </section>
@@ -23562,7 +23818,7 @@ function calculateTradeJournal(trades) {
     if (!open) {
       exit = sell * qty;
       pl = exit - invested;
-      ret = invested > 0 ? (pl / invested) * 100 : 0;
+      ret = invested > 0 ? (pl / invested) * 100 : null;
       status = pl >= 0 ? 'win' : 'loss';
     }
     return Object.assign({}, tr, { invested, exit, pl, ret, status, open });
@@ -23570,12 +23826,27 @@ function calculateTradeJournal(trades) {
   const closed = list.filter(x => !x.open);
   const totalInvested = list.reduce((s, x) => s + x.invested, 0);
   const netProfit = closed.reduce((s, x) => s + x.pl, 0);
-  const avgReturn = closed.length ? closed.reduce((s, x) => s + x.ret, 0) / closed.length : 0;
+  // ── EL AGREGADO SALE DE IMPORTES, AQUÍ TAMBIÉN ────────────────────────────
+  // Era la MEDIA ARITMÉTICA de los porcentajes, y se publica bajo la etiqueta
+  // «Rentabilidad media» — la MISMA etiqueta que Seguimiento de precios, donde sí
+  // se corrigió a Σresultado/Σinvertido. Dos definiciones bajo una etiqueta: cerrar
+  // 100.000 al 2 % y 1.000 al 200 % daba «+101,0 %» en el Diario y «+3,96 %» en
+  // Precios para las MISMAS operaciones. Lo encontró la revisión financiera.
+  // `null` cuando no hay invertido: dividir por cero no es un 0 %.
+  const closedInvested = closed.reduce((s, x) => s + x.invested, 0);
+  const avgReturn = closedInvested > 0
+    ? closed.reduce((s, x) => s + x.pl, 0) / closedInvested * 100 : null;
+  const avgReturnBasis = closedInvested > 0 ? 'pnl_over_invested' : null;
   const winners = closed.filter(x => x.pl >= 0).length;
   const winRate = closed.length ? (winners / closed.length) * 100 : 0;
   let best = null, worst = null;
-  for (const x of closed) { if (best === null || x.ret > best.ret) best = x; if (worst === null || x.ret < worst.ret) worst = x; }
-  return { list, totalInvested, netProfit, avgReturn, winners, closedCount: closed.length, winRate, best, worst };
+  // Sólo compite lo CALCULABLE: `null < x` es cierto en JavaScript, así que una
+  // operación sin rentabilidad medible ganaba la comparación de «peor».
+  for (const x of closed.filter(x => x.ret != null)) {
+    if (best === null || x.ret > best.ret) best = x;
+    if (worst === null || x.ret < worst.ret) worst = x;
+  }
+  return { list, totalInvested, netProfit, avgReturn, avgReturnBasis, winners, closedCount: closed.length, winRate, best, worst };
 }
 
 function _wsJrnNewDraft() { return { asset: '', atype: 'stock', buy: '', sell: '', qty: '', fee: '', currency: 'EUR', notes: '', buyDate: '', sellDate: '' }; }
@@ -23700,7 +23971,7 @@ function _wsJrnSummaryHtml(res) {
         <span class="wstool-res-final ${npCls}">${esc((res.netProfit >= 0 ? '+' : '') + formatBase(res.netProfit))}</span>
       </div>
       <div class="wsjrn-sum-grid">
-        <div class="wstool-res-cell"><span class="wstool-res-v ${res.avgReturn >= 0 ? 'is-up' : 'is-down'}">${esc(hasClosed ? _wsJrnPct(res.avgReturn) : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_avg'))}</span></div>
+        <div class="wstool-res-cell"><span class="wstool-res-v ${res.avgReturn == null ? '' : (res.avgReturn >= 0 ? 'is-up' : 'is-down')}">${esc(hasClosed ? _wsJrnPct(res.avgReturn) : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_avg'))}</span></div>
         <div class="wstool-res-cell"><span class="wstool-res-v">${esc(hasClosed ? Math.round(res.winRate) + '%' : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_winrate'))}</span></div>
         <div class="wstool-res-cell"><span class="wstool-res-v">${esc(best)}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_best'))}</span></div>
       </div>
@@ -23785,7 +24056,7 @@ function _renderJournalTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wstool_journal_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wstool_journal_d'))}</p>
       </section>
@@ -23905,6 +24176,20 @@ function calculateRealEstatePortfolio(properties) {
   const n = list.length, sum = k => list.reduce((s, x) => s + (Number(x[k]) || 0), 0);
   const buyTotal = sum('buy'), valueTotal = sum('value'), mortgageTotal = sum('mortgage');
   const noiAnnualTotal = sum('noiAnnual');
+  // ── EL RATIO RECORRE UN SOLO CONJUNTO ─────────────────────────────────────
+  // `noiAnnualTotal / buyTotal` sumaba el NOI de TODOS los inmuebles y lo dividía
+  // por el coste de sólo los que lo declaran. La revisión financiera lo midió: un
+  // piso con coste 240.000 y renta 1.250 junto a uno heredado SIN coste y renta 900
+  // publicaba «9,35 %» donde el tramo medible rinde 5,35 % — un 75 % inflado, y la
+  // tarjeta del heredado mostraba «—» contradiciendo al agregado.
+  // Un ratio exige que numerador y denominador describan LO MISMO, así que el
+  // agregado se calcula sólo sobre los inmuebles con base de coste, y se declara
+  // CUÁNTOS son para que la superficie pueda decir que no cubre toda la cartera.
+  const withCost = list.filter(x => x.buy > 0);
+  const costedBuyTotal = withCost.reduce((a, x) => a + x.buy, 0);
+  const costedNoiAnnual = withCost.reduce((a, x) => a + x.noiAnnual, 0);
+  const costedCashflowAnnual = withCost.reduce((a, x) => a + x.cashflowAnnual, 0);
+  const costedEquity = withCost.reduce((a, x) => a + x.equity, 0);
   const cashflowMonthly = sum('cashflowMonthly');
   const equityTotal = valueTotal - mortgageTotal;
   const cashflowAnnual = cashflowMonthly * 12;
@@ -23919,11 +24204,15 @@ function calculateRealEstatePortfolio(properties) {
     noiMonthlyTotal: sum('noiMonthly'), noiAnnualTotal,
     debtServiceMonthlyTotal: sum('debtServiceMonthly'),
     cashflowMonthly, cashflowAnnual,
-    // EL AGREGADO, DESDE IMPORTES. Σ(resultado operativo anual) / Σ(coste), que sí
-    // es la rentabilidad neta del conjunto. `null` cuando no hay base de coste:
-    // dividir por cero no es un 0 %.
-    portfolioNetYield: buyTotal > 0 ? noiAnnualTotal / buyTotal * 100 : null,
-    portfolioCashOnCash: equityTotal > 0 ? cashflowAnnual / equityTotal * 100 : null,
+    // EL AGREGADO, DESDE IMPORTES y sobre UN SOLO CONJUNTO: Σ(resultado operativo
+    // anual) / Σ(coste), las dos sumas sobre los inmuebles que declaran coste.
+    // `null` cuando no hay ninguno: dividir por cero no es un 0 %.
+    portfolioNetYield: costedBuyTotal > 0 ? costedNoiAnnual / costedBuyTotal * 100 : null,
+    portfolioCashOnCash: costedEquity > 0 ? costedCashflowAnnual / costedEquity * 100 : null,
+    // CUÁNTOS inmuebles cubre el ratio. Si no son todos, la superficie lo dice en
+    // vez de presentar el porcentaje como si fuera de la cartera entera.
+    yieldCoverage: withCost.length,
+    yieldCoversAll: withCost.length === n && n > 0,
     // Y la apreciación LATENTE del conjunto, sólo sobre los inmuebles cuyo valor el
     // usuario ha declarado: sumar los que no lo traen los contaría a coste y
     // diluiría la cifra sin decirlo.
@@ -23932,8 +24221,11 @@ function calculateRealEstatePortfolio(properties) {
     valuesDeclared: list.filter(x => x.valueIsDeclared).length,
     // `avgYield` se CONSERVA para los consumidores que lo leían (la vista previa de
     // Mi Espacio y los resultados guardados), pero ya NO es la media de porcentajes:
-    // es el agregado por importes. Misma clave, cifra correcta.
-    avgYield: buyTotal > 0 ? noiAnnualTotal / buyTotal * 100 : 0,
+    // es el MISMO agregado por importes, con el MISMO `null`. Dejarle un `: 0` de
+    // fallback anulaba el arreglo de `_wsJrnPct`, porque la superficie lee esta
+    // clave y no `portfolioNetYield`: un inmueble sin coste publicaba «+0,0 %» con
+    // 800 €/mes de resultado operativo. Lo encontró la revisión financiera.
+    avgYield: costedBuyTotal > 0 ? costedNoiAnnual / costedBuyTotal * 100 : null,
     best, worst,
     ranking: list.slice().sort((a, b) => b.cashflowMonthly - a.cashflowMonthly),
   };
@@ -24083,6 +24375,7 @@ function _wsReSummaryHtml(r) {
           <li>${esc(t('wsre_basis_debt'))}</li>
           <li>${esc(t('wsre_basis_appr'))}</li>
           <li>${esc(r.valuesDeclared === r.count ? t('wsre_basis_declared_all') : String(t('wsre_basis_declared_some') || '').replace('{n}', String(r.valuesDeclared)).replace('{t}', String(r.count)))}</li>
+          ${r.yieldCoversAll ? '' : `<li>${esc(String(t('wsre_basis_yield_partial') || '').replace('{n}', String(r.yieldCoverage)).replace('{t}', String(r.count)))}</li>`}
         </ul>
       </details>
     </div>`;
@@ -24222,7 +24515,7 @@ function _renderRealEstateTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-re-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsre_n'))} <span class="wsb-title-tier">${_wsTierChip('tpl_realestate')}</span></h2>
         <p class="wsb-subtitle">${esc(t('wsre_d'))}</p>
         <p class="wsb-note">${esc(t('wsre_local_note'))}</p>
@@ -24373,7 +24666,10 @@ function _wsRecvSummaryHtml(r) {
         <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
       </div>
       <div class="wsrecv-sumbar"${r.porcentajeCobrado == null ? ` data-ws-na="1" aria-label="${esc(t('wstool_bud_na'))}"` : ``}>${r.porcentajeCobrado == null ? `` : `<span class="wsrecv-sumbar-fill" style="width:${Math.round(r.porcentajeCobrado)}%"></span>`}</div>
-      <div class="wsrecv-sumbar-row"><span class="wsrecv-sumbar-lbl">${Math.round(r.porcentajeCobrado)}% ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>${r.numeroVencidos ? `<span class="wsrecv-overdue-badge">${esc(t('wsrecv_overdue_badge')(r.numeroVencidos))}</span>` : ''}</div>
+      ${/* §H — la barra se blindó y la etiqueta DE AL LADO se quedó sin blindar:
+            `Math.round(null)` es 0 y publicaba «0% cobrado» sobre facturas sin
+            importe. El mismo hunk, dos líneas. */''}
+      <div class="wsrecv-sumbar-row"><span class="wsrecv-sumbar-lbl">${esc(r.porcentajeCobrado == null ? t('wstool_bud_na') : Math.round(r.porcentajeCobrado) + '%')} ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>${r.numeroVencidos ? `<span class="wsrecv-overdue-badge">${esc(t('wsrecv_overdue_badge')(r.numeroVencidos))}</span>` : ''}</div>
     </div>`;
 }
 function _wsRecvCardHtml(it) {
@@ -24449,7 +24745,7 @@ function _renderReceivablesTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsapp_receivables_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsrecv_sub'))}</p>
       </section>
@@ -24624,6 +24920,20 @@ function _wsLoanCmpOutHtml(inp) {
   // compara se mantiene CONSTANTE; si no, no es una comparación.
   const B = calculateLoan({ principal: inp.bPrincipal, rate: inp.bRate, years: inp.bYears,
                             insurance: inp.insurance, fees: inp.fees });
+  // ── UN ESCENARIO INCOMPLETO NO SE COMPARA ─────────────────────────────────
+  // Los campos guardan texto CRUDO (para poder borrarlos), así que el plazo o el
+  // principal de B pueden quedar vacíos. Con plazo 0 la cuota base es 0 y, desde
+  // que B hereda el seguro, `monthlyPayment` sale 25,00 €: una cifra CREÍBLE para
+  // un escenario que no existe. La revisión financiera lo midió — se publicaba
+  // «Cuota del escenario B: 25,00 €», «Δ cuota −1.122,61 €» y «ahorras 154.140,22 €
+  // en intereses». Antes de heredar el seguro daba 0 € y se veía roto; heredarlo lo
+  // disfrazó, así que la guarda tiene que ser explícita.
+  // Se exige principal Y plazo declarados: sin los dos no hay préstamo que comparar.
+  const bPrincipal = _wsNumOrNull(inp.bPrincipal);
+  const bYears = _wsNumOrNull(inp.bYears);
+  if (bPrincipal == null || bPrincipal <= 0 || bYears == null || bYears <= 0) {
+    return `<p class="wsloan-cmp-insight is-incomplete">${esc(t('wsloan_cmp_incomplete'))}</p>`;
+  }
   const dCuota = B.monthlyPayment - A.monthlyPayment;
   const dInt = B.totalInterest - A.totalInterest;
   const dYears = A.years - B.years;
@@ -24661,7 +24971,7 @@ function _renderLoanTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsloan_n'))} <span class="wsb-title-tier">${_wsTierChip('loan_simulation')}</span></h2>
         <p class="wsb-subtitle">${esc(t('wsloan_sub'))}</p>
       </section>
@@ -24704,8 +25014,20 @@ function calculateAssetPrices(rows) {
     return Object.assign({}, rw, { qty, buy, fees, sell, investment, saleValue, profitLoss, returnPct, status, open });
   });
   const closed = list.filter(x => !x.open);
+  // ── SÓLO COMPITE LO CALCULABLE ────────────────────────────────────────────
+  // `best`/`worst` comparaban contra `null`, y en JavaScript `null < x` es cierto:
+  // la fila SIN rentabilidad calculable (inversión 0, por ejemplo unas acciones
+  // recibidas) acababa siendo «la peor operación» por delante de una pérdida real
+  // del −12 %. Y el ranking ordenaba con `b.returnPct - a.returnPct`, que trata el
+  // null como 0 y la coloca en medio de la tabla como si rindiera cero. Una fila
+  // cuya rentabilidad no se puede calcular no puede ganar ni perder una
+  // comparación: se queda fuera del ranking y se lista aparte.
+  const ranked = closed.filter(x => x.returnPct != null);
   let best = null, worst = null;
-  for (const x of closed) { if (best === null || x.returnPct > best.returnPct) best = x; if (worst === null || x.returnPct < worst.returnPct) worst = x; }
+  for (const x of ranked) {
+    if (best === null || x.returnPct > best.returnPct) best = x;
+    if (worst === null || x.returnPct < worst.returnPct) worst = x;
+  }
   return {
     list, count: list.length,
     totalInvested: list.reduce((s, x) => s + x.investment, 0),
@@ -24725,6 +25047,9 @@ function calculateAssetPrices(rows) {
     winningCount: closed.filter(x => x.profitLoss > 0).length,
     losingCount: closed.filter(x => x.profitLoss < 0).length,
     openCount: list.filter(x => x.open).length,
+    // Las cerradas SIN rentabilidad calculable existen y se cuentan, pero no
+    // entran en el ranking: no pueden ordenarse contra un porcentaje.
+    unrankedCount: closed.length - ranked.length,
     best, worst,
   };
 }
@@ -24802,7 +25127,7 @@ function _wsApSummaryHtml(r) {
       <div class="wstool-result wsap-result">
         <div class="wstool-res-main"><span class="wstool-res-label">${esc(t('wsap_kpi_net'))}</span><span class="wstool-res-final ${npCls}">${esc((r.netProfitLoss >= 0 ? '+' : '') + formatBase(r.netProfitLoss))}</span></div>
         <div class="wsap-sum-grid">
-          <div class="wstool-res-cell"><span class="wstool-res-v ${r.averageReturnPct >= 0 ? 'is-up' : 'is-down'}">${esc(hasClosed ? _wsJrnPct(r.averageReturnPct) : '—')}</span><span class="wstool-res-k">${esc(t('wsap_kpi_avg'))}</span></div>
+          <div class="wstool-res-cell"><span class="wstool-res-v ${r.averageReturnPct == null ? '' : (r.averageReturnPct >= 0 ? 'is-up' : 'is-down')}">${esc(hasClosed ? _wsJrnPct(r.averageReturnPct) : '—')}</span><span class="wstool-res-k">${esc(t('wsap_kpi_avg'))}</span></div>
           <div class="wstool-res-cell"><span class="wstool-res-v">${r.openCount}</span><span class="wstool-res-k">${esc(t('wsap_kpi_open'))}</span></div>
           <div class="wstool-res-cell is-gain"><span class="wstool-res-v">${esc(best)}</span><span class="wstool-res-k">${esc(t('wsap_kpi_best'))}</span></div>
         </div>
@@ -24814,7 +25139,11 @@ function _wsApRankingHtml(r) {
   const closed = r.list.filter(x => !x.open);
   if (!closed.length) return '';
   const maxAbs = Math.max.apply(null, closed.map(x => Math.abs(x.returnPct)).concat([1]));
-  const rows = closed.slice().sort((a, b) => b.returnPct - a.returnPct).map(x => {
+  // Sólo entran en el ranking las cerradas con rentabilidad CALCULABLE: ordenar por
+  // `b.returnPct - a.returnPct` trataba el null como 0 y colocaba una operación de
+  // rentabilidad desconocida en medio de la tabla como si rindiera cero.
+  const rows = closed.filter(x => x.returnPct != null).slice()
+    .sort((a, b) => b.returnPct - a.returnPct).map(x => {
     const w = Math.max(4, Math.abs(x.returnPct) / maxAbs * 100);
     return `<div class="wsap-rank-row"><span class="wsap-rank-t">${esc(x.ticker || String(x.assetName).slice(0, 6))}</span><div class="wsap-rank-track"><span class="wsap-rank-bar is-${x.status}" style="width:${w.toFixed(0)}%"></span></div><span class="wsap-rank-v is-${x.profitLoss >= 0 ? 'win' : 'loss'}">${esc(_wsJrnPct(x.returnPct))}</span></div>`;
   }).join('');
@@ -24869,7 +25198,7 @@ function _renderAssetPricesTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-ap-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
         <h2 class="wsb-title">${esc(t('wsapp_assets_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsap_sub'))}</p>
       </section>

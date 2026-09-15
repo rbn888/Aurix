@@ -41,7 +41,8 @@ function ctx(lang) {
   vm.createContext(sb);
   sb.lang = lang || 'es';
   ['_WSBUD_INCOME','_WSBUD_EXPENSES'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
-  ['_wsNum','_wsNumOrNull','_wsJrnPct','calculateLoan','calculateRealEstatePortfolio','calculateMonthlyBudget']
+  ['_wsNum','_wsCanonicalNumStr','_wsNumOrNull','_wsJrnPct','calculateLoan',
+   'calculateRealEstatePortfolio','calculateMonthlyBudget','calculateAssetPrices','calculateTradeJournal']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
@@ -278,6 +279,136 @@ console.log('\n7 · Inmobiliario · el usuario ve la separación:');
   const occ = k => (app.match(new RegExp('\\n    ' + k + ':', 'g')) || []).length;
   ok('7.6 las diez claves existen en ES y EN',
     LK.every(k => occ(k) === 2), JSON.stringify(LK.map(k => k + ':' + occ(k))));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 8 · LOS HALLAZGOS DE LA REVISIÓN FINANCIERA, COMO REGRESIÓN
+// ════════════════════════════════════════════════════════════════════════════
+// Catorce, y ninguno lo cubría un gate. El crítico lo introdujo la propia
+// corrección anterior: la pantalla de interés compuesto mostraba una convención y
+// el guardado usaba otra.
+console.log('\n8 · Regresión de la revisión financiera:');
+{
+  // ── [crítico] UN DOCUMENTO, UNA PROYECCIÓN ────────────────────────────────
+  // `_wsToolSave` y la vista previa del catálogo llamaban a
+  // `calculateCompoundGrowth` (NOMINAL12 cableado) mientras la herramienta pintaba
+  // `_wsProject` (efectiva). Con los defaults nuevos la pantalla decía 139.238,73 €
+  // y la tarjeta 141.922 € para el MISMO documento: 2.684 € de diferencia.
+  ok('8.1 nadie llama ya al owner con la convención cableada',
+    (app.match(/calculateCompoundGrowth\(/g) || []).length === 1,
+    'sólo su propia declaración: ' + (app.match(/calculateCompoundGrowth\(/g) || []).length);
+  ok('8.2 el guardado y la vista previa usan el MISMO owner que la pantalla',
+    /const pr = _wsCompoundProjection\(_wsToolInputs\);/.test(app)
+    && /const pr = _wsCompoundProjection\(inp\);/.test(app));
+  ok('8.3 y lo guardado lleva su convención, para que reabrirlo no lo reinterprete',
+    /convention: pr\.assumptions\.convention/.test(app)
+    && /annualRatePct: pr\.assumptions\.annualRatePct/.test(app));
+  ok('8.4 el capital inicial se guarda SEPARADO de las aportaciones',
+    /initial: Math\.round\(pr\.initial\)/.test(app)
+    && /contributedOnly: Math\.round\(pr\.contributed\)/.test(app));
+
+  // ── [alto] UN RATIO, UN CONJUNTO ──────────────────────────────────────────
+  const mixed = RE([{ buy: 240000, rent: 1250, expenses: 180 }, { rent: 900, expenses: 100 }]);
+  ok('8.5 el yield agregado no mezcla un numerador de todos con un denominador de algunos',
+    near(mixed.portfolioNetYield, (1250 - 180) * 12 / 240000 * 100, 0.01),
+    JSON.stringify({ publicado: mixed.portfolioNetYield, correcto: (1250 - 180) * 12 / 240000 * 100 }));
+  ok('8.6 …y declara a cuántos inmuebles cubre',
+    mixed.yieldCoverage === 1 && mixed.count === 2 && mixed.yieldCoversAll === false);
+  ok('8.7 `avgYield` es null sin base de coste (el `: 0` anulaba el arreglo de `_wsJrnPct`)',
+    RE([{ rent: 900, expenses: 100 }]).avgYield === null,
+    JSON.stringify(RE([{ rent: 900, expenses: 100 }]).avgYield));
+
+  // ── [alto] UN ESCENARIO INCOMPLETO NO SE COMPARA ──────────────────────────
+  ok('8.8 sin principal o sin plazo, la comparación de préstamo no se publica',
+    /if \(bPrincipal == null \|\| bPrincipal <= 0 \|\| bYears == null \|\| bYears <= 0\)/.test(app)
+    && /wsloan_cmp_incomplete/.test(app));
+  ok('8.9 …porque heredar el seguro hacía creíble un escenario inexistente',
+    (() => { const b = LOAN({ principal: '250000', rate: '3,5', years: '', insurance: '25' });
+      return near(b.monthlyPayment, 25, 0.01); })(),
+    'plazo vacío ⇒ cuota = sólo el seguro');
+
+  // ── [alto] EL TEXTO PERSISTIDO NO PUEDE DEPENDER DEL IDIOMA ACTIVO ────────
+  ok('8.10 la forma canónica se lee igual en los dos idiomas',
+    [250000, 3.5, 1234.567, 0.125, 12500.75, -1500, 3.125].every(v => {
+      const c = run('_wsCanonicalNumStr(' + v + ')');
+      return run('_wsNum(' + JSON.stringify(c) + ')', ES) === v
+          && run('_wsNum(' + JSON.stringify(c) + ')', EN) === v; }),
+    JSON.stringify([250000, 3.5, 1234.567, 0.125, 3.125].map(v => {
+      const c = run('_wsCanonicalNumStr(' + v + ')');
+      return [c, run('_wsNum(' + JSON.stringify(c) + ')', ES), run('_wsNum(' + JSON.stringify(c) + ')', EN)]; })));
+  ok('8.11 el caso de TRES decimales, que era el que seguía ambiguo, se desambigua',
+    run('_wsCanonicalNumStr(1234.567)') === '1234.5670'
+    && run('_wsNum("1234.5670")', ES) === 1234.567 && run('_wsNum("1234.5670")', EN) === 1234.567);
+  ok('8.12 y el estado se canoniza al perder el foco, no al escribir',
+    /const n = _wsNumOrNull\(raw\);/.test(app) && /el\.value = _wsCanonicalNumStr\(n\);/.test(app)
+    && /if \(raw === ''\) return;/.test(app));
+
+  // ── [alto] EL FORMULARIO DE OBJETIVOS TAMBIÉN PARSEA TOLERANTE ────────────
+  ok('8.13 crear un objetivo ya no lee con Number()',
+    !/target: Number\(v\('target'\)\) \|\| 0/.test(app)
+    && /target: _wsNum\(v\('target'\)\)/.test(app));
+  ok('8.14 …y el AÑO se limpia a dígitos, que es su formato real',
+    /String\(v\('year'\) \|\| ''\)\.replace\(\/\[\^\\d\]\/g, ''\)/.test(app));
+
+  // ── [medio] CEROS FALSOS QUE VOLVÍAN POR EL CAMINO DE GUARDADO ────────────
+  ok('8.15 el presupuesto no persiste un 0 % donde dijo «no aplicable»',
+    /saveRate: r\.saveRate == null \? null : Math\.round\(r\.saveRate\)/.test(app));
+  ok('8.16 la etiqueta de cobros dice «no aplicable», no «0%»',
+    /r\.porcentajeCobrado == null \? t\('wstool_bud_na'\)/.test(app));
+  ok('8.17 y el mejor activo no se publica como «+null%»',
+    /\(r\.bestName && r\.bestPct != null\)/.test(app));
+
+  // ── [medio] `null` NO COMPITE EN UNA COMPARACIÓN ──────────────────────────
+  const AP = rows => run('calculateAssetPrices(' + JSON.stringify(rows) + ')');
+  ok('8.18 una operación sin rentabilidad calculable no gana el «peor»',
+    (() => { const r = AP([{ assetName: 'REGALO', quantity: '10', buyPrice: '', sellPrice: '5' },
+                           { assetName: 'REAL', quantity: '10', buyPrice: '100', sellPrice: '88' }]);
+      return r.worst && r.worst.assetName === 'REAL' && r.unrankedCount === 1; })(),
+    JSON.stringify(AP([{ assetName: 'REGALO', quantity: '10', buyPrice: '', sellPrice: '5' },
+                       { assetName: 'REAL', quantity: '10', buyPrice: '100', sellPrice: '88' }]).worst));
+  ok('8.19 su rentabilidad es null, no 0',
+    AP([{ quantity: '10', buyPrice: '', sellPrice: '5' }]).list[0].returnPct === null);
+  ok('8.20 y el ranking no la coloca como si rindiera cero',
+    /closed\.filter\(x => x\.returnPct != null\)\.slice\(\)/.test(app));
+
+  // ── [medio] EL DIARIO TENÍA LA MISMA ETIQUETA CON OTRA DEFINICIÓN ─────────
+  const TJ = rows => run('calculateTradeJournal(' + JSON.stringify(rows) + ')');
+  ok('8.21 «Rentabilidad media» significa lo MISMO en Diario y en Precios',
+    (() => { const rows = [{ qty: '1', buy: '100000', sell: '102000' },
+                           { qty: '1', buy: '1000', sell: '3000' }];
+      const j = TJ(rows);
+      const a = AP([{ quantity: '1', buyPrice: '100000', sellPrice: '102000' },
+                    { quantity: '1', buyPrice: '1000', sellPrice: '3000' }]);
+      return near(j.avgReturn, a.averageReturnPct, 0.01) && j.avgReturn < 10; })(),
+    JSON.stringify([TJ([{ qty: '1', buy: '100000', sell: '102000' }, { qty: '1', buy: '1000', sell: '3000' }]).avgReturn,
+                    AP([{ quantity: '1', buyPrice: '100000', sellPrice: '102000' },
+                        { quantity: '1', buyPrice: '1000', sellPrice: '3000' }]).averageReturnPct]));
+  ok('8.22 …y ya no es la media aritmética de porcentajes (que daba +101 %)',
+    (() => { const j = TJ([{ qty: '1', buy: '100000', sell: '102000' }, { qty: '1', buy: '1000', sell: '3000' }]);
+      return j.avgReturn != null && j.avgReturn < 10 && j.avgReturnBasis === 'pnl_over_invested'; })());
+  ok('8.23 sin invertido es null, no 0',
+    TJ([{ qty: '1', buy: '', sell: '100' }]).avgReturn === null);
+
+  // ── [medio] FIRE INTERNO: LA TASA LA PONE EL USUARIO ─────────────────────
+  ok('8.24 la plantilla FIRE ya no proyecta con un 5 % cableado',
+    !/projectScenario\(cur, monthly, 0\.05, y\)/.test(app)
+    && /_ws4FireYears\(cur, monthly, needed, annualRatePct\)/.test(app));
+  ok('8.25 …ni asume una tasa de retirada del 4 % con un «× 25» implícito',
+    !/\(v\.annualSpend \|\| 0\) \* 25/.test(app)
+    && /const swr = _wsNumOrNull\(v\.withdrawalRatePct\);/.test(app));
+  ok('8.26 sin tasa de retirada NO da número, igual que Objetivos',
+    /ws4_read_fire_needsrate/.test(app));
+
+  // ── [medio] LA CONCLUSIÓN DE ESCENARIOS NO DICTAMINA ─────────────────────
+  ok('8.27 el umbral de 500 y el `stabKey` muerto han desaparecido',
+    !/max\.monthly >= 500/.test(app) && !/s\.stabKey === 'balanced'/.test(app));
+  ok('8.28 …y la conclusión dice la consecuencia calculada',
+    /wsb_concl_spread:\s*'Aportar \{m\} al mes/.test(app));
+
+  // ── LAS PREFERENCIAS SE FUSIONAN POR REVISIÓN ────────────────────────────
+  ok('8.29 el pull de preferencias compara revisión en vez de sobrescribir',
+    /if \(!\(remoteRev > localRev\)\) continue;/.test(app)
+    && /_WS_PREF_REV_PREFIX/.test(app));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

@@ -35,11 +35,12 @@ function konstSrc(name){ const s='const '+name+' ='; const i=app.indexOf(s); if(
   return app.slice(i,k); }
 let pass=0,fail=0; function ok(n,c,info){ if(c){pass++;console.log('  ✓ '+n);}else{fail++;console.log('  ✗ '+n+(info?'  ['+info+']':''));} }
 const near = (a,b,tol) => Number.isFinite(a) && Math.abs(a-b) <= (tol==null?0.01:tol);
-const KONSTS = ['_WS_PROJ_CONV','_WS_PROJ_CONV_DEFAULT','_WS_PROJ_TIMING','_WS_PROJ_TIMING_DEFAULT','_WSG_ZERO_RETURN_TYPES','_WSG_TYPES',
+const KONSTS = ['_WS_PROJ_CONV','_WS_PROJ_CONV_DEFAULT','_WS_PROJ_TIMING','_WS_PROJ_TIMING_DEFAULT','_WSG_ZERO_RETURN_TYPES','_WSG_SOLVER_MAX_MONTHS','_WSG_TYPES',
                 '_WSB_HORIZON','_WSB_RETURN','_WSB_MAX_SCENARIOS','_WSB_PARAMS_KEY','_WSH_SCENARIOS_KEY'];
 const FNS = ['_wsNum','_wsNumOrNull','_wsProjMonthlyRate','_wsProject','calculateCompoundGrowth',
              'projectScenario','_wsgThisYear','_wsgAssumedRatePct','_wsgTargetAmount','calculateGoalProgress',
-             '_wshReadStore','_wsbParams','_wsbParamsSet','_wsbBase','_wsbScenarios','_wsbCompare'];
+             '_wshReadStore','_wsbParams','_wsbParamsSet','_wsbBase','_wsbScenarios','_wsbCompare',
+             '_wsCanonicalNumStr'];
 function ctx(langCode) {
   const sb = { Math, Number, String, isFinite, isNaN, parseFloat, JSON, Array, Object, Date,
                console: { warn(){}, log(){} } };
@@ -235,12 +236,23 @@ console.log('\n5 · Cada tipo calcula su meta con sus propios campos:');
     JSON.stringify(G({ type: 'fire', annualSpend: '24000' }).state));
   ok('5.6 una tasa de retirada de 0 no produce una división por cero',
     (() => { const f = G({ type: 'fire', annualSpend: '24000', withdrawalRatePct: '0' });
-      return f.state === 'needs-rate' && Number.isFinite(f.target); })());
+      // `target` es null (no hay importe), no Infinity ni NaN: es lo correcto desde
+      // que los ceros falsos se retiraron del estado sin datos.
+      return f.state === 'needs-rate' && f.target === null; })(),
+    JSON.stringify(G({ type: 'fire', annualSpend: '24000', withdrawalRatePct: '0' })));
   ok('5.7 libre y patrimonio usan el importe declarado',
     G({ type: 'free', target: '10000' }).targetBasis === 'declared_target'
     && G({ type: 'wealth', target: '500000' }).target === 500000);
   ok('5.8 sin ningún campo, no hay meta y el estado es «faltan datos»',
     G({ type: 'free' }).state === 'no-data' && G({ type: 'emergency' }).state === 'no-data');
+  // Y sin meta NO se publican ceros: «Objetivo 0 €» y «Restante 0 €» eran un cero
+  // AFIRMADO sobre un dato declaradamente ausente. Lo señaló la revisión financiera.
+  ok('5.9 …y no se publica ni objetivo 0 ni restante 0',
+    (() => { const n = G({ type: 'free' });
+      return n.target === null && n.remaining === null; })(),
+    JSON.stringify({ target: G({ type: 'free' }).target, remaining: G({ type: 'free' }).remaining }));
+  ok('5.10 una meta FIRE sin tasa tampoco publica un importe',
+    G({ type: 'fire', annualSpend: '24000' }).target === null);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -277,6 +289,25 @@ console.log('\n6 · Ningún estado afirma un cumplimiento que no se ha calculado
     String(G({ type: 'wealth', target: '100000', current: '50000', monthly: '100', targetYear: Y + 2, ret: '0' }).requiredMonthly));
   ok('6.7 una fecha en el PASADO no cuenta como plazo (no se inventa cumplimiento)',
     G({ type: 'free', target: '10000', current: '1000', monthly: '200', targetYear: Y - 1 }).hasDate === false);
+  // ── UN PLAZO EN EL AÑO EN CURSO SIGUE SIENDO UN PLAZO ────────────────────
+  // Se exigía `> thisYear`, así que fijar el objetivo para ESTE año se publicaba
+  // como «sin fecha objetivo» — a alguien que sí lo había puesto, y con el plazo
+  // más apretado de todos. Lo encontró la revisión financiera.
+  ok('6.7b el año EN CURSO sí es un plazo, y mide lo que queda de año',
+    (() => { const n = G({ type: 'free', target: '10000', current: '5000', monthly: '1000', targetYear: Y });
+      return n.hasDate === true && n.state !== 'no-date' && n.projectedAtDate != null; })(),
+    JSON.stringify(G({ type: 'free', target: '10000', current: '5000', monthly: '1000', targetYear: Y })));
+  // ── «NO SE ALCANZA» ≠ «NO EN EL HORIZONTE QUE MIRO» ──────────────────────
+  // El solver cortaba en 600 meses y declaraba imposible lo que tardaba más: meta
+  // 100.000 desde 0 con 150/mes son 667 meses, y existe.
+  ok('6.7c una meta alcanzable en 667 meses NO se declara imposible',
+    (() => { const n = G({ type: 'free', target: '100000', current: '0', monthly: '150' });
+      return n.months === 667 && n.state !== 'no-solution'; })(),
+    JSON.stringify(G({ type: 'free', target: '100000', current: '0', monthly: '150' }).months));
+  ok('6.7d …y lo que de verdad no se alcanza sigue siendo `no-solution`',
+    G({ type: 'free', target: '10000', current: '1000', monthly: '0' }).state === 'no-solution');
+  ok('6.7e el horizonte del solver se declara, no es un número suelto',
+    run('_WSG_SOLVER_MAX_MONTHS') === 1200);
   ok('6.8 alcanzado es alcanzado: 100 %, sin pendiente y sin aportación necesaria',
     (() => { const r = G({ type: 'free', target: '1000', current: '1200' });
       return r.state === 'reached' && r.pct === 100 && r.remaining === 0 && r.requiredMonthly === 0; })());
