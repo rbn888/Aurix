@@ -5767,7 +5767,9 @@ const T = {
     wsh_fp_future:         'Meta',
     wsh_fp_read_none:      'No has definido objetivos todavía.',
     wsh_fp_read_goal:      n => `Tu objetivo más cercano está a ${n} ${n === 1 ? 'año' : 'años'}.`,
-    wsh_fp_read_scenario:  pct => `Tu mejor escenario supera tu situación actual en un ${pct}%.`,
+    // §C — sin veredicto prescriptivo: el escenario que más proyecta es el que más
+    // obliga a aportar, y decidir si eso conviene no es una consecuencia calculada.
+    wsh_fp_read_scenario:  pct => `Aportar más eleva la proyección un ${pct}% frente a no aportar nada.`,
     wsh_fp_read_reached:   'Ya has alcanzado uno de tus objetivos.',
     // WS.2 — Scenario Builder
     wsb_title:         'Simulador de escenarios',
@@ -5786,9 +5788,28 @@ const T = {
     wsb_b_desc: '+500 €/mes',
     wsb_c_name: 'Crecimiento equilibrado',
     wsb_c_desc: '+500 €/mes · mayor estabilidad',
+    // §C — las etiquetas de «estabilidad» se RETIRAN: afirmaban una propiedad de
+    // riesgo que ningún cálculo respalda. Se conservan las claves porque un
+    // escenario GUARDADO de antes puede referenciarlas, pero ya no se pintan.
     wsb_stab_steady:   'Constante',
     wsb_stab_dynamic:  'Dinámico',
     wsb_stab_balanced: 'Equilibrado',
+    // §C — los parámetros comunes, las dos causas de la diferencia y el rango.
+    wsb_params_title:  'Parámetros de la comparación',
+    wsb_p_base:        'Patrimonio de partida',
+    wsb_p_years:       'Horizonte',
+    wsb_p_ret:         'Rentabilidad supuesta',
+    wsb_base_missing:  'Declara tu patrimonio de partida: sin él Aurix no proyecta desde cero, porque cero sería un dato y no lo tiene.',
+    wsb_by_contrib:    'De lo que aportas',
+    wsb_by_growth:     'Del crecimiento estimado',
+    wsb_impact_nocontrib: 'Sin aportar nada',
+    wsb_impact_highest:   'Aportación más alta',
+    wsb_impact_spread:    'Rango de la comparación al final del horizonte',
+    wsb_pct_na:        'porcentaje no aplicable',
+    wsb_asm_common:    'Los tres escenarios comparten horizonte ({y} años), rentabilidad y convención: si no, no serían comparables.',
+    wsb_asm_base_declared: 'El patrimonio de partida es el que TÚ has declarado.',
+    wsb_asm_base_imported: 'El patrimonio de partida se importó el {d}.',
+    wsb_asm_base_unknown:  'Sin patrimonio de partida declarado: la comparación mide sólo el efecto de aportar.',
     wsb_proj:   'Patrimonio proyectado',
     wsb_diff:   'Diferencia vs actual',
     wsb_save:   'Guardar escenario',
@@ -5803,8 +5824,6 @@ const T = {
     wsb_concl_more: 'Aumentar aportaciones mejora claramente el resultado proyectado.',
     wsb_concl_steady: 'El mayor impacto viene de mantener una aportación mensual constante.',
     wsb_disclaimer: 'Simulación orientativa. No es una promesa de rentabilidad ni asesoramiento financiero.',
-    wsb_impact_best:   'Mejor escenario',
-    wsb_impact_uplift: 'Mejora proyectada a 10 años',
     // WS.3 — Planning · Wealth Projection
     wsp_cta:          'Explorar proyección',
     wsp_title:        'Proyección patrimonial',
@@ -8358,7 +8377,7 @@ const T = {
     wsh_fp_future:         'Goal',
     wsh_fp_read_none:      'You haven\'t set any goals yet.',
     wsh_fp_read_goal:      n => `Your nearest goal is ${n} ${n === 1 ? 'year' : 'years'} away.`,
-    wsh_fp_read_scenario:  pct => `Your best scenario beats your current situation by ${pct}%.`,
+    wsh_fp_read_scenario:  pct => `Contributing more raises the projection by ${pct}% versus contributing nothing.`,
     wsh_fp_read_reached:   'You\'ve already reached one of your goals.',
     // WS.2 — Scenario Builder
     wsb_title:         'Scenario Builder',
@@ -8380,6 +8399,21 @@ const T = {
     wsb_stab_steady:   'Steady',
     wsb_stab_dynamic:  'Dynamic',
     wsb_stab_balanced: 'Balanced',
+    wsb_params_title:  'Comparison parameters',
+    wsb_p_base:        'Starting wealth',
+    wsb_p_years:       'Horizon',
+    wsb_p_ret:         'Assumed return',
+    wsb_base_missing:  'Declare your starting wealth: without it Aurix does not project from zero, because zero would be a figure it does not have.',
+    wsb_by_contrib:    'From what you contribute',
+    wsb_by_growth:     'From estimated growth',
+    wsb_impact_nocontrib: 'Contributing nothing',
+    wsb_impact_highest:   'Highest contribution',
+    wsb_impact_spread:    'Comparison range at the end of the horizon',
+    wsb_pct_na:        'percentage not applicable',
+    wsb_asm_common:    'All three scenarios share horizon ({y} years), return and convention: otherwise they would not be comparable.',
+    wsb_asm_base_declared: 'The starting wealth is the one YOU declared.',
+    wsb_asm_base_imported: 'The starting wealth was imported on {d}.',
+    wsb_asm_base_unknown:  'No starting wealth declared: the comparison measures only the effect of contributing.',
     wsb_proj:   'Projected wealth',
     wsb_diff:   'Difference vs current',
     wsb_save:   'Save scenario',
@@ -8394,8 +8428,6 @@ const T = {
     wsb_concl_more: 'Increasing contributions clearly improves the projected outcome.',
     wsb_concl_steady: 'The biggest impact comes from keeping a steady monthly contribution.',
     wsb_disclaimer: 'Indicative simulation. Not a promise of returns nor financial advice.',
-    wsb_impact_best:   'Best scenario',
-    wsb_impact_uplift: 'Projected improvement over 10 years',
     // WS.3 — Planning · Wealth Projection
     wsp_cta:          'Explore projection',
     wsp_title:        'Wealth Projection',
@@ -20206,6 +20238,9 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsrecv-input')) { _wsRecvOnInput(el); return; }
     if (el.hasAttribute('data-wsrecv-search')) { _wsRecvSearch(el); return; }
     if (el.getAttribute('data-wsloan-cmp-input')) { _wsLoanCmpInput(el); return; }
+    // §C — los parámetros COMUNES de la comparación. Valor crudo en edición (WS.15A)
+    // y un solo repintado del bloque de resultados, no de la vista entera.
+    if (el.getAttribute('data-wsb-param')) { _wsbParamInput(el); return; }
     if (el.getAttribute('data-wsap-input')) { _wsApOnInput(el); return; }
   });
   // WS.12 — property photo upload (file input → downscaled data URL).
@@ -20233,7 +20268,7 @@ function _wshRefreshMetrics(root, metrics) {
 // (present → base → future) with scenario nodes. Pure SVG/CSS, no libraries, no
 // Intelligence orb/ECG/pulse. Blue Aurix, soft one-shot draw animation.
 // WS.5A — dynamic reading under the Future Path. Communicates, not decorates.
-// Priority: reached goal → nearest goal ETA → best scenario uplift → none.
+// Priority: reached goal → nearest goal ETA → contribution uplift → none.
 function _wshFuturePathReading() {
   let goals = [], scenarios = [];
   try { goals = _wshReadStore(_WSH_GOALS_KEY); } catch (_) {}
@@ -20675,7 +20710,22 @@ const _WS_CATALOG = Object.freeze([
   // lo que §3 pide: conservar el estado público previo mientras las capacidades
   // nuevas están en preparación.
   { id: 'tpl_mbudget',           kind: 'template', published: false, featureKey: 'workspace.budget',      commercialTier: 'premium', opens: 'budget' },
-  { id: 'tpl_assets',            kind: 'template', published: false, featureKey: 'workspace.prices',      commercialTier: 'premium', opens: 'assets' },
+  // ── §J · SE QUEDA INTERNA, Y LA EXCEPCIÓN SE EXPLICA ──────────────────────
+  // §J pide que Seguimiento de precios «aporte valor diferente a Market» y que, si
+  // sigue siendo redundante, se mantenga INTERNA explicando la excepción, porque
+  // la regla es no vender una copia. Las dos condiciones se cumplen:
+  //   · La LISTA de activos con seguimiento ya existe en Market (la watchlist), y
+  //     además SÍ sincroniza entre dispositivos (project_persistence_model). Una
+  //     plantilla de watchlist sería una segunda copia con menos garantías.
+  //   · Y lo que de verdad hay construido aquí (`calculateAssetPrices`) no es una
+  //     watchlist: es un registro de compraventa con resultado, que es la misma
+  //     pregunta que responde el DIARIO DE OPERACIONES (§I). Publicar las dos sería
+  //     dos hogares públicos para una capacidad, que §1 prohíbe.
+  // Su matemática SÍ se ha corregido (el agregado era una media de porcentajes),
+  // porque §CONTINUIDAD pide mejorar los internos que reciben la corrección común.
+  // Queda como decisión del founder: si quiere publicarla, el camino es fusionarla
+  // con el Diario, no duplicarlo.
+  { id: 'tpl_assets',            kind: 'template', published: false, featureKey: null,                    commercialTier: 'undecided' },
   { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: 'workspace.receivables', commercialTier: 'premium', opens: 'receivables' },
   { id: 'tpl_goals',             kind: 'template', published: false, featureKey: 'workspace.goals',       commercialTier: 'premium', opens: 'goals' },
   { id: 'tpl_journal',           kind: 'template', published: false, featureKey: 'workspace.journal',     commercialTier: 'premium', opens: 'journal' },
@@ -21528,15 +21578,126 @@ function projectScenario(baseWealth, monthlyContribution, annualReturn, years, s
   };
 }
 
-// MVP scenario set (spec): A +200, B +500, C +500 with higher stability framing.
-const _WSB_HORIZON = 10;
-const _WSB_RETURN  = 0.06;
+// ════════════════════════════════════════════════════════════════════════════
+// WORKSPACE COMPLETION · §C — SIMULADOR DE ESCENARIOS
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE ERA: tres escenarios LITERALES (A +200, B +500, C +500) con un 6 % de
+// rentabilidad y 10 años HARDCODEADOS en dos constantes. Tres defectos:
+//
+// 1 · UNA RENTABILIDAD INVENTADA. `_WSB_RETURN = 0.06` es un supuesto que el
+//     usuario nunca eligió, aplicado a los tres escenarios y a la base. Es el
+//     mismo defecto que el 5 % de Objetivos, en otra superficie.
+// 2 · EL HORIZONTE NO ERA EDITABLE. §C lo exige «editable y COMÚN»: común porque
+//     comparar dos escenarios a horizontes distintos no es una comparación.
+// 3 · «MÁS ESTABILIDAD» SIN MODELO. Las etiquetas `steady`/`dynamic`/`balanced`
+//     afirmaban una propiedad de riesgo que nada calcula. §C manda retirarlas.
+//
+// AHORA los parámetros son del USUARIO y COMUNES a la comparación, y viven en un
+// solo sitio. El 6 % y los 10 años se conservan como VALOR INICIAL del formulario
+// —hay que partir de algo y §C dice «diez años iniciales»— pero son editables y
+// se declaran como supuesto, no como una propiedad del producto.
+const _WSB_HORIZON = 10;                 // valor INICIAL del horizonte, editable
+const _WSB_RETURN = 0.06;               // valor INICIAL de la rentabilidad, editable
+const _WSB_MAX_SCENARIOS = 3;            // §C — «hasta tres escenarios»
+const _WSB_PARAMS_KEY = 'aurix_ws_scn_params_v1';
+// Los parámetros COMUNES de la comparación. Uno por cuenta, no uno por escenario:
+// si cada escenario tuviera su horizonte, la comparación no compararía nada.
+function _wsbParams() {
+  let raw = null;
+  try { raw = localStorage.getItem(_WSB_PARAMS_KEY); } catch (_) { raw = null; }
+  let v = null; try { v = raw ? JSON.parse(raw) : null; } catch (_) { v = null; }
+  const o = (v && typeof v === 'object') ? v : {};
+  return {
+    years: (o.years != null && String(o.years) !== '') ? o.years : _WSB_HORIZON,
+    ret:   (o.ret   != null && String(o.ret)   !== '') ? o.ret   : (_WSB_RETURN * 100),
+    // La BASE del patrimonio. §C: «base manual o importación EXPLÍCITA de
+    // patrimonio con fecha/procedencia. Sin datos certificados, permitir base
+    // manual; no inventar cero.»
+    baseMode:   o.baseMode || 'manual',       // 'manual' | 'imported'
+    baseManual: o.baseManual != null ? o.baseManual : '',
+    baseImportedAt: Number.isFinite(Number(o.baseImportedAt)) ? Number(o.baseImportedAt) : null,
+    baseImportedValue: o.baseImportedValue != null ? o.baseImportedValue : null,
+    convention: o.convention || _WS_PROJ_CONV_DEFAULT,
+  };
+}
+function _wsbParamsSet(patch) {
+  const next = Object.assign(_wsbParams(), patch || {});
+  try { localStorage.setItem(_WSB_PARAMS_KEY, JSON.stringify(next)); } catch (_) {}
+  try { _wsDocsQueue(_WSB_PARAMS_KEY); } catch (_) {}
+  return next;
+}
+// ── LA BASE, Y POR QUÉ NO PUEDE SER CERO POR DEFECTO ────────────────────────
+// Devuelve `{ value, known, source, at }`. `known:false` significa que el usuario
+// no ha declarado base y Aurix no ha importado ninguna: la superficie tiene que
+// pedirla, no proyectar desde cero — proyectar desde cero es afirmar que no tienes
+// nada, que es un dato y es falso.
+function _wsbBase() {
+  const p = _wsbParams();
+  if (p.baseMode === 'imported' && p.baseImportedValue != null) {
+    const v = _wsNumOrNull(p.baseImportedValue);
+    if (v != null) return { value: v, known: true, source: 'imported', at: p.baseImportedAt };
+  }
+  const m = _wsNumOrNull(p.baseManual);
+  if (m != null) return { value: m, known: true, source: 'declared', at: null };
+  return { value: 0, known: false, source: null, at: null };
+}
+// Los escenarios GUARDADOS del usuario, o los tres de arranque si no hay ninguno.
+// Los de arranque ya NO afirman estabilidad: se distinguen por su APORTACIÓN, que
+// es lo único que los diferencia de verdad.
 function _wsbScenarios() {
+  let saved = [];
+  try { saved = _wshReadStore(_WSH_SCENARIOS_KEY).filter(x => x && x.scenarioId); } catch (_) { saved = []; }
+  if (saved.length) {
+    return saved.slice(0, _WSB_MAX_SCENARIOS).map(x => ({
+      id: String(x.scenarioId), name: x.name || '', desc: '',
+      monthly: x.monthly != null ? x.monthly : 0, saved: true,
+    }));
+  }
   return [
-    { id: 'A', name: t('wsb_a_name'), desc: t('wsb_a_desc'), monthly: 200, stabKey: 'steady',   read: t('wsb_read_a') },
-    { id: 'B', name: t('wsb_b_name'), desc: t('wsb_b_desc'), monthly: 500, stabKey: 'dynamic',  read: t('wsb_read_b') },
-    { id: 'C', name: t('wsb_c_name'), desc: t('wsb_c_desc'), monthly: 500, stabKey: 'balanced', read: t('wsb_read_c') },
+    { id: 'A', name: t('wsb_a_name'), desc: t('wsb_a_desc'), monthly: 200 },
+    { id: 'B', name: t('wsb_b_name'), desc: t('wsb_b_desc'), monthly: 500 },
+    { id: 'C', name: t('wsb_c_name'), desc: t('wsb_c_desc'), monthly: 800 },
   ];
+}
+// ── LA COMPARACIÓN, CON SUS DOS CAUSAS SEPARADAS (§C) ───────────────────────
+// «Separar diferencia por aportaciones de diferencia por crecimiento.» Sin esto,
+// «este escenario da 60.000 más» no dice si es porque aportas más o porque el
+// dinero crece más: son dos decisiones distintas y sólo una está en tu mano.
+//
+// Y el porcentaje: con base CERO no existe, así que se publica la diferencia
+// ABSOLUTA y el porcentaje se declara no aplicable (§C, literal).
+function _wsbCompare(scenarios) {
+  const p = _wsbParams();
+  const base = _wsbBase();
+  const years = Math.max(0, Math.round(_wsNum(p.years)));
+  const ratePct = _wsNum(p.ret);
+  const conv = (p.convention === _WS_PROJ_CONV.NOMINAL12) ? _WS_PROJ_CONV.NOMINAL12 : _WS_PROJ_CONV_DEFAULT;
+  const proj = monthly => _wsProject({
+    initial: base.value, monthly: monthly, years: years,
+    annualRatePct: ratePct, convention: conv,
+  });
+  const ref = proj(0);                      // la base sin aportar nada
+  const rows = (scenarios || []).slice(0, _WSB_MAX_SCENARIOS).map(s => {
+    const r = proj(s.monthly);
+    const diff = r.final - ref.final;
+    // La diferencia por APORTACIONES es exactamente lo que has puesto de más.
+    const byContribution = r.contributed - ref.contributed;
+    // Y el resto es crecimiento: el interés que generan esas aportaciones. Los dos
+    // suman la diferencia total, por construcción, no por aproximación.
+    const byGrowth = diff - byContribution;
+    return {
+      id: s.id, name: s.name, monthly: s.monthly, saved: !!s.saved,
+      projected: r.final, contributed: r.contributed, growth: r.growth,
+      diff, byContribution, byGrowth,
+      series: r.series,
+    };
+  });
+  return {
+    rows, reference: ref, base, years, ratePct, convention: conv,
+    // §C — el porcentaje NO APLICA con base cero, y se dice en vez de calcularse.
+    pctApplicable: base.known && base.value > 0,
+    assumptions: ref.assumptions,
+  };
 }
 
 // Real, read-only baseline for the "Escenario actual" block.
@@ -21586,62 +21747,139 @@ function _wsbChartHtml(baselineProj, results) {
     </svg>`;
 }
 
+// ── LAS TARJETAS DE LA COMPARACIÓN, UN SOLO OWNER ───────────────────────────
+// SIN la píldora de «estabilidad»: afirmaba una propiedad de riesgo que nada
+// calculaba (§C manda retirarla). Lo que distingue a un escenario es su
+// APORTACIÓN, y eso sí se dice. Y la diferencia se desglosa en sus DOS causas,
+// porque sólo una de ellas depende del usuario.
+function _wsbCardsHtml(cmp) {
+  const esc = _intccEsc;
+  let saved = [];
+  try { saved = _wshReadStore(_WSH_SCENARIOS_KEY); } catch (_) { saved = []; }
+  const isSaved = id => saved.some(x => x && x.scenarioId === id);
+  const money = v => formatBase(Math.abs(v));
+  const sign = v => (v >= 0 ? '+' : '−');
+  return (cmp.rows || []).map(s => `
+    <div class="wsb-card">
+      <div class="wsb-card-head">
+        <p class="wsb-card-name">${esc(s.name)}</p>
+        <span class="wsb-pill is-contrib">${esc(formatBase(s.monthly))}${esc(t('wsre_permonth'))}</span>
+      </div>
+      <div class="wsb-card-rows">
+        <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>${esc(formatBase(s.projected))}</b></div>
+        <div class="wsb-row is-diff"><span>${esc(t('wsb_diff'))}</span><b>${sign(s.diff)}${esc(money(s.diff))}</b></div>
+        <div class="wsb-row is-cause"><span>${esc(t('wsb_by_contrib'))}</span><b>${sign(s.byContribution)}${esc(money(s.byContribution))}</b></div>
+        <div class="wsb-row is-cause"><span>${esc(t('wsb_by_growth'))}</span><b>${sign(s.byGrowth)}${esc(money(s.byGrowth))}</b></div>
+      </div>
+      <button type="button" class="wsh-cta wsb-save${isSaved(s.id) ? ' is-saved' : ''}" data-wsh-save="${esc(s.id)}"${isSaved(s.id) ? ' disabled' : ''}>${esc(isSaved(s.id) ? t('wsb_saved') : t('wsb_save'))}</button>
+    </div>`).join('');
+}
+// ── EL RANGO DE LA COMPARACIÓN, SIN LLAMAR MEJOR A NINGUNO ──────────────────
+// Antes esto elegía el de mayor valor proyectado y lo titulaba «tu mejor
+// escenario». Es prescriptivo: el que más proyecta es el que más te obliga a
+// aportar, y si eso es «mejor» no es una consecuencia calculada — depende de lo que
+// el usuario pueda aportar. Lo que queda es el RANGO: de no aportar nada a la
+// aportación más alta, identificada por su importe y no por un juicio.
+function _wsbImpactInnerHtml(cmp) {
+  const esc = _intccEsc;
+  const baseProj = cmp.reference.final;
+  const rows = cmp.rows || [];
+  const top = rows.length ? rows.reduce((a, b) => (b.projected > a.projected ? b : a), rows[0])
+                          : { projected: baseProj, monthly: 0 };
+  const spread = top.projected - baseProj;
+  // §C — con base CERO el porcentaje no existe: se publica el absoluto y se declara
+  // no aplicable, en vez de dividir por cero o pintar un 0 %.
+  const spreadPct = (cmp.pctApplicable && baseProj > 0) ? Math.round(spread / baseProj * 100) : null;
+  return `
+      <div class="wsb-impact-row">
+        <div class="wsb-impact-col">
+          <span class="wsb-impact-label">${esc(t('wsb_impact_nocontrib'))}</span>
+          <span class="wsb-impact-val">${esc(formatBase(baseProj))}</span>
+        </div>
+        <div class="wsb-impact-arrow" aria-hidden="true">→</div>
+        <div class="wsb-impact-col is-best">
+          <span class="wsb-impact-label">${esc(t('wsb_impact_highest'))} · ${esc(formatBase(top.monthly))}${esc(t('wsre_permonth'))}</span>
+          <span class="wsb-impact-val">${esc(formatBase(top.projected))}</span>
+        </div>
+      </div>
+      <div class="wsb-impact-uplift">
+        <span class="wsb-impact-delta">${spread >= 0 ? '+' : '−'}${esc(formatBase(Math.abs(spread)))}</span>
+        ${spreadPct != null ? `<span class="wsb-impact-pct">${spreadPct >= 0 ? '+' : '−'}${Math.abs(spreadPct)}%</span>`
+                            : `<span class="wsb-impact-pct is-na">${esc(t('wsb_pct_na'))}</span>`}
+        <span class="wsb-impact-cap">${esc(t('wsb_impact_spread'))}</span>
+      </div>`;
+}
+// §C — un cambio de parámetro recompone la COMPARACIÓN, no la vista: si se
+// repintase todo, el campo perdería el foco en cada tecla.
+function _wsbParamInput(el) {
+  const k = el.getAttribute('data-wsb-param');
+  if (!k) return;
+  const patch = {}; patch[k] = el.value;          // crudo: se puede borrar
+  _wsbParamsSet(patch);
+  const root = document.querySelector('.wsh-sb');
+  if (!root) return;
+  const cmp = _wsbCompare(_wsbScenarios());
+  const grid = root.querySelector('[data-wsb-cards]');
+  if (grid) grid.innerHTML = _wsbCardsHtml(cmp);
+  const imp = root.querySelector('[data-wsb-impact]');
+  if (imp) imp.innerHTML = _wsbImpactInnerHtml(cmp);
+}
 function _renderScenarioBuilder() {
   const esc = _intccEsc;
   const bl  = _wsbBaseline();
-  const baseProj = projectScenario(bl.wealth, 0, _WSB_RETURN, _WSB_HORIZON).projected;
-  const scenarios = _wsbScenarios();
+  // §C — LA COMPARACIÓN ES UN SOLO OWNER (`_wsbCompare`), con los parámetros
+  // COMUNES del usuario: mismo horizonte, misma tasa, misma convención. Antes cada
+  // tarjeta llamaba al motor con dos constantes hardcodeadas.
+  const cmp = _wsbCompare(_wsbScenarios());
+  const baseProj = cmp.reference.final;
   const saved = _wshReadStore(_WSH_SCENARIOS_KEY);
   const isSaved = id => saved.some(s => s && s.scenarioId === id);
-
-  const results = scenarios.map(s => {
-    const p = projectScenario(bl.wealth, s.monthly, _WSB_RETURN, _WSB_HORIZON, t('wsb_stab_' + s.stabKey));
-    return Object.assign({}, s, { projected: p.projected, diff: p.projected - baseProj, contributed: p.contributed });
-  });
+  const results = cmp.rows;
+  const params = _wsbParams();
 
   // Baseline metrics (only render the ones we actually have).
   const blMetrics = [`<div class="wsb-bl-metric"><span class="wsb-bl-val">${esc(bl.wealthFmt)}</span><span class="wsb-bl-label">${esc(t('wsb_metric_wealth'))}</span></div>`];
   if (bl.liq != null) blMetrics.push(`<div class="wsb-bl-metric"><span class="wsb-bl-val">${bl.liq}%</span><span class="wsb-bl-label">${esc(t('wsb_metric_liquidity'))}</span></div>`);
   if (bl.top) blMetrics.push(`<div class="wsb-bl-metric"><span class="wsb-bl-val">${esc(bl.top.name)} · ${bl.top.pct}%</span><span class="wsb-bl-label">${esc(t('wsb_metric_topexp'))}</span></div>`);
 
-  const cards = results.map(s => `
-    <div class="wsb-card">
-      <div class="wsb-card-head">
-        <p class="wsb-card-name">${esc(s.name)}</p>
-        <span class="wsb-pill is-${esc(s.stabKey)}">${esc(t('wsb_stab_' + s.stabKey))}</span>
-      </div>
-      <p class="wsb-card-desc">${esc(s.desc)}</p>
-      <div class="wsb-card-rows">
-        <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>${esc(formatBase(s.projected))}</b></div>
-        <div class="wsb-row is-diff"><span>${esc(t('wsb_diff'))}</span><b>+${esc(formatBase(s.diff))}</b></div>
-      </div>
-      <p class="wsb-card-read">${esc(s.read)}</p>
-      <button type="button" class="wsh-cta wsb-save${isSaved(s.id) ? ' is-saved' : ''}" data-wsh-save="${esc(s.id)}"${isSaved(s.id) ? ' disabled' : ''}>${esc(isSaved(s.id) ? t('wsb_saved') : t('wsb_save'))}</button>
-    </div>`).join('');
+  const cards = _wsbCardsHtml(cmp);
 
-  // WS.5A P8 — lead with the impact, not the table: current trajectory → best
-  // scenario, with a big uplift in € and %.
-  const best = results.reduce((a, b) => (b.projected > a.projected ? b : a), results[0]);
-  const uplift = best.projected - baseProj;
-  const upliftPct = baseProj > 0 ? Math.round(uplift / baseProj * 100) : 0;
+  // ── §C · SIN «MEJOR ESCENARIO» ────────────────────────────────────────────
+  // Esto elegía el de mayor valor proyectado y lo titulaba «el mejor». Es
+  // prescriptivo: el escenario que más proyecta es el que más te obliga a aportar,
+  // y decidir si eso es «mejor» no es una consecuencia calculada — depende de lo
+  // que el usuario pueda o quiera aportar. §C manda retirarlo.
+  // Lo que queda es el RANGO de la comparación: de la base a la aportación más
+  // alta, sin llamar mejor a ninguno. Y el PORCENTAJE sólo cuando hay base
+  // positiva: con base cero se publica la diferencia absoluta y se dice que el
+  // porcentaje no aplica (§C, literal).
+  const top = results.reduce((a, b) => (b.projected > a.projected ? b : a), results[0]) || { projected: baseProj, name: '', monthly: 0 };
+  const spread = top.projected - baseProj;
+  const spreadPct = cmp.pctApplicable && baseProj > 0 ? Math.round(spread / baseProj * 100) : null;
   const impactHtml = `
-    <section class="wsh-card wsb-impact is-feature">
-      <div class="wsb-impact-row">
-        <div class="wsb-impact-col">
-          <span class="wsb-impact-label">${esc(t('wsb_current_title'))}</span>
-          <span class="wsb-impact-val">${esc(formatBase(baseProj))}</span>
-        </div>
-        <div class="wsb-impact-arrow" aria-hidden="true">→</div>
-        <div class="wsb-impact-col is-best">
-          <span class="wsb-impact-label">${esc(t('wsb_impact_best'))} · ${esc(best.name)}</span>
-          <span class="wsb-impact-val">${esc(formatBase(best.projected))}</span>
-        </div>
+    <section class="wsh-card wsb-impact is-feature" data-wsb-impact>${_wsbImpactInnerHtml(cmp)}
+    </section>
+    ${/* §C — LOS CONTROLES, VISIBLES AL ENTRAR. Base, horizonte y tasa son comunes
+          a la comparación, así que viven arriba y no dentro de cada tarjeta. */''}
+    <section class="wsh-card wsb-params">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_params_title'))}</h3></header>
+      <div class="wsb-params-grid">
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_base'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="baseManual" value="${esc(_wsFormatInputNumber(params.baseManual))}"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_years'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="years" value="${esc(_wsFormatInputNumber(params.years))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(t('wstool_unit_years')))}</span></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_ret'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="ret" value="${esc(_wsFormatInputNumber(params.ret))}"><span class="ws4-field-unit">${esc(_wsFieldUnit('%'))}</span></span></label>
       </div>
-      <div class="wsb-impact-uplift">
-        <span class="wsb-impact-delta">+${esc(formatBase(uplift))}</span>
-        <span class="wsb-impact-pct">+${upliftPct}%</span>
-        <span class="wsb-impact-cap">${esc(t('wsb_impact_uplift'))}</span>
-      </div>
+      ${!cmp.base.known ? `<p class="wsb-note is-warn">${esc(t('wsb_base_missing'))}</p>` : ''}
+      <details class="wstool-asm">
+        <summary class="wstool-asm-sum">${esc(t('wstool_asm_title'))}</summary>
+        <ul class="wstool-asm-list">
+          <li>${esc(String(t('wstool_asm_rate') || '').replace('{r}', _intv4Num(cmp.ratePct, 2)))}</li>
+          <li>${esc(t(cmp.convention === _WS_PROJ_CONV.NOMINAL12 ? 'wstool_asm_conv_nominal' : 'wstool_asm_conv_effective'))}</li>
+          <li>${esc(t('wstool_asm_timing_end'))}</li>
+          <li>${esc(String(t('wsb_asm_common') || '').replace('{y}', String(cmp.years)))}</li>
+          <li>${esc(cmp.base.source === 'imported' ? String(t('wsb_asm_base_imported') || '').replace('{d}', _intccDate(cmp.base.at))
+                   : cmp.base.known ? t('wsb_asm_base_declared') : t('wsb_asm_base_unknown'))}</li>
+        </ul>
+      </details>
     </section>`;
 
   return `
@@ -21662,7 +21900,7 @@ function _renderScenarioBuilder() {
 
       <section class="wsh-card wsb-scenarios">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_scenarios_title'))}</h3></header>
-        <div class="wsb-grid">${cards}</div>
+        <div class="wsb-grid" data-wsb-cards>${cards}</div>
       </section>
 
       <section class="wsh-card wsb-compare">
@@ -21683,20 +21921,31 @@ function _renderScenarioBuilder() {
 function _wsbSaveScenario(id, btn) {
   try {
     const bl = _wsbBaseline();
-    const baseProj = projectScenario(bl.wealth, 0, _WSB_RETURN, _WSB_HORIZON).projected;
+    const cmpS = _wsbCompare(_wsbScenarios());
+    const baseProj = cmpS.reference.final;
     const s = _wsbScenarios().find(x => x.id === id);
     if (!s) return;
-    const p = projectScenario(bl.wealth, s.monthly, _WSB_RETURN, _WSB_HORIZON, t('wsb_stab_' + s.stabKey));
+    const rowS = cmpS.rows.find(x => x.id === id) || { projected: baseProj, diff: 0, contributed: 0, byContribution: 0, byGrowth: 0 };
+    const p = { projected: rowS.projected, contributed: rowS.contributed };
     const store = _wshReadStore(_WSH_SCENARIOS_KEY);
     if (store.some(x => x && x.scenarioId === id)) return; // already saved
     store.push({
       scenarioId: id,
       name: s.name,
       monthly: s.monthly,
-      annualReturn: _WSB_RETURN,
-      years: _WSB_HORIZON,
+      // §C / §A — la simulación guardada lleva SUS supuestos y SU convención, así que
+      // reabrirla más tarde no la reinterpreta con los parámetros de entonces.
+      annualReturn: cmpS.ratePct / 100,
+      annualRatePct: cmpS.ratePct,
+      years: cmpS.years,
+      convention: cmpS.convention,
+      baseValue: cmpS.base.value,
+      baseSource: cmpS.base.source,
+      currency: (typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'EUR',
       projected: Math.round(p.projected),
-      diff: Math.round(p.projected - baseProj),
+      diff: Math.round(rowS.diff),
+      diffByContribution: Math.round(rowS.byContribution),
+      diffByGrowth: Math.round(rowS.byGrowth),
       createdAt: Date.now(),
     });
     _wshWriteStore(_WSH_SCENARIOS_KEY, store);
@@ -22945,7 +23194,7 @@ function _wsToolSave() {
   if (_wsToolActive === 'assets') {
     const r = calculateAssetPrices(_wsToolInputs.rows);
     type = 'asset_prices';
-    results = { count: r.count, netProfitLoss: Math.round(r.netProfitLoss), averageReturnPct: Math.round(r.averageReturnPct * 10) / 10, openCount: r.openCount, bestName: r.best ? r.best.assetName : '', bestPct: r.best ? Math.round(r.best.returnPct) : null };
+    results = { count: r.count, netProfitLoss: Math.round(r.netProfitLoss), averageReturnPct: r.averageReturnPct == null ? null : Math.round(r.averageReturnPct * 10) / 10, averageReturnBasis: r.averageReturnBasis, openCount: r.openCount, bestName: r.best ? r.best.assetName : '', bestPct: (r.best && r.best.returnPct != null) ? Math.round(r.best.returnPct) : null };
   } else if (_wsToolActive === 'loan') {
     const r = calculateLoan(_wsToolInputs);
     type = 'loan_simulation';
@@ -22953,7 +23202,7 @@ function _wsToolSave() {
   } else if (_wsToolActive === 'receivables') {
     const r = calculateReceivables(_wsToolInputs.items);
     type = 'receivables_app';
-    results = { count: r.count, totalPendiente: Math.round(r.totalPendiente), totalCobrado: Math.round(r.totalCobrado), totalVencido: Math.round(r.totalVencido), numeroVencidos: r.numeroVencidos, porcentajeCobrado: Math.round(r.porcentajeCobrado) };
+    results = { count: r.count, totalPendiente: Math.round(r.totalPendiente), totalCobrado: Math.round(r.totalCobrado), totalVencido: Math.round(r.totalVencido), numeroVencidos: r.numeroVencidos, porcentajeCobrado: r.porcentajeCobrado == null ? null : Math.round(r.porcentajeCobrado), periodBasis: r.periodBasis };
   } else if (_wsToolActive === 'realestate') {
     const r = calculateRealEstatePortfolio(_wsToolInputs.properties);
     type = 'real_estate_portfolio';
@@ -24010,10 +24259,12 @@ function _wsRecvStatus(total, paid, dueDate) {
 }
 function calculateReceivables(items) {
   const list = (Array.isArray(items) ? items : []).map(it => {
-    const units = Math.max(0, Number(it.units) || 0);
-    const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
+    // Parseo TOLERANTE, como el resto de Workspace: estos campos pueden llegar
+    // como texto de edición y `Number('1.200')` son 1,2 en formato español.
+    const units = Math.max(0, _wsNum(it.units));
+    const unitPrice = Math.max(0, _wsNum(it.unitPrice));
     const totalAmount = units * unitPrice;
-    const paidAmount = Math.max(0, Number(it.paidAmount) || 0);
+    const paidAmount = Math.max(0, _wsNum(it.paidAmount));
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
     const status = _wsRecvStatus(totalAmount, paidAmount, it.dueDate);
     return Object.assign({}, it, { units, unitPrice, totalAmount, paidAmount, pendingAmount, status });
@@ -24025,7 +24276,21 @@ function calculateReceivables(items) {
     if (x.status !== 'cobrado') { totalPendiente += x.pendingAmount; numeroPendientes++; }
     if (x.status === 'vencido') { totalVencido += x.pendingAmount; numeroVencidos++; }
   }
-  return { list, count: list.length, grand, totalCobrado, totalPendiente, totalVencido, numeroPendientes, numeroVencidos, porcentajeCobrado: grand > 0 ? totalCobrado / grand * 100 : 0 };
+  return {
+    list, count: list.length, grand, totalCobrado, totalPendiente, totalVencido,
+    numeroPendientes, numeroVencidos,
+    // §H — sin importe total no hay proporción que calcular: `null`, no un 0 % que
+    // el usuario leería como «no has cobrado nada». Mismo criterio que la tasa de
+    // ahorro del presupuesto y que las rentabilidades del inmobiliario.
+    porcentajeCobrado: grand > 0 ? totalCobrado / grand * 100 : null,
+    // §H — el PERIODO del resumen, explícito. Estos totales son de TODO lo
+    // registrado, no de un mes: decirlo evita que se lean como el cobro del mes.
+    periodBasis: 'all_registered',
+    // Y el cobro parcial es de primera clase: lo pendiente sale del total menos lo
+    // cobrado, así que registrar un cobro dos veces con el mismo importe no
+    // duplica nada (es un CAMPO, no un registro que se acumula).
+    partialSupported: true,
+  };
 }
 function _wsRecvNewDraft() { return { personOrCompany: '', concept: '', units: '', unitPrice: '', paidAmount: '', dueDate: '', notes: '' }; }
 function _wsRecvDemo() {
@@ -24107,7 +24372,7 @@ function _wsRecvSummaryHtml(r) {
         <div class="wsrecv-kpi is-collected"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalCobrado))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_collected'))}</span></div>
         <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
       </div>
-      <div class="wsrecv-sumbar"><span class="wsrecv-sumbar-fill" style="width:${Math.round(r.porcentajeCobrado)}%"></span></div>
+      <div class="wsrecv-sumbar"${r.porcentajeCobrado == null ? ` data-ws-na="1" aria-label="${esc(t('wstool_bud_na'))}"` : ``}>${r.porcentajeCobrado == null ? `` : `<span class="wsrecv-sumbar-fill" style="width:${Math.round(r.porcentajeCobrado)}%"></span>`}</div>
       <div class="wsrecv-sumbar-row"><span class="wsrecv-sumbar-lbl">${Math.round(r.porcentajeCobrado)}% ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>${r.numeroVencidos ? `<span class="wsrecv-overdue-badge">${esc(t('wsrecv_overdue_badge')(r.numeroVencidos))}</span>` : ''}</div>
     </div>`;
 }
@@ -24427,15 +24692,15 @@ function _renderLoanTool() {
 const _WSAP_TYPES = ['stock', 'etf', 'crypto', 'fund', 'commodity', 'other'];
 function calculateAssetPrices(rows) {
   const list = (Array.isArray(rows) ? rows : []).map(rw => {
-    const qty = Math.max(0, Number(rw.quantity) || 0);
-    const buy = Math.max(0, Number(rw.buyPrice) || 0);
-    const fees = Math.max(0, Number(rw.fees) || 0);
+    const qty = Math.max(0, _wsNum(rw.quantity));
+    const buy = Math.max(0, _wsNum(rw.buyPrice));
+    const fees = Math.max(0, _wsNum(rw.fees));
     const sellEmpty = (rw.sellPrice === '' || rw.sellPrice == null);
-    const sell = sellEmpty ? null : Math.max(0, Number(rw.sellPrice) || 0);
+    const sell = sellEmpty ? null : Math.max(0, _wsNum(rw.sellPrice));
     const investment = buy * qty + fees;
     const open = sellEmpty;
     let saleValue = null, profitLoss = null, returnPct = null, status = 'abierta';
-    if (!open) { saleValue = sell * qty; profitLoss = saleValue - investment; returnPct = investment > 0 ? profitLoss / investment * 100 : 0; status = profitLoss > 0 ? 'ganadora' : (profitLoss < 0 ? 'perdedora' : 'cerrada'); }
+    if (!open) { saleValue = sell * qty; profitLoss = saleValue - investment; returnPct = investment > 0 ? profitLoss / investment * 100 : null; status = profitLoss > 0 ? 'ganadora' : (profitLoss < 0 ? 'perdedora' : 'cerrada'); }
     return Object.assign({}, rw, { qty, buy, fees, sell, investment, saleValue, profitLoss, returnPct, status, open });
   });
   const closed = list.filter(x => !x.open);
@@ -24446,7 +24711,17 @@ function calculateAssetPrices(rows) {
     totalInvested: list.reduce((s, x) => s + x.investment, 0),
     totalSaleValue: closed.reduce((s, x) => s + x.saleValue, 0),
     netProfitLoss: closed.reduce((s, x) => s + x.profitLoss, 0),
-    averageReturnPct: closed.length ? closed.reduce((s, x) => s + x.returnPct, 0) / closed.length : 0,
+    // §J / §E — EL AGREGADO SALE DE IMPORTES. Era la media aritmética de los
+    // porcentajes: una posición de 100.000 al 2 % junto a otra de 1.000 al 200 %
+    // publicaba un «101 % de rentabilidad media». El agregado correcto es
+    // Σ(resultado) / Σ(invertido) de las operaciones CERRADAS, y `null` cuando no
+    // hay invertido, porque dividir por cero no es un 0 %.
+    averageReturnPct: (() => {
+      const inv = closed.reduce((a, x) => a + x.investment, 0);
+      if (!(inv > 0)) return null;
+      return closed.reduce((a, x) => a + x.profitLoss, 0) / inv * 100;
+    })(),
+    averageReturnBasis: closed.reduce((a, x) => a + x.investment, 0) > 0 ? 'pnl_over_invested' : null,
     winningCount: closed.filter(x => x.profitLoss > 0).length,
     losingCount: closed.filter(x => x.profitLoss < 0).length,
     openCount: list.filter(x => x.open).length,

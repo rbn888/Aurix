@@ -35,14 +35,23 @@ function konstSrc(name){ const s='const '+name+' ='; const i=app.indexOf(s); if(
   return app.slice(i,k); }
 let pass=0,fail=0; function ok(n,c,info){ if(c){pass++;console.log('  ✓ '+n);}else{fail++;console.log('  ✗ '+n+(info?'  ['+info+']':''));} }
 const near = (a,b,tol) => Number.isFinite(a) && Math.abs(a-b) <= (tol==null?0.01:tol);
-const KONSTS = ['_WS_PROJ_CONV','_WS_PROJ_CONV_DEFAULT','_WS_PROJ_TIMING','_WS_PROJ_TIMING_DEFAULT','_WSG_ZERO_RETURN_TYPES','_WSG_TYPES'];
+const KONSTS = ['_WS_PROJ_CONV','_WS_PROJ_CONV_DEFAULT','_WS_PROJ_TIMING','_WS_PROJ_TIMING_DEFAULT','_WSG_ZERO_RETURN_TYPES','_WSG_TYPES',
+                '_WSB_HORIZON','_WSB_RETURN','_WSB_MAX_SCENARIOS','_WSB_PARAMS_KEY','_WSH_SCENARIOS_KEY'];
 const FNS = ['_wsNum','_wsNumOrNull','_wsProjMonthlyRate','_wsProject','calculateCompoundGrowth',
-             'projectScenario','_wsgThisYear','_wsgAssumedRatePct','_wsgTargetAmount','calculateGoalProgress'];
+             'projectScenario','_wsgThisYear','_wsgAssumedRatePct','_wsgTargetAmount','calculateGoalProgress',
+             '_wshReadStore','_wsbParams','_wsbParamsSet','_wsbBase','_wsbScenarios','_wsbCompare'];
 function ctx(langCode) {
   const sb = { Math, Number, String, isFinite, isNaN, parseFloat, JSON, Array, Object, Date,
                console: { warn(){}, log(){} } };
   vm.createContext(sb);
   sb.lang = langCode || 'es'; sb.t = k => k; sb.baseCurrency = 'EUR';
+  sb.__store = {};
+  sb.localStorage = {
+    getItem: k => (Object.prototype.hasOwnProperty.call(sb.__store, k) ? sb.__store[k] : null),
+    setItem: (k, v) => { sb.__store[k] = String(v); },
+    removeItem: k => { delete sb.__store[k]; },
+  };
+  sb._wsDocsQueue = () => {};
   KONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
@@ -308,6 +317,79 @@ console.log('\n7 · La tasa se lee igual en compound, escenarios y objetivos:');
     /_wsProjMonthlyRate\(/.test(fnSrc('calculateGoalProgress')));
   ok('7.4 y el motor compartido es el que proyecta el interés compuesto',
     /_wsProject\(/.test(fnSrc('_wsCompoundProjection')));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 8 · ESCENARIOS · PARÁMETROS COMUNES Y NINGÚN SUPUESTO INVENTADO (§C)
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n8 · Escenarios · lo que el usuario elige y lo que Aurix no inventa:');
+{
+  const C = ctx('es');
+  const cmp = () => vm.runInContext('_wsbCompare(_wsbScenarios())', C);
+  const set = patch => vm.runInContext('_wsbParamsSet(' + JSON.stringify(patch) + ')', C);
+  // SIN BASE DECLARADA no se proyecta desde cero: cero sería un dato.
+  const c0 = cmp();
+  ok('8.1 sin patrimonio de partida declarado, la base es DESCONOCIDA',
+    c0.base.known === false && c0.base.source === null,
+    JSON.stringify(c0.base));
+  ok('8.2 y el porcentaje se declara NO APLICABLE en vez de dividir por cero',
+    c0.pctApplicable === false);
+  set({ baseManual: '120000' });
+  const c1 = cmp();
+  ok('8.3 una base declarada a mano se acepta y se marca como declarada',
+    c1.base.known === true && c1.base.value === 120000 && c1.base.source === 'declared');
+  ok('8.4 …y entonces el porcentaje sí aplica', c1.pctApplicable === true);
+  // LAS DOS CAUSAS DE LA DIFERENCIA, y suman exactamente el total.
+  ok('8.5 la diferencia se separa en aportaciones y crecimiento, y cuadra exacto',
+    c1.rows.length > 0 && c1.rows.every(r => near(r.byContribution + r.byGrowth, r.diff, 0.01)),
+    JSON.stringify(c1.rows.map(r => ({ d: +r.diff.toFixed(2), c: +r.byContribution.toFixed(2), g: +r.byGrowth.toFixed(2) }))));
+  ok('8.6 la parte por aportaciones es exactamente lo aportado de más',
+    c1.rows.every(r => near(r.byContribution, r.contributed - c1.reference.contributed, 0.01)));
+  ok('8.7 y la referencia es el mismo patrimonio SIN aportar nada',
+    c1.reference.contributed === 0 && near(c1.reference.initial, 120000, 0.01));
+  // HORIZONTE Y TASA: editables y COMUNES.
+  set({ years: '20', ret: '4,5' });
+  const c2 = cmp();
+  ok('8.8 el horizonte es editable', c2.years === 20);
+  ok('8.9 la tasa es editable y admite decimal con coma', c2.ratePct === 4.5);
+  ok('8.10 y los dos son COMUNES: todas las series tienen el mismo horizonte',
+    c2.rows.every(r => r.series.length === c2.years + 1),
+    JSON.stringify(c2.rows.map(r => r.series.length)));
+  ok('8.11 la convención de la comparación se declara',
+    c2.assumptions.convention === vm.runInContext('_WS_PROJ_CONV_DEFAULT', C));
+  ok('8.12 nunca más de tres escenarios',
+    c2.rows.length <= vm.runInContext('_WSB_MAX_SCENARIOS', C));
+  // Y LOS SUPUESTOS INVENTADOS, RETIRADOS.
+  ok('8.13 el 6 % y los 10 años ya NO se usan como constante en el cálculo',
+    !/projectScenario\(bl\.wealth, 0, _WSB_RETURN, _WSB_HORIZON\)/.test(app)
+    && !/projectScenario\(bl\.wealth, s\.monthly, _WSB_RETURN, _WSB_HORIZON/.test(app));
+  ok('8.14 …siguen existiendo sólo como valor INICIAL del formulario',
+    /_WSB_HORIZON = 10;/.test(app) && /_WSB_RETURN = 0\.06;/.test(app)
+    && /\(o\.years != null && String\(o\.years\) !== ''\) \? o\.years : _WSB_HORIZON/.test(app));
+  ok('8.15 las etiquetas de «estabilidad» ya no se pintan en ninguna tarjeta',
+    !/wsb-pill is-\$\{esc\(s\.stabKey\)\}/.test(app)
+    && !/t\('wsb_stab_' \+ s\.stabKey\)/.test(app));
+  ok('8.16 y el titular prescriptivo «tu mejor escenario» ha desaparecido',
+    !/Tu mejor escenario supera/.test(app) && !/Your best scenario beats/.test(app)
+    && !/wsb_impact_best/.test(app));
+  ok('8.17 el rango se nombra por la APORTACIÓN, no por un juicio',
+    /wsb_impact_highest:\s*'Aportación más alta'/.test(app)
+    && /wsb_impact_nocontrib:\s*'Sin aportar nada'/.test(app));
+  // Una simulación GUARDADA lleva sus supuestos, así que reabrirla no la
+  // reinterpreta con los parámetros de otro día.
+  ok('8.18 el escenario guardado persiste su tasa, horizonte y convención',
+    /annualRatePct: cmpS\.ratePct/.test(app) && /years: cmpS\.years/.test(app)
+    && /convention: cmpS\.convention/.test(app) && /baseSource: cmpS\.base\.source/.test(app));
+  ok('8.19 …y también el desglose de las dos causas',
+    /diffByContribution: Math\.round\(rowS\.byContribution\)/.test(app)
+    && /diffByGrowth: Math\.round\(rowS\.byGrowth\)/.test(app));
+  const CK = ['wsb_params_title','wsb_p_base','wsb_p_years','wsb_p_ret','wsb_base_missing',
+              'wsb_by_contrib','wsb_by_growth','wsb_impact_nocontrib','wsb_impact_highest',
+              'wsb_impact_spread','wsb_pct_na','wsb_asm_common','wsb_asm_base_declared',
+              'wsb_asm_base_imported','wsb_asm_base_unknown'];
+  const occ = k => (app.match(new RegExp('\\n    ' + k + ':', 'g')) || []).length;
+  ok('8.20 las quince claves nuevas existen en ES y EN',
+    CK.every(k => occ(k) === 2), JSON.stringify(CK.filter(k => occ(k) !== 2)));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

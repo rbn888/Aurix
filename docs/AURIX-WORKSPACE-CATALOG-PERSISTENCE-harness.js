@@ -54,16 +54,16 @@ const FREE = catCtx(false), FOUNDER = catCtx(true);
 const run = (e, c) => vm.runInContext(e, c);
 const CAT = run('_WS_CATALOG', FREE);
 {
-  // El catálogo declarado por la SPEC, con su tier.
+  // El catálogo declarado por la SPEC, con su tier. OCHO y no nueve: Seguimiento de
+  // precios se queda INTERNA por la regla que §J trae consigo (ver 1.9).
   const SPEC = {
     tpl_realestate: ['template', 'free'],
     tpl_mbudget:    ['template', 'premium'], tpl_receivables: ['template', 'premium'],
-    tpl_journal:    ['template', 'premium'], tpl_assets:      ['template', 'premium'],
-    tpl_goals:      ['template', 'premium'],
+    tpl_journal:    ['template', 'premium'], tpl_goals:       ['template', 'premium'],
     compound_growth: ['tool', 'free'], loan_simulation: ['tool', 'premium'],
     scenario:        ['tool', 'premium'],
   };
-  ok('1.1 las nueve capacidades del catálogo canónico existen con su kind y su tier',
+  ok('1.1 las ocho capacidades publicables del catálogo canónico existen con su kind y su tier',
     Object.keys(SPEC).every(id => { const e = CAT.find(x => x.id === id);
       return e && e.kind === SPEC[id][0] && e.commercialTier === SPEC[id][1]; }),
     JSON.stringify(Object.keys(SPEC).filter(id => { const e = CAT.find(x => x.id === id);
@@ -82,10 +82,28 @@ const CAT = run('_WS_CATALOG', FREE);
         if (opens[e.opens]) dup = true; opens[e.opens] = e.id; });
       return !dup; })());
   ok('1.5 cada plantilla Premium declara qué superficie abre',
-    ['tpl_mbudget','tpl_receivables','tpl_journal','tpl_assets','tpl_goals']
+    ['tpl_mbudget','tpl_receivables','tpl_journal','tpl_goals']
       .every(id => !!(CAT.find(e => e.id === id) || {}).opens),
-    JSON.stringify(['tpl_mbudget','tpl_receivables','tpl_journal','tpl_assets','tpl_goals']
+    JSON.stringify(['tpl_mbudget','tpl_receivables','tpl_journal','tpl_goals']
       .map(id => id + ':' + (CAT.find(e => e.id === id) || {}).opens)));
+  // ── §J · LA EXCEPCIÓN DE SEGUIMIENTO DE PRECIOS, DECLARADA ────────────────
+  // §J pide que aporte valor distinto a Market y que, si sigue siendo redundante,
+  // se mantenga interna «explicando la excepción al fundador; no vender una copia».
+  // Las dos condiciones se cumplen: la watchlist ya existe en Market —y además
+  // sincroniza— y lo construido aquí responde la misma pregunta que el Diario. Así
+  // que el gate no exige publicarla: exige que siga interna Y que el motivo esté
+  // escrito, porque una decisión sin motivo escrito se revierte sin darse cuenta.
+  ok('1.9 Seguimiento de precios sigue interna y sin clave vendible',
+    (() => { const e = CAT.find(x => x.id === 'tpl_assets');
+      return e && e.published === false && e.featureKey === null
+        && e.commercialTier === 'undecided'; })(),
+    JSON.stringify(CAT.find(x => x.id === 'tpl_assets')));
+  ok('1.10 …y su excepción está EXPLICADA en el catálogo, no sólo aplicada',
+    /§J · SE QUEDA INTERNA, Y LA EXCEPCIÓN SE EXPLICA/.test(app)
+    && /no vender una copia/.test(app) && /la watchlist/i.test(app));
+  ok('1.11 su matemática SÍ se corrigió, aunque siga interna',
+    /§J \/ §E — EL AGREGADO SALE DE IMPORTES/.test(app)
+    && /averageReturnBasis/.test(app));
   // Los INTERNOS que la SPEC nombra, y que no pueden publicarse por solapamiento.
   const MUST_STAY_INTERNAL = ['financial_calc','investment_analyzer','tpl_property',
     'tpl_networth','tpl_business','tpl_projection','tpl_fire','tpl_scenario',
@@ -108,8 +126,8 @@ console.log('\n2 · Publicar exige un derecho real, no una etiqueta:');
   const planSql = read('db/workspace_premium_2_plan_features.sql');
   const docSql  = read('db/workspace_documents_1.sql');
   const NEW_KEYS = ['workspace.budget','workspace.receivables','workspace.journal',
-                    'workspace.prices','workspace.goals','workspace.scenarios'];
-  ok('2.1 las seis claves nuevas se conceden a premium y se NIEGAN a free en el SQL',
+                    'workspace.goals','workspace.scenarios'];
+  ok('2.1 las cinco claves nuevas se conceden a premium y se NIEGAN a free en el SQL',
     NEW_KEYS.every(k => new RegExp("'premium',\\s*'" + k.replace('.', '\\.') + "',\\s*true").test(planSql)
                      && new RegExp("'free',\\s*'" + k.replace('.', '\\.') + "',\\s*false").test(planSql)),
     JSON.stringify(NEW_KEYS.filter(k => !new RegExp("'premium',\\s*'" + k.replace('.', '\\.') + "',\\s*true").test(planSql))));
@@ -124,6 +142,10 @@ console.log('\n2 · Publicar exige un derecho real, no una etiqueta:');
   ok('2.4 ninguna capacidad que dependa del SQL nuevo está publicada',
     CAT.filter(e => NEW_KEYS.indexOf(e.featureKey) !== -1).every(e => e.published === false),
     JSON.stringify(CAT.filter(e => NEW_KEYS.indexOf(e.featureKey) !== -1 && e.published).map(e => e.id)));
+  ok('2.4b y el SQL NO concede la clave de la capacidad que se quedó interna',
+    !/'premium',\s*'workspace\.prices'/.test(planSql)
+    && /Seguimiento de precios: NO SE INCLUYE/.test(planSql),
+    'workspace.prices no puede venderse si no se publica');
   ok('2.5 y lo que YA estaba publicado sigue publicado (el estado público previo se conserva)',
     ['compound_growth','loan_simulation','tpl_realestate']
       .every(id => (CAT.find(e => e.id === id) || {}).published === true));
