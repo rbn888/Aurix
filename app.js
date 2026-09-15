@@ -6030,6 +6030,17 @@ const T = {
     wstool_bud_free:      'Dinero libre',
     wstool_bud_chart_title: 'Reparto del mes',
     wstool_bud_overspend: 'Gastas más de lo que ingresas',
+    // §F — lectura NEUTRAL. Los umbrales de «margen sólido» / «buen camino» eran una
+    // opinión sobre las finanzas del usuario presentada como medición, y no hay
+    // criterio documentado que los respalde. Se dice la proporción y su denominador.
+    wstool_bud_na:            'no aplicable',
+    wstool_bud_read_neutral:  'Según tu presupuesto, te queda el {r}% de tus ingresos.',
+    wstool_bud_read_deficit:  'Según tu presupuesto, tus gastos superan tus ingresos en {d}.',
+    wstool_bud_read_noincome: 'Sin ingresos declarados, la proporción de ahorro no se puede calcular.',
+    wstool_bud_basis_title:   'Cómo se lee este presupuesto',
+    wstool_bud_basis_plan:    'Son cifras de TU PRESUPUESTO, no un saldo bancario: Aurix no lee tu cuenta.',
+    wstool_bud_basis_denom:   'La proporción de ahorro es sobre los INGRESOS declarados: (ingresos − gastos) / ingresos.',
+    wstool_bud_basis_notcat:  'El disponible no es una categoría de gasto, así que no aparece en el reparto.',
     wstool_bud_read_high: r => `Ahorras el ${r}% de tus ingresos. Margen sólido.`,
     wstool_bud_read_mid:  r => `Ahorras el ${r}% de tus ingresos. Vas por buen camino.`,
     wstool_bud_read_low:  r => `Ahorras el ${r}% de tus ingresos. Hay margen para mejorar.`,
@@ -6164,14 +6175,28 @@ const T = {
     wsloan_kpi_monthly: 'Cuota mensual',
     wsloan_kpi_interest:'Total intereses',
     wsloan_kpi_total:   'Total devuelto',
-    wsloan_kpi_rate:    'Interés medio',
+    // §G — NO es un «interés medio» ni una TAE: es el TIPO NOMINAL ANUAL que el
+    // usuario ha escrito, y no incluye ni el seguro ni los gastos iniciales. Una
+    // TAE los incorporaría, y Aurix no la calcula — así que no la nombra.
+    wsloan_kpi_rate:    'Tipo nominal anual',
     wsloan_kpi_years:   'Duración',
     wsloan_capital:     'Capital',
     wsloan_donut_aria:  'Capital vs intereses',
     wsloan_insights_title: 'Lectura rápida Aurix',
     wsloan_ins_interest: pct => `Más del ${pct}% del coste total serán intereses.`,
     wsloan_ins_term:    (y, amt) => `Reducir ${y} años el plazo ahorra aproximadamente ${amt}.`,
-    wsloan_ins_rate:    amt => `Un aumento del 1% en el tipo incrementa la cuota en ${amt}/mes.`,
+    // §G — «un punto porcentual», no «un 1 %»: la simulación suma 1 pp al tipo
+    // (3,5 → 4,5), no lo multiplica por 1,01. Son dos cosas distintas y la frase
+    // anterior decía la que NO se calcula.
+    wsloan_ins_rate:    amt => `Un punto porcentual más de tipo (por ejemplo 3,5 → 4,5) incrementa la cuota en ${amt}/mes.`,
+    // §G — el contrato, y lo que NO entra en la cuota.
+    wsloan_ct_title:    'Qué préstamo se está simulando',
+    wsloan_ct_fixed:    'Cuota constante y tipo fijo durante todo el plazo.',
+    wsloan_ct_nominal:  'El tipo introducido es una tasa NOMINAL anual, no una TAE.',
+    wsloan_ct_monthly:  'Pagos mensuales, amortización francesa.',
+    wsloan_ct_fees:     'Gastos iniciales: {f}. Se suman al desembolso total y NO se financian, así que no suben la cuota.',
+    wsloan_ct_ins:      'Seguro: {i} en total. Va dentro de la cuota mensual pero NO genera intereses.',
+    wsloan_ct_excluded: 'No incluye comisiones de apertura ni de amortización anticipada, ni impuestos, ni revisiones de tipo.',
     wsloan_amort_title: 'Tabla de amortización',
     wsloan_am_month:    'Mes',
     wsloan_am_payment:  'Cuota',
@@ -6180,6 +6205,7 @@ const T = {
     wsloan_am_balance:  'Pendiente',
     wsloan_cmp_btn:     'Comparar escenario',
     wsloan_cmp_title:   'Escenario B',
+    wsloan_cmp_newpay:  'Cuota del escenario B',
     wsloan_cmp_dcuota:  'Diferencia cuota',
     wsloan_cmp_dint:    'Diferencia intereses',
     wsloan_cmp_dyears:  'Diferencia plazo',
@@ -6232,6 +6258,17 @@ const T = {
     wsre_kpi_equity:    'Equity',
     wsre_kpi_cashflow:  'Cashflow',
     wsre_kpi_yield:     'Rentabilidad',
+    // §E — las tres capas, y el denominador de cada cifra.
+    wsre_l_noi:   'Resultado operativo',
+    wsre_l_debt:  'Pago de deuda',
+    wsre_l_cf:    'Flujo tras deuda',
+    wsre_l_appr:  'Apreciación latente',
+    wsre_basis_title: 'Cómo se calculan estas cifras',
+    wsre_basis_yield: 'La rentabilidad del conjunto es Σ(resultado operativo anual) / Σ(coste de compra), no la media de las rentabilidades de cada inmueble.',
+    wsre_basis_debt:  'La cuota incluye la parte que amortiza capital, que NO es un gasto operativo: construye equity. Por eso el resultado operativo se publica antes de la deuda.',
+    wsre_basis_appr:  'La apreciación es LATENTE: es la diferencia entre el valor que has declarado y lo que pagaste, y no entra en el flujo de caja porque no se ha cobrado.',
+    wsre_basis_declared_all:  'Los valores actuales son los que TÚ has declarado, no una valoración certificada.',
+    wsre_basis_declared_some: '{n} de {t} inmuebles tienen valor declarado; el resto se cuenta a coste de compra.',
     wsre_kpi_value:     'Valor actual',
     wsre_kpi_mortgage:  'Hipoteca',
     wsre_kpi_cf_annual: 'Cashflow anual',
@@ -8568,6 +8605,14 @@ const T = {
     wstool_bud_free:      'Free money',
     wstool_bud_chart_title: 'Monthly breakdown',
     wstool_bud_overspend: 'You spend more than you earn',
+    wstool_bud_na:            'not applicable',
+    wstool_bud_read_neutral:  'On your budget, {r}% of your income is left over.',
+    wstool_bud_read_deficit:  'On your budget, your expenses exceed your income by {d}.',
+    wstool_bud_read_noincome: 'With no income declared, the savings share cannot be calculated.',
+    wstool_bud_basis_title:   'How to read this budget',
+    wstool_bud_basis_plan:    'These are YOUR BUDGET figures, not a bank balance: Aurix does not read your account.',
+    wstool_bud_basis_denom:   'The savings share is over declared INCOME: (income − expenses) / income.',
+    wstool_bud_basis_notcat:  'What is left over is not an expense category, so it does not appear in the split.',
     wstool_bud_read_high: r => `You save ${r}% of your income. Solid margin.`,
     wstool_bud_read_mid:  r => `You save ${r}% of your income. On the right track.`,
     wstool_bud_read_low:  r => `You save ${r}% of your income. Room to improve.`,
@@ -8702,14 +8747,21 @@ const T = {
     wsloan_kpi_monthly: 'Monthly payment',
     wsloan_kpi_interest:'Total interest',
     wsloan_kpi_total:   'Total repaid',
-    wsloan_kpi_rate:    'Average rate',
+    wsloan_kpi_rate:    'Nominal annual rate',
     wsloan_kpi_years:   'Duration',
     wsloan_capital:     'Principal',
     wsloan_donut_aria:  'Principal vs interest',
     wsloan_insights_title: 'Aurix quick read',
     wsloan_ins_interest: pct => `More than ${pct}% of the total cost will be interest.`,
     wsloan_ins_term:    (y, amt) => `Cutting ${y} years off the term saves about ${amt}.`,
-    wsloan_ins_rate:    amt => `A 1% rate increase raises the payment by ${amt}/mo.`,
+    wsloan_ins_rate:    amt => `One percentage point more on the rate (e.g. 3.5 → 4.5) raises the payment by ${amt}/mo.`,
+    wsloan_ct_title:    'Which loan is being simulated',
+    wsloan_ct_fixed:    'Constant payment and fixed rate for the whole term.',
+    wsloan_ct_nominal:  'The rate you enter is a NOMINAL annual rate, not an APR.',
+    wsloan_ct_monthly:  'Monthly payments, French amortisation.',
+    wsloan_ct_fees:     'Upfront costs: {f}. Added to the total outlay and NOT financed, so they do not raise the payment.',
+    wsloan_ct_ins:      'Insurance: {i} in total. Included in the monthly payment but it does NOT accrue interest.',
+    wsloan_ct_excluded: 'Excludes arrangement and early-repayment fees, taxes, and rate revisions.',
     wsloan_amort_title: 'Amortization table',
     wsloan_am_month:    'Month',
     wsloan_am_payment:  'Payment',
@@ -8718,6 +8770,7 @@ const T = {
     wsloan_am_balance:  'Balance',
     wsloan_cmp_btn:     'Compare scenario',
     wsloan_cmp_title:   'Scenario B',
+    wsloan_cmp_newpay:  'Scenario B payment',
     wsloan_cmp_dcuota:  'Payment difference',
     wsloan_cmp_dint:    'Interest difference',
     wsloan_cmp_dyears:  'Term difference',
@@ -8770,6 +8823,16 @@ const T = {
     wsre_kpi_equity:    'Equity',
     wsre_kpi_cashflow:  'Cashflow',
     wsre_kpi_yield:     'Yield',
+    wsre_l_noi:   'Operating result',
+    wsre_l_debt:  'Debt service',
+    wsre_l_cf:    'Cash flow after debt',
+    wsre_l_appr:  'Unrealised appreciation',
+    wsre_basis_title: 'How these figures are worked out',
+    wsre_basis_yield: 'The portfolio yield is Σ(annual operating result) / Σ(purchase cost), not the average of each property\'s yield.',
+    wsre_basis_debt:  'The payment includes the part that repays capital, which is NOT an operating expense: it builds equity. That is why the operating result is shown before debt.',
+    wsre_basis_appr:  'Appreciation is UNREALISED: it is the difference between the value you declared and what you paid, and it does not enter cash flow because it has not been received.',
+    wsre_basis_declared_all:  'Current values are the ones YOU declared, not a certified valuation.',
+    wsre_basis_declared_some: '{n} of {t} properties have a declared value; the rest are counted at purchase cost.',
     wsre_kpi_value:     'Current value',
     wsre_kpi_mortgage:  'Mortgage',
     wsre_kpi_cf_annual: 'Annual cashflow',
@@ -22894,7 +22957,15 @@ function _wsToolSave() {
   } else if (_wsToolActive === 'realestate') {
     const r = calculateRealEstatePortfolio(_wsToolInputs.properties);
     type = 'real_estate_portfolio';
-    results = { count: r.count, valueTotal: Math.round(r.valueTotal), equityTotal: Math.round(r.equityTotal), cashflowMonthly: Math.round(r.cashflowMonthly), avgYield: Math.round(r.avgYield * 10) / 10 };
+    // §E — el agregado guardado es el de IMPORTES, y `null` se conserva como null:
+    // redondearlo daría un 0 % que el documento afirmaría para siempre.
+    results = { count: r.count, valueTotal: Math.round(r.valueTotal), equityTotal: Math.round(r.equityTotal),
+                cashflowMonthly: Math.round(r.cashflowMonthly),
+                noiAnnualTotal: Math.round(r.noiAnnualTotal),
+                debtServiceMonthlyTotal: Math.round(r.debtServiceMonthlyTotal),
+                appreciationTotal: Math.round(r.appreciationTotal),
+                avgYield: r.portfolioNetYield == null ? null : Math.round(r.portfolioNetYield * 10) / 10,
+                yieldBasis: r.portfolioNetYield == null ? null : 'noi_over_cost_basis' };
   } else if (_wsToolActive === 'journal') {
     const r = calculateTradeJournal(_wsToolInputs.trades);
     type = 'trade_journal';
@@ -23106,8 +23177,20 @@ function calculateMonthlyBudget(inp) {
   const items = _WSBUD_EXPENSES.map(f => ({ k: f.k, label: f.label, color: f.color, value: num(f.k) }));
   const expenses = items.reduce((s, it) => s + it.value, 0);
   const free = income - expenses;
-  const saveRate = income > 0 ? (free / income) * 100 : 0;
-  return { income, expenses, free, saveRate, items };
+  // ── §F · CON INGRESOS CERO LA TASA DE AHORRO NO EXISTE ────────────────────
+  // Devolvía 0, y la superficie pintaba «0 %»: eso afirma que no ahorras nada,
+  // cuando lo cierto es que la razón NO SE PUEDE CALCULAR —su denominador es cero—.
+  // §F lo dice por su nombre: «Ingresos cero: no aplicable». `null` no es 0, y así
+  // la superficie puede escribir «no aplicable» en vez de un cero falso.
+  const saveRate = income > 0 ? (free / income) * 100 : null;
+  return {
+    income, expenses, free, saveRate, items,
+    // El DENOMINADOR, declarado: la tasa es sobre INGRESOS, no sobre gastos ni
+    // sobre patrimonio, y §F exige explicarlo.
+    saveRateBasis: income > 0 ? 'share_of_income' : null,
+    applicable: income > 0,
+    deficit: free < 0,
+  };
 }
 
 function _wsBudgetDefaults() {
@@ -23134,31 +23217,48 @@ function _wsBudgetChartHtml(res) {
 function _wsBudgetOutHtml(inp) {
   const esc = _intccEsc;
   const res = calculateMonthlyBudget(inp);
-  const rate = Math.round(res.saveRate);
-  const reading = res.income <= 0 ? ''
-    : res.free < 0 ? t('wstool_bud_overspend')
-    : rate >= 30 ? t('wstool_bud_read_high')(rate)
-    : rate >= 10 ? t('wstool_bud_read_mid')(rate)
-    : rate > 0   ? t('wstool_bud_read_low')(rate)
-    : t('wstool_bud_read_none');
+  // §F — «no aplicable» cuando no hay denominador, nunca un 0 %.
+  const rateTxt = res.saveRate == null ? t('wstool_bud_na') : Math.round(res.saveRate) + '%';
+  const rate = res.saveRate == null ? null : Math.round(res.saveRate);
+  // ── LA LECTURA NO DA VEREDICTOS SIN CRITERIO (§F) ─────────────────────────
+  // Había una escalera de umbrales —30 % «margen sólido», 10 % «buen camino»— que
+  // no está documentada en ningún sitio: es una opinión sobre las finanzas del
+  // usuario presentada como una medición. §F lo permite SÓLO con criterio
+  // documentado, y no lo hay, así que la lectura es NEUTRAL: dice la proporción y
+  // su denominador, que es verdad, y no dictamina si está bien.
+  // El DÉFICIT sí se nombra, porque es un hecho aritmético y no un juicio.
+  const reading = !res.applicable ? t('wstool_bud_read_noincome')
+    : res.deficit ? String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free)))
+    : String(t('wstool_bud_read_neutral') || '').replace('{r}', String(rate));
   return `
     <div class="wstool-result wsbud-result">
       <div class="wstool-res-main">
         <span class="wstool-res-label">${esc(t('wstool_bud_avail'))}</span>
         <span class="wstool-res-final ${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</span>
-        <span class="wstool-res-orient">${esc(t('wstool_bud_saverate'))} · ${rate}%</span>
+        <span class="wstool-res-orient">${esc(t('wstool_bud_saverate'))} · ${esc(rateTxt)}</span>
       </div>
       <div class="wsbud-split">
         <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.income))}</span><span class="wstool-res-k">${esc(t('wstool_bud_income_t'))}</span></div>
         <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.expenses))}</span><span class="wstool-res-k">${esc(t('wstool_bud_expenses_t'))}</span></div>
-        <div class="wstool-res-cell ${res.free < 0 ? 'is-neg' : 'is-gain'}"><span class="wstool-res-v">${rate}%</span><span class="wstool-res-k">${esc(t('wstool_bud_saverate'))}</span></div>
+        <div class="wstool-res-cell ${res.free < 0 ? 'is-neg' : 'is-gain'}"><span class="wstool-res-v">${esc(rateTxt)}</span><span class="wstool-res-k">${esc(t('wstool_bud_saverate'))}</span></div>
       </div>
     </div>
     <div class="wstool-chart wsbud-chartbox">
       <span class="wsbud-chart-title">${esc(t('wstool_bud_chart_title'))}</span>
       ${_wsBudgetChartHtml(res)}
     </div>
-    ${reading ? `<p class="wsbud-reading">${esc(reading)}</p>` : ''}`;
+    ${reading ? `<p class="wsbud-reading">${esc(reading)}</p>` : ''}
+    ${/* §F — el DENOMINADOR de la tasa y la naturaleza de la cifra, dichos. El
+          «disponible» es lo que queda SEGÚN EL PRESUPUESTO, no un saldo bancario, y
+          no es una categoría de gasto: por eso no aparece en el reparto. */''}
+    <details class="wstool-asm wsbud-basis">
+      <summary class="wstool-asm-sum">${esc(t('wstool_bud_basis_title'))}</summary>
+      <ul class="wstool-asm-list">
+        <li>${esc(t('wstool_bud_basis_plan'))}</li>
+        <li>${esc(t('wstool_bud_basis_denom'))}</li>
+        <li>${esc(t('wstool_bud_basis_notcat'))}</li>
+      </ul>
+    </details>`;
 }
 
 function _renderBudgetTool() {
@@ -23239,9 +23339,17 @@ function _wsJournalDefaults() {
 }
 
 function _wsJrnPct(v) {
-  const s = (Math.round(v * 10) / 10).toFixed(1);
+  // ── «—» ES DATO AUSENTE Y «+0,0 %» UN CERO REAL ───────────────────────────
+  // `Math.round(null * 10) / 10` es 0, así que una rentabilidad NO CALCULABLE
+  // —un inmueble sin base de coste, una cartera sin coste total— se imprimía como
+  // «+0,0 %»: un cero que el usuario podía leer como «no rinde nada» cuando lo
+  // cierto es que no se puede calcular. Es la misma convención que MARKET
+  // EXCELLENCE ya fijó para el resto del producto, y aquí faltaba.
+  if (v == null || !Number.isFinite(Number(v))) return '—';
+  const n = Number(v);
+  const s = (Math.round(n * 10) / 10).toFixed(1);
   const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
-  return (v >= 0 ? '+' : '') + s.replace('.', sep) + '%';
+  return (n >= 0 ? '+' : '') + s.replace('.', sep) + '%';
 }
 function _wsJrnMoney(v, ccy, signed) { return ((signed && v >= 0) ? '+' : '') + formatBase(v); }
 
@@ -23472,38 +23580,116 @@ function _wsReCoverHtml(p, big) {
   const asset = photo ? '' : _wsAssetImg(_WSRE_ASSET[ptype], t('wsre_t_' + ptype));
   return `<div class="wsre-cover${big ? ' is-big' : ''} ${cls}"${style}>${glyph}${asset}<span class="wsre-status is-${esc(p.status || 'green')}"></span></div>`;
 }
+// ════════════════════════════════════════════════════════════════════════════
+// WORKSPACE COMPLETION · §E — PORTFOLIO INMOBILIARIO
+// ════════════════════════════════════════════════════════════════════════════
+// DOS DEFECTOS FINANCIEROS REALES que esta reescritura cierra:
+//
+// 1 · EL AGREGADO ERA UN PROMEDIO DE PORCENTAJES. `avgYield` hacía la media
+//     aritmética de las rentabilidades: un piso de 500.000 al 3 % y un garaje de
+//     50.000 al 10 % daban un 6,5 % de «rentabilidad media», que no es la
+//     rentabilidad de nada. §E lo prohíbe por su nombre: «agregados desde
+//     IMPORTES, no promedios arbitrarios de porcentajes». El agregado correcto es
+//     Σ(resultado operativo) / Σ(base de coste), y es lo que se publica.
+//
+// 2 · LA AMORTIZACIÓN DE PRINCIPAL SE CONTABA COMO GASTO. `cashflow = renta −
+//     gastos − cuota` mete la cuota entera, y la cuota incluye la parte que
+//     AMORTIZA capital: eso no es un gasto operativo, es una transferencia que
+//     construye equity. Mezclarlas hace que un inmueble con hipoteca parezca
+//     menos rentable de lo que es y que su rentabilidad no se pueda comparar con
+//     uno sin deuda. §E: «separar resultado operativo, pago de deuda y
+//     apreciación» y «no confundir amortización de principal con gasto operativo».
+//
+// LAS TRES CAPAS, SEPARADAS Y CON SU DENOMINADOR DICHO:
+//   · OPERATIVO      renta − gastos           (NOI). No conoce la deuda.
+//   · SERVICIO DEUDA la cuota                  (interés + principal, sin separar:
+//                    el usuario declara una cuota, no su desglose — y eso se dice).
+//   · APRECIACIÓN    valor declarado − coste   Latente, no realizada, y NUNCA
+//                    entra en el flujo de caja.
 function calculateRealEstatePortfolio(properties) {
+  const n0 = v => Math.max(0, (typeof _wsNum === 'function') ? _wsNum(v) : (Number(v) || 0));
   const list = (Array.isArray(properties) ? properties : []).map(p => {
-    const buy = Math.max(0, Number(p.buy) || 0);
-    const value = Math.max(0, Number(p.value) || 0) || buy;
-    const rent = Math.max(0, Number(p.rent) || 0);
-    const expenses = Math.max(0, Number(p.expenses) || 0);
-    const mortgage = Math.max(0, Number(p.mortgage) || 0);
-    const payment = Math.max(0, Number(p.payment) || 0);
-    const cashflowMonthly = rent - expenses - payment;
+    const buy = n0(p.buy);
+    // El valor DECLARADO por el usuario. No es una valoración certificada y no se
+    // presenta como tal: sin él se cae al coste, que al menos es un hecho.
+    const declaredValue = n0(p.value);
+    const value = declaredValue || buy;
+    const valueIsDeclared = declaredValue > 0;
+    const rent = n0(p.rent);
+    const expenses = n0(p.expenses);
+    const mortgage = n0(p.mortgage);
+    const payment = n0(p.payment);
+    // ── CAPA 1 · OPERATIVO ───────────────────────────────────────────────────
+    const noiMonthly = rent - expenses;
+    const noiAnnual = noiMonthly * 12;
+    // ── CAPA 2 · SERVICIO DE LA DEUDA ────────────────────────────────────────
+    const debtServiceMonthly = payment;
+    const cashflowMonthly = noiMonthly - debtServiceMonthly;
     const cashflowAnnual = cashflowMonthly * 12;
-    const grossYield = buy > 0 ? (rent * 12) / buy * 100 : 0;
-    const netYield = buy > 0 ? ((rent - expenses) * 12) / buy * 100 : 0;
+    // ── CAPA 3 · APRECIACIÓN, LATENTE ────────────────────────────────────────
+    const appreciation = valueIsDeclared ? (declaredValue - buy) : null;
+    // ── RENTABILIDADES, CADA UNA CON SU DENOMINADOR ─────────────────────────
+    // Bruta y neta sobre la BASE DE COSTE (lo que pagaste), que es el denominador
+    // comparable entre inmuebles. Sobre el valor declarado sería otra cosa y se
+    // movería sola cada vez que el usuario reestimara el valor.
+    const grossYield = buy > 0 ? (rent * 12) / buy * 100 : null;
+    const netYield = buy > 0 ? noiAnnual / buy * 100 : null;
     const equity = value - mortgage;
-    const roi = equity > 0 ? cashflowAnnual / equity * 100 : 0;
-    const status = cashflowMonthly < 0 ? 'red' : (cashflowMonthly > 0 && netYield >= 5 ? 'green' : 'amber');
-    return Object.assign({}, p, { buy, value, rent, expenses, mortgage, payment, cashflowMonthly, cashflowAnnual, grossYield, netYield, equity, roi, status });
+    // Cash-on-cash: flujo DESPUÉS de deuda sobre el equity. Es la única de las
+    // tres que depende del valor declarado, y por eso se marca.
+    const cashOnCash = equity > 0 ? cashflowAnnual / equity * 100 : null;
+    // El semáforo describe un HECHO —el signo del flujo—, no un veredicto sobre un
+    // umbral de rentabilidad inventado. Antes exigía además superar un cinco por
+    // ciento de rentabilidad neta para ponerse en verde: un umbral que no está
+    // documentado en ninguna parte, es decir una opinión presentada como medición.
+    const status = cashflowMonthly < 0 ? 'red' : (cashflowMonthly > 0 ? 'green' : 'amber');
+    return Object.assign({}, p, {
+      buy, value, declaredValue, valueIsDeclared, rent, expenses, mortgage, payment,
+      noiMonthly, noiAnnual, debtServiceMonthly,
+      cashflowMonthly, cashflowAnnual, appreciation,
+      grossYield, netYield, equity, cashOnCash,
+      // Se conserva `roi` como alias de `cashOnCash` para los consumidores que ya
+      // lo leían, pero deja de ser 0 cuando no es calculable: null no es cero.
+      roi: cashOnCash, status,
+    });
   });
-  const n = list.length, sum = k => list.reduce((s, x) => s + x[k], 0);
-  const valueTotal = sum('value'), mortgageTotal = sum('mortgage');
+  const n = list.length, sum = k => list.reduce((s, x) => s + (Number(x[k]) || 0), 0);
+  const buyTotal = sum('buy'), valueTotal = sum('value'), mortgageTotal = sum('mortgage');
+  const noiAnnualTotal = sum('noiAnnual');
   const cashflowMonthly = sum('cashflowMonthly');
+  const equityTotal = valueTotal - mortgageTotal;
+  const cashflowAnnual = cashflowMonthly * 12;
   let best = null, worst = null;
-  for (const x of list) { if (best === null || x.cashflowMonthly > best.cashflowMonthly) best = x; if (worst === null || x.cashflowMonthly < worst.cashflowMonthly) worst = x; }
+  for (const x of list) {
+    if (best === null || x.cashflowMonthly > best.cashflowMonthly) best = x;
+    if (worst === null || x.cashflowMonthly < worst.cashflowMonthly) worst = x;
+  }
   return {
     list, count: n,
-    buyTotal: sum('buy'), valueTotal, mortgageTotal,
-    equityTotal: valueTotal - mortgageTotal,
-    cashflowMonthly, cashflowAnnual: cashflowMonthly * 12,
-    avgYield: n ? list.reduce((s, x) => s + x.netYield, 0) / n : 0,
+    buyTotal, valueTotal, mortgageTotal, equityTotal,
+    noiMonthlyTotal: sum('noiMonthly'), noiAnnualTotal,
+    debtServiceMonthlyTotal: sum('debtServiceMonthly'),
+    cashflowMonthly, cashflowAnnual,
+    // EL AGREGADO, DESDE IMPORTES. Σ(resultado operativo anual) / Σ(coste), que sí
+    // es la rentabilidad neta del conjunto. `null` cuando no hay base de coste:
+    // dividir por cero no es un 0 %.
+    portfolioNetYield: buyTotal > 0 ? noiAnnualTotal / buyTotal * 100 : null,
+    portfolioCashOnCash: equityTotal > 0 ? cashflowAnnual / equityTotal * 100 : null,
+    // Y la apreciación LATENTE del conjunto, sólo sobre los inmuebles cuyo valor el
+    // usuario ha declarado: sumar los que no lo traen los contaría a coste y
+    // diluiría la cifra sin decirlo.
+    appreciationTotal: list.filter(x => x.valueIsDeclared)
+      .reduce((s, x) => s + (Number(x.appreciation) || 0), 0),
+    valuesDeclared: list.filter(x => x.valueIsDeclared).length,
+    // `avgYield` se CONSERVA para los consumidores que lo leían (la vista previa de
+    // Mi Espacio y los resultados guardados), pero ya NO es la media de porcentajes:
+    // es el agregado por importes. Misma clave, cifra correcta.
+    avgYield: buyTotal > 0 ? noiAnnualTotal / buyTotal * 100 : 0,
     best, worst,
     ranking: list.slice().sort((a, b) => b.cashflowMonthly - a.cashflowMonthly),
   };
 }
+
 function _wsReNewDraft() {
   // WS.12 §10 — future-prep fields carried (no logic yet).
   return { name: '', ptype: 'flat', city: '', photo: '', buy: '', value: '', rent: '', expenses: '', mortgage: '', payment: '', buyDate: '', notes: '', timeline: [], tenantId: null, maintenanceId: null, vacancyRate: 0, insuranceCost: 0, propertyTax: 0, communityFees: 0 };
@@ -23629,6 +23815,27 @@ function _wsReSummaryHtml(r) {
         <span class="wsre-subkpi"><b>${esc((r.cashflowAnnual >= 0 ? '+' : '') + formatBase(r.cashflowAnnual))}</b><i>${esc(t('wsre_kpi_cf_annual'))}</i></span>
         <span class="wsre-subkpi"><b>${esc(formatBase(r.buyTotal))}</b><i>${esc(t('wsre_kpi_buy'))}</i></span>
       </div>
+      ${/* ── §E · LAS TRES CAPAS, SEPARADAS Y A LA VISTA ──────────────────────
+            «Separar resultado operativo, pago de deuda y apreciación.» Antes sólo
+            se publicaba el flujo YA NETO de la cuota, así que era imposible saber
+            cuánto rinde el inmueble y cuánto se lleva la deuda — dos hechos
+            distintos que se leían como uno. La apreciación va aparte y se nombra
+            LATENTE: no es dinero cobrado y no entra en el flujo. */''}
+      <div class="wsre-layers">
+        <span class="wsre-layer"><i>${esc(t('wsre_l_noi'))}</i><b>${esc((r.noiMonthlyTotal >= 0 ? '+' : '') + formatBase(r.noiMonthlyTotal))}</b></span>
+        <span class="wsre-layer"><i>${esc(t('wsre_l_debt'))}</i><b>${esc('−' + formatBase(Math.abs(r.debtServiceMonthlyTotal)))}</b></span>
+        <span class="wsre-layer is-total"><i>${esc(t('wsre_l_cf'))}</i><b class="${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</b></span>
+        ${r.valuesDeclared > 0 ? `<span class="wsre-layer is-latent"><i>${esc(t('wsre_l_appr'))}</i><b>${esc((r.appreciationTotal >= 0 ? '+' : '') + formatBase(r.appreciationTotal))}</b></span>` : ''}
+      </div>
+      <details class="wstool-asm wsre-basis">
+        <summary class="wstool-asm-sum">${esc(t('wsre_basis_title'))}</summary>
+        <ul class="wstool-asm-list">
+          <li>${esc(t('wsre_basis_yield'))}</li>
+          <li>${esc(t('wsre_basis_debt'))}</li>
+          <li>${esc(t('wsre_basis_appr'))}</li>
+          <li>${esc(r.valuesDeclared === r.count ? t('wsre_basis_declared_all') : String(t('wsre_basis_declared_some') || '').replace('{n}', String(r.valuesDeclared)).replace('{t}', String(r.count)))}</li>
+        </ul>
+      </details>
     </div>`;
 }
 function _wsRePropCard(p) {
@@ -24059,6 +24266,27 @@ function _wsLoanInsights(res) {
   const up = calculateLoan({ principal: res.principal, rate: res.annual + 1, years: res.years }); const diff = up.base - res.base; if (diff > 0) out.push(t('wsloan_ins_rate')(formatBase(diff)));
   return out.slice(0, 3);
 }
+// ── EL CONTRATO QUE SE ESTÁ SIMULANDO, DECLARADO (§G) ───────────────────────
+// «Contrato explícito: cuota constante, tipo fijo, tasa nominal anual, pagos
+// mensuales.» Sin esto el usuario no puede saber QUÉ préstamo es el que está
+// viendo, y dos préstamos con la misma cuota pueden ser productos distintos.
+//
+// Y los COSTES EXCLUIDOS se nombran. No se financian por defecto: los gastos
+// iniciales se suman al desembolso total pero NO al principal —si se añadieran al
+// capital, la cuota subiría y el usuario no lo habría pedido—, y eso es
+// exactamente lo que hay que decir en vez de dejarlo a la interpretación.
+function _wsLoanContractHtml(res) {
+  const esc = _intccEsc;
+  const rows = [t('wsloan_ct_fixed'), t('wsloan_ct_nominal'), t('wsloan_ct_monthly')];
+  if (res.fees > 0) rows.push(String(t('wsloan_ct_fees') || '').replace('{f}', formatBase(res.fees)));
+  if (res.totalInsurance > 0) rows.push(String(t('wsloan_ct_ins') || '').replace('{i}', formatBase(res.totalInsurance)));
+  rows.push(t('wsloan_ct_excluded'));
+  return `
+      <details class="wstool-asm wsloan-contract">
+        <summary class="wstool-asm-sum">${esc(t('wsloan_ct_title'))}</summary>
+        <ul class="wstool-asm-list">${rows.filter(Boolean).map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+      </details>`;
+}
 function _wsLoanAmortHtml(res) {
   const esc = _intccEsc;
   if (!res.table.length) return '';
@@ -24092,6 +24320,7 @@ function _wsLoanOutHtml(inp) {
       </div>
     </div>
     ${insights.length ? `<div class="wsloan-insights"><span class="wsloan-insights-t">${esc(t('wsloan_insights_title'))}</span><ul>${insights.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
+    ${_wsLoanContractHtml(res)}
     ${_wsLoanAmortHtml(res)}`;
 }
 // Comparator (own card outside [data-wstool-out] so its inputs keep focus).
@@ -24121,7 +24350,15 @@ function _wsLoanCmpInput(el) {
 function _wsLoanCmpOutHtml(inp) {
   const esc = _intccEsc;
   const A = calculateLoan(inp);
-  const B = calculateLoan({ principal: inp.bPrincipal, rate: inp.bRate, years: inp.bYears });
+  // ── SÓLO CAMBIAN LAS VARIABLES COMPARADAS (§G) ────────────────────────────
+  // El escenario B recibía sólo principal, tipo y plazo, así que NO heredaba el
+  // seguro ni los gastos iniciales del escenario A. Consecuencia medible: con un
+  // seguro de 25 €/mes, `A.monthlyPayment` lo incluía y `B.monthlyPayment` no, así
+  // que la «diferencia de cuota» se abarataba en esos 25 € — B parecía mejor de lo
+  // que es, y por una variable que el usuario no estaba comparando. Lo que no se
+  // compara se mantiene CONSTANTE; si no, no es una comparación.
+  const B = calculateLoan({ principal: inp.bPrincipal, rate: inp.bRate, years: inp.bYears,
+                            insurance: inp.insurance, fees: inp.fees });
   const dCuota = B.monthlyPayment - A.monthlyPayment;
   const dInt = B.totalInterest - A.totalInterest;
   const dYears = A.years - B.years;
@@ -24132,6 +24369,10 @@ function _wsLoanCmpOutHtml(inp) {
   const row = (label, val, cls) => `<div class="wsloan-cmp-row"><span>${esc(label)}</span><b class="${cls || ''}">${esc(val)}</b></div>`;
   return `
     <div class="wsloan-cmp-rows">
+      ${/* §G — LA CUOTA NUEVA, EN ABSOLUTO. Sólo se publicaba el DELTA, y «+180 €
+            al mes» no dice cuánto vas a pagar: al acortar el plazo la consecuencia
+            que importa es la cuota resultante, no su diferencia. */''}
+      ${row(t('wsloan_cmp_newpay'), formatBase(B.monthlyPayment), '')}
       ${row(t('wsloan_cmp_dcuota'), (dCuota >= 0 ? '+' : '') + formatBase(dCuota), dCuota > 0 ? 'is-neg' : 'is-pos')}
       ${row(t('wsloan_cmp_dint'), (dInt >= 0 ? '+' : '') + formatBase(dInt), dInt > 0 ? 'is-neg' : 'is-pos')}
       ${row(t('wsloan_cmp_dyears'), (dYears >= 0 ? '−' : '+') + Math.abs(dYears) + ' ' + t('wstool_unit_years'), '')}
@@ -57588,7 +57829,13 @@ function _aurixIntelligencePreviewHTML() {
 
   const style = ''
     + '<style>'
-    + '.intprev-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;align-items:stretch;justify-content:center;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    + '.intprev-stage{position:relative;width:100%;display:flex;align-items:stretch;justify-content:center;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    // SIN `min-height` EN MÓVIL. La medición encontró los últimos 24 px de scroll de
+    // página en 360×740: el stage pedía `100dvh − 116px` (624 px) mientras `#appRoot`
+    // YA reserva 68 px de padding para la navegación, así que el alto se contaba dos
+    // veces y el stage renderizaba 650 px. En móvil no hace falta ningún mínimo —la
+    // tarjeta está acotada y el CTA anclado—, y a partir de 768 px se restaura,
+    // porque ahí el mínimo es lo que centra la tarjeta en la pantalla.
 
     // Neutralize the Intelligence host (#tabPlaceholder) exactly like the shared
     // premium preview does, so the card sits on one clean field.
@@ -57631,7 +57878,7 @@ function _aurixIntelligencePreviewHTML() {
     + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
     + '.intprev-hold-body{flex:0 1 auto;min-height:0;overflow-y:auto;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-cta--ghost{min-width:0;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-premium{font-size:13.5px;margin:0 0 22px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
+    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-cta--ghost{min-width:0;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-premium{font-size:13.5px;margin:0 0 22px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 

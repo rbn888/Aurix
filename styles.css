@@ -26639,3 +26639,40 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   .wsfc-item, .wsfc-cta, .wsfc-skip { transition: none; }
   .wsfc-cta:active { transform: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE COMPLETION · §E — LAS TRES CAPAS DEL INMOBILIARIO
+   ════════════════════════════════════════════════════════════════════════════
+   Resultado operativo, pago de deuda y flujo tras deuda se leen como una
+   cascada, y la apreciación va separada porque NO es dinero cobrado. Sin token
+   de alfa blanco: la escalera es `--elev-*` (la lección de GLOBAL POLISH). */
+.wsre-layers {
+  display: grid; grid-template-columns: 1fr; gap: 1px; margin-top: 12px;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+  background: rgba(var(--aurix-blue-rgb), 0.10);
+}
+.wsre-layer {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 12px; background: var(--elev-1);
+}
+.wsre-layer i {
+  font-style: normal; font-size: 12px; color: rgba(198,214,246,0.72);
+}
+.wsre-layer b {
+  font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text-bright);
+}
+/* El total cierra la cascada, así que se separa con un filo y pesa más. */
+.wsre-layer.is-total { background: var(--elev-2); }
+.wsre-layer.is-total i { color: rgba(214,226,255,0.88); font-weight: 600; }
+.wsre-layer.is-total b { font-size: 15px; }
+.wsre-layer.is-total b.is-pos { color: rgba(120,215,170,0.98); }
+.wsre-layer.is-total b.is-neg { color: rgba(240,170,110,0.98); }
+/* La apreciación latente se lee atenuada: es real, pero no está cobrada. */
+.wsre-layer.is-latent { background: var(--elev-1); }
+.wsre-layer.is-latent i, .wsre-layer.is-latent b { color: rgba(198,214,246,0.60); }
+@media (min-width: 560px) {
+  .wsre-layers { grid-template-columns: 1fr 1fr; }
+  .wsre-layer.is-total { grid-column: 1 / -1; }
+}
