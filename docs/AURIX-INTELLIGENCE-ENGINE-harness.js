@@ -656,13 +656,20 @@ const TOUCHED_EXISTING = ['.intcc-hero-body', '.intcc-hero-orb-wrap', '.intcc-he
   // SALUD minimalista: sólo composición vertical de su columna y el tamaño del
   // badge de estado, que ahora es el único texto bajo el donut.
   '.intcc-hero-score', '.intcc-hero .intcc-chips',
+  // MEMORIA: sólo composición de su propia card (ocupar el alto que la rejilla ya
+  // le da, en vez de dejar un hueco muerto). Ni color ni tipografía.
+  '.aurix-intcc .intv4-memory',
   // Tokens del corredor de la esfera en el contenedor de la rejilla.
   '.aurix-intv6 {'];
 // `.intcc-tl-item.is-declared …` es un selector COMPUESTO que exige una clase
 // NUEVA: no puede alterar el render de un item de memoria existente, así que es
 // scoping y no modificación. Se lista aparte para que quede explícito.
 const NEW_SCOPED = ['.intcc-tl-item.is-declared'];
-const isNew = l => /intv8-|intv9-|intv10-|intv11-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
+// La serie de prefijos siguió creciendo: `intv12-` son las clases NUEVAS del
+// contador trazable (el enlace al destino, la card de pregunta y el control
+// «Entendido»). Reconocerlas aquí no relaja nada: siguen siendo clases propias
+// que no existían antes y que no pueden alterar el render de nada heredado.
+const isNew = l => /intv8-|intv9-|intv10-|intv11-|intv12-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
   // El contenedor de la rejilla sólo recibe TOKENS del corredor de la esfera.
   || l.trim().startsWith('.aurix-intv6 {');
 ok('N.7 sólo se tocan 4 selectores heredados, y son los que exige el hero adaptativo',
@@ -679,7 +686,11 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
       const OK_PROPS = ['padding-right', 'padding-top', 'padding-bottom', 'position', 'z-index',
         'pointer-events', 'align-items', 'grid-row', 'justify-content', 'gap', 'display',
         'flex-direction', 'min-height', 'margin', 'font-size', 'letter-spacing',
-        'flex-wrap', 'row-gap'];
+        'flex-wrap', 'row-gap',
+        // Composición añadida por el cierre de QA: ocupar el alto disponible y
+        // dejar que el texto de una etiqueta envuelva. Ningún color, ninguna
+        // familia tipográfica.
+        'flex', 'max-height', 'white-space', 'max-width'];
       props.forEach(pr => { if (!OK_PROPS.includes(pr)) bad.push(head.trim() + ' → ' + pr); });
     });
     return bad.length === 0 ? true : bad; })() === true);
@@ -810,11 +821,16 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
   ok('O.7 sin motor la lectura NO afirma estabilidad: falla cerrada',
     (() => { sb2.t = k => ES[k]; const r = sb2.READ(null, {}, null, null);
       return r.intelState === 'insufficient_history' && r.title === ES.intel_now_history; })());
+  // SIN CORE NO HAY EVIDENCIA, así que tampoco se puede afirmar «no ha cambiado
+  // nada»: el estado cae a disponibilidad insuficiente. Lo que esta prueba fija
+  // —que ningún estado se pinte como URGENCIA sin que el motor la respalde— sigue
+  // intacto, y ahora además se comprueba que la ausencia no se lea como calma.
   ok('O.8 ningún estado publica urgencia en su clase visual sin venir del motor',
     (() => { sb2.t = k => ES[k];
       const r = sb2.READ(null, {}, null, { now: { state: 'stable_no_change', changeCount: 0 },
         discoveries: [], questions: [], context: { fields: {} } });
-      return r.state === 'healthy'; })());
+      return r.state !== 'attention' && r.intelState === 'insufficient_history'
+        && r.activeReviewCount === 0 && r.hasEvidence === false; })());
 }
 
 // ── P · MEMORIA · un cambio se anuncia UNA vez ──────────────────────────────
@@ -1403,18 +1419,36 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
     && /:not\(:has\(\.intv4-changed\)\) \.intv5-structure \{ grid-column: 1 \/ 13/.test(css));
   // ── EXPLORA · deja de ser fija ──
   const expFn = fnSrc('_intv4ExploreHtml');
-  ok('U.18 Explora ordena por relevancia AHORA y por lo menos visto, sin azar',
-    /hot\.has\(a\.q\.causalRoot\)/.test(expFn) && /shownAt\[a\.q\.id\]/.test(expFn)
-    && !/Math\.random/.test(expFn));
-  ok('U.19 …y registra lo mostrado con prefijo `x:` para que la próxima visita cambie',
-    // `data-intcc-q="` son 14 caracteres. Con 15 se comía el primer carácter del
-    // id, nunca coincidía con `q.id` y la señal quedaba MUERTA: FAIL de la revisión.
-    /'x:' \+ m\.slice\(14, -1\)/.test(src) && /indexOf\('x:'\) === 0/.test(expFn));
+  // ── LA ROTACIÓN YA NO SALE DEL HISTORIAL LOCAL ──────────────────────────
+  // Ordenaba por «lo menos visto» leyendo `_intv4ReadShown()`, que es del
+  // DISPOSITIVO: el móvil y el escritorio de la misma cuenta veían conjuntos
+  // distintos. Ahora la elección es una función pura de (cuenta, periodo) y la
+  // relevancia sólo ordena las elegidas. Sigue sin haber azar.
+  ok('U.18 Explora elige por cuenta y periodo, ordena por relevancia, y sin azar',
+    /hot\.has\(a\.q\.causalRoot\)/.test(expFn) && /_intv4ExploreRotation\(/.test(expFn)
+    && !/shownAt/.test(expFn) && !/Math\.random/.test(expFn)
+    && !/Math\.random/.test(fnSrc('_intv4ExploreRotation')));
+  ok('U.19 la rotación es DETERMINISTA: mismas entradas ⇒ mismo conjunto, y cambia de periodo',
+    (() => { // Se ejecutan los owners REALES en el sandbox, con su tope declarado.
+      const rot = vm.runInContext(block('const _INTV4_EXPLORE_MAX', ';')
+        + block('const _INTV4_EXPLORE_CADENCE', ');') + ';'
+        + fnSrc('_intv4ExploreSeed') + ';'
+        + fnSrc('_intv4ExploreRotation') + ';_intv4ExploreRotation', sandbox);
+      const ids = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'];
+      const day = 1757000000000;
+      const a = JSON.stringify(rot(ids, day, 'u1'));
+      const b = JSON.stringify(rot(ids, day + 3600e3, 'u1'));
+      const c = JSON.stringify(rot(ids, day + 5 * 864e5, 'u1'));
+      return a === b && a !== c && JSON.parse(a).length === 4
+        && new Set(JSON.parse(a)).size === 4; })());
   ok('U.19b el id anotado coincide EXACTAMENTE con el que lee Explora',
     (() => { const m = 'data-intcc-q="top_position_intent"';
       return ('x:' + m.slice(14, -1)).slice(2) === 'top_position_intent'; })());
-  ok('U.19c el desempate por «lo menos visto» se agrupa por DÍA, no por render',
-    /Math\.floor\(Number\(shownAt\[a\.q\.id\] \|\| 0\) \/ 864e5\)/.test(expFn));
+  ok('U.19c las cadencias están declaradas (una diaria, dos semanales, una mensual)',
+    (() => { const cad = block('const _INTV4_EXPLORE_CADENCE', ');');
+      return /'day'/.test(cad) && (cad.match(/'week'/g) || []).length === 2 && /'month'/.test(cad)
+        && /Math\.floor\(day \/ 7\)/.test(fnSrc('_intv4ExploreRotation'))
+        && /Math\.floor\(day \/ 30\)/.test(fnSrc('_intv4ExploreRotation')); })());
   ok('U.19d las anotaciones se filtran en LAS DOS puertas al Core',
     (src.match(/indexOf\('x:'\) === 0\)\)/g) || []).length >= 2);
   ok('U.20 el desempate final es el id: mismo estado ⇒ mismo orden',

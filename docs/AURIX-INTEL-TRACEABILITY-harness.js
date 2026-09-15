@@ -76,7 +76,7 @@ function extractDict(langIdx) {
     'intcc_dim_breadth',
     // A2 — el enlace de trazabilidad del hero. Sin la clave el renderer emite un
     // enlace VACÍO, que es peor que no tenerlo.
-    'intel_see_changes','intel_ack','intel_ack_aria',
+    'intel_see_changes','intel_now_novelty','intel_sub_review','intel_now_reviewed','intel_sub_reviewed','intel_now_no_news','intel_sub_no_news','intel_ack_done','intel_ack','intel_ack_aria',
     'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
@@ -132,8 +132,8 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE'];
-const FNS = ['_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -290,9 +290,14 @@ console.log('1 · Si el hero dice N, el destino contiene exactamente esos N:');
   const rows = count(h, /class="intv4-chg /g);
   ok('1.1 el hero publica su contador y el destino publica su cardinalidad',
     heroN !== null && destN !== null, JSON.stringify({ heroN: heroN, destN: destN }));
-  ok('1.2 hero N === filas del destino === cardinalidad declarada',
-    Number(heroN) === rows && Number(destN) === rows && rows > 0,
-    JSON.stringify({ heroN: heroN, destN: destN, rows: rows }));
+  // EL CONTADOR CUENTA LO PENDIENTE. Desde que acusar deja la fila en el
+  // historial, el destino puede tener MÁS filas que el contador: la igualdad es
+  // contra las filas NO revisadas, que son las que el hero promete.
+  const pendingRows = count(h, /class="intv4-chg [^"]*"\s+data-root="[^"]*"\s+data-finding="[^"]*"\s+data-fact="[^"]*"\s+data-reviewed="0"/g);
+  ok('1.2 hero N === filas PENDIENTES del destino === cardinalidad declarada',
+    Number(heroN) === pendingRows && Number(destN) === pendingRows && pendingRows > 0
+    && rows >= pendingRows,
+    JSON.stringify({ heroN: heroN, destN: destN, rows: rows, pending: pendingRows }));
   ok('1.3 el destino es DIRECCIONABLE (el enlace del hero apunta a un id que existe)',
     /href="#aurix-intel-changes"/.test(h) && /id="aurix-intel-changes"/.test(h));
   ok('1.3b el enlace existe en las DOS composiciones y las dos declaran el MISMO número',
@@ -693,6 +698,310 @@ console.log('\n9 · La ausencia no cura nada: sólo una medición resuelve un co
       return first.length === 0 && second.length === 0; })());
   ok('9.6 y el owner de la resolución no conoce la lista de conceptos vivos: no puede resolver por ausencia',
     !/liveConceptIds|live\b/.test(fnSrc('_aurixIntelResolveCertified')));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco ejes:');
+{
+  // ── LA CUENTA DEL FOUNDER, REPRODUCIDA ──────────────────────────────────
+  // Registra 100 acciones de Apple: la exposición a acciones se mueve de verdad,
+  // el ledger lo corrobora con su `asset_add`, y eso produce un hallazgo
+  // PENDIENTE. Es el caso exacto en el que el hero decía «1 cambio que merece
+  // revisión» y «Sin cambios materiales» a la vez.
+  const APPLE_FLOWS = [{ id: 'aapl1', ts: NOWTS - 2 * DAY, amountUSD: 22000, kind: 'asset_add',
+    source: 'user', intent: 'INTERNAL_BUY', assetId: 'a2', revision: 1 }];
+  const APPLE = Object.assign({}, MATURE, {
+    serverRows: srvHistory(NOWTS, 30, { crypto: 55000, stock: 20000, liquidity: 25000 },
+                                       { crypto: 55000, stock: 42000, liquidity: 25000 }),
+    flows: APPLE_FLOWS,
+  });
+  const heroPending = (h) => num(h, /class="intcc-hero[^"]*"[^>]*data-review-pending="(\d+)"/);
+  const heroState   = (h) => (h.match(/class="intcc-hero[^"]*"[^>]*data-intel-state="([^"]+)"/) || [, null])[1];
+  const mobPending  = (h) => num(h, /class="intcc-card intcc-m-card intcc-m-hero[^"]*"[\s\S]{0,120}?data-review-pending="(\d+)"/);
+  const heroTitle   = (h) => (h.match(/class="intcc-hero-title">([^<]*)</) || [, ''])[1];
+  const heroSub     = (h) => (h.match(/class="intcc-hero-sub">([^<]*)</) || [, ''])[1];
+
+  const a0 = render(APPLE);
+  ok('10.1 Apple supera materialidad y deja un hallazgo PENDIENTE',
+    Number(heroPending(a0.html)) > 0
+    && /data-reviewed="0"/.test(a0.html)
+    && heroState(a0.html) === 'review_pending',
+    JSON.stringify({ pending: heroPending(a0.html), state: heroState(a0.html) }));
+  ok('10.2 …y el hero NO puede decir «sin novedades» ni «sin cambios» con algo pendiente',
+    !/Sin novedades/i.test(heroTitle(a0.html)) && !/Sin cambios/i.test(heroTitle(a0.html))
+    && /merece|merecen/.test(heroSub(a0.html)),
+    JSON.stringify({ title: heroTitle(a0.html), sub: heroSub(a0.html) }));
+  ok('10.3 escritorio y móvil publican la MISMA bandeja',
+    Number(heroPending(a0.html)) === Number(mobPending(a0.html)),
+    JSON.stringify({ desktop: heroPending(a0.html), mobile: mobPending(a0.html) }));
+  // REFRESCAR NO RECONOCE NADA. Segundo render, contexto nuevo, mismo estado.
+  ok('10.4 el hallazgo sigue PENDIENTE tras refrescar (la atención no se olvida)',
+    (() => { const a1 = render(APPLE);
+      return Number(heroPending(a1.html)) === Number(heroPending(a0.html))
+        && heroState(a1.html) === 'review_pending'; })(),
+    JSON.stringify({ first: heroPending(a0.html), second: heroPending(render(APPLE).html) }));
+  // «La superficie ya no se contradice»: ningún render puede publicar pendientes
+  // y a la vez el texto de ausencia de novedades.
+  ok('10.5 pendientes > 0 nunca convive con el copy de «sin novedades»',
+    (() => { const h = a0.html;
+      const p = Number(heroPending(h));
+      const noNews = /Sin novedades significativas/.test(h) || /No significant news/.test(h);
+      return p > 0 ? !noNews : true; })());
+
+  // ── «ENTENDIDO» · COMPORTAMIENTO REAL, NO REGEX ─────────────────────────
+  // Se ejecuta el flujo entero con los owners de producción: se acusa el concepto
+  // que la fila publica, se vuelve a pintar en el MISMO contexto (mismo
+  // almacenamiento) y se mide qué cambió. Sin DOM falso: lo que se certifica es
+  // acuse → recomputación → hero/historial → persistencia.
+  const ackOf = (h) => (h.match(/data-intel-ack="([^"]+)"/) || [, null])[1];
+  const sigOf = (h) => (h.match(/data-intel-ack="[^"]+"\s*\n?\s*data-intel-sig="([^"]*)"/) || [, ''])[1];
+  // El acuse se guarda por PROPIETARIO (`_aurixIntelWriteOwned` se niega sin uno,
+  // que es el fail-closed correcto), así que el caso se ejercita con una cuenta
+  // real igual que en producción.
+  const c1 = makeCtx(APPLE);
+  c1._aurixActiveUserId = 'founder-qa';
+  const h1 = run('_renderIntelligenceCommandCenter()', c1);
+  const id1 = ackOf(h1), sg1 = sigOf(h1);
+  ok('10.6 la fila pendiente ofrece un control con identidad acusable',
+    !!id1 && /class="intv12-ack"/.test(h1), JSON.stringify({ id: id1, sig: sg1 }));
+  run('_aurixIntelAcknowledge(' + JSON.stringify(id1) + ', { signature: '
+    + (sg1 === '' ? 'null' : JSON.stringify(sg1)) + ' })', c1);
+  const h2 = run('_renderIntelligenceCommandCenter()', c1);
+  ok('10.7 al acusar, la fila SIGUE en «Qué ha cambiado» y pasa a revisada',
+    /data-reviewed="1"/.test(h2) && /class="intv12-ack is-done"/.test(h2)
+    && count(h2, /class="intv4-chg /g) === count(h1, /class="intv4-chg /g),
+    JSON.stringify({ before: count(h1, /class="intv4-chg /g), after: count(h2, /class="intv4-chg /g) }));
+  ok('10.8 …y deja de ser interactiva: ya no hay botón para esa fila',
+    !new RegExp('data-intel-ack="' + id1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"').test(h2));
+  ok('10.9 …el contador del hero baja y el CTA desaparece si era el último',
+    Number(heroPending(h2)) === Number(heroPending(h1)) - 1
+    && (Number(heroPending(h2)) > 0 || !/intv12-see-changes/.test(h2)),
+    JSON.stringify({ before: heroPending(h1), after: heroPending(h2) }));
+  ok('10.10 …y sin pendientes el hero dice «Todo revisado», no «sin novedades»',
+    Number(heroPending(h2)) > 0 || (heroState(h2) === 'all_reviewed'
+      && /Todo revisado/.test(heroTitle(h2))),
+    JSON.stringify({ pending: heroPending(h2), state: heroState(h2), title: heroTitle(h2) }));
+  ok('10.11 el ledger, el Core y la Memoria financiera quedan INTACTOS',
+    (() => { const coreBefore = run('_aurixIntelligenceCore({}).ledger.facts.length', c1);
+      return coreBefore > 0 && /class="intcc-card intcc-timeline/.test(h2)
+        && count(h2, /class="intcc-tl-item/g) === count(h1, /class="intcc-tl-item/g); })(),
+    JSON.stringify({ mem_before: count(h1, /class="intcc-tl-item/g),
+      mem_after: count(h2, /class="intcc-tl-item/g) }));
+  ok('10.12 PERSISTE tras refrescar: un contexto nuevo con el mismo almacenamiento lo lee revisado',
+    (() => { const c2 = makeCtx(APPLE);
+      c2._aurixActiveUserId = 'founder-qa';
+      c2.__store = JSON.parse(JSON.stringify(c1.__store));
+      const h3 = run('_renderIntelligenceCommandCenter()', c2);
+      return /data-reviewed="1"/.test(h3) && Number(heroPending(h3)) === Number(heroPending(h2)); })());
+  ok('10.13 es IDEMPOTENTE: acusar dos veces no crea un episodio ni cambia el contador',
+    (() => { const before = JSON.stringify(run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c1).ack);
+      run('_aurixIntelAcknowledge(' + JSON.stringify(id1) + ', { signature: '
+        + (sg1 === '' ? 'null' : JSON.stringify(sg1)) + ' })', c1);
+      const after = JSON.stringify(run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c1).ack);
+      const h4 = run('_renderIntelligenceCommandCenter()', c1);
+      return Object.keys(JSON.parse(before)).length === Object.keys(JSON.parse(after)).length
+        && Number(heroPending(h4)) === Number(heroPending(h2)); })());
+  ok('10.14 CROSS-DEVICE: el acuse viaja por el merge y el otro dispositivo lo lee revisado',
+    (() => { const mine = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c1);
+      const other = makeCtx(APPLE);
+      other._aurixActiveUserId = 'founder-qa';
+      const merged = run('_aurixIntelCtxMerge(' + JSON.stringify(mine) + ', null)', other);
+      run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify(merged) + ', {})', other);
+      const h5 = run('_renderIntelligenceCommandCenter()', other);
+      return /data-reviewed="1"/.test(h5); })());
+  // EVIDENCIA NUEVA REABRE, Y UNA SOLA VEZ. Se usa el hallazgo CON FIRMA —la
+  // deriva de exposición—, que es el caso del ciclo de vida: acusado con su firma
+  // queda cubierto, y una firma distinta (un episodio materialmente nuevo) vuelve
+  // a hablar. Un hallazgo SIN firma se identifica por concepto y no reabre por
+  // cambiarle la firma: eso es correcto y lo cubre 10.12.
+  ok('10.15 SÓLO evidencia nueva reabre, y una sola vez (firma distinta ⇒ episodio nuevo)',
+    (() => { const signed = h1.match(/data-intel-ack="([^"]+)"\s*\n\s*data-intel-sig="([^"]+)"/);
+      if (!signed) return false;
+      const c3 = makeCtx(APPLE);
+      c3._aurixActiveUserId = 'founder-qa';
+      const base = Number(heroPending(run('_renderIntelligenceCommandCenter()', c3)));
+      run('_aurixIntelAcknowledge(' + JSON.stringify(signed[1]) + ', { signature: '
+        + JSON.stringify(signed[2]) + ' })', c3);
+      const covered = Number(heroPending(run('_renderIntelligenceCommandCenter()', c3)));
+      const rec = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c3);
+      rec.ack[signed[1]].signature = String(signed[2]) + ':moved';
+      run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify(rec) + ', {})', c3);
+      const reopened = Number(heroPending(run('_renderIntelligenceCommandCenter()', c3)));
+      return covered === base - 1 && reopened === base; })(),
+    JSON.stringify(h1.match(/data-intel-ack="([^"]+)"\s*\n\s*data-intel-sig="([^"]+)"/) || null));
+  // EL DEFECTO DEL BOTÓN ERA EL REPINTADO. `renderIntelligence()` no existe en
+  // ninguna parte del fichero; el owner es `renderIntelligenceTab()`. Esto no es
+  // un regex decorativo: es el único punto del flujo que no se puede ejercitar
+  // sin DOM, y era exactamente donde estaba el fallo.
+  ok('10.16 el handler repinta con el owner que EXISTE',
+    /renderIntelligenceTab\(\)/.test(fnSrc('_initIntelSeeChanges'))
+    && !/renderIntelligence\(\)\s*;/.test(app),
+    JSON.stringify({ tab: /renderIntelligenceTab\(\)/.test(fnSrc('_initIntelSeeChanges')),
+      ghost: /renderIntelligence\(\)\s*;/.test(app) }));
+  ok('10.17 …y mueve el foco a la fila revisada, no al principio del documento',
+    /data-finding/.test(fnSrc('_initIntelSeeChanges'))
+    && /focus\(\{ preventScroll: true \}\)/.test(fnSrc('_initIntelSeeChanges')));
+
+  // ── UNA PREGUNTA SÓLO POR NECESIDAD ─────────────────────────────────────
+  ok('10.18 un hallazgo nuevo NO abre pregunta por sí mismo: sólo `questionNeed`',
+    (() => { // Todos los campos declarados ⇒ no hay necesidad que preguntar.
+      const answered = { fields: {
+        concentration_intent: { value: 'deliberate', provenance: 'declared', answeredAt: 1 },
+        wealth_coverage: { value: 'all', provenance: 'declared', answeredAt: 1 },
+        liquidity_need: { value: 'none_known', provenance: 'declared', answeredAt: 1 },
+        primary_goal: { value: 'grow', provenance: 'declared', answeredAt: 1 },
+      }, answered: 4, source: 'stored', asked: {}, declined: {}, pausedAt: null };
+      const r = render(Object.assign({}, APPLE, { context: answered }));
+      return Number(heroPending(r.html)) > 0 && !/intv12-qcard/.test(r.html); })());
+
+  // ── RADAR · CINCO MARCADORES, TRES VALORES ──────────────────────────────
+  const rr = render(APPLE).html;
+  const svg = (re) => (rr.match(re) || [, null])[1];
+  ok('10.19 cinco ejes, cinco etiquetas y cinco marcadores de disponibilidad',
+    svg(/data-svg-axes="(\d+)"/) === '5'
+    && count(rr, /class="intcc-radar-label[ "]/g) === 5
+    && (count(rr, /class="intcc-radar-dot"/g) + count(rr, /class="intcc-radar-dot is-unknown"/g)) === 5,
+    JSON.stringify({ axes: svg(/data-svg-axes="(\d+)"/),
+      labels: count(rr, /class="intcc-radar-label[ "]/g),
+      filled: count(rr, /class="intcc-radar-dot"/g),
+      hollow: count(rr, /class="intcc-radar-dot is-unknown"/g) }));
+  ok('10.20 tres certificados y dos DESCONOCIDOS, y los desconocidos no entran en el polígono',
+    (() => { const measured = Number(svg(/data-svg-measured="(\d+)"/));
+      const unknown = Number(svg(/data-svg-unknown="(\d+)"/));
+      const pts = (rr.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim();
+      return measured === 3 && unknown === 2
+        && pts.split(/\s+/).filter(Boolean).length === 3
+        && count(rr, /class="intcc-radar-dot"/g) === 3
+        && count(rr, /class="intcc-radar-dot is-unknown"/g) === 2; })(),
+    JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
+  ok('10.21 un eje DESCONOCIDO no es un valor bajo: su marcador va al extremo, hueco y con radial discontinua',
+    /class="intcc-radar-dot is-unknown" cx="[^"]+" cy="[^"]+" r="3.1"/.test(rr)
+    && /class="intcc-radar-spoke is-unknown"/.test(rr)
+    && /\.intcc-radar-dot\.is-unknown\s*\{[^}]*fill:\s*none/.test(css)
+    && /\.intcc-radar-spoke\.is-unknown\s*\{[^}]*stroke-dasharray/.test(css));
+  ok('10.22 …dice «sin datos» y su etiqueta está atenuada',
+    count(rr, /class="intcc-radar-val is-unavailable"/g) === 2
+    && count(rr, /class="intcc-radar-label is-unavailable"/g) === 2
+    && /sin datos/.test(rr));
+  ok('10.23 CRECIMIENTO sigue siendo no computable: ningún owner puede puntuarlo',
+    (() => { const dims = run('JSON.stringify(_INTV7_RADAR_DIMS)', makeCtx(APPLE));
+      const g = JSON.parse(dims).find(d => d.key === 'growth');
+      return !!g && g.owner === null && g.pending === 'no_certifiable_scale'
+        && /data-svg-unknown="2"/.test(rr); })());
+  ok('10.24 la transición del radar respeta `prefers-reduced-motion`',
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,200}\.intcc-radar-dot[^}]*transition: none/.test(css));
+
+  // ── COPY DE PERÍMETRO ───────────────────────────────────────────────────
+  ok('10.25 la superficie ya no repite «invertible» y no miente sobre el denominador · ES',
+    (() => { const h = render(APPLE).html;
+      const text = h.replace(/<[^>]*>/g, ' ');
+      return !/invertible/i.test(text) && /(inversiones|cartera financiera)/i.test(text); })(),
+    (render(APPLE).html.replace(/<[^>]*>/g, ' ').match(/[^.]*invertible[^.]*/i) || [''])[0]);
+  ok('10.26 …y lo mismo en EN',
+    (() => { const h = render(Object.assign({}, APPLE, { lang: 'en' })).html;
+      const text = h.replace(/<[^>]*>/g, ' ');
+      return !/investable/i.test(text) && /(investments|financial portfolio)/i.test(text); })(),
+    (render(Object.assign({}, APPLE, { lang: 'en' })).html.replace(/<[^>]*>/g, ' ')
+      .match(/[^.]*investable[^.]*/i) || [''])[0]);
+  ok('10.27 el helper de perímetro es UNO y no toca ninguna cifra',
+    (() => { const c = makeCtx(APPLE);
+      const before = 'Tu patrimonio invertible es de 12.345,67 US$';
+      const after = run('_intv4Perimeter(' + JSON.stringify(before) + ')', c);
+      const digits = t0 => (String(t0).match(/[\d.,]+/g) || []).join('|');
+      return after.indexOf('invertible') === -1 && digits(after) === digits(before)
+        && /Tus inversiones suman/.test(after); })(),
+    JSON.stringify(run('_intv4Perimeter("Tu patrimonio invertible es de 12.345,67 US$")', makeCtx(APPLE))));
+  ok('10.28 …y el vocabulario ya no dice «material» en pantalla (ES y EN)',
+    (() => { const es = render(APPLE).html.replace(/<[^>]*>/g, ' ');
+      const en = render(Object.assign({}, APPLE, { lang: 'en' })).html.replace(/<[^>]*>/g, ' ');
+      return !/material(es)?\b/i.test(es) && !/\bmaterial(ly)?\b/i.test(en); })(),
+    (render(APPLE).html.replace(/<[^>]*>/g, ' ').match(/[^.]*material[^.]*/i) || [''])[0]);
+  ok('10.29 el rendimiento NO se atribuye a un activo ni a una categoría',
+    (() => { const h = render(APPLE).html;
+      const m = h.match(/class="intv4-chg-text">([^<]*rendimiento[^<]*)</i);
+      if (!m) return true;                       // sin frase de rendimiento no hay riesgo
+      const names = ['Bitcoin', 'BTC', 'Cripto', 'cripto', 'A1', 'A2'];
+      return names.every(n => m[1].indexOf(n) === -1); })());
+
+  // ── EXPLORA · ROTACIÓN DETERMINISTA ─────────────────────────────────────
+  ok('10.30 la rotación es estable dentro del periodo e independiente del dispositivo',
+    (() => { const c = makeCtx(APPLE);
+      const ids = ['q_a', 'q_b', 'q_c', 'q_d', 'q_e', 'q_f'];
+      const at = (now, owner) => JSON.stringify(run('_intv4ExploreRotation('
+        + JSON.stringify(ids) + ', ' + now + ', ' + JSON.stringify(owner) + ')', c));
+      const day0 = 1757000000000;
+      return at(day0, 'u1') === at(day0 + 3600e3, 'u1')     // misma jornada ⇒ mismo conjunto
+        && at(day0, 'u1') !== at(day0 + 4 * 864e5, 'u1')    // otro día ⇒ rota la posición diaria
+        && at(day0, 'u1') !== at(day0, 'u2'); })());        // otra cuenta ⇒ otro conjunto
+  ok('10.31 …nunca repite concepto y respeta el tope de cuatro',
+    (() => { const c = makeCtx(APPLE);
+      const ids = ['q_a', 'q_b', 'q_c', 'q_d', 'q_e', 'q_f'];
+      for (let d = 0; d < 40; d++) {
+        const got = run('_intv4ExploreRotation(' + JSON.stringify(ids) + ', '
+          + (1757000000000 + d * 864e5) + ', "u1")', c);
+        if (got.length !== 4) return false;
+        if (new Set(got).size !== got.length) return false;
+      }
+      return true; })());
+  ok('10.32 …y con catálogo corto no inventa nada: devuelve lo que hay',
+    (() => { const c = makeCtx(APPLE);
+      const got = run('_intv4ExploreRotation(["q_a","q_b"], 1757000000000, "u1")', c);
+      return got.length === 2; })());
+  ok('10.33 Explora no depende del historial local de presentación',
+    !/_intv4ReadShown/.test(fnSrc('_intv4ExploreHtml')));
+
+  // ── LO QUE IMPORTA · SIN DESPLEGABLE, TRES COMO MÁXIMO ──────────────────
+  ok('10.34 no queda ningún desplegable en la superficie, ni «Hechos que lo sostienen»',
+    !/<details/.test(rr) && !/intv4-more/.test(rr) && !/Hechos que lo sostienen/.test(rr));
+  ok('10.35 «Lo que importa» publica 3 lecturas como máximo, y declara sus apoyos sin abrirlos',
+    (() => { const items = num(rr, /class="intcc-card intcc-watch[^"]*"[^>]*data-items="(\d+)"/);
+      return items !== null && Number(items) <= 3 && /data-support="\d+"/.test(rr); })(),
+    JSON.stringify({ items: num(rr, /data-items="(\d+)"/) }));
+  ok('10.36 …y la escalera de actualidad ordena: 24H antes que un estado',
+    (() => { const c = makeCtx(APPLE);
+      const tier = (st) => run('_intv5RecencyTier(' + JSON.stringify(st) + ')', c);
+      return tier({ window: { range: '24H' } }) < tier({ window: { range: '7D' } })
+        && tier({ window: { range: '7D' } }) < tier({ values: { causeKnown: true } })
+        && tier({ values: { causeKnown: true } }) < tier({ window: { range: '30D' } })
+        && tier({ window: { range: '30D' } }) < tier({ window: { range: 'observed' } }); })());
+  ok('10.37 un hecho ya publicado abajo no se repite literalmente arriba',
+    (() => { const facts = (rr.match(/class="intv4-chg-text">([^<]+)</g) || [])
+        .map(x => x.replace(/.*>/, '').trim());
+      const heads = (rr.match(/class="intv4-story-head">([^<]+)</g) || [])
+        .map(x => x.replace(/.*>/, '').trim());
+      return heads.every(hd => facts.indexOf(hd) === -1); })(),
+    JSON.stringify({ heads: (rr.match(/class="intv4-story-head">([^<]+)</g) || []).length }));
+
+  // ── MEMORIA · HASTA 8 Y SCROLL CONDICIONAL ──────────────────────────────
+  ok('10.38 la Memoria publica hasta 8 entradas reales y declara si va a hacer scroll',
+    (() => { const n = count(rr, /class="intcc-tl-item/g);
+      const declared = num(rr, /class="intcc-card intcc-timeline[^"]*"[^>]*data-rows="(\d+)"/);
+      return n <= 8 && (declared === null || Number(declared) === n); })(),
+    JSON.stringify({ rows: count(rr, /class="intcc-tl-item/g) }));
+  ok('10.39 …y en la rejilla ancha la lista OCUPA la card en vez de dejar hueco muerto',
+    /@media \(min-width: 1024px\)[\s\S]{0,400}\.intv4-memory > \.intv10-mem-scroll\s*\{[^}]*flex: 1 1 auto/.test(css)
+    && /\.intv4-memory > \.intv10-mem-scroll\s*\{[^}]*max-height: none/.test(css));
+
+  // ── RESPONSIVE ESTRUCTURAL ──────────────────────────────────────────────
+  ok('10.40 móvil: Hero → Salud → Pregunta → Radar, y ninguna card antes del hero',
+    (() => { const orderOf = (sel) => { const m = css.match(new RegExp('\\' + sel + '\\s*\\{\\s*order:\\s*(\\d+)')); return m ? Number(m[1]) : null; };
+      return orderOf('.intcc-m-hero') === 0 && orderOf('.intcc-m-health') === 1
+        && orderOf('.intv12-qcard') === 2; })());
+  ok('10.41 escritorio: el CTA va separado de las etiquetas, y las etiquetas envuelven',
+    /\.intcc-hero \.intcc-chips\s*\{[^}]*margin-top: 18px/.test(css)
+    && /\.intcc-hero \.intcc-chips \.intcc-chip\s*\{[^}]*white-space: normal/.test(css)
+    && /\.intcc-hero \.intv12-see-changes\s*\{[^}]*margin-top: 16px/.test(css));
+  ok('10.42 sin pregunta no se reserva hueco: la card no existe',
+    (() => { const answered = { fields: {
+        concentration_intent: { value: 'deliberate', provenance: 'declared', answeredAt: 1 },
+        wealth_coverage: { value: 'all', provenance: 'declared', answeredAt: 1 },
+        liquidity_need: { value: 'none_known', provenance: 'declared', answeredAt: 1 },
+        primary_goal: { value: 'grow', provenance: 'declared', answeredAt: 1 },
+      }, answered: 4, source: 'stored', asked: {}, declined: {}, pausedAt: null };
+      const h = render(Object.assign({}, APPLE, { context: answered })).html;
+      return !/intv12-qcard/.test(h) && /data-has-question="0"/.test(h); })());
+  ok('10.43 el objetivo táctil del control «Entendido» es de 44px en móvil',
+    /@media \(max-width: 640px\)[\s\S]{0,300}\.intv12-ack\s*\{[^}]*min-height: 44px/.test(css));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

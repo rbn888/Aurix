@@ -20583,6 +20583,18 @@ body.gs-open { overflow: hidden; }
 .intv4-chg:hover .intv12-ack { opacity: 1; }
 .intv12-ack:hover { color: var(--color-text-primary); border-color: var(--color-border); }
 .intv12-ack:focus-visible { opacity: 1; outline: 2px solid var(--color-accent, #6ea8fe); outline-offset: 2px; }
+/* REVISADO · es una MARCA DE ESTADO, no un botón apagado. Un control
+   deshabilitado sigue pareciendo accionable y el usuario vuelve a pulsarlo; esto
+   se lee como lo que es: la fila sigue en el historial y ya está vista. */
+.intv12-ack.is-done {
+  opacity: 1;
+  cursor: default;
+  color: var(--color-text-secondary);
+  border-color: transparent;
+  background: rgba(122,162,255,0.10);
+}
+.intv4-chg.is-reviewed { opacity: 0.72; }
+.intv4-chg.is-reviewed .intv4-chg-dot { opacity: 0.5; }
 /* En móvil el objetivo táctil manda: 44px de alto sin engordar la fila. */
 @media (max-width: 640px) {
   .intv12-ack { min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; }
@@ -20857,9 +20869,38 @@ body.gs-open { overflow: hidden; }
   font-size: 7.5px; font-weight: 600; letter-spacing: 0.03em;
   font-variant-numeric: normal;      /* it is a word, not a figure */
 }
+/* ── CINCO MARCADORES DE DISPONIBILIDAD ─────────────────────────────────────
+   La QA autenticada demostró el hueco: sin vértice, un eje no certificado no
+   dejaba NADA que mirar, así que «Aurix no lo mide» y «aquí no hay nada» se veían
+   igual. El marcador va HUECO y en el EXTREMO del eje —el punto más alejado de la
+   serie— para que no pueda leerse como un valor bajo ni como un cero, con su
+   radial discontinua. No entra en el polígono: eso lo decide el motor, no el CSS. */
+.intcc-radar-dot.is-unknown {
+  fill: none;
+  stroke: rgba(150,180,240,0.52);
+  stroke-width: 1.2;
+  stroke-dasharray: 1.6 1.6;
+  filter: none;                      /* sin glow: un dato ausente no brilla */
+}
+.intcc-radar-spoke.is-unknown {
+  stroke: rgba(150,180,240,0.18);
+  stroke-width: 1;
+  stroke-dasharray: 2.5 3.5;
+}
 /* The measured length along each axis: legible with one or two certified
    dimensions, where a closed polygon would be a line or a dot. */
 .intcc-radar-spoke { stroke: rgba(122,162,255,0.55); stroke-width: 1.4; stroke-linecap: round; }
+/* TRANSICIÓN SUTIL AL MOVERSE UN VALOR. Sólo geometría y opacidad, sin animación
+   de entrada: lo que se percibe es que el dato SE HA MOVIDO, no un efecto. */
+.intcc-radar-area, .intcc-radar-dot:not(.is-unknown), .intcc-radar-spoke:not(.is-unknown) {
+  transition: all 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.intcc-radar-dot:not(.is-unknown) {
+  filter: drop-shadow(0 0 3px rgba(92,156,255,0.9));
+}
+@media (prefers-reduced-motion: reduce) {
+  .intcc-radar-area, .intcc-radar-dot, .intcc-radar-spoke { transition: none !important; }
+}
 /* A certified vertex stays readable at the low end of its axis. */
 .intv6-radar .intcc-radar-dot { r: 2.6; }
 
@@ -26345,6 +26386,33 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
 }
 /* El último recuerdo no puede quedar cortado a ras del borde. */
 .intv10-mem-scroll > .intcc-tl-list > .intcc-tl-item:last-child { padding-bottom: 4px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   AURIX INTELLIGENCE · CIERRE DE QA DEL FOUNDER
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ETIQUETAS · más aire y envoltura limpia. Con tres confirmaciones y la copy EN
+   más larga se pegaban entre sí y contra el CTA, que es el control que de verdad
+   lleva a algún sitio. Separación explícita para las dos, y el CTA en su propia
+   línea: no puede quedar al lado de una etiqueta y parecer otra. */
+.intcc-hero .intcc-chips { margin-top: 18px; row-gap: 8px; }
+.intcc-hero .intcc-chips .intcc-chip { max-width: 100%; white-space: normal; }
+.intcc-hero .intv12-see-changes { margin-top: 16px; }
+
+/* MEMORIA · la altura interna dejaba un hueco artificial. En la rejilla ancha la
+   card se estira hasta la línea base compartida de su fila (invariante ya
+   certificado: el mosaico no se rompe), y dentro el `max-height: 268px` cortaba
+   la lista mucho antes del borde, dejando aire muerto debajo. La lista pasa a
+   OCUPAR lo que la card le da, y el scroll sigue apareciendo sólo cuando el
+   contenido de verdad excede el espacio. */
+@media (min-width: 1024px) {
+  .aurix-intcc .intv4-memory { display: flex; flex-direction: column; }
+  .aurix-intcc .intv4-memory > .intv10-mem-scroll {
+    flex: 1 1 auto;
+    min-height: 0;               /* sin esto, flex ignora el overflow del hijo */
+    max-height: none;            /* la card ya pone el techo — sobra uno fijo */
+  }
+}
 
 @media (max-width: 1023px) {
   /* Táctil: scroll natural, sin barra invasiva, y algo menos de alto porque la

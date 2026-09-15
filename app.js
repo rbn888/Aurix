@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '683'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '684'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5281,14 +5281,25 @@ const T = {
     // última revisión» sobre los mismos dos. Se dice lo que el número ES: cuántas
     // cosas hay que merecen revisión, sin afirmar cuándo se vieron por última vez.
     intel_see_changes:     n => `${n} ${n === 1 ? 'cambio que merece' : 'cambios que merecen'} revisión · Ver cambios ↓`,
+    // ── UNA ÚNICA BANDEJA DE ATENCIÓN ───────────────────────────────────────
+    // `material` sale de la superficie: era jerga del contrato interno y encima
+    // se contradecía con el contador. Se dice «significativo», «relevante» o
+    // «requiere revisión», que es lo que el usuario entiende.
+    intel_now_novelty:     'Hay una novedad en tu patrimonio',
+    intel_sub_review:      n => `${n} ${n === 1 ? 'cambio merece' : 'cambios merecen'} revisión`,
+    intel_now_reviewed:    'Todo revisado',
+    intel_sub_reviewed:    'No tienes cambios pendientes. Aurix seguirá observando la evolución de tu patrimonio.',
+    intel_now_no_news:     'Sin novedades significativas desde tu última visita',
+    intel_sub_no_news:     'Aurix ha comparado tu patrimonio con la última revisión y no ha encontrado cambios que requieran tu atención.',
+    intel_ack_done:        'Entendido ✓',
     // §8 — «Entendido» no borra nada: baja la prioridad de presentación. El hecho
     // sigue certificado y en el ledger, y un episodio materialmente nuevo vuelve.
     intel_ack:             'Entendido',
-    intel_ack_aria:        'Marcar como entendido: deja de mostrarse hasta que haya evidencia material nueva',
+    intel_ack_aria:        'Marcar como entendido: sale de los cambios pendientes y se queda en el historial',
     intel_now_material:    'Ha cambiado algo que importa',
     intel_now_discovery:   'Aurix ha visto algo en tu estructura',
     intel_now_changed:     'Tu estructura se ha movido',
-    intel_now_stable_nc:   'Sin cambios materiales desde tu última visita',
+    intel_now_stable_nc:   'Sin novedades significativas desde tu última visita',
     intel_now_stable:      'Tu estructura se mantiene',
     intel_now_history:     'Aurix necesita más historia para leer tu evolución',
     intel_now_context:     'Aurix puede leerlo mejor con un dato tuyo',
@@ -5299,7 +5310,7 @@ const T = {
     // frase también: dice cuántas cosas hay y que están abajo.
     intel_sub_material:    n => `${n} ${n === 1 ? 'lectura' : 'lecturas'} que Aurix considera que merecen tu atención, justo abajo.`,
     intel_sub_changed:     n => `${n} ${n === 1 ? 'lectura se ha movido' : 'lecturas se han movido'}. Las tienes detalladas abajo.`,
-    intel_sub_stable_nc:   'Aurix ha comparado tu estructura con la de tu última visita y no ha encontrado nada material.',
+    intel_sub_stable_nc:   'Aurix ha comparado tu estructura con la de tu última visita y no ha encontrado nada relevante.',
     intel_sub_history:     'Las conclusiones de evolución aparecerán solas en cuanto haya observaciones suficientes.',
     // Descubrimientos: cada uno nace de una RELACIÓN entre hechos, nunca de una causa inventada.
     intel_d_apparent:      (pos, eff) => `Tienes ${pos} posiciones, pero tu peso se reparte como si tuvieras ${eff}.`,
@@ -7816,18 +7827,25 @@ const T = {
     intel_disp_na_generic: 'Aurix cannot measure the spread rigorously yet.',
     intel_disp_depth:      'It measures how weight is spread across your positions. It is not a grade or a risk measure: sector, geography, correlation and currency are not measurable yet.',
     intel_see_changes:     n => `${n} ${n === 1 ? 'change worth' : 'changes worth'} reviewing · See changes ↓`,
+    intel_now_novelty:     'There is something new in your wealth',
+    intel_sub_review:      n => `${n} ${n === 1 ? 'change needs' : 'changes need'} review`,
+    intel_now_reviewed:    'All reviewed',
+    intel_sub_reviewed:    'You have no pending changes. Aurix will keep watching how your wealth evolves.',
+    intel_now_no_news:     'No significant news since your last visit',
+    intel_sub_no_news:     'Aurix compared your wealth with the last review and found no change that needs your attention.',
+    intel_ack_done:        'Reviewed ✓',
     intel_ack:             'Understood',
-    intel_ack_aria:        'Mark as understood: stops showing until there is materially new evidence',
+    intel_ack_aria:        'Mark as understood: leaves pending changes and stays in your history',
     intel_now_material:    'Something that matters has changed',
     intel_now_discovery:   'Aurix spotted something in your structure',
     intel_now_changed:     'Your structure has moved',
-    intel_now_stable_nc:   'No material change since your last visit',
+    intel_now_stable_nc:   'No significant news since your last visit',
     intel_now_stable:      'Your structure is holding',
     intel_now_history:     'Aurix needs more history to read your evolution',
     intel_now_context:     'Aurix can read this better with one detail from you',
     intel_sub_material:    n => `${n} ${n === 1 ? 'reading' : 'readings'} Aurix thinks deserve your attention, right below.`,
     intel_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} moved. They are detailed below.`,
-    intel_sub_stable_nc:   'Aurix compared your structure with your last visit and found nothing material.',
+    intel_sub_stable_nc:   'Aurix compared your structure with your last visit and found nothing relevant.',
     intel_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
     intel_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
     intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
@@ -30652,10 +30670,17 @@ function _aurixCanonicalFindings(ledger, opts) {
   const ackCovers = f => {
     const r = acks[conceptOf(f)];
     if (!r || r.state !== 'acknowledged') return false;      // resuelto ⇒ no cubre
-    // Sin firma en ninguno de los dos lados se cae al criterio anterior (identidad
-    // de evento), que es el comportamiento legacy y sigue siendo correcto.
+    // ── EL LECTOR Y EL ESCRITOR TIENEN QUE HABLAR DE LO MISMO ──────────────
+    // Sin firma en ninguno de los dos lados se cae a la IDENTIDAD, y aquí estaba
+    // el segundo defecto de «Entendido»: el escritor guarda `episodeId = concepto`
+    // cuando no hay firma (deliberado: sin firma el concepto ES el episodio), pero
+    // esto lo comparaba contra `f.eventId`. Los hechos de observación proyectan
+    // `eventId: null`, así que `String(null)` nunca casaba: el acuse se escribía y
+    // no cubría NADA. El usuario pulsaba, se guardaba, y la fila seguía pendiente.
+    // Se compara contra la misma identidad que el escritor usó.
     if (r.signature == null || f.episodeSignature == null) {
-      return !r.episodeId || String(r.episodeId) === String(f.eventId);
+      const idOf = String(f.eventId || conceptOf(f));
+      return !r.episodeId || String(r.episodeId) === idOf;
     }
     return String(r.signature) === String(f.episodeSignature);
   };
@@ -57090,18 +57115,32 @@ function _intccRadarSvg(radar, dimsOverride) {
     labels += `<text class="intcc-radar-val${dimCls}" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${
       isMeasured ? _intccEsc(d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
                  : _intccEsc(_intv4T('intv7_axis_unavailable'))}</text>`;
-    // No vertex for an unmeasured axis: "unknown" must not look like zero.
+    // ── CINCO DIMENSIONES RECONOCIBLES, TRES VALORES ───────────────────────
+    // «Sin vértice» dejaba dos ejes sin NADA que mirar: la QA del founder no podía
+    // distinguir «Aurix no lo mide» de «aquí no hay nada». Un eje no certificado
+    // recibe ahora un marcador HUECO en el EXTREMO de su eje —lo más lejos posible
+    // de la serie, para que no pueda leerse como un valor bajo ni como un cero— y
+    // su radial va discontinua. Sigue sin entrar en el polígono, que es el
+    // invariante financiero: no participa, no puntúa y no se interpola.
     if (isMeasured) {
       const [dx, dy] = pt(i, rOf(d.key));
       dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
       if (!closeArea) spokes += `<line class="intcc-radar-spoke" x1="${cx}" y1="${cy}" x2="${dx.toFixed(1)}" y2="${dy.toFixed(1)}"/>`;
+    } else {
+      const [ux, uy] = pt(i, R);
+      dots += `<circle class="intcc-radar-dot is-unknown" cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="3.1"`
+           +  ` data-axis="${_intccEsc(d.key)}" data-availability="unknown"/>`;
+      spokes += `<line class="intcc-radar-spoke is-unknown" x1="${cx}" y1="${cy}"`
+             +  ` x2="${ux.toFixed(1)}" y2="${uy.toFixed(1)}" data-axis="${_intccEsc(d.key)}"/>`;
     }
   });
   // viewBox padded horizontally so the outer end/start-anchored labels
   // (Diversificación, Concentración…) are never clipped on narrow screens, and
   // INT.2Y — extra top padding so the raised apex label never clips.
   return `
-    <svg class="intcc-radar-svg" viewBox="-58 -12 336 232" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}">
+    <svg class="intcc-radar-svg" viewBox="-58 -12 336 232" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}"
+         data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
+         data-svg-unknown="${dims.length - measured.length}">
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
       <g class="intcc-radar-spokes">${spokes}</g>
@@ -57185,11 +57224,72 @@ function _aurixIntelRootsOf(intel) {
 // `intelligence_context`: es cuántos recuerdos caben en la card.
 const _INTV4_MEMORY_MAX = 8;
 
+// ════════════════════════════════════════════════════════════════════════════
+// EL PERÍMETRO SE NOMBRA UNA VEZ, Y SIN MENTIR SOBRE EL DENOMINADOR
+// ════════════════════════════════════════════════════════════════════════════
+// «Invertible» es vocabulario del contrato interno: describe el PERÍMETRO que
+// excluye el inmueble, y repetirlo en cada frase convertía la superficie en un
+// glosario. Pero no se puede sustituir por «patrimonio» sin más, porque entonces
+// el denominador sería otro: la cifra habla de la cartera FINANCIERA, no del
+// patrimonio total. Las dos cosas se resuelven en un solo owner con una tabla
+// DECLARADA de frases —ni un regex suelto sobre el texto renderizado— y ninguna
+// entrada toca una cifra, una ventana ni un cálculo: sólo el sustantivo.
+//
+//   denominador = patrimonio total certificado  → «patrimonio»
+//   perímetro exclusivamente financiero         → «tus inversiones» / «tu cartera
+//                                                  financiera» / «el rendimiento
+//                                                  de tus inversiones»
+// Aquí el denominador es SIEMPRE el invertible (el inmueble queda fuera por
+// contrato, ver project_investable_wealth), así que se usa la forma financiera:
+// es verdad tanto si hay inmueble como si no, y nunca sobreafirma el total.
+const _INTV4_PERIMETER = Object.freeze({
+  es: Object.freeze([
+    Object.freeze(['Tu rendimiento invertible fue', 'El rendimiento de tus inversiones fue']),
+    Object.freeze(['Tu patrimonio invertible es de', 'Tus inversiones suman']),
+    Object.freeze(['Tu patrimonio invertible está', 'Tus inversiones están']),
+    Object.freeze(['Tu patrimonio invertible ha', 'Tus inversiones han']),
+    Object.freeze(['del patrimonio invertible', 'de tu cartera financiera']),
+    Object.freeze(['de tu patrimonio invertible', 'de tu cartera financiera']),
+    Object.freeze(['tu patrimonio invertible', 'tu cartera financiera']),
+    Object.freeze(['el patrimonio invertible', 'la cartera financiera']),
+    Object.freeze(['patrimonio invertible', 'cartera financiera']),
+    Object.freeze(['rendimiento invertible', 'rendimiento de tus inversiones']),
+    Object.freeze(['liquidez invertible', 'liquidez de tu cartera financiera']),
+  ]),
+  en: Object.freeze([
+    Object.freeze(['Your investable return was', 'The return of your investments was']),
+    Object.freeze(['Your investable wealth is at its high', 'Your investments are at their high']),
+    Object.freeze(['Your investable wealth is up', 'Your investments are up']),
+    Object.freeze(['Your investable wealth is down', 'Your investments are down']),
+    Object.freeze(['Your investable wealth is', 'Your investments add up to']),
+    Object.freeze(['of your investable wealth', 'of your financial portfolio']),
+    Object.freeze(['your investable wealth', 'your financial portfolio']),
+    Object.freeze(['the investable wealth', 'the financial portfolio']),
+    Object.freeze(['investable wealth', 'financial portfolio']),
+    Object.freeze(['investable return', 'return of your investments']),
+  ]),
+});
+function _intv4Perimeter(txt) {
+  if (typeof txt !== 'string' || !txt) return txt;
+  const code = (typeof lang === 'string' && _INTV4_PERIMETER[lang]) ? lang : 'es';
+  let out = txt;
+  // Orden declarado: de la frase más específica a la más corta, así que una
+  // sustitución larga no queda partida por otra más genérica.
+  _INTV4_PERIMETER[code].forEach(pair => {
+    if (out.indexOf(pair[0]) !== -1) out = out.split(pair[0]).join(pair[1]);
+  });
+  return out;
+}
 function _intv4T(key, ...args) {
   try {
     const v = (typeof t === 'function') ? t(key) : null;
-    if (typeof v === 'function') return v(...args);
-    return (typeof v === 'string') ? v : '';
+    // El sustantivo del perímetro es COSMÉTICO: si su owner no estuviera, la frase
+    // debe seguir saliendo tal cual. Envolverlo sin esta guarda dejaba que un
+    // fallo del helper vaciara TODA la copy dentro del `catch`, que es un precio
+    // absurdo por una palabra.
+    const fix = (x) => (typeof _intv4Perimeter === 'function') ? _intv4Perimeter(x) : x;
+    if (typeof v === 'function') return fix(v(...args));
+    return (typeof v === 'string') ? fix(v) : '';
   } catch (_) { return ''; }
 }
 function _intv4Money(v) {
@@ -57382,18 +57482,19 @@ function _intv4StoryHtml(story, esc, depth, publishedKeys) {
   const advanced = (depth === _INTV4_DEPTH.ADVANCED) || support.length > 0;
   return `
     <article class="intv4-story is-${esc(story.direction || 'flat')}${story.positive === true ? ' is-positive' : ''}"
-             data-root="${esc(story.causalRoot)}" data-fact="${esc(story.semanticKey)}">
+             data-root="${esc(story.causalRoot)}" data-fact="${esc(story.semanticKey)}"
+             data-support="${support.length}" data-confidence="${esc(conf === 'intv4_confidence_high' ? 'high' : 'medium')}">
       <p class="intv4-story-head">${esc(head)}</p>
       ${(why && !leadWithMeaning) ? `<p class="intv4-story-why">${esc(why)}</p>` : ''}
       ${showWin ? `<p class="intv4-story-meta">${esc(_intv4T('intv4_window', _intv4WindowLabel(story.window)))}</p>` : ''}
-      ${advanced && support.length ? `
-        <details class="intv4-more">
-          <summary class="intv4-more-sum">${esc(_intv4T('intv4_supporting'))}</summary>
-          <ul class="intv4-sup-list">
-            ${support.map(x => `<li class="intv4-sup" data-fact="${esc(x.s.semanticKey)}">${esc(x.txt)}</li>`).join('')}
-          </ul>
-          <p class="intv4-story-conf">${esc(_intv4T(conf))}</p>
-        </details>` : ''}
+      ${/* ── «HECHOS QUE LO SOSTIENEN» SE RETIRA DE LA SUPERFICIE ─────────────
+            El hecho certificado ya lo publica «Qué ha cambiado» con su cifra, y
+            esta card existe para el SIGNIFICADO. El desplegable repetía el mismo
+            dato un nivel más abajo y añadía el único disclosure que quedaba en
+            Intelligence, justo después de retirar los otros dos por decisión de
+            producto. Los apoyos NO se pierden del dominio: siguen viajando en el
+            contrato (`story.supporting`) para el motor y los gates, y el conteo
+            se declara en el DOM para que la QA pueda verlo sin abrir nada. */''}
     </article>`;
 }
 
@@ -57406,10 +57507,14 @@ function _intv4BriefHtml(core, esc, depth) {
     .filter(s => s.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
     .slice(0, _INTV4_BRIEF_MAX);
   const cards = stories.map(s => _intv4StoryHtml(s, esc, depth)).filter(Boolean);
+  // `withAck` era una variable INEXISTENTE aquí: este owner quedó fuera de la
+  // superficie (lo sustituyó `_intv5MattersHtml`) y nadie lo llama, así que el
+  // ReferenceError no llegó a dispararse nunca. Se corrige igual: una mina
+  // enterrada sigue siendo una mina.
   return `
     <section class="intcc-card intv4-brief">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_brief_title'))}</h3>
-      ${withAck.length ? `<div class="intv4-story-list">${withAck.join('')}</div>`
+      ${cards.length ? `<div class="intv4-story-list">${cards.join('')}</div>`
                      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_brief_empty'))}</p>`}
     </section>`;
 }
@@ -57437,17 +57542,41 @@ function _intv4BriefHtml(core, esc, depth) {
 // («esto aumenta cuánto influyen los movimientos de cripto en tu patrimonio»).
 // Tres trabajos distintos sobre la misma raíz es exactamente lo que el contrato
 // autoriza; tres formas de decir lo mismo es lo que prohíbe.
-function _intv4FindingRows(core) {
+// ── DOS LISTAS, UNA FUENTE ──────────────────────────────────────────────────
+// El defecto que reprodujo el founder: tras registrar 100 acciones de Apple
+// existía «1 cambio que merece revisión» y el hero decía a la vez «Sin cambios
+// materiales», y al refrescar la atención se olvidaba aunque el cambio siguiera
+// pendiente. Eran dos universos: el titular salía de las transiciones de INSIGHTS
+// (que se consumen en la primera pintura y desaparecen al recargar) y el contador
+// de los hallazgos canónicos (que siguen vivos hasta que el usuario los acusa).
+//
+// Se separan explícitamente, y las dos salen de la MISMA fuente:
+//   · allFindings           → historial certificado, acuses incluidos. Es lo que
+//                             pinta «Qué ha cambiado»: acusar NO borra historia.
+//   · activeReviewFindings  → lo vigente y NO acusado. Es lo único que el hero
+//                             cuenta y lo único que abre CTA.
+// Refrescar, reabrir o cambiar de dispositivo no acusa ni resuelve nada: el acuse
+// es un registro persistido por concepto, no un efecto de la pintura.
+function _intv4FindingRows(core, opts) {
+  const all = !!(opts && opts.all);
   const facts = (core && core.ledger && core.ledger.facts) || [];
-  return ((core && core.findings) || [])
+  const active = new Set(((core && core.findings) || [])
+    .map(fd => String(fd.findingId || fd.eventId || fd.semanticKey)));
+  const src = all ? ((core && core.findingsAll) || ((core && core.findings) || []))
+                  : ((core && core.findings) || []);
+  return src
     .map(fd => {
       const f = facts.find(x => x.semanticKey === fd.semanticKey) || null;
-      return { fd, f, txt: f ? _intv4FactText(f) : '' };
+      const id = String(fd.findingId || fd.eventId || fd.semanticKey);
+      return { fd, f, txt: f ? _intv4FactText(f) : '', reviewed: all ? !active.has(id) : false };
     })
     // Sin copy no hay fila, y sin fila no puede contarse: el contador y el destino
     // se derivan de ESTA lista, así que un hallazgo sin frase no infla el número.
     .filter(x => !!x.txt);
 }
+// LA BANDEJA DE REVISIÓN, con nombre. Un solo owner para que el hero, el CTA y el
+// gate no puedan derivarla por su cuenta.
+function _intv4ActiveReviewFindings(core) { return _intv4FindingRows(core); }
 function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   const seen = new Set();
   // Same rule as Memory: what the Brief already headlined is not repeated here.
@@ -57468,7 +57597,13 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   // conservan SÓLO como diagnóstico en los `data-*` (siguen diciendo qué otra
   // superficie tocó la misma raíz, que es útil para el gate) pero ya no pueden
   // vaciar el destino de un contador que el hero acaba de anunciar.
-  const rows = _intv4FindingRows(core);
+  // EL HISTORIAL NO SE VACÍA AL ACUSAR. Antes esta card rendía sólo la lista
+  // ACTIVA, así que «Entendido» borraba la fila y el usuario perdía el hecho
+  // certificado que acababa de leer. Ahora rinde el historial completo y la fila
+  // acusada CAMBIA DE ESTADO: sigue ahí, con su cifra, ya no es interactiva y no
+  // cuenta para el hero.
+  const rows = _intv4FindingRows(core, { all: true });
+  const pending = rows.filter(x => !x.reviewed);
   const candidates = rows;
   rows.forEach(x => seen.add(x.fd.rootCause));
   // ── M.03 · E — "SIN CAMBIO MATERIAL" ≠ "NO PUEDO MEDIRLO" ─────────────────
@@ -57487,6 +57622,7 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   const emptyKey = !hasEvidence ? 'intv4_changed_empty'
     : (candidates.length ? 'intv4_changed_others_none'
       : (published.size ? 'intv4_changed_all_published' : 'intv4_changed_stable'));
+  const ackable = (fd) => !!(fd && (fd.conceptId || fd.episodeId));
   // SIN CAMBIO MATERIAL, LA SUPERFICIE SE ENCOGE. Reservar una card entera con
   // título para decir «no se detectan otros cambios relevantes» es gastar la zona
   // más visible de la pantalla en una no-noticia. La frase NO se pierde —las cuatro
@@ -57500,24 +57636,34 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   // `id` + `tabindex` + `role="group"`: el hero navega HASTA AQUÍ y mueve el foco
   // al encabezado, así que el destino tiene que ser direccionable y enfocable. Sin
   // eso «Ver cambios ↓» sería un scroll decorativo que un teclado no puede seguir.
-  return { state: 'rows', evidence: hasEvidence, count: rows.length, html: `
+  return { state: 'rows', evidence: hasEvidence, count: pending.length, html: `
     <section class="intcc-card intv4-changed" id="aurix-intel-changes"
              data-evidence="${hasEvidence ? '1' : '0'}"
              data-obs="${esc(String(obs.observations || 0))}"
              data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
-             data-findings="${rows.length}" data-state="rows">
+             data-findings="${pending.length}" data-all="${rows.length}" data-state="rows">
       <h3 class="intcc-card-title" id="aurix-intel-changes-title" tabindex="-1">${esc(_intv4T('intv4_changed_title'))}</h3>
       <ul class="intv4-chg-list">${rows.map(x => `
-        <li class="intv4-chg is-${esc((x.f && x.f.direction) || 'flat')}"
+        <li class="intv4-chg is-${esc((x.f && x.f.direction) || 'flat')}${x.reviewed ? ' is-reviewed' : ''}"
             data-root="${esc(x.fd.rootCause)}" data-finding="${esc(x.fd.findingId)}"
             data-fact="${esc(x.fd.semanticKey)}"
+            data-reviewed="${x.reviewed ? '1' : '0'}"
             data-cause="${x.fd.causeKnown ? 'user' : 'unknown'}"
             data-diluted="${(x.f && x.f.values && x.f.values.dilutedBy) ? esc(x.f.values.dilutionKind || 'pure') : ''}">
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
-          <button type="button" class="intv12-ack" data-intel-ack="${esc(x.fd.conceptId || x.fd.episodeId)}"
+          ${x.reviewed
+            // REVISADO: se dice, no se esconde, y deja de ser interactivo. No es un
+            // botón deshabilitado —que sigue siendo un control que no hace nada—
+            // sino una marca de estado.
+            ? `<span class="intv12-ack is-done" data-intel-reviewed="1">${esc(_intv4T('intel_ack_done'))}</span>`
+            // Sin identidad que acusar NO se pinta control: un botón que no puede
+            // registrar nada sería una promesa falsa.
+            : (ackable(x.fd)
+              ? `<button type="button" class="intv12-ack" data-intel-ack="${esc(x.fd.conceptId || x.fd.episodeId)}"
                   data-intel-sig="${esc(x.fd.episodeSignature == null ? '' : x.fd.episodeSignature)}"
-                  aria-label="${esc(_intv4T('intel_ack_aria'))}">${esc(_intv4T('intel_ack'))}</button>
+                  aria-label="${esc(_intv4T('intel_ack_aria'))}">${esc(_intv4T('intel_ack'))}</button>`
+              : '')}
         </li>`).join('')}</ul>
     </section>` };
 }
@@ -57565,29 +57711,62 @@ function _intv4DiscoveryHtml(core, esc, publishedTexts) {
 //       prefijo `x:` para no mezclarse con las claves de hechos.
 // Empate ⇒ id, así que la misma entrada da siempre el mismo orden: cambia cuando
 // cambia la cartera o cuando el usuario ya ha visto algo, no al azar.
+// ════════════════════════════════════════════════════════════════════════════
+// EXPLORA · ROTACIÓN DETERMINISTA POR CUENTA Y POR PERIODO
+// ════════════════════════════════════════════════════════════════════════════
+// El orden salía del HISTORIAL DE PRESENTACIÓN, que es local al dispositivo: el
+// móvil y el escritorio de la misma persona veían conjuntos distintos, y una
+// pintura nueva podía darle la vuelta. La rotación pasa a ser una FUNCIÓN PURA de
+// (cuenta, periodo): cuatro posiciones con cadencias declaradas —una diaria, dos
+// semanales, una mensual—, sin persistencia nueva, sin query nueva, sin azar y
+// sin conceptos repetidos. El mismo día, la misma cuenta y el mismo catálogo dan
+// exactamente el mismo conjunto en cualquier dispositivo.
+const _INTV4_EXPLORE_CADENCE = Object.freeze(['day', 'week', 'week', 'month']);
+function _intv4ExploreSeed(owner) {
+  const str = String(owner == null ? '' : owner);
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h * 31) + str.charCodeAt(i)) % 100000;
+  return h;
+}
+function _intv4ExploreRotation(ids, now, owner) {
+  const pool = (Array.isArray(ids) ? ids : []).slice().sort();
+  if (pool.length <= _INTV4_EXPLORE_MAX) return pool;
+  const day = Math.floor((Number.isFinite(now) ? now : 0) / 864e5);
+  // Periodos declarados. El «mes» son 30 días: es una CADENCIA, no una fecha de
+  // calendario, y no necesita zona horaria para ser determinista.
+  const periodOf = { day: day, week: Math.floor(day / 7), month: Math.floor(day / 30) };
+  const seed = _intv4ExploreSeed(owner);
+  const out = [], used = new Set();
+  _INTV4_EXPLORE_CADENCE.forEach((cad, slot) => {
+    // Cada posición arranca en un punto distinto del catálogo (`slot * 7`) para
+    // que dos cadencias no converjan en la misma pregunta, y avanza hasta la
+    // primera libre: ninguna posición puede duplicar un concepto.
+    let idx = (seed + periodOf[cad] + slot * 7) % pool.length;
+    for (let k = 0; k < pool.length; k++) {
+      const cand = pool[(idx + k) % pool.length];
+      if (used.has(cand)) continue;
+      used.add(cand); out.push(cand); break;
+    }
+  });
+  return out;
+}
 function _intv4ExploreHtml(core, esc, intel) {
   const hot = new Set(_aurixIntelRootsOf(intel));
-  let shownAt = {};
-  try {
-    (_intv4ReadShown() || []).forEach(e => {
-      if (typeof e.semanticKey === 'string' && e.semanticKey.indexOf('x:') === 0) {
-        shownAt[e.semanticKey.slice(2)] = e.shownAt;
-      }
-    });
-  } catch (_) { shownAt = {}; }
-  const qs = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
+  const all = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
     .map(q => ({ q, label: _intv4T('intv4_q_' + q.id), answer: _intv4AnswerHtml(q, core, esc) }))
-    .filter(x => !!x.label && !!x.answer)
+    .filter(x => !!x.label && !!x.answer);
+  // La rotación elige QUÉ cuatro; la relevancia del modelo sólo ordena las
+  // elegidas, y es una derivación de datos certificados, así que es igual en
+  // todos los dispositivos. La pregunta del dock NO entra aquí: son dos
+  // superficies distintas y sólo `questionNeed` abre aquella.
+  const picked = new Set(_intv4ExploreRotation(all.map(x => x.q.id),
+    (typeof Date !== 'undefined') ? Date.now() : 0,
+    (typeof _aurixIntelOwner === 'function') ? _aurixIntelOwner({}) : null));
+  const qs = all
+    .filter(x => picked.has(x.q.id))
     .sort((a, b) => {
       const ha = hot.has(a.q.causalRoot) ? 1 : 0, hb = hot.has(b.q.causalRoot) ? 1 : 0;
       if (ha !== hb) return hb - ha;
-      // Granularidad de DÍA a propósito: con el timestamp exacto, todas las
-      // mostradas comparten el mismo `Date.now()` y las no mostradas valen 0, así
-      // que el conjunto se daba la vuelta en cada repintado. Por día, el orden es
-      // estable dentro de una sesión y cambia entre visitas.
-      const sa = Math.floor(Number(shownAt[a.q.id] || 0) / 864e5);
-      const sb = Math.floor(Number(shownAt[b.q.id] || 0) / 864e5);
-      if (sa !== sb) return sa - sb;                 // lo menos visto, primero
       return a.q.id < b.q.id ? -1 : 1;
     })
     .slice(0, _INTV4_EXPLORE_MAX);
@@ -57595,6 +57774,7 @@ function _intv4ExploreHtml(core, esc, intel) {
   return `
     <section class="intcc-card intcc-explore intv4-explore"
              data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
+             data-pool="${all.length}"
              data-hot="${qs.filter(x => hot.has(x.q.causalRoot)).length}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intcc-explore-list">
@@ -57955,6 +58135,12 @@ function _intelCoherentState(nowState, healthBand, justified) {
 // («N lecturas han cambiado») y la card listaba hechos del ledger: dos universos,
 // dos cardinalidades, y ninguna forma de que el usuario averiguara qué eran esas N
 // cosas. Un contador sin destino exacto es una promesa incumplida.
+// ── EL HERO TIENE UNA SOLA BANDEJA DE ATENCIÓN ──────────────────────────────
+// `activeReviewCount` la gobierna entera, y por encima del estado semántico del
+// motor: mientras haya un hallazgo pendiente, el hero no puede decir «sin
+// novedades» ni «sin cambios», ni olvidarse de él al refrescar. Los cuatro
+// estados son los que autorizó el founder, y son los MISMOS en escritorio y en
+// móvil porque las dos composiciones leen esta función.
 function _intv5Reading(core, score, snap, intel, findingCount) {
   // FAIL CLOSED. Si el motor no ha podido correr, la lectura NO puede caer en «Tu
   // estructura se mantiene»: eso es una afirmación estructural POSITIVA sostenida
@@ -57987,7 +58173,10 @@ function _intv5Reading(core, score, snap, intel, findingCount) {
   const CLASS = { material_change: 'attention', attention_material_fact: 'attention',
     discovery: 'concentrated', context_needed: 'balanced', insufficient_history: 'balanced',
     readings_changed: 'concentrated', stable_no_change: 'healthy', stable: 'balanced',
-    monitoring: 'healthy', no_data: 'balanced' };
+    monitoring: 'healthy', no_data: 'balanced',
+    // Los tres estados de la bandeja reutilizan las clases visuales que ya
+    // existen: no hay lenguaje visual nuevo que mantener.
+    review_pending: 'attention', all_reviewed: 'healthy', no_news: 'balanced' };
   // NINGÚN ESTADO PUEDE PRONUNCIAR UN NÚMERO QUE EL DESTINO NO PUEDA MOSTRAR. Si
   // la lista canónica está vacía, los dos estados que dicen «N lecturas han
   // cambiado» dejan de ser publicables y se cae al estado que describe la
@@ -57996,8 +58185,49 @@ function _intv5Reading(core, score, snap, intel, findingCount) {
     nowState = (score && _AURIX_INTEL_HEALTH_POSITIVE.indexOf(String(score.band || '')) !== -1)
       ? 'monitoring' : 'stable';
   }
+  // ── LA BANDEJA MANDA ────────────────────────────────────────────────────
+  // A · hay pendientes ⇒ título contextual del ancla (o su fallback) y el
+  //     contador. Nunca «sin cambios» ni «una lectura se ha movido».
+  // B · hubo cambios y están todos acusados ⇒ «Todo revisado», sin contador.
+  // C · no hay novedades y SÍ hay evidencia para afirmarlo ⇒ «sin novedades».
+  // D · sin evidencia suficiente ⇒ se explica la disponibilidad. UNKNOWN nunca
+  //     se convierte en «no hubo cambios».
+  const activeReviewCount = Number.isFinite(findingCount) ? findingCount : 0;
+  const allCount = ((core && core.findingsAll) || []).length;
+  const obs = (core && core.dataAvailability && core.dataAvailability.observation) || {};
+  const hasEvidence = Number(obs.observations) >= 2;
+  const CONTEXTUAL = ['material_change', 'attention_material_fact', 'discovery', 'readings_changed'];
+  if (activeReviewCount > 0) {
+    nowState = 'review_pending';
+  } else if (allCount > 0) {
+    nowState = 'all_reviewed';
+  } else if (nowState === 'stable_no_change' || nowState === 'stable'
+             || nowState === 'monitoring' || nowState === 'material_change'
+             || nowState === 'readings_changed') {
+    // D · SIN EVIDENCIA NO SE AFIRMA AUSENCIA. Decir «no he encontrado cambios»
+    // exige haber podido comparar; con menos de dos observaciones eso es
+    // DESCONOCIDO, y se explica la disponibilidad en vez de fabricar calma.
+    nowState = hasEvidence ? 'no_news' : 'insufficient_history';
+  }
   let title, sub;
   switch (nowState) {
+    case 'review_pending': {
+      // El título contextual se conserva si el motor tenía uno que hable de
+      // atención; si no, el fallback dice que hay una novedad y no inventa cuál.
+      const ctxTitle = {
+        material_change: _intv4T('intel_now_material'),
+        attention_material_fact: _intv4T('intcc_read_attention'),
+        discovery: _intv4T('intel_now_discovery'),
+        readings_changed: _intv4T('intel_now_changed'),
+      }[rawState];
+      title = (CONTEXTUAL.indexOf(rawState) !== -1 && ctxTitle) ? ctxTitle : _intv4T('intel_now_novelty');
+      sub = _intv4T('intel_sub_review', activeReviewCount);
+      break;
+    }
+    case 'all_reviewed':
+      title = _intv4T('intel_now_reviewed'); sub = _intv4T('intel_sub_reviewed'); break;
+    case 'no_news':
+      title = _intv4T('intel_now_no_news'); sub = _intv4T('intel_sub_no_news'); break;
     case 'material_change':
       title = _intv4T('intel_now_material'); sub = _intv4T('intel_sub_material', changeCount); break;
     case 'discovery':
@@ -58025,7 +58255,9 @@ function _intv5Reading(core, score, snap, intel, findingCount) {
   if (ctxFields.wealth_coverage && ctxFields.wealth_coverage.value === 'partial') {
     sub = sub + ' ' + _intv4T('intel_ctx_partial');
   }
-  return { state: CLASS[nowState] || 'balanced', intelState: nowState, title, sub };
+  return { state: CLASS[nowState] || 'balanced', intelState: nowState, title, sub,
+    // UNA sola cifra viaja: el CTA, el atributo del DOM y el gate la leen de aquí.
+    activeReviewCount, hasEvidence };
 }
 
 // Hero chips: short confirmations derived from Core facts. Never a metric — the
@@ -58349,6 +58581,20 @@ function _intv5DriversHtml(snap, esc) {
 // publicaba en «Lo que importa» en cada pintura, para siempre, sin forma de darla
 // por vista. El hecho más cargado del delta era el único irrenunciable.
 // El acuse se aplica por EPISODIO, igual que en el destino, y sigue sin borrar nada.
+// LA ESCALERA DE ACTUALIDAD, declarada una vez. Cuanto más bajo el número, más
+// arriba se lee. Ninguna banda inventa una ventana que el hecho no traiga.
+const _INTV5_TIER = Object.freeze({ D1: 0, D7: 1, ACTION: 2, DRIFT: 3, STATE: 4 });
+function _intv5RecencyTier(st) {
+  const range = String((st && st.window && st.window.range) || '').toUpperCase();
+  if (range === '24H') return _INTV5_TIER.D1;
+  if (range === '7D')  return _INTV5_TIER.D7;
+  const v = (st && st.values) || {};
+  // Una acción del usuario corroborada por el ledger: es suya y es reciente.
+  if (v.causeKnown === true || st.eventClass === 'user_driven'
+      || (typeof v.lastMaterialAction === 'string' && v.lastMaterialAction)) return _INTV5_TIER.ACTION;
+  if (range === '30D' || range === '90D') return _INTV5_TIER.DRIFT;
+  return _INTV5_TIER.STATE;
+}
 function _intv5MattersStories(core, skipRoots, intel, acks) {
   const ack = (acks && typeof acks === 'object') ? acks : {};
   const skip = new Set(skipRoots || []);
@@ -58376,10 +58622,13 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
       // cubre SU firma; un registro resuelto no cubre nada.
       const covered = (x) => {
         if (!x) return false;
-        const r = ack[String(x.conceptId || x.eventId || '')];
+        const concept = String(x.conceptId || x.eventId || '');
+        const r = ack[concept];
         if (!r || r.state !== 'acknowledged') return false;
+        // Mismo criterio que el conjunto canónico, y por la misma razón: sin firma
+        // el escritor guardó el CONCEPTO como episodio (ver `_aurixCanonicalFindings`).
         if (r.signature == null || x.episodeSignature == null) {
-          return !r.episodeId || String(r.episodeId) === String(x.eventId);
+          return !r.episodeId || String(r.episodeId) === String(x.eventId || concept);
         }
         return String(r.signature) === String(x.episodeSignature);
       };
@@ -58394,10 +58643,28 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
       });
     })
     .filter(Boolean)
+    // DEDUP DEFENSIVA por raíz Y por identidad de evento. `_aurixIntelligenceStories`
+    // ya elige una historia por raíz, pero una promoción puede traer el evento de
+    // un hermano, y dos tarjetas con el mismo evento serían el mismo hecho contado
+    // dos veces.
+    .filter((st, i, arr) => {
+      const idOf = x => String((x && (x.eventId || x.semanticKey)) || '');
+      return arr.findIndex(y => idOf(y) === idOf(st)) === i;
+    })
     .slice()
     .sort((a, b) => {
+      // ── PRIMERO LO QUE ACABA DE PASAR ─────────────────────────────────────
+      // El orden lo ponía la relevancia contextual, y eso dejaba un ESTADO
+      // permanente por encima de un movimiento de hoy: la card se leía como una
+      // ficha fija en vez de como lo que importa AHORA. La escalera la declaró el
+      // founder —24H → 7D → acción reciente → deriva reciente → estado actual— y
+      // es determinista: sale de la ventana del propio hecho y de si un evento del
+      // usuario lo corrobora. No fabrica actualidad: un hecho sin ventana sigue
+      // siendo un estado y se ordena como tal.
       const ra = rank.has(a.causalRoot) ? rank.get(a.causalRoot) : -1;
       const rb = rank.has(b.causalRoot) ? rank.get(b.causalRoot) : -1;
+      const ta = _intv5RecencyTier(a), tb = _intv5RecencyTier(b);
+      if (ta !== tb) return ta - tb;
       if (ra !== rb) return rb - ra;
       // Sin señal del motor se conserva el orden certificado del Core.
       return (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1);
@@ -58410,18 +58677,23 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks) {
   // A2 — qué hechos publica ya el destino del contador. Los que coinciden se
   // titulan aquí por su SIGNIFICADO y llevan el hecho como evidencia de apoyo,
   // para que la misma frase no salga dos veces en la misma pantalla.
-  const publishedKeys = new Set(((core && core.findings) || []).map(f => f.semanticKey));
+  // EL HISTORIAL COMPLETO es lo que publica «Qué ha cambiado» desde que acusar
+  // deja la fila en su sitio, así que la exclusión por repetición literal se mide
+  // contra ESA lista y no contra la activa.
+  const publishedKeys = new Set(((core && core.findingsAll) || (core && core.findings) || [])
+    .map(f => f.semanticKey));
   const cards = sel.stories
+    // SIN SIGNIFICADO PROPIO NO SE REPITE EL HECHO. Si la frase disponible es
+    // exactamente la que el destino ya publica y no hay un «por qué» que aportar,
+    // esta card no tiene nada que decir sobre ella: callar es mejor que duplicar.
+    .filter(st => !(publishedKeys.has(st.semanticKey) && !_intv4WhyText(st)))
     .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
     .filter(Boolean);
-  // El control va por historia, con su episodio: una sola delegación ya lo resuelve.
-  const withAck = sel.stories.map((st, i) => cards[i]
-    ? cards[i].replace('</article>',
-        (st.eventId ? `<button type="button" class="intv12-ack" data-intel-ack="${esc(st.conceptId || st.eventId)}"
-           data-intel-sig="${esc(st.episodeSignature == null ? '' : st.episodeSignature)}"
-           aria-label="${esc(_intv4T('intel_ack_aria'))}">${esc(_intv4T('intel_ack'))}</button>` : '')
-        + '</article>')
-    : '').filter(Boolean);
+  // EL CONTROL «ENTENDIDO» VIVE EN UN SOLO SITIO. Aquí se construía una segunda
+  // copia por historia —con el MISMO `data-intel-ack`— que además nunca se
+  // renderizaba: el `return` usaba `cards`. Dos controles con la misma identidad
+  // en una pantalla es una trampa para cualquier delegación por atributo, así que
+  // el acuse se queda donde vive el hecho: en «Qué ha cambiado».
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
              data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}">
@@ -58628,6 +58900,8 @@ function _renderIntelligenceCommandCenter() {
   const heroHtml = `
     <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}"
              data-state="${esc(reading.state)}"
+             data-intel-state="${esc(reading.intelState)}"
+             data-review-pending="${findingCount}"
              data-has-question="${intelQHtml ? '1' : '0'}"
              data-health-state="${esc(score.band || '')}" data-health-conf="${esc(score.confidence || '')}">
       <div class="intcc-hero-score">
@@ -58655,7 +58929,9 @@ function _renderIntelligenceCommandCenter() {
   // Mobile composition (≤640px): the desktop hero is hidden by CSS and these two
   // cards take over. Same engines, same numbers — only the arrangement differs.
   const mHeroHtml = `
-    <section class="intcc-card intcc-m-card intcc-m-hero is-${esc(reading.state)}">
+    <section class="intcc-card intcc-m-card intcc-m-hero is-${esc(reading.state)}"
+             data-intel-state="${esc(reading.intelState)}"
+             data-review-pending="${findingCount}">
       <div class="intcc-m-hero-text" data-has-question="${intelQHtml ? '1' : '0'}">
         <h3 class="intcc-card-title">${esc(t('intcc_eyebrow'))}</h3>
         <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
@@ -58883,11 +59159,46 @@ function _initIntelSeeChanges(root) {
         try {
           const id = ack.getAttribute('data-intel-ack');
           const sig = ack.getAttribute('data-intel-sig');
-          if (id && typeof _aurixIntelAcknowledge === 'function') {
+          // ── EL BOTÓN NO HACÍA NADA VISIBLE, Y ÉSTA ERA LA RAZÓN ────────────
+          // Llamaba a `renderIntelligence()`, que NO EXISTE: el owner se llama
+          // `renderIntelligenceTab()`. El `typeof` lo tapaba, caía en
+          // `render(false)` —que no reconstruye esta superficie— y el acuse se
+          // escribía sin que la pantalla lo reflejase. El usuario pulsaba y no
+          // pasaba nada; al recargar, el hallazgo ya estaba acusado. Se usa el
+          // MISMO idioma de repintado que el resto del fichero (el tirón remoto y
+          // la respuesta a una pregunta ya lo hacían bien).
+          if (!id) return;
+          // FEEDBACK INMEDIATO, antes de recomputar: el control se marca revisado
+          // en el acto, así que la acción nunca parece perdida aunque el repintado
+          // tarde un frame.
+          try {
+            ack.setAttribute('aria-disabled', 'true');
+            ack.classList.add('is-done');
+            if (typeof _intv4T === 'function') ack.textContent = _intv4T('intel_ack_done');
+          } catch (_) {}
+          const row = ack.closest ? ack.closest('.intv4-chg, .intv4-story') : null;
+          const findingId = row ? row.getAttribute('data-finding') : null;
+          // IDEMPOTENTE: `_aurixIntelAcknowledge` guarda UN registro por concepto,
+          // así que pulsar dos veces no crea dos episodios ni dos escrituras.
+          if (typeof _aurixIntelAcknowledge === 'function') {
             _aurixIntelAcknowledge(id, { signature: (sig === null || sig === '') ? null : sig });
           }
-          if (typeof renderIntelligence === 'function') renderIntelligence();
-          else if (typeof render === 'function') render(false);
+          const ph = document.getElementById('tabPlaceholder')
+            || document.querySelector('.tab-placeholder--intel');
+          if (ph && typeof renderIntelligenceTab === 'function') {
+            ph.innerHTML = renderIntelligenceTab();
+            if (typeof _initIntelligenceCommandCenter === 'function') _initIntelligenceCommandCenter();
+            // FOCO SEGURO. El control desaparece con el repintado, así que el foco
+            // se mueve a su fila —que sigue existiendo, ahora marcada revisada— y
+            // no se cae al principio del documento.
+            try {
+              const back = findingId
+                ? ph.querySelector('[data-finding="' + String(findingId).replace(/"/g, '\\"') + '"]')
+                : null;
+              const dest = back || ph.querySelector('#aurix-intel-changes-title');
+              if (dest) { try { dest.setAttribute('tabindex', '-1'); } catch (_) {} dest.focus({ preventScroll: true }); }
+            } catch (_) {}
+          }
         } catch (_) {}
         return;
       }
