@@ -89,10 +89,10 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD','_AURIX_WN12_MIN_SPAN_RETENTION',
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
-  '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
+  '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_RANK_WEIGHTS',
   '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
   '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
   'assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
   '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixInvestablePerformance',
@@ -406,6 +406,24 @@ const MEASURE = `(function(){
   out.radarAreaPts = (function(){ var a = host.querySelector('.intcc-radar-area');
     if (!a) return 0; var p = (a.getAttribute('points')||'').trim();
     return p ? p.split(/\\s+/).length : 0; })();
+  // SPEC ADVANCED INTELLIGENCE · §8 — la figura ABIERTA y sus dos márgenes.
+  out.radarEdges = host.querySelectorAll('.intcc-radar-edge').length;
+  out.radarOpen  = (function(){ var svg = host.querySelector('.intcc-radar-svg');
+    return svg ? svg.getAttribute('data-svg-open') : null; })();
+  out.radarRadii = (function(){
+    var svg = host.querySelector('.intcc-radar-svg'); if (!svg) return null;
+    var cx = 110, cy = 106, R = 76;
+    var r = function(el){ return Math.hypot(+el.getAttribute('cx') - cx, +el.getAttribute('cy') - cy); };
+    var filled = [].map.call(svg.querySelectorAll('.intcc-radar-dot:not(.is-unknown)'), r);
+    var hollow = [].map.call(svg.querySelectorAll('.intcc-radar-dot.is-unknown'), r);
+    return { filled: filled, hollow: hollow, R: R,
+      // ningún marcador en el centro ni en el vértice, y disponibilidad SIEMPRE
+      // más lejos que cualquier valor certificado
+      noneAtCentre: filled.concat(hollow).every(function(v){ return v > 4; }),
+      noneAtVertex: filled.concat(hollow).every(function(v){ return v < R - 0.5; }),
+      hollowOutside: !filled.length || !hollow.length
+        || Math.min.apply(null, hollow) > Math.max.apply(null, filled) + 2 };
+  })();
   // A HOLE detector: on the wide grid, the leftmost module of row 2 must start at
   // the container's content edge. A fail-closed module used to leave 1/3 of the
   // row blank, which is exactly what the founder photographed.
@@ -527,15 +545,23 @@ for (const vp of VIEWPORTS) {
     m.radarVals.length === 5 && m.radarFigures === 3
     && m.radarNoData === 2 && m.radarDimmed === 2,
     JSON.stringify({ vals: m.radarVals, figures: m.radarFigures, dimmed: m.radarDimmed }));
-  // CINCO MARCADORES DE DISPONIBILIDAD, TRES VALORES. El polígono une sólo los
-  // certificados; los otros dos llevan marcador HUECO en el extremo de su eje, que
-  // es lo que permite distinguir «no lo mide» de «no hay nada» sin puntuar un cero.
+  // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ─────────────────────────
+  // Esta comprobación exigía `radarArea === 1 && radarAreaPts === 3`, es decir un
+  // POLÍGONO CERRADO sobre los tres ejes medidos. Con `stability` y `growth` sin
+  // certificar —y están intercalados— los lados de esa figura ATRAVIESAN los ejes
+  // desconocidos, que es lo que §8 prohíbe por su nombre. Fosilizaba una limitación
+  // como contrato; se sustituye por los invariantes que §8 sí pide.
   check(vp, 'five availability markers, three certified vertices (unknown never a value)',
-    m.radarArea === 1 && m.radarAreaPts === 3
-    && m.radarDots === 3 && m.radarUnknownDots === 2
-    && m.radarUnknownSpokes === 2,
-    JSON.stringify({ area: m.radarArea, pts: m.radarAreaPts, filled: m.radarDots,
-      hollow: m.radarUnknownDots, spokes: m.radarUnknownSpokes }));
+    m.radarArea === 0 && m.radarDots === 3 && m.radarUnknownDots === 2
+    && m.radarUnknownSpokes === 2 && m.radarOpen === '1' && m.radarEdges === 1,
+    JSON.stringify({ area: m.radarArea, open: m.radarOpen, edges: m.radarEdges,
+      filled: m.radarDots, hollow: m.radarUnknownDots, spokes: m.radarUnknownSpokes }));
+  check(vp, 'no marker sits at the centre or on the outer vertex (uniform graphic margin)',
+    !!m.radarRadii && m.radarRadii.noneAtCentre === true && m.radarRadii.noneAtVertex === true,
+    JSON.stringify(m.radarRadii));
+  check(vp, 'the availability marker lives OUTSIDE the series band (unknown is not a high value)',
+    !!m.radarRadii && m.radarRadii.hollowOutside === true,
+    JSON.stringify(m.radarRadii && { filled: m.radarRadii.filled, hollow: m.radarRadii.hollow }));
   check(vp, 'no reserved column is left empty where a module fail-closed',
     m.emptyGridGap === false, 'gapPx=' + m.gapPx);
   if (!vp.mobile || vp.name === 'tablet') {

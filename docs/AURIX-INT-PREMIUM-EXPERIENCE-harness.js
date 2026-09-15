@@ -124,12 +124,12 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
-  '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
+  '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -362,9 +362,15 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   // The retired blocks were the duplication mechanism.
   // INT.07 — THE SEMANTIC PENTAGON. Five FIXED conceptual dimensions, always
   // drawn; a value exists only where Aurix can certify it. "No data" is NOT 0.
-  ok('3.5 the radar polygon is restored',
-    /intcc-radar-svg/.test(html) && /intcc-radar-area/.test(html)
-    && /intcc-radar-axis/.test(html) && /intcc-radar-label/.test(html));
+  // RE-DECIDIDO (§8): con ejes sin certificar la figura NO se cierra, así que
+  // exigir `intcc-radar-area` era exigir el triángulo engañoso. Lo que esta
+  // aserción protege —que el radar se pinte con su marco y su serie— se comprueba
+  // sobre el trazo abierto, que es la forma correcta en este estado de datos.
+  ok('3.5 the radar renders with its frame and its (open) series',
+    /intcc-radar-svg/.test(html) && /intcc-radar-axis/.test(html)
+    && /intcc-radar-label/.test(html) && /class="intcc-radar-dot"/.test(html)
+    && /data-svg-open="1"/.test(html) && !/intcc-radar-area/.test(html),
+    (html.match(/data-svg-(open|edges)="[^"]*"/g) || []).join(' '));
   ok('3.5b the five axes are the founder\'s five SEMANTIC dimensions, in the FIXED drawing order',
     JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<'))
       // A1/A2 — el primer eje DEJA DE LLAMARSE «Diversificación». Publicaba
@@ -814,12 +820,27 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
     [five, founder, one].every(x => x.pending === 'stability,growth'
       && x.vals.filter(v => v === 'sin datos').length === 2),
     JSON.stringify(founder.vals));
+  // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ────────────────────────
+  // Estas aserciones exigían un POLÍGONO CERRADO (`intcc-radar-area`) sobre los
+  // ejes medidos. Con `stability` y `growth` sin certificar —y están INTERCALADOS
+  // (13B.7b lo exige a propósito)— cada lado de esa figura ATRAVIESA un eje
+  // desconocido: la forma afirmaba algo sobre dimensiones que Aurix no mide. §8 lo
+  // prohíbe literalmente. Fosilizaban una limitación como contrato; se sustituyen
+  // por el invariante que §8 pide, conservando lo que de verdad protegían: un eje
+  // no certificado NO recibe vértice de serie y no se arrastra al centro.
   ok('13B.6 an uncertified axis gets NO vertex — it is not dragged to the centre',
-    founder.pts.length === 3 && founder.dots === 3
-    && founder.pts.every(p => p !== CENTRE || founder.nums.indexOf(0) !== -1),
+    founder.dots === 3 && founder.pts.length === 0
+    && !/class="intcc-radar-dot" cx="110.0" cy="106.0"/.test(founder.html),
     JSON.stringify({ pts: founder.pts, dots: founder.dots }));
-  ok('13B.7 the polygon joins ONLY certified dimensions (never five points)',
-    [five, founder, one].every(x => x.pts.length === 3));
+  ok('13B.7 exactly the certified dimensions carry a vertex, and the figure is OPEN',
+    [five, founder, one].every(x => x.dots === 3 && x.pts.length === 0
+      && /data-svg-open="1"/.test(x.html)));
+  ok('13B.7c y NINGÚN segmento cruza un eje desconocido: sólo se unen ADYACENTES',
+    // Los pendientes están intercalados (13B.7b), así que de los tres medidos
+    // —índices 0, 2 y 4— el único par adyacente en el anillo es 4↔0. Un segundo
+    // segmento sería una línea atravesando `stability` o `growth`.
+    [five, founder, one].every(x => /data-svg-edges="1"/.test(x.html)),
+    JSON.stringify([five, founder, one].map(x => (x.html.match(/data-svg-edges="[^"]*"/) || [, '?'])[0])));
   ok('13B.7b the pending axes are INTERLEAVED, so no sector of the pentagon is dead',
     (() => { const ks = konstSrc('_INTV7_RADAR_DIMS');
       const order = (ks.match(/key: '(\w+)'/g) || []).map(m => m.split("'")[1]);

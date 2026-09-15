@@ -20485,6 +20485,14 @@ body.gs-open { overflow: hidden; }
   transform-origin: 110px 106px;
   animation: intccRadarIn 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/* SPEC ADVANCED INTELLIGENCE · §8 — EL TRAZO ABIERTO. Mismo lenguaje visual que el
+   borde del polígono (mismo color, mismo grosor, mismo glow) para que no parezca
+   otro elemento, pero SIN relleno: la figura está interrumpida y rellenarla
+   inventaría superficie entre dos puntos que no se tocan. */
+.intcc-radar-edge {
+  stroke: #6aa0ff; stroke-width: 1.6; stroke-linecap: round; fill: none;
+  filter: drop-shadow(0 0 5px rgba(92,156,255,0.55));
+}
 .intcc-radar-dot { fill: #cfe0ff; filter: drop-shadow(0 0 3px rgba(92,156,255,0.9)); }
 .intcc-radar-label { fill: rgba(214,226,255,0.82); font-size: 9.5px; font-weight: 600; }
 .intcc-radar-val   { fill: rgba(150,180,240,0.62); font-size: 8px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -20892,14 +20900,14 @@ body.gs-open { overflow: hidden; }
 .intcc-radar-spoke { stroke: rgba(122,162,255,0.55); stroke-width: 1.4; stroke-linecap: round; }
 /* TRANSICIÓN SUTIL AL MOVERSE UN VALOR. Sólo geometría y opacidad, sin animación
    de entrada: lo que se percibe es que el dato SE HA MOVIDO, no un efecto. */
-.intcc-radar-area, .intcc-radar-dot:not(.is-unknown), .intcc-radar-spoke:not(.is-unknown) {
+.intcc-radar-area, .intcc-radar-edge, .intcc-radar-dot:not(.is-unknown), .intcc-radar-spoke:not(.is-unknown) {
   transition: all 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .intcc-radar-dot:not(.is-unknown) {
   filter: drop-shadow(0 0 3px rgba(92,156,255,0.9));
 }
 @media (prefers-reduced-motion: reduce) {
-  .intcc-radar-area, .intcc-radar-dot, .intcc-radar-spoke { transition: none !important; }
+  .intcc-radar-area, .intcc-radar-edge, .intcc-radar-dot, .intcc-radar-spoke { transition: none !important; }
 }
 /* A certified vertex stays readable at the low end of its axis. */
 .intv6-radar .intcc-radar-dot { r: 2.6; }
@@ -21314,11 +21322,12 @@ body.gs-open { overflow: hidden; }
   /* ── 5. Radar — better read, no added noise.
      Dimmer secondary mesh, brighter main polygon, +10% active dots. */
   .intcc-radar-ring, .intcc-radar-axis { stroke: rgba(150,180,240,0.07); }
-  .intcc-radar-area {
+  .intcc-radar-area, .intcc-radar-edge {
     fill: rgba(92,156,255,0.27);
     stroke: #8ab6ff;
     filter: drop-shadow(0 0 6px rgba(92,156,255,0.7));
   }
+  .intcc-radar-edge { fill: none; }
   .intcc-radar-dot { r: 2.86px; fill: #e2edff; }
 
   /* ── 6. Health card — more premium and compact.
@@ -21391,7 +21400,7 @@ body.gs-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .aurix-intcc > * { opacity: 1 !important; transform: none !important; transition: none !important; }
   .intcc-orb-glow, .intcc-orb-core, .intcc-orb-ring, .intcc-orb-ecg path,
-  .intcc-radar-area, .intcc-drv-bar { animation: none !important; }
+  .intcc-radar-area, .intcc-radar-edge, .intcc-drv-bar { animation: none !important; }
   .intcc-orb-ecg path { stroke-dashoffset: 0; stroke-dasharray: none; }
 }
 

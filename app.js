@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '684'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '685'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5525,13 +5525,75 @@ const T = {
     // hechos
     intv4_f_return: (pct, win) => `Tu rendimiento invertible fue del ${pct}% en ${win}`,
     intv4_f_return_pos: pct => `Tus inversiones han generado un ${pct}% de rendimiento`,
-    intv4_f_level: amt => `Tu patrimonio invertible es de ${amt}`,
+    // §2 — CUANDO SÓLO SE CONOCE UN NIVEL, SE DICE UN NIVEL. La frase la fija el
+    // contrato palabra por palabra, y no pasa por la tabla de perímetro porque ya
+    // nombra el perímetro financiero correcto sin decir «patrimonio invertible».
+    intv4_f_level: amt => `Tu cartera financiera tiene actualmente un valor de ${amt}`,
     intv4_f_ath: amt => `Tu patrimonio invertible está en su máximo: ${amt}`,
-    // M.03 D — NIVEL, nunca rentabilidad: la frase dice "incluyendo aportaciones"
-    // en su propia línea (`intv4_why_investable_level_change`) y aquí no aparece
-    // ningún porcentaje, porque el hecho no lo afirma.
-    intv4_f_level_up:   (amt, since) => `Tu patrimonio invertible ha subido ${amt} desde el ${since}`,
-    intv4_f_level_down: (amt, since) => `Tu patrimonio invertible ha bajado ${amt} desde el ${since}`,
+    // ── §2 · «CAMBIO DEL VALOR REGISTRADO», NUNCA UNA SUBIDA ─────────────────
+    // «Tus inversiones han subido X» QUEDA RETIRADA. En producción publicó una
+    // subida de 75.432,67 US$ y después de 106.868,37 US$ sobre una cartera en la
+    // que no había ocurrido ninguna ganancia: eran el registro inicial y la
+    // incorporación de Microsoft. El hecho ya no se emite cuando su ventana
+    // contiene un registro (ver la puerta en `_aurixFactLedger`), y cuando SÍ se
+    // emite —ventana sin incorporaciones— se llama por su nombre exacto. «Subido»
+    // desaparece del vocabulario de este hecho: es la palabra que lo hacía leerse
+    // como rentabilidad.
+    intv4_f_level_up:   (amt, since) => `Cambio del valor registrado de tu cartera financiera desde el ${since}: +${amt}`,
+    intv4_f_level_down: (amt, since) => `Cambio del valor registrado de tu cartera financiera desde el ${since}: −${amt}`,
+    // ── §3 · REGISTRO Y EVENTO ECONÓMICO, CON TRES FRASES DISTINTAS ──────────
+    // Las tres del contrato, y la diferencia entre ellas es el contrato entero:
+    // «registrado» es un acto en Aurix, «comprado» es un hecho económico, y
+    // «tienes registradas» es lo único decible cuando sólo se conoce la posición.
+    intv4_f_op_recorded:  (asset, amt) => `Hoy has registrado ${asset} por un coste registrado de ${amt}`,
+    intv4_f_op_bought:    (asset, amt) => `Hoy has comprado ${asset} por un coste registrado de ${amt}`,
+    // SIN CIFRA cuando el importe no está certificado. No es una degradación
+    // cosmética: el ACTO es el hecho que faltaba, y publicarlo sin importe es
+    // verdad, mientras publicarlo con el `qty × price` del oro serían 350.000 US$
+    // donde el coste eran 8.436. El lado `out` NUNCA lleva importe, porque ahí
+    // `amountUSD` es el producto de la venta o la valoración al borrar, y el
+    // mecanismo no distingue cuál.
+    intv4_f_op_recorded_na: asset => `Hoy has registrado ${asset} en tu cartera`,
+    intv4_f_op_bought_na:   asset => `Hoy has comprado ${asset}`,
+    intv4_f_op_removed:   asset => `Hoy has retirado ${asset} de tu cartera`,
+    intv4_f_op_holding:   asset => `Tienes registrado ${asset} en tu cartera`,
+    // Y la ventana que desborda el día UTC sin desbordar las 24 h: se dice lo que
+    // se puede demostrar, que es «reciente», no «hoy».
+    // ── SIN FECHA QUE AFIRMAR, PERO CON LADO ─────────────────────────────────
+    // La rama de procedencia desconocida es el camino cross-device NORMAL mientras
+    // la columna remota siga sin aplicar, y era la única que seguía ciega al lado:
+    // el dispositivo B recibía una VENTA y publicaba «Tienes registrado Microsoft
+    // en tu cartera» sobre una posición que acababa de salir. El acto contrario al
+    // ocurrido, igual que la tanda de bajas. Aquí no se puede afirmar CUÁNDO, así
+    // que no se afirma; el QUÉ sí se sabe y se dice.
+    intv4_f_op_removed_nd: asset => `Has retirado ${asset} de tu cartera`,
+    intv4_f_op_recent:     asset => `Has registrado ${asset} en las últimas 24 horas`,
+    intv4_f_op_recent_out: asset => `Has retirado ${asset} de tu cartera en las últimas 24 horas`,
+    intv4_f_ops_batch:    (n, amt) => `Hoy has registrado ${n} posiciones en tu cartera, por un coste registrado de ${amt}`,
+    intv4_f_ops_batch_na:      n => `Hoy has registrado ${n} posiciones en tu cartera`,
+    intv4_f_ops_batch_recent:  n => `Has registrado ${n} posiciones en tu cartera en las últimas 24 horas`,
+    intv4_f_ops_batch_holding: n => `Tienes ${n} posiciones registradas en tu cartera`,
+    // ── LA TANDA TIENE LADO, Y LA FRASE TIENE QUE MIRARLO ────────────────────
+    // Sin estas dos, una tanda de BAJAS publicaba «Hoy has registrado 2 posiciones»
+    // —el acto contrario al ocurrido— porque la rama de tanda ignoraba
+    // `values.side`. Y una tanda MIXTA no puede llamarse ni alta ni baja: se dice
+    // «operaciones», que es verdad para las dos.
+    intv4_f_ops_batch_out:        n => `Hoy has retirado ${n} posiciones de tu cartera`,
+    intv4_f_ops_batch_out_recent: n => `Has retirado ${n} posiciones de tu cartera en las últimas 24 horas`,
+    intv4_f_ops_batch_mixed:        n => `Hoy has registrado ${n} operaciones en tu cartera`,
+    intv4_f_ops_batch_mixed_recent: n => `Has registrado ${n} operaciones en tu cartera en las últimas 24 horas`,
+    intv4_f_ops_batch_out_nd:   n => `Has retirado ${n} posiciones de tu cartera`,
+    intv4_f_ops_batch_mixed_nd: n => `Has registrado ${n} operaciones en tu cartera`,
+    // §4 — el PESO en plural. «Esta operación» sobre la suma de N era singular
+    // hablando de un conjunto.
+    intv4_why_recorded_operations_share: pct => `Es un registro tuyo, no un resultado: estas operaciones representan el ${pct}% de tu cartera financiera.`,
+    // §4 — DOS ETAPAS. Lo que se conoce se publica ya; el PESO se añade cuando
+    // valoración, FX y denominador están completos. La primera frase es la que
+    // encabeza «Lo que importa hoy» cuando el hecho ya viaja como fila en «Qué ha
+    // cambiado» (A2: arriba el significado, abajo la cifra), así que tiene que
+    // DECIR algo —el peso estructural de la incorporación— y no sólo advertir.
+    intv4_why_recorded_operation_share: pct => `Es un registro tuyo, no un resultado: esta operación representa el ${pct}% de tu cartera financiera.`,
+    intv4_why_recorded_operation: 'Es lo que has registrado, no un resultado: el importe es el coste de la operación, no su valoración actual.',
     intv4_f_prior_high: (amt, at) => `Tu máximo observado sigue siendo el del ${at}: ${amt}`,
     intv4_why_investable_level_change: 'Es la evolución del nivel, no una rentabilidad: incluye los movimientos de liquidez que has registrado.',
     intv4_why_investable_prior_high: 'El máximo es una referencia de nivel; no dice por qué estás por debajo.',
@@ -8042,10 +8104,32 @@ const T = {
     intv4_cat_other: 'other assets',
     intv4_f_return: (pct, win) => `Your investable return was ${pct}% over ${win}`,
     intv4_f_return_pos: pct => `Your investments have generated a ${pct}% return`,
-    intv4_f_level: amt => `Your investable wealth is ${amt}`,
+    intv4_f_level: amt => `Your financial portfolio is currently worth ${amt}`,
     intv4_f_ath: amt => `Your investable wealth is at its high: ${amt}`,
-    intv4_f_level_up:   (amt, since) => `Your investable wealth is up ${amt} since ${since}`,
-    intv4_f_level_down: (amt, since) => `Your investable wealth is down ${amt} since ${since}`,
+    intv4_f_level_up:   (amt, since) => `Change in your financial portfolio's recorded value since ${since}: +${amt}`,
+    intv4_f_level_down: (amt, since) => `Change in your financial portfolio's recorded value since ${since}: −${amt}`,
+    intv4_f_op_recorded:  (asset, amt) => `Today you recorded ${asset} at a recorded cost of ${amt}`,
+    intv4_f_op_bought:    (asset, amt) => `Today you bought ${asset} at a recorded cost of ${amt}`,
+    intv4_f_op_recorded_na: asset => `Today you recorded ${asset} in your portfolio`,
+    intv4_f_op_bought_na:   asset => `Today you bought ${asset}`,
+    intv4_f_op_removed:   asset => `Today you removed ${asset} from your portfolio`,
+    intv4_f_op_holding:   asset => `You have ${asset} recorded in your portfolio`,
+    intv4_f_op_removed_nd: asset => `You removed ${asset} from your portfolio`,
+    intv4_f_op_recent:     asset => `You recorded ${asset} in the last 24 hours`,
+    intv4_f_op_recent_out: asset => `You removed ${asset} from your portfolio in the last 24 hours`,
+    intv4_f_ops_batch:    (n, amt) => `Today you recorded ${n} positions in your portfolio, at a recorded cost of ${amt}`,
+    intv4_f_ops_batch_na:      n => `Today you recorded ${n} positions in your portfolio`,
+    intv4_f_ops_batch_recent:  n => `You recorded ${n} positions in your portfolio in the last 24 hours`,
+    intv4_f_ops_batch_holding: n => `You have ${n} positions recorded in your portfolio`,
+    intv4_f_ops_batch_out:        n => `Today you removed ${n} positions from your portfolio`,
+    intv4_f_ops_batch_out_recent: n => `You removed ${n} positions from your portfolio in the last 24 hours`,
+    intv4_f_ops_batch_mixed:        n => `Today you recorded ${n} operations in your portfolio`,
+    intv4_f_ops_batch_mixed_recent: n => `You recorded ${n} operations in your portfolio in the last 24 hours`,
+    intv4_f_ops_batch_out_nd:   n => `You removed ${n} positions from your portfolio`,
+    intv4_f_ops_batch_mixed_nd: n => `You recorded ${n} operations in your portfolio`,
+    intv4_why_recorded_operations_share: pct => `This is something you recorded, not a result: these operations are ${pct}% of your financial portfolio.`,
+    intv4_why_recorded_operation_share: pct => `This is something you recorded, not a result: this operation is ${pct}% of your financial portfolio.`,
+    intv4_why_recorded_operation: 'This is what you recorded, not a result: the amount is the cost of the operation, not its current valuation.',
     intv4_f_prior_high: (amt, at) => `Your observed high is still the one from ${at}: ${amt}`,
     intv4_why_investable_level_change: 'This is how the level moved, not a return: it includes the cash movements you recorded.',
     intv4_why_investable_prior_high: 'A high is a level reference; it does not say why you are below it.',
@@ -11244,6 +11328,33 @@ function _aurixCaptureFlow(kind, amountUSD, ts, assetId, note, source, extra) {
     const flows = _aurixLoadCapitalFlowsRaw();
     if (flows.some(f => f.id === id)) return;                       // idempotent (id keyed on effective ts)
     const flow = { id, ts: t, amountUSD: +amountUSD.toFixed(2), kind, source: source || 'user', revision: 1 };
+    // ── SPEC ADVANCED INTELLIGENCE · §3 — DOS TIEMPOS, Y NINGUNO SE INVENTA ──
+    // `ts` es el instante ECONÓMICO (`effectiveAt`): lo elige el usuario y puede
+    // estar en el pasado, porque una compra de hace dos años introducida hoy
+    // ocurrió hace dos años. `recordedAt` es cuándo ENTRÓ EN AURIX, y sólo puede
+    // escribirlo quien está escribiendo la fila: es ahora, por definición.
+    //
+    // Se escribe AQUÍ y en ningún otro sitio. Navegar, hidratar, importar o
+    // repintar no lo tocan: `_aurixCapitalFlowsPull` sólo hace `Object.assign`
+    // con las claves que trae la fila remota, así que un `recordedAt` local
+    // SOBREVIVE a una revisión remota en vez de desaparecer. Y NO entra en el
+    // `id`: la identidad del evento es su hecho económico, no cuándo se tecleó
+    // (si entrara, reimportar la misma compra crearía una operación nueva).
+    //
+    // LÍMITE DECLARADO, no disimulado: la columna remota no existe todavía
+    // (`db/capital_flows_2_recorded_at.sql`, aditiva, SIN APLICAR y pendiente de
+    // autorización), así que un SEGUNDO dispositivo recibe la fila sin este campo.
+    // Ahí la procedencia es DESCONOCIDA y el consumidor no puede decir «hoy has
+    // registrado» — que es exactamente lo correcto, porque no lo sabe. Una fila
+    // legacy tampoco lo tiene y nunca se le rellena hacia atrás.
+    // Y SÓLO SI LA FILA ES UN ACTO DEL USUARIO. `_aurixCaptureFlow` es también el
+    // escritor del BACKFILL derivado (`source:'tx-backfill'`), que el self-heal
+    // purga y reconstruye en CADA arranque: sellar ahí `Date.now()` convertía todo
+    // el historial de compras en «Hoy has registrado N posiciones», una vez por
+    // recarga y para siempre. La procedencia de una fila reconstruida es, por
+    // definición, desconocida — se reconstruyó, no se registró— y eso es lo que
+    // debe viajar. La revisión financiera lo encontró ejecutándolo.
+    if (!(typeof _aurixFlowIsDerived === 'function' && _aurixFlowIsDerived(flow))) flow.recordedAt = Date.now();
     // SPEC ADVANCED INTELLIGENCE · A1 — INTENCIÓN EXPLÍCITA, NUNCA INFERIDA.
     // `kind` describe el MECANISMO, no la intención económica, y ahí nace la frase
     // falsa: `deposit` se emite tanto cuando entra dinero nuevo como cuando el
@@ -28742,6 +28853,12 @@ const _AURIX_FACT_FAMILY = Object.freeze({
   CONCENTRATION:   'concentration',
   DIVERSIFICATION: 'diversification',
   DATA_QUALITY:    'data_quality',
+  // SPEC ADVANCED INTELLIGENCE · §3 — LO QUE EL USUARIO REGISTRA. Familia propia y
+  // no `CAPITAL_FLOW`: un flujo de capital afirma algo sobre DINERO que entra o
+  // sale del perímetro, y una incorporación de activo no afirma eso (el modelo no
+  // debita la caja al comprar, ver `_aurixLedgerHealthSignal`). Meterlas juntas
+  // fue exactamente el defecto P0 que produjo «Has aportado 159.381,97 US$».
+  PORTFOLIO_RECORD: 'portfolio_record',
 });
 // CAUSAL ROOTS — the deduplication axis, and the whole point of §4. Before
 // INT.03 a single phenomenon (BTC = 53% of the portfolio) surfaced as three
@@ -28765,6 +28882,15 @@ const _AURIX_CAUSAL_ROOT = Object.freeze({
   // otra pregunta y tiene otro owner. Confundir las tres es exactamente lo que
   // produce «has perdido un 30 %» cuando lo medido era la caída de 30 días.
   POSITION_RESULT:     'position_result',
+  // SPEC ADVANCED INTELLIGENCE · §3/§5 — LA OPERACIÓN QUE EL USUARIO REGISTRÓ.
+  // Raíz propia, y por la misma razón que `POSITION_RESULT` no es `TOP_POSITION`:
+  // «has registrado Microsoft» y «Microsoft es el 32 % de tu cartera» responden
+  // preguntas distintas —una es un ACTO, la otra un ESTADO— y comparten activo sin
+  // compartir causa. Con la misma raíz, la dedup por raíz habría hecho que la
+  // exposición y el registro se excluyesen mutuamente, que es justo la superficie
+  // que el founder echó de menos. §5 lo permite explícitamente: un mismo evento
+  // puede sustentar dos funciones distintas mientras no repita la frase.
+  RECORDED_OPERATION:  'recorded_operation',
 });
 // Materiality thresholds. Named so they are reviewable, not buried in
 // expressions. These are PUBLICATION thresholds, not financial advice.
@@ -28798,6 +28924,22 @@ const _AURIX_FACT_MATERIAL = Object.freeze({
   top3MinPct:       70,
   top3MinPositions: 4,
 });
+// SPEC ADVANCED INTELLIGENCE · §3 — LOS `kind` QUE SON UNA OPERACIÓN REGISTRADA
+// SOBRE UNA POSICIÓN. Es el complemento EXACTO del filtro C1 de
+// `_aurixCashLedgerAuthority` (`deposit`/`withdrawal`), y ahí estaba el agujero:
+// los dos conjuntos juntos son el ledger entero, pero sólo uno tenía un hecho, así
+// que `asset_add` se persistía, se sincronizaba y NO EXISTÍA para Intelligence.
+// Declarados aquí para que los dos filtros se lean juntos y nadie vuelva a dejar
+// un `kind` sin owner.
+const _AURIX_REGISTERED_OP_KINDS = Object.freeze(['asset_add', 'asset_remove']);
+// A partir de aquí una tanda de incorporaciones es un REGISTRO DE CARTERA y se
+// lee como uno solo. §3: «no producir una alarma por cada posición».
+// EL UMBRAL ES DOS, no tres, y lo fijó la revisión financiera: con tres, el caso
+// de EXACTAMENTE dos operaciones tomaba el camino de «una sola» —que nombra el
+// primer activo— pero imprimía la suma de las dos, mezclando una compra dentro de
+// una venta. El camino de una operación tiene que ser el de UNA; a partir de dos,
+// el hecho habla del CONJUNTO y el nombre de cada posición no añade comprensión.
+const _AURIX_REGISTERED_OP_BATCH_MIN = 2;
 // Ranking weights. Explicit and testable on purpose — §5 forbids an opaque
 // "magic" formula. Every component is a normalised 0..1 score.
 const _AURIX_RANK_WEIGHTS = Object.freeze({
@@ -28985,6 +29127,14 @@ const _AURIX_EV_GAP = Object.freeze({
   // perímetro no se puede valorar, el porcentaje publicado describe una parte y se
   // lee como el total — la misma clase de defecto que el −24 %.
   DENOMINATOR_PARTIAL:      'investable_denominator_partial',
+  // §3 — la fila existe y la operación es cierta, pero no se sabe CUÁNDO entró en
+  // Aurix: legacy, o llegada de otro dispositivo antes de que exista la columna
+  // remota. No se reconstruye; se declara.
+  RECORD_PROVENANCE_UNKNOWN: 'recorded_at_provenance_unknown',
+  // §2 — el nivel se movió, pero la ventana contiene incorporaciones o arranca en
+  // el registro inicial, así que la diferencia NO es comparable y no se publica
+  // como una subida. El nivel actual sí se conserva.
+  LEVEL_WINDOW_HAS_INCORPORATION: 'level_window_contains_recorded_operation',
 });
 // EL BLOQUE DE EVIDENCIA. `ok` es el AND de todas sus condiciones, así que un
 // consumidor no puede olvidarse de comprobar una: si la usa, ya está comprobada.
@@ -29188,6 +29338,117 @@ function _aurixCashLedgerAuthority(t0, t1) {
     // revisión pide en vez de una cifra precisa equivocada con caveat.
     const blocking = out.gaps.filter(g => g !== _AURIX_EV_GAP.FLOW_INTENT_UNKNOWN);
     out.amountPublishable = cash.length > 0 && blocking.length === 0;
+    out.status = _AURIX_FACT_STATUS.AVAILABLE; out.reason = '';
+    return out;
+  } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
+}
+
+// ── OPERACIONES REGISTRADAS · EL COMPLEMENTO QUE FALTABA ────────────────────
+// SPEC ADVANCED INTELLIGENCE · §1/§3. Owner de «qué ha registrado el usuario», y
+// el hermano exacto de `_aurixCashLedgerAuthority`: mismo ledger, misma lectura,
+// `kind` complementario. No hay segundo ledger ni segundo motor — §3 lo prohíbe y
+// no haría falta: la fila ya existía y ya se sincronizaba.
+//
+// LOS TRES TIEMPOS, y ninguno se fabrica:
+//   · effectiveAt → `f.ts`, el instante ECONÓMICO de la operación.
+//   · recordedAt  → `f.recordedAt`, cuándo entró en Aurix. AUSENTE en filas legacy
+//     y en filas llegadas de otro dispositivo (la columna remota no existe
+//     todavía): ahí la procedencia es DESCONOCIDA, y desconocida NO es hoy.
+//   · observedAt  → no es de esta capa: la valoración la publica su propio owner.
+//
+// FALLA HACIA «NO LO SÉ», nunca hacia «lo hiciste hoy»: sin `recordedAt` no se
+// puede afirmar un registro de hoy, y el hueco lo dice por su nombre. Ésa es la
+// única lectura honesta de un dato sin procedencia, y es el error que §3 nombra
+// explícitamente («no reconstruir 'lo hiciste hoy'»).
+//
+// `dayStart` se INYECTA desde el ledger (que lo deriva de `opts.now`), así que
+// «hoy» es UNA referencia temporal para todas las superficies y todos los
+// dispositivos que compartan ese instante — §5 lo exige — y el core sigue siendo
+// determinista: la misma entrada da siempre el mismo resultado.
+function _aurixRegisteredOperations(dayStart, nowTs, flows, recentStart) {
+  const out = { status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE, reason: 'no_window',
+    ops: [], recordedToday: 0, effectiveToday: 0, provenanceUnknown: 0,
+    netUSD: null, amountPublishable: false, gaps: [],
+    observationClass: _AURIX_OBS_CLASS.DECLARED };
+  try {
+    if (!Number.isFinite(dayStart) || !Number.isFinite(nowTs)) return out;
+    // El suelo de SELECCIÓN. Por defecto el propio día, pero el ledger lo abre a
+    // 24 h para que un huso no silencie una operación reciente (ver C2).
+    const rStart = Number.isFinite(recentStart) ? Math.min(recentStart, dayStart) : dayStart;
+    let all = Array.isArray(flows) ? flows : [];
+    if (!all.length) {
+      try { all = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { all = []; }
+    }
+    // `_aurixLoadCapitalFlows` ya aplica tombstones y dedup de identidad, así que
+    // aquí no se reimplementa ninguna de las dos: un flujo anulado no es una
+    // operación y un duplicado no es dos. Se filtra por `kind` y nada más.
+    const ops = all.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD)
+      && _AURIX_REGISTERED_OP_KINDS.indexOf(String(f.kind)) !== -1);
+    // ── LO RECONSTRUIDO NO ES UN ACTO DEL USUARIO ──────────────────────────
+    // Se excluye con el predicado CANÓNICO (`_aurixFlowIsDerived`), no con una
+    // lista propia. La versión anterior nombraba sólo `inferred` e `import_baseline`
+    // y dejaba pasar `tx-backfill`, que es la fila que el self-heal PURGA Y
+    // RECONSTRUYE en cada arranque: el resultado, ejecutado por la revisión
+    // financiera, era «Hoy has registrado 3 posiciones por 44.000 US$» sobre
+    // compras de 2023 y 2024, re-emitido en cada recarga. Dos filtros para el mismo
+    // concepto es cómo se cuela un `source` nuevo; ahora hay uno.
+    const realRaw = ops.filter(f => !(typeof _aurixFlowIsDerived === 'function' && _aurixFlowIsDerived(f))
+      && String(f.kind || '') !== 'import_baseline');
+    // DEDUP POR IDENTIDAD DE FLUJO, aquí y no aguas arriba. `_aurixFlowDuplicateIds`
+    // sólo resuelve el cruce derivado↔usuario, y `_aurixCaptureFlow` es idempotente
+    // por `id`, así que dos filas de usuario con el mismo `id` no deberían existir.
+    // «No debería existir» no es un invariante cuando de esa identidad depende un
+    // hecho publicado Y la identidad del episodio que el usuario puede acusar: una
+    // sola fila repetida convertía una operación en dos y, con el umbral de tanda en
+    // dos, cambiaba la frase entera. Se queda la de revisión más alta.
+    const byFlowId = new Map();
+    for (const f of realRaw) {
+      const id = String(f.id);
+      const cur = byFlowId.get(id);
+      if (!cur || (Number(f.revision) || 1) > (Number(cur.revision) || 1)) byFlowId.set(id, f);
+    }
+    const real = Array.from(byFlowId.values());
+    let complete = false;
+    try { complete = (typeof _aurixCapitalFlowsComplete === 'function') ? !!_aurixCapitalFlowsComplete() : false; } catch (_) { complete = false; }
+    if (!complete) out.gaps.push(_AURIX_EV_GAP.FLOW_AUTHORITY_INCOMPLETE);
+    const rows = [];
+    for (const f of real) {
+      const rec = Number.isFinite(f.recordedAt) ? Number(f.recordedAt) : null;
+      // El IMPORTE es el COSTE REGISTRADO de la operación: `amountUSD` de un
+      // `asset_add` es qty × precio en el instante de la transacción, que es
+      // justamente eso. NO es valoración actual y no se le puede llamar así (§3:
+      // «no confundir ambos»).
+      const amt = (typeof toBase === 'function') ? toBase(f.amountUSD, 'USD') : f.amountUSD;
+      if (!Number.isFinite(amt)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'fx_unavailable'; return out; }
+      const r = {
+        flowId: String(f.id), assetId: f.assetId ? String(f.assetId) : null,
+        kind: String(f.kind), side: String(f.kind) === 'asset_remove' ? 'out' : 'in',
+        costUSD: +Math.abs(amt).toFixed(2), signedUSD: +amt.toFixed(2),
+        effectiveAt: Number(f.ts), recordedAt: rec,
+        effectiveToday: Number(f.ts) >= dayStart && Number(f.ts) <= nowTs,
+        // DESCONOCIDO NO ES HOY. Sin `recordedAt` esto es `false`, no `true`.
+        recordedToday: rec != null && rec >= dayStart && rec <= nowTs,
+        // RECIENTE es el criterio de SELECCIÓN; `…Today` es el de AFIRMACIÓN. Separarlos
+        // es lo que permite no perder una operación por el huso sin afirmar un día
+        // que no se puede demostrar.
+        effectiveRecent: Number(f.ts) >= rStart && Number(f.ts) <= nowTs,
+        recordedRecent: rec != null && rec >= rStart && rec <= nowTs,
+        provenanceKnown: rec != null,
+      };
+      if (!r.provenanceKnown) out.provenanceUnknown++;
+      if (r.recordedToday)   out.recordedToday++;
+      if (r.effectiveToday)  out.effectiveToday++;
+      rows.push(r);
+    }
+    if (out.provenanceUnknown > 0) out.gaps.push(_AURIX_EV_GAP.RECORD_PROVENANCE_UNKNOWN);
+    // Orden determinista: lo más reciente primero, con el id como desempate para
+    // que dos operaciones del mismo instante no cambien de sitio entre pinturas.
+    rows.sort((a, b) => (Math.max(b.recordedAt || 0, b.effectiveAt) - Math.max(a.recordedAt || 0, a.effectiveAt))
+                     || (a.flowId < b.flowId ? -1 : 1));
+    out.ops = rows;
+    out.netUSD = +rows.reduce((n, r) => n + r.signedUSD, 0).toFixed(2);
+    out.amountPublishable = rows.length > 0 && out.gaps.indexOf(_AURIX_EV_GAP.FLOW_AUTHORITY_INCOMPLETE) === -1;
+    out.ledgerComplete = complete;
     out.status = _AURIX_FACT_STATUS.AVAILABLE; out.reason = '';
     return out;
   } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
@@ -29473,9 +29734,56 @@ function _aurixFactLedger(opts) {
       const first = lvlSeries[0].value, lastV = lvlSeries[lvlSeries.length - 1].value;
       const delta = lastV - first;
       const floor = _AURIX_FACT_MATERIAL.levelDeltaShare * lastV;
+      // ── §2 · NINGÚN REGISTRO SE CONVIERTE EN GANANCIA ──────────────────────
+      // EL DEFECTO MEDIDO, con la evidencia del founder: este hecho se publicaba
+      // como «Tus inversiones han subido 75.432,67 US$» y, al registrar Microsoft,
+      // como «han subido 106.868,37 US$». Ni un dólar de eso era rendimiento: eran
+      // DOS REGISTROS. La causa es que `delta` compara el primer punto de la serie
+      // con el último sin preguntar si el PERÍMETRO es el mismo, y una
+      // incorporación de activo cambia el perímetro, no el valor. El `note`
+      // (`level_claim_not_return`) y el subtítulo aclaratorio no lo arreglaban:
+      // §2 es explícito en que un subtítulo no hace aceptable el titular.
+      //
+      // DOS CONDICIONES, las dos sobre el ledger que ya está cargado:
+      //  1. INCORPORACIÓN DESDE EL PUNTO BASE. Si desde el extremo inicial ha
+      //     habido una operación registrada sobre una posición, los dos extremos
+      //     describen CARTERAS DISTINTAS y su diferencia no se puede explicar
+      //     honestamente. Deliberadamente SIN cota superior: la primera versión
+      //     exigía `ts <= endAt` y eso dejaba pasar el caso real del founder, en el
+      //     que la última observación de la serie es anterior al flujo aunque su
+      //     VALOR ya incluya la posición nueva (el snapshot llega minutos después
+      //     de la operación, y entre ambos la caché local ya publica el nivel
+      //     nuevo). Una cota que depende de qué llegó primero no es una cota.
+      //     Consecuencia asumida y correcta: en una cuenta que ha comprado algo
+      //     desde su punto base, este hecho NO se publica. Es la verdad —separar
+      //     mercado de registro en ese importe exige invertir el TWR, que este
+      //     mismo fichero declara NO COMPUTABLE— y §2 prescribe omitir la
+      //     transición y conservar el nivel, que es lo que queda.
+      //  2. REFERENCIA INICIAL NO COMPARABLE. Si la primera operación registrada de
+      //     la cuenta cae dentro del PRIMER DÍA de la ventana, la serie arranca EN
+      //     el alta de la cartera: el punto base no es un nivel previo, es el acto
+      //     de registrarla. Acotado a un día a propósito — no suprime para siempre,
+      //     sólo mientras el punto base SEA el registro.
+      //
+      // Se omite la transición y se conserva el nivel, que es lo que §2 prescribe.
+      // El nivel actual (`investable_level`) y el máximo observado NO se tocan:
+      // son estados, no transiciones, y siguen siendo verdad.
+      const regOps = (flowLedger || []).filter(f => f && Number.isFinite(f.ts)
+        && _AURIX_REGISTERED_OP_KINDS.indexOf(String(f.kind)) !== -1);
+      const lvlEndTs = lvlSeries[lvlSeries.length - 1].ts;
+      const incorporationInWindow = regOps.some(f => f.ts > lvlStartAt);
+      const earliestOp = regOps.reduce((m, f) => (m == null || f.ts < m) ? f.ts : m, null);
+      const baselineIsRegistration = earliestOp != null
+        && earliestOp <= lvlStartAt + 864e5 && earliestOp >= lvlStartAt - 864e5;
       if (!(lastV > 0)) {
         gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_level_change',
           _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'end_value_not_positive');
+      } else if (incorporationInWindow || baselineIsRegistration) {
+        gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_level_change',
+          _AURIX_FACT_STATUS.AVAILABLE, _AURIX_EV_GAP.LEVEL_WINDOW_HAS_INCORPORATION,
+          { startAt: lvlStartAt, endAt: lvlEndTs, observations: lvlSeries.length,
+            incorporationInWindow: incorporationInWindow,
+            baselineIsRegistration: baselineIsRegistration });
       } else if (Math.abs(delta) < floor) {
         // MEDIDO y estable: no es lo mismo que "no medible". La Memoria lee este
         // gap para decir "trayectoria estable" en vez de "estoy acumulando".
@@ -29615,6 +29923,218 @@ function _aurixFactLedger(opts) {
       });
     } else if (!cashAuth.events) {
       gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'recorded_capital_net', _AURIX_FACT_STATUS.AVAILABLE, 'no_flows_in_window');
+    }
+  }
+
+  // ── C2 · OPERACIONES REGISTRADAS — EL ACTO DEL USUARIO ───────────────────
+  // SPEC ADVANCED INTELLIGENCE · §1. EL FALLO QUE ESTO CORRIGE, con la evidencia
+  // del founder: registró 100 acciones de Microsoft, «Factores principales» la
+  // publicó como primera exposición (~32 %) y «Lo que importa hoy» y «Qué ha
+  // cambiado» no dijeron NADA durante minutos. No era caché, ni un filtro de
+  // presentación, ni el snapshot periódico —el Core se recomputa en cada pintura y
+  // el flujo estaba en el disco—: era que este hecho NO EXISTÍA. El ledger sólo
+  // derivaba del ledger de flujos `recorded_capital_net`, que filtra por contrato
+  // `kind ∈ {deposit, withdrawal}`, así que el `asset_add` que `_ledgerTrade`
+  // persiste correctamente se quedaba fuera del universo de hechos. Sin hecho no
+  // hay hallazgo, sin hallazgo no hay selección, y sin selección no hay pintura.
+  // «Factores principales» funcionaba porque lee POSICIONES vivas, no el ledger:
+  // por eso el mismo dato aparecía en una superficie y no en la otra.
+  //
+  // ── «HOY», Y POR QUÉ LA VENTANA ES MÁS ANCHA QUE EL DÍA ──────────────────
+  // El día se ancla en UTC porque §5 pide una referencia consistente ENTRE
+  // DISPOSITIVOS y la medianoche local no lo es. Pero anclar SÓLO ahí reintroducía
+  // el síntoma original a media jornada: la revisión financiera lo ejecutó —usuario
+  // en UTC−7 que registra a las 09:00 locales y abre Aurix a las 18:00 locales, ya
+  // día UTC siguiente— y el hecho desaparecía con un `no_operations_today`.
+  // Así que la SELECCIÓN usa el suelo más antiguo de los dos (medianoche UTC o
+  // 24 h atrás) y nunca pierde una operación reciente, mientras la AFIRMACIÓN de
+  // día la sigue decidiendo el calendario UTC: dentro del día se dice «hoy», y en
+  // las 24 h que lo desbordan se dice «en las últimas 24 horas». Las dos frases son
+  // verdad en cualquier huso, y ninguna operación reciente se queda muda.
+  const dayStart = (() => {
+    const d = new Date(nowTs);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  })();
+  const recentStart = Math.min(dayStart, nowTs - 864e5);
+  {
+    const reg = _aurixRegisteredOperations(dayStart, nowTs, flowLedger, recentStart);
+    (reg.gaps || []).forEach(g => {
+      gap(_AURIX_FACT_FAMILY.PORTFOLIO_RECORD, 'recorded_operations', _AURIX_FACT_STATUS.LOW_CONFIDENCE, g);
+    });
+    if (reg.status === _AURIX_FACT_STATUS.LOW_CONFIDENCE && reg.reason === 'fx_unavailable') {
+      gap(_AURIX_FACT_FAMILY.PORTFOLIO_RECORD, 'recorded_operations', _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'fx_unavailable');
+    } else {
+      // Sólo lo RECIENTE compite por la superficie de hoy. Una operación de hace
+      // tres días es historia, y su sitio es «Qué ha cambiado» mientras siga en su
+      // horizonte, no la prioridad del día.
+      const today = (reg.ops || []).filter(r => r.recordedRecent || r.effectiveRecent);
+      if (!today.length) {
+        gap(_AURIX_FACT_FAMILY.PORTFOLIO_RECORD, 'recorded_operations',
+            _AURIX_FACT_STATUS.AVAILABLE, 'no_operations_today');
+      } else {
+        // ── EL IMPORTE SÓLO SI SU SIGNIFICADO ESTÁ CERTIFICADO (§3) ──────────
+        // La revisión financiera encontró dos formas de mentir con `amountUSD`:
+        //  · METALES. Para el oro físico la cantidad son gramos y el precio es por
+        //    onza troy con pureza aparte, así que el `qty × price` que escribe
+        //    `_ledgerTrade` sobreestima 100 g de 18K en dos órdenes de magnitud
+        //    —lo declara este mismo fichero en `_aurixLedgerAssetRemoval`, que por
+        //    eso NO lo usa—. Publicarlo como «coste registrado» habría puesto
+        //    350.000 US$ donde el coste eran 8.436, y encima en primer puesto,
+        //    porque la materialidad sale de ese mismo importe.
+        //  · EL LADO `out`. Ahí `amountUSD` es el PRODUCTO de la venta (ruta de
+        //    venta) o la VALORACIÓN al borrar (ruta de eliminación). Ninguna de las
+        //    dos es un coste, y el mecanismo no las distingue.
+        // Así que el importe se publica sólo cuando es demostrablemente el coste de
+        // la operación. Si no, se publica el ACTO sin cifra —que sigue siendo el
+        // hecho que el founder echaba de menos— y sin peso estructural, porque el
+        // peso se derivaría de la misma cifra no certificada.
+        const costCertified = (r) => {
+          if (r.side !== 'in') return false;               // producto ≠ coste, valoración ≠ coste
+          try {
+            const a = (typeof assets !== 'undefined' && Array.isArray(assets))
+              ? assets.find(x => x && String(x.id) === String(r.assetId)) : null;
+            if (!a) return false;                          // sin la posición no se puede certificar
+            // La excepción declarada: unidad ≠ unidad de precio.
+            if (String(a.type || '') === 'metal') return false;
+            if (String(a.ticker || '').toUpperCase() === 'XAU') return false;
+            if (a.karat != null || a.goldUnit != null) return false;
+            return true;
+          } catch (_) { return false; }
+        };
+        const certified = today.filter(costCertified);
+        const allIn = today.every(r => r.side === 'in');
+        const allOut = today.every(r => r.side === 'out');
+        // `mixed` SÓLO si de verdad hay de los dos. La primera versión lo derivaba
+        // de `!allIn`, así que una tanda entera de BAJAS se etiquetaba `mixed` y la
+        // frase decía «Hoy has registrado 2 posiciones» sobre dos ventas: el acto
+        // contrario al ocurrido. Lo encontró la revisión financiera.
+        const batchSide = allIn ? 'in' : (allOut ? 'out' : 'mixed');
+        const amountPublishable = certified.length === today.length && allIn;
+        // ── EL DENOMINADOR ES EL VALOR VIVO, NO EL ÚLTIMO SNAPSHOT ──────────
+        // `lvlSeries[último]` puede ser ANTERIOR a la operación —el snapshot llega
+        // minutos después—, y entonces el peso se calcula contra un patrimonio que
+        // todavía no contiene la posición: 41,6 % en vez de 29,4 %. Con el valor
+        // invertible vivo el numerador y el denominador describen la misma cartera.
+        let denom = null;
+        try {
+          const live = (typeof investableValueUSD === 'function') ? toBase(investableValueUSD(), 'USD') : null;
+          if (Number.isFinite(live) && live > 0) denom = live;
+        } catch (_) { denom = null; }
+        if (denom == null && lvlSeries.length && lvlSeries[lvlSeries.length - 1].value > 0) {
+          denom = lvlSeries[lvlSeries.length - 1].value;
+        }
+        const grossUSD = amountPublishable
+          ? +today.reduce((n, r) => n + r.costUSD, 0).toFixed(2) : null;
+        // ── EL PESO EXIGE QUE EL COSTE Y EL VALOR SEAN DE LA MISMA ÉPOCA ─────
+        // `share` divide un COSTE por el patrimonio de HOY, así que sólo es el peso
+        // de la operación cuando la operación es de hoy. Registrar hoy una compra
+        // de 2021 de 5.000 US$ cuya posición vale ya 40.000 publicaba «esta
+        // operación representa el 4,2 % de tu cartera»: ni el peso de la operación
+        // ni el de la posición (~33 %), sino un cociente entre dos épocas vendido
+        // como peso estructural. Lo encontró la revisión financiera.
+        // Sin fecha económica de hoy no hay peso: el ACTO se publica igual (es el
+        // hecho que faltaba) con materialidad informativa. El peso de la POSICIÓN es
+        // otra pregunta y tiene su propio owner certificado en «Factores
+        // principales»; no se reimplementa aquí ni se aproxima con el coste.
+        const sameEpoch = today.every(r => r.effectiveToday);
+        const share = (grossUSD != null && sameEpoch && denom && denom > 0) ? grossUSD / denom : null;
+        // §5 — «significativo» decide el TONO, no la existencia. Sin peso medible el
+        // registro entra como informativo: se publica, no urge.
+        const material = share != null && share >= _AURIX_FACT_MATERIAL.flowShareOfValue;
+        const materiality = material ? 0.88 : 0.45;
+        // UNA LECTURA DE REGISTRO DE CARTERA a partir de DOS operaciones, no de
+        // tres. Con el umbral en tres, exactamente dos operaciones tomaban el camino
+        // «una sola» —que nombra `today[0]`— pero imprimían la SUMA de las dos: la
+        // revisión lo ejecutó y salió «Hoy has retirado Tesla (coste registrado:
+        // 41.435,70 US$)» con una compra de Microsoft sumada dentro de una venta.
+        // El camino de una operación es ahora el de UNA, sin excepción posible.
+        const batch = today.length >= _AURIX_REGISTERED_OP_BATCH_MIN;
+        const key = batch ? 'positions_registered_today'
+                          : ('operation_registered_' + String(today[0].assetId || 'position'));
+        const eventId = batch
+          ? _aurixEventIdentity('transaction', { flowId: 'batch:' + today.map(r => r.flowId).sort().join('|') })
+          : _aurixEventIdentity('transaction', { flowId: today[0].flowId });
+        const first = today[0];
+        // El nombre se resuelve AQUÍ, con el mismo owner que el resto de los hechos
+        // por activo (`getDisplayName`, ver `position_below_cost_*`): la capa de
+        // copy no busca en `assets`. Si la posición ya no existe —se registró y se
+        // borró el mismo día— el hecho sigue siendo cierto y el nombre cae al
+        // guion, que es lo que hace cualquier otro hecho por activo.
+        let firstName = null;
+        try {
+          const _a = (typeof assets !== 'undefined' && Array.isArray(assets))
+            ? assets.find(x => x && String(x.id) === String(first.assetId)) : null;
+          firstName = _a ? ((typeof getDisplayName === 'function') ? getDisplayName(_a) : (_a.name || _a.ticker || null)) : null;
+        } catch (_) { firstName = null; }
+        push({
+          semanticKey: key,
+          family: _AURIX_FACT_FAMILY.PORTFOLIO_RECORD,
+          causalRoot: _AURIX_CAUSAL_ROOT.RECORDED_OPERATION,
+          value: grossUSD != null ? (batch ? grossUSD : first.costUSD) : today.length,
+          unit: grossUSD != null ? 'base_currency' : 'count',
+          values: {
+            operations: today.length,
+            assetId: batch ? null : first.assetId,
+            name: batch ? null : firstName,
+            side: batch ? batchSide : first.side,
+            // §3 — EL SIGNIFICADO DEL IMPORTE, DECLARADO, y `null` cuando no hay
+            // importe publicable. El consumidor no tiene que adivinarlo ni puede
+            // heredar una etiqueta falsa.
+            amountKind: grossUSD != null ? 'recorded_cost' : null,
+            grossUSD: grossUSD,
+            amountPublishable: amountPublishable,
+            // `every`, NO `some`. Con la selección abierta a 24 h, `some` afirmaba
+            // «Hoy has registrado 2 posiciones por un coste de <A+B>» cuando una de
+            // las dos era de ayer y su coste viajaba dentro de la afirmación de hoy.
+            // `effectiveToday` ya usaba `every` dos líneas más abajo: eran dos
+            // agregadores distintos para la misma pregunta. Si la tanda desborda el
+            // día, la frase cae a «en las últimas 24 horas», que es verdad para todas.
+            recordedToday: today.every(r => r.recordedToday),
+            recordedRecent: today.some(r => r.recordedRecent),
+            effectiveToday: today.every(r => r.effectiveToday),
+            effectiveAt: batch ? null : first.effectiveAt,
+            recordedAt: batch ? null : first.recordedAt,
+            provenanceKnown: today.every(r => r.provenanceKnown),
+            shareOfValue: share != null ? +share.toFixed(4) : null,
+            significant: material,
+            ledgerComplete: reg.ledgerComplete === true,
+            dayStart: dayStart,
+            windowStart: recentStart,
+          },
+          evidence: _aurixEvidence({
+            accountId: (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null,
+            epoch: (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : null,
+            source: 'capitalFlowsLedger', observationClass: _AURIX_OBS_CLASS.DECLARED,
+            // Un registro NO necesita dos extremos de serie: es un ACTO fechado, no
+            // una diferencia entre dos observaciones. Pedirle una comparación sería
+            // pedirle que fuese un rendimiento, que es justo lo que no es.
+            window: { range: 'today', startAt: recentStart, endAt: nowTs },
+            coverage: { complete: reg.amountPublishable },
+            confidence: 1,
+            extraGaps: reg.gaps,
+          }),
+          window: { range: 'today', startAt: recentStart, endAt: nowTs },
+          source: 'capitalFlowsLedger',
+          // ── NI BUENO NI MALO, Y ESO INCLUYE EL COLOR ────────────────────────
+          // `positive: null` no bastaba: `.intv4-story.is-up::before` usa el MISMO
+          // verde que `.is-positive` y `.is-down` el ámbar de aviso, así que una
+          // compra registrada salía con el acento de una evolución positiva y una
+          // baja con el de una alerta. El tono lo decide `direction`, así que
+          // `direction` es el que tiene que ser neutro: registrar no es subir ni
+          // bajar. El SENTIDO de la operación no se pierde —viaja en `values.side`
+          // y lo dice la propia frase— pero deja de pintarse como un resultado.
+          direction: 'flat',
+          positive: null,
+          note: 'record_claim_not_return',
+          changeFact: true,
+          eventId: eventId,
+          conceptId: 'rec:' + key,
+          episodeSignature: eventId,
+          materiality: materiality,
+          magnitude: share != null ? _aurixFactClamp01(share) : 0.2,
+          confidence: 1, utility: 0.85, rarity: 0.3,
+        });
+      }
     }
   }
 
@@ -57086,15 +57606,48 @@ function _intccRadarSvg(radar, dimsOverride) {
   // que este contrato existe para evitar. Se le da un radio MÍNIMO VISIBLE, así
   // que un 0 real es una MARCA cerca del centro y un eje sin dato sigue sin
   // vértice ninguno. La cifra impresa no cambia: esto es geometría, no valor.
-  const RMIN = 0.06;
-  const rOf = key => R * Math.max(RMIN, Math.min(1, (radar[key] / 100)));
+  // ── SPEC ADVANCED INTELLIGENCE · §8 — LA BANDA DE LA SERIE, CON MARGEN A LOS
+  // DOS EXTREMOS. Antes el margen existía sólo abajo (`RMIN`), así que un valor
+  // certificado de 100 caía EXACTAMENTE sobre el vértice exterior — el mismo píxel
+  // donde se dibujaba el marcador de «sin datos». Dos significados opuestos en la
+  // misma posición es precisamente lo que este contrato existe para impedir.
+  //
+  // Tres radios DECLARADOS, uniformes para los cinco ejes, y los tres son
+  // GEOMETRÍA: la etiqueta sigue imprimiendo el dato real, incluido un 0.
+  //   · [RMIN, RMAX] → la serie. Ningún valor toca el centro ni el vértice.
+  //   · R_UNK        → DISPONIBILIDAD, no puntuación. Vive FUERA de la banda de la
+  //     serie, así que no puede confundirse con ningún valor por alto que sea, y
+  //     tampoco se apoya en el vértice.
+  const RMIN = 0.10, RMAX = 0.88, R_UNK = 0.97;
+  const rOf = key => R * (RMIN + (RMAX - RMIN) * Math.max(0, Math.min(1, (radar[key] / 100))));
+  // ── LOS SEGMENTOS SE INTERRUMPEN ──────────────────────────────────────────
+  // El polígono se cerraba sobre los vértices MEDIDOS, y con dos ejes sin datos eso
+  // dibujaba un triángulo cuyos lados ATRAVESABAN los ejes desconocidos: la figura
+  // afirmaba una forma sobre dimensiones que Aurix no mide. §8 lo prohíbe por su
+  // nombre. Ahora sólo se une un par de ejes ADYACENTES si los DOS están
+  // certificados; donde se interpone un eje desconocido, la línea se corta.
+  //
+  // El área RELLENA sobrevive únicamente cuando los cinco ejes están certificados:
+  // ahí cerrar el pentágono no cruza nada desconocido y el relleno es honesto. Con
+  // cualquier hueco se pinta trazo abierto y sin relleno, porque un relleno sobre
+  // una figura abierta inventaría superficie entre dos puntos que no se tocan.
+  const isM = i => measured.indexOf(dims[i]) !== -1;
+  const closeArea = measured.length === n;
   const dp = dims
     .map((d, i) => (measured.indexOf(d) === -1) ? null : pt(i, rOf(d.key)).map(v => v.toFixed(1)).join(','))
     .filter(Boolean).join(' ');
-  // A filled area needs three vertices. With one or two certified dimensions we
-  // draw the measured length ALONG each axis instead of closing a shape through
-  // the centre, because the centre is not a data point.
-  const closeArea = measured.length >= 3;
+  let edges = '', edgeCount = 0;
+  if (!closeArea) {
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      if (!isM(i) || !isM(j)) continue;
+      const [ax, ay] = pt(i, rOf(dims[i].key));
+      const [bx, by] = pt(j, rOf(dims[j].key));
+      edges += `<line class="intcc-radar-edge" x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}"`
+            +  ` x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}"/>`;
+      edgeCount++;
+    }
+  }
   let labels = '', dots = '', spokes = '';
   dims.forEach((d, i) => {
     // INT.2Y — the apex (top) label sits directly above the highest data point;
@@ -57125,9 +57678,15 @@ function _intccRadarSvg(radar, dimsOverride) {
     if (isMeasured) {
       const [dx, dy] = pt(i, rOf(d.key));
       dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
-      if (!closeArea) spokes += `<line class="intcc-radar-spoke" x1="${cx}" y1="${cy}" x2="${dx.toFixed(1)}" y2="${dy.toFixed(1)}"/>`;
+      // La radial se reserva al eje AISLADO —ninguno de sus dos vecinos está
+      // certificado—, que es el único caso en que su marcador quedaría flotando sin
+      // nada que lo ancle. Donde hay trazo abierto, el trazo ya lo ancla; dibujar
+      // las dos cosas devolvía la figura radial que cruza el centro, y el centro no
+      // es un dato.
+      const isolated = !isM((i + 1) % n) && !isM((i - 1 + n) % n);
+      if (!closeArea && isolated) spokes += `<line class="intcc-radar-spoke" x1="${cx}" y1="${cy}" x2="${dx.toFixed(1)}" y2="${dy.toFixed(1)}"/>`;
     } else {
-      const [ux, uy] = pt(i, R);
+      const [ux, uy] = pt(i, R * R_UNK);
       dots += `<circle class="intcc-radar-dot is-unknown" cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="3.1"`
            +  ` data-axis="${_intccEsc(d.key)}" data-availability="unknown"/>`;
       spokes += `<line class="intcc-radar-spoke is-unknown" x1="${cx}" y1="${cy}"`
@@ -57140,9 +57699,11 @@ function _intccRadarSvg(radar, dimsOverride) {
   return `
     <svg class="intcc-radar-svg" viewBox="-58 -12 336 232" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}"
          data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
-         data-svg-unknown="${dims.length - measured.length}">
+         data-svg-unknown="${dims.length - measured.length}"
+         data-svg-open="${closeArea ? '0' : '1'}" data-svg-edges="${edgeCount}">
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
+      ${edges ? `<g class="intcc-radar-edges">${edges}</g>` : ''}
       <g class="intcc-radar-spokes">${spokes}</g>
       <g class="intcc-radar-dots">${dots}</g>
       <g class="intcc-radar-labels">${labels}</g>
@@ -57346,6 +57907,55 @@ function _intv4FactText(fact) {
     ? _intv4T('intv4_f_level_up',   _intv4Money(Math.abs(fact.value)), _intccDate(fact.window && fact.window.startAt))
     : _intv4T('intv4_f_level_down', _intv4Money(Math.abs(fact.value)), _intccDate(fact.window && fact.window.startAt));
   if (k === 'investable_prior_high')   return _intv4T('intv4_f_prior_high', _intv4Money(fact.value), _intccDate((fact.values || {}).at));
+  // ── §3 · LA FRASE LA DECIDEN LOS DOS TIEMPOS, NO EL ACTIVO ───────────────
+  // Tres frases, tres estados de conocimiento, y la elección es determinista:
+  //   · registro de hoy + fecha económica de hoy → «Hoy has comprado»
+  //   · registro de hoy + fecha económica antigua → «Hoy has registrado»
+  //   · procedencia desconocida (legacy, u otro dispositivo sin la columna
+  //     remota) → «Tienes registrado», que es lo único cierto: la posición existe
+  //     y cuándo se registró no se sabe. NUNCA «hoy».
+  if (/^operation_registered_/.test(k) || k === 'positions_registered_today') {
+    // EL IMPORTE, SÓLO SI EL HECHO LO DECLARA PUBLICABLE. `grossUSD` es `null`
+    // cuando el ledger no puede certificar que sea el coste de la operación.
+    // `!= null` PRIMERO, y no es defensa redundante: `Number(null)` es 0 y
+    // `Number.isFinite(0)` es true, así que comprobar sólo la finitud publicaba
+    // «por un coste registrado de 0» en todos los casos sin importe certificado —es
+    // decir, en TODOS los metales y TODAS las bajas—. Lo destapó el gate de copy.
+    const hasAmt = v.grossUSD != null && Number.isFinite(Number(v.grossUSD));
+    const amt = hasAmt ? _intv4Money(Math.abs(Number(v.grossUSD))) : null;
+    // LA GUARDA DE PROCEDENCIA VA PRIMERO, Y CUBRE LOS DOS CAMINOS. Estaba sólo en
+    // el de una operación, así que la tanda afirmaba «Hoy has registrado 3
+    // posiciones» con la procedencia DESCONOCIDA — exactamente lo que §3 dice que
+    // un segundo dispositivo no puede decir mientras la columna remota no exista.
+    const dayClaimable = v.provenanceKnown === true && v.recordedRecent !== false;
+    if (k === 'positions_registered_today') {
+      const n = _intv4Num(v.operations || 0, 0);
+      if (!dayClaimable) {
+        if (v.side === 'out')   return _intv4T('intv4_f_ops_batch_out_nd', n);
+        if (v.side === 'mixed') return _intv4T('intv4_f_ops_batch_mixed_nd', n);
+        return _intv4T('intv4_f_ops_batch_holding', n);
+      }
+      const today = v.recordedToday === true;
+      // EL LADO PRIMERO. Una tanda de bajas no «registra posiciones» y una mixta no
+      // es ninguna de las dos cosas.
+      if (v.side === 'out')   return _intv4T(today ? 'intv4_f_ops_batch_out' : 'intv4_f_ops_batch_out_recent', n);
+      if (v.side === 'mixed') return _intv4T(today ? 'intv4_f_ops_batch_mixed' : 'intv4_f_ops_batch_mixed_recent', n);
+      if (!today) return _intv4T('intv4_f_ops_batch_recent', n);
+      return hasAmt ? _intv4T('intv4_f_ops_batch', n, amt) : _intv4T('intv4_f_ops_batch_na', n);
+    }
+    const name = v.name || '—';
+    if (!dayClaimable) {
+      return _intv4T(v.side === 'out' ? 'intv4_f_op_removed_nd' : 'intv4_f_op_holding', name);
+    }
+    if (v.recordedToday !== true) {
+      return _intv4T(v.side === 'out' ? 'intv4_f_op_recent_out' : 'intv4_f_op_recent', name);
+    }
+    if (v.side === 'out') return _intv4T('intv4_f_op_removed', name);
+    if (v.effectiveToday === true) {
+      return hasAmt ? _intv4T('intv4_f_op_bought', name, amt) : _intv4T('intv4_f_op_bought_na', name);
+    }
+    return hasAmt ? _intv4T('intv4_f_op_recorded', name, amt) : _intv4T('intv4_f_op_recorded_na', name);
+  }
   // A1 · P0 CAPITAL — el hecho conserva su clave (sus consumidores aguas abajo
   // están certificados sobre ella) pero ya sólo contiene MOVIMIENTOS DE LIQUIDEZ
   // REGISTRADOS, y su frase lo dice. Cuando el importe no es publicable —ledger
@@ -57424,6 +58034,22 @@ function _intv4WhyText(factOrRoot) {
     // causa del bucket que creció.
     if (factOrRoot.values && factOrRoot.values.dilutedBy) {
       return _intv4T(factOrRoot.values.causeLicensed === true ? 'intv4_why_dilution' : 'intv4_why_dilution_nc');
+    }
+    // §4 — el PESO sólo cuando el denominador está completo. Sin `shareOfValue` el
+    // registro sigue publicándose (es un hecho cierto) con la forma que no afirma
+    // un peso que no se ha podido medir.
+    if (/^operation_registered_/.test(String(factOrRoot.semanticKey || ''))
+        || String(factOrRoot.semanticKey || '') === 'positions_registered_today') {
+      const _v = factOrRoot.values || {};
+      const sh = (_v.shareOfValue != null) ? Number(_v.shareOfValue) : NaN;
+      if (Number.isFinite(sh) && sh > 0) {
+        // Plural cuando el hecho habla de un CONJUNTO.
+        const many = String(factOrRoot.semanticKey) === 'positions_registered_today'
+                  || Number(_v.operations) > 1;
+        return _intv4T(many ? 'intv4_why_recorded_operations_share' : 'intv4_why_recorded_operation_share',
+                       _intv4Num(sh * 100, 1));
+      }
+      return _intv4T('intv4_why_recorded_operation');
     }
     const specific = _intv4T('intv4_why_' + String(factOrRoot.semanticKey || ''));
     if (specific) return specific;
@@ -58583,9 +59209,20 @@ function _intv5DriversHtml(snap, esc) {
 // El acuse se aplica por EPISODIO, igual que en el destino, y sigue sin borrar nada.
 // LA ESCALERA DE ACTUALIDAD, declarada una vez. Cuanto más bajo el número, más
 // arriba se lee. Ninguna banda inventa una ventana que el hecho no traiga.
-const _INTV5_TIER = Object.freeze({ D1: 0, D7: 1, ACTION: 2, DRIFT: 3, STATE: 4 });
+// §5 — TODAY ES EL PELDAÑO NUEVO, Y VA POR ENCIMA DE 24H. No son lo mismo: 24H es
+// una VENTANA DE MEDICIÓN sobre precios, y TODAY es un ACTO del usuario registrado
+// hoy. El caso del founder es exactamente la diferencia: la incorporación de
+// Microsoft no tenía ventana de 24 horas que la respaldase —acababa de pasar, no
+// se había medido nada— así que ninguna banda existente la habría puesto arriba.
+// La escalera se declara por nombre y no por número para que insertar un peldaño
+// no obligue a reescribir los comparadores.
+const _INTV5_TIER = Object.freeze({ TODAY: 0, D1: 1, D7: 2, ACTION: 3, DRIFT: 4, STATE: 5 });
 function _intv5RecencyTier(st) {
   const range = String((st && st.window && st.window.range) || '').toUpperCase();
+  // La ventana 'today' la emite SÓLO el hecho de operación registrada, y sólo
+  // cuando el ledger demuestra que la operación es de hoy. No la fabrica la
+  // pintura: un repintado no mueve nada de peldaño.
+  if (range === 'TODAY') return _INTV5_TIER.TODAY;
   if (range === '24H') return _INTV5_TIER.D1;
   if (range === '7D')  return _INTV5_TIER.D7;
   const v = (st && st.values) || {};

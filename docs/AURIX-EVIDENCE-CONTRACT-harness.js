@@ -48,7 +48,18 @@ const LIFECYCLE_KEYS = ['intv4_f_expo_move','intv4_f_expo_diluted','intv4_f_expo
   'intv4_f_pos_below_cost_top_amt','intv4_why_position_result',
   'intv4_gap_position_below_cost','intv4_gap_position_period_decline',
   'intv4_gap_position_drawdown_from_peak','intv4_gap_position_fx_attribution',
-  'intel_ack','intel_ack_aria','intv4_f_expo_up','intv4_f_expo_down'];
+  'intel_ack','intel_ack_aria','intv4_f_expo_up','intv4_f_expo_down',
+  // SPEC ADVANCED INTELLIGENCE · §2/§3 — la copy de nivel y de registro se extrae
+  // de app.js en los DOS idiomas, no se declara aquí: un diccionario propio
+  // certificaría el harness en vez del producto (la lección de `formatBase`).
+  'intv4_f_level','intv4_f_level_up','intv4_f_level_down',
+  'intv4_f_op_recorded','intv4_f_op_bought','intv4_f_op_removed','intv4_f_op_holding',
+  'intv4_f_ops_batch','intv4_why_recorded_operation','intv4_why_recorded_operation_share',
+  'intv4_f_op_recorded_na','intv4_f_op_bought_na','intv4_f_op_recent','intv4_f_op_recent_out',
+  'intv4_f_ops_batch_na','intv4_f_ops_batch_recent','intv4_f_ops_batch_holding',
+  'intv4_f_ops_batch_out','intv4_f_ops_batch_out_recent','intv4_f_ops_batch_mixed',
+  'intv4_f_ops_batch_mixed_recent','intv4_why_recorded_operations_share',
+  'intv4_f_op_removed_nd','intv4_f_ops_batch_out_nd','intv4_f_ops_batch_mixed_nd'];
 function keyOccurrences(key) {
   const out = []; let i = 0;
   for (;;) { const j = app.indexOf('\n    ' + key + ':', i); if (j < 0) break; out.push(j + 5); i = j + 1; }
@@ -78,7 +89,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_INTEL_MEM_MAX_ENTRIES','_AURI
   '_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD','_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES',
   '_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT',
   '_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL','_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY',
-  '_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS',
+  '_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS',
   '_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
   '_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT',
   '_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_INTEL_DIM_ROOT','_INTV4_BRIEF_MAX','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
@@ -92,7 +103,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixInvestablePerformance','_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct',
   '_aurixCatHistWindow','_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification',
   '_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_aurixEvidence',
-  '_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth',
+  '_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth',
   '_aurixEventIdentity','_aurixCanonicalFindings','_aurixFactLedger','_aurixIntelligenceStories',
   '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixIntelligenceCore'];
 
@@ -1703,6 +1714,176 @@ console.log('\n14 · La cuota de pérdida se calcula con importes, no con una ap
         POS('eth', 'crypto', 1, 45000, 60000), POS('eur', 'cash', 15000, 1, 15000)], 60000);
       const rows = run('_intv4FindingRows(' + JSON.stringify({ findings: r.findings }) + ')', makeCtx({}));
       return rows.length === r.findings.length; })());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC ADVANCED INTELLIGENCE · §2/§3 — LA COPY, EN LOS DOS IDIOMAS
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
+{
+  const txt = (f, lang) => run('_intv4FactText(' + JSON.stringify(f) + ')', makeCtx({ lang: lang || 'es' }));
+  // §2 — «Tus inversiones han subido X» QUEDA RETIRADA. Era el titular que el
+  // founder vio publicar 75.432,67 US$ y después 106.868,37 US$ de subida sobre una
+  // cartera en la que no había ocurrido ninguna ganancia. La tabla de perímetro
+  // reescribía «Tu patrimonio invertible ha» → «Tus inversiones han», así que la
+  // frase salía literalmente así en pantalla.
+  const lvlUp = { semanticKey: 'investable_level_change', value: 106868.37,
+                  values: { delta: 106868.37, observations: 12 },
+                  window: { range: 'observed', startAt: 1750000000000, endAt: 1755000000000 } };
+  const esUp = txt(lvlUp, 'es'), enUp = txt(lvlUp, 'en');
+  ok('ADV.1 el cambio de nivel no dice «subido» ni «up» en ningún idioma',
+    !/subido|han subido/i.test(esUp) && !/\bis up\b|\brose\b/i.test(enUp),
+    JSON.stringify([esUp, enUp]));
+  ok('ADV.2 se llama explícitamente «cambio del valor registrado»',
+    /cambio del valor registrado/i.test(esUp) && /recorded value/i.test(enUp),
+    JSON.stringify([esUp, enUp]));
+  ok('ADV.3 y sigue sin publicar ningún porcentaje',
+    !/%/.test(esUp) && !/%/.test(enUp), JSON.stringify([esUp, enUp]));
+  // §2 — cuando sólo se conoce un nivel, se dice un nivel.
+  const lvl = { semanticKey: 'investable_level', value: 75432.67, values: {}, window: { range: 'now' } };
+  ok('ADV.4 un nivel solo se publica como valor actual de la cartera financiera',
+    /cartera financiera tiene actualmente un valor de/i.test(txt(lvl, 'es'))
+    && /currently worth/i.test(txt(lvl, 'en')),
+    JSON.stringify([txt(lvl, 'es'), txt(lvl, 'en')]));
+  ok('ADV.5 y no se lee como ganancia ni como aportación',
+    !/subido|ganad|aportad/i.test(txt(lvl, 'es')) && !/gain|up |contribut/i.test(txt(lvl, 'en')));
+  // §3 — las TRES frases, y la diferencia entre ellas es el contrato entero.
+  const mkOp = v => ({ semanticKey: 'operation_registered_msft', value: 31435.70,
+    values: Object.assign({ operations: 1, assetId: 'msft', name: 'Microsoft', side: 'in',
+      amountKind: 'recorded_cost', grossUSD: 31435.70, provenanceKnown: true }, v),
+    window: { range: 'today' } });
+  const recorded = mkOp({ recordedToday: true, effectiveToday: false });
+  const bought   = mkOp({ recordedToday: true, effectiveToday: true });
+  const unknown  = mkOp({ recordedToday: false, effectiveToday: false, provenanceKnown: false });
+  ok('ADV.6 compra antigua registrada hoy ⇒ «Hoy has registrado», nunca «has comprado»',
+    /Hoy has registrado/.test(txt(recorded, 'es')) && !/has comprado/.test(txt(recorded, 'es'))
+    && /Today you recorded/.test(txt(recorded, 'en')) && !/you bought/.test(txt(recorded, 'en')),
+    JSON.stringify([txt(recorded, 'es'), txt(recorded, 'en')]));
+  ok('ADV.7 compra con fecha económica de hoy ⇒ «Hoy has comprado»',
+    /Hoy has comprado/.test(txt(bought, 'es')) && /Today you bought/.test(txt(bought, 'en')),
+    JSON.stringify([txt(bought, 'es'), txt(bought, 'en')]));
+  ok('ADV.8 sin procedencia ⇒ «Tienes registrado», y NUNCA la palabra «hoy»',
+    /Tienes registrado/.test(txt(unknown, 'es')) && !/[Hh]oy/.test(txt(unknown, 'es'))
+    && /You have/.test(txt(unknown, 'en')) && !/[Tt]oday/.test(txt(unknown, 'en')),
+    JSON.stringify([txt(unknown, 'es'), txt(unknown, 'en')]));
+  ok('ADV.9 el importe se identifica como COSTE REGISTRADO, no como valoración',
+    /coste registrado/i.test(txt(recorded, 'es')) && /recorded cost/i.test(txt(recorded, 'en'))
+    && !/valoración|valuation|vale ahora/i.test(txt(recorded, 'es') + txt(recorded, 'en')));
+  // La tanda: una lectura de registro de cartera, no una alarma por posición.
+  const batch = { semanticKey: 'positions_registered_today', value: 75432.67,
+    values: { operations: 6, grossUSD: 75432.67, amountKind: 'recorded_cost',
+              recordedToday: true, effectiveToday: true, provenanceKnown: true },
+    window: { range: 'today' } };
+  ok('ADV.10 una incorporación masiva se lee como registro de cartera',
+    /6 posiciones/.test(txt(batch, 'es')) && /6 positions/.test(txt(batch, 'en')),
+    JSON.stringify([txt(batch, 'es'), txt(batch, 'en')]));
+  // Y el «por qué» del registro no puede insinuar un resultado.
+  const why = run('_intv4WhyText(' + JSON.stringify({ semanticKey: 'operation_registered_msft',
+    causalRoot: 'recorded_operation' }) + ')', makeCtx({ lang: 'es' }));
+  ok('ADV.11 su «por qué» declara que no es un resultado',
+    /no un resultado/i.test(why) && /coste de la operación/i.test(why), JSON.stringify(why));
+  // §4 — DOS ETAPAS: el peso sólo cuando el denominador está completo.
+  const whyOf = (v, lang) => run('_intv4WhyText(' + JSON.stringify({
+    semanticKey: 'operation_registered_msft', causalRoot: 'recorded_operation', values: v }) + ')',
+    makeCtx({ lang: lang || 'es' }));
+  ok('ADV.11b con denominador completo el «por qué» publica el PESO estructural',
+    /representa el 29,4% de tu cartera financiera/.test(whyOf({ shareOfValue: 0.294 }))
+    && /is 29\.4% of your financial portfolio/.test(whyOf({ shareOfValue: 0.294 }, 'en')),
+    JSON.stringify([whyOf({ shareOfValue: 0.294 }), whyOf({ shareOfValue: 0.294 }, 'en')]));
+  ok('ADV.11c sin denominador NO se afirma ningún peso',
+    !/%/.test(whyOf({ shareOfValue: null })) && !/%/.test(whyOf({}, 'en'))
+    && /no un resultado/.test(whyOf({ shareOfValue: null })),
+    JSON.stringify([whyOf({ shareOfValue: null }), whyOf({}, 'en')]));
+  // Fail-closed: un hecho de registro sin entrada en el mapa no se pinta.
+  ok('ADV.12 un hecho de registro desconocido no inventa frase',
+    txt({ semanticKey: 'operation_invented_xyz', value: 1, values: {}, window: { range: 'today' } }) === '');
+  // ── SIN IMPORTE CERTIFICADO, SIN CIFRA (hallazgos [alto] de la revisión) ──
+  // Éste es ahora el camino POR DEFECTO de los metales y de todo el lado `out`,
+  // así que su copy es la más expuesta: tiene que decir el acto y ninguna cifra.
+  const naIn = mkOp({ recordedToday: true, effectiveToday: false, grossUSD: null, amountKind: null });
+  const naBuy = mkOp({ recordedToday: true, effectiveToday: true, grossUSD: null, amountKind: null });
+  const naOut = mkOp({ recordedToday: true, effectiveToday: true, side: 'out', grossUSD: null, amountKind: null });
+  ok('ADV.13 sin importe certificado se publica el ACTO y ninguna cifra',
+    /^Hoy has registrado Microsoft en tu cartera$/.test(txt(naIn, 'es'))
+    && /^Today you recorded Microsoft in your portfolio$/.test(txt(naIn, 'en')),
+    JSON.stringify([txt(naIn, 'es'), txt(naIn, 'en')]));
+  ok('ADV.14 lo mismo para una compra del día sin coste certificable',
+    !/\d/.test(txt(naBuy, 'es')) && /Hoy has comprado Microsoft/.test(txt(naBuy, 'es'))
+    && !/\d/.test(txt(naBuy, 'en')), JSON.stringify([txt(naBuy, 'es'), txt(naBuy, 'en')]));
+  ok('ADV.15 una baja NUNCA lleva importe ni la palabra «coste»',
+    /^Hoy has retirado Microsoft de tu cartera$/.test(txt(naOut, 'es'))
+    && !/coste/i.test(txt(naOut, 'es')) && !/cost/i.test(txt(naOut, 'en')),
+    JSON.stringify([txt(naOut, 'es'), txt(naOut, 'en')]));
+  // La ventana que desborda el día UTC pero no las 24 h.
+  const recent = mkOp({ recordedToday: false, recordedRecent: true, effectiveToday: false });
+  ok('ADV.16 fuera del día UTC pero dentro de 24 h se dice «reciente», no «hoy»',
+    /últimas 24 horas/.test(txt(recent, 'es')) && !/^Hoy/.test(txt(recent, 'es'))
+    && /last 24 hours/.test(txt(recent, 'en')) && !/^Today/.test(txt(recent, 'en')),
+    JSON.stringify([txt(recent, 'es'), txt(recent, 'en')]));
+  // Y la tanda, en sus tres estados de conocimiento.
+  const bt = v => ({ semanticKey: 'positions_registered_today', value: 3,
+    values: Object.assign({ operations: 3, amountKind: null, grossUSD: null,
+      recordedToday: true, recordedRecent: true, provenanceKnown: true }, v),
+    window: { range: 'today' } });
+  ok('ADV.17 la tanda sin procedencia no afirma un día',
+    /^Tienes 3 posiciones registradas en tu cartera$/.test(txt(bt({ provenanceKnown: false }), 'es'))
+    && !/[Hh]oy/.test(txt(bt({ provenanceKnown: false }), 'es')),
+    txt(bt({ provenanceKnown: false }), 'es'));
+  ok('ADV.18 la tanda reciente fuera del día lo dice como reciente',
+    /últimas 24 horas/.test(txt(bt({ recordedToday: false }), 'es')));
+  // ── CORREGIDO · LA ASERCIÓN FOSILIZABA EL DEFECTO ────────────────────────
+  // La versión anterior de ADV.19 afirmaba `^Hoy has registrado 3 posiciones en tu
+  // cartera$` para `side:'mixed'`, es decir CERTIFICABA como contrato que una tanda
+  // con bajas dentro se anunciase como un alta de posiciones. La revisión financiera
+  // lo señaló: es la novena vez que un gate de este proyecto fosiliza una
+  // limitación. Ahora se comprueba que la frase MIRA el lado.
+  ok('ADV.19 la tanda mixta no se anuncia como alta ni como baja, y sin importe',
+    /^Hoy has registrado 3 operaciones en tu cartera$/.test(txt(bt({ side: 'mixed' }), 'es'))
+    && /^Today you recorded 3 operations in your portfolio$/.test(txt(bt({ side: 'mixed' }), 'en'))
+    && !/US\$|€/.test(txt(bt({ side: 'mixed' }), 'es')),
+    JSON.stringify([txt(bt({ side: 'mixed' }), 'es'), txt(bt({ side: 'mixed' }), 'en')]));
+  ok('ADV.20 una tanda de BAJAS dice que se retiraron, no que se registraron',
+    /^Hoy has retirado 3 posiciones de tu cartera$/.test(txt(bt({ side: 'out' }), 'es'))
+    && /^Today you removed 3 positions from your portfolio$/.test(txt(bt({ side: 'out' }), 'en'))
+    && !/registrado/.test(txt(bt({ side: 'out' }), 'es')),
+    JSON.stringify([txt(bt({ side: 'out' }), 'es'), txt(bt({ side: 'out' }), 'en')]));
+  ok('ADV.21 …y lo mismo fuera del día UTC pero dentro de 24 h',
+    /^Has retirado 3 posiciones de tu cartera en las últimas 24 horas$/
+      .test(txt(bt({ side: 'out', recordedToday: false }), 'es'))
+    && /^Has registrado 3 operaciones en tu cartera en las últimas 24 horas$/
+      .test(txt(bt({ side: 'mixed', recordedToday: false }), 'es')),
+    JSON.stringify([txt(bt({ side: 'out', recordedToday: false }), 'es'),
+                    txt(bt({ side: 'mixed', recordedToday: false }), 'es')]));
+  // ── SIN PROCEDENCIA TAMPOCO SE INVIERTE EL ACTO ──────────────────────────
+  // Es el camino cross-device NORMAL mientras `recorded_at` siga sin aplicar: el
+  // dispositivo B recibe la fila sin procedencia. Era la última rama ciega al lado,
+  // y publicaba «Tienes registrado Microsoft» sobre una posición que acababa de
+  // SALIR. No se puede afirmar cuándo; sí se puede afirmar qué.
+  ok('ADV.23 sin procedencia, una baja no se publica como tenencia',
+    /^Has retirado Microsoft de tu cartera$/.test(txt(mkOp({ provenanceKnown: false, side: 'out' }), 'es'))
+    && /^You removed Microsoft from your portfolio$/.test(txt(mkOp({ provenanceKnown: false, side: 'out' }), 'en'))
+    && !/[Hh]oy|[Tt]oday|Tienes/.test(txt(mkOp({ provenanceKnown: false, side: 'out' }), 'es')),
+    JSON.stringify([txt(mkOp({ provenanceKnown: false, side: 'out' }), 'es'),
+                    txt(mkOp({ provenanceKnown: false, side: 'out' }), 'en')]));
+  ok('ADV.24 …y un alta sin procedencia sigue siendo una TENENCIA, sin fecha',
+    /^Tienes registrado Microsoft en tu cartera$/.test(txt(mkOp({ provenanceKnown: false, side: 'in' }), 'es'))
+    && !/[Hh]oy/.test(txt(mkOp({ provenanceKnown: false, side: 'in' }), 'es')));
+  ok('ADV.25 la tanda sin procedencia también mira el lado',
+    /^Has retirado 3 posiciones de tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'out' }), 'es'))
+    && /^Has registrado 3 operaciones en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'mixed' }), 'es'))
+    && /^Tienes 3 posiciones registradas en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'in' }), 'es')),
+    JSON.stringify([txt(bt({ provenanceKnown: false, side: 'out' }), 'es'),
+                    txt(bt({ provenanceKnown: false, side: 'mixed' }), 'es'),
+                    txt(bt({ provenanceKnown: false, side: 'in' }), 'es')]));
+  ok('ADV.22 el «por qué» de un CONJUNTO habla en plural',
+    /estas operaciones representan el 12(,0)?%/.test(run('_intv4WhyText(' + JSON.stringify({
+      semanticKey: 'positions_registered_today', causalRoot: 'recorded_operation',
+      values: { operations: 3, shareOfValue: 0.12 } }) + ')', makeCtx({ lang: 'es' })))
+    && /these operations are 12(\.0)?%/.test(run('_intv4WhyText(' + JSON.stringify({
+      semanticKey: 'positions_registered_today', causalRoot: 'recorded_operation',
+      values: { operations: 3, shareOfValue: 0.12 } }) + ')', makeCtx({ lang: 'en' }))),
+    run('_intv4WhyText(' + JSON.stringify({ semanticKey: 'positions_registered_today',
+      causalRoot: 'recorded_operation', values: { operations: 3, shareOfValue: 0.12 } }) + ')', makeCtx({ lang: 'es' })));
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');

@@ -344,15 +344,73 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     && (svg.match(/class="intcc-radar-val[^"]*"/g) || []).length === 5
     && /class="intcc-radar-val is-unavailable"[^>]*>[^<0-9]+</.test(svg),
     (svg.match(/class="intcc-radar-val is-unavailable"[^>]*>([^<]*)</) || [, '?'])[1]);
-  ok('3.8 the data polygon has 4 vertices — the absent axis gets NO vertex at all',
-    (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 4
-    && (svg.match(/class="intcc-radar-dot"/g) || []).length === 4);
+  // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ────────────────────────
+  // La versión anterior de 3.8 exigía `class="intcc-radar-area"` con 4 vértices,
+  // es decir un POLÍGONO CERRADO sobre los ejes medidos. Con un eje sin datos, los
+  // lados de esa figura ATRAVIESAN el eje desconocido: la forma afirmaba algo sobre
+  // una dimensión que Aurix no mide. §8 lo prohíbe literalmente («no cerrar un
+  // triángulo engañoso atravesando ejes desconocidos»), así que la aserción estaba
+  // fosilizando como contrato lo que era una limitación —la novena vez que pasa en
+  // este proyecto— y se sustituye por el invariante que §8 SÍ pide.
+  //
+  // Lo que 3.8 protegía de verdad y sigue protegido: el eje ausente no recibe
+  // vértice de serie, y hay exactamente un marcador certificado por eje medido.
+  ok('3.8 el eje ausente no recibe vértice de serie y la figura NO se cierra',
+    (svg.match(/class="intcc-radar-dot"/g) || []).length === 4
+    && !/intcc-radar-area/.test(svg)
+    && /data-svg-open="1"/.test(svg),
+    (svg.match(/data-svg-open="[^"]*"/) || [, '?'])[0]);
+  ok('3.8b con un hueco se pintan sólo los segmentos entre ejes ADYACENTES medidos',
+    // 4 de 5 medidos (falta `growth`, índice 4): adyacentes 0-1, 1-2, 2-3 → 3
+    // segmentos. 3-4 y 4-0 se interrumpen porque el eje 4 no está certificado.
+    (svg.match(/class="intcc-radar-edge"/g) || []).length === 3
+    && /data-svg-edges="3"/.test(svg),
+    (svg.match(/data-svg-edges="[^"]*"/) || [, '?'])[0]);
+  ok('3.8c con los cinco ejes certificados el pentágono SÍ se cierra y se rellena',
+    (() => { const all = run('_intccRadarSvg({ diversification: 80, liquidity: 60, concentration: 40, stability: 55, growth: 30 })');
+      return /class="intcc-radar-area" points="/.test(all)
+        && (all.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 5
+        && !/class="intcc-radar-edge"/.test(all) && /data-svg-open="0"/.test(all); })());
   ok('3.9 no "0", "50" or "—" placeholder value is emitted for the absent axis',
     !/intcc-radar-val[^"]*"[^>]*>(0|50|55|—|null|NaN)</.test(svg));
-  ok('3.9b "unavailable" is never drawn at the centre (0 and unknown differ)',
-    (() => { const pts = (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/);
-      return pts.length === 4 && pts.indexOf('110.0,106.0') === -1; })(),
-    (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1]);
+  // ── §8 · NINGÚN MARCADOR EN EL CENTRO NI EN EL VÉRTICE ───────────────────
+  // El margen es GRÁFICO y uniforme, y se comprueba en los dos extremos a la vez:
+  // un 0 real no puede caer en el centro (110,106) y un 100 real no puede caer en
+  // el vértice exterior, que es donde vivía el marcador de «sin datos».
+  const dotsOf = str => (str.match(/class="intcc-radar-dot" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g) || [])
+    .map(m => { const n = m.match(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/); return [+n[1], +n[2]]; });
+  const R_OUT = 76, CX = 110, CY = 106;
+  const radiusOf = ([x, y]) => Math.sqrt((x - CX) ** 2 + (y - CY) ** 2);
+  {
+    const zero = run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0, growth: 0 })');
+    const full = run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })');
+    const rz = dotsOf(zero).map(radiusOf), rf = dotsOf(full).map(radiusOf);
+    ok('3.9b un 0 REAL es una marca visible, nunca el centro',
+      rz.length === 5 && rz.every(r => r > 4), JSON.stringify(rz.map(r => +r.toFixed(1))));
+    ok('3.9c un 100 REAL no se apoya en el vértice exterior',
+      rf.length === 5 && rf.every(r => r < R_OUT - 4), JSON.stringify(rf.map(r => +r.toFixed(1))));
+    ok('3.9d el margen es UNIFORME: los cinco ejes comparten radio con el mismo valor',
+      new Set(rz.map(r => r.toFixed(1))).size === 1 && new Set(rf.map(r => r.toFixed(1))).size === 1);
+    ok('3.9e y la etiqueta sigue imprimiendo el dato real, incluido el 0',
+      (zero.match(/class="intcc-radar-val"[^>]*>0</g) || []).length === 5,
+      (zero.match(/class="intcc-radar-val"[^>]*>([^<]*)</) || [, '?'])[1]);
+  }
+  // UNKNOWN ocupa una posición de DISPONIBILIDAD, fuera de la banda de la serie:
+  // no puede confundirse con un valor alto ni con un cero.
+  {
+    const unkR = ((svg.match(/class="intcc-radar-dot is-unknown" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/) || [])
+      .slice(1).map(Number));
+    const rUnk = unkR.length === 2 ? radiusOf(unkR) : null;
+    const fullMax = Math.max.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })')).map(radiusOf));
+    ok('3.9f el marcador «sin datos» vive FUERA de la banda de la serie',
+      rUnk != null && rUnk > fullMax + 2, JSON.stringify({ rUnk, fullMax }));
+    ok('3.9g …y tampoco se apoya exactamente en el vértice',
+      rUnk != null && rUnk < R_OUT - 0.5, String(rUnk));
+    ok('3.9h está rotulado como disponibilidad, no como puntuación',
+      /data-availability="unknown"/.test(svg) && /data-axis="growth"/.test(svg));
+    ok('3.9i y NO participa en el trazo de la serie',
+      !new RegExp('class="intcc-radar-edge"[^>]*' + unkR[0].toFixed(1)).test(svg));
+  }
   ok('3.10 the wealth-identity cascade cannot read a fabricated return',
     /Number\.isFinite\(radar\.growth\)/.test(fnSrc('_intccIdentity')));
   ok('3.11 identity does not classify as "growth" with an absent return axis',

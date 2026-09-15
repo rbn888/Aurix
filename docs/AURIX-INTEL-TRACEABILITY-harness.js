@@ -128,12 +128,12 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
-  '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
+  '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -408,9 +408,19 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
       const measured = Number(num(h, /data-measured="(\d+)"/));
       return dots === measured && unavail.length === 5 - measured; })(),
     JSON.stringify({ measured: num(h, /data-measured="(\d+)"/), dots: count(h, /class="intcc-radar-dot"/g) }));
-  ok('5.2 un eje certificado BAJO conserva radio mínimo visible, así que un 0 real es una MARCA',
-    /const RMIN = 0\.06;/.test(fnSrc('_intccRadarSvg'))
-    && /Math\.max\(RMIN,/.test(fnSrc('_intccRadarSvg')));
+  // RE-DECIDIDO (§8): el margen ya no es sólo inferior. La banda de la serie tiene
+  // margen a los DOS extremos —antes un 100 certificado caía exactamente en el
+  // vértice, el mismo píxel del marcador de «sin datos»— y el marcador de
+  // disponibilidad vive fuera de esa banda. Se comprueba la propiedad, no la
+  // constante: el valor concreto es geometría y puede afinarse.
+  ok('5.2 la banda de la serie tiene margen a los dos extremos, y el 0 real es una MARCA',
+    (() => { const src = fnSrc('_intccRadarSvg');
+      const m = src.match(/const RMIN = ([\d.]+), RMAX = ([\d.]+), R_UNK = ([\d.]+);/);
+      if (!m) return false;
+      const [, rmin, rmax, runk] = m.map(Number);
+      return rmin > 0 && rmax < 1 && runk > rmax && runk < 1
+        && /RMIN \+ \(RMAX - RMIN\)/.test(src); })(),
+    (fnSrc('_intccRadarSvg').match(/const RMIN = [^;]+;/) || [, '?'])[0]);
   ok('5.3 el radio mínimo es GEOMETRÍA: no altera la cifra publicada',
     (() => { const src = fnSrc('_intccRadarSvg');
       // el texto sale de `display` o de `radar[key]+suffix`, nunca de `rOf`
@@ -865,14 +875,23 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
       labels: count(rr, /class="intcc-radar-label[ "]/g),
       filled: count(rr, /class="intcc-radar-dot"/g),
       hollow: count(rr, /class="intcc-radar-dot is-unknown"/g) }));
-  ok('10.20 tres certificados y dos DESCONOCIDOS, y los desconocidos no entran en el polígono',
+  // RE-DECIDIDO (§8): «no entran en el polígono» se medía contra un polígono
+  // CERRADO que §8 prohíbe cuando hay huecos. El invariante financiero es el
+  // mismo y se mide sobre el trazo abierto: los desconocidos no participan, no
+  // puntúan y no se interpolan.
+  ok('10.20 tres certificados y dos DESCONOCIDOS, y los desconocidos no entran en la serie',
     (() => { const measured = Number(svg(/data-svg-measured="(\d+)"/));
       const unknown = Number(svg(/data-svg-unknown="(\d+)"/));
-      const pts = (rr.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim();
+      const unkXY = (rr.match(/class="intcc-radar-dot is-unknown" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g) || [])
+        .map(m => (m.match(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/) || []).slice(1).join(','));
+      const edges = rr.match(/class="intcc-radar-edge"[^>]*>/g) || [];
       return measured === 3 && unknown === 2
-        && pts.split(/\s+/).filter(Boolean).length === 3
+        && !/intcc-radar-area/.test(rr) && svg(/data-svg-open="(\d)"/) === '1'
         && count(rr, /class="intcc-radar-dot"/g) === 3
-        && count(rr, /class="intcc-radar-dot is-unknown"/g) === 2; })(),
+        && count(rr, /class="intcc-radar-dot is-unknown"/g) === 2
+        // ninguna coordenada de un marcador desconocido aparece en un segmento
+        && unkXY.every(xy => edges.every(e => e.indexOf(xy.split(',')[0]) === -1
+                                           || e.indexOf(xy.split(',')[1]) === -1)); })(),
     JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
   ok('10.21 un eje DESCONOCIDO no es un valor bajo: su marcador va al extremo, hueco y con radial discontinua',
     /class="intcc-radar-dot is-unknown" cx="[^"]+" cy="[^"]+" r="3.1"/.test(rr)
@@ -1002,6 +1021,75 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
       return !/intv12-qcard/.test(h) && /data-has-question="0"/.test(h); })());
   ok('10.43 el objetivo táctil del control «Entendido» es de 44px en móvil',
     /@media \(max-width: 640px\)[\s\S]{0,300}\.intv12-ack\s*\{[^}]*min-height: 44px/.test(css));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ADV · SPEC ADVANCED INTELLIGENCE §1/§4/§5 — EL REGISTRO DE HOY SE PINTA
+// ════════════════════════════════════════════════════════════════════════════
+// El fallo del founder no era que el hecho estuviese mal redactado: era que NO
+// LLEGABA A LA PANTALLA. Este bloque mide la pintura real de la superficie
+// (`_renderIntelligenceCommandCenter`), no el ledger, porque el ledger ya estaba
+// certificado y la superficie seguía muda.
+console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
+{
+  const MSFT_TODAY = [
+    // El movimiento de liquidez ANTIGUO que se quedó destacado en producción.
+    { id: 'oldcash', ts: NOWTS - 40 * DAY, amountUSD: 10869.57, kind: 'deposit',
+      source: 'user', revision: 1, recordedAt: NOWTS - 40 * DAY },
+    // Y la incorporación de HOY, con su procedencia.
+    { id: 'msfttoday', ts: NOWTS - 2 * HOUR, amountUSD: 22000, kind: 'asset_add',
+      source: 'user', intent: 'INTERNAL_BUY', assetId: 'a2', revision: 1,
+      recordedAt: NOWTS - 2 * HOUR },
+  ];
+  const CASE = Object.assign({}, MATURE, {
+    serverRows: srvHistory(NOWTS, 30, { crypto: 55000, stock: 20000, liquidity: 25000 },
+                                       { crypto: 55000, stock: 42000, liquidity: 25000 }),
+    flows: MSFT_TODAY,
+  });
+  const r = render(CASE);
+  const h = r.html;
+  const brief = section(h, 'intv5-matters');
+  ok('ADV.1 la superficie pinta la operación registrada hoy',
+    /Hoy has (registrado|comprado)/.test(h), (h.match(/Hoy has [^<]{0,60}/) || [, ''])[0] || 'ausente');
+  // A2 — arriba el SIGNIFICADO, abajo la cifra. Cuando «Qué ha cambiado» ya
+  // publica el hecho como fila, «Lo que importa hoy» lo encabeza por su peso
+  // estructural (§4) y no repite el importe. Se mide por `data-fact`, no por
+  // texto: comparar cadenas renderizadas en dos idiomas es frágil.
+  ok('ADV.2 «Lo que importa hoy» encabeza con la operación registrada',
+    /data-root="recorded_operation"/.test(brief)
+    && /data-fact="operation_registered_a2"/.test(brief), brief.slice(0, 300));
+  ok('ADV.2b y su titular es el SIGNIFICADO, con el peso estructural medido',
+    /intv4-story-head">Es un registro tuyo, no un resultado: esta operación representa el [\d,.]+% de tu cartera financiera/.test(brief),
+    (brief.match(/intv4-story-head">([^<]*)/) || [, ''])[1]);
+  ok('ADV.3 ocupa la PRIMERA posición de esa card',
+    (() => { const i = brief.indexOf('data-root="recorded_operation"');
+      const j = brief.indexOf('data-root="external_capital"');
+      return i >= 0 && (j === -1 || i < j); })(),
+    JSON.stringify(attrs(brief, 'data-root="([^"]+)"')));
+  ok('ADV.3b y el importe del registro vive en «Qué ha cambiado», no duplicado arriba',
+    /Hoy has (registrado|comprado)/.test(section(h, 'intv4-changed'))
+    && !/Hoy has (registrado|comprado)/.test(brief),
+    (section(h, 'intv4-changed').match(/Hoy has [^<]{0,60}/) || [, ''])[0]);
+  ok('ADV.4 el hero cuenta el registro como algo pendiente de revisar',
+    Number(num(h, /class="intcc-hero[^"]*"[^>]*data-review-pending="(\d+)"/)) > 0,
+    String(num(h, /class="intcc-hero[^"]*"[^>]*data-review-pending="(\d+)"/)));
+  ok('ADV.5 la frase NO se repite literalmente en dos superficies',
+    (h.match(/Hoy has (registrado|comprado)/g) || []).length === 1,
+    String((h.match(/Hoy has (registrado|comprado)/g) || []).length));
+  ok('ADV.6 y NO se publica ninguna subida de valor: el nivel cambió por registro',
+    !/han subido/.test(h) && !/ha subido \d/.test(h),
+    (h.match(/ha[n]? subido[^<]{0,50}/) || [, ''])[0] || 'ninguna');
+  // SIN ACTIVIDAD: la misma superficie, sin operaciones de hoy, no inventa nada.
+  const quiet = render(Object.assign({}, CASE, { flows: [MSFT_TODAY[0]] }));
+  ok('ADV.7 sin operación de hoy la superficie no afirma ningún registro',
+    !/Hoy has (registrado|comprado)/.test(quiet.html));
+  ok('ADV.8 …y sigue pintándose sin hueco ni error',
+    /intcc-radar-svg/.test(quiet.html) && /intv5-matters/.test(quiet.html));
+  // EN: la misma operación, el otro idioma.
+  const en = render(Object.assign({}, CASE, { lang: 'en' }));
+  ok('ADV.9 en inglés se publica igual y sin decir «up»',
+    /Today you (recorded|bought)/.test(en.html) && !/\bis up\b/.test(en.html),
+    (en.html.match(/Today you [^<]{0,60}/) || [, ''])[0] || 'ausente');
 }
 
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');
