@@ -453,8 +453,14 @@ function catalog() {
   // comprobaciones de AUSENCIA pasaban sin comprobar nada. Lo detect\u00f3 la revisi\u00f3n
   // de seguridad. Se repuntan a la PROPIEDAD, sobre el cat\u00e1logo, que es donde
   // ahora vive la decisi\u00f3n de publicaci\u00f3n.
+  // ── RE-DECIDIDO · WORKSPACE COMPLETION ────────────────────────────────────
+  // `scenario` sale de la lista de ocultas: se PUBLICA como herramienta Premium con
+  // su derecho concedido en `plan_features` (verificado en producción: 10 filas,
+  // premium=true / free=false). Las entradas de HERRAMIENTA de las superficies que
+  // se publican como PLANTILLA siguen ocultas —un hogar público por capacidad— y
+  // eso es lo que esta lista sigue ejerciendo.
   const HIDDEN_IDS = ['trade_journal', 'real_estate_portfolio', 'receivables', 'asset_prices',
-                      'monthly_budget', 'scenario', 'goal', 'financial_calc', 'investment_analyzer'];
+                      'monthly_budget', 'goal', 'financial_calc', 'investment_analyzer'];
   OK('L10 ninguna herramienta oculta est\u00e1 publicada en el cat\u00e1logo',
      HIDDEN_IDS.every(id => { const e = catalog().find(x => x.id === id); return e && e.published === false; }),
      HIDDEN_IDS.filter(id => { const e = catalog().find(x => x.id === id); return !e || e.published !== false; }).join(','));
@@ -465,7 +471,10 @@ function catalog() {
   // sigue intacto: M.03 publica Real Estate Portfolio como la plantilla gratuita
   // porque el SPEC lo declara, y se fija el CONJUNTO publicado —más fuerte que un
   // recuento a cero, porque una entrada interna que se colara aquí rompe el assert.
-  const PUBLISHED_IDS = 'compound_growth,loan_simulation,tpl_realestate';
+  // El conjunto publicado es DATO y se deriva del catálogo; lo que se ancla es su
+  // contenido EXACTO, que es lo que delata una publicación accidental.
+  const PUBLISHED_IDS = 'compound_growth,loan_simulation,scenario,tpl_goals,tpl_journal,'
+                      + 'tpl_mbudget,tpl_realestate,tpl_receivables';
   OK('L11 sólo está publicado el conjunto declarado, y el filtro de visibilidad es \u00daNICO',
      catalog().filter(e => e.published === true).map(e => e.id).sort().join(',') === PUBLISHED_IDS &&
      /return _WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\);/.test(app));
@@ -479,8 +488,8 @@ function catalog() {
      /if \(!entry \|\| !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fn('_wsToolAccess')) &&
      /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')));
   OK('L12 s\u00ed est\u00e1n las autorizadas, y en el CAT\u00c1LOGO (no en un literal)',
-     catalog().filter(e => e.published && e.kind === 'tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation' &&
-     catalog().filter(e => e.published && e.kind === 'template').map(e => e.id).join(',') === 'tpl_realestate');
+     catalog().filter(e => e.published && e.kind === 'tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation,scenario' &&
+     catalog().filter(e => e.published && e.kind === 'template').map(e => e.id).sort().join(',') === 'tpl_goals,tpl_journal,tpl_mbudget,tpl_realestate,tpl_receivables');
   // L13 SUPERADO por MONETIZATION-V1 · M.01B: Plantillas vuelve como secci\u00f3n
   // estructural (bloque M m\u00e1s abajo). La regla que L13 proteg\u00eda \u2014no dejar una
   // secci\u00f3n vac\u00eda\u2014 sigue viva: ahora se cumple pintando su estado honesto en
@@ -496,7 +505,7 @@ function catalog() {
        // plantilla, con `cta: 'tool', arg: '…'` en TPL_RENDER. Las dos formas
        // valen; lo que no vale es una entrada publicada SIN ruta.
        const opens = e => new RegExp(e.id + ":\\s*\\{[^}]*(tool: '|cta: ')").test(home);
-       return pub.length === 3 && pub.every(opens) && /soon: !openAttr/.test(home); })());
+       return pub.length === 8 && pub.every(opens) && /soon: !openAttr/.test(home); })());
   // M.03 A — `TPL_CAT` ya no es un array vacío escrito a mano: se DERIVA del
   // catálogo con el mismo filtro de visibilidad que las herramientas. La garantía
   // es la misma y ahora es estructural: lo que no está publicado no puede entrar,
@@ -566,14 +575,24 @@ function catalog() {
      (app.match(/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/g) || []).length >= 1 &&
      (app.match(/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/g) || []).length >= 1);
   const home = fn('_renderWorkspaceHome');
-  // M.03 A — se publica UNA plantilla (la gratuita del SPEC) y el inventario
-  // interno sigue completo e invisible para un usuario normal.
-  OK('M4 s\u00f3lo la plantilla gratuita est\u00e1 publicada; el inventario interno sigue interno',
-     catalog().filter(e => e.kind === 'template').length >= 12 &&
-     catalog().filter(e => e.kind === 'template' && e.published === false).length >= 11 &&
-     catalog().filter(e => e.kind === 'template' && e.published === true)
-       .every(e => e.id === 'tpl_realestate' && e.tier === 'free' && e.featureKey === null) &&
-     /const TPL_CAT = _wsCatalogFor\('template'\)/.test(home));
+  // WORKSPACE COMPLETION §§1,3 — el conjunto publicado ha crecido (cuatro Premium
+  // más el Diario, ya con su contrato de divisa única certificado), así que lo que
+  // se ancla ya no es «una sola» sino la regla que hace publicable una plantilla:
+  //   · el inventario interno sigue COMPLETO (no se ha borrado nada al publicar),
+  //   · sigue existiendo exactamente UNA plantilla gratuita, y no declara derecho,
+  //   · toda plantilla Premium declara un `featureKey` real —sin él `hasFeature`
+  //     deniega y la tarjeta pintaría «Premium» sin un derecho que la conceda—,
+  //   · nada publicado queda en `undecided`, y
+  //   · la rejilla se sigue derivando del catálogo, no de un literal.
+  OK('M4 toda plantilla publicada declara su estado comercial real; el inventario interno sigue interno',
+     (() => { const tpl = catalog().filter(e => e.kind === 'template');
+       const pub = tpl.filter(e => e.published === true);
+       const free = pub.filter(e => e.tier === 'free');
+       return tpl.length >= 12 && tpl.filter(e => e.published === false).length >= 7 &&
+              free.length === 1 && free[0].id === 'tpl_realestate' && free[0].featureKey === null &&
+              pub.filter(e => e.tier === 'premium').every(e => typeof e.featureKey === 'string' && e.featureKey.startsWith('workspace.')) &&
+              pub.every(e => e.tier === 'free' || e.tier === 'premium') &&
+              /const TPL_CAT = _wsCatalogFor\('template'\)/.test(home); })());
   OK('M5 con cat\u00e1logo vac\u00edo NO se pinta una rejilla de cero tarjetas',
      /const body = gallery\.length[\s\S]{0,700}wsh-tpl-grid wsh-gallery[\s\S]{0,120}: `<div class="wsh-tplarch">/.test(home));
   OK('M6 el estado de Plantillas no finge contenido: sin card, sin viz, sin "pr\u00f3ximamente", sin banner de upgrade',

@@ -1,13 +1,19 @@
 -- ============================================================================
--- AURIX WORKSPACE COMPLETION · §4  ·  public.workspace_documents   *** NOT YET APPLIED ***
+-- AURIX WORKSPACE COMPLETION · §4  ·  public.workspace_documents   *** APPLIED 2026-09-16 ***
 -- ----------------------------------------------------------------------------
 -- Apply: paste this whole file into the Supabase SQL editor for the project
 -- referenced by SUPABASE_URL in config.js, then run.
--- *** NOT YET APPLIED — PENDING FOUNDER REVIEW AND AUTHORIZATION. ***
+-- *** APPLIED: run by the founder on 2026-09-16 in the production SQL editor
+--     ("Success. No rows returned"). Verified from outside with the
+--     publishable key: /rest/v1/workspace_documents went from PGRST205
+--     (absent) to 42501 (exists, no grant for that role) — which is the
+--     only external proof that the transaction committed. Idempotent:
+--     re-running it changes nothing. ***
 --
 -- Idempotent and ADDITIVE: creates ONE new table. Touches no existing table, no
--- existing column, no existing policy. If this is never applied, Workspace keeps
--- behaving exactly as it does today (device-local) and says so.
+-- existing column, no existing policy. Before it was applied Workspace stayed
+-- device-local and said so; that fallback is still the behaviour if the table is
+-- ever revoked or dropped.
 --
 -- WHY IT IS NEEDED
 --   The ten `aurix_ws_*_v1` keys live in ONE browser's localStorage. app.js says

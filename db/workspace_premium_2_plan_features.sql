@@ -1,15 +1,18 @@
 -- ============================================================================
 -- AURIX WORKSPACE COMPLETION · §1  ·  derechos de las capacidades Premium
---                                                      *** SIN APLICAR ***
+--                              *** APLICADO EN PRODUCCION · 2026-09-16 ***
 -- ----------------------------------------------------------------------------
 -- Aplicar: pegar este fichero entero en el editor SQL de Supabase del proyecto
 -- al que apunta SUPABASE_URL en config.js, y ejecutar.
--- *** SIN APLICAR — PENDIENTE DE REVISIÓN Y AUTORIZACIÓN DEL FOUNDER. ***
+-- *** APLICADO: el founder lo ejecutó el 2026-09-16 en el editor SQL de
+--     producción («Success. No rows returned») y verificó el resultado:
+--     exactamente 10 filas para las cinco claves, con free=false y
+--     premium=true en cada una. Es idempotente: reejecutarlo no cambia nada. ***
 --
 -- Idempotente y ADITIVO: DIEZ filas en `public.plan_features`. No toca el esquema,
 -- no crea tablas, no modifica ninguna fila existente (el `on conflict` reescribe
--- sólo las seis claves que nombra). Si no se aplica nunca, las seis capacidades
--- siguen INTERNAS y no hay ningún cambio de comportamiento para nadie.
+-- sólo las cinco claves que nombra). Antes de aplicarlo las cinco capacidades
+-- estaban INTERNAS; el catálogo no las publica sin estas filas.
 --
 -- POR QUÉ HACEN FALTA
 --   `_WS_CATALOG` declara su propia REGLA DE VERDAD: «si el founder ve "Premium",

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '687'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '688'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -19931,6 +19931,22 @@ function _wsDocRows(key, userId) {
     deleted_at: null, updated_at: nowIso,
   }];
 }
+// ── UN SOLO JUEZ DE «ESTO NO VA A FUNCIONAR NUNCA» ────────────────────
+// La escritura y la lectura tenían cada una su propio regex, y no decían lo mismo:
+// la de escritura ya trataba un permiso retirado como permanente y la de lectura no,
+// así que tras el rollback seguro (que retira los grants, no la tabla) el push
+// pasaba a 'local_only' y el pull seguía intentándolo. Dos jueces para la misma
+// pregunta terminan discrepando, así que hay uno.
+//
+// PERMANENTE = la tabla no está expuesta (PGRST205 / 42P01 / schema cache) o el rol
+// no tiene permiso (42501). Las dos se arreglan tocando la base de datos, no
+// reintentando. TRANSITORIO = todo lo demás (5xx, corte de red, timeout): se marca
+// 'error' y se puede reintentar, porque un fallo de red no es una prueba sobre el
+// esquema.
+function _wsDocErrPermanent(error) {
+  const msg = String((error && (error.message || error.code || error.details)) || '').toLowerCase();
+  return /relation|does not exist|pgrst205|42p01|schema cache|42501|permission denied/.test(msg);
+}
 async function _wsDocsPush(key) {
   const userId = _wsDocsSession();
   if (!userId) { _wsDocSyncSet(key, 'local_only'); return false; }
@@ -19947,10 +19963,15 @@ async function _wsDocsPush(key) {
       // toda la sesión y el usuario veía «local» el resto del día por un fallo
       // transitorio: un fallo de red no es una prueba sobre el esquema. Es la
       // misma corrección que ya se hizo en `_aurixCapitalFlowsPush`.
-      const msg = String((error && (error.message || error.code || error.details)) || '').toLowerCase();
-      const schema = /relation|does not exist|pgrst205|42p01|schema cache/.test(msg);
-      if (schema) _wsDocTableState = 'no';
-      _wsDocSyncSet(key, schema ? 'local_only' : 'error');
+      // PERMISO DENEGADO ES UNA CONDICIÓN PERMANENTE, NO UN FALLO TRANSITORIO.
+      // El rollback seguro de `workspace_documents` retira los grants y dice que el
+      // cliente «vuelve a comportarse como antes de la tabla». Un permiso retirado
+      // se trata como la tabla ausente: guardado local, dicho, y sin prometer un
+      // reintento inútil sobre algo que no va a funcionar hasta que alguien toque la
+      // base de datos. El juicio lo hace `_wsDocErrPermanent`, el único owner.
+      const permanent = _wsDocErrPermanent(error);
+      if (permanent) _wsDocTableState = 'no';
+      _wsDocSyncSet(key, permanent ? 'local_only' : 'error');
       return false;
     }
     // SÓLO AQUÍ. Este punto se alcanza cuando el upsert VOLVIÓ SIN ERROR, es decir
@@ -19979,8 +20000,7 @@ async function _wsDocsPull() {
       .select('doc_id,kind,body,revision,deleted_at,body_version,currency')
       .eq('user_id', userId);
     if (error) {
-      const msg = String((error && (error.message || error.code)) || '').toLowerCase();
-      if (/relation|does not exist|pgrst205|42p01|schema cache/.test(msg)) _wsDocTableState = 'no';
+      if (_wsDocErrPermanent(error)) _wsDocTableState = 'no';
       return false;
     }
     _wsDocTableState = 'yes';
@@ -20889,10 +20909,11 @@ const _WS_CATALOG = Object.freeze([
   // SPEC WORKSPACE COMPLETION · §1 — El SIMULADOR DE ESCENARIOS es una
   // HERRAMIENTA Premium y su hogar público es la rejilla de Herramientas, así que
   // `tpl_scenario` se queda interna: una capacidad, un ID, un hogar.
-  // `published` sigue en false hasta que existan sus filas de `plan_features`
-  // (db/workspace_premium_2_plan_features.sql, SIN APLICAR): la REGLA DE VERDAD de
-  // este catálogo prohíbe pintar «Premium» sin un derecho real que lo conceda.
-  { id: 'scenario',              kind: 'tool',     published: false, featureKey: 'workspace.scenarios',   commercialTier: 'premium' },
+  // Se publica porque sus filas de `plan_features` YA existen en producción
+  // (db/workspace_premium_2_plan_features.sql, aplicado: 10 filas verificadas, con
+  // free false y premium true). La REGLA DE VERDAD de este catálogo prohíbe pintar
+  // «Premium» sin un derecho real que lo conceda, y ese derecho ya existe.
+  { id: 'scenario',              kind: 'tool',     published: true,  featureKey: 'workspace.scenarios',   commercialTier: 'premium' },
   // OBJETIVOS es una PLANTILLA (§1), así que su hogar público es `tpl_goals` y esta
   // entrada de herramienta se queda interna — el mismo patrón que ya resolvió
   // `tpl_realestate` / `real_estate_portfolio` en M.03 A.
@@ -20913,13 +20934,13 @@ const _WS_CATALOG = Object.freeze([
   // la que decide el acceso es la PUBLICADA (ver `_wsSurfaceEntry`).
   { id: 'tpl_realestate',        kind: 'template', published: true,  featureKey: null,              commercialTier: 'free', opens: 'realestate' },
   // ── plantillas INTERNAS ────────────────────────────────────────────────────
-  // ── LAS CINCO PLANTILLAS PREMIUM DEL CATÁLOGO CANÓNICO ────────────────────
-  // Declaran ya su `featureKey`, su tier y la superficie que abren, así que
-  // publicarlas es UNA línea por entrada en cuanto el founder aplique los dos SQL.
-  // Hasta entonces `published:false` las mantiene internas (sólo founder), que es
-  // lo que §3 pide: conservar el estado público previo mientras las capacidades
-  // nuevas están en preparación.
-  { id: 'tpl_mbudget',           kind: 'template', published: false, featureKey: 'workspace.budget',      commercialTier: 'premium', opens: 'budget' },
+  // ── LAS PLANTILLAS PREMIUM DEL CATÁLOGO CANÓNICO ────────────────────
+  // Cada una declara su `featureKey`, su tier y la superficie que abre, y están
+  // publicadas porque las dos condiciones de §3 ya se cumplen: los dos SQL están
+  // aplicados en producción (`plan_features` con las cinco claves, y
+  // `workspace_documents` con su RLS por usuario) y su matemática está revisada.
+  // `tpl_assets` es la única excepción, y se explica junto a su entrada.
+  { id: 'tpl_mbudget',           kind: 'template', published: true,  featureKey: 'workspace.budget',      commercialTier: 'premium', opens: 'budget' },
   // ── §J · SE QUEDA INTERNA, Y LA EXCEPCIÓN SE EXPLICA ──────────────────────
   // §J pide que Seguimiento de precios «aporte valor diferente a Market» y que, si
   // sigue siendo redundante, se mantenga INTERNA explicando la excepción, porque
@@ -20951,12 +20972,16 @@ const _WS_CATALOG = Object.freeze([
   // política de fecha del tipo, y publicar un agregado con un tipo no declarado es
   // exactamente el defecto que este bloque ha estado cerrando.
   { id: 'tpl_assets',            kind: 'template', published: false, featureKey: null,                    commercialTier: 'undecided' },
-  { id: 'tpl_receivables',       kind: 'template', published: false, featureKey: 'workspace.receivables', commercialTier: 'premium', opens: 'receivables' },
-  { id: 'tpl_goals',             kind: 'template', published: false, featureKey: 'workspace.goals',       commercialTier: 'premium', opens: 'goals' },
-  // DIARIO · misma condición de divisas que `tpl_assets` (ver su bloque): sus
-  // totales suman importes con `currency` POR FILA sin convertir. Publicarla exige
-  // cerrar antes una divisa por documento o declarar la base FX con su fecha.
-  { id: 'tpl_journal',           kind: 'template', published: false, featureKey: 'workspace.journal',     commercialTier: 'premium', opens: 'journal' },
+  { id: 'tpl_receivables',       kind: 'template', published: true,  featureKey: 'workspace.receivables', commercialTier: 'premium', opens: 'receivables' },
+  { id: 'tpl_goals',             kind: 'template', published: true,  featureKey: 'workspace.goals',       commercialTier: 'premium', opens: 'goals' },
+  // DIARIO · su condición de divisas está CUMPLIDA y certificada, y por eso se
+  // publica: el documento DECLARA su divisa, la fija su primera operación, una
+  // posterior no puede cambiarla, y un diario heredado con la mezcla ya hecha no
+  // publica totales —declara qué divisas tiene— sin inventar ninguna conversión.
+  // Certificado en AURIX-WORKSPACE-CATALOG-PERSISTENCE §8, ejecutando `_wsJrnAdd`
+  // con la divisa base del usuario DISTINTA de la del diario, que es el caso que
+  // justifica el contrato. `tpl_assets` sigue interna: su condición NO está cerrada.
+  { id: 'tpl_journal',           kind: 'template', published: true,  featureKey: 'workspace.journal',     commercialTier: 'premium', opens: 'journal' },
   // INTERNA: Escenarios se publica como HERRAMIENTA (ver arriba). Dos entradas
   // publicadas para la misma superficie hacen que `_wsSurfaceEntry` falle CERRADO.
   { id: 'tpl_scenario',          kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },

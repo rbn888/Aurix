@@ -224,8 +224,26 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     free._wsToolFeatureKey('compound') === null);
   ok('C.5 FREE · Loan sí tiene featureKey workspace.loan',
     free._wsToolFeatureKey('loan') === 'workspace.loan');
-  ok('C.6 FREE · ve Compound y Loan en el catálogo público',
-    free._wsCatalogFor('tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation');
+  // ── RE-DECIDIDO · WORKSPACE COMPLETION · publicación de las cinco Premium ──
+  // `PUB_TPL` era el literal `'tpl_realestate'`: el conjunto publicado de M.03 A.
+  // Ese conjunto es DATO —cambia cada vez que el producto publica algo— mientras
+  // el invariante que estas aserciones protegen es otro: que un usuario normal, un
+  // premium de pago y un compensado vean EXACTAMENTE lo publicado y nada más.
+  // Así que el conjunto se DERIVA del catálogo y lo que se ancla es su tamaño, que
+  // es lo que delata una publicación accidental.
+  const PUB_TPL = fdr._WS_CATALOG.filter(e => e.kind === 'template' && e.published)
+    .map(e => e.id).sort().join(',');
+  const PUB_TOOLS = fdr._WS_CATALOG.filter(e => e.kind === 'tool' && e.published)
+    .map(e => e.id).sort().join(',');
+  const N_PUB_TOOLS = PUB_TOOLS.split(',').length;
+  ok('C.5b el conjunto publicado es el DECLARADO tras aplicar los dos SQL',
+    PUB_TOOLS === 'compound_growth,loan_simulation,scenario'
+    && PUB_TPL === 'tpl_goals,tpl_journal,tpl_mbudget,tpl_realestate,tpl_receivables',
+    JSON.stringify({ tools: PUB_TOOLS, templates: PUB_TPL }));
+  ok('C.5c y Seguimiento de precios NO está en él',
+    PUB_TPL.indexOf('tpl_assets') === -1);
+  ok('C.6 FREE · ve el catálogo público de herramientas, completo y sin nada más',
+    free._wsCatalogFor('tool').map(e => e.id).sort().join(',') === PUB_TOOLS);
   // ── RE-DECIDIDO EN M.03 A (SPEC · FREE V1) ────────────────────────────────
   // C.7 / C.9 / C.18 afirmaban `_wsCatalogFor('template').length === 0`. Eso NO
   // era el invariante: era el estado de M.02, donde ninguna plantilla estaba
@@ -234,7 +252,6 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // exactamente las entradas `published:true`, ni una más— y se fija además el
   // CONJUNTO publicado, que es más fuerte que un recuento a cero: una plantilla
   // interna que se colara aquí rompe el assert.
-  const PUB_TPL = 'tpl_realestate';
   ok('C.7 FREE · NO ve ninguna entrada no publicada',
     free._wsCatalogFor('tool').every(e => e.published === true) &&
     free._wsCatalogFor('template').every(e => e.published === true) &&
@@ -242,8 +259,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('C.8 PREMIUM · las 3 features concedidas',
     prem.hasFeature('workspace.loan') && prem.hasFeature('intelligence.full') && prem.hasFeature('premium.settings'));
   ok('C.9 PREMIUM · el catálogo sigue siendo el PUBLICADO (no ve lo interno)',
-    prem._wsCatalogFor('tool').length === 2 &&
-    prem._wsCatalogFor('template').map(e => e.id).join(',') === PUB_TPL);
+    prem._wsCatalogFor('tool').length === N_PUB_TOOLS &&
+    prem._wsCatalogFor('template').map(e => e.id).sort().join(',') === PUB_TPL);
   ok('C.10 FOUNDER · no es Premium comercial (plan free)', fdr.state().plan === 'free');
   ok('C.11 FOUNDER · el acceso viene de override', fdr.state().sources['intelligence.full'] === 'override');
   ok('C.12 FOUNDER · tiene las features', fdr.hasFeature('workspace.loan') && fdr.hasFeature('intelligence.full'));
@@ -254,7 +271,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('C.15 FOUNDER · ve TODAS las plantillas existentes',
     fdr._wsCatalogFor('template').length === 12, 've ' + fdr._wsCatalogFor('template').length);
   ok('C.16 un premium de pago NO ve lo interno aunque tenga las features',
-    prem._aurixEntIsCatalogPreview() === false && prem._wsCatalogFor('tool').length === 2);
+    prem._aurixEntIsCatalogPreview() === false && prem._wsCatalogFor('tool').length === N_PUB_TOOLS);
   // El escenario de la revisión de seguridad: soporte compensa con las TRES
   // features por override individual. Tiene el mismo perfil de orígenes que el
   // founder y NO debe ver el catálogo interno.
@@ -266,11 +283,14 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       .every(k => comp.state().sources[k] === 'override'));
   ok('C.18 …y AUN ASÍ no ve el catálogo interno (era el fail-open de la deducción)',
     comp._aurixEntIsCatalogPreview() === false &&
-    comp._wsCatalogFor('tool').length === 2 &&
-    comp._wsCatalogFor('template').map(e => e.id).join(',') === PUB_TPL);
+    comp._wsCatalogFor('tool').length === N_PUB_TOOLS &&
+    comp._wsCatalogFor('template').map(e => e.id).sort().join(',') === PUB_TPL);
+  // El ejemplo pasa de `budget` a `assets`: budget ya está publicado, y el
+  // invariante es «no se puede abrir lo NO publicado», no «no se puede abrir
+  // budget». `assets` es la que sigue interna, así que es la que lo ejerce.
   ok('C.19 …ni puede abrir una herramienta sin publicar',
-    comp._wsToolAccess('budget').ok === false &&
-    comp._wsToolAccess('budget').reason === 'unpublished');
+    comp._wsToolAccess('assets').ok === false &&
+    comp._wsToolAccess('assets').reason === 'unpublished');
   ok('C.20 el founder sí, y por la CAPACIDAD, no por el perfil de orígenes',
     fdr._aurixEntIsCatalogPreview() === true &&
     fdr.state().features['workspace.catalog_preview'] === true);
@@ -322,11 +342,22 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // Y el corolario que impide vender antes de tiempo: mientras su SQL no esté
   // aplicado, la entrada NO puede estar publicada. El catálogo lo declara con
   // `published:false`, y esa es la única razón por la que hoy no se ven.
-  ok('D.5b ninguna capacidad Premium nueva está publicada antes de aplicar su SQL',
-    fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium'
-        && e.featureKey && e.featureKey !== 'workspace.loan')
-      .every(e => e.published === false),
-    JSON.stringify(fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium' && e.published).map(e => e.id)));
+  // RE-DECIDIDO: los dos SQL están APLICADOS en producción —verificado con la
+  // sonda de existencia (`workspace_documents` pasó de PGRST205 a 42501) y con la
+  // consulta de `plan_features` (10 filas, premium=true / free=false)—, así que la
+  // condición deja de ser «nada publicado» y pasa a ser la que de verdad protege:
+  // toda entrada publicada como Premium tiene su fila que la concede, y la que NO
+  // la tiene sigue sin publicar.
+  ok('D.5b toda capacidad Premium publicada tiene su derecho concedido en un SQL del repo',
+    (() => {
+      const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
+                   'db/workspace_premium_2_plan_features.sql']
+        .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
+      return fdr._WS_CATALOG.filter(e => e.published && e.commercialTier === 'premium')
+        .every(e => e.featureKey === 'workspace.loan'
+          || new RegExp("'premium',\\s*'" + e.featureKey.replace('.', '\\.') + "',\\s*true").test(sql));
+    })(),
+    JSON.stringify(fdr._WS_CATALOG.filter(e => e.published && e.commercialTier === 'premium').map(e => e.featureKey)));
   ok('D.6 ninguna entrada publicada queda sin decidir',
     fdr._WS_CATALOG.filter(e => e.published).every(e => e.commercialTier !== 'undecided'));
   ok('D.7 una convención única de etiqueta: Incluido | Premium | Preview',
@@ -335,7 +366,9 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // ══ E. NO PUBLICAR CÓDIGO DORMIDO (§18) ════════════════════════════════
   console.log('\nE · GATE DE PUBLICACIÓN (§18)');
   const hidden = free._WS_CATALOG.filter(e => e.published === false);
-  ok('E.1 hay inventario interno que proteger', hidden.length >= 20, 'internas: ' + hidden.length);
+  // Eran ≥20 antes de publicar cinco. El invariante es que SIGA habiendo
+  // inventario interno que el gate pueda ejercer, no cuántas hay.
+  ok('E.1 hay inventario interno que proteger', hidden.length >= 10, 'internas: ' + hidden.length);
   ok('E.2 USUARIO NORMAL ∩ published=false = 0 entradas visibles',
     hidden.every(e => free._wsCatalogVisible(e) === false));
   ok('E.3 el mismo cero para un premium de pago', hidden.every(e => prem._wsCatalogVisible(e) === false));
@@ -353,9 +386,18 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // La decisión de accesibilidad es UNA y la comparten el owner de apertura y el
   // registro de recencia. Eso es lo que impide que Mi Espacio afirme un "último uso"
   // de algo que nunca se abrió, sin duplicar la decisión del resolver.
+  // El ejemplo pasa de `budget` a `assets`. El invariante es «el owner bloquea lo
+  // NO publicado», y `assets` es la superficie que sigue interna, así que es la que
+  // puede ejercerlo. `budget` ahora está publicado y su denegación es COMERCIAL,
+  // que es otra pregunta y la cubre E.9c.
   ok('E.7 §18 el owner de apertura bloquea lo NO PUBLICADO, no sólo lo premium',
-    (() => { const a = free._wsToolAccess('budget');
+    (() => { const a = free._wsToolAccess('assets');
       return a.ok === false && a.reason === 'unpublished'; })());
+  ok('E.7b y una publicada SÍ produce razón comercial, que es la otra pregunta',
+    (() => { const a = free._wsToolAccess('budget');
+      return a.ok === false && a.reason === 'entitlement'
+        && a.featureKey === 'workspace.budget'; })(),
+    JSON.stringify(free._wsToolAccess('budget')));
   ok('E.8 §18 la publicación se comprueba ANTES del entitlement (pregunta distinta)',
     // M.03 A — el predicado pasa de `entry && !visible` a `!entry || !visible`: la
     // AUSENCIA de entrada también deniega. El orden, que es lo que este assert
@@ -365,14 +407,14 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('E.9 §18 sólo se ofrece upgrade cuando la razón ES comercial',
     /if \(_acc\.reason === 'entitlement'\) openUpgradeIntent\(/.test(fnSource('_wsOpenTool')));
   ok('E.9b una herramienta no publicada NO produce razón comercial',
-    free._wsToolAccess('journal').reason === 'unpublished' &&
-    free._wsToolAccess('journal').featureKey === null);
+    free._wsToolAccess('assets').reason === 'unpublished' &&
+    free._wsToolAccess('assets').featureKey === null);
   ok('E.9c Loan para Free SÍ produce razón comercial con su clave',
     (() => { const a = free._wsToolAccess('loan');
       return a.ok === false && a.reason === 'entitlement' && a.featureKey === 'workspace.loan'; })());
   ok('E.9d Compound abre para Free', free._wsToolAccess('compound').ok === true);
   ok('E.9e Loan abre para Premium', prem._wsToolAccess('loan').ok === true);
-  ok('E.9f el founder abre lo interno', fdr._wsToolAccess('budget').ok === true);
+  ok('E.9f el founder abre lo interno', fdr._wsToolAccess('assets').ok === true);
   // HIGH-2 de la revisión de producto: la recencia es una AFIRMACIÓN.
   ok('E.9g la recencia sólo se graba si la herramienta se va a abrir de verdad',
     /if \(cta !== 'tool' \|\| _wsToolAccess\(_carg\)\.ok\) _wsTouch\(_wsCanonRef\(cta, _carg\)\);/.test(app));
@@ -659,10 +701,20 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     // El punto delicado: la MISMA superficie conserva su entrada de herramienta
     // del inventario de M.02, y esa sigue interna. Publicar la plantilla no puede
     // haber publicado la herramienta.
+    // El invariante de M.03 A intacto: la entrada de HERRAMIENTA de una superficie
+    // publicada como PLANTILLA sigue interna, para que no haya dos hogares públicos.
+    // Lo que cambia es la lista pública de herramientas, que ahora incluye
+    // Escenarios — se deriva del catálogo en vez de repetirse aquí.
     ok('M3.4 la entrada de HERRAMIENTA de la misma superficie sigue interna e invisible',
       free._wsCatalogEntry('real_estate_portfolio').published === false &&
       free._wsCatalogVisible(free._wsCatalogEntry('real_estate_portfolio')) === false &&
-      free._wsCatalogFor('tool').map(x => x.id).sort().join(',') === 'compound_growth,loan_simulation');
+      ['monthly_budget', 'receivables', 'trade_journal', 'goal'].every(id =>
+        free._wsCatalogEntry(id).published === false
+        && free._wsCatalogVisible(free._wsCatalogEntry(id)) === false));
+    ok('M3.4b …y ninguna superficie tiene DOS entradas publicadas',
+      (() => { const seen = {};
+        return free._WS_CATALOG.filter(e => e.published && e.opens)
+          .every(e => { if (seen[e.opens]) return false; seen[e.opens] = 1; return true; }); })());
     ok('M3.5 dos entradas publicadas para una superficie = AMBIGÜEDAD y falla cerrado',
       /if \(opens\.length > 1\) return null;/.test(fnSource('_wsSurfaceEntry')) &&
       free._wsCatalogVisible(null) === false &&
@@ -726,9 +778,15 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       return keys.length >= 1 && keys.every(k => sql.indexOf("'" + k + "'") !== -1);
     })(),
     JSON.stringify([...new Set(free._WS_CATALOG.map(e => e.featureKey).filter(Boolean))]));
-  ok('H.2a y el SQL que las concede sigue SIN APLICAR y lo dice en su cabecera',
+  // El SQL YA ESTÁ APLICADO (el founder lo ejecutó el 2026-09-16 y verificó las diez
+  // filas), y por eso las cinco capacidades pasaron a publicadas. Lo que este assert
+  // vigila cambia de lado pero no de fuerza: la cabecera tiene que declarar su
+  // estado REAL —con fecha y con la prueba— y el fichero tiene que seguir siendo
+  // reejecutable sin daño, que es lo que hace segura una migración aplicada.
+  ok('H.2a y el SQL que las concede declara en su cabecera que está aplicado, con fecha y prueba',
     (() => { const sql = read('db/workspace_premium_2_plan_features.sql');
-      return /SIN APLICAR/.test(sql) && /PENDIENTE DE REVISIÓN Y AUTORIZACIÓN DEL FOUNDER/.test(sql)
+      return /\*\*\* APLICADO EN PRODUCCION · 2026-09-16 \*\*\*/.test(sql)
+        && /10 filas para las cinco claves/.test(sql) && !/SIN APLICAR/.test(sql)
         && /on conflict \(plan, feature_key\) do update/.test(sql); })());
   ok('H.2b la única clave nueva no es vendible por ningún plan',
     (() => { const sql = read('db/monetization_catalog_preview_key_1.sql');

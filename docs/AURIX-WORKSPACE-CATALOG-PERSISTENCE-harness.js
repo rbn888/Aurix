@@ -20,7 +20,8 @@
 //     honesto.
 //
 // Y la regla que gobierna la publicación: `published` sólo puede ser true cuando
-// existe un derecho REAL que la conceda. Los dos SQL están escritos y SIN APLICAR.
+// existe un derecho REAL que la conceda. Los dos SQL están APLICADOS en producción
+// desde el 2026-09-16, y por eso las cinco capacidades Premium ya se publican.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
@@ -32,6 +33,7 @@ function fnSrc(name){ const s='function '+name+'('; const i=app.indexOf(s); if(i
 function konstSrc(name){ const s='const '+name+' ='; const i=app.indexOf(s); if(i<0) throw new Error('missing const '+name);
   let k=i, depth=0, started=false; for(;k<app.length;k++){ const c=app[k]; if(c==='('||c==='{'||c==='[') {depth++;started=true;} else if(c===')'||c==='}'||c===']') depth--; else if(c===';'&&(!started||depth===0)) { k++; break; } }
   return app.slice(i,k); }
+const ASYNC=[];
 let pass=0,fail=0; function ok(n,c,info){ if(c){pass++;console.log('  ✓ '+n);}else{fail++;console.log('  ✗ '+n+(info?'  ['+info+']':''));} }
 
 console.log('AURIX-WORKSPACE-CATALOG-PERSISTENCE — §1 catálogo y gate · §4 persistencia\n');
@@ -101,17 +103,24 @@ const CAT = run('_WS_CATALOG', FREE);
   ok('1.10 …y su excepción está EXPLICADA en el catálogo, no sólo aplicada',
     /§J · SE QUEDA INTERNA, Y LA EXCEPCIÓN SE EXPLICA/.test(app)
     && /no vender una copia/.test(app) && /la watchlist/i.test(app));
-  // ── LA CONDICIÓN DE DIVISAS, PEGADA A LA ENTRADA ──────────────────────────
-  // Los totales de Diario y Precios suman importes con `currency` POR FILA sin
-  // convertir. Hoy no hace daño (internas + formulario en EUR), pero el día que
-  // alguien las publique el campo ya estará ahí. La condición vive junto a la
-  // entrada del catálogo y no en un informe, y este gate impide que se pierda.
-  ok('1.10b la condición de divisas está escrita junto a las dos entradas afectadas',
+  // ── LA CONDICIÓN DE DIVISAS, PEGADA A LA ENTRADA ──────────────────────
+  // Los totales de Diario y Precios sumaban importes con `currency` POR FILA sin
+  // convertir. El DIARIO ha cerrado la condición por la vía de una divisa por
+  // documento (certificada en §8, ejecutando el código) y por eso se publica;
+  // Precios NO la ha cerrado y por eso sigue interna. Lo que este gate protege es
+  // que la condición siga ESCRITA junto a la entrada que aún la debe, en vez de
+  // desaparecer del catálogo el día que su vecina se publicó.
+  ok('1.10b la condición de divisas sigue escrita junto a la entrada que aún la debe',
     /CONDICIÓN DE PUBLICACIÓN, Y VA AQUÍ A PROPÓSITO/.test(app)
     && /sin cerrar antes/.test(app)
-    && /misma condición de divisas que `tpl_assets`/.test(app));
-  ok('1.10c y las dos siguen internas mientras la condición no se cierre',
-    ['tpl_assets', 'tpl_journal'].every(id => (CAT.find(e => e.id === id) || {}).published === false));
+    && /`tpl_assets` sigue interna: su condición NO está cerrada/.test(app));
+  // Y no basta con el comentario: la entrada publicada tiene que cumplirlo de
+  // verdad. `totalsPublishable` es el contrato, y §8 lo ejerce con datos reales.
+  ok('1.10c la que no ha cerrado la condición sigue interna; la publicada la cumple',
+    (CAT.find(e => e.id === 'tpl_assets') || {}).published === false
+    && (CAT.find(e => e.id === 'tpl_journal') || {}).published === true
+    && /totalsPublishable/.test(fnSrc('calculateTradeJournal'))
+    && /if \(!_wsToolInputs\.currency\) _wsToolInputs\.currency = trade\.currency;/.test(app));
   ok('1.11 su matemática SÍ se corrigió, aunque siga interna',
     /§J \/ §E — EL AGREGADO SALE DE IMPORTES/.test(app)
     && /averageReturnBasis/.test(app));
@@ -146,13 +155,27 @@ console.log('\n2 · Publicar exige un derecho real, no una etiqueta:');
     /on conflict \(plan, feature_key\) do update/.test(planSql)
     && !/delete from public\.plan_features/i.test(planSql)
     && !/truncate/i.test(planSql));
-  ok('2.3 …y declara que está SIN APLICAR',
-    /SIN APLICAR/.test(planSql) && /SIN APLICAR/.test(docSql.toUpperCase().replace('NOT YET APPLIED','SIN APLICAR')));
-  // MIENTRAS NO SE APLIQUE, NO SE PUBLICA. Es la condición que impide vender algo
-  // que el resolver denegaría.
-  ok('2.4 ninguna capacidad que dependa del SQL nuevo está publicada',
-    CAT.filter(e => NEW_KEYS.indexOf(e.featureKey) !== -1).every(e => e.published === false),
-    JSON.stringify(CAT.filter(e => NEW_KEYS.indexOf(e.featureKey) !== -1 && e.published).map(e => e.id)));
+  // Los dos ficheros declaran su estado REAL y cómo se comprobó. Antes decían «SIN
+  // APLICAR»; seguir diciéndolo ahora sería la mentira contraria, y el estado de una
+  // migración ya aplicada es justo lo que se olvida.
+  ok('2.3 …y declara su estado real: APLICADO, con fecha y con su prueba',
+    /\*\*\* APLICADO EN PRODUCCION · 2026-09-16 \*\*\*/.test(planSql)
+    && /10 filas para las cinco claves/.test(planSql)
+    && /\*\*\* APPLIED 2026-09-16 \*\*\*/.test(docSql)
+    && /PGRST205[\s\S]{0,160}42501/.test(docSql)
+    && !/SIN APLICAR/.test(planSql) && !/NOT YET APPLIED/.test(docSql));
+  // APLICADO ES LA CONDICIÓN DE PUBLICACIÓN, no una formalidad: `hasFeature` deniega
+  // una clave sin fila, así que publicar antes del SQL habría pintado «Premium»
+  // sobre un derecho que el resolver niega. Ahora la relación se invierte y se ancla
+  // igual de fuerte en las dos direcciones.
+  ok('2.4 toda capacidad publicada con derecho tiene su fila CONCEDIDA en el SQL',
+    CAT.filter(e => e.published && e.featureKey && NEW_KEYS.indexOf(e.featureKey) !== -1)
+      .every(e => new RegExp("'premium',\\s*'" + e.featureKey.replace('.', '\\.') + "',\\s*true").test(planSql)
+                && new RegExp("'free',\\s*'" + e.featureKey.replace('.', '\\.') + "',\\s*false").test(planSql)),
+    JSON.stringify(CAT.filter(e => e.published && e.featureKey).map(e => e.featureKey)));
+  ok('2.4d y ninguna clave del SQL se queda sin hogar público (no se concede lo invisible)',
+    NEW_KEYS.every(k => CAT.some(e => e.featureKey === k && e.published === true)),
+    JSON.stringify(NEW_KEYS.filter(k => !CAT.some(e => e.featureKey === k && e.published === true))));
   ok('2.4b y el SQL NO concede la clave de la capacidad que se quedó interna',
     !/'premium',\s*'workspace\.prices'/.test(planSql)
     && /Seguimiento de precios: NO SE INCLUYE/.test(planSql),
@@ -193,14 +216,21 @@ console.log('\n3 · Objetivos, Escenarios y Proyección ya no se abren a mano:')
     ['goals','scenario','projection','planning'].every(k => !!run('_wsSurfaceEntry(' + JSON.stringify(k) + ')', FREE)),
     JSON.stringify(['goals','scenario','projection','planning']
       .map(k => k + ':' + JSON.stringify(!!run('_wsSurfaceEntry(' + JSON.stringify(k) + ')', FREE)))));
-  // FAIL-CLOSED para un usuario normal mientras sigan internas.
-  ok('3.5 un usuario normal NO puede abrir Escenarios hoy (no publicado)',
+  // FAIL-CLOSED para un usuario normal. Ahora que Escenarios y Objetivos ESTÁN
+  // publicados, la denegación sigue siendo la misma pero su motivo cambia: ya no es
+  // «no existe» sino «no lo tienes», que es un motivo COMERCIAL y el único que
+  // autoriza a ofrecer el upgrade (3.10). Confundirlos era el defecto que 3.7
+  // vigilaba, y se sigue vigilando: `unpublished` queda reservado para lo interno.
+  ok('3.5 un usuario normal NO puede abrir Escenarios: publicado, pero sin derecho',
     run('_wsToolAccess("scenario")', FREE).ok === false
-    && run('_wsToolAccess("scenario")', FREE).reason === 'unpublished');
+    && run('_wsToolAccess("scenario")', FREE).reason === 'entitlement',
+    JSON.stringify(run('_wsToolAccess("scenario")', FREE)));
   ok('3.6 …ni Objetivos', run('_wsToolAccess("goals")', FREE).ok === false);
-  ok('3.7 y «no publicado» NO se disfraza de «Premium»',
-    run('_wsToolAccess("goals")', FREE).reason === 'unpublished',
-    run('_wsToolAccess("goals")', FREE).reason);
+  ok('3.7 y los dos motivos no se confunden: lo INTERNO dice «no publicado»',
+    run('_wsToolAccess("goals")', FREE).reason === 'entitlement'
+    && run('_wsToolAccess("prices")', FREE).reason === 'unpublished'
+    && run('_wsToolAccess("projection")', FREE).reason === 'unpublished',
+    JSON.stringify(['goals','prices','projection'].map(k => k + ':' + run('_wsToolAccess(' + JSON.stringify(k) + ')', FREE).reason)));
   ok('3.8 el founder sí puede abrirlas', run('_wsToolAccess("scenario")', FOUNDER).ok === true);
   // Lo ya publicado no se rompe.
   ok('3.9 compound sigue abierto para todos y realestate sigue siendo Free',
@@ -267,9 +297,59 @@ console.log('\n4 · Guardar, y decir la verdad sobre dónde:');
   ok('4.10 las subidas se agrupan por pausa, no una por pulsación',
     /_WS_DOC_PUSH_DEBOUNCE_MS/.test(app) && /clearTimeout\(_wsDocTimers\[key\]\)/.test(app)
     && /_wsDocsQueue\(key\)/.test(fnSrc('_wshWriteStore')));
-  ok('4.11 sólo un error de ESQUEMA retira la tabla; un fallo de red se reintenta',
-    /const schema = \/relation\|does not exist\|pgrst205\|42p01\|schema cache\//.test(app)
-    && /if \(schema\) _wsDocTableState = 'no';/.test(app));
+  // ── 4.11 SE COMPRUEBA EJECUTANDO EL PUSH, NO LEYENDO SU REGEX ────────────
+  // Tercera vez en este proyecto que un assert de sincronización era un regex: el
+  // regex pasa en verde mientras el `if` que lo usa hace lo contrario. Así que aquí
+  // se ejerce `_wsDocsPush` con TRES errores distintos y se mira qué hace.
+  function pushCtx(error) {
+    const sb = { Math, Number, String, Object, Array, JSON, Date, Promise,
+                 console: { warn(){}, error(){} } };
+    vm.createContext(sb);
+    sb._wsDocsSession = () => 'u-1';
+    sb._wsDocRows = () => [{ user_id: 'u-1', doc_id: 'd-1', kind: 'goal', body: {}, revision: 1 }];
+    // Cliente mínimo que devuelve el error que se quiere probar, o lanza si es una
+    // excepción de transporte (fetch caído), que es el tercer caso.
+    sb.supabaseClient = { from: () => ({ upsert: async () => {
+      if (error && error.__throw) throw new Error('Failed to fetch');
+      return { error: error }; } }) };
+    vm.runInContext(konstSrc('_WS_DOC_TABLE'), sb);
+    vm.runInContext(konstSrc('_WS_SYNC_SEVERITY'), sb);
+    vm.runInContext('var _wsDocSync = Object.create(null); var _wsDocSyncState = "idle";'
+      + ' var _wsDocSyncAt = 0; var _wsDocTableState = "yes";', sb);
+    vm.runInContext('function _wsSyncBadgeRefresh(){}', sb);
+    vm.runInContext(fnSrc('_wsDocSyncSet'), sb);
+    vm.runInContext(fnSrc('_wsDocErrPermanent'), sb);
+    // `fnSrc` localiza por `function …(` y se dejaría fuera el `async`, que aquí
+    // es parte del contrato: sin él el `await` del upsert no compila.
+    vm.runInContext('async ' + fnSrc('_wsDocsPush'), sb);
+    return sb;
+  }
+  const pushed = async (error) => { const c = pushCtx(error);
+    await vm.runInContext('_wsDocsPush("aurix_ws_goals_v1")', c);
+    return { table: vm.runInContext('_wsDocTableState', c),
+             state: vm.runInContext('(_wsDocSync["aurix_ws_goals_v1"] || {}).state', c) }; };
+  ASYNC.push(async () => {
+    const absent  = await pushed({ code: 'PGRST205', message: 'Could not find the table in the schema cache' });
+    const denied  = await pushed({ code: '42501', message: 'permission denied for table workspace_documents' });
+    const outage  = await pushed({ code: '503', message: 'service unavailable' });
+    const offline = await pushed({ __throw: true });
+    ok('4.11 una tabla ausente retira la tabla y lo dice como local, sin prometer reintento',
+      absent.table === 'no' && absent.state === 'local_only',
+      JSON.stringify(absent));
+    ok('4.11b un PERMISO retirado se trata igual (el rollback seguro retira grants, no la tabla)',
+      denied.table === 'no' && denied.state === 'local_only',
+      JSON.stringify(denied));
+    ok('4.11c un 5xx NO retira la tabla: queda en error, que es el único estado con reintento',
+      outage.table === 'yes' && outage.state === 'error',
+      JSON.stringify(outage));
+    ok('4.11d y un corte de red tampoco (la excepción de transporte no prueba nada del esquema)',
+      offline.table === 'yes' && offline.state === 'error',
+      JSON.stringify(offline));
+    ok('4.11e el juicio lo hace UN owner, y lo comparten escritura y lectura',
+      (app.match(/= _wsDocErrPermanent\(error\)|if \(_wsDocErrPermanent\(error\)\)/g) || []).length === 2
+      && !/\/relation\|does not exist\|pgrst205\|42p01\|schema cache\//.test(fnSrc('_wsDocsPull')),
+      String((app.match(/= _wsDocErrPermanent\(error\)|if \(_wsDocErrPermanent\(error\)\)/g) || []).length));
+  });
   ok('4.12 la lectura remota AÑADE y ACTUALIZA, nunca sustituye la lista local',
     (() => { const src = fnSrc('_wsDocsPull');
       return /remoteRev > \(Number\(cur\.revision\) \|\| 1\)/.test(src)
@@ -528,5 +608,10 @@ console.log('\n8 · Diario · un documento, una moneda, declarada:');
     && /else trade\.currency = _wsToolInputs\.currency;/.test(app));
 }
 
-console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail === 0 ? 0 : 1);
+// Las comprobaciones que exigen ejecutar código asíncrono (el push remoto) corren
+// aquí, antes del informe: un assert que se resuelve después del recuento no cuenta.
+(async () => {
+  for (const c of ASYNC) await c();
+  console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail === 0 ? 0 : 1);
+})();
