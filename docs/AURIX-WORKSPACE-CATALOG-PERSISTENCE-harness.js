@@ -439,5 +439,94 @@ console.log('\n7 · Un documento, una moneda; y la mezcla no se suma:');
     CK.every(k => occ(k) === 2), JSON.stringify(CK.map(k => k + ':' + occ(k))));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 8 · CERTIFICACIÓN DEL CONTRATO DE DIVISA ÚNICA DEL DIARIO
+// ════════════════════════════════════════════════════════════════════════════
+// Es la condición que el catálogo exige para poder publicar `tpl_journal`. No basta
+// con que los totales se supriman ante una mezcla: el documento tiene que DECLARAR
+// su divisa y conservarla, porque si se derivara de `baseCurrency` en cada
+// escritura, cambiar una preferencia de VISUALIZACIÓN fragmentaría el diario y los
+// totales dejarían de publicarse por algo que no es una decisión sobre el diario.
+console.log('\n8 · Diario · un documento, una moneda, declarada:');
+{
+  function jrnCtx(base) {
+    const sb = { Math, Number, String, isFinite, isNaN, parseFloat, JSON, Array, Object, Set, Intl, Date,
+                 console: { warn(){} } };
+    vm.createContext(sb);
+    sb.lang = 'es'; sb.baseCurrency = base || 'EUR';
+    sb._wsToolStateSet = () => {}; sb._wsJrnRerender = () => {}; sb._wsToolStateGet = () => null;
+    vm.runInContext('var _wsToolDirty = false, _wsJrnEditId = null, _wsJrnDraft = null;', sb);
+    ['_wsNum', 'formatCurrency', '_wsJournalDefaults', '_wsJrnNewDraft', '_wsJrnAdd',
+     'calculateTradeJournal', '_wsJrnMoney'].forEach(n => vm.runInContext(fnSrc(n), sb));
+    vm.runInContext('function formatBase(a){ return formatCurrency(a, baseCurrency); }', sb);
+    vm.runInContext('var _wsToolInputs = _wsJournalDefaults();', sb);
+    return sb;
+  }
+  const add = (c, t) => vm.runInContext('_wsJrnDraft = Object.assign(_wsJrnNewDraft(), '
+    + JSON.stringify(t) + '); _wsJrnAdd();', c);
+  const calc = c => vm.runInContext('calculateTradeJournal(_wsToolInputs.trades)', c);
+  ok('8.1 el diario declara su divisa desde el arranque',
+    vm.runInContext('_wsToolInputs.currency', jrnCtx('EUR')) === 'EUR');
+  // EL CASO QUE JUSTIFICA EL CONTRATO: la divisa base del usuario es OTRA.
+  {
+    const c = jrnCtx('USD');
+    add(c, { asset: 'AAPL', buy: '100', qty: '10' });
+    const r = calc(c);
+    ok('8.2 una operación nueva hereda la divisa del DOCUMENTO, no la base del usuario',
+      r.currency === 'EUR' && r.currencyMixed === false && r.totalsPublishable === true,
+      JSON.stringify({ doc: r.currency, base: 'USD', mixed: r.currencyMixed }));
+    ok('8.3 …así que cambiar la divisa base NO fragmenta el diario',
+      JSON.stringify(r.currencies) === JSON.stringify(['EUR']) && r.list.length === 4);
+    ok('8.4 y sus totales siguen publicándose',
+      r.netProfit != null && r.totalInvested != null);
+  }
+  // LA PRIMERA OPERACIÓN FIJA LA DIVISA; LA SEGUNDA NO PUEDE CAMBIARLA.
+  // Se parte de un diario VACÍO, que es donde el contrato se establece de verdad.
+  {
+    const c = jrnCtx('EUR');
+    vm.runInContext('_wsToolInputs = { trades: [] };', c);
+    add(c, { asset: 'VOD', buy: '50', qty: '100', currency: 'GBP' });
+    ok('8.5 la PRIMERA operación fija la divisa del documento',
+      vm.runInContext('_wsToolInputs.currency', c) === 'GBP',
+      vm.runInContext('_wsToolInputs.currency', c));
+    // Y ahora una segunda que intenta traer otra: se reescribe con la del diario.
+    add(c, { asset: 'HSBC', buy: '600', qty: '10', currency: 'USD' });
+    const r = calc(c);
+    ok('8.5b una operación posterior NO puede introducir otra divisa',
+      r.currency === 'GBP' && r.currencyMixed === false && r.list.length === 2
+      && r.list.every(x => x.currency === 'GBP'),
+      JSON.stringify(r.currencies));
+  }
+  // LO HEREDADO sí puede venir mezclado, y ahí no se inventa nada.
+  {
+    const c = jrnCtx('EUR');
+    const MIX = [{ id: 'a', asset: 'A', buy: 100, sell: 120, qty: 10, fee: 0, currency: 'EUR' },
+                 { id: 'b', asset: 'B', buy: 200, sell: 180, qty: 5,  fee: 0, currency: 'USD' }];
+    const r = vm.runInContext('calculateTradeJournal(' + JSON.stringify(MIX) + ')', c);
+    ok('8.6 un diario HEREDADO con divisas mezcladas no publica totales',
+      r.currencyMixed === true && r.netProfit === null && r.totalInvested === null
+      && r.avgReturn === null && r.totalsPublishable === false);
+    ok('8.7 …declara cuáles hay y cada operación conserva la suya',
+      JSON.stringify(r.currencies.slice().sort()) === JSON.stringify(['EUR', 'USD'])
+      && r.list[0].currency === 'EUR' && r.list[1].currency === 'USD');
+    ok('8.8 y no se ha introducido ninguna conversión para «arreglarlo»',
+      !/exchangeRate|fxRate|convertCurrency|\* *rate/.test(fnSrc('calculateTradeJournal')));
+  }
+  // P&L sólo con lo certificado, y el diario NO es un segundo ledger.
+  {
+    const c = jrnCtx('EUR');
+    const r = vm.runInContext('calculateTradeJournal(' + JSON.stringify([
+      { id: 'x', asset: 'X', buy: 0, sell: 100, qty: 10, fee: 0, currency: 'EUR' }]) + ')', c);
+    ok('8.9 sin coste no se publica rentabilidad (null, no 0)',
+      r.list[0].ret === null && r.avgReturn === null);
+  }
+  ok('8.10 el diario no escribe en el ledger de flujos de capital',
+    !/_aurixCaptureFlow|aurixCashOperation|_ledgerTrade/.test(fnSrc('_wsJrnAdd')),
+    'registro de decisiones, no un segundo ledger');
+  ok('8.11 la divisa se fija en la primera operación y no se mueve',
+    /if \(!_wsToolInputs\.currency\) _wsToolInputs\.currency = trade\.currency;/.test(app)
+    && /else trade\.currency = _wsToolInputs\.currency;/.test(app));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

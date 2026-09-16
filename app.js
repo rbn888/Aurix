@@ -24023,13 +24023,19 @@ function _wsJrnNewDraft() {
   // una moneda. Si el diario no la trae (documento heredado), la base del usuario.
   let ccy = 'EUR';
   try {
+    // Primero el documento ABIERTO —es el que manda—, luego el último estado
+    // guardado, y sólo si no hay ninguno, la divisa base del usuario.
+    const open = (typeof _wsToolInputs !== 'undefined' && _wsToolInputs) ? _wsToolInputs.currency : null;
     const st = _wsToolStateGet('journal');
-    ccy = (st && st.currency) || ((typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'EUR');
+    ccy = open || (st && st.currency)
+       || ((typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'EUR');
   } catch (_) { ccy = 'EUR'; }
   return { asset: '', atype: 'stock', buy: '', sell: '', qty: '', fee: '', currency: ccy, notes: '', buyDate: '', sellDate: '' };
 }
 function _wsJournalDefaults() {
-  return { trades: [
+  // El diario de arranque DECLARA su divisa, como cualquier documento: si no lo
+  // hiciera, la primera operación la fijaría y las de ejemplo ya están en euros.
+  return { currency: 'EUR', trades: [
     { id: 'tr_seed1', asset: 'BTC',  atype: 'crypto', buy: 52000, sell: 61000, qty: 0.5, fee: 20, currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
     { id: 'tr_seed2', asset: 'NVDA', atype: 'stock',  buy: 90,    sell: 119,   qty: 20,  fee: 5,  currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
     { id: 'tr_seed3', asset: 'SPY',  atype: 'etf',    buy: 480,   sell: 455,   qty: 8,   fee: 3,  currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
@@ -24099,6 +24105,16 @@ function _wsJrnAdd() {
     notes: (d.notes || '').trim(), buyDate: d.buyDate || '', sellDate: d.sellDate || '',
   };
   const list = Array.isArray(_wsToolInputs.trades) ? _wsToolInputs.trades : [];
+  // ── EL DOCUMENTO DECLARA SU DIVISA UNA VEZ ────────────────────────────────
+  // Sin esto, la divisa de una operación nueva se derivaba de `baseCurrency` en el
+  // momento de escribirla: un usuario con un diario en euros que cambiara su divisa
+  // base a dólares empezaría a crear operaciones en dólares y FRAGMENTARÍA su
+  // propio diario — los totales dejarían de publicarse por una preferencia de
+  // visualización, no por una decisión sobre el diario.
+  // La divisa se fija en la PRIMERA operación y no se mueve. Cambiar la divisa base
+  // cambia cómo se muestran otras cosas; no reescribe en qué moneda operaste.
+  if (!_wsToolInputs.currency) _wsToolInputs.currency = trade.currency;
+  else trade.currency = _wsToolInputs.currency;
   if (_wsJrnEditId) { const i = list.findIndex(x => x && x.id === _wsJrnEditId); if (i >= 0) list[i] = trade; else list.push(trade); }
   else list.push(trade);
   _wsToolInputs.trades = list;
