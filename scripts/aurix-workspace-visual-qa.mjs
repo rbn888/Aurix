@@ -361,10 +361,22 @@ function check(name, cond, detail) {
 await S('Page.navigate', { url: PUBLIC });
 await sleep(3500);
 await ev('window.__WSQA_CSS = ' + JSON.stringify(cssLocal) + '; 1');
-const served = await ev(`fetch('app.js?v=' + (window.APPJS_V || ''), { cache: 'no-store' }).then(r => r.text()).then(t => t.length)`);
+// ── LOS BYTES SERVIDOS SE PIDEN DESDE NODE, NO DESDE LA PÁGINA ──────────────
+// La página tiene el bundle BLOQUEADO a propósito (ver arriba), así que pedirlo
+// desde ella devolvía un error y el informe decía «DIFIEREN» sobre una medida que
+// nunca llegó a hacerse. Un informe que se equivoca sobre su propia cobertura es
+// peor que uno que falta: se pide aquí, con la misma URL pública.
+let served = null, servedSrc = '';
+try {
+  const vjson = await (await fetch(new URL('version.json?nc=' + Date.now(), PUBLIC), { cache: 'no-store' })).json();
+  const r = await fetch(new URL('app.js?v=' + vjson.appjs + '&nc=' + Date.now(), PUBLIC), { cache: 'no-store' });
+  servedSrc = await r.text(); served = servedSrc.length;
+} catch (e) { served = null; }
 console.log('AURIX WORKSPACE VISUAL QA · ' + PUBLIC);
-console.log('bytes de app.js servido: ' + served + ' · local: ' + app.length
-  + (served === app.length ? '  (coinciden)' : '  (DIFIEREN: la medida es del bundle local inyectado)') + '\n');
+console.log('bytes de app.js servido: ' + (served == null ? 'no disponible' : served) + ' · local: ' + app.length
+  + (served === app.length ? '  (COINCIDEN: se mide el candidato desplegado)'
+     : '  (DIFIEREN: se mide el markup y el CSS LOCALES sobre el navegador real)') + '\n');
+const DEPLOYED = served === app.length;
 
 for (const vp of VIEWPORTS) {
   await S('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height,
@@ -467,10 +479,13 @@ await ev('window.__WSQA_CSS = ' + JSON.stringify(cssLocal) + '; 1');
 // `window.openUpgradeIntent` desde este bloque; mientras no esté desplegado, se
 // evalúa el owner LOCAL (su código exacto, sin stub) sobre el DOM público, que es
 // el mismo overlay. Tras el deploy, esta sonda usa el global y lo declara.
+// EL BUNDLE ESTÁ BLOQUEADO A PROPÓSITO (si no, la página se va a /login.html y con
+// ella el `#upgradeOverlay`, que es markup ESTÁTICO de index.html). Así que el
+// owner del paywall se evalúa desde el fuente —su código EXACTO, sin stub— sobre
+// el DOM público. Y se declara de qué fuente sale: si el bundle desplegado y el
+// local coinciden byte a byte, es el código que corre en producción.
 const paywallPath = await ev("typeof window.openUpgradeIntent === 'function' ? 'global-desplegado' : 'pendiente'");
 if (paywallPath !== 'global-desplegado') {
-  // Se evalúa el owner LOCAL —su código exacto, sin stub— sobre el DOM público,
-  // que es el MISMO overlay. Nada se simula: sólo se adelanta el bundle.
   const localSrc = [konstSrc('FEATURE_LABELS'), konstSrc('_AURIX_UPGRADE_INTENT_KEY'),
     fnSrc('_featureLabel'), fnSrc('_aurixEntLoaded'), fnSrc('_aurixRecordUpgradeIntent'),
     'var _aurixEnt = { loaded: true, plan: "free", features: Object.create(null) };',
@@ -483,7 +498,16 @@ if (paywallPath !== 'global-desplegado') {
 }
 console.log('  camino del paywall: ' + (paywallPath === 'global-desplegado'
   ? 'window.openUpgradeIntent del bundle PÚBLICO'
-  : 'owner LOCAL evaluado sobre el DOM público (aún no desplegado)'));
+  : 'owner evaluado sobre el DOM público (el bundle se bloquea a propósito para que la página no redirija a login)'
+    + (DEPLOYED ? ' — y su fuente COINCIDE byte a byte con la desplegada'
+                : ' — ATENCIÓN: la fuente local NO coincide con la desplegada')));
+// Y se comprueba que el owner que se está ejerciendo ES el que hay en producción.
+if (servedSrc) {
+  check('el owner del paywall desplegado es idéntico al ejercido',
+    servedSrc.indexOf(fnSrc('openUpgradeIntent')) !== -1
+    && servedSrc.indexOf('window.openUpgradeIntent = openUpgradeIntent') !== -1,
+    'el bundle público tiene que contener este owner y exponerlo');
+}
 for (const [src, key] of [['workspace:card:tpl_mbudget', 'workspace.budget'],
                           ['workspace:free_cover', 'workspace.full'],
                           ['intelligence-preview', 'intelligence.full']]) {
