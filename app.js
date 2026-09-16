@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '688'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '689'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5710,6 +5710,19 @@ const T = {
     intprev_title:      'Esto es lo que Aurix ya entiende de tu patrimonio',
     intprev_f_conc:     (pct, name) => `El ${pct}% de tu patrimonio invertible depende de ${name}.`,
     intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu patrimonio invertible.`,
+    intprev_subj_w_crypto: 'Tu exposición a cripto',
+    intprev_subj_w_dep:    'Tu posición principal',
+    intprev_subj_w_liq:    'Tu liquidez',
+    intprev_subj_w_div:    'El reparto por categorías',
+    intprev_subj_w_sector: 'Tu exposición sectorial',
+    intprev_subj_conc:  'Concentración de tu mayor posición',
+    intprev_subj_liq:   'Peso de tu liquidez',
+    intprev_subj_watch: 'Área de atención',
+    intprev_q_conc:     '¿Cómo ha cambiado esta concentración en el tiempo?',
+    intprev_q_liq:      '¿Cómo ha evolucionado este peso de liquidez?',
+    intprev_q_watch:    '¿Desde cuándo se comporta así, y qué lo ha movido?',
+    intprev_locked_tag: 'Disponible con Premium',
+    intprev_locked_aria: 'Tercer descubrimiento, disponible con Premium',
     intprev_q_label:    'La pregunta siguiente',
     intprev_q:          '¿Cómo ha cambiado esta exposición en el tiempo?',
     intprev_premium:    'Aurix ya lee tu estructura. El movimiento de esa estructura, su causa y su vigilancia continua llegan con Aurix Premium.',
@@ -5958,6 +5971,12 @@ const T = {
     // WS.5B — studio layout, tabs, tools
     wsh_studio_title:  'Tu zona de trabajo',
     wsh_studio_sub:    'Crea plantillas, simulaciones y planes financieros.',
+    wstab_internal:    'Interno',
+    wsh_internal_tag:  'Interno',
+    wsh_lock_aria:     'Disponible con Premium',
+    wstool_save_session: 'Tus números siguen aquí durante la sesión',
+    wsmse2_doc_one:    '1 guardado',
+    wsmse2_doc_n:      n => n + ' guardados',
     wstab_space:       'Mi espacio',
     wstab_templates:   'Plantillas',
     wstab_tools:       'Herramientas',
@@ -5982,6 +6001,7 @@ const T = {
     // WS.6 — Compound Growth tool
     // §3 — las tres etiquetas de retorno, una por destino real.
     wsback_tools:         'Volver a Herramientas',
+    wsback_internal:      'Volver a Interno',
     wsback_templates:     'Volver a Plantillas',
     wsback_space:         'Volver a Mi espacio',
     wstool_back:          'Volver a Herramientas',
@@ -6005,9 +6025,7 @@ const T = {
     wsfc_d_realestate: 'Tus inmuebles, su deuda y lo que rinden de verdad.',
     wsfc_ico_realestate: '⌂',
     wsfc_premium_label: 'Con Premium',
-    wsfc_premium_body: 'Presupuesto mensual, control de cobros, diario de operaciones, seguimiento de precios, objetivos y simulador de escenarios.',
-    wsfc_cta:          'Ver Premium',
-    wsfc_skip:         'Explorar Workspace',
+    wsfc_cta:          'Ver Workspace completo',
     ws_sync_idle:         'Sin cambios sin guardar',
     ws_sync_saving:       'Guardando…',
     ws_sync_saved_synced: 'Guardado y sincronizado',
@@ -8342,6 +8360,19 @@ const T = {
     intprev_title:      'This is what Aurix already understands about your wealth',
     intprev_f_conc:     (pct, name) => `${pct}% of your investable wealth depends on ${name}.`,
     intprev_f_liq:      pct => `Liquidity represents ${pct}% of your investable wealth.`,
+    intprev_subj_w_crypto: 'Your crypto exposure',
+    intprev_subj_w_dep:    'Your largest position',
+    intprev_subj_w_liq:    'Your cash',
+    intprev_subj_w_div:    'How your categories split',
+    intprev_subj_w_sector: 'Your sector exposure',
+    intprev_subj_conc:  'Concentration of your largest position',
+    intprev_subj_liq:   'Weight of your cash',
+    intprev_subj_watch: 'Area to watch',
+    intprev_q_conc:     'How has this concentration changed over time?',
+    intprev_q_liq:      'How has this cash weight evolved?',
+    intprev_q_watch:    'Since when has it behaved like this, and what moved it?',
+    intprev_locked_tag: 'Available with Premium',
+    intprev_locked_aria: 'Third discovery, available with Premium',
     intprev_q_label:    'The next question',
     intprev_q:          'How has this exposure changed over time?',
     intprev_premium:    'Aurix already reads your structure. The movement of that structure, its cause and its ongoing monitoring come with Aurix Premium.',
@@ -8578,6 +8609,12 @@ const T = {
     // WS.5B — studio layout, tabs, tools
     wsh_studio_title:  'Your workspace',
     wsh_studio_sub:    'Create templates, simulations and financial plans.',
+    wstab_internal:    'Internal',
+    wsh_internal_tag:  'Internal',
+    wsh_lock_aria:     'Available with Premium',
+    wstool_save_session: 'Your numbers stay here for this session',
+    wsmse2_doc_one:    '1 saved',
+    wsmse2_doc_n:      n => n + ' saved',
     wstab_space:       'My space',
     wstab_templates:   'Templates',
     wstab_tools:       'Tools',
@@ -8601,6 +8638,7 @@ const T = {
     wstool_journal_d:  'Log buys, sells and returns.',
     // WS.6 — Compound Growth tool
     wsback_tools:         'Back to Tools',
+    wsback_internal:      'Back to Internal',
     wsback_templates:     'Back to Templates',
     wsback_space:         'Back to My space',
     wstool_back:          'Back to Tools',
@@ -8615,9 +8653,7 @@ const T = {
     wsfc_d_realestate: 'Your properties, their debt and what they actually yield.',
     wsfc_ico_realestate: '⌂',
     wsfc_premium_label: 'With Premium',
-    wsfc_premium_body: 'Monthly budget, receivables tracking, trade journal, price watchlist, goals and the scenario simulator.',
-    wsfc_cta:          'See Premium',
-    wsfc_skip:         'Explore Workspace',
+    wsfc_cta:          'See the full Workspace',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
     ws_sync_saved_synced: 'Saved and synced',
@@ -19834,6 +19870,42 @@ const _WS_PREF_KEYS = Object.freeze([
   'aurix_ws_tool_state_v1', 'aurix_ws_pinned_v1', 'aurix_ws_recent_v1',
   'aurix_ws_space_hidden_v1', 'aurix_ws_space_top_v1', 'aurix_ws_planning_v1',
 ]);
+// ¿PUEDE ESTA CUENTA GUARDAR TRABAJO EN WORKSPACE?
+//
+// «Fijar» y «Guardar» son Premium —lo son desde el bloque de personalización— y
+// NO estaban gateados: un usuario Free podía guardar un proyecto y fijarlo, iba a
+// localStorage, no sincronizaba nunca y nadie se lo decía. Eso es fingir un
+// guardado, que es justo lo que no puede pasar en una superficie de trabajo.
+//
+// ── LA PRIMERA VERSIÓN DE ESTE GATE ERA UN DEFECTO CRÍTICO, Y HAY QUE DECIRLO ──
+// Preguntaba `isPremiumTier()`, que lee `getPlan().tier` —el rail LOCAL
+// `aurix_plan`—. Ese rail no lo escribe ningún servidor y su único escritor
+// (`setPlanTier`, vía el `applyPromoCode` que M.06 retiró) ya no tiene llamadores,
+// así que `loadPlan()` cae siempre a 'free'. Consecuencias, las dos malas:
+//   · una cuenta Premium DE PAGO no podía guardar ni sincronizar NADA, y el mismo
+//     render le pintaba el acento Premium: el producto se contradecía a sí mismo, y
+//     `_wsDocsPush` quedaba apagado para el 100 % de los usuarios —regresión del
+//     contrato por-documento que este mismo bloque certificó—;
+//   · y al revés, un `localStorage.setItem('aurix_plan', …)` desde la consola
+//     concedía persistencia Y empuje remoto sin ningún derecho.
+// Es exactamente lo que prohíbe el bloque de entitlements: el cliente NO decide
+// Premium con `aurix_plan`, se gatea SIEMPRE con la respuesta del servidor.
+//
+// AHORA pregunta `hasAurixPremiumAccess()`, que es `hasFeature('intelligence.full')`:
+// server-side, booleano estricto, fail-closed sin lectura, y el MISMO predicado que
+// decide el acento Premium del contenedor —así que la interfaz no puede volver a
+// decir dos cosas a la vez—. Sirve tanto a una suscripción de pago (por plan) como
+// a una cuenta compensada (por override), que es lo que una clave de plan no haría.
+function _wsCanPersist() {
+  try { return hasAurixPremiumAccess() === true; } catch (_) { return false; }
+}
+// La explicación contextual, por el paywall CANÓNICO. `workspace.documents` es una
+// clave de ETIQUETA, nunca un gate: no está en `_AURIX_ENT_CANON` ni en ningún
+// `hasFeature`, sólo le da nombre a lo que el usuario está intentando hacer.
+function _wsPersistUpsell(source) {
+  try { openUpgradeIntent({ featureKey: 'workspace.documents', source: 'workspace:persist:' + String(source || '') }); } catch (_) {}
+  return false;
+}
 // ── EL OWNER ÚNICO DE ESCRITURA ─────────────────────────────────────────────
 // Todo lo que persiste Workspace pasa por aquí. Antes cada superficie hacía su
 // `setItem` y nadie podía saber que algo se había guardado, así que no había forma
@@ -19950,6 +20022,11 @@ function _wsDocErrPermanent(error) {
 async function _wsDocsPush(key) {
   const userId = _wsDocsSession();
   if (!userId) { _wsDocSyncSet(key, 'local_only'); return false; }
+  // Sin plan no hay sincronización, y el estado lo DICE: «guardado en este
+  // dispositivo». Es la mitad honesta del gate de `_wsCanPersist` —la otra mitad
+  // impide escribir— y evita la peor combinación posible: subir trabajo de una
+  // cuenta a la que el producto no le promete permanencia.
+  if (!_wsCanPersist()) { _wsDocSyncSet(key, 'local_only'); return false; }
   if (_wsDocTableState === 'no') { _wsDocSyncSet(key, 'local_only'); return false; }
   const rows = _wsDocRows(key, userId);
   if (!rows.length) return false;
@@ -19995,6 +20072,7 @@ async function _wsDocsPush(key) {
 async function _wsDocsPull() {
   const userId = _wsDocsSession();
   if (!userId || _wsDocTableState === 'no') return false;
+  if (!_wsCanPersist()) return false;          // simétrico con el push: sin plan, nada remoto
   try {
     const { data, error } = await supabaseClient.from(_WS_DOC_TABLE)
       .select('doc_id,kind,body,revision,deleted_at,body_version,currency')
@@ -20124,6 +20202,15 @@ let _wsFreeCoverSeen = false;
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
+// ── LOS ESTADOS VÁLIDOS DE PESTAÑA, EN UN SOLO SITIO ────────────────────────
+// Estaban escritos como `x === 'space' || x === 'templates' || x === 'tools'` en
+// CUATRO sitios (el conmutador, el origen de «Volver», la etiqueta de «Volver» y el
+// propio render). Añadir la vista de inventario habría exigido acordarse de los
+// cuatro, y el que se olvidara devolvería al usuario a otra pestaña de la que
+// salió —que es exactamente el defecto que `_wsBackLabel` vino a cerrar—. Un
+// predicado, cuatro consumidores.
+const _WS_TABS = Object.freeze(['space', 'templates', 'tools', 'internal']);
+function _wsTabOk(x) { return _WS_TABS.indexOf(String(x || '')) !== -1; }
 let _wsTab = null;         // WS.5B/WS.6A — Home tab; null = smart default on entry
 let _wsReturnTab = 'tools'; // WS.14A — tab to return to from a tool/app/view ("Volver")
 // ── §3 · EL RETORNO DICE A DÓNDE VUELVE ─────────────────────────────────────
@@ -20135,9 +20222,8 @@ let _wsReturnTab = 'tools'; // WS.14A — tab to return to from a tool/app/view 
 // había salido. El destino YA se sabía (`_wsReturnTab`, que lo fija quien abre);
 // lo único que faltaba era que la etiqueta lo leyera.
 function _wsBackLabel() {
-  const tab = (_wsReturnTab === 'space' || _wsReturnTab === 'templates' || _wsReturnTab === 'tools')
-    ? _wsReturnTab : 'tools';
-  const k = tab === 'space' ? 'wsback_space' : tab === 'templates' ? 'wsback_templates' : 'wsback_tools';
+  const tab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools';
+  const k = tab === 'space' ? 'wsback_space' : tab === 'templates' ? 'wsback_templates' : tab === 'internal' ? 'wsback_internal' : 'wsback_tools';
   return t(k) || t('wstool_back');
 }
 // WS.6 — Compound Growth tool working state.
@@ -20270,7 +20356,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsfc-open],[data-wsfc-upgrade],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -20297,7 +20383,7 @@ function _wshWireOnce() {
     const nav = t.getAttribute('data-wsh-nav');
     // WS.14A — remember the tab the user came from so "Volver" always returns there.
     if (cta) {
-      _wsReturnTab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
+      _wsReturnTab = _wsTabOk(_wsTab) ? _wsTab : _wsSmartTab();
       // DSH.WORKSPACE.01 — record real usage so Mi Espacio surfaces it at #1.
       const _carg = cta === 'tool' ? (t.getAttribute('data-wstool') || 'compound') : cta === 'workspace' ? t.getAttribute('data-ws4-type') : '';
       // M.02 B4 — la recencia es una AFIRMACIÓN ("último uso: hace 2 min"), así que
@@ -20319,16 +20405,33 @@ function _wshWireOnce() {
     // El CTA va al paywall CANÓNICO con su featureKey y su source. No hay un
     // segundo camino de conversión ni se tocan precios aquí.
     if (t.getAttribute('data-wsfc-upgrade')) {
-      try { openUpgradeIntent({ featureKey: 'workspace.templates', source: 'workspace:free_cover' }); } catch (_) {}
+      // `workspace.templates` no existía como etiqueta, así que el Único punto de
+      // conversión le enseñaba al usuario la clave cruda como nombre de lo que
+      // estaba a punto de comprar —lo midió la sonda abriendo el overlay real—. Y
+      // además nombraba una SECCIÓN que no se vende suelta: este CTA ofrece el
+      // Workspace completo, que es lo que dice su texto.
+      try { openUpgradeIntent({ featureKey: 'workspace.full', source: 'workspace:free_cover' }); } catch (_) {}
       return;
     }
-    // Y se puede pasar de largo: una portada que no se puede cerrar es un muro.
-    if (t.getAttribute('data-wsfc-skip')) { _wshView = 'home'; renderWorkspaceHome(); return; }
+    // El botón «Explorar Workspace» se retiró (la portada lleva UN CTA), y la salida
+    // sin comprar son las dos tarjetas Free más el hecho de que la portada es de un
+    // solo uso: al reentrar en la sección se ve el catálogo completo (ver
+    // `renderWorkspace`). El manejador se conserva porque el paso de largo sigue
+    // siendo un estado válido del despachador si alguna superficie lo necesita.
     if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); _wsOpenSurface('goals', { before: () => { if (ty) _wsgPrefill = ty; } }); return; }
     if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
     if (cta === 'tool') { _wsOpenTool(t.getAttribute('data-wstool') || 'compound'); return; }
+    // ── UNA TARJETA BLOQUEADA TIENE DESTINO ───────────────────────────────────
+    // No «Abrir» y luego silencio: la tarjeta que el usuario no puede abrir lleva al
+    // paywall CANÓNICO con su featureKey y su origen. Un solo camino de conversión,
+    // el que ya existe, y sin precios aquí.
+    if (t.hasAttribute('data-wsh-lock')) {
+      const _lk = t.getAttribute('data-wsh-lock') || '';
+      try { openUpgradeIntent({ featureKey: _lk, source: 'workspace:card:' + (t.getAttribute('data-wsh-locksrc') || '') }); } catch (_) {}
+      return;
+    }
     // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
-    if (nav === 'back') { _wshView = 'home'; _ws4ActiveId = null; _wsTab = (_wsReturnTab === 'space' || _wsReturnTab === 'templates' || _wsReturnTab === 'tools') ? _wsReturnTab : 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    if (nav === 'back') { _wshView = 'home'; _ws4ActiveId = null; _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
     if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
     if (t.hasAttribute('data-wstool-save')) { _wsToolSave(); return; }
@@ -20905,7 +21008,7 @@ const _WS_CATALOG = Object.freeze([
   // ── herramientas PUBLICADAS ────────────────────────────────────────────────
   { id: 'compound_growth',       kind: 'tool',     published: true,  featureKey: null,              commercialTier: 'free' },
   { id: 'loan_simulation',       kind: 'tool',     published: true,  featureKey: 'workspace.loan',  commercialTier: 'premium' },
-  // ── herramientas INTERNAS (founder las evalúa; usuario normal NO las ve) ───
+  // ── herramientas INTERNAS (las evalúa el founder, un usuario normal NO las ve) ─
   // SPEC WORKSPACE COMPLETION · §1 — El SIMULADOR DE ESCENARIOS es una
   // HERRAMIENTA Premium y su hogar público es la rejilla de Herramientas, así que
   // `tpl_scenario` se queda interna: una capacidad, un ID, un hogar.
@@ -20989,7 +21092,7 @@ const _WS_CATALOG = Object.freeze([
   // Proyección patrimonial y Plan de independencia financiera se solapan con
   // Objetivos (tipos «Patrimonio objetivo» y «FIRE») y con Escenarios: la SPEC pide
   // examinarlos como posible solapamiento y NO crear otra superficie pública
-  // redundante. Su matemática se reusa desde el motor compartido; su superficie no
+  // redundante. Su matemática se reusa desde el motor compartido, y su superficie no
   // se publica. Balance patrimonial, Flujo de caja empresarial y Analizador
   // inmobiliario siguen internos por la misma regla de un solo hogar público.
   { id: 'tpl_projection',        kind: 'template', published: false, featureKey: null,              commercialTier: 'undecided' },
@@ -21017,6 +21120,61 @@ const _WS_TOOLKEY_TO_ID = Object.freeze({
 // nada. `_wsOpenTool` sí tenía su gate desde M.02, así que la protección existía
 // para siete claves y no para estas tres. Un solo owner, todos los caminos.
 const _WS_VIEW_SURFACES = Object.freeze(['goals', 'scenario', 'projection', 'planning']);
+// ── COMO SE PINTA Y COMO SE ABRE CADA ENTRADA, EN UN SOLO SITIO ─────────────
+// Estos dos mapas vivian DENTRO de `_renderWorkspaceHome`, y ademas habia una
+// SEGUNDA copia reducida, propia de Mi Espacio, con su propio par de nombres.
+// Las dos copias se congelaron en el catalogo de WORKSPACE-LAUNCH-V1 —compound,
+// loan y realestate— asi que al publicar las cinco capacidades nuevas el catalogo
+// las mostraba y Mi Espacio no podia contenerlas NUNCA: no existian en su lista.
+// Un mapa por superficie, un solo sitio: publicar una entrada es una linea aqui y
+// aparece en el catalogo, en Mi Espacio y en la vista interna a la vez.
+//
+// `surface` es la clave de apertura (lo que decide el gate). `cat` es la identidad
+// visual (la portada real de la plantilla): se declara EXPLICITA porque derivarla
+// de `arg` dejaba a Objetivos y Escenarios —las dos que no tienen `arg`— con el
+// glyph genérico en vez de su imagen, teniéndola publicada.
+const _WS_TOOL_RENDER = Object.freeze({
+  compound_growth:       { nameKey: 'wstool_compound_n',   viz: 'curve',   tool: 'compound',    cat: 'compound' },
+  loan_simulation:       { nameKey: 'wsloan_n',            viz: 'donut',   tool: 'loan',        cat: 'loan' },
+  scenario:              { nameKey: 'wsh_scenario_title',  viz: 'compare', cta: 'scenario',     cat: 'scenario' },
+  goal:                  { nameKey: 'wsg_title',           viz: 'target',  cta: 'goals',        cat: 'goals' },
+  financial_calc:        { nameKey: 'wstool_financial_n',  viz: 'bars' },
+  investment_analyzer:   { nameKey: 'wstool_analyzer_n',   viz: 'donut' },
+  monthly_budget:        { nameKey: 'wstool_budget_n',     viz: 'bars',    tool: 'budget',      cat: 'budget' },
+  real_estate_portfolio: { nameKey: 'wsre_n',              viz: 'donut',   tool: 'realestate',  cat: 'realestate' },
+  trade_journal:         { nameKey: 'wstool_journal_n',    viz: 'bars',    tool: 'journal',     cat: 'journal' },
+  receivables:           { nameKey: 'wsapp_receivables_n', viz: 'bars',    tool: 'receivables', cat: 'receivables' },
+  asset_prices:          { nameKey: 'wsapp_assets_n',      viz: 'bars',    tool: 'assets',      cat: 'assets' },
+});
+const _WS_TPL_RENDER = Object.freeze({
+  tpl_realestate:  { nameKey: 'wsre_n',              tool: 'realestate',  cat: 'realestate' },
+  tpl_mbudget:     { nameKey: 'wstool_budget_n',     tool: 'budget',      cat: 'budget' },
+  tpl_receivables: { nameKey: 'wsapp_receivables_n', tool: 'receivables', cat: 'receivables' },
+  tpl_journal:     { nameKey: 'wstool_journal_n',    tool: 'journal',     cat: 'journal' },
+  tpl_goals:       { nameKey: 'wsg_title',           cta: 'goals',        cat: 'goals' },
+  tpl_assets:      { nameKey: 'wsapp_assets_n',      tool: 'assets',      cat: 'assets' },
+  tpl_scenario:    { nameKey: 'wsh_scenario_title',  cta: 'scenario',     cat: 'scenario' },
+  tpl_projection:  { nameKey: 'wsp_title',           cta: 'planning',     cat: 'projection' },
+  tpl_networth:    { nameKey: 'wsh_ws_networth',     ws4: 'networth',     cat: 'networth' },
+  tpl_property:    { nameKey: 'wsh_ws_property',     ws4: 'property',     cat: 'property' },
+  tpl_business:    { nameKey: 'wsh_ws_business',     ws4: 'business',     cat: 'business' },
+  tpl_fire:        { nameKey: 'wsh_ws_fire',         ws4: 'fire',         cat: 'fire' },
+});
+// El TIPO de hoja legacy (`cta:'workspace'`) -> entrada del catalogo. Sin este mapa
+// `_ws4OpenOrCreate` no tenia forma de preguntar por publicacion ni por derecho, y
+// era la SEXTA ruta directa de apertura: la unica que quedaba sin gate despues de
+// que Objetivos, Escenarios y Proyeccion pasaran por `_wsOpenSurface`.
+const _WS4TYPE_TO_ID = Object.freeze({
+  networth: 'tpl_networth', property: 'tpl_property',
+  business: 'tpl_business', fire: 'tpl_fire',
+  investment: 'tpl_projection', budget: 'tpl_mbudget',
+});
+// La entrada de catalogo que gobierna una entrada de render, sea del mapa que sea.
+function _wsRenderSurface(entryId) {
+  const r = _WS_TOOL_RENDER[entryId] || _WS_TPL_RENDER[entryId] || null;
+  if (!r) return null;
+  return r.tool || r.cta || (r.ws4 ? 'ws4:' + r.ws4 : null);
+}
 function _wsOpenSurface(key, opts) {
   const k = String(key || '');
   if (_WS_VIEW_SURFACES.indexOf(k) === -1) return false;
@@ -21060,16 +21218,80 @@ function _wsToolFeatureKey(toolKey) {
   return e && e.featureKey ? e.featureKey : null;
 }
 // ¿Puede el usuario ACTUAL ver esta entrada en un catálogo?
-// Usuario normal: sólo `published`. Founder (override global): todo.
-// Esta es la ÚNICA puerta de visibilidad de catálogo, y el catálogo público NO se
-// construye filtrando el del founder por descuido: se filtra aquí, siempre.
+//
+// UNA SOLA RESPUESTA, Y YA NO DEPENDE DE QUIÉN MIRA: `published === true`.
+//
+// Antes esta función decía también «sí» a un usuario con
+// `workspace.catalog_preview`, y eso metía el INVENTARIO INTERNO en el catálogo
+// NORMAL de esa cuenta. El efecto, verificado por el founder sobre su propia
+// cuenta: tarjetas «Interno» y «Próximamente» mezcladas con el producto, Objetivos
+// DUPLICADO (la entrada interna de herramienta junto a la plantilla publicada), y
+// rutas de apertura sin gate llegando a superficies legacy. Una cuenta que también
+// es la cuenta de QA Premium no puede ver el producto con el inventario encima:
+// deja de poder juzgar lo que el cliente ve.
+//
+// El inventario interno NO desaparece —se sigue pudiendo evaluar— pero vive en una
+// VISTA FUNDADOR EXPLÍCITA (`_wsCatalogInternal`, pestaña `internal`), que es lo
+// que la SPEC pide: «el texto Sólo visible para tu cuenta sólo puede existir en una
+// vista fundador explícita».
 function _wsCatalogVisible(entry) {
-  if (!entry) return false;
-  if (entry.published === true) return true;
-  return _aurixEntIsCatalogPreview() === true;
+  return !!entry && entry.published === true;
 }
 function _wsCatalogFor(kind) {
   return _WS_CATALOG.filter(e => e.kind === kind && _wsCatalogVisible(e));
+}
+// ── LA VISTA FUNDADOR, Y SUS DOS REGLAS ─────────────────────────────────────
+// 1. Falla CERRADA: sin `workspace.catalog_preview` devuelve la lista vacía, así
+//    que ningún usuario externo puede recibir una entrada interna por este camino
+//    ni por descuido de un llamador.
+// 2. NO REPITE UNA SUPERFICIE YA PUBLICADA. Una entrada interna cuya superficie
+//    tiene un propietario PUBLICADO es un duplicado del mismo hogar, no una
+//    capacidad aparte: `goal` frente a `tpl_goals`, `monthly_budget` frente a
+//    `tpl_mbudget`, `trade_journal` frente a `tpl_journal`, `receivables`,
+//    `real_estate_portfolio`, `tpl_scenario`. Enseñarlas era exactamente el
+//    «Objetivos duplicado» que el founder reporta, y la regla lo cierra para las
+//    seis a la vez en vez de con seis excepciones escritas a mano.
+function _wsEntrySurfaceKey(entry) {
+  if (!entry) return null;
+  if (entry.opens) return entry.opens;
+  return _wsCatalogSurfaceKey(entry.id);
+}
+function _wsCatalogInternal(kind) {
+  if (_aurixEntIsCatalogPreview() !== true) return [];
+  return _WS_CATALOG.filter(e => {
+    if (e.kind !== kind || e.published === true) return false;
+    const surface = _wsEntrySurfaceKey(e) || _wsRenderSurface(e.id);
+    if (!surface) return true;                       // sin superficie: no puede duplicar
+    const owner = _wsSurfaceEntry(surface);
+    return !(owner && owner.published === true && owner.id !== e.id);
+  });
+}
+// ¿Puede ABRIRSE esta entrada? Visibilidad de catálogo y autorización de apertura
+// son dos preguntas distintas, y mezclarlas fue el defecto de arriba. El founder
+// SIGUE pudiendo abrir un interno desde su vista explícita —es como lo evalúa— pero
+// eso ya no mete nada en el catálogo de nadie.
+// El acceso a una hoja legacy (`cta:'workspace'`), en UN solo sitio. Lo consultan
+// el owner de apertura (`_ws4OpenOrCreate`) y el modelo de tarjeta, que es lo que
+// impide que la tarjeta diga una cosa y la apertura haga otra: la primera version
+// de este bloque resolvia el derecho DOS veces, una en cada lado.
+function _wsWs4Access(type) {
+  const id = _WS4TYPE_TO_ID[String(type || '')];
+  const entry = id ? _wsCatalogEntry(id) : null;
+  // FALLA CERRADO. La primera versión devolvía `ok:true` para un tipo sin entrada
+  // «sin decidir», y eso es un default abierto en una función de AUTORIZACIÓN: añadir
+  // un séptimo tipo a `_ws4Templates()` y olvidar su línea en `_WS4TYPE_TO_ID` lo
+  // dejaba accesible para todo el mundo, en silencio. Lo único que lo mantenía
+  // cerrado era que dos mapas coincidieran.
+  if (!id) return { ok: false, reason: 'unpublished', featureKey: null };
+  if (!_wsEntryOpenable(entry)) return { ok: false, reason: 'unpublished', featureKey: null };
+  const fk = entry && entry.featureKey ? entry.featureKey : null;
+  if (fk && !hasFeature(fk)) return { ok: false, reason: 'entitlement', featureKey: fk };
+  return { ok: true, reason: null, featureKey: fk };
+}
+function _wsEntryOpenable(entry) {
+  if (!entry) return false;
+  if (entry.published === true) return true;
+  return _aurixEntIsCatalogPreview() === true;
 }
 // Etiqueta comercial REAL. Una sola convención:
 //   free → "Incluido" · premium → "Premium" · no publicado/undecided → "Preview"
@@ -21104,7 +21326,7 @@ function _wsToolAccess(toolKey) {
   // las siete claves reales están mapeadas (E.10), pero ahora `_wsSurfaceEntry`
   // devuelve null A PROPÓSITO cuando dos entradas publicadas se pelean por una
   // superficie, y ese null tiene que DENEGAR. Lo destapó el propio gate.
-  if (!entry || !_wsCatalogVisible(entry)) return { ok: false, reason: 'unpublished', featureKey: null };
+  if (!entry || !_wsEntryOpenable(entry)) return { ok: false, reason: 'unpublished', featureKey: null };
   const featureKey = entry && entry.featureKey ? entry.featureKey : null;
   if (featureKey && !hasFeature(featureKey)) return { ok: false, reason: 'entitlement', featureKey };
   return { ok: true, reason: null, featureKey };
@@ -21158,7 +21380,14 @@ function _wsIsPinned(ref) { return _wsPinned().some(p => p && p.ref === ref); }
 function _wsTogglePin(ref) {
   const list = _wsPinned();
   const i = list.findIndex(p => p && p.ref === ref);
-  if (i >= 0) list.splice(i, 1); else list.push({ ref, ts: Date.now() });
+  // EL GATE VA EN LA RAMA DE AÑADIR, NO ANTES. Esta función hace las DOS cosas, y
+  // ponerlo arriba dejaba fijados huérfanos que nadie podía retirar: un usuario que
+  // fijó algo cuando fijar no estaba gateado se quedaba con la estrella encendida y
+  // cada clic le abría el paywall en vez de apagarla. Retirar lo propio nunca
+  // requiere plan; añadir, sí.
+  if (i >= 0) { list.splice(i, 1); _wshWriteStore(_WSH_PINNED_KEY, list); return; }
+  if (!_wsCanPersist()) return _wsPersistUpsell('pin');
+  list.push({ ref, ts: Date.now() });
   _wshWriteStore(_WSH_PINNED_KEY, list);
 }
 // ── DSH.WORKSPACE.01 — usage recency (Aurix learns from real behaviour) ─────
@@ -21209,6 +21438,16 @@ function _wsPinOpen(ref) {
 // pinned/active tool restores this; editing inputs updates it; only "Guardar
 // proyecto" creates a real project in aurix_ws_projects_v1.
 const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
+// El INVERSO de `_wsToolStateType`. Mi Espacio necesita saber a qué superficie
+// pertenece un documento guardado para poder decir «2 guardados» en la tarjeta
+// correcta. Se deriva del mismo par de nombres, así que no hay un segundo mapa que
+// pueda divergir: un tipo desconocido devuelve null y no se cuenta en ninguna.
+const _WS_PROJTYPE_TO_TOOL = Object.freeze({
+  monthly_budget: 'budget', trade_journal: 'journal', real_estate_portfolio: 'realestate',
+  receivables_app: 'receivables', loan_simulation: 'loan', asset_prices: 'assets',
+  compound_growth: 'compound',
+});
+function _wsToolKeyForProjectType(type) { return _WS_PROJTYPE_TO_TOOL[String(type || '')] || null; }
 function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : key === 'loan' ? 'loan_simulation' : key === 'assets' ? 'asset_prices' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
@@ -21487,7 +21726,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wsOpenSurface('goals'); }
   else if (kind === 'scenario') { _wsOpenSurface('scenario'); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else if (p.type === 'asset_prices') { _wsOpenTool('assets', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else if (p.type === 'asset_prices') { _wsOpenTool('assets', id); } else if (_wsWs4Access(p.type).ok) { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -21511,99 +21750,150 @@ function _wsxAct(act, ref) {
 
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
-  let tab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
+  // La vista de inventario es una PESTAÑA MÁS y sólo existe si el servidor concede
+  // `workspace.catalog_preview`. Falla cerrada en el propio conjunto de pestañas:
+  // un usuario externo no puede seleccionarla porque no está en `TAB_KEYS`.
+  const _internalView = (function () { try { return _aurixEntIsCatalogPreview() === true; } catch (_) { return false; } })();
+  const TAB_KEYS = _WS_TABS.filter(k => k !== 'internal' || _internalView);
+  let tab = TAB_KEYS.indexOf(_wsTab) !== -1 ? _wsTab : _wsSmartTab();
 
-  // WS.5C — no hero. Workspace opens directly on the internal tabs.
-
-  // WS.5B P2 — internal tabs: Mi espacio / Plantillas / Herramientas.
-  // MONETIZATION-V1 · M.01B — PLANTILLAS vuelve como SECCIÓN ESTRUCTURAL. En
-  // WORKSPACE-LAUNCH-V1 se retiró porque su catálogo público quedó vacío, y una
-  // rejilla vacía se lee como algo roto. La arquitectura de tres secciones es
-  // ahora un requisito de Monetization: el usuario tiene que poder ver QUÉ existe
-  // en Workspace. El catálogo sigue vacío —no se publica ninguna plantilla en este
-  // bloque y no se inventa contenido—, así que la sección no pinta una galería
-  // sino su estado honesto: ninguna plantilla publicada todavía, con el criterio
-  // de publicación y una salida viva a Herramientas (no un enlace muerto).
-  // M.03 A — ese catálogo YA NO está vacío: Real Estate Portfolio es la plantilla
-  // gratuita de FREE V1, así que la galería se pinta de verdad. El estado vacío
-  // sigue existiendo intacto por debajo (la condición es el propio catálogo).
-  const TABS = [['space', 'wstab_space'], ['templates', 'wstab_templates'], ['tools', 'wstab_tools']];
+  const TABS = TAB_KEYS.map(k => [k, k === 'internal' ? 'wstab_internal' : 'wstab_' + k]);
   const tabsHtml = `
     <nav class="wsh-tabs" role="tablist">
-      ${TABS.map(([k, lk]) => `<button type="button" class="wsh-tab${tab === k ? ' is-active' : ''}" data-wstab="${k}">${esc(t(lk))}</button>`).join('')}
+      ${TABS.map(([k, lk]) => `<button type="button" class="wsh-tab${tab === k ? ' is-active' : ''}${k === 'internal' ? ' is-internal' : ''}" role="tab" aria-selected="${tab === k ? 'true' : 'false'}" data-wstab="${k}">${esc(t(lk))}</button>`).join('')}
     </nav>`;
 
   // Small pin/star toggle for tool & template cards (stops the card's open click
   // because the delegated handler matches [data-wspin] before [data-wsh-cta]).
   const pinBtn = ref => { const on = _wsIsPinned(ref); return `<button type="button" class="wsh-pin${on ? ' is-on' : ''}" data-wspin="${esc(ref)}" title="${esc(on ? t('wspin_remove') : t('wspin'))}" aria-label="${esc(on ? t('wspin_remove') : t('wspin'))}"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.6 5.5 6 .6-4.5 4.1 1.3 5.9L12 16.9 6.6 19.6l1.3-5.9L3.4 9.6l6-.6z"/></svg></button>`; };
 
+  // ── UN SOLO MODELO DE TARJETA, Y LO DECIDE EL ACCESO REAL ──────────────────
+  // Antes cada rejilla derivaba sus atributos por su cuenta y el chip comercial se
+  // pintaba SIEMPRE, así que un usuario Premium veía «Premium» dentro de cada
+  // tarjeta que ya tenía pagada —ruido, no información— y una tarjeta bloqueada
+  // ofrecía «Abrir ›» para después denegar en silencio.
+  //
+  // `_wsCardModel` resuelve UNA vez, con `_wsToolAccess` (el mismo owner que decide
+  // la apertura), en qué estado está la entrada para ESTE usuario:
+  //   open     → una sola acción, «Abrir», y CERO etiqueta comercial
+  //   locked   → etiqueta «Premium», acción «Premium», y la tarjeta abre el paywall
+  //   internal → etiqueta «Interno», sólo alcanzable desde la vista fundador
+  // Nunca se pinta «Abrir» sobre algo que el gate va a denegar, y nunca se dice
+  // «Premium» de algo que el usuario ya tiene.
+  const _wsCardModel = (entry, r) => {
+    const surface = r.tool || r.cta || (r.ws4 ? 'ws4' : null);
+    const openKind = r.tool ? 'tool' : (r.ws4 ? 'workspace' : (r.cta || ''));
+    const openArg = r.tool || r.ws4 || '';
+    let acc = { ok: false, reason: 'unpublished', featureKey: entry.featureKey || null };
+    if (r.ws4) {
+      // La hoja legacy no tiene clave de superficie: lo decide `_wsWs4Access`, el
+      // MISMO owner que usa su apertura. Resolverlo aquí por separado fue la
+      // primera versión y era una segunda copia del gate.
+      acc = _wsWs4Access(r.ws4);
+    } else if (surface) {
+      try { acc = _wsToolAccess(surface); } catch (_) {}
+    }
+    const hasRoute = !!openKind;
+    const state = !hasRoute ? 'noroute'
+      : acc.ok ? 'open'
+      : (acc.reason === 'entitlement' ? 'locked' : 'internal');
+    return {
+      id: entry.id, entryId: entry.id, entry, state, hasRoute, openKind, openArg,
+      featureKey: acc.featureKey || entry.featureKey || null,
+      name: r.nameKey ? t(r.nameKey) : entry.id,
+      cat: r.cat || entry.id, viz: r.viz || 'bars',
+      pinRef: (entry.published === true && acc.ok) ? _wsCanonRef(openKind, openArg) : '',
+    };
+  };
+  // Los atributos de apertura. Una tarjeta bloqueada TAMBIÉN es interactiva: su
+  // destino es el paywall canónico, no el silencio.
+  const _wsCardAttrs = m => {
+    if (m.state === 'locked') return ` role="button" tabindex="0" data-wsh-lock="${esc(m.featureKey || '')}" data-wsh-locksrc="${esc(m.id)}"`;
+    if (m.state !== 'open') return '';
+    if (m.openKind === 'tool') return ` role="button" tabindex="0" data-wsh-cta="tool" data-wstool="${esc(m.openArg)}"`;
+    if (m.openKind === 'workspace') return ` role="button" tabindex="0" data-wsh-cta="workspace" data-ws4-type="${esc(m.openArg)}"`;
+    return ` role="button" tabindex="0" data-wsh-cta="${esc(m.openKind)}"`;
+  };
+  // El pie: UNA acción, y la etiqueta sólo cuando aporta información comercial.
+  const _wsCardFoot = m => {
+    const action = m.state === 'open'
+      ? `<span class="wsh-tool-go">${esc(t('wsh_proj_open'))} ›</span>`
+      : m.state === 'locked'
+        ? `<span class="wsh-tool-go is-lock">${esc(t('wstier_premium'))}</span>`
+        : `<span class="wsh-pill">${esc(t(m.hasRoute ? 'wsh_internal_tag' : 'wsh_soon'))}</span>`;
+    const chip = m.state === 'locked'
+      ? `<span class="wsh-tier is-premium">${esc(t('wstier_premium'))}</span>`
+      : (m.state === 'internal' || m.state === 'noroute')
+        ? `<span class="wsh-tier is-preview">${esc(t('wstier_preview'))}</span>`
+        : '';
+    return action + chip;
+  };
+  const _wsAria = m => m.state === 'locked'
+    ? ` aria-label="${esc(m.name + ' · ' + t('wsh_lock_aria'))}"`
+    : (m.state === 'open' ? ` aria-label="${esc(m.name + ' · ' + t('wsh_proj_open'))}"` : '');
+
   let panel = '';
   if (tab === 'space') {
-    // DSH.WORKSPACE.01 — Mi Espacio = personal operating centre. Two equal
-    // columns (Mis plantillas | Mis herramientas), each ordered by REAL usage
-    // (lastUsedAt DESC). The user's last action is always #1. Aurix reorganizes
-    // the space from behaviour — the user organizes nothing. Items appear once a
-    // user has used or pinned them (created → used → recorded); else, empty state.
+    // ── MI ESPACIO · DOS COLUMNAS, SIEMPRE, Y CON PERSISTENCIA REAL ──────────
+    // Las dos columnas se pintan SIEMPRE y con la misma jerarquía: son el inicio
+    // útil del usuario y tienen que verse las dos desde el primer viewport. Antes
+    // una columna podía no pintarse (dejando media pantalla muerta) o las dos se
+    // sustituían por una portada única, y en los dos casos la simetría se rompía.
+    //
+    // Y lo que puebla cada columna ya no es sólo «lo que se abrió en memoria»: son
+    // las TRES fuentes reales —documentos guardados, favoritos y última apertura—
+    // ordenadas por actividad más reciente. Un presupuesto guardado aparece aquí
+    // aunque esta sesión no lo haya abierto, que es lo que el usuario espera de un
+    // espacio de trabajo.
     const pinTs = ref => { const p = _wsPinned().find(x => x && x.ref === ref); return p ? (p.ts || 1) : 0; };
-    // Canonical catalogs — each entry belongs to exactly one column. Opens reuse
-    // the existing cta mechanism (which records recency via the click handler).
-    // WORKSPACE-LAUNCH-V1 — Mi Espacio ordena por USO REAL, así que un usuario que
-    // hubiera abierto antes una de estas superficies la vería reaparecer aquí aunque
-    // estuviera fuera del catálogo. Por eso se reducen TAMBIÉN estos dos catálogos:
-    // es la otra puerta de entrada. Ninguna plantilla es publicable en V1; de las
-    // herramientas quedan las dos con matemática comprobada. Owners intactos.
-    // MONETIZATION V1 · M.02 B4 — Mi Espacio es la TERCERA puerta del catálogo, y es
-    // la que se olvida: ordena por uso real, así que resucita lo que ya se abrió una
-    // vez. Se deriva de `_WS_CATALOG` y pasa por el MISMO filtro de visibilidad, de
-    // modo que nada interno puede reaparecer aquí para un usuario normal.
-    const _MSE_TOOL_RENDER = {
-      compound_growth: { arg: 'compound', viz: 'curve', nameKey: 'wstool_compound_n' },
-      loan_simulation: { arg: 'loan',     viz: 'donut', nameKey: 'wsloan_n' },
-    };
-    // M.03 A — la columna de plantillas DEJA DE ESTAR VACÍA A MANO. Era `[]` porque
-    // el catálogo público de plantillas lo estaba; ahora se deriva del catálogo por
-    // el MISMO camino y el MISMO filtro de visibilidad que las herramientas, así que
-    // nada interno puede reaparecer aquí y reponer una plantilla es una línea.
-    const _MSE_TPL_RENDER = {
-      tpl_realestate:  { cta: 'tool', arg: 'realestate', cat: 'realestate', nameKey: 'wsre_n' },
-    };
-    const TPL_CAT = _wsCatalogFor('template')
-      .filter(e => _MSE_TPL_RENDER[e.id])
-      .map(e => {
-        const r = _MSE_TPL_RENDER[e.id];
-        return { ref: e.id.replace(/^tpl_/, 'tpl:'), cta: r.cta, arg: r.arg, cat: r.cat,
-                 name: t(r.nameKey), entryId: e.id };
+    // Los documentos GUARDADOS, indexados por la superficie a la que pertenecen.
+    // `_wshAllProjects` es la vista unificada de los tres almacenes y ya existía:
+    // aquí sólo se agrupa por superficie para poder decir «2 guardados».
+    const savedBySurface = Object.create(null);
+    try {
+      _wshAllProjects().forEach(it => {
+        if (!it) return;
+        const sf = it.kind === 'goal' ? 'goals'
+          : it.kind === 'scenario' ? 'scenario'
+          : _wsToolKeyForProjectType(it.type);
+        if (!sf) return;
+        const b = savedBySurface[sf] || (savedBySurface[sf] = { n: 0, ts: 0 });
+        b.n += 1; b.ts = Math.max(b.ts, Number(it.ts) || 0);
       });
-    const TOOL_CAT = _wsCatalogFor('tool')
-      .filter(e => _MSE_TOOL_RENDER[e.id])
-      .map(e => {
-        const r = _MSE_TOOL_RENDER[e.id];
-        return { ref: 'tool:' + r.arg, cta: 'tool', arg: r.arg, viz: r.viz,
-                 name: t(r.nameKey), entryId: e.id };
-      });
-    // Keep only used/pinned items, ordered by most-recent activity (DESC).
-    // M.03 A — `saved` se separa de `used`: un elemento puede estar aquí por haberse
-    // ABIERTO o por estar en FAVORITOS, y son dos afirmaciones distintas. Antes las
-    // dos pintaban la misma fila y un favorito sin abrir mostraba una hora suelta
-    // sin decir de qué.
-    const activate = arr => arr
-      .map(it => { const r = _wsRecentTs(it.ref), p = pinTs(it.ref);
-                   return Object.assign({}, it, { ts: Math.max(r, p), used: r > 0, saved: p > 0 }); })
+    } catch (_) {}
+
+    const colItems = (map, kind) => _wsCatalogFor(kind)
+      .filter(e => map[e.id])
+      .map(e => _wsCardModel(e, map[e.id]))
+      .filter(m => m.state === 'open')
+      .map(m => {
+        const ref = m.pinRef || _wsCanonRef(m.openKind, m.openArg);
+        const sf = m.openKind === 'tool' ? m.openArg : m.openKind;
+        const sv = savedBySurface[sf] || { n: 0, ts: 0 };
+        const used = _wsRecentTs(ref), pinned = pinTs(ref);
+        return Object.assign({}, m, {
+          ref, used, pinned, savedCount: sv.n, savedTs: sv.ts,
+          ts: Math.max(used, pinned, sv.ts),
+        });
+      })
       .filter(x => x.ts > 0)
       .sort((a, b) => b.ts - a.ts);
-    const tplList = activate(TPL_CAT), toolList = activate(TOOL_CAT);
+    const tplList = colItems(_WS_TPL_RENDER, 'template');
+    const toolList = colItems(_WS_TOOL_RENDER, 'tool');
 
-    const openAttrs = it => ` role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : it.cta === 'workspace' ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}`;
-    // M.03 A — el FAVORITO se declara aquí, no se re-implementa: el toggle sigue
-    // siendo `pinBtn` (misma primitiva, mismo `ref`) en las tarjetas de Plantillas y
-    // Herramientas, y Mi Espacio se limita a DECIR cuál está guardado. Un segundo
-    // toggle aquí sería un segundo sistema de guardado para el mismo estado.
+    const mseMeta = it => {
+      const bits = [];
+      if (it.savedCount > 0) bits.push(esc(it.savedCount === 1 ? t('wsmse2_doc_one') : t('wsmse2_doc_n')(it.savedCount)));
+      if (it.used > 0) bits.push(esc(t('wsmse2_last') + ': ' + _wsRelTime(it.used)));
+      else if (it.pinned > 0) bits.push(esc(t('wsmse2_saved')));
+      return bits.join(' · ');
+    };
     const card = (it, preview) => `
-      <div class="wsh-mse2-card${it.saved ? ' is-saved' : ''}"${openAttrs(it)}>
+      <div class="wsh-mse2-card${it.pinned ? ' is-saved' : ''}"${_wsCardAttrs(it)}${_wsAria(it)}>
         <div class="wsh-mse2-pv">${preview}</div>
         <div class="wsh-mse2-body">
           <p class="wsh-mse2-name">${esc(it.name)}</p>
-          <span class="wsh-mse2-meta">${esc(it.used ? t('wsmse2_last') + ': ' : (it.saved ? t('wsmse2_saved') + ' · ' : ''))}${esc(_wsRelTime(it.ts))}</span>
+          <span class="wsh-mse2-meta">${mseMeta(it)}</span>
         </div>
         <span class="wsh-mse2-open" aria-hidden="true">${esc(t('wsh_proj_open'))} →</span>
       </div>`;
@@ -21622,194 +21912,75 @@ function _renderWorkspaceHome(metrics) {
         ${list.length ? `<div class="wsh-mse2-list">${list.map(it => card(it, previewFn(it))).join('')}</div>` : emptyState.apply(null, emptyArgs)}
       </section>`;
 
-    // GLOBAL-POLISH-V1 — la columna "Mis plantillas" se pintaba SIEMPRE, así que al
-    // vaciarse su catálogo en WORKSPACE-LAUNCH-V1 quedaba media pantalla con un
-    // estado vacío permanente y, peor, con un CTA que llevaba a la pestaña
-    // `templates` que ese mismo bloque había retirado: un enlace muerto. Si no hay
-    // nada publicable que pueda llegar a poblarla, la columna NO se pinta y la
-    // rejilla pasa a una sola columna (`is-single`). Cuando vuelva a haber
-    // plantillas públicas, reaparece sola: la condición es el propio catálogo.
-    // M.03 A — Y LA OTRA MITAD DE LA MISMA LECCIÓN: con las dos columnas ya
-    // publicables, un usuario que todavía no ha abierto nada veía DOS estados vacíos
-    // uno al lado del otro, que es la misma pobreza visual vista del otro lado. Si el
-    // espacio está genuinamente vacío se pinta UNA portada: una invitación, no dos.
-    // En cuanto hay actividad en cualquiera de las dos, vuelven las columnas.
-    const _mseEmpty = !tplList.length && !toolList.length;
-    const _mseCols = _mseEmpty ? [`
-      <section class="wsh-card wsh-mse2-col wsh-mse2-blank">
-        <header class="wsh-mse2-head">
-          <h3 class="wsh-title">${esc(t('wstab_space'))}</h3>
-          <span class="wsh-mse2-sub">${esc(t('wsmse2_empty_b'))}</span>
-        </header>
-        <div class="wsh-mse2-empty">
-          <p class="wsh-mse2-empty-t">${esc(t('wsmse2_empty_t'))}</p>
-          <div class="wsh-mse2-empty-ctas">
-            <button type="button" class="wsh-cta is-primary" data-wstab="tools">${esc(t('wsmse2_tool_empty_cta'))}</button>
-            <button type="button" class="wsh-cta" data-wstab="templates">${esc(t('wsmse2_tpl_empty_cta'))}</button>
-          </div>
-        </div>
-      </section>`] : [
-      TPL_CAT.length ? column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates']) : '',
-      // M.02 B4 · §14 — identidad visual coherente. Aquí se pintaba SÓLO el glyph
-      // genérico `_wsTplViz`, así que Compound aparecía en Mi Espacio con un dibujo
-      // distinto al de su tarjeta del catálogo, que sí carga `tool_compound.webp`.
-      // Se usa la misma composición que la tarjeta: escena + imagen real, y el
-      // `<img>` se autorretira si no carga, así que nunca queda un hueco.
-      column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsMseToolPreview(it), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools']),
-    ].filter(Boolean);
-    panel = `<div class="wsh-mse2${_mseCols.length < 2 ? ' is-single' : ''}">
-      ${_mseCols.join('\n      ')}
+    panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}">
+      ${column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
+      ${column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsMseToolPreview(it), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
     </div>`;
-  } else if (tab === 'templates') {
-    // Organized by real utility (not by technical structure). 'cta'+'arg' decide
-    // how each card opens; 'ref' is the pinnable identifier.
-    // WS.10 — visual-first card: dominant data/archetype preview, name + CTA, no
-    // descriptive sentence. The preview communicates the category in <1s.
-    const card = it => {
-      const soon = it.cta === 'soon';
-      const openAttrs = soon ? '' : ` role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? (it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : ' data-ws4-type="' + esc(it.arg) + '"') : ''}`;
-      return `
-      <div class="wsh-tpl wsh-cardv${soon ? ' is-soon' : ''}"${openAttrs}>
-        ${(soon || it.internal) ? '' : pinBtn(it.ref)}
-        <div class="wsh-pv-wrap">${_wsCatPreviewHtml(it.cat)}</div>
+  } else if (tab === 'templates' || tab === 'tools') {
+    const kind = tab === 'templates' ? 'template' : 'tool';
+    const map = kind === 'template' ? _WS_TPL_RENDER : _WS_TOOL_RENDER;
+    const items = _wsCatalogFor(kind).map(e => _wsCardModel(e, map[e.id] || {}));
+    const tplCard = m => `
+      <div class="wsh-tpl wsh-cardv is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
+        ${m.pinRef ? pinBtn(m.pinRef) : ''}
+        <div class="wsh-pv-wrap">${_wsCatPreviewHtml(m.cat)}</div>
         <div class="wsh-cardv-foot">
-          <p class="wsh-tpl-name">${esc(it.name)}</p>
-          ${soon ? `<span class="wsh-pill">${esc(t('wsh_soon'))}</span>` : `<span class="wsh-tpl-chev" aria-hidden="true">›</span>`}
-          ${it.entryId ? _wsTierChip(it.entryId) : ''}
+          <p class="wsh-tpl-name">${esc(m.name)}</p>
+          ${_wsCardFoot(m)}
         </div>
       </div>`;
-    };
-    const T2 = type => ({ cta: 'workspace', arg: type, ref: 'tpl:' + type, name: t('wsh_ws_' + type), cat: type });
-    // WS.12 (v2) — single premium gallery, priority order. FIRE/abstract last.
-    // ── WORKSPACE-LAUNCH-V1 · CATÁLOGO PÚBLICO ────────────────────────────────
-    // Workspace V1 sale deliberadamente pequeño: Interés compuesto y Préstamo, las
-    // dos únicas superficies con matemática comprobada y que NO guardan trabajo del
-    // usuario. Todo lo demás persiste sólo en localStorage (`aurix_ws_*_v1` no viaja
-    // en el payload de sync), así que publicarlo prometería una permanencia que la
-    // arquitectura todavía no da. Los renderers y sus datos SIGUEN EXISTENTES e
-    // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
-    // reponerlos es volver a añadir su línea aquí.
-    // M.02 B4 — misma derivación para plantillas. Para un usuario normal el catálogo
-    // publicado sigue VACÍO (ninguna plantilla tiene matemática y persistencia
-    // comprobadas), así que ve exactamente el mismo estado vacío premium que antes.
-    // El founder ve el inventario interno para poder evaluarlo.
-    // M.03 A — se publica UNA: `tpl_realestate` (Real Estate Portfolio), gratuita,
-    // porque el SPEC de FREE V1 la declara. Y hay que decir en qué se aparta del
-    // criterio de WORKSPACE-LAUNCH-V1: esta plantilla SÍ guarda trabajo, y sus
-    // claves `aurix_ws_*_v1` no viajan en el sync. La permanencia no se promete —se
-    // declara en la propia plantilla (`wsre_local_note`)— y Workspace Sync sigue
-    // siendo el prerrequisito para publicar cualquier otra. Las once restantes
-    // siguen internas.
-    const TPL_RENDER = {
-      tpl_mbudget:     { nameKey: 'wstool_budget_n',      cta: 'tool',      arg: 'budget' },
-      tpl_assets:      { nameKey: 'wsapp_assets_n',       cta: 'tool',      arg: 'assets' },
-      tpl_receivables: { nameKey: 'wsapp_receivables_n',  cta: 'tool',      arg: 'receivables' },
-      tpl_realestate:  { nameKey: 'wsre_n',               cta: 'tool',      arg: 'realestate' },
-      tpl_goals:       { nameKey: 'wsg_title',            cta: 'goals' },
-      tpl_journal:     { nameKey: 'wstool_journal_n',     cta: 'tool',      arg: 'journal' },
-      tpl_scenario:    { nameKey: 'wsh_scenario_title',   cta: 'scenario' },
-      tpl_projection:  { nameKey: 'wsp_title',            cta: 'planning' },
-      tpl_networth:    { nameKey: 'wsh_ws_networth',      cta: 'workspace', arg: 'networth' },
-      tpl_property:    { nameKey: 'wsh_ws_property',      cta: 'workspace', arg: 'property' },
-      tpl_business:    { nameKey: 'wsh_ws_business',      cta: 'workspace', arg: 'business' },
-      tpl_fire:        { nameKey: 'wsh_ws_fire',          cta: 'workspace', arg: 'fire' },
-    };
-    const gallery = _wsCatalogFor('template').map(e => {
-      const r = TPL_RENDER[e.id] || {};
-      // `internal` suprime el botón de fijar: las herramientas ya tenían ese guard
-      // (`pinRef` sólo si `published`), las plantillas no. Fijar una interna no
-      // aparecía en ningún sitio (TPL_CAT está vacío) y encima cambiaba la pestaña
-      // por defecto a `space`.
-      return { cta: r.cta || '', arg: r.arg, ref: e.id.replace(/^tpl_/, 'tpl:'),
-               cat: (r.arg || e.id), name: r.nameKey ? t(r.nameKey) : e.id,
-               entryId: e.id, internal: e.published !== true };
-    });
-    // MONETIZATION-V1 · M.01B — con catálogo vacío NO se pinta la rejilla (una
-    // galería de cero tarjetas es una galería rota). Se pinta la representación
-    // mínima profesional: por qué está vacía, cuál es el criterio de publicación
-    // y una salida a una sección viva. Sin plantillas falsas, sin "próximamente",
-    // sin banner de upgrade. Cuando el catálogo tenga una entrada, la galería
-    // reaparece sola: la condición es el propio catálogo.
-    const body = gallery.length
-      // M.03 A — con menos de tres tarjetas la rejilla de TRES columnas fijas deja
-      // una fila medio vacía y la tarjeta se estira: es la misma clase de defecto
-      // que ya se corrigió en la rejilla de herramientas (`is-sparse`), y ahora le
-      // toca a la galería porque el catálogo público de plantillas es de UNA.
-      ? `<div class="wsh-tpl-grid wsh-gallery${gallery.length < 3 ? ' is-sparse' : ''}">${gallery.map(card).join('')}</div>`
+    const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
+    const toolCard = m => `
+      <div class="wsh-tool wsh-toolcard ${accent(m.id)} is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
+        ${m.pinRef ? pinBtn(m.pinRef) : ''}
+        <div class="wsh-toolcard-ic${_WS_TOOL_ASSET[m.id] ? ' has-asset' : ''}">${_wsTplViz(m.viz)}${_wsAssetImg(_WS_TOOL_ASSET[m.id], '')}</div>
+        <p class="wsh-tool-name">${esc(m.name)}</p>
+        <div class="wsh-toolcard-foot">${_wsCardFoot(m)}</div>
+      </div>`;
+    // La rejilla declara CUÁNTAS tarjetas lleva, y el CSS decide columnas con eso:
+    // una rejilla de tres columnas fijas con cinco tarjetas deja una fila a medias y
+    // estira las que quedan, que es el desequilibrio de escritorio que hay que cerrar.
+    const body = items.length
+      ? `<div class="${kind === 'template' ? 'wsh-tpl-grid wsh-gallery' : 'wsh-tool-grid wsh-toolbox'}" data-wsgrid-n="${items.length}">${items.map(kind === 'template' ? tplCard : toolCard).join('')}</div>`
       : `<div class="wsh-tplarch">
           <p class="wsh-tplarch-t">${esc(t('wstpl_arch_t'))}</p>
           <p class="wsh-tplarch-b">${esc(t('wstpl_arch_b'))}</p>
           <button type="button" class="wsh-cta wsh-tplarch-cta" data-wstab="tools">${esc(t('wstpl_arch_cta'))}</button>
         </div>`;
-    // Cuando lo que se está viendo es el catálogo interno, se dice. No se disfraza
-    // de catálogo publicado, porque quien lo mira está evaluando qué publicar.
-    const internalNote = (gallery.length && _aurixEntIsCatalogPreview())
-      ? `<p class="wsh-mse2-sub">${esc(t('wsh_internal_b'))}</p>` : '';
-    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3>${internalNote}</header>${body}</section>`;
+    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t(kind === 'template' ? 'wstab_templates' : 'wstab_tools'))}</h3></header>${body}</section>`;
   } else {
-    // WS.12 (v2) — Herramientas = compact, operative toolbox (quick utilities, NOT
-    // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
-    // ── WORKSPACE-LAUNCH-V1 · CATÁLOGO PÚBLICO ────────────────────────────────
-    // Workspace V1 sale deliberadamente pequeño: Interés compuesto y Préstamo, las
-    // dos únicas superficies con matemática comprobada y que NO guardan trabajo del
-    // usuario. Todo lo demás persiste sólo en localStorage (`aurix_ws_*_v1` no viaja
-    // en el payload de sync), así que publicarlo prometería una permanencia que la
-    // arquitectura todavía no da. Los renderers y sus datos SIGUEN EXISTENTES e
-    // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
-    // reponerlos es volver a añadir su línea aquí.
-    // MONETIZATION V1 · M.02 B4 — la rejilla se DERIVA de `_WS_CATALOG`. El catálogo
-    // público ya no es una lista escrita a mano: es el filtro `_wsCatalogVisible`,
-    // que para un usuario normal sólo deja pasar `published:true`. El founder ve
-    // además el catálogo interno, por el mismo camino y con su etiqueta real.
-    const TOOL_RENDER = {
-      compound_growth:       { nameKey: 'wstool_compound_n',  viz: 'curve',   tool: 'compound' },
-      loan_simulation:       { nameKey: 'wsloan_n',           viz: 'donut',   tool: 'loan' },
-      scenario:              { nameKey: 'wsh_scenario_title', viz: 'compare', cta: 'scenario' },
-      goal:                  { nameKey: 'wsg_title',          viz: 'target',  cta: 'goals' },
-      financial_calc:        { nameKey: 'wstool_financial_n', viz: 'bars' },
-      investment_analyzer:   { nameKey: 'wstool_analyzer_n',  viz: 'donut' },
-      monthly_budget:        { nameKey: 'wstool_budget_n',    viz: 'bars',    tool: 'budget' },
-      real_estate_portfolio: { nameKey: 'wsre_n',             viz: 'donut',   tool: 'realestate' },
-      trade_journal:         { nameKey: 'wstool_journal_n',   viz: 'bars',    tool: 'journal' },
-      receivables:           { nameKey: 'wsapp_receivables_n', viz: 'bars',   tool: 'receivables' },
-      asset_prices:          { nameKey: 'wsapp_assets_n',     viz: 'bars',    tool: 'assets' },
-    };
-    const tools = _wsCatalogFor('tool').map(e => {
-      const r = TOOL_RENDER[e.id] || {};
-      const openAttr = r.tool
-        ? ` role="button" tabindex="0" data-wsh-cta="tool" data-wstool="${esc(r.tool)}"`
-        : (r.cta ? ` role="button" tabindex="0" data-wsh-cta="${esc(r.cta)}"` : '');
-      return {
-        id: e.id,
-        name: r.nameKey ? t(r.nameKey) : e.id,
-        viz: r.viz || 'bars',
-        open: openAttr,
-        // Sólo se fija/guarda lo publicado: no se promete permanencia de lo interno.
-        pinRef: (e.published && r.tool) ? ('tool:' + r.tool) : '',
-        soon: !openAttr,
-      };
-    });
-    const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
-    panel = `
-      <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
-        <div class="wsh-tool-grid wsh-toolbox${tools.length < 3 ? ' is-sparse' : ''}">
-          ${tools.map(tl => `
-            <div class="wsh-tool wsh-toolcard ${accent(tl.id)}${tl.soon ? ' is-soon' : ''}"${tl.open}>
-              ${tl.pinRef ? pinBtn(tl.pinRef) : ''}
-              <div class="wsh-toolcard-ic${_WS_TOOL_ASSET[tl.id] ? ' has-asset' : ''}">${_wsTplViz(tl.viz)}${_wsAssetImg(_WS_TOOL_ASSET[tl.id], '')}</div>
-              <p class="wsh-tool-name">${esc(tl.name)}</p>
-              <div class="wsh-toolcard-foot">
-                <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wsh_proj_open') + ' ›')}</span>
-                ${_wsTierChip(tl.id)}
-              </div>
+    // ── LA VISTA FUNDADOR EXPLÍCITA ──────────────────────────────────────────
+    // Aquí —y SÓLO aquí— vive el inventario interno, con su etiqueta y con el aviso
+    // de que no está publicado. `_wsCatalogInternal` falla cerrada sin el derecho y
+    // además no repite una superficie que ya tiene propietario publicado, así que
+    // Objetivos no vuelve a aparecer dos veces.
+    const secc = (kind, titleK) => {
+      const map = kind === 'template' ? _WS_TPL_RENDER : _WS_TOOL_RENDER;
+      const list = _wsCatalogInternal(kind).map(e => _wsCardModel(e, map[e.id] || {}));
+      if (!list.length) return '';
+      return `<section class="wsh-card wsh-internal-sec">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t(titleK))}</h3><span class="wsh-mse2-sub">${esc(t('wsh_internal_b'))}</span></header>
+        <div class="wsh-tool-grid wsh-toolbox" data-wsgrid-n="${list.length}">
+          ${list.map(m => `
+            <div class="wsh-tool wsh-toolcard is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
+              <div class="wsh-toolcard-ic">${_wsTplViz(m.viz)}</div>
+              <p class="wsh-tool-name">${esc(m.name)}</p>
+              <div class="wsh-toolcard-foot">${_wsCardFoot(m)}</div>
             </div>`).join('')}
         </div>
       </section>`;
+    };
+    panel = `<div class="wsh-internal" data-wsh-internal="1">${secc('template', 'wstab_templates')}${secc('tool', 'wstab_tools')}</div>`;
   }
 
+  // La identidad Premium: un acento discreto en el contenedor, una sola vez. No un
+  // badge por tarjeta —eso es lo que se retira— sino la señal de que esta cuenta
+  // tiene el espacio completo.
+  // La identidad Premium pasa por el helper canónico, no por `hasFeature` suelto:
+  // el render no puede tener su propia lectura del derecho (M11b).
+  const _prem = (function () { try { return hasAurixPremiumAccess() === true; } catch (_) { return false; } })();
   return `
-    <div class="aurix-wsh wsh-studio-root" data-wsh-view="home" data-wstab="${tab}">
+    <div class="aurix-wsh wsh-studio-root${_prem ? ' is-premium' : ''}" data-wsh-view="home" data-wstab="${tab}"${_prem ? ' data-ws-premium="1"' : ''}>
       ${tabsHtml}
       <div class="wsh-tabpanel">${panel}</div>
     </div>`;
@@ -22518,6 +22689,19 @@ function _ws4Summarize(type, inputs) { const c = _ws4Templates()[type].compute(i
 function _ws4OpenOrCreate(type) {
   const tmpl = _ws4Templates()[type];
   if (!tmpl) return;
+  // ── EL GATE QUE FALTABA, Y ERA LA SEXTA PUERTA ────────────────────────────
+  // §1 puso Objetivos, Escenarios y Proyección detrás de `_wsOpenSurface`, pero
+  // `cta:'workspace'` seguía abriendo la hoja legacy SIN comprobar nada: ni
+  // publicación ni derecho. No era alcanzable para un usuario normal porque las
+  // cuatro entradas son internas, pero SÍ lo era para la cuenta con vista de
+  // inventario y, sobre todo, para cualquiera con una referencia FIJADA antigua,
+  // porque `_wsPinOpen` cae aquí como último recurso. Un elemento fijado no puede
+  // conceder lo que el catálogo no publica.
+  const _acc4 = _wsWs4Access(type);
+  if (!_acc4.ok) {
+    if (_acc4.reason === 'entitlement') { try { openUpgradeIntent({ featureKey: _acc4.featureKey, source: 'workspace:ws4:' + type }); } catch (_) {} }
+    return;
+  }
   const existing = _ws4Projects().find(x => x && x.type === type);
   if (existing) {
     _ws4Draft = Object.assign({}, existing, { inputs: Object.assign({}, existing.inputs) });
@@ -23489,6 +23673,20 @@ function _renderWorkspaceFreeCover() {
       })
       .filter(Boolean);
   } catch (_) { freeItems = []; }
+  // ── LO QUE PREMIUM AÑADE SE LEE DEL CATÁLOGO, NO SE ESCRIBE AQUÍ ───────────
+  // Era una frase fija, y nombraba «seguimiento de precios» —una capacidad INTERNA—.
+  // Prometer en la portada de venta algo que el producto no publica es la forma más
+  // barata de mentir, y sobrevive a cualquier cambio de catálogo porque nadie
+  // vuelve a leer la cadena. Ahora la lista son las entradas PUBLICADAS de tier
+  // premium, con su nombre real: si algo deja de publicarse, desaparece de aquí.
+  let premItems = [];
+  try {
+    premItems = _WS_CATALOG
+      .filter(e => e.published === true && e.commercialTier === 'premium' && e.featureKey)
+      .map(e => { const r = _WS_TOOL_RENDER[e.id] || _WS_TPL_RENDER[e.id] || null;
+                  return (r && r.nameKey) ? t(r.nameKey) : null; })
+      .filter(Boolean);
+  } catch (_) { premItems = []; }
   const card = it => `
         <button type="button" class="wsfc-item" data-wsfc-open="${esc(it.surface)}">
           <span class="wsfc-item-ico" aria-hidden="true">${esc(tx('wsfc_ico_' + it.surface, '◈'))}</span>
@@ -23511,11 +23709,12 @@ function _renderWorkspaceFreeCover() {
         </div>
         <div class="wsfc-premium">
           <p class="wsfc-premium-label">${esc(tx('wsfc_premium_label', 'Con Premium'))}</p>
-          <p class="wsfc-premium-body">${esc(tx('wsfc_premium_body', ''))}</p>
+          <ul class="wsfc-premium-list" data-wsfc-premium="${premItems.length}">
+            ${premItems.map(n => `<li class="wsfc-premium-i">${esc(n)}</li>`).join('')}
+          </ul>
         </div>
         <div class="wsfc-cta-wrap">
           <button type="button" class="wsfc-cta" data-wsfc-upgrade="1">${esc(tx('wsfc_cta', ''))}</button>
-          <button type="button" class="wsfc-skip" data-wsfc-skip="1">${esc(tx('wsfc_skip', ''))}</button>
         </div>
       </section>
     </div>`;
@@ -23593,6 +23792,9 @@ function _wsToolOnInput(el) {
 
 function _wsToolSave() {
   if (!_wsToolInputs) return;
+  // Ni falla en silencio ni finge: el trabajo de la sesión sigue intacto en
+  // pantalla y lo que se abre es la explicación de qué añade Premium.
+  if (!_wsCanPersist()) return _wsPersistUpsell('tool:' + String(_wsToolActive || ''));
   const now = Date.now();
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
@@ -23674,6 +23876,16 @@ function _wsToolSaveBarHtml() {
   const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
   const canSave = !_wsToolEditId || _wsToolDirty;
   const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : _wsToolActive === 'receivables' ? t('wsrecv_save') : _wsToolActive === 'loan' ? t('wsloan_save') : _wsToolActive === 'assets' ? t('wsap_save') : t('wstool_save');
+  // ── SIN PLAN, EL BOTÓN LO DICE ANTES DE PULSARLO ────────────────────────────
+  // «Nunca presenta Abrir para después denegar en silencio» vale igual para
+  // Guardar. Una cuenta Free ve el mismo botón con su etiqueta Premium y su estado
+  // honesto —el cálculo está hecho y vivo, lo que falta es conservarlo—, y al
+  // pulsarlo llega la explicación, no un fallo.
+  if (!_wsCanPersist()) {
+    return `
+    <span class="wsg-savestate is-local">${esc(t('wstool_save_session'))}</span>
+    <button type="button" class="wsh-cta wsg-savebtn is-lock" data-wstool-save>${esc(saveLabel)}<span class="wsh-tier is-premium">${esc(t('wstier_premium'))}</span></button>`;
+  }
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
     <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
@@ -25481,6 +25693,15 @@ function renderWorkspace() {
   // lo que se gatea son las HERRAMIENTAS concretas (loan → workspace.loan), no la
   // sección. El preview compartido `_aurixPremiumPreviewHTML('workspace')` sigue
   // existiendo intacto y ya no es el camino de Workspace.
+
+  // ── LA PORTADA FREE ES DE UN SOLO USO, Y SI NO LO FUERA SERÍA UN MURO ─────
+  // Su único CTA va al paywall y sus dos tarjetas abren capacidades reales: no hay
+  // (ni debe haber) un tercer botón de «explorar». Con la vista recordada en
+  // `_wshView`, salir de la pestaña y volver repintaba la portada otra vez, así que
+  // un usuario Free que no quisiera ninguna de las dos cosas se quedaba encerrado.
+  // Al REENTRAR en la sección, la portada ya vista cede el paso al catálogo
+  // completo: se ve una vez por sesión, que es lo que la convierte en portada.
+  if (_wshView === 'free_cover' && _wsFreeCoverSeen) _wshView = 'home';
 
   // WS.1 — route to the new planning Home; legacy path below is preserved.
   if (AURIX_WS_HOME) { renderWorkspaceHome(container); return; }
@@ -58677,7 +58898,51 @@ function _aurixIntelligencePreviewFacts() {
   if (pick) out.facts.push({ kind: 'watch:' + pick.key, title: pick.title, text: pick.body });
 
   if (!out.facts.length) { out.state = 'none'; out.reason = 'no-qualifying-fact'; }
+  // §D — DOS VISIBLES Y UNO BLOQUEADO, Y EL BLOQUEADO ES REAL O NO EXISTE.
+  // La portada mostraba los TRES hechos enteros, así que enseñaba todo lo que
+  // Intelligence sabe decir y luego pedía pagar por verlo. El tercero pasa a estar
+  // bloqueado, pero sigue siendo un hecho REAL del motor: si el patrimonio del
+  // usuario no produce un tercero, NO se inventa uno —se enseña lo que hay—.
+  out.visible = out.facts.slice(0, 2);
+  out.locked = out.facts.length > 2 ? out.facts[2] : null;
   return out;
+}
+// El SUJETO de un hecho, sin su conclusión. Es lo que permite bloquear el tercero
+// sin revelarlo: se dice DE QUÉ habla, no qué dice. Deriva de la clase del hecho,
+// así que no hay ningún dato nuevo ni ninguna cifra en juego.
+// ── Y EL SUJETO NO PUEDE SER EL TÍTULO DEL HECHO ───────────────────────────
+// La primera versión devolvía `f.title` cuando existía, y para los hechos de
+// VIGILANCIA el título ES el juicio: «Liquidez reducida», «Diversificación
+// limitada», «Dependencia de activo principal». Es decir, el tercer hecho se
+// publicaba «bloqueado» mientras entregaba su conclusión cualitativa entera, que es
+// justo lo que §D prohíbe y lo contrario de lo que este bloque afirma hacer. No hay
+// cifras de por medio, pero la etiqueta no coincidía con la conducta.
+// Ahora el sujeto se deriva SIEMPRE de la clase del hecho: nombra el área, nunca su
+// lectura. Un área de vigilancia desconocida cae en el sujeto genérico.
+function _aurixIntPreviewSubject(f) {
+  const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : fb; } catch (_) { return fb; } };
+  if (!f) return '';
+  const k = String(f.kind || '');
+  if (k === 'concentration') return tx('intprev_subj_conc', 'Concentración');
+  if (k === 'liquidity') return tx('intprev_subj_liq', 'Liquidez');
+  if (k.indexOf('watch:') === 0) {
+    const area = k.slice(6);
+    const byArea = tx('intprev_subj_w_' + area, '');
+    if (byArea) return byArea;
+  }
+  return tx('intprev_subj_watch', 'Área de atención');
+}
+// La pregunta siguiente TIENE QUE SALIR DE LO QUE SE VE. Era una cadena fija sobre
+// «esta exposición» aunque el hecho visible hablara de liquidez: una pregunta que
+// no se refiere a nada de lo que el usuario acaba de leer no es un gancho, es ruido.
+function _aurixIntPreviewQuestion(visible) {
+  const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : fb; } catch (_) { return fb; } };
+  const first = (visible && visible[0]) || null;
+  const k = first ? String(first.kind || '') : '';
+  if (k === 'concentration') return tx('intprev_q_conc', '');
+  if (k === 'liquidity') return tx('intprev_q_liq', '');
+  if (k.indexOf('watch:') === 0) return tx('intprev_q_watch', '');
+  return tx('intprev_q', '');
 }
 
 function _aurixIntelligencePreviewHTML() {
@@ -58732,12 +58997,28 @@ function _aurixIntelligencePreviewHTML() {
     + '.intprev-cta{width:100%;font-size:14px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.10);border:1px solid rgba(120,170,255,0.34);border-radius:14px;height:46px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
     + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
     + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;flex:0 0 auto;margin-top:auto;}'
-    + '.intprev-cta--ghost{background:transparent;border-color:rgba(120,170,255,0.16);color:rgba(255,255,255,0.62);font-weight:600;}'
-    + '.intprev-cta--ghost:hover{background:rgba(255,255,255,0.04);border-color:rgba(120,170,255,0.28);color:rgba(255,255,255,0.85);}'
     + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
     + '.intprev-hold-body{flex:0 1 auto;min-height:0;overflow-y:auto;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
+    // §D — el tercer descubrimiento bloqueado. La barra redactada es DECORACIÓN
+    // (`aria-hidden`), no un texto difuminado: el bloqueo está en que la conclusión
+    // no se emite, así que quitar el filtro desde el inspector no revela nada.
+    + '.intprev-fact.is-locked{border-color:rgba(150,185,255,0.22);background:rgba(90,140,255,0.055);position:relative;align-items:center;gap:10px;}'
+    // El sujeto del tercero compite con la etiqueta de candado en la misma fila:
+    // a 360 px se recortaba a media palabra (medido, 84 px de texto en 73). La
+    // etiqueta cede primero y el sujeto envuelve; nada se corta.
+    + '.intprev-fact.is-locked .intprev-fact-body{flex:1 1 auto;min-width:0;}'
+    + '.intprev-fact.is-locked .intprev-fact-label{white-space:normal;overflow-wrap:anywhere;margin-bottom:6px;}'
+    + '.intprev-fact-dot.is-locked{background:rgba(150,185,255,0.5);box-shadow:none;}'
+    + '.intprev-redact{display:flex;flex-direction:column;gap:6px;margin-top:2px;filter:blur(2.5px);opacity:.55;}'
+    + '.intprev-redact i{display:block;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(190,215,255,0.55),rgba(190,215,255,0.16));}'
+    + '.intprev-redact i:nth-child(1){width:94%;}.intprev-redact i:nth-child(2){width:78%;}.intprev-redact i:nth-child(3){width:52%;}'
+    + '.intprev-lock-tag{flex:0 0 auto;align-self:center;font-size:11px;font-weight:700;letter-spacing:.04em;color:rgba(214,178,94,0.95);border:1px solid rgba(214,178,94,0.34);background:rgba(214,178,94,0.09);border-radius:999px;padding:3px 8px;white-space:nowrap;}'
+    // El escritorio RELAJA (mismo patron que el resto de esta hoja: base movil,
+    // `min-width` para lo demas). Nunca un `max-width`, que invertiria el contrato.
+    + '@media (min-width:768px){.intprev-lock-tag{padding:4px 10px;}.intprev-redact i{height:9px;}}'
+    + '@media (prefers-reduced-motion:reduce){.intprev-redact{filter:none;}}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-cta--ghost{min-width:0;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-premium{font-size:13.5px;margin:0 0 22px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
+    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-premium{font-size:13.5px;margin:0 0 22px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 
@@ -58748,18 +59029,22 @@ function _aurixIntelligencePreviewHTML() {
   // volver al Dashboard sigue ahí como salida secundaria, así que nadie queda
   // atrapado y esto no se convierte en una pared publicitaria. Sólo lo ve Free: la
   // superficie entera vive detrás de `hasFeature('intelligence.full')`.
+  // §D — UN SOLO CTA. El secundario mandaba al Dashboard justo después de leer
+  // hechos ciertos sobre el propio patrimonio: dos acciones compitiendo en el
+  // momento de máxima intención, y la que ganaba era la de irse. La salida no
+  // desaparece —la navegación inferior está siempre ahí— pero deja de ser un
+  // botón que compite con la única acción de esta superficie.
   const cta = '<div class="intprev-ctas">'
     + '<button type="button" class="intprev-cta" data-preview-event="preview_cta_premium"'
     +   ' data-premium-cta="intelligence.full" data-premium-source="intelligence-preview">'
     +   esc(tx('intprev_cta_full', 'Ver el análisis completo')) + '</button>'
-    + '<button type="button" class="intprev-cta intprev-cta--ghost" data-preview-event="preview_cta_click"'
-    +   ' onclick="try{switchTab(\'home\')}catch(_){}">' + esc(tx('intprev_cta', 'Volver al Dashboard'))
-    +   '</button>'
     + '</div>';
 
   let body;
-  if (res.state === 'ok' && res.facts.length) {
-    const items = res.facts.map(f => ''
+  const _visible = Array.isArray(res.visible) ? res.visible : (res.facts || []).slice(0, 2);
+  const _locked = res.locked || null;
+  if (res.state === 'ok' && _visible.length) {
+    const items = _visible.map(f => ''
       + '<li class="intprev-fact" data-preview-fact="' + esc(f.kind) + '">'
       +   '<span class="intprev-fact-dot" aria-hidden="true"></span>'
       +   '<span class="intprev-fact-body">'
@@ -58767,12 +59052,29 @@ function _aurixIntelligencePreviewHTML() {
       +     '<span class="intprev-fact-text">' + esc(f.text) + '</span>'
       +   '</span>'
       + '</li>').join('');
+    // ── EL TERCERO, BLOQUEADO DE VERDAD ──────────────────────────────────────
+    // El bloqueo NO puede ser sólo un `filter: blur`: un blur se desactiva desde el
+    // inspector y el texto sigue en el DOM, así que no bloquea nada —decora—. Aquí
+    // la conclusión NO SE EMITE: se manda el SUJETO (de qué habla) y una barra
+    // redactada decorativa. Ni el inspector ni un lector de pantalla pueden leer lo
+    // que no se ha enviado, y la etiqueta accesible dice exactamente qué falta.
+    const lockedHtml = _locked ? ''
+      + '<li class="intprev-fact is-locked" data-preview-fact="locked"'
+      +   ' data-preview-locked="' + esc(_locked.kind) + '"'
+      +   ' aria-label="' + esc(_aurixIntPreviewSubject(_locked) + ' — ' + tx('intprev_locked_aria', 'Disponible con Premium')) + '">'
+      +   '<span class="intprev-fact-dot is-locked" aria-hidden="true"></span>'
+      +   '<span class="intprev-fact-body">'
+      +     '<span class="intprev-fact-label">' + esc(_aurixIntPreviewSubject(_locked)) + '</span>'
+      +     '<span class="intprev-redact" aria-hidden="true"><i></i><i></i><i></i></span>'
+      +   '</span>'
+      +   '<span class="intprev-lock-tag">' + esc(tx('intprev_locked_tag', 'Disponible con Premium')) + '</span>'
+      + '</li>' : '';
     body = ''
       + '<h2 class="intprev-title">' + esc(tx('intprev_title', 'Esto es lo que Aurix ya entiende de tu patrimonio')) + '</h2>'
-      + '<ul class="intprev-facts">' + items + '</ul>'
+      + '<ul class="intprev-facts">' + items + lockedHtml + '</ul>'
       + '<div class="intprev-sep" aria-hidden="true"></div>'
       + '<p class="intprev-q-label">' + esc(tx('intprev_q_label', 'La pregunta siguiente')) + '</p>'
-      + '<p class="intprev-q">' + esc(tx('intprev_q', '¿Cómo ha cambiado esta exposición en el tiempo?')) + '</p>'
+      + '<p class="intprev-q">' + esc(_aurixIntPreviewQuestion(_visible)) + '</p>'
       + '<p class="intprev-premium">' + esc(tx('intprev_premium', '')) + '</p>'
       + cta;
   } else {
@@ -58788,7 +59090,8 @@ function _aurixIntelligencePreviewHTML() {
     + '<div class="intprev-stage" data-aurix-preview="intelligence"'
     +   ' data-preview-event="intelligence_preview_view"'
     +   ' data-preview-state="' + esc(res.state) + '"'
-    +   ' data-preview-facts="' + res.facts.length + '">' + style
+    +   ' data-preview-facts="' + _visible.length + '"'
+    +   ' data-preview-locked="' + (_locked ? '1' : '0') + '">' + style
     +   '<section class="intprev-card" role="region" aria-label="' + esc(tx('intprev_badge', 'Intelligence')) + '">'
     +     '<div class="intprev-badge">' + esc(tx('intprev_badge', 'Intelligence')) + '</div>'
     +     body
@@ -72570,9 +72873,32 @@ function planStatus() { return getPlan().status || 'active'; }
 // otras tres: NINGÚN plan la concede —sus dos filas de `plan_features` están en
 // false— así que sólo puede llegar por un override explícito. No se vende, y un
 // Premium de pago no la tiene: vería producto sin terminar.
-const _AURIX_ENT_CANON = Object.freeze([
-  'workspace.loan', 'intelligence.full', 'premium.settings', 'workspace.catalog_preview',
+// ── LAS CLAVES QUE EL CLIENTE ACEPTA, Y POR QUE SE DERIVAN ──────────────────
+// ESTO FUE UN P0 REAL Y LO INTRODUJE YO. Esta lista era LITERAL y tenia cuatro
+// claves. El bucle de abajo copia `row.features[k]` SOLO para las claves de esta
+// lista, asi que una clave que el servidor SI concede pero que aqui no figura se
+// cae en silencio y `hasFeature` devuelve false. Al publicar las cinco
+// capacidades Premium de Workspace (`plan_features` aplicado, diez filas
+// verificadas) el catalogo empezo a ofrecerlas y el cliente las negaba: la cuenta
+// Premium veia Presupuesto y no podia entrar. El resolver estaba bien, la base de
+// datos estaba bien, y el gate mentia.
+//
+// Asi que deja de ser una lista que hay que acordarse de ampliar: las claves de
+// producto se DERIVAN del catalogo, que es la unica fuente de que capacidad existe
+// y cual es su derecho. Publicar una entrada nueva fluye hasta aqui sin tocar nada.
+// Las claves que NO son de Workspace se declaran a mano porque no tienen entrada de
+// catalogo: son transversales.
+const _AURIX_ENT_CANON_EXTRA = Object.freeze([
+  'intelligence.full',            // toda la seccion Intelligence
+  'premium.settings',             // gestion del plan
+  'workspace.catalog_preview',    // vista de inventario interno (solo founder)
 ]);
+const _AURIX_ENT_CANON = Object.freeze(
+  Array.from(new Set(
+    _WS_CATALOG.map(e => e.featureKey).filter(k => typeof k === 'string' && k)
+      .concat(_AURIX_ENT_CANON_EXTRA)
+  ))
+);
 const _AURIX_ENT_TTL_MS = 5 * 60 * 1000;   // revalidación perezosa; NUNCA autoridad en sí
 let _aurixEnt = {
   loaded: false, loading: false, error: null,
@@ -73961,6 +74287,24 @@ const FEATURE_LABELS = {
   'workspace.loan':       { i18nKey: 'wsloan_n' },
   'intelligence.full':    { es: 'Aurix Intelligence',      en: 'Aurix Intelligence' },
   'premium.settings':     { es: 'Gestión de tu plan',      en: 'Plan management' },
+  // WORKSPACE COMPLETION · las cinco capacidades publicadas. Sin su etiqueta, el
+  // ÚNICO punto de conversión del producto le enseñaba al usuario la clave cruda
+  // («workspace.budget») como nombre de la función que quiere comprar. Todas
+  // delegan en el diccionario para que el modal diga EXACTAMENTE lo que dice la
+  // tarjeta desde la que se llega.
+  'workspace.budget':      { i18nKey: 'wstool_budget_n' },
+  'workspace.receivables': { i18nKey: 'wsapp_receivables_n' },
+  'workspace.journal':     { i18nKey: 'wstool_journal_n' },
+  'workspace.goals':       { i18nKey: 'wsg_title' },
+  'workspace.scenarios':   { i18nKey: 'wsh_scenario_title' },
+  // CLAVE DE ETIQUETA, NO DE GATE. `_wsCanPersist` pregunta por el PLAN; esto sólo
+  // existe para que el paywall diga «Guardar tu trabajo» en vez de una clave cruda.
+  // No está en `plan_features` ni en `_AURIX_ENT_CANON`, así que ningún
+  // `hasFeature` puede depender de ella por accidente.
+  'workspace.documents':   { es: 'Guardar tu trabajo',         en: 'Saving your work' },
+  // Igual que la anterior: ETIQUETA, no gate. La portada Free ofrece el Workspace
+  // entero, no una capacidad suelta, y el paywall tiene que poder nombrarlo.
+  'workspace.full':        { es: 'Workspace completo',         en: 'The full Workspace' },
 };
 // Display order for the Founder "Incluye" list (matches the product framing).
 const FOUNDER_BENEFIT_ORDER = [
@@ -74034,6 +74378,12 @@ function _aurixRecordUpgradeIntent(featureKey, source) {
   return entry;
 }
 try { if (typeof window !== 'undefined') window._aurixRecordUpgradeIntent = _aurixRecordUpgradeIntent; } catch (_) {}
+// El ÚNICO punto de conversión, expuesto para poder VERIFICARLO desde fuera. No
+// concede nada —abre el overlay y nombra la función— y la sonda multi-viewport lo
+// necesita para comprobar que los CTA de las dos portadas y las tarjetas
+// bloqueadas llegan al paywall por el camino real del producto y no por uno
+// simulado. No hay escritor de tier ni de entitlement aquí: eso sigue retirado.
+try { if (typeof window !== 'undefined') window.openUpgradeIntent = openUpgradeIntent; } catch (_) {}
 function openUpgradeIntent(opts) {
   const featureKey = String((opts && opts.featureKey) || '').trim();
   const source     = String((opts && opts.source) || 'unknown').trim();

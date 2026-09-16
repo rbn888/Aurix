@@ -58,14 +58,23 @@ function makeApi(overrides) {
     const supabaseClient = __client;
     const _aurixActiveUserId = __uid;
   `;
-  const body = shim + '\n' + ENT_BLOCK + '\n' +
+  // EL CATÁLOGO VA PRIMERO, y es consecuencia del arreglo del P0: desde la SPEC de
+  // cierre `_AURIX_ENT_CANON` se DERIVA de `_WS_CATALOG` (era un literal de cuatro
+  // claves y las cinco capacidades publicadas se caían en silencio del mapa de
+  // features). Montarlo después dejaba el catálogo en zona muerta temporal.
+  const body = shim + '\n' +
+    slice('const _WS_CATALOG = Object.freeze([', 'function _wsCatalogEntry') + '\n' +
+    slice('const _WS_TOOLKEY_TO_ID', 'function _wsToolFeatureKey') + '\n' +
+    ENT_BLOCK + '\n' +
     fnSource('_wsCatalogEntry') + '\n' + fnSource('_wsToolFeatureKey') + '\n' +
     fnSource('_wsCatalogVisible') + '\n' + fnSource('_wsCatalogFor') + '\n' +
+    fnSource('_aurixEntIsCatalogPreview') + '\n' +
+    fnSource('_wsCatalogSurfaceKey') + '\n' + fnSource('_wsEntrySurfaceKey') + '\n' +
+    fnSource('_wsCatalogInternal') + '\n' + fnSource('_wsEntryOpenable') + '\n' +
+    fnSource('_wsWs4Access') + '\n' +
     fnSource('_wsToolAccess') + '\n' +
     fnSource('_wsCommercialLabel') + '\n' + fnSource('_wsCommercialTierClass') + '\n' +
     fnSource('_wsMseToolPreview') + '\n' +
-    slice('const _WS_CATALOG = Object.freeze([', 'function _wsCatalogEntry') + '\n' +
-    slice('const _WS_TOOLKEY_TO_ID', 'function _wsToolFeatureKey') + '\n' +
     // el owner declara su estado en módulo: se trae tal cual, no se recrea
     slice("const _AURIX_UPGRADE_INTENT_KEY", 'function openUpgradeIntent') + '\n' +
     fnSource('openUpgradeIntent') + '\n' + fnSource('requireFeature') + '\n' +
@@ -73,7 +82,7 @@ function makeApi(overrides) {
       hasFeature, _aurixEntitlementsLoad, _aurixEntIsCatalogPreview, _aurixEntLoaded,
       _aurixEntReset, _wsCatalogFor, _wsCatalogVisible, _wsCommercialLabel,
       _wsCommercialTierClass, _wsToolFeatureKey, _wsCatalogEntry, _wsMseToolPreview, _wsToolAccess,
-      _wsSurfaceEntry,
+      _wsSurfaceEntry, _wsCatalogInternal, _wsEntryOpenable, _wsWs4Access,
       openUpgradeIntent, requireFeature, _WS_CATALOG,
       state: () => _aurixEnt, setState: (s) => { _aurixEnt = s; },
     };`;
@@ -112,7 +121,15 @@ ok('A.4 el estado cliente sale de la RPC del resolver, no de un cálculo local',
 ok('A.5 ENFORCE_ENTITLEMENTS ya NO puede conceder nada (hasFeature no lo lee)',
   !/ENFORCE_ENTITLEMENTS/.test(stripComments(fnSource('hasFeature'))));
 ok('A.6 sólo se aceptan las claves canónicas declaradas',
-  /'workspace\.loan', 'intelligence\.full', 'premium\.settings', 'workspace\.catalog_preview',/.test(ENT_CODE));
+  // RE-DECIDIDO · SPEC DE CIERRE. El conjunto era un LITERAL de cuatro claves y el
+  // bucle de carga copia `row.features[k]` sólo para las claves de esa lista: al
+  // publicar las cinco capacidades Premium, `hasFeature('workspace.budget')` daba
+  // false para TODA cuenta premium. El catálogo ofrecía Presupuesto y el gate lo
+  // negaba, con `plan_features` correcto y el resolver correcto.
+  // Ahora se DERIVA del catálogo, así que lo que se ancla es eso —que se derive— y
+  // que las claves transversales sigan declaradas.
+  /_AURIX_ENT_CANON = Object\.freeze\(\s*Array\.from\(new Set\(\s*_WS_CATALOG\.map\(e => e\.featureKey\)/.test(ENT_CODE) &&
+  /'intelligence\.full',[\s\S]{0,120}'premium\.settings',[\s\S]{0,140}'workspace\.catalog_preview',/.test(ENT_BLOCK));
 ok('A.6b `workspace.catalog_preview` no la concede NINGÚN plan (no se vende)',
   (() => { const sql = read('db/monetization_catalog_preview_key_1.sql');
     return /\('free',\s*'workspace\.catalog_preview', false\)/.test(sql) &&
@@ -265,11 +282,21 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('C.11 FOUNDER · el acceso viene de override', fdr.state().sources['intelligence.full'] === 'override');
   ok('C.12 FOUNDER · tiene las features', fdr.hasFeature('workspace.loan') && fdr.hasFeature('intelligence.full'));
   ok('C.13 FOUNDER · ve el catálogo interno', fdr._aurixEntIsCatalogPreview() === true);
-  ok('C.14 FOUNDER · ve TODAS las herramientas existentes',
-    fdr._wsCatalogFor('tool').length === fdr._WS_CATALOG.filter(e => e.kind === 'tool').length &&
-    fdr._wsCatalogFor('tool').length === 11, 've ' + fdr._wsCatalogFor('tool').length);
-  ok('C.15 FOUNDER · ve TODAS las plantillas existentes',
-    fdr._wsCatalogFor('template').length === 12, 've ' + fdr._wsCatalogFor('template').length);
+  // RE-DECIDIDO · SPEC DE CIERRE. `_wsCatalogFor` YA NO devuelve el inventario al
+  // founder: la visibilidad de catálogo es sólo publicación. Mezclar el inventario
+  // con el producto en la cuenta que ADEMÁS es la de QA Premium le impedía ver lo
+  // que ve un cliente, y traía «Próximamente», Objetivos duplicado y rutas legacy
+  // sin gate. El inventario vive ahora en `_wsCatalogInternal`, que falla cerrada.
+  ok('C.14 FOUNDER · su catálogo público es el MISMO que el de cualquiera',
+    fdr._wsCatalogFor('tool').length === free._wsCatalogFor('tool').length &&
+    fdr._wsCatalogFor('tool').length === 3, 've ' + fdr._wsCatalogFor('tool').length);
+  ok('C.15 FOUNDER · y sus plantillas públicas también, ni una más',
+    fdr._wsCatalogFor('template').length === free._wsCatalogFor('template').length &&
+    fdr._wsCatalogFor('template').length === 5, 've ' + fdr._wsCatalogFor('template').length);
+  ok('C.15b …pero SIGUE pudiendo evaluar el inventario, por un owner explícito',
+    fdr._wsCatalogInternal('tool').length > 0 && fdr._wsCatalogInternal('template').length > 0 &&
+    free._wsCatalogInternal('tool').length === 0 && free._wsCatalogInternal('template').length === 0,
+    JSON.stringify([fdr._wsCatalogInternal('tool').length, fdr._wsCatalogInternal('template').length]));
   ok('C.16 un premium de pago NO ve lo interno aunque tenga las features',
     prem._aurixEntIsCatalogPreview() === false && prem._wsCatalogFor('tool').length === N_PUB_TOOLS);
   // El escenario de la revisión de seguridad: soporte compensa con las TRES
@@ -373,7 +400,18 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     hidden.every(e => free._wsCatalogVisible(e) === false));
   ok('E.3 el mismo cero para un premium de pago', hidden.every(e => prem._wsCatalogVisible(e) === false));
   ok('E.4 el founder las ve TODAS, y sólo por el camino de catálogo interno',
-    hidden.every(e => fdr._wsCatalogVisible(e) === true));
+    // El camino ya no es `_wsCatalogVisible` (que ahora sólo mira publicación) sino
+    // `_wsCatalogInternal`, y lo que vale es que el inventario siga siendo
+    // evaluable Y que ningún usuario externo pueda alcanzarlo.
+    (() => {
+      const seen = fdr._wsCatalogInternal('tool').concat(fdr._wsCatalogInternal('template')).map(e => e.id);
+      // La regla del owner descarta las que DUPLICAN una superficie ya publicada
+      // (Objetivos era la que se veía dos veces), así que se exige el resto.
+      const dupes = ['goal','monthly_budget','trade_journal','receivables','real_estate_portfolio','tpl_scenario'];
+      const expected = hidden.map(e => e.id).filter(id => dupes.indexOf(id) === -1);
+      return expected.length > 0 && expected.every(id => seen.indexOf(id) !== -1)
+        && hidden.every(e => free._wsCatalogVisible(e) === false && fdr._wsCatalogVisible(e) === false);
+    })());
   ok('E.5 el catálogo público NO se construye filtrando el del founder: hay un único filtro',
     /function _wsCatalogFor\(kind\) \{\s*return _WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\);/.test(app.replace(/\n\s*/g, ' ').replace(/ +/g, ' ')) ||
     /_WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\)/.test(app));
@@ -399,10 +437,10 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
         && a.featureKey === 'workspace.budget'; })(),
     JSON.stringify(free._wsToolAccess('budget')));
   ok('E.8 §18 la publicación se comprueba ANTES del entitlement (pregunta distinta)',
-    // M.03 A — el predicado pasa de `entry && !visible` a `!entry || !visible`: la
-    // AUSENCIA de entrada también deniega. El orden, que es lo que este assert
-    // protege, no cambia.
-    /if \(!entry \|\| !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fnSource('_wsToolAccess')) &&
+    // El predicado de APERTURA se separó del de visibilidad de catálogo
+    // (`_wsEntryOpenable`): son dos preguntas y mezclarlas fue el defecto. El
+    // ORDEN, que es lo que este assert protege, no cambia.
+    /if \(!entry \|\| !_wsEntryOpenable\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fnSource('_wsToolAccess')) &&
     fnSource('_wsToolAccess').indexOf("reason: 'unpublished'") < fnSource('_wsToolAccess').indexOf("reason: 'entitlement'"));
   ok('E.9 §18 sólo se ofrece upgrade cuando la razón ES comercial',
     /if \(_acc\.reason === 'entitlement'\) openUpgradeIntent\(/.test(fnSource('_wsOpenTool')));
@@ -541,35 +579,49 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     // invariante que este assert protege —ninguna lista de tarjetas fuera del
     // catálogo— sale REFORZADO, no relajado: eran cuatro vistas y sólo tres
     // derivaban.
-    ok('E.12 §18 las CUATRO vistas derivan del catálogo, y no hay una quinta lista',
-      (home.match(/_wsCatalogFor\(/g) || []).length === 4 &&
-      (app.match(/_wsCatalogFor\(/g) || []).length === 5,
-      'home=' + (home.match(/_wsCatalogFor\(/g) || []).length + ' app=' + (app.match(/_wsCatalogFor\(/g) || []).length);
+    // RE-DECIDIDO: el render tiene ahora CUATRO consumidores del catálogo —las dos
+    // columnas de Mi Espacio (por `colItems`), la galería/rejilla (por `kind`) y la
+    // vista interna— y todos pasan por `_wsCatalogFor` o `_wsCatalogInternal`. Lo
+    // que importa es que NO exista una quinta lista escrita a mano, que es lo que
+    // permitía que Mi Espacio se quedara congelado en el catálogo de LAUNCH-V1.
+    ok('E.12 §18 todas las vistas derivan del catálogo, y no hay una quinta lista',
+      (home.match(/_wsCatalogFor\(|_wsCatalogInternal\(/g) || []).length >= 3 &&
+      !/_MSE_TOOL_RENDER|_MSE_TPL_RENDER|const TPL_CAT = \[/.test(app),
+      'home=' + (home.match(/_wsCatalogFor\(|_wsCatalogInternal\(/g) || []).length);
     ok('E.13 §18 los emisores de apertura son exactamente los del catálogo',
-      (home.match(/data-wsh-cta="/g) || []).length === 4 &&
-      (home.match(/data-wstool="/g) || []).length === 3);
+      // Se emiten desde UN owner (`_wsCardAttrs`), así que hay una sola plantilla
+      // por clase de apertura en vez de una por rejilla.
+      (home.match(/data-wsh-cta="/g) || []).length === 3 &&
+      (home.match(/data-wstool="/g) || []).length === 1,
+      JSON.stringify([(home.match(/data-wsh-cta="/g) || []).length, (home.match(/data-wstool="/g) || []).length]));
     ok('E.14 §18 ningún `data-wstool` LITERAL: la identidad sale siempre del catálogo',
       (home.match(/data-wstool="[a-z_]+"/g) || []).length === 0,
       String(home.match(/data-wstool="[a-z_]+"/g) || []));
-    ok('E.15 §18 el único `data-wsh-cta` literal es la CLASE "tool", no una identidad',
-      (() => { const vals = [...new Set([...home.matchAll(/data-wsh-cta="([a-z_]+)"/g)].map(m => m[1]))];
-        return vals.length === 1 && vals[0] === 'tool'; })(),
+    ok('E.15 §18 los `data-wsh-cta` literales son CLASES de apertura, no identidades',
+      (() => { const vals = [...new Set([...home.matchAll(/data-wsh-cta="([a-z_]+)"/g)].map(m => m[1]))].sort();
+        return JSON.stringify(vals) === JSON.stringify(['tool', 'workspace']); })(),
       String([...new Set([...home.matchAll(/data-wsh-cta="([a-z_]+)"/g)].map(m => m[1]))]));
     // Un renderer huérfano que el catálogo no conozca queda cazado aquí.
     const ids = new Set(free._WS_CATALOG.map(e => e.id));
+    // Los mapas son ahora constantes de MÓDULO (`_WS_TOOL_RENDER` / `_WS_TPL_RENDER`)
+    // y sus claves van con dos espacios de sangría, no con seis. Antes vivían dentro
+    // de `_renderWorkspaceHome` y había ADEMÁS una tercera y una cuarta copia
+    // reducidas para Mi Espacio, congeladas en el catálogo de LAUNCH-V1: por eso Mi
+    // Espacio no podía contener nunca las capacidades publicadas después. Dos mapas
+    // menos que mantener es el arreglo, y que ya no existan se ancla abajo.
     const mapKeys = (block) => {
-      const i = app.indexOf('const ' + block + ' = {'); if (i < 0) return null;
-      const body = app.slice(i, app.indexOf('};', i));
-      return [...body.matchAll(/\n\s{6}([\w]+):\s*\{/g)].map(m => m[1]);
+      const i = app.indexOf('const ' + block + ' = Object.freeze({'); if (i < 0) return null;
+      const body = app.slice(i, app.indexOf('});', i));
+      return [...body.matchAll(/\n\s{2}([\w]+):\s*\{/g)].map(m => m[1]);
     };
-    const TR = mapKeys('TOOL_RENDER'), PR = mapKeys('TPL_RENDER'), MR = mapKeys('_MSE_TOOL_RENDER');
-    // M.03 A — `_MSE_TPL_RENDER` entra en el mismo assert: es el cuarto mapa de
-    // renderers y quedaba fuera de la cobertura.
-    const MP = mapKeys('_MSE_TPL_RENDER');
+    const TR = mapKeys('_WS_TOOL_RENDER'), PR = mapKeys('_WS_TPL_RENDER');
     ok('E.16 §18 todo renderer declarado pertenece al catálogo (nada huérfano)',
-      TR && PR && MR && MP && TR.length === 11 && PR.length === 12 && MR.length === 2 && MP.length === 1 &&
-      [...TR, ...PR, ...MR, ...MP].every(k => ids.has(k)),
-      'huérfanos: ' + [...(TR || []), ...(PR || []), ...(MR || []), ...(MP || [])].filter(k => !ids.has(k)));
+      // Los dos mapas salieron de la función y son constantes de módulo; la tercera
+      // y cuarta copia (las de Mi Espacio) dejaron de existir, que es el arreglo.
+      TR && PR && TR.length === 11 && PR.length === 12 &&
+      [...TR, ...PR].every(k => ids.has(k)) &&
+      !/_MSE_TOOL_RENDER|_MSE_TPL_RENDER/.test(app),
+      'huérfanos: ' + [...(TR || []), ...(PR || [])].filter(k => !ids.has(k)));
     // RE-DECIDIDO (§1): `keys.length === 7` fosilizaba el inventario de M.02. El
     // mapa tiene ahora también las superficies que NO pasan por `_wsOpenTool`
     // (Objetivos, Escenarios, Proyección), que antes se abrían asignando `_wshView`
@@ -597,11 +649,16 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     /if \(_aurixEntLoaded\(\)\) _aurixUpgradeIntents\.push\(entry\);/.test(app) &&
     /if \(!_aurixEntLoaded\(\)\) throw new Error\('not-loaded'\);/.test(app));
   ok('G.5d una plantilla interna no se puede FIJAR (el guard que sí tenían las tools)',
-    /\$\{\(soon \|\| it\.internal\) \? '' : pinBtn\(it\.ref\)\}/.test(app) &&
-    /internal: e\.published !== true/.test(app));
-  ok('G.5e con menos de 3 herramientas la rejilla deja de pintar columnas fijas',
-    /wsh-toolbox\$\{tools\.length < 3 \? ' is-sparse' : ''\}/.test(app) &&
-    /\.wsh-toolbox\.is-sparse\s*\{[^}]*auto-fit/.test(css));
+    // Ahora es UNA regla para los dos mapas: sólo se fija lo publicado Y abrible.
+    /pinRef: \(entry\.published === true && acc\.ok\) \? _wsCanonRef\(openKind, openArg\) : '',/.test(app) &&
+    /\$\{m\.pinRef \? pinBtn\(m\.pinRef\) : ''\}/.test(app));
+  ok('G.5e la rejilla nunca pinta columnas fijas que dejen una fila a medias',
+    // `is-sparse` era un caso especial para «menos de 3». Con 5 y 8 tarjetas el
+    // problema es el mismo, así que el recuento viaja en `data-wsgrid-n` y el
+    // reparto es `auto-fit` en todos los casos.
+    /data-wsgrid-n="\$\{items\.length\}"/.test(app) &&
+    /\.wsh-tool-grid\[data-wsgrid-n\] \{ grid-template-columns: repeat\(auto-fit/.test(css) &&
+    /\.wsh-tpl-grid\[data-wsgrid-n\]  \{ grid-template-columns: repeat\(auto-fit/.test(css));
   ok('G.5f el chip del catálogo interno tiene regla propia y NO usa alfa blanco',
     /\.wsh-tier\.is-preview\s*\{[^}]*color:\s*rgba\(/.test(css) &&
     !/\.wsh-tier\.is-preview\s*\{[^}]*rgba\(255,\s*255,\s*255/.test(css));
@@ -724,7 +781,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       /const entry = _wsSurfaceEntry\(toolKey\);/.test(fnSource('_wsToolAccess')) &&
       (fnSource('_wsToolAccess').match(/hasFeature\(/g) || []).length === 1);
     ok('M3.7 la columna "Mis plantillas" de Mi Espacio se DERIVA del catálogo',
-      /_wsCatalogFor\('template'\)\s*[\r\n]\s*\.filter\(e => _MSE_TPL_RENDER\[e\.id\]\)/.test(app) &&
+      /_wsCatalogFor\(kind\)\s*[\r\n]\s*\.filter\(e => map\[e\.id\]\)/.test(app) &&
+      /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
       !/const TPL_CAT = \[\];/.test(app));
     ok('M3.8 el cover reutiliza un asset YA existente de esa plantilla (no se añade ninguno)',
       /realestate:\s+'realestate_apartment'/.test(app) &&
@@ -740,15 +798,26 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     ok('M3.11 la permanencia local se DECLARA en la plantilla, en los dos idiomas',
       (app.match(/wsre_local_note:/g) || []).length === 2 &&
       /wsre_local_note/.test(fnSource('_renderRealEstateTool')));
-    ok('M3.12 con menos de 3 tarjetas la galería deja de pintar columnas fijas',
-      /wsh-gallery\$\{gallery\.length < 3 \? ' is-sparse' : ''\}/.test(app) &&
-      /\.wsh-gallery\.is-sparse\s*\{[^}]*auto-fit/.test(css));
-    ok('M3.13 Mi Espacio distingue lo USADO de lo GUARDADO',
-      /used: r > 0, saved: p > 0/.test(app) &&
-      (app.match(/wsmse2_saved:/g) || []).length === 2);
-    ok('M3.14 espacio vacío = UNA portada, no dos estados vacíos en paralelo',
-      /const _mseEmpty = !tplList\.length && !toolList\.length;/.test(app) &&
-      /wsh-mse2-blank/.test(app) && /\.wsh-mse2-blank/.test(css));
+    ok('M3.12 la galería no pinta columnas fijas con pocas tarjetas',
+      /data-wsgrid-n="\$\{items\.length\}"/.test(app) &&
+      /\.wsh-tpl-grid\[data-wsgrid-n="1"\], \.wsh-tpl-grid\[data-wsgrid-n="2"\]   \{ grid-template-columns: repeat\(auto-fit/.test(css));
+    ok('M3.13 Mi Espacio distingue lo USADO, lo GUARDADO y lo FIJADO',
+      // Y ahora son TRES señales, no dos: un documento guardado puebla su columna
+      // aunque no se haya abierto hoy, que es lo que se espera de un espacio de
+      // trabajo (antes Mi Espacio sólo sabía de aperturas en memoria).
+      /ref, used, pinned, savedCount: sv\.n, savedTs: sv\.ts,/.test(app) &&
+      (app.match(/wsmse2_saved:/g) || []).length === 2 &&
+      (app.match(/wsmse2_doc_one:/g) || []).length === 2);
+    // RE-DECIDIDO POR DECISIÓN DE PRODUCTO. «Espacio vacío = UNA portada» era la
+    // respuesta correcta a dos estados vacíos en paralelo, pero la SPEC de cierre
+    // pide lo contrario y con razón: las DOS columnas tienen que verse desde el
+    // primer viewport, también vacías, porque son el mapa del espacio. Lo que no
+    // puede pasar —y es lo que se ancla— es que se fabrique contenido para
+    // rellenarlas ni que se rompa la simetría.
+    ok('M3.14 espacio vacío = dos columnas simétricas y CERO contenido inventado',
+      /panel = `<div class="wsh-mse2" data-wsmse-cols="2"/.test(app) &&
+      !/_mseEmpty/.test(app) && !/wsh-mse2-blank/.test(app) &&
+      /\.wsh-mse2\[data-wsmse-cols="2"\] \{ align-items: stretch; \}/.test(css));
     ok('M3.15 paridad i18n de las claves nuevas de Workspace',
       ['wsmse2_saved', 'wsmse2_empty_t', 'wsmse2_empty_b', 'wsre_local_note']
         .every(k => (app.match(new RegExp('\\n\\s+' + k + ':', 'g')) || []).length === 2));

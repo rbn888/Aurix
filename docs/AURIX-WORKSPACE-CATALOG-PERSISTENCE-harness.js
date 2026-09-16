@@ -47,8 +47,11 @@ function catCtx(founder) {
   vm.createContext(sb);
   sb._aurixEntIsCatalogPreview = () => !!founder;
   sb.hasFeature = k => !!founder;
-  ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES'].forEach(n => vm.runInContext(konstSrc(n), sb));
-  ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor','_wsToolAccess']
+  ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WS4TYPE_TO_ID']
+    .forEach(n => vm.runInContext(konstSrc(n), sb));
+  ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',
+   '_wsCatalogSurfaceKey','_wsRenderSurface','_wsEntrySurfaceKey','_wsCatalogInternal',
+   '_wsEntryOpenable','_wsWs4Access','_wsToolAccess']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
@@ -134,8 +137,20 @@ const CAT = run('_WS_CATALOG', FREE);
   ok('1.7 un usuario normal NO ve ni una entrada interna',
     run('_wsCatalogFor("tool")', FREE).every(e => e.published === true)
     && run('_wsCatalogFor("template")', FREE).every(e => e.published === true));
-  ok('1.8 y el founder SÍ ve el inventario completo',
-    run('_wsCatalogFor("tool")', FOUNDER).length + run('_wsCatalogFor("template")', FOUNDER).length === CAT.length);
+  // RE-DECIDIDO · SPEC DE CIERRE. El inventario SALE del catálogo normal del
+  // founder: mezclarlo con el producto en la cuenta que ADEMÁS es la de QA Premium
+  // le impedía ver lo que ve un cliente, y arrastraba «Próximamente», Objetivos
+  // duplicado y rutas legacy sin gate. Sigue siendo evaluable, pero por un owner
+  // explícito que falla cerrado —y que además no repite una superficie ya
+  // publicada, que es lo que quitaba el duplicado—.
+  ok('1.8 el founder ve el MISMO catálogo público, y el inventario por un owner aparte',
+    run('_wsCatalogFor("tool")', FOUNDER).length === run('_wsCatalogFor("tool")', FREE).length
+    && run('_wsCatalogFor("template")', FOUNDER).length === run('_wsCatalogFor("template")', FREE).length
+    && run('_wsCatalogInternal("tool")', FOUNDER).length > 0
+    && run('_wsCatalogInternal("tool")', FREE).length === 0
+    && run('_wsCatalogInternal("template")', FREE).length === 0,
+    JSON.stringify([run('_wsCatalogFor("tool")', FOUNDER).length,
+                    run('_wsCatalogInternal("tool")', FOUNDER).length]));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -319,6 +334,10 @@ console.log('\n4 · Guardar, y decir la verdad sobre dónde:');
     vm.runInContext('function _wsSyncBadgeRefresh(){}', sb);
     vm.runInContext(fnSrc('_wsDocSyncSet'), sb);
     vm.runInContext(fnSrc('_wsDocErrPermanent'), sb);
+    // El plan decide si hay sincronización: sin él el push cae a 'local_only' y lo
+    // DICE. Aquí se prueba el comportamiento CON plan, que es el que discrimina
+    // permanente de transitorio; el caso sin plan se ejerce en §6 de ACCESS-TRUTH.
+    vm.runInContext('function _wsCanPersist(){ return true; }', sb);
     // `fnSrc` localiza por `function …(` y se dejaría fuera el `async`, que aquí
     // es parte del contrato: sin él el `await` del upsert no compila.
     vm.runInContext('async ' + fnSrc('_wsDocsPush'), sb);

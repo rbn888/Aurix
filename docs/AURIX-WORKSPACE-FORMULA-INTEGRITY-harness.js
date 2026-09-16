@@ -478,15 +478,25 @@ function catalog() {
   OK('L11 sólo está publicado el conjunto declarado, y el filtro de visibilidad es \u00daNICO',
      catalog().filter(e => e.published === true).map(e => e.id).sort().join(',') === PUBLISHED_IDS &&
      /return _WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\);/.test(app));
-  OK('L11b lo NO publicado s\u00f3lo es visible con cat\u00e1logo interno, y eso lo decide el servidor',
-     /if \(entry\.published === true\) return true;/.test(fn('_wsCatalogVisible')) &&
-     /return _aurixEntIsCatalogPreview\(\) === true;/.test(fn('_wsCatalogVisible')));
+  // RE-DECIDIDO · SPEC DE CIERRE. `_wsCatalogVisible` YA NO pregunta quién mira: la
+  // visibilidad de catálogo es sólo `published`. Dejaba pasar lo interno a la cuenta
+  // con `workspace.catalog_preview` —que es también la cuenta de QA Premium— y así
+  // el inventario y las tarjetas «Próximamente» se mezclaban con el producto, con
+  // Objetivos duplicado y rutas legacy sin gate. El inventario sigue evaluándose,
+  // pero por un owner SEPARADO que falla cerrado, y eso es lo que se ancla.
+  // (La conducta, ejercida con tres personas, en AURIX-WORKSPACE-ACCESS-TRUTH §2.)
+  OK('L11b la visibilidad de catálogo es sólo publicación; lo interno vive en un owner aparte',
+     /return !!entry && entry\.published === true;/.test(fn('_wsCatalogVisible')) &&
+     !/_aurixEntIsCatalogPreview/.test(fn('_wsCatalogVisible')) &&
+     /if \(_aurixEntIsCatalogPreview\(\) !== true\) return \[\];/.test(fn('_wsCatalogInternal')) &&
+     /return _aurixEntIsCatalogPreview\(\) === true;/.test(fn('_wsEntryOpenable')));
   OK('L11c y el owner de apertura bloquea lo no publicado (proyecto guardado incluido)',
-     // M.03 A — el predicado pasa a `!entry || !visible`: la AUSENCIA de entrada
-     // también deniega (`_wsSurfaceEntry` devuelve null a propósito si dos entradas
-     // publicadas se pelean por una superficie).
-     /if \(!entry \|\| !_wsCatalogVisible\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fn('_wsToolAccess')) &&
-     /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')));
+     // La autorización de APERTURA y la visibilidad de catálogo son dos preguntas
+     // distintas desde el cierre: `_wsEntryOpenable` es la de apertura.
+     /if \(!entry \|\| !_wsEntryOpenable\(entry\)\) return \{ ok: false, reason: 'unpublished'/.test(fn('_wsToolAccess')) &&
+     /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')) &&
+     // Y la SEXTA puerta, la única que quedaba sin gate: la hoja legacy.
+     /const _acc4 = _wsWs4Access\(type\);/.test(fn('_ws4OpenOrCreate')));
   OK('L12 s\u00ed est\u00e1n las autorizadas, y en el CAT\u00c1LOGO (no en un literal)',
      catalog().filter(e => e.published && e.kind === 'tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation,scenario' &&
      catalog().filter(e => e.published && e.kind === 'template').map(e => e.id).sort().join(',') === 'tpl_goals,tpl_journal,tpl_mbudget,tpl_realestate,tpl_receivables');
@@ -498,22 +508,35 @@ function catalog() {
   // `soon: !openAttr`. La regla que proteg\u00eda \u2014que nada PUBLICADO parezca
   // deshabilitado\u2014 se comprueba ahora sobre el cat\u00e1logo: toda entrada publicada
   // tiene ruta de apertura, luego `soon` es false para todas ellas.
+  // RE-DECIDIDO: los dos mapas de render salieron de dentro de la función y son
+  // constantes de módulo (antes había ADEMÁS una segunda copia reducida para Mi
+  // Espacio, congelada en el catálogo de LAUNCH-V1, y por eso Mi Espacio no podía
+  // contener nunca las capacidades nuevas). El invariante NO cambia: toda entrada
+  // publicada tiene ruta de apertura, y aquí se comprueba EJECUTANDO el resolvedor
+  // de ruta, no leyendo el cuerpo del render.
   OK('L14 nada PUBLICADO parece deshabilitado: todo lo publicado tiene ruta de apertura',
-     (() => { const pub = catalog().filter(e => e.published);
-       const home = fn('_renderWorkspaceHome');
-       // Una herramienta declara su apertura con `tool: '…'` en TOOL_RENDER; una
-       // plantilla, con `cta: 'tool', arg: '…'` en TPL_RENDER. Las dos formas
-       // valen; lo que no vale es una entrada publicada SIN ruta.
-       const opens = e => new RegExp(e.id + ":\\s*\\{[^}]*(tool: '|cta: ')").test(home);
-       return pub.length === 8 && pub.every(opens) && /soon: !openAttr/.test(home); })());
+     (() => {
+       const sb = { Math, Number, String, Object, Array, JSON };
+       vm.createContext(sb);
+       ['_WS_TOOL_RENDER', '_WS_TPL_RENDER'].forEach(n => vm.runInContext(konstSrc(n), sb));
+       vm.runInContext(fn('_wsRenderSurface'), sb);
+       const pub = catalog().filter(e => e.published);
+       const routeless = pub.filter(e => !vm.runInContext('_wsRenderSurface(' + JSON.stringify(e.id) + ')', sb));
+       return pub.length === 8 && routeless.length === 0;
+     })());
   // M.03 A — `TPL_CAT` ya no es un array vacío escrito a mano: se DERIVA del
   // catálogo con el mismo filtro de visibilidad que las herramientas. La garantía
   // es la misma y ahora es estructural: lo que no está publicado no puede entrar,
   // por uso previo ni por nada.
+  // RE-DECIDIDO: Mi Espacio ya no tiene catálogo propio. Deriva del MISMO mapa y
+  // pasa por el MISMO filtro, y además descarta lo que el usuario no puede abrir
+  // (`state === 'open'`), que es la garantía de verdad: ni lo interno ni lo que
+  // requiere plan pueden reaparecer por uso previo.
   OK('L15 Mi Espacio no puede resucitar una oculta por uso previo',
-     /const TPL_CAT = _wsCatalogFor\('template'\)\s*[\r\n]\s*\.filter\(e => _MSE_TPL_RENDER\[e\.id\]\)/.test(app) &&
-     !/const TPL_CAT = \[\];/.test(app) &&
-     !/\{ ref: 'tpl:scenario'[\s\S]{0,40}viz: 'compare'/.test(app));
+     /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
+     /const toolList = colItems\(_WS_TOOL_RENDER, 'tool'\);/.test(app) &&
+     /_wsCatalogFor\(kind\)\s*[\r\n]\s*\.filter\(e => map\[e\.id\]\)/.test(app) &&
+     /\.filter\(m => m\.state === 'open'\)/.test(app));
 
   // ── NADA BORRADO: los owners siguen vivos y dormidos ─────────────────────
   const KEPT = ['_renderBudgetTool', '_renderJournalTool', '_renderRealEstateTool',
@@ -527,20 +550,31 @@ function catalog() {
 
   // ── GLOBAL-POLISH-V1: lo que el fast-close final destapó ─────────────────
   const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
-  OK('G1 Mi Espacio no pinta una columna cuyo cat\u00e1logo est\u00e1 vac\u00edo',
-     /TPL_CAT\.length \? column\('wsmse2_tpl_title'/.test(app));
-  OK('G2 \u2026as\u00ed que el CTA a la pesta\u00f1a retirada s\u00f3lo vive dentro de esa rama condicional',
+  // ── RE-DECIDIDO POR DECISIÓN DE PRODUCTO, Y HAY QUE DECIRLO ──────────────
+  // G1–G3 fijaban la regla INVERSA: «si una columna no puede poblarse, NO se
+  // pinta». Era correcta cuando el catálogo público de plantillas estaba vacío. La
+  // SPEC de cierre decide lo contrario, y con razón: Mi Espacio es el inicio útil
+  // del usuario y sus DOS columnas tienen que verse desde el primer viewport a
+  // partir de 360 px. Con las dos columnas ya publicables, no pintar una dejaba
+  // media pantalla muerta; y el carrusel horizontal al 78 % de ancho que la
+  // sustituía en móvil mostraba media tarjeta cortada.
+  // Lo que G1–G3 protegían de verdad —cero enlaces muertos, cero huecos— sigue
+  // anclado, ahora sobre la estructura nueva.
+  OK('G1 Mi Espacio pinta SIEMPRE sus dos columnas, y con la misma jerarquía',
+     /const column = \(titleK, subK, list, previewFn, emptyArgs\) => `/.test(app) &&
+     /panel = `<div class="wsh-mse2" data-wsmse-cols="2"/.test(app) &&
+     !/_mseEmpty/.test(app) && !/wsh-mse2-blank/.test(app));
+  OK('G2 el estado vacío de cada columna apunta a una pestaña que EXISTE',
      (() => {
-       // M.03 A — la rejilla arranca ahora con la rama del espacio VACÍO
-       // (`_mseEmpty ? [...] : [...]`), así que el ancla es el operador, no `= [`.
-       const m = /const _mseCols = _mseEmpty \? \[([\s\S]*?)\n    \];/.exec(app);
-       if (!m) return false;
-       const tplLine = m[1].split('\n').find(l => l.includes("'templates'") && l.includes('column('));
-       return !!tplLine && tplLine.includes('TPL_CAT.length ?');
+       const tabs = konstSrc('_WS_TABS');
+       const targets = (app.match(/'wsmse2_\w+_empty_cta', '(\w+)'\]/g) || [])
+         .map(x => /'(\w+)'\]$/.exec(x)[1]);
+       return targets.length === 2 && targets.every(k => tabs.indexOf("'" + k + "'") !== -1);
      })());
-  OK('G3 con una sola columna la rejilla no deja hueco del 50%',
-     /\.wsh-mse2\.is-single\{ grid-template-columns:1fr; \}/.test(css) &&
-     /is-single/.test(app));
+  OK('G3 la rejilla no deja hueco: dos columnas reales en todo viewport, sin carrusel',
+     /\.wsh-mse2\[data-wsmse-cols="2"\] \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); gap: 14px; \}/.test(css) &&
+     /\.wsh-mse2\[data-wsmse-cols="2"\] \.wsh-mse2-list \{\s*flex-direction: column;/.test(css) &&
+     /\.wsh-mse2\[data-wsmse-cols="2"\] \{ align-items: stretch; \}/.test(css));
   OK('G4 las superficies de las DOS herramientas p\u00fablicas no usan alfa BLANCO (gris gen\u00e9rico)',
      !/\.wsh-tool \{[^}]*background: rgba\(255,255,255/.test(css) &&
      !/\.wsh-toolcard \{[^}]*background: rgba\(255,255,255/.test(css) &&
@@ -566,14 +600,23 @@ function catalog() {
   console.log('\nMONETIZATION-V1 \u00b7 M.01B \u2014 superficie de monetizaci\u00f3n:');
 
   const tabsSrc = /const TABS = \[[\s\S]*?\];/.exec(app);
-  OK('M1 las TRES secciones estructurales est\u00e1n en la barra de Workspace',
-     !!tabsSrc && /'space'/.test(tabsSrc[0]) && /'templates'/.test(tabsSrc[0]) && /'tools'/.test(tabsSrc[0]),
-     tabsSrc ? tabsSrc[0] : 'TABS no encontrado');
+  // RE-DECIDIDO: `TABS` se DERIVA de `_WS_TABS`, el predicado único de pestaña
+  // válida. Estaba escrito como una disyunción literal en CUATRO sitios, y añadir la
+  // vista de inventario habría exigido acordarse de los cuatro; el que se olvidara
+  // devolvería al usuario a otra pestaña de la que salió.
+  OK('M1 las TRES secciones estructurales están en la barra de Workspace',
+     (() => { const k = konstSrc('_WS_TABS');
+       return /'space'/.test(k) && /'templates'/.test(k) && /'tools'/.test(k)
+         && /const TABS = TAB_KEYS\.map/.test(app)
+         && /const TAB_KEYS = _WS_TABS\.filter/.test(app); })(),
+     konstSrc('_WS_TABS'));
   OK('M2 sin desv\u00edo silencioso: `templates` ya no cae a Herramientas',
      !/if \(tab === 'templates'\) tab = 'tools'/.test(app));
-  OK('M3 los tres tabs son estados v\u00e1lidos en TODOS los puntos que leen _wsTab (persistencia coherente)',
-     (app.match(/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/g) || []).length >= 1 &&
-     (app.match(/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/g) || []).length >= 1);
+  OK('M3 un solo predicado decide qué pestaña es válida, y lo usan TODOS sus lectores',
+     (app.match(/_wsTabOk\(/g) || []).length >= 4 &&
+     !/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/.test(app) &&
+     !/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/.test(app),
+     String((app.match(/_wsTabOk\(/g) || []).length));
   const home = fn('_renderWorkspaceHome');
   // WORKSPACE COMPLETION §§1,3 — el conjunto publicado ha crecido (cuatro Premium
   // más el Diario, ya con su contrato de divisa única certificado), así que lo que
@@ -592,17 +635,19 @@ function catalog() {
               free.length === 1 && free[0].id === 'tpl_realestate' && free[0].featureKey === null &&
               pub.filter(e => e.tier === 'premium').every(e => typeof e.featureKey === 'string' && e.featureKey.startsWith('workspace.')) &&
               pub.every(e => e.tier === 'free' || e.tier === 'premium') &&
-              /const TPL_CAT = _wsCatalogFor\('template'\)/.test(home); })());
-  OK('M5 con cat\u00e1logo vac\u00edo NO se pinta una rejilla de cero tarjetas',
-     /const body = gallery\.length[\s\S]{0,700}wsh-tpl-grid wsh-gallery[\s\S]{0,120}: `<div class="wsh-tplarch">/.test(home));
+              // La galería se sigue derivando del catálogo, no de un literal: el mapa
+              // de render sólo dice CÓMO se pinta cada entrada, nunca cuáles hay.
+              /const items = _wsCatalogFor\(kind\)\.map\(e => _wsCardModel\(e, map\[e\.id\] \|\| \{\}\)\);/.test(home); })());
+  OK('M5 con catálogo vacío NO se pinta una rejilla de cero tarjetas',
+     /const body = items\.length[\s\S]{0,460}: `<div class="wsh-tplarch">/.test(home));
   OK('M6 el estado de Plantillas no finge contenido: sin card, sin viz, sin "pr\u00f3ximamente", sin banner de upgrade',
      (() => { const m = /<div class="wsh-tplarch">[\s\S]*?<\/div>`/.exec(home); if (!m) return false;
        const b = m[0];
        return !/wsh-tpl\b/.test(b) && !/wsh-pv-wrap/.test(b) && !/wsh_soon/.test(b) &&
               !/upgrade/i.test(b) && !/premium/i.test(b); })());
-  OK('M7 su \u00fanica acci\u00f3n apunta a una pesta\u00f1a que EXISTE (cero enlaces muertos)',
+  OK('M7 su única acción apunta a una pestaña que EXISTE (cero enlaces muertos)',
      (() => { const m = /wsh-tplarch-cta" data-wstab="([a-z]+)"/.exec(home);
-       return !!m && !!tabsSrc && tabsSrc[0].includes("'" + m[1] + "'"); })());
+       return !!m && konstSrc('_WS_TABS').indexOf("'" + m[1] + "'") !== -1; })());
 
   // ── Frontera comercial: UNA fuente, y s\u00f3lo presentaci\u00f3n ──────────────────
   const reg = /const _WS_APP_IDENTITY = \{[\s\S]*?\n\};/.exec(app);
@@ -629,8 +674,14 @@ function catalog() {
      /const _acc = _wsToolAccess\(key\);/.test(fn('_wsOpenTool')) &&
      /if \(featureKey && !hasFeature\(featureKey\)\) return \{ ok: false, reason: 'entitlement'/.test(fn('_wsToolAccess')) &&
      /openUpgradeIntent\(/.test(fn('_wsOpenTool')));
+  // El render NO puede tener su propia lectura del derecho: sigue siendo cero
+  // `hasFeature(` dentro de la función. El estado de cada tarjeta lo resuelven
+  // `_wsToolAccess` / `_wsWs4Access`, los MISMOS owners que deciden la apertura, y
+  // la identidad Premium pasa por el helper canónico.
   OK('M11b el gate vive en el OWNER de apertura, no duplicado en cada tarjeta',
-     !/hasFeature\(/.test(home));
+     !/hasFeature\(/.test(home) &&
+     /acc = _wsToolAccess\(surface\);/.test(home) &&
+     /acc = _wsWs4Access\(r\.ws4\);/.test(home));
   // M.06 · BLOQUE 9/10/11 — ESTE ASSERT FIJABA UN FLAG MUERTO COMO CONTRATO.
   // `ENFORCE_ENTITLEMENTS = false` no gateaba nada desde M.02 B3: `hasFeature()` lee
   // EXCLUSIVAMENTE el entitlement del servidor (`_aurixEnt.features[key] === true`,
@@ -651,10 +702,18 @@ function catalog() {
   OK('M13 loan NO parece deshabilitada: publicada, con ruta de apertura y sin soon/lock',
      (() => { const e = catalog().find(x => x.id === 'loan_simulation');
        if (!e || !e.published || e.featureKey !== 'workspace.loan') return false;
-       return /loan_simulation:\s*\{[^}]*tool: 'loan'[^}]*\}/.test(home) &&
-              !/is-locked|lock-icon/i.test(home) && /soon: !openAttr/.test(home); })());
-  OK('M14 el chip vive en el MISMO pie que "Abrir \u203a": la tarjeta no cambia de altura',
-     /<div class="wsh-toolcard-foot">[\s\S]{0,220}\$\{_wsTierChip\(tl\.id\)\}/.test(home));
+       return /loan_simulation:\s*\{[^}]*tool: 'loan'[^}]*\}/.test(konstSrc('_WS_TOOL_RENDER')) &&
+              // El estado sale del acceso REAL: `is-locked` no puede escribirse a mano
+              // en el render, sólo puede derivarse de `m.state`.
+              !/'is-locked'|"is-locked"|lock-icon/i.test(home) &&
+              /is-\$\{m\.state\}/.test(home); })());
+  OK('M14 el chip vive en el MISMO pie que "Abrir ›": la tarjeta no cambia de altura',
+     /<div class="wsh-toolcard-foot">\$\{_wsCardFoot\(m\)\}<\/div>/.test(home) &&
+     /<div class="wsh-cardv-foot">[\s\S]{0,220}\$\{_wsCardFoot\(m\)\}/.test(home) &&
+     // Y `_wsCardFoot` devuelve LOS DOS juntos —acción y chip—, así que no pueden
+     // separarse en dos sitios del pie. Vive dentro del render, no es una función
+     // suelta, así que se busca ahí.
+     /const _wsCardFoot = m => \{[\s\S]{0,900}return action \+ chip;/.test(home));
 
   // ── UX: lenguaje visual de Aurix ─────────────────────────────────────────
   OK('M15 el chip Premium reutiliza el oro institucional del plan, no un gradiente comercial',

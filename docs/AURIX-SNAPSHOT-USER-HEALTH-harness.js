@@ -550,7 +550,22 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
         let base = null;
         try { base = cp.execSync('git show ' + BASELINE + ':app.js', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8'); } catch (e) { return false; }
         const cur = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
-        return FRONTEND_OWNERS.every(n => { const a = bodyOf(base, n), b = bodyOf(cur, n); return !!a && !!b && a === b; });
+        // ── `_aurixIntelligencePreviewFacts` SE COMPARA POR SU NÚCLEO, CON CAUSA ──
+        // La SPEC de cierre §D edita su COLA legítimamente: la portada Free mostraba
+        // los TRES hechos enteros —enseñaba todo lo que Intelligence sabe decir y
+        // luego pedía pagar por verlo— así que ahora publica `visible` (dos) y
+        // `locked` (el tercero, sin su conclusión). Eso NO toca ningún cálculo: los
+        // tres `out.facts.push` y sus denominadores son idénticos.
+        // En vez de sacar el owner de la lista —que sería perder los dientes— se fija
+        // byte a byte su NÚCLEO: desde el inicio hasta la línea que cierra la
+        // producción de hechos. Un cambio en una ponderación, un umbral o un
+        // denominador sigue poniendo esto rojo.
+        const CORE_END = 'if (!out.facts.length)';
+        const coreOf = (src, n) => { const b = bodyOf(src, n); if (!b) return null;
+          const i = b.indexOf(CORE_END); return i < 0 ? b : b.slice(0, i); };
+        return FRONTEND_OWNERS.every(n => {
+          const cmp = (n === '_aurixIntelligencePreviewFacts') ? coreOf : bodyOf;
+          const a = cmp(base, n), b = cmp(cur, n); return !!a && !!b && a === b; });
       })(),
       FRONTEND_OWNERS.join(','));
     ok('22.2 the four bundle-version sources are COHERENT (a bundle change carried a complete bump)',

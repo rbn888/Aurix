@@ -979,11 +979,18 @@ console.log('\nK4 · producto · el plan y el portal son ALCANZABLES');
 console.log('\nM5 · conversión · superficies Free y medición del embudo');
 {
   const prev = fnSrc(app, '_aurixIntelligencePreviewHTML');
-  ok('M5.1 el preview de Intelligence ofrece VER EL ANÁLISIS, no sólo volver al Dashboard',
+  // RE-DECIDIDO · SPEC DE CIERRE §D: «Un único CTA: Ver el análisis completo. Elimina
+  // Volver al Dashboard.» Este assert exigía que convivieran los dos, y el
+  // secundario competía con la única acción de la superficie justo en el momento de
+  // máxima intención —el usuario acaba de leer hechos ciertos sobre su patrimonio—.
+  // Lo que M5.1 protege de verdad es que el CTA vaya al paywall CANÓNICO con su
+  // featureKey y su origen, y eso se refuerza: ahora es el ÚNICO.
+  ok('M5.1 el preview de Intelligence ofrece VER EL ANÁLISIS por el paywall canónico, y es su Único CTA',
     /data-premium-cta="intelligence\.full"/.test(prev) &&
     /data-premium-source="intelligence-preview"/.test(prev) &&
-    /intprev_cta_full/.test(prev) && /intprev_cta'/.test(prev) &&
-    /switchTab/.test(prev));
+    /intprev_cta_full/.test(prev) &&
+    (prev.match(/class="intprev-cta"/g) || []).length === 1 &&
+    !/switchTab/.test(prev));
   ok('M5.2 …y no publica ningún precio: los precios viven en el catálogo',
     !/7[.,]99|59[.,]99|amount_cents/.test(prev));
   const ident = fnSrc(app, '_aurixRenderMenuIdentity');

@@ -174,14 +174,28 @@ section('E — Intelligence: CTA Free y verdad semántica:');
      /if \(!hasFeature\('intelligence\.full'\)\) return _aurixIntelligencePreviewHTML\(\);/.test(app));
   ok('E.2 [P1 M.05 CERRADO] el preview Free tiene CTA PRIMARIO al paywall canónico',
      /data-premium-cta="intelligence\.full"/.test(app) && /data-premium-source="intelligence-preview"/.test(app));
-  ok('E.2b y una salida secundaria: nadie queda atrapado en una pared publicitaria',
-     /intprev-cta--ghost/.test(app) && /intprev_cta/.test(app));
+  // RE-DECIDIDO · SPEC DE CIERRE §D. La preocupación de E.2b sigue siendo válida
+  // —nadie puede quedar atrapado— pero la respuesta ya no es un segundo botón: la
+  // navegación inferior está siempre presente y la SPEC pide un único CTA, porque el
+  // secundario ganaba justo en el momento de máxima intención. Lo que se ancla es
+  // que la superficie NO sea una pared: no bloquea la navegación, no se fija a la
+  // pantalla y no atrapa el scroll.
+  ok('E.2b no es una pared: la navegación sigue disponible y el scroll no queda atrapado',
+     !/intprev-cta--ghost/.test(app) &&
+     (function () {
+       const st = (app.match(/<style>([\s\S]*?)<\/style>/g) || []).filter(x => /intprev-/.test(x)).join('');
+       return !/position:fixed/.test(st) && !/overflow:hidden/.test(st)
+         && /\.intprev-facts\{[^}]*overflow-y:auto/.test(st);
+     })());
   ok('E.2c el CTA es táctil y no se sale de pantalla en móvil (ancho completo, 46 px)',
      /\.intprev-cta\{width:100%;[\s\S]{0,200}?height:46px/.test(app) &&
      /\.intprev-ctas\{display:flex;flex-direction:column/.test(app) &&
      /@media \(min-width:768px\)\{[\s\S]{0,400}?\.intprev-cta\{width:auto/.test(app));
   ok('E.3 el preview muestra hechos CIERTOS del propio patrimonio, no promesas',
-     /res\.state === 'ok' && res\.facts\.length/.test(app) && /intprev-fact/.test(app));
+     // §D publica DOS visibles y un tercero bloqueado, así que la condición mira
+     // `visible` en vez de `facts`. Los hechos siguen saliendo del mismo motor.
+     /res\.state === 'ok' && _visible\.length/.test(app) && /intprev-fact/.test(app) &&
+     /out\.visible = out\.facts\.slice\(0, 2\);/.test(app));
   ok('E.4 «sin datos» NUNCA es 0: un eje no certificable se declara `unavailable`',
      /unavailable/.test(app) && !/unavailable[^\n]{0,40}:\s*0\b/.test(appB));
   ok('E.5 Estabilidad y Crecimiento siguen `unavailable` a propósito (contrato INT.07)',

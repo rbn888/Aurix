@@ -55,6 +55,19 @@ sb.t = k => ({
   intprev_hold_empty_b:'Registra tu primer activo y esta lectura aparecerá aquí, calculada sobre tus datos reales.',
   intprev_hold_inc_t:  'Aurix no puede confirmar ahora la valoración completa de tu cartera',
   intprev_hold_inc_b:  'Cuando todos tus activos tengan precio y divisa disponibles, esta lectura aparecerá aquí. Aurix prefiere no mostrar una cifra que no pueda demostrar.',
+  intprev_subj_w_crypto: 'Tu exposición a cripto',
+  intprev_subj_w_dep:    'Tu posición principal',
+  intprev_subj_w_liq:    'Tu liquidez',
+  intprev_subj_w_div:    'El reparto por categorías',
+  intprev_subj_w_sector: 'Tu exposición sectorial',
+  intprev_subj_conc:  'Concentración de tu mayor posición',
+  intprev_subj_liq:   'Peso de tu liquidez',
+  intprev_subj_watch: 'Área de atención',
+  intprev_q_conc:     '¿Cómo ha cambiado esta concentración en el tiempo?',
+  intprev_q_liq:      '¿Cómo ha evolucionado este peso de liquidez?',
+  intprev_q_watch:    '¿Desde cuándo se comporta así, y qué lo ha movido?',
+  intprev_locked_tag: 'Disponible con Premium',
+  intprev_locked_aria: 'Tercer descubrimiento, disponible con Premium',
   intprev_hold_none_t: 'Aurix está leyendo tu estructura patrimonial',
   intprev_hold_none_b: 'Todavía no hay un hecho que Aurix pueda afirmar con la precisión suficiente sobre tu cartera actual.',
   intcc_w_dep_t:'Dependencia de activo principal', intcc_w_dep_b:name=>`Buena parte de tu patrimonio invertible se apoya en ${name}.`,
@@ -72,7 +85,8 @@ sb._aurixAssessValuationCompleteness = () => sb.__val;
 vm.runInContext(konstSrc('_INT_PREVIEW_WATCH_ALLOWED'), sb);
 ['_aurixUsableQuantity','isInvestableAsset','investableAssets','investableValueUSD','getInvestableDistribution',
  '_intRealEstatePresence','buildLiquidityView','_aurixHealthSnapshot','_intccWatchAreas',
- '_aurixIntelligencePreviewFacts','_aurixIntelligencePreviewHTML']
+ '_aurixIntelligencePreviewFacts','_aurixIntPreviewSubject','_aurixIntPreviewQuestion',
+ '_aurixIntelligencePreviewHTML']
   .forEach(n => vm.runInContext(fnSrc(n), sb));
 
 const facts = () => vm.runInContext('_aurixIntelligencePreviewFacts()', sb);
@@ -117,11 +131,24 @@ console.log('\n2 · Real portfolio data:');
     /El 60% de tu patrimonio invertible depende de BTC\./.test(h), h.match(/El \d+% de[^<]*/)?.[0]);
   ok('2.3 liquidity fact states the canonical cash weight',
     /La liquidez representa el 20% de tu patrimonio invertible\./.test(h), h.match(/La liquidez[^<]*/)?.[0]);
-  ok('2.4 the contextual question is present exactly once',
-    (h.match(/¿Cómo ha cambiado esta exposición en el tiempo\?/g) || []).length === 1);
+  // RE-DECIDIDO · SPEC DE CIERRE §D: la pregunta ya no es una cadena fija. Tenía que
+  // salir de lo que el usuario ACABA de leer —decía «esta exposición» aunque el
+  // hecho visible hablara de liquidez—, así que ahora se deriva del primer hecho
+  // visible. Lo que se ancla es la CORRESPONDENCIA, que es el invariante real.
+  ok('2.4 la pregunta se corresponde con el primer hecho VISIBLE, y aparece una vez',
+    (function () {
+      const k = f.visible[0].kind;
+      const q = k === 'concentration' ? '¿Cómo ha cambiado esta concentración en el tiempo?'
+        : k === 'liquidity' ? '¿Cómo ha evolucionado este peso de liquidez?'
+        : '¿Desde cuándo se comporta así, y qué lo ha movido?';
+      return (h.split(q).length - 1) === 1;
+    })(),
+    JSON.stringify([f.visible[0].kind, (h.match(/class="intprev-q">([^<]*)</) || [])[1]]));
   ok('2.5 facts carry stable instrumentation hooks',
     /data-preview-fact="concentration"/.test(h) && /data-preview-fact="liquidity"/.test(h)
-    && /data-preview-event="intelligence_preview_view"/.test(h) && /data-preview-event="preview_cta_click"/.test(h));
+    // El gancho `preview_cta_click` era el del botón «Volver al Dashboard», retirado
+    // por §D (un solo CTA). El que queda es el de conversión, que es el que importa.
+    && /data-preview-event="intelligence_preview_view"/.test(h) && /data-preview-event="preview_cta_premium"/.test(h));
 }
 
 // ── 3 · investable denominator · real estate never contaminates ──────────────
@@ -239,8 +266,18 @@ console.log('\n7 · No commercial or entitlement change:');
 {
   setPortfolio([{ name:'BTC', type:'crypto', qty:1, price:60000 }, { name:'EUR', type:'cash', qty:40000 }]);
   const h = html();
-  ok('7.1 CTA goes to the Dashboard — no checkout, no founder page, no upgrade modal',
-    /switchTab\('home'\)/.test(h) && !/openFounderPage|openUpgradeModal|checkout|stripe/i.test(h));
+  // RE-DECIDIDO · SPEC DE CIERRE §D: «Un único CTA: Ver el análisis completo. Elimina
+  // Volver al Dashboard.» El secundario competía con la única acción de la
+  // superficie justo en el momento de máxima intención. Lo que este assert protegía
+  // —que aquí no se reimplemente checkout ni se cuele una página comercial
+  // retirada— sigue intacto y ahora es lo ÚNICO que dice.
+  ok('7.1 hay UN solo CTA y va al paywall canónico — sin checkout ni página founder',
+    (h.match(/class="intprev-cta"/g) || []).length === 1
+    && (h.match(/intprev-cta--ghost/g) || []).length === 0
+    && /data-premium-cta="intelligence\.full"/.test(h)
+    && !/switchTab\('home'\)/.test(h)
+    && !/openFounderPage|openUpgradeModal|checkout|stripe/i.test(h),
+    String((h.match(/class="intprev-cta"/g) || []).length));
   ok('7.2 no price anywhere in the preview', !/14,99|14\.99|59\s?€|8,99|€\s?\d/.test(h));
   // RE-DECIDIDO por M.02 B3. Antes: "el gate no cambia, hasAurixPremiumAccess sigue
   // decidiendo". Ahora decide el resolver server-side y ese helper ya no es
@@ -297,6 +334,90 @@ console.log('\n9 · i18n parity:');
   ok('9.1 every preview key exists in BOTH language dictionaries', missing.length === 0, missing.join(','));
   ok('9.2 no hardcoded Spanish copy in the renderer outside the t() fallbacks',
     (fnSrc('_aurixIntelligencePreviewHTML').match(/tx\('intprev_/g) || []).length >= 8);
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 10 · SPEC DE CIERRE · §D — DOS DESCUBRIMIENTOS Y UN TERCERO BLOQUEADO
+// ═════════════════════════════════════════════════════════════════════════════
+// La portada mostraba los TRES hechos enteros: enseñaba todo lo que Intelligence
+// sabe decir y después pedía pagar por verlo. Ahora se ven dos y el tercero está
+// bloqueado —y bloqueado DE VERDAD: su conclusión NO SE EMITE. Un `filter:blur` se
+// desactiva desde el inspector y el texto sigue en el DOM, así que no bloquea nada;
+// lo que no se ha enviado no lo lee ni el inspector ni un lector de pantalla.
+console.log('\n10 · Dos visibles, uno bloqueado, y el bloqueo no es un blur:');
+{
+  setPortfolio([
+    { name:'BTC',  type:'crypto', qty:1, price:60000 },
+    { name:'AAPL', type:'stock',  qty:100, price:200 },
+    { name:'EUR',  type:'cash',   qty:20000 },
+  ]);
+  const f = facts(), h = html();
+  ok('10.1 el motor sigue produciendo tres hechos reales',
+    f.facts.length === 3, JSON.stringify(f.facts.map(x => x.kind)));
+  ok('10.2 se publican EXACTAMENTE dos visibles y uno bloqueado',
+    f.visible.length === 2 && !!f.locked
+    && /data-preview-facts="2"/.test(h) && /data-preview-locked="1"/.test(h),
+    JSON.stringify({ v: f.visible.length, l: !!f.locked }));
+  ok('10.3 el DOM lleva dos hechos legibles y uno bloqueado, no tres legibles',
+    (h.match(/class="intprev-fact"/g) || []).length === 2
+    && (h.match(/class="intprev-fact is-locked"/g) || []).length === 1);
+  ok('10.4 la conclusión del tercero NO se emite (ni difuminada ni oculta)',
+    h.indexOf(f.locked.text) === -1, JSON.stringify(f.locked.text).slice(0, 70));
+  ok('10.5 …y sus cifras propias tampoco viajan',
+    (function () {
+      const nums = String(f.locked.text).match(/\d+[.,]?\d*/g) || [];
+      const visibleText = f.visible.map(x => x.text).join(' ');
+      return nums.filter(n => visibleText.indexOf(n) === -1)
+                 .every(n => h.indexOf('>' + n) === -1);
+    })());
+  ok('10.6 el bloqueo NO depende del blur: se dice el sujeto y se marca el candado',
+    /class="intprev-fact-label">[^<]+</.test(h.slice(h.indexOf('is-locked')))
+    && /class="intprev-lock-tag">Disponible con Premium</.test(h)
+    && /class="intprev-redact" aria-hidden="true"/.test(h));
+  ok('10.7 y es accesible: la etiqueta dice qué falta sin revelar qué dice',
+    (function () {
+      const m = /<li class="intprev-fact is-locked"[^>]*aria-label="([^"]*)"/.exec(h);
+      return !!m && m[1].indexOf('Premium') !== -1 && h.indexOf(f.locked.text) === -1;
+    })(),
+    (/<li class="intprev-fact is-locked"[^>]*aria-label="([^"]*)"/.exec(h) || [])[1]);
+  ok('10.8 la barra redactada es decoración, y con reduced-motion no se difumina',
+    /\.intprev-redact\{[^}]*filter:blur/.test(h)
+    && /prefers-reduced-motion:reduce\)\{\.intprev-redact\{filter:none/.test(h));
+  setPortfolio([{ name:'BTC', type:'crypto', qty:1, price:60000 }]);
+  const f2 = facts(), h2 = html();
+  ok('10.9 sin un tercer hecho real, no se fabrica un bloqueado',
+    f2.locked === null && /data-preview-locked="0"/.test(h2)
+    && h2.indexOf('intprev-fact is-locked') === -1,
+    JSON.stringify(f2.facts.map(x => x.kind)));
+  ok('10.10 …y lo que sí hay se sigue mostrando entero',
+    (h2.match(/class="intprev-fact"/g) || []).length === f2.visible.length && f2.visible.length >= 1);
+  ok('10.11 el sujeto de un hecho no contiene su conclusión',
+    f.facts.every(x => {
+      const subj = vm.runInContext('_aurixIntPreviewSubject(' + JSON.stringify(x) + ')', sb);
+      return subj && subj !== x.text && String(x.text).indexOf(subj) === -1;
+    }));
+  // ── Y EL SUJETO NO PUEDE SER EL TÍTULO, QUE ES LO QUE ENCONTRÓ LA REVISIÓN ──
+  // Para un hecho de VIGILANCIA el título ES el juicio («Liquidez reducida»,
+  // «Diversificación limitada»). La primera versión devolvía `f.title` cuando
+  // existía, así que el tercer hecho se pintaba «bloqueado» entregando su
+  // conclusión cualitativa entera. Sin cifras, sí, pero diciendo lo que decía que
+  // no decía. Se ejerce con las cinco áreas reales del motor.
+  ok('10.12 el sujeto de un área de vigilancia NOMBRA el área, nunca su lectura',
+    ['crypto', 'dep', 'liq', 'div', 'sector'].every(area => {
+      const fake = { kind: 'watch:' + area, title: vm.runInContext('t("intcc_w_' + area + '_t")', sb), text: 'x' };
+      const subj = vm.runInContext('_aurixIntPreviewSubject(' + JSON.stringify(fake) + ')', sb);
+      return subj && subj !== fake.title;
+    }),
+    JSON.stringify(['crypto','dep','liq','div','sector'].map(a => {
+      const fake = { kind: 'watch:' + a, title: vm.runInContext('t("intcc_w_' + a + '_t")', sb) };
+      return a + '=' + vm.runInContext('_aurixIntPreviewSubject(' + JSON.stringify(fake) + ')', sb);
+    })));
+  ok('10.13 …y el título del hecho bloqueado NO llega al DOM',
+    (function () {
+      const fake = { kind: 'watch:liq', title: 'Liquidez reducida', body: 'x', text: 'x' };
+      const subj = vm.runInContext('_aurixIntPreviewSubject(' + JSON.stringify(fake) + ')', sb);
+      return subj.indexOf('reducida') === -1 && subj.indexOf('limitada') === -1;
+    })());
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);

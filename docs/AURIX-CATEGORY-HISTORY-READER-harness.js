@@ -589,8 +589,20 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
     // byte a byte (no de 17.1/17.2, que le siguen aplicando): M.05 edita su CTA y su CSS inline
     // con causa. Es exactamente el caso que anticipa el comentario de arriba. Los HECHOS del
     // preview los sigue fijando `_aurixIntelligencePreviewFacts`.
+    // SPEC DE CIERRE §D — y `_aurixIntelligencePreviewFacts` se compara por su
+    // NÚCLEO, no entero. §D edita su COLA con causa: la portada Free publicaba los
+    // TRES hechos completos y ahora publica dos visibles más un tercero bloqueado
+    // (`visible` / `locked`). Eso no toca ningún cálculo —los tres `out.facts.push`,
+    // sus umbrales y sus denominadores son idénticos— y sacar el owner de la lista
+    // habría perdido los dientes, así que se fija su núcleo: de su inicio a la línea
+    // que cierra la producción de hechos. Cambiar una ponderación lo pone rojo.
+    const CORE_END = 'if (!out.facts.length)';
+    const coreOf = src => { const i = src.indexOf(CORE_END); return i < 0 ? src : src.slice(0, i); };
     untouched.filter(n => n !== '_aurixIntelligencePreviewHTML')
-      .forEach(n => ok('17.3 ' + n + ' byte-identical to ' + BASELINE, fnSrcIn(base, n) === fnSrc(n)));
+      .forEach(n => {
+        const cmp = (n === '_aurixIntelligencePreviewFacts') ? coreOf : (x => x);
+        ok('17.3 ' + n + ' byte-identical to ' + BASELINE, cmp(fnSrcIn(base, n)) === cmp(fnSrc(n)));
+      });
     // CONTAINMENT, stated exactly: remove the reader block from app.js, normalise the build
     // self-version (which the cache-bust contract forces to move on every bundle change),
     // and what remains must be the baseline BYTE FOR BYTE. That proves the whole of this

@@ -26972,3 +26972,240 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
    un corte silencioso en un desbordamiento medible, que era la intención. */
 .wsb-row b { font-size: clamp(12px, 3.2vw, 14px); }
 .wsb-row.is-cause b { font-size: clamp(11px, 3vw, 13px); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   WORKSPACE COMPLETION · CIERRE — ESTADOS DE TARJETA, REJILLAS Y MI ESPACIO
+   ────────────────────────────────────────────────────────────────────────────
+   Cuatro defectos medidos, y los cuatro eran de ESTRUCTURA, no de tamaños:
+
+   1 · MI ESPACIO NO MOSTRABA SUS DOS COLUMNAS. `max-width:760px` colapsaba la
+       rejilla a UNA columna y `max-width:640px` convertía cada lista en un
+       CARRUSEL HORIZONTAL con tarjetas al 78 % de ancho: en móvil el usuario veía
+       una columna y media tarjeta cortada. La SPEC pide las dos columnas visibles
+       desde el primer viewport a partir de 360 px, así que la rejilla se queda en
+       dos y lo que cede es la densidad de cada tarjeta.
+   2 · LOS ESTADOS DE TARJETA ERAN DOS (normal / `is-soon`) y ahora son cuatro,
+       porque el acceso real tiene cuatro respuestas. `is-soon` se conserva intacto
+       para las superficies que todavía lo usan.
+   3 · LAS REJILLAS ERAN DE TRES COLUMNAS FIJAS. Con 5 u 8 tarjetas la última fila
+       quedaba a medias y las tarjetas se estiraban. Ahora el recuento viaja en
+       `data-wsgrid-n` y el reparto se elige con él.
+   4 · LA IDENTIDAD PREMIUM ERA UN BADGE POR TARJETA. Se retira de la tarjeta (el
+       chip sólo aparece cuando el usuario NO tiene la capacidad) y pasa a ser un
+       acento discreto en el contenedor, una sola vez.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · LOS CUATRO ESTADOS DE UNA TARJETA ────────────────────────────────── */
+/* ABIERTA: interactiva, con su realce. Es el estado por defecto y no añade nada. */
+.wsh-toolcard.is-open, .wsh-tpl.is-open { cursor: pointer; }
+
+/* BLOQUEADA: interactiva TAMBIÉN —su destino es el paywall— pero se lee distinto.
+   No se atenúa ni se deshabilita: atenuar una tarjeta de venta es pedirle al
+   usuario que no la mire. El oro es el de la frontera comercial del plan. */
+.wsh-toolcard.is-locked, .wsh-tpl.is-locked {
+  cursor: pointer;
+  border-color: rgba(244,196,90,0.26);
+  background: linear-gradient(165deg, rgba(244,196,90,0.045), rgba(255,255,255,0.012));
+}
+.wsh-toolcard.is-locked:hover, .wsh-tpl.is-locked:hover {
+  border-color: rgba(244,196,90,0.46);
+  box-shadow: 0 12px 30px -20px rgba(0,0,0,0.8), 0 0 22px rgba(244,196,90,0.10);
+}
+.wsh-tool-go.is-lock { color: rgba(244,196,90,0.95); }
+.wsh-toolcard.is-locked .wsh-toolcard-ic, .wsh-tpl.is-locked .wsh-pv-wrap { opacity: 0.86; }
+
+/* INTERNA y SIN RUTA: sólo alcanzables desde la vista fundador. Aquí sí procede
+   el estado inerte, porque no son producto. */
+.wsh-toolcard.is-internal, .wsh-tpl.is-internal { cursor: pointer; opacity: 0.95; }
+.wsh-toolcard.is-noroute, .wsh-tpl.is-noroute { cursor: default; opacity: 0.8; }
+.wsh-toolcard.is-noroute:hover, .wsh-tpl.is-noroute:hover { transform: none; border-color: rgba(120,160,255,0.13); }
+
+/* El foco visible es obligatorio: estas tarjetas son `role="button"` con
+   `tabindex="0"`, así que un usuario de teclado tiene que ver dónde está. */
+.wsh-toolcard[role="button"]:focus-visible,
+.wsh-tpl[role="button"]:focus-visible,
+.wsh-mse2-card[role="button"]:focus-visible,
+.wsh-tab:focus-visible, .wsfc-item:focus-visible, .wsfc-cta:focus-visible {
+  outline: 2px solid rgba(var(--aurix-blue-rgb,77,141,255), 0.85);
+  outline-offset: 2px;
+}
+
+/* ── 2 · REJILLAS EQUILIBRADAS, CON EL RECUENTO COMO DATO ─────────────────── */
+/* `auto-fit` con un mínimo real reparte 5 u 8 tarjetas sin dejar una fila a
+   medias ni estirar la última. El tope evita la tarjeta gigante de escritorio. */
+.wsh-tool-grid[data-wsgrid-n] { grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); }
+.wsh-tpl-grid[data-wsgrid-n]  { grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
+@media (min-width: 1100px) {
+  .wsh-tool-grid[data-wsgrid-n] { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .wsh-tpl-grid[data-wsgrid-n]  { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+}
+/* Con una o dos tarjetas, `1fr` las estiraría a media pantalla cada una. */
+.wsh-tool-grid[data-wsgrid-n="1"], .wsh-tool-grid[data-wsgrid-n="2"] { grid-template-columns: repeat(auto-fit, minmax(168px, 220px)); justify-content: start; }
+.wsh-tpl-grid[data-wsgrid-n="1"], .wsh-tpl-grid[data-wsgrid-n="2"]   { grid-template-columns: repeat(auto-fit, minmax(232px, 320px)); justify-content: start; }
+/* Dos columnas en móvil: tres no caben a 360px y una desperdicia la pantalla. */
+@media (max-width: 560px) {
+  .wsh-tool-grid[data-wsgrid-n] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .wsh-tpl-grid[data-wsgrid-n]  { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .wsh-tool-grid[data-wsgrid-n="1"], .wsh-tpl-grid[data-wsgrid-n="1"] { grid-template-columns: minmax(0, 1fr); }
+}
+/* Ninguna celda de rejilla puede empujar: sin esto un nombre largo desborda. */
+.wsh-tool-grid > *, .wsh-tpl-grid > * { min-width: 0; }
+.wsh-tool-name, .wsh-tpl-name { min-width: 0; overflow-wrap: anywhere; }
+/* El nombre tiene ALTURA RESERVADA y un máximo de dos líneas, así que las tarjetas
+   de una fila no se descuadran cuando un nombre ocupa dos líneas y otro una. */
+.wsh-toolcard .wsh-tool-name, .wsh-cardv-foot .wsh-tpl-name, .wsh-cardv-foot .wsh-tool-name {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; min-height: 2.5em;
+}
+.wsh-cardv-foot { flex-wrap: wrap; row-gap: 6px; }
+.wsh-cardv-foot .wsh-tpl-name, .wsh-cardv-foot .wsh-tool-name { flex: 1 1 100%; min-height: 0; }
+.wsh-toolcard-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; flex-wrap: wrap; row-gap: 6px; }
+/* El chip y la acción no se cortan nunca: es la etiqueta que el founder vio
+   truncada en móvil. Se envuelven antes de recortarse. */
+.wsh-tier, .wsh-tool-go, .wsh-pill { white-space: nowrap; flex: 0 0 auto; max-width: 100%; }
+
+/* ── 3 · MI ESPACIO: DOS COLUMNAS DESDE 360 px ────────────────────────────── */
+.wsh-mse2[data-wsmse-cols="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.wsh-mse2[data-wsmse-cols="2"] > .wsh-mse2-col { min-width: 0; }
+@media (max-width: 760px) {
+  /* Anula el colapso a una columna: las dos tienen que verse a la vez. */
+  .wsh-mse2[data-wsmse-cols="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-col { padding: 12px 10px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-head { margin-bottom: 9px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-head .wsh-title { font-size: 13.5px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-sub { font-size: 11px; line-height: 1.35; }
+}
+@media (max-width: 560px) {
+  /* Y la lista vuelve a ser VERTICAL: el carrusel horizontal al 78 % de ancho era
+     la tarjeta cortada que el founder describe. Sin imagen grande: en dos columnas
+     de 360px la miniatura compite con el nombre, que es lo que hay que leer. */
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-list {
+    flex-direction: column; overflow-x: visible; gap: 7px;
+    scroll-snap-type: none; padding-bottom: 0;
+  }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-card {
+    flex: 0 0 auto; max-width: none;
+    flex-direction: row; align-items: center; gap: 9px;
+    padding: 9px 10px; min-height: 44px;
+  }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-pv { width: 34px; height: 34px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-name { font-size: 12.5px; white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-meta { font-size: 11px; }
+  /* «Abrir →» sobra en dos columnas estrechas: la tarjeta entera ya es el botón. */
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-open { display: none; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty { padding: 8px 2px 4px; gap: 5px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty-t { font-size: 12.5px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty-b { font-size: 11px; margin-bottom: 6px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty .wsh-cta { min-height: 44px; padding: 0 12px; font-size: 12px; }
+}
+/* Las dos columnas con la MISMA altura: una con dos elementos y otra con cinco no
+   pueden tener una caja el doble de alta que la otra, es lo que se lee como roto. */
+.wsh-mse2[data-wsmse-cols="2"] { align-items: stretch; }
+.wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-col { height: 100%; }
+
+/* ── 4 · IDENTIDAD PREMIUM: UNA VEZ, EN EL CONTENEDOR ─────────────────────── */
+/* Azul eléctrico de Aurix + un filo dorado en la barra de pestañas. Nada más: sin
+   fondo dorado, sin badges repetidos, sin gradientes comerciales. */
+.wsh-studio-root.is-premium .wsh-tabs {
+  position: relative;
+  border-bottom: 1px solid rgba(244,196,90,0.16);
+}
+.wsh-studio-root.is-premium .wsh-tabs::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, rgba(244,196,90,0.42), rgba(244,196,90,0.06) 55%, transparent);
+  pointer-events: none;
+}
+.wsh-studio-root.is-premium .wsh-tab.is-active { color: rgba(255,255,255,0.98); }
+.wsh-tab.is-internal { color: rgba(150,178,196,0.72); }
+.wsh-internal-sec { border-color: rgba(126,160,180,0.24); }
+/* Objetivos táctiles: la barra de pestañas es navegación primaria. */
+.wsh-tab { min-height: 44px; }
+
+/* ── PORTADA FREE DE WORKSPACE · el bloque Premium pasa a ser LISTA ─────────
+   Era una frase corrida que nombraba seis capacidades, y una de ellas ni existe
+   en el producto. Ahora son las entradas PUBLICADAS de tier premium leídas del
+   catálogo, en dos columnas compactas: se lee de un golpe, cabe en 360px y no
+   puede prometer algo que no está publicado. `overflow-wrap` en vez de recorte:
+   ningún nombre se corta. */
+.wsfc-premium-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+.wsfc-premium-i {
+  position: relative; min-width: 0; padding-left: 13px;
+  font-size: 12.5px; line-height: 1.45; color: rgba(222,214,196,0.86);
+  overflow-wrap: anywhere;
+}
+.wsfc-premium-i::before {
+  content: ''; position: absolute; left: 2px; top: 0.56em;
+  width: 4px; height: 4px; border-radius: 50%; background: rgba(225,196,122,0.72);
+}
+@media (max-width: 359px) { .wsfc-premium-list { grid-template-columns: minmax(0, 1fr); } }
+/* Con un solo CTA la columna sobra, pero se conserva para que el ancla inferior
+   (`margin-top:auto`) siga siendo la del contenedor y no la del botón. */
+.wsfc-cta-wrap { gap: 0; }
+
+/* El botón Guardar de una cuenta sin plan: mismo sitio, misma altura, etiqueta
+   Premium dentro. No se atenúa ni se deshabilita —está vivo y lleva al paywall—
+   pero deja de parecer la acción primaria, que no lo es todavía. */
+.wsg-savebtn.is-lock {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: rgba(244,196,90,0.95);
+  border: 1px solid rgba(244,196,90,0.34);
+  background: rgba(244,196,90,0.09);
+  min-height: 44px;
+}
+.wsg-savebtn.is-lock:hover { background: rgba(244,196,90,0.15); border-color: rgba(244,196,90,0.5); }
+.wsg-savestate.is-local { color: rgba(198,214,246,0.66); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CIERRE · LOS CUATRO DEFECTOS QUE MIDIÓ LA SONDA EN 360 px
+   Ninguno es de gusto: los cuatro son medidas que el SPEC prohíbe.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* 1 · EL FAVORITO ERA UN OBJETIVO TÁCTIL DE 28 px. En una tarjeta a 165 px de
+      ancho, fallar el pulsado abre la tarjeta en vez de fijarla, así que el error
+      no es «no pasa nada», es «pasa otra cosa». El botón pasa a 44×44 y su CHROMA
+      visible (el cuadrado de 28 px) se dibuja en un pseudo-elemento: la zona
+      pulsable crece, el aspecto no cambia ni un píxel. */
+.wsh-pin {
+  width: 44px; height: 44px; top: 2px; right: 2px;
+  background: transparent; border: 0; border-radius: 12px;
+}
+.wsh-pin::before {
+  content: ''; position: absolute; top: 8px; left: 8px; width: 28px; height: 28px;
+  border-radius: 8px; background: var(--elev-1);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+  transition: background 150ms ease, border-color 150ms ease;
+  pointer-events: none;
+}
+.wsh-pin svg { position: relative; z-index: 1; }
+.wsh-pin:hover { background: transparent; }
+.wsh-pin:hover::before { background: rgba(var(--aurix-blue-rgb), 0.16); }
+.wsh-pin.is-on { background: transparent; border: 0; }
+.wsh-pin.is-on::before { border-color: rgba(var(--aurix-blue-rgb), 0.46); background: rgba(var(--aurix-blue-rgb), 0.14); }
+.wsh-cardv .wsh-pin { top: 0; right: 0; }
+
+/* 2 · EL CTA DEL ESTADO VACÍO DESBORDABA SU COLUMNA por 5 px: `inline-block` con
+      padding fijo dentro de una columna de 150 px. Ocupa el ancho de su columna,
+      que además es lo que quiere un estado vacío. */
+.wsh-mse2-empty .wsh-cta {
+  display: block; width: 100%; max-width: 100%; box-sizing: border-box;
+  white-space: normal; text-align: center; min-height: 44px;
+  padding: 10px 8px; margin-top: 4px;
+}
+
+/* 3 · LA BARRA DE PESTAÑAS CON CUATRO PESTAÑAS NO CABE EN 360 px (373 px de
+      contenido). Sólo le pasa a la vista fundador, y la respuesta correcta no es
+      encoger la tipografía por debajo del suelo: la barra se desplaza. El
+      `overflow-x:auto` es deliberado, no un recorte. */
+.wsh-tabs { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.wsh-tabs::-webkit-scrollbar { display: none; }
+.wsh-tab { flex: 1 0 auto; white-space: nowrap; }
+@media (max-width: 400px) { .wsh-tab { padding: 10px 10px; } }
+
+/* 4 · UNA PÍLDORA A 10,5 px. El suelo de legibilidad del producto es 11 px y se
+      aplica a TODA superficie publicada, también a la vista interna. */
+.wsh-pill { font-size: 11px; }

@@ -50,6 +50,10 @@ const ctx = { console: { log() {}, warn() {} }, Object, String, Number, Date, Ar
   t: k => k, IS_DEV: false, document: { getElementById: () => null } };
 vm.createContext(ctx);
 vm.runInContext([
+  // El conjunto canónico de claves se DERIVA del catálogo desde la SPEC de cierre
+  // (era un literal de cuatro claves y las cinco capacidades publicadas se caían en
+  // silencio), así que sus dos fuentes tienen que entrar ANTES que él.
+  konstSrc('_WS_CATALOG'), konstSrc('_AURIX_ENT_CANON_EXTRA'),
   konstSrc('_AURIX_ENT_CANON'), konstSrc('_AURIX_ENT_TTL_MS'),
   "let _aurixEnt = { loaded:false, loading:false, error:null, plan:'free', status:'none', source:'default', validUntil:null, features:Object.create(null), sources:Object.create(null), fetchedAt:0 };",
   fnSrc('hasFeature'), fnSrc('_aurixEntLoaded'), fnSrc('_aurixMenuTier'),
