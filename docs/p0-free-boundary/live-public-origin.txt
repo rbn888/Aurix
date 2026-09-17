@@ -1,0 +1,25 @@
+AURIX · P0 FREE BOUNDARY — sonda en navegador real
+origen: https://app.aurixsystem.io  (PÚBLICO · bytes desplegados)
+
+  ✓ 0.1 el bundle del candidato arranca sin errores de boot
+
+A · INTELLIGENCE FREE
+  ✓ A.1 exactamente UN análisis visible  [visible=1]
+  ✓ A.2 exactamente DOS análisis bloqueados  [locked=2]
+  ✓ A.3 el análisis visible es el del caso observado  [El 47% de tu patrimonio depende de Bitcoin.]
+  ✓ A.4 la palabra «invertible» no aparece en la portada
+  ✓ A.5 CERO texto filtrado por los bloqueados (ni innerText ni textContent)  [["|","|"]]
+  ✓ A.6 la etiqueta accesible del bloqueado no revela categoría ni juicio  [["Análisis todavía sin desbloquear","Análisis todavía sin desbloquear"]]
+  ✓ A.7 CERO menciones a «Premium» antes del clic
+  ✓ A.8 UN solo CTA, y es «Ver el análisis completo»  [1 / Ver el análisis completo]
+  ✓ A.9 el CTA declara la feature del owner canónico  [intelligence.full]
+  ✓ A.10 la anticipación dice CUÁNTOS hay y nada más  [Aurix ha encontrado 2 análisis más sobre tu patrimonio.]
+  ✓ A.11 con dos hechos reales se bloquea UNO (no se inventa)  [1/1]
+  ✓ A.12 pulsar el CTA abre el paywall canónico, sin paso intermedio
+  ✓ A.13 cerrar el pago devuelve a la portada, intacta
+  ✓ A.14 Premium no ve la portada: entra en Intelligence
+
+════════════════════════════════════════════════
+15 passed, 0 failed
+
+RESULT: GO — evidencia en docs/p0-free-boundary/measurements.json

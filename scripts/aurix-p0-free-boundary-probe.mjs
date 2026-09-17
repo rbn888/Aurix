@@ -54,11 +54,22 @@ const server = createServer(async (req, res) => {
   } catch (_) { res.writeHead(404).end('nf'); }
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
-const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+// ── CONTRA EL LOCAL POR DEFECTO, CONTRA LO PÚBLICO CUANDO SE PIDE ──────────
+// `AURIX_P0_URL=https://app.aurixsystem.io/` ejecuta la MISMA sonda sobre el
+// origen desplegado: mismo index.html, mismo token de CSS y el bundle tal y como
+// lo sirve el CDN. Es la diferencia entre «los bytes coinciden» y «la app
+// desplegada funciona». El sandbox no resuelve el dominio, así que Chrome recibe
+// la regla de resolución (el equivalente del `--resolve` de curl).
+const PUBLIC_URL = String(process.env.AURIX_P0_URL || '').replace(/\/$/, '');
+const ORIGIN = PUBLIC_URL || `http://127.0.0.1:${server.address().port}`;
+const RESOLVE = String(process.env.AURIX_P0_RESOLVE || '');   // ej. app.aurixsystem.io=185.199.111.153
 
 const PORT = 9500 + (process.pid % 400);
 const profile = mkdtempSync(join(tmpdir(), 'aurix-p0-'));
-spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
+spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
+  '--no-first-run', '--no-default-browser-check', '--disable-gpu',
+  ...(RESOLVE ? [`--host-resolver-rules=MAP ${RESOLVE.split('=')[0]} ${RESOLVE.split('=')[1]}`] : []),
+  'about:blank'], { stdio: 'ignore' });
 let wsu = null;
 for (let i = 0; i < 100; i++) {
   try { const j = await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json(); if (j.webSocketDebuggerUrl) { wsu = j.webSocketDebuggerUrl; break; } } catch (_) {}
@@ -114,6 +125,39 @@ async function backspace(n = 1) {
 // para los 14 campos. `Input.insertText` es la inserción del navegador.
 const paste = txt => S('Input.insertText', { text: txt });
 
+// ── LO QUE EL ORIGEN PÚBLICO **NO** PUEDE DAR, Y HAY QUE DECIRLO ───────────
+// Apuntar esta sonda a `app.aurixsystem.io` parece la verificación definitiva y no
+// lo es: el bundle público NO lleva el parche de la navegación de auth, así que sin
+// sesión la app se va a `login.html` y todos los globals desaparecen —la primera
+// versión de este override se estrellaba con un `renderWorkspaceHome is not
+// defined` a mitad del bloque B, que es un error que no dice nada—. Y la sesión no
+// se puede fabricar: el acceso es OTP y `mailer_autoconfirm` está en false, así que
+// el journey autenticado es de la QA del founder, no de una sonda.
+// La verificación live que SÍ se puede hacer es la que hace el cierre de esta SPEC:
+// comparar byte a byte el `app.js` y el `styles.css` servidos contra el candidato
+// probado, más los tokens de `index.html`. Si coinciden, el comportamiento medido
+// aquí sobre la copia de trabajo ES el comportamiento desplegado.
+//
+// LO MEDIDO, y hasta dónde llega: `AURIX_P0_ONLY=A` contra el origen PÚBLICO pasa
+// 15/15 —la portada Free de Intelligence se ejercita entera sobre los bytes
+// desplegados, ver `docs/p0-free-boundary/live-public-origin.txt`—. El bloque B
+// NO: en algún punto de su recorrido por secciones el build público se va a
+// `login.html` y los globals desaparecen. No es un fallo del candidato, es la
+// ausencia de sesión; por eso el guard de abajo aborta con la razón en vez de
+// dejar un `renderWorkspaceHome is not defined` a mitad de la matriz.
+async function assertUsableOrigin() {
+  if (!PUBLIC_URL) return;
+  const url = await ev('location.href').catch(() => '');
+  const ready = await ev(`typeof renderWorkspaceHome === 'function'`).catch(() => false);
+  if (ready) return;
+  console.error('\n✗ ORIGEN NO EJERCITABLE — ' + ORIGIN);
+  console.error('  la app pública redirige sin sesión (href=' + url + ').');
+  console.error('  Esta sonda mide comportamiento sobre la copia de trabajo; la equivalencia');
+  console.error('  con lo desplegado se demuestra comparando los BYTES servidos, no aquí.');
+  console.error('\nRESULT: NO-GO (origen, no candidato)');
+  process.exit(2);
+}
+
 async function load(w, h, mobile) {
   await S('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: mobile ? 3 : 1, mobile });
   // `reducedMotion` es un `const` capturado al cargar el bundle, así que no se
@@ -128,6 +172,7 @@ async function load(w, h, mobile) {
     await sleep(250);
   }
   await sleep(600);
+  await assertUsableOrigin();
 }
 // Monta la persona escribiendo la superficie saneada del resolver. Nada más.
 const PERSONA = {
@@ -145,7 +190,8 @@ const showWs = () => ev(`(function(){var c=document.getElementById('aurixWorkspa
 // que hace el producto al cambiar de pestaña interna.
 const repaintWs = () => ev(`(function(){ _wshRepaintHome(); return true; })()`);
 
-console.log('AURIX · P0 FREE BOUNDARY — sonda en navegador real\n');
+console.log('AURIX · P0 FREE BOUNDARY — sonda en navegador real');
+console.log('origen: ' + ORIGIN + (PUBLIC_URL ? '  (PÚBLICO · bytes desplegados)' : '  (copia de trabajo)') + '\n');
 await load(390, 844, true);
 ok('0.1 el bundle del candidato arranca sin errores de boot',
   (await J(`JSON.stringify((window.__AURIX_BOOT&&window.__AURIX_BOOT.errors)||[])`)).length === 0);
