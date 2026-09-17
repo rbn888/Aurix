@@ -186,6 +186,8 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // §6 · la guarda de hidratación (una hidratación pendiente NO es cero activos) y
   // §12 · la etiqueta de porcentaje que distingue un cero real de un «<1%».
   '_intccHydrationPending','_intccPctLabel',
+  // §10 — el writer del ledger: la fila que viaja a `capital_flows`.
+  '_aurixFlowRowFromLocal',
   // El formateador CANÓNICO de porcentaje, compartido por Dashboard, Workspace e
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
@@ -522,6 +524,67 @@ console.log('\n§5 · procedencia temporal · coste desconocido');
     (() => { const c = makeCtx({});
       const v = run('assetValueUSD({ id: "x", type: "stock", qty: 10 })', c);
       return !Number.isFinite(v); })());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// §10 · RECORDED_AT · PROCEDENCIA DE LA OPERACIÓN
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n§10 · recorded_at · procedencia');
+{
+  const wr = fnSrc('_aurixFlowRowFromLocal');
+  const push = fnSrc('_aurixCapitalFlowsPush');
+  const pull = fnSrc('_aurixCapitalFlowsPull');
+  const sql = fs.readFileSync(path.join(ROOT, 'db/capital_flows_2_recorded_at.sql'), 'utf8');
+
+  ok('10.A la migración es ADITIVA e IDEMPOTENTE: ni backfill, ni DML, ni borrado',
+    /add column if not exists recorded_at timestamptz/i.test(sql)
+    && !/\bupdate\s+public\.capital_flows/i.test(sql)
+    && !/\binsert\s+into\b/i.test(sql)
+    && !/\bdelete\b/i.test(sql) && !/\bdrop\b/i.test(sql)
+    && !/\btruncate\b/i.test(sql));
+  ok('10.B el writer envía la procedencia SÓLO si existe: nunca la fabrica',
+    /if \(withRecorded && Number\.isFinite\(Number\(f\.recordedAt\)\)\)/.test(wr)
+    && /row\.recorded_at = new Date\(Number\(f\.recordedAt\)\)\.toISOString\(\);/.test(wr)
+    && !/recorded_at[^;]*Date\.now\(\)/.test(wr));
+  ok('10.C …y una fila legacy sin procedencia OMITE la columna (no la pone a hoy)',
+    (() => { const c = makeCtx({});
+      const legacy = { id: 'l1', ts: 1700000000000, kind: 'deposit', amountUSD: 100, revision: 1 };
+      const fresh  = Object.assign({}, legacy, { id: 'f1', recordedAt: 1789000000000 });
+      const r1 = run('_aurixFlowRowFromLocal(' + JSON.stringify(legacy) + ', false, true)', c);
+      const r2 = run('_aurixFlowRowFromLocal(' + JSON.stringify(fresh) + ', false, true)', c);
+      const r3 = run('_aurixFlowRowFromLocal(' + JSON.stringify(fresh) + ', false, false)', c);
+      return !('recorded_at' in r1) && r2.recorded_at === new Date(1789000000000).toISOString()
+        && !('recorded_at' in r3); })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      return run('_aurixFlowRowFromLocal(' + JSON.stringify({ id: 'l1', ts: 1700000000000,
+        kind: 'deposit', amountUSD: 100, revision: 1 }) + ', false, true)', c); })()));
+  ok('10.D la columna se descubre ESCRIBIENDO, y un fallo transitorio no concluye nada',
+    /let _aurixFlowRecordedColumn = 'unknown';/.test(app)
+    && /const isSchemaError = \(err\) =>/.test(push)
+    && /if \(!isSchemaError\(error\)\) break;/.test(push)
+    && /_aurixFlowRecordedColumn = 'yes';/.test(push)
+    && /_aurixFlowRecordedColumn = 'no';/.test(push));
+  ok('10.E la lectura sólo pide la columna cuando la escritura demostró que existe',
+    /_aurixFlowRecordedColumn === 'yes' \? ', recorded_at' : ''/.test(pull));
+  ok('10.F la hidratación cross-device conserva la procedencia, y su ausencia NO la borra',
+    /const _rec = r\.recorded_at \? new Date\(r\.recorded_at\)\.getTime\(\) : NaN;/.test(pull)
+    && /if \(Number\.isFinite\(_rec\)\) remote\.recordedAt = _rec;/.test(pull)
+    && /Object\.assign\(cur, remote\)/.test(pull));
+  ok('10.G la dirección de la operación no la toca nada de esto',
+    /side: String\(f\.kind\) === 'asset_remove' \? 'out' : 'in'/.test(fnSrc('_aurixRegisteredOperations')));
+  ok('10.H dedup e idempotencia intactas: upsert por (user_id, flow_id) y dedup por revisión',
+    /onConflict: 'user_id,flow_id'/.test(push)
+    && /\(Number\(f\.revision\) \|\| 1\) > \(Number\(cur\.revision\) \|\| 1\)/.test(fnSrc('_aurixRegisteredOperations')));
+  // El invariante que de verdad protege al usuario, y no depende de la migración.
+  ok('10.I SIN procedencia NUNCA se publica «hoy» (fail-closed, verificado antes)',
+    (() => { const c = makeCtx({});
+      const noProv = run('_intv4FactText(' + JSON.stringify({ semanticKey: 'operation_registered_x',
+        value: 1, values: { operations: 1, name: 'Microsoft', side: 'in', provenanceKnown: false },
+        window: { range: 'today' } }) + ')', c);
+      return !!noProv && !/[Hh]oy/.test(noProv); })());
+  ok('10.J y la fecha ECONÓMICA sigue siendo `ts`: la procedencia no la sustituye',
+    /ts:         new Date\(Number\(f\.ts\) \|\| Date\.now\(\)\)\.toISOString\(\)/.test(wr)
+    && /effectiveAt: Number\(f\.ts\), recordedAt: rec/.test(fnSrc('_aurixRegisteredOperations')));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1018,32 +1081,32 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   const h5 = RADAR(FIVE, DIMS([]));
   ok('11.1 cinco valores ⇒ cinco marcadores, cinco segmentos y figura CERRADA con relleno',
     count(h5, /class="intcc-radar-dot"/g) === 5
-    && /data-svg-edges="5"/.test(h5) && /data-svg-dashed="0"/.test(h5)
-    && /intcc-radar-area/.test(h5),
+    && /data-svg-edges="5"/.test(h5) && /data-svg-neutral="0"/.test(h5)
+    && /intcc-radar-area/.test(h5) && !/stroke-dasharray/.test(h5),
     JSON.stringify({ dots: count(h5, /class="intcc-radar-dot"/g),
-      edges: num(h5, /data-svg-edges="(\d+)"/), dashed: num(h5, /data-svg-dashed="(\d+)"/) }));
+      edges: num(h5, /data-svg-edges="(\d+)"/), neutral: num(h5, /data-svg-neutral="(\d+)"/) }));
   ok('11.2 exactamente UN marcador por eje, en los cinco',
     (() => { const axes = attrs(h5, 'class="intcc-radar-dot" cx="[^"]*" cy="[^"]*" r="[^"]*" data-axis="([^"]+)"');
       return new Set(axes).size === 5 && axes.length === 5; })(),
     JSON.stringify(attrs(h5, 'data-axis="([^"]+)" data-availability')));
 
   // La geometría, comprobada por coordenadas REALES.
-  const cx = 110, cy = 106, R = 76;
+  const cx = 110, cy = 106, R = 100;   // §4 — el marco crece dentro de la misma card
   const radiusOf = (html, axis) => { const m = html.match(new RegExp(
     'class="intcc-radar-dot[^"]*" cx="([\\d.]+)" cy="([\\d.]+)" r="[^"]*" data-axis="' + axis + '"'));
     if (!m) return null; const dx = Number(m[1]) - cx, dy = Number(m[2]) - cy;
     return Math.sqrt(dx * dx + dy * dy) / R; };
   const hZero = RADAR({ diversification: 100, stability: 70, liquidity: 0, growth: 55, concentration: 60 }, DIMS([]));
   ok('11.3 un 0 % REAL se dibuja en el límite interior, NUNCA en el centro',
-    (() => { const r = radiusOf(hZero, 'liquidity'); return r !== null && r > 0.2 && r < 0.25; })(),
+    (() => { const r = radiusOf(hZero, 'liquidity'); return r !== null && r > 0.28 && r < 0.32; })(),
     String(radiusOf(hZero, 'liquidity')));
   ok('11.4 un 100 % NO toca el vértice exterior',
-    (() => { const r = radiusOf(hZero, 'diversification'); return r !== null && r > 0.85 && r < 0.9; })(),
+    (() => { const r = radiusOf(hZero, 'diversification'); return r !== null && r > 0.88 && r <= 0.901; })(),
     String(radiusOf(hZero, 'diversification')));
   ok('11.5 un valor pequeño (1/7 ≈ 14 %) queda cerca del interior pero SEPARADO del cero',
     (() => { const h = RADAR(Object.assign({}, FIVE, { diversification: 14 }), DIMS([]));
       const rSmall = radiusOf(h, 'diversification'), rZero = radiusOf(hZero, 'liquidity');
-      return rSmall > rZero + 0.04 && rSmall < 0.35; })(),
+      return rSmall > rZero + 0.04 && rSmall < 0.42; })(),
     JSON.stringify({ small: radiusOf(RADAR(Object.assign({}, FIVE, { diversification: 14 }), DIMS([])), 'diversification'),
                      zero: radiusOf(hZero, 'liquidity') }));
   ok('11.6 dos valores bajos simultáneos conservan puntos DIFERENCIADOS (ejes distintos)',
@@ -1068,15 +1131,21 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     && /data-svg-unknown="2"/.test(hUnk),
     JSON.stringify({ solid: count(hUnk, /class="intcc-radar-dot"/g),
       hollow: count(hUnk, /class="intcc-radar-dot is-unknown"/g) }));
-  ok('11.9 la figura se recorre completa: cinco segmentos, y los adyacentes al hueco discontinuos',
-    /data-svg-edges="5"/.test(hUnk) && /data-svg-dashed="4"/.test(hUnk)
-    && count(hUnk, /class="intcc-radar-edge is-unknown"/g) === 4,
-    JSON.stringify({ edges: num(hUnk, /data-svg-edges="(\d+)"/), dashed: num(hUnk, /data-svg-dashed="(\d+)"/) }));
+  // §6 RE-DECIDE EL TRATAMIENTO: el tramo que toca un eje sin datos era DISCONTINUO
+  // y en la pantalla real hacía que el gráfico entero pareciese roto. Pasa a sólido
+  // NEUTRAL —mismo grosor, color apagado, sin resplandor—, así que la trayectoria
+  // se sigue de un vistazo y sigue sin poder leerse como una medición.
+  ok('11.9 la figura se recorre completa y el tramo sin datos es sólido NEUTRAL, no partido',
+    /data-svg-edges="5"/.test(hUnk) && /data-svg-neutral="4"/.test(hUnk)
+    && count(hUnk, /class="intcc-radar-edge is-unknown"/g) === 4
+    && !/stroke-dasharray/.test(hUnk)
+    && /<g class="intcc-radar-edges is-neutral">/.test(hUnk),
+    JSON.stringify({ edges: num(hUnk, /data-svg-edges="(\d+)"/), neutral: num(hUnk, /data-svg-neutral="(\d+)"/) }));
   ok('11.10 el quinto eje cierra con el primero (la trayectoria es un ciclo)',
     (() => { const src0 = fnSrc('_intccRadarSvg');
       return /const j = \(i \+ 1\) % n;/.test(src0) && /for \(let i = 0; i < n; i\+\+\)/.test(src0); })());
   ok('11.11 el eje desconocido se sitúa en el límite INTERIOR de referencia',
-    (() => { const r = radiusOf(hUnk, 'stability'); return r !== null && r > 0.2 && r < 0.25; })(),
+    (() => { const r = radiusOf(hUnk, 'stability'); return r !== null && r > 0.28 && r < 0.32; })(),
     String(radiusOf(hUnk, 'stability')));
   ok('11.12 y NO se rellena área con un eje desconocido dentro',
     !/intcc-radar-area/.test(hUnk));
@@ -1093,7 +1162,7 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   ok('11.15 todos los ejes sin datos: cinco huecos, cinco segmentos, cero relleno',
     (() => { const h = RADAR({}, DIMS(['diversification', 'stability', 'liquidity', 'growth', 'concentration']));
       return count(h, /class="intcc-radar-dot is-unknown"/g) === 5
-        && /data-svg-edges="5"/.test(h) && /data-svg-dashed="5"/.test(h)
+        && /data-svg-edges="5"/.test(h) && /data-svg-neutral="5"/.test(h)
         && !/intcc-radar-area/.test(h); })());
   ok('11.16 la zona central excluida NO forma parte de la retícula medible',
     (() => { const src0 = fnSrc('_intccRadarSvg');
@@ -1102,15 +1171,23 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
       return /rings \+= `<polygon class="intcc-radar-ring" points="\$\{poly\(rBand\(f\)\)\}"\/>`/.test(src0)
         && /x1="\$\{ix\.toFixed\(1\)\}" y1="\$\{iy\.toFixed\(1\)\}"/.test(src0)
         && !/x1="\$\{cx\}" y1="\$\{cy\}"/.test(src0); })());
-  ok('11.17 el orden de capas es retícula → relleno → conexiones → marcadores → halo → etiquetas',
-    (() => { const s0 = h5;
-      const i1 = s0.indexOf('intcc-radar-grid'), i2 = s0.indexOf('intcc-radar-area'),
-        i3 = s0.indexOf('intcc-radar-edges'), i4 = s0.indexOf('intcc-radar-dots'),
-        i5 = s0.indexOf('intcc-radar-halos'), i6 = s0.indexOf('intcc-radar-labels');
-      return i1 < i2 && i2 < i3 && i3 < i4 && i4 < i5 && i5 < i6; })());
-  ok('11.18 el halo es un anillo SIN relleno: separa el marcador sin taparlo',
-    /\.intcc-radar-halo \{ fill: none;/.test(css)
-    && count(h5, /class="intcc-radar-halo"/g) === 5);
+  // §7 — el halo pasa a ser un DISCO opaco del color del lienzo INMEDIATAMENTE
+  // BAJO el marcador. Como anillo dibujado encima se solapaba con el contorno del
+  // hueco y lo mordía: en la captura a 3× los «sin datos» parecían iconos con una
+  // muesca. Debajo cumple lo que el orden de capas persigue —ninguna línea
+  // atraviesa el centro de un marcador— sin comerse el marcador.
+  ok('11.17 el orden de capas es retícula → trayectoria neutral → medidos → marcador con su halo → etiquetas',
+    (() => { const s0 = hUnk;
+      const i1 = s0.indexOf('intcc-radar-grid'), i3n = s0.indexOf('intcc-radar-edges is-neutral');
+      const i3 = s0.indexOf('<g class="intcc-radar-edges">'), i5 = s0.indexOf('intcc-radar-halos');
+      const i4 = s0.indexOf('intcc-radar-dots'), i6 = s0.indexOf('intcc-radar-labels');
+      return i1 < i3n && i3n < i3 && i3 < i5 && i5 < i4 && i4 < i6; })(),
+    JSON.stringify({ grid: hUnk.indexOf('intcc-radar-grid'), neutral: hUnk.indexOf('is-neutral'),
+      halos: hUnk.indexOf('intcc-radar-halos'), dots: hUnk.indexOf('intcc-radar-dots') }));
+  ok('11.18 el halo es un DISCO opaco bajo el marcador: corta las líneas sin morderlo',
+    /\.intcc-radar-halo \{ fill: #111726; stroke: none; \}/.test(css)
+    && count(h5, /class="intcc-radar-halo"/g) === 5
+    && h5.indexOf('intcc-radar-halos') < h5.indexOf('intcc-radar-dots'));
   ok('11.19 la transformación gráfica NO altera el dato publicado',
     (() => { const s0 = fnSrc('_intccRadarSvg');
       return /d\.display != null \? String\(d\.display\) : \(radar\[d\.key\] \+ \(d\.suffix \|\| ''\)\)/.test(s0)
@@ -1120,11 +1197,11 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   ok('11.21 la transición se declara y respeta `prefers-reduced-motion`',
     /\.intcc-radar-area, \.intcc-radar-edge, \.intcc-radar-halo, \.intcc-radar-dot:not\(\.is-unknown\)/.test(css)
     && /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,260}\.intcc-radar-dot \{ transition: none/.test(css));
-  ok('11.22 los marcadores tienen tamaño suficiente en los tres viewports',
-    /\.intv6-radar \.intcc-radar-dot \{ r: 2\.9; \}/.test(css)
-    && /\.intv6-radar \.intcc-radar-dot\.is-unknown \{ r: 3\.5; \}/.test(css)
-    && /\.intcc-radar-dot \{ r: 3\.1px;/.test(css)
-    && /\.intcc-radar-dot\.is-unknown \{ r: 3\.7px;/.test(css));
+  // §7 — MISMO diámetro exterior para los cinco, en los tres viewports.
+  ok('11.22 los cinco marcadores comparten diámetro y se leen en los tres viewports',
+    /\.intv6-radar \.intcc-radar-dot,[\s\S]{0,60}\.is-unknown \{ r: 4; \}/.test(css)
+    && /\.intcc-radar-dot \{ r: 4\.4px; fill: #e2edff; \}/.test(css)
+    && /\.intcc-radar-dot\.is-unknown \{ r: 4\.4px; fill: none; \}/.test(css));
   ok('11.23 en las DOS cuentas de referencia el radar publica sus cinco ejes',
     [CUENTA_A, CUENTA_B].every(f => { const h = render(f).html;
       return /data-axes="5"/.test(h) && count(h, /class="intcc-radar-dot[" ]/g) === 5
@@ -1143,6 +1220,96 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
       return { d: r.display, v: r.values.liquidity }; })()));
   ok('11.23c …y un CERO REAL sigue rotulando 0 %',
     (() => { const h = render(CUENTA_A).html; return />0%</.test(h); })());
+  // ════════════════════════════════════════════════════════════════════════
+  // CIERRE FINAL · CASO DE ACEPTACIÓN DEL SPEC Y TAMAÑO REAL
+  // ════════════════════════════════════════════════════════════════════════
+  // 2,2/7 · concentración 31 % · liquidez 7 % · Estabilidad y Crecimiento sin
+  // datos, que es exactamente la captura autenticada de 390 px que abrió este
+  // cierre. Era el caso en que el radar «parecía un símbolo pequeño».
+  const ACC = RADAR({ diversification: 31, liquidity: 7, concentration: 31 },
+    DIMS(['stability', 'growth']).map(d => Object.assign({}, d,
+      { display: d.key === 'diversification' ? '2,2 / 7' : null })));
+  ok('11.25 CASO DE ACEPTACIÓN · cinco coordenadas, cinco marcadores y cinco segmentos',
+    count(ACC, /class="intcc-radar-dot[" ]/g) === 5
+    && count(ACC, /class="intcc-radar-halo[" ]/g) === 5
+    && /data-svg-edges="5"/.test(ACC) && /data-svg-axes="5"/.test(ACC),
+    JSON.stringify({ dots: count(ACC, /class="intcc-radar-dot[" ]/g),
+      edges: num(ACC, /data-svg-edges="(\d+)"/) }));
+  ok('11.25b …tres medidos y dos desconocidos, diferenciados por relleno y tono',
+    count(ACC, /class="intcc-radar-dot"/g) === 3
+    && count(ACC, /class="intcc-radar-dot is-unknown"/g) === 2
+    && count(ACC, /class="intcc-radar-edge"/g) === 1
+    && count(ACC, /class="intcc-radar-edge is-unknown"/g) === 4
+    && /data-svg-neutral="4"/.test(ACC)
+    && (ACC.match(/sin datos/g) || []).length === 2,
+    JSON.stringify({ solid: count(ACC, /class="intcc-radar-dot"/g),
+      hollow: count(ACC, /class="intcc-radar-dot is-unknown"/g),
+      medido: count(ACC, /class="intcc-radar-edge"/g),
+      neutral: count(ACC, /class="intcc-radar-edge is-unknown"/g) }));
+  ok('11.25c …y el dato publicado es el REAL, no la coordenada',
+    /2,2 \/ 7/.test(ACC) && />31%</.test(ACC) && />7%</.test(ACC));
+  ok('11.25d ningún marcador en el centro ni en el vértice exterior',
+    (() => { const rs = [...ACC.matchAll(/class="intcc-radar-dot[^"]*" cx="([\d.]+)" cy="([\d.]+)"/g)]
+        .map(m => Math.hypot(Number(m[1]) - cx, Number(m[2]) - cy) / R);
+      return rs.length === 5 && rs.every(r => r >= 0.29 && r <= 0.901); })(),
+    JSON.stringify([...ACC.matchAll(/class="intcc-radar-dot[^"]*" cx="([\d.]+)" cy="([\d.]+)"/g)]
+      .map(m => +(Math.hypot(Number(m[1]) - cx, Number(m[2]) - cy) / R).toFixed(3))));
+  // §4 — EL TAMAÑO, comprobable sin navegador: el marco mide 2·R·sen(72°) unidades
+  // de viewBox, y el SVG ocupa el 100 % de su envoltorio (el tope de 280px en
+  // móvil se retiró), así que la fracción del ancho útil de la card es
+  // exactamente la fracción del viewBox. Medido después en el navegador: 52,5 %.
+  ok('11.26 el marco exterior ocupa entre el 50 % y el 58 % del ancho del viewBox',
+    (() => { const vb = (ACC.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/) || []);
+      if (!vb.length) return false;
+      const frac = (2 * R * Math.sin(72 * Math.PI / 180)) / Number(vb[3]);
+      return frac >= 0.50 && frac <= 0.58; })(),
+    JSON.stringify({ viewBox: (ACC.match(/viewBox="[^"]*"/) || [''])[0],
+      frac: +((2 * R * Math.sin(72 * Math.PI / 180)) / Number((ACC.match(/viewBox="[^ ]+ [^ ]+ ([\d.]+)/) || [, 1])[1])).toFixed(3) }));
+  ok('11.26b …y en móvil el SVG ya no está capado por debajo de su card',
+    /\.intcc-radar-svg \{ max-width: 100%; \}/.test(css)
+    && !/\.intcc-radar-svg \{ max-width: 280px; \}/.test(css));
+  ok('11.26c la retícula son como mucho cinco anillos, y ninguna línea va partida',
+    count(ACC, /class="intcc-radar-ring/g) <= 5
+    && count(ACC, /class="intcc-radar-ring/g) >= 4
+    && !/stroke-dasharray/.test(ACC)
+    && !/\.intcc-radar-axis\.is-unavailable \{[^}]*stroke-dasharray/.test(css),
+    String(count(ACC, /class="intcc-radar-ring/g)));
+  // ── §1 · ORDEN RESPONSIVE ───────────────────────────────────────────────
+  // El bloque de orden es el que declara `.intcc-hero { order: 1; }`: hay varios
+  // `@media (max-width: 1023px)` en el fichero y sólo uno lleva la escalera.
+  const MOBILE_ORDER = (() => {
+    const blocks = css.split('@media (max-width: 1023px)').slice(1);
+    return blocks.find(b0 => /\.intcc-hero\s*\{ order: 1; \}/.test(b0)) || '';
+  })();
+  const ordOf = (sel) => {
+    const r = MOBILE_ORDER.match(new RegExp(sel.replace('.', '\\.') + '\\s*\\{ order: (\\d+); \\}'));
+    return r ? Number(r[1]) : null;
+  };
+  ok('1.1 MÓVIL · Factores → Explora → Radar, y la cabecera intacta',
+    ordOf('.intcc-hero') === 1 && ordOf('.intv12-qcard') === 2
+    && ordOf('.intcc-drivers') === 3 && ordOf('.intcc-explore') === 4
+    && ordOf('.intcc-radar') === 5 && ordOf('.intcc-watch') === 6
+    && ordOf('.intcc-timeline') === 7 && ordOf('.intv4-changed') === 9,
+    JSON.stringify({ hero: ordOf('.intcc-hero'), q: ordOf('.intv12-qcard'),
+      drivers: ordOf('.intcc-drivers'), explore: ordOf('.intcc-explore'),
+      radar: ordOf('.intcc-radar'), watch: ordOf('.intcc-watch'),
+      memoria: ordOf('.intcc-timeline'), changed: ordOf('.intv4-changed') }));
+  ok('1.1b …y en ≤640px la cabecera sigue siendo Inteligencia → Salud → Pregunta',
+    (() => { const b0 = css.split('@media (max-width: 640px)')
+        .find(x => /\.intcc-m-hero\s*\{ order: 0; \}/.test(x)) || '';
+      return /\.intcc-m-hero\s*\{ order: 0; \}/.test(b0)
+        && /\.intcc-m-health\s*\{ order: 1; \}/.test(b0)
+        && /\.intv12-qcard\s*\{ order: 2; \}/.test(b0); })(),
+    JSON.stringify((css.match(/\.intcc-m-(hero|health)\s*\{ order: \d+; \}/g) || [])));
+  ok('1.2 ESCRITORIO · la rejilla no se toca: Radar · Factores · Explora en su fila',
+    /\.intcc-radar     \{ grid-column: 1 \/ 5;  grid-row: 2; \}/.test(css)
+    && /\.intcc-drivers   \{ grid-column: 5 \/ 9;  grid-row: 2; \}/.test(css)
+    && /\.intcc-explore   \{ grid-column: 9 \/ 13; grid-row: 2; \}/.test(css));
+  ok('1.3 y no hay un segundo radar ni un nodo duplicado',
+    (() => { const h = render(CUENTA_A).html;
+      return count(h, /class="intcc-card intcc-radar/g) === 1
+        && count(h, /<svg class="intcc-radar-svg/g) === 1; })(),
+    String(count(render(CUENTA_A).html, /<svg class="intcc-radar-svg/g)));
   ok('11.24 ES y EN dibujan la MISMA geometría (la copy no mueve un punto)',
     (() => { const a = render(Object.assign({}, CUENTA_A, { lang: 'es' })).html;
       const b = render(Object.assign({}, CUENTA_A, { lang: 'en' })).html;

@@ -369,19 +369,26 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // medición— se preserva de forma EXPLÍCITA en vez de por ausencia: el tramo va
   // DISCONTINUO (`is-unknown`) y sigue fuera del relleno, que es el invariante
   // financiero. Se comprueban las dos cosas, así que es más fuerte que antes.
-  ok('3.8b con un hueco la figura se recorre completa y el tramo sin evidencia va discontinuo',
+  // El SPEC de cierre RE-DECIDE el tratamiento: el tramo apoyado en un eje sin
+  // evidencia era DISCONTINUO y hacía parecer roto el gráfico entero. Pasa a
+  // sólido NEUTRAL, en su propio grupo, con color y opacidad distintos — sigue sin
+  // poder leerse como una medición y ahora la trayectoria se sigue de un vistazo.
+  ok('3.8b con un hueco la figura se recorre completa y el tramo sin evidencia va NEUTRAL',
     (svg.match(/class="intcc-radar-edge"/g) || []).length === 3
     && (svg.match(/class="intcc-radar-edge is-unknown"/g) || []).length === 2
-    && /data-svg-edges="5"/.test(svg) && /data-svg-dashed="2"/.test(svg)
+    && /data-svg-edges="5"/.test(svg) && /data-svg-neutral="2"/.test(svg)
+    && /<g class="intcc-radar-edges is-neutral">/.test(svg)
+    && !/stroke-dasharray/.test(svg)
     && !/intcc-radar-area/.test(svg),
-    (svg.match(/data-svg-edges="[^"]*" data-svg-dashed="[^"]*"/) || [, '?'])[0]);
+    JSON.stringify([(svg.match(/data-svg-edges="[^"]*"/) || [, '?'])[0],
+                    (svg.match(/data-svg-neutral="[^"]*"/) || [, '?'])[0]]));
   ok('3.8c con los cinco ejes certificados el pentágono SÍ se cierra y se rellena',
     (() => { const all = run('_intccRadarSvg({ diversification: 80, liquidity: 60, concentration: 40, stability: 55, growth: 30 })');
       return /class="intcc-radar-area" points="/.test(all)
         && (all.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 5
         && (all.match(/class="intcc-radar-edge"/g) || []).length === 5
         && !/class="intcc-radar-edge is-unknown"/.test(all)
-        && /data-svg-open="0"/.test(all) && /data-svg-dashed="0"/.test(all); })());
+        && /data-svg-open="0"/.test(all) && /data-svg-neutral="0"/.test(all); })());
   ok('3.9 no "0", "50" or "—" placeholder value is emitted for the absent axis',
     !/intcc-radar-val[^"]*"[^>]*>(0|50|55|—|null|NaN)</.test(svg));
   // ── §8 · NINGÚN MARCADOR EN EL CENTRO NI EN EL VÉRTICE ───────────────────
@@ -390,7 +397,7 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // el vértice exterior, que es donde vivía el marcador de «sin datos».
   const dotsOf = str => (str.match(/class="intcc-radar-dot" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g) || [])
     .map(m => { const n = m.match(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/); return [+n[1], +n[2]]; });
-  const R_OUT = 76, CX = 110, CY = 106;
+  const R_OUT = 100, CX = 110, CY = 106;   // §4 — el marco crece dentro de la misma card
   const radiusOf = ([x, y]) => Math.sqrt((x - CX) ** 2 + (y - CY) ** 2);
   {
     const zero = run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0, growth: 0 })');

@@ -20490,7 +20490,7 @@ body.gs-open { overflow: hidden; }
 
 /* ── Bloque 4 — Radar ── */
 .intcc-radar-wrap { display: grid; place-items: center; }
-.intcc-radar-svg { width: 100%; max-width: 340px; height: auto; }
+.intcc-radar-svg { width: 100%; max-width: 380px; height: auto; }
 .intcc-radar-ring { fill: none; stroke: rgba(150,180,240,0.10); stroke-width: 0.8; }
 /* SPEC §11 — EL MARCO NO ES UN NIVEL. Los anillos interiores SÍ son niveles de la
    banda medible [22 %, 88 %] y el exterior es la estructura conceptual del
@@ -20515,22 +20515,27 @@ body.gs-open { overflow: hidden; }
   filter: drop-shadow(0 0 5px rgba(92,156,255,0.55));
 }
 .intcc-radar-dot { fill: #cfe0ff; filter: drop-shadow(0 0 3px rgba(92,156,255,0.9)); }
-/* SPEC §11 — EL TRAMO DESCONOCIDO SE DIBUJA, PERO DISCONTINUO. La figura recorre
-   los cinco ejes y se cierra (sin eso el radar se leía como un triángulo), y el
-   trazo que toca un eje sin datos va de puntos y sin glow: la forma es legible y
-   la línea dice que ese tramo no es una medición. El RELLENO sigue exigiendo los
+/* SPEC §6 — LA TRAYECTORIA ES CONTINUA, CON DOS TRATAMIENTOS. El tramo que toca un
+   eje sin datos era DISCONTINUO y en la pantalla real hacía que el gráfico entero
+   pareciese roto: exactamente lo contrario de lo que la continuidad resuelve. Pasa
+   a SÓLIDO y NEUTRAL — mismo grosor, azul apagado, sin resplandor— así que sostiene
+   la forma de los cinco ejes sin poder leerse como una medición certificada. Lo que
+   distingue medido de desconocido es el COLOR, la OPACIDAD, el marcador HUECO y la
+   palabra «sin datos»; nunca una línea partida. El RELLENO sigue exigiendo los
    cinco ejes certificados — eso lo decide el motor, no el CSS. */
 .intcc-radar-edge.is-unknown {
-  stroke: rgba(150,180,240,0.46);
-  stroke-width: 1.25;
-  stroke-dasharray: 3 3;
+  stroke: rgba(138,166,214,0.42);
+  stroke-width: 1.6;
   filter: none;
 }
-/* HALO — anillo SIN relleno pintado DESPUÉS del marcador (orden de capas del §11).
-   Separa el punto de las conexiones y de la retícula sin taparlo: no es un brillo
-   y no crece con el valor. */
-.intcc-radar-halo { fill: none; stroke: rgba(10,14,23,0.82); stroke-width: 2.2; }
-.intcc-radar-halo.is-unknown { stroke: rgba(10,14,23,0.7); stroke-width: 2; }
+/* HALO — anillo SIN relleno pintado DESPUÉS del marcador (orden de capas del §7).
+   Separa el punto de las conexiones y de la retícula sin taparlo: no es un brillo,
+   no crece con el valor y es IDÉNTICO para los cinco. */
+/* Disco opaco del color del lienzo, bajo el marcador: separa el punto de las
+   conexiones y de la retícula sin morder su contorno (ver el comentario del
+   renderer). No es un brillo y no crece con el valor. */
+.intcc-radar-halo { fill: #111726; stroke: none; }
+.intcc-radar-halo.is-unknown { fill: #111726; }
 .intcc-radar-label { fill: rgba(214,226,255,0.82); font-size: 9.5px; font-weight: 600; }
 .intcc-radar-val   { fill: rgba(150,180,240,0.62); font-size: 8px; font-weight: 700; font-variant-numeric: tabular-nums; }
 @keyframes intccRadarIn { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -20912,8 +20917,7 @@ body.gs-open { overflow: hidden; }
    "sin datos" and WITHOUT a vertex — so the eye reads "not measured yet" instead
    of "measured at zero". Those are different claims and must never look alike. */
 .intcc-radar-axis.is-unavailable {
-  stroke: rgba(150,180,240,0.16);
-  stroke-dasharray: 2.5 3.5;
+  stroke: rgba(150,180,240,0.11);
   stroke-linecap: round;
 }
 .intcc-radar-label.is-unavailable { fill: rgba(214,226,255,0.40); font-weight: 600; }
@@ -20931,8 +20935,8 @@ body.gs-open { overflow: hidden; }
    tendría que hacerlo. No entra en el polígono: eso lo decide el motor. */
 .intcc-radar-dot.is-unknown {
   fill: none;
-  stroke: rgba(158,188,246,0.72);
-  stroke-width: 1.3;
+  stroke: rgba(168,196,250,0.85);
+  stroke-width: 1.6;
   filter: none;                      /* sin glow: un dato ausente no brilla */
 }
 /* TRANSICIÓN SUTIL AL MOVERSE UN VALOR. Sólo geometría y opacidad, sin animación
@@ -20946,11 +20950,11 @@ body.gs-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-radar-dot { transition: none !important; }
 }
-/* Los dos marcadores se leen a tamaño real en los tres viewports. El hueco es un
-   punto MAYOR que el sólido: sin relleno necesita más diámetro para pesar lo
-   mismo en la composición. */
-.intv6-radar .intcc-radar-dot { r: 2.9; }
-.intv6-radar .intcc-radar-dot.is-unknown { r: 3.5; }
+/* §7 — MISMO DIÁMETRO EXTERIOR y misma alineación para los cinco. Un hueco mayor
+   que un sólido rompía la retícula de lectura; lo que distingue al desconocido es
+   el relleno y el contorno, no el tamaño. */
+.intv6-radar .intcc-radar-dot,
+.intv6-radar .intcc-radar-dot.is-unknown { r: 4; }
 
 /* ── INT.06 · STRUCTURE dependence line ─────────────────────────────────────*/
 .intv6-struct-dep {
@@ -21174,9 +21178,14 @@ body.gs-open { overflow: hidden; }
   /* INT.05 — change reads right after the cockpit, so every later block shifts by
      one. Distinct values on purpose: `order: 3` tied with the drivers and DOM
      order silently decided the winner (measured). */
-  /* INT.07 §15 — hero → radar → factores → explora → lo que importa → memoria →
-     estructura → qué ha cambiado → descubrimiento. One column, natural heights:
-     equal heights stop making sense once the cards are stacked. */
+  /* ORDEN DE LECTURA EN UNA COLUMNA, re-decidido por el cierre final:
+     hero → pregunta → FACTORES → EXPLORA → RADAR → lo que importa → memoria →
+     estructura → qué ha cambiado → descubrimientos. El radar baja porque en
+     vertical su lectura es más lenta que la de Factores y Explora, que responden
+     «de qué depende mi patrimonio» de un vistazo. Alturas naturales: igualarlas
+     deja de tener sentido en cuanto las cards se apilan.
+     ESCRITORIO NO CAMBIA: su rejilla (≥1024px) sigue pineando Radar · Factores ·
+     Explora en la misma fila y en las mismas celdas. */
   .intcc-hero      { order: 1; }
   /* A2 — INVARIANTE: toda card de Intelligence tiene que declarar su `order` en
      este rango o se pinta ANTES del hero (flex-column con orders 1…10). La
@@ -21184,9 +21193,9 @@ body.gs-open { overflow: hidden; }
      qué pasa, después qué te pregunta Aurix. En ≤640px el bloque de abajo la
      recoloca detrás de Salud, que es la composición que pidió el founder. */
   .intv12-qcard    { order: 2; }
-  .intcc-radar     { order: 3; }
-  .intcc-drivers   { order: 4; }
-  .intcc-explore   { order: 5; }
+  .intcc-drivers   { order: 3; }
+  .intcc-explore   { order: 4; }
+  .intcc-radar     { order: 5; }
   .intcc-watch     { order: 6; }
   .intcc-timeline  { order: 7; }
   .intv5-structure { order: 8; }
@@ -21268,7 +21277,10 @@ body.gs-open { overflow: hidden; }
   /* Bloque 4/5/6/9 — compact cards on mobile */
   .intcc-card { padding: 14px 15px; }
   .intcc-card-title { margin-bottom: 10px; }
-  .intcc-radar-svg { max-width: 280px; }
+  /* §4 — el tope de 280px dejaba 46px de card sin usar y era, medido, la mitad
+     del problema de «radar pequeño». El SVG ocupa su envoltorio; el viewBox ya
+     está ceñido a las etiquetas, así que no hay recorte posible. */
+  .intcc-radar-svg { max-width: 100%; }
   .intcc-drv-explain { font-size: 12px; margin-bottom: 10px; }
   .intcc-drv-list { gap: 9px; }
   .intcc-x-q { padding: 9px 13px; font-size: 12.5px; }
@@ -21368,9 +21380,9 @@ body.gs-open { overflow: hidden; }
     filter: drop-shadow(0 0 6px rgba(92,156,255,0.7));
   }
   .intcc-radar-edge { fill: none; }
-  .intcc-radar-edge.is-unknown { fill: none; stroke: rgba(150,180,240,0.52); filter: none; }
-  .intcc-radar-dot { r: 3.1px; fill: #e2edff; }
-  .intcc-radar-dot.is-unknown { r: 3.7px; fill: none; }
+  .intcc-radar-edge.is-unknown { fill: none; stroke: rgba(146,176,226,0.50); filter: none; }
+  .intcc-radar-dot { r: 4.4px; fill: #e2edff; }
+  .intcc-radar-dot.is-unknown { r: 4.4px; fill: none; }
 
   /* ── 6. Health card — more premium and compact.
      Truly-centred score, higher-contrast checks, −8% badge height. */

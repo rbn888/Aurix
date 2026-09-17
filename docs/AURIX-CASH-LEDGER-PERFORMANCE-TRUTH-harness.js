@@ -445,6 +445,11 @@ console.log('\n6 · lectura paginada del ledger (completitud demostrable):');
       // haría fallar el select entero y marcaría el ledger como incompleto, y eso
       // detendría la publicación de rentabilidad. Es parte del contrato.
       _aurixFlowIntentColumn: 'unknown',
+      // §10 — el mismo contrato para `recorded_at`, la PROCEDENCIA de la
+      // operación: arranca en 'unknown', así que la lectura tampoco la pide. Sin
+      // declararla aquí el owner lanza un ReferenceError y el pull entero cae por
+      // el `catch`, que es exactamente cómo se descubrió que faltaba.
+      _aurixFlowRecordedColumn: 'unknown',
       _AURIX_FLOW_INTENT: _AURIX_FLOW_INTENT,
     };
     vm.createContext(ctx);

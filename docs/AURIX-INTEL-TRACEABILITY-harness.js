@@ -912,16 +912,20 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
         && unkXY.every(xy => edges.every(e => e.indexOf(xy.split(',')[0]) === -1
                                            || e.indexOf(xy.split(',')[1]) === -1)); })(),
     JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
-  // §11 — las tres señales que distinguen «no medido» de «medido en cero», y
-  // ninguna de las tres es la coordenada: marcador HUECO (`fill: none`), los dos
-  // segmentos adyacentes DISCONTINUOS y la palabra «sin datos» bajo la etiqueta
-  // (10.22). La radial al centro se retiró con §11 — el centro no es un dato.
-  ok('10.21 un eje DESCONOCIDO se distingue por relleno, trazo y texto, no por su radio',
+  // Las tres señales que distinguen «no medido» de «medido en cero», y ninguna es
+  // la coordenada: marcador HUECO (`fill: none`), su tramo de trayectoria en tono
+  // NEUTRAL —sólido, no partido: el SPEC de cierre re-decidió la discontinua
+  // porque hacía parecer roto el gráfico entero— y la palabra «sin datos» bajo la
+  // etiqueta (10.22). La radial al centro se retiró: el centro no es un dato.
+  ok('10.21 un eje DESCONOCIDO se distingue por relleno, tono y texto, no por su radio',
     /class="intcc-radar-dot is-unknown"[^>]*data-availability="unknown"/.test(rr)
     && /class="intcc-radar-edge is-unknown"/.test(rr)
     && !/intcc-radar-spoke/.test(rr)
+    // El ámbito es el SVG DEL RADAR: `rr` es la pintura completa y el anillo de
+    // Salud emite su propio `stroke-dasharray` como atributo.
+    && !/stroke-dasharray/.test((rr.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0])
     && /\.intcc-radar-dot\.is-unknown\s*\{[^}]*fill:\s*none/.test(css)
-    && /\.intcc-radar-edge\.is-unknown\s*\{[^}]*stroke-dasharray/.test(css),
+    && /\.intcc-radar-edge\.is-unknown\s*\{[^}]*stroke:\s*rgba\(138,166,214/.test(css),
     JSON.stringify((rr.match(/class="intcc-radar-dot is-unknown"[^>]*/g) || []).slice(0, 1)));
   ok('10.22 …dice «sin datos» y su etiqueta está atenuada',
     count(rr, /class="intcc-radar-val is-unavailable"/g) === 2

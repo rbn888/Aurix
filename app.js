@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '690'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '691'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -10363,6 +10363,7 @@ function _aurixEnforceCacheOwner(userId) {
       // pero re-descubrirlo cuesta un upsert y evita arrastrar un 'no' que en
       // realidad fue un error de red de la sesión anterior.
       try { _aurixFlowIntentColumn = 'unknown'; } catch (_) {}
+      try { _aurixFlowRecordedColumn = 'unknown'; } catch (_) {}
       // La guarda de impresión de la pregunta es por SESIÓN de usuario: si no se
       // reinicia, la primera pregunta de B no se registraría como mostrada.
       try { _intelMarkedQuestionId = null; } catch (_) {}
@@ -11437,6 +11438,12 @@ const _AURIX_FLOW_INTENT_EXTERNAL = Object.freeze(['EXTERNAL_CASH_CONTRIBUTION',
 // lectura entera fallaría), así que la presencia se descubre en la ESCRITURA, que
 // ya sabe reintentar, y sólo entonces se empieza a leer.
 let _aurixFlowIntentColumn = 'unknown';   // unknown | yes | no
+// §10 — `capital_flows.recorded_at`, la PROCEDENCIA de la operación: cuándo entró
+// en Aurix, que NO es su fecha económica. Se descubre por el mismo camino que
+// `intent` —escribiendo, una vez por sesión— porque un upsert que nombra una
+// columna ausente falla COMPLETO y dejaría sin sincronizar el ledger financiero de
+// todo el mundo. Mientras valga 'no', el comportamiento es EXACTAMENTE el de hoy.
+let _aurixFlowRecordedColumn = 'unknown';   // unknown | yes | no
 // SPEC CIERRE PRE-FREEZE — la lectura del ledger sufría la MISMA clase de truncamiento silencioso que
 // se eliminó de `portfolio_snapshots`: `.select(...).eq('user_id', …)` sin `order`, sin `limit` y sin
 // paginación. PostgREST devuelve como mucho `max-rows` (1000) SIN señalarlo como error y, al no haber
@@ -11733,7 +11740,7 @@ function _aurixFlowLedgerRevision() {
 function _aurixBumpFlowLedgerRevision() {
   try { const n = _aurixFlowLedgerRevision() + 1; localStorage.setItem(_AURIX_FLOW_REVISION_KEY, String(n)); return n; } catch (_) { return 0; }
 }
-function _aurixFlowRowFromLocal(f, withIntent) {
+function _aurixFlowRowFromLocal(f, withIntent, withRecorded) {
   const row = {
     flow_id:    String(f.id),
     ts:         new Date(Number(f.ts) || Date.now()).toISOString(),
@@ -11751,6 +11758,15 @@ function _aurixFlowRowFromLocal(f, withIntent) {
   // ciegas rompería la persistencia del ledger de todo el mundo hasta aplicar el
   // SQL. Se descubre escribiendo (ver `_aurixCapitalFlowsPush`), no leyendo.
   if (withIntent) row.intent = _aurixFlowIntentOf(f);
+  // §10 — LA PROCEDENCIA VIAJA SÓLO SI EXISTE, y NUNCA se fabrica. Una fila legacy
+  // no tiene `recordedAt` local, así que la columna se OMITE para esa fila: en un
+  // upsert eso deja el valor remoto intacto (o NULL al insertar), que es
+  // exactamente «procedencia desconocida». Poner aquí `Date.now()` sería el backfill
+  // con la hora actual que el propio SQL prohíbe por escrito, y convertiría una
+  // compra de 2021 en algo que «registraste hoy».
+  if (withRecorded && Number.isFinite(Number(f.recordedAt))) {
+    row.recorded_at = new Date(Number(f.recordedAt)).toISOString();
+  }
   return row;
 }
 async function _aurixCapitalFlowsPush(flows) {
@@ -11759,33 +11775,52 @@ async function _aurixCapitalFlowsPush(flows) {
     if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return false;
     const list = (Array.isArray(flows) ? flows : []).filter(Boolean);
     if (!list.length) return false;
-    const send = async (withIntent) => {
-      const rows = list.map(f => Object.assign({ user_id: currentUser.id }, _aurixFlowRowFromLocal(f, withIntent)));
+    const send = async (withIntent, withRecorded) => {
+      const rows = list.map(f => Object.assign({ user_id: currentUser.id },
+        _aurixFlowRowFromLocal(f, withIntent, withRecorded)));
       // Idempotente por (user_id, flow_id): repetir el push de un mismo evento es
       // un no-op, y una edición reescribe SU fila en vez de añadir otra.
       return await supabaseClient.from('capital_flows').upsert(rows, { onConflict: 'user_id,flow_id' });
     };
-    // DESCUBRIMIENTO DE ESQUEMA EN LA ESCRITURA, una sola vez por sesión. Si la
-    // columna no está, se reintenta SIN ella y se recuerda: el ledger sigue
-    // sincronizando exactamente como hoy. Si está, se recuerda también y a partir
-    // de ahí la lectura puede pedirla.
-    let attemptIntent = (_aurixFlowIntentColumn !== 'no');
-    let { error } = await send(attemptIntent);
-    if (error && attemptIntent) {
-      // SÓLO UN ERROR DE ESQUEMA retira la columna. Con cualquier error (un 5xx,
-      // un corte de red) se marcaba 'no' para TODA la sesión: las filas siguientes
-      // se escribían sin `intent`, un pull posterior lo quitaba también en local, y
-      // al ser UNKNOWN_LEGACY terminal y no promovible las etiquetas se perdían
-      // para siempre por un fallo transitorio. Un fallo de red no es una prueba
-      // sobre el esquema, así que el estado se queda en 'unknown' y se reintenta.
-      const _msg = String((error && (error.message || error.code || error.details)) || '').toLowerCase();
-      const _schema = /intent/.test(_msg) || /column/.test(_msg) || /pgrst204/.test(_msg)
-                   || /42703/.test(_msg) || /schema/.test(_msg);
-      if (_schema) _aurixFlowIntentColumn = 'no';
-      const retry = await send(false);
-      error = retry.error;
-    } else if (!error && attemptIntent) {
-      _aurixFlowIntentColumn = 'yes';
+    // Un error de ESQUEMA (columna ausente) retira la columna; cualquier otro —un
+    // 5xx, un corte de red— NO prueba nada sobre el esquema y deja el estado en
+    // 'unknown' para reintentarlo. Es la lección que ya costó perder etiquetas de
+    // `intent` por un fallo transitorio.
+    const isSchemaError = (err) => {
+      const m = String((err && (err.message || err.code || err.details)) || '').toLowerCase();
+      return /column/.test(m) || /pgrst204/.test(m) || /42703/.test(m) || /schema/.test(m);
+    };
+    // DESCUBRIMIENTO DE ESQUEMA EN LA ESCRITURA, una vez por sesión y ahora para
+    // DOS columnas opcionales. Se prueban de más a menos y el primer éxito fija el
+    // estado de ambas; un error de esquema descarta la combinación y pasa a la
+    // siguiente. En el peor caso son tres intentos UNA vez, y el resultado es que
+    // el ledger sincroniza igual que hoy aunque no exista ninguna de las dos.
+    const wantIntent = (_aurixFlowIntentColumn !== 'no');
+    const wantRec    = (_aurixFlowRecordedColumn !== 'no');
+    const combos = [];
+    if (wantIntent && wantRec) combos.push([true, true]);
+    if (wantIntent)            combos.push([true, false]);
+    if (wantRec)               combos.push([false, true]);
+    combos.push([false, false]);
+    let error = null;
+    for (let ci = 0; ci < combos.length; ci++) {
+      const [wi, wr] = combos[ci];
+      const res = await send(wi, wr);
+      error = res.error;
+      if (!error) {
+        // Sólo se AFIRMA lo que el intento demuestra: una escritura que incluyó la
+        // columna prueba que existe; una que no la incluyó no prueba que falte.
+        if (wi) _aurixFlowIntentColumn = 'yes';
+        if (wr) _aurixFlowRecordedColumn = 'yes';
+        break;
+      }
+      if (!isSchemaError(error)) break;              // fallo transitorio: no se concluye nada
+      if (ci === combos.length - 1) break;           // ya era el intento sin columnas
+      // La combinación siguiente retira exactamente la columna que ésta llevaba y
+      // la próxima no: eso es lo que convierte el fallo en conocimiento.
+      const [ni, nr] = combos[ci + 1];
+      if (wi && !ni) _aurixFlowIntentColumn = 'no';
+      if (wr && !nr) _aurixFlowRecordedColumn = 'no';
     }
     if (error) { try { console.warn('[capital-flows][push]', error.message || error); } catch (_) {} return false; }
     _aurixBumpFlowLedgerRevision();
@@ -11818,7 +11853,12 @@ async function _aurixCapitalFlowsPull() {
       // completa, y una lectura fallida marca el ledger como incompleto ⇒ dejaría
       // de publicarse rentabilidad. El coste de descubrirlo por aquí sería un P0.
       const _cols = 'flow_id, ts, kind, amount, currency, amount_usd, asset_id, revision, deleted_at'
-                  + (_aurixFlowIntentColumn === 'yes' ? ', intent' : '');
+                  + (_aurixFlowIntentColumn === 'yes' ? ', intent' : '')
+                  // §10 — misma regla que `intent`: sólo se pide cuando la escritura
+                  // ya demostró que la columna existe. Nombrarla sin estar hace
+                  // fallar la lectura ENTERA, y una lectura fallida marca el ledger
+                  // como incompleto ⇒ dejaría de publicarse rentabilidad.
+                  + (_aurixFlowRecordedColumn === 'yes' ? ', recorded_at' : '');
       let _q = supabaseClient.from('capital_flows')
         .select(_cols, _page === 0 ? { count: 'exact' } : undefined)
         .eq('user_id', currentUser.id);
@@ -11863,6 +11903,13 @@ async function _aurixCapitalFlowsPull() {
       // valor desconocido se trata como ausente (UNKNOWN_LEGACY), nunca como una
       // intención nueva: el conjunto lo fija el contrato, no la fila.
       if (r.intent && _AURIX_FLOW_INTENT[r.intent]) remote.intent = String(r.intent);
+      // §10 — LA PROCEDENCIA CRUZA EL DISPOSITIVO. Si la fila remota no la trae
+      // (legacy, o escrita por un cliente sin la columna), la CLAVE NO SE DEFINE:
+      // el merge es `Object.assign`, así que una ausencia remota no puede borrar
+      // un `recordedAt` local. Sin ella la lectura sigue siendo DESCONOCIDA y el
+      // motor nunca dice «hoy» — el mismo fail-closed que rige hoy.
+      { const _rec = r.recorded_at ? new Date(r.recorded_at).getTime() : NaN;
+        if (Number.isFinite(_rec)) remote.recordedAt = _rec; }
       if (!Number.isFinite(remote.ts) || !Number.isFinite(remote.amountUSD)) continue;
       const cur = byId.get(remote.id);
       // Autoridad por REVISIÓN, no por reloj: una edición posterior siempre gana,
@@ -60134,7 +60181,8 @@ function _intccRadarSvg(radar, dimsOverride) {
   const dims = ALL_DIMS;
   const measured = dims.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
   if (dims.length < 3) return '';
-  const cx = 110, cy = 106, R = 76, n = dims.length;
+  const cx = 110, cy = 106, R = 100, n = dims.length;
+  const RADAR_DOT_R = 4;                        // §7 — el mismo para los cinco
   const ang = i => (-90 + i * (360 / n)) * Math.PI / 180;
   const pt  = (i, r) => [cx + Math.cos(ang(i)) * r, cy + Math.sin(ang(i)) * r];
   // ── §11 · LA BANDA DE LA SERIE, Y POR QUÉ EL CENTRO DEJA DE MEDIR ────────
@@ -60155,15 +60203,20 @@ function _intccRadarSvg(radar, dimsOverride) {
   // Esto es GEOMETRÍA y sólo geometría: no toca métricas, Salud, hechos,
   // porcentajes, narrativa ni decisiones. Las etiquetas siguen imprimiendo el
   // dato real, incluido un 0 %.
-  const RMIN = 0.22, RMAX = 0.88;
+  // [22 %, 88 %] seguía siendo conservadora: en la captura autenticada del caso de
+  // referencia —2,2/7 · 31 % · 7 % y dos ejes sin datos— los cinco marcadores caían
+  // entre 0,22R y 0,43R, o sea un cúmulo en el tercio interior que no se lee como
+  // un radar. La banda sube a [30 %, 90 %]: el suelo levanta la figura del centro
+  // sin tocar ni un porcentaje publicado, y el techo deja margen al vértice.
+  const RMIN = 0.30, RMAX = 0.90;
   const rBand = f => R * (RMIN + (RMAX - RMIN) * Math.max(0, Math.min(1, f)));
   const R_UNK = R * RMIN;                       // límite INTERIOR de referencia
   let rings = '';
-  // Mismo número de trazos que antes (marco + tres niveles), así que la densidad
-  // visual no cambia; lo que cambia es DÓNDE están y qué significan.
+  // Marco + CUATRO niveles de la banda = cinco anillos, el máximo que §8 permite.
+  // Todos comparten centro y geometría, y el interior (f = 0) ES la línea del cero.
   const poly = r => dims.map((_, i) => pt(i, r).map(v => v.toFixed(1)).join(',')).join(' ');
   rings += `<polygon class="intcc-radar-ring is-frame" points="${poly(R)}"/>`;
-  [0, 0.5, 1].forEach(f => {
+  [0, 1 / 3, 2 / 3, 1].forEach(f => {
     rings += `<polygon class="intcc-radar-ring" points="${poly(rBand(f))}"/>`;
   });
   let axes = '';
@@ -60197,24 +60250,27 @@ function _intccRadarSvg(radar, dimsOverride) {
   const dp = dims
     .map((d, i) => (measured.indexOf(d) === -1) ? null : pt(i, rOf(d.key)).map(v => v.toFixed(1)).join(','))
     .filter(Boolean).join(' ');
-  // ── §11 · CINCO SEGMENTOS, SIEMPRE, Y LA FIGURA SE CIERRA ────────────────
-  // Antes sólo se unían pares de ejes ADYACENTES los DOS certificados, así que con
-  // dos ejes sin datos la figura quedaba abierta y el radar parecía roto. Ahora se
-  // recorre 1→2→3→4→5→1 sin saltar ninguno y el trazo que toca un eje desconocido
-  // es DISCONTINUO: la forma se lee, y la línea discontinua dice que ese tramo no
-  // es una medición. El RELLENO sigue exigiendo los cinco ejes certificados, que es
-  // el invariante financiero: un área sobre un eje desconocido inventaría
-  // superficie medida.
-  let edges = '', edgeCount = 0, dashedCount = 0;
+  // ── §6 · CINCO SEGMENTOS, SIEMPRE, Y LA TRAYECTORIA ES CONTINUA ──────────
+  // Se recorre 1→2→3→4→5→1 sin saltar ningún eje y la figura CIERRA. El trazo que
+  // toca un eje sin datos era DISCONTINUO, y en la pantalla real eso hacía que el
+  // gráfico entero pareciese roto — que es justo lo contrario de lo que la
+  // continuidad viene a resolver. Pasa a ser SÓLIDO y NEUTRAL: mismo grosor, color
+  // azulado apagado y sin resplandor, así que mantiene la forma sin poder leerse
+  // como una medición certificada. La diferencia la comunican el color, la
+  // opacidad, el marcador hueco y la palabra «sin datos» — nunca una línea partida.
+  // Los dos tratamientos van en GRUPOS separados para respetar el orden de capas
+  // de §7: primero la trayectoria neutral, después los tramos medidos encima.
+  let edgeNeutral = '', edgeMeasured = '', edgeCount = 0, neutralCount = 0;
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
-    const dashed = !isM(i) || !isM(j);
+    const known = isM(i) && isM(j);
     const [ax, ay] = posOf(i);
     const [bx, by] = posOf(j);
-    edges += `<line class="intcc-radar-edge${dashed ? ' is-unknown' : ''}"`
+    const seg = `<line class="intcc-radar-edge${known ? '' : ' is-unknown'}"`
           +  ` x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}"`
           +  ` x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}"/>`;
-    edgeCount++; if (dashed) dashedCount++;
+    if (known) edgeMeasured += seg; else { edgeNeutral += seg; neutralCount++; }
+    edgeCount++;
   }
   let labels = '', dots = '', halos = '';
   dims.forEach((d, i) => {
@@ -60254,32 +60310,41 @@ function _intccRadarSvg(radar, dimsOverride) {
     // ambigua. Las radiales al centro se RETIRAN: con cinco segmentos siempre
     // dibujados ningún marcador queda sin anclar, y una línea que sale del centro
     // volvería a sugerir que el centro es un valor.
+    // §7 — MISMO DIÁMETRO EXTERIOR y misma alineación para los cinco. Un hueco más
+    // grande que un sólido rompía la retícula de lectura: lo que distingue al
+    // desconocido es el RELLENO (ninguno) y el contorno, no el tamaño. El halo es
+    // idéntico para ambos, así que ninguna línea atraviesa el centro de un marcador.
     const [dx, dy] = posOf(i);
     halos += `<circle class="intcc-radar-halo${isMeasured ? '' : ' is-unknown'}"`
-          +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${isMeasured ? '4.1' : '4.8'}"/>`;
+          +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${(RADAR_DOT_R + 2.2).toFixed(1)}"/>`;
     dots += `<circle class="intcc-radar-dot${isMeasured ? '' : ' is-unknown'}"`
-         +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${isMeasured ? '2.8' : '3.4'}"`
+         +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${RADAR_DOT_R}"`
          +  ` data-axis="${_intccEsc(d.key)}"`
          +  ` data-availability="${isMeasured ? 'measured' : 'unknown'}"/>`;
   });
-  // viewBox padded horizontally so the outer end/start-anchored labels
-  // (Diversificación, Concentración…) are never clipped on narrow screens, and
-  // INT.2Y — extra top padding so the raised apex label never clips.
+  // ── §4 · EL VIEWBOX SE CIÑE A LOS EXTREMOS REALES ────────────────────────
+  // Los fijan las etiquetas laterales (vértices 1 y 4, ancladas start/end a R+15
+  // más el ancho del texto), la del ápice arriba y el par inferior con su cifra
+  // debajo. Con R = 100 los extremos caen en x ∈ [−67, 277] e y ∈ [−26, 214]
+  // sobre la copy más larga de los dos idiomas, así que el marco deja ~5 unidades
+  // de holgura por lado: ni una etiqueta se recorta y no sobra espacio muerto.
   return `
-    <svg class="intcc-radar-svg" viewBox="-58 -12 336 232" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}"
+    <svg class="intcc-radar-svg" viewBox="-76 -32 362 252" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}"
          data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
          data-svg-unknown="${dims.length - measured.length}"
          data-svg-open="${closeArea ? '0' : '1'}" data-svg-edges="${edgeCount}"
-         data-svg-dashed="${dashedCount}" data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}">
-      ${/* ORDEN DE CAPAS (§11): retícula → relleno → conexiones → marcadores →
-            halo → etiquetas. El halo va DESPUÉS de los marcadores y es un anillo
-            SIN relleno, así que separa el punto de las líneas y de la retícula sin
-            taparlo. */''}
+         data-svg-neutral="${neutralCount}" data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}">
+      ${/* ORDEN DE CAPAS (§7): retícula → trayectoria neutral → segmentos medidos
+            → marcador CON SU HALO → etiquetas. El halo es un disco opaco del color
+            del lienzo inmediatamente bajo el marcador: corta las conexiones justo
+            en su borde, así que ninguna línea atraviesa el centro de un marcador y
+            el contorno del hueco no queda mordido por un anillo superpuesto. */''}
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
-      ${edges ? `<g class="intcc-radar-edges">${edges}</g>` : ''}
-      <g class="intcc-radar-dots">${dots}</g>
+      ${edgeNeutral ? `<g class="intcc-radar-edges is-neutral">${edgeNeutral}</g>` : ''}
+      ${edgeMeasured ? `<g class="intcc-radar-edges">${edgeMeasured}</g>` : ''}
       <g class="intcc-radar-halos">${halos}</g>
+      <g class="intcc-radar-dots">${dots}</g>
       <g class="intcc-radar-labels">${labels}</g>
     </svg>`;
 }
