@@ -555,8 +555,15 @@ console.log('\n8 · Diario · un documento, una moneda, declarada:');
     sb.lang = 'es'; sb.baseCurrency = base || 'EUR';
     sb._wsToolStateSet = () => {}; sb._wsJrnRerender = () => {}; sb._wsToolStateGet = () => null;
     vm.runInContext('var _wsToolDirty = false, _wsJrnEditId = null, _wsJrnDraft = null;', sb);
-    ['_wsNum', 'formatCurrency', '_wsJournalDefaults', '_wsJrnNewDraft', '_wsJrnAdd',
+    // SPEC P0 §3 — `_wsJrnAdd` ya no falla en silencio cuando falta un campo
+    // obligatorio: pide la validación al owner compartido. Va REAL al contexto.
+    ['_wsNum', '_wsNumOrNull', '_wsDraftMissing', '_wsDraftRequiredIn', '_wsDraftRequired',
+     'formatCurrency', '_wsJournalDefaults', '_wsJrnNewDraft', '_wsJrnAdd',
      'calculateTradeJournal', '_wsJrnMoney'].forEach(n => vm.runInContext(fnSrc(n), sb));
+    // Sin DOM, el owner de validación devuelve false sin tocar nada: es
+    // exactamente lo que hace en producción cuando la vista no está montada.
+    vm.runInContext('var document = { querySelector: () => null };', sb);
+    vm.runInContext('function t(k){ return k; }', sb);
     vm.runInContext('function formatBase(a){ return formatCurrency(a, baseCurrency); }', sb);
     vm.runInContext('var _wsToolInputs = _wsJournalDefaults();', sb);
     return sb;

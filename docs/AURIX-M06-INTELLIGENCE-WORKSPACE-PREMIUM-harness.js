@@ -192,10 +192,13 @@ section('E — Intelligence: CTA Free y verdad semántica:');
      /\.intprev-ctas\{display:flex;flex-direction:column/.test(app) &&
      /@media \(min-width:768px\)\{[\s\S]{0,400}?\.intprev-cta\{width:auto/.test(app));
   ok('E.3 el preview muestra hechos CIERTOS del propio patrimonio, no promesas',
-     // §D publica DOS visibles y un tercero bloqueado, así que la condición mira
-     // `visible` en vez de `facts`. Los hechos siguen saliendo del mismo motor.
+     // SPEC P0 §1 — el reparto pasa a UN visible y DOS bloqueados (§D fijaba dos y
+     // uno). Lo que este assert protege es que el visible salga del MOTOR y no de
+     // una promesa, y eso no cambia. El reparto exacto y el no-filtrado de los
+     // bloqueados los certifica AURIX-INT-PREVIEW-V1 §10 ejecutando el render.
      /res\.state === 'ok' && _visible\.length/.test(app) && /intprev-fact/.test(app) &&
-     /out\.visible = out\.facts\.slice\(0, 2\);/.test(app));
+     /out\.visible = out\.facts\.slice\(0, 1\);/.test(app) &&
+     /out\.locked = out\.facts\.slice\(1, 3\);/.test(app));
   ok('E.4 «sin datos» NUNCA es 0: un eje no certificable se declara `unavailable`',
      /unavailable/.test(app) && !/unavailable[^\n]{0,40}:\s*0\b/.test(appB));
   ok('E.5 Estabilidad y Crecimiento siguen `unavailable` a propósito (contrato INT.07)',

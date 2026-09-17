@@ -84,6 +84,9 @@ function ctx(persona, langCode) {
   vm.runInContext('var __upsell = []; function openUpgradeIntent(o){ __upsell.push(o); return false; }', sb);
   // Almacenamiento local real (en memoria) para que fijados y recientes se comporten.
   vm.runInContext('var __LS = Object.create(null); var localStorage = { getItem: k => (k in __LS ? __LS[k] : null), setItem: (k,v) => { __LS[k] = String(v); }, removeItem: k => { delete __LS[k]; } };', sb);
+  // `sessionStorage` real (en memoria): la vista técnica de fundador es una
+  // activación DELIBERADA de sesión, así que el gate tiene que poder ejercerla.
+  vm.runInContext('var __SS = Object.create(null); var sessionStorage = { getItem: k => (k in __SS ? __SS[k] : null), setItem: (k,v) => { __SS[k] = String(v); }, removeItem: k => { delete __SS[k]; } };', sb);
   vm.runInContext('var _wshView = "home", _wsTab = null, _wsToolActive = null, _wsToolInputs = null, _wsToolEditId = null, _wsToolDirty = false, _wsReturnTab = "tools", _ws4ActiveId = null, _ws4Draft = null, _ws4Dirty = false, _wsFreeCoverSeen = false, _wsgPrefill = null, _wsJrnDraft = null, _wsJrnEditId = null, _wsReDraft = null, _wsReEditId = null, _wsReDetailId = null, _wsRecvDraft = null, _wsRecvEditId = null, _wsRecvQuery = "", _wsApDraft = null, _wsApEditId = null;', sb);
   vm.runInContext('var __opened = []; function renderWorkspaceHome(){ __opened.push("render:" + _wshView); }', sb);
   vm.runInContext('function formatBase(v){ return String(v); }', sb);
@@ -92,7 +95,8 @@ function ctx(persona, langCode) {
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
    '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
-   '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL',
+   '_WS_FOUNDER_VIEW_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',
    '_wsEntrySurfaceKey','_wsCatalogInternal','_wsEntryOpenable','_wsWs4Access','_wsToolAccess','_wsCatalogSurfaceKey',
    '_aurixEntIsCatalogPreview',
@@ -102,14 +106,19 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType',
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
    '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover',
-   '_wsCanPersist','_wsPersistUpsell','_wsOpenSurface','_wsTogglePin','_wsTouch'].forEach(n => {
+   '_wsCanPersist','_wsPersistUpsell','_wsOpenSurface','_wsTogglePin','_wsTouch',
+   // SPEC P0 — el guard de vista, la vista técnica de fundador y el contrato de
+   // documento (revisión + tombstone). Se ejecutan los REALES, no un stub.
+   '_wsPremiumShell','_renderWorkspacePending','_wsFounderViewFlag','_wsInternalViewOn',
+   '_ws4ProjectsRaw','_ws4Projects','_wsDocStamp','_wsScenariosRaw','_wsScenarios',
+   '_wsgGoalsRaw','_wsgGoals','_wsxOpen'].forEach(n => {
      try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); }
    });
   // `_wsOpenTool` se instrumenta: se conserva su CUERPO real (con sus gates) y sólo
   // se observa el resultado. Stubbearlo sería certificar el stub.
   vm.runInContext(fnSrc('_wsOpenTool')
     .replace('_wshView = \'tool\'; renderWorkspaceHome();', '__opened.push("tool:" + key);'), sb);
-  vm.runInContext('function _wsToolDefaultsFor(){ return {}; } function _wsCanonicalizeInputs(o){ return o||{}; } function _wsToolStateGet(){ return null; } function _ws4Projects(){ return []; } function _wsJrnNewDraft(){ return {}; } function _wsReNewDraft(){ return {}; } function _wsRecvNewDraft(){ return {}; } function _wsApNewDraft(){ return {}; }', sb);
+  vm.runInContext('function _wsToolDefaultsFor(){ return {}; } function _wsCanonicalizeInputs(o){ return o||{}; } function _wsToolStateGet(){ return null; } function _wsJrnNewDraft(){ return {}; } function _wsReNewDraft(){ return {}; } function _wsRecvNewDraft(){ return {}; } function _wsApNewDraft(){ return {}; }', sb);
   vm.runInContext('var AURIX_WS6_TOOL=true, AURIX_WS7_TOOL=true, AURIX_WS8_TOOL=true, AURIX_WS12_TOOL=true, AURIX_WS13_TOOL=true, AURIX_WS14_TOOL=true, AURIX_WS15_TOOL=true;', sb);
   vm.runInContext('function _wshWriteStore(k,v){ localStorage.setItem(k, JSON.stringify(v)); return true; }', sb);
   vm.runInContext('function _wsDocsQueue(){} function _wsDocSyncSet(){}', sb);
@@ -135,6 +144,9 @@ function cards(html) {
       cls: m[1], attrs,
       role: g('role'), cta: g('data-wsh-cta'), tool: g('data-wstool'),
       ws4: g('data-ws4-type'), lock: g('data-wsh-lock'), aria: g('aria-label'),
+      // SPEC P0 §4 — Mi espacio ya no es sólo accesos a capacidades: un DOCUMENTO
+      // guardado se abre por su ref propia (`data-wsx-open`), no por la capacidad.
+      xopen: g('data-wsx-open'), mtype: g('data-wsmse-type'),
       interactive: /role="button"/.test(attrs),
     });
   }
@@ -149,6 +161,7 @@ function names(html) {
 function destination(c, card) {
   R(c, '__opened.length = 0; __upsell.length = 0;');
   if (card.lock !== null) { R(c, 'openUpgradeIntent({ featureKey: ' + JSON.stringify(card.lock) + ' })'); }
+  else if (card.xopen) { R(c, '_wsxOpen(' + JSON.stringify(card.xopen) + ')'); }
   else if (card.cta === 'tool') { R(c, '_wsOpenTool(' + JSON.stringify(card.tool || 'compound') + ')'); }
   else if (card.cta === 'workspace') { R(c, '_ws4OpenOrCreate(' + JSON.stringify(card.ws4 || '') + ')'); }
   else if (card.cta === 'goals' || card.cta === 'scenario' || card.cta === 'planning') { R(c, '_wsOpenSurface(' + JSON.stringify(card.cta) + ')'); }
@@ -237,9 +250,22 @@ console.log('\n2 · Interno y «Próximamente» fuera del producto:');
       html.indexOf('>' + R(c, 't("wsh_soon")') + '<') === -1
       && html.indexOf('>' + R(c, 't("wstier_preview")') + '<') === -1);
   });
+  // SPEC P0 §4 — RE-DECIDIDO: el derecho del servidor ya no BASTA. Un override
+  // global Premium concede `workspace.catalog_preview` con todo lo demás, así que
+  // la pestaña «Interno» aparecía automáticamente en la vista normal de la cuenta
+  // del founder, que es también la cuenta de QA. Ahora hace falta activar la vista
+  // técnica a mano; el derecho sigue siendo la autoridad y el flag no concede nada.
+  ok('2.5a un override global NO muestra Interno por sí solo',
+    home(fdr, 'tools').indexOf('data-wstab="internal"') === -1);
+  R(fdr, 'sessionStorage.setItem(_WS_FOUNDER_VIEW_KEY, "1")');
   ok('2.5 el founder SÍ tiene su vista explícita, y sólo ahí vive el inventario',
     home(fdr, 'tools').indexOf('data-wstab="internal"') !== -1
     && home(fdr, 'internal').indexOf('data-wsh-internal="1"') !== -1);
+  ok('2.5b y el flag local SIN el derecho del servidor no concede nada',
+    (function () { const c = ctx('premium', 'es');
+      R(c, 'sessionStorage.setItem(_WS_FOUNDER_VIEW_KEY, "1")');
+      return R(c, '_wsInternalViewOn()') === false
+        && home(c, 'tools').indexOf('data-wstab="internal"') === -1; })());
   const fdrPublic = home(fdr, 'tools') + home(fdr, 'templates') + home(fdr, 'space');
   ok('2.6 …y en su catálogo NORMAL ya no hay nada interno (era el defecto reportado)',
     leakedIds(fdr, fdrPublic, INTERNAL_IDS).length === 0
@@ -369,31 +395,98 @@ console.log('\n5 · Mi espacio:');
   ok('5.3 cada columna vacía ofrece salida a SU catálogo (cero enlaces muertos)',
     (empty.match(/data-wstab="templates"/g) || []).length >= 1
     && (empty.match(/data-wstab="tools"/g) || []).length >= 1);
-  // Una columna poblada y la otra no: la simetría no puede romperse.
-  R(c, '_wsTouch("tool:compound")');
-  const one = home(c, 'space');
-  ok('5.4 con una columna poblada siguen siendo dos columnas',
-    (one.match(/wsh-mse2-col/g) || []).length === 2
-    && one.indexOf('data-wsmse-tool="1"') !== -1 && one.indexOf('data-wsmse-tpl="0"') !== -1);
-  // Y ahora la otra, por una vía DISTINTA: un documento guardado, no una apertura.
-  R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", name: "Presupuesto", updatedAt: Date.now(), results: {} }]))');
+  // ── LA PERTENENCIA ES INTENCIONAL, Y ESTO ES LO QUE SE RE-DECIDE ─────────
+  // La versión anterior de este bloque poblaba Mi espacio con `_wsTouch` —abrir
+  // una herramienta— y lo certificaba como correcto. Era la regla que la SPEC P0
+  // retira: un espacio que se llena con lo que pasó por delante no es el espacio
+  // del usuario. Ahora sólo entran FAVORITOS y DOCUMENTOS GUARDADOS.
+  R(c, '_wsTouch("tool:compound"); _wsTouch("tpl:mbudget")');
+  const touched = home(c, 'space');
+  ok('5.4 ABRIR una capacidad NO la mete en Mi espacio',
+    touched.indexOf('data-wsmse-tpl="0"') !== -1 && touched.indexOf('data-wsmse-tool="0"') !== -1
+    && touched.indexOf('wsh-mse2-card') === -1,
+    touched.slice(touched.indexOf('data-wsmse-cols'), touched.indexOf('data-wsmse-cols') + 70));
+  // 1 · un FAVORITO puebla su columna, y sólo la suya.
+  R(c, '_wsTogglePin("tool:compound")');
+  const fav = home(c, 'space');
+  ok('5.4b marcar un favorito SÍ lo mete, y una sola vez',
+    fav.indexOf('data-wsmse-tool="1"') !== -1 && fav.indexOf('data-wsmse-tpl="0"') !== -1
+    && (fav.match(/data-wsmse-type="fav"/g) || []).length === 1,
+    fav.slice(fav.indexOf('data-wsmse-cols'), fav.indexOf('data-wsmse-cols') + 70));
+  ok('5.4c quitar la estrella lo saca',
+    (function () { R(c, '_wsTogglePin("tool:compound")');
+      const h = home(c, 'space');
+      return h.indexOf('wsh-mse2-card') === -1; })());
+  R(c, '_wsTogglePin("tool:compound")');
+  // 2 · un DOCUMENTO guardado puebla la columna de SU capacidad, con SU nombre.
+  R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: Date.now(), results: {} }]))');
   const both = home(c, 'space');
   ok('5.5 un documento GUARDADO puebla su columna aunque no se haya abierto hoy',
     both.indexOf('data-wsmse-tpl="1"') !== -1 && both.indexOf('data-wsmse-tool="1"') !== -1,
     both.slice(both.indexOf('data-wsmse-cols'), both.indexOf('data-wsmse-cols') + 70));
-  ok('5.6 …y lo DICE: la tarjeta declara cuántos documentos hay',
-    both.indexOf(R(c, 't("wsmse2_doc_one")')) !== -1);
-  ok('5.7 las tarjetas de Mi espacio abren de verdad',
-    cards(both).filter(cd => /wsh-mse2-card/.test(cd.cls)).length === 2
-    && cards(both).filter(cd => /wsh-mse2-card/.test(cd.cls)).every(cd => destination(c, cd).kind === 'opened'),
-    JSON.stringify(cards(both).filter(cd => /wsh-mse2-card/.test(cd.cls)).map(cd => destination(c, cd))));
+  ok('5.6 …y lleva el NOMBRE que le puso el usuario, no el de la plantilla',
+    names(both).indexOf('Presupuesto empresa') !== -1
+    && both.indexOf('data-wsmse-type="doc"') !== -1,
+    JSON.stringify(names(both)));
+  ok('5.6b un favorito y un documento no se fusionan: son tipos distintos',
+    (both.match(/data-wsmse-type="fav"/g) || []).length === 1
+    && (both.match(/data-wsmse-type="doc"/g) || []).length === 1);
+  ok('5.6c VARIAS instancias de la MISMA capacidad conviven, sin sobrescribirse',
+    (function () {
+      R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([' +
+        '{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 2, results: {} },' +
+        '{ id: "p2", type: "monthly_budget", customName: "Presupuesto personal", revision: 1, updatedAt: 3, results: {} },' +
+        '{ id: "p3", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 4, results: {} }]))');
+      const h = home(c, 'space');
+      return h.indexOf('data-wsmse-tpl="3"') !== -1
+        && (h.match(/data-wsmse-type="doc"/g) || []).length === 3;
+    })());
+  ok('5.6d un documento con tombstone desaparece y NO resucita',
+    (function () {
+      R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([' +
+        '{ id: "p1", type: "monthly_budget", customName: "Borrado", revision: 2, deletedAt: 9, updatedAt: 9, results: {} },' +
+        '{ id: "p2", type: "monthly_budget", customName: "Vivo", revision: 1, updatedAt: 3, results: {} }]))');
+      const h = home(c, 'space');
+      const raw = R(c, '_ws4ProjectsRaw().length'), live = R(c, '_ws4Projects().length');
+      return h.indexOf('data-wsmse-tpl="1"') !== -1
+        && names(h).indexOf('Vivo') !== -1 && names(h).indexOf('Borrado') === -1
+        // el tombstone SIGUE en el almacén: es lo que se sube como `deleted_at`
+        && raw === 2 && live === 1;
+    })(),
+    JSON.stringify({ tpl: (home(c, 'space').match(/data-wsmse-tpl="\d+"/) || [])[0],
+                     names: names(home(c, 'space')),
+                     raw: R(c, '_ws4ProjectsRaw().length'), live: R(c, '_ws4Projects().length') }));
+  ok('5.7 las tarjetas de Mi espacio abren de verdad (el favorito su capacidad, el documento su instancia)',
+    (function () {
+      R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 5, results: {} }]))');
+      const h = home(c, 'space');
+      const cd = cards(h).filter(x => /wsh-mse2-card/.test(x.cls));
+      return cd.length === 2 && cd.every(x => destination(c, x).kind === 'opened');
+    })(),
+    JSON.stringify(cards(home(c, 'space')).filter(x => /wsh-mse2-card/.test(x.cls)).map(x => destination(c, x))));
   // Y un usuario Free no puede ver en Mi Espacio algo que no puede abrir.
   const cf = ctx('free', 'es');
-  R(cf, '_wsTouch("tpl:mbudget"); _wsTouch("tool:compound")');
+  R(cf, '_wsTogglePin("tpl:mbudget"); _wsTogglePin("tool:compound")');
+  R(cf, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 5, results: {} }]))');
   const hf = home(cf, 'space');
-  ok('5.8 free · Mi espacio no resucita una capacidad que no puede abrir',
-    hf.indexOf('data-wsmse-tpl="0"') !== -1 && hf.indexOf('data-wsmse-tool="1"') !== -1,
+  // Free no llega a tener NADA aquí, y por dos razones independientes que conviene
+  // separar: fijar es Premium (así que no hay favorito) y el documento heredado de
+  // una capacidad Premium no se ofrece (así que no hay tarjeta de documento).
+  ok('5.8 free · Mi espacio no ofrece ni la capacidad ni el DOCUMENTO que no puede abrir',
+    hf.indexOf('data-wsmse-tpl="0"') !== -1 && hf.indexOf('data-wsmse-tool="0"') !== -1
+    && names(hf).indexOf('Presupuesto empresa') === -1,
     hf.slice(hf.indexOf('data-wsmse-cols'), hf.indexOf('data-wsmse-cols') + 70));
+  ok('5.8b …porque fijar es Premium: no queda una estrella huérfana',
+    R(cf, '_wsIsPinned("tpl:mbudget")') === false && R(cf, '_wsIsPinned("tool:compound")') === false);
+  // ── LAS DOS COLUMNAS SON SIMÉTRICAS EN EL MARKUP ──────────────────────────
+  ok('5.8c las dos cabeceras son IDÉNTICAS: ningún subtítulo desplaza una columna',
+    (function () {
+      const h = home(c, 'space');
+      return (h.match(/wsh-mse2-sub/g) || []).length === 0
+        && (h.match(/class="wsh-title wsh-mse2-title"/g) || []).length === 2;
+    })());
+  ok('5.8d y los subtítulos «… utilizadas recientemente» ya no existen en el diccionario',
+    app.indexOf('wsmse2_tpl_sub') === -1 && app.indexOf('wsmse2_tool_sub') === -1);
   // El mapa de render es UNO: si vuelve a haber dos, Mi Espacio se queda atrás.
   ok('5.9 no queda un segundo catálogo de render para Mi espacio',
     !/_MSE_TOOL_RENDER|_MSE_TPL_RENDER/.test(app));
@@ -518,10 +611,19 @@ console.log('\n8 · Portada Free: un CTA, dos accesos vivos, cero promesas falsa
     ok('8.1 ' + lg + ' · dos tarjetas Free, y son las dos capacidades gratuitas',
       html.indexOf('data-wsfc-count="2"') !== -1
       && /data-wsfc-open="compound"/.test(html) && /data-wsfc-open="realestate"/.test(html));
-    ok('8.2 ' + lg + ' · UN solo CTA, y ya no existe el segundo botón',
-      (html.match(/data-wsfc-upgrade/g) || []).length === 1
+    // SPEC P0 §2 — RE-DECIDIDO: `data-wsfc-upgrade` abría `openUpgradeIntent`, que
+    // montaba el overlay intermedio «Función premium → Ver AURIX Premium» y pedía
+    // un SEGUNDO clic para llegar a los planes. El CTA pasa al MISMO atributo
+    // canónico que usa Intelligence, así que las dos portadas comparten owner de
+    // pago y no hay paso intermedio que mantener.
+    ok('8.2 ' + lg + ' · UN solo CTA, por el owner canónico de planes, sin paso intermedio',
+      (html.match(/data-premium-cta="workspace\.full"/g) || []).length === 1
+      && (html.match(/wsfc-cta/g) || []).length === 2
+      && html.indexOf('data-wsfc-upgrade') === -1
       && html.indexOf('data-wsfc-skip') === -1
       && html.indexOf('wsfc-skip') === -1);
+    ok('8.2b ' + lg + ' · y declara su origen para la medición del embudo',
+      /data-premium-source="workspace:free_cover"/.test(html));
     ok('8.3 ' + lg + ' · el CTA dice «Ver Workspace completo», no «Ver Premium»',
       html.indexOf(R(c, 't("wsfc_cta")')) !== -1
       && !/Ver Premium|See Premium|Explorar Workspace|Explore Workspace/.test(html),
@@ -540,8 +642,8 @@ console.log('\n8 · Portada Free: un CTA, dos accesos vivos, cero promesas falsa
         return out.join('|') === '["tool:compound"]|["tool:realestate"]';
       })());
   });
-  ok('8.8 los tres controles de la portada están en el selector del despachador',
-    /\[data-wsfc-open\],\[data-wsfc-upgrade\]/.test(app)
+  ok('8.8 los controles de la portada están en el selector del despachador',
+    /\[data-wsfc-open\],\[data-wsh-lock\]/.test(app)
     && /\[data-wsh-lock\]/.test(app) && /\[data-ws-sync-retry\]/.test(app),
     'sin esto los botones no reciben el clic (era el defecto reportado)');
   ok('8.9 la portada es de UN SOLO USO: reentrar en la sección da el catálogo',

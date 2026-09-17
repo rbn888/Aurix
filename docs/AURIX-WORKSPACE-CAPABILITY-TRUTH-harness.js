@@ -376,7 +376,12 @@ console.log('\n8 · Regresión de la revisión financiera:');
       sb._wshReveal = () => {};
       sb._renderGoals = () => '';
       vm.runInContext('var _wsgPrefill = null;', sb);
-      ['_wsNum', '_wsgFormValues', '_wsgCreate'].forEach(n => vm.runInContext(fnSrc(n), sb));
+      // SPEC P0 §3 — `_wsgCreate` valida ahora el importe objetivo antes de
+      // persistir (un `target` vacío guardaba una meta de 0 € en silencio), así
+      // que el owner de validación entra en el contexto REAL: stubearlo dejaría
+      // de certificar la rama que decide si se guarda.
+      ['_wsNum', '_wsNumOrNull', '_wsDraftMissing', '_wsDraftRequiredIn', '_wsDraftRequired',
+       '_wsgFormValues', '_wsgCreate'].forEach(n => vm.runInContext(fnSrc(n), sb));
       vm.runInContext('_wsgCreate()', sb);
       return saved && saved.target === 250000 && saved.current === 10000
           && saved.monthly === 1500 && saved.targetYear === 2032;

@@ -24,6 +24,21 @@
 // `calculateCompoundGrowth` y `projectScenario`, ejecutados sobre los bytes de
 // app.js. Nada stubeado: la lección de `formatBase` dice que un gate que stubea la
 // integración que certifica no es evidencia.
+//
+// ── Y LO QUE ESTE GATE NO PUEDE DEMOSTRAR, DICHO AQUÍ ──────────────────────
+// SPEC P0 · investigación del gate. Este fichero se escribió para cerrar «no me
+// deja borrar números» y llama al PARSER directamente en un sandbox de `vm`:
+// nunca despacha un evento, nunca toca un `<input>` y nunca lee el estado después
+// de una pulsación. Es decir: su verde nunca fue evidencia del contrato de EDICIÓN
+// —ni a favor ni en contra—. Podía estar verde con producción impidiendo borrar, y
+// de hecho el defecto que lo originó (`_wsLoanCmpInput` coaccionando a número en
+// cada tecla) se encontró LEYENDO el código, no ejecutándolo.
+// Lo que sí certifica —y sigue siendo valioso— es que la misma cifra escrita de
+// cualquier forma vale lo mismo en los dos idiomas, y que los tres motores la leen
+// con el parser tolerante.
+// El camino REAL (DOM → evento de teclado → handler → estado → render) lo recorre
+// `scripts/aurix-p0-free-boundary-probe.mjs` en Chrome con eventos de CDP, y su
+// contrato de no-reinserción se ancla en `AURIX-P0-FREE-BOUNDARY-harness.js` §5.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 function fnSrc(name){ const s='function '+name+'('; const i=app.indexOf(s); if(i<0) throw new Error('missing '+name);

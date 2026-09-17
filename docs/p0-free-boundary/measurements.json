@@ -1,0 +1,567 @@
+{
+ "360x740/es": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 148,
+    "h": 502,
+    "x": 28,
+    "y": 909
+   },
+   {
+    "w": 148,
+    "h": 502,
+    "x": 185,
+    "y": 909
+   }
+  ],
+  "colPad": [
+   "8px/8px/12px",
+   "8px/8px/12px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   11,
+   11
+  ],
+  "titleText": [
+   "MIS PLANTILLAS",
+   "MIS HERRAMIENTAS"
+  ],
+  "cardMin": [
+   66,
+   122,
+   122,
+   122,
+   66
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   66,
+   122,
+   122,
+   122,
+   66
+  ],
+  "minFont": 11,
+  "minFontOff": []
+ },
+ "360x740/en": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 148,
+    "h": 387,
+    "x": 28,
+    "y": 1732
+   },
+   {
+    "w": 148,
+    "h": 387,
+    "x": 185,
+    "y": 1732
+   }
+  ],
+  "colPad": [
+   "8px/8px/12px",
+   "8px/8px/12px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   11,
+   11
+  ],
+  "titleText": [
+   "MY TEMPLATES",
+   "MY TOOLS"
+  ],
+  "cardMin": [
+   108,
+   108,
+   108
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   108,
+   108,
+   108,
+   44
+  ],
+  "minFont": 11,
+  "minFontOff": []
+ },
+ "390x844/es": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 163,
+    "h": 460,
+    "x": 28,
+    "y": 917
+   },
+   {
+    "w": 163,
+    "h": 460,
+    "x": 200,
+    "y": 917
+   }
+  ],
+  "colPad": [
+   "8px/8px/12px",
+   "8px/8px/12px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   11,
+   11
+  ],
+  "titleText": [
+   "MIS PLANTILLAS",
+   "MIS HERRAMIENTAS"
+  ],
+  "cardMin": [
+   66,
+   108,
+   108,
+   108,
+   66
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   66,
+   108,
+   108,
+   108,
+   66
+  ],
+  "minFont": 11,
+  "minFontOff": []
+ },
+ "390x844/en": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 163,
+    "h": 387,
+    "x": 28,
+    "y": 917
+   },
+   {
+    "w": 163,
+    "h": 387,
+    "x": 200,
+    "y": 917
+   }
+  ],
+  "colPad": [
+   "8px/8px/12px",
+   "8px/8px/12px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   11,
+   11
+  ],
+  "titleText": [
+   "MY TEMPLATES",
+   "MY TOOLS"
+  ],
+  "cardMin": [
+   108,
+   108,
+   108
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   108,
+   108,
+   108,
+   44
+  ],
+  "minFont": 11,
+  "minFontOff": []
+ },
+ "430x932/es": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 183,
+    "h": 461,
+    "x": 28,
+    "y": 920
+   },
+   {
+    "w": 183,
+    "h": 461,
+    "x": 220,
+    "y": 920
+   }
+  ],
+  "colPad": [
+   "10px/10px/12px",
+   "10px/10px/12px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   12,
+   12
+  ],
+  "titleText": [
+   "MIS PLANTILLAS",
+   "MIS HERRAMIENTAS"
+  ],
+  "cardMin": [
+   66,
+   108,
+   108,
+   108,
+   66
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   66,
+   108,
+   108,
+   108,
+   66
+  ],
+  "minFont": 11,
+  "minFontOff": []
+ },
+ "430x932/en": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 183,
+    "h": 304,
+    "x": 28,
+    "y": 920
+   },
+   {
+    "w": 183,
+    "h": 304,
+    "x": 220,
+    "y": 920
+   }
+  ],
+  "colPad": [
+   "10px/10px/12px",
+   "10px/10px/12px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   12,
+   12
+  ],
+  "titleText": [
+   "MY TEMPLATES",
+   "MY TOOLS"
+  ],
+  "cardMin": [
+   80,
+   80,
+   80
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   80,
+   80,
+   80,
+   44
+  ],
+  "minFont": 11,
+  "minFontOff": []
+ },
+ "768x1024/es": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 329,
+    "h": 385,
+    "x": 48,
+    "y": 1493
+   },
+   {
+    "w": 329,
+    "h": 385,
+    "x": 391,
+    "y": 1493
+   }
+  ],
+  "colPad": [
+   "18px/18px/18px",
+   "18px/18px/18px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   12.5,
+   12.5
+  ],
+  "titleText": [
+   "MIS PLANTILLAS",
+   "MIS HERRAMIENTAS"
+  ],
+  "cardMin": [
+   74,
+   74,
+   74,
+   74,
+   74
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   74,
+   74,
+   74,
+   74,
+   74
+  ],
+  "minFont": 11.5,
+  "minFontOff": []
+ },
+ "768x1024/en": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 329,
+    "h": 303,
+    "x": 48,
+    "y": 1493
+   },
+   {
+    "w": 329,
+    "h": 303,
+    "x": 391,
+    "y": 1493
+   }
+  ],
+  "colPad": [
+   "18px/18px/18px",
+   "18px/18px/18px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   12.5,
+   12.5
+  ],
+  "titleText": [
+   "MY TEMPLATES",
+   "MY TOOLS"
+  ],
+  "cardMin": [
+   74,
+   74,
+   74
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   74,
+   74,
+   74,
+   44
+  ],
+  "minFont": 11.5,
+  "minFontOff": []
+ },
+ "1366x768/es": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 543,
+    "h": 389,
+    "x": 133,
+    "y": 977
+   },
+   {
+    "w": 543,
+    "h": 389,
+    "x": 690,
+    "y": 977
+   }
+  ],
+  "colPad": [
+   "20px/20px/20px",
+   "20px/20px/20px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   12.5,
+   12.5
+  ],
+  "titleText": [
+   "MIS PLANTILLAS",
+   "MIS HERRAMIENTAS"
+  ],
+  "cardMin": [
+   74,
+   74,
+   74,
+   74,
+   74
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   74,
+   74,
+   74,
+   74,
+   74
+  ],
+  "minFont": 11.5,
+  "minFontOff": []
+ },
+ "1366x768/en": {
+  "colCount": 2,
+  "colBox": [
+   {
+    "w": 543,
+    "h": 307,
+    "x": 133,
+    "y": 977
+   },
+   {
+    "w": 543,
+    "h": 307,
+    "x": 690,
+    "y": 977
+   }
+  ],
+  "colPad": [
+   "20px/20px/20px",
+   "20px/20px/20px"
+  ],
+  "titleOneLine": [
+   true,
+   true
+  ],
+  "titleClipped": [
+   false,
+   false
+  ],
+  "titleFont": [
+   12.5,
+   12.5
+  ],
+  "titleText": [
+   "MY TEMPLATES",
+   "MY TOOLS"
+  ],
+  "cardMin": [
+   74,
+   74,
+   74
+  ],
+  "docOverflowX": false,
+  "sectionOverflowX": false,
+  "taps": [
+   44,
+   44,
+   44,
+   74,
+   74,
+   74,
+   44
+  ],
+  "minFont": 11.5,
+  "minFontOff": []
+ }
+}

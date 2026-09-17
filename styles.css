@@ -26721,6 +26721,51 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   .wsfc-cta:active { transform: none; }
 }
 
+/* ── VALIDACIÓN VISIBLE, Y NO SÓLO UN `return` ───────────────────────────────
+   Un campo obligatorio vacío marca el campo y publica UNA línea de razón junto al
+   botón que se acaba de pulsar. No es un estado de error del formulario entero:
+   el trabajo de la pantalla sigue intacto. */
+.ws4-field input.is-invalid,
+.wsg-text.is-invalid,
+input.ws4-num.is-invalid {
+  border-color: rgba(230,120,120,0.72) !important;
+  box-shadow: 0 0 0 2px rgba(230,120,120,0.14);
+}
+.wsg-reqerr {
+  flex: 1 1 100%;
+  margin: 8px 0 0; font-size: 12.5px; line-height: 1.45;
+  color: rgba(238,150,150,0.96);
+}
+.ws-modal-label {
+  display: block; margin: 2px 0 6px;
+  font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  color: var(--text-dim, #8a96aa);
+}
+.ws-modal-err {
+  margin: 8px 0 0; font-size: 12.5px; line-height: 1.45;
+  color: rgba(238,150,150,0.96);
+}
+
+/* ── LA ESPERA DEL ENTITLEMENT ───────────────────────────────────────────────
+   Mientras el servidor no ha resuelto el plan no se monta el interior de
+   Workspace NI se pinta la portada comercial: a un cliente de pago no se le
+   ofrece comprar lo que ya tiene. Es una espera neutra y breve, sin mensaje
+   sobre el plan, y se repinta sola cuando el resolver contesta. */
+.wsfc-pending { display: block; }
+.wsfc-pending-stage {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; min-height: 240px; padding: 48px 20px;
+}
+.wsfc-pending-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid rgba(var(--aurix-blue-rgb), .22);
+  border-top-color: rgba(var(--aurix-blue-rgb), .85);
+  animation: wsfcSpin .9s linear infinite;
+}
+.wsfc-pending-text { margin: 0; font-size: 13.5px; color: var(--text-dim, #8a96aa); }
+@keyframes wsfcSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wsfc-pending-spinner { animation: none; } }
+
 /* ════════════════════════════════════════════════════════════════════════════
    WORKSPACE COMPLETION · §E — LAS TRES CAPAS DEL INMOBILIARIO
    ════════════════════════════════════════════════════════════════════════════
@@ -27122,16 +27167,41 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
    truncada en móvil. Se envuelven antes de recortarse. */
 .wsh-tier, .wsh-tool-go, .wsh-pill { white-space: nowrap; flex: 0 0 auto; max-width: 100%; }
 
-/* ── 3 · MI ESPACIO: DOS COLUMNAS DESDE 360 px ────────────────────────────── */
+/* ── 3 · MI ESPACIO: DOS COLUMNAS SIMÉTRICAS DESDE 360 px ────────────────────
+   Las dos columnas son la MISMA columna dos veces: mismo ancho (`1fr` con
+   `minmax(0,…)`, que es lo que impide que el contenido las desiguale), mismo
+   padding, misma cabecera y mismo inicio vertical. El subtítulo se retiró del
+   markup precisamente porque ocupaba dos líneas en una y una en la otra, y eso
+   desplazaba verticalmente la lista de una respecto de la otra. */
 .wsh-mse2[data-wsmse-cols="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .wsh-mse2[data-wsmse-cols="2"] > .wsh-mse2-col { min-width: 0; }
+/* ── LOS DOS TÍTULOS, COMPLETOS Y EN UNA LÍNEA ──────────────────────────────
+   «MIS PLANTILLAS» es la cadena más larga de las dos y tiene que caber entera en
+   una columna de ~160 px a 360 px de viewport. No se abrevia y no se trunca: se
+   ajusta el tamaño y el interletrado, y `nowrap` deja que la medición falle de
+   forma VISIBLE (desbordaría) en vez de silenciosa (envolvería), que es lo que
+   una sonda de geometría puede detectar. */
+.wsh-mse2-title {
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: visible;
+  letter-spacing: .04em;
+}
 @media (max-width: 760px) {
   /* Anula el colapso a una columna: las dos tienen que verse a la vez. */
   .wsh-mse2[data-wsmse-cols="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-col { padding: 12px 10px; }
   .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-head { margin-bottom: 9px; }
-  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-head .wsh-title { font-size: 13.5px; }
-  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-sub { font-size: 11px; line-height: 1.35; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-head .wsh-title { font-size: 12px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-title { letter-spacing: .02em; }
+}
+/* 360 px es el caso límite medido: la columna vale ~157 px y «MIS PLANTILLAS»
+   necesita bajar a 11 px para entrar entera. 11 px es el mínimo declarado de la
+   hoja; no se baja de ahí. */
+@media (max-width: 400px) {
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-head .wsh-title { font-size: 11px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-title { letter-spacing: 0; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-col { padding: 12px 8px; }
 }
 @media (max-width: 560px) {
   /* Y la lista vuelve a ser VERTICAL: el carrusel horizontal al 78 % de ancho era
@@ -27157,6 +27227,22 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty-b { font-size: 11px; margin-bottom: 6px; }
   .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty .wsh-cta { min-height: 44px; padding: 0 12px; font-size: 12px; }
 }
+/* ── LAS TARJETAS COMPARTEN ALTO, ICONO, TIPOGRAFÍA Y JERARQUÍA ──────────────
+   Un favorito y un documento son cosas distintas y se distinguen por un filo, no
+   por un tamaño: si una tarjeta fuera más alta que la otra las dos columnas
+   dejarían de leerse como un par. El nombre personalizado puede ocupar DOS
+   líneas y ahí se corta con elipsis; nunca media palabra. */
+.wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-card { min-height: 56px; align-items: center; }
+.wsh-mse2-card .wsh-mse2-name {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; white-space: normal; overflow-wrap: anywhere;
+}
+.wsh-mse2-card.is-doc { border-left: 2px solid rgba(var(--aurix-blue-rgb), .42); }
+.wsh-mse2-card.is-fav { border-left: 2px solid rgba(244, 196, 90, .38); }
+/* El estado vacío, COMPACTO y con el mismo alto mínimo que una tarjeta: una
+   columna vacía no puede achicar su caja respecto de la otra. */
+.wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-empty { min-height: 56px; }
+
 /* Las dos columnas con la MISMA altura: una con dos elementos y otra con cinco no
    pueden tener una caja el doble de alta que la otra, es lo que se lee como roto. */
 .wsh-mse2[data-wsmse-cols="2"] { align-items: stretch; }

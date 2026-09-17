@@ -780,8 +780,14 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     ok('M3.6 el gate de la superficie NO duplica la decisión: sigue siendo un solo predicado',
       /const entry = _wsSurfaceEntry\(toolKey\);/.test(fnSource('_wsToolAccess')) &&
       (fnSource('_wsToolAccess').match(/hasFeature\(/g) || []).length === 1);
+    // SPEC P0 §4 — Mi Espacio ya no deriva del catálogo POR USO: la columna se
+    // compone de FAVORITOS (resueltos contra el catálogo y contra el acceso real) y
+    // DOCUMENTOS guardados (atribuidos a su capacidad por `_wsSurfaceEntry`). La
+    // garantía que este assert protege —que no hay un segundo catálogo escrito a
+    // mano— sigue anclada, ahora sobre las dos fuentes.
     ok('M3.7 la columna "Mis plantillas" de Mi Espacio se DERIVA del catálogo',
-      /_wsCatalogFor\(kind\)\s*[\r\n]\s*\.filter\(e => map\[e\.id\]\)/.test(app) &&
+      /const favItems = \(map, kind\) => _wsCatalogFor\(kind\)/.test(app) &&
+      /const entry = _wsSurfaceEntry\(sf\);/.test(app) &&
       /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
       !/const TPL_CAT = \[\];/.test(app));
     ok('M3.8 el cover reutiliza un asset YA existente de esa plantilla (no se añade ninguno)',
@@ -801,13 +807,20 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     ok('M3.12 la galería no pinta columnas fijas con pocas tarjetas',
       /data-wsgrid-n="\$\{items\.length\}"/.test(app) &&
       /\.wsh-tpl-grid\[data-wsgrid-n="1"\], \.wsh-tpl-grid\[data-wsgrid-n="2"\]   \{ grid-template-columns: repeat\(auto-fit/.test(css));
-    ok('M3.13 Mi Espacio distingue lo USADO, lo GUARDADO y lo FIJADO',
-      // Y ahora son TRES señales, no dos: un documento guardado puebla su columna
-      // aunque no se haya abierto hoy, que es lo que se espera de un espacio de
-      // trabajo (antes Mi Espacio sólo sabía de aperturas en memoria).
-      /ref, used, pinned, savedCount: sv\.n, savedTs: sv\.ts,/.test(app) &&
-      (app.match(/wsmse2_saved:/g) || []).length === 2 &&
-      (app.match(/wsmse2_doc_one:/g) || []).length === 2);
+    // RE-DECIDIDO · SPEC P0 §4. Este assert fijó «tres señales: usado, guardado y
+    // fijado» y las trataba como equivalentes para PERTENECER a Mi Espacio. Era la
+    // regla que había que retirar: abrir algo una vez lo metía en el espacio del
+    // usuario, así que el espacio se llenaba con lo que pasó por delante. Ahora
+    // pertenecer es INTENCIONAL (favorito o documento nombrado) y la última
+    // apertura sobrevive sólo como METADATO de un favorito.
+    ok('M3.13 Mi Espacio distingue el FAVORITO (acceso) del DOCUMENTO (instancia)',
+      /mtype: 'fav'/.test(app) && /mtype: 'doc'/.test(app) &&
+      /data-wsmse-type="\$\{it\.mtype\}"/.test(app) &&
+      (app.match(/wsmse2_fav:/g) || []).length === 2 &&
+      (app.match(/wsmse2_updated:/g) || []).length === 2);
+    ok('M3.13b y la última apertura ya NO decide la pertenencia, sólo acompaña',
+      !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
+      /used: _wsRecentTs\(m\.pinRef\)/.test(app));
     // RE-DECIDIDO POR DECISIÓN DE PRODUCTO. «Espacio vacío = UNA portada» era la
     // respuesta correcta a dos estados vacíos en paralelo, pero la SPEC de cierre
     // pide lo contrario y con razón: las DOS columnas tienen que verse desde el

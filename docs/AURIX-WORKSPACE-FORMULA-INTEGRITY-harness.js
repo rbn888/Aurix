@@ -532,11 +532,21 @@ function catalog() {
   // pasa por el MISMO filtro, y además descarta lo que el usuario no puede abrir
   // (`state === 'open'`), que es la garantía de verdad: ni lo interno ni lo que
   // requiere plan pueden reaparecer por uso previo.
-  OK('L15 Mi Espacio no puede resucitar una oculta por uso previo',
+  // SPEC P0 §4 — la pertenencia a Mi Espacio ya no es «uso previo» en ningún
+  // sentido: son FAVORITOS y DOCUMENTOS GUARDADOS. La garantía que este assert
+  // protege es la de verdad y sigue anclada, ahora sobre las DOS fuentes: ni un
+  // favorito antiguo ni un documento heredado pueden ofrecer una capacidad que el
+  // usuario no puede abrir (`state === 'open'` para el favorito, `_wsToolAccess`
+  // para el documento). El gate lo verifica EJECUTANDO en ACCESS-TRUTH §5.8; aquí
+  // se ancla que las dos ramas siguen preguntando.
+  OK('L15 Mi Espacio no puede ofrecer una capacidad que el usuario no puede abrir',
      /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
      /const toolList = colItems\(_WS_TOOL_RENDER, 'tool'\);/.test(app) &&
-     /_wsCatalogFor\(kind\)\s*[\r\n]\s*\.filter\(e => map\[e\.id\]\)/.test(app) &&
-     /\.filter\(m => m\.state === 'open'\)/.test(app));
+     /\.filter\(m => m\.state === 'open' && m\.pinRef && _wsIsPinned\(m\.pinRef\)\)/.test(app) &&
+     /if \(!acc\.ok\) return null;/.test(app));
+  OK('L15b …y la última apertura ya NO es condición de pertenencia',
+     !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
+     !/\.filter\(x => x\.ts > 0\)/.test(app));
 
   // ── NADA BORRADO: los owners siguen vivos y dormidos ─────────────────────
   const KEPT = ['_renderBudgetTool', '_renderJournalTool', '_renderRealEstateTool',
@@ -560,10 +570,18 @@ function catalog() {
   // sustituía en móvil mostraba media tarjeta cortada.
   // Lo que G1–G3 protegían de verdad —cero enlaces muertos, cero huecos— sigue
   // anclado, ahora sobre la estructura nueva.
+  // SPEC P0 §4 — la cabecera de columna PIERDE su subtítulo: era «Plantillas
+  // utilizadas recientemente», así que describía la regla de pertenencia retirada
+  // y, al ocupar dos líneas en una columna y una en la otra, desplazaba
+  // verticalmente el contenido de una respecto de la otra. La firma de `column`
+  // cambia con él.
   OK('G1 Mi Espacio pinta SIEMPRE sus dos columnas, y con la misma jerarquía',
-     /const column = \(titleK, subK, list, previewFn, emptyArgs\) => `/.test(app) &&
+     /const column = \(titleK, list, emptyArgs\) => `/.test(app) &&
      /panel = `<div class="wsh-mse2" data-wsmse-cols="2"/.test(app) &&
      !/_mseEmpty/.test(app) && !/wsh-mse2-blank/.test(app));
+  OK('G1b las dos cabeceras son idénticas: ningún subtítulo desnivela una columna',
+     !/wsh-mse2-sub">\$\{esc\(t\(subK\)\)\}/.test(app) &&
+     (app.match(/class="wsh-title wsh-mse2-title"/g) || []).length === 1);
   OK('G2 el estado vacío de cada columna apunta a una pestaña que EXISTE',
      (() => {
        const tabs = konstSrc('_WS_TABS');

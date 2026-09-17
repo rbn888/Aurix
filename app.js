@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '691'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '692'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5733,24 +5733,28 @@ const T = {
     // No health score, no attribution, no cause, no price, no checkout.
     intprev_badge:      'Inteligencia · tu cartera',
     intprev_title:      'Esto es lo que Aurix ya entiende de tu patrimonio',
-    intprev_f_conc:     (pct, name) => `El ${pct}% de tu patrimonio invertible depende de ${name}.`,
-    intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu patrimonio invertible.`,
-    intprev_subj_w_crypto: 'Tu exposición a cripto',
-    intprev_subj_w_dep:    'Tu posición principal',
-    intprev_subj_w_liq:    'Tu liquidez',
-    intprev_subj_w_div:    'El reparto por categorías',
-    intprev_subj_w_sector: 'Tu exposición sectorial',
-    intprev_subj_conc:  'Concentración de tu mayor posición',
-    intprev_subj_liq:   'Peso de tu liquidez',
-    intprev_subj_watch: 'Área de atención',
+    // §1 — SIN la palabra «invertible». Es la copy que la SPEC fija para esta
+    // portada, y sólo para ella: las dos claves son EXCLUSIVAS del preview (no las
+    // lee ninguna otra superficie), así que ningún otro sitio cambia de lenguaje.
+    // LO QUE ESTO CUESTA, dicho aquí y no en un informe: el denominador SIGUE
+    // siendo el patrimonio INVERTIBLE (`_aurixHealthSnapshot` excluye el inmueble
+    // de numerador y denominador). La frase es por tanto más amplia que el cálculo
+    // para un usuario con inmuebles. La cifra no se toca; la precisión la recupera
+    // el análisis completo, que es donde vive el desglose.
+    intprev_f_conc:     (pct, name) => `El ${pct}% de tu patrimonio depende de ${name}.`,
+    intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu patrimonio.`,
     intprev_q_conc:     '¿Cómo ha cambiado esta concentración en el tiempo?',
     intprev_q_liq:      '¿Cómo ha evolucionado este peso de liquidez?',
     intprev_q_watch:    '¿Desde cuándo se comporta así, y qué lo ha movido?',
-    intprev_locked_tag: 'Disponible con Premium',
-    intprev_locked_aria: 'Tercer descubrimiento, disponible con Premium',
+    // §1 — los bloqueados no revelan NADA: ni título, ni categoría, ni cifra, ni
+    // activo, ni juicio. Sólo CUÁNTOS hay, que es verificable y no es una promesa.
+    // Y sin la palabra «Premium» en ningún sitio visible antes del clic.
+    intprev_locked_n:   n => n === 1
+      ? 'Aurix ha encontrado 1 análisis más sobre tu patrimonio.'
+      : `Aurix ha encontrado ${n} análisis más sobre tu patrimonio.`,
+    intprev_locked_aria: 'Análisis todavía sin desbloquear',
     intprev_q_label:    'La pregunta siguiente',
     intprev_q:          '¿Cómo ha cambiado esta exposición en el tiempo?',
-    intprev_premium:    'Aurix ya lee tu estructura. El movimiento de esa estructura, su causa y su vigilancia continua llegan con Aurix Premium.',
     intprev_cta:        'Volver al Dashboard',
     intprev_cta_full:   'Ver el análisis completo',
     intprev_hold_empty_t: 'Aurix todavía no tiene con qué leer tu patrimonio',
@@ -6051,6 +6055,8 @@ const T = {
     wsfc_ico_realestate: '⌂',
     wsfc_premium_label: 'Con Premium',
     wsfc_cta:          'Ver Workspace completo',
+    // La espera mientras el servidor resuelve el plan. No afirma NADA del plan.
+    wsfc_pending:      'Preparando tu espacio de trabajo…',
     ws_sync_idle:         'Sin cambios sin guardar',
     ws_sync_saving:       'Guardando…',
     ws_sync_saved_synced: 'Guardado y sincronizado',
@@ -6194,20 +6200,22 @@ const T = {
     wsmse_empty_title:  'Empieza creando tu primer espacio financiero.',
     wsmse_empty_cta:    'Explorar plantillas',
     // DSH.WORKSPACE.01 — Mi Espacio V2 (two-column personal operating centre)
+    // Los subtítulos «… utilizadas recientemente» se retiraron: describían la
+    // regla de pertenencia que ya no existe y desequilibraban las dos columnas.
     wsmse2_tpl_title:   'Mis plantillas',
-    wsmse2_tpl_sub:     'Plantillas utilizadas recientemente',
     wsmse2_tool_title:  'Mis herramientas',
-    wsmse2_tool_sub:    'Herramientas utilizadas recientemente',
     wsmse2_last:        'Última apertura',
+    wsmse2_updated:     'actualizado',
+    wsmse2_fav:         'Favorito',
     wsmse2_saved:       'Guardado',
-    wsmse2_empty_t:     'Tu espacio se construye con lo que usas.',
-    wsmse2_empty_b:     'Aquí aparece lo que abres y lo que guardas',
-    wsmse2_tpl_empty_t: 'Todavía no has abierto ninguna plantilla.',
-    wsmse2_tpl_empty_b: 'Ábrela una vez y aparecerá aquí.',
-    wsmse2_tpl_empty_cta: 'Explorar plantillas',
-    wsmse2_tool_empty_t: 'Todavía no tienes herramientas recientes.',
-    wsmse2_tool_empty_b: 'Explora las herramientas disponibles.',
-    wsmse2_tool_empty_cta: 'Explorar herramientas',
+    wsmse2_empty_t:     'Tu espacio lo eliges tú.',
+    wsmse2_empty_b:     'Aquí aparece lo que marcas con la estrella y lo que guardas con nombre',
+    wsmse2_tpl_empty_t: 'Sin plantillas todavía.',
+    wsmse2_tpl_empty_b: 'Márcala con la estrella o guarda un documento y aparecerá aquí.',
+    wsmse2_tpl_empty_cta: 'Ver plantillas',
+    wsmse2_tool_empty_t: 'Sin herramientas todavía.',
+    wsmse2_tool_empty_b: 'Márcala con la estrella o guarda un documento y aparecerá aquí.',
+    wsmse2_tool_empty_cta: 'Ver herramientas',
     wsapp_receivables_n:'Control de cobros',
     wsapp_assets_n:     'Precios de activos',
     wstool_financial_n: 'Calculadora financiera',
@@ -6406,6 +6414,17 @@ const T = {
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
     wsmodal_cancel:    'Cancelar',
+    // ── GUARDADO NOMBRADO · un modal, tres acciones ──────────────────────────
+    wsname_save_title:  'Guardar en Mi espacio',
+    wsname_saveas_title:'Guardar como…',
+    wsname_field:       'Nombre',
+    wsname_ok:          'Guardar',
+    wsname_required:    'Escribe un nombre para guardarlo.',
+    wstool_saveas:      'Guardar como…',
+    wstool_delete:      'Eliminar',
+    // Validación de campo obligatorio al intentar guardar. NO se persiste nada.
+    wsreq_one:          'Falta un dato obligatorio: ',
+    wsreq_many:         'Faltan datos obligatorios: ',
     wsmodal_delete:    'Eliminar',
     // WS.6A — pinned items, states, template groups
     wspin:             'Fijar',
@@ -8394,24 +8413,19 @@ const T = {
     // No health score, no attribution, no cause, no price, no checkout.
     intprev_badge:      'Intelligence · your portfolio',
     intprev_title:      'This is what Aurix already understands about your wealth',
-    intprev_f_conc:     (pct, name) => `${pct}% of your investable wealth depends on ${name}.`,
-    intprev_f_liq:      pct => `Liquidity represents ${pct}% of your investable wealth.`,
-    intprev_subj_w_crypto: 'Your crypto exposure',
-    intprev_subj_w_dep:    'Your largest position',
-    intprev_subj_w_liq:    'Your cash',
-    intprev_subj_w_div:    'How your categories split',
-    intprev_subj_w_sector: 'Your sector exposure',
-    intprev_subj_conc:  'Concentration of your largest position',
-    intprev_subj_liq:   'Weight of your cash',
-    intprev_subj_watch: 'Area to watch',
+    // §1 — the natural equivalent WITHOUT «investable» (see the ES note: same
+    // trade-off, same reason, and these two keys are preview-only).
+    intprev_f_conc:     (pct, name) => `${pct}% of your wealth depends on ${name}.`,
+    intprev_f_liq:      pct => `Liquidity represents ${pct}% of your wealth.`,
     intprev_q_conc:     'How has this concentration changed over time?',
     intprev_q_liq:      'How has this cash weight evolved?',
     intprev_q_watch:    'Since when has it behaved like this, and what moved it?',
-    intprev_locked_tag: 'Available with Premium',
-    intprev_locked_aria: 'Third discovery, available with Premium',
+    intprev_locked_n:   n => n === 1
+      ? 'Aurix has found 1 more reading of your wealth.'
+      : `Aurix has found ${n} more readings of your wealth.`,
+    intprev_locked_aria: 'Analysis not unlocked yet',
     intprev_q_label:    'The next question',
     intprev_q:          'How has this exposure changed over time?',
-    intprev_premium:    'Aurix already reads your structure. The movement of that structure, its cause and its ongoing monitoring come with Aurix Premium.',
     intprev_cta:        'Back to Dashboard',
     intprev_cta_full:   'See the full analysis',
     intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
@@ -8690,6 +8704,7 @@ const T = {
     wsfc_ico_realestate: '⌂',
     wsfc_premium_label: 'With Premium',
     wsfc_cta:          'See the full Workspace',
+    wsfc_pending:      'Preparing your workspace…',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
     ws_sync_saved_synced: 'Saved and synced',
@@ -8826,19 +8841,19 @@ const T = {
     wsmse_empty_cta:    'Explore templates',
     // DSH.WORKSPACE.01 — Mi Espacio V2 (two-column personal operating centre)
     wsmse2_tpl_title:   'My templates',
-    wsmse2_tpl_sub:     'Recently used templates',
     wsmse2_tool_title:  'My tools',
-    wsmse2_tool_sub:    'Recently used tools',
     wsmse2_last:        'Last opened',
+    wsmse2_updated:     'updated',
+    wsmse2_fav:         'Favourite',
     wsmse2_saved:       'Saved',
-    wsmse2_empty_t:     'Your space builds itself from what you use.',
-    wsmse2_empty_b:     'What you open and what you save shows up here',
-    wsmse2_tpl_empty_t: "You haven't opened a template yet.",
-    wsmse2_tpl_empty_b: 'Open one and it will show up here.',
-    wsmse2_tpl_empty_cta: 'Explore templates',
-    wsmse2_tool_empty_t: 'No recent tools yet.',
-    wsmse2_tool_empty_b: 'Explore the available tools.',
-    wsmse2_tool_empty_cta: 'Explore tools',
+    wsmse2_empty_t:     'Your space is yours to choose.',
+    wsmse2_empty_b:     'What you star and what you save with a name shows up here',
+    wsmse2_tpl_empty_t: 'No templates yet.',
+    wsmse2_tpl_empty_b: 'Star one, or save a named document, and it will show up here.',
+    wsmse2_tpl_empty_cta: 'See templates',
+    wsmse2_tool_empty_t: 'No tools yet.',
+    wsmse2_tool_empty_b: 'Star one, or save a named document, and it will show up here.',
+    wsmse2_tool_empty_cta: 'See tools',
     wsapp_receivables_n:'Payment Control',
     wsapp_assets_n:     'Asset prices',
     wstool_financial_n: 'Financial calculator',
@@ -9026,6 +9041,15 @@ const T = {
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
     wsmodal_cancel:    'Cancel',
+    wsname_save_title:  'Save to My Space',
+    wsname_saveas_title:'Save as…',
+    wsname_field:       'Name',
+    wsname_ok:          'Save',
+    wsname_required:    'Type a name to save it.',
+    wstool_saveas:      'Save as…',
+    wstool_delete:      'Delete',
+    wsreq_one:          'A required value is missing: ',
+    wsreq_many:         'Required values are missing: ',
     wsmodal_delete:    'Delete',
     // WS.6A — pinned items, states, template groups
     wspin:             'Pin',
@@ -19878,6 +19902,20 @@ const AURIX_WS_HOME = true;
 // return real counts honestly (0 today) so the hero never fabricates numbers.
 const _WSH_GOALS_KEY     = 'aurix_ws_goals_v1';
 const _WSH_SCENARIOS_KEY = 'aurix_ws_scenarios_v1';
+// Los escenarios guardados comparten el contrato de documento (id estable,
+// revisión, tombstone). Su lectura pública oculta lo borrado; la cruda la
+// conserva para que el push suba el tombstone.
+function _wsScenariosRaw() { return _wshReadStore(_WSH_SCENARIOS_KEY); }
+function _wsScenarios() { return _wsScenariosRaw().filter(x => x && !x.deletedAt); }
+function _wsScenarioTombstone(id) {
+  const arr = _wsScenariosRaw();
+  const it = arr.find(x => x && (x.scenarioId || x.id) === id);
+  if (!it) return false;
+  it.deletedAt = Date.now();
+  _wsDocStamp(it);
+  _wshWriteStore(_WSH_SCENARIOS_KEY, arr);
+  return true;
+}
 const _WSH_PROJECTS_KEY  = 'aurix_ws_projects_v1';
 function _wshReadStore(key) {
   try { const raw = localStorage.getItem(key); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; }
@@ -20176,11 +20214,28 @@ async function _wsDocsPull() {
       local.forEach(item => { const id = spec.idOf(item); if (id) byId.set(String(id), item); });
       let changed = false;
       for (const r of mine) {
-        if (r.deleted_at) continue;                       // tombstone: no se resucita
-        const body = r.body && typeof r.body === 'object' ? r.body : null;
-        if (!body) continue;
         const cur = byId.get(String(r.doc_id));
         const remoteRev = Number(r.revision) || 1;
+        // ── EL TOMBSTONE TIENE QUE VIAJAR, NO SÓLO NO RESUCITAR ───────────────
+        // Aquí había `if (r.deleted_at) continue;` con el comentario «tombstone: no
+        // se resucita», y eso era la mitad del contrato: impedía que el remoto
+        // reintrodujera un borrado, pero NO propagaba el borrado al otro
+        // dispositivo. Borrar un documento en el móvil lo dejaba vivo en el
+        // escritorio para siempre, y el escritorio lo volvía a subir con su
+        // revisión al siguiente guardado. Ahora el tombstone se APLICA cuando es
+        // más nuevo que lo que hay en local, con la misma regla de revisión que
+        // todo lo demás: una edición posterior siempre gana.
+        if (r.deleted_at) {
+          if (!cur) continue;                              // nunca lo tuvimos: nada que borrar
+          if (cur.deletedAt) continue;                      // ya estaba marcado
+          if (!(remoteRev > (Number(cur.revision) || 1))) continue;   // nuestra copia es más nueva
+          cur.deletedAt = Date.parse(r.deleted_at) || Date.now();
+          cur.revision = remoteRev;
+          changed = true;
+          continue;
+        }
+        const body = r.body && typeof r.body === 'object' ? r.body : null;
+        if (!body) continue;
         if (!cur) { local.push(body); byId.set(String(r.doc_id), body); changed = true; }
         else if (remoteRev > (Number(cur.revision) || 1)) { Object.assign(cur, body); changed = true; }
       }
@@ -20268,9 +20323,11 @@ function _wshMetrics() {
   try { if (AURIX_WS_USE_REAL_DATA && typeof investableValueBase === 'function') wealth = formatBase(investableValueBase()); } catch (_) {}
   return {
     wealth,
-    goals:     _wshReadStore(_WSH_GOALS_KEY).length,
-    scenarios: _wshReadStore(_WSH_SCENARIOS_KEY).length,
-    projects:  _wshReadStore(_WSH_PROJECTS_KEY).length,
+    // Los contadores también cuentan lo VIVO: un documento borrado no puede seguir
+    // sumando en la cabecera después de desaparecer de la lista.
+    goals:     _wsgGoals().length,
+    scenarios: _wsScenarios().length,
+    projects:  _ws4Projects().length,
   };
 }
 
@@ -20281,7 +20338,8 @@ function _wshMetrics() {
 let _wshView    = 'home';
 // §2 — de SESIÓN, no de disco: la portada no es una preferencia y no debe
 // convertirse en un muro dentro de la misma visita.
-let _wsFreeCoverSeen = false;
+// `_wsFreeCoverSeen` se retiró: era el contador de «ya la has visto» que convertía
+// la frontera del plan en una pantalla de un solo uso. Un guard no se gasta.
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
@@ -20365,6 +20423,52 @@ function renderWorkspaceHome(container) {
   const cur   = container.querySelector('.aurix-wsh');
   const shown = cur ? cur.getAttribute('data-wsh-view') : null;
 
+  // ── LA PORTADA FREE ES UN GUARD, NO UNA PANTALLA DE BIENVENIDA ────────────
+  // LO QUE HABÍA, y era el P0: la portada se mostraba UNA vez por sesión
+  // (`_wsFreeCoverSeen`), la decisión fallaba hacia ABIERTO («si no sé el plan, al
+  // catálogo») y `renderWorkspace` convertía explícitamente `free_cover` en `home`
+  // al reentrar en la sección. Las tres cosas juntas significaban que un usuario
+  // Free veía el interior completo de Workspace —Mi espacio, Plantillas,
+  // Herramientas— con sólo salir de la pestaña y volver, o con un atrás del
+  // navegador. El catálogo no CONCEDÍA nada (`_wsOpenTool` sigue gateando cada
+  // apertura), pero montar el interior ya es el defecto: el producto enseñaba lo
+  // que no se ha comprado y la portada dejaba de ser una frontera.
+  //
+  // AHORA es un guard de verdad, y se decide aquí —no en CSS y no en la sección—
+  // en el ÚNICO despachador de vistas de Workspace, antes de montar cualquier
+  // shell interior:
+  //   · el derecho lo da `hasAurixPremiumAccess()` (server-side, booleano
+  //     estricto) y falla CERRADO: sin lectura válida no se monta el interior;
+  //   · mientras el entitlement no ha resuelto NO se pinta la portada comercial
+  //     —a un cliente de pago no se le ofrece comprar lo que ya tiene—: se pinta
+  //     una espera neutra y se repinta sola cuando el resolver contesta;
+  //   · para un usuario Free la ÚNICA vista alcanzable es `free_cover`, más las
+  //     capacidades que su plan sí incluye (`tool`, revalidado por su gate);
+  //   · y la portada deja de ser de un solo uso: ya no hay estado que gastar.
+  //
+  // `renderWorkspace` sigue sin nombrar el entitlement (dos gates lo exigen y
+  // tienen razón: la SECCIÓN es de todo usuario autenticado). Lo que se gatea es
+  // la VISTA, que es otra pregunta.
+  const _wsPrem = _wsPremiumShell();
+  if (_wsPrem === 'pending') {
+    if (shown === 'pending') return;
+    container.innerHTML = _renderWorkspacePending();
+    _wshReveal(container);
+    return;
+  }
+  if (_wsPrem === false) {
+    // Una capacidad incluida en el plan Free puede estar abierta; cualquier otra
+    // vista —`home`, `workspace`, `goals`, `scenario`, `planning`— es interior y
+    // no se monta. Se revalida por el MISMO owner que decide la apertura, así que
+    // una ruta directa o una referencia fijada antigua no puede colarse.
+    const _openOk = (_wshView === 'tool')
+      && (function () { try { return _wsToolAccess(_wsToolActive).ok === true; } catch (_) { return false; } })();
+    if (!_openOk) _wshView = 'free_cover';
+  } else if (_wshView === 'free_cover') {
+    // Premium nunca ve la portada comercial: entra directamente en Workspace.
+    _wshView = 'home';
+  }
+
   if (_wshView === 'scenario') {
     if (shown === 'scenario') return;
     container.innerHTML = _renderScenarioBuilder();
@@ -20395,31 +20499,6 @@ function renderWorkspaceHome(container) {
     _wshReveal(container);
     return;
   }
-  // ── §2 · LA PORTADA FREE ───────────────────────────────────────────────────
-  // «Free entra en una portada propia de Workspace; Premium entra directamente en
-  // Workspace.» El catálogo completo NO es la portada de un usuario Free: lo que
-  // ve es una propuesta y los dos recursos que SÍ tiene. Y no hay lecturas de
-  // patrimonio aquí — eso pertenece a Intelligence (§2).
-  //
-  // Es una PORTADA, no un muro: los dos accesos abren las superficies de verdad, y
-  // una vez dentro el usuario Free navega Workspace con normalidad. Por eso la
-  // vista se recuerda (`_wsFreeCoverSeen`): volver a la pestaña después de usar una
-  // herramienta lleva al catálogo, no otra vez a la portada.
-  // ── DÓNDE VIVE LA DECISIÓN, Y POR QUÉ NO EN `renderWorkspace` ─────────────
-  // M.02 B4 RETIRÓ el bloqueo global de Workspace a propósito: la sección entera se
-  // sustituía por el preview premium, así que ningún usuario Free llegó nunca a ver
-  // Compound. Dos gates certifican que eso no vuelva (`renderWorkspace` no puede
-  // nombrar `hasAurixPremiumAccess`), y tienen razón: la portada Free NO es un
-  // bloqueo de sección y no debe parecerlo ni en el código. Es una VISTA MÁS del
-  // despachador, con sus dos accesos vivos y su salida — así que se decide aquí,
-  // junto a las otras vistas, y la sección sigue abierta para todo el mundo.
-  if (_wshView === 'home' && !_wsFreeCoverSeen) {
-    let _premium = true;
-    try { _premium = hasAurixPremiumAccess(); } catch (_) { _premium = true; }
-    // Falla hacia NO mostrar la portada: si no se puede saber el plan, el usuario
-    // va al catálogo, que es lo que ya funcionaba.
-    if (!_premium) { _wsFreeCoverSeen = true; _wshView = 'free_cover'; }
-  }
   if (_wshView === 'free_cover') {
     if (shown === 'free_cover') return;
     container.innerHTML = _renderWorkspaceFreeCover();
@@ -20433,24 +20512,82 @@ function renderWorkspaceHome(container) {
   _wshReveal(container);
 }
 
+// ¿MONTA ESTA CUENTA EL INTERIOR DE WORKSPACE? Tres respuestas, no dos.
+//   true      → Premium confirmado por el servidor: interior completo.
+//   false     → el servidor contestó y NO concede: portada Free, y nada más.
+//   'pending' → todavía no hay respuesta. Fail-closed igual (no se monta nada
+//               interior), pero tampoco se afirma que el usuario es Free.
+// La distinción importa porque `hasFeature` devuelve false en los dos últimos
+// casos, y tratarlos igual le enseñaba la portada de venta a un cliente que ya
+// había pagado durante toda la ventana de arranque.
+function _wsPremiumShell() {
+  let loaded = false;
+  try { loaded = _aurixEntLoaded() === true; } catch (_) { loaded = false; }
+  // ── Y LA ESPERA TIENE QUE ACABARSE ────────────────────────────────────────
+  // La primera versión devolvía 'pending' con `loaded === false` y punto. Eso
+  // convertía un fallo PERMANENTE del resolver (sin red, RPC caída, sesión sin
+  // cliente) en un spinner eterno: peor que la portada, porque el usuario Free se
+  // quedaba sin sus dos capacidades y sin saber por qué. `_aurixEntReset` deja
+  // `error` cuando la primera carga falló, así que hay tres estados de verdad:
+  // «no ha contestado todavía» (espera), «contestó que no» y «no pudo contestar».
+  // Los dos últimos caen en la portada Free, que es la respuesta honesta a «no
+  // puedo confirmar que seas Premium» y sigue siendo fail-closed.
+  if (!loaded) {
+    let answered = false;
+    try { answered = !!_aurixEnt.error; } catch (_) { answered = false; }
+    return answered ? false : 'pending';
+  }
+  try { return hasAurixPremiumAccess() === true; } catch (_) { return false; }
+}
+// La espera. No dice nada del plan porque todavía no se sabe, y no monta ninguna
+// superficie interior. Se repinta sola: `_aurixEntRevalidate` hace `switchTab` en
+// cuanto las features cambian, y la primera carga también pasa por ahí.
+function _renderWorkspacePending() {
+  const esc = _escapeWorkspaceText;
+  return `
+    <div class="aurix-wsh wsfc-pending" data-wsh-view="pending" aria-busy="true">
+      <section class="wsfc-pending-stage">
+        <span class="wsfc-pending-spinner" aria-hidden="true"></span>
+        <p class="wsfc-pending-text">${esc(t('wsfc_pending'))}</p>
+      </section>
+    </div>`;
+}
+
+// ── EL REPINTADO DE HOME TAMBIÉN PASA POR EL GUARD ─────────────────────────
+// Seis sitios repintaban Home escribiendo `_renderWorkspaceHome(...)` DIRECTAMENTE
+// en el contenedor, saltándose el despachador —y por tanto el guard—. Lo hacían
+// por una razón válida (el despachador es idempotente: con Home ya pintado sólo
+// refresca métricas, así que cambiar de pestaña no repintaría el panel), pero eso
+// deja seis caminos por los que el shell interior se monta sin que nadie pregunte
+// el plan. Este helper conserva el repintado forzado y añade la única pregunta que
+// faltaba. Un fallo o una lectura pendiente NO montan nada: caen al despachador,
+// que decide portada o espera.
+function _wshRepaintHome() {
+  const c = document.getElementById('aurixWorkspace');
+  if (!c) return;
+  if (_wsPremiumShell() !== true) { _wshView = 'free_cover'; renderWorkspaceHome(c); return; }
+  c.innerHTML = _renderWorkspaceHome(_wshMetrics());
+  _wshReveal(c);
+}
+
 // One-time delegated handler for Workspace internal navigation + scenario save.
 function _wshWireOnce() {
   if (_wshWired) return;
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsfc-open],[data-wsfc-upgrade],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsfc-open],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
     const tab = t.getAttribute('data-wstab');
-    if (tab) { _wsTab = tab; _wshView = 'home'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    if (tab) { _wsTab = tab; _wshView = 'home'; _wshRepaintHome(); return; }
     // WS.12 (v2) — Mi Espacio per-card context menu (⋮).
     const wsMenu = t.getAttribute('data-wsmenu');
     if (wsMenu) { _wsSpaceMenu(wsMenu, t); return; }
     // WS.6A — pin toggle / open pinned (rebuild Home in place)
     const pin = t.getAttribute('data-wspin');
-    if (pin) { _wsTogglePin(pin); const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    if (pin) { _wsTogglePin(pin); _wshRepaintHome(); return; }
     const pinOpen = t.getAttribute('data-wspinopen');
     if (pinOpen) { _wsPinOpen(pinOpen); return; }
     // P5/P4 — goal lifecycle
@@ -20485,17 +20622,14 @@ function _wshWireOnce() {
     // mismo gate que cualquier otra entrada: la portada no puede conceder nada.
     const _fcOpen = t.getAttribute('data-wsfc-open');
     if (_fcOpen) { _wsReturnTab = 'tools'; _wsOpenTool(_fcOpen); return; }
-    // El CTA va al paywall CANÓNICO con su featureKey y su source. No hay un
-    // segundo camino de conversión ni se tocan precios aquí.
-    if (t.getAttribute('data-wsfc-upgrade')) {
-      // `workspace.templates` no existía como etiqueta, así que el Único punto de
-      // conversión le enseñaba al usuario la clave cruda como nombre de lo que
-      // estaba a punto de comprar —lo midió la sonda abriendo el overlay real—. Y
-      // además nombraba una SECCIÓN que no se vende suelta: este CTA ofrece el
-      // Workspace completo, que es lo que dice su texto.
-      try { openUpgradeIntent({ featureKey: 'workspace.full', source: 'workspace:free_cover' }); } catch (_) {}
-      return;
-    }
+    // ── EL CTA DE LA PORTADA YA NO PASA POR AQUÍ ──────────────────────────────
+    // Abría `openUpgradeIntent`, que montaba el overlay intermedio «Función
+    // premium / Ver AURIX Premium» y exigía un SEGUNDO clic para llegar a los
+    // planes. Dos pantallas para una decisión, y la primera no aportaba nada que
+    // la portada no dijera ya. Ahora el botón lleva `data-premium-cta`, así que lo
+    // despacha el MISMO owner canónico que el CTA de Intelligence
+    // (`_initFounderUI` → `openAurixPremiumModal`): un solo camino de conversión,
+    // un solo sitio con precios, cero pasos intermedios.
     // El botón «Explorar Workspace» se retiró (la portada lleva UN CTA), y la salida
     // sin comprar son las dos tarjetas Free más el hecho de que la portada es de un
     // solo uso: al reentrar en la sección se ve el catálogo completo (ver
@@ -20514,9 +20648,12 @@ function _wshWireOnce() {
       return;
     }
     // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
-    if (nav === 'back') { _wshView = 'home'; _ws4ActiveId = null; _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
-    if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    if (nav === 'back') { _wshView = 'home'; _ws4ActiveId = null; _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome(); return; }
+    if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; _wshRepaintHome(); return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
+    if (t.hasAttribute('data-wstool-saveas')) { _wsToolSaveAs(); return; }
+    if (t.hasAttribute('data-wstool-rename')) { _wsToolRename(); return; }
+    if (t.hasAttribute('data-wstool-delete')) { _wsToolDelete(); return; }
     if (t.hasAttribute('data-wstool-save')) { _wsToolSave(); return; }
     // WS.8 — Trade Journal: add/save trade, per-trade act, cancel edit.
     if (t.hasAttribute('data-wsjrn-add')) { _wsJrnAdd(); return; }
@@ -20622,7 +20759,7 @@ function _wshRefreshMetrics(root, metrics) {
 function _wshFuturePathReading() {
   let goals = [], scenarios = [];
   try { goals = _wshReadStore(_WSH_GOALS_KEY); } catch (_) {}
-  try { scenarios = _wshReadStore(_WSH_SCENARIOS_KEY); } catch (_) {}
+  try { scenarios = _wsScenarios(); } catch (_) {}
   const wealth = (function () { try { return _ws4Real().wealth; } catch (_) { return 0; } })();
 
   if (goals.length && typeof calculateGoalProgress === 'function') {
@@ -20878,7 +21015,21 @@ function _wsModal2(o) {
   document.body.appendChild(ov);
   requestAnimationFrame(() => ov.classList.add('is-open'));
 }
-// WS.12 (v2) — rename prompt modal (single text input).
+// ── UN SOLO MODAL DE NOMBRE, PARA LAS TRES ACCIONES ────────────────────────
+// `_wsPrompt` era el modal de RENOMBRAR y ya tenía la forma correcta (un campo de
+// texto, Cancelar / Guardar, Esc y Enter). La SPEC pide exactamente esta caja
+// también para «Guardar en Mi espacio» y «Guardar como…», y pide explícitamente
+// que sea UNA y no tres. Lo único que le faltaba para poder serlo:
+//   · la ETIQUETA del campo («Nombre»), porque un input sin etiqueta en un modal
+//     de creación no dice qué se está nombrando —y no era accesible—;
+//   · un campo OBLIGATORIO de verdad: la versión anterior llamaba a `onOk('')` con
+//     el campo vacío y quien lo recibía decidía por su cuenta (`_wsRename` hacía
+//     `if (!name) return`, así que el modal se cerraba y no pasaba nada, sin
+//     decirle al usuario por qué). Ahora el modal NO se cierra sin nombre y
+//     muestra la razón;
+//   · un `placeholder`/sugerencia editable.
+// Nada de esto cambia el contrato de los llamadores existentes: sin `required` se
+// comporta igual que antes.
 function _wsPrompt(o) {
   const esc = _intccEsc;
   const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
@@ -20887,7 +21038,9 @@ function _wsPrompt(o) {
   ov.innerHTML = `
     <div class="ws-modal" role="dialog" aria-modal="true" aria-labelledby="wsModalTitle">
       <h3 class="ws-modal-title" id="wsModalTitle">${esc(o.title)}</h3>
-      <input class="wsg-text wsmse-rename-in" id="wsRenameInput" type="text" autocomplete="off" value="${esc(o.current || '')}">
+      ${o.fieldLabel ? `<label class="ws-modal-label" for="wsRenameInput">${esc(o.fieldLabel)}</label>` : ''}
+      <input class="wsg-text wsmse-rename-in" id="wsRenameInput" type="text" autocomplete="off" maxlength="80"${o.required ? ' required aria-required="true"' : ''} placeholder="${esc(o.placeholder || '')}" value="${esc(o.current || '')}">
+      <p class="ws-modal-err" id="wsPromptErr" role="alert" hidden></p>
       <div class="ws-modal-actions">
         <button type="button" class="ws-modal-btn is-cancel" data-wsmodal="cancel">${esc(t('wsmodal_cancel'))}</button>
         <button type="button" class="ws-modal-btn is-primary" data-wsmodal="ok">${esc(o.okLabel)}</button>
@@ -20895,7 +21048,20 @@ function _wsPrompt(o) {
     </div>`;
   const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'Enter') doOk(); };
-  const doOk = () => { const v = (ov.querySelector('#wsRenameInput') || {}).value || ''; close(); try { o.onOk(v.trim()); } catch (_) {} };
+  const doOk = () => {
+    const el = ov.querySelector('#wsRenameInput');
+    const v = String((el && el.value) || '').trim();
+    // Obligatorio significa que el modal se queda y lo dice, no que se cierre y
+    // no pase nada. Cancelar sigue sin persistir absolutamente nada.
+    if (o.required && !v) {
+      const err = ov.querySelector('#wsPromptErr');
+      if (err) { err.textContent = t('wsname_required'); err.hidden = false; }
+      if (el) { el.setAttribute('aria-invalid', 'true'); el.classList.add('is-invalid'); try { el.focus(); } catch (_) {} }
+      return;
+    }
+    close();
+    try { o.onOk(v); } catch (_) {}
+  };
   ov.addEventListener('click', e => {
     if (e.target === ov) { close(); return; }
     const b = e.target.closest ? e.target.closest('[data-wsmodal]') : null; if (!b) return;
@@ -20909,9 +21075,9 @@ function _wsPrompt(o) {
 function _wsRename(ref, name) {
   if (!name) return;
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
-  if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { p.customName = name; p.updatedAt = Date.now(); _ws4Persist(p); } }
-  else if (kind === 'goal') { const l = _wsgGoals(); const g = l.find(x => x && x.id === id); if (g) { g.name = name; g.updatedAt = Date.now(); _wsgSaveAll(l); delete _wsgWorking[id]; } }
-  else if (kind === 'scenario') { try { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { s.name = name; _wshWriteStore(_WSH_SCENARIOS_KEY, arr); } } catch (_) {} }
+  if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { p.customName = name; _ws4Persist(p); } }
+  else if (kind === 'goal') { const g = _wsgGoals().find(x => x && x.id === id); if (g) { g.name = name; _wsgPersist(g); delete _wsgWorking[id]; } }
+  else if (kind === 'scenario') { try { const arr = _wsScenariosRaw(); const sc = arr.find(x => (x.scenarioId || x.id) === id); if (sc) { sc.name = name; _wsDocStamp(sc); _wshWriteStore(_WSH_SCENARIOS_KEY, arr); } } catch (_) {} }
 }
 // WS.12 (v2) — per-card context menu popover (Abrir / Renombrar / Fijar arriba /
 // Quitar de Mi Espacio / Eliminar proyecto). Pinned tools: Abrir / Fijar / Quitar.
@@ -20919,7 +21085,7 @@ function _wsSpaceMenu(ref, anchor) {
   const esc = _intccEsc;
   const prev = document.getElementById('wsSpaceMenu'); if (prev) prev.remove();
   const isPinned = ref.indexOf('tool:') === 0 || ref.indexOf('tpl:') === 0;
-  const reb = () => { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } };
+  const reb = () => { _wshRepaintHome(); };
   const items = [];
   items.push({ k: 'open', label: t('wsh_proj_open') });
   if (!isPinned) items.push({ k: 'rename', label: t('wsg_act_rename') });
@@ -21797,9 +21963,12 @@ function _wsSmartTab() {
 // WS.5A P3/P4 — unified view of saved items across the 3 stores.
 function _wshAllProjects() {
   const out = [];
-  try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, gtype: g.type, target: g.target, current: g.current, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, type: p.type, results: p.results, inputs: p.inputs, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
+  // Los TRES lectores filtrados, no el almacén crudo: un documento con tombstone
+  // seguía apareciendo aquí —y por tanto en Mi espacio y en los contadores— porque
+  // esta vista unificada leía `_wshReadStore` directamente. Lo destapó el gate.
+  try { _wsgGoals().forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, gtype: g.type, target: g.target, current: g.current, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
+  try { _ws4Projects().forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, type: p.type, results: p.results, inputs: p.inputs, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
+  try { _wsScenarios().forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
   return out;
 }
 function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? all.reduce((a, b) => (b.ts > a.ts ? b : a), all[0]) : null; }
@@ -21815,11 +21984,14 @@ function _wsxAct(act, ref) {
   if (!ref) return;
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   const now = Date.now();
-  const rerender = () => { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } };
+  const rerender = () => { _wshRepaintHome(); };
   const doDelete = () => {
-    if (kind === 'goal') { _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id)); delete _wsgWorking[id]; delete _wsgDirty[id]; }
-    else if (kind === 'workspace') { _ws4SaveAll(_ws4Projects().filter(p => p && p.id !== id)); }
-    else if (kind === 'scenario') { _wshWriteStore(_WSH_SCENARIOS_KEY, _wshReadStore(_WSH_SCENARIOS_KEY).filter(s => (s.scenarioId || s.id) !== id)); }
+    // Recortar el array era lo que permitía la resurrección: el siguiente pull veía
+    // el documento en remoto y ausente en local, y lo volvía a meter. Ahora se
+    // marca (`deletedAt`) y el push sube el tombstone que el pull ya respeta.
+    if (kind === 'goal') { _wsgTombstone(id); delete _wsgWorking[id]; delete _wsgDirty[id]; }
+    else if (kind === 'workspace') { _ws4Tombstone(id); if (_wsToolEditId === id) { _wsToolEditId = null; _wsToolDirty = true; } }
+    else if (kind === 'scenario') { _wsScenarioTombstone(id); }
     rerender();
   };
   if (act === 'del') { _wsConfirm(doDelete); return; }
@@ -21831,12 +22003,52 @@ function _wsxAct(act, ref) {
   }
 }
 
+// ── LA VISTA TÉCNICA DE FUNDADOR SE ACTIVA, NO SE HEREDA ───────────────────
+// `workspace.catalog_preview` es una clave propia que ningún plan concede, y eso
+// bastaba para que ningún usuario externo viera el inventario interno. Pero el
+// derecho del founder se concede con overrides, y un override GLOBAL ('*') las
+// concede TODAS: con eso, la pestaña «Interno» aparecía automáticamente en la
+// vista Premium normal de esa cuenta —que es también la cuenta de QA—, mezclando
+// inventario sin publicar con el producto que se está revisando.
+//
+// Ahora hacen falta las DOS cosas, y en este orden:
+//   1. el derecho del servidor (sigue siendo la autoridad, sigue fallando cerrado);
+//   2. una activación DELIBERADA de la sesión.
+// Un flag local por sí solo NO concede nada: sin el derecho, `_aurixEntIsCatalogPreview()`
+// es false y la pestaña no existe. Es una preferencia de vista sobre una
+// capacidad ya autorizada, no una llave —la distinción que el bloque de
+// entitlements exige—. Y vive en `sessionStorage`: se apaga al cerrar la pestaña,
+// así que la vista normal es siempre la que se ve por defecto.
+const _WS_FOUNDER_VIEW_KEY = 'aurix_ws_founder_view';
+function _wsFounderViewFlag() {
+  try { return sessionStorage.getItem(_WS_FOUNDER_VIEW_KEY) === '1'; } catch (_) { return false; }
+}
+function _wsInternalViewOn() {
+  let right = false;
+  try { right = _aurixEntIsCatalogPreview() === true; } catch (_) { right = false; }
+  return right && _wsFounderViewFlag();
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixFounderView = function (on) {
+      const want = on !== false;
+      try { if (want) sessionStorage.setItem(_WS_FOUNDER_VIEW_KEY, '1'); else sessionStorage.removeItem(_WS_FOUNDER_VIEW_KEY); } catch (_) {}
+      // Si el derecho no está, se dice: activar una vista que no se va a mostrar
+      // en silencio es peor que no activarla.
+      const granted = _wsInternalViewOn();
+      if (want && !granted) { try { console.warn('[WS][FOUNDER-VIEW] activada localmente, pero el servidor no concede workspace.catalog_preview: la vista interna NO se muestra.'); } catch (_) {} }
+      try { if (typeof _wshRepaintHome === 'function') _wshRepaintHome(); } catch (_) {}
+      return granted;
+    };
+  }
+} catch (_) {}
+
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
   // La vista de inventario es una PESTAÑA MÁS y sólo existe si el servidor concede
   // `workspace.catalog_preview`. Falla cerrada en el propio conjunto de pestañas:
   // un usuario externo no puede seleccionarla porque no está en `TAB_KEYS`.
-  const _internalView = (function () { try { return _aurixEntIsCatalogPreview() === true; } catch (_) { return false; } })();
+  const _internalView = _wsInternalViewOn();
   const TAB_KEYS = _WS_TABS.filter(k => k !== 'internal' || _internalView);
   let tab = TAB_KEYS.indexOf(_wsTab) !== -1 ? _wsTab : _wsSmartTab();
 
@@ -21917,87 +22129,143 @@ function _renderWorkspaceHome(metrics) {
 
   let panel = '';
   if (tab === 'space') {
-    // ── MI ESPACIO · DOS COLUMNAS, SIEMPRE, Y CON PERSISTENCIA REAL ──────────
-    // Las dos columnas se pintan SIEMPRE y con la misma jerarquía: son el inicio
-    // útil del usuario y tienen que verse las dos desde el primer viewport. Antes
-    // una columna podía no pintarse (dejando media pantalla muerta) o las dos se
-    // sustituían por una portada única, y en los dos casos la simetría se rompía.
+    // ══════════════════════════════════════════════════════════════════════════
+    // MI ESPACIO · SÓLO LO QUE EL USUARIO PUSO AQUÍ A PROPÓSITO
+    // ══════════════════════════════════════════════════════════════════════════
+    // LO QUE HABÍA: la pertenencia se decidía con `ts = max(último uso, favorito,
+    // guardado)` y se filtraba por `ts > 0`, así que ABRIR UNA VEZ una herramienta
+    // ya la metía en Mi espacio. El resultado es el que describe la SPEC: un espacio
+    // que se llena solo con lo que pasó por delante, encabezado por «Plantillas
+    // utilizadas recientemente». Eso no es el espacio del usuario, es un historial
+    // —y un historial ya existe en el catálogo, ordenado por uso—.
     //
-    // Y lo que puebla cada columna ya no es sólo «lo que se abrió en memoria»: son
-    // las TRES fuentes reales —documentos guardados, favoritos y última apertura—
-    // ordenadas por actividad más reciente. Un presupuesto guardado aparece aquí
-    // aunque esta sesión no lo haya abierto, que es lo que el usuario espera de un
-    // espacio de trabajo.
+    // AHORA la pertenencia es INTENCIONAL y sólo tiene dos fuentes:
+    //   1. FAVORITOS — la estrella. Un acceso directo a una capacidad.
+    //   2. DOCUMENTOS GUARDADOS — una instancia con datos y nombre propio.
+    // La última apertura sobrevive como METADATO de un favorito (dice «actualizado
+    // hace…»), nunca como condición de pertenencia. Abrir sin marcar ni guardar no
+    // añade nada, que es exactamente lo que la SPEC pide.
+    //
+    // Y son dos cosas DISTINTAS que no se fusionan: un favorito es la capacidad, un
+    // documento es una instancia. Por eso cada tarjeta declara su `data-wsmse-type`
+    // y el documento lleva el nombre que el usuario le puso, no el de la plantilla.
     const pinTs = ref => { const p = _wsPinned().find(x => x && x.ref === ref); return p ? (p.ts || 1) : 0; };
-    // Los documentos GUARDADOS, indexados por la superficie a la que pertenecen.
-    // `_wshAllProjects` es la vista unificada de los tres almacenes y ya existía:
-    // aquí sólo se agrupa por superficie para poder decir «2 guardados».
-    const savedBySurface = Object.create(null);
-    try {
-      _wshAllProjects().forEach(it => {
-        if (!it) return;
-        const sf = it.kind === 'goal' ? 'goals'
-          : it.kind === 'scenario' ? 'scenario'
-          : _wsToolKeyForProjectType(it.type);
-        if (!sf) return;
-        const b = savedBySurface[sf] || (savedBySurface[sf] = { n: 0, ts: 0 });
-        b.n += 1; b.ts = Math.max(b.ts, Number(it.ts) || 0);
-      });
-    } catch (_) {}
 
-    const colItems = (map, kind) => _wsCatalogFor(kind)
-      .filter(e => map[e.id])
-      .map(e => _wsCardModel(e, map[e.id]))
-      .filter(m => m.state === 'open')
-      .map(m => {
-        const ref = m.pinRef || _wsCanonRef(m.openKind, m.openArg);
-        const sf = m.openKind === 'tool' ? m.openArg : m.openKind;
-        const sv = savedBySurface[sf] || { n: 0, ts: 0 };
-        const used = _wsRecentTs(ref), pinned = pinTs(ref);
-        return Object.assign({}, m, {
-          ref, used, pinned, savedCount: sv.n, savedTs: sv.ts,
-          ts: Math.max(used, pinned, sv.ts),
-        });
-      })
-      .filter(x => x.ts > 0)
-      .sort((a, b) => b.ts - a.ts);
+    // ── 1 · FAVORITOS ────────────────────────────────────────────────────────
+    // Se resuelven contra el CATÁLOGO y contra el acceso real (`_wsCardModel` ya
+    // usa `_wsToolAccess`), así que una estrella antigua sobre una capacidad que
+    // dejó de publicarse o de estar concedida no aparece: un favorito no puede
+    // conceder lo que el gate deniega.
+    const favItems = (map, kind) => _wsCatalogFor(kind)
+      .map(e => _wsCardModel(e, map[e.id] || {}))
+      .filter(m => m.state === 'open' && m.pinRef && _wsIsPinned(m.pinRef))
+      .map(m => ({
+        mtype: 'fav', ref: m.pinRef, model: m, name: m.name, cat: m.cat,
+        entryId: m.entryId, viz: m.viz, used: _wsRecentTs(m.pinRef),
+        ts: Math.max(pinTs(m.pinRef), _wsRecentTs(m.pinRef)),
+      }));
+
+    // ── 2 · DOCUMENTOS GUARDADOS ─────────────────────────────────────────────
+    // `_wshAllProjects` es la vista unificada de los tres almacenes y ya oculta los
+    // tombstones (sus lectores los filtran). Cada documento se atribuye a la
+    // capacidad que lo abre, y de ahí sale su columna: un presupuesto es una
+    // PLANTILLA, una simulación de interés compuesto es una HERRAMIENTA.
+    const docSurface = it => {
+      if (!it) return null;
+      if (it.kind === 'goal') return 'goals';
+      if (it.kind === 'scenario') return 'scenario';
+      return _wsToolKeyForProjectType(it.type);
+    };
+    const allDocs = (function () { try { return _wshAllProjects(); } catch (_) { return []; } })();
+    const docItems = kind => allDocs.map(it => {
+      const sf = docSurface(it);
+      if (!sf) return null;
+      const entry = _wsSurfaceEntry(sf);
+      if (!entry || entry.kind !== kind) return null;
+      // El MISMO gate que la apertura: un documento de una capacidad que esta
+      // cuenta no puede abrir no se ofrece como si pudiera abrirlo.
+      let acc = { ok: false };
+      try { acc = _wsToolAccess(sf); } catch (_) {}
+      if (!acc.ok) return null;
+      const r = _WS_TOOL_RENDER[entry.id] || _WS_TPL_RENDER[entry.id] || {};
+      return {
+        mtype: 'doc', ref: it.ref, name: it.name, typeLabel: it.typeLabel,
+        entryId: entry.id, cat: r.cat || entry.id, viz: r.viz || 'bars',
+        // El documento ENTERO viaja con la tarjeta, porque su miniatura tiene que
+        // salir de SUS datos. La primera versión usaba la ilustración de la
+        // CATEGORÍA (`_wsCatPreviewHtml`), que lee `_wsToolStateGet` —el borrador
+        // local de la herramienta— así que la tarjeta de «Presupuesto empresa»
+        // podía enseñar las cifras del último presupuesto EDITADO. Ese owner ya
+        // existía y es `_wsProjPreviewHtml`: construye la vista previa desde los
+        // `results` guardados del documento.
+        proj: it,
+        ts: Number(it.ts) || 0,
+      };
+    }).filter(Boolean);
+
+    const colItems = (map, kind) => favItems(map, kind)
+      .concat(docItems(kind))
+      .sort((a, b) => (b.ts - a.ts) || String(a.name).localeCompare(String(b.name)));
     const tplList = colItems(_WS_TPL_RENDER, 'template');
     const toolList = colItems(_WS_TOOL_RENDER, 'tool');
 
-    const mseMeta = it => {
-      const bits = [];
-      if (it.savedCount > 0) bits.push(esc(it.savedCount === 1 ? t('wsmse2_doc_one') : t('wsmse2_doc_n')(it.savedCount)));
-      if (it.used > 0) bits.push(esc(t('wsmse2_last') + ': ' + _wsRelTime(it.used)));
-      else if (it.pinned > 0) bits.push(esc(t('wsmse2_saved')));
-      return bits.join(' · ');
+    // El metadato, y sólo lo que se puede demostrar. Un favorito dice cuándo se
+    // abrió por última vez SI se abrió; un documento dice de qué capacidad es y
+    // cuándo se actualizó. Nunca «guardado» sobre algo que no está guardado.
+    const mseMeta = it => it.mtype === 'doc'
+      ? [it.typeLabel, it.ts ? (t('wsmse2_updated') + ' ' + _wsRelTime(it.ts)) : ''].filter(Boolean).join(' · ')
+      : [t('wsmse2_fav'), it.used ? (t('wsmse2_last') + ': ' + _wsRelTime(it.used)) : ''].filter(Boolean).join(' · ');
+    // Abrir: un favorito abre la CAPACIDAD (por su ref fijada), un documento abre
+    // SU instancia (por su ref de documento). Los dos por owners que ya existen.
+    const openAttrs = it => it.mtype === 'doc'
+      ? ` role="button" tabindex="0" data-wsx-open="${esc(it.ref)}"`
+      : _wsCardAttrs(it.model);
+    // La miniatura de un DOCUMENTO sale de sus propios datos; si el tipo no tiene
+    // vista previa propia, cae en la ilustración de su categoría —una ilustración,
+    // no una cifra ajena—.
+    const docPreview = it => {
+      let h = '';
+      try { h = _wsProjPreviewHtml(it.proj) || ''; } catch (_) { h = ''; }
+      return h || _wsCatPreviewHtml(it.cat);
     };
-    const card = (it, preview) => `
-      <div class="wsh-mse2-card${it.pinned ? ' is-saved' : ''}"${_wsCardAttrs(it)}${_wsAria(it)}>
-        <div class="wsh-mse2-pv">${preview}</div>
+    // `aria-hidden` en la miniatura: es una ILUSTRACIÓN de 34 px en móvil, con
+    // etiquetas de 7,5 px que nadie lee y que un lector de pantalla no debe
+    // dictar. El nombre accesible de la tarjeta es el del documento, que ya está.
+    const card = it => `
+      <div class="wsh-mse2-card is-${it.mtype}" data-wsmse-type="${it.mtype}"${openAttrs(it)} aria-label="${esc(it.name)}">
+        <div class="wsh-mse2-pv" aria-hidden="true">${it.mtype === 'doc' ? docPreview(it) : _wsMseToolPreview(it)}</div>
         <div class="wsh-mse2-body">
           <p class="wsh-mse2-name">${esc(it.name)}</p>
-          <span class="wsh-mse2-meta">${mseMeta(it)}</span>
+          <span class="wsh-mse2-meta">${esc(mseMeta(it))}</span>
         </div>
-        <span class="wsh-mse2-open" aria-hidden="true">${esc(t('wsh_proj_open'))} →</span>
       </div>`;
+    // El vacío es COMPACTO y SIMÉTRICO: mismo alto mínimo, misma tipografía, y no
+    // inventa elementos para rellenar. Y su copy ya no promete que el espacio se
+    // llena solo, porque ya no se llena solo.
     const emptyState = (tk, bk, ck, gotoTab) => `
       <div class="wsh-mse2-empty">
         <p class="wsh-mse2-empty-t">${esc(t(tk))}</p>
         <p class="wsh-mse2-empty-b">${esc(t(bk))}</p>
         <button type="button" class="wsh-cta is-primary" data-wstab="${gotoTab}">${esc(t(ck))}</button>
       </div>`;
-    const column = (titleK, subK, list, previewFn, emptyArgs) => `
+    // ── LAS DOS COLUMNAS SON LA MISMA COLUMNA DOS VECES ──────────────────────
+    // Se retira el SUBTÍTULO de la cabecera: era «Plantillas utilizadas
+    // recientemente» / «Herramientas utilizadas recientemente», así que (a)
+    // describía la regla de pertenencia que acaba de desaparecer y (b) al ocupar
+    // dos líneas en una columna y una en la otra desplazaba verticalmente todo el
+    // contenido de una respecto de la otra. Sin él las dos cabeceras son
+    // idénticas y las dos listas empiezan a la misma altura.
+    const column = (titleK, list, emptyArgs) => `
       <section class="wsh-card wsh-mse2-col">
         <header class="wsh-mse2-head">
-          <h3 class="wsh-title">${esc(t(titleK))}</h3>
-          <span class="wsh-mse2-sub">${esc(t(subK))}</span>
+          <h3 class="wsh-title wsh-mse2-title">${esc(t(titleK))}</h3>
         </header>
-        ${list.length ? `<div class="wsh-mse2-list">${list.map(it => card(it, previewFn(it))).join('')}</div>` : emptyState.apply(null, emptyArgs)}
+        ${list.length ? `<div class="wsh-mse2-list">${list.map(card).join('')}</div>` : emptyState.apply(null, emptyArgs)}
       </section>`;
 
     panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}">
-      ${column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
-      ${column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsMseToolPreview(it), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
+      ${column('wsmse2_tpl_title', tplList, ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
+      ${column('wsmse2_tool_title', toolList, ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
     </div>`;
   } else if (tab === 'templates' || tab === 'tools') {
     const kind = tab === 'templates' ? 'template' : 'tool';
@@ -22163,7 +22431,7 @@ function _wsbBase() {
 // es lo único que los diferencia de verdad.
 function _wsbScenarios() {
   let saved = [];
-  try { saved = _wshReadStore(_WSH_SCENARIOS_KEY).filter(x => x && x.scenarioId); } catch (_) { saved = []; }
+  try { saved = _wsScenarios().filter(x => x && x.scenarioId); } catch (_) { saved = []; }
   if (saved.length) {
     return saved.slice(0, _WSB_MAX_SCENARIOS).map(x => ({
       id: String(x.scenarioId), name: x.name || '', desc: '',
@@ -22286,7 +22554,7 @@ function _wsbChartHtml(baselineProj, results) {
 function _wsbCardsHtml(cmp) {
   const esc = _intccEsc;
   let saved = [];
-  try { saved = _wshReadStore(_WSH_SCENARIOS_KEY); } catch (_) { saved = []; }
+  try { saved = _wsScenarios(); } catch (_) { saved = []; }
   const isSaved = id => saved.some(x => x && x.scenarioId === id);
   const money = v => formatBase(Math.abs(v));
   const sign = v => (v >= 0 ? '+' : '−');
@@ -22387,7 +22655,8 @@ function _renderScenarioBuilder() {
   // tarjeta llamaba al motor con dos constantes hardcodeadas.
   const cmp = _wsbCompare(_wsbScenarios());
   const baseProj = cmp.reference.final;
-  const saved = _wshReadStore(_WSH_SCENARIOS_KEY);
+  // Lo VIVO: un escenario borrado no puede seguir marcándose como guardado.
+  const saved = _wsScenarios();
   const isSaved = id => saved.some(s => s && s.scenarioId === id);
   const results = cmp.rows;
   const params = _wsbParams();
@@ -22761,10 +23030,50 @@ function _ws4Templates() {
   };
 }
 
-function _ws4Projects() { return _wshReadStore(_WSH_PROJECTS_KEY); }
+// ── LA IDENTIDAD DE UN DOCUMENTO, Y LAS DOS COSAS QUE LE FALTABAN ──────────
+// «La identidad real es el ID»: eso ya era cierto (`_ws4Persist` indexa por `id`).
+// Lo que no estaba cerrado era el CICLO DE VIDA del documento entre dispositivos:
+//
+//   · LA REVISIÓN NO SE MOVÍA. `_wsDocRows` sube `revision: Number(item.revision)
+//     || 1` y `_wsDocsPull` aplica el remoto sólo si `remoteRev > localRev`. Nadie
+//     escribía `revision`, así que valía 1 SIEMPRE y la comparación era `1 > 1`:
+//     la CREACIÓN de un documento viajaba (el otro dispositivo no lo tenía) pero
+//     ninguna EDICIÓN posterior llegaba nunca. Renombrar en el móvil y no verlo en
+//     el escritorio es exactamente el síntoma.
+//   · BORRAR NO DEJABA TOMBSTONE. El borrado filtraba el elemento del array local,
+//     y el siguiente pull lo veía «ausente en local, presente en remoto» y lo
+//     RESUCITABA. La tabla ya tiene `deleted_at` y el pull ya lo respeta
+//     (`if (r.deleted_at) continue`): lo que faltaba era escribirlo.
+//
+// Las dos se cierran en el OWNER de escritura, no en los llamadores, así que
+// guardar, renombrar, duplicar y borrar lo heredan sin repetir la decisión.
+// `_ws4ProjectsRaw` existe porque `_ws4Projects` ahora OCULTA los tombstones y el
+// owner de escritura tiene que conservarlos: escribir la lista filtrada los
+// borraría del almacén y devolvería la resurrección por la puerta de atrás.
+function _ws4ProjectsRaw() { return _wshReadStore(_WSH_PROJECTS_KEY); }
+function _ws4Projects() { return _ws4ProjectsRaw().filter(p => p && !p.deletedAt); }
 function _ws4SaveAll(list) { _wshWriteStore(_WSH_PROJECTS_KEY, list); }
 function _ws4Get() { return _ws4Draft; }   // P5 — live working copy (may be unsaved)
-function _ws4Persist(p) { const list = _ws4Projects(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); _ws4SaveAll(list); }
+// Sella la revisión SIGUIENTE y el instante. Monótona por documento: es lo que
+// permite que la fusión por revisión distinga «más nuevo» de «igual».
+function _wsDocStamp(doc) {
+  if (!doc || typeof doc !== 'object') return doc;
+  doc.revision = Math.max(1, (Number(doc.revision) || 0) + 1);
+  doc.updatedAt = Date.now();
+  return doc;
+}
+function _ws4Persist(p) { _wsDocStamp(p); const list = _ws4ProjectsRaw(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); _ws4SaveAll(list); }
+// El borrado SEGURO: marca, no recorta. El documento sigue en el almacén con su
+// `deletedAt` para que el push suba el tombstone; todos los lectores lo ocultan.
+function _ws4Tombstone(id) {
+  const list = _ws4ProjectsRaw();
+  const it = list.find(x => x && x.id === id);
+  if (!it) return false;
+  it.deletedAt = Date.now();
+  _wsDocStamp(it);
+  _ws4SaveAll(list);
+  return true;
+}
 function _ws4Summarize(type, inputs) { const c = _ws4Templates()[type].compute(inputs); return { rows: c.rows, reading: c.reading }; }
 
 // P5 — open a saved workspace (working copy) or create an UNSAVED draft. Nothing
@@ -22939,12 +23248,23 @@ function _renderWorkspaceDetail() {
 // (read-only); manual mode uses the entered amount. No wealthEngine, no APIs, no AI.
 const _WSG_TYPES = ['wealth', 'emergency', 'home', 'fire', 'free'];
 function _wsgThisYear() { try { return new Date().getFullYear(); } catch (_) { return 2026; } }
-function _wsgGoals() { return _wshReadStore(_WSH_GOALS_KEY); }
+function _wsgGoalsRaw() { return _wshReadStore(_WSH_GOALS_KEY); }
+function _wsgGoals() { return _wsgGoalsRaw().filter(g => g && !g.deletedAt); }
 function _wsgSaveAll(list) { _wshWriteStore(_WSH_GOALS_KEY, list); }
+// Mismo contrato que los proyectos: revisión monótona y borrado por tombstone.
+function _wsgTombstone(id) {
+  const list = _wsgGoalsRaw();
+  const it = list.find(x => x && x.id === id);
+  if (!it) return false;
+  it.deletedAt = Date.now();
+  _wsDocStamp(it);
+  _wsgSaveAll(list);
+  return true;
+}
 // Working copy (unsaved edits) overrides the stored goal for display/edit.
 function _wsgGet(id) { return _wsgWorking[id] || _wsgGoals().find(g => g && g.id === id) || null; }
 function _wsgStored(id) { return _wsgGoals().find(g => g && g.id === id) || null; }
-function _wsgPersist(g) { const list = _wsgGoals(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); _wsgSaveAll(list); }
+function _wsgPersist(g) { _wsDocStamp(g); const list = _wsgGoalsRaw(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); _wsgSaveAll(list); }
 
 // ════════════════════════════════════════════════════════════════════════════
 // WORKSPACE COMPLETION · §D — PROGRESO DE UN OBJETIVO
@@ -23206,6 +23526,12 @@ function _wsgCreate() {
   // Dos derivaciones de una misma decisión siempre acaban divergiendo: ahora hay
   // una, y lo que se previsualiza es literalmente lo que se guarda.
   const v = _wsgFormValues(root);
+  // El OBJETIVO sin importe objetivo no es un objetivo: `_wsNum('')` es 0 y se
+  // persistía una meta de 0 € cuyo progreso es indefinido para siempre. Se valida
+  // aquí, en el mismo owner que crea, y se dice qué falta.
+  const missG = _wsDraftMissing({ target: (root.querySelector('[data-wsg-form="target"]') || {}).value },
+    [{ k: 'target', label: 'wsg_f_target', num: true }]);
+  if (missG.length) return _wsDraftRequiredIn(root, 'wsg-form', missG);
   const now = Date.now();
   const g = { id: 'wsg_' + now, type, name, target: v.target, current: v.current,
               monthly: v.monthly, targetYear: v.targetYear, mode: 'manual',
@@ -23253,7 +23579,10 @@ function _wsgDuplicate(id) {
 }
 function _wsgDelete(id) {
   _wsConfirm(() => {
-    _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id));
+    // Por tombstone, igual que el resto: recortar el array dejaba que el siguiente
+    // pull lo resucitara (presente en remoto, ausente en local). Era el MISMO
+    // defecto que el borrado desde Mi espacio, en el segundo sitio que borra.
+    _wsgTombstone(id);
     delete _wsgWorking[id]; delete _wsgDirty[id];
     const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
   });
@@ -23797,7 +24126,7 @@ function _renderWorkspaceFreeCover() {
           </ul>
         </div>
         <div class="wsfc-cta-wrap">
-          <button type="button" class="wsfc-cta" data-wsfc-upgrade="1">${esc(tx('wsfc_cta', ''))}</button>
+          <button type="button" class="wsfc-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
         </div>
       </section>
     </div>`;
@@ -23873,14 +24202,168 @@ function _wsToolOnInput(el) {
   if (bar) bar.innerHTML = _wsToolSaveBarHtml();
 }
 
+// ── LOS CUATRO FORMULARIOS DE FILA NO PUEDEN FALLAR EN SILENCIO ────────────
+// `_wsJrnAdd`, `_wsReAdd`, `_wsRecvAdd` y `_wsApAdd` empiezan todos con la misma
+// línea: `if (!nombre || importe <= 0) return;`. La comprobación es correcta —no se
+// añade una fila sin identidad ni importe— pero el `return` era MUDO: el usuario
+// pulsaba «Añadir», no pasaba nada, y nada en la pantalla decía por qué. Es el
+// mismo defecto que el guardado sin nombre, en cuatro sitios.
+// Un solo owner de mensaje para los cuatro, con los campos marcados.
+function _wsDraftRequired(attr, missing) {
+  return _wsDraftRequiredIn(document.querySelector('.wsh-tool-view'), attr, missing);
+}
+function _wsDraftRequiredIn(root, attr, missing) {
+  if (!root) return false;
+  const prev = root.querySelector('.wsg-reqerr'); if (prev) prev.remove();
+  missing.forEach(f => {
+    const el = root.querySelector('[data-' + attr + '="' + f.k + '"]');
+    if (!el) return;
+    el.setAttribute('aria-invalid', 'true');
+    el.classList.add('is-invalid');
+  });
+  const names = missing.map(f => { try { return t(f.label) || f.k; } catch (_) { return f.k; } });
+  const host = root.querySelector('[data-' + attr + ']');
+  const box = host && host.closest ? (host.closest('.wsh-card') || root) : root;
+  const p = document.createElement('p');
+  p.className = 'wsg-reqerr'; p.setAttribute('role', 'alert');
+  p.textContent = (missing.length === 1 ? t('wsreq_one') : t('wsreq_many')) + names.join(', ');
+  box.appendChild(p);
+  const first = missing[0] && root.querySelector('[data-' + attr + '="' + missing[0].k + '"]');
+  if (first) { try { first.focus(); } catch (_) {} }
+  return false;
+}
+// Un campo de texto está «vacío» si no tiene contenido; uno numérico, si no hay
+// número que leer. `_wsNumOrNull` es el juez del segundo caso: distingue vacío de
+// cero, que es justo la distinción que el `<= 0` de los cuatro no hacía.
+function _wsDraftMissing(draft, req) {
+  const d = draft || {};
+  return req.filter(f => {
+    const v = d[f.k];
+    if (f.num) return _wsNumOrNull(v) == null || !(Number(_wsNumOrNull(v)) > 0);
+    return v == null || String(v).trim() === '';
+  });
+}
+
+// ── LOS CAMPOS OBLIGATORIOS, DECLARADOS EN UN SOLO SITIO ───────────────────
+// Sólo entran aquí los campos cuya AUSENCIA convierte el documento en una
+// afirmación falsa: `_wsNum('')` es 0, así que guardar con el plazo vacío
+// persistía una simulación «a 0 años» y con el principal vacío un préstamo de 0 €,
+// los dos en silencio y los dos publicados después en Mi espacio como si el
+// usuario los hubiera declarado. Un 0 escrito A PROPÓSITO sigue siendo válido: lo
+// que se exige es que HAYA un valor, no que sea distinto de cero. Los campos donde
+// el cero es una respuesta legítima (aportación, tipo de interés, gastos, seguro,
+// cada partida del presupuesto) NO son obligatorios y no se tocan.
+const _WS_TOOL_REQUIRED = Object.freeze({
+  compound: [{ k: 'years', label: 'wstool_in_years' }],
+  loan:     [{ k: 'principal', label: 'wsloan_in_amount' }, { k: 'years', label: 'wsloan_in_years' }],
+});
+function _wsToolMissingRequired() {
+  const req = _WS_TOOL_REQUIRED[String(_wsToolActive || '')] || [];
+  const inp = _wsToolInputs || {};
+  return req.filter(f => {
+    const v = inp[f.k];
+    return v == null || String(v).trim() === '' || _wsNumOrNull(v) == null;
+  });
+}
+// La validación se PINTA donde está el botón que se acaba de pulsar, y marca los
+// campos que faltan. No persiste nada y no borra el trabajo de la pantalla.
+function _wsToolShowRequired(missing) {
+  const esc = _intccEsc;
+  const root = document.querySelector('.wsh-tool-view');
+  if (!root) return false;
+  const names = missing.map(f => { try { return t(f.label) || f.k; } catch (_) { return f.k; } });
+  missing.forEach(f => {
+    const el = root.querySelector('[data-wstool-input="' + f.k + '"]');
+    if (!el) return;
+    el.setAttribute('aria-invalid', 'true');
+    el.classList.add('is-invalid');
+  });
+  const bar = root.querySelector('[data-wstool-savebar]');
+  if (bar) {
+    const prev = bar.querySelector('.wsg-reqerr'); if (prev) prev.remove();
+    const p = document.createElement('p');
+    p.className = 'wsg-reqerr'; p.setAttribute('role', 'alert');
+    p.textContent = (missing.length === 1 ? t('wsreq_one') : t('wsreq_many')) + names.join(', ');
+    bar.appendChild(p);
+  }
+  const first = missing[0] && root.querySelector('[data-wstool-input="' + missing[0].k + '"]');
+  if (first) { try { first.focus(); } catch (_) {} }
+  return false;
+}
+// El nombre sugerido de una instancia NUEVA: la capacidad, y un ordinal cuando ya
+// hay otras del mismo tipo. Editable —es una sugerencia, no una imposición—.
+function _wsToolSuggestName() {
+  const type = _wsToolStateType(_wsToolActive);
+  let base = type; try { base = _wsTypeLabel(type); } catch (_) {}
+  let n = 0;
+  try { n = _ws4Projects().filter(p => p && p.type === type).length; } catch (_) { n = 0; }
+  return n > 0 ? base + ' ' + (n + 1) : base;
+}
+
+// ── GUARDAR · ACTUALIZAR · GUARDAR COMO · RENOMBRAR · ELIMINAR ─────────────
+// Lo que había: `Guardar` persistía SIEMPRE sin preguntar el nombre, así que dos
+// presupuestos guardados eran dos tarjetas con la MISMA etiqueta («Presupuesto
+// mensual») y el usuario no podía distinguirlas ni decidir cuál abría —el ID ya
+// era distinto, pero el nombre es lo que se ve—. Ahora la PRIMERA vez se pide un
+// nombre; a partir de ahí `Guardar` actualiza la instancia abierta y hay una
+// acción explícita para crear una copia.
 function _wsToolSave() {
   if (!_wsToolInputs) return;
   // Ni falla en silencio ni finge: el trabajo de la sesión sigue intacto en
   // pantalla y lo que se abre es la explicación de qué añade Premium.
   if (!_wsCanPersist()) return _wsPersistUpsell('tool:' + String(_wsToolActive || ''));
+  const missing = _wsToolMissingRequired();
+  if (missing.length) return _wsToolShowRequired(missing);
+  // Instancia YA guardada ⇒ actualiza en su sitio, sin modal y sin duplicar.
+  if (_wsToolEditId) return _wsToolCommit(null, false);
+  _wsToolNamePrompt(t('wsname_save_title'), _wsToolSuggestName(), name => _wsToolCommit(name, true));
+}
+// «Guardar como…» — el MISMO modal, y una copia con ID nuevo. Un nombre repetido
+// no sobrescribe nada: la identidad es el ID.
+function _wsToolSaveAs() {
+  if (!_wsToolInputs) return;
+  if (!_wsCanPersist()) return _wsPersistUpsell('tool:' + String(_wsToolActive || ''));
+  const missing = _wsToolMissingRequired();
+  if (missing.length) return _wsToolShowRequired(missing);
+  let cur = '';
+  try { const p = _ws4Projects().find(x => x && x.id === _wsToolEditId); cur = (p && p.customName) || ''; } catch (_) {}
+  const sug = cur ? (cur + ' ' + t('wsg_copy_suffix')) : _wsToolSuggestName();
+  _wsToolNamePrompt(t('wsname_saveas_title'), sug, name => _wsToolCommit(name, true));
+}
+// «Renombrar» — cambia SÓLO el nombre y conserva los datos (no vuelve a calcular
+// ni a escribir `inputs`/`results`).
+function _wsToolRename() {
+  if (!_wsToolEditId) return;
+  const p = _ws4Projects().find(x => x && x.id === _wsToolEditId);
+  if (!p) return;
+  _wsToolNamePrompt(t('wsmse_rename_title'), p.customName || _wsTypeLabel(p.type), name => {
+    _wsRename('workspace:' + p.id, name);
+    const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); }
+  });
+}
+// «Eliminar» — confirmación y tombstone, por el mecanismo existente.
+function _wsToolDelete() {
+  if (!_wsToolEditId) return;
+  const id = _wsToolEditId;
+  _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true, onOk: () => {
+    _ws4Tombstone(id);
+    _wsToolEditId = null; _wsToolDirty = true;
+    const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); }
+  } });
+}
+// El único llamador del modal de nombre desde las herramientas.
+function _wsToolNamePrompt(title, suggested, onName) {
+  _wsPrompt({
+    title: title, current: suggested, placeholder: suggested,
+    fieldLabel: t('wsname_field'), okLabel: t('wsname_ok'), required: true,
+    onOk: v => { const name = String(v || '').trim(); if (!name) return; onName(name); },
+  });
+}
+function _wsToolCommit(name, forceNew) {
+  if (!_wsToolInputs) return;
   const now = Date.now();
   const list = _ws4Projects();
-  const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
+  const existing = (!forceNew && _wsToolEditId) ? list.find(p => p && p.id === _wsToolEditId) : null;
   let type, results;
   if (_wsToolActive === 'assets') {
     const r = calculateAssetPrices(_wsToolInputs.rows);
@@ -23940,11 +24423,19 @@ function _wsToolSave() {
     };
   }
   const proj = {
+    // El ID es la identidad REAL y no deriva del nombre: dos documentos con el
+    // mismo nombre son dos documentos distintos, y renombrar no crea uno nuevo.
     id: existing ? existing.id : ('ws4_' + now + '_' + Math.random().toString(36).slice(2, 7)),
     type,
-    customName: existing ? existing.customName : undefined,
+    customName: name || (existing ? existing.customName : undefined),
     inputs: Object.assign({}, _wsToolInputs),
     results,
+    // La divisa del documento, declarada: ya viajaba al remoto (`_wsDocRows`) pero
+    // no quedaba en el cuerpo, así que reabrirlo en otra divisa base reinterpretaba
+    // sus importes sin decirlo.
+    currency: (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency) : 'EUR',
+    bodyVersion: 1,
+    revision: existing ? (Number(existing.revision) || 1) : 0,
     createdAt: existing ? (existing.createdAt || now) : now,
     updatedAt: now,
   };
@@ -23969,9 +24460,19 @@ function _wsToolSaveBarHtml() {
     <span class="wsg-savestate is-local">${esc(t('wstool_save_session'))}</span>
     <button type="button" class="wsh-cta wsg-savebtn is-lock" data-wstool-save>${esc(saveLabel)}<span class="wsh-tier is-premium">${esc(t('wstier_premium'))}</span></button>`;
   }
+  // ── EL CICLO DE VIDA DE LA INSTANCIA ABIERTA ──────────────────────────────
+  // Con un documento abierto, `Guardar` ACTUALIZA. Las otras tres acciones existen
+  // porque sin ellas no hay forma de tener dos instancias de la misma capacidad:
+  // «Guardar como…» crea una copia con ID nuevo, «Renombrar» toca sólo el nombre y
+  // «Eliminar» pide confirmación y deja tombstone.
+  const lifecycle = _wsToolEditId ? `
+    <button type="button" class="wsg-act" data-wstool-saveas>${esc(t('wstool_saveas'))}</button>
+    <button type="button" class="wsg-act" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
+    <button type="button" class="wsg-act is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>` : '';
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
-    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
+    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>
+    ${lifecycle}`;
 }
 
 function _wsToolMilestones(res) {
@@ -24413,9 +24914,14 @@ function _wsJrnRerender() { const c = document.getElementById('aurixWorkspace');
 function _wsJrnAdd() {
   if (!_wsToolInputs) return;
   const d = _wsJrnDraft || _wsJrnNewDraft();
+  const miss = _wsDraftMissing(d, [
+    { k: 'asset', label: 'wsjrn_f_asset' },
+    { k: 'buy', label: 'wsjrn_f_buy', num: true },
+    { k: 'qty', label: 'wsjrn_f_qty', num: true },
+  ]);
+  if (miss.length) return _wsDraftRequired('wsjrn-input', miss);
   const asset = (d.asset || '').trim();
   const buy = _wsNum(d.buy), qty = _wsNum(d.qty);
-  if (!asset || buy <= 0 || qty <= 0) return;   // need a real entry to add
   const sellRaw = (d.sell == null ? '' : String(d.sell)).trim();
   const trade = {
     id: _wsJrnEditId || ('tr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
@@ -24828,7 +25334,8 @@ function _wsReProps() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.prope
 function _wsReAdd() {
   const d = _wsReDraft || _wsReNewDraft();
   const name = (d.name || '').trim();
-  if (!name && _wsNum(d.buy) <= 0) return;   // need at least a name or a price
+  const missRe = _wsDraftMissing(d, [{ k: 'name', label: 'wsre_f_name' }]);
+  if (missRe.length) return _wsDraftRequired('wsre-input', missRe);
   const prop = Object.assign(_wsReNewDraft(), {
     id: _wsReEditId || ('pr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
     name: name || t('wsre_n'), ptype: d.ptype || 'flat', city: (d.city || '').trim(), photo: d.photo || '',
@@ -25156,9 +25663,13 @@ function _wsRecvPreviewLine(d) {
 }
 function _wsRecvAdd() {
   const d = _wsRecvDraft || _wsRecvNewDraft();
+  const missRc = _wsDraftMissing(d, [
+    { k: 'personOrCompany', label: 'wsrecv_f_who' },
+    { k: 'units', label: 'wsrecv_f_units', num: true },
+    { k: 'unitPrice', label: 'wsrecv_f_unitprice', num: true },
+  ]);
+  if (missRc.length) return _wsDraftRequired('wsrecv-input', missRc);
   const who = (d.personOrCompany || '').trim();
-  const total = _wsNum(d.units) * _wsNum(d.unitPrice);
-  if (!who && total <= 0) return;
   const now = Date.now();
   const item = {
     id: _wsRecvEditId || ('rc_' + now + '_' + Math.random().toString(36).slice(2, 6)),
@@ -25630,8 +26141,9 @@ function _wsApPreviewLine(d) {
 }
 function _wsApAdd() {
   const d = _wsApDraft || _wsApNewDraft();
+  const missAp = _wsDraftMissing(d, [{ k: 'assetName', label: 'wsap_f_name' }]);
+  if (missAp.length) return _wsDraftRequired('wsap-input', missAp);
   const name = (d.assetName || '').trim();
-  if (!name && _wsNum(d.buyPrice) <= 0) return;
   const now = Date.now();
   const sellRaw = (d.sellPrice == null ? '' : String(d.sellPrice)).trim();
   const row = {
@@ -25777,14 +26289,16 @@ function renderWorkspace() {
   // sección. El preview compartido `_aurixPremiumPreviewHTML('workspace')` sigue
   // existiendo intacto y ya no es el camino de Workspace.
 
-  // ── LA PORTADA FREE ES DE UN SOLO USO, Y SI NO LO FUERA SERÍA UN MURO ─────
-  // Su único CTA va al paywall y sus dos tarjetas abren capacidades reales: no hay
-  // (ni debe haber) un tercer botón de «explorar». Con la vista recordada en
-  // `_wshView`, salir de la pestaña y volver repintaba la portada otra vez, así que
-  // un usuario Free que no quisiera ninguna de las dos cosas se quedaba encerrado.
-  // Al REENTRAR en la sección, la portada ya vista cede el paso al catálogo
-  // completo: se ve una vez por sesión, que es lo que la convierte en portada.
-  if (_wshView === 'free_cover' && _wsFreeCoverSeen) _wshView = 'home';
+  // ── AQUÍ VIVÍA LA PUERTA TRASERA ──────────────────────────────────────────
+  // `if (_wshView === 'free_cover' && _wsFreeCoverSeen) _wshView = 'home';`
+  // Era literalmente el escape: al reentrar en la sección, la portada Free cedía
+  // el paso al catálogo interior. Se justificaba como «se ve una vez por sesión,
+  // que es lo que la convierte en portada», y el razonamiento tenía sentido para
+  // una bienvenida — pero esto no es una bienvenida, es la frontera del plan. La
+  // salida sin comprar no necesita una puerta trasera: son las dos capacidades
+  // Free, que abren de verdad, más las otras tres secciones del producto.
+  // La decisión de vista vive entera en `renderWorkspaceHome` (`_wsPremiumShell`),
+  // así que esta función sigue sin nombrar el entitlement.
 
   // WS.1 — route to the new planning Home; legacy path below is preserved.
   if (AURIX_WS_HOME) { renderWorkspaceHome(container); return; }
@@ -59104,40 +59618,25 @@ function _aurixIntelligencePreviewFacts() {
   if (pick) out.facts.push({ kind: 'watch:' + pick.key, title: pick.title, text: pick.body });
 
   if (!out.facts.length) { out.state = 'none'; out.reason = 'no-qualifying-fact'; }
-  // §D — DOS VISIBLES Y UNO BLOQUEADO, Y EL BLOQUEADO ES REAL O NO EXISTE.
-  // La portada mostraba los TRES hechos enteros, así que enseñaba todo lo que
-  // Intelligence sabe decir y luego pedía pagar por verlo. El tercero pasa a estar
-  // bloqueado, pero sigue siendo un hecho REAL del motor: si el patrimonio del
-  // usuario no produce un tercero, NO se inventa uno —se enseña lo que hay—.
-  out.visible = out.facts.slice(0, 2);
-  out.locked = out.facts.length > 2 ? out.facts[2] : null;
+  // ── UN VISIBLE, DOS BLOQUEADOS, Y LOS BLOQUEADOS SON REALES O NO EXISTEN ───
+  // §D dejaba DOS visibles y UNO bloqueado: la portada seguía entregando casi todo
+  // lo que Intelligence sabe decir y después pedía pagar por el resto. La SPEC P0
+  // invierte el reparto —un análisis completo y dos bloqueados—, y la regla que no
+  // cambia es la que importa: los bloqueados salen del MISMO motor, así que si el
+  // patrimonio del usuario sólo produce dos hechos, se bloquea UNO. Nunca se
+  // inventa un tercero para rellenar la portada.
+  out.visible = out.facts.slice(0, 1);
+  out.locked = out.facts.slice(1, 3);
   return out;
 }
-// El SUJETO de un hecho, sin su conclusión. Es lo que permite bloquear el tercero
-// sin revelarlo: se dice DE QUÉ habla, no qué dice. Deriva de la clase del hecho,
-// así que no hay ningún dato nuevo ni ninguna cifra en juego.
-// ── Y EL SUJETO NO PUEDE SER EL TÍTULO DEL HECHO ───────────────────────────
-// La primera versión devolvía `f.title` cuando existía, y para los hechos de
-// VIGILANCIA el título ES el juicio: «Liquidez reducida», «Diversificación
-// limitada», «Dependencia de activo principal». Es decir, el tercer hecho se
-// publicaba «bloqueado» mientras entregaba su conclusión cualitativa entera, que es
-// justo lo que §D prohíbe y lo contrario de lo que este bloque afirma hacer. No hay
-// cifras de por medio, pero la etiqueta no coincidía con la conducta.
-// Ahora el sujeto se deriva SIEMPRE de la clase del hecho: nombra el área, nunca su
-// lectura. Un área de vigilancia desconocida cae en el sujeto genérico.
-function _aurixIntPreviewSubject(f) {
-  const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : fb; } catch (_) { return fb; } };
-  if (!f) return '';
-  const k = String(f.kind || '');
-  if (k === 'concentration') return tx('intprev_subj_conc', 'Concentración');
-  if (k === 'liquidity') return tx('intprev_subj_liq', 'Liquidez');
-  if (k.indexOf('watch:') === 0) {
-    const area = k.slice(6);
-    const byArea = tx('intprev_subj_w_' + area, '');
-    if (byArea) return byArea;
-  }
-  return tx('intprev_subj_watch', 'Área de atención');
-}
+// ── EL SUJETO DEL HECHO BLOQUEADO SE RETIRA ────────────────────────────────
+// Aquí vivía `_aurixIntPreviewSubject`, que publicaba «de qué habla» un análisis
+// bloqueado («Concentración de tu mayor posición», «Tu exposición a cripto»). Era
+// honesto respecto a lo que decía hacer —no entregaba la conclusión—, pero la SPEC
+// P0 es más estricta y tiene razón: la CATEGORÍA es contenido. Saber que el
+// análisis bloqueado va de cripto ya es la mitad del hallazgo, y además convierte
+// la portada en un mapa de los defectos de la cartera. Ahora no se emite NADA de
+// los bloqueados salvo cuántos son.
 // La pregunta siguiente TIENE QUE SALIR DE LO QUE SE VE. Era una cadena fija sobre
 // «esta exposición» aunque el hecho visible hablara de liquidez: una pregunta que
 // no se refiere a nada de lo que el usuario acaba de leer no es un gancho, es ruido.
@@ -59199,7 +59698,6 @@ function _aurixIntelligencePreviewHTML() {
     + '.intprev-sep{flex:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(120,170,255,0.28),transparent);margin:0 0 12px;}'
     + '.intprev-q-label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.72);margin:0 0 6px;}'
     + '.intprev-q{flex:0 0 auto;font-size:15.5px;font-weight:700;line-height:1.35;color:rgba(210,228,255,0.97);margin:0 0 10px;}'
-    + '.intprev-premium{flex:0 0 auto;font-size:12.5px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
     + '.intprev-cta{width:100%;font-size:14px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.10);border:1px solid rgba(120,170,255,0.34);border-radius:14px;height:46px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
     + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
     + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;flex:0 0 auto;margin-top:auto;}'
@@ -59209,22 +59707,19 @@ function _aurixIntelligencePreviewHTML() {
     // (`aria-hidden`), no un texto difuminado: el bloqueo está en que la conclusión
     // no se emite, así que quitar el filtro desde el inspector no revela nada.
     + '.intprev-fact.is-locked{border-color:rgba(150,185,255,0.22);background:rgba(90,140,255,0.055);position:relative;align-items:center;gap:10px;}'
-    // El sujeto del tercero compite con la etiqueta de candado en la misma fila:
-    // a 360 px se recortaba a media palabra (medido, 84 px de texto en 73). La
-    // etiqueta cede primero y el sujeto envuelve; nada se corta.
     + '.intprev-fact.is-locked .intprev-fact-body{flex:1 1 auto;min-width:0;}'
-    + '.intprev-fact.is-locked .intprev-fact-label{white-space:normal;overflow-wrap:anywhere;margin-bottom:6px;}'
     + '.intprev-fact-dot.is-locked{background:rgba(150,185,255,0.5);box-shadow:none;}'
-    + '.intprev-redact{display:flex;flex-direction:column;gap:6px;margin-top:2px;filter:blur(2.5px);opacity:.55;}'
+    + '.intprev-redact{display:flex;flex-direction:column;gap:6px;margin:2px 0;filter:blur(2.5px);opacity:.55;}'
     + '.intprev-redact i{display:block;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(190,215,255,0.55),rgba(190,215,255,0.16));}'
     + '.intprev-redact i:nth-child(1){width:94%;}.intprev-redact i:nth-child(2){width:78%;}.intprev-redact i:nth-child(3){width:52%;}'
-    + '.intprev-lock-tag{flex:0 0 auto;align-self:center;font-size:11px;font-weight:700;letter-spacing:.04em;color:rgba(214,178,94,0.95);border:1px solid rgba(214,178,94,0.34);background:rgba(214,178,94,0.09);border-radius:999px;padding:3px 8px;white-space:nowrap;}'
+    // El recuento de bloqueados: una línea, tono secundario, sin etiqueta de plan.
+    + '.intprev-locked-n{flex:0 0 auto;font-size:12.5px;line-height:1.5;color:rgba(170,200,255,0.72);margin:0 0 14px;}'
     // El escritorio RELAJA (mismo patron que el resto de esta hoja: base movil,
     // `min-width` para lo demas). Nunca un `max-width`, que invertiria el contrato.
-    + '@media (min-width:768px){.intprev-lock-tag{padding:4px 10px;}.intprev-redact i{height:9px;}}'
+    + '@media (min-width:768px){.intprev-redact i{height:9px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-redact{filter:none;}}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-premium{font-size:13.5px;margin:0 0 22px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
+    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-locked-n{font-size:13.5px;margin:0 0 20px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 
@@ -59247,8 +59742,8 @@ function _aurixIntelligencePreviewHTML() {
     + '</div>';
 
   let body;
-  const _visible = Array.isArray(res.visible) ? res.visible : (res.facts || []).slice(0, 2);
-  const _locked = res.locked || null;
+  const _visible = Array.isArray(res.visible) ? res.visible : (res.facts || []).slice(0, 1);
+  const _locked = Array.isArray(res.locked) ? res.locked : [];
   if (res.state === 'ok' && _visible.length) {
     const items = _visible.map(f => ''
       + '<li class="intprev-fact" data-preview-fact="' + esc(f.kind) + '">'
@@ -59258,30 +59753,35 @@ function _aurixIntelligencePreviewHTML() {
       +     '<span class="intprev-fact-text">' + esc(f.text) + '</span>'
       +   '</span>'
       + '</li>').join('');
-    // ── EL TERCERO, BLOQUEADO DE VERDAD ──────────────────────────────────────
+    // ── LOS BLOQUEADOS, BLOQUEADOS DE VERDAD ─────────────────────────────────
     // El bloqueo NO puede ser sólo un `filter: blur`: un blur se desactiva desde el
     // inspector y el texto sigue en el DOM, así que no bloquea nada —decora—. Aquí
-    // la conclusión NO SE EMITE: se manda el SUJETO (de qué habla) y una barra
-    // redactada decorativa. Ni el inspector ni un lector de pantalla pueden leer lo
-    // que no se ha enviado, y la etiqueta accesible dice exactamente qué falta.
-    const lockedHtml = _locked ? ''
+    // NO SE EMITE NADA del análisis: ni su título, ni su categoría, ni su cifra, ni
+    // el activo, ni el juicio. Sólo barras redactadas decorativas (`aria-hidden`).
+    // Ni el inspector ni un lector de pantalla pueden leer lo que no se ha enviado.
+    // Lo único que se declara es CUÁNTOS hay, y eso es verificable.
+    const lockedHtml = _locked.map(() => ''
       + '<li class="intprev-fact is-locked" data-preview-fact="locked"'
-      +   ' data-preview-locked="' + esc(_locked.kind) + '"'
-      +   ' aria-label="' + esc(_aurixIntPreviewSubject(_locked) + ' — ' + tx('intprev_locked_aria', 'Disponible con Premium')) + '">'
+      +   ' aria-label="' + esc(tx('intprev_locked_aria', 'Análisis todavía sin desbloquear')) + '">'
       +   '<span class="intprev-fact-dot is-locked" aria-hidden="true"></span>'
       +   '<span class="intprev-fact-body">'
-      +     '<span class="intprev-fact-label">' + esc(_aurixIntPreviewSubject(_locked)) + '</span>'
       +     '<span class="intprev-redact" aria-hidden="true"><i></i><i></i><i></i></span>'
       +   '</span>'
-      +   '<span class="intprev-lock-tag">' + esc(tx('intprev_locked_tag', 'Disponible con Premium')) + '</span>'
-      + '</li>' : '';
+      + '</li>').join('');
+    // La anticipación: un hecho comprobable sobre el propio motor, sin nombrar el
+    // plan y sin afirmar nada que el usuario no pueda verificar después.
+    const lockedNote = _locked.length
+      ? '<p class="intprev-locked-n" data-preview-locked-n="' + _locked.length + '">'
+        + esc((function () { try { const f = t('intprev_locked_n'); return (typeof f === 'function') ? f(_locked.length) : ''; } catch (_) { return ''; } })())
+        + '</p>'
+      : '';
     body = ''
       + '<h2 class="intprev-title">' + esc(tx('intprev_title', 'Esto es lo que Aurix ya entiende de tu patrimonio')) + '</h2>'
       + '<ul class="intprev-facts">' + items + lockedHtml + '</ul>'
+      + lockedNote
       + '<div class="intprev-sep" aria-hidden="true"></div>'
       + '<p class="intprev-q-label">' + esc(tx('intprev_q_label', 'La pregunta siguiente')) + '</p>'
       + '<p class="intprev-q">' + esc(_aurixIntPreviewQuestion(_visible)) + '</p>'
-      + '<p class="intprev-premium">' + esc(tx('intprev_premium', '')) + '</p>'
       + cta;
   } else {
     // Hold states — say what is missing instead of promising anything.
@@ -59297,7 +59797,7 @@ function _aurixIntelligencePreviewHTML() {
     +   ' data-preview-event="intelligence_preview_view"'
     +   ' data-preview-state="' + esc(res.state) + '"'
     +   ' data-preview-facts="' + _visible.length + '"'
-    +   ' data-preview-locked="' + (_locked ? '1' : '0') + '">' + style
+    +   ' data-preview-locked="' + _locked.length + '">' + style
     +   '<section class="intprev-card" role="region" aria-label="' + esc(tx('intprev_badge', 'Intelligence')) + '">'
     +     '<div class="intprev-badge">' + esc(tx('intprev_badge', 'Intelligence')) + '</div>'
     +     body
@@ -74867,6 +75367,34 @@ function openUpgradeIntent(opts) {
   const featureKey = String((opts && opts.featureKey) || '').trim();
   const source     = String((opts && opts.source) || 'unknown').trim();
   _aurixRecordUpgradeIntent(featureKey, source);
+  // ── UN SOLO PASO HASTA LOS PLANES ─────────────────────────────────────────
+  // Esto montaba `#upgradeOverlay` —«Función premium», «esta herramienta forma
+  // parte del plan premium», y un botón «Ver AURIX Premium»— y sólo DESPUÉS, con
+  // un segundo clic, abría el paywall. Era un peaje informativo en el punto de
+  // máxima intención: el usuario ya sabía que estaba tocando algo Premium (por eso
+  // lo tocó) y lo que necesitaba era el precio. Se va la pantalla intermedia, no
+  // el registro de intención: la línea base de conversión de M.05 se conserva
+  // intacta, y el paywall canónico sigue siendo el ÚNICO sitio con precios.
+  //
+  // El overlay y su markup siguen en index.html sin opener en el producto: no es
+  // esta SPEC quien retira markup, y un `#upgradeOverlay` huérfano no es
+  // alcanzable. Todos los llamadores —tarjeta bloqueada, gate de apertura, gate de
+  // guardado, `requireFeature`— heredan el arreglo sin tocarse.
+  try {
+    if (typeof window !== 'undefined' && window.openAurixPremiumModal) {
+      window.openAurixPremiumModal({ source: source + (featureKey ? ':' + featureKey : '') });
+      return false;
+    }
+  } catch (_) {}
+  // Sin el paywall canónico no se ofrece nada: mejor no hacer nada que ofrecer un
+  // plan sin precio (la misma regla que M.06 aplicó al retirar la página legacy).
+  return false;
+}
+// El opener legacy del overlay, sin llamadores en el producto desde el bloque de
+// arriba. Se conserva porque está expuesto y porque un `undefined` silencioso es
+// peor que una función honesta.
+function openUpgradeIntentOverlay(opts) {
+  const featureKey = String((opts && opts.featureKey) || '').trim();
   try {
     const ov = document.getElementById('upgradeOverlay');
     if (!ov) return false;
