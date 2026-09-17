@@ -1774,14 +1774,24 @@ console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
     values: { operations: 6, grossUSD: 75432.67, amountKind: 'recorded_cost',
               recordedToday: true, effectiveToday: true, provenanceKnown: true },
     window: { range: 'today' } };
-  ok('ADV.10 una incorporación masiva se lee como registro de cartera',
-    /6 posiciones/.test(txt(batch, 'es')) && /6 positions/.test(txt(batch, 'en')),
+  // §4 — el recuento es de OPERACIONES del ledger, no de posiciones vivas: seis
+  // compras pueden ser seis posiciones o dos. El assert comprueba el recuento y
+  // que el sustantivo NO sea «posiciones».
+  ok('ADV.10 una incorporación masiva se lee como registro de OPERACIONES',
+    /6 operaciones/.test(txt(batch, 'es')) && /6 operations/.test(txt(batch, 'en'))
+    && !/posicion/i.test(txt(batch, 'es')) && !/position/i.test(txt(batch, 'en')),
     JSON.stringify([txt(batch, 'es'), txt(batch, 'en')]));
   // Y el «por qué» del registro no puede insinuar un resultado.
   const why = run('_intv4WhyText(' + JSON.stringify({ semanticKey: 'operation_registered_msft',
     causalRoot: 'recorded_operation' }) + ')', makeCtx({ lang: 'es' }));
-  ok('ADV.11 su «por qué» declara que no es un resultado',
-    /no un resultado/i.test(why) && /coste de la operación/i.test(why), JSON.stringify(why));
+  // §14/§20 — «Es un registro tuyo, no un resultado» se RETIRA: era una defensa
+  // del motor, no información, y la frase de cabecera ya dice que es un registro.
+  // Lo que NO se puede perder —y es lo que este assert protege ahora— es la
+  // aclaración que evita una lectura financiera engañosa: el importe es COSTE, no
+  // valoración. Sigue estando, y sin la coletilla paternalista.
+  ok('ADV.11 su «por qué» distingue coste de valoración, sin paternalismo',
+    /coste de la operación/i.test(why) && /no su valoración actual/i.test(why)
+    && !/no un resultado/i.test(why), JSON.stringify(why));
   // §4 — DOS ETAPAS: el peso sólo cuando el denominador está completo.
   const whyOf = (v, lang) => run('_intv4WhyText(' + JSON.stringify({
     semanticKey: 'operation_registered_msft', causalRoot: 'recorded_operation', values: v }) + ')',
@@ -1792,7 +1802,7 @@ console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
     JSON.stringify([whyOf({ shareOfValue: 0.294 }), whyOf({ shareOfValue: 0.294 }, 'en')]));
   ok('ADV.11c sin denominador NO se afirma ningún peso',
     !/%/.test(whyOf({ shareOfValue: null })) && !/%/.test(whyOf({}, 'en'))
-    && /no un resultado/.test(whyOf({ shareOfValue: null })),
+    && /coste de la operación/.test(whyOf({ shareOfValue: null })),
     JSON.stringify([whyOf({ shareOfValue: null }), whyOf({}, 'en')]));
   // Fail-closed: un hecho de registro sin entrada en el mapa no se pinta.
   ok('ADV.12 un hecho de registro desconocido no inventa frase',
@@ -1825,9 +1835,16 @@ console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
     values: Object.assign({ operations: 3, amountKind: null, grossUSD: null,
       recordedToday: true, recordedRecent: true, provenanceKnown: true }, v),
     window: { range: 'today' } });
-  ok('ADV.17 la tanda sin procedencia no afirma un día',
-    /^Tienes 3 posiciones registradas en tu cartera$/.test(txt(bt({ provenanceKnown: false }), 'es'))
-    && !/[Hh]oy/.test(txt(bt({ provenanceKnown: false }), 'es')),
+  // La revisión financiera pilló que «Tienes N operaciones registradas en tu
+  // cartera» era un STOCK sobre una lista filtrada por la ventana reciente: en una
+  // cuenta con 40 operaciones históricas el total es falso. Lo único cierto de
+  // todas las filas de esa rama es que son RECIENTES, y sin procedencia no se puede
+  // nombrar en qué sentido (registro o fecha económica). Así que se dice
+  // «recientes», no se afirma un día y no se afirma un inventario.
+  ok('ADV.17 la tanda sin procedencia no afirma un día NI un inventario',
+    /^Hay 3 incorporaciones recientes en tu cartera$/.test(txt(bt({ provenanceKnown: false }), 'es'))
+    && !/[Hh]oy/.test(txt(bt({ provenanceKnown: false }), 'es'))
+    && !/^Tienes/.test(txt(bt({ provenanceKnown: false }), 'es')),
     txt(bt({ provenanceKnown: false }), 'es'));
   ok('ADV.18 la tanda reciente fuera del día lo dice como reciente',
     /últimas 24 horas/.test(txt(bt({ recordedToday: false }), 'es')));
@@ -1842,13 +1859,24 @@ console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
     && /^Today you recorded 3 operations in your portfolio$/.test(txt(bt({ side: 'mixed' }), 'en'))
     && !/US\$|€/.test(txt(bt({ side: 'mixed' }), 'es')),
     JSON.stringify([txt(bt({ side: 'mixed' }), 'es'), txt(bt({ side: 'mixed' }), 'en')]));
-  ok('ADV.20 una tanda de BAJAS dice que se retiraron, no que se registraron',
-    /^Hoy has retirado 3 posiciones de tu cartera$/.test(txt(bt({ side: 'out' }), 'es'))
-    && /^Today you removed 3 positions from your portfolio$/.test(txt(bt({ side: 'out' }), 'en'))
-    && !/registrado/.test(txt(bt({ side: 'out' }), 'es')),
+  // ── §4 RE-DECIDE EL SUSTANTIVO, Y ESTE ASSERT SE HACE MÁS FUERTE ─────────
+  // La garantía de ADV.20 es que una tanda de BAJAS no se lea como un alta, y se
+  // comprobaba con `!/registrado/` sobre una frase que decía «3 POSICIONES». Pero
+  // `values.operations` cuenta OPERACIONES del ledger, y dos ventas parciales del
+  // mismo activo son dos operaciones y UNA posición: el sustantivo era falso. §4
+  // lo prohíbe por su nombre («si se cuentan operaciones, llamarlas operaciones»).
+  // Así que el assert deja de fosilizar la palabra y comprueba las DOS cosas que
+  // de verdad importan: que el acto sigue siendo una RETIRADA y que la frase NO
+  // afirma un recuento de posiciones.
+  ok('ADV.20 una tanda de BAJAS sigue siendo una retirada, y no cuenta posiciones',
+    /^Hoy has registrado 3 retiradas de tu cartera$/.test(txt(bt({ side: 'out' }), 'es'))
+    && /^Today you recorded 3 removals from your portfolio$/.test(txt(bt({ side: 'out' }), 'en'))
+    && !/posicion/i.test(txt(bt({ side: 'out' }), 'es'))
+    && !/position/i.test(txt(bt({ side: 'out' }), 'en'))
+    && txt(bt({ side: 'out' }), 'es') !== txt(bt({ side: 'in' }), 'es'),
     JSON.stringify([txt(bt({ side: 'out' }), 'es'), txt(bt({ side: 'out' }), 'en')]));
   ok('ADV.21 …y lo mismo fuera del día UTC pero dentro de 24 h',
-    /^Has retirado 3 posiciones de tu cartera en las últimas 24 horas$/
+    /^Has registrado 3 retiradas de tu cartera en las últimas 24 horas$/
       .test(txt(bt({ side: 'out', recordedToday: false }), 'es'))
     && /^Has registrado 3 operaciones en tu cartera en las últimas 24 horas$/
       .test(txt(bt({ side: 'mixed', recordedToday: false }), 'es')),
@@ -1868,18 +1896,27 @@ console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
   ok('ADV.24 …y un alta sin procedencia sigue siendo una TENENCIA, sin fecha',
     /^Tienes registrado Microsoft en tu cartera$/.test(txt(mkOp({ provenanceKnown: false, side: 'in' }), 'es'))
     && !/[Hh]oy/.test(txt(mkOp({ provenanceKnown: false, side: 'in' }), 'es')));
-  ok('ADV.25 la tanda sin procedencia también mira el lado',
-    /^Has retirado 3 posiciones de tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'out' }), 'es'))
-    && /^Has registrado 3 operaciones en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'mixed' }), 'es'))
-    && /^Tienes 3 posiciones registradas en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'in' }), 'es')),
+  // ── §4 · EL DEFECTO QUE EL FOUNDER REPRODUJO VIVÍA EXACTAMENTE AQUÍ ──────
+  // Ésta es la rama cross-device NORMAL mientras `recorded_at` siga sin aplicar, y
+  // publicaba «Tienes 2 posiciones registradas en tu cartera» en una cuenta con
+  // Bitcoin, Ethereum, Apple, Microsoft y liquidez: una selección de DOS eventos
+  // del ledger vendida como el inventario completo. El recuento no cambia —es el
+  // que el hecho declara— y lo que cambia es que ya no miente sobre QUÉ cuenta.
+  ok('ADV.25 la tanda sin procedencia mira el lado, no cuenta posiciones y no afirma un total',
+    /^Hay 3 retiradas recientes en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'out' }), 'es'))
+    && /^Hay 3 operaciones recientes en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'mixed' }), 'es'))
+    && /^Hay 3 incorporaciones recientes en tu cartera$/.test(txt(bt({ provenanceKnown: false, side: 'in' }), 'es'))
+    && ['in', 'out', 'mixed'].every(sd => !/posicion/i.test(txt(bt({ provenanceKnown: false, side: sd }), 'es'))
+        && !/position/i.test(txt(bt({ provenanceKnown: false, side: sd }), 'en'))
+        && !/^Tienes/.test(txt(bt({ provenanceKnown: false, side: sd }), 'es'))),
     JSON.stringify([txt(bt({ provenanceKnown: false, side: 'out' }), 'es'),
                     txt(bt({ provenanceKnown: false, side: 'mixed' }), 'es'),
                     txt(bt({ provenanceKnown: false, side: 'in' }), 'es')]));
   ok('ADV.22 el «por qué» de un CONJUNTO habla en plural',
-    /estas operaciones representan el 12(,0)?%/.test(run('_intv4WhyText(' + JSON.stringify({
+    /^Por su coste registrado, estas operaciones representan el 12(,0)?%/.test(run('_intv4WhyText(' + JSON.stringify({
       semanticKey: 'positions_registered_today', causalRoot: 'recorded_operation',
       values: { operations: 3, shareOfValue: 0.12 } }) + ')', makeCtx({ lang: 'es' })))
-    && /these operations are 12(\.0)?%/.test(run('_intv4WhyText(' + JSON.stringify({
+    && /^At their recorded cost, these operations are 12(\.0)?%/.test(run('_intv4WhyText(' + JSON.stringify({
       semanticKey: 'positions_registered_today', causalRoot: 'recorded_operation',
       values: { operations: 3, shareOfValue: 0.12 } }) + ')', makeCtx({ lang: 'en' }))),
     run('_intv4WhyText(' + JSON.stringify({ semanticKey: 'positions_registered_today',

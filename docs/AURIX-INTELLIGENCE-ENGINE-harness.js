@@ -195,7 +195,15 @@ ok('A.9 el pipeline se declara en orden y es auditable',
 
 // ── B · CATÁLOGO DE CONTEXTO ────────────────────────────────────────────────
 group('B · contexto · siete campos, cada uno con propósito y procedencia');
-ok('B.1 exactamente 7 campos, ni un cuestionario', Object.keys(FIELDS).length === 7);
+// §9 — OCHO campos, y el que se añade justifica su existencia: con CERO liquidez
+// registrada, cualquier lectura de liquidez describe lo registrado y puede no
+// describir el patrimonio, y eso Aurix no lo puede deducir. Lo que este assert
+// protege —que no haya un cuestionario— no es el número de campos del catálogo
+// sino cuántos pueden PREGUNTARSE, así que se comprueba lo segundo también.
+ok('B.1 ocho campos, y como máximo cinco son preguntables: no es un cuestionario',
+  Object.keys(FIELDS).length === 8
+  && (fnSrc('_aurixIntelQuestions').match(/field: '/g) || []).length <= 5,
+  JSON.stringify(Object.keys(FIELDS)));
 ok('B.2 cada campo declara purpose, changes y opciones cerradas',
   Object.keys(FIELDS).every(k => !!FIELDS[k].purpose && !!FIELDS[k].changes
     && Array.isArray(FIELDS[k].options) && FIELDS[k].options.length >= 2));
@@ -261,9 +269,22 @@ ok('D.1b el índice es COMPARABLE entre carteras: 0 = todo en una, 100 = reparti
   (() => { const casi1 = DISP(div({ positions: 9, hhi: 0.98, effectiveN: 1.02 }), snap());
     const perfecto = DISP(div({ positions: 9, hhi: 1 / 9, effectiveN: 9 }), snap());
     return casi1.value === 0 && perfecto.value === 100; })());
-ok('D.1c DOS posiciones 80/20 no publican cifra: el índice degenera con N=2',
+// ── §6 RE-DECIDE EL UMBRAL, CON CAUSA ─────────────────────────────────────
+// El assert anterior fosilizaba `positions >= 3` con el argumento de que el
+// índice «degenera» con N=2. Eso era cierto del ratio SIN reescalar (80/20 daba
+// 74 %) y deja de serlo del REESCALADO —(effectiveN−1)/(N−1)—, que está definido
+// en todo [0,1] para N=2: 50/50 → 100, 99/1 → 4, 80/20 → 47. §6 prohíbe por su
+// nombre «cualquier barrera arbitraria de mínimo tres posiciones». Lo que sigue
+// intacto es el único caso en que el índice NO EXISTE: N=1 (D.4), donde el
+// denominador es 0.
+ok('D.1c DOS posiciones 80/20 SÍ publican cifra: el dominio empieza en dos',
   (() => { const x = DISP(div({ positions: 2, hhi: 0.68, effectiveN: 1.47, topWeightPct: 80 }), snap({ assetCount: 2 }));
-    return x.value === null && x.reason === 'too_few_positions'; })());
+    const par = DISP(div({ positions: 2, hhi: 0.5, effectiveN: 2, topWeightPct: 50 }), snap({ assetCount: 2 }));
+    const casi = DISP(div({ positions: 2, hhi: 0.9802, effectiveN: 1.02, topWeightPct: 99 }), snap({ assetCount: 2 }));
+    return x.availability === 'available' && x.value === 47 && x.reason === ''
+      && par.value === 100 && casi.value === 2
+      && Number.isFinite(x.value) && !Number.isNaN(x.value); })(),
+  JSON.stringify(DISP(div({ positions: 2, hhi: 0.68, effectiveN: 1.47, topWeightPct: 80 }), snap({ assetCount: 2 }))));
 ok('D.2 declara PROHIBIDO enmarcarlo como salud, riesgo, calidad o nota',
   ['health', 'risk', 'quality', 'grade'].every(k => dOk.forbiddenFraming.includes(k)));
 ok('D.3 y arrastra su límite de profundidad',
@@ -365,11 +386,24 @@ ok('F.6 liquidez que baja habiendo declarado que se necesita',
     { context: ctxOf({ liquidity_need: { value: 'imminent', provenance: 'user_answer', answeredAt: 1,
       purpose: 'relevance_of_liquidity', changes: 'priority' } }) })
     .discoveries.some(d => d.code === 'liquidity_fell_while_need_declared'));
-ok('F.7 lo que PERSISTE se declara como tal: deja de reclamar atención por novedad',
+// ── §17 RETIRA LA PUBLICACIÓN, NO LA SEÑAL ────────────────────────────────
+// «Esta lectura sigue igual tras 11 observaciones; ya no es una novedad» falla
+// las tres preguntas que §17 exige a un patrón: no dice QUÉ condición persiste,
+// no dice durante qué periodo —una «observación» era una visita separada 30 min
+// de la anterior, es decir ABRIR LA PÁGINA, que §17 declara que NO es una
+// observación— y no dice por qué importa. La SEÑAL sigue siendo imprescindible
+// (gobierna prioridad y la coherencia del hero), así que este assert comprueba
+// las dos mitades: que la señal existe y que NO se publica como descubrimiento.
+ok('F.7 lo que PERSISTE sigue siendo señal interna y NO se publica como patrón',
   (() => { const many = { observedAt: 1, dispersion: first.dispersion.value, seen: first.memory.seen.map(e =>
       ({ id: e.id, dimension: e.dimension, label: e.label, firstSeenAt: 1, lastSeenAt: 1, observations: 6 })) };
-    return run(P.concentr, { memory: many }).discoveries
-      .some(d => d.code === 'reading_persists_across_observations'); })());
+    const r = run(P.concentr, { memory: many });
+    return Array.isArray(r.memory.persisting) && r.memory.persisting.length > 0
+      && !r.discoveries.some(d => d.code === 'reading_persists_across_observations')
+      && !/observaciones|observations/i.test(JSON.stringify(r.discoveries)); })(),
+  JSON.stringify((run(P.concentr, { memory: { observedAt: 1, dispersion: first.dispersion.value,
+    seen: first.memory.seen.map(e => ({ id: e.id, dimension: e.dimension, label: e.label,
+      firstSeenAt: 1, lastSeenAt: 1, observations: 6 })) } }).discoveries || []).map(d => d.code)));
 ok('F.8 varios cambios menores a la vez son un hecho conjunto',
   (() => { const prev = { observedAt: 1, dispersion: first.dispersion.value, seen: [
       { id: 'ai_concentration_top_position', dimension: 'concentration', label: 'balanced', firstSeenAt: 1, lastSeenAt: 1, observations: 2 },
@@ -707,10 +741,21 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
         // Composición añadida por el cierre de QA: ocupar el alto disponible y
         // dejar que el texto de una etiqueta envuelva. Ningún color, ninguna
         // familia tipográfica.
-        'flex', 'max-height', 'white-space', 'max-width'];
+        'flex', 'max-height', 'white-space', 'max-width',
+        // §15 — el scroll de la Memoria deja de RESERVAR altura: el techo lo pone
+        // la fila de la rejilla y el desbordamiento es real cuando ocurre.
+        // `overflow-y` es composición; no hay color ni tipografía.
+        'overflow-y'];
       props.forEach(pr => { if (!OK_PROPS.includes(pr)) bad.push(head.trim() + ' → ' + pr); });
     });
-    return bad.length === 0 ? true : bad; })() === true);
+    return bad.length === 0 ? true : bad; })() === true,
+  JSON.stringify((() => { const bad = [];
+    newCss.split(/(?<=\})/).forEach(rule => {
+      const head = (rule.match(/^[\s]*([^{]+)\{/) || [])[1] || '';
+      if (!TOUCHED_EXISTING.some(t => head.trim().startsWith(t))) return;
+      (rule.match(/[a-z-]+\s*:/g) || []).map(x => x.replace(/\s*:$/, ''))
+        .forEach(pr => bad.push(head.trim() + ' -> ' + pr));
+    }); return bad; })()));
 ok('N.8b la superficie nueva declara `order` en móvil y tablet',
   // Sin esto valía `order: 0` en un contenedor flex-column cuyos hijos van de 1 a
   // 10, así que se pintaba ANTES DEL HERO. Fue un FAIL real de la revisión.
@@ -792,11 +837,16 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
   const STATES = ['no_data', 'material_change', 'discovery', 'attention_material_fact',
     'readings_changed', 'context_needed', 'insufficient_history', 'stable_no_change', 'stable',
     'monitoring'];
+  // §17 — `reading_persists_across_observations` sale de la lista porque sale de
+  // la PUBLICACIÓN: su frase no decía qué condición persiste, ni durante qué
+  // periodo real, ni por qué importa. La señal sigue viva en `memory.persisting`
+  // (ver F.7), que es donde de verdad hace falta.
   const DISCOVERY_CODES = ['apparent_vs_effective_diversification', 'concentration_crossed_upward',
     'level_rose_on_capital_not_return', 'declared_goal_distant_from_observed_structure',
-    'liquidity_fell_while_need_declared', 'reading_persists_across_observations',
-    'several_readings_moved_together'];
-  const QFIELDS = ['concentration_intent', 'wealth_coverage', 'liquidity_need', 'primary_goal'];
+    'liquidity_fell_while_need_declared', 'several_readings_moved_together'];
+  const QFIELDS = ['concentration_intent', 'wealth_coverage', 'liquidity_need', 'primary_goal',
+    // §9 — la pregunta nueva: liquidez que existe y que Aurix no ve.
+    'unregistered_liquidity'];
   const badStates = [], badDisc = [], badQ = [];
   ['es', 'en'].forEach(lang => {
     sb2.t = k => (lang === 'es' ? ES : EN)[k];
@@ -1359,11 +1409,20 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
       recordedCapitalNet: 25000 } });
   ok('U.3 sin descubrimientos NO se pinta card: no se rellena por rellenar',
     sb3.DISC({ discoveries: [] }, sb3._intccEsc, []) === '');
-  ok('U.4 con descubrimientos se pinta, con su procedencia visible',
+  // §17 — «Sobre datos de tu propia cartera» RETIRADA: es verdad de TODO lo que
+  // Intelligence publica, así que como etiqueta no distinguía nada y añadía una
+  // línea por ítem. La evidencia NO se pierde: viaja en el contrato y se declara
+  // en `data-evidence`, que es donde un metadato tiene su sitio (y es lo que este
+  // assert comprueba ahora — una garantía verificable, no una frase).
+  ok('U.4 con descubrimientos se pinta, y su evidencia queda declarada',
     (() => { const h = sb3.DISC({ discoveries: [D('apparent_vs_effective_diversification', 'diversification')] },
         sb3._intccEsc, []);
-      return /intv9-disc/.test(h) && /intv9-disc-ev/.test(h)
-        && h.includes('7 posiciones') && h.includes(ES.intv9_disc_evidence); })());
+      return /intv9-disc/.test(h) && /data-evidence="effective_holdings"/.test(h)
+        && h.includes('7 posiciones')
+        && !/intv9-disc-ev/.test(h)
+        && !h.includes('Sobre datos de tu propia cartera'); })(),
+    sb3.DISC({ discoveries: [D('apparent_vs_effective_diversification', 'diversification')] },
+      sb3._intccEsc, []));
   ok('U.5 NO duplica lo que «Lo que importa» ya encabeza (exclusión por raíz)',
     sb3.DISC({ discoveries: [D('apparent_vs_effective_diversification', 'diversification')] },
       sb3._intccEsc, ['top_position']) === '');
@@ -1402,12 +1461,21 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
         primary_goal: { value: 'grow', provenance: 'user_answer', answeredAt: 100 },
         horizon: { value: 'long', provenance: 'user_answer', answeredAt: 900 } }));
       return d[0].field === 'horizon' && d[1].field === 'primary_goal' && d[0].at === 900; })());
-  ok('U.12 los cinco campos recordables tienen copy para TODOS sus valores',
+  // §15 — SEIS campos recordables, y UNA excepción declarada: `primary_goal` con
+  // valor `undecided` NO tiene copy de Memoria A PROPÓSITO. «Todavía no has
+  // decidido tu prioridad» ocupaba un hito de la Memoria patrimonial y no es un
+  // acontecimiento: es una pregunta pendiente. Sin copy no hay fila, y el filtro
+  // de `_intv4MemoryDeclared` lo excluye explícitamente además de por copy.
+  ok('U.12 los seis campos recordables tienen copy para todos sus valores, salvo el aplazamiento declarado',
     (() => { const F = sandbox.FIELDS;
       const MAP = { concentration_intent: 'intv9_mem_intent', primary_goal: 'intv9_mem_goal',
-        horizon: 'intv9_mem_horizon', liquidity_need: 'intv9_mem_liq', wealth_coverage: 'intv9_mem_coverage' };
+        horizon: 'intv9_mem_horizon', liquidity_need: 'intv9_mem_liq',
+        wealth_coverage: 'intv9_mem_coverage',
+        unregistered_liquidity: 'intv9_mem_unregistered_liquidity' };
+      const DEFERRAL = { primary_goal: 'undecided' };
       const missing = [];
       Object.keys(MAP).forEach(k => F[k].options.forEach(o => {
+        if (DEFERRAL[k] === o) { if (ES[MAP[k] + '_' + o]) missing.push('DEBE NO EXISTIR: ' + MAP[k] + '_' + o); return; }
         if (!ES[MAP[k] + '_' + o]) missing.push(MAP[k] + '_' + o); }));
       return missing.length === 0 ? true : missing; })() === true);
   // ── QUÉ HA CAMBIADO · compacto ──
@@ -1611,8 +1679,15 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
     (() => { const m = fnSrc('_intv4MemoryHtml');
       return (m.match(/class="intcc-tl-list"/g) || []).length === 1
         && !/intv9-mem-declared/.test(m); })());
-  ok('V.18 scroll interno vertical, acotado, sin barra horizontal',
-    /\.intv10-mem-scroll \{ max-height: 268px; overflow-y: auto; overflow-x: hidden/.test(css)
+  // §15 — EL SCROLL DEJA DE RESERVAR ALTURA. `max-height` incondicional montaba
+  // un contenedor con barra propia incluso con tres recuerdos, y el resultado era
+  // el scroll interior corto con espacio vacío debajo que §15 prohíbe. El techo
+  // pasa a colgar del atributo que el renderer ya publica (`data-scroll`), que es
+  // el mismo criterio que decide si hay algo que recortar. Lo que se conserva y se
+  // comprueba: vertical acotado cuando hay desbordamiento, y NUNCA horizontal.
+  ok('V.18 scroll interno vertical y acotado SÓLO cuando desborda, sin barra horizontal',
+    /\.intv10-mem-scroll \{ overflow-x: hidden/.test(css)
+    && /\.intv4-memory\[data-scroll="1"\] \.intv10-mem-scroll \{ max-height: 268px; overflow-y: auto; \}/.test(css)
     && /<div class="intv10-mem-scroll">/.test(src));
   ok('V.19 la barra es discreta y aparece al interactuar; en táctil no hay barra',
     /\.intv10-mem-scroll:hover, \.intv10-mem-scroll:focus-within/.test(css)
@@ -1700,22 +1775,37 @@ group('W · finalización del hero · lo que la captura de producción demostró
   ok('W.12 …dentro del cuerpo, que ya reserva el corredor de la esfera',
     /\.intcc-hero-body \{ padding-right: calc\(var\(--intel-orb-overlap\) \+ var\(--intel-orb-gap\)\)/.test(css)
     && /\.intv11-dock \{[\s\S]{0,400}max-width: 100%; box-sizing: border-box/.test(css));
-  // Enunciado honesto: `min-height` es un SUELO, así que la garantía vale mientras
-  // el bloque de texto quepa dentro (el caso normal y el de la captura). No se
-  // fuerza un techo porque eso exigiría recortar contenido.
-  ok('W.13 el hero reserva la altura de la dock: sin salto mientras el texto quepa',
-    /@media \(min-width: 1024px\)[\s\S]{0,900}\.intcc-hero-body \{ min-height: 228px; \}/.test(css)
-    && /@media \(max-width: 1023px\) and \(min-width: 641px\)[\s\S]{0,200}min-height: 216px/.test(css));
-  ok('W.13b …y el CSS declara el alcance real de esa garantía, sin prometer un techo',
-    /es un SUELO, así que garantiza/.test(css) && /al responder la última pregunta/.test(css));
+  // ── W.13 RE-DECIDIDO POR §7, Y MEDIDO SOBRE UNA CAPTURA REAL ─────────────
+  // `min-height: 228px` reservaba dentro del cuerpo del hero la altura de la
+  // QUESTION DOCK para que aparecer o desaparecer la pregunta no moviera Salud,
+  // Radar ni Factores. Pero la dock SALIÓ del hero a su propia card
+  // (`.intv12-qcard`, ver A2) y la reserva se quedó: medida a 1440px, el cuerpo
+  // ocupaba 228px para 123px de contenido — 105px muertos en TODA cuenta — y
+  // encima ya no podía evitar ningún salto, porque lo que aparece y desaparece es
+  // una card entera por encima del radar. Era una reserva HUÉRFANA y es, literal,
+  // lo que §7 llama «la card queda visualmente abandonada».
+  // La garantía que sustituye a la anterior es comprobable y más honesta: la dock
+  // NO es hija del hero (así que no hay nada que reservarle) y el bloque de texto
+  // se distribuye en la altura que la fila le da, sin inventar contenido.
+  ok('W.13 el hero ya NO reserva altura para una dock que vive en otra card',
+    !/\.intcc-hero-body \{ min-height: 228px; \}/.test(css)
+    && !/\.intcc-hero-body \{ min-height: 216px; \}/.test(css)
+    && /@media \(min-width: 1024px\)[\s\S]{0,300}\.intcc-hero-body \{ justify-content: center; \}/.test(css)
+    && /intelQCardHtml = intelQHtml \? `[\s\S]{0,200}intv12-qcard/.test(src));
+  ok('W.13b …y el CSS declara POR QUÉ se retiró, con la medida que lo demuestra',
+    /reserva HUÉRFANA|RESERVA HUÉRFANA/.test(css) && /105px de espacio muerto/.test(css));
   ok('W.13c la dock se compacta para que el espacio reservado sea el mínimo',
     /\.intv11-dock \.intv8-intel-pause \{ margin: 0 0 0 4px; \}/.test(css)
     && /\.intv11-dock \.intv8-intel-q-opts \{ align-items: center; \}/.test(css));
   ok('W.14 sin pregunta NO se pinta caja vacía ni texto de relleno',
     /const intelQHtml = intelQ \? \(\(\) => \{/.test(src)
     && !/no hay preguntas|No questions/i.test(src));
+  // En móvil nunca hubo reserva (la esfera vive en su propia card) y ahora tampoco
+  // la hay en ningún viewport, así que lo que se comprueba es lo que sigue siendo
+  // propio del móvil: la dock ocupa su ancho con su propio padding compacto.
   ok('W.15 en móvil la dock no compite con la esfera ni reserva altura',
-    /@media \(max-width: 640px\)[\s\S]{0,500}\.intcc-hero-body \{ min-height: 0; \}/.test(css));
+    /@media \(max-width: 640px\)[\s\S]{0,500}\.intv11-dock \{ margin-top: 12px; padding: 12px; \}/.test(css)
+    && !/\.intcc-hero-body \{ min-height/.test(css));
   ok('W.16 la animación es sutil y respeta reduced-motion',
     /@media \(prefers-reduced-motion: no-preference\)[\s\S]{0,200}intv11DockIn/.test(css)
     && /220ms/.test(css));

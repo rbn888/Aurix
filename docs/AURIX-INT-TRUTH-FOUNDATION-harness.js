@@ -360,17 +360,28 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     && !/intcc-radar-area/.test(svg)
     && /data-svg-open="1"/.test(svg),
     (svg.match(/data-svg-open="[^"]*"/) || [, '?'])[0]);
-  ok('3.8b con un hueco se pintan sólo los segmentos entre ejes ADYACENTES medidos',
-    // 4 de 5 medidos (falta `growth`, índice 4): adyacentes 0-1, 1-2, 2-3 → 3
-    // segmentos. 3-4 y 4-0 se interrumpen porque el eje 4 no está certificado.
+  // ── RE-DECIDIDO POR §11 DEL CIERRE, Y LA GARANTÍA SE REFUERZA ────────────
+  // «Sólo los adyacentes medidos» fosilizaba una figura ABIERTA, y era la causa
+  // visual del defecto que el founder reportó: con dos ejes sin datos el radar
+  // dibujaba una línea suelta y se leía como si tuviera tres puntos. §11 exige
+  // recorrer 1→2→3→4→5→1 sin saltar ningún eje y CERRAR la figura. Lo que no podía
+  // perderse —que un tramo apoyado en un eje sin evidencia no se lea como una
+  // medición— se preserva de forma EXPLÍCITA en vez de por ausencia: el tramo va
+  // DISCONTINUO (`is-unknown`) y sigue fuera del relleno, que es el invariante
+  // financiero. Se comprueban las dos cosas, así que es más fuerte que antes.
+  ok('3.8b con un hueco la figura se recorre completa y el tramo sin evidencia va discontinuo',
     (svg.match(/class="intcc-radar-edge"/g) || []).length === 3
-    && /data-svg-edges="3"/.test(svg),
-    (svg.match(/data-svg-edges="[^"]*"/) || [, '?'])[0]);
+    && (svg.match(/class="intcc-radar-edge is-unknown"/g) || []).length === 2
+    && /data-svg-edges="5"/.test(svg) && /data-svg-dashed="2"/.test(svg)
+    && !/intcc-radar-area/.test(svg),
+    (svg.match(/data-svg-edges="[^"]*" data-svg-dashed="[^"]*"/) || [, '?'])[0]);
   ok('3.8c con los cinco ejes certificados el pentágono SÍ se cierra y se rellena',
     (() => { const all = run('_intccRadarSvg({ diversification: 80, liquidity: 60, concentration: 40, stability: 55, growth: 30 })');
       return /class="intcc-radar-area" points="/.test(all)
         && (all.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 5
-        && !/class="intcc-radar-edge"/.test(all) && /data-svg-open="0"/.test(all); })());
+        && (all.match(/class="intcc-radar-edge"/g) || []).length === 5
+        && !/class="intcc-radar-edge is-unknown"/.test(all)
+        && /data-svg-open="0"/.test(all) && /data-svg-dashed="0"/.test(all); })());
   ok('3.9 no "0", "50" or "—" placeholder value is emitted for the absent axis',
     !/intcc-radar-val[^"]*"[^>]*>(0|50|55|—|null|NaN)</.test(svg));
   // ── §8 · NINGÚN MARCADOR EN EL CENTRO NI EN EL VÉRTICE ───────────────────
@@ -402,10 +413,20 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
       .slice(1).map(Number));
     const rUnk = unkR.length === 2 ? radiusOf(unkR) : null;
     const fullMax = Math.max.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })')).map(radiusOf));
-    ok('3.9f el marcador «sin datos» vive FUERA de la banda de la serie',
-      rUnk != null && rUnk > fullMax + 2, JSON.stringify({ rUnk, fullMax }));
-    ok('3.9g …y tampoco se apoya exactamente en el vértice',
-      rUnk != null && rUnk < R_OUT - 0.5, String(rUnk));
+    // §11 RE-DECIDE DÓNDE VIVE, y conviene dejar escrito por qué. A2 lo puso FUERA
+    // de la banda y por encima de ella para que no pudiera confundirse con un
+    // valor; en la pantalla real eso lo pegaba al marco —donde el ojo lee
+    // «máximo»— mientras los ejes certificados se apelotonaban en el centro. §11
+    // lo baja al límite INTERIOR de referencia y confía la distinción a tres
+    // señales que NO son la coordenada: marcador hueco, segmentos discontinuos y
+    // la palabra «sin datos». Lo que este assert protege ahora: sigue DENTRO del
+    // marco, no toca el centro, y no puede leerse como un valor alto.
+    const bandMin = Math.min.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0, growth: 0 })')).map(radiusOf));
+    ok('3.9f el marcador «sin datos» no puede leerse como un valor ALTO',
+      rUnk != null && rUnk < fullMax - 20 && Math.abs(rUnk - bandMin) < 0.5,
+      JSON.stringify({ rUnk, fullMax, bandMin }));
+    ok('3.9g …y no toca ni el centro ni el vértice',
+      rUnk != null && rUnk > 6 && rUnk < R_OUT - 0.5, String(rUnk));
     ok('3.9h está rotulado como disponibilidad, no como puntuación',
       /data-availability="unknown"/.test(svg) && /data-axis="growth"/.test(svg));
     ok('3.9i y NO participa en el trazo de la serie',

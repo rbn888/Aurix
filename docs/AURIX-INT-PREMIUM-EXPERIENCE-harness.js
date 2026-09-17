@@ -95,7 +95,10 @@ function extractDict(langIdx) {
     'intel_now_stable','intel_now_history','intel_now_context',
     'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
     'intel_d_apparent','intel_d_conc_rising','intel_d_capital','intel_d_intent','intel_d_liq_need',
-    'intel_d_persisting','intel_d_combined',
+    // §17 — `intel_d_persisting` RETIRADA con su descubrimiento: «esta lectura
+    // sigue igual tras 11 observaciones» no dice qué condición, ni durante qué
+    // periodo (las «observaciones» eran visitas), ni por qué importa.
+    'intel_d_combined',
     'intel_q_conc_intent','intel_q_conc_why','intel_q_coverage','intel_q_coverage_why',
     'intel_q_liq_need','intel_q_liq_why','intel_q_goal','intel_q_goal_why','intel_q_thanks',
     'intel_opt_deliberate','intel_opt_not_deliberate','intel_opt_complete','intel_opt_partial',
@@ -151,6 +154,12 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown',
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
+  // §6 · la guarda de hidratación (una hidratación pendiente NO es cero activos) y
+  // §12 · la etiqueta de porcentaje que distingue un cero real de un «<1%».
+  '_intccHydrationPending','_intccPctLabel',
+  // El formateador CANÓNICO de porcentaje, compartido por Dashboard, Workspace e
+  // Intelligence: el redondeo es de renderizado y hay UNA sola función.
+  '_aurixPctNum','_aurixPctLabel',
   
   '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
@@ -835,12 +844,26 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.7 exactly the certified dimensions carry a vertex, and the figure is OPEN',
     [five, founder, one].every(x => x.dots === 3 && x.pts.length === 0
       && /data-svg-open="1"/.test(x.html)));
-  ok('13B.7c y NINGÚN segmento cruza un eje desconocido: sólo se unen ADYACENTES',
-    // Los pendientes están intercalados (13B.7b), así que de los tres medidos
-    // —índices 0, 2 y 4— el único par adyacente en el anillo es 4↔0. Un segundo
-    // segmento sería una línea atravesando `stability` o `growth`.
-    [five, founder, one].every(x => /data-svg-edges="1"/.test(x.html)),
-    JSON.stringify([five, founder, one].map(x => (x.html.match(/data-svg-edges="[^"]*"/) || [, '?'])[0])));
+  // ── RE-DECIDIDO POR §11, Y LA GARANTÍA SE MANTIENE POR OTRA VÍA ──────────
+  // Este assert fosilizaba «un solo segmento» como contrato, y era la causa
+  // visual del defecto que el founder reportó: con dos ejes sin datos el radar
+  // dibujaba UNA línea y se leía como una figura rota de tres puntos. §11 exige
+  // recorrer 1→2→3→4→5→1 sin saltar ningún eje y CERRAR la figura. Lo que no
+  // podía perderse —que un tramo apoyado en un eje sin datos no se lea como una
+  // medición— se preserva de forma explícita en vez de por ausencia: el tramo se
+  // dibuja DISCONTINUO (`is-unknown`) y sigue fuera de cualquier relleno. Así que
+  // aquí se comprueban los cinco segmentos Y que los que tocan un desconocido
+  // estén marcados como tales: es una garantía más fuerte, no más débil.
+  ok('13B.7c la figura recorre los CINCO ejes y el tramo desconocido va discontinuo',
+    [five, founder, one].every(x => /data-svg-edges="5"/.test(x.html))
+    // Tres medidos intercalados ⇒ los cuatro tramos que tocan `stability` o
+    // `growth` son discontinuos, y el par adyacente 4↔0 es el único continuo.
+    && [five, founder, one].every(x => /data-svg-dashed="4"/.test(x.html))
+    && [five, founder, one].every(x =>
+         (x.html.match(/class="intcc-radar-edge is-unknown"/g) || []).length === 4)
+    && [five, founder, one].every(x => !/intcc-radar-area/.test(x.html)),
+    JSON.stringify([five, founder, one].map(x =>
+      (x.html.match(/data-svg-edges="[^"]*" data-svg-dashed="[^"]*"/) || [, '?'])[0])));
   ok('13B.7b the pending axes are INTERLEAVED, so no sector of the pentagon is dead',
     (() => { const ks = konstSrc('_INTV7_RADAR_DIMS');
       const order = (ks.match(/key: '(\w+)'/g) || []).map(m => m.split("'")[1]);
@@ -876,12 +899,18 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
       const vals = attrs(h, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<');
       // A single vertex cannot close an area, and the centre is not a data point,
       // so no polygon is emitted — the axis itself carries the measurement.
+      // §11 RE-DECIDE la forma: las radiales al centro se retiran (el centro no es
+      // un dato y una línea que sale de él lo sugería) y cada eje recibe UN
+      // marcador, así que con un solo eje certificado hay 1 marcador sólido y 4
+      // huecos. Lo que se conserva es lo esencial: cinco ejes, cuatro «sin datos»
+      // y NINGÚN área rellena, porque un relleno exigiría los cinco certificados.
       return /intcc-radar-svg/.test(h)
         && (h.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
         && vals.length === 5 && vals.filter(v => v.trim() === 'sin datos').length === 4
         && !/intcc-radar-area/.test(h)
-        && (h.match(/class="intcc-radar-spoke"/g) || []).length === 1
-        && (h.match(/class="intcc-radar-dot"/g) || []).length === 1; })(),
+        && !/intcc-radar-spoke/.test(h)
+        && (h.match(/class="intcc-radar-dot"[^>]*/g) || []).length === 1
+        && (h.match(/class="intcc-radar-dot is-unknown"[^>]*/g) || []).length === 4; })(),
     run('_intv7RadarHtml(s => s)', makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }))));
   // A1/A2 · RE-DECIDIDO. El eje ya NO lee `_aurixEffectiveDiversification`: leerlo
   // era publicar la MISMA magnitud que el anillo de Salud con otra normalización
@@ -907,12 +936,20 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
       return b.status === 'available' && b.categoriesHeld === 2
         && b.effectiveCategories < 2.5 && b.taxonomySize === 7; })(),
     JSON.stringify(run('_aurixRegisteredCategoryBreadth()', founder.ctx)));
-  ok('13B.11b Liquidez and Concentración are the snapshot owner\'s numbers',
-    (() => { const snap = MATURE.snap;
-      // Los índices se desplazan porque el primer eje ya no publica porcentaje.
-      return founder.nums[0] === Math.round(snap.cashPct)
-        && founder.nums[1] === Math.round(snap.topInvestedAsset.pctTotal); })(),
-    JSON.stringify({ radar: founder.nums, snap: [MATURE.snap.cashPct, MATURE.snap.topInvestedAsset.pctTotal] }));
+  // ── LA GARANTÍA SIGUE SIENDO LA MISMA, Y AHORA TAMBIÉN EL OWNER ──────────
+  // El eje lee `_aurixHealthSnapshot`, que ya NO redondea `cashPct`: el redondeo
+  // pasó a ser exclusivamente de renderizado (`_aurixPctLabel`), así que el radar
+  // no inventa su número de liquidez, no lo trunca y no abre una segunda lectura
+  // de la distribución. Los índices se desplazan porque el primer eje publica un
+  // conteo, no un porcentaje.
+  ok('13B.11b Liquidez y Concentración salen del owner canónico, sin redondeo en origen',
+    (() => { const cashRaw = Number(MATURE.snap.cashPct);
+      return Math.abs(Number(founder.nums[0]) - cashRaw) < 0.51
+        && founder.nums[1] === Math.round(MATURE.snap.topInvestedAsset.pctTotal)
+        && !/out\.cashPct   = Math\.round/.test(app)
+        && /certified\.liquidity = snap\.cashPct;/.test(fnSrc('_intv7RadarAxes')); })(),
+    JSON.stringify({ radar: founder.nums, snapCash: MATURE.snap.cashPct,
+      snapTop: MATURE.snap.topInvestedAsset.pctTotal }));
   ok('13B.12 real estate never enters the radar',
     (() => { const withRE = st(['crypto', 'crypto', 'cash', 'real_estate']);
       return JSON.stringify(withRE.nums) === JSON.stringify(founder.nums); })(),

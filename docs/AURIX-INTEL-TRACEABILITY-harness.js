@@ -99,7 +99,10 @@ function extractDict(langIdx) {
     'intel_now_stable','intel_now_history','intel_now_context',
     'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
     'intel_d_apparent','intel_d_conc_rising','intel_d_capital','intel_d_intent','intel_d_liq_need',
-    'intel_d_persisting','intel_d_combined',
+    // §17 — `intel_d_persisting` RETIRADA con su descubrimiento: «esta lectura
+    // sigue igual tras 11 observaciones» no dice qué condición, ni durante qué
+    // periodo (las «observaciones» eran visitas), ni por qué importa.
+    'intel_d_combined',
     'intel_q_conc_intent','intel_q_conc_why','intel_q_coverage','intel_q_coverage_why',
     'intel_q_liq_need','intel_q_liq_why','intel_q_goal','intel_q_goal_why','intel_q_thanks',
     'intel_opt_deliberate','intel_opt_not_deliberate','intel_opt_complete','intel_opt_partial',
@@ -155,6 +158,12 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown',
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
+  // §6 · la guarda de hidratación (una hidratación pendiente NO es cero activos) y
+  // §12 · la etiqueta de porcentaje que distingue un cero real de un «<1%».
+  '_intccHydrationPending','_intccPctLabel',
+  // El formateador CANÓNICO de porcentaje, compartido por Dashboard, Workspace e
+  // Intelligence: el redondeo es de renderizado y hay UNA sola función.
+  '_aurixPctNum','_aurixPctLabel',
   
   '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
@@ -413,12 +422,22 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
   // vértice, el mismo píxel del marcador de «sin datos»— y el marcador de
   // disponibilidad vive fuera de esa banda. Se comprueba la propiedad, no la
   // constante: el valor concreto es geometría y puede afinarse.
+  // ── §11 RE-DECIDE DÓNDE VIVE EL MARCADOR DE «SIN DATOS» ──────────────────
+  // A2 lo puso FUERA de la banda y por encima de ella (R_UNK > RMAX) para que no
+  // pudiera confundirse con un valor. En la pantalla real eso lo pegaba al marco
+  // —donde el ojo lee «máximo»— mientras los ejes certificados se apelotonaban en
+  // el centro con RMIN = 0,10. §11 sube el suelo de la banda a 0,22 y fija el
+  // límite INTERIOR de referencia para el desconocido. La garantía que se
+  // conserva, y que este assert comprueba: la banda tiene margen a los DOS
+  // extremos (ningún valor en el centro, ninguno en el vértice) y el suelo es lo
+  // bastante alto para que un 0 real sea una MARCA separada del centro.
   ok('5.2 la banda de la serie tiene margen a los dos extremos, y el 0 real es una MARCA',
     (() => { const src = fnSrc('_intccRadarSvg');
-      const m = src.match(/const RMIN = ([\d.]+), RMAX = ([\d.]+), R_UNK = ([\d.]+);/);
+      const m = src.match(/const RMIN = ([\d.]+), RMAX = ([\d.]+);/);
       if (!m) return false;
-      const [, rmin, rmax, runk] = m.map(Number);
-      return rmin > 0 && rmax < 1 && runk > rmax && runk < 1
+      const rmin = Number(m[1]), rmax = Number(m[2]);
+      return rmin >= 0.2 && rmax < 1 && rmax > rmin
+        && /R_UNK = R \* RMIN/.test(src)
         && /RMIN \+ \(RMAX - RMIN\)/.test(src); })(),
     (fnSrc('_intccRadarSvg').match(/const RMIN = [^;]+;/) || [, '?'])[0]);
   ok('5.3 el radio mínimo es GEOMETRÍA: no altera la cifra publicada',
@@ -893,11 +912,17 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
         && unkXY.every(xy => edges.every(e => e.indexOf(xy.split(',')[0]) === -1
                                            || e.indexOf(xy.split(',')[1]) === -1)); })(),
     JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
-  ok('10.21 un eje DESCONOCIDO no es un valor bajo: su marcador va al extremo, hueco y con radial discontinua',
-    /class="intcc-radar-dot is-unknown" cx="[^"]+" cy="[^"]+" r="3.1"/.test(rr)
-    && /class="intcc-radar-spoke is-unknown"/.test(rr)
+  // §11 — las tres señales que distinguen «no medido» de «medido en cero», y
+  // ninguna de las tres es la coordenada: marcador HUECO (`fill: none`), los dos
+  // segmentos adyacentes DISCONTINUOS y la palabra «sin datos» bajo la etiqueta
+  // (10.22). La radial al centro se retiró con §11 — el centro no es un dato.
+  ok('10.21 un eje DESCONOCIDO se distingue por relleno, trazo y texto, no por su radio',
+    /class="intcc-radar-dot is-unknown"[^>]*data-availability="unknown"/.test(rr)
+    && /class="intcc-radar-edge is-unknown"/.test(rr)
+    && !/intcc-radar-spoke/.test(rr)
     && /\.intcc-radar-dot\.is-unknown\s*\{[^}]*fill:\s*none/.test(css)
-    && /\.intcc-radar-spoke\.is-unknown\s*\{[^}]*stroke-dasharray/.test(css));
+    && /\.intcc-radar-edge\.is-unknown\s*\{[^}]*stroke-dasharray/.test(css),
+    JSON.stringify((rr.match(/class="intcc-radar-dot is-unknown"[^>]*/g) || []).slice(0, 1)));
   ok('10.22 …dice «sin datos» y su etiqueta está atenuada',
     count(rr, /class="intcc-radar-val is-unavailable"/g) === 2
     && count(rr, /class="intcc-radar-label is-unavailable"/g) === 2
@@ -1058,8 +1083,16 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
   ok('ADV.2 «Lo que importa hoy» encabeza con la operación registrada',
     /data-root="recorded_operation"/.test(brief)
     && /data-fact="operation_registered_a2"/.test(brief), brief.slice(0, 300));
-  ok('ADV.2b y su titular es el SIGNIFICADO, con el peso estructural medido',
-    /intv4-story-head">Es un registro tuyo, no un resultado: esta operación representa el [\d,.]+% de tu cartera financiera/.test(brief),
+  // §14/§20 — «Es un registro tuyo, no un resultado» se RETIRA del inicio: era una
+  // defensa del motor y no información para el lector. El titular sigue siendo el
+  // SIGNIFICADO (el peso estructural medido), que es lo que este assert protege.
+  // La revisión financiera pidió que volviese la única aclaración que evita una
+  // lectura engañosa del porcentaje: su numerador es el COSTE registrado, no la
+  // valoración. Vuelve como información («Por su coste registrado…»), no como la
+  // coletilla defensiva que §14 retiró («Es un registro tuyo, no un resultado»).
+  ok('ADV.2b y su titular es el SIGNIFICADO, con el peso estructural medido y su base',
+    /intv4-story-head">Por su coste registrado, esta operación representa el [\d,.]+% de tu cartera financiera/.test(brief)
+    && !/no un resultado/.test(brief),
     (brief.match(/intv4-story-head">([^<]*)/) || [, ''])[1]);
   ok('ADV.3 ocupa la PRIMERA posición de esa card',
     (() => { const i = brief.indexOf('data-root="recorded_operation"');

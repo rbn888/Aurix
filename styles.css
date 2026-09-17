@@ -20234,6 +20234,13 @@ body.gs-open { overflow: hidden; }
   padding: 6px 14px 40px;
 }
 .aurix-intcc.is-empty { min-height: 46vh; justify-content: center; }
+.aurix-intcc.is-hydrating { min-height: 46vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; }
+.intcc-hydrating-card {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: min(100%, 300px); text-align: center;
+}
+.intcc-hydrating-card .intcc-score-ring { width: 130px; height: 130px; position: relative; }
 
 /* Reveal-on-mount stagger (disabled under reduced motion below). */
 .aurix-intcc > * {
@@ -20376,6 +20383,14 @@ body.gs-open { overflow: hidden; }
 .intcc-chip.is-good   { border-color: rgba(63,191,127,0.28); color: #8fe6b6; background: rgba(63,191,127,0.09);  box-shadow: inset 0 0 12px rgba(63,191,127,0.12); }
 .intcc-chip.is-accent { border-color: rgba(74,130,240,0.30); color: #aecbff; background: rgba(74,130,240,0.10); box-shadow: inset 0 0 12px rgba(74,130,240,0.14); }
 .intcc-chip.is-warn   { border-color: rgba(233,168,87,0.30); color: #f3cf9a; background: rgba(233,168,87,0.10); box-shadow: inset 0 0 12px rgba(233,168,87,0.12); }
+.intcc-chip.is-context {
+  border-color: rgba(150,180,240,0.22);
+  color: rgba(198,214,246,0.86);
+  background: rgba(150,180,240,0.06);
+  box-shadow: none;
+  font-weight: 500;
+}
+.intcc-chip.is-context::before { content: none; }
 
 /* Energy orb — pure SVG/CSS, no external assets */
 .intcc-orb {
@@ -20477,6 +20492,12 @@ body.gs-open { overflow: hidden; }
 .intcc-radar-wrap { display: grid; place-items: center; }
 .intcc-radar-svg { width: 100%; max-width: 340px; height: auto; }
 .intcc-radar-ring { fill: none; stroke: rgba(150,180,240,0.10); stroke-width: 0.8; }
+/* SPEC §11 — EL MARCO NO ES UN NIVEL. Los anillos interiores SÍ son niveles de la
+   banda medible [22 %, 88 %] y el exterior es la estructura conceptual del
+   pentágono, así que se atenúa un punto para que el ojo no lo lea como «máximo».
+   La zona por debajo del anillo interior queda deliberadamente VACÍA: es la zona
+   de exclusión visual, y no tener retícula es lo que impide leerla como escala. */
+.intcc-radar-ring.is-frame { stroke: rgba(150,180,240,0.07); }
 .intcc-radar-axis { stroke: rgba(150,180,240,0.10); stroke-width: 0.8; }
 .intcc-radar-area {
   fill: rgba(92,156,255,0.20);
@@ -20494,6 +20515,22 @@ body.gs-open { overflow: hidden; }
   filter: drop-shadow(0 0 5px rgba(92,156,255,0.55));
 }
 .intcc-radar-dot { fill: #cfe0ff; filter: drop-shadow(0 0 3px rgba(92,156,255,0.9)); }
+/* SPEC §11 — EL TRAMO DESCONOCIDO SE DIBUJA, PERO DISCONTINUO. La figura recorre
+   los cinco ejes y se cierra (sin eso el radar se leía como un triángulo), y el
+   trazo que toca un eje sin datos va de puntos y sin glow: la forma es legible y
+   la línea dice que ese tramo no es una medición. El RELLENO sigue exigiendo los
+   cinco ejes certificados — eso lo decide el motor, no el CSS. */
+.intcc-radar-edge.is-unknown {
+  stroke: rgba(150,180,240,0.46);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 3;
+  filter: none;
+}
+/* HALO — anillo SIN relleno pintado DESPUÉS del marcador (orden de capas del §11).
+   Separa el punto de las conexiones y de la retícula sin taparlo: no es un brillo
+   y no crece con el valor. */
+.intcc-radar-halo { fill: none; stroke: rgba(10,14,23,0.82); stroke-width: 2.2; }
+.intcc-radar-halo.is-unknown { stroke: rgba(10,14,23,0.7); stroke-width: 2; }
 .intcc-radar-label { fill: rgba(214,226,255,0.82); font-size: 9.5px; font-weight: 600; }
 .intcc-radar-val   { fill: rgba(150,180,240,0.62); font-size: 8px; font-weight: 700; font-variant-numeric: tabular-nums; }
 @keyframes intccRadarIn { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -20557,6 +20594,8 @@ body.gs-open { overflow: hidden; }
   transition: color 160ms ease, border-color 160ms ease;
 }
 .intv12-see-changes:hover { color: var(--color-text-primary); border-bottom-color: var(--color-border-subtle); }
+.intv12-see-changes.is-quiet { color: var(--color-text-muted, rgba(174,190,220,0.62)); font-size: 12px; }
+.intv12-see-changes.is-quiet:hover { color: var(--color-text-secondary); }
 .intv12-see-changes:focus-visible {
   outline: 2px solid var(--color-accent, #6ea8fe);
   outline-offset: 3px;
@@ -20594,6 +20633,12 @@ body.gs-open { overflow: hidden; }
 /* REVISADO · es una MARCA DE ESTADO, no un botón apagado. Un control
    deshabilitado sigue pareciendo accionable y el usuario vuelve a pulsarlo; esto
    se lee como lo que es: la fila sigue en el historial y ya está vista. */
+.intv12-ack-error {
+  display: block;
+  margin: 4px 0 0;
+  font-size: 11px; line-height: 1.4;
+  color: #f3cf9a;
+}
 .intv12-ack.is-done {
   opacity: 1;
   cursor: default;
@@ -20877,40 +20922,35 @@ body.gs-open { overflow: hidden; }
   font-size: 7.5px; font-weight: 600; letter-spacing: 0.03em;
   font-variant-numeric: normal;      /* it is a word, not a figure */
 }
-/* ── CINCO MARCADORES DE DISPONIBILIDAD ─────────────────────────────────────
-   La QA autenticada demostró el hueco: sin vértice, un eje no certificado no
-   dejaba NADA que mirar, así que «Aurix no lo mide» y «aquí no hay nada» se veían
-   igual. El marcador va HUECO y en el EXTREMO del eje —el punto más alejado de la
-   serie— para que no pueda leerse como un valor bajo ni como un cero, con su
-   radial discontinua. No entra en el polígono: eso lo decide el motor, no el CSS. */
+/* ── CINCO MARCADORES, TRES ESTADOS DISTINGUIBLES ───────────────────────────
+   §11 · el marcador de un eje SIN DATOS va HUECO y en el límite INTERIOR de
+   referencia de su eje, con sus dos segmentos discontinuos y la palabra «sin
+   datos» bajo su etiqueta. Un 0 % REAL va SÓLIDO, también en el límite interior,
+   con su «0%» impreso. Tres señales independientes —relleno, trazo y texto—
+   distinguen «medido en cero» de «no medido»; la coordenada, por sí sola, no
+   tendría que hacerlo. No entra en el polígono: eso lo decide el motor. */
 .intcc-radar-dot.is-unknown {
   fill: none;
-  stroke: rgba(150,180,240,0.52);
-  stroke-width: 1.2;
-  stroke-dasharray: 1.6 1.6;
+  stroke: rgba(158,188,246,0.72);
+  stroke-width: 1.3;
   filter: none;                      /* sin glow: un dato ausente no brilla */
 }
-.intcc-radar-spoke.is-unknown {
-  stroke: rgba(150,180,240,0.18);
-  stroke-width: 1;
-  stroke-dasharray: 2.5 3.5;
-}
-/* The measured length along each axis: legible with one or two certified
-   dimensions, where a closed polygon would be a line or a dot. */
-.intcc-radar-spoke { stroke: rgba(122,162,255,0.55); stroke-width: 1.4; stroke-linecap: round; }
 /* TRANSICIÓN SUTIL AL MOVERSE UN VALOR. Sólo geometría y opacidad, sin animación
    de entrada: lo que se percibe es que el dato SE HA MOVIDO, no un efecto. */
-.intcc-radar-area, .intcc-radar-edge, .intcc-radar-dot:not(.is-unknown), .intcc-radar-spoke:not(.is-unknown) {
+.intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-radar-dot:not(.is-unknown) {
   transition: all 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .intcc-radar-dot:not(.is-unknown) {
   filter: drop-shadow(0 0 3px rgba(92,156,255,0.9));
 }
 @media (prefers-reduced-motion: reduce) {
-  .intcc-radar-area, .intcc-radar-edge, .intcc-radar-dot, .intcc-radar-spoke { transition: none !important; }
+  .intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-radar-dot { transition: none !important; }
 }
-/* A certified vertex stays readable at the low end of its axis. */
-.intv6-radar .intcc-radar-dot { r: 2.6; }
+/* Los dos marcadores se leen a tamaño real en los tres viewports. El hueco es un
+   punto MAYOR que el sólido: sin relleno necesita más diámetro para pesar lo
+   mismo en la composición. */
+.intv6-radar .intcc-radar-dot { r: 2.9; }
+.intv6-radar .intcc-radar-dot.is-unknown { r: 3.5; }
 
 /* ── INT.06 · STRUCTURE dependence line ─────────────────────────────────────*/
 .intv6-struct-dep {
@@ -21328,7 +21368,9 @@ body.gs-open { overflow: hidden; }
     filter: drop-shadow(0 0 6px rgba(92,156,255,0.7));
   }
   .intcc-radar-edge { fill: none; }
-  .intcc-radar-dot { r: 2.86px; fill: #e2edff; }
+  .intcc-radar-edge.is-unknown { fill: none; stroke: rgba(150,180,240,0.52); filter: none; }
+  .intcc-radar-dot { r: 3.1px; fill: #e2edff; }
+  .intcc-radar-dot.is-unknown { r: 3.7px; fill: none; }
 
   /* ── 6. Health card — more premium and compact.
      Truly-centred score, higher-contrast checks, −8% badge height. */
@@ -21400,7 +21442,7 @@ body.gs-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .aurix-intcc > * { opacity: 1 !important; transform: none !important; transition: none !important; }
   .intcc-orb-glow, .intcc-orb-core, .intcc-orb-ring, .intcc-orb-ecg path,
-  .intcc-radar-area, .intcc-radar-edge, .intcc-drv-bar { animation: none !important; }
+  .intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-drv-bar { animation: none !important; }
   .intcc-orb-ecg path { stroke-dashoffset: 0; stroke-dasharray: none; }
 }
 
@@ -26186,14 +26228,12 @@ summary:focus-visible,
 .intcc-m-health.is-tone-neutral .intcc-score-ring {
   --health-ring-color: var(--aurix-blue);
 }
-/* El HECHO comprobable debajo del índice («tu peso se comporta como 5,6 de 9
-   posiciones»): es lo que hace auditable el número, así que acompaña siempre
-   al badge en vez de esconderse en una explicación. */
-.intv8-disp-detail {
-  display: block; max-width: 22ch; margin: 2px auto 0;
-  font-size: 11px; line-height: 1.35; font-weight: 500;
-  color: var(--text-dim); text-align: center;
-}
+/* SPEC §6 — `.intv8-disp-detail` y `.intv8-h-note` se RETIRAN con su markup. El
+   contenido permitido de la card de Salud es título + anillo + % + UN estado:
+   el detalle repetía en prosa lo que el estado ya dice y la nota metía una
+   declaración del usuario dentro del juicio estructural. La metodología sigue en
+   el contrato del owner y la declaración del usuario se publica como etiqueta
+   neutral entre las de Inteligencia. */
 
 /* El disclosure «Qué mide cada eje» del RADAR se RETIRÓ por decisión del founder:
    era un control, un hueco reservado y un elemento enfocable al pie de la card, y
@@ -26227,7 +26267,6 @@ button.intv8-intel-opt:focus-visible { outline: 2px solid var(--focus-ring-color
      la primitiva, y la pregunta ocupa el ancho de la card. */
   button.intv8-intel-opt { height: 32px; font-size: 12px; }
   .intv8-intel-q { margin-top: 10px; }
-  .intv8-disp-detail { max-width: 26ch; font-size: 10.5px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -26252,14 +26291,11 @@ button.intv8-intel-opt:focus-visible { outline: 2px solid var(--focus-ring-color
 .intcc-hero[data-has-question="1"] { padding-top: 22px; padding-bottom: 22px; }
 .intcc-hero[data-has-question="1"] .intcc-hero-intel { align-items: center; }
 
-/* La chip de COBERTURA salió de la superficie con el resto de textos: SALUD es
-   título + anillo + % + UN estado. La confianza sigue publicándose en el contrato
-   del owner, que es donde se audita. Se conserva la nota de contexto, que es lo
-   único que el usuario DECLARÓ y no un derivado. */
-.intv8-h-note {
-  display: block; max-width: 24ch; margin: 6px auto 0;
-  font-size: 10.5px; line-height: 1.35; color: #9fc2ff; text-align: center;
-}
+/* SALUD es título + anillo + % + UN estado, y §6 cierra la lista. La chip de
+   cobertura ya se había retirado; ahora se van también el detalle y la nota de
+   contexto. La confianza sigue en el contrato del owner —que es donde se audita—
+   y lo que el usuario DECLARÓ se publica como etiqueta neutral de Inteligencia,
+   no dentro del juicio de salud. */
 
 /* El disclosure «Cómo se calcula» SE RETIRÓ de la superficie: al abrirlo, la
    columna de Salud crecía en horizontal y comprimía Inteligencia en una columna
@@ -26268,7 +26304,6 @@ button.intv8-intel-opt:focus-visible { outline: 2px solid var(--focus-ring-color
 
 @media (max-width: 640px) {
   .intcc-hero-body { padding-right: 0; }
-  .intv8-h-note { max-width: none; }
   .intcc-m-hero-text[data-has-question="1"] { padding-bottom: 2px; }
 }
 
@@ -26400,7 +26435,8 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
 
 /* MEMORIA V2 · hasta 8 recuerdos, el más reciente arriba, con scroll interno
    cuando no caben. La altura se acota para que la card no crezca como un log. */
-.intv10-mem-scroll { max-height: 268px; overflow-y: auto; overflow-x: hidden; padding-right: 6px; }
+.intv10-mem-scroll { overflow-x: hidden; padding-right: 6px; }
+.intv4-memory[data-scroll="1"] .intv10-mem-scroll { max-height: 268px; overflow-y: auto; }
 /* Sin desbordamiento no hay barra ni hueco reservado: `max-height` sólo actúa
    cuando de verdad sobra contenido. */
 .intv10-mem-scroll > .intcc-tl-list { margin-bottom: 0; }
@@ -26443,20 +26479,23 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
     flex: 1 1 auto;
     min-height: 0;               /* sin esto, flex ignora el overflow del hijo */
     max-height: none;            /* la card ya pone el techo — sobra uno fijo */
+    /* El techo lo pone la FILA de la rejilla, de modo que un desbordamiento aquí
+       es real — el scroll no reserva altura, la hereda. */
+    overflow-y: auto;
   }
 }
 
 @media (max-width: 1023px) {
   /* Táctil: scroll natural, sin barra invasiva, y algo menos de alto porque la
      card comparte pantalla en vertical. */
-  .intv10-mem-scroll { max-height: 232px; -webkit-overflow-scrolling: touch; }
+  .intv4-memory[data-scroll="1"] .intv10-mem-scroll { max-height: 232px; -webkit-overflow-scrolling: touch; }
   .intv10-mem-scroll::-webkit-scrollbar { width: 0; }
   .intv10-mem-scroll { scrollbar-width: none; }
 }
 @media (max-width: 640px) {
   /* En móvil el orbe vive en su propia card, así que no hay corredor que reservar. */
   .aurix-intv6 { --intel-orb-overlap: 0px; --intel-orb-gap: 0px; }
-  .intv10-mem-scroll { max-height: 260px; }
+  .intv4-memory[data-scroll="1"] .intv10-mem-scroll { max-height: 260px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -26502,27 +26541,34 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   @keyframes intv11DockIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   SPEC CIERRE · §7 — EL HUECO DEL HERO ERA UNA RESERVA HUÉRFANA
+   ════════════════════════════════════════════════════════════════════════════
+   `min-height: 228px` existía para reservar la altura de la QUESTION DOCK dentro
+   del cuerpo del hero, de modo que aparecer o desaparecer la pregunta no moviera
+   Salud, Radar ni Factores. Pero la dock SALIÓ del hero a su propia card
+   (`.intv12-qcard`) y el `min-height` se quedó: medido sobre la captura real a
+   1440px, el cuerpo medía 228px para 123px de contenido — 105px de espacio muerto
+   en TODA cuenta, y encima el reserve no podía evitar ningún salto, porque lo que
+   aparece y desaparece ahora es una card entera por encima del radar.
+   Eso es exactamente lo que §7 llama «la card queda visualmente abandonada».
+   Se retira la reserva y el bloque de texto se CENTRA verticalmente, que es la
+   misma solución que INT.07 aplicó al resto de las cards: el contenido que ya
+   existe respira en la altura que la fila le da, y no se inventa nada para
+   rellenar. La altura del hero la fijan ahora sus dos piezas reales —el donut de
+   Salud y la esfera—, no un hueco reservado para algo que vive en otro sitio. */
 @media (min-width: 1024px) {
-  /* Altura estable del hero, y conviene ser EXACTO sobre su alcance: `min-height`
-     es un SUELO, así que garantiza que no haya salto mientras el bloque de texto
-     quepa dentro —el caso normal y el de la captura de producción: titular de una
-     o dos líneas y hasta cuatro señales—. Con un titular de tres líneas Y cuatro
-     señales envueltas el cuerpo puede superarlo y entonces el hero sí crece con la
-     dock. No se fuerza un techo porque eso exigiría recortar contenido, que está
-     prohibido. El único instante en que un desplazamiento es perceptible es justo
-     al responder la última pregunta. */
-  .intcc-hero-body { min-height: 228px; }
+  .intcc-hero-body { justify-content: center; }
   /* Las señales admiten 2–4 sin romper: envuelven en su propio espacio y nunca
      alcanzan el corredor de la esfera. */
   .intcc-hero .intcc-chips { flex-wrap: wrap; row-gap: 6px; }
 }
 @media (max-width: 1023px) and (min-width: 641px) {
-  .intcc-hero-body { min-height: 216px; }
+  .intcc-hero-body { justify-content: center; }
 }
 @media (max-width: 640px) {
   /* En móvil la esfera vive en su propia card, así que la dock no compite con ella
      por el espacio: ocupa el ancho completo y no se reserva altura. */
-  .intcc-hero-body { min-height: 0; }
   .intv11-dock { margin-top: 12px; padding: 12px; }
   .intv11-dock .intv8-intel-q-text { font-size: 12.5px; }
 }
