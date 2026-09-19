@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '692'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '693'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -37605,9 +37605,14 @@ function _aurixComputePeriodReturn(range, first, last) {
 // Reconciles the PUBLISHED return of every range against the flow-neutral certification equation. Pure READ:
 // it calls buildProductionPortfolioChart(range) and inspects its output — it NEVER mutates state and NEVER
 // touches rendering / hydration / repaint / segmentation / FRC / merge / gap detection / LTTB / pricing /
-// Supabase. Every visible consumer (displayed %, tooltip %, badge %, desktop, mobile) reads the SAME
-// out.returnPct (out.returnPct === out.lineReturnPct === out.badgeReturnPct at the single owner), so certifying
-// that value certifies all consumers. Certification per range:
+// Supabase. Every visible consumer of the PERIOD RETURN (the displayed %, the badge %, desktop and mobile)
+// reads the SAME out.returnPct (out.returnPct === out.badgeReturnPct at the single owner), so certifying that
+// value certifies them. CORRECTION (SPEC CHART-TOOLTIP-METRIC-COHERENCE): this paragraph used to list the
+// TOOLTIPS among those consumers and to equate out.lineReturnPct with them. Both claims were false — the
+// tooltips computed their own unlabelled figure, so this certification never covered them, and
+// out.lineReturnPct is GROSS wealth growth, DIAGNOSTIC ONLY, deliberately ≠ out.returnPct whenever the
+// window has capital flows. The tooltips now publish no % at all, which is what makes the claim above
+// true today. Certification per range:
 //   equation:  baselineValue + marketPnl(returnValue) + externalCashflows(netFlows) == currentValue
 //   published% == flow-neutral market return == (currentValue − baselineValue − externalCashflows)/baselineValue×100
 // The ±0.05% neutral dead-band affects COLOR ONLY — never the numeric percentage (returnPct is the exact value).
@@ -45884,10 +45889,11 @@ function _wscAttachTooltip(plot, model) {
   const cur   = document.createElement('div'); cur.className   = 'wsc-cursor';
   const tip   = document.createElement('div'); tip.className   = 'wsc-tip';
   plot.appendChild(hairV); plot.appendChild(hairH); plot.appendChild(cur); plot.appendChild(tip);
-  const pf = _dshFmtPct(Number.isFinite(model.deltaPct) ? model.deltaPct : 0);
-  const rangeLabel = ({ '24h': '24H', '7d': '7D', '30d': '30D', '1y': '1A', all: 'TOTAL' })[model.range] || '';
+  // SPEC CHART-TOOLTIP-METRIC-COHERENCE — see _aurixMobInspectorUpdate. This surface printed the RANGE
+  // return (model.deltaPct, resolved ONCE outside `move`) on EVERY hovered point, so one number read as if
+  // it belonged to each date, and it disagreed with what the mobile tooltip showed for the same point. The
+  // badge owns the period return; a point publishes value + timestamp. Desktop and mobile now agree.
   const showTime = model.range === '24h' || model.range === '7d';
-  const chgTone = model.deltaPct > 0.005 ? 'pos' : model.deltaPct < -0.005 ? 'neg' : '';
   const sx = model.sampleX, sy = model.sampleY, sv = model.sampleVal, st = model.sampleTs, N = model.n;
   const move = (e) => {
     const r = plot.getBoundingClientRect();
@@ -45925,8 +45931,7 @@ function _wscAttachTooltip(plot, model) {
     tip.innerHTML =
       `<span class="wsc-tip-date">${dateStr}</span>${timeStr}` +
       `<span class="wsc-tip-lbl">${t('chartTipValue')}</span>` +
-      `<span class="wsc-tip-v">${formatBase(val)}</span>` +
-      `<span class="wsc-tip-chg ${chgTone}">${rangeLabel} ${pf.text}</span>`;
+      `<span class="wsc-tip-v">${formatBase(val)}</span>`;
     // RC4-A — premium placement (shared helper): centered above the marker so it NEVER covers
     // the active point; flips below only if there's no room above; always inside the card.
     const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 64;
@@ -45952,11 +45957,11 @@ function _wscAttachTooltipInstitutional(plot, model) {
   const cur = document.createElement('div'); cur.className = 'wsc-cursor';
   const tip = document.createElement('div'); tip.className = 'wsc-tip';
   plot.appendChild(hairV); plot.appendChild(hairH); plot.appendChild(cur); plot.appendChild(tip);
-  const pf = _dshFmtPct(Number.isFinite(model.deltaPct) ? model.deltaPct : 0);
+  // SPEC CHART-TOOLTIP-METRIC-COHERENCE — see _aurixMobInspectorUpdate. rangeLabel stays: it NAMES the
+  // hovered range inside the aria-label, it is not a return. The per-point % is gone (the badge owns it).
   const rangeLabel = ({ '24h': '24H', '7d': '7D', '30d': '30D', '1y': '1A', all: 'TOTAL' })[model.range] || '';
   // SPEC.34 range-aware date/time: 24H/7D/30D show time; 1Y/ALL are date-focused.
   const showTime = model.range === '24h' || model.range === '7d' || model.range === '30d';
-  const chgTone = model.deltaPct > 0.005 ? 'pos' : model.deltaPct < -0.005 ? 'neg' : '';
   const W = (typeof _WSC_VIEW_W === 'number') ? _WSC_VIEW_W : 1000, H = (typeof _WSC_VIEW_H === 'number') ? _WSC_VIEW_H : 240;
   // build the REAL-point set once (cached for this attach; a repaint re-attaches with a fresh series/hash).
   const pts = new Array(N);
@@ -45979,8 +45984,7 @@ function _wscAttachTooltipInstitutional(plot, model) {
     tip.innerHTML =
       `<span class="wsc-tip-date">${dateStr}</span>${timeStr}` +
       `<span class="wsc-tip-lbl">${t('chartTipValue')}</span>` +
-      `<span class="wsc-tip-v">${formatBase(res.pointValue)}</span>` +
-      `<span class="wsc-tip-chg ${chgTone}">${rangeLabel} ${pf.text}</span>`;
+      `<span class="wsc-tip-v">${formatBase(res.pointValue)}</span>`;
     const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 64;
     const pl = _aurixPlaceTooltip(px, py, tw, th, r.width, r.height, _AURIX_TOOLTIP_MARGIN_DESKTOP, false);
     tip.style.left = `${pl.tx}px`; tip.style.top = `${pl.ty}px`; tip.style.transform = 'none';
@@ -48131,13 +48135,14 @@ function _aurixMobInspectorUpdate(clientX) {
     const lxPct = (vpt.x / VBW) * 100, lyPct = (vpt.y / VBH) * 100;
     n.hair.style.left = lxPct.toFixed(3) + '%';
     n.cur.style.left = lxPct.toFixed(3) + '%'; n.cur.style.top = lyPct.toFixed(3) + '%';
-    // Fase 3 — tooltip from REAL values only: value (protagonist) · date · time · % from start.
-    let pctTxt = '', tone = '';
-    const v0 = pts[0].v;
-    // SPEC CHART-INTEGRITY.LB-2 — withhold the per-point return % while publication is not ready (hydration
-    // in progress), matching the badge; the value + date (factual line data) still show (LINE ⊥ RETURN).
-    const _pubReadyTip = (typeof _aurixReturnPublishReadyNow !== 'function') || _aurixReturnPublishReadyNow();
-    if (_pubReadyTip && typeof v0 === 'number' && v0 !== 0 && typeof p.v === 'number') { const pc = ((p.v - v0) / Math.abs(v0)) * 100; tone = pc > 0.005 ? 'pos' : pc < -0.005 ? 'neg' : ''; pctTxt = (pc > 0 ? '+' : '') + pc.toFixed(2) + '%'; }
+    // SPEC CHART-TOOLTIP-METRIC-COHERENCE — a POINT publishes what the portfolio was WORTH and WHEN; it
+    // does NOT publish a return. The figure removed here was ((p.v - pts[0].v) / |pts[0].v|) * 100: GROSS
+    // wealth change against the first RENDERED point, capital flows NOT neutralized — a different metric
+    // from the badge's flow-neutral return, printed unlabelled and carrying the badge's own authority (it
+    // shared the _aurixReturnPublishReadyNow gate), so on a window with a withdrawal the point read
+    // negative while the badge correctly read positive. One surface may not publish two metrics under one
+    // meaning. The badge stays the SINGLE owner of the period return (_aurixComputePeriodReturn).
+    // Presentation only: no formula, ledger, timestamp, geometry, continuity or colour is touched.
     let dateStr = '', timeStr = '';
     try {
       const dt = new Date(p.t);
@@ -48145,7 +48150,7 @@ function _aurixMobInspectorUpdate(clientX) {
       if (_aurixMobChartMeta && (_aurixMobChartMeta.range === '24h' || _aurixMobChartMeta.range === '7d')) timeStr = '<span class="mob-tip-time">' + dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</span>';
     } catch (_) {}
     const valStr = (typeof formatBase === 'function') ? formatBase(p.v) : String(Math.round(p.v));
-    n.tip.innerHTML = '<span class="mob-tip-v">' + valStr + '</span><span class="mob-tip-date">' + dateStr + '</span>' + timeStr + (pctTxt ? '<span class="mob-tip-chg ' + tone + '">' + pctTxt + '</span>' : '');
+    n.tip.innerHTML = '<span class="mob-tip-v">' + valStr + '</span><span class="mob-tip-date">' + dateStr + '</span>' + timeStr;
     // RC4-A — premium placement: centered above the point (off the finger), flips below only
     // if needed; never covers the active point; clamped inside. Configurable margin.
     const tw = n.tip.offsetWidth || 116, th = n.tip.offsetHeight || 54;

@@ -92,7 +92,128 @@ ok('C1 buildProductionPortfolioChart assigns ONE value to returnPct/lineReturnPc
 ok('C2 exactly one flow-neutral engine (_aurixComputePeriodReturn)', (app.match(/function _aurixComputePeriodReturn\(/g) || []).length === 1);
 ok('C3 badge painter reads emg.badgeReturnPct (not a re-computation)', /badgeReturnPct/.test(app) && /_aurixResolveChartReturnContract|_aurixEmergencyPaintBadgeNode/.test(app));
 ok('C4 published 24H partial return also guarded by partial24hPublished (not overwritten by full-range per)', /if \(!out\.partial24hPublished\) \{[\s\S]{0,160}out\.returnPct = per\.returnPct/.test(app));
-ok('C5 no consumer recomputes a second period-return number for the badge (single owner)', (app.match(/neutralDelta \/ startV/g) || []).length === 1);
+ok('C5a single flow-neutral OWNER expression in the codebase', (app.match(/neutralDelta \/ startV/g) || []).length === 1);
+
+// ── C5 (BEHAVIOURAL) — SPEC CHART-TOOLTIP-METRIC-COHERENCE ───────────────────────────────────────────
+// The former C5 was exactly the line above and nothing else. It counted occurrences of the OWNER's
+// expression, so it could only ever see the owner. The two tooltips published `(p.v - v0)/|v0|` (mobile)
+// and `model.deltaPct` repeated on every point (desktop) — different expressions — so the assert was
+// structurally blind to the very defect it was named after. This block RUNS the real consumers against
+// fixtures A–D across every range and both surfaces and asserts what the user actually sees.
+// Each case asserts BOTH that the tooltip really rendered (its value string is present) AND that it
+// publishes no percentage: a broken stub that renders nothing would otherwise pass silently.
+// (Lesson AURIX-HARNESS: never certify against an empty surface.)
+function fakeEl() {
+  return {
+    className: '', id: '', innerHTML: '', style: {}, children: [], attrs: {}, _l: {},
+    offsetWidth: 120, offsetHeight: 64,
+    appendChild(c) { this.children.push(c); return c; },
+    setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k]; },
+    removeAttribute(k) { delete this.attrs[k]; }, hasAttribute(k) { return k in this.attrs; },
+    classList: { add() {}, remove() {} },
+    addEventListener(t, fn) { (this._l[t] = this._l[t] || []).push(fn); },
+    getBoundingClientRect() { return { left: 0, top: 0, width: 1000, height: 260 }; },
+    querySelector() { return null; },
+  };
+}
+// Only genuinely EXTERNAL things are stubbed: the DOM, locale money formatting, i18n, rAF, the reduced-
+// motion media query. None of them can introduce a '%' — the tooltip body is the only thing that could.
+function makeTipCtx(institutional, created) {
+  const c = {
+    console: { log() {} }, Math, JSON, Object, Number, String, Boolean, Array, isFinite, Date,
+    document: { createElement: () => { const e = fakeEl(); created.push(e); return e; }, getElementById: () => null },
+    formatBase: (v) => '$' + Number(v).toFixed(2),
+    t: () => 'Valor cartera',
+    _dshReducedMotion: () => false,
+    requestAnimationFrame: (fn) => fn(),
+  };
+  vm.createContext(c);
+  ['_AURIX_TOOLTIP_MARGIN_DESKTOP', '_AURIX_TOOLTIP_MARGIN_MOBILE', '_WSC_VIEW_W', '_WSC_VIEW_H',
+   '_AURIX_INTERACTION_MAX_SNAP_PX'].forEach(k => vm.runInContext(konstSrc(k), c));
+  // flag ABSENT ⇒ _instOn false ⇒ the v514 fallback body of _wscAttachTooltip runs.
+  if (institutional) vm.runInContext(konstSrc('_AURIX_CHART_INSTITUTIONAL_INTERACTION'), c);
+  ['_aurixPlaceTooltip', '_aurixVisualPointAtX', '_aurixResolveChartInteraction',
+   '_aurixMobInspectorUpdate', '_wscAttachTooltipInstitutional', '_wscAttachTooltip'].forEach(f => vm.runInContext(fnSrc(f), c));
+  return c;
+}
+function seriesOf(fx) {
+  const n = 4, out = [];
+  for (let i = 0; i < n; i++) out.push({ t: T + (spanOf['30d'] / (n - 1)) * i, v: fx.first + ((fx.last - fx.first) / (n - 1)) * i });
+  return out;
+}
+// LIVE mobile surface: the long-press inspector.
+function mobileTipHtml(range, pts) {
+  const created = [], c = makeTipCtx(true, created);
+  const tip = fakeEl(), area = fakeEl();
+  c._aurixMobInspectorActive = true;
+  c._aurixMobChartVisual = null;
+  c._aurixMobChartMeta = { range: range, deltaPct: 0, up: true };
+  c._aurixMobChartPts = pts.map((p, i) => ({ t: p.t, v: p.v, x: i * (1000 / (pts.length - 1)), y: 100 }));
+  c._aurixMobInspectorNodes = () => ({ area: area, hair: fakeEl(), cur: fakeEl(), tip: tip });
+  vm.runInContext('_aurixMobInspectorUpdate', c)(999);   // finger far right ⇒ nearest REAL point = last
+  return tip.innerHTML;
+}
+// Desktop: institutional=true is the LIVE path (_AURIX_CHART_INSTITUTIONAL_INTERACTION === true in app.js);
+// institutional=false exercises the v514 fallback body that runs if the live one throws.
+function desktopTipHtml(range, pts, deltaPct, institutional) {
+  const created = [], c = makeTipCtx(institutional, created);
+  const plot = fakeEl();
+  const model = {
+    sampleX: pts.map((p, i) => i * (1000 / (pts.length - 1))),
+    sampleY: pts.map(() => 100), sampleVal: pts.map(p => p.v), sampleTs: pts.map(p => p.t),
+    n: pts.length, deltaPct: deltaPct, range: range, snapToPoint: true,
+  };
+  vm.runInContext('_wscAttachTooltip', c)(plot, model);
+  const tip = created[3];                                 // hairV, hairH, cur, tip
+  if (institutional) (plot._l.keydown || []).forEach(fn => fn({ key: 'ArrowLeft', preventDefault() {} }));   // ⇒ last point
+  else (plot._l.pointermove || []).forEach(fn => fn({ clientX: 999 }));
+  return tip.innerHTML;
+}
+
+const FIX = [
+  { id: 'A  no flows      100→110', first: 100, last: 110, flows: [], badge: 10 },
+  { id: 'B  withdrawal-30 100→80 ', first: 100, last: 80, flows: [{ ts: T + HOUR, amountUSD: -30 }], badge: 10, gross: -20 },
+  { id: 'C  deposit+30    100→120', first: 100, last: 120, flows: [{ ts: T + HOUR, amountUSD: 30 }], badge: -10, gross: 20 },
+];
+
+console.log('\nFixtures A–C — the BADGE is the single owner of the period return:');
+FIX.forEach(fx => {
+  FLOWS = fx.flows;
+  const res = CPR('30d', { ts: T, value: fx.first }, { ts: T + spanOf['30d'], value: fx.last });
+  const grossTxt = (fx.gross != null) ? ' (gross ' + fx.gross + '%)' : '';
+  ok('badge ' + fx.id + ' → flow-neutral ' + fx.badge + '%' + grossTxt,
+    res.returnState === 'ok' && Math.abs(res.returnPct - fx.badge) <= 0.0001, 'got ' + res.returnPct + ' state=' + res.returnState);
+});
+
+console.log('\nFixture D — nothing published when the return is not certifiable:');
+{ FLOWS = []; const d1 = CPR('30d', { ts: T, value: 0.5 }, { ts: T + spanOf['30d'], value: 900 });
+  ok('D1 baseline below floor → no % published', d1.returnState !== 'ok' && d1.returnPct === null, d1.returnState);
+  const d2 = CPR('30d', { ts: T, value: 100 }, { ts: T + spanOf['30d'], value: 500 });   // +400% > 80 sane band
+  ok('D2 unrecorded/incomplete capital → no % published', d2.returnState !== 'ok' && d2.returnPct === null, d2.returnState);
+  FLOWS = []; }
+
+console.log('\nC5 BEHAVIOUR — every tooltip consumer, every range, both surfaces: value + date, never a %:');
+const SURFACES = [
+  ['mobile  (inspector, LIVE)', (r, pts, d) => mobileTipHtml(r, pts)],
+  ['desktop (institutional, LIVE)', (r, pts, d) => desktopTipHtml(r, pts, d, true)],
+  ['desktop (v514 fallback)', (r, pts, d) => desktopTipHtml(r, pts, d, false)],
+];
+FIX.forEach(fx => {
+  const pts = seriesOf(fx);
+  const vstr = '$' + Number(pts[pts.length - 1].v).toFixed(2);
+  RANGES.forEach(r => {
+    SURFACES.forEach(([sname, fn]) => {
+      let html = null, err = null;
+      try { html = fn(r, pts, fx.badge); } catch (e) { err = (e && e.message) || String(e); }
+      const lbl = 'C5 ' + fx.id + ' · ' + r.padEnd(4) + ' · ' + sname;
+      ok(lbl + ' → rendered the REAL point value ' + vstr, !err && typeof html === 'string' && html.indexOf(vstr) >= 0, err || ('html=' + html));
+      ok(lbl + ' → publishes NO percentage', !err && typeof html === 'string' && html.indexOf('%') < 0, err || ('html=' + html));
+    });
+  });
+});
+console.log('\nC5 negative control — the harness can actually SEE a percentage when one is present:');
+{ const probe = '<span class="mob-tip-v">$80.00</span><span class="mob-tip-chg neg">-20.00%</span>';
+  ok('C5z a tooltip carrying a % WOULD fail the assert above', probe.indexOf('%') >= 0); }
 
 console.log('\nShipped read-only certifier (additive; frozen engine):');
 ok('S1 spec marker present', /MULTI_RANGE_FINANCIAL_CERTIFICATION/.test(app));

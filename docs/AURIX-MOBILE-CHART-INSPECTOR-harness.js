@@ -82,7 +82,12 @@ console.log('\nEXECUTION — selection / cursor / tooltip / placement (real rend
 { const env = makeEnv(); setPtsAndUpdate(env, 150);
   const tipHtml = env.reg['mobChartTip']._html;
   ck('4. tooltip value = exact REAL point value ($10250)', tipHtml.indexOf('$10250') > -1 && /mob-tip-v/.test(tipHtml));
-  ck('4b. tooltip % computed from REAL start value (no fabrication)', /mob-tip-chg/.test(tipHtml) && (tipHtml.indexOf('+2.50%') > -1)); /* (10250-10000)/10000 */ }
+  // 4b — SPEC CHART-TOOLTIP-METRIC-COHERENCE. This assert used to REQUIRE the tooltip to publish
+  // (10250-10000)/10000 = +2.50%: GROSS wealth change against the first RENDERED point, with capital
+  // flows NOT neutralized. That is not a return, and on any window with flows it contradicted the badge
+  // (the flow-neutral owner) on the very same point. Demanding it fossilised the defect as the contract.
+  // A point now publishes what the portfolio was WORTH and WHEN; the badge owns the period return.
+  ck('4b. tooltip publishes NO percentage (badge is the single owner of the return)', !/mob-tip-chg/.test(tipHtml) && tipHtml.indexOf('%') < 0, tipHtml); }
 
 // 5. tooltip value is ALWAYS one of the real points (sweep) — never an interpolated value
 { const env = makeEnv(); let allReal = true;

@@ -4,9 +4,19 @@
 // ════════════════════════════════════════════════════════════════════════════
 // The badge painter was gated by LB-2 but the two hover tooltips (desktop updateChartTooltip, mobile
 // _aurixMobInspectorUpdate) computed a per-point return % straight from the plotted (possibly pre-merge)
-// series — leaking a pre-reconciliation number while the badge shows "Calculando…". This certifies:
+// series — leaking a pre-reconciliation number while the badge shows "Calculando…".
+//
+// SUPERSEDED FOR THE MOBILE SURFACE (SPEC CHART-TOOLTIP-METRIC-COHERENCE). Gating that per-point figure
+// was treating it as a return; it never was one — it was GROSS wealth change vs the first rendered point,
+// with capital flows NOT neutralized, i.e. a different metric wearing the badge's authority. Asserts 8/9
+// used to require that the figure EXIST and be gated, which fossilised the defect as the contract. The
+// mobile tooltip now publishes no percentage at all, which is strictly stronger than gating one.
+// `updateChartTooltip` (asserts 6/7) is left exactly as it was: it is an INERT route — `.hero-right
+// .chart-wrap` is `display:none` at ≥769px (styles.css) and `AURIX_MOBILE_SAFE` (≤768px) never calls
+// `initChart()` — so it has no reachable surface and is out of this intervention's scope. This certifies:
 //   • _aurixReturnPublishReadyNow mirrors the badge readiness (false while backend enabled + idle/loading/failed).
-//   • both tooltip functions consult it before emitting a %.
+//   • the inert desktop route still consults it before emitting a %.
+//   • the LIVE mobile tooltip emits no % at all, and still shows value + date.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 function fnSrc(name){ const s='function '+name+'('; const i=app.indexOf(s); if(i<0) throw new Error('missing '+name);
@@ -34,13 +44,15 @@ ok('3 backend enabled + failed ⇒ NOT ready', ready(true,'failed')===false);
 ok('4 backend enabled + ready ⇒ ready', ready(true,'ready')===true);
 ok('5 backend disabled ⇒ ready regardless of state', ready(false,'loading')===true);
 
-console.log('\nBoth tooltip functions consult the gate before emitting a %:');
+console.log('\nInert desktop route still gated; LIVE mobile tooltip publishes no % at all:');
 const desk = fnSrc('updateChartTooltip');
 const mob = fnSrc('_aurixMobInspectorUpdate');
 ok('6 desktop updateChartTooltip references _aurixReturnPublishReadyNow', desk.indexOf('_aurixReturnPublishReadyNow') >= 0);
 ok('7 desktop withholds % (valText = \'—\') when not ready', /!_aurixReturnPublishReadyNow\(\)/.test(desk) && /valText\s*=\s*'—'/.test(desk));
-ok('8 mobile _aurixMobInspectorUpdate references _aurixReturnPublishReadyNow', mob.indexOf('_aurixReturnPublishReadyNow') >= 0);
-ok('9 mobile guards pctTxt with the readiness predicate', /_pubReadyTip\s*&&/.test(mob));
+// 8/9 — the mobile tooltip must not publish a percentage under ANY readiness state. Scoped to the tooltip
+// CONTENT: a bare '%' scan would false-fail on `lxPct.toFixed(3) + '%'`, which is CSS geometry, not a metric.
+ok('8 mobile tooltip publishes NO return % (no pctTxt / no .mob-tip-chg span)', !/pctTxt/.test(mob) && !/mob-tip-chg/.test(mob));
+ok('9 mobile computes no per-point figure ((p.v - v0)/v0 and its readiness guard both gone)', !/p\.v\s*-\s*v0/.test(mob) && !/_pubReadyTip/.test(mob));
 ok('10 mobile still shows value + date (LINE ⊥ RETURN preserved)', mob.indexOf('mob-tip-v') >= 0 && mob.indexOf('mob-tip-date') >= 0);
 
 console.log('\n' + (fail? ('FAIL — '+pass+' passed, '+fail+' failed') : ('PASS — '+pass+' passed, 0 failed  —  TOOLTIP GATE CERTIFIED ✓')));
