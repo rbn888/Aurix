@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '693'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '694'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5731,8 +5731,11 @@ const T = {
     // INT.PREVIEW.V1 — Intelligence Preview (FREE). Only facts certified as publishable
     // TODAY: single-position concentration, liquidity weight and ONE allowed watch area.
     // No health score, no attribution, no cause, no price, no checkout.
-    intprev_badge:      'Inteligencia · tu cartera',
-    intprev_title:      'Esto es lo que Aurix ya entiende de tu patrimonio',
+    intprev_badge:      'AURIX INTELLIGENCE',
+    intprev_title:      'Entiende qué está moviendo tu patrimonio',
+    intprev_sub:        'Aurix analiza su estructura, detecta concentraciones y cambios relevantes y los convierte en una lectura clara.',
+    intprev_bridge:     'Esto es solo una primera lectura',
+    intprev_bridge_b:   'Descubre cómo está construido tu patrimonio, cómo evoluciona y qué merece tu atención.',
     // §1 — SIN la palabra «invertible». Es la copy que la SPEC fija para esta
     // portada, y sólo para ella: las dos claves son EXCLUSIVAS del preview (no las
     // lee ninguna otra superficie), así que ningún otro sitio cambia de lenguaje.
@@ -5743,20 +5746,11 @@ const T = {
     // el análisis completo, que es donde vive el desglose.
     intprev_f_conc:     (pct, name) => `El ${pct}% de tu patrimonio depende de ${name}.`,
     intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu patrimonio.`,
-    intprev_q_conc:     '¿Cómo ha cambiado esta concentración en el tiempo?',
-    intprev_q_liq:      '¿Cómo ha evolucionado este peso de liquidez?',
-    intprev_q_watch:    '¿Desde cuándo se comporta así, y qué lo ha movido?',
     // §1 — los bloqueados no revelan NADA: ni título, ni categoría, ni cifra, ni
     // activo, ni juicio. Sólo CUÁNTOS hay, que es verificable y no es una promesa.
     // Y sin la palabra «Premium» en ningún sitio visible antes del clic.
-    intprev_locked_n:   n => n === 1
-      ? 'Aurix ha encontrado 1 análisis más sobre tu patrimonio.'
-      : `Aurix ha encontrado ${n} análisis más sobre tu patrimonio.`,
-    intprev_locked_aria: 'Análisis todavía sin desbloquear',
-    intprev_q_label:    'La pregunta siguiente',
-    intprev_q:          '¿Cómo ha cambiado esta exposición en el tiempo?',
     intprev_cta:        'Volver al Dashboard',
-    intprev_cta_full:   'Ver el análisis completo',
+    intprev_cta_full:   'Ver mi análisis completo',
     intprev_hold_empty_t: 'Aurix todavía no tiene con qué leer tu patrimonio',
     intprev_hold_empty_b: 'Registra tu primer activo y esta lectura aparecerá aquí, calculada sobre tus datos reales.',
     intprev_hold_inc_t:   'Aurix no puede confirmar ahora la valoración completa de tu cartera',
@@ -6043,18 +6037,25 @@ const T = {
     // El beneficio Premium nombra lo que EXISTE construido —presupuesto, cobros,
     // diario, precios, objetivos y escenarios— y nada más. Ni una promesa de algo
     // que no esté implementado, ni un precio: eso es del paywall.
-    wsfc_eyebrow:      'Workspace',
-    wsfc_title:        'Organiza, calcula y planifica tu patrimonio',
-    wsfc_sub:          'Herramientas y plantillas para trabajar tus números con criterio, no de memoria.',
-    wsfc_included:     'Incluido',
+    wsfc_eyebrow:      'WORKSPACE',
+    wsfc_title:        'Planifica tus próximos pasos con claridad',
+    wsfc_sub:          'Herramientas y plantillas para calcular escenarios, ordenar tus finanzas y convertir decisiones en planes.',
+    wsfc_free_label:   'Empieza ahora',
     wsfc_n_compound:   'Interés compuesto',
-    wsfc_d_compound:   'Cuánto puede crecer tu capital con una aportación constante.',
+    wsfc_d_compound:   'Proyecta cómo puede crecer tu capital.',
     wsfc_ico_compound: '∑',
     wsfc_n_realestate: 'Portfolio inmobiliario',
-    wsfc_d_realestate: 'Tus inmuebles, su deuda y lo que rinden de verdad.',
+    wsfc_d_realestate: 'Controla tus inmuebles, su deuda y su rentabilidad.',
     wsfc_ico_realestate: '⌂',
-    wsfc_premium_label: 'Con Premium',
-    wsfc_cta:          'Ver Workspace completo',
+    wsfc_open:         'Abrir',
+    wsfc_disc_label:   'Todo lo que puedes hacer en Workspace',
+    wsfc_c_loans:      'Simula préstamos',
+    wsfc_c_scenarios:  'Compara escenarios',
+    wsfc_c_budget:     'Controla tu presupuesto',
+    wsfc_c_receivables:'Organiza tus cobros',
+    wsfc_c_goals:      'Define objetivos',
+    wsfc_c_journal:    'Registra tus operaciones',
+    wsfc_cta:          'Descubrir Workspace completo',
     // La espera mientras el servidor resuelve el plan. No afirma NADA del plan.
     wsfc_pending:      'Preparando tu espacio de trabajo…',
     ws_sync_idle:         'Sin cambios sin guardar',
@@ -8411,23 +8412,17 @@ const T = {
     // INT.PREVIEW.V1 — Intelligence Preview (FREE). Only facts certified as publishable
     // TODAY: single-position concentration, liquidity weight and ONE allowed watch area.
     // No health score, no attribution, no cause, no price, no checkout.
-    intprev_badge:      'Intelligence · your portfolio',
-    intprev_title:      'This is what Aurix already understands about your wealth',
+    intprev_badge:      'AURIX INTELLIGENCE',
+    intprev_title:      'Understand what’s driving your wealth',
+    intprev_sub:        'Aurix analyzes its structure, detects concentrations and meaningful changes, and turns them into a clear view.',
+    intprev_bridge:     'This is only a first look',
+    intprev_bridge_b:   'See how your wealth is built, how it is evolving, and what deserves your attention.',
     // §1 — the natural equivalent WITHOUT «investable» (see the ES note: same
     // trade-off, same reason, and these two keys are preview-only).
     intprev_f_conc:     (pct, name) => `${pct}% of your wealth depends on ${name}.`,
     intprev_f_liq:      pct => `Liquidity represents ${pct}% of your wealth.`,
-    intprev_q_conc:     'How has this concentration changed over time?',
-    intprev_q_liq:      'How has this cash weight evolved?',
-    intprev_q_watch:    'Since when has it behaved like this, and what moved it?',
-    intprev_locked_n:   n => n === 1
-      ? 'Aurix has found 1 more reading of your wealth.'
-      : `Aurix has found ${n} more readings of your wealth.`,
-    intprev_locked_aria: 'Analysis not unlocked yet',
-    intprev_q_label:    'The next question',
-    intprev_q:          'How has this exposure changed over time?',
     intprev_cta:        'Back to Dashboard',
-    intprev_cta_full:   'See the full analysis',
+    intprev_cta_full:   'View my full analysis',
     intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
     intprev_hold_empty_b: 'Add your first asset and this reading will appear here, computed on your real data.',
     intprev_hold_inc_t:   'Aurix cannot confirm a complete valuation of your portfolio right now',
@@ -8692,18 +8687,25 @@ const T = {
     wsback_templates:     'Back to Templates',
     wsback_space:         'Back to My space',
     wstool_back:          'Back to Tools',
-    wsfc_eyebrow:      'Workspace',
-    wsfc_title:        'Organise, calculate and plan your wealth',
-    wsfc_sub:          'Tools and templates to work through your numbers with method, not from memory.',
-    wsfc_included:     'Included',
+    wsfc_eyebrow:      'WORKSPACE',
+    wsfc_title:        'Plan your next steps with clarity',
+    wsfc_sub:          'Tools and templates to model scenarios, organize your finances, and turn decisions into plans.',
+    wsfc_free_label:   'Start now',
     wsfc_n_compound:   'Compound interest',
-    wsfc_d_compound:   'How far your capital can grow with a steady contribution.',
+    wsfc_d_compound:   'Project how your capital can grow.',
     wsfc_ico_compound: '∑',
     wsfc_n_realestate: 'Property portfolio',
-    wsfc_d_realestate: 'Your properties, their debt and what they actually yield.',
+    wsfc_d_realestate: 'Track your properties, their debt and their return.',
     wsfc_ico_realestate: '⌂',
-    wsfc_premium_label: 'With Premium',
-    wsfc_cta:          'See the full Workspace',
+    wsfc_open:         'Open',
+    wsfc_disc_label:   'Everything you can do in Workspace',
+    wsfc_c_loans:      'Simulate loans',
+    wsfc_c_scenarios:  'Compare scenarios',
+    wsfc_c_budget:     'Control your budget',
+    wsfc_c_receivables:'Organize receivables',
+    wsfc_c_goals:      'Set goals',
+    wsfc_c_journal:    'Record transactions',
+    wsfc_cta:          'Explore the full Workspace',
     wsfc_pending:      'Preparing your workspace…',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
@@ -24085,46 +24087,63 @@ function _renderWorkspaceFreeCover() {
       })
       .filter(Boolean);
   } catch (_) { freeItems = []; }
-  // ── LO QUE PREMIUM AÑADE SE LEE DEL CATÁLOGO, NO SE ESCRIBE AQUÍ ───────────
-  // Era una frase fija, y nombraba «seguimiento de precios» —una capacidad INTERNA—.
-  // Prometer en la portada de venta algo que el producto no publica es la forma más
-  // barata de mentir, y sobrevive a cualquier cambio de catálogo porque nadie
-  // vuelve a leer la cadena. Ahora la lista son las entradas PUBLICADAS de tier
-  // premium, con su nombre real: si algo deja de publicarse, desaparece de aquí.
-  let premItems = [];
-  try {
-    premItems = _WS_CATALOG
-      .filter(e => e.published === true && e.commercialTier === 'premium' && e.featureKey)
-      .map(e => { const r = _WS_TOOL_RENDER[e.id] || _WS_TPL_RENDER[e.id] || null;
-                  return (r && r.nameKey) ? t(r.nameKey) : null; })
-      .filter(Boolean);
-  } catch (_) { premItems = []; }
-  const card = it => `
+  // ── LA RETAHÍLA DE «CON PREMIUM» SE RETIRA ────────────────────────────────
+  // Aquí se leía del catálogo la lista de entradas premium y se pintaba bajo un
+  // rótulo «Con Premium». Era honesta y estaba viva, pero vendía PERMISOS: antes
+  // del clic el usuario leía una lista de cosas que NO puede hacer. La SPEC de
+  // conversión lo invierte — se muestran CAPACIDADES como acciones, sin nombrar
+  // el plan, sin candados y sin precio — así que la lectura del catálogo premium
+  // desaparece de esta superficie. El catálogo sigue siendo el owner de qué es
+  // premium; simplemente esta portada ya no lo recita.
+  // Las seis capacidades son ACCIONES y usan iconos YA EXISTENTES (_wsTplViz):
+  // ningún asset nuevo, ninguna ruta nueva, no son botones y no abren nada.
+  const CAPS = [
+    { k: 'loans',       viz: 'donut'   },
+    { k: 'scenarios',   viz: 'compare' },
+    { k: 'budget',      viz: 'budget'  },
+    { k: 'receivables', viz: 'table'   },
+    { k: 'goals',       viz: 'target'  },
+    { k: 'journal',     viz: 'journal' },
+  ];
+  // Portada de las DOS gratuitas: se reutiliza la imagen REAL que ya usa cada
+  // capacidad por dentro (tool_compound / realestate_apartment, ambas presentes en
+  // assets/workspace/). Ni icono genérico ni asset duplicado. Si el WebP faltara,
+  // `_wsAssetImg` se autoelimina con onerror y queda la escena CSS de debajo.
+  const SHOT = { compound: 'tool_compound', realestate: 'realestate_apartment' };
+  const card = it => {
+    const name = tx('wsfc_n_' + it.surface, it.surface);
+    return `
         <button type="button" class="wsfc-item" data-wsfc-open="${esc(it.surface)}">
-          <span class="wsfc-item-ico" aria-hidden="true">${esc(tx('wsfc_ico_' + it.surface, '◈'))}</span>
-          <span class="wsfc-item-body">
-            <span class="wsfc-item-name">${esc(tx('wsfc_n_' + it.surface, it.surface))}</span>
-            <span class="wsfc-item-desc">${esc(tx('wsfc_d_' + it.surface, ''))}</span>
+          <span class="wsfc-item-shot" aria-hidden="true">
+            <span class="wsfc-item-ico">${esc(tx('wsfc_ico_' + it.surface, '◈'))}</span>
+            ${SHOT[it.surface] ? _wsAssetImg(SHOT[it.surface], '') : ''}
           </span>
-          <span class="wsfc-item-tag">${esc(tx('wsfc_included', 'Incluido'))}</span>
+          <span class="wsfc-item-body">
+            <span class="wsfc-item-name">${esc(name)}</span>
+            <span class="wsfc-item-desc">${esc(tx('wsfc_d_' + it.surface, ''))}</span>
+            <span class="wsfc-item-open">${esc(tx('wsfc_open', 'Abrir'))} <i aria-hidden="true">→</i></span>
+          </span>
         </button>`;
+  };
   return `
     <div class="aurix-wsh wsfc" data-wsh-view="free_cover">
       <section class="wsfc-stage">
         <header class="wsfc-head">
-          <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'Workspace'))}</p>
+          <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'WORKSPACE'))}</p>
           <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
           <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
         </header>
+        <p class="wsfc-block-label">${esc(tx('wsfc_free_label', 'Empieza ahora'))}</p>
         <div class="wsfc-items" data-wsfc-count="${freeItems.length}">
           ${freeItems.map(card).join('')}
         </div>
-        <div class="wsfc-premium">
-          <p class="wsfc-premium-label">${esc(tx('wsfc_premium_label', 'Con Premium'))}</p>
-          <ul class="wsfc-premium-list" data-wsfc-premium="${premItems.length}">
-            ${premItems.map(n => `<li class="wsfc-premium-i">${esc(n)}</li>`).join('')}
-          </ul>
-        </div>
+        <p class="wsfc-block-label wsfc-disc-label">${esc(tx('wsfc_disc_label', ''))}</p>
+        <ul class="wsfc-caps" data-wsfc-caps="${CAPS.length}">
+          ${CAPS.map(c => `<li class="wsfc-cap">
+            <span class="wsfc-cap-ico">${_wsTplViz(c.viz)}</span>
+            <span class="wsfc-cap-name">${esc(tx('wsfc_c_' + c.k, ''))}</span>
+          </li>`).join('')}
+        </ul>
         <div class="wsfc-cta-wrap">
           <button type="button" class="wsfc-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
         </div>
@@ -59630,8 +59649,19 @@ function _aurixIntelligencePreviewFacts() {
   // cambia es la que importa: los bloqueados salen del MISMO motor, así que si el
   // patrimonio del usuario sólo produce dos hechos, se bloquea UNO. Nunca se
   // inventa un tercero para rellenar la portada.
-  out.visible = out.facts.slice(0, 1);
-  out.locked = out.facts.slice(1, 3);
+  // ── SPEC PORTADAS FREE DE CONVERSIÓN — DOS VISIBLES, UNO OCULTO ─────────────
+  // Decisión de producto del founder que REVIERTE el reparto 1+2 de la SPEC P0
+  // FREE BOUNDARY: una portada que enseña un solo hecho no demuestra valor, y sin
+  // demostración no hay deseo. Lo que NO cambia es la regla dura: los visibles
+  // salen del motor y nunca se fabrica uno. Si el patrimonio del usuario sólo
+  // produce un hecho fiable, se publica UNO (1 visible + 2 ocultos); jamás se
+  // inventa un segundo para rellenar la retícula.
+  // Los OCULTOS ya no son hechos: son bloques neutros sin contenido (ver el markup),
+  // así que aquí sólo se decide CUÁNTOS hacen falta para que la retícula sea
+  // siempre de tres bloques idénticos. Nada del hecho oculto se emite.
+  out.visible = out.facts.slice(0, 2);
+  out.lockedCount = (out.visible.length >= 2) ? 1 : 2;
+  out.locked = new Array(out.lockedCount).fill(null);
   return out;
 }
 // ── EL SUJETO DEL HECHO BLOQUEADO SE RETIRA ────────────────────────────────
@@ -59642,18 +59672,11 @@ function _aurixIntelligencePreviewFacts() {
 // análisis bloqueado va de cripto ya es la mitad del hallazgo, y además convierte
 // la portada en un mapa de los defectos de la cartera. Ahora no se emite NADA de
 // los bloqueados salvo cuántos son.
-// La pregunta siguiente TIENE QUE SALIR DE LO QUE SE VE. Era una cadena fija sobre
-// «esta exposición» aunque el hecho visible hablara de liquidez: una pregunta que
-// no se refiere a nada de lo que el usuario acaba de leer no es un gancho, es ruido.
-function _aurixIntPreviewQuestion(visible) {
-  const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : fb; } catch (_) { return fb; } };
-  const first = (visible && visible[0]) || null;
-  const k = first ? String(first.kind || '') : '';
-  if (k === 'concentration') return tx('intprev_q_conc', '');
-  if (k === 'liquidity') return tx('intprev_q_liq', '');
-  if (k.indexOf('watch:') === 0) return tx('intprev_q_watch', '');
-  return tx('intprev_q', '');
-}
+// LA PREGUNTA PROMOCIONAL SE RETIRA (SPEC PORTADAS FREE DE CONVERSIÓN). Aquí vivía
+// `_aurixIntPreviewQuestion`, que derivaba una pregunta del hecho visible. Estaba bien
+// construida —salía de lo que se ve— pero era una SEGUNDA voz compitiendo con el puente
+// justo antes del único botón. La secuencia de conversión es promesa → prueba → puente →
+// CTA, y no admite un cuarto mensaje entre el puente y el clic.
 
 function _aurixIntelligencePreviewHTML() {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -59692,18 +59715,19 @@ function _aurixIntelligencePreviewHTML() {
     // por contrato —su gate lo exige y tiene razón— así que el móvil es el punto de
     // partida y el escritorio RELAJA la restricción en su `min-width:768px`.
     + '.intprev-card{position:relative;display:flex;flex-direction:column;width:100%;max-width:620px;max-height:calc(100dvh - 116px);border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:20px 18px 18px;animation:intprevIn .22s ease-out both;}'
-    + '.intprev-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
+    + '.intprev-badge{display:inline-block;align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
     + '.intprev-title{flex:0 0 auto;font-size:18px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 14px;letter-spacing:-.01em;line-height:1.25;}'
-    + '.intprev-facts{list-style:none;padding:0;margin:0 0 14px;display:flex;flex-direction:column;gap:9px;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
-    + '.intprev-fact{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;flex:0 0 auto;border:1px solid rgba(120,160,255,0.16);border-radius:14px;background:rgba(255,255,255,0.035);}'
+    + '.intprev-facts{list-style:none;padding:0;margin:0 0 14px;display:grid;grid-auto-rows:1fr;align-content:start;gap:9px;flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
+    + '.intprev-fact{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;flex:0 0 auto;min-height:62px;box-sizing:border-box;border:1px solid rgba(120,160,255,0.16);border-radius:14px;background:rgba(255,255,255,0.035);}'
     + '.intprev-fact-dot{width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;margin-top:7px;}'
     + '.intprev-fact-body{min-width:0;}'
     + '.intprev-fact-label{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(150,185,255,0.8);margin-bottom:4px;}'
     + '.intprev-fact-text{font-size:14.5px;line-height:1.5;color:rgba(255,255,255,0.9);}'
     + '.intprev-sep{flex:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(120,170,255,0.28),transparent);margin:0 0 12px;}'
-    + '.intprev-q-label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.72);margin:0 0 6px;}'
-    + '.intprev-q{flex:0 0 auto;font-size:15.5px;font-weight:700;line-height:1.35;color:rgba(210,228,255,0.97);margin:0 0 10px;}'
-    + '.intprev-cta{width:100%;font-size:14px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.10);border:1px solid rgba(120,170,255,0.34);border-radius:14px;height:46px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
+    + '.intprev-sub{flex:0 0 auto;font-size:13.5px;line-height:1.5;color:rgba(198,214,246,0.76);margin:0 0 14px;}'
+    + '.intprev-bridge{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.78);margin:0 0 6px;}'
+    + '.intprev-bridge-b{flex:0 0 auto;font-size:14px;line-height:1.45;color:rgba(214,228,250,0.9);margin:0 0 12px;}'
+    + '.intprev-cta{width:100%;font-size:15px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.14);border:1px solid rgba(120,170,255,0.44);border-radius:14px;min-height:52px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
     + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
     + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;flex:0 0 auto;margin-top:auto;}'
     + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
@@ -59714,17 +59738,21 @@ function _aurixIntelligencePreviewHTML() {
     + '.intprev-fact.is-locked{border-color:rgba(150,185,255,0.22);background:rgba(90,140,255,0.055);position:relative;align-items:center;gap:10px;}'
     + '.intprev-fact.is-locked .intprev-fact-body{flex:1 1 auto;min-width:0;}'
     + '.intprev-fact-dot.is-locked{background:rgba(150,185,255,0.5);box-shadow:none;}'
-    + '.intprev-redact{display:flex;flex-direction:column;gap:6px;margin:2px 0;filter:blur(2.5px);opacity:.55;}'
+    + '.intprev-redact{display:flex;flex-direction:column;justify-content:center;gap:6px;margin:0;height:auto;flex:1 1 auto;opacity:.42;}'
+    // `.intprev-fact-body` es un <span>: como caja INLINE añade el interlineado de su
+    // línea alrededor del skeleton, y esos 2px sobrantes hacían el bloque oculto más
+    // alto que los visibles en los seis viewports. Se neutraliza SOLO en el oculto.
+    + '.intprev-fact.is-locked{align-items:stretch;}'
+    + '.intprev-fact.is-locked .intprev-fact-body{display:flex;line-height:0;}'
     + '.intprev-redact i{display:block;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(190,215,255,0.55),rgba(190,215,255,0.16));}'
     + '.intprev-redact i:nth-child(1){width:94%;}.intprev-redact i:nth-child(2){width:78%;}.intprev-redact i:nth-child(3){width:52%;}'
     // El recuento de bloqueados: una línea, tono secundario, sin etiqueta de plan.
-    + '.intprev-locked-n{flex:0 0 auto;font-size:12.5px;line-height:1.5;color:rgba(170,200,255,0.72);margin:0 0 14px;}'
     // El escritorio RELAJA (mismo patron que el resto de esta hoja: base movil,
     // `min-width` para lo demas). Nunca un `max-width`, que invertiria el contrato.
     + '@media (min-width:768px){.intprev-redact i{height:9px;}}'
-    + '@media (prefers-reduced-motion:reduce){.intprev-redact{filter:none;}}'
+    + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:220px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:32px 24px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:24px;margin:0 0 20px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:14px 16px;}.intprev-sep{margin:0 0 18px;}.intprev-q{font-size:18px;margin:0 0 14px;}.intprev-locked-n{font-size:13.5px;margin:0 0 20px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}'
+    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:240px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:clamp(32px,4vh,48px) 24px 40px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:26px;margin:0 0 12px;}.intprev-sub{font-size:15px;margin:0 0 22px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:16px 18px;min-height:74px;}.intprev-sep{margin:0 0 18px;}.intprev-bridge{font-size:11.5px;margin:0 0 8px;}.intprev-bridge-b{font-size:16px;margin:0 0 20px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}@media (min-width:1024px){.intprev-stage{min-height:auto;padding-top:clamp(32px,4vh,48px);}.intprev-card{max-width:860px;padding:44px 44px 34px;}.intprev-title{font-size:32px;}.intprev-sub{font-size:16px;max-width:74ch;}.intprev-fact-text{font-size:15.5px;}.intprev-bridge-b{font-size:17px;}.intprev-cta{min-height:54px;font-size:15.5px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 
@@ -59765,28 +59793,30 @@ function _aurixIntelligencePreviewHTML() {
     // el activo, ni el juicio. Sólo barras redactadas decorativas (`aria-hidden`).
     // Ni el inspector ni un lector de pantalla pueden leer lo que no se ha enviado.
     // Lo único que se declara es CUÁNTOS hay, y eso es verificable.
+    // El bloque entero es aria-hidden: no hay texto, ni categoría, ni cifra, ni
+    // activo, ni etiqueta de bloqueo — tampoco para un lector de pantalla, ni al
+    // seleccionar, ni al copiar. Es una retícula de skeletons con las MISMAS
+    // dimensiones que un bloque visible (misma clase base, mismo padding, mismo
+    // borde, mismo punto), no un dato real emborronado: un blur se desactiva desde
+    // el inspector y el texto seguiría ahí. Lo que no se envía no se puede leer.
     const lockedHtml = _locked.map(() => ''
-      + '<li class="intprev-fact is-locked" data-preview-fact="locked"'
-      +   ' aria-label="' + esc(tx('intprev_locked_aria', 'Análisis todavía sin desbloquear')) + '">'
-      +   '<span class="intprev-fact-dot is-locked" aria-hidden="true"></span>'
+      + '<li class="intprev-fact is-locked" data-preview-fact="locked" aria-hidden="true">'
+      +   '<span class="intprev-fact-dot is-locked"></span>'
       +   '<span class="intprev-fact-body">'
-      +     '<span class="intprev-redact" aria-hidden="true"><i></i><i></i><i></i></span>'
+      +     '<span class="intprev-redact"><i></i><i></i><i></i></span>'
       +   '</span>'
       + '</li>').join('');
-    // La anticipación: un hecho comprobable sobre el propio motor, sin nombrar el
-    // plan y sin afirmar nada que el usuario no pueda verificar después.
-    const lockedNote = _locked.length
-      ? '<p class="intprev-locked-n" data-preview-locked-n="' + _locked.length + '">'
-        + esc((function () { try { const f = t('intprev_locked_n'); return (typeof f === 'function') ? f(_locked.length) : ''; } catch (_) { return ''; } })())
-        + '</p>'
-      : '';
+    // PROMESA → PRUEBA REAL → PUENTE → CTA. Se retiran, por SPEC: el contador de
+    // análisis ocultos (cuantificar lo oculto es hablar de lo oculto) y la pregunta
+    // promocional dinámica (no era un gancho, era una segunda voz compitiendo con
+    // el puente justo antes del único botón de la superficie).
     body = ''
-      + '<h2 class="intprev-title">' + esc(tx('intprev_title', 'Esto es lo que Aurix ya entiende de tu patrimonio')) + '</h2>'
+      + '<h2 class="intprev-title">' + esc(tx('intprev_title', 'Entiende qué está moviendo tu patrimonio')) + '</h2>'
+      + '<p class="intprev-sub">' + esc(tx('intprev_sub', '')) + '</p>'
       + '<ul class="intprev-facts">' + items + lockedHtml + '</ul>'
-      + lockedNote
       + '<div class="intprev-sep" aria-hidden="true"></div>'
-      + '<p class="intprev-q-label">' + esc(tx('intprev_q_label', 'La pregunta siguiente')) + '</p>'
-      + '<p class="intprev-q">' + esc(_aurixIntPreviewQuestion(_visible)) + '</p>'
+      + '<p class="intprev-bridge">' + esc(tx('intprev_bridge', 'Esto es solo una primera lectura')) + '</p>'
+      + '<p class="intprev-bridge-b">' + esc(tx('intprev_bridge_b', '')) + '</p>'
       + cta;
   } else {
     // Hold states — say what is missing instead of promising anything.
@@ -59794,6 +59824,9 @@ function _aurixIntelligencePreviewHTML() {
     body = ''
       + '<h2 class="intprev-hold-title">' + esc(tx('intprev_hold_' + k + '_t', '')) + '</h2>'
       + '<p class="intprev-hold-body">' + esc(tx('intprev_hold_' + k + '_b', '')) + '</p>'
+      + '<div class="intprev-sep" aria-hidden="true"></div>'
+      + '<p class="intprev-bridge">' + esc(tx('intprev_bridge', 'Esto es solo una primera lectura')) + '</p>'
+      + '<p class="intprev-bridge-b">' + esc(tx('intprev_bridge_b', '')) + '</p>'
       + cta;
   }
 

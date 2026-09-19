@@ -79,7 +79,7 @@ sb._aurixAssessValuationCompleteness = () => sb.__val;
 vm.runInContext(konstSrc('_INT_PREVIEW_WATCH_ALLOWED'), sb);
 ['_aurixUsableQuantity','isInvestableAsset','investableAssets','investableValueUSD','getInvestableDistribution',
  '_intRealEstatePresence','buildLiquidityView','_aurixHealthSnapshot','_intccWatchAreas',
- '_aurixIntelligencePreviewFacts','_aurixIntPreviewQuestion',
+ '_aurixIntelligencePreviewFacts',
  '_aurixIntelligencePreviewHTML']
   .forEach(n => vm.runInContext(fnSrc(n), sb));
 
@@ -137,15 +137,17 @@ console.log('\n2 · Real portfolio data:');
   // salir de lo que el usuario ACABA de leer —decía «esta exposición» aunque el
   // hecho visible hablara de liquidez—, así que ahora se deriva del primer hecho
   // visible. Lo que se ancla es la CORRESPONDENCIA, que es el invariante real.
-  ok('2.4 la pregunta se corresponde con el primer hecho VISIBLE, y aparece una vez',
-    (function () {
-      const k = f.visible[0].kind;
-      const q = k === 'concentration' ? '¿Cómo ha cambiado esta concentración en el tiempo?'
-        : k === 'liquidity' ? '¿Cómo ha evolucionado este peso de liquidez?'
-        : '¿Desde cuándo se comporta así, y qué lo ha movido?';
-      return (h.split(q).length - 1) === 1;
-    })(),
-    JSON.stringify([f.visible[0].kind, (h.match(/class="intprev-q">([^<]*)</) || [])[1]]));
+  // 2.4 SE INVIERTE (SPEC PORTADAS FREE DE CONVERSIÓN). La pregunta promocional
+  // dinámica se retira: era una segunda voz entre el puente y el único botón. Lo que
+  // se exige ahora es la secuencia PROMESA → PRUEBA → PUENTE → CTA, con el puente
+  // como texto FIJO (no derivado del hecho) y sin rastro de la pregunta.
+  ok('2.4 puente fijo presente y CERO pregunta promocional',
+    /class="intprev-bridge"/.test(h) && /class="intprev-bridge-b"/.test(h)
+    && !/class="intprev-q(-label)?"/.test(h) && !/class="intprev-locked-n"/.test(h),
+    JSON.stringify([/intprev-bridge/.test(h), /intprev-q/.test(h)]));
+  ok('2.4b la portada abre con la promesa: eyebrow + título + subtítulo',
+    /class="intprev-badge"/.test(h) && /INTELLIGENCE/i.test(h)
+    && /class="intprev-title"/.test(h) && /class="intprev-sub"/.test(h));
   ok('2.5 facts carry stable instrumentation hooks',
     /data-preview-fact="concentration"/.test(h) && /data-preview-fact="locked"/.test(h)
     // El gancho `preview_cta_click` era el del botón «Volver al Dashboard», retirado
@@ -274,7 +276,9 @@ console.log('\n6 · No uncertified claim:');
   ok('6.7 la anticipación no nombra el plan ni promete una fecha',
     !/premium/i.test(h.replace(/\sdata-(premium|preview)-[a-z]+="[^"]*"/g, ''))
     && !/próximamente/i.test(h)
-    && /análisis más sobre tu patrimonio/.test(h),
+    // SPEC PORTADAS FREE DE CONVERSIÓN: cuantificar lo oculto es hablar de lo oculto.
+    // Antes se EXIGÍA la frase «N análisis más»; ahora se exige que no exista.
+    && !/análisis más sobre tu patrimonio/.test(h),
     (h.replace(/\sdata-(premium|preview)-[a-z]+="[^"]*"/g, '').match(/.{0,40}premium.{0,40}/i) || [''])[0]);
 }
 
@@ -344,8 +348,8 @@ console.log('\n8 · Layout contract:');
 // ── 9 · i18n parity ─────────────────────────────────────────────────────────
 console.log('\n9 · i18n parity:');
 {
-  const keys = ['intprev_badge','intprev_title','intprev_f_conc','intprev_f_liq','intprev_q_label','intprev_q',
-    'intprev_locked_n','intprev_locked_aria','intprev_cta_full',
+  const keys = ['intprev_badge','intprev_title','intprev_sub','intprev_bridge','intprev_bridge_b',
+    'intprev_f_conc','intprev_f_liq','intprev_cta_full',
     'intprev_cta','intprev_hold_empty_t','intprev_hold_empty_b','intprev_hold_inc_t',
     'intprev_hold_inc_b','intprev_hold_none_t','intprev_hold_none_b'];
   const missing = keys.filter(k => (app.split(k + ':').length - 1) < 2);
@@ -371,7 +375,7 @@ console.log('\n9 · i18n parity:');
 // bloqueado no se emite NADA salvo cuántos hay. Por eso `_aurixIntPreviewSubject`
 // ya no existe y los asserts 10.11–10.13 de la versión anterior desaparecen: no se
 // puede certificar que un sujeto no revele su conclusión cuando no hay sujeto.
-console.log('\n10 · Un visible, dos bloqueados, y del bloqueado no se emite nada:');
+console.log('\n10 · Dos visibles y un bloque oculto, y del oculto no se emite nada:');
 {
   setPortfolio([
     { name:'BTC',  type:'crypto', qty:1, price:60000 },
@@ -379,69 +383,79 @@ console.log('\n10 · Un visible, dos bloqueados, y del bloqueado no se emite nad
     { name:'EUR',  type:'cash',   qty:20000 },
   ]);
   const f = facts(), h = html();
+  // El reparto vuelve a 2+1 (la SPEC P0 lo había invertido a 1+2). Lo que NO cambia
+  // —y es lo que esta sección existe para proteger— es que del contenido no publicado
+  // no salga absolutamente nada. Y ahora es estructuralmente más fuerte: los bloques
+  // ocultos ya NO son hechos con el texto escondido, son skeletons sin dato ninguno.
   ok('10.1 el motor sigue produciendo tres hechos reales',
     f.facts.length === 3, JSON.stringify(f.facts.map(x => x.kind)));
-  ok('10.2 se publican EXACTAMENTE uno visible y dos bloqueados',
-    f.visible.length === 1 && f.locked.length === 2
-    && /data-preview-facts="1"/.test(h) && /data-preview-locked="2"/.test(h),
-    JSON.stringify({ v: f.visible.length, l: f.locked.length }));
-  ok('10.3 el DOM lleva UN hecho legible y DOS bloqueados',
-    (h.match(/class="intprev-fact"/g) || []).length === 1
-    && (h.match(/class="intprev-fact is-locked"/g) || []).length === 2);
-  ok('10.4 de los bloqueados NO se emite el texto',
-    f.locked.every(x => h.indexOf(x.text) === -1),
-    JSON.stringify(f.locked.map(x => x.text)).slice(0, 110));
+  ok('10.2 se publican EXACTAMENTE dos visibles y UN bloque oculto',
+    f.visible.length === 2 && f.lockedCount === 1
+    && /data-preview-facts="2"/.test(h) && /data-preview-locked="1"/.test(h),
+    JSON.stringify({ v: f.visible.length, l: f.lockedCount }));
+  ok('10.3 el DOM lleva DOS hechos legibles y UN bloque oculto',
+    (h.match(/class="intprev-fact"/g) || []).length === 2
+    && (h.match(/class="intprev-fact is-locked"/g) || []).length === 1);
+  // Los hechos que el motor calculó y la portada NO publica: de ellos no puede salir
+  // ni el texto, ni el título, ni una cifra propia.
+  const extra = f.facts.slice(f.visible.length);
+  ok('10.4 de los hechos no publicados NO se emite el texto',
+    extra.every(x => h.indexOf(x.text) === -1),
+    JSON.stringify(extra.map(x => x.text)).slice(0, 110));
   ok('10.5 …ni su TÍTULO, ni su categoría, ni su sujeto',
-    f.locked.every(x => !x.title || h.indexOf(x.title) === -1)
+    extra.every(x => !x.title || h.indexOf(x.title) === -1)
     && !/intprev-fact-label/.test(h.slice(h.indexOf('is-locked'))),
-    JSON.stringify(f.locked.map(x => x.title || null)));
+    JSON.stringify(extra.map(x => x.title || null)));
   ok('10.6 …ni sus cifras propias',
     (function () {
       const visibleText = f.visible.map(x => x.text).join(' ');
-      return f.locked.every(l => (String(l.text).match(/\d+[.,]?\d*/g) || [])
+      return extra.every(l => (String(l.text).match(/\d+[.,]?\d*/g) || [])
         .filter(n => visibleText.indexOf(n) === -1)
         .every(n => h.indexOf('>' + n) === -1));
     })());
-  ok('10.7 dentro de un bloqueado sólo hay la barra redactada, decorativa',
+  ok('10.7 dentro del bloque oculto sólo hay el skeleton, decorativo',
     (function () {
       const li = h.slice(h.indexOf('<li class="intprev-fact is-locked"'));
       const one = li.slice(0, li.indexOf('</li>') + 5);
-      return /class="intprev-redact" aria-hidden="true"/.test(one)
+      return /class="intprev-redact"/.test(one)
         && !/intprev-lock-tag/.test(one)
         && one.replace(/<[^>]*>/g, '').trim() === '';
     })());
-  ok('10.8 y su etiqueta accesible no nombra el plan ni revela contenido',
+  ok('10.8 el bloque oculto no existe para accesibilidad: aria-hidden y SIN aria-label',
     (function () {
-      const m = /<li class="intprev-fact is-locked"[^>]*aria-label="([^"]*)"/.exec(h);
-      return !!m && !/premium/i.test(m[1]) && f.locked.every(x => m[1].indexOf(x.text) === -1);
+      const m = /<li class="intprev-fact is-locked"([^>]*)>/.exec(h);
+      return !!m && /aria-hidden="true"/.test(m[1]) && !/aria-label/.test(m[1]);
     })(),
-    (/<li class="intprev-fact is-locked"[^>]*aria-label="([^"]*)"/.exec(h) || [])[1]);
-  ok('10.9 la barra redactada es decoración, y con reduced-motion no se difumina',
-    /\.intprev-redact\{[^}]*filter:blur/.test(h)
-    && /prefers-reduced-motion:reduce\)\{\.intprev-redact\{filter:none/.test(h));
+    (/<li class="intprev-fact is-locked"([^>]*)>/.exec(h) || [])[1]);
+  ok('10.9 el skeleton NO es un dato real emborronado (sin blur) y mide como los visibles',
+    !/\.intprev-redact\{[^}]*filter:blur/.test(h)
+    && /\.intprev-facts\{[^}]*grid-auto-rows:1fr/.test(h));
   ok('10.10 la etiqueta «Disponible con Premium» se retiró del markup y de la hoja',
     !/intprev-lock-tag/.test(h) && !/Disponible con Premium/.test(h));
-  ok('10.11 el recuento de bloqueados es REAL: lo dice el motor, no una cadena fija',
-    /2 análisis más sobre tu patrimonio/.test(h)
-    && /data-preview-locked-n="2"/.test(h));
-  // NO SE INVENTA NADA PARA RELLENAR LA PORTADA. Con acciones + liquidez el motor
-  // produce DOS hechos: `sector` y `div` disparan aguas arriba pero no están en la
-  // lista admitida, así que no hay tercero. (Con cripto sí lo habría: `watch:crypto`.)
+  // 10.11 SE INVIERTE: cuantificar lo oculto es hablar de lo oculto, y la SPEC de
+  // conversión lo prohíbe. El contador desaparece del markup y del diccionario.
+  ok('10.11 no se publica NINGÚN recuento de análisis ocultos',
+    !/análisis más sobre tu patrimonio/.test(h) && !/data-preview-locked-n=/.test(h));
+  // LA RETÍCULA ES SIEMPRE DE TRES, PERO LOS VISIBLES SON SIEMPRE REALES. Con
+  // acciones + liquidez el motor produce DOS hechos (`sector` y `div` disparan aguas
+  // arriba pero no están en la lista admitida, así que no hay tercero): se publican
+  // los dos y queda UN bloque oculto.
   setPortfolio([{ name:'AAPL', type:'stock', qty:100, price:600 }, { name:'EUR', type:'cash', qty:40000 }]);
   const f2 = facts(), h2 = html();
-  ok('10.12 con dos hechos reales se bloquea UNO, no dos',
-    f2.visible.length === 1 && f2.locked.length === 1
-    && /data-preview-locked="1"/.test(h2)
-    && /1 análisis más sobre tu patrimonio/.test(h2),
-    JSON.stringify({ v: f2.visible.length, l: f2.locked.length }));
-  // Y con UNA sola posición sin liquidez sólo hay concentración: nada que bloquear.
+  ok('10.12 con exactamente dos hechos reales: los DOS visibles y UN bloque oculto',
+    f2.visible.length === 2 && f2.lockedCount === 1
+    && /data-preview-facts="2"/.test(h2) && /data-preview-locked="1"/.test(h2),
+    JSON.stringify({ v: f2.visible.length, l: f2.lockedCount }));
+  // Y con UNA sola posición sin liquidez sólo hay concentración: se publica UNO y la
+  // retícula se completa con DOS bloques ocultos. Nunca se fabrica un segundo hecho.
   setPortfolio([{ name:'AAPL', type:'stock', qty:100, price:600 }]);
   const f3 = facts(), h3 = html();
-  ok('10.13 sin un segundo hecho real, no se fabrica un bloqueado',
-    f3.locked.length === 0 && /data-preview-locked="0"/.test(h3)
-    && h3.indexOf('intprev-fact is-locked') === -1
-    && !/análisis más/.test(h3),
-    JSON.stringify(f3.facts.map(x => x.kind)));
+  ok('10.13 con un solo hecho fiable: 1 visible + 2 ocultos, y JAMÁS un hecho inventado',
+    f3.visible.length === 1 && f3.lockedCount === 2
+    && /data-preview-facts="1"/.test(h3) && /data-preview-locked="2"/.test(h3)
+    && (h3.match(/class="intprev-fact"/g) || []).length === 1
+    && (h3.match(/class="intprev-fact is-locked"/g) || []).length === 2,
+    JSON.stringify({ v: f3.visible.length, l: f3.lockedCount, kinds: f3.facts.map(x => x.kind) }));
   ok('10.14 …y lo que sí hay se sigue mostrando entero',
     (h3.match(/class="intprev-fact"/g) || []).length === f3.visible.length && f3.visible.length === 1);
   ok('10.15 `_aurixIntPreviewSubject` ya no existe: no hay sujeto que filtrar',

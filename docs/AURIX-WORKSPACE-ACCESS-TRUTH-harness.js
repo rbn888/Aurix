@@ -628,9 +628,15 @@ console.log('\n8 · Portada Free: un CTA, dos accesos vivos, cero promesas falsa
       html.indexOf(R(c, 't("wsfc_cta")')) !== -1
       && !/Ver Premium|See Premium|Explorar Workspace|Explore Workspace/.test(html),
       R(c, 't("wsfc_cta")'));
-    ok('8.4 ' + lg + ' · los beneficios Premium salen del catálogo y son SEIS',
-      html.indexOf('data-wsfc-premium="6"') !== -1,
-      (/data-wsfc-premium="(\d+)"/.exec(html) || [])[1]);
+    // 8.4 SE INVIERTE (SPEC PORTADAS FREE DE CONVERSIÓN). Exigía que la portada
+    // recitara las SEIS entradas premium del catálogo bajo un rótulo «Con Premium»:
+    // antes del clic el usuario leía una lista de lo que NO puede hacer. Ahora la
+    // portada publica SEIS CAPACIDADES como acciones, sin nombrar el plan. Lo que se
+    // conserva —y es lo que importaba de 8.4— es que sean seis y que ninguna sea un
+    // permiso: por eso se mide el contador de capacidades y la ausencia de «Premium».
+    ok('8.4 ' + lg + ' · la portada publica SEIS capacidades como acciones, no permisos',
+      html.indexOf('data-wsfc-caps="6"') !== -1 && html.indexOf('data-wsfc-premium') === -1,
+      (/data-wsfc-caps="(\d+)"/.exec(html) || [])[1]);
     ok('8.5 ' + lg + ' · y no nombra Seguimiento de precios, que sigue interno',
       html.indexOf(R(c, 't("wsapp_assets_n")')) === -1
       && !/seguimiento de precios|price watchlist/i.test(html));

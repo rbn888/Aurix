@@ -26661,26 +26661,63 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   display: block; margin-top: 2px; font-size: 12px; line-height: 1.4;
   color: rgba(198,214,246,0.66);
 }
-.wsfc-item-tag {
-  /* SUELO DE 11px. La sonda multi-viewport lo midió en vivo: por debajo de 11px el
-     texto deja de ser legible en móvil y la QA visual lo prohíbe. El `letter-spacing`
-     baja un punto para que la etiqueta siga cabiendo en una línea a 360px. */
-  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  color: rgba(150,205,175,0.95); border: 1px solid rgba(120,200,160,0.30);
-  background: rgba(90,200,150,0.08); border-radius: 999px; padding: 4px 9px; white-space: nowrap;
+.wsfc-item-open {
+  /* La acción de la tarjeta. La tarjeta ENTERA es el botón (es un <button>), así
+     que esto es afordancia, no un segundo destino: no recibe eventos propios. */
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+  color: rgba(150,190,255,0.95);
 }
-/* El beneficio Premium: una frase. No es un catálogo de candados. */
-.wsfc-premium {
-  flex: 0 1 auto; min-height: 0;
-  padding: 12px 14px; border-radius: 14px;
-  border: 1px solid rgba(190,160,90,0.22); background: rgba(190,160,90,0.06);
+.wsfc-item-open i { font-style: normal; transition: transform .18s; }
+.wsfc-item:hover .wsfc-item-open i { transform: translateX(3px); }
+/* ── PORTADA REAL DE CADA CAPACIDAD GRATUITA ────────────────────────────────
+   Miniatura lateral con la imagen que la capacidad YA usa por dentro. Ratio fijo
+   y `object-fit:cover`, así que la imagen no deforma ni provoca layout shift: la
+   caja reserva su tamaño antes de que el WebP cargue. Si el archivo faltara,
+   `_wsAssetImg` se autoelimina (onerror) y queda visible el glifo de debajo, que
+   por eso sigue existiendo en el DOM en vez de haberse borrado. */
+.wsfc-item-shot {
+  position: relative; overflow: hidden; flex: 0 0 auto;
+  width: 78px; height: 78px; border-radius: 13px;
+  display: grid; place-items: center;
+  background: rgba(90,140,255,0.10); border: 1px solid rgba(120,170,255,0.22);
 }
-.wsfc-premium-label {
-  margin: 0 0 4px; font-size: 10px; font-weight: 700; letter-spacing: .14em;
-  text-transform: uppercase; color: rgba(225,196,122,0.95);
+.wsfc-item-ico { font-size: 20px; color: rgba(180,208,255,0.95); }
+.wsfc-item-shot .ws-asset-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; opacity: 0; transition: opacity .25s;
 }
-.wsfc-premium-body {
-  margin: 0; font-size: 12.5px; line-height: 1.5; color: rgba(222,214,196,0.80);
+.wsfc-item-shot .ws-asset-img.is-loaded { opacity: 1; }
+/* ── RÓTULO DE BLOQUE (compartido con Intelligence en ritmo y escala) ──────── */
+.wsfc-block-label {
+  flex: 0 0 auto; margin: 2px 0 0; font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; color: rgba(150,185,255,0.78);
+}
+.wsfc-disc-label { color: rgba(198,214,246,0.62); }
+/* ── LAS SEIS CAPACIDADES ───────────────────────────────────────────────────
+   Son ACCIONES, no permisos: ni «Premium», ni candado, ni precio, ni ruta. No son
+   botones —son <li>—, así que no hay nada que pulsar y nada que denegar. 2×3 en
+   móvil y 3×2 en escritorio, con el nombre COMPLETO en hasta dos líneas: sin
+   elipsis, porque cortar el nombre de una capacidad es exactamente perder lo que
+   esta superficie viene a demostrar. */
+.wsfc-caps {
+  flex: 0 1 auto; min-height: 0; list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 9px;
+}
+.wsfc-cap {
+  display: flex; align-items: center; gap: 10px; min-height: 52px;
+  padding: 10px 11px; border-radius: 13px;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+  background: var(--elev-1);
+}
+.wsfc-cap-ico {
+  flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 26px;
+  color: rgba(150,190,255,0.9);
+}
+.wsfc-cap-ico svg { width: 30px; height: 20px; }
+.wsfc-cap-name {
+  min-width: 0; font-size: 12.5px; font-weight: 650; line-height: 1.3;
+  color: rgba(222,232,250,0.92);
 }
 /* El CTA es lo último que se comprime: `margin-top:auto` lo ancla abajo cuando
    sobra altura, y nunca se encoge cuando falta. */
@@ -26689,7 +26726,9 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
   display: flex; flex-direction: column; gap: 8px;
 }
 .wsfc-cta {
-  width: 100%; min-height: 48px; font-size: 15px; font-weight: 700; cursor: pointer;
+  /* 52px: suelo táctil de la SPEC de conversión para el CTA móvil (por encima del
+     mínimo de 44px que rige el resto de objetivos). */
+  width: 100%; min-height: 52px; font-size: 15px; font-weight: 700; cursor: pointer;
   color: rgba(18,16,10,0.94); border: none; border-radius: 14px;
   background: linear-gradient(180deg, rgba(240,212,142,1), rgba(212,178,104,1));
   box-shadow: 0 6px 20px rgba(190,160,90,0.22);
@@ -26706,15 +26745,61 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
 }
 .wsfc-skip:hover { background: var(--elev-1); color: var(--text-bright); }
 .wsfc-skip:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
-/* Dos columnas en cuanto caben de verdad. */
+/* Hover no desplaza el layout: sólo cambian color/borde/sombra y la flecha, que
+   se mueve dentro de su propia caja. */
+@media (hover: none) {
+  .wsfc-item:hover { background: var(--elev-1); border-color: rgba(var(--aurix-blue-rgb), 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsfc-item, .wsfc-cta, .wsfc-item-open i, .wsfc-item-shot .ws-asset-img { transition: none; }
+  .wsfc-item:hover .wsfc-item-open i { transform: none; }
+}
+/* ── TABLET (768–1023) ─────────────────────────────────────────────────────── */
 @media (min-width: 560px) {
   .wsfc-items { grid-template-columns: 1fr 1fr; }
+}
+/* 360px: se permite bajar el padding lateral a 16px antes que comprimir texto. */
+@media (max-width: 374px) {
+  .wsfc-stage { padding-left: 16px; padding-right: 16px; }
+  .wsfc-item-shot { width: 72px; height: 72px; }
+  .wsfc-cap-name { font-size: 12px; }
 }
 @media (min-width: 768px) {
   .wsfc-stage { gap: 20px; padding: 28px 24px; max-width: 760px; margin: 0 auto; }
   .wsfc-cta-wrap { flex-direction: row; align-items: center; }
   .wsfc-cta { width: auto; min-width: 240px; }
   .wsfc-skip { width: auto; min-width: 180px; }
+}
+/* ── ESCRITORIO (≥1024) ─────────────────────────────────────────────────────
+   El contenedor se acota a 1040px y se centra, y la portada arranca 32–48px bajo
+   la navegación. Sin `max-height`: en escritorio la altura la pone el contenido,
+   que es lo que evita la tarjeta diminuta flotando en un vacío negro. */
+@media (min-width: 1024px) {
+  .wsfc-stage {
+    max-width: 1040px; margin: 0 auto;
+    min-height: auto; max-height: none; overflow: visible;
+    padding: clamp(32px, 4vh, 48px) 24px 40px;
+    gap: clamp(16px, 2.2vh, 24px);
+  }
+  .wsfc-title { font-size: 34px; }
+  .wsfc-sub   { font-size: 16px; max-width: 74ch; }
+  .wsfc-items { gap: 16px; }
+  .wsfc-item  { min-height: 116px; padding: 16px; align-items: center; }
+  .wsfc-item-shot { width: 96px; height: 96px; border-radius: 14px; }
+  .wsfc-item-name { font-size: 16px; }
+  .wsfc-item-desc { font-size: 13px; }
+  .wsfc-caps  { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .wsfc-cap   { min-height: 58px; padding: 12px 14px; }
+  .wsfc-cap-name { font-size: 13.5px; }
+  /* El bloque @media 768 de arriba deja el CTA en `width:auto;min-width:240px`, y a
+     1440 px eso lo convierte en un botón pequeño y huérfano bajo una retícula ancha.
+     Aquí recupera presencia sin ocupar todo el ancho. */
+  .wsfc-cta-wrap { margin-top: 8px; align-self: flex-start; width: min(420px, 100%); }
+  .wsfc-cta { width: 100%; min-width: 0; min-height: 54px; font-size: 15.5px; }
+  /* Escritorio alto: la portada se centra en el viewport en vez de quedar pegada
+     arriba con un vacío debajo. `justify-content` sólo reparte el espacio SOBRANTE,
+     así que en 1366×768 (donde no sobra) la composición no se mueve. */
+  .wsfc-stage { min-height: calc(100dvh - 68px); justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .wsfc-item, .wsfc-cta, .wsfc-skip { transition: none; }
@@ -27019,7 +27104,7 @@ input.ws4-num.is-invalid {
 .wsre-type-chip { font-size: 11px; letter-spacing: 0.02em; }
 .wsre-form-sec-t { font-size: 11px; letter-spacing: 0.05em; }
 .wsfc-eyebrow { font-size: 11px; letter-spacing: 0.13em; }
-.wsfc-premium-label { font-size: 11px; letter-spacing: 0.11em; }
+.wsfc-block-label { font-size: 11px; letter-spacing: 0.12em; }
 /* Las leyendas dentro de los SVG (ejes del gráfico de compound y del donut de
    préstamos) estaban entre 8 y 10px. En un SVG el tamaño escala con el viewBox,
    así que se sube al suelo legible y el `viewBox` las sigue acomodando. */
@@ -27266,27 +27351,6 @@ input.ws4-num.is-invalid {
 /* Objetivos táctiles: la barra de pestañas es navegación primaria. */
 .wsh-tab { min-height: 44px; }
 
-/* ── PORTADA FREE DE WORKSPACE · el bloque Premium pasa a ser LISTA ─────────
-   Era una frase corrida que nombraba seis capacidades, y una de ellas ni existe
-   en el producto. Ahora son las entradas PUBLICADAS de tier premium leídas del
-   catálogo, en dos columnas compactas: se lee de un golpe, cabe en 360px y no
-   puede prometer algo que no está publicado. `overflow-wrap` en vez de recorte:
-   ningún nombre se corta. */
-.wsfc-premium-list {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 12px;
-}
-.wsfc-premium-i {
-  position: relative; min-width: 0; padding-left: 13px;
-  font-size: 12.5px; line-height: 1.45; color: rgba(222,214,196,0.86);
-  overflow-wrap: anywhere;
-}
-.wsfc-premium-i::before {
-  content: ''; position: absolute; left: 2px; top: 0.56em;
-  width: 4px; height: 4px; border-radius: 50%; background: rgba(225,196,122,0.72);
-}
-@media (max-width: 359px) { .wsfc-premium-list { grid-template-columns: minmax(0, 1fr); } }
 /* Con un solo CTA la columna sobra, pero se conserva para que el ancla inferior
    (`margin-top:auto`) siga siendo la del contenedor y no la del botón. */
 .wsfc-cta-wrap { gap: 0; }

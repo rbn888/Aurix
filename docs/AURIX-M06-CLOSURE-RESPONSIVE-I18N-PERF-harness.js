@@ -246,8 +246,10 @@ section('E — responsive: invariantes transversales:');
      (css.match(/@media \(min-width: ?769px/g) || []).length >= 10);
   ok('E.7 el paywall se puede cerrar siempre (botón propio + fondo + Escape)',
      /aurix-premium-close/.test(app) && /ap_close/.test(app));
+  // ≥52 px: la SPEC de portadas de conversión sube el suelo táctil del CTA por
+  // encima del mínimo general de 44 px.
   ok('E.8 y el CTA del preview de Intelligence es de ancho completo y táctil en móvil',
-     /\.intprev-cta\{width:100%;[\s\S]{0,200}?height:46px/.test(app));
+     /\.intprev-cta\{width:100%;[\s\S]{0,200}?min-height:52px/.test(app));
 }
 
 // ══════════════════════════════════════════════════════════════════════════

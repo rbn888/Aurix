@@ -201,53 +201,82 @@ if (run('A')) {
 console.log('\nA · INTELLIGENCE FREE');
 // ══════════════════════════════════════════════════════════════════════════
 await persona('free');
-// El motor real con una cartera que SÍ produce tres hechos. Se sustituye sólo la
-// fuente de hechos (los datos de cartera), nunca el renderizador ni el reparto.
+// ── LO QUE SE SUSTITUYE ES LA CARTERA, NO EL REPARTO ────────────────────────
+// Antes esta sonda reemplazaba `_aurixIntelligencePreviewFacts` ENTERA por una
+// versión que fijaba `visible = facts.slice(0,1)` y `locked = facts.slice(1,3)`.
+// Es decir: afirmaba certificar el reparto de la portada y lo que medía era su
+// propio stub. Habría dado verde con cualquier reparto en el producto. Ahora se
+// sustituyen sólo las FUENTES DE DATOS —las entradas de cartera, que son
+// externas a la portada— y el reparto lo decide el motor real.
 const INT = async n => J(`(function(){
-  var facts=[{kind:'concentration',text:t('intprev_f_conc')(47,'Bitcoin')},
-             {kind:'liquidity',text:t('intprev_f_liq')(12)},
-             {kind:'watch:crypto',title:'Exposición alta a cripto',text:'x'}].slice(0,${n});
-  var real=_aurixIntelligencePreviewFacts;
-  _aurixIntelligencePreviewFacts=function(){var o={facts:facts,state:'ok',reason:''};o.visible=facts.slice(0,1);o.locked=facts.slice(1,3);return o;};
+  var real={aa:activeAssets,vc:_aurixAssessValuationCompleteness,hs:_aurixHealthSnapshot,lv:buildLiquidityView,wa:_intccWatchAreas};
+  activeAssets=function(){return [{id:'a'},{id:'b'},{id:'c'}];};
+  _aurixAssessValuationCompleteness=function(){return {totalActive:3,complete:true};};
+  _aurixHealthSnapshot=function(){return {totUSD:100000,topInvestedAsset:{pctTotal:47,name:'Bitcoin'}};};
+  buildLiquidityView=function(){return {cashPct: ${n} >= 2 ? 12 : 0};};
+  _intccWatchAreas=function(){return ${n} >= 3 ? [{key:'crypto',title:'Exposición alta a cripto',body:'x'}] : [];};
   var host=document.getElementById('tabPlaceholder')||document.body;
   host.innerHTML=renderIntelligenceTab();
-  _aurixIntelligencePreviewFacts=real;
+  activeAssets=real.aa;_aurixAssessValuationCompleteness=real.vc;_aurixHealthSnapshot=real.hs;buildLiquidityView=real.lv;_intccWatchAreas=real.wa;
   var st=host.querySelector('.intprev-stage');
   var vis=host.querySelectorAll('.intprev-fact:not(.is-locked)');
   var lok=host.querySelectorAll('.intprev-fact.is-locked');
   var txt=(st?st.innerText:'')||'';
+  var box=function(e){var r=e.getBoundingClientRect();return Math.round(r.width)+'x'+Math.round(r.height);};
   return JSON.stringify({
     stage:!!st, visible:vis.length, locked:lok.length,
     visibleText:[].map.call(vis,function(x){return x.innerText.trim();}),
     lockedText:[].map.call(lok,function(x){return (x.innerText||'').trim()+'|'+(x.textContent||'').trim();}),
     lockedAria:[].map.call(lok,function(x){return x.getAttribute('aria-label');}),
+    lockedHidden:[].every.call(lok,function(x){return x.getAttribute('aria-hidden')==='true';}),
+    boxes:[].map.call(host.querySelectorAll('.intprev-fact'),box),
     ctas:host.querySelectorAll('.intprev-cta').length,
     ctaLabel:(host.querySelector('.intprev-cta')||{}).innerText,
     ctaFeature:(host.querySelector('.intprev-cta')||{}).getAttribute?host.querySelector('.intprev-cta').getAttribute('data-premium-cta'):null,
+    eyebrow:(host.querySelector('.intprev-badge')||{}).innerText||'',
+    title:(host.querySelector('.intprev-title')||{}).innerText||'',
+    sub:(host.querySelector('.intprev-sub')||{}).innerText||'',
+    bridge:(host.querySelector('.intprev-bridge')||{}).innerText||'',
+    bridgeB:(host.querySelector('.intprev-bridge-b')||{}).innerText||'',
     premiumWord:/premium/i.test(txt), invertibleWord:/invertible/i.test(txt),
-    note:(host.querySelector('.intprev-locked-n')||{}).innerText||'',
+    counterWord:/análisis más|analyses|análisis más/i.test(txt),
+    qLabel:host.querySelectorAll('.intprev-q-label,.intprev-q,.intprev-locked-n').length,
     lockedAttr:st?st.getAttribute('data-preview-locked'):null
   });
 })()`);
 let a = await INT(3);
-ok('A.1 exactamente UN análisis visible', a.visible === 1, 'visible=' + a.visible);
-ok('A.2 exactamente DOS análisis bloqueados', a.locked === 2, 'locked=' + a.locked);
+ok('A.1 con datos suficientes: exactamente DOS análisis visibles', a.visible === 2, 'visible=' + a.visible);
+ok('A.2 y exactamente UN bloque oculto', a.locked === 1, 'locked=' + a.locked);
+ok('A.1b los dos visibles son hallazgos MATERIALMENTE distintos (no dos variaciones)',
+  a.visibleText.length === 2 && a.visibleText[0] !== a.visibleText[1]
+  && /47%/.test(a.visibleText[0]) && /liquidez|Liquidity/i.test(a.visibleText[1]), a.visibleText.join(' | '));
+ok('A.1c secuencia PROMESA → PRUEBA → PUENTE → CTA completa',
+  /AURIX INTELLIGENCE/i.test(a.eyebrow) && a.title.length > 10 && a.sub.length > 20
+  && a.bridge.length > 5 && a.bridgeB.length > 20,
+  JSON.stringify({ e: a.eyebrow, t: a.title.slice(0, 30), s: a.sub.slice(0, 30), b: a.bridge }));
+ok('A.1d los tres bloques miden EXACTAMENTE igual', new Set(a.boxes).size === 1, JSON.stringify(a.boxes));
 ok('A.3 el análisis visible es el del caso observado',
   /El 47% de tu patrimonio depende de Bitcoin\./.test(a.visibleText.join(' ')), a.visibleText.join(' | '));
 ok('A.4 la palabra «invertible» no aparece en la portada', a.invertibleWord === false);
 ok('A.5 CERO texto filtrado por los bloqueados (ni innerText ni textContent)',
   a.lockedText.every(x => x === '|'), JSON.stringify(a.lockedText));
-ok('A.6 la etiqueta accesible del bloqueado no revela categoría ni juicio',
-  a.lockedAria.every(x => x && !/concentraci|liquidez|cripto|bitcoin|47/i.test(x)), JSON.stringify(a.lockedAria));
+ok('A.6 el bloque oculto no existe para accesibilidad (aria-hidden, sin aria-label)',
+  a.lockedHidden === true && a.lockedAria.every(x => x === null), JSON.stringify({ hidden: a.lockedHidden, aria: a.lockedAria }));
 ok('A.7 CERO menciones a «Premium» antes del clic', a.premiumWord === false);
-ok('A.8 UN solo CTA, y es «Ver el análisis completo»',
-  a.ctas === 1 && /Ver el análisis completo/.test(a.ctaLabel || ''), a.ctas + ' / ' + a.ctaLabel);
+ok('A.8 UN solo CTA, y es «Ver mi análisis completo»',
+  a.ctas === 1 && /Ver mi análisis completo/.test(a.ctaLabel || ''), a.ctas + ' / ' + a.ctaLabel);
 ok('A.9 el CTA declara la feature del owner canónico', a.ctaFeature === 'intelligence.full', String(a.ctaFeature));
-ok('A.10 la anticipación dice CUÁNTOS hay y nada más', /2 análisis más/.test(a.note), a.note);
+// A.10 se INVIERTE. Antes exigía que la portada dijera cuántos análisis quedaban
+// ocultos; cuantificar lo oculto es hablar de lo oculto, y la SPEC de conversión lo
+// prohíbe junto con la pregunta promocional. Ahora se exige que NADA de eso exista.
+ok('A.10 ni contador de ocultos ni pregunta promocional', a.counterWord === false && a.qLabel === 0,
+  JSON.stringify({ counter: a.counterWord, nodes: a.qLabel }));
 // No se inventa un tercero: con dos hechos reales sólo se bloquea uno.
-let a2 = await INT(2);
-ok('A.11 con dos hechos reales se bloquea UNO (no se inventa)', a2.visible === 1 && a2.locked === 1,
-  a2.visible + '/' + a2.locked);
+let a2 = await INT(1);
+ok('A.11 con UN solo hecho fiable: 1 visible + 2 ocultos (jamás se inventa un segundo)',
+  a2.visible === 1 && a2.locked === 2, a2.visible + '/' + a2.locked);
+ok('A.11b y el único visible sigue siendo un hecho REAL del motor',
+  /47%/.test(a2.visibleText.join(' ')), a2.visibleText.join(' | '));
 // El CTA abre el paywall CANÓNICO, no un overlay intermedio. Se repinta la portada
 // de tres hechos primero: A.11 la dejó con dos, y comprobar «intacta» sobre otro
 // render sería comprobar otra cosa.
@@ -322,6 +351,37 @@ for (const cap of ['compound', 'realestate']) {
   await sleep(200);
   ok('B.salir de «' + cap + '» devuelve a la portada, no al interior', (await wsView()) === 'free_cover', await wsView());
 }
+// ── CONTRATO DE LA PORTADA (SPEC PORTADAS FREE DE CONVERSIÓN) ──────────────
+{
+  await ev(`_wshView='free_cover'; renderWorkspaceHome(); true`); await sleep(200);
+  const c = await J(`(function(){
+    var r=document.querySelector('#aurixWorkspace .wsfc');
+    var txt=r?(r.innerText||''):'';
+    var imgs=[].map.call(document.querySelectorAll('#aurixWorkspace .wsfc-item-shot img'),function(i){
+      return {src:(i.getAttribute('src')||''),w:i.naturalWidth,h:i.naturalHeight};});
+    return JSON.stringify({
+      text:txt,
+      cards:document.querySelectorAll('#aurixWorkspace .wsfc-item').length,
+      imgs:imgs,
+      caps:[].map.call(document.querySelectorAll('#aurixWorkspace .wsfc-cap-name'),function(e){return (e.innerText||'').trim();}),
+      capButtons:document.querySelectorAll('#aurixWorkspace .wsfc-cap button, #aurixWorkspace button.wsfc-cap').length,
+      opens:[].map.call(document.querySelectorAll('#aurixWorkspace [data-wsfc-open]'),function(e){return e.getAttribute('data-wsfc-open');}),
+      eyebrow:(document.querySelector('#aurixWorkspace .wsfc-eyebrow')||{}).innerText||'',
+      freeLabel:(document.querySelector('#aurixWorkspace .wsfc-block-label')||{}).innerText||''
+    });
+  })()`);
+  ok('B.portada · las 2 tarjetas Free usan la IMAGEN REAL y ninguna 404',
+    c.imgs.length === 2 && c.imgs.every(i => i.w > 0 && i.h > 0)
+    && /tool_compound\.webp/.test(c.imgs[0].src + c.imgs[1].src)
+    && /realestate_apartment\.webp/.test(c.imgs[0].src + c.imgs[1].src), JSON.stringify(c.imgs));
+  ok('B.portada · las 6 capacidades se publican como ACCIONES', c.caps.length === 6 && c.caps.every(x => x.length > 3), JSON.stringify(c.caps));
+  ok('B.portada · las capacidades NO son botones ni abren rutas',
+    c.capButtons === 0 && c.opens.length === 2, JSON.stringify({ btns: c.capButtons, opens: c.opens }));
+  ok('B.portada · CERO «Premium», «Con Premium» o «Incluido» antes del clic',
+    !/premium/i.test(c.text) && !/\bIncluido\b/i.test(c.text), c.text.slice(0, 120));
+  ok('B.portada · CERO precio y CERO lenguaje de bloqueo antes del clic',
+    !/€|\$\s?\d/.test(c.text) && !/bloquead|desbloque|candado/i.test(c.text), c.text.slice(0, 120));
+}
 // ruta directa a una capacidad Premium
 await ev(`_wsOpenTool('loan'); true`); await sleep(200);
 ok('B.ruta directa a una capacidad Premium no monta la capacidad',
@@ -333,14 +393,14 @@ ok('B.y lleva al flujo comercial autorizado', await ev(`(function(){
 })()`));
 await ev(`if(window.closeAurixPremiumModal)window.closeAurixPremiumModal(); true`);
 // el CTA de la portada
-ok('B.CTA «Ver Workspace completo» abre el pago SIN modal intermedio', await ev(`(function(){
+ok('B.CTA «Descubrir Workspace completo» abre el pago SIN modal intermedio', await ev(`(function(){
   _wshView='free_cover'; renderWorkspaceHome();
   var b=document.querySelector('#aurixWorkspace .wsfc-cta'); if(!b) return false;
   var lbl=b.innerText||'';
   b.click();
   var pay=document.querySelector('.aurix-premium-overlay');
   var mid=document.getElementById('upgradeOverlay');
-  return /Ver Workspace completo/.test(lbl) && !!(pay&&pay.style.display==='flex') && !(mid&&mid.classList.contains('open'));
+  return /Descubrir Workspace completo/.test(lbl) && !!(pay&&pay.style.display==='flex') && !(mid&&mid.classList.contains('open'));
 })()`));
 ok('B.cancelar el pago devuelve a la portada Free', await ev(`(function(){
   if(window.closeAurixPremiumModal)window.closeAurixPremiumModal();
@@ -640,7 +700,9 @@ if (run('E')) {
 console.log('\nE · VISUAL RESPONSIVE');
 // ══════════════════════════════════════════════════════════════════════════
 mkdirSync(OUT, { recursive: true });
-const VIEWPORTS = [[360, 740], [390, 844], [430, 932], [768, 1024], [1366, 768]];
+// 1440×900 lo exige la SPEC de portadas de conversión y faltaba: es el escritorio
+// ancho donde una card acotada corre el riesgo de quedarse pequeña en un vacío.
+const VIEWPORTS = [[360, 740], [390, 844], [430, 932], [768, 1024], [1366, 768], [1440, 900]];
 const measurements = {};
 for (const [w, h] of VIEWPORTS) {
   for (const L of ['es', 'en']) {
