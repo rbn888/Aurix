@@ -292,7 +292,15 @@ console.log('\nI) blast radius — untouched surfaces:');
 ok('I.1 the ±60 min frontend authority window is unchanged (60 min)', run(ON, '_AURIX_SNAP_FE_AUTHORITY_MS') === 60 * 60000);
 ok('I.2 the merge still drops backend points near a frontend point (not disabled)',
   c2.src.filter(p => p.source === 'backend_snapshot').length < backendRows().length);
-ok('I.3 return comparability thresholds unchanged', JSON.stringify(run(ON, '_AURIX_RETURN_COMPARABLE_RATIO')) === JSON.stringify({ '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 }));
+// SUPREME CLOSURE §4.5 — la tabla admite periodos nuevos; los umbrales YA
+// ADOPTADOS no se mueven ni un decimal, y un periodo nuevo no puede ser más
+// permisivo que 'all'. Se mide eso, que es el invariante, y no el tamaño de la
+// tabla, que no lo era.
+ok('I.3 return comparability thresholds unchanged', (() => {
+  const R = run(ON, '_AURIX_RETURN_COMPARABLE_RATIO');
+  const BASE = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
+  return Object.keys(BASE).every(k => R[k] === BASE[k])
+    && Object.keys(R).filter(k => !(k in BASE)).every(k => R[k] > 0 && R[k] <= BASE.all); })());
 ok('I.4 the retention floor is the adopted coverage boundary (0.8), not a tuned value',
   run(ON, '_AURIX_WN12_MIN_SPAN_RETENTION') === 0.80 && run(ON, '_AURIX_24H_COVERAGE_THR') === 0.8);
 ok('I.5 _aurixRangeReturn source is untouched (no span/guard logic inside it)',

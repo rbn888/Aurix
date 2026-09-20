@@ -20515,19 +20515,13 @@ body.gs-open { overflow: hidden; }
   filter: drop-shadow(0 0 5px rgba(92,156,255,0.55));
 }
 .intcc-radar-dot { fill: #cfe0ff; filter: drop-shadow(0 0 3px rgba(92,156,255,0.9)); }
-/* SPEC §6 — LA TRAYECTORIA ES CONTINUA, CON DOS TRATAMIENTOS. El tramo que toca un
-   eje sin datos era DISCONTINUO y en la pantalla real hacía que el gráfico entero
-   pareciese roto: exactamente lo contrario de lo que la continuidad resuelve. Pasa
-   a SÓLIDO y NEUTRAL — mismo grosor, azul apagado, sin resplandor— así que sostiene
-   la forma de los cinco ejes sin poder leerse como una medición certificada. Lo que
-   distingue medido de desconocido es el COLOR, la OPACIDAD, el marcador HUECO y la
-   palabra «sin datos»; nunca una línea partida. El RELLENO sigue exigiendo los
-   cinco ejes certificados — eso lo decide el motor, no el CSS. */
-.intcc-radar-edge.is-unknown {
-  stroke: rgba(138,166,214,0.42);
-  stroke-width: 1.6;
-  filter: none;
-}
+/* SUPREME CLOSURE §5 — LA TRAYECTORIA ES CONTINUA Y TIENE UN SOLO TRATAMIENTO.
+   El tramo «neutral» que tocaba un eje sin datos se retira: el §5 exige cinco
+   segmentos visualmente idénticos, mismo grosor y mismas terminaciones. Lo que
+   distingue medido de no medido pasa íntegramente al TEXTO — la palabra «sin
+   datos» bajo la etiqueta y la enumeración de los cinco ejes en el aria-label—,
+   que es el canal que el §5 pide («no depender solo del color»). El RELLENO
+   sigue exigiendo los cinco ejes certificados: eso lo decide el motor. */
 /* HALO — anillo SIN relleno pintado DESPUÉS del marcador (orden de capas del §7).
    Separa el punto de las conexiones y de la retícula sin taparlo: no es un brillo,
    no crece con el valor y es IDÉNTICO para los cinco. */
@@ -20535,7 +20529,6 @@ body.gs-open { overflow: hidden; }
    conexiones y de la retícula sin morder su contorno (ver el comentario del
    renderer). No es un brillo y no crece con el valor. */
 .intcc-radar-halo { fill: #111726; stroke: none; }
-.intcc-radar-halo.is-unknown { fill: #111726; }
 .intcc-radar-label { fill: rgba(214,226,255,0.82); font-size: 9.5px; font-weight: 600; }
 .intcc-radar-val   { fill: rgba(150,180,240,0.62); font-size: 8px; font-weight: 700; font-variant-numeric: tabular-nums; }
 @keyframes intccRadarIn { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -20916,45 +20909,30 @@ body.gs-open { overflow: hidden; }
    rendered in a distinct, deliberately quiet state — dashed, dimmed, labelled
    "sin datos" and WITHOUT a vertex — so the eye reads "not measured yet" instead
    of "measured at zero". Those are different claims and must never look alike. */
-.intcc-radar-axis.is-unavailable {
-  stroke: rgba(150,180,240,0.11);
-  stroke-linecap: round;
-}
 .intcc-radar-label.is-unavailable { fill: rgba(214,226,255,0.40); font-weight: 600; }
 .intcc-radar-val.is-unavailable {
   fill: rgba(150,180,240,0.36);
   font-size: 7.5px; font-weight: 600; letter-spacing: 0.03em;
   font-variant-numeric: normal;      /* it is a word, not a figure */
 }
-/* ── CINCO MARCADORES, TRES ESTADOS DISTINGUIBLES ───────────────────────────
-   §11 · el marcador de un eje SIN DATOS va HUECO y en el límite INTERIOR de
-   referencia de su eje, con sus dos segmentos discontinuos y la palabra «sin
-   datos» bajo su etiqueta. Un 0 % REAL va SÓLIDO, también en el límite interior,
-   con su «0%» impreso. Tres señales independientes —relleno, trazo y texto—
-   distinguen «medido en cero» de «no medido»; la coordenada, por sí sola, no
-   tendría que hacerlo. No entra en el polígono: eso lo decide el motor. */
-.intcc-radar-dot.is-unknown {
-  fill: none;
-  stroke: rgba(168,196,250,0.85);
-  stroke-width: 1.6;
-  filter: none;                      /* sin glow: un dato ausente no brilla */
-}
+/* ── SUPREME CLOSURE §5 · CINCO MARCADORES, UNO SOLO ───────────────────────
+   El marcador HUECO del eje sin datos era exactamente lo que el §5 prohíbe por
+   su nombre —«ninguna muesca, hueco o centro negro»— y rompía «cinco puntos
+   visualmente idénticos … misma forma, diámetro, relleno, borde, color, brillo y
+   opacidad». Se retira la regla entera: los cinco marcadores heredan
+   `.intcc-radar-dot` y nada más. La limitación NO se pierde — vive en la palabra
+   «sin datos» de la etiqueta y en la descripción accesible—, y el invariante
+   financiero tampoco: un eje sin dato no puntúa, no se interpola y no rellena. */
 /* TRANSICIÓN SUTIL AL MOVERSE UN VALOR. Sólo geometría y opacidad, sin animación
    de entrada: lo que se percibe es que el dato SE HA MOVIDO, no un efecto. */
-.intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-radar-dot:not(.is-unknown) {
+.intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-radar-dot {
   transition: all 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-.intcc-radar-dot:not(.is-unknown) {
-  filter: drop-shadow(0 0 3px rgba(92,156,255,0.9));
 }
 @media (prefers-reduced-motion: reduce) {
   .intcc-radar-area, .intcc-radar-edge, .intcc-radar-halo, .intcc-radar-dot { transition: none !important; }
 }
-/* §7 — MISMO DIÁMETRO EXTERIOR y misma alineación para los cinco. Un hueco mayor
-   que un sólido rompía la retícula de lectura; lo que distingue al desconocido es
-   el relleno y el contorno, no el tamaño. */
-.intv6-radar .intcc-radar-dot,
-.intv6-radar .intcc-radar-dot.is-unknown { r: 4; }
+/* §7 — MISMO DIÁMETRO para los cinco, ahora por construcción: una sola regla. */
+.intv6-radar .intcc-radar-dot { r: 4; }
 
 /* ── INT.06 · STRUCTURE dependence line ─────────────────────────────────────*/
 .intv6-struct-dep {
@@ -21108,6 +21086,28 @@ body.gs-open { overflow: hidden; }
   .aurix-intcc:has(.intv12-qcard) .intv4-changed  { grid-row: 5; }
   .aurix-intcc:has(.intv12-qcard) .intv4-discovery { grid-row: 6; }
   .aurix-intcc:has(.intv12-qcard) .intcc-disclaimer { grid-row: 7; }
+  /* ── §6 · COMPARADOR · FILA PROPIA A ANCHO COMPLETO ──────────────────────
+     Igual que la card de pregunta, el cambio de rejilla está CONDICIONADO a que
+     la card exista (`:has`): sin comparador la rejilla es la de hoy byte por
+     byte, y con `gap` una fila reservada vacía sería un agujero de 16px.
+     Su sitio es el que fijó el founder: bajo la fila Radar–Factores–Explora y
+     ANTES de Lo que importa hoy / Tu evolución. */
+  .aurix-intcc:has(.intv14-cmp) .intv14-cmp       { grid-column: 1 / 13; grid-row: 3; }
+  .aurix-intcc:has(.intv14-cmp) .intcc-watch      { grid-row: 4; }
+  .aurix-intcc:has(.intv14-cmp) .intcc-timeline   { grid-row: 4; }
+  .aurix-intcc:has(.intv14-cmp) .intv5-structure  { grid-row: 5; }
+  .aurix-intcc:has(.intv14-cmp) .intv4-changed    { grid-row: 5; }
+  .aurix-intcc:has(.intv14-cmp) .intv4-discovery  { grid-row: 6; }
+  .aurix-intcc:has(.intv14-cmp) .intcc-disclaimer { grid-row: 7; }
+  /* Con pregunta Y comparador todo baja una fila más. Doble `:has` ⇒ mayor
+     especificidad, así que gana sobre las dos variantes simples. */
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intv14-cmp       { grid-row: 4; }
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intcc-watch      { grid-row: 5; }
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intcc-timeline   { grid-row: 5; }
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intv5-structure  { grid-row: 6; }
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intv4-changed    { grid-row: 6; }
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intv4-discovery  { grid-row: 7; }
+  .aurix-intcc:has(.intv12-qcard):has(.intv14-cmp) .intcc-disclaimer { grid-row: 8; }
   /* ROW SYMMETRY (INT.07 §14). INT.06 sized each card by its own content to kill
      dead space — and that produced the broken mosaic the founder photographed:
      cards ending at different baselines with black holes between them. A row must
@@ -21196,12 +21196,22 @@ body.gs-open { overflow: hidden; }
   .intcc-drivers   { order: 3; }
   .intcc-explore   { order: 4; }
   .intcc-radar     { order: 5; }
-  .intcc-watch     { order: 6; }
-  .intcc-timeline  { order: 7; }
-  .intv5-structure { order: 8; }
-  .intv4-changed   { order: 9; }
-  .intv4-discovery { order: 11; }
-  .intcc-disclaimer { order: 12; }
+  /* §6 — el comparador va DETRÁS del Radar y DELANTE de «Lo que importa hoy».
+     Mi primer intento fue darle el MISMO `order` que `.intcc-watch` y dejar que
+     el empate lo resolviera el orden del DOM: habría funcionado y no habría
+     tocado ninguna declaración existente. Lo rechazó N.8c, que prohíbe
+     expresamente los `order` repetidos en esta columna — «un empate lo decide
+     el DOM, no la composición» — y tiene razón: una composición que depende de
+     en qué punto del renderer se concatena una plantilla es una composición que
+     nadie puede leer en la hoja de estilos. Se renumera explícitamente.
+     El ORDEN VISUAL de las demás cards no cambia: sólo se abre un hueco. */
+  .intv14-cmp      { order: 6; }
+  .intcc-watch     { order: 7; }
+  .intcc-timeline  { order: 8; }
+  .intv5-structure { order: 9; }
+  .intv4-changed   { order: 10; }
+  .intv4-discovery { order: 12; }
+  .intcc-disclaimer { order: 13; }
 }
 @media (max-width: 640px) {
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
@@ -21380,9 +21390,7 @@ body.gs-open { overflow: hidden; }
     filter: drop-shadow(0 0 6px rgba(92,156,255,0.7));
   }
   .intcc-radar-edge { fill: none; }
-  .intcc-radar-edge.is-unknown { fill: none; stroke: rgba(146,176,226,0.50); filter: none; }
   .intcc-radar-dot { r: 4.4px; fill: #e2edff; }
-  .intcc-radar-dot.is-unknown { r: 4.4px; fill: none; }
 
   /* ── 6. Health card — more premium and compact.
      Truly-centred score, higher-contrast checks, −8% badge height. */
@@ -26398,7 +26406,7 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
      el 9, que ahora lo ocupa «Qué ha cambiado»: dos hermanos con el mismo `order`
      los resuelve el orden del DOM, y eso es precisamente lo que no puede decidir
      una composición. */
-  .intv9-disc          { order: 10; }
+  .intv9-disc          { order: 11; }
 }
 @media (max-width: 640px) {
   .intv9-disc-text { font-size: 12.5px; }
@@ -26547,6 +26555,208 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
    cuando no hay pregunta. */
 .intv11-dock .intv8-intel-q-opts { align-items: center; }
 .intv11-dock .intv8-intel-pause { margin: 0 0 0 4px; }
+/* ── SUPREME CLOSURE · §4.2 · LA PUERTA DE LIQUIDEZ ────────────────────────
+   Reutiliza la dock entera —mismo fondo, mismo borde, mismos chips— porque es la
+   misma conversación: una respuesta y su consecuencia. Lo único propio es la
+   línea de explicación, que existe para decir en voz baja lo que Aurix NO va a
+   hacer (poner el importe). Clase nueva, cero lógica nueva.
+   El área táctil de los dos controles la da `button.intv8-intel-opt`, que ya
+   cumple el mínimo que usa toda la dock. */
+.intv11-dock-why {
+  margin: 0 0 10px; font-size: 11.5px; line-height: 1.45;
+  color: rgba(197, 214, 245, 0.72);
+}
+.intv13-liqcta { margin-top: 10px; }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   §7 · CHAT DE LA ESFERA
+   ════════════════════════════════════════════════════════════════════════════
+   Escritorio: panel LATERAL integrado. Móvil: hoja alta con el compositor
+   SIEMPRE visible sobre el teclado y la safe-area. Un solo markup y un solo
+   contrato de foco; lo que cambia es la composición. */
+.intv15-panel {
+  position: fixed; z-index: 1200; display: flex; flex-direction: column;
+  top: 0; right: 0; bottom: 0; width: min(420px, 100vw);
+  background: var(--elev-1, #111726);
+  border-left: 1px solid rgba(var(--aurix-blue-rgb), 0.18);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.45);
+}
+.intv15-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 16px 12px; border-bottom: 1px solid rgba(var(--aurix-blue-rgb), 0.12);
+}
+.intv15-title { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(159, 194, 255, 0.9); }
+button.intv15-close {
+  cursor: pointer; font-family: inherit; font-size: 22px; line-height: 1;
+  min-width: 44px; min-height: 44px; border-radius: 10px;
+  color: rgba(214, 226, 255, 0.8); background: transparent;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.18);
+}
+.intv15-head-actions { display: inline-flex; align-items: center; gap: 8px; }
+button.intv15-clear {
+  cursor: pointer; font-family: inherit; font-size: 11.5px; font-weight: 600;
+  min-height: 44px; padding: 8px 12px; border-radius: 10px;
+  color: rgba(197, 214, 245, 0.78); background: transparent;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.18);
+}
+.intv15-log { flex: 1 1 auto; overflow-y: auto; padding: 16px; }
+.intv15-hint { margin: 0; font-size: 12.5px; line-height: 1.5; color: rgba(197, 214, 245, 0.7); }
+.intv15-msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.intv15-msg-who {
+  display: block; margin-bottom: 4px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: rgba(159, 194, 255, 0.7);
+}
+/* Un mensaje largo NO desborda: el texto envuelve y las palabras imposibles se
+   parten. Un chat que se sale de su panel es un chat roto. */
+.intv15-msg-text {
+  margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-bright);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.intv15-msg.is-user .intv15-msg-text { color: rgba(214, 226, 255, 0.82); }
+/* Una respuesta que el validador bloqueó se publica igual —son los hechos, sin
+   adornar— y se marca discretamente para que la QA pueda verlo. */
+.intv15-msg[data-blocked="1"] .intv15-msg-text { border-left: 2px solid rgba(var(--aurix-blue-rgb), 0.45); padding-left: 10px; }
+.intv15-busy, .intv15-error { margin: 14px 0 0; font-size: 12px; color: rgba(197, 214, 245, 0.7); }
+button.intv15-retry {
+  cursor: pointer; font-family: inherit; font-size: 12px; margin-left: 8px;
+  min-height: 32px; padding: 4px 10px; border-radius: 8px;
+  color: var(--text-bright); background: var(--elev-2);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.22);
+}
+.intv15-composer {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(var(--aurix-blue-rgb), 0.12);
+  background: var(--elev-1, #111726);
+}
+.intv15-input {
+  flex: 1 1 auto; resize: none; font-family: inherit; font-size: 14px; line-height: 1.45;
+  min-height: 44px; max-height: 140px; padding: 11px 12px; border-radius: 12px;
+  color: var(--text-bright); background: var(--elev-2);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.22);
+}
+button.intv15-send, button.intv15-stop {
+  cursor: pointer; font-family: inherit; flex: 0 0 auto;
+  min-width: 44px; min-height: 44px; border-radius: 12px; font-size: 14px; font-weight: 700;
+  color: var(--text-bright); background: rgba(var(--aurix-blue-rgb), 0.18);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.45);
+}
+button.intv15-send[disabled] { opacity: 0.45; cursor: default; }
+button.intv15-stop { padding: 0 12px; background: var(--elev-2); }
+.intv15-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* La esfera, cuando el gate abre, es un BOTÓN de verdad: enfocable, con nombre
+   accesible y con su rótulo visible. Sin el gate conserva su markup de siempre
+   y estas reglas no la alcanzan. */
+button.intcc-orb.is-interactive {
+  cursor: pointer; background: transparent; border: 0; padding: 0;
+  display: block; position: relative;
+}
+button.intcc-orb.is-interactive:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.85); outline-offset: 6px; border-radius: 50%; }
+.intcc-orb-cta {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: -18px; white-space: nowrap;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(159, 194, 255, 0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .intv15-panel { transition: none !important; animation: none !important; }
+}
+@media (max-width: 640px) {
+  /* Hoja casi completa. El compositor NO se va con el teclado: el panel usa
+     `dvh`, que en móvil se encoge con el teclado virtual, así que la barra de
+     escritura queda pegada al borde del área visible y no debajo de él. */
+  .intv15-panel {
+    top: auto; left: 0; right: 0; bottom: 0; width: 100vw;
+    height: 92dvh; max-height: 92dvh;
+    border-left: 0; border-top: 1px solid rgba(var(--aurix-blue-rgb), 0.18);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .intv15-input { font-size: 16px; }   /* 16px evita el zoom automático de iOS */
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   §6 · COMPARADOR DE RENTABILIDAD
+   ════════════════════════════════════════════════════════════════════════════
+   Lenguaje visual de la curva del producto —mismo azul, mismo grosor, mismo
+   glow contenido— sin reutilizar el pintor del Dashboard, que está atado al
+   FRC. Clases nuevas con prefijo propio: no pueden alterar el render de nada
+   heredado. */
+.intv14-cmp { display: flex; flex-direction: column; }
+.intv14-cmp-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin: 0 0 12px;
+}
+.intv14-cmp-ranges { display: flex; gap: 4px; flex-wrap: wrap; }
+button.intv14-cmp-range {
+  cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.04em; padding: 7px 10px; min-height: 32px; border-radius: 9px;
+  color: rgba(197, 214, 245, 0.78);
+  background: var(--elev-2); border: 1px solid rgba(var(--aurix-blue-rgb), 0.18);
+  transition: border-color 160ms var(--ease-premium, ease), background 160ms var(--ease-premium, ease), color 160ms var(--ease-premium, ease);
+}
+button.intv14-cmp-range.is-active {
+  color: var(--text-bright); border-color: rgba(var(--aurix-blue-rgb), 0.55);
+  background: rgba(var(--aurix-blue-rgb), 0.16);
+}
+.intv14-cmp-pick { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.intv14-cmp-pick-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(159, 194, 255, 0.85);
+}
+select.intv14-cmp-select {
+  cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  color: var(--text-bright); background: var(--elev-2);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.22); border-radius: 9px;
+  padding: 7px 10px; min-height: 36px; max-width: 100%;
+}
+button.intv14-cmp-clear {
+  cursor: pointer; font-family: inherit; font-size: 11.5px; font-weight: 600;
+  color: rgba(197, 214, 245, 0.72); background: transparent;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.18); border-radius: 9px;
+  padding: 7px 10px; min-height: 36px;
+}
+.intv14-cmp-plot { width: 100%; }
+.intv14-cmp-svg { display: block; width: 100%; height: 180px; overflow: visible; }
+/* La línea del cero: base 100, que es el origen común de las dos series. */
+.intv14-cmp-base { stroke: rgba(150,180,240,0.16); stroke-width: 1; stroke-dasharray: 3 4; }
+.intv14-cmp-line { fill: none; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round;
+  vector-effect: non-scaling-stroke; }
+.intv14-cmp-line.is-mine  { stroke: #6aa0ff; filter: drop-shadow(0 0 5px rgba(92,156,255,0.45)); }
+/* DOS CANALES, NO UNO. El §6.3 exige que las series se distingan por color Y
+   por trazo: con daltonismo o en una captura en gris, el color solo no basta. */
+.intv14-cmp-line.is-other { stroke: rgba(214, 226, 255, 0.72); stroke-dasharray: 6 4; filter: none; }
+.intv14-cmp-legend { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 14px; }
+.intv14-cmp-key { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(214,226,255,0.82); }
+.intv14-cmp-swatch { width: 14px; height: 0; border-top-width: 2px; border-top-style: solid; display: inline-block; }
+.intv14-cmp-key.is-mine  .intv14-cmp-swatch { border-top-color: #6aa0ff; border-top-style: solid; }
+.intv14-cmp-key.is-other .intv14-cmp-swatch { border-top-color: rgba(214,226,255,0.72); border-top-style: dashed; }
+.intv14-cmp-diff { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.intv14-cmp-note { margin: 6px 0 0; font-size: 11.5px; line-height: 1.45; color: rgba(197,214,245,0.66); }
+.intv14-cmp[data-loading="1"] .intv14-cmp-plot { opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) {
+  button.intv14-cmp-range { transition: none !important; }
+}
+@media (max-width: 640px) {
+  /* Área táctil mínima 44x44 en móvil (§6.3). */
+  button.intv14-cmp-range { min-height: 44px; padding: 10px 12px; }
+  select.intv14-cmp-select, button.intv14-cmp-clear { min-height: 44px; }
+  .intv14-cmp-pick { margin-left: 0; width: 100%; }
+  select.intv14-cmp-select { flex: 1 1 auto; }
+  .intv14-cmp-svg { height: 150px; }
+}
+/* §4.6 — la referencia de «Qué ha cambiado». Una línea discreta bajo el título:
+   dice contra qué compara la lista sin competir con ninguna cifra. */
+.intv4-chg-ref {
+  margin: -4px 0 12px; font-size: 11.5px; line-height: 1.4;
+  color: rgba(197, 214, 245, 0.66);
+}
+.intv12-qcard .intv13-liqcta:first-child { margin-top: 0; }
 /* Aparición sutil, y sólo la dock: nada que mueva otras cards. */
 @media (prefers-reduced-motion: no-preference) {
   .intv11-dock { animation: intv11DockIn 220ms var(--ease-premium, ease) both; }

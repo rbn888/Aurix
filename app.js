@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '694'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '695'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4165,6 +4165,9 @@ const USER_SCOPED_LOCAL_KEYS = [
   // va sellado con su dueño y la lectura falla cerrada sin sello, así que el
   // aislamiento no depende sólo de que esta purga corra.
   'aurix_intel_ctx_v1', 'aurix_intel_mem_v1',
+  // §6.2 — el comparador se guarda «solo sesión/local y separada por cuenta».
+  // Va sellado con su dueño como los dos de arriba, y además se purga aquí.
+  'aurix_cmp_state_v1',
   // SPEC ADVANCED INTELLIGENCE · A1 — linaje de clasificación. Es el mapa
   // activo→bucket de UNA cartera y su bitácora de cambios: con el de A vivo, una
   // afirmación de exposición histórica de B podría declararse «clasificación
@@ -5331,7 +5334,7 @@ const T = {
     // que ya tenías. Se dice lo que se sabe: se registró liquidez.
     intel_d_capital:       'Tu patrimonio ha subido por la liquidez que registraste, no por rendimiento del mercado.',
     intel_d_intent:        pct => `Dijiste que tu prioridad es preservar, y hoy una sola posición pesa el ${pct}%.`,
-    intel_d_liq_need:      'Dijiste que vas a necesitar liquidez y tu peso en liquidez ha bajado.',
+    intel_d_liq_need:      (pp, pct, win) => `Dijiste que vas a necesitar liquidez y tu peso en liquidez ha bajado ${pp} puntos, hasta el ${pct}%, en ${win}.`,
     intel_d_combined:      n => `${n} lecturas se han movido a la vez. Por separado ninguna destacaba.`,
     // Preguntas: sólo cuando un hecho real las necesita, y siempre con su porqué.
     intel_q_conc_intent:   name => `¿Tu posición en ${name} es una exposición que has elegido a propósito?`,
@@ -5348,6 +5351,10 @@ const T = {
     // desconocida en liquidez suficiente: hace explícito que Aurix no lo ve todo.
     intel_q_unregistered_liquidity:     '¿Tienes liquidez disponible que todavía no has registrado en Aurix?',
     intel_q_unregistered_liquidity_why: 'Aurix mide sobre lo registrado. Saberlo evita que trate una parte como el total.',
+    intel_liq_cta_title: 'Nos has dicho que tienes liquidez que Aurix todavía no ve.',
+    intel_liq_cta_body:  'Si la registras, Aurix medirá tu patrimonio completo. Ni el importe ni la fecha los pone Aurix: los pones tú.',
+    intel_liq_cta_add:   'Añadir liquidez en Aurix',
+    intel_liq_cta_later: 'Ahora no',
     intel_opt_deliberate:  'Sí, es una decisión propia',
     intel_opt_not_deliberate: 'No, no lo había decidido',
     intel_opt_complete:    'Sí, está todo',
@@ -5441,6 +5448,10 @@ const T = {
     intcc_dim_stab:   'Estabilidad',
     intcc_dim_growth: 'Crecimiento',   // INT.07 — the founder's five conceptual dimensions
     intv7_axis_unavailable: 'sin datos',
+    // RESIDUAL B — la cobertura del eje, en la etiqueta. Compacta a propósito:
+    // el eje tiene sitio para una cifra y poco más, y lo que hay que decir es
+    // sobre cuántos días se midió, no una frase.
+    intv7_axis_span_days: (n) => `${n} d medidos`,
     intv7_radar_legend: 'Las cinco dimensiones de tu estructura. Cada eje es un porcentaje de su propia magnitud, y Aurix sólo dibuja los que puede certificar.',
     intv7_radar_pending: (d) => `Todavía sin datos: ${d}. Aparecerán cuando Aurix pueda medirlas con rigor.`,
     // M.03 C — el disclosure nombra la evidencia que falta, eje por eje.
@@ -5521,6 +5532,8 @@ const T = {
     intv4_brief_title: 'Lo que importa hoy',
     intv4_brief_empty: 'Aurix está leyendo tu patrimonio. En cuanto haya un hecho que pueda demostrar, aparecerá aquí.',
     intv4_changed_title: 'Qué ha cambiado',
+    intv4_changed_ref_since: (d) => `Sobre lo registrado desde el ${d}.`,
+    intv4_changed_ref_24h:   'Durante las últimas 24 horas.',
     intv4_changed_empty: 'Todavía no hay cambios que Aurix pueda medir con la historia disponible.',
     // M.03 E — tres estados vacíos, tres afirmaciones distintas.
     intv4_changed_stable: 'Aurix ha comparado tu historia y no detecta ningún cambio material.',
@@ -5530,23 +5543,66 @@ const T = {
     intv4_changed_others_none: 'No se detectan otros cambios relevantes.',
     intv4_discovery_title: 'Puede que no hayas visto esto',
     intv4_explore_title: 'Explora tu patrimonio',
-    intv4_memory_title: 'Memoria patrimonial',
-    intv4_memory_empty: 'Tu memoria patrimonial empezará a construirse con las próximas observaciones.',
+    intv4_memory_title: 'Tu evolución',
+    intv4_memory_empty: 'Aún no hay historial suficiente para mostrar tu evolución.',
     intv4_quality_title: 'Lo que Aurix todavía no puede afirmar',
     intv4_detail_more: 'Ver el detalle',
     intv4_supporting: 'Hechos que lo sostienen',
     intv4_confidence_high: 'Datos completos',
     intv4_confidence_medium: 'Pocas observaciones todavía',
     // ventanas
+    chat_ask: 'Preguntar a Aurix',
+    chat_title: 'Aurix Intelligence',
+    chat_close: 'Cerrar',
+    chat_you: 'Tú',
+    chat_aurix: 'Aurix',
+    chat_hint: 'Pregunta sobre tu patrimonio: valor, composición, concentración, liquidez, evolución o qué ha cambiado. Aurix responde con hechos ya calculados de tu cuenta.',
+    chat_placeholder: 'Escribe tu pregunta…',
+    chat_input_label: 'Tu pregunta para Aurix',
+    chat_send: 'Enviar',
+    chat_stop: 'Detener',
+    chat_retry: 'Reintentar',
+    chat_thinking: 'Aurix está analizando…',
+    chat_clear: 'Limpiar',
+    chat_err_conversation_unavailable: 'La conversación todavía no está disponible.',
+    chat_err_generic: 'No se ha podido completar la respuesta.',
+    chat_err_network: 'No hay conexión con Aurix ahora mismo.',
+    chat_err_unauthenticated: 'Tu sesión ha caducado. Vuelve a entrar para seguir preguntando.',
+    chat_err_daily_question_limit: 'Has alcanzado el máximo de preguntas de hoy.',
+    chat_err_daily_budget: 'Has alcanzado el límite de uso de hoy.',
+    chat_err_global_budget: 'Aurix Intelligence está en pruebas y ha alcanzado su límite.',
+    chat_err_provider_error: 'Aurix no ha podido responder. Inténtalo de nuevo.',
+    chat_err_provider_unavailable: 'Aurix no está disponible ahora mismo.',
+    chat_err_already_generating: 'Espera a que termine la respuesta anterior.',
+    chat_err_not_available: 'La conversación todavía no está disponible en tu cuenta.',
+    cmp_title: 'Comparar rentabilidad',
+    cmp_with: 'Comparar con',
+    cmp_none: 'Sin comparación',
+    cmp_mine: 'Mi patrimonio',
+    cmp_clear: 'Quitar comparación',
+    cmp_insufficient: 'Datos insuficientes',
+    cmp_available_from: (d) => `Comparación disponible desde el ${d}`,
+    cmp_diff_ahead:  (pp) => `En este periodo vas ${pp} puntos porcentuales POR DELANTE.`,
+    cmp_diff_behind: (pp) => `En este periodo vas ${pp} puntos porcentuales POR DETRÁS.`,
+    cmp_diff_flat:   'En este periodo vais prácticamente igual.',
+    cmp_ends: (d) => `La comparación llega hasta el ${d}.`,
+    cmp_no_return: 'Aurix todavía no puede certificar una rentabilidad para este periodo, así que no hay nada que comparar. La comparación es entre rentabilidades, no entre importes.',
+    cmp_price_return: 'Los comparadores usan la variación de precio del índice o del activo; no incorporan dividendos.',
+    cmp_range_aria: 'Periodo de la comparación',
+    cmp_range_24h: '24H', cmp_range_7d: '7D', cmp_range_30d: '30D',
+    cmp_range_1y: '1A', cmp_range_all: 'TOTAL',
+    cmp_a11y: (mine, other) => `Comparación de rentabilidad entre ${mine} y ${other}, con base 100 en la primera fecha común.`,
+    cmp_b_sp500: 'S&P 500', cmp_b_ndx100: 'Nasdaq 100', cmp_b_btc: 'Bitcoin', cmp_b_gold: 'Oro',
     intv4_r_24h: 'las últimas 24 h', intv4_r_7d: 'los últimos 7 días', intv4_r_30d: 'los últimos 30 días',
-    intv4_r_90d: 'los últimos 90 días', intv4_r_all: 'todo el periodo registrado', intv4_r_now: 'ahora mismo',
+    intv4_r_90d: 'los últimos 90 días',
+    intv4_r_all: 'todo el periodo registrado', intv4_r_now: 'ahora mismo',
     // categorías del lector certificado
     intv4_cat_stock: 'la bolsa', intv4_cat_etf: 'los ETF', intv4_cat_fund: 'los fondos',
     intv4_cat_crypto: 'la cripto', intv4_cat_metal: 'los metales', intv4_cat_liquidity: 'la liquidez',
     intv4_cat_other: 'otros activos',
     // hechos
     intv4_f_return: (pct, win) => `Tu rendimiento invertible fue del ${pct}% en ${win}`,
-    intv4_f_return_pos: pct => `Tus inversiones han generado un ${pct}% de rendimiento`,
+    intv4_f_return_pos: (pct, win) => `Tus inversiones han generado un ${pct}% de rendimiento en ${win}`,
     // §2 — CUANDO SÓLO SE CONOCE UN NIVEL, SE DICE UN NIVEL. La frase la fija el
     // contrato palabra por palabra, y no pasa por la tabla de perímetro porque ya
     // nombra el perímetro financiero correcto sin decir «patrimonio invertible».
@@ -5700,9 +5756,9 @@ const T = {
     intv4_q_q_liquidity: '¿Cuánta liquidez tengo y cómo se mueve?',
     intv4_q_q_concentration: '¿De qué posición depende más mi patrimonio?',
     intv4_q_q_diversification: '¿Estoy tan diversificado como parece?',
-    intv4_q_q_capital_flows: '¿Cuánto de mi crecimiento es dinero que puse yo?',
     intv4_q_q_structure: '¿Cómo se reparte hoy mi patrimonio?',
     intv4_q_q_historical: '¿Dónde está mi patrimonio frente a su propia historia?',
+    intv4_q_q_current_value: '¿Cuánto vale actualmente mi cartera financiera?',
     intv4_q_q_data_quality: '¿Qué puede saber Aurix de mí ahora mismo?',
     intv4_gap_per_asset_attribution: 'Aurix todavía no puede decirte qué activo explicó tu rendimiento: la historia por posición es demasiado corta para afirmarlo.',
     intv4_gap_generic: familia => `Todavía no hay historia suficiente para ${familia}.`,
@@ -8114,7 +8170,7 @@ const T = {
     intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
     intel_d_capital:       'Your wealth rose on the cash you recorded, not on market return.',
     intel_d_intent:        pct => `You said preserving is your priority, and today one position weighs ${pct}%.`,
-    intel_d_liq_need:      'You said you will need liquidity and your liquidity weight has fallen.',
+    intel_d_liq_need:      (pp, pct, win) => `You said you will need liquidity and your liquidity weight has fallen ${pp} points, to ${pct}%, over ${win}.`,
     intel_d_combined:      n => `${n} readings moved at the same time. Individually none stood out.`,
     intel_q_conc_intent:   name => `Is your position in ${name} an exposure you chose on purpose?`,
     intel_q_conc_why:      'The figure does not change. What changes is Aurix no longer flagging it as an oversight.',
@@ -8125,6 +8181,10 @@ const T = {
     intel_q_goal:          'What are you mainly looking for with this wealth?',
     intel_q_unregistered_liquidity:     'Do you have available cash you have not recorded in Aurix yet?',
     intel_q_unregistered_liquidity_why: 'Aurix measures what is recorded. Knowing this stops it treating a part as the whole.',
+    intel_liq_cta_title: 'You told us you hold cash Aurix cannot see yet.',
+    intel_liq_cta_body:  'Record it and Aurix will measure your whole wealth. Aurix sets neither the amount nor the date: you do.',
+    intel_liq_cta_add:   'Add cash in Aurix',
+    intel_liq_cta_later: 'Not now',
     intel_q_goal_why:      'It orders what Aurix shows you first.',
     intel_opt_deliberate:  'Yes, a decision of mine',
     intel_opt_not_deliberate: 'No, I had not decided it',
@@ -8213,6 +8273,7 @@ const T = {
     intcc_dim_stab:   'Stability',
     intcc_dim_growth: 'Growth',        // INT.07 — the founder's five conceptual dimensions
     intv7_axis_unavailable: 'no data',
+    intv7_axis_span_days: (n) => `${n}d measured`,
     intv7_radar_legend: 'The five dimensions of your structure. Each axis is a percentage of its own magnitude, and Aurix only draws the ones it can certify.',
     intv7_radar_pending: (d) => `No data yet: ${d}. They will appear once Aurix can measure them rigorously.`,
     intv7_pending_obs:     (d) => `${d}: there is history, but not yet enough observations to measure it without overstating the calm. It appears on its own once there is.`,
@@ -8289,26 +8350,71 @@ const T = {
     intv4_brief_title: 'What matters today',
     intv4_brief_empty: 'Aurix is reading your wealth. As soon as there is a fact it can prove, it will appear here.',
     intv4_changed_title: 'What changed',
+    intv4_changed_ref_since: (d) => `Against what is recorded since ${d}.`,
+    intv4_changed_ref_24h:   'Over the last 24 hours.',
     intv4_changed_empty: 'There are no changes Aurix can measure with the history available yet.',
     intv4_changed_stable: 'Aurix compared your history and detects no material change.',
     intv4_changed_all_published: 'The only material change in your portfolio is the one Aurix reports above.',
     intv4_changed_others_none: 'No other relevant changes detected.',
     intv4_discovery_title: 'You may not have seen this',
     intv4_explore_title: 'Explore your wealth',
-    intv4_memory_title: 'Wealth memory',
-    intv4_memory_empty: 'Your wealth memory will start building with the next observations.',
+    intv4_memory_title: 'Your evolution',
+    intv4_memory_empty: 'There is not enough history yet to show your evolution.',
     intv4_quality_title: 'What Aurix cannot state yet',
     intv4_detail_more: 'See the detail',
     intv4_supporting: 'Facts behind it',
     intv4_confidence_high: 'Complete data',
     intv4_confidence_medium: 'Few observations yet',
+    chat_ask: 'Ask Aurix',
+    chat_title: 'Aurix Intelligence',
+    chat_close: 'Close',
+    chat_you: 'You',
+    chat_aurix: 'Aurix',
+    chat_hint: 'Ask about your wealth: value, composition, concentration, cash, evolution or what changed. Aurix answers with facts already computed for your account.',
+    chat_placeholder: 'Type your question…',
+    chat_input_label: 'Your question for Aurix',
+    chat_send: 'Send',
+    chat_stop: 'Stop',
+    chat_retry: 'Retry',
+    chat_thinking: 'Aurix is analysing…',
+    chat_clear: 'Clear',
+    chat_err_conversation_unavailable: 'Conversation is not available yet.',
+    chat_err_generic: 'The answer could not be completed.',
+    chat_err_network: 'No connection to Aurix right now.',
+    chat_err_unauthenticated: 'Your session expired. Sign in again to keep asking.',
+    chat_err_daily_question_limit: 'You have reached today\u2019s question limit.',
+    chat_err_daily_budget: 'You have reached today\u2019s usage limit.',
+    chat_err_global_budget: 'Aurix Intelligence is in testing and has reached its limit.',
+    chat_err_provider_error: 'Aurix could not answer. Please try again.',
+    chat_err_provider_unavailable: 'Aurix is unavailable right now.',
+    chat_err_already_generating: 'Wait for the previous answer to finish.',
+    chat_err_not_available: 'Conversation is not available on your account yet.',
+    cmp_title: 'Compare performance',
+    cmp_with: 'Compare with',
+    cmp_none: 'No comparison',
+    cmp_mine: 'My wealth',
+    cmp_clear: 'Remove comparison',
+    cmp_insufficient: 'Insufficient data',
+    cmp_available_from: (d) => `Comparison available from ${d}`,
+    cmp_diff_ahead:  (pp) => `Over this period you are ${pp} percentage points AHEAD.`,
+    cmp_diff_behind: (pp) => `Over this period you are ${pp} percentage points BEHIND.`,
+    cmp_diff_flat:   'Over this period you are essentially level.',
+    cmp_ends: (d) => `The comparison runs up to ${d}.`,
+    cmp_no_return: 'Aurix cannot certify a return for this period yet, so there is nothing to compare. The comparison is between returns, not between amounts.',
+    cmp_price_return: 'Comparators use the price change of the index or asset; they do not include dividends.',
+    cmp_range_aria: 'Comparison period',
+    cmp_range_24h: '24H', cmp_range_7d: '7D', cmp_range_30d: '30D',
+    cmp_range_1y: '1Y', cmp_range_all: 'ALL',
+    cmp_a11y: (mine, other) => `Performance comparison between ${mine} and ${other}, rebased to 100 at the first common date.`,
+    cmp_b_sp500: 'S&P 500', cmp_b_ndx100: 'Nasdaq 100', cmp_b_btc: 'Bitcoin', cmp_b_gold: 'Gold',
     intv4_r_24h: 'the last 24h', intv4_r_7d: 'the last 7 days', intv4_r_30d: 'the last 30 days',
-    intv4_r_90d: 'the last 90 days', intv4_r_all: 'the whole recorded period', intv4_r_now: 'right now',
+    intv4_r_90d: 'the last 90 days',
+    intv4_r_all: 'the whole recorded period', intv4_r_now: 'right now',
     intv4_cat_stock: 'equities', intv4_cat_etf: 'ETFs', intv4_cat_fund: 'funds',
     intv4_cat_crypto: 'crypto', intv4_cat_metal: 'metals', intv4_cat_liquidity: 'cash',
     intv4_cat_other: 'other assets',
     intv4_f_return: (pct, win) => `Your investable return was ${pct}% over ${win}`,
-    intv4_f_return_pos: pct => `Your investments have generated a ${pct}% return`,
+    intv4_f_return_pos: (pct, win) => `Your investments have generated a ${pct}% return over ${win}`,
     intv4_f_level: amt => `Your financial portfolio is currently worth ${amt}`,
     intv4_f_ath: amt => `Your investable wealth is at its high: ${amt}`,
     intv4_f_level_up:   (amt, since) => `Change in your financial portfolio's recorded value since ${since}: +${amt}`,
@@ -8384,9 +8490,9 @@ const T = {
     intv4_q_q_liquidity: 'How much cash do I hold, and how is it moving?',
     intv4_q_q_concentration: 'Which position does my wealth depend on most?',
     intv4_q_q_diversification: 'Am I as diversified as it looks?',
-    intv4_q_q_capital_flows: 'How much of my growth is money I put in?',
     intv4_q_q_structure: 'How is my wealth split today?',
     intv4_q_q_historical: 'Where is my wealth against its own history?',
+    intv4_q_q_current_value: 'How much is my financial portfolio worth right now?',
     intv4_q_q_data_quality: 'What can Aurix know about me right now?',
     intv4_gap_per_asset_attribution: 'Aurix cannot yet tell you which asset explained your return: the per-position history is too short to state it.',
     intv4_gap_generic: family => `There is not enough history yet for ${family}.`,
@@ -28763,7 +28869,19 @@ function _aurixInvestableSnapshots(range) {
     let nowRef = 0;
     for (const _p of _src) { if (_p && Number.isFinite(_p.ts) && _p.ts > nowRef) nowRef = _p.ts; }
     if (!(nowRef > 0)) nowRef = Date.now();
-    const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
+    // ── SUPREME CLOSURE · LAS DOS TABLAS DE SPAN TIENEN QUE DECIR LO MISMO ──
+    // Ésta y la de `_aurixInvestablePerformance` (`_nominal`) son gemelas, y la
+    // revisión financiera encontró que ya NO coincidían: allí existía '90d' y
+    // aquí no, y el `|| 2592e6` de abajo convertía ese nombre en una ventana de
+    // 30 días SIN DECIRLO — treinta días de datos con la cobertura declarada
+    // como BUENA, porque el nominal sí sabía qué era '90d'. Hoy nadie pide '90d'
+    // por este camino, así que no hay defecto en producción; lo que había era la
+    // trampa esperando al primer llamador. Se sincronizan las dos claves a clave.
+    // NO se unifican en una sola constante a propósito: una docena de harness del
+    // motor del gráfico construyen su sandbox con estas funciones y una constante
+    // externa las obligaría a todas a cambiar, que es mucho riesgo por una
+    // consolidación cosmética. Si se toca una, se toca la otra.
+    const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '90d': 7776e6, '1y': 31536e6 };
     const start = range === 'all' ? 0 : nowRef - (ms[range] || 2592e6);
     // FASE 1 — exclude INCOMPLETE snapshots (the main source of false vertical jumps:
     // e.g. 62.886 → 75.538 with no deposit). fxPartial = a holding had no price/FX at
@@ -28835,7 +28953,21 @@ function _aurixInvestableSnapshots(range) {
 // invariant is untouched. Rollback: flip the flag false ⇒ byte-identical to the previous build.
 const _AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD = true;
 const _AURIX_WN12_MIN_SPAN_RETENTION = 0.80;                              // = the adopted coverageRatio<0.8 authority boundary
-const _AURIX_WN12_BOUNDED_RANGES = { '24h': 1, '7d': 1, '30d': 1, '1y': 1 };   // 'all'/TOTAL is unbounded ⇒ guard does not apply
+// '90d' ENTRA AQUÍ PORQUE ENTRÓ EN LAS OTRAS DOS, y la revisión financiera
+// explicó por qué no basta con sincronizar dos de tres: antes, un llamador de
+// '90d' recibía 30 días con `coversNominal:false` —fallo cerrado y ruidoso—; con
+// `ms` y `_nominal` ya sincronizadas y este guardia sin la clave, recibiría una
+// ventana de 90 días de aspecto impecable pero EXPUESTA al trim cosmético, con un
+// nominal contra el que medirse y ningún aviso. Es la forma exacta del residual
+// de abajo. Cuesta una clave y hoy no cambia nada para nadie.
+// RESIDUAL ANOTADO POR EL §4.5: 'all' es el ÚNICO rango sin guardia de retención
+// —«unbounded ⇒ no hay contrato de cobertura que honrar»— y eso, con una cuenta
+// larga, deja que el trim cosmético de WN.12 le recorte el arranque hasta el
+// pico y publique 90 días bajo el nombre «todo el periodo registrado». Con los
+// cuatro rangos actuales el defecto no es visible porque nadie publica un
+// periodo largo con el que contrastarlo; lo destapó el intento de añadirlos.
+// No se toca aquí: el motor está congelado y esto es suyo, no de este SPEC.
+const _AURIX_WN12_BOUNDED_RANGES = { '24h': 1, '7d': 1, '30d': 1, '90d': 1, '1y': 1 };   // 'all'/TOTAL is unbounded ⇒ guard does not apply
 function _aurixEligibleInvestableSeries(range) {
   const raw = _aurixInvestableSnapshots(range);
   const meta = {
@@ -28843,6 +28975,12 @@ function _aurixEligibleInvestableSeries(range) {
     reasons: { real_estate_polluted: 0, pre_investable_split: 0, incompatible_regime: 0, construction_baseline: 0, stale_low_information: 0, insufficient_clean_data: 0 },
     anchor: null, activeWindowStart: null, activeWindowEnd: null,
   };
+  // P1 · EL ARRANQUE DEL REGISTRO, EXPORTADO. `meta.raw` era un RECUENTO, así que
+  // nadie aguas abajo podía comparar «dónde empieza la serie» con «dónde empieza
+  // el registro» — y esa comparación es justo lo que decide si una ventana puede
+  // llamarse «todo el periodo registrado». Se publica el timestamp, que ya
+  // estaba aquí. Cero cálculo nuevo.
+  meta.rawWindowStart = raw.length ? raw[0].ts : null;
   if (raw.length < 2) { meta.eligible = raw.length; if (raw.length < 2) meta.reasons.insufficient_clean_data = 1; return { series: raw.slice(), meta }; }
 
   // P0-CANONICAL-PERFORMANCE-ENGINE — trust-filter anchor = the LAST SHARED SNAPSHOT value (canonical,
@@ -31440,6 +31578,29 @@ function _aurixInvestablePerformance(range) {
     startValue: null, endValue: null, observations: 0, flowCount: 0,
     externalFlowCount: 0, tradeFlowCount: 0, confidence: null, basis: 'investable-twr', fallbackReason: null,
     spanMs: null, nominalMs: null, coversNominal: null,
+    // ── P1 · «TODO EL PERIODO REGISTRADO» PODÍA SER MEDIO PERIODO ──────────
+    // `coversNominal` no podía detectarlo y nunca podrá: para 'all' no hay span
+    // nominal contra el que medir, así que vale `true` POR DEFINICIÓN. El
+    // recorte de WN.12 es COSMÉTICO y en 'all' —el único rango sin guardia de
+    // retención— se aplica siempre, de modo que la serie puede empezar en el
+    // pico de una rampa y el hecho seguir llamándose «todo el periodo
+    // registrado». Medido: una cuenta de 200 días publicaba −20,27 % sobre 90
+    // días bajo ese nombre. La cifra es correcta (es un TWR flow-neutral real
+    // sobre la ventana que midió); lo que era falso era el NOMBRE.
+    // Esta bandera es el dato que faltaba: dice que el arranque NO es el
+    // arranque del registro. No cambia ninguna cifra ni ninguna publicación —
+    // sólo permite que el periodo se nombre por lo que es.
+    //
+    // MIDE EL HECHO, NO UN MECANISMO. Mi primera versión la ataba al recorte
+    // cosmético de WN.12, y la revisión financiera encontró que ése no es el
+    // único camino: el filtro de confianza WN.13 también deja fuera puntos
+    // INICIALES (`construction_baseline`, `pre_investable_split`,
+    // `incompatible_regime`). Una cuenta que empezó en 500 € y hoy vale 60.000 €
+    // pierde sus primeros puntos por debajo del 15 % del ancla, y «todo el
+    // periodo registrado» volvía a ser falso por otra vía. La pregunta correcta
+    // es una sola —¿empieza la serie después del primer punto registrado?— y se
+    // responde comparando dos timestamps que el owner ya tenía.
+    startsAfterRecord: false,
     unmatchedFlows: 0, unmatchedFlowTotal: 0,
     // SPEC ADVANCED INTELLIGENCE · A1 — DIAGNÓSTICOS, no valores publicables.
     // La puerta de reconciliación necesita una tolerancia DERIVADA, no elegida, y
@@ -31475,12 +31636,24 @@ function _aurixInvestablePerformance(range) {
     // snapshots can do the same on any range. The threshold is NOT invented here:
     // `_AURIX_WN12_MIN_SPAN_RETENTION` (0.8) is the boundary this codebase already
     // adopted for "a window stops being authoritative for its range".
+    // GEMELA de la tabla `ms` de `_aurixInvestableSnapshots`: mismas claves,
+    // mismos valores. Su fallback sí difiere y debe hacerlo: `null` significa «no
+    // hay nominal contra el que medir la cobertura», no «treinta días».
     const _nominal = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '90d': 7776e6, '1y': 31536e6 }[String(r).toLowerCase()] || null;
     out.spanMs = tLast - tFirst;
     out.nominalMs = _nominal;
     out.coversNominal = (_nominal == null)
       ? true                                            // 'all' has no nominal span to fall short of
       : (out.spanMs / _nominal) >= _AURIX_WN12_MIN_SPAN_RETENTION;
+    // Se compara con el meta del owner de la serie. `coversNominal` se deja
+    // INTACTO a propósito: es un contrato con otros consumidores
+    // —`_aurixPeakRetention` deja de publicar Estabilidad cuando es falso— y
+    // convertir un recorte en «historia insuficiente» apagaría un eje del radar
+    // que sí es medible. Son dos preguntas distintas y ahora tienen dos
+    // respuestas distintas.
+    const _rawStart = (elig && elig.meta && Number.isFinite(elig.meta.rawWindowStart))
+      ? elig.meta.rawWindowStart : null;
+    out.startsAfterRecord = (_rawStart !== null && tFirst > _rawStart);
     out.startValue = +pts[0].value.toFixed(2);
     out.endValue   = +pts[pts.length - 1].value.toFixed(2);
 
@@ -31642,7 +31815,17 @@ if (typeof window !== 'undefined') {
 function _aurixPeakRetention(range) {
   const out = { range: range || 'all', status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE,
     reason: 'owner_unavailable', retentionPct: null, maxDrawdownPct: null,
-    observations: 0, intervals: 0, quality: null };
+    observations: 0, intervals: 0, quality: null,
+    // ── RESIDUAL B · LA COBERTURA DEL DRAWDOWN, DECLARADA ─────────────────
+    // El drawdown se mide sobre el índice de `_aurixInvestablePerformance`, o
+    // sea sobre la MISMA serie que puede venir recortada. Cuando el lead-in
+    // recortado es un descenso largo y recto, el máximo anterior desaparece con
+    // él y la retención publicada es mejor que la real. El pico suele sobrevivir
+    // —el trim conserva el punto de contexto anterior a la curvatura—, pero
+    // «suele» no es un contrato. Estas dos se heredan del owner del retorno y
+    // permiten que la superficie diga sobre QUÉ ventana mide, en vez de dejar
+    // que el usuario asuma «desde siempre».
+    startsAfterRecord: false, spanMs: null };
   try {
     if (typeof _aurixInvestablePerformance !== 'function') return out;
     const perf = _aurixInvestablePerformance(out.range);
@@ -31673,6 +31856,8 @@ function _aurixPeakRetention(range) {
     if (!Number.isFinite(worst)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'drawdown_not_finite'; return out; }
     out.maxDrawdownPct = +(worst * 100).toFixed(2);
     out.retentionPct   = Math.max(0, Math.min(100, Math.round(100 - out.maxDrawdownPct)));
+    out.startsAfterRecord = perf.startsAfterRecord === true;
+    out.spanMs = Number.isFinite(perf.spanMs) ? perf.spanMs : null;
     out.status = _AURIX_FACT_STATUS.AVAILABLE;
     out.reason = '';
     out.quality = 'measured';
@@ -32445,12 +32630,29 @@ function _aurixFactLedger(opts) {
   };
   // NOVELTY affects PRIORITY, never TRUTH. A fact already shown is still true;
   // it simply ranks lower until the memory horizon passes.
+  //
+  // ── SUPREME CLOSURE · §4.4 · LA NOVEDAD SE MIDE EN DÍAS, NO EN MILISEGUNDOS ─
+  // ÉSTE ERA EL MOTOR DE LA INESTABILIDAD QUE EL §4.4 PROHÍBE POR SU NOMBRE
+  // («estable durante el mismo día … nunca por refresh»). La novedad era una
+  // fracción CONTINUA de la edad en milisegundos, y la historia de presentación
+  // se reescribe en CADA pintura: un hecho publicado pasaba a novedad 0 al
+  // instante mientras el que no cupo seguía en 1, así que en el repintado
+  // siguiente se intercambiaban el sitio. La card cambiaba al refrescar sin que
+  // hubiera cambiado ni un dato — que es exactamente la clase de movimiento que
+  // hace que una superficie de interpretación deje de leerse como verdad.
+  //
+  // La edad se DISCRETIZA a días completos. Dentro de una misma jornada la
+  // novedad de cada hecho es una constante, así que el orden es idéntico en la
+  // primera pintura y en la vigésima; cruzar un día es lo único que puede
+  // moverlo. No cambia ninguna cifra publicada: la novedad es un componente de
+  // PRIORIDAD, y la prioridad sólo decide el ORDEN.
   const noveltyOf = key => {
     const t0 = lastShown(key);
     if (t0 === null) return 1;
     const age = nowTs - t0;
     if (!Number.isFinite(age) || age <= 0) return 0;
-    return _aurixFactClamp01(age / _AURIX_NOVELTY_WINDOW_MS);
+    const ageDays = Math.floor(age / 864e5);
+    return _aurixFactClamp01((ageDays * 864e5) / _AURIX_NOVELTY_WINDOW_MS);
   };
   const gap = (family, semanticKey, status, reason, extra) => {
     gaps.push(Object.assign({ family, semanticKey, status, reason: reason || '' }, extra || {}));
@@ -32477,7 +32679,46 @@ function _aurixFactLedger(opts) {
   };
 
   // ── A · PERFORMANCE — exclusively the INT.02 certified owner ──────────────
-  const perfRanges = Array.isArray(o.perfRanges) ? o.perfRanges : ['24h', '7d', '30d', 'all'];
+  // SUPREME CLOSURE · §4.5 — VARIEDAD TEMPORAL, CON LA MISMA PUERTA.
+  // «Tu evolución» debe poder combinar 3, 6, 12, 24 y 60 meses «si existe
+  // cobertura». No hay ninguna regla nueva que lo permita: el owner ya falla
+  // cerrado por historia insuficiente, por baseline no comparable y por salto sin
+  // flujo, y la de-duplicación por INTERVALO MEDIDO que hay justo debajo hace el
+  // resto del trabajo — con 34 días de historia, 90d/180d/1y/2y/5y seleccionan el
+  // MISMO primer y último punto que 'all' y se publican UNA vez, bajo el nombre
+  // más ancho y veraz ('all' = «todo el periodo registrado»). Es decir: añadir
+  // periodos no puede crear un hecho nuevo hasta que la historia los cubra de
+  // verdad. Orden estricto de estrecho a ancho: de él depende esa regla.
+  // ════════════════════════════════════════════════════════════════════════
+  // §4.5 · VARIEDAD TEMPORAL — DETENIDA, Y POR UNA RAZÓN MEDIDA
+  // ════════════════════════════════════════════════════════════════════════
+  // El §4.5 pide combinar 3, 6 y 12 meses «si existe cobertura». Añadirlos aquí
+  // es una línea, y el gate lo ejecutó sobre una cuenta de 200 días. El
+  // resultado, con esa cuenta (rampa hasta el día 110 y caída después):
+  //
+  //     investable_return_all  = −20,27 %   «todo el periodo registrado»
+  //     investable_return_1y   = +12,33 %   «el último año»
+  //     investable_return_180d =  +4,85 %   «los últimos 6 meses»
+  //
+  // Los tres son CERTIFICADOS y los tres se publicarían a la vez. No es un
+  // redondeo: 'all' es el único rango NO acotado, así que el guardia de
+  // retención de WN.12 (`_AURIX_WN12_BOUNDED_RANGES`) no lo protege y su trim
+  // cosmético le recorta el arranque hasta el PICO — mide 90 días y se llama
+  // «todo el periodo registrado», mientras '1y', que sí está protegido, mide los
+  // 200 días completos. El nombre más ancho acaba sobre la ventana más estrecha.
+  //
+  // Publicar dos rentabilidades de signo opuesto sobre periodos que se contienen
+  // es exactamente lo que este producto no puede hacer, así que la variedad
+  // temporal NO entra. La causa NO está en este SPEC: está en el trim de WN.12 y
+  // en que 'all' no tiene contrato de cobertura, o sea en el motor del gráfico,
+  // que está congelado desde su certificación. Queda anotado como residual con
+  // su reproducción exacta (gate SC.5.13) y con lo que haría falta para
+  // levantarlo: un contrato de cobertura para 'all'.
+  //
+  // Lo que SÍ queda hecho y no depende de esto: la tabla de spans unificada, el
+  // guardia de retención y el contrato de periodo/cobertura por hecho.
+  const perfRanges = Array.isArray(o.perfRanges) ? o.perfRanges
+    : ['24h', '7d', '30d', 'all'];
   // A window is identified by the interval it actually MEASURED, not by its name.
   // With a short history 7D, 30D and ALL select the same first/last observation,
   // so they are ONE measurement — publishing it once per range name put the same
@@ -32520,7 +32761,10 @@ function _aurixFactLedger(opts) {
       value: p.returnPct, unit: 'percent',
       values: { returnPct: p.returnPct, startValue: p.startValue, endValue: p.endValue, flowCount: p.flowCount },
       window: { range: pr, startAt: p.startAt, endAt: p.endAt, observations: p.observations,
-                spanMs: p.spanMs, coversNominal: p.coversNominal !== false },
+                spanMs: p.spanMs, coversNominal: p.coversNominal !== false,
+                // P1 — sin esto la ventana llega al renderer sin saber que su
+                // arranque no es el del registro, y el nombre vuelve a mentir.
+                startsAfterRecord: p.startsAfterRecord === true },
       source: 'aurixInvestablePerformance',
       direction: p.returnPct > 0 ? 'up' : (p.returnPct < 0 ? 'down' : 'flat'),
       positive: p.returnPct > 0,
@@ -33949,6 +34193,35 @@ function _aurixWowInsights(ledger) {
 // is what removes the current "three questions, one answer" problem (what moves
 // my wealth / where am I concentrated / what should I watch all resolved to
 // top1). Answers are STRUCTURED — never copy, never "movers" used for exposure.
+// ════════════════════════════════════════════════════════════════════════════
+// SUPREME CLOSURE · §4.3 — UNA PREGUNTA SÓLO EXISTE SI SU RESPUESTA EXISTE
+// ════════════════════════════════════════════════════════════════════════════
+// La puerta era `requires`: una lista de claves exactas que deben estar en el
+// ledger. Correcta, pero demasiado corta para dos preguntas concretas que el
+// §4.3 señala por su nombre, porque el hecho que exigían NO ES la respuesta:
+//
+//  · «¿Cuánto de mi crecimiento es dinero que puse yo?» exigía sólo
+//    `recorded_capital_net`, que desde el P0 de capital contiene ÚNICAMENTE
+//    movimientos de liquidez registrados. Con eso se puede decir cuánto efectivo
+//    entró; NO se puede separar aportación externa de rendimiento, que es
+//    literalmente lo que la pregunta pregunta. El §4.3 lo dice sin rodeos: «el
+//    coste de compra no demuestra el origen del dinero». Ahora exige ADEMÁS un
+//    rendimiento certificado, que es el otro término de la resta.
+//
+//  · «¿Dónde está mi patrimonio frente a su propia historia?» exigía sólo
+//    `investable_level`, que es el nivel de HOY. Sin máximo, mínimo o periodo
+//    anterior no hay «su propia historia» contra la que situarlo. Ahora exige
+//    una referencia histórica certificada.
+//
+// Y donde antes no había pregunta posible, ahora hay una VERDADERA: si lo único
+// que Aurix sabe es el valor actual, ésa es la pregunta honesta. Comparte raíz
+// causal con la histórica, así que la regla de raíces distintas que ya existía
+// las hace mutuamente excluyentes por construcción — una función, no dos
+// derivaciones — y el `interest` decide cuál gana cuando las dos son elegibles.
+//
+// `requiresAny` es la extensión mínima que esto necesita: basta UNA de las
+// claves. Un prefijo (`investable_return_`) cubre las familias con nombre de
+// rango, que no se pueden enumerar sin fijar los periodos.
 const _AURIX_QUESTION_CATALOG = Object.freeze([
   { id: 'q_performance',      family: 'performance',        causalRoot: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
     requires: ['investable_return_all'], interest: 0.95 },
@@ -33960,12 +34233,37 @@ const _AURIX_QUESTION_CATALOG = Object.freeze([
     requires: ['top_position_weight'], interest: 0.85 },
   { id: 'q_diversification',  family: 'diversification',    causalRoot: _AURIX_CAUSAL_ROOT.TOP_POSITION,
     requires: ['effective_holdings'], interest: 0.8 },
-  { id: 'q_capital_flows',    family: 'capital_flows',      causalRoot: _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL,
-    requires: ['recorded_capital_net'], interest: 0.75 },
+  // ── §4.3 · «¿CUÁNTO DE MI CRECIMIENTO ES DINERO QUE PUSE YO?» SE RETIRA ────
+  // Mi primer intento fue endurecer la puerta: exigir además un rendimiento
+  // certificado, para que existiera el otro término de la resta. La revisión
+  // financiera demostró que eso arregla la MITAD equivocada del problema. El
+  // §4.3 exige poder separar CUATRO cosas —aportaciones externas, retiradas,
+  // transferencias o reclasificaciones, y rendimiento— y Aurix sólo conoce las
+  // dos primeras: `recorded_capital_net` contiene ÚNICAMENTE movimientos de
+  // LIQUIDEZ registrados (así quedó tras el P0 de capital), y la rotación interna
+  // no deja rastro en él porque una compra no debita caja en este modelo. Con la
+  // puerta endurecida la respuesta seguía siendo dos párrafos yuxtapuestos —«has
+  // registrado 5.000 US$ en entradas» y «tu rentabilidad ha sido +3,00 %»— que el
+  // usuario tiene que restar de cabeza, y la resta ni siquiera cerraría. Es la
+  // misma dicotomía capital-vs-mercado que A1 ya había retirado a propósito de
+  // los descubrimientos, reintroducida por otra puerta.
+  // «El coste de compra no demuestra el origen del dinero», dice el §4.3. Tampoco
+  // lo demuestra el ledger de liquidez. La pregunta vuelve el día que exista un
+  // hecho que certifique la descomposición, y no antes.
   { id: 'q_structure',        family: 'structure',          causalRoot: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
     requiresFamily: 'exposure', interest: 0.6 },
   { id: 'q_historical',       family: 'historical_behaviour', causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
-    requires: ['investable_level'], interest: 0.55 },
+    requires: ['investable_level'],
+    // §4.3 — «frente a su propia historia» exige que la historia esté certificada:
+    // un máximo, un máximo anterior o un cambio de nivel medido.
+    requiresAny: ['investable_all_time_high', 'investable_prior_high', 'investable_level_change'],
+    interest: 0.55 },
+  // §4.3 — LA PREGUNTA QUE FALTABA. «Si solo se conoce el valor actual, usar
+  // ¿Cuánto vale actualmente mi cartera financiera?». Misma raíz que la
+  // histórica ⇒ nunca coinciden; menor interés ⇒ cede el sitio en cuanto existe
+  // una comparación real que ofrecer.
+  { id: 'q_current_value',    family: 'wealth_level',       causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
+    requires: ['investable_level'], interest: 0.50 },
   { id: 'q_data_quality',     family: 'data_quality',       causalRoot: _AURIX_CAUSAL_ROOT.DATA_COVERAGE,
     alwaysEligible: true, interest: 0.3 },
 ]);
@@ -33977,11 +34275,28 @@ function _aurixContextualQuestions(ledger, opts) {
   const has = k => facts.some(f => f.semanticKey === k);
   const famFacts = fam => facts.filter(f => f.family === fam);
   const eligible = [];
+  // Una clave que termina en `_` es un PREFIJO de familia (los rangos de
+  // rendimiento no se pueden enumerar sin fijar los periodos); cualquier otra es
+  // una clave exacta. Devuelve el hecho encontrado, no un booleano, porque el
+  // hecho pasa a formar parte de la respuesta.
+  const findAny = keys => {
+    for (const k of (keys || [])) {
+      const f = /_$/.test(k) ? facts.find(x => String(x.semanticKey).indexOf(k) === 0)
+                             : facts.find(x => x.semanticKey === k);
+      if (f) return f;
+    }
+    return null;
+  };
   for (const q of _AURIX_QUESTION_CATALOG) {
     let answerFacts = [];
     if (q.requires) {
       if (!q.requires.every(has)) continue;                       // INELIGIBLE — a missing fact is not a question
       answerFacts = q.requires.map(k => facts.find(f => f.semanticKey === k));
+      if (q.requiresAny) {
+        const extra = findAny(q.requiresAny);
+        if (!extra) continue;                                     // §4.3 — sin la evidencia que la respuesta necesita, no hay pregunta
+        answerFacts.push(extra);
+      }
     } else if (q.requiresFamily) {
       answerFacts = famFacts(q.requiresFamily);
       if (!answerFacts.length) continue;
@@ -34191,6 +34506,130 @@ function _aurixCanonicalFindings(ledger, opts) {
   return deduped.slice(0, limit);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SUPREME CLOSURE · CHECKPOINT B — EL SOBRE DEL HECHO CERTIFICADO
+// ════════════════════════════════════════════════════════════════════════════
+// QUÉ ES, Y SOBRE TODO QUÉ NO ES. No es un motor: no calcula, no convierte, no
+// pondera y no lee ningún owner. Es una CAPA ADAPTADORA sobre el hecho que el
+// ledger ya emitió, y su único trabajo es NOMBRAR de una vez lo que hasta ahora
+// cada superficie volvía a derivar por su cuenta: qué periodo se pidió, cuál se
+// midió de verdad, cuánto lo cubre, quién lo calculó y qué no puede afirmar.
+//
+// POR QUÉ HACÍA FALTA. Las cuatro superficies —Hoy, Tu evolución, Explora y Qué
+// ha cambiado— leían `fact.window` y cada una decidía a su manera si el nombre
+// del rango era publicable. `_intv4WindowLabel` ya resolvía el caso importante
+// (degradar a «efectivo: N días» cuando la ventana no cubre su nombre), pero
+// esa decisión vivía en la COPY, así que ni el DOM ni el gate podían verla. Un
+// consumidor nuevo tenía que reinventarla, y reinventarla mal es exactamente
+// cómo se publica un periodo parcial con nombre de periodo completo.
+//
+// EL CONTRATO NO COPIA EL PATRIMONIO. Lleva identidad, tiempos, cobertura y
+// procedencia — nunca posiciones, nunca la cartera, nunca importes que el hecho
+// no publique ya. El ámbito (`scope.owner`) viaja en el OBJETO y jamás al DOM:
+// un identificador de cuenta en un atributo sería PII en el HTML.
+const _AURIX_FACT_CONTRACT_VERSION = 'fact-envelope-1';
+// LA DECISIÓN, EN UN SOLO SITIO: ¿puede este hecho llamarse por el nombre de su
+// rango? Vivía DOS veces —en `_intv4WindowLabel` (copy) y, implícitamente, en
+// cada superficie que leía `window.range`—, y una decisión duplicada sobre si un
+// periodo parcial puede usar un nombre completo es la definición del defecto que
+// el §4.5 prohíbe. Devuelve el nombre publicable o `null`; nunca degrada en
+// silencio.
+function _aurixFactPeriodNamedAs(win) {
+  if (!win) return null;
+  if (_aurixFactPeriodDegraded(win)) return null;   // medido, pero no cubre su nombre
+  return win.range ? String(win.range) : null;      // …o sencillamente no tiene nombre
+}
+// Los DOS nulos de arriba no son el mismo caso, y confundirlos publica un
+// periodo donde antes no había ninguno: «no cubre su nombre nominal» autoriza
+// decir «efectivo: N días», y «no hay rango» no autoriza NADA. Se separan
+// explícitamente en vez de dejar que cada consumidor lo deduzca.
+function _aurixFactPeriodDegraded(win) {
+  if (!win) return false;
+  // CAUSA 1 · RANGOS ACOTADOS: el span medido no cubre el nominal. Ya existía y
+  // no cambia.
+  if (win.coversNominal === false) return true;
+  if (win.startsAfterRecord !== true) return false;
+  // ── CAUSA 2 · Y POR QUÉ SÓLO SE APLICA A 'all' ──────────────────────────
+  // Mi primera versión degradaba con `startsAfterRecord` a secas, y la revisión
+  // financiera lo tumbó con el caso que WN.12 existe para tratar: una ráfaga
+  // densa de onboarding delante de la historia */15 hace que el trim se aplique
+  // en 24H con retención ≈1,0 — o sea la ventana mide 24 horas de verdad— y aun
+  // así «en las últimas 24 h» pasaba a «en los últimos 1 día registrados».
+  // Unidad equivocada, frase agramatical, y en la superficie más vista. Con '1y'
+  // y retención 0,85 salía «los últimos 310 días registrados» mientras el badge
+  // del gráfico seguía diciendo 1A sobre la MISMA serie: dos superficies
+  // nombrando distinto la misma ventana.
+  //
+  // La razón de fondo es que la pregunta sólo es binaria para un nombre: un
+  // rango ACOTADO no afirma completitud —afirma «las últimas 24 h»—, y si su
+  // arranque se movió, quien lo mide ya es `coversNominal`, con el umbral 0,80
+  // que esta app adoptó y que el guardia de retención de WN.12 hace cumplir: un
+  // trim que sobrevive en un rango acotado es un trim que la app YA declaró
+  // inocuo para nombrarlo. Degradarlo aquí contradecía ese umbral.
+  // 'all' es el único nombre que afirma «todo», y el único sin nominal contra el
+  // que medirse. Por eso es el único que esta causa puede degradar.
+  return String(win.range || '').toLowerCase() === 'all';
+}
+// La cobertura sólo se puede declarar cuando hay con qué compararla. Sin span
+// nominal (un periodo abierto como 'all') la pregunta «¿cubre su nombre?» no
+// tiene sentido, y se dice `null` en vez de inventar un 1.
+function _aurixFactEnvelope(fact, opts) {
+  if (!fact || !fact.semanticKey) return null;
+  const o = opts || {};
+  const w = fact.window || {};
+  const requested = w.range ? String(w.range) : null;
+  const spanMs = Number.isFinite(w.spanMs) ? w.spanMs : null;
+  const covers = (w.coversNominal === false) ? false : (w.coversNominal === true ? true : null);
+  // PERIODO EFECTIVO: el que se MIDIÓ. Cuando no cubre el nominal, el nombre del
+  // rango deja de ser una etiqueta válida y el periodo se identifica por sus dos
+  // extremos reales. Es la misma regla que ya aplicaba la copy — aquí se declara
+  // una vez y la copy pasa a ser un consumidor más.
+  const effective = {
+    startAt: Number.isFinite(w.startAt) ? w.startAt : null,
+    endAt: Number.isFinite(w.endAt) ? w.endAt : null,
+    spanMs,
+    // `null` = no se puede afirmar el nombre nominal; nunca se degrada en silencio.
+    namedAs: _aurixFactPeriodNamedAs(w),
+  };
+  const limitations = [];
+  if (covers === false) limitations.push('window_shorter_than_nominal');
+  if (w.startsAfterRecord === true) limitations.push('starts_after_first_record');
+  if (fact.causeKnown === false) limitations.push('cause_not_demonstrable');
+  if (Number.isFinite(fact.confidence) && fact.confidence < 1) limitations.push('observation_density');
+  return {
+    factId: fact.id || (fact.semanticKey + (requested ? '@' + requested : '')),
+    type: fact.semanticKey,
+    family: fact.family || null,
+    subject: (fact.values && (fact.values.name || fact.values.subject)) || fact.causalRoot || null,
+    // ÁMBITO AUTORIZADO. Nunca se renderiza: identifica de quién es el hecho para
+    // que ningún consumidor pueda mezclar cuentas sin declararlo.
+    scope: { owner: ('owner' in o) ? o.owner
+      : ((typeof _aurixIntelOwner === 'function') ? _aurixIntelOwner({}) : null) },
+    value: (fact.value === undefined) ? null : fact.value,
+    unit: fact.unit || null,
+    requestedPeriod: requested,
+    effectivePeriod: effective,
+    // COBERTURA: la proporción del periodo pedido que se midió de verdad, y el
+    // número de observaciones que la sostienen. Sin nominal no hay proporción.
+    coverage: {
+      observations: Number.isFinite(w.observations) ? w.observations : null,
+      coversNominal: covers,
+    },
+    provenance: fact.source || null,
+    certification: fact.dataStatus || null,
+    limitations,
+    computedAt: Number.isFinite(o.generatedAt) ? o.generatedAt : null,
+    ownerVersion: _AURIX_FACT_CONTRACT_VERSION,
+    // IDENTIDAD SEMÁNTICA — tipo + sujeto + periodo EFECTIVO + owner/versión. Es
+    // la clave de deduplicación entre superficies, y usa el periodo efectivo a
+    // propósito: dos rangos que midieron el MISMO intervalo son un solo hecho,
+    // que es la regla que `perfByWindow` ya aplica en el ledger.
+    semanticIdentity: [fact.semanticKey, String(fact.causalRoot || ''),
+      String(effective.startAt || ''), String(effective.endAt || ''),
+      String(fact.source || ''), _AURIX_FACT_CONTRACT_VERSION].join('|'),
+  };
+}
+
 // ── THE CONSUMPTION CONTRACT FOR INT.04 ────────────────────────────────────
 // One entry point. INT.04 must never recompute a financial metric: everything
 // it can render is here, already certified, deduplicated and ranked.
@@ -34222,6 +34661,18 @@ function _aurixIntelligenceCore(opts) {
     contextualQuestions: _aurixContextualQuestions(ledger, o),
     temporalEvents: ledger.facts.filter(f => f.family === _AURIX_FACT_FAMILY.WEALTH_LEVEL)
       .sort((a, b) => (b.priority - a.priority) || (a.semanticKey < b.semanticKey ? -1 : 1)),
+    // CHECKPOINT B — el sobre de cada hecho, indexado por `factId`. UNA
+    // derivación, cuatro consumidores: es la razón de ser del contrato. Se
+    // construye sobre `ledger.facts`, que ya está recorrido, así que no añade
+    // ni una lectura de owner.
+    factContract: {
+      version: _AURIX_FACT_CONTRACT_VERSION,
+      byId: ledger.facts.reduce((acc, f) => {
+        const env = _aurixFactEnvelope(f, { owner: o.owner, generatedAt: ledger.generatedAt });
+        if (env) acc[env.factId] = env;
+        return acc;
+      }, {}),
+    },
     dataAvailability: {
       status: _AURIX_FACT_STATUS,
       gaps: ledger.gaps,
@@ -34471,6 +34922,11 @@ function _aurixAiLiquidity(snap, facts) {
 // el rendimiento sale de los facts de INT.02 (flow-neutral) y el capital aportado
 // de `recorded_capital_net`. Cuando no hay historia suficiente, el rendimiento no
 // se sustituye por la variación del nivel — serían dos cosas distintas.
+// Las ventanas que la señal de EVOLUCIÓN del hero puede leer. Es la lista que
+// `perfRanges` tenía antes de que el §4.5 la ampliara, y se declara por su nombre
+// para que ampliar el catálogo de hechos no vuelva a mover, en silencio, lo que
+// el producto considera «una novedad».
+const _AURIX_AI_EVOLUTION_RANGES = Object.freeze(['24h', '7d', '30d', 'all']);
 function _aurixAiEvolution(facts, gaps, observation) {
   const out = { dimension: _AURIX_AI_DIM.EVOLUTION, availability: _AURIX_AI_AVAIL.UNAVAILABLE,
     coverage: _AURIX_AI_COVERAGE.UNAVAILABLE, reason: 'insufficient_history',
@@ -34481,8 +34937,29 @@ function _aurixAiEvolution(facts, gaps, observation) {
   const level = (facts || []).filter(x => x && x.semanticKey === 'investable_level_change'
                                        && Number.isFinite(x.value))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0] || null;
+  // ── SUPREME CLOSURE · LA VENTANA DE LA SEÑAL NO PUEDE DEPENDER DEL CATÁLOGO ─
+  // LA REVISIÓN FINANCIERA ENCONTRÓ AQUÍ UN DEFECTO CARO Y DIFERIDO, y merece
+  // quedar escrito entero porque es exactamente la clase de ripple que un cambio
+  // "aditivo" produce.
+  //
+  // Este selector elige el retorno de MAYOR VALOR ABSOLUTO entre TODOS los hechos
+  // `investable_return_*` del ledger. El §4.5 amplió `perfRanges` para que «Tu
+  // evolución» pueda combinar 3, 6 y 12 meses, y eso, sin tocar una línea de
+  // aquí, ampliaba el universo de este `sort`. Con ~200 días de historia:
+  // `investable_return_all` = +1,2 % (no material) frente a un
+  // `investable_return_90d` = −9 % que ANTES NO EXISTÍA. La señal pasaría de
+  // STABLE a DECREASING, `_aurixIntelMemory` emitiría `reading_changed`, y el
+  // hero titularía «Hay una novedad en tu patrimonio» sin que el patrimonio ni el
+  // mercado hubieran cambiado: sólo había entrado una ventana nueva en el
+  // catálogo. Y detonaría SOLO, sin desplegar nada, el día ~91 de cada cuenta.
+  //
+  // La señal de evolución del hero lee las ventanas que SIEMPRE ha leído. Que el
+  // ledger publique más periodos es una capacidad de «Tu evolución», no un cambio
+  // en lo que el hero considera un cambio.
   const ret = (facts || []).filter(x => x && typeof x.semanticKey === 'string'
                                      && x.semanticKey.indexOf('investable_return_') === 0
+                                     && _AURIX_AI_EVOLUTION_RANGES
+                                          .indexOf(x.semanticKey.slice('investable_return_'.length)) !== -1
                                      && Number.isFinite(x.value))
     .sort((a, b) => (b.confidence || 0) - (a.confidence || 0)
                  || Math.abs(b.value) - Math.abs(a.value))[0] || null;
@@ -34923,6 +35400,19 @@ const _AURIX_INTEL_FIELDS = Object.freeze({
   explanation_depth:    { purpose: 'explanation_density',           changes: 'language',
                           options: ['guided', 'balanced', 'advanced'] },
 });
+// ── SUPREME CLOSURE · §4.1 · GRUPOS DE AFIRMACIÓN EXCLUYENTE ───────────────
+// Cada grupo enumera COMBINACIONES campo+valor que no pueden ser verdad a la vez.
+// Es una tabla declarativa a propósito: añadir un campo nuevo al catálogo no
+// obliga a tocar el lector, y la única forma de crear una contradicción nueva es
+// declararla aquí, donde se ve. Un valor que NO aparece en ningún grupo nunca
+// supersede ni es superseded — que es el caso de la mayoría.
+const _AURIX_INTEL_EXCLUSIVE_CLAIMS = Object.freeze([
+  // «Aurix ve todo mi patrimonio» vs. «tengo liquidez que Aurix no ve».
+  Object.freeze([
+    Object.freeze({ field: 'wealth_coverage',        value: 'complete' }),
+    Object.freeze({ field: 'unregistered_liquidity', value: 'yes' }),
+  ]),
+]);
 const _AURIX_INTEL_CTX_KEY = 'aurix_intel_ctx_v1';
 const _AURIX_INTEL_MEM_KEY = 'aurix_intel_mem_v1';
 const _AURIX_INTEL_PROVENANCE = Object.freeze(['user_answer', 'inferred', 'default']);
@@ -35029,6 +35519,46 @@ function _aurixIntelContext(env) {
     out.fields[k] = { value: v.value, provenance: v.provenance,
       answeredAt: Number.isFinite(v.answeredAt) ? v.answeredAt : null,
       subject: v.subject || null, purpose: spec.purpose, changes: spec.changes };
+  });
+  // ══════════════════════════════════════════════════════════════════════
+  // SUPREME CLOSURE · §4.1 — LA RESPUESTA MÁS RECIENTE SUSTITUYE A LA ANTERIOR
+  // ══════════════════════════════════════════════════════════════════════
+  // El defecto, con el ejemplo del propio SPEC: el usuario confirma «todo mi
+  // patrimonio está registrado» (`wealth_coverage: complete`) y semanas después
+  // responde «sí, tengo liquidez sin registrar» (`unregistered_liquidity: yes`).
+  // Son DOS CAMPOS distintos, así que nada los relacionaba, y las dos frases
+  // seguían publicándose a la vez como verdades ACTUALES. Una de las dos es
+  // falsa, y es siempre la vieja.
+  //
+  // LA REGLA, declarada y general (el §4.1 la pide «para cualquier contexto
+  // declarado»): los campos que hacen AFIRMACIONES INCOMPATIBLES sobre el mismo
+  // asunto se agrupan, y dentro de un grupo sólo el respondido MÁS RECIENTEMENTE
+  // sigue siendo estado vigente. Los demás NO se borran —el §4.1 permite
+  // conservarlos como historial— sino que quedan marcados `superseded`, y ninguna
+  // superficie de verdad actual puede publicarlos.
+  //
+  // La incompatibilidad se declara por PAR DE VALORES, no por campo: «tengo
+  // liquidez sin registrar» contradice «la cobertura es completa», pero «NO tengo
+  // liquidez sin registrar» la confirma y no debe invalidar nada.
+  //
+  // Sin `answeredAt` no se puede ordenar, y entonces no se supersede nada: fallar
+  // hacia CONSERVAR es lo correcto aquí, porque la alternativa es ocultar en
+  // silencio una respuesta que el usuario sí dio.
+  _AURIX_INTEL_EXCLUSIVE_CLAIMS.forEach(group => {
+    const present = group
+      .filter(c => { const f = out.fields[c.field]; return f && f.value === c.value; })
+      .filter(c => Number.isFinite(out.fields[c.field].answeredAt));
+    if (present.length < 2) return;
+    let newest = present[0];
+    present.forEach(c => {
+      if (out.fields[c.field].answeredAt > out.fields[newest.field].answeredAt) newest = c;
+    });
+    present.forEach(c => {
+      if (c === newest) return;
+      out.fields[c.field] = Object.assign({}, out.fields[c.field],
+        { superseded: true, supersededBy: newest.field,
+          supersededAt: out.fields[newest.field].answeredAt });
+    });
   });
   out.answered = Object.keys(out.fields).length;
   out.source = out.answered ? 'stored' : 'none';
@@ -36107,6 +36637,12 @@ function _aurixIntel(opts) {
       fields: Object.keys(ctx.fields).reduce((acc, k) => {
         acc[k] = { value: ctx.fields[k].value, provenance: ctx.fields[k].provenance,
           answeredAt: ctx.fields[k].answeredAt, purpose: ctx.fields[k].purpose,
+          // §4.1 — el sello de supersesión VIAJA. Si se quedase en el lector, cada
+          // consumidor tendría que volver a derivar qué respuesta es la vigente, y
+          // dos derivaciones de lo mismo es exactamente cómo aparecen las dos
+          // verdades contradictorias que este apartado viene a eliminar.
+          superseded: ctx.fields[k].superseded === true,
+          supersededBy: ctx.fields[k].supersededBy || null,
           changes: ctx.fields[k].changes }; return acc; }, {}),
       catalogue: Object.keys(_AURIX_INTEL_FIELDS) },
     // El nivel sale del contexto si el usuario lo eligió; si no, se PROPONE desde
@@ -60158,6 +60694,10 @@ let _intelLastRun = null;
 // pintura era escritura y red por repintado. La misma pregunta se marca una vez.
 let _intelMarkedQuestionId = null;
 let _intelAnswerWired = false;
+let _intv14CmpWired = false;
+let _intv14CmpRepaint = null;
+let _aurixChatWired = false;
+let _aurixChatResetWired = false;
 const _INTCC_VISIT_KEY  = 'aurix_intcc_last_visit_v1';
 
 function _intccEsc(s) {
@@ -60642,7 +61182,30 @@ function _intccDate(ts) {
 // ── Visual primitives (pure SVG/CSS, no external assets) ────────────────────
 
 // Animated Aurix energy orb — glow + pulse + ECG, tone driven by reading state.
+// ── §7 · LA ESFERA PROMETE CONVERSACIÓN SÓLO SI LA HAY ─────────────────────
+// Sin endpoint configurado, sin Premium o con el kill switch puesto, la esfera
+// se queda EXACTAMENTE como hoy: decorativa, `aria-hidden`, sin foco y sin
+// listener. El §7 lo pide con estas palabras — «conservar la esfera sin
+// affordance conversacional»— y es la diferencia entre no tener chat y tener un
+// chat muerto. Cuando el gate abre, la MISMA esfera se convierte en un botón
+// real: rótulo «Preguntar a Aurix», enfocable, con nombre accesible.
 function _intccOrbHtml() {
+  const chat = (typeof _aurixChatEnabled === 'function') ? _aurixChatEnabled() : false;
+  if (chat) {
+    const label = _intv4T('chat_ask');
+    return `
+    <button type="button" class="intcc-orb is-interactive" data-chat-open="1"
+            aria-label="${_intccEsc(label)}" title="${_intccEsc(label)}">
+      <span class="intcc-orb-glow" aria-hidden="true"></span>
+      <span class="intcc-orb-ring intcc-orb-ring--1" aria-hidden="true"></span>
+      <span class="intcc-orb-ring intcc-orb-ring--2" aria-hidden="true"></span>
+      <span class="intcc-orb-core" aria-hidden="true"></span>
+      <svg class="intcc-orb-ecg" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true">
+        <path pathLength="100" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/>
+      </svg>
+      <span class="intcc-orb-cta">${_intccEsc(label)}</span>
+    </button>`;
+  }
   return `
     <div class="intcc-orb" aria-hidden="true">
       <span class="intcc-orb-glow"></span>
@@ -60700,13 +61263,25 @@ function _intccScoreRingHtml(score) {
 // INT.07 — THE FRAME AND THE POLYGON ARE DIFFERENT THINGS.
 //
 // The five axes are the radar's CONCEPTUAL STRUCTURE and are always drawn, because
-// they are the five dimensions Intelligence reasons about. The POLYGON only joins
-// the axes Aurix can actually certify. An axis with no evidence is rendered in a
-// distinct, dimmed "sin datos" state and gets NO vertex — it is NOT pulled to the
-// centre, because 0 and "unknown" are different claims and drawing one as the
-// other would assert something Aurix does not know.
+// they are the five dimensions Intelligence reasons about. The AREA FILL only
+// exists when Aurix can certify all five.
 //
-// So: geometry follows the data. `dims` may carry `unavailable: true`.
+// SUPREME CLOSURE §5 RE-DECIDES WHERE THE LIMITATION IS DECLARED, and it is worth
+// writing down why, because it reverses INT.07/§11 on purpose. Those versions put
+// the "sin datos" state INTO THE FIGURE — dimmed radial, neutral segment, hollow
+// marker— and the founder's QA on the real screen read the result as a broken
+// chart rather than as an honest one: a hollow dot next to four solid ones looks
+// like a rendering defect, not like a declared limit. So the figure becomes
+// UNIFORM (five identical markers, five identical segments, one line weight) and
+// the limitation moves ENTIRELY to text: the word "sin datos" under the axis
+// label, and the accessible enumeration of all five axes in the aria-label.
+//
+// WHAT DOES NOT MOVE, and must not: an uncertified axis still scores nothing,
+// interpolates nothing, and blocks the area fill. Its coordinate is the neutral,
+// deterministic interior reference (`R_UNK`) that §5 authorises "solo para cerrar
+// visualmente la figura" — it is not a value and nothing reads it as one.
+//
+// So: geometry is the frame, text is the truth. `dims` may carry `unavailable: true`.
 function _intccRadarSvg(radar, dimsOverride) {
   const ALL_DIMS = Array.isArray(dimsOverride) && dimsOverride.length ? dimsOverride : [
     { key: 'diversification', label: t('intcc_dim_div') },
@@ -60758,9 +61333,13 @@ function _intccRadarSvg(radar, dimsOverride) {
     rings += `<polygon class="intcc-radar-ring" points="${poly(rBand(f))}"/>`;
   });
   let axes = '';
+  // ── SUPREME CLOSURE · §5 — LAS CINCO RADIALES SON LA MISMA LÍNEA ──────────
+  // Atenuar la radial de un eje sin datos era una tercera señal de estado sobre
+  // la GEOMETRÍA, y el §5 la retira por su nombre: «mismo grosor y terminaciones
+  // en todas las líneas». La ausencia de dato la siguen diciendo la palabra «sin
+  // datos» bajo la etiqueta y la descripción accesible, que son texto y no color.
   dims.forEach((d, i) => { const [x, y] = pt(i, R); const [ix, iy] = pt(i, R_UNK);
-    const cls = (measured.indexOf(d) === -1) ? ' is-unavailable' : '';
-    axes += `<line class="intcc-radar-axis${cls}" x1="${ix.toFixed(1)}" y1="${iy.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
+    axes += `<line class="intcc-radar-axis" x1="${ix.toFixed(1)}" y1="${iy.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
   // Los vértices conservan su posición angular real dentro del marco de cinco
   // ejes: la figura es una sub-figura honesta del pentágono, nunca un polígono
   // reescalado sobre menos ejes.
@@ -60798,16 +61377,25 @@ function _intccRadarSvg(radar, dimsOverride) {
   // opacidad, el marcador hueco y la palabra «sin datos» — nunca una línea partida.
   // Los dos tratamientos van en GRUPOS separados para respetar el orden de capas
   // de §7: primero la trayectoria neutral, después los tramos medidos encima.
-  let edgeNeutral = '', edgeMeasured = '', edgeCount = 0, neutralCount = 0;
+  // ── SUPREME CLOSURE · §5 — CINCO SEGMENTOS IDÉNTICOS ─────────────────────
+  // El tratamiento «neutral» del tramo que tocaba un eje sin datos se retira: el
+  // §5 exige «cinco segmentos visualmente idénticos» y «mismo grosor y
+  // terminaciones en todas las líneas». Dos colores de trazo eran una CUARTA
+  // señal de estado sobre la figura, y la figura ya no es donde se dice el
+  // estado — se dice en la etiqueta y en la descripción accesible.
+  // LO QUE NO CAMBIA, y es el invariante financiero: un eje sin dato sigue sin
+  // puntuar, sin interpolarse y sin entrar en el RELLENO (`closeArea` exige los
+  // cinco certificados). Su coordenada es la posición interior neutral y
+  // determinista que el §5 autoriza «solo para cerrar visualmente la figura».
+  let edges = '', edgeCount = 0, neutralCount = 0;
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
-    const known = isM(i) && isM(j);
+    if (!(isM(i) && isM(j))) neutralCount++;      // diagnóstico, ya no tratamiento
     const [ax, ay] = posOf(i);
     const [bx, by] = posOf(j);
-    const seg = `<line class="intcc-radar-edge${known ? '' : ' is-unknown'}"`
+    edges += `<line class="intcc-radar-edge"`
           +  ` x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}"`
           +  ` x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}"/>`;
-    if (known) edgeMeasured += seg; else { edgeNeutral += seg; neutralCount++; }
     edgeCount++;
   }
   let labels = '', dots = '', halos = '';
@@ -60852,10 +61440,20 @@ function _intccRadarSvg(radar, dimsOverride) {
     // grande que un sólido rompía la retícula de lectura: lo que distingue al
     // desconocido es el RELLENO (ninguno) y el contorno, no el tamaño. El halo es
     // idéntico para ambos, así que ninguna línea atraviesa el centro de un marcador.
+    // ── SUPREME CLOSURE · §5 — UN SOLO MARCADOR, CINCO VECES ───────────────
+    // El marcador HUECO del eje sin datos era, literalmente, lo que el §5 prohíbe
+    // por su nombre: «ninguna muesca, hueco o centro negro» y «cinco puntos
+    // visualmente idénticos … misma forma, diámetro, relleno, borde, color,
+    // brillo y opacidad». Se retira el estado visual; NO se retira la verdad: el
+    // eje sigue rotulado «sin datos», sigue enumerado como tal en la descripción
+    // accesible, sigue sin puntuar y sigue sin rellenar el área. Lo que cambia es
+    // que la figura deja de ser el sitio donde se declara la limitación.
+    // `data-availability` se conserva: es el discriminador del gate y el que
+    // alimenta la descripción accesible, y no pinta nada.
     const [dx, dy] = posOf(i);
-    halos += `<circle class="intcc-radar-halo${isMeasured ? '' : ' is-unknown'}"`
+    halos += `<circle class="intcc-radar-halo"`
           +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${(RADAR_DOT_R + 2.2).toFixed(1)}"/>`;
-    dots += `<circle class="intcc-radar-dot${isMeasured ? '' : ' is-unknown'}"`
+    dots += `<circle class="intcc-radar-dot"`
          +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${RADAR_DOT_R}"`
          +  ` data-axis="${_intccEsc(d.key)}"`
          +  ` data-availability="${isMeasured ? 'measured' : 'unknown'}"/>`;
@@ -60866,21 +61464,36 @@ function _intccRadarSvg(radar, dimsOverride) {
   // debajo. Con R = 100 los extremos caen en x ∈ [−67, 277] e y ∈ [−26, 214]
   // sobre la copy más larga de los dos idiomas, así que el marco deja ~5 unidades
   // de holgura por lado: ni una etiqueta se recorta y no sobra espacio muerto.
+  // ── SUPREME CLOSURE · §5 — DESCRIPCIÓN ACCESIBLE DE LOS CINCO EJES ───────
+  // «No depender solo del color» deja de ser una aspiración cuando la figura es
+  // deliberadamente uniforme: si los cinco marcadores son idénticos, el ÚNICO
+  // canal que distingue medido de no medido para quien no ve la etiqueta es
+  // éste. Se enumeran los cinco por su nombre con su valor publicado o con la
+  // misma palabra que imprime la etiqueta («sin datos») — nunca un 0 ni un
+  // porcentaje inventado. Se compone de la copy que ya existe, en el idioma
+  // activo, y no añade ningún nodo enfocable.
+  const a11y = dims.map((d, i) => {
+    const isMeasured = measured.indexOf(d) !== -1;
+    return d.label + ': ' + (isMeasured
+      ? (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
+      : _intv4T('intv7_axis_unavailable'));
+  }).join('. ');
   return `
-    <svg class="intcc-radar-svg" viewBox="-76 -32 362 252" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}"
+    <svg class="intcc-radar-svg" viewBox="-76 -32 362 252" role="img" aria-label="${_intccEsc(t('intcc_radar_title') + '. ' + a11y + '.')}"
          data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
          data-svg-unknown="${dims.length - measured.length}"
          data-svg-open="${closeArea ? '0' : '1'}" data-svg-edges="${edgeCount}"
-         data-svg-neutral="${neutralCount}" data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}">
-      ${/* ORDEN DE CAPAS (§7): retícula → trayectoria neutral → segmentos medidos
-            → marcador CON SU HALO → etiquetas. El halo es un disco opaco del color
-            del lienzo inmediatamente bajo el marcador: corta las conexiones justo
-            en su borde, así que ninguna línea atraviesa el centro de un marcador y
-            el contorno del hueco no queda mordido por un anillo superpuesto. */''}
+         data-svg-neutral="${neutralCount}" data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}"
+         data-svg-a11y-axes="${dims.length}">
+      ${/* ORDEN DE CAPAS (§7): retícula → relleno → los cinco segmentos → marcador
+            CON SU HALO → etiquetas. El halo es un disco opaco del color del lienzo
+            inmediatamente bajo el marcador: corta las conexiones justo en su borde,
+            así que ninguna línea atraviesa el centro de un marcador. */''}
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
-      ${edgeNeutral ? `<g class="intcc-radar-edges is-neutral">${edgeNeutral}</g>` : ''}
-      ${edgeMeasured ? `<g class="intcc-radar-edges">${edgeMeasured}</g>` : ''}
+      ${/* UN SOLO GRUPO: con los cinco segmentos idénticos, separar en dos capas
+            sólo podía reintroducir una diferencia de pintado. */''}
+      <g class="intcc-radar-edges">${edges}</g>
       <g class="intcc-radar-halos">${halos}</g>
       <g class="intcc-radar-dots">${dots}</g>
       <g class="intcc-radar-labels">${labels}</g>
@@ -60960,7 +61573,12 @@ function _aurixIntelRootsOf(intel) {
 }
 // Límite de la memoria PRESENTADA. No toca snapshots, historial, facts ni
 // `intelligence_context`: es cuántos recuerdos caben en la card.
-const _INTV4_MEMORY_MAX = 8;
+// SUPREME CLOSURE · §4.5 — HASTA TRES HECHOS HISTÓRICOS CERTIFICADOS.
+// Eran ocho porque la lista mezclaba hitos medidos con respuestas declaradas y
+// necesitaba sitio para las dos cosas. Ahora publica una sola clase de contenido
+// —hechos con sujeto, resultado, periodo y cobertura— y tres es el techo que el
+// §4.5 fija: una card de perspectiva histórica no es un registro de auditoría.
+const _INTV4_MEMORY_MAX = 3;
 
 // ════════════════════════════════════════════════════════════════════════════
 // EL PERÍMETRO SE NOMBRA UNA VEZ, Y SIN MENTIR SOBRE EL DENOMINADOR
@@ -61050,11 +61668,18 @@ function _intv4RangeLabel(range) {
 // the EFFECTIVE window is named instead. Never silently keeps the nominal label.
 function _intv4WindowLabel(win) {
   if (!win) return '';
-  if (win.coversNominal === false && Number.isFinite(win.spanMs) && win.spanMs > 0) {
+  // CHECKPOINT B — quién puede llamarse por su nombre lo decide el contrato, no
+  // esta función. Antes lo decidía aquí, en la capa de COPY, así que el DOM y el
+  // gate no podían ver la degradación: sólo se notaba leyendo la frase.
+  const named = (typeof _aurixFactPeriodNamedAs === 'function')
+    ? _aurixFactPeriodNamedAs(win) : (win.range || null);
+  const degraded = (typeof _aurixFactPeriodDegraded === 'function')
+    ? _aurixFactPeriodDegraded(win) : (win.coversNominal === false);
+  if (degraded && Number.isFinite(win.spanMs) && win.spanMs > 0) {
     const days = Math.max(1, Math.round(win.spanMs / 864e5));
     return _intv4T('intv6_r_effective_days', days);
   }
-  return _intv4RangeLabel(win.range);
+  return _intv4RangeLabel(named);
 }
 function _intv4CatLabel(cat) {
   const k = 'intv4_cat_' + String(cat || '');
@@ -61074,7 +61699,17 @@ function _intv4FactText(fact) {
   const k = fact.semanticKey, v = fact.values || {};
   const win = _intv4WindowLabel(fact.window);
   if (/^investable_return_/.test(k))   return _intv4T('intv4_f_return', _intv4Num(fact.value, 2), win);
-  if (k === 'return_positive')         return _intv4T('intv4_f_return_pos', _intv4Num(fact.value, 2));
+  // ── RESIDUAL A · UN RENDIMIENTO SIN PERIODO SE LEE COMO «EN TOTAL» ──────
+  // Es la misma familia que el P1 que se acaba de cerrar, sólo que por OMISIÓN
+  // en vez de por nombre falso: «Tus inversiones han generado un 1,85 % de
+  // rendimiento» no dice sobre qué ventana, y el lector la completa solo — por
+  // defecto, como «desde siempre». El hecho SIEMPRE transportó su ventana
+  // (`Object.assign({}, best.window)`), así que sólo faltaba pasarla por el
+  // owner que ya decide qué nombre es publicable: si la serie está recortada,
+  // `win` ya dice «los últimos N días registrados» y no «todo el periodo».
+  // FAIL-CLOSED: sin periodo nombrable no hay frase. Publicar el porcentaje
+  // solo sería exactamente el defecto que esto corrige.
+  if (k === 'return_positive')         return win ? _intv4T('intv4_f_return_pos', _intv4Num(fact.value, 2), win) : '';
   if (k === 'investable_level')        return _intv4T('intv4_f_level', _intv4Money(fact.value));
   if (k === 'investable_all_time_high') return _intv4T('intv4_f_ath', _intv4Money(fact.value));
   // M.03 D — TRAYECTORIA. El cambio de nivel se dice en dinero y con su fecha de
@@ -61306,13 +61941,26 @@ function _intv4StoryHtml(story, esc, depth, publishedKeys) {
   // se pierde: los hechos que la necesitan la llevan DENTRO de la frase (ver
   // `recorded_capital_net`) y la sigue declarando `data-window` para la QA y el
   // gate, que es donde un metadato tiene su sitio.
-  const winRange = (story.window && story.window.range) ? String(story.window.range) : '';
+  // CHECKPOINT B — el periodo que la card DECLARA es el publicable, no el
+  // nominal: si la ventana no cubre su nombre, `data-window` deja de afirmarlo y
+  // `data-coverage` dice por qué. Hasta ahora el atributo publicaba el nombre
+  // nominal aunque la frase dijera otra cosa, así que la QA y el gate leían una
+  // ventana que la copy no estaba afirmando.
+  const winRange = (typeof _aurixFactPeriodNamedAs === 'function')
+    ? (_aurixFactPeriodNamedAs(story.window) || '') : '';
+  // La cobertura declarada la decide el MISMO owner que decide el nombre: si
+  // leyera `coversNominal` por su cuenta, un recorte de lead-in saldría como
+  // 'nominal' mientras la frase ya dice «los últimos N días registrados».
+  const winCovers = !story.window ? ''
+    : (_aurixFactPeriodDegraded(story.window) ? 'partial'
+      : (story.window.coversNominal === true ? 'nominal' : ''));
   const conf = story.confidence >= 1 ? 'intv4_confidence_high' : 'intv4_confidence_medium';
   const advanced = (depth === _INTV4_DEPTH.ADVANCED) || support.length > 0;
   return `
     <article class="intv4-story is-${esc(story.direction || 'flat')}${story.positive === true ? ' is-positive' : ''}"
              data-root="${esc(story.causalRoot)}" data-fact="${esc(story.semanticKey)}"
              data-support="${support.length}" data-window="${esc(winRange)}"
+             data-coverage="${esc(winCovers)}"
              data-confidence="${esc(conf === 'intv4_confidence_high' ? 'high' : 'medium')}">
       <p class="intv4-story-head">${esc(head)}</p>
       ${(why && !leadWithMeaning) ? `<p class="intv4-story-why">${esc(why)}</p>` : ''}
@@ -61406,6 +62054,46 @@ function _intv4FindingRows(core, opts) {
 // LA BANDEJA DE REVISIÓN, con nombre. Un solo owner para que el hero, el CTA y el
 // gate no puedan derivarla por su cuenta.
 function _intv4ActiveReviewFindings(core) { return _intv4FindingRows(core); }
+// ── SUPREME CLOSURE · §4.6 · LA CARD DECLARA CONTRA QUÉ COMPARA ───────────
+// «Qué ha cambiado» listaba hallazgos sin decir nunca respecto a QUÉ habían
+// cambiado. Cada fila lleva su propia ventana dentro de la frase, pero la card
+// como conjunto no declaraba su referencia, y sin ella «ha cambiado» no
+// significa nada comprobable.
+//
+// LA MARCA DE VISITA NO ES UNA REFERENCIA, Y COSTÓ DOS INTENTOS AVERIGUARLO.
+// El §4.6 ofrece «desde la última visita válida» o «durante las últimas 24
+// horas», y yo cableé la primera. La revisión financiera tumbó las DOS
+// direcciones posibles de esa rama, y tenía razón las dos veces:
+//   · con `visitAt <= earliest` la card decía «desde tu última visita, el 22 de
+//     junio» sobre filas que sólo medían 7 días — afirmaba una cobertura que
+//     nadie había escaneado;
+//   · con `visitAt >= earliest` —el arreglo— pasaba a fallar en el caso COMÚN:
+//     un usuario diario tiene la marca de AYER y filas medidas sobre 30 días, y
+//     encabezar «desde tu última visita, ayer» atribuye a un día magnitudes de
+//     un mes. Deja de mentir por completitud y empieza a mentir por recencia,
+//     y además casi siempre.
+// La razón de fondo: `savedAt` es un timestamp de PRESENTACIÓN local: cuándo se
+// pintó la pantalla. No es un extremo de medición de nada, así que sólo es una
+// referencia verdadera cuando por casualidad coincide con el arranque de los
+// datos. La rama se retira entera.
+//
+// La referencia que queda SALE DE LOS DATOS y por eso es siempre comprobable:
+//   1 · la fecha REAL en la que arranca la ventana más antigua de las filas —
+//       que es literalmente contra lo que la lista compara;
+//   2 · y si todas caben en 24 horas, se dice así, que es la otra forma que el
+//       §4.6 nombra.
+// Sin ninguna de las dos no se pinta línea: una referencia inventada sería peor
+// que ninguna.
+function _intv4ChangedRef(rows, now) {
+  const starts = (rows || [])
+    .map(x => (x && x.f && x.f.window && Number.isFinite(x.f.window.startAt)) ? x.f.window.startAt : null)
+    .filter(t => Number.isFinite(t));
+  if (!starts.length) return null;
+  const earliest = Math.min.apply(null, starts);
+  const t = Number.isFinite(now) ? now : Date.now();
+  if ((t - earliest) <= 864e5) return { kind: '24h', at: earliest };
+  return { kind: 'since', at: earliest };
+}
 function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
   const seen = new Set();
   // Same rule as Memory: what the Brief already headlined is not repeated here.
@@ -61472,6 +62160,10 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
              data-candidates="${candidates.length}" data-claimed="${claimedKeys.size}"
              data-findings="${pending.length}" data-all="${rows.length}" data-state="rows">
       <h3 class="intcc-card-title" id="aurix-intel-changes-title" tabindex="-1">${esc(_intv4T('intv4_changed_title'))}</h3>
+      ${(() => { const ref = _intv4ChangedRef(rows, null); if (!ref) return '';
+        const txt = ref.kind === '24h' ? _intv4T('intv4_changed_ref_24h')
+                                       : _intv4T('intv4_changed_ref_since', _intccDate(ref.at));
+        return txt ? `<p class="intv4-chg-ref" data-ref="${esc(ref.kind)}">${esc(txt)}</p>` : ''; })()}
       <ul class="intv4-chg-list">${rows.map(x => `
         <li class="intv4-chg is-${esc((x.f && x.f.direction) || 'flat')}${x.reviewed ? ' is-reviewed' : ''}"
             data-root="${esc(x.fd.rootCause)}" data-finding="${esc(x.fd.findingId)}"
@@ -61550,7 +62242,21 @@ function _intv4DiscoveryHtml(core, esc, publishedTexts) {
 // semanales, una mensual—, sin persistencia nueva, sin query nueva, sin azar y
 // sin conceptos repetidos. El mismo día, la misma cuenta y el mismo catálogo dan
 // exactamente el mismo conjunto en cualquier dispositivo.
-const _INTV4_EXPLORE_CADENCE = Object.freeze(['day', 'week', 'week', 'month']);
+// ── SUPREME CLOSURE · §4.3 · UNA PREGUNTA POR SEMANA, COMO MUCHO ───────────
+// Las cadencias eran `['day','week','week','month']`: la primera posición
+// cambiaba TODOS LOS DÍAS y en una frontera de semana podían moverse tres a la
+// vez. El §4.3 fija el techo en «como máximo una pregunta por semana», y eso no
+// es una cadencia más lenta: es una cadencia ESCALONADA. Cada posición avanza
+// cada `_INTV4_EXPLORE_PERIOD_WEEKS` semanas y arranca desplazada una semana
+// respecto de la anterior, así que en cualquier semana dada le toca a EXACTAMENTE
+// UNA. Con cuatro posiciones y periodo cuatro, el ciclo completo dura un mes y
+// ninguna semana mueve dos.
+// El cambio ANTICIPADO que el §4.3 sí permite —«solo ante información material
+// nueva»— no necesita código nuevo y sería un error añadirlo: el catálogo
+// elegible SALE DE LOS HECHOS, así que una pregunta que deja de ser respondible
+// desaparece en la pintura siguiente y otra ocupa su sitio. Eso es información
+// material, no rotación.
+const _INTV4_EXPLORE_PERIOD_WEEKS = 4;
 function _intv4ExploreSeed(owner) {
   const str = String(owner == null ? '' : owner);
   let h = 0;
@@ -61561,22 +62267,29 @@ function _intv4ExploreRotation(ids, now, owner) {
   const pool = (Array.isArray(ids) ? ids : []).slice().sort();
   if (pool.length <= _INTV4_EXPLORE_MAX) return pool;
   const day = Math.floor((Number.isFinite(now) ? now : 0) / 864e5);
-  // Periodos declarados. El «mes» son 30 días: es una CADENCIA, no una fecha de
-  // calendario, y no necesita zona horaria para ser determinista.
-  const periodOf = { day: day, week: Math.floor(day / 7), month: Math.floor(day / 30) };
+  // La SEMANA es la única unidad de tiempo de esta rotación. Son 7 días desde la
+  // época, no un lunes: es una CADENCIA, no una fecha de calendario, así que es
+  // determinista sin zona horaria y da el mismo conjunto en cualquier dispositivo.
+  const week = Math.floor(day / 7);
+  const P = _INTV4_EXPLORE_PERIOD_WEEKS;
   const seed = _intv4ExploreSeed(owner);
   const out = [], used = new Set();
-  _INTV4_EXPLORE_CADENCE.forEach((cad, slot) => {
+  for (let slot = 0; slot < _INTV4_EXPLORE_MAX; slot++) {
+    // EL ESCALONADO. `week - slot` desplaza el calendario de cada posición una
+    // semana, y la división entera por P hace que sólo cruce frontera una de
+    // ellas por semana. `Math.floor` (no `|0`) para que una semana anterior al
+    // desplazamiento no redondee hacia cero y mueva dos a la vez.
+    const step = Math.floor((week - slot) / P);
     // Cada posición arranca en un punto distinto del catálogo (`slot * 7`) para
-    // que dos cadencias no converjan en la misma pregunta, y avanza hasta la
-    // primera libre: ninguna posición puede duplicar un concepto.
-    let idx = (seed + periodOf[cad] + slot * 7) % pool.length;
+    // que dos no converjan en la misma pregunta, y avanza hasta la primera libre:
+    // ninguna posición puede duplicar un concepto.
+    let idx = (((seed + step + slot * 7) % pool.length) + pool.length) % pool.length;
     for (let k = 0; k < pool.length; k++) {
       const cand = pool[(idx + k) % pool.length];
       if (used.has(cand)) continue;
       used.add(cand); out.push(cand); break;
     }
-  });
+  }
   return out;
 }
 function _intv4ExploreHtml(core, esc, intel) {
@@ -61748,14 +62461,41 @@ function _intv4MemoryDeclared(intel, excludeFields) {
 // ordenada por fecha, la continuidad del raíl es estructural y no hay nada que
 // parchear con CSS. Y el orden cronológico mezclado es además el correcto: un
 // recuerdo es un recuerdo, venga de una respuesta del usuario o de un hito medido.
+// ════════════════════════════════════════════════════════════════════════════
+// SUPREME CLOSURE · §4.5 — «TU EVOLUCIÓN» PUBLICA HECHOS, NO RESPUESTAS
+// ════════════════════════════════════════════════════════════════════════════
+// LA CARD MEZCLABA DOS COSAS QUE NO SON LA MISMA, y el §4.5 lo corta por su
+// nombre: prohíbe publicar aquí «onboarding, prioridad declarada, confirmaciones,
+// concentración aceptada, preguntas respondidas y asuntos pendientes». Una
+// respuesta del usuario no es evolución de su patrimonio: es contexto, no
+// historia, y ocupando la mitad de la lista impedía ver la historia que sí hay.
+//
+// LO DECLARADO NO SE PIERDE NI SE BORRA — el §4.1 permite expresamente
+// conservarlo «internamente como historial», y así queda: `_intv4MemoryDeclared`
+// sigue siendo su owner, sigue viajando entre dispositivos y sigue moviendo
+// INTERPRETACIÓN (chips del hero, coherencia, preguntas). Lo único que cambia es
+// que deja de PUBLICARSE como una fila de esta card. Su recuento sigue expuesto
+// en `data-declared` para que el gate pueda demostrar que existe y que no se
+// pinta.
+//
+// Lo que queda es una sola clase de contenido, y por tanto un solo contrato por
+// fila: sujeto, resultado, periodo y cobertura — el periodo y la cobertura los
+// pone `_intv4WindowLabel`, que ya degrada a «efectivo: N días» cuando la ventana
+// no cubre su nombre nominal (el §4.5 prohíbe comparar periodos parciales con
+// completos SIN INDICARLO, no prohíbe publicarlos).
 function _intv4MemoryRows(core, alreadyPublished, intel, excludeFields) {
-  const declared = _intv4MemoryDeclared(intel, excludeFields)
-    .map(d => ({ kind: 'declared', at: Number(d.at) || 0, txt: d.txt, field: d.field }));
-  const events = _intv4MemoryEvents(core, alreadyPublished)
+  return _intv4MemoryEvents(core, alreadyPublished)
     .map(x => ({ kind: 'event', at: (x.f.window && (x.f.window.endAt || x.f.window.startAt)) || 0,
-      txt: x.txt, why: _intv4WhyText(x.f), key: x.f.semanticKey }));
-  return declared.concat(events)
-    .sort((a, b) => (b.at - a.at) || (a.kind < b.kind ? -1 : 1))
+      txt: x.txt, why: _intv4WhyText(x.f), key: x.f.semanticKey,
+      // §4.5 — «cada hecho debe incluir sujeto, resultado, PERIODO y COBERTURA».
+      // Los dos primeros van en la frase; los dos últimos se declaran, con el
+      // mismo owner que usa la copy, para que el gate pueda demostrarlos.
+      period: (typeof _aurixFactPeriodNamedAs === 'function')
+        ? (_aurixFactPeriodNamedAs(x.f.window) || '') : '',
+      coverage: !x.f.window ? ''
+        : (_aurixFactPeriodDegraded(x.f.window) ? 'partial'
+          : (x.f.window.coversNominal === true ? 'nominal' : '')) }))
+    .sort((a, b) => (b.at - a.at) || (a.key < b.key ? -1 : 1))
     .slice(0, _INTV4_MEMORY_MAX);
 }
 function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
@@ -61794,16 +62534,18 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
             : _intv4T('intv4_memory_stable_b_nodays', nObs))}</p>
         </section>`;
     }
+    // ── SUPREME CLOSURE · §4.5 · EL ESTADO VACÍO ES COMPACTO ──────────────
+    // Era una línea de tiempo animada con cinco nodos y DOS párrafos: media card
+    // premium dedicada a decir que todavía no hay nada. El §4.5 pide exactamente
+    // una frase —«Aún no hay historial suficiente para mostrar tu evolución»— y
+    // que el bloque sea compacto. La animación se retira entera: no informaba de
+    // nada y, al ocupar el alto de una card llena, hacía que la ausencia de
+    // historia pareciera contenido.
     return `
       <section class="intcc-card intcc-timeline intv4-memory is-accruing"
-               data-obs="${esc(String(nObs))}">
+               data-obs="${esc(String(nObs))}" data-compact="1">
         <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-        <div class="intv6-accrue" aria-hidden="true">
-          <span class="intv6-accrue-line"></span>
-          ${[0, 1, 2, 3, 4].map(i => `<span class="intv6-accrue-node" style="--i:${i}"></span>`).join('')}
-        </div>
-        <p class="intv6-accrue-text">${esc(_intv4T('intv6_memory_accruing'))}</p>
-        <p class="intv6-accrue-sub">${esc(_intv4T('intv6_memory_accruing_sub'))}</p>
+        <p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>
       </section>`;
   }
   return `
@@ -61813,7 +62555,8 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
       ${rows.length ? `<div class="intv10-mem-scroll"><ul class="intcc-tl-list">${rows.map(r => `
         <li class="intcc-tl-item${r.kind === 'declared' ? ' is-declared' : ''}"${
-          r.kind === 'declared' ? ` data-declared-field="${esc(r.field)}"` : ` data-fact="${esc(r.key)}"`}>
+          r.kind === 'declared' ? ` data-declared-field="${esc(r.field)}"`
+            : ` data-fact="${esc(r.key)}" data-period="${esc(r.period || '')}" data-coverage="${esc(r.coverage || '')}"`}>
           <span class="intcc-tl-node" aria-hidden="true"></span>
           <div class="intcc-tl-text">
             <span class="intv4-mem-what">${esc(r.txt)}</span>
@@ -61856,9 +62599,16 @@ function _intv4RecordShown(keys) {
   try {
     if (typeof localStorage === 'undefined' || !Array.isArray(keys) || !keys.length) return;
     const now = Date.now();
+    // §4.4 — LA MARCA SE SELLA AL DÍA, NO AL INSTANTE. Es la otra mitad del
+    // mismo arreglo: con `shownAt: now` cada repintado movía el sello unos
+    // milisegundos hacia delante y la novedad discretizada volvía a depender de
+    // la hora. Sellando el COMIENZO DEL DÍA, veinte pinturas de la misma jornada
+    // escriben exactamente el mismo valor y el motor no puede distinguirlas.
+    // Es una marca de presentación: no toca ningún hecho ni ninguna cifra.
+    const dayStamp = Math.floor(now / 864e5) * 864e5;
     const prev = _intv4ReadShown().filter(x => now - x.shownAt < 30 * 864e5);
     const merged = prev.filter(x => keys.indexOf(x.semanticKey) === -1)
-      .concat(keys.map(k => ({ semanticKey: k, shownAt: now })));
+      .concat(keys.map(k => ({ semanticKey: k, shownAt: dayStamp })));
     localStorage.setItem(_INTV4_SHOWN_KEY, JSON.stringify(merged.slice(-80)));
   } catch (_) {}
 }
@@ -61922,7 +62672,20 @@ function _intelDiscoveryText(d) {
     case 'level_rose_on_capital_not_return': return _intv4T('intel_d_capital');
     case 'declared_goal_distant_from_observed_structure':
       return _intv4T('intel_d_intent', _intv4Num(v.topWeightPct, 0));
-    case 'liquidity_fell_while_need_declared': return _intv4T('intel_d_liq_need');
+    case 'liquidity_fell_while_need_declared': {
+      // ── SUPREME CLOSURE · §4.7 · UN PATRÓN SIN DATO NO ES UN PATRÓN ──────
+      // «tu peso en liquidez ha bajado» nombraba la relevancia (el usuario dijo
+      // que la necesita) pero ni el DATO ni el PERIODO, que son dos de las
+      // cuatro cosas que el §4.7 exige nombrar. El descubrimiento SIEMPRE
+      // transportó las tres cifras —`changePp`, `cashPct`, `window`— y la copy
+      // simplemente no las usaba. Ahora las usa, y si alguna falta la sección se
+      // calla en vez de publicar una frase sin contenido: es la misma regla que
+      // el §4.7 aplica a «Esta lectura sigue igual».
+      const win = _intv4RangeLabel(v.window);
+      if (!Number.isFinite(v.changePp) || !Number.isFinite(v.cashPct) || !win) return '';
+      return _intv4T('intel_d_liq_need', _intv4Num(Math.abs(v.changePp), 1),
+        _intv4Num(v.cashPct, 0), win);
+    }
     case 'several_readings_moved_together':  return _intv4T('intel_d_combined', v.count);
     default: return '';
   }
@@ -62367,6 +63130,25 @@ function _intv7RadarAxes() {
   if (ret && ret.status === 'available' && Number.isFinite(ret.retentionPct)) {
     certified.stability = ret.retentionPct;
     out.quality.stability = ret.quality || 'measured';
+    // ── RESIDUAL B · NO SE PUBLICA UNA CONCLUSIÓN MÁS ANCHA QUE LA COBERTURA ─
+    // Una «Estabilidad 82 %» a secas se lee como «de toda mi historia». Cuando
+    // la serie de la que sale el drawdown NO empieza en el principio del
+    // registro, el eje lo DICE: la cifra sigue siendo la misma y no se degrada
+    // a «sin datos» —es medible y está certificada—, pero deja de afirmar una
+    // cobertura que no tiene. Se usa `display`, que ya existe justamente para
+    // que un eje publique algo que no es un porcentaje pelado.
+    if (ret.startsAfterRecord === true && Number.isFinite(ret.spanMs) && ret.spanMs > 0) {
+      const _days = Math.max(1, Math.round(ret.spanMs / 864e5));
+      const _span = _intv4T('intv7_axis_span_days', _days);
+      // FAIL CLOSED SOBRE LA COPY. Sin la cadena de cobertura, la alternativa NO
+      // es «82 % · » con el separador colgando: es dejar el eje EXACTAMENTE como
+      // estaba. Una declaración a medias es peor que la que ya había, y el gate
+      // lo pilló publicando el separador vacío.
+      if (_span) {
+        out.display = out.display || {};
+        out.display.stability = _aurixPctLabel(ret.retentionPct) + ' · ' + _span;
+      }
+    }
   } else if (ret) {
     out.quality.stability = ret.quality || 'unavailable';
   }
@@ -62529,8 +63311,47 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
     const w = (Number.isFinite(i.relevance) ? i.relevance : 0) + (1 - idx * 0.01);
     if (!rank.has(r) || rank.get(r) < w) rank.set(r, w);
   });
+  // ══════════════════════════════════════════════════════════════════════
+  // SUPREME CLOSURE · §4.4 — «HOY» ES UNA AFIRMACIÓN SOBRE EL TIEMPO
+  // ══════════════════════════════════════════════════════════════════════
+  // La card se llama «Lo que importa HOY» y debe responder «¿qué merece mi
+  // atención AHORA?». La escalera de actualidad ya ordenaba bien —un estado cae
+  // al último peldaño—, pero ordenar no basta: con tres huecos y pocos hechos,
+  // el último peldaño acaba EN PANTALLA igualmente. La captura de escritorio lo
+  // enseñaba con las dos frases que el §4.4 nombra para retirar:
+  //
+  //   «Tus inversiones han generado un 1,85 % de rendimiento»  → rentabilidad de
+  //      TODO EL PERIODO, presentada bajo un titular que promete hoy;
+  //   «Tu liquidez es el 12 % de tu cartera financiera»        → liquidez
+  //      ESTÁTICA, sin ningún cambio detrás.
+  //
+  // Se retiran las dos, y sólo las dos. NO es un filtro por peldaño: un
+  // `position_below_cost_*` también es un estado y es, por decisión anterior
+  // explícita, el hecho más cargado del delta y el único irrenunciable. La regla
+  // es literal y acotada:
+  //   · un hecho de RENDIMIENTO sólo encabeza HOY si su ventana es actual;
+  //   · el NIVEL de liquidez sólo encabeza HOY si algo lo ha movido.
+  // Los hechos NO se pierden: siguen en el ledger, siguen en «Qué ha cambiado» y
+  // siguen respondiendo en Explora. Lo que dejan de hacer es ocupar la
+  // superficie que promete actualidad. Y si con esto no queda nada, la card se
+  // encoge: el §4.4 prefiere «un vacío compacto» a inventar actualidad.
+  const CURRENT_WINDOWS = ['TODAY', '24H', '7D'];
+  const isCurrentWindow = st => CURRENT_WINDOWS
+    .indexOf(String((st && st.window && st.window.range) || '').toUpperCase()) !== -1;
+  // ¿Ha MOVIDO algo la liquidez? Lo dice el ledger, no esta capa: un hecho de
+  // deriva de caja con su ventana. Sin él, el nivel es un estado.
+  const cashMoved = ((core && core.ledger && core.ledger.facts) || [])
+    .some(f => f && typeof f.semanticKey === 'string'
+            && f.semanticKey.indexOf('cash_drift_') === 0);
   const stories = (core.topStories || [])
     .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+    // EL DISCRIMINADOR ES LA RAÍZ, NO LA FAMILIA, y el gate lo demostró en el
+    // acto: `position_below_cost_*` también es familia PERFORMANCE, y filtrar
+    // por familia lo borraba — justo el hecho que una decisión anterior declaró
+    // irrenunciable. Lo que el §4.4 retira es la RENTABILIDAD DE LA CARTERA
+    // fuera de ventana; el resultado de una POSICIÓN es otra raíz y se queda.
+    .filter(st => !(st.causalRoot === _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN && !isCurrentWindow(st)))
+    .filter(st => !(st.semanticKey === 'cash_weight' && !cashMoved))
     .filter(st => !skip.has(st.causalRoot))
     // ── SE RE-ELIGE, NO SE DESCARTA ────────────────────────────────────────
     // Filtrar la historia acusada reintroducía en la capa de HISTORIAS el mismo
@@ -62644,6 +63465,13 @@ function _intv9DiscoveriesHtml(intel, esc, claimedRoots, claimedIds) {
   const items = ((intel && intel.discoveries) || [])
     .filter(d => !heroClaimed.has(d.id))
     .filter(d => !claimed.has(_AURIX_INTEL_DIM_ROOT[d.dimension]))
+    // ── SUPREME CLOSURE · §4.7 · SIN EVIDENCIA NOMBRABLE NO SE PUBLICA ─────
+    // La puerta era sólo «hay copy». Un descubrimiento que no puede nombrar
+    // CONTRA QUÉ HECHO razona no cumple las cuatro condiciones del §4.7 —patrón,
+    // dato, periodo y relevancia— aunque su frase exista, y su lugar es el
+    // silencio. La evidencia ya viajaba en el contrato y ya se declaraba en
+    // `data-evidence`; lo que faltaba era que DECIDIERA.
+    .filter(d => Array.isArray(d.evidence) && d.evidence.length > 0)
     .map(d => ({ d, txt: _intelDiscoveryText(d) }))
     .filter(x => !!x.txt)
     .slice(0, _AURIX_INTEL_DISC_MAX);
@@ -62681,6 +63509,795 @@ function _intccHydrationPending() {
     return !_aurixPersistenceReady();
   } catch (_) { return false; }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC SUPREME CLOSURE · §6 — COMPARADOR DE RENTABILIDAD
+// ════════════════════════════════════════════════════════════════════════════
+// QUÉ ES, Y SOBRE TODO QUÉ NO ES. No es un motor de rentabilidad: no calcula un
+// solo TWR. La serie «Mi patrimonio» es LITERALMENTE
+// `_aurixInvestablePerformance(range).index` —base 100, flow-neutral, publicada
+// sólo cuando el retorno es publicable— y el benchmark son cierres de mercado
+// que ya sirve un adaptador certificado. Lo único que vive aquí es la
+// ALINEACIÓN y la NORMALIZACIÓN, que es exactamente lo que el §6.2 pide y lo
+// único que no existía.
+//
+// POR QUÉ NO SE ENCHUFA AL GRÁFICO DEL DASHBOARD. Su línea es VALOR EN DIVISA,
+// no índice, y el §6.2 prohíbe comparar valor monetario contra precio. Enchufar
+// ahí el comparador obligaría a cambiar qué SIGNIFICA el gráfico principal —en
+// un motor congelado, con 44 harness sobre el FRC y 12 sobre el pintor—, así que
+// esta superficie dibuja su propio índice y el Dashboard queda byte-idéntico.
+const _AURIX_CMP_FLAG_KEY = 'aurix_cmp_enabled_v1';
+// Flag independiente + kill switch, y APAGADO POR DEFECTO.
+//
+// POR QUÉ APAGADO. El código se publica; la exposición no. La instrucción del
+// founder es activarlo primero sólo para su cuenta con un mecanismo EXISTENTE
+// y no inventar un canary nuevo. Aurix no tiene hoy ninguna lista de permitidos
+// por cuenta en el cliente: `hasAurixPremiumAccess()` abre a TODO Premium, y
+// `aurix_ws_founder_view` es una vista de sesión de Workspace —otro dominio, y
+// acoplar las dos superficies haría que un interruptor moviera la otra—. Sin
+// mecanismo por cuenta, el founder fijó la alternativa: dejar el flag global
+// apagado y declarar el único paso para encenderlo.
+//
+// Así que se invierte el DEFECTO de este mismo flag, sin añadir nada: se
+// enciende sólo con un opt-in explícito, y el kill switch sigue mandando por
+// encima. Un usuario que no haga nada no ve el comparador; Intelligence
+// determinista se publica entera igual.
+function _aurixCmpEnabled() {
+  try {
+    if (typeof window !== 'undefined' && window.__AURIX_CMP_KILL === true) return false;
+    if (typeof window !== 'undefined' && window.__AURIX_CMP_FORCE === true) return true;
+    if (typeof localStorage !== 'undefined') return localStorage.getItem(_AURIX_CMP_FLAG_KEY) === '1';
+  } catch (_) {}
+  return false;
+}
+// ── CATÁLOGO CERRADO ───────────────────────────────────────────────────────
+// Cuatro entradas, identificadores AUTORITATIVOS y verificados contra el
+// proveedor real antes de escribir una línea (ver la sonda del cierre):
+//   ^GSPC  24h 79 · 7d 131 · 30d 22 · 1y 251 · all 169
+//   ^NDX   24h 79 · 7d 131 · 30d 22 · 1y 251 · all 165
+//   BTC-USD 24h 128 · all 145 (desde 2014)
+//   GC=F   24h 0 (!) · 7d 345 · 30d 21 · 1y 250 · all 268
+// NASDAQ 100 ES ^NDX, no ^IXIC. El registro de Market sólo tenía el Composite
+// (^IXIC), que es OTRO índice: 3.000 valores frente a 100, y su rentabilidad no
+// es la misma. Se verificó que ^NDX responde en los cinco rangos antes de
+// ofrecerlo.
+// TIPO DE RENTABILIDAD, DECLARADO Y NO MEZCLADO: los cuatro son PRICE RETURN.
+// Yahoo sirve el NIVEL del índice, que no incorpora dividendos, y el oro y el
+// bitcoin no tienen dividendo que incorporar. No se inventa un total return que
+// el proveedor no da, y no se mezclan los dos tipos en una misma comparación
+// porque no hay ninguno del otro tipo en el catálogo.
+const _AURIX_CMP_CATALOG = Object.freeze([
+  Object.freeze({ id: 'sp500',  symbol: '^GSPC',   labelKey: 'cmp_b_sp500',  returnType: 'price_return' }),
+  Object.freeze({ id: 'ndx100', symbol: '^NDX',    labelKey: 'cmp_b_ndx100', returnType: 'price_return' }),
+  Object.freeze({ id: 'btc',    symbol: 'BTC-USD', labelKey: 'cmp_b_btc',    returnType: 'price_return' }),
+  Object.freeze({ id: 'gold',   symbol: 'GC=F',    labelKey: 'cmp_b_gold',   returnType: 'price_return' }),
+]);
+function _aurixCmpBenchmark(id) {
+  return _AURIX_CMP_CATALOG.find(b => b.id === String(id || '')) || null;
+}
+// El par FX. Aurix admite EXACTAMENTE dos divisas base —USD y EUR, ver
+// `baseCurrency`— así que el adaptador histórico necesita UNA pareja. No se
+// promete ninguna otra: una divisa sin datos fiables no se ofrece.
+const _AURIX_CMP_FX_PAIR = Object.freeze({ EUR: { symbol: 'EURUSD=X', invert: true } });
+
+// ── MEDIANA DE INTERVALO — el bucket se DERIVA, no se elige ────────────────
+// Un umbral de "cada cuánto es comparable" elegido a ojo sería exactamente lo
+// que este proyecto no hace. El bucket es el intervalo mediano de la serie MÁS
+// GRUESA de las dos: comparar más fino que eso obligaría a interpolar, y el
+// §6.2 lo prohíbe.
+function _aurixCmpMedianStep(points) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const d = [];
+  for (let i = 1; i < points.length; i++) {
+    const dt = points[i].ts - points[i - 1].ts;
+    if (Number.isFinite(dt) && dt > 0) d.push(dt);
+  }
+  if (!d.length) return null;
+  d.sort((a, b) => a - b);
+  return d[Math.floor(d.length / 2)];
+}
+// Último valor observado dentro de cada bucket. NO interpola, NO rellena y NO
+// arrastra el valor de un bucket al siguiente: un bucket sin observación
+// sencillamente no existe, y por eso no puede colarse en la intersección.
+function _aurixCmpBucketize(points, bucketMs) {
+  const out = new Map();
+  if (!Array.isArray(points) || !(bucketMs > 0)) return out;
+  for (const p of points) {
+    if (!p || !Number.isFinite(p.ts) || !Number.isFinite(p.value)) continue;
+    const k = Math.floor(p.ts / bucketMs);
+    const prev = out.get(k);
+    if (!prev || p.ts >= prev.ts) out.set(k, { ts: p.ts, value: p.value });
+  }
+  return out;
+}
+
+// ── ADAPTADOR FX HISTÓRICO ─────────────────────────────────────────────────
+// Reutiliza el MISMO proveedor y el MISMO endpoint que ya sirve el histórico de
+// mercado (`yahooHistoryAdapter` → `/api/prices/history-yahoo`), con su caché y
+// su guarda anti-estampida server-side. No hay servicio nuevo, no hay endpoint
+// nuevo y no hay clave nueva.
+// EL TIPO ACTUAL NO SE USA JAMÁS PARA CONVERTIR HISTORIA. `toBase()` existe y
+// convierte al tipo de HOY; aplicarlo a una serie de hace un año publicaría una
+// rentabilidad que nunca ocurrió. Esta función devuelve la SERIE.
+async function _aurixCmpFxSeries(range, base, opts) {
+  const o = opts || {};
+  const b = String(base || 'USD').toUpperCase();
+  if (b === 'USD') return { ok: true, series: null, pair: null };   // nada que convertir
+  const pair = _AURIX_CMP_FX_PAIR[b];
+  if (!pair) return { ok: false, reason: 'currency_not_supported', series: null, pair: null };
+  const ad = (typeof window !== 'undefined' && window.AurixChartAdapters) ? window.AurixChartAdapters : null;
+  if (!ad || typeof ad.yahooHistoryAdapter !== 'function') {
+    return { ok: false, reason: 'adapter_unavailable', series: null, pair: pair.symbol };
+  }
+  let res = null;
+  // El adaptador certificado recibe un OBJETO, no argumentos posicionales.
+  try { res = await ad.yahooHistoryAdapter({ symbol: pair.symbol, range, signal: o.signal }); } catch (_) { res = null; }
+  const series = (res && Array.isArray(res.series))
+    ? res.series.filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0)
+        .map(p => ({ ts: p.time, value: p.value }))
+    : [];
+  if (series.length < 2) return { ok: false, reason: 'fx_insufficient', series: null, pair: pair.symbol };
+  return { ok: true, series, pair: pair.symbol, invert: pair.invert === true };
+}
+
+// ── SERIE DEL BENCHMARK, YA EN LA DIVISA BASE ──────────────────────────────
+// La conversión se hace ANTES de normalizar y BUCKET A BUCKET con el FX de ESE
+// bucket. Un bucket sin FX se descarta: fail-closed, nunca interpolado.
+async function _aurixCmpBenchmarkSeries(id, range, opts) {
+  const o = opts || {};
+  const bm = _aurixCmpBenchmark(id);
+  if (!bm) return { ok: false, reason: 'unknown_benchmark' };
+  const ad = (typeof window !== 'undefined' && window.AurixChartAdapters) ? window.AurixChartAdapters : null;
+  if (!ad || typeof ad.yahooHistoryAdapter !== 'function') return { ok: false, reason: 'adapter_unavailable' };
+  let res = null;
+  try { res = await ad.yahooHistoryAdapter({ symbol: bm.symbol, range, signal: o.signal }); } catch (_) { res = null; }
+  const raw = (res && Array.isArray(res.series))
+    ? res.series.filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0)
+        .map(p => ({ ts: p.time, value: p.value }))
+    : [];
+  // El proveedor puede responder CORRECTAMENTE con cero puntos, y eso es un
+  // dato: el oro no tiene serie de 5 minutos en 24H (medido: 0 puntos). No es
+  // un error, es «este comparador no existe en esta ventana».
+  if (raw.length < 2) return { ok: false, reason: 'benchmark_insufficient', symbol: bm.symbol };
+  const quoted = (res && res.meta && res.meta.currency) ? String(res.meta.currency).toUpperCase() : 'USD';
+  // SE DEVUELVE EN SU DIVISA DE COTIZACIÓN, SIN CONVERTIR. La conversión la hace
+  // `_aurixComparison` sobre LAS DOS series a la vez: convertir aquí sólo el
+  // benchmark fue un defecto crítico —ver el comentario de `_aurixComparison`—
+  // porque dejaba las dos curvas en divisas distintas.
+  return { ok: true, series: raw, symbol: bm.symbol, returnType: bm.returnType, quoted };
+}
+
+// ── CONVERSIÓN HISTÓRICA, PARA LAS DOS SERIES ──────────────────────────────
+// EL DEFECTO QUE ESTO CORRIGE ERA CRÍTICO Y VALE LA PENA DEJARLO ESCRITO.
+// Mi primera versión convertía SÓLO el benchmark con FX histórico y daba por
+// hecho que «Mi patrimonio» ya venía en divisa base. Y venía… pero convertida
+// con el tipo de HOY: `_aurixInvestableSnapshots` aplica `toBase(invUSD,'USD')`
+// a cada punto histórico, o sea un factor CONSTANTE, que se cancela al
+// normalizar. Resultado: la serie propia era un índice de retorno en USD y el
+// benchmark uno en EUR. Con la cartera y el S&P subiendo lo mismo en USD en un
+// año en que el euro se aprecia, la card publicaba una diferencia de varios
+// puntos porcentuales que NO EXISTIÓ. Dos divisas en la misma comparación.
+//
+// La regla ahora: si la base no es la divisa de cotización, se convierten LAS
+// DOS con la MISMA serie FX y los MISMOS buckets. Un bucket sin FX se cae para
+// las dos, así que siguen midiendo el mismo intervalo.
+//
+// Por qué dividir un ÍNDICE por un tipo de cambio es correcto: el índice propio
+// es V_usd(t)/V_usd(t0), así que al dividir por rate(t) y volver a normalizar en
+// el primer bucket común queda V_usd(t)/rate(t) ÷ V_usd(t0)/rate(t0), que es
+// exactamente el índice de retorno en euros. No hay ninguna cifra nueva: es la
+// misma serie leída en la divisa en la que el usuario vive.
+function _aurixCmpConvert(series, fxByBucket, stepMs, invert) {
+  const out = [];
+  let dropped = 0;
+  for (const p of (series || [])) {
+    const r = fxByBucket.get(Math.floor(p.ts / stepMs));
+    if (!r || !(r.value > 0)) { dropped++; continue; }   // sin FX de ESE bucket: se cae, no se inventa
+    // `EURUSD=X` cotiza USD por EUR ⇒ para pasar de USD a EUR se DIVIDE.
+    out.push({ ts: p.ts, value: invert ? (p.value / r.value) : (p.value * r.value) });
+  }
+  return { series: out, dropped };
+}
+
+// ── LA COMPARACIÓN ─────────────────────────────────────────────────────────
+// Devuelve un ESTADO, nunca una cifra a medias. Los estados son los que el §6.2
+// nombra, y cada uno tiene su copy: sin retorno certificado, datos
+// insuficientes, y disponible-desde cuando el benchmark empieza más tarde.
+const _AURIX_CMP_STATE = Object.freeze({
+  OFF: 'off', NO_RETURN: 'no_return', INSUFFICIENT: 'insufficient', READY: 'ready',
+});
+function _aurixCmpAlign(mineIdx, other) {
+  // ── EL BUCKET CIEGO EMPAREJABA OBSERVACIONES DE MESES DISTINTOS ────────
+  // La versión anterior agrupaba las dos series en buckets de tamaño
+  // `max(mediana_A, mediana_B)` y tomaba el ÚLTIMO punto de cada bucket. Con el
+  // rango TOTAL y un benchmark en velas semanales o mensuales eso empareja el
+  // snapshot de la cartera —cada 15 minutos, así que siempre al final del
+  // bucket— con una barra del benchmark que puede ser de semanas antes. En un
+  // activo que se mueve un 30 % al mes, la diferencia publicada es en buena
+  // parte ese desfase. La revisión financiera lo encontró y tenía razón.
+  //
+  // AHORA ES UN «AS-OF JOIN» ANCLADO EN LA SERIE MÁS GRUESA: por cada
+  // observación del benchmark se busca la observación de la cartera
+  // inmediatamente ANTERIOR O IGUAL, y sólo vale si está dentro de la propia
+  // resolución de esa serie. La tolerancia no se elige: es la mediana de
+  // intervalo de la serie densa, o sea «lo que ella misma considera un
+  // instante». Fuera de eso, el ancla se descarta — nunca se interpola.
+  const stepA = _aurixCmpMedianStep(mineIdx), stepB = _aurixCmpMedianStep(other);
+  if (!(stepA > 0) || !(stepB > 0)) return null;
+  // El ANCLA es la serie de menor resolución: pedirle a la gruesa un punto que
+  // no tiene sería inventarlo.
+  const anchorIsOther = stepB >= stepA;
+  const anchors = anchorIsOther ? other : mineIdx;
+  const dense = anchorIsOther ? mineIdx : other;
+  const tol = anchorIsOther ? stepA : stepB;
+  const sorted = dense.slice().sort((a, b) => a.ts - b.ts);
+  const pairs = [];
+  let k = 0;
+  for (const a of anchors.slice().sort((x, y) => x.ts - y.ts)) {
+    while (k + 1 < sorted.length && sorted[k + 1].ts <= a.ts) k++;
+    const d = sorted[k];
+    if (!d || d.ts > a.ts) continue;                 // la densa aún no había empezado
+    if ((a.ts - d.ts) > tol) continue;               // demasiado lejos: no es el mismo instante
+    pairs.push(anchorIsOther ? { m: d, o: a } : { m: a, o: d });
+  }
+  if (pairs.length < 2) return null;
+  const a0 = pairs[0].m.value, b0 = pairs[0].o.value;
+  if (!(a0 > 0) || !(b0 > 0)) return null;
+  const mine = [], oth = [];
+  for (const pr of pairs) {
+    // Base 100 DESPUÉS de encontrar la primera fecha común válida, nunca antes:
+    // normalizar cada serie por su cuenta compararía dos orígenes distintos.
+    // La ETIQUETA temporal de las dos es la del ANCLA, que es el instante que
+    // las dos comparten de verdad.
+    const ts = anchorIsOther ? pr.o.ts : pr.m.ts;
+    mine.push({ ts, value: +((pr.m.value / a0) * 100).toFixed(4) });
+    oth.push({ ts, value: +((pr.o.value / b0) * 100).toFixed(4) });
+  }
+  return { mine, other: oth, from: mine[0].ts, to: mine[mine.length - 1].ts,
+           buckets: pairs.length, stepMs: Math.max(stepA, stepB), toleranceMs: tol };
+}
+
+// El punto de entrada ÚNICO de la superficie. Async porque el benchmark viaja
+// por red; la serie propia es SÍNCRONA y siempre está, que es lo que garantiza
+// el §6.3: «el estado de carga o error del benchmark nunca debe borrar la serie
+// principal».
+async function _aurixComparison(range, benchmarkId, opts) {
+  const o = opts || {};
+  const r = String(range || 'all').toLowerCase();
+  const base = String(o.base || (typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD')).toUpperCase();
+  const out = { range: r, base, state: _AURIX_CMP_STATE.OFF, benchmarkId: benchmarkId || null,
+                mine: null, other: null, from: null, to: null, diffPp: null, reason: null,
+                returnType: null, fxPair: null, symbol: null, availableFrom: null };
+  if (!_aurixCmpEnabled()) { out.reason = 'flag_off'; return out; }
+  // ── PUERTA 1 · SIN RENTABILIDAD CERTIFICADA NO HAY NADA QUE COMPARAR ────
+  // Es el mismo `valid` que gobierna si Intelligence puede publicar un
+  // rendimiento. `pending` y `value_fallback` caen aquí: el §6.2 prohíbe
+  // reinterpretar una serie de VALOR como rentabilidad, así que la comparación
+  // porcentual se desactiva y se dice por qué.
+  let perf = null;
+  try { perf = (typeof _aurixInvestablePerformance === 'function') ? _aurixInvestablePerformance(r) : null; } catch (_) { perf = null; }
+  if (!perf || perf.valid !== true || !perf.index || perf.index.basis !== 'flow_neutral_index') {
+    out.state = _AURIX_CMP_STATE.NO_RETURN;
+    out.reason = (perf && perf.fallbackReason) || 'return_not_publishable';
+    return out;
+  }
+  const idx = perf.index;
+  let mineRaw = [];
+  for (let i = 0; i < idx.values.length; i++) {
+    const ts = idx.timestamps[i], v = idx.values[i];
+    if (Number.isFinite(ts) && Number.isFinite(v) && v > 0) mineRaw.push({ ts, value: v });
+  }
+  if (mineRaw.length < 2) { out.state = _AURIX_CMP_STATE.NO_RETURN; out.reason = 'index_too_short'; return out; }
+  const selfBase = mineRaw[0].value;
+  out.mine = mineRaw.map(p => ({ ts: p.ts, value: +((p.value / selfBase) * 100).toFixed(4) }));
+  out.from = mineRaw[0].ts; out.to = mineRaw[mineRaw.length - 1].ts;
+  if (!benchmarkId) { out.state = _AURIX_CMP_STATE.READY; return out; }
+  // ── PUERTA 2 · EL BENCHMARK, EN SU DIVISA DE COTIZACIÓN ────────────────
+  const bm = await _aurixCmpBenchmarkSeries(benchmarkId, r, o);
+  if (!bm.ok) {
+    out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = bm.reason;
+    out.symbol = bm.symbol || null;
+    return out;                                   // la serie propia sigue en `out.mine`
+  }
+  out.symbol = bm.symbol; out.returnType = bm.returnType;
+  let otherRaw = bm.series;
+  // ── PUERTA 3 · LA DIVISA, PARA LAS DOS SERIES A LA VEZ ─────────────────
+  // El índice propio viene de snapshots convertidos con el tipo de HOY (un
+  // factor constante que se cancela al normalizar), así que es un índice de
+  // retorno en la divisa de COTIZACIÓN, igual que el benchmark. Si la base es
+  // otra, se convierten LAS DOS con la MISMA serie FX y los MISMOS buckets.
+  // Convertir sólo una era el defecto crítico que encontró la revisión.
+  if (base !== bm.quoted) {
+    const fx = await _aurixCmpFxSeries(r, base, o);
+    if (!fx.ok) { out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = fx.reason; return out; }
+    out.fxPair = fx.pair;
+    const step = Math.max(_aurixCmpMedianStep(mineRaw) || 0, _aurixCmpMedianStep(otherRaw) || 0,
+                          _aurixCmpMedianStep(fx.series) || 0);
+    if (!(step > 0)) { out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = 'no_common_step'; return out; }
+    const fxB = _aurixCmpBucketize(fx.series, step);
+    const cm = _aurixCmpConvert(mineRaw, fxB, step, fx.invert === true);
+    const co = _aurixCmpConvert(otherRaw, fxB, step, fx.invert === true);
+    if (cm.series.length < 2 || co.series.length < 2) {
+      out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = 'fx_coverage_insufficient'; return out;
+    }
+    mineRaw = cm.series; otherRaw = co.series;
+    out.fxDropped = cm.dropped + co.dropped;
+  }
+  // ── PUERTA 4 · PRIMERA FECHA COMÚN VÁLIDA, Y NORMALIZAR DESPUÉS ────────
+  const al = _aurixCmpAlign(mineRaw, otherRaw);
+  if (!al) { out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = 'no_common_window'; return out; }
+  out.mine = al.mine; out.other = al.other; out.from = al.from; out.to = al.to;
+  out.toleranceMs = al.toleranceMs;
+  // «Comparación disponible desde [fecha]»: la ventana comparable es más corta
+  // que la medida, por un lado o por el otro. Se declaran LOS DOS extremos: el
+  // §6 pedía el inicio, y la revisión señaló que sin el FIN una comparación que
+  // acabó en el cierre de ayer se publica bajo la etiqueta «24H» como si
+  // llegara hasta ahora.
+  out.availableFrom = (al.from > (idx.timestamps[0] || al.from)) ? al.from : null;
+  out.endsBefore = (al.to < (idx.timestamps[idx.timestamps.length - 1] || al.to)) ? al.to : null;
+  // DIFERENCIA EN PUNTOS PORCENTUALES, no un porcentaje entre porcentajes:
+  // (mío − 100) − (otro − 100). Con las dos series en base 100 es una resta.
+  // EL SIGNO SE CONSERVA: publicarla en valor absoluto hacía que ir 12 pp por
+  // detrás y 12 pp por delante se leyeran EXACTAMENTE IGUAL.
+  const mLast = al.mine[al.mine.length - 1].value, oLast = al.other[al.other.length - 1].value;
+  out.diffPp = +(mLast - oLast).toFixed(2);
+  out.state = _AURIX_CMP_STATE.READY;
+  return out;
+}
+
+if (typeof window !== 'undefined') {
+  window.debugAurixComparison = (range, id) => _aurixComparison(range || 'all', id || null, {});
+}
+
+// La mitad SÍNCRONA de `_aurixComparison`: todo lo que no necesita red. Existe
+// porque el renderer de Intelligence es síncrono y la serie principal NO puede
+// depender de una promesa — si dependiera, un benchmark lento dejaría la card
+// sin su propia curva, que es justo lo que el §6.3 prohíbe.
+function _aurixComparisonSync(range) {
+  const r = String(range || 'all').toLowerCase();
+  const base = String((typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD')).toUpperCase();
+  const out = { range: r, base, state: _AURIX_CMP_STATE.OFF, benchmarkId: null,
+                mine: null, other: null, from: null, diffPp: null, reason: null,
+                returnType: null, fxPair: null, symbol: null, availableFrom: null };
+  if (!_aurixCmpEnabled()) { out.reason = 'flag_off'; return out; }
+  let perf = null;
+  try { perf = (typeof _aurixInvestablePerformance === 'function') ? _aurixInvestablePerformance(r) : null; } catch (_) { perf = null; }
+  if (!perf || perf.valid !== true || !perf.index || perf.index.basis !== 'flow_neutral_index') {
+    out.state = _AURIX_CMP_STATE.NO_RETURN;
+    out.reason = (perf && perf.fallbackReason) || 'return_not_publishable';
+    return out;
+  }
+  const idx = perf.index, mineRaw = [];
+  for (let i = 0; i < idx.values.length; i++) {
+    const ts = idx.timestamps[i], v = idx.values[i];
+    if (Number.isFinite(ts) && Number.isFinite(v) && v > 0) mineRaw.push({ ts, value: v });
+  }
+  if (mineRaw.length < 2) { out.state = _AURIX_CMP_STATE.NO_RETURN; out.reason = 'index_too_short'; return out; }
+  const b0 = mineRaw[0].value;
+  out.mine = mineRaw.map(p => ({ ts: p.ts, value: +((p.value / b0) * 100).toFixed(4) }));
+  out.from = mineRaw[0].ts;
+  out.state = _AURIX_CMP_STATE.READY;
+  return out;
+}
+
+// ── ESTADO DE LA SUPERFICIE ────────────────────────────────────────────────
+// Sesión/local y SEPARADO POR CUENTA (§6.2): la clave va sellada con su dueño y
+// la lectura falla cerrada sin sello, igual que el contexto de Intelligence, así
+// que el comparador de A no puede aparecer en la sesión de B. Estado inicial:
+// SIN COMPARACIÓN. No se crea persistencia remota.
+// Los rangos CANÓNICOS, los mismos cinco que el resto del producto ofrece.
+const _AURIX_CMP_RANGES = Object.freeze(['24h', '7d', '30d', '1y', 'all']);
+const _AURIX_CMP_STATE_KEY = 'aurix_cmp_state_v1';
+function _intv14CmpState() {
+  const def = { range: 'all', benchmarkId: null };
+  try {
+    const rec = _aurixIntelReadOwned(_AURIX_CMP_STATE_KEY, {});
+    if (!rec) return def;
+    const r = String(rec.range || '').toLowerCase();
+    const id = rec.benchmarkId ? String(rec.benchmarkId) : null;
+    return {
+      range: _AURIX_CMP_RANGES.indexOf(r) !== -1 ? r : def.range,
+      benchmarkId: _aurixCmpBenchmark(id) ? id : null,      // un id inventado en storage no entra
+    };
+  } catch (_) { return def; }
+}
+function _intv14CmpSetState(patch) {
+  try {
+    const cur = _intv14CmpState();
+    return _aurixIntelWriteOwned(_AURIX_CMP_STATE_KEY, Object.assign({}, cur, patch || {}), {});
+  } catch (_) { return false; }
+}
+
+// ── EL DIBUJO ──────────────────────────────────────────────────────────────
+// SVG propio, con el lenguaje visual de la curva del producto pero SIN reutilizar
+// `_wscPaintEmergency`: ese pintor está atado al FRC (pinta VALOR, no índice) y
+// el founder lo excluyó expresamente. Aquí sólo hay geometría sobre dos series
+// ya normalizadas: cero cálculo financiero.
+// Las series se distinguen por COLOR y por TRAZO (§6.3: nunca sólo por color).
+function _intv14CmpSvg(mine, other, opts) {
+  const o = opts || {};
+  const all = (mine || []).concat(other || []);
+  if (!Array.isArray(mine) || mine.length < 2 || !all.length) return '';
+  let lo = Infinity, hi = -Infinity, t0 = Infinity, t1 = -Infinity;
+  for (const p of all) {
+    if (p.value < lo) lo = p.value; if (p.value > hi) hi = p.value;
+    if (p.ts < t0) t0 = p.ts; if (p.ts > t1) t1 = p.ts;
+  }
+  if (!(hi > lo)) { hi = lo + 1; lo = lo - 1; }               // serie plana: banda mínima, sin mentir
+  const W = 600, H = 180, PAD_X = 8, PAD_Y = 14;
+  const x = ts => PAD_X + ((ts - t0) / Math.max(1, t1 - t0)) * (W - PAD_X * 2);
+  const y = v  => PAD_Y + (1 - (v - lo) / (hi - lo)) * (H - PAD_Y * 2);
+  const path = pts => pts.map((p, i) => (i ? 'L' : 'M') + x(p.ts).toFixed(1) + ' ' + y(p.value).toFixed(1)).join(' ');
+  const base100 = (lo <= 100 && hi >= 100)
+    ? `<line class="intv14-cmp-base" x1="${PAD_X}" y1="${y(100).toFixed(1)}" x2="${W - PAD_X}" y2="${y(100).toFixed(1)}"/>` : '';
+  const oth = (other && other.length >= 2)
+    ? `<path class="intv14-cmp-line is-other" d="${path(other)}"/>` : '';
+  return `
+    <svg class="intv14-cmp-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+         role="img" aria-label="${_intccEsc(o.a11y || '')}"
+         data-cmp-points="${mine.length}" data-cmp-other="${(other || []).length}">
+      ${base100}
+      ${oth}
+      <path class="intv14-cmp-line is-mine" d="${path(mine)}"/>
+    </svg>`;
+}
+
+// ── LA CARD ────────────────────────────────────────────────────────────────
+// Se pinta SÍNCRONA con la serie propia —que es síncrona— y el benchmark llega
+// después: el §6.3 exige que un fallo o una carga del comparador NUNCA borre la
+// serie principal, y la única forma estructural de garantizarlo es que la
+// principal no dependa de la red.
+function _intv14ComparatorHtml(esc, cmp) {
+  if (!_aurixCmpEnabled()) return '';
+  if (!cmp || cmp.state === _AURIX_CMP_STATE.OFF) return '';
+  const st = _intv14CmpState();
+  const rangeBtns = _AURIX_CMP_RANGES.map(r =>
+    `<button type="button" class="intv14-cmp-range${r === st.range ? ' is-active' : ''}"
+       data-cmp-range="${esc(r)}" aria-pressed="${r === st.range ? 'true' : 'false'}">${
+      esc(_intv4T('cmp_range_' + r))}</button>`).join('');
+  const options = [`<option value="">${esc(_intv4T('cmp_none'))}</option>`].concat(
+    _AURIX_CMP_CATALOG.map(b =>
+      `<option value="${esc(b.id)}"${b.id === st.benchmarkId ? ' selected' : ''}>${esc(_intv4T(b.labelKey))}</option>`)
+  ).join('');
+  // SIN RENTABILIDAD CERTIFICADA no se dibuja una comparación porcentual, y se
+  // dice por qué en vez de callar (§6.2). `pending` y `value_fallback` entran
+  // por aquí, y NO se reinterpreta una serie de valor como rentabilidad.
+  if (cmp.state === _AURIX_CMP_STATE.NO_RETURN) {
+    // EL SELECTOR DE PERIODO SE QUEDA, y es la corrección de un defecto que la
+    // QA visual enseñó en el acto: la primera versión escondía TODOS los
+    // controles en este estado, y el periodo por defecto es TOTAL. Una cuenta
+    // con rentabilidad certificada en 24H pero no en TOTAL aterrizaba en «no
+    // hay nada que comparar» SIN NINGUNA FORMA DE CAMBIAR DE PERIODO: el único
+    // control que saca al usuario del estado era justo el que se ocultaba.
+    // Lo que sí desaparece es «Comparar con»: sin rentabilidad que comparar,
+    // ese desplegable sería un control que no puede hacer nada.
+    return `
+      <section class="intcc-card intv14-cmp" data-state="no_return"
+               data-range="${esc(st.range)}" data-reason="${esc(cmp.reason || '')}">
+        <h3 class="intcc-card-title">${esc(_intv4T('cmp_title'))}</h3>
+        <div class="intv14-cmp-controls">
+          <div class="intv14-cmp-ranges" role="group" aria-label="${esc(_intv4T('cmp_range_aria'))}">${rangeBtns}</div>
+        </div>
+        <p class="intcc-empty-body">${esc(_intv4T('cmp_no_return'))}</p>
+      </section>`;
+  }
+  const bm = _aurixCmpBenchmark(st.benchmarkId);
+  const hasOther = !!(cmp.other && cmp.other.length >= 2);
+  const insufficient = cmp.state === _AURIX_CMP_STATE.INSUFFICIENT;
+  // EL SIGNO ERA LO ÚNICO QUE IMPORTABA Y SE PERDÍA. `Math.abs` hacía que ir
+  // 12 pp por detrás y 12 pp por delante imprimieran la MISMA frase, carácter
+  // por carácter. Se dice la dirección con palabras —que es lo que el usuario
+  // lee— y el valor absoluto acompaña; el signo crudo sigue en `data-diff-pp`
+  // para la QA y el gate.
+  const diffTxt = (hasOther && Number.isFinite(cmp.diffPp))
+    ? (Math.abs(cmp.diffPp) < 0.01
+        ? _intv4T('cmp_diff_flat')
+        : _intv4T(cmp.diffPp > 0 ? 'cmp_diff_ahead' : 'cmp_diff_behind', _intv4Num(Math.abs(cmp.diffPp), 2)))
+    : '';
+  const a11y = _intv4T('cmp_a11y', _intv4T('cmp_mine'),
+    bm ? _intv4T(bm.labelKey) : _intv4T('cmp_none'));
+  return `
+    <section class="intcc-card intv14-cmp"
+             data-state="${esc(cmp.state)}" data-range="${esc(st.range)}"
+             data-benchmark="${esc(st.benchmarkId || '')}"
+             data-return-type="${esc(cmp.returnType || '')}"
+             data-fx="${esc(cmp.fxPair || '')}"
+             data-diff-pp="${esc(Number.isFinite(cmp.diffPp) ? String(cmp.diffPp) : '')}">
+      <h3 class="intcc-card-title">${esc(_intv4T('cmp_title'))}</h3>
+      <div class="intv14-cmp-controls">
+        <div class="intv14-cmp-ranges" role="group" aria-label="${esc(_intv4T('cmp_range_aria'))}">${rangeBtns}</div>
+        <label class="intv14-cmp-pick">
+          <span class="intv14-cmp-pick-label">${esc(_intv4T('cmp_with'))}</span>
+          <select class="intv14-cmp-select" data-cmp-select="1"
+                  aria-label="${esc(_intv4T('cmp_with'))}">${options}</select>
+        </label>
+        ${st.benchmarkId ? `<button type="button" class="intv14-cmp-clear" data-cmp-clear="1">${
+          esc(_intv4T('cmp_clear'))}</button>` : ''}
+      </div>
+      <div class="intv14-cmp-plot">${_intv14CmpSvg(cmp.mine, hasOther ? cmp.other : null, { a11y })}</div>
+      <ul class="intv14-cmp-legend">
+        <li class="intv14-cmp-key is-mine"><span class="intv14-cmp-swatch" aria-hidden="true"></span>${esc(_intv4T('cmp_mine'))}</li>
+        ${hasOther && bm ? `<li class="intv14-cmp-key is-other"><span class="intv14-cmp-swatch" aria-hidden="true"></span>${esc(_intv4T(bm.labelKey))}</li>` : ''}
+      </ul>
+      ${diffTxt ? `<p class="intv14-cmp-diff">${esc(diffTxt)}</p>` : ''}
+      ${insufficient ? `<p class="intv14-cmp-note">${esc(_intv4T('cmp_insufficient'))}</p>` : ''}
+      ${(!insufficient && cmp.availableFrom) ? `<p class="intv14-cmp-note">${
+        esc(_intv4T('cmp_available_from', _intccDate(cmp.availableFrom)))}</p>` : ''}
+      ${(!insufficient && cmp.endsBefore) ? `<p class="intv14-cmp-note">${
+        esc(_intv4T('cmp_ends', _intccDate(cmp.endsBefore)))}</p>` : ''}
+      ${(hasOther && cmp.returnType === 'price_return') ? `<p class="intv14-cmp-note">${
+        esc(_intv4T('cmp_price_return'))}</p>` : ''}
+    </section>`;
+}
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC SUPREME CLOSURE §7/§8 · CHAT DE LA ESFERA — LADO CLIENTE
+// ════════════════════════════════════════════════════════════════════════════
+// LA PUERTA, ANTES QUE NADA. El §7 es explícito: si falta una dependencia, la
+// esfera NO promete conversación. Aquí eso significa que sin endpoint
+// configurado no hay affordance, no hay panel y no hay un solo byte de red. No
+// se simula una respuesta y no se construye un chat muerto.
+const _AURIX_CHAT_KILL_KEY = 'aurix_chat_kill_v1';
+function _aurixChatEndpoint() {
+  try {
+    const u = (typeof window !== 'undefined' && typeof window.AURIX_CHAT_URL === 'string')
+      ? window.AURIX_CHAT_URL.trim() : '';
+    return /^https:\/\/[^\s]+$/.test(u) ? u : '';
+  } catch (_) { return ''; }
+}
+function _aurixChatEnabled() {
+  try {
+    if (typeof window !== 'undefined' && window.__AURIX_CHAT_KILL === true) return false;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(_AURIX_CHAT_KILL_KEY) === '1') return false;
+    if (!_aurixChatEndpoint()) return false;                       // sin infraestructura, sin promesa
+    if (typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess()) return false;
+    return true;
+  } catch (_) { return false; }
+}
+
+// ── EL NAVEGADOR NO CONSTRUYE HECHOS. YA NO. ───────────────────────────────
+// Aquí vivía `_aurixChatEnvelope`, que armaba el fact envelope con los owners
+// certificados y lo enviaba al servidor. Estaba razonado —evitaba un segundo
+// motor financiero— y era inseguro: lo que se construye en el navegador se
+// puede manipular, y el validador del servidor derivaba su lista de permitidos
+// DEL MISMO envelope, así que un cliente tocado autorizaba sus propias cifras.
+//
+// El cliente sólo puede enviar la PREGUNTA, el IDIOMA y un identificador de
+// petición. Los hechos los construye el servidor sobre datos autoritativos.
+// La función se borra entera en vez de dejarla sin llamar: una función que sabe
+// fabricar un envelope es una invitación a volver a enviarlo.
+// ── ESTADO DE LA CONVERSACIÓN ──────────────────────────────────────────────
+// SÓLO EN MEMORIA. Ventana corta, sin persistencia permanente, sin adjuntos y
+// sin voz. Al cambiar de cuenta o cerrar sesión se vacía entero (ver
+// `_aurixChatReset`), que es el único contrato que impide que un carácter de la
+// cuenta anterior aparezca en la siguiente.
+const _AURIX_CHAT_WINDOW = 6;
+const _aurixChat = { open: false, busy: false, turns: [], draft: '', error: null,
+                     ctl: null, owner: null, seq: 0 };
+function _aurixChatReset(reason) {
+  try { if (_aurixChat.ctl) _aurixChat.ctl.abort(); } catch (_) {}
+  _aurixChat.ctl = null; _aurixChat.busy = false; _aurixChat.turns = [];
+  // `lastAsked` guarda la ÚLTIMA PREGUNTA, así que es contenido de la cuenta
+  // anterior tanto como un turno. Se quedaba viva y podía reaparecer en el
+  // compositor por la vía de Reintentar: «no queda un carácter» la incluye.
+  _aurixChat.draft = ''; _aurixChat.error = null; _aurixChat.open = false;
+  _aurixChat.lastAsked = ''; _aurixChat.atEnd = true;
+  _aurixChat.seq++;                                  // invalida cualquier chunk tardío
+  _aurixChat.owner = (typeof _aurixIntelOwner === 'function') ? _aurixIntelOwner({}) : null;
+  try { const p = document.getElementById('aurix-chat-panel'); if (p) p.remove(); } catch (_) {}
+  try { if (reason) console.log('[AURIX_CHAT] reset:', reason); } catch (_) {}
+}
+// El dueño se comprueba en CADA interacción, no sólo en el evento de logout: un
+// cambio de cuenta que no dispare el evento no puede dejar la conversación de A
+// viva en la sesión de B.
+function _aurixChatOwnerGuard() {
+  const now = (typeof _aurixIntelOwner === 'function') ? _aurixIntelOwner({}) : null;
+  if (_aurixChat.owner !== null && now !== _aurixChat.owner) { _aurixChatReset('owner_changed'); return false; }
+  _aurixChat.owner = now;
+  return true;
+}
+
+// ── SANITIZACIÓN ───────────────────────────────────────────────────────────
+// La respuesta del modelo se trata como TEXTO PLANO, siempre. No se interpreta
+// Markdown, no se permite HTML y no se permite una URL: el modelo no navega, y
+// un enlace que él construyera sería exactamente el vector que el §8.2 prohíbe.
+// Las acciones viajan por `action_id` de una allowlist, nunca por URL.
+const _AURIX_CHAT_ACTIONS = Object.freeze(['view_concentration', 'view_evolution',
+  'view_changes', 'view_position', 'add_liquidity']);
+// Los caracteres de control se quitan por CÓDIGO, no con un rango escrito en el
+// fuente: un rango literal es fácil de leer mal y de romper al editar.
+function _aurixChatStripControl(s) {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c === 10 || c === 9) { out += s[i]; continue; }   // salto de línea y tab sí
+    if (c < 32 || c === 127) continue;
+    out += s[i];
+  }
+  return out;
+}
+function _aurixChatSanitize(s) {
+  const base = String(s == null ? '' : s)
+    .replace(/https?:\/\/\S+/gi, '')                 // ninguna URL, venga de donde venga
+    .replace(/<[^>]*>/g, '');                        // ningún tag
+  return _aurixChatStripControl(base).slice(0, 2000);
+}
+
+
+// ── LA LLAMADA ─────────────────────────────────────────────────────────────
+// Una por mensaje. El servidor es quien impone cuota, presupuesto, concurrencia
+// e idempotencia; aquí sólo se garantiza que un doble clic no genere dos
+// peticiones y que la clave de idempotencia sea la MISMA en un reintento del
+// mismo mensaje — si cambiara, el servidor cobraría dos veces por lo mismo.
+function _aurixChatIdemKey(text, turnIndex) {
+  const owner = (typeof _aurixIntelOwner === 'function') ? (_aurixIntelOwner({}) || '') : '';
+  // EL DÍA ENTRA EN LA CLAVE. Sin él, la misma pregunta en el mismo turno
+  // mañana chocaba con la de hoy: el servidor la reconocía como repetición y
+  // devolvía la respuesta de AYER, con las cifras de ayer, pintada como nueva.
+  // El servidor además acota su búsqueda al día en curso: dos barreras.
+  const day = new Date().toISOString().slice(0, 10);
+  const base = owner + '|' + day + '|' + turnIndex + '|' + String(text);
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < base.length; i++) {
+    h1 = (h1 ^ base.charCodeAt(i)) >>> 0; h1 = (h1 * 16777619) >>> 0;
+    h2 = (h2 + base.charCodeAt(i) * (i + 7)) >>> 0;
+  }
+  return 'ck_' + h1.toString(36) + h2.toString(36);
+}
+async function _aurixChatAsk(text) {
+  if (!_aurixChatEnabled()) return { ok: false, reason: 'disabled' };
+  if (!_aurixChatOwnerGuard()) return { ok: false, reason: 'owner_changed' };
+  if (_aurixChat.busy) return { ok: false, reason: 'busy' };      // doble envío: NO duplica coste
+  const url = _aurixChatEndpoint();
+  let token = '';
+  try {
+    const sess = (typeof supabaseClient !== 'undefined' && supabaseClient)
+      ? await supabaseClient.auth.getSession() : null;
+    token = (sess && sess.data && sess.data.session && sess.data.session.access_token) || '';
+  } catch (_) { token = ''; }
+  // Sin sesión resuelta NO se llama: la autoridad la deriva el servidor del
+  // token, así que sin token no hay nada que autorizar.
+  if (!token) return { ok: false, reason: 'unauthenticated' };
+  // NADA FINANCIERO VIAJA DESDE AQUÍ: ni importes, ni porcentajes, ni periodos,
+  // ni divisas, ni posiciones, ni fact_id, ni cobertura, ni account_id. Sólo la
+  // pregunta, el idioma y un identificador de petición.
+  const idem = _aurixChatIdemKey(text, _aurixChat.turns.length);
+  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+  const seq = _aurixChat.seq;
+  _aurixChat.busy = true;
+  _aurixChat.ctl = new AbortController();
+  // TIMEOUT PROPIO. Sin él, una función colgada deja el panel en «generando»
+  // para siempre y la única salida es que el usuario pulse Detener. Se da
+  // margen sobre el timeout del servidor para no cortar una respuesta válida.
+  const _to = setTimeout(() => { try { if (_aurixChat.ctl) _aurixChat.ctl.abort(); } catch (_) {} }, 30000);
+  let res = null, body = null;
+  try {
+    res = await fetch(url, {
+      method: 'POST', signal: _aurixChat.ctl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, 'x-idempotency-key': idem },
+      body: JSON.stringify({ message: text, lang: (typeof lang !== 'undefined' ? String(lang) : 'es'),
+                             requestId, idempotencyKey: idem }),
+    });
+    body = await res.json();
+  } catch (e) {
+    clearTimeout(_to);
+    _aurixChat.busy = false; _aurixChat.ctl = null;
+    const aborted = e && e.name === 'AbortError';
+    return { ok: false, reason: aborted ? 'aborted' : 'network' };
+  }
+  clearTimeout(_to);
+  _aurixChat.busy = false; _aurixChat.ctl = null;
+  // Una respuesta que llega DESPUÉS de un cambio de cuenta o de un reset se
+  // descarta: ni se pinta ni se guarda.
+  if (seq !== _aurixChat.seq) return { ok: false, reason: 'stale' };
+  if (!res.ok || !body) return { ok: false, reason: (body && body.error) || ('http_' + (res ? res.status : '0')) };
+  return {
+    ok: true,
+    text: _aurixChatSanitize(body.text),
+    actionId: (_AURIX_CHAT_ACTIONS.indexOf(String(body.actionId || '')) !== -1) ? String(body.actionId) : null,
+    blocked: body.blocked === true,
+    mock: body.mock === true,
+  };
+}
+
+// ── EL PANEL ───────────────────────────────────────────────────────────────
+// Escritorio: panel LATERAL. Móvil: hoja a pantalla casi completa con el
+// compositor SIEMPRE visible sobre el teclado y la safe-area. Un único markup:
+// lo que cambia es CSS, porque dos markups serían dos contratos de foco.
+function _aurixChatPanelHtml() {
+  const esc = _intccEsc;
+  const turns = _aurixChat.turns.slice(-_AURIX_CHAT_WINDOW);
+  const rows = turns.map((t, i) => `
+    <li class="intv15-msg is-${esc(t.role)}"${t.blocked ? ' data-blocked="1"' : ''}>
+      <span class="intv15-msg-who">${esc(t.role === 'user' ? _intv4T('chat_you') : _intv4T('chat_aurix'))}</span>
+      <p class="intv15-msg-text">${esc(t.text)}</p>
+    </li>`).join('');
+  return `
+    <aside id="aurix-chat-panel" class="intv15-panel" role="dialog" aria-modal="true"
+           aria-label="${esc(_intv4T('chat_title'))}" data-busy="${_aurixChat.busy ? '1' : '0'}">
+      <header class="intv15-head">
+        <h2 class="intv15-title">${esc(_intv4T('chat_title'))}</h2>
+        <div class="intv15-head-actions">
+          ${turns.length ? `<button type="button" class="intv15-clear" data-chat-clear="1">${
+            esc(_intv4T('chat_clear'))}</button>` : ''}
+          <button type="button" class="intv15-close" data-chat-close="1"
+                  aria-label="${esc(_intv4T('chat_close'))}">×</button>
+        </div>
+      </header>
+      <div class="intv15-log" id="aurix-chat-log" role="log" aria-live="polite" aria-relevant="additions">
+        ${turns.length ? `<ul class="intv15-msgs">${rows}</ul>`
+                       : `<p class="intv15-hint">${esc(_intv4T('chat_hint'))}</p>`}
+        ${_aurixChat.busy ? `<p class="intv15-busy" role="status">${esc(_intv4T('chat_thinking'))}</p>` : ''}
+        ${_aurixChat.error ? `<p class="intv15-error" role="status">${esc(_intv4T('chat_err_' + _aurixChat.error) || _intv4T('chat_err_generic'))}
+          <button type="button" class="intv15-retry" data-chat-retry="1">${esc(_intv4T('chat_retry'))}</button></p>` : ''}
+      </div>
+      <form class="intv15-composer" data-chat-form="1">
+        <label class="intv15-sr" for="aurix-chat-input">${esc(_intv4T('chat_input_label'))}</label>
+        <textarea id="aurix-chat-input" class="intv15-input" rows="1" maxlength="800"
+                  placeholder="${esc(_intv4T('chat_placeholder'))}"
+                  ${_aurixChat.busy ? 'disabled' : ''}>${esc(_aurixChat.draft)}</textarea>
+        ${_aurixChat.busy
+          ? `<button type="button" class="intv15-stop" data-chat-stop="1">${esc(_intv4T('chat_stop'))}</button>`
+          : `<button type="submit" class="intv15-send" data-chat-send="1"
+               aria-label="${esc(_intv4T('chat_send'))}"${_aurixChat.draft.trim() ? '' : ' disabled'}>
+               <span aria-hidden="true">↑</span></button>`}
+      </form>
+    </aside>`;
+}
+function _aurixChatRender() {
+  try {
+    const old = document.getElementById('aurix-chat-panel');
+    if (!_aurixChat.open) { if (old) old.remove(); return; }
+    const html = _aurixChatPanelHtml();
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const next = tmp.firstElementChild;
+    if (old) old.replaceWith(next); else document.body.appendChild(next);
+    const log = document.getElementById('aurix-chat-log');
+    // AUTOSCROLL SÓLO SI EL USUARIO ESTÁ AL FINAL: arrastrarle la vista mientras
+    // lee algo de más arriba es quitarle el control de su propia lectura.
+    if (log && _aurixChat.atEnd !== false) log.scrollTop = log.scrollHeight;
+    const ta = document.getElementById('aurix-chat-input');
+    if (ta && !_aurixChat.busy) { try { ta.focus(); } catch (_) {} _aurixChatAutosize(ta); }
+  } catch (_) {}
+}
+function _aurixChatAutosize(ta) {
+  try { ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; } catch (_) {}
+}
+function _aurixChatOpen() {
+  if (!_aurixChatEnabled() || !_aurixChatOwnerGuard()) return;
+  _aurixChat.open = true;
+  try { _aurixChat.returnFocus = document.querySelector('[data-chat-open]'); } catch (_) {}
+  _aurixChatRender();
+}
+function _aurixChatClose() {
+  _aurixChat.open = false;
+  try { if (_aurixChat.ctl) _aurixChat.ctl.abort(); } catch (_) {}
+  _aurixChat.busy = false;
+  _aurixChatRender();
+  // El foco VUELVE a la esfera: un panel que se cierra y deja el foco en el
+  // body deja al teclado y al lector de pantalla en ninguna parte.
+  try { if (_aurixChat.returnFocus) _aurixChat.returnFocus.focus(); } catch (_) {}
+}
+async function _aurixChatSubmit() {
+  const text = String(_aurixChat.draft || '').trim();
+  if (!text || _aurixChat.busy) return;
+  _aurixChat.turns.push({ role: 'user', text });
+  _aurixChat.lastAsked = text;
+  _aurixChat.draft = ''; _aurixChat.error = null; _aurixChat.busy = true;
+  _aurixChatRender();
+  const r = await _aurixChatAsk(text);
+  if (r.ok) {
+    _aurixChat.turns.push({ role: 'aurix', text: r.text, blocked: r.blocked, actionId: r.actionId });
+    _aurixChat.error = null;
+  } else if (r.reason !== 'aborted' && r.reason !== 'stale' && r.reason !== 'owner_changed') {
+    _aurixChat.error = r.reason;
+  }
+  _aurixChat.busy = false;
+  _aurixChatRender();
+}
+
 function _renderIntelligenceCommandCenter() {
   const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
   const esc  = _intccEsc;
@@ -62835,6 +64452,46 @@ function _renderIntelligenceCommandCenter() {
   // dock al PIE del contenido: es donde la captura demuestra que hay espacio, y
   // así ni empuja el titular ni compite con la esfera. Lleva su propio rótulo
   // para que se lea como una capa nativa de Intelligence y no como una encuesta.
+  // ══════════════════════════════════════════════════════════════════════
+  // SUPREME CLOSURE · §4.2 — CONFIRMAR LIQUIDEZ FUERA DE AURIX ABRE UNA PUERTA
+  // ══════════════════════════════════════════════════════════════════════
+  // El usuario respondía «sí, tengo liquidez sin registrar», Aurix lo guardaba,
+  // cambiaba su interpretación… y ahí se acababa. La consecuencia útil de esa
+  // respuesta —registrarla— no estaba a un toque en ningún sitio.
+  //
+  // LO QUE AURIX NO HACE, y está escrito en el §4.2 con estas palabras: no
+  // inventa importe, no registra automáticamente y no lo clasifica como
+  // aportación nueva. Sólo ABRE EL FORMULARIO QUE YA EXISTE (`openLiquidityModal`),
+  // que es donde el usuario pone la cifra y la fecha. Cero owners financieros
+  // tocados: esta superficie no escribe ni un céntimo.
+  //
+  // Y NO VUELVE A PREGUNTAR. La pregunta ya está respondida, así que el dock no
+  // la reabre —eso ya lo garantizaba la política de preguntas—; lo que este
+  // bloque añade es que la puerta tampoco insiste: «Ahora no» la cierra con el
+  // MISMO mecanismo de acuse que ya viaja entre dispositivos, de modo que
+  // cerrarla en el móvil la cierra también en el escritorio.
+  const _LIQ_CTA_ID = 'ctx:unregistered_liquidity';
+  const liqCtaHtml = (() => {
+    try {
+      const f = (intel && intel.context && intel.context.fields) || {};
+      const u = f.unregistered_liquidity;
+      if (!u || u.value !== 'yes' || u.provenance !== 'user_answer') return '';
+      if (u.superseded === true) return '';           // §4.1 — ya no es el estado vigente
+      const a = _ackMap[_LIQ_CTA_ID];
+      if (a && a.state === 'acknowledged') return '';
+      return `
+        <div class="intv11-dock intv13-liqcta" data-liq-cta="1">
+          <p class="intv8-intel-q-text">${esc(_intv4T('intel_liq_cta_title'))}</p>
+          <p class="intv11-dock-why">${esc(_intv4T('intel_liq_cta_body'))}</p>
+          <div class="intv8-intel-q-opts">
+            <button type="button" class="intcc-chip intv8-intel-opt" data-liq-cta-act="add">${
+              esc(_intv4T('intel_liq_cta_add'))}</button>
+            <button type="button" class="intcc-chip intv8-intel-opt is-quiet" data-liq-cta-act="later">${
+              esc(_intv4T('intel_liq_cta_later'))}</button>
+          </div>
+        </div>`;
+    } catch (_) { return ''; }
+  })();
   const intelQHtml = intelQ ? (() => {
     const qt = _intelQuestionText(intelQ);
     if (!qt.text) return '';
@@ -62968,9 +64625,16 @@ function _renderIntelligenceCommandCenter() {
   // Su sitio en móvil es el que pidió el founder: Hero → Salud → Pregunta →
   // Radar. Lo decide `order` en `≤1023px`, declarado en styles.css — sin él se
   // pintaría ANTES del hero, que es la invariante que ya nos costó una vez.
-  const intelQCardHtml = intelQHtml ? `
-    <section class="intcc-card intv12-qcard" data-state="question">
-      ${intelQHtml}
+  // §4.2 — la puerta de liquidez comparte la card de la pregunta: es la MISMA
+  // conversación (una respuesta y su consecuencia) y el §4.2 pide no crear
+  // superficie nueva. Si no hay ni pregunta ni puerta, no se pinta card: el
+  // reflow y la desaparición que el SPEC manda conservar siguen siendo los de
+  // antes, porque el contenedor sigue siendo condicional.
+  const _qCardBody = intelQHtml + liqCtaHtml;
+  const intelQCardHtml = _qCardBody ? `
+    <section class="intcc-card intv12-qcard" data-state="question"
+             data-liq-cta="${liqCtaHtml ? '1' : '0'}">
+      ${_qCardBody}
     </section>` : '';
 
   // ── COGNITIVE ORDER (SPEC §14) ───────────────────────────────────────────
@@ -62999,6 +64663,22 @@ function _renderIntelligenceCommandCenter() {
   // estaba mostrando y republicaran otro que sí. Es exactamente la duplicación que
   // estas superficies existen para evitar.
   const mattersSel = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
+  // ── §6 · COMPARADOR ──────────────────────────────────────────────────────
+  // Se construye SÍNCRONO y con la serie propia solamente: `_aurixComparison`
+  // es async por el benchmark, pero «Mi patrimonio» sale del índice que ya está
+  // en memoria. Si el benchmark falla o tarda, esta card ya está pintada con su
+  // serie principal — que es la garantía estructural que pide el §6.3.
+  // Su sitio: escritorio/tablet a ancho completo bajo la fila Radar–Factores–
+  // Explora; móvil detrás del Radar. Lo decide el CSS; aquí sólo importa que
+  // vaya entre `exploreHtml` y `mattersHtml` en el DOM.
+  let cmpHtml = '';
+  try {
+    if (_aurixCmpEnabled()) {
+      const _cmpSt = _intv14CmpState();
+      const _cmpSync = _aurixComparisonSync(_cmpSt.range);
+      cmpHtml = _intv14ComparatorHtml(esc, _cmpSync);
+    }
+  } catch (_) { cmpHtml = ''; }
   const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap);
   const publishedKeys = [];
   mattersSel.forEach(st => {
@@ -63068,7 +64748,8 @@ function _renderIntelligenceCommandCenter() {
     <div class="aurix-intcc aurix-intv5 aurix-intv6"
          data-changed-state="${esc(changed.state)}"
          data-changed-evidence="${changed.evidence ? '1' : '0'}"
-         data-has-question="${intelQHtml ? '1' : '0'}">
+         data-has-question="${intelQHtml ? '1' : '0'}"
+         data-liq-cta="${liqCtaHtml ? '1' : '0'}">
       ${heroHtml}
       ${mHeroHtml}
       ${mHealthHtml}
@@ -63076,6 +64757,7 @@ function _renderIntelligenceCommandCenter() {
       ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
+      ${cmpHtml}
       ${mattersHtml}
       ${memoryHtml}
       ${structureHtml}
@@ -63294,9 +64976,224 @@ function _initIntelligenceCommandCenter() {
   // LA RESPUESTA TIENE EFECTO INMEDIATO. Un progressive profiling que pide un dato
   // y no cambia nada visible enseña al usuario a no volver a responder, así que al
   // guardar se repinta la pestaña y la nueva interpretación ya está aplicada.
+  // ══════════════════════════════════════════════════════════════════════
+  // §6 · INTERACCIÓN DEL COMPARADOR
+  // ══════════════════════════════════════════════════════════════════════
+  // Delegación única, como el resto de la superficie. Y un repintado ACOTADO:
+  // se reescribe SÓLO la card del comparador, nunca la pestaña entera. Repintar
+  // todo aquí volvería a recorrer el Core, reescribiría la historia de
+  // presentación y podría mover «Lo que importa hoy» al cambiar un selector
+  // —una interacción del comparador no puede alterar otra superficie—.
+  if (!_intv14CmpWired) {
+    _intv14CmpWired = true;
+    // Una sola generación viva: un cambio de selector cancela la anterior, así
+    // que una respuesta lenta no puede pisar a una posterior.
+    let _cmpSeq = 0;
+    const repaint = async () => {
+      const seq = ++_cmpSeq;
+      const host = document.querySelector('.intv14-cmp');
+      if (!host) return;
+      const st = _intv14CmpState();
+      host.setAttribute('data-loading', '1');
+      let res = null;
+      try { res = await _aurixComparison(st.range, st.benchmarkId, {}); } catch (_) { res = null; }
+      if (seq !== _cmpSeq) return;                       // llegó tarde: se descarta
+      const host2 = document.querySelector('.intv14-cmp');
+      if (!host2) return;
+      if (!res) { host2.removeAttribute('data-loading'); return; }
+      try {
+        const html = _intv14ComparatorHtml(_intccEsc, res);
+        if (!html) { host2.removeAttribute('data-loading'); return; }
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const next = tmp.firstElementChild;
+        if (next) host2.replaceWith(next);
+      } catch (_) { host2.removeAttribute('data-loading'); }
+    };
+    document.addEventListener('click', (e) => {
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const rb = t.closest('[data-cmp-range]');
+      if (rb) {
+        e.preventDefault();
+        const r = rb.getAttribute('data-cmp-range');
+        if (_AURIX_CMP_RANGES.indexOf(r) === -1) return;   // un rango inventado no entra
+        if (_intv14CmpSetState({ range: r })) repaint();
+        return;
+      }
+      // «Quitar comparación» en UN toque: vuelve a «Sin comparación» y la serie
+      // principal se queda donde estaba.
+      const cb = t.closest('[data-cmp-clear]');
+      if (cb) {
+        e.preventDefault();
+        if (_intv14CmpSetState({ benchmarkId: null })) repaint();
+      }
+    });
+    document.addEventListener('change', (e) => {
+      const sel = e.target && e.target.closest ? e.target.closest('[data-cmp-select]') : null;
+      if (!sel) return;
+      const v = String(sel.value || '');
+      // UN solo comparador a la vez: el estado guarda un id, no una lista.
+      const id = v && _aurixCmpBenchmark(v) ? v : null;
+      if (_intv14CmpSetState({ benchmarkId: id })) repaint();
+    });
+    _intv14CmpRepaint = repaint;
+  }
+  // SE DISPARA EN CADA PINTURA, NO SÓLO AL CABLEAR. El cableado ocurre UNA vez,
+  // así que dejar aquí dentro la carga inicial dejaba un estado incoherente
+  // tras cualquier repintado de la pestaña: el selector seguía marcando el
+  // comparador guardado y la segunda línea había desaparecido, porque la card
+  // se reconstruye desde el camino SÍNCRONO, que no tiene benchmark. Lo
+  // encontró la revisión financiera.
+  try {
+    if (typeof _intv14CmpRepaint === 'function' && _aurixCmpEnabled()
+        && _intv14CmpState().benchmarkId) _intv14CmpRepaint();
+  } catch (_) {}
+
+  // ══════════════════════════════════════════════════════════════════════
+  // §7 · CHAT DE LA ESFERA — CABLEADO
+  // ══════════════════════════════════════════════════════════════════════
+  // Delegación única en el documento, como el resto de la superficie. Si el
+  // gate está cerrado no se engancha NADA: sin endpoint no hay listeners, no
+  // hay panel y no hay promesa.
+  if (!_aurixChatWired && _aurixChatEnabled()) {
+    _aurixChatWired = true;
+    _aurixChat.owner = (typeof _aurixIntelOwner === 'function') ? _aurixIntelOwner({}) : null;
+    document.addEventListener('click', (e) => {
+      const t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('[data-chat-open]')) { e.preventDefault(); _aurixChatOpen(); return; }
+      if (t.closest('[data-chat-close]')) { e.preventDefault(); _aurixChatClose(); return; }
+      // «LIMPIAR» — una de las tres vías de borrado que el §3 exige, junto al
+      // cambio de cuenta y el cierre de sesión. Vacía la conversación de la
+      // memoria del navegador, que es el único sitio donde vive.
+      if (t.closest('[data-chat-clear]')) {
+        e.preventDefault();
+        try { if (_aurixChat.ctl) _aurixChat.ctl.abort(); } catch (_) {}
+        _aurixChat.turns = []; _aurixChat.draft = ''; _aurixChat.lastAsked = '';
+        _aurixChat.error = null; _aurixChat.busy = false; _aurixChat.seq++;
+        _aurixChatRender();
+        return;
+      }
+      if (t.closest('[data-chat-stop]')) {
+        // DETENER: aborta la petición en curso. El transporte se cierra; que eso
+        // pare la facturación del proveedor no está garantizado y no se promete.
+        e.preventDefault();
+        try { if (_aurixChat.ctl) _aurixChat.ctl.abort(); } catch (_) {}
+        _aurixChat.busy = false; _aurixChatRender();
+        return;
+      }
+      if (t.closest('[data-chat-retry]')) {
+        e.preventDefault();
+        _aurixChat.error = null;
+        _aurixChat.draft = String(_aurixChat.lastAsked || '');
+        // El turno del usuario ya está en la lista: se reintenta el MISMO
+        // mensaje, y la clave de idempotencia se deriva del índice, así que el
+        // servidor lo reconoce y no lo cobra dos veces.
+        if (_aurixChat.turns.length && _aurixChat.turns[_aurixChat.turns.length - 1].role === 'user') _aurixChat.turns.pop();
+        _aurixChatSubmit();
+        return;
+      }
+    });
+    document.addEventListener('input', (e) => {
+      const ta = e.target && e.target.id === 'aurix-chat-input' ? e.target : null;
+      if (!ta) return;
+      _aurixChat.draft = String(ta.value || '');
+      _aurixChatAutosize(ta);
+      // El botón se habilita sin repintar: repintar en cada tecla movería el
+      // cursor y perdería la selección.
+      try {
+        const btn = document.querySelector('[data-chat-send]');
+        if (btn) btn.disabled = !_aurixChat.draft.trim();
+      } catch (_) {}
+    });
+    document.addEventListener('scroll', (e) => {
+      const log = e.target && e.target.id === 'aurix-chat-log' ? e.target : null;
+      if (!log) return;
+      _aurixChat.atEnd = (log.scrollHeight - log.scrollTop - log.clientHeight) < 24;
+    }, true);
+    document.addEventListener('submit', (e) => {
+      const f = e.target && e.target.closest ? e.target.closest('[data-chat-form]') : null;
+      if (!f) return;
+      e.preventDefault();
+      _aurixChatSubmit();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!_aurixChat.open) return;
+      if (e.key === 'Escape') { e.preventDefault(); _aurixChatClose(); return; }
+      const ta = document.getElementById('aurix-chat-input');
+      if (e.key === 'Enter' && !e.shiftKey && document.activeElement === ta) {
+        // Enter envía en ESCRITORIO. En móvil el teclado manda salto de línea y
+        // el envío es el botón: forzar Enter ahí haría imposible escribir dos
+        // párrafos con el pulgar.
+        const coarse = (typeof window !== 'undefined' && window.matchMedia)
+          ? window.matchMedia('(pointer: coarse)').matches : false;
+        if (!coarse) { e.preventDefault(); _aurixChatSubmit(); }
+        return;
+      }
+      // FOCUS TRAP: el tabulador no puede salirse del panel mientras está
+      // abierto; si pudiera, el lector de pantalla se iría a la página de
+      // detrás sin que nada se lo dijera.
+      if (e.key === 'Tab') {
+        const panel = document.getElementById('aurix-chat-panel');
+        if (!panel) return;
+        const f2 = panel.querySelectorAll('button, textarea, [href], [tabindex]:not([tabindex="-1"])');
+        if (!f2.length) return;
+        const first = f2[0], last = f2[f2.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    });
+  }
+  // CAMBIO DE CUENTA O CIERRE DE SESIÓN: se cancela el streaming, se invalida
+  // el contexto y no queda un carácter de la cuenta anterior. Se engancha
+  // SIEMPRE, aunque el gate esté cerrado: si el chat se habilita a mitad de
+  // sesión, la limpieza ya tiene que estar escuchando.
+  if (!_aurixChatResetWired) {
+    _aurixChatResetWired = true;
+    try {
+      if (typeof supabaseClient !== 'undefined' && supabaseClient && supabaseClient.auth
+          && typeof supabaseClient.auth.onAuthStateChange === 'function') {
+        supabaseClient.auth.onAuthStateChange((ev) => {
+          if (ev === 'SIGNED_OUT' || ev === 'SIGNED_IN' || ev === 'USER_UPDATED') _aurixChatReset(ev);
+        });
+      }
+    } catch (_) {}
+  }
+
   if (!_intelAnswerWired) {
     _intelAnswerWired = true;
     document.addEventListener('click', e => {
+      // ── SUPREME CLOSURE · §4.2 · LA PUERTA DE LIQUIDEZ ──────────────────
+      // Misma delegación única, sin listeners por nodo. Dos acciones y ninguna
+      // escribe un importe: «Añadir» abre el formulario que ya existe y
+      // «Ahora no» cierra la puerta con el acuse que ya viaja entre
+      // dispositivos. Va ANTES del handler de respuestas porque comparte las
+      // clases de chip y no comparte su contrato.
+      const liq = e.target && e.target.closest ? e.target.closest('[data-liq-cta-act]') : null;
+      if (liq) {
+        e.preventDefault();
+        const act = liq.getAttribute('data-liq-cta-act');
+        if (act === 'add') {
+          // NO se registra nada aquí: se abre el formulario. El importe, la
+          // divisa y la fecha los pone el usuario, y el owner de liquidez hace
+          // el resto exactamente igual que desde cualquier otra entrada.
+          try { if (typeof openLiquidityModal === 'function') openLiquidityModal(); } catch (_) {}
+          return;
+        }
+        let closed = false;
+        try { closed = (typeof _aurixIntelAcknowledge === 'function')
+          ? _aurixIntelAcknowledge('ctx:unregistered_liquidity', {}) : false; } catch (_) { closed = false; }
+        if (!closed) return;                       // fail closed: sin dueño no se finge que se guardó
+        try {
+          const ph0 = document.getElementById('tabPlaceholder') || document.querySelector('.tab-placeholder--intel');
+          if (ph0 && typeof renderIntelligenceTab === 'function') {
+            ph0.innerHTML = renderIntelligenceTab();
+            if (typeof _initIntelligenceCommandCenter === 'function') _initIntelligenceCommandCenter();
+          }
+        } catch (_) {}
+        return;
+      }
       const btn = e.target && e.target.closest ? e.target.closest('[data-intel-answer]') : null;
       if (!btn) return;
       const box = btn.closest('[data-intel-q]');

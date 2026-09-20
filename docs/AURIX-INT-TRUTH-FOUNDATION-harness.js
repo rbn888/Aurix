@@ -335,9 +335,14 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // cinco dimensiones conceptuales" — and marks the axis `unavailable` instead.
   // The INVARIANT INT.01 actually protects is unchanged and still asserted below:
   // no fabricated value, no placeholder number, and NO vertex at the centre.
-  ok('3.6 the frame keeps its five conceptual axes; the absent one is attenuated',
+  // SUPREME CLOSURE §5 — «mismo grosor y terminaciones en todas las líneas»: la
+  // radial deja de llevar estado. La atenuación del eje ausente vive en su
+  // ETIQUETA, que es texto y se lee, no en la geometría.
+  ok('3.6 the frame keeps its five conceptual axes; the absent one is attenuated IN ITS LABEL',
     (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
-    && (svg.match(/class="intcc-radar-axis is-unavailable"/g) || []).length === 1,
+    && !/intcc-radar-axis is-unavailable/.test(svg)
+    && (svg.match(/class="intcc-radar-label is-unavailable"/g) || []).length === 1
+    && (svg.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 1,
     'axes=' + (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length);
   ok('3.7 the absent dimension publishes its NAME but never a figure',
     svg.indexOf(T.intcc_dim_growth) !== -1
@@ -355,8 +360,15 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   //
   // Lo que 3.8 protegía de verdad y sigue protegido: el eje ausente no recibe
   // vértice de serie, y hay exactamente un marcador certificado por eje medido.
-  ok('3.8 el eje ausente no recibe vértice de serie y la figura NO se cierra',
-    (svg.match(/class="intcc-radar-dot"/g) || []).length === 4
+  // §5 lo vuelve a re-decidir, y es la DÉCIMA vez que este proyecto descubre que
+  // un gate fosilizó una limitación: «no recibe vértice» describía cómo se
+  // dibujaba el hueco de entonces, no el invariante. El invariante es que el eje
+  // ausente no PUNTÚA y no RELLENA, y eso es lo que se mide.
+  ok('3.8 el eje ausente no puntúa y la figura NO se rellena',
+    (svg.match(/class="intcc-radar-dot"/g) || []).length === 5
+    && (svg.match(/data-availability="measured"/g) || []).length === 4
+    && (svg.match(/data-availability="unknown"/g) || []).length === 1
+    && /data-svg-measured="4"/.test(svg)
     && !/intcc-radar-area/.test(svg)
     && /data-svg-open="1"/.test(svg),
     (svg.match(/data-svg-open="[^"]*"/) || [, '?'])[0]);
@@ -373,11 +385,11 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // evidencia era DISCONTINUO y hacía parecer roto el gráfico entero. Pasa a
   // sólido NEUTRAL, en su propio grupo, con color y opacidad distintos — sigue sin
   // poder leerse como una medición y ahora la trayectoria se sigue de un vistazo.
-  ok('3.8b con un hueco la figura se recorre completa y el tramo sin evidencia va NEUTRAL',
-    (svg.match(/class="intcc-radar-edge"/g) || []).length === 3
-    && (svg.match(/class="intcc-radar-edge is-unknown"/g) || []).length === 2
+  ok('3.8b con un hueco la figura se recorre completa con CINCO segmentos idénticos',
+    (svg.match(/class="intcc-radar-edge"/g) || []).length === 5
+    && !/is-unknown/.test(svg)
     && /data-svg-edges="5"/.test(svg) && /data-svg-neutral="2"/.test(svg)
-    && /<g class="intcc-radar-edges is-neutral">/.test(svg)
+    && (svg.match(/<g class="intcc-radar-edges">/g) || []).length === 1
     && !/stroke-dasharray/.test(svg)
     && !/intcc-radar-area/.test(svg),
     JSON.stringify([(svg.match(/data-svg-edges="[^"]*"/) || [, '?'])[0],
@@ -416,7 +428,10 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // UNKNOWN ocupa una posición de DISPONIBILIDAD, fuera de la banda de la serie:
   // no puede confundirse con un valor alto ni con un cero.
   {
-    const unkR = ((svg.match(/class="intcc-radar-dot is-unknown" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/) || [])
+    // SUPREME CLOSURE §5 — el marcador ya no lleva clase de estado; el eje sin
+    // dato se localiza por `data-availability`, que es el discriminador que
+    // sobrevive a la uniformidad visual y es además el que lee el aria-label.
+    const unkR = ((svg.match(/class="intcc-radar-dot" cx="(-?[\d.]+)" cy="(-?[\d.]+)"[^>]*data-availability="unknown"/) || [])
       .slice(1).map(Number));
     const rUnk = unkR.length === 2 ? radiusOf(unkR) : null;
     const fullMax = Math.max.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })')).map(radiusOf));
@@ -424,10 +439,12 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     // de la banda y por encima de ella para que no pudiera confundirse con un
     // valor; en la pantalla real eso lo pegaba al marco —donde el ojo lee
     // «máximo»— mientras los ejes certificados se apelotonaban en el centro. §11
-    // lo baja al límite INTERIOR de referencia y confía la distinción a tres
-    // señales que NO son la coordenada: marcador hueco, segmentos discontinuos y
-    // la palabra «sin datos». Lo que este assert protege ahora: sigue DENTRO del
-    // marco, no toca el centro, y no puede leerse como un valor alto.
+    // lo baja al límite INTERIOR de referencia. SUPREME CLOSURE §5 retira las dos
+    // señales GRÁFICAS que lo acompañaban (hueco y segmento discontinuo) porque
+    // la QA real las leyó como un defecto de pintado, y deja la distinción en el
+    // TEXTO: «sin datos» bajo la etiqueta y la enumeración accesible de los cinco
+    // ejes. Lo que este assert protege ahora: sigue DENTRO del marco, no toca el
+    // centro, y no puede leerse como un valor alto.
     const bandMin = Math.min.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0, growth: 0 })')).map(radiusOf));
     ok('3.9f el marcador «sin datos» no puede leerse como un valor ALTO',
       rUnk != null && rUnk < fullMax - 20 && Math.abs(rUnk - bandMin) < 0.5,
@@ -436,8 +453,14 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
       rUnk != null && rUnk > 6 && rUnk < R_OUT - 0.5, String(rUnk));
     ok('3.9h está rotulado como disponibilidad, no como puntuación',
       /data-availability="unknown"/.test(svg) && /data-axis="growth"/.test(svg));
-    ok('3.9i y NO participa en el trazo de la serie',
-      !new RegExp('class="intcc-radar-edge"[^>]*' + unkR[0].toFixed(1)).test(svg));
+    // §5 — «no participa» se mide donde el invariante financiero vive: el eje sin
+    // dato no puntúa y no rellena. Su coordenada SÍ entra en la trayectoria (es
+    // la posición interior neutral que cierra la figura, autorizada por el §5),
+    // así que exigir que no aparezca en ningún segmento sería fosilizar otra vez
+    // la limitación que el §5 acaba de retirar.
+    ok('3.9i y NO puntúa ni rellena',
+      /data-svg-measured="4"/.test(svg) && /data-svg-open="1"/.test(svg)
+      && !/intcc-radar-area/.test(svg));
   }
   ok('3.10 the wealth-identity cascade cannot read a fabricated return',
     /Number\.isFinite\(radar\.growth\)/.test(fnSrc('_intccIdentity')));
@@ -446,11 +469,12 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // RE-CERTIFIED (INT.07): the frame no longer disappears — the founder requires
   // it always visible. What must never happen is a VALUE without evidence, so the
   // assertion moves from "no radar" to "no certified value but one".
-  ok('3.12 one certified dimension ⇒ frame intact, no area, exactly one vertex',
+  ok('3.12 one certified dimension ⇒ frame intact, no area, exactly one MEASURED axis',
     (() => { const one = run('_intccRadarSvg({ diversification: 50, liquidity: null, concentration: null, stability: null, growth: null })');
       return one !== '' && (one.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
         && !/intcc-radar-area/.test(one)
-        && (one.match(/class="intcc-radar-dot"/g) || []).length === 1
+        && (one.match(/class="intcc-radar-dot"/g) || []).length === 5
+        && (one.match(/data-availability="measured"/g) || []).length === 1
         && (one.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 4; })());
 
   // Dropping an axis re-lays out every label. The viewBox is FIXED, so the only

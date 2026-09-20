@@ -61,8 +61,13 @@ const STRICT = {"24h":1.20,"7d":1.35,"30d":1.75,"1y":3.00,"all":3.00};
   // comparable baseline (5200 vs 5000 → ratio 1.04 < 1.35) → real return shows
   sb._cfg = { valid:true, deltaPct:-3.85, deltaAbs:-200, startValue:5200, baselineTs:NOW-3*DAY, lastTs:NOW, netFlowsNeutralized:0 };
   ok('6b comparable baseline (ratio<1.35) → READY with the real return', vm.runInContext('getValidReturnBaseline("7d")', sb).valid===true); }
+// SUPREME CLOSURE §4.5 — la tabla se declara ahora en dos líneas y con los
+// periodos largos. Lo que este assert exige sigue siendo que los umbrales
+// ESTRICTOS estén literalmente en el fuente, uno a uno.
 ok('6c strict thresholds present in source',
-   /_AURIX_RETURN_COMPARABLE_RATIO = \{ '24h': 1\.20, '7d': 1\.35, '30d': 1\.75, '1y': 3\.00, 'all': 3\.00 \};/.test(app));
+   /_AURIX_RETURN_COMPARABLE_RATIO = \{[\s\S]{0,240}?\};/.test(app)
+   && ["'24h': 1.20", "'7d': 1.35", "'30d': 1.75", "'1y': 3.00", "'all': 3.00"]
+        .every(t => app.indexOf(t) !== -1));
 
 // ── PART B/E — honest range collapse ──
 console.log('\nPART B/E — short history is reported as a collapse, not "different history per range":');

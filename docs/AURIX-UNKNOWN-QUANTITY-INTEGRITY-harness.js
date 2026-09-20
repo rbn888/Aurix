@@ -389,9 +389,16 @@ console.log('\n23 · The per-user signal explains the refusal, without PII:');
       const args = (TS_CODE.match(/warnings\.push\(([^;]*?)\);/g) || []).map(a => a.replace(/'[^']*'/g, "''"));
       return args.length >= 4 && args.every(a => !/\b(valueUSD|storedPrice|unit|native|nativeUSD|spotPerOz|qty|total|fx|raw)\b/.test(a));
     })());
-  ok('23.6 no schema change and no new migration', (function () {
-    let m = []; try { m = fs.readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter(f => /\.sql$/.test(f)); } catch (e) { m = []; }
-    return m.length === 1; })());
+  // Igual que sus hermanas: el invariante es «nada de mi dominio cambia de
+  // esquema», no «el repo tiene N migraciones».
+  ok('23.6 no schema change: ninguna migración toca cantidades ni posiciones', (function () {
+      const D = path.join(ROOT, 'supabase', 'migrations');
+      let m = []; try { m = fs.readdirSync(D).filter(f => /\.sql$/.test(f)); } catch (e) { m = []; }
+      // DDL, no lecturas: la migración certificada de observabilidad LEE
+      // `user_portfolios` a propósito, y leer no cambia ningún esquema.
+      const DDL = /\b(alter\s+table|create\s+table|drop\s+table|add\s+column|drop\s+column|alter\s+column)\b[^;]{0,200}\b(user_portfolios|holdings|quantity|category_history)\b/i;
+      return m.every(f => !DDL.test(fs.readFileSync(path.join(D, f), 'utf8')));
+    })());
 }
 
 // ── 24 · Recovery ────────────────────────────────────────────────────────

@@ -251,7 +251,19 @@ ok('S3 the LOCAL cache is never counted as evidence',
 ok('S4 _aurixRangeReturn body carries no SPEC gate', fnSrc('_aurixRangeReturn').indexOf('24H_PENDING_RECOVERY') < 0);
 ok('S5 v654 monotonic guard intact', run(CTX, '_AURIX_PERF_STATE_24H_MONOTONIC') === true && typeof run(CTX, '_aurix24hMonotonicPublication') === 'function');
 ok('S6 v654 unit reference intact', run(CTX, '_AURIX_PERF_INVESTABLE_UNIT_REFERENCE') === true);
-ok('S7 no return threshold moved', run(CTX, 'JSON.stringify(_AURIX_RETURN_COMPARABLE_RATIO)') === JSON.stringify({ '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 })
+// SUPREME CLOSURE §4.5 — «Tu evolución» necesita periodos largos, así que la
+// tabla GANA entradas ('90d','180d','2y','5y'). Lo que este assert protege no es
+// que la tabla tenga cinco claves: es que NINGÚN UMBRAL YA ADOPTADO SE MUEVA. Se
+// comprueba clave a clave sobre los cinco existentes —igualdad exacta— y aparte
+// que los periodos nuevos no sean más permisivos que 'all', que es el techo que
+// el motor ya tolera. Así añadir un periodo sigue siendo barato y aflojar un
+// umbral sigue poniendo el gate en rojo.
+ok('S7 no return threshold moved', (() => {
+    const t = run(CTX, 'JSON.stringify(_AURIX_RETURN_COMPARABLE_RATIO)');
+    const R = JSON.parse(t), BASE = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
+    const unchanged = Object.keys(BASE).every(k => R[k] === BASE[k]);
+    const added = Object.keys(R).filter(k => !(k in BASE));
+    return unchanged && added.every(k => R[k] > 0 && R[k] <= BASE.all); })()
   && run(CTX, '_AURIX_RETURN_MIN_HISTORY_MS') === 90 * 1000 && run(CTX, '_AURIX_RETURN_FLOW_DOMINANCE') === 0.5);
 
 console.log('\n' + (fail === 0 ? 'GATE GO' : 'GATE NO-GO') + ' — ' + pass + ' passed, ' + fail + ' failed');

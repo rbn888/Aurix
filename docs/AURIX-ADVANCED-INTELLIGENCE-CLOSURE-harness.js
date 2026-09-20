@@ -45,6 +45,21 @@ const ENGINE_SRC = blockOf('const _AURIX_INTEL_FIELDS = Object.freeze({',
 const bareOf = t => t.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
 let pass=0,fail=0; function ok(n,c,info){ if(c){pass++;console.log('  ✓ '+n);}else{fail++;console.log('  ✗ '+n+(info?'  ['+info+']':''));} }
 
+
+// ── UN `ok` QUE RECIBE UNA PROMESA PASA SIEMPRE ────────────────────────────
+// La revisión de seguridad lo demostró con una línea: `!!(async()=>false)()`
+// es `true`. Todos los asserts que ejercitaban un camino asíncrono estaban
+// PASANDO SIN PROBAR NADA — el peor defecto posible en un gate, porque su
+// verde era exactamente igual al verde de verdad. `okA` encola la promesa y
+// se resuelve ANTES del resumen; ningún assert asíncrono puede volver a
+// colarse en silencio.
+const _pending = [];
+function okA(n, promise, info) {
+  _pending.push(Promise.resolve(promise).then(
+    (v) => ok(n, v === true, info),
+    (e) => ok(n, false, 'THREW ' + ((e && e.message) || e))));
+}
+async function drainAsserts() { await Promise.all(_pending); }
 const DAY = 86400000, HOUR = 36e5, MIN = 60000;
 const T0 = 1750000000000;
 const NOW = Date.now();                 // the certified exposure reader checks freshness against the real clock
@@ -88,7 +103,7 @@ function extractDict(langIdx) {
     // A2 — el enlace de trazabilidad del hero. Sin la clave el renderer emite un
     // enlace VACÍO, que es peor que no tenerlo.
     'intel_see_changes','intel_now_novelty','intel_sub_review','intel_now_reviewed','intel_sub_reviewed','intel_now_no_news','intel_sub_no_news','intel_ack_done','intel_ack','intel_ack_aria',
-    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
+    'intv7_axis_unavailable','intv7_axis_span_days','intv7_radar_legend','intv7_radar_pending',
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
     // y 13B.9 dejaría de ver los nombres.
@@ -131,6 +146,17 @@ function extractDict(langIdx) {
     // publicaba una pregunta pendiente como si fuera un hito.
     'intel_see_history','intcc_chip_ctx_intent','intel_ack_failed','intel_h_two_positions',
     'intel_q_unregistered_liquidity','intel_q_unregistered_liquidity_why',
+    // SUPREME CLOSURE §4.2 — la puerta de liquidez. Sin estas cuatro claves el
+    // renderer pinta dos botones SIN texto, que es exactamente el defecto que
+    // este gate tiene que poder ver.
+    'intel_liq_cta_title','intel_liq_cta_body','intel_liq_cta_add','intel_liq_cta_later',
+    // §4.6 — la referencia declarada de «Qué ha cambiado».
+    'intv4_changed_ref_since','intv4_changed_ref_24h',
+    // §4.3 — la pregunta del caso «sólo conozco el valor actual».
+    'intv4_q_q_current_value',
+    // §4.5 — la etiqueta de periodo que sí existe. Las de los periodos largos se
+    // retiraron con la parada de la variedad temporal (SC.5.12 lo fija).
+    'intv4_r_90d',
     'intel_opt_flexibility','intel_opt_yes','intel_opt_no',
     'intv9_disc_title','intv9_mem_intent_deliberate','intv9_mem_intent_not_deliberate',
     'intv9_mem_goal_preserve','intv9_mem_goal_grow','intv9_mem_goal_income',
@@ -157,10 +183,10 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT',
-  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
+  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -168,11 +194,11 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixFlowCounterpartObserved','_aurixInvestablePerformance','_aurixCatHistRows',
   '_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow','_aurixCatExposureDelta',
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
-  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixIntelligenceCore',
+  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore',
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
@@ -1125,22 +1151,41 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
 
   // Datos desconocidos.
   const hUnk = RADAR({ diversification: 40, liquidity: 30, concentration: 60 }, DIMS(['stability', 'growth']));
-  ok('11.8 dos ejes sin datos ⇒ siguen cinco marcadores, y los dos van HUECOS',
-    count(hUnk, /class="intcc-radar-dot"/g) === 3
-    && count(hUnk, /class="intcc-radar-dot is-unknown"/g) === 2
-    && /data-svg-unknown="2"/.test(hUnk),
-    JSON.stringify({ solid: count(hUnk, /class="intcc-radar-dot"/g),
-      hollow: count(hUnk, /class="intcc-radar-dot is-unknown"/g) }));
+  // SUPREME CLOSURE §5 RE-DECIDE ESTA ASERCIÓN, y conviene dejar escrito por qué:
+  // era el ejemplo de manual de un gate que FOSILIZA COMO CONTRATO LO QUE ERA UNA
+  // LIMITACIÓN. §11 metió el estado «sin datos» dentro de la figura (marcador
+  // hueco) y el gate lo convirtió en requisito; la QA del founder sobre la
+  // pantalla real leyó ese hueco como un defecto de pintado, no como un límite
+  // declarado. Ahora los cinco marcadores son IDÉNTICOS y la limitación vive
+  // íntegramente en el texto. Lo que el gate mide pasa a ser eso.
+  ok('11.8 dos ejes sin datos ⇒ cinco marcadores IDÉNTICOS, sin hueco ni muesca',
+    count(hUnk, /class="intcc-radar-dot"/g) === 5
+    && !/intcc-radar-dot is-unknown/.test(hUnk)
+    && /data-svg-unknown="2"/.test(hUnk)
+    && count(hUnk, /data-availability="unknown"/g) === 2
+    && count(hUnk, /data-availability="measured"/g) === 3,
+    JSON.stringify({ dots: count(hUnk, /class="intcc-radar-dot"/g),
+      unknown: count(hUnk, /data-availability="unknown"/g) }));
+  ok('11.8b …y los cinco ejes se enumeran en la descripción accesible',
+    (() => { const m = hUnk.match(/aria-label="([^"]+)"/);
+      if (!m) return false;
+      const a = m[1];
+      return /data-svg-a11y-axes="5"/.test(hUnk)
+        && (a.match(/:/g) || []).length >= 5
+        && (a.match(/sin datos/g) || []).length === 2; })(),
+    JSON.stringify((hUnk.match(/aria-label="([^"]+)"/) || [])[1] || null));
   // §6 RE-DECIDE EL TRATAMIENTO: el tramo que toca un eje sin datos era DISCONTINUO
   // y en la pantalla real hacía que el gráfico entero pareciese roto. Pasa a sólido
   // NEUTRAL —mismo grosor, color apagado, sin resplandor—, así que la trayectoria
   // se sigue de un vistazo y sigue sin poder leerse como una medición.
-  ok('11.9 la figura se recorre completa y el tramo sin datos es sólido NEUTRAL, no partido',
+  ok('11.9 la figura se recorre completa y los CINCO segmentos son idénticos',
     /data-svg-edges="5"/.test(hUnk) && /data-svg-neutral="4"/.test(hUnk)
-    && count(hUnk, /class="intcc-radar-edge is-unknown"/g) === 4
+    && count(hUnk, /class="intcc-radar-edge"/g) === 5
+    && !/intcc-radar-edge is-unknown/.test(hUnk)
     && !/stroke-dasharray/.test(hUnk)
-    && /<g class="intcc-radar-edges is-neutral">/.test(hUnk),
-    JSON.stringify({ edges: num(hUnk, /data-svg-edges="(\d+)"/), neutral: num(hUnk, /data-svg-neutral="(\d+)"/) }));
+    && count(hUnk, /<g class="intcc-radar-edges">/g) === 1,
+    JSON.stringify({ edges: num(hUnk, /data-svg-edges="(\d+)"/), neutral: num(hUnk, /data-svg-neutral="(\d+)"/),
+      drawn: count(hUnk, /class="intcc-radar-edge"/g) }));
   ok('11.10 el quinto eje cierra con el primero (la trayectoria es un ciclo)',
     (() => { const src0 = fnSrc('_intccRadarSvg');
       return /const j = \(i \+ 1\) % n;/.test(src0) && /for \(let i = 0; i < n; i\+\+\)/.test(src0); })());
@@ -1151,19 +1196,29 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     !/intcc-radar-area/.test(hUnk));
   ok('11.13 «sin datos» se dice con palabras, no con un número',
     count(hUnk, /class="intcc-radar-val is-unavailable"/g) === 2 && /sin datos/.test(hUnk));
-  ok('11.14 los TRES estados se distinguen: 0 real sólido, valor pequeño sólido, desconocido hueco',
+  // Los tres estados siguen siendo TRES — lo que cambia es el canal. Ya no los
+  // distingue el relleno del marcador (que ahora es uno solo) sino el TEXTO: un
+  // cero real imprime «0%», un valor pequeño imprime su cifra, y un eje sin dato
+  // imprime la palabra. Eso es lo que el §5 pide y lo que un lector de pantalla
+  // puede seguir; un relleno no lo es.
+  ok('11.14 los TRES estados se distinguen POR TEXTO: 0 real, valor pequeño, «sin datos»',
     (() => { const h = RADAR({ diversification: 14, stability: 70, liquidity: 0, concentration: 60 },
         DIMS(['growth']));
-      const zero = /class="intcc-radar-dot" cx="[^"]*" cy="[^"]*" r="[^"]*" data-axis="liquidity" data-availability="measured"/.test(h);
+      const zero = /data-axis="liquidity" data-availability="measured"/.test(h);
       const small = /data-axis="diversification" data-availability="measured"/.test(h);
-      const unk = /class="intcc-radar-dot is-unknown"[^>]*data-axis="growth" data-availability="unknown"/.test(h);
-      return zero && small && unk && />0%</.test(h) && /sin datos/.test(h); })(),
+      const unk = /data-axis="growth" data-availability="unknown"/.test(h);
+      return zero && small && unk && />0%</.test(h) && /sin datos/.test(h)
+        && count(h, /class="intcc-radar-dot"/g) === 5
+        && !/intcc-radar-dot is-unknown/.test(h); })(),
     RADAR({ diversification: 14, stability: 70, liquidity: 0, concentration: 60 }, DIMS(['growth'])).slice(0, 200));
-  ok('11.15 todos los ejes sin datos: cinco huecos, cinco segmentos, cero relleno',
+  ok('11.15 todos los ejes sin datos: cinco marcadores, cinco segmentos, CERO relleno',
     (() => { const h = RADAR({}, DIMS(['diversification', 'stability', 'liquidity', 'growth', 'concentration']));
-      return count(h, /class="intcc-radar-dot is-unknown"/g) === 5
+      return count(h, /class="intcc-radar-dot"/g) === 5
+        && count(h, /data-availability="unknown"/g) === 5
         && /data-svg-edges="5"/.test(h) && /data-svg-neutral="5"/.test(h)
-        && !/intcc-radar-area/.test(h); })());
+        && !/intcc-radar-area/.test(h)
+        && count(h, /class="intcc-radar-val is-unavailable"/g) === 5
+        && ((((h.match(/aria-label="([^"]+)"/) || [])[1]) || '').match(/sin datos/g) || []).length === 5; })());
   ok('11.16 la zona central excluida NO forma parte de la retícula medible',
     (() => { const src0 = fnSrc('_intccRadarSvg');
       // Los anillos se mapean por la MISMA transformación de la serie y los ejes
@@ -1176,13 +1231,13 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   // hueco y lo mordía: en la captura a 3× los «sin datos» parecían iconos con una
   // muesca. Debajo cumple lo que el orden de capas persigue —ninguna línea
   // atraviesa el centro de un marcador— sin comerse el marcador.
-  ok('11.17 el orden de capas es retícula → trayectoria neutral → medidos → marcador con su halo → etiquetas',
+  ok('11.17 el orden de capas es retícula → segmentos → marcador con su halo → etiquetas',
     (() => { const s0 = hUnk;
-      const i1 = s0.indexOf('intcc-radar-grid'), i3n = s0.indexOf('intcc-radar-edges is-neutral');
+      const i1 = s0.indexOf('intcc-radar-grid');
       const i3 = s0.indexOf('<g class="intcc-radar-edges">'), i5 = s0.indexOf('intcc-radar-halos');
       const i4 = s0.indexOf('intcc-radar-dots'), i6 = s0.indexOf('intcc-radar-labels');
-      return i1 < i3n && i3n < i3 && i3 < i5 && i5 < i4 && i4 < i6; })(),
-    JSON.stringify({ grid: hUnk.indexOf('intcc-radar-grid'), neutral: hUnk.indexOf('is-neutral'),
+      return i1 < i3 && i3 < i5 && i5 < i4 && i4 < i6; })(),
+    JSON.stringify({ grid: hUnk.indexOf('intcc-radar-grid'), edges: hUnk.indexOf('<g class="intcc-radar-edges">'),
       halos: hUnk.indexOf('intcc-radar-halos'), dots: hUnk.indexOf('intcc-radar-dots') }));
   ok('11.18 el halo es un DISCO opaco bajo el marcador: corta las líneas sin morderlo',
     /\.intcc-radar-halo \{ fill: #111726; stroke: none; \}/.test(css)
@@ -1195,13 +1250,19 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   ok('11.20 coordenadas ESTABLES con datos iguales (sin jitter al refrescar)',
     RADAR(FIVE, DIMS([])) === RADAR(FIVE, DIMS([])));
   ok('11.21 la transición se declara y respeta `prefers-reduced-motion`',
-    /\.intcc-radar-area, \.intcc-radar-edge, \.intcc-radar-halo, \.intcc-radar-dot:not\(\.is-unknown\)/.test(css)
+    /\.intcc-radar-area, \.intcc-radar-edge, \.intcc-radar-halo, \.intcc-radar-dot \{/.test(css)
     && /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,260}\.intcc-radar-dot \{ transition: none/.test(css));
   // §7 — MISMO diámetro exterior para los cinco, en los tres viewports.
-  ok('11.22 los cinco marcadores comparten diámetro y se leen en los tres viewports',
-    /\.intv6-radar \.intcc-radar-dot,[\s\S]{0,60}\.is-unknown \{ r: 4; \}/.test(css)
+  // §5 — UNA SOLA REGLA POR VIEWPORT. Que no exista ninguna declaración
+  // `.is-unknown` en el CSS del radar ES la aserción: mientras exista, alguien
+  // puede reintroducir el hueco sin que nada se ponga rojo.
+  ok('11.22 los cinco marcadores comparten diámetro, relleno y brillo en los tres viewports',
+    /\.intv6-radar \.intcc-radar-dot \{ r: 4; \}/.test(css)
     && /\.intcc-radar-dot \{ r: 4\.4px; fill: #e2edff; \}/.test(css)
-    && /\.intcc-radar-dot\.is-unknown \{ r: 4\.4px; fill: none; \}/.test(css));
+    && !/intcc-radar-dot\.is-unknown/.test(css)
+    && !/intcc-radar-edge\.is-unknown/.test(css)
+    && !/intcc-radar-halo\.is-unknown/.test(css)
+    && !/intcc-radar-axis\.is-unavailable/.test(css));
   ok('11.23 en las DOS cuentas de referencia el radar publica sus cinco ejes',
     [CUENTA_A, CUENTA_B].every(f => { const h = render(f).html;
       return /data-axes="5"/.test(h) && count(h, /class="intcc-radar-dot[" ]/g) === 5
@@ -1235,17 +1296,19 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     && /data-svg-edges="5"/.test(ACC) && /data-svg-axes="5"/.test(ACC),
     JSON.stringify({ dots: count(ACC, /class="intcc-radar-dot[" ]/g),
       edges: num(ACC, /data-svg-edges="(\d+)"/) }));
-  ok('11.25b …tres medidos y dos desconocidos, diferenciados por relleno y tono',
-    count(ACC, /class="intcc-radar-dot"/g) === 3
-    && count(ACC, /class="intcc-radar-dot is-unknown"/g) === 2
-    && count(ACC, /class="intcc-radar-edge"/g) === 1
-    && count(ACC, /class="intcc-radar-edge is-unknown"/g) === 4
+  ok('11.25b …tres medidos y dos desconocidos, diferenciados SÓLO por texto',
+    count(ACC, /class="intcc-radar-dot"/g) === 5
+    && count(ACC, /data-availability="measured"/g) === 3
+    && count(ACC, /data-availability="unknown"/g) === 2
+    && count(ACC, /class="intcc-radar-edge"/g) === 5
+    && !/is-unknown/.test(ACC)
     && /data-svg-neutral="4"/.test(ACC)
-    && (ACC.match(/sin datos/g) || []).length === 2,
-    JSON.stringify({ solid: count(ACC, /class="intcc-radar-dot"/g),
-      hollow: count(ACC, /class="intcc-radar-dot is-unknown"/g),
-      medido: count(ACC, /class="intcc-radar-edge"/g),
-      neutral: count(ACC, /class="intcc-radar-edge is-unknown"/g) }));
+    && count(ACC, /class="intcc-radar-val is-unavailable"/g) === 2
+    && ((((ACC.match(/aria-label="([^"]+)"/) || [])[1]) || '').match(/sin datos/g) || []).length === 2,
+    JSON.stringify({ dots: count(ACC, /class="intcc-radar-dot"/g),
+      unknown: count(ACC, /data-availability="unknown"/g),
+      edges: count(ACC, /class="intcc-radar-edge"/g),
+      labels: count(ACC, /class="intcc-radar-val is-unavailable"/g) }));
   ok('11.25c …y el dato publicado es el REAL, no la coordenada',
     /2,2 \/ 7/.test(ACC) && />31%</.test(ACC) && />7%</.test(ACC));
   ok('11.25d ningún marcador en el centro ni en el vértice exterior',
@@ -1285,14 +1348,22 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     const r = MOBILE_ORDER.match(new RegExp(sel.replace('.', '\\.') + '\\s*\\{ order: (\\d+); \\}'));
     return r ? Number(r[1]) : null;
   };
-  ok('1.1 MÓVIL · Factores → Explora → Radar, y la cabecera intacta',
-    ordOf('.intcc-hero') === 1 && ordOf('.intv12-qcard') === 2
-    && ordOf('.intcc-drivers') === 3 && ordOf('.intcc-explore') === 4
-    && ordOf('.intcc-radar') === 5 && ordOf('.intcc-watch') === 6
-    && ordOf('.intcc-timeline') === 7 && ordOf('.intv4-changed') === 9,
+  // LO QUE IMPORTA ES LA SECUENCIA, NO EL NÚMERO. Fijar los valores absolutos
+  // convertía en contrato una numeración contigua, de modo que insertar una card
+  // en su sitio —lo que el §6 pide para el comparador— ponía el gate en rojo sin
+  // que el orden de lectura hubiera cambiado. Se mide la secuencia RELATIVA, que
+  // es la que el founder aprobó, y además se exige que no haya empates: un
+  // `order` repetido dejaría la composición en manos del orden del DOM (N.8c).
+  ok('1.1 MÓVIL · Factores → Explora → Radar → Comparador → Hoy → Evolución → Cambios',
+    (() => { const seq = ['.intcc-hero', '.intv12-qcard', '.intcc-drivers', '.intcc-explore',
+        '.intcc-radar', '.intv14-cmp', '.intcc-watch', '.intcc-timeline', '.intv4-changed'];
+      const v = seq.map(ordOf);
+      if (v.some(x => x === null)) return false;
+      for (let i = 1; i < v.length; i++) if (!(v[i] > v[i - 1])) return false;
+      return true; })(),
     JSON.stringify({ hero: ordOf('.intcc-hero'), q: ordOf('.intv12-qcard'),
       drivers: ordOf('.intcc-drivers'), explore: ordOf('.intcc-explore'),
-      radar: ordOf('.intcc-radar'), watch: ordOf('.intcc-watch'),
+      radar: ordOf('.intcc-radar'), comparador: ordOf('.intv14-cmp'), watch: ordOf('.intcc-watch'),
       memoria: ordOf('.intcc-timeline'), changed: ordOf('.intv4-changed') }));
   ok('1.1b …y en ≤640px la cabecera sigue siendo Inteligencia → Salud → Pregunta',
     (() => { const b0 = css.split('@media (max-width: 640px)')
@@ -1492,8 +1563,19 @@ console.log('\n§14 · lo que importa hoy');
     JSON.stringify({ meta: /intv4-story-meta/.test(render(CUENTA_B).html),
       ventana: (textOf(render(CUENTA_B).html).match(/[^.]{0,40}entana[^.]{0,40}/) || [''])[0],
       periodo: (textOf(render(CUENTA_B).html).match(/[^.]{0,40}PERIODO[^.]{0,40}/i) || [''])[0] }));
+  // §4.4 RE-DECIDE LA FIXTURE, no la aserción. «Lo que importa hoy» deja de
+  // publicar la rentabilidad de TODO EL PERIODO y la liquidez estática, y en la
+  // cuenta B eso era justo lo que llenaba la card: ahora se encoge, que es lo
+  // que el §4.4 pide («un vacío compacto» antes que inventar actualidad). La
+  // ventana declarada se comprueba donde SIGUE habiendo una historia de hoy.
   ok('14.8 …pero la ventana sigue DECLARADA para la QA y el gate',
-    /data-window="/.test(render(CUENTA_B).html));
+    /data-window="/.test(render(CUENTA_C).html),
+    (render(CUENTA_C).html.match(/data-window="[^"]*"/g) || []).join(','));
+  ok('14.8b …y en una cuenta cuyo único contenido era un estado, la card se ENCOGE',
+    (() => { const h = render(CUENTA_B).html;
+      const m = section(h, 'intcc-watch');
+      return !/class="intv4-story"/.test(m) && /data-items="0"/.test(m); })(),
+    section(render(CUENTA_B).html, 'intcc-watch').slice(0, 260));
   ok('14.9 «No es un resultado», «no son rendimiento» y el resto de coletillas, fuera',
     (() => { const t0 = textOf(render(CUENTA_B).html);
       return !/no un resultado/i.test(t0) && !/no son rendimiento/i.test(t0)
@@ -1698,5 +1780,1062 @@ console.log('\n§18 · cada sección hace su trabajo');
     num(render(EVEN_NO_HISTORY).html, /data-changed-state="([^"]*)"/));
 }
 
+
+// ════════════════════════════════════════════════════════════════════════════
+// SUPREME CLOSURE · §4.1–§4.7 + CHECKPOINT B
+// ════════════════════════════════════════════════════════════════════════════
+// Lo que este SPEC decide POR ENCIMA del cierre anterior. Se añade a este fichero
+// y no a uno nuevo a propósito: es la MISMA superficie, con la misma maquinaria
+// y las mismas cuentas de referencia, y CLAUDE.md §6 pide no multiplicar gates
+// que validan esencialmente lo mismo.
+console.log('\nSC · §4.1 · la respuesta más reciente sustituye a la anterior');
+{
+  const ctxOf = (fields) => { const c = makeCtx({});
+    run('_aurixActiveUserId = "sc-user"', c);
+    run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify({ fields }) + ', {})', c);
+    return run('_aurixIntelContext({})', c); };
+  const COMPLETE_OLD = { wealth_coverage: { value: 'complete', provenance: 'user_answer', answeredAt: 1000 },
+    unregistered_liquidity: { value: 'yes', provenance: 'user_answer', answeredAt: 9000 } };
+  const COMPLETE_NEW = { wealth_coverage: { value: 'complete', provenance: 'user_answer', answeredAt: 9000 },
+    unregistered_liquidity: { value: 'yes', provenance: 'user_answer', answeredAt: 1000 } };
+  ok('SC.1.1 «tengo liquidez sin registrar» invalida «todo está registrado» como estado ACTUAL',
+    (() => { const c = ctxOf(COMPLETE_OLD);
+      return c.fields.wealth_coverage.superseded === true
+        && c.fields.wealth_coverage.supersededBy === 'unregistered_liquidity'
+        && c.fields.unregistered_liquidity.superseded !== true; })(),
+    JSON.stringify(ctxOf(COMPLETE_OLD).fields));
+  ok('SC.1.2 …y la regla es SIMÉTRICA: manda la más reciente, no un campo concreto',
+    (() => { const c = ctxOf(COMPLETE_NEW);
+      return c.fields.unregistered_liquidity.superseded === true
+        && c.fields.wealth_coverage.superseded !== true; })());
+  ok('SC.1.3 la anterior se CONSERVA como historial, no se borra',
+    (() => { const c = ctxOf(COMPLETE_OLD);
+      return c.fields.wealth_coverage.value === 'complete'
+        && Number(c.fields.wealth_coverage.answeredAt) === 1000
+        && c.answered === 2; })());
+  ok('SC.1.4 un par NO contradictorio no supersede nada',
+    (() => { const c = ctxOf({ wealth_coverage: { value: 'complete', provenance: 'user_answer', answeredAt: 1000 },
+        unregistered_liquidity: { value: 'no', provenance: 'user_answer', answeredAt: 9000 } });
+      return c.fields.wealth_coverage.superseded !== true
+        && c.fields.unregistered_liquidity.superseded !== true; })());
+  ok('SC.1.5 sin fecha NO se supersede: se falla hacia CONSERVAR, nunca hacia ocultar',
+    (() => { const c = ctxOf({ wealth_coverage: { value: 'complete', provenance: 'user_answer' },
+        unregistered_liquidity: { value: 'yes', provenance: 'user_answer', answeredAt: 9000 } });
+      return c.fields.wealth_coverage.superseded !== true; })());
+  ok('SC.1.6 el sello VIAJA al modelo que consumen las superficies',
+    /superseded: ctx\.fields\[k\]\.superseded === true/.test(fnSrc('_aurixIntel')));
+}
+
+console.log('\nSC · §4.2 · confirmar liquidez fuera de Aurix abre una puerta');
+{
+  const withCtx = (fields, ack) => { const o = Object.assign({}, CUENTA_B);
+    const c = makeCtx(o);
+    run('_aurixActiveUserId = "sc-liq"', c);
+    run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify({ fields, ack: ack || {} }) + ', {})', c);
+    return run('_renderIntelligenceCommandCenter()', c); };
+  const YES = { unregistered_liquidity: { value: 'yes', provenance: 'user_answer', answeredAt: NOW2 - DAY } };
+  const NO  = { unregistered_liquidity: { value: 'no',  provenance: 'user_answer', answeredAt: NOW2 - DAY } };
+  const hYes = withCtx(YES);
+  ok('SC.2.1 al confirmar liquidez fuera de Aurix aparece la puerta, con sus dos controles',
+    /data-liq-cta="1"/.test(hYes)
+    && /data-liq-cta-act="add"/.test(hYes) && /data-liq-cta-act="later"/.test(hYes)
+    && hYes.indexOf(DICT.es.intel_liq_cta_add) !== -1
+    && hYes.indexOf(DICT.es.intel_liq_cta_later) !== -1,
+    (hYes.match(/data-liq-cta="[^"]*"/g) || []).join(','));
+  ok('SC.2.2 responder que NO tiene liquidez sin registrar no abre ninguna puerta',
+    !/data-liq-cta="1"/.test(withCtx(NO)));
+  ok('SC.2.3 «Ahora no» la cierra, y el acuse viaja con el resto del contexto',
+    !/data-liq-cta="1"/.test(withCtx(YES,
+      { 'ctx:unregistered_liquidity': { at: NOW2, state: 'acknowledged', episodeId: 'ctx:unregistered_liquidity' } })));
+  ok('SC.2.4 §4.1 manda también aquí: una respuesta superseded no abre la puerta',
+    !/data-liq-cta="1"/.test(withCtx({
+      unregistered_liquidity: { value: 'yes', provenance: 'user_answer', answeredAt: 1000 },
+      wealth_coverage: { value: 'complete', provenance: 'user_answer', answeredAt: 9000 } })));
+  ok('SC.2.5 NO se inventa importe ni se registra nada: sólo se abre el formulario existente',
+    (() => { const f = fnSrc('_initIntelligenceCommandCenter');
+      return /openLiquidityModal\(\)/.test(f)
+        && !/amountUSD/.test(f) && !/_aurixRecordFlow|addLiquidity\(/.test(f); })());
+  ok('SC.2.6 la pregunta NO se repite aunque todavía no haya añadido la liquidez',
+    (() => { const q = fnSrc('_aurixIntelQuestions');
+      return /!known\.unregistered_liquidity/.test(q); })());
+}
+
+console.log('\nSC · §4.3 · una pregunta sólo existe si su respuesta existe');
+{
+  const cat = konstSrc('_AURIX_QUESTION_CATALOG');
+  // LA REVISIÓN FINANCIERA RE-DECIDIÓ ESTA. Endurecer la puerta arreglaba la
+  // mitad equivocada: el §4.3 exige separar CUATRO cosas y Aurix sólo conoce dos
+  // (el ledger de capital contiene únicamente movimientos de LIQUIDEZ; la
+  // rotación interna no deja rastro). Con la puerta dura, la respuesta seguía
+  // siendo dos párrafos que el usuario tenía que restar de cabeza. La pregunta
+  // sale del catálogo y su copy se va con ella: una clave sin consumidor es una
+  // promesa olvidada esperando a que alguien la vuelva a cablear.
+  ok('SC.3.1 la pregunta por el origen del crecimiento NO se hace: Aurix no puede separarlo',
+    !/q_capital_flows/.test(app)
+    && DICT.es.intv4_q_q_capital_flows === undefined
+    && DICT.en.intv4_q_q_capital_flows === undefined);
+  ok('SC.3.2 «frente a su propia historia» exige una comparación histórica certificada',
+    /q_historical[\s\S]{0,420}requiresAny: \['investable_all_time_high', 'investable_prior_high', 'investable_level_change'\]/.test(cat));
+  ok('SC.3.3 existe la pregunta del caso «sólo conozco el valor actual»',
+    /q_current_value/.test(cat)
+    && typeof DICT.es.intv4_q_q_current_value === 'string'
+    && typeof DICT.en.intv4_q_q_current_value === 'string');
+  ok('SC.3.4 …y NUNCA convive con la histórica: comparten raíz causal',
+    (() => { const hist = /id: 'q_historical'[\s\S]{0,120}causalRoot: ([A-Z_.]+)/.exec(cat);
+      const curr = /id: 'q_current_value'[\s\S]{0,120}causalRoot: ([A-Z_.]+)/.exec(cat);
+      return !!hist && !!curr && hist[1] === curr[1]; })());
+  ok('SC.3.5 …y cede el sitio en cuanto hay una comparación real que ofrecer',
+    (() => { const hist = /id: 'q_historical'[\s\S]{0,400}?interest: ([\d.]+)/.exec(cat);
+      const curr = /id: 'q_current_value'[\s\S]{0,400}?interest: ([\d.]+)/.exec(cat);
+      return !!hist && !!curr && Number(curr[1]) < Number(hist[1]); })());
+  // EJECUTADO, no leído: un catálogo declarativo puede estar bien escrito y su
+  // puerta no aplicarse. Se corre el owner con un ledger que tiene el nivel y
+  // NADA más, que es el caso que el §4.3 nombra.
+  ok('SC.3.6 con SÓLO el nivel: nada de historia, y la pregunta publicada es la del valor actual',
+    (() => { const c = makeCtx({});
+      const ledger = { facts: [{ semanticKey: 'investable_level', family: 'wealth_level',
+        causalRoot: 'wealth_level', priority: 0.5, value: 1000 }], gaps: [] };
+      const q = run('_aurixContextualQuestions(' + JSON.stringify(ledger) + ', {})', c);
+      const ids = q.selected.map(x => x.id);
+      return ids.indexOf('q_current_value') !== -1 && ids.indexOf('q_historical') === -1; })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      const ledger = { facts: [{ semanticKey: 'investable_level', family: 'wealth_level',
+        causalRoot: 'wealth_level', priority: 0.5, value: 1000 }], gaps: [] };
+      return run('_aurixContextualQuestions(' + JSON.stringify(ledger) + ', {})', c).selected.map(x => x.id); })()));
+  ok('SC.3.7 con máximo registrado SÍ se puede preguntar por la historia, y desplaza a la otra',
+    (() => { const c = makeCtx({});
+      const ledger = { facts: [
+        { semanticKey: 'investable_level', family: 'wealth_level', causalRoot: 'wealth_level', priority: 0.5, value: 1000 },
+        { semanticKey: 'investable_all_time_high', family: 'wealth_level', causalRoot: 'wealth_level', priority: 0.6, value: 1200 }], gaps: [] };
+      const ids = run('_aurixContextualQuestions(' + JSON.stringify(ledger) + ', {})', c).selected.map(x => x.id);
+      return ids.indexOf('q_historical') !== -1 && ids.indexOf('q_current_value') === -1; })());
+  ok('SC.3.8 …ni siquiera con capital registrado Y rendimiento certificado a la vez',
+    (() => { const c = makeCtx({});
+      const withBoth = run('_aurixContextualQuestions(' + JSON.stringify({ facts: [
+        { semanticKey: 'recorded_capital_net', family: 'capital_flow',
+          causalRoot: 'external_capital', priority: 0.7, value: 500 },
+        { semanticKey: 'investable_return_all', family: 'performance', causalRoot: 'investable_return',
+          priority: 0.9, value: 4.2 }], gaps: [] }) + ', {})', c);
+      return withBoth.selected.every(x => x.id !== 'q_capital_flows'); })());
+  // `requiresAny` sigue vivo y sigue siendo necesario: lo usa la pregunta
+  // histórica. Se ejerce que la puerta por PREFIJO funciona de verdad.
+  ok('SC.3.9 la puerta `requiresAny` acepta claves por PREFIJO de familia',
+    /const findAny = keys =>/.test(fnSrc('_aurixContextualQuestions'))
+    && /\/_\$\/\.test\(k\)/.test(fnSrc('_aurixContextualQuestions')));
+}
+
+console.log('\nSC · §4.4 · «lo que importa hoy» no cambia al refrescar');
+{
+  ok('SC.4.1 la novedad se mide en DÍAS COMPLETOS, no en milisegundos',
+    /const ageDays = Math\.floor\(age \/ 864e5\);/.test(fnSrc('_aurixFactLedger'))
+    && /_aurixFactClamp01\(\(ageDays \* 864e5\) \/ _AURIX_NOVELTY_WINDOW_MS\)/.test(fnSrc('_aurixFactLedger')));
+  ok('SC.4.2 …y la marca de presentación se sella al DÍA, no al instante',
+    /const dayStamp = Math\.floor\(now \/ 864e5\) \* 864e5;/.test(fnSrc('_intv4RecordShown'))
+    && /shownAt: dayStamp/.test(fnSrc('_intv4RecordShown')));
+  ok('SC.4.3 EJECUTADO: dos pinturas seguidas de la misma jornada publican lo MISMO',
+    (() => { const c = makeCtx(CUENTA_B);
+      run('_aurixActiveUserId = "sc-stable"', c);
+      const h1 = run('_renderIntelligenceCommandCenter()', c);
+      const h2 = run('_renderIntelligenceCommandCenter()', c);
+      const h3 = run('_renderIntelligenceCommandCenter()', c);
+      const facts = h => (h.match(/class="intv4-story"[^>]*data-fact="([^"]*)"/g) || []).join(',');
+      return facts(h1) === facts(h2) && facts(h2) === facts(h3); })(),
+    (() => { const c = makeCtx(CUENTA_B); run('_aurixActiveUserId = "sc-stable"', c);
+      const a = run('_renderIntelligenceCommandCenter()', c), b = run('_renderIntelligenceCommandCenter()', c);
+      return JSON.stringify([(a.match(/data-fact="([^"]*)"/g) || []).slice(0, 4),
+                             (b.match(/data-fact="([^"]*)"/g) || []).slice(0, 4)]); })());
+  ok('SC.4.4 y sigue habiendo un techo de tres hechos',
+    (() => { const ks = konstSrc('_INTV4_BRIEF_MAX'); return /= 3;/.test(ks); })());
+}
+
+console.log('\nSC · §4.5 · «Tu evolución» publica hechos, no respuestas');
+{
+  ok('SC.5.1 la card se llama «Tu evolución» en los dos idiomas',
+    DICT.es.intv4_memory_title === 'Tu evolución' && DICT.en.intv4_memory_title === 'Your evolution');
+  ok('SC.5.2 el techo son TRES hechos históricos certificados',
+    /const _INTV4_MEMORY_MAX = 3;/.test(app));
+  ok('SC.5.3 ninguna respuesta declarada se publica como fila',
+    !/_intv4MemoryDeclared/.test(fnSrc('_intv4MemoryRows'))
+    && !/kind: 'declared'/.test(fnSrc('_intv4MemoryRows')));
+  ok('SC.5.4 …y en la pintura real, con contexto declarado, la lista es SÓLO de hechos',
+    (() => { const c = makeCtx(CUENTA_B);
+      run('_aurixActiveUserId = "sc-mem"', c);
+      run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify({ fields: {
+        primary_goal: { value: 'grow', provenance: 'user_answer', answeredAt: NOW2 - DAY },
+        horizon: { value: 'long', provenance: 'user_answer', answeredAt: NOW2 - 2 * DAY },
+      } }) + ', {})', c);
+      const h = run('_renderIntelligenceCommandCenter()', c);
+      const m = section(h, 'intcc-timeline');
+      return !/is-declared/.test(m) && !/data-declared-field/.test(m)
+        && m.indexOf(DICT.es.intv9_mem_goal_grow) === -1; })(),
+    section(render(CUENTA_B).html, 'intcc-timeline').slice(0, 300));
+  ok('SC.5.5 pero lo DECLARADO no se pierde: se conserva y se declara su recuento',
+    /data-declared="\$\{declared\.length\}"/.test(fnSrc('_intv4MemoryHtml'))
+    && typeof run('_intv4MemoryDeclared', makeCtx({})) === 'function');
+  ok('SC.5.6 cada fila declara su PERIODO y su COBERTURA',
+    /data-period="\$\{esc\(r\.period \|\| ''\)\}" data-coverage="\$\{esc\(r\.coverage \|\| ''\)\}"/.test(fnSrc('_intv4MemoryHtml')));
+  ok('SC.5.7 el estado vacío es COMPACTO y dice una sola frase',
+    (() => { const h = render(YOUNG).html;
+      return /data-compact="1"/.test(h) && !/intv6-accrue-node/.test(h)
+        && h.indexOf(DICT.es.intv4_memory_empty) !== -1; })(),
+    section(render(YOUNG).html, 'intcc-timeline').slice(0, 260));
+  ok('SC.5.8 …y esa frase es la que el §4.5 dicta, en los dos idiomas',
+    /^Aún no hay historial suficiente/.test(DICT.es.intv4_memory_empty)
+    && /^There is not enough history yet/.test(DICT.en.intv4_memory_empty));
+  // VARIEDAD TEMPORAL — el owner aprende los periodos largos y los publica SÓLO
+  // cuando existen. Se ejerce el owner REAL, no su declaración.
+  ok('SC.5.9 la variedad temporal está DETENIDA: el ledger no pide periodos largos',
+    /perfRanges[\s\S]{0,2200}\['24h', '7d', '30d', 'all'\]/.test(fnSrc('_aurixFactLedger')));
+  // LA REVISIÓN FINANCIERA DEJÓ FUERA 2 Y 5 AÑOS, y el gate lo fija: la
+  // tolerancia de cobertura es PROPORCIONAL (20 %), así que en 5 años admitiría
+  // llamar «los últimos 5 años» a una medición de cuatro. Hasta 180d el margen
+  // absoluto (36 días) es MENOR que el que 1A ya concede (73), así que no se
+  // relaja nada que el producto no tolerase ya.
+  // NINGÚN UMBRAL FINANCIERO SE MUEVE, y esto es lo que lo demuestra: al detener
+  // la variedad temporal, las dos tablas que el intento había tocado vuelven
+  // EXACTAMENTE a sus valores certificados.
+  ok('SC.5.9b la parada devuelve los umbrales de comparabilidad a sus valores certificados',
+    (() => { const c = makeCtx({});
+      const R = run('_AURIX_RETURN_COMPARABLE_RATIO', c);
+      return JSON.stringify(R) === JSON.stringify({ '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 }); })(),
+    JSON.stringify(run('_AURIX_RETURN_COMPARABLE_RATIO', makeCtx({}))));
+  // LAS TRES TABLAS DE RANGO DICEN LO MISMO. Sincronizar sólo dos no cerraba la
+  // trampa, la cambiaba de forma: un llamador de '90d' pasaría de recibir 30
+  // días con cobertura FALSA a recibir 90 días sin guardia de retención, que es
+  // la forma exacta del residual de 'all'.
+  ok('SC.5.9c el guardia de retención conoce los mismos rangos que las tablas de span',
+    (() => { const c = makeCtx({});
+      const B = run('_AURIX_WN12_BOUNDED_RANGES', c);
+      const tbl = /\{ '24h': 864e5[^}]*\}/.exec(fnSrc('_aurixInvestableSnapshots'))[0];
+      // eslint-disable-next-line no-new-func
+      const spans = new Function('return (' + tbl + ')')();
+      return Object.keys(spans).every(k => B[k] === 1)
+        && B.all === undefined; })(),
+    JSON.stringify(run('_AURIX_WN12_BOUNDED_RANGES', makeCtx({}))));
+  // LO QUE SÍ QUEDA: una sola tabla de spans. Eran dos literales gemelos que ya
+  // discrepaban en su fallback —un nombre desconocido daba 30 días de datos con
+  // la cobertura declarada como BUENA— y ahora no pueden volver a divergir. Es la
+  // UNIÓN EXACTA de las dos anteriores, así que ninguna ventana se mueve.
+  // LO QUE SÍ QUEDA: las dos tablas gemelas de span dicen lo MISMO. Ya no
+  // coincidían —'90d' existía en el nominal y no en la selección— y el fallback
+  // de ésta convertía ese nombre en 30 días de datos con la cobertura declarada
+  // como BUENA. Se comparan CLAVE A CLAVE extrayéndolas de sus dos owners: no se
+  // unifican en una constante porque una docena de harness del motor del gráfico
+  // construyen su sandbox con estas funciones.
+  ok('SC.5.10 las dos tablas de span gemelas dicen exactamente lo mismo',
+    (() => { const tbl = (src0) => { const m = /\{ '24h': 864e5[^}]*\}/.exec(src0);
+        // eslint-disable-next-line no-new-func
+        return m ? new Function('return (' + m[0] + ')')() : null; };
+      const a = tbl(fnSrc('_aurixInvestableSnapshots'));
+      const b = tbl(fnSrc('_aurixInvestablePerformance'));
+      return !!a && !!b && JSON.stringify(a) === JSON.stringify(b)
+        && JSON.stringify(a) === JSON.stringify({ '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '90d': 7776e6, '1y': 31536e6 }); })(),
+    JSON.stringify([/\{ '24h': 864e5[^}]*\}/.exec(fnSrc('_aurixInvestableSnapshots'))[0],
+                    /\{ '24h': 864e5[^}]*\}/.exec(fnSrc('_aurixInvestablePerformance'))[0]]));
+  ok('SC.5.11 EJECUTADO: con historia corta los periodos largos NO crean hechos nuevos',
+    (() => { const c = makeCtx(CUENTA_B);
+      const led = run('_aurixFactLedger({})', c);
+      const rets = led.facts.filter(f => /^investable_return_/.test(f.semanticKey));
+      // Una sola medición por INTERVALO: dos nombres no pueden publicar el mismo
+      // par (startAt, endAt).
+      const wins = rets.map(f => f.window.startAt + ':' + f.window.endAt);
+      return new Set(wins).size === wins.length; })(),
+    JSON.stringify((() => { const c = makeCtx(CUENTA_B);
+      return run('_aurixFactLedger({})', c).facts
+        .filter(f => /^investable_return_/.test(f.semanticKey)).map(f => f.semanticKey); })()));
+  ok('SC.5.12 …y no queda copy de periodos que nadie publica',
+    ['intv4_r_180d', 'intv4_r_1y', 'intv4_r_2y', 'intv4_r_5y']
+      .every(k => DICT.es[k] === undefined && DICT.en[k] === undefined)
+    && typeof DICT.es.intv4_r_90d === 'string');
+}
+
+console.log('\nSC · §4.5b · HISTORIA LARGA — el caso que el diff crea y nadie medía');
+{
+  // LA REVISIÓN FINANCIERA SEÑALÓ ESTE HUECO POR SU NOMBRE: SC.5.11 corre sobre
+  // una cuenta de historia CORTA, donde 90d/180d colapsan en 'all' y por tanto no
+  // existen. El caso que el diff realmente introduce —y en el que estaba el
+  // defecto alto— es el de una cuenta con ~200 días, donde 90d SÍ es una
+  // medición propia. Se construye esa cuenta.
+  const LARGA = (() => {
+    const N = 200, rows = [];
+    for (let i = 0; i < N; i++) {
+      // Sube hasta el día 110 y cae después: así el retorno de 90d es
+      // marcadamente NEGATIVO mientras el de todo el periodo es ligeramente
+      // positivo — exactamente la configuración del hallazgo.
+      const v = i < 110 ? 80000 + i * 300 : 113000 - (i - 110) * 260;
+      rows.push({ ts: NOW2 - (N - 1 - i) * DAY, total: Math.round(v), real_estate: 0 });
+    }
+    return { assets: B_ASSETS, snap: B_SNAP, rows, serverRows: [], flows: [] };
+  })();
+  // ── LA RAZÓN DE LA PARADA, FIJADA COMO PRUEBA ─────────────────────────
+  // Con los periodos largos pedidos, esta misma cuenta publicaba a la vez
+  // all = −20,27 %, 1y = +12,33 % y 180d = +4,85 %. Tres hechos certificados,
+  // dos signos, y periodos que se contienen. La causa es que 'all' es el ÚNICO
+  // rango sin guardia de retención, así que el trim cosmético de WN.12 le
+  // recorta el arranque hasta el pico: mide 90 días y se llama «todo el periodo
+  // registrado». Esta prueba deja el defecto REPRODUCIDO para quien levante la
+  // parada, y comprueba que hoy no se publica ninguna contradicción.
+  ok('SC.5.13 RESIDUAL REPRODUCIDO · «todo el periodo» puede medir MENOS que un rango acotado',
+    (() => { const c = makeCtx(LARGA);
+      const all = run('_aurixFactLedger({ perfRanges: ["all"] })', c).facts
+        .find(f => f.semanticKey === 'investable_return_all');
+      const y1 = run('_aurixFactLedger({ perfRanges: ["1y"] })', c).facts
+        .find(f => f.semanticKey === 'investable_return_1y');
+      if (!all || !y1) return false;
+      // El nombre más ancho sobre la ventana más estrecha, y con el signo opuesto.
+      return all.window.spanMs < y1.window.spanMs
+        && Math.sign(all.value) !== Math.sign(y1.value); })(),
+    JSON.stringify((() => { const c = makeCtx(LARGA);
+      const f = (r) => { const x = run('_aurixFactLedger({ perfRanges: ["' + r + '"] })', c).facts
+        .find(y => y.semanticKey === 'investable_return_' + r);
+        return x ? { v: x.value, days: Math.round(x.window.spanMs / DAY) } : null; };
+      return { all: f('all'), y1: f('1y') }; })()));
+  ok('SC.5.13b …y por eso HOY el ledger no publica ningún periodo largo',
+    (() => { const c = makeCtx(LARGA);
+      const names = run('_aurixFactLedger({})', c).facts
+        .filter(f => /^investable_return_/.test(f.semanticKey)).map(f => f.semanticKey);
+      return names.every(n => ['investable_return_24h', 'investable_return_7d',
+        'investable_return_30d', 'investable_return_all'].indexOf(n) !== -1); })(),
+    JSON.stringify((() => { const c = makeCtx(LARGA);
+      return run('_aurixFactLedger({})', c).facts
+        .filter(f => /^investable_return_/.test(f.semanticKey)).map(f => f.semanticKey); })()));
+  ok('SC.5.14 …y aun así NINGÚN intervalo se publica dos veces bajo dos nombres',
+    (() => { const c = makeCtx(LARGA);
+      const wins = run('_aurixFactLedger({})', c).facts
+        .filter(f => /^investable_return_/.test(f.semanticKey))
+        .map(f => f.window.startAt + ':' + f.window.endAt);
+      return wins.length > 0 && new Set(wins).size === wins.length; })());
+  ok('SC.5.15 …y el nombre más ANCHO gana el intervalo compartido: «todo el periodo» nunca lo pierde',
+    (() => { const src0 = fnSrc('_aurixFactLedger');
+      const m = /perfRanges = Array[\s\S]{0,2200}?\[([^\]]*)\]/.exec(src0);
+      if (!m) return false;
+      const order = m[1].split(',').map(x => x.trim().replace(/'/g, ''));
+      return order[order.length - 1] === 'all'
+        && /perfByWindow\.set\(p\.startAt \+ ':' \+ p\.endAt/.test(src0); })());
+  // ── EL HALLAZGO ALTO, EJERCITADO CONTRA EL OWNER REAL ────────────────────
+  // Ampliar el catálogo de hechos NO puede mover lo que el hero considera «una
+  // novedad». Se le da al selector un 90d enorme y un 'all' plano: si leyera el
+  // catálogo entero elegiría el 90d y la lectura pasaría a DECREASING.
+  ok('SC.5.16 un periodo NUEVO no puede cambiar la señal de evolución del hero',
+    (() => { const c = makeCtx({});
+      const FACTS = [
+        { semanticKey: 'investable_return_all', family: 'performance', causalRoot: 'investable_return',
+          value: 1.2, unit: 'percent', confidence: 1, window: { range: 'all' } },
+        { semanticKey: 'investable_return_90d', family: 'performance', causalRoot: 'investable_return',
+          value: -9.0, unit: 'percent', confidence: 1, window: { range: '90d' } }];
+      const e = run('_aurixAiEvolution(' + JSON.stringify(FACTS) + ', [], { observations: 20 })', c);
+      return e.returnPct === 1.2 && e.window === 'all'; })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      const FACTS = [
+        { semanticKey: 'investable_return_all', family: 'performance', causalRoot: 'investable_return',
+          value: 1.2, unit: 'percent', confidence: 1, window: { range: 'all' } },
+        { semanticKey: 'investable_return_90d', family: 'performance', causalRoot: 'investable_return',
+          value: -9.0, unit: 'percent', confidence: 1, window: { range: '90d' } }];
+      return run('_aurixAiEvolution(' + JSON.stringify(FACTS) + ', [], { observations: 20 })', c); })()));
+  ok('SC.5.17 …y las ventanas que esa señal lee están DECLARADAS, no deducidas del catálogo',
+    (() => { const c = makeCtx({});
+      const R = run('_AURIX_AI_EVOLUTION_RANGES', c);
+      return JSON.stringify(R) === JSON.stringify(['24h', '7d', '30d', 'all'])
+        && /_AURIX_AI_EVOLUTION_RANGES[\s\S]{0,120}indexOf/.test(fnSrc('_aurixAiEvolution')); })(),
+    JSON.stringify(run('_AURIX_AI_EVOLUTION_RANGES', makeCtx({}))));
+}
+
+console.log('\nSC · P1 · «todo el periodo registrado» no puede ser medio periodo');
+{
+  // EL DEFECTO, MEDIDO: 'all' es el único rango sin guardia de retención WN.12,
+  // así que su trim COSMÉTICO se aplica siempre y puede dejar la serie
+  // arrancando en el pico de una rampa. La cifra publicada es un TWR
+  // flow-neutral REAL sobre esa ventana —no se toca—, pero se llamaba «todo el
+  // periodo registrado». Y era indetectable: para 'all' no hay span nominal, así
+  // que `coversNominal` vale `true` POR DEFINICIÓN.
+  const RAMPA = (() => {
+    const N = 200, rows = [];
+    for (let i = 0; i < N; i++) {
+      const v = i < 110 ? 80000 + i * 300 : 113000 - (i - 110) * 260;
+      rows.push({ ts: NOW2 - (N - 1 - i) * DAY, total: Math.round(v), real_estate: 0 });
+    }
+    return { assets: B_ASSETS, snap: B_SNAP, rows, serverRows: [], flows: [] };
+  })();
+  const perf = (fx) => { const c = makeCtx(fx); return run('_aurixInvestablePerformance("all")', c); };
+  ok('P1.1 el caso se REPRODUCE: el trim recorta el arranque de «todo el periodo»',
+    (() => { const p = perf(RAMPA);
+      const totalSpan = 199 * DAY;
+      return p.valid === true && p.startsAfterRecord === true
+        && p.spanMs < totalSpan * 0.8; })(),
+    JSON.stringify((() => { const p = perf(RAMPA);
+      return { valid: p.valid, trimmed: p.startsAfterRecord,
+        diasMedidos: Math.round(p.spanMs / DAY), diasRegistrados: 199, pct: p.returnPct }; })()));
+  ok('P1.2 …y `coversNominal` NO podía verlo: para «all» no hay nominal que medir',
+    perf(RAMPA).coversNominal === true && perf(RAMPA).nominalMs === null);
+  ok('P1.3 el owner lo DECLARA, y la bandera viaja con la ventana del hecho',
+    (() => { const c = makeCtx(RAMPA);
+      const f = run('_aurixFactLedger({})', c).facts
+        .find(x => x.semanticKey === 'investable_return_all');
+      return !!f && f.window.startsAfterRecord === true; })());
+  ok('P1.4 y la FRASE deja de decir «todo el periodo»: publica el periodo EFECTIVO real',
+    (() => { const c = makeCtx(RAMPA);
+      const f = run('_aurixFactLedger({})', c).facts
+        .find(x => x.semanticKey === 'investable_return_all');
+      const txt = run('_intv4FactText(' + JSON.stringify(f) + ')', c);
+      const dias = Math.round(f.window.spanMs / DAY);
+      return txt.indexOf(DICT.es.intv4_r_all) === -1
+        && txt.indexOf(String(dias)) !== -1
+        && /d[ií]as registrados/.test(txt); })(),
+    JSON.stringify((() => { const c = makeCtx(RAMPA);
+      const f = run('_aurixFactLedger({})', c).facts.find(x => x.semanticKey === 'investable_return_all');
+      return run('_intv4FactText(' + JSON.stringify(f) + ')', c); })()));
+  ok('P1.5 …y LA CIFRA NO SE TOCA: es el mismo TWR flow-neutral que ya se medía',
+    (() => { const c = makeCtx(RAMPA);
+      const p = run('_aurixInvestablePerformance("all")', c);
+      const f = run('_aurixFactLedger({})', c).facts.find(x => x.semanticKey === 'investable_return_all');
+      return f.value === p.returnPct && p.basis === 'investable-twr'; })());
+  ok('P1.6 el sobre del hecho declara la limitación por su nombre',
+    (() => { const c = makeCtx(RAMPA);
+      const core = run('_aurixIntelligenceCore({})', c);
+      const env = Object.keys(core.factContract.byId)
+        .map(k => core.factContract.byId[k])
+        .find(e => e.type === 'investable_return_all');
+      return !!env && env.effectivePeriod.namedAs === null
+        && env.limitations.indexOf('starts_after_first_record') !== -1
+        && env.requestedPeriod === 'all'; })(),
+    JSON.stringify((() => { const c = makeCtx(RAMPA);
+      const core = run('_aurixIntelligenceCore({})', c);
+      return Object.keys(core.factContract.byId).map(k => core.factContract.byId[k])
+        .filter(e => e.type === 'investable_return_all')[0]; })()));
+  // LO QUE NO PUEDE ROMPERSE: una cuenta SIN recorte sigue diciendo «todo el
+  // periodo registrado», que es verdad y es la copy que el producto ya tenía.
+  ok('P1.7 sin recorte, «todo el periodo registrado» se sigue diciendo tal cual',
+    (() => { const c = makeCtx(CUENTA_B);
+      const p = run('_aurixInvestablePerformance("all")', c);
+      if (p.valid !== true) return false;
+      const f = run('_aurixFactLedger({})', c).facts.find(x => x.semanticKey === 'investable_return_all');
+      const txt = run('_intv4FactText(' + JSON.stringify(f) + ')', c);
+      return p.startsAfterRecord === false && f.window.startsAfterRecord === false
+        && txt.indexOf(DICT.es.intv4_r_all) !== -1; })(),
+    JSON.stringify((() => { const c = makeCtx(CUENTA_B);
+      const f = run('_aurixFactLedger({})', c).facts.find(x => x.semanticKey === 'investable_return_all');
+      return f ? run('_intv4FactText(' + JSON.stringify(f) + ')', c) : null; })()));
+  ok('P1.8 NO se reconstruye historia: el recorte sigue recortando, sólo cambia el NOMBRE',
+    (() => { const c = makeCtx(RAMPA);
+      const elig = run('_aurixEligibleInvestableSeries("all")', c);
+      const raw  = run('_aurixInvestableSnapshots("all")', c);
+      return elig.meta.activeTrimApplied === true && elig.series.length < raw.length
+        && elig.series[0].ts > raw[0].ts; })());
+  ok('P1.9 `coversNominal` queda INTACTO: Estabilidad no se apaga por un recorte cosmético',
+    (() => { const src0 = fnSrc('_aurixInvestablePerformance');
+      // La bandera nueva es ADITIVA: la línea de `coversNominal` no cambia.
+      return /out\.coversNominal = \(_nominal == null\)\s*\n\s*\? true/.test(src0)
+        && /out\.startsAfterRecord = \(_rawStart !== null && tFirst > _rawStart\)/.test(src0); })());
+  ok('P1.10 los tres estados del owner siguen intactos (flow-neutral, pending, value_fallback)',
+    (() => { const src0 = fnSrc('_aurixInvestablePerformance');
+      return /basis: 'investable-twr'/.test(src0)
+        && /fallbackReason = 'insufficient_observations'|out\.fallbackReason = 'insufficient_observations'/.test(src0)
+        && /out\.fallbackReason = 'baseline_not_comparable'/.test(src0)
+        && /out\.fallbackReason = 'window_too_short'/.test(src0); })());
+  // ── LO QUE LA REVISIÓN TUMBÓ, Y AHORA SE MIDE ─────────────────────────
+  // Degradar por «se movió el arranque» a secas rompía los rangos ACOTADOS,
+  // cuyo trim el guardia de retención ya había declarado inocuo: «en las
+  // últimas 24 h» pasaba a «en los últimos 1 día registrados». Sólo el nombre
+  // que AFIRMA COMPLETITUD puede perderlo.
+  ok('P1.12 un rango ACOTADO con el arranque movido CONSERVA su nombre nominal',
+    (() => { const c = makeCtx({});
+      const W = (range) => ({ range, coversNominal: true, startsAfterRecord: true, spanMs: 864e5 });
+      // Los rangos que el ledger publica de verdad. '1y' lo soporta el motor
+      // pero `perfRanges` no lo pide, así que nunca llega a la copy (ver P1.12d,
+      // que es quien impide que esa asimetría se vuelva un periodo vacío).
+      return ['24h', '7d', '30d'].every(r =>
+        run('_aurixFactPeriodDegraded(' + JSON.stringify(W(r)) + ')', c) === false
+        && run('_intv4WindowLabel(' + JSON.stringify(W(r)) + ')', c) === DICT.es['intv4_r_' + r]); })(),
+    JSON.stringify(['24h', '7d', '30d'].map(r => run('_intv4WindowLabel('
+      + JSON.stringify({ range: r, coversNominal: true, startsAfterRecord: true, spanMs: 864e5 }) + ')', makeCtx({})))));
+  // LA ASIMETRÍA QUE CAUSÓ EL P1, GENERALIZADA COMO INVARIANTE: un rango que el
+  // ledger PIDE tiene que poder nombrarse. Si alguien añade un periodo a
+  // `perfRanges` sin su copy, el hecho se publica con el periodo VACÍO — que es
+  // la misma familia de defecto que «todo el periodo registrado» sobre 90 días.
+  ok('P1.12d todo rango que el ledger pide tiene nombre en los DOS idiomas',
+    (() => { const m = /perfRanges = Array[\s\S]{0,2200}?\[([^\]]*)\]/.exec(fnSrc('_aurixFactLedger'));
+      if (!m) return false;
+      const ranges = m[1].split(',').map(x => x.trim().replace(/'/g, '')).filter(Boolean);
+      return ranges.length > 0 && ranges.every(r =>
+        typeof DICT.es['intv4_r_' + r] === 'string' && typeof DICT.en['intv4_r_' + r] === 'string'); })(),
+    JSON.stringify((/perfRanges = Array[\s\S]{0,2200}?\[([^\]]*)\]/.exec(fnSrc('_aurixFactLedger')) || [, ''])[1]));
+  ok('P1.12b …y «24 h» NO se convierte nunca en «1 día registrado»',
+    run('_intv4WindowLabel(' + JSON.stringify({ range: '24h', coversNominal: true, startsAfterRecord: true, spanMs: 864e5 }) + ')', makeCtx({}))
+      === DICT.es.intv4_r_24h);
+  ok('P1.12c …pero un acotado que NO cubre su nominal sigue degradando (regla previa intacta)',
+    run('_aurixFactPeriodDegraded(' + JSON.stringify({ range: '1y', coversNominal: false, spanMs: 310 * DAY }) + ')', makeCtx({})) === true);
+  // La bandera mide el HECHO, no el mecanismo: el filtro de confianza WN.13
+  // también deja fuera puntos INICIALES y producía el mismo nombre falso.
+  ok('P1.13 el arranque movido por el FILTRO DE CONFIANZA degrada igual que el recorte',
+    (() => { // Cuenta que empezó en 500 US$ y hoy vale 60.000: los primeros
+      // puntos caen por `construction_baseline` (< 15 % del ancla).
+      const rows = [];
+      for (let i = 0; i < 10; i++) rows.push({ ts: NOW2 - (60 - i) * DAY, total: 500 + i * 30, real_estate: 0 });
+      for (let i = 0; i < 40; i++) rows.push({ ts: NOW2 - (40 - i) * DAY, total: 55000 + i * 120, real_estate: 0 });
+      const c = makeCtx({ assets: B_ASSETS, snap: B_SNAP, rows, serverRows: [], flows: [] });
+      const elig = run('_aurixEligibleInvestableSeries("all")', c);
+      const raw  = run('_aurixInvestableSnapshots("all")', c);
+      const p    = run('_aurixInvestablePerformance("all")', c);
+      return elig.meta.reasons.construction_baseline > 0
+        && elig.series[0].ts > raw[0].ts
+        && Number.isFinite(elig.meta.rawWindowStart)
+        && (p.valid !== true || p.startsAfterRecord === true); })(),
+    JSON.stringify((() => { const rows = [];
+      for (let i = 0; i < 10; i++) rows.push({ ts: NOW2 - (60 - i) * DAY, total: 500 + i * 30, real_estate: 0 });
+      for (let i = 0; i < 40; i++) rows.push({ ts: NOW2 - (40 - i) * DAY, total: 55000 + i * 120, real_estate: 0 });
+      const c = makeCtx({ assets: B_ASSETS, snap: B_SNAP, rows, serverRows: [], flows: [] });
+      const e = run('_aurixEligibleInvestableSeries("all")', c);
+      const p = run('_aurixInvestablePerformance("all")', c);
+      return { construction: e.meta.reasons.construction_baseline, valid: p.valid,
+               startsAfter: p.startsAfterRecord }; })()));
+  ok('P1.13b el arranque del REGISTRO se exporta: sin él nadie podía detectarlo',
+    /meta\.rawWindowStart = raw\.length \? raw\[0\]\.ts : null;/.test(fnSrc('_aurixEligibleInvestableSeries')));
+  ok('P1.11 la cobertura declarada en el DOM la decide el mismo owner que el nombre',
+    /_aurixFactPeriodDegraded\(story\.window\)/.test(fnSrc('_intv4StoryHtml'))
+    && /_aurixFactPeriodDegraded\(x\.f\.window\)/.test(fnSrc('_intv4MemoryRows')));
+}
+
+console.log('\nSC · RESIDUALES · un rendimiento sin periodo, y un drawdown sin cobertura');
+{
+  const RAMPA2 = (() => {
+    const N = 200, rows = [];
+    for (let i = 0; i < N; i++) {
+      const v = i < 110 ? 80000 + i * 300 : 113000 - (i - 110) * 260;
+      rows.push({ ts: NOW2 - (N - 1 - i) * DAY, total: Math.round(v), real_estate: 0 });
+    }
+    return { assets: B_ASSETS, snap: B_SNAP, rows, serverRows: [], flows: [] };
+  })();
+  // ── A · `return_positive` ──────────────────────────────────────────────
+  ok('R.A1 «Tus inversiones han generado un X %» ya NO puede salir sin periodo',
+    (() => { const c = makeCtx({});
+      const F = (win) => ({ semanticKey: 'return_positive', value: 4.2, unit: 'percent', window: win });
+      const sinVentana = run('_intv4FactText(' + JSON.stringify(F(null)) + ')', c);
+      const sinRango   = run('_intv4FactText(' + JSON.stringify(F({ spanMs: 5 * DAY })) + ')', c);
+      return sinVentana === '' && sinRango === ''; })(),
+    JSON.stringify([run('_intv4FactText(' + JSON.stringify({ semanticKey: 'return_positive', value: 4.2, window: null }) + ')', makeCtx({}))]));
+  ok('R.A2 con ventana válida publica la cifra Y su periodo',
+    (() => { const c = makeCtx({});
+      const txt = run('_intv4FactText(' + JSON.stringify({ semanticKey: 'return_positive', value: 4.2,
+        unit: 'percent', window: { range: '30d', coversNominal: true, spanMs: 30 * DAY } }) + ')', c);
+      return /4,2\s*%/.test(txt) && txt.indexOf(DICT.es.intv4_r_30d) !== -1; })(),
+    run('_intv4FactText(' + JSON.stringify({ semanticKey: 'return_positive', value: 4.2, unit: 'percent',
+      window: { range: '30d', coversNominal: true, spanMs: 30 * DAY } }) + ')', makeCtx({})));
+  ok('R.A3 …y sobre una serie RECORTADA no lo llama «todo el periodo»',
+    (() => { const c = makeCtx(RAMPA2);
+      const f = run('_aurixFactLedger({})', c).facts.find(x => x.semanticKey === 'return_positive');
+      if (!f) return true;                       // sin rendimiento positivo no hay caso
+      const txt = run('_intv4FactText(' + JSON.stringify(f) + ')', c);
+      return txt === '' || txt.indexOf(DICT.es.intv4_r_all) === -1; })(),
+    JSON.stringify((() => { const c = makeCtx(RAMPA2);
+      const f = run('_aurixFactLedger({})', c).facts.find(x => x.semanticKey === 'return_positive');
+      return f ? run('_intv4FactText(' + JSON.stringify(f) + ')', c) : 'sin hecho'; })()));
+  ok('R.A4 el hecho SIGUE transportando su ventana (no se tocó su emisión)',
+    /values: Object\.assign\(\{\}, best\.values\), window: Object\.assign\(\{\}, best\.window\)/.test(fnSrc('_aurixFactLedger')));
+  // ── B · Estabilidad ────────────────────────────────────────────────────
+  ok('R.B1 el owner del drawdown hereda la cobertura del retorno',
+    (() => { const c = makeCtx(RAMPA2);
+      const r = run('_aurixPeakRetention("all")', c);
+      const p = run('_aurixInvestablePerformance("all")', c);
+      return r.startsAfterRecord === p.startsAfterRecord
+        && (r.status !== 'available' || Number.isFinite(r.spanMs)); })(),
+    JSON.stringify((() => { const c = makeCtx(RAMPA2);
+      const r = run('_aurixPeakRetention("all")', c);
+      return { status: r.status, startsAfter: r.startsAfterRecord, dias: r.spanMs ? Math.round(r.spanMs / DAY) : null }; })()));
+  ok('R.B2 con serie recortada, el eje DECLARA su cobertura en vez de afirmar «desde siempre»',
+    (() => { const c = makeCtx({});
+      // Se inyecta el owner para fijar el CONTRATO de la superficie, no la
+      // forma de una fixture: lo que se certifica es que una retención con
+      // arranque movido publica días medidos.
+      run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
+        + ' startsAfterRecord: true, spanMs: ' + (90 * DAY) + ' })', c);
+      const r = run('_intv7RadarAxes()', c);
+      return typeof r.display.stability === 'string'
+        && /82/.test(r.display.stability) && /90/.test(r.display.stability)
+        && r.values.stability === 82; })(),
+    JSON.stringify((() => { const c = makeCtx({});
+      run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
+        + ' startsAfterRecord: true, spanMs: ' + (90 * DAY) + ' })', c);
+      return run('_intv7RadarAxes()', c).display; })()));
+  ok('R.B3 sin recorte NO se añade ninguna coletilla: el eje queda como estaba',
+    (() => { const c = makeCtx({});
+      run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
+        + ' startsAfterRecord: false, spanMs: ' + (200 * DAY) + ' })', c);
+      const r = run('_intv7RadarAxes()', c);
+      return r.display.stability == null && r.values.stability === 82; })());
+  ok('R.B4 la cifra NO se degrada a «sin datos»: es medible y sigue certificada',
+    (() => { const c = makeCtx({});
+      run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
+        + ' startsAfterRecord: true, spanMs: ' + (90 * DAY) + ' })', c);
+      const r = run('_intv7RadarAxes()', c);
+      return r.unavailable.indexOf('stability') === -1 && r.quality.stability === 'measured'; })());
+  ok('R.B5 y la cobertura llega a la descripción accesible, no sólo al píxel',
+    (() => { const c = makeCtx({});
+      run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
+        + ' startsAfterRecord: true, spanMs: ' + (90 * DAY) + ' })', c);
+      const h = run('_intv7RadarHtml(s => s)', c);
+      const a = (h.match(/aria-label="([^"]+)"/) || [, ''])[1];
+      return /90/.test(a) && /82/.test(a); })());
+}
+
+console.log('\nSC · §4.6 · «Qué ha cambiado» declara contra qué compara');
+{
+  const mkRows = (startAt) => [{ f: { window: { startAt } } }];
+  const refOf = (rows, now) => { const c = makeCtx({});
+    return run('_intv4ChangedRef(' + JSON.stringify(rows) + ', ' + String(now) + ')', c); };
+  const T = NOW2;
+  // LA MARCA DE VISITA SE RETIRA COMO REFERENCIA, y costó dos intentos. La
+  // revisión financiera tumbó las DOS direcciones posibles de esa rama: hacia un
+  // lado afirmaba una cobertura que nadie había escaneado (visita vieja, filas
+  // cortas); hacia el otro atribuía a UN día magnitudes de un mes (visita de
+  // ayer, filas de 30 días) y encima en el caso común. `savedAt` es cuándo se
+  // PINTÓ la pantalla: no es el extremo de medición de nada. La única referencia
+  // publicable es la que sale de los datos.
+  ok('SC.6.1 la referencia SALE DE LOS DATOS: la ventana más antigua de las filas',
+    (() => { const r = refOf(mkRows(T - 10 * DAY), T);
+      return r && r.kind === 'since' && r.at === T - 10 * DAY; })(),
+    JSON.stringify(refOf(mkRows(T - 10 * DAY), T)));
+  ok('SC.6.2 …y NO existe ninguna rama que pueda nombrar la marca de visita',
+    !/visit/.test(fnSrc('_intv4ChangedRef'))
+    && !/visitAt/.test(fnSrc('_intv4ChangedHtml'))
+    && DICT.es.intv4_changed_ref_visit === undefined
+    && DICT.en.intv4_changed_ref_visit === undefined);
+  ok('SC.6.3 si todo cabe en 24 h, se dice así',
+    (() => { const r = refOf(mkRows(T - 3 * HOUR), T);
+      return r && r.kind === '24h'; })());
+  ok('SC.6.4 sin ninguna ventana no se inventa referencia',
+    refOf([{ f: { window: {} } }], T) === null);
+  ok('SC.6.4b la referencia es la MÁS ANTIGUA de todas las filas, no la de la primera',
+    (() => { const r = refOf([{ f: { window: { startAt: T - 2 * DAY } } },
+                              { f: { window: { startAt: T - 34 * DAY } } }], T);
+      return r && r.kind === 'since' && r.at === T - 34 * DAY; })());
+  ok('SC.6.5 la línea se pinta, con su tipo declarado para el gate',
+    (() => { const h = render(CUENTA_B).html;
+      if (!/intv4-changed/.test(h)) return true;           // sin cambios no hay card, y es correcto
+      return /class="intv4-chg-ref" data-ref="(since|24h)"/.test(h); })(),
+    (render(CUENTA_B).html.match(/class="intv4-chg-ref"[^>]*>[^<]*</) || [''])[0]);
+  ok('SC.6.6 las dos frases publicables existen en los dos idiomas',
+    ['intv4_changed_ref_since', 'intv4_changed_ref_24h']
+      .every(k => DICT.es[k] !== undefined && DICT.en[k] !== undefined));
+}
+
+console.log('\nSC · §4.7 · un patrón sin dato no es un patrón');
+{
+  ok('SC.7.1 la liquidez frente a una necesidad declarada nombra DATO y PERIODO',
+    (() => { const c = makeCtx({});
+      const txt = run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared',
+        values: { cashPct: 6, changePp: -4.2, window: '30D' } }) + ')', c);
+      return /4,2/.test(txt) && /6%/.test(txt) && txt.indexOf(DICT.es.intv4_r_30d) !== -1; })(),
+    run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared',
+      values: { cashPct: 6, changePp: -4.2, window: '30D' } }) + ')', makeCtx({})));
+  ok('SC.7.2 …y si falta cualquiera de los tres, CALLA en vez de publicar una frase vacía',
+    (() => { const c = makeCtx({});
+      return ['cashPct', 'changePp', 'window'].every(drop => {
+        const v = { cashPct: 6, changePp: -4.2, window: '30D' }; delete v[drop];
+        return run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared', values: v }) + ')', c) === '';
+      }); })());
+  ok('SC.7.3 un descubrimiento sin evidencia nombrable no se publica',
+    (() => { const c = makeCtx({});
+      const noEv = run('_intv9DiscoveriesHtml(' + JSON.stringify({ discoveries: [
+        { id: 'x', code: 'concentration_crossed_upward', dimension: 'concentration',
+          values: { topWeightPct: 68 }, evidence: [] }] }) + ', s => s, [], [])', c);
+      const withEv = run('_intv9DiscoveriesHtml(' + JSON.stringify({ discoveries: [
+        { id: 'x', code: 'concentration_crossed_upward', dimension: 'concentration',
+          values: { topWeightPct: 68 }, evidence: ['top_position_weight'] }] }) + ', s => s, [], [])', c);
+      return noEv === '' && /intv9-disc-item/.test(withEv); })());
+}
+
+console.log('\nSC · CHECKPOINT B · el sobre del hecho certificado');
+{
+  const c = makeCtx(CUENTA_B);
+  const core = run('_aurixIntelligenceCore({})', c);
+  const byId = (core.factContract && core.factContract.byId) || {};
+  const envs = Object.keys(byId).map(k => byId[k]);
+  ok('SC.B.1 el Core publica un sobre por hecho, con su versión declarada',
+    core.factContract && core.factContract.version === 'fact-envelope-1'
+    && envs.length === core.ledger.facts.length && envs.length > 0,
+    JSON.stringify({ envs: envs.length, facts: core.ledger.facts.length }));
+  ok('SC.B.2 cada sobre declara identidad, procedencia, certificación y cobertura',
+    envs.every(e => typeof e.factId === 'string' && e.factId
+      && typeof e.semanticIdentity === 'string' && e.semanticIdentity.indexOf('|') > 0
+      && 'provenance' in e && 'certification' in e && e.coverage && 'coversNominal' in e.coverage
+      && Array.isArray(e.limitations) && e.ownerVersion === 'fact-envelope-1'),
+    JSON.stringify(envs[0] || null));
+  ok('SC.B.3 la identidad semántica es tipo + sujeto + periodo EFECTIVO + owner/versión',
+    /semanticIdentity: \[fact\.semanticKey, String\(fact\.causalRoot \|\| ''\),[\s\S]{0,180}_AURIX_FACT_CONTRACT_VERSION\]/.test(fnSrc('_aurixFactEnvelope')));
+  ok('SC.B.4 un periodo que NO cubre su nombre nominal no puede nombrarse por él',
+    (() => { const e1 = run('_aurixFactEnvelope(' + JSON.stringify({ semanticKey: 'k', id: 'k@1y',
+        window: { range: '1y', coversNominal: false, spanMs: 34 * DAY, startAt: 1, endAt: 2 } }) + ', {})', c);
+      const e2 = run('_aurixFactEnvelope(' + JSON.stringify({ semanticKey: 'k', id: 'k@1y',
+        window: { range: '1y', coversNominal: true, spanMs: 365 * DAY, startAt: 1, endAt: 2 } }) + ', {})', c);
+      return e1.effectivePeriod.namedAs === null && e1.requestedPeriod === '1y'
+        && e1.limitations.indexOf('window_shorter_than_nominal') !== -1
+        && e2.effectivePeriod.namedAs === '1y'; })());
+  ok('SC.B.5 y la COPY es un consumidor de esa decisión, no una segunda fuente',
+    /_aurixFactPeriodNamedAs\(win\)/.test(fnSrc('_intv4WindowLabel'))
+    && /_aurixFactPeriodDegraded\(win\)/.test(fnSrc('_intv4WindowLabel')));
+  // LOS DOS NULOS NO SON EL MISMO CASO, y confundirlos publicaba un periodo donde
+  // antes no había ninguno. Una ventana SIN rango no autoriza «efectivo: N días»;
+  // una ventana que no cubre su nominal, sí. Se ejerce la diferencia.
+  ok('SC.B.5b una ventana SIN rango no publica periodo; una DEGRADADA sí',
+    (() => { const c2 = makeCtx({});
+      const sinRango = run('_intv4WindowLabel(' + JSON.stringify({ spanMs: 5 * DAY }) + ')', c2);
+      const degradada = run('_intv4WindowLabel(' + JSON.stringify({ range: '1y', coversNominal: false, spanMs: 34 * DAY }) + ')', c2);
+      const normal = run('_intv4WindowLabel(' + JSON.stringify({ range: '30d', coversNominal: true, spanMs: 30 * DAY }) + ')', c2);
+      return sinRango === '' && /34/.test(degradada) && normal === DICT.es.intv4_r_30d; })(),
+    JSON.stringify([run('_intv4WindowLabel(' + JSON.stringify({ spanMs: 5 * DAY }) + ')', makeCtx({})),
+      run('_intv4WindowLabel(' + JSON.stringify({ range: '1y', coversNominal: false, spanMs: 34 * DAY }) + ')', makeCtx({}))]));
+  ok('SC.B.6 el ámbito de la cuenta viaja en el OBJETO y NUNCA al DOM',
+    (() => { const h = render(CUENTA_B).html;
+      return /scope: \{ owner:/.test(fnSrc('_aurixFactEnvelope'))
+        && !/data-owner=/.test(h) && !/data-scope=/.test(h) && !/data-user/.test(h); })());
+  ok('SC.B.7 el contrato NO es un motor: no lee ningún owner financiero ni calcula',
+    (() => { const f = fnSrc('_aurixFactEnvelope');
+      return !/_aurixInvestablePerformance|_aurixHealthSnapshot|_aurixEligibleInvestableSeries|toBase\(/.test(f)
+        && !/\* |\/ /.test(f.replace(/\/\/[^\n]*/g, '').replace(/864e5/g, '')); })());
+  ok('SC.B.8 no añade ni una lectura: se construye sobre el ledger ya recorrido',
+    /byId: ledger\.facts\.reduce/.test(fnSrc('_aurixIntelligenceCore')));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// §6 · COMPARADOR DE RENTABILIDAD
+// ════════════════════════════════════════════════════════════════════════════
+// Sandbox PROPIO y sin red. El adaptador de mercado se simula —es un owner ya
+// certificado con su propio gate, y una llamada real haría este gate lento,
+// intermitente y dependiente de que la bolsa esté abierta—, pero TODO lo que
+// este SPEC añade (alineación, primera fecha común, normalización, FX
+// histórico, diferencia en pp y los estados) se ejecuta de verdad.
+console.log('\nSC · §6 · comparador de rentabilidad');
+{
+  const cmpFns = ['_aurixCmpEnabled','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize',
+                  '_aurixCmpConvert',
+                  '_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState',
+                  '_intv14CmpSvg','_intv14ComparatorHtml','_intv4T','_intv4Num','_intccEsc','_intccDate',
+                  '_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner'];
+  const cmpAsync = ['_aurixCmpFxSeries','_aurixCmpBenchmarkSeries','_aurixComparison'];
+  const cmpConsts = ['_AURIX_CMP_FLAG_KEY','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE',
+                     '_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_INTV4_PERIMETER'];
+  function afnSrc(name) {
+    const s0 = 'async function ' + name + '('; const i = app.indexOf(s0);
+    if (i < 0) throw new Error('missing async ' + name);
+    let p = app.indexOf('(', i), pd = 0;
+    for (; p < app.length; p++) { if (app[p] === '(') pd++; else if (app[p] === ')') { pd--; if (!pd) { p++; break; } } }
+    let k = app.indexOf('{', p), d = 0;
+    for (; k < app.length; k++) { if (app[k] === '{') d++; else if (app[k] === '}') { d--; if (!d) { k++; break; } } }
+    return app.slice(i, k);
+  }
+  // Serie de mercado determinista: crece un 1 por mil por paso desde `from`.
+  const mkMarket = (from, n, step, v0, drift) => { const out = [];
+    for (let i = 0; i < n; i++) out.push({ time: from + i * step, value: v0 * (1 + drift * i) });
+    return out; };
+  function cmpCtx(o) {
+    const opt = o || {};
+    const sb = { Math, Number, JSON, Array, String, Object, Set, Map, Date, isFinite, Promise, console: { warn(){}, log(){} } };
+    vm.createContext(sb);
+    sb.__store = {};
+    sb.localStorage = { getItem: k => (Object.prototype.hasOwnProperty.call(sb.__store, k) ? sb.__store[k] : null),
+                        setItem: (k, v) => { sb.__store[k] = String(v); }, removeItem: k => { delete sb.__store[k]; } };
+    // EL COMPARADOR SE PUBLICA APAGADO. El resto de este bloque mide qué hace
+    // cuando está encendido, así que se le da el opt-in explícito — salvo
+    // cuando el caso mide precisamente la puerta (`opt.noOptIn`).
+    if (!opt.noOptIn) sb.__store['aurix_cmp_enabled_v1'] = '1';
+    sb.lang = opt.lang || 'es';
+    sb.t = k => DICT[sb.lang][k];
+    sb._escapeWorkspaceText = s0 => String(s0 == null ? '' : s0)
+      .replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    sb._aurixActiveUserId = opt.owner || 'cmp-user';
+    sb.baseCurrency = opt.base || 'USD';
+    // EL ADAPTADOR SIMULADO devuelve exactamente la forma del certificado:
+    // { series:[{time,value}], meta:{ currency, status } }.
+    sb.__calls = [];
+    sb.window = {
+      AurixChartAdapters: {
+        yahooHistoryAdapter: (args) => {
+          sb.__calls.push(args.symbol + '@' + args.range);
+          const f = (opt.feed || {})[args.symbol];
+          if (!f) return Promise.resolve({ series: [], meta: { currency: 'USD', status: 'no_history' } });
+          return Promise.resolve({ series: f.series, meta: { currency: f.currency || 'USD', status: 'ready' } });
+        },
+      },
+    };
+    if (opt.kill) sb.window.__AURIX_CMP_KILL = true;
+    vm.runInContext('var window = globalThis.window;', sb);
+    cmpConsts.forEach(n => vm.runInContext(konstSrc(n), sb));
+    cmpFns.forEach(n => vm.runInContext(fnSrc(n), sb));
+    cmpAsync.forEach(n => vm.runInContext(afnSrc(n), sb));
+    // El owner del retorno se INYECTA: su certificación es suya y tiene su
+    // propio gate; lo que aquí se mide es qué hace el comparador con él.
+    vm.runInContext('var __perf = ' + JSON.stringify(opt.perf === undefined
+      ? { valid: false, fallbackReason: 'insufficient_observations' } : opt.perf)
+      + '; function _aurixInvestablePerformance(){ return __perf; }', sb);
+    return sb;
+  }
+  const IDX = (from, n, step, drift) => ({ basis: 'flow_neutral_index', base: 100,
+    intervals: n - 1, timestamps: Array.from({ length: n }, (_, i) => from + i * step),
+    values: Array.from({ length: n }, (_, i) => 100 * (1 + drift * i)) });
+  const T_0 = Date.UTC(2026, 0, 1), D1 = 86400000;
+  const PERF_OK = { valid: true, index: IDX(T_0, 40, D1, 0.002), fallbackReason: null };
+  const FEED_OK = { '^GSPC': { series: mkMarket(T_0, 40, D1, 5000, 0.001) } };
+
+  // ── LA PUERTA, ANTES QUE NADA ────────────────────────────────────────
+  // El founder autorizó publicar el CÓDIGO del comparador, no su exposición.
+  // Sin mecanismo por cuenta en el cliente, el defecto es APAGADO y sólo un
+  // opt-in explícito lo enciende. Esto se mide, no se declara en un comentario.
+  ok('6.0a APAGADO POR DEFECTO: sin opt-in, el comparador no existe para nadie',
+    run('_aurixCmpEnabled()', cmpCtx({ noOptIn: true })) === false);
+  ok('6.0b …y un opt-in explícito lo enciende',
+    run('_aurixCmpEnabled()', cmpCtx({})) === true);
+  ok('6.0c el KILL SWITCH manda por encima del opt-in',
+    run('_aurixCmpEnabled()', cmpCtx({ kill: true })) === false);
+  ok('6.0d apagado ⇒ la superficie no se pinta y NO se publica ninguna serie',
+    (() => { const c = cmpCtx({ noOptIn: true });
+      return run('_intv14ComparatorHtml(_escapeWorkspaceText, null) === ""', c) === true
+        && run('_aurixComparisonSync("all").reason', c) === 'flag_off'; })());
+  ok('6.1 el catálogo es CERRADO y con identificadores autoritativos',
+    (() => { const c = cmpCtx({});
+      const cat = run('_AURIX_CMP_CATALOG', c);
+      const bySym = cat.reduce((a, b) => (a[b.id] = b.symbol, a), {});
+      return cat.length === 4
+        && bySym.sp500 === '^GSPC' && bySym.ndx100 === '^NDX'
+        && bySym.btc === 'BTC-USD' && bySym.gold === 'GC=F'; })(),
+    JSON.stringify(run('_AURIX_CMP_CATALOG', cmpCtx({})).map(b => b.id + '=' + b.symbol)));
+  // EL FOUNDER LO PIDIÓ POR SU NOMBRE: Nasdaq 100 es ^NDX. El registro de Market
+  // sólo tenía el Composite (^IXIC), que es OTRO índice —3.000 valores frente a
+  // 100— y su rentabilidad no es la misma.
+  ok('6.1b Nasdaq 100 es ^NDX y NUNCA el Composite ^IXIC',
+    (() => { const cat = run('_AURIX_CMP_CATALOG', cmpCtx({}));
+      return cat.some(b => b.symbol === '^NDX')
+        && !cat.some(b => b.symbol === '^IXIC')
+        && !/\^IXIC/.test(konstSrc('_AURIX_CMP_CATALOG')); })());
+  ok('6.1c el tipo de rentabilidad se DECLARA y no se mezcla (ninguno finge total return)',
+    (() => { const cat = run('_AURIX_CMP_CATALOG', cmpCtx({}));
+      return cat.every(b => b.returnType === 'price_return')
+        && typeof DICT.es.cmp_price_return === 'string'
+        && /dividendos/.test(DICT.es.cmp_price_return); })());
+  ok('6.2 SIN COMPARACIÓN el gráfico publica SÓLO la serie propia, en base 100',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      const r = run('_aurixComparisonSync("all")', c);
+      return r.state === 'ready' && r.other === null
+        && r.mine.length === 40 && r.mine[0].value === 100; })(),
+    JSON.stringify((() => { const c = cmpCtx({ perf: PERF_OK });
+      const r = run('_aurixComparisonSync("all")', c);
+      return { state: r.state, n: r.mine && r.mine.length, first: r.mine && r.mine[0].value, other: r.other }; })()));
+  okA('6.3 seleccionar un comparador añade UNA segunda serie, y ambas arrancan en 100',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, feed: FEED_OK });
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      return r.state === 'ready' && r.other && r.other.length === r.mine.length
+        && r.mine[0].value === 100 && r.other[0].value === 100
+        && r.mine[0].ts === r.other[0].ts; })());
+  okA('6.4 la diferencia va en PUNTOS PORCENTUALES, no en porcentaje entre porcentajes',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, feed: FEED_OK });
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      const mine = r.mine[r.mine.length - 1].value - 100;
+      const oth  = r.other[r.other.length - 1].value - 100;
+      return Math.abs(r.diffPp - (mine - oth)) < 0.011; })());
+  ok('6.5 UN solo comparador: elegir otro SUSTITUYE, no acumula',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      run('_intv14CmpSetState({ benchmarkId: "sp500" })', c);
+      run('_intv14CmpSetState({ benchmarkId: "btc" })', c);
+      const st = run('_intv14CmpState()', c);
+      return st.benchmarkId === 'btc' && typeof st.benchmarkId === 'string'; })());
+  ok('6.6 retirarlo devuelve el estado inicial SIN COMPARACIÓN y conserva la serie propia',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      run('_intv14CmpSetState({ benchmarkId: "sp500" })', c);
+      run('_intv14CmpSetState({ benchmarkId: null })', c);
+      const st = run('_intv14CmpState()', c);
+      const r = run('_aurixComparisonSync("all")', c);
+      return st.benchmarkId === null && r.mine.length === 40; })());
+  ok('6.7 un id inventado en el almacenamiento NO entra',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      run('_aurixIntelWriteOwned(_AURIX_CMP_STATE_KEY, { range: "all", benchmarkId: "../evil" }, {})', c);
+      return run('_intv14CmpState()', c).benchmarkId === null; })());
+  ok('6.8 …y un rango inventado tampoco',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      run('_aurixIntelWriteOwned(_AURIX_CMP_STATE_KEY, { range: "9999y", benchmarkId: null }, {})', c);
+      return _AURIX_CMP_RANGES_OK(run('_intv14CmpState()', c).range); })());
+  ok('6.9 el estado va SELLADO POR CUENTA: el comparador de A no aparece en B',
+    (() => { const a = cmpCtx({ perf: PERF_OK, owner: 'user-A' });
+      run('_intv14CmpSetState({ benchmarkId: "gold" })', a);
+      const raw = JSON.parse(a.__store[run('_AURIX_CMP_STATE_KEY', a)]);
+      const b = cmpCtx({ perf: PERF_OK, owner: 'user-B' });
+      b.__store[run('_AURIX_CMP_STATE_KEY', b)] = JSON.stringify(raw);
+      return raw.owner === 'user-A' && run('_intv14CmpState()', b).benchmarkId === null; })());
+  // ── PUERTAS FINANCIERAS ────────────────────────────────────────────────
+  okA('6.10 SIN rentabilidad certificada NO hay comparación porcentual, y se dice por qué',
+    (async () => { const c = cmpCtx({ perf: { valid: false, fallbackReason: 'window_too_short' }, feed: FEED_OK });
+      const r = await run('_aurixComparison("30d", "sp500", {})', c);
+      return r.state === 'no_return' && r.reason === 'window_too_short'
+        && r.mine === null && r.other === null; })());
+  // LA QA VISUAL ENSEÑÓ ESTE DEFECTO: el estado «sin rentabilidad» ocultaba
+  // TODOS los controles, y el periodo por defecto es TOTAL. Una cuenta con
+  // rentabilidad en 24H pero no en TOTAL se quedaba encerrada en el estado sin
+  // ninguna forma de cambiar de periodo.
+  okA('6.10c …pero el SELECTOR DE PERIODO se queda: es la salida del estado',
+    (async () => { const c = cmpCtx({ perf: { valid: false, fallbackReason: 'window_too_short' }, feed: FEED_OK });
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(r) + ')', c);
+      return /data-state="no_return"/.test(h)
+        && (h.match(/data-cmp-range="/g) || []).length === 5
+        && !/data-cmp-select/.test(h); })(),
+    'controles en el estado no_return');
+  okA('6.10b …y una serie de VALOR nunca se reinterpreta como rentabilidad',
+    (async () => { const c = cmpCtx({ perf: { valid: true, index: { basis: 'value_series', base: null,
+        timestamps: [T_0, T_0 + D1], values: [1000, 1100] } }, feed: FEED_OK });
+      const r = await run('_aurixComparison("30d", "sp500", {})', c);
+      return r.state === 'no_return'; })());
+  okA('6.11 INSUFICIENCIA no produce ceros: no hay segunda serie y la propia sobrevive',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, feed: {} });      // el oro no cotiza en 24h
+      const r = await run('_aurixComparison("24h", "gold", {})', c);
+      return r.state === 'insufficient' && r.other === null
+        && Array.isArray(r.mine) && r.mine.length === 40
+        && r.diffPp === null; })(),
+    JSON.stringify((async () => 0)) && 'ver estado');
+  okA('6.12 HISTORIA PARCIAL: se usa la PRIMERA FECHA COMÚN y se declara desde cuándo',
+    (async () => { // el benchmark empieza 20 días más tarde que la cartera
+      const c = cmpCtx({ perf: PERF_OK, feed: { '^GSPC': { series: mkMarket(T_0 + 20 * D1, 20, D1, 5000, 0.001) } } });
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      return r.state === 'ready' && r.from === T_0 + 20 * D1
+        && r.availableFrom === T_0 + 20 * D1
+        && r.mine[0].value === 100 && r.other[0].value === 100; })());
+  ok('6.13 NUNCA se interpola: un hueco del benchmark NO se rellena',
+    (() => { const c = cmpCtx({});
+      // Dos series con el mismo paso pero una a la que le faltan buckets.
+      const A = [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 101 }, { ts: T_0 + 2 * D1, value: 102 }];
+      const B = [{ ts: T_0, value: 50 }, { ts: T_0 + 2 * D1, value: 52 }];
+      const al = run('_aurixCmpAlign(' + JSON.stringify(A) + ', ' + JSON.stringify(B) + ')', c);
+      if (!al) return false;
+      // El bucket que B no tiene sencillamente NO EXISTE en la salida: no se
+      // rellena, no se arrastra y no se interpola. Y los pares emparejados caen
+      // en el MISMO bucket — que es la unidad de alineación que el §6.2
+      // autoriza («por timestamp/bucket certificado»), no el instante exacto.
+      return al.mine.length === al.other.length
+        && al.mine.length === 2
+        && al.mine.every((p, i) => Math.floor(p.ts / al.stepMs) === Math.floor(al.other[i].ts / al.stepMs))
+        // Ningún valor de B se ha inventado: los dos que salen son los dos que
+        // B tenía.
+        && al.other.length === B.length; })());
+  okA('6.14 cambiar de periodo recalcula LAS DOS series desde el mismo inicio',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, feed: FEED_OK });
+      const a = await run('_aurixComparison("all", "sp500", {})', c);
+      const b = await run('_aurixComparison("30d", "sp500", {})', c);
+      return a.mine[0].value === 100 && a.other[0].value === 100
+        && b.mine[0].value === 100 && b.other[0].value === 100
+        && a.from === b.from; })());
+  ok('6.15 la serie propia es el ÍNDICE FLOW-NEUTRAL: un flujo no la deforma',
+    (() => { const src0 = fnSrc('_aurixComparison') + fnSrc('_aurixComparisonSync');
+      return /perf\.index\.basis !== 'flow_neutral_index'/.test(src0)
+        && !/portfolioHistory|categoryHistory|investableValueBase/.test(src0); })());
+  // ── LO QUE LA REVISIÓN FINANCIERA ROMPIÓ ───────────────────────────────
+  // (1) CRÍTICO: sólo el benchmark se convertía con FX histórico. La serie
+  // propia venía de snapshots convertidos con el tipo de HOY (factor constante
+  // que se cancela al normalizar), o sea un índice en USD, contra un benchmark
+  // en EUR. Con las dos subiendo lo mismo en USD y el euro apreciándose, la
+  // card publicaba una diferencia de varios pp que NO EXISTIÓ.
+  const FXS = (from, n, step, r0, drift) => { const out = [];
+    for (let i = 0; i < n; i++) out.push({ time: from + i * step, value: r0 * (1 + drift * i) });
+    return out; };
+  okA('6.17 CRÍTICO · con base EUR se convierten LAS DOS series, no sólo el benchmark',
+    (async () => {
+      // Cartera y benchmark IDÉNTICOS en USD ⇒ en cualquier divisa la
+      // diferencia tiene que ser CERO. Si sólo se convirtiera una, saldría la
+      // deriva del euro entera.
+      const same = 0.002;
+      const c = cmpCtx({ base: 'EUR',
+        perf: { valid: true, index: IDX(T_0, 40, D1, same), fallbackReason: null },
+        feed: { '^GSPC': { series: mkMarket(T_0, 40, D1, 5000, same) },
+                'EURUSD=X': { series: FXS(T_0, 40, D1, 1.05, 0.003) } } });
+      const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', c);
+      return r.state === 'ready' && Math.abs(r.diffPp) < 0.02 && r.fxPair === 'EURUSD=X'; })(),
+    'diferencia con las dos series iguales en USD');
+  okA('6.17b …y si el FX NO se aplicara a las dos, este mismo caso daría ≠ 0',
+    (async () => {
+      // Control negativo: el benchmark se mueve distinto, así que la diferencia
+      // SÍ debe existir. Sin esto, 6.17 pasaría con un comparador roto que
+      // devolviera siempre 0.
+      const c = cmpCtx({ base: 'EUR',
+        perf: { valid: true, index: IDX(T_0, 40, D1, 0.004), fallbackReason: null },
+        feed: { '^GSPC': { series: mkMarket(T_0, 40, D1, 5000, 0.001) },
+                'EURUSD=X': { series: FXS(T_0, 40, D1, 1.05, 0.003) } } });
+      const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', c);
+      return r.state === 'ready' && Math.abs(r.diffPp) > 1; })());
+  okA('6.17c sin FX para un bucket, ese bucket se cae para las DOS (nunca se interpola)',
+    (async () => { const c = cmpCtx({ base: 'EUR',
+        perf: { valid: true, index: IDX(T_0, 40, D1, 0.002), fallbackReason: null },
+        feed: { '^GSPC': { series: mkMarket(T_0, 40, D1, 5000, 0.001) },
+                'EURUSD=X': { series: FXS(T_0, 5, D1, 1.05, 0.001) } } });   // FX sólo 5 días
+      const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', c);
+      return (r.state === 'ready' && r.mine.length === r.other.length && r.mine.length <= 5)
+        || r.state === 'insufficient'; })());
+  okA('6.17d con base USD no se pide FX en absoluto',
+    (async () => { const c = cmpCtx({ base: 'USD', perf: PERF_OK, feed: FEED_OK });
+      await run('_aurixComparison("all", "sp500", { base: "USD" })', c);
+      return c.__calls.every(x => x.indexOf('EURUSD') === -1); })(),
+    JSON.stringify(cmpCtx({}).__calls));
+  // (2) ALTO: el bucket ciego emparejaba observaciones separadas semanas.
+  ok('6.18 ALTO · la alineación es AS-OF con tolerancia derivada, no bucket ciego',
+    (() => { const c = cmpCtx({});
+      // Cartera densa (cada día) y benchmark mensual: el as-of tiene que
+      // emparejar cada barra del benchmark con el punto de cartera del MISMO
+      // día, no con el del final del mes.
+      const mine = []; for (let i = 0; i < 90; i++) mine.push({ ts: T_0 + i * D1, value: 100 + i });
+      const other = [{ ts: T_0 + 5 * D1, value: 50 }, { ts: T_0 + 35 * D1, value: 55 },
+                     { ts: T_0 + 65 * D1, value: 60 }];
+      const al = run('_aurixCmpAlign(' + JSON.stringify(mine) + ', ' + JSON.stringify(other) + ')', c);
+      if (!al) return false;
+      // Cada par tiene que caer dentro de la tolerancia, que es la resolución
+      // de la serie DENSA (un día), no la del benchmark (un mes).
+      return al.mine.length === 3 && al.toleranceMs === D1
+        && al.mine.every((p, i) => p.ts === al.other[i].ts)
+        && al.mine[0].value === 100 && al.other[0].value === 100; })(),
+    JSON.stringify((() => { const c = cmpCtx({});
+      const mine = []; for (let i = 0; i < 90; i++) mine.push({ ts: T_0 + i * D1, value: 100 + i });
+      const other = [{ ts: T_0 + 5 * D1, value: 50 }, { ts: T_0 + 35 * D1, value: 55 }, { ts: T_0 + 65 * D1, value: 60 }];
+      const al = run('_aurixCmpAlign(' + JSON.stringify(mine) + ', ' + JSON.stringify(other) + ')', c);
+      return al ? { n: al.mine.length, tol: al.toleranceMs } : null; })()));
+  ok('6.18b un ancla sin pareja DENTRO de la tolerancia se descarta, no se estira',
+    (() => { const c = cmpCtx({});
+      // La cartera tiene un hueco de 40 días justo donde cae la segunda barra.
+      const mine = [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 101 },
+                    { ts: T_0 + 80 * D1, value: 150 }, { ts: T_0 + 81 * D1, value: 151 }];
+      const other = [{ ts: T_0 + D1, value: 50 }, { ts: T_0 + 40 * D1, value: 55 },
+                     { ts: T_0 + 81 * D1, value: 60 }];
+      const al = run('_aurixCmpAlign(' + JSON.stringify(mine) + ', ' + JSON.stringify(other) + ')', c);
+      // La barra de +40d no tiene punto de cartera cercano ⇒ fuera.
+      return !!al && al.mine.length === 2
+        && al.mine.every(p => p.ts === T_0 + D1 || p.ts === T_0 + 81 * D1); })());
+  // (3) MEDIO: la diferencia se publicaba SIN SIGNO.
+  ok('6.19 MEDIO · ir por detrás y ir por delante NO se leen igual',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      const mk = (d) => ({ state: 'ready', mine: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }],
+        other: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 116 }], diffPp: d, from: T_0, to: T_0 + D1 });
+      const behind = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk(-12)) + ')', c);
+      const ahead  = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk(12)) + ')', c);
+      return behind !== ahead
+        && behind.indexOf(DICT.es.cmp_diff_behind(12)) !== -1
+        && ahead.indexOf(DICT.es.cmp_diff_ahead(12)) !== -1
+        && /data-diff-pp="-12"/.test(behind); })(),
+    'frases de dirección');
+  // (4) MEDIO: no se declaraba el FIN de la ventana comparable.
+  ok('6.20 MEDIO · se declaran los DOS extremos de la ventana comparable',
+    /out\.endsBefore = \(al\.to </.test(fnSrc('_aurixComparison'))
+    && /cmp\.endsBefore/.test(fnSrc('_intv14ComparatorHtml'))
+    && typeof DICT.es.cmp_ends === 'function' && typeof DICT.en.cmp_ends === 'function');
+  // (5) El repintado tras un re-render de la pestaña.
+  ok('6.21 tras repintar la pestaña, el comparador guardado vuelve a cargarse',
+    (() => { const s0 = fnSrc('_initIntelligenceCommandCenter');
+      const iWire = s0.indexOf('_intv14CmpRepaint = repaint;');
+      const iCall = s0.indexOf('_intv14CmpRepaint();');
+      // La llamada tiene que estar FUERA del bloque de cableado, que corre una
+      // sola vez: dentro, un repintado dejaba el selector marcado y la segunda
+      // línea desaparecida.
+      return iWire > 0 && iCall > iWire && /SE DISPARA EN CADA PINTURA/.test(s0); })());
+  ok('6.16 el comparador NO crea un segundo motor de rentabilidad',
+    (() => { const src0 = fnSrc('_aurixComparison') + fnSrc('_aurixComparisonSync')
+        + fnSrc('_aurixCmpAlign') + fnSrc('_aurixCmpBenchmarkSeries');
+      return !/_aurixTwrChain|_aurixEligibleInvestableSeries|Modified|deltaPct/.test(src0); })());
+}
+function _AURIX_CMP_RANGES_OK(r) { return ['24h','7d','30d','1y','all'].indexOf(r) !== -1; }
+
+(async () => { await drainAsserts();
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
+})();

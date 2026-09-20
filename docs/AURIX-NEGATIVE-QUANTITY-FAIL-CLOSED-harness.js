@@ -435,10 +435,16 @@ console.log('\n10 · Non-regression on the SPEC 2.8 price contracts:');
         && /return asset\.qty \* asset\.price;/.test(app)                        // …over qty × price
         && /if \(n\.valuationComplete === false\)/.test(app);                    // …and that hard-rejects the write
     })());
-  ok('10.14 no schema change and no migration added',
+  // Se mide lo que este spec protege —que nada de su dominio cambia de
+  // esquema— y no el número de ficheros del directorio, que no es suyo.
+  ok('10.14 no schema change: ninguna migración toca cantidades ni posiciones',
     (function () {
-      let m = []; try { m = fs.readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter(f => /\.sql$/.test(f)); } catch (e) { m = []; }
-      return m.length === 1;
+      const D = path.join(ROOT, 'supabase', 'migrations');
+      let m = []; try { m = fs.readdirSync(D).filter(f => /\.sql$/.test(f)); } catch (e) { m = []; }
+      // DDL, no lecturas: la migración certificada de observabilidad LEE
+      // `user_portfolios` a propósito, y leer no cambia ningún esquema.
+      const DDL = /\b(alter\s+table|create\s+table|drop\s+table|add\s+column|drop\s+column|alter\s+column)\b[^;]{0,200}\b(user_portfolios|holdings|quantity|category_history)\b/i;
+      return m.every(f => !DDL.test(fs.readFileSync(path.join(D, f), 'utf8')));
     })());
 }
 

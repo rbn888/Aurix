@@ -90,8 +90,8 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_RANK_WEIGHTS',
-  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
-  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
+  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
+  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_AURIX_CMP_FLAG_KEY','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_INTV5_TIER'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
   'assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
@@ -99,15 +99,15 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow',
   '_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger',
   '_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged',
-  '_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc',
+  '_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc',
   '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
-  '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml','_intv4ChangedHtml',
+  '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml','_intv4ChangedRef','_intv4ChangedHtml',
   '_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml','_intv4QualityHtml',
   '_intv4ReadShown','_intv4RecordShown',
   // INT.05 — restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_aurixPctNum','_aurixPctLabel','_intccPctLabel','_aurixPeakRetention','_intccHydrationPending','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixFlowCounterpartObserved','_aurixFlowRowFromLocal','_aurixCmpEnabled','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize','_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState','_intv14CmpSvg','_intv14ComparatorHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter','_intv7PendingReasonKey','_intv5MattersStories','_intv9DiscoveriesHtml','_intv4MemoryRows'];
 
 function srvRow(ts, cats){ let tot=0; for(const k in cats) tot+=cats[k];
@@ -214,10 +214,21 @@ await S('Page.addScriptToEvaluateOnNewDocument', { source:
 // ESTRUCTURA salió de la presentación por decisión de producto: republicaba lo
 // que ya dicen Salud, Radar y Factores. Su owner y sus datos siguen intactos para
 // el motor y los gates, así que esto es una retirada de superficie, no de dominio.
+// ── SUPREME CLOSURE · EL ORDEN APROBADO POR EL FOUNDER ────────────────────
+// Este probe fijaba «Radar antes que Factores» en los TRES viewports, y en móvil
+// y tablet eso lleva fallando desde que el founder aprobó el orden contrario:
+// Inteligencia → Salud → Pregunta → Factores → Explora → Radar → Lo que importa
+// → Tu evolución → Qué ha cambiado. El SPEC lo declara literalmente en su
+// apartado «BASE QUE DEBE PRESERVARSE», así que lo que estaba mal era la
+// expectativa, no la superficie. En ESCRITORIO el orden aprobado SÍ es
+// Radar → Factores → Explora, y ahí el probe ya medía lo correcto.
+// TABLET queda FIJADO con la jerarquía de móvil, que es la que la hoja de
+// estilos le aplica hoy (`≤1023px`) y la que el SPEC pide «fijar sin alterar».
+const MOBILE_HIERARCHY = ['intcc-m-hero','intcc-m-health','intv12-qcard','intcc-drivers','intcc-explore','intcc-radar','intv14-cmp','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'];
 const EXPECTED_ORDER = {
-  mobile:  ['intcc-m-hero','intcc-m-health','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
-  tablet:  ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
-  desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
+  mobile:  MOBILE_HIERARCHY,
+  tablet:  ['intcc-hero','intv12-qcard'].concat(MOBILE_HIERARCHY.slice(3)),
+  desktop: ['intcc-hero','intv12-qcard','intcc-radar','intcc-drivers','intcc-explore','intv14-cmp','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
 };
 // INT.07 §14 — a row must behave like a ROW: every card in it shares one bottom
 // baseline. The founder photographed the opposite (a broken mosaic with black
@@ -253,7 +264,7 @@ const MEASURE = `(function(){
   // flex-direction) cannot pass a DOM-order check.
   out.order = Array.prototype.slice.call(host.querySelectorAll('section'))
     .filter(vis)
-    .map(function(s){ return { k: (s.className.match(/intcc-m-hero|intcc-m-health|intcc-hero|intcc-radar|intcc-drivers|intcc-explore|intcc-watch|intcc-timeline|intv5-structure|intv4-changed|intv4-discovery/) || ['?'])[0],
+    .map(function(s){ return { k: (s.className.match(/intcc-m-hero|intcc-m-health|intv12-qcard|intv14-cmp|intcc-hero|intcc-radar|intcc-drivers|intcc-explore|intcc-watch|intcc-timeline|intv5-structure|intv4-changed|intv4-discovery/) || ['?'])[0],
                                y: Math.round(s.getBoundingClientRect().top + host.scrollTop) }; })
     .sort(function(a,b){ return a.y - b.y; })
     .map(function(o){ return o.k; });
@@ -393,13 +404,51 @@ const MEASURE = `(function(){
     .map(function(e){ return (e.textContent||'').trim(); });
   out.radarMeasured = out.radarVals.filter(function(v){ return /^\\d+%$/.test(v); }).length;
   out.radarPending  = out.radarVals.filter(function(v){ return !/^\\d+%$/.test(v); });
-  out.radarDimmed = host.querySelectorAll('.intcc-radar-axis.is-unavailable').length;
+  // SUPREME CLOSURE §5 — la atenuación se retira de la GEOMETRÍA y vive en el
+  // TEXTO. Se mide donde ahora está (etiqueta y valor) y, además, que ninguna
+  // radial conserve estado: «mismo grosor y terminaciones en todas las líneas».
+  out.radarDimmed = host.querySelectorAll('.intcc-radar-label.is-unavailable').length;
+  out.radarDimmedVals = host.querySelectorAll('.intcc-radar-val.is-unavailable').length;
+  out.radarDimmedAxes = host.querySelectorAll('.intcc-radar-axis.is-unavailable').length;
+  // LOS CINCO MARCADORES, MEDIDOS DE VERDAD. No se comprueba una clase: se lee el
+  // estilo COMPUTADO de cada uno y se exige que los cinco coincidan en forma,
+  // diámetro, relleno, borde, opacidad y brillo. Una clase puede desaparecer y el
+  // hueco volver por otra vía; esto no.
+  out.radarDotStyles = (function(){
+    var seen = {}, n = 0;
+    Array.prototype.forEach.call(host.querySelectorAll('.intcc-radar-dot'), function(d){
+      var cs = getComputedStyle(d), b = d.getBoundingClientRect();
+      var key = [cs.fill, cs.stroke, cs.strokeWidth, cs.opacity, cs.filter,
+                 Math.round(b.width * 10), Math.round(b.height * 10)].join('|');
+      seen[key] = (seen[key] || 0) + 1; n++;
+    });
+    return { total: n, distinct: Object.keys(seen).length,
+             sample: Object.keys(seen)[0] || null };
+  })();
+  out.radarEdgeStyles = (function(){
+    var seen = {}, n = 0;
+    Array.prototype.forEach.call(host.querySelectorAll('.intcc-radar-edge'), function(e){
+      var cs = getComputedStyle(e);
+      var key = [cs.stroke, cs.strokeWidth, cs.strokeDasharray, cs.strokeLinecap,
+                 cs.opacity, cs.filter].join('|');
+      seen[key] = (seen[key] || 0) + 1; n++;
+    });
+    return { total: n, distinct: Object.keys(seen).length,
+             dashed: Object.keys(seen).some(function(k){ return /\d/.test(k.split('|')[2] || ''); }) };
+  })();
+  out.radarA11y = (function(){ var svg = host.querySelector('.intcc-radar-svg');
+    if (!svg) return null; var a = svg.getAttribute('aria-label') || '';
+    return { axes: svg.getAttribute('data-svg-a11y-axes'),
+             noData: (a.match(/sin datos|no data/gi) || []).length,
+             len: a.length }; })();
+  out.radarUnknownAvail = host.querySelectorAll('.intcc-radar-dot[data-availability="unknown"]').length;
+  out.radarMeasuredAvail = host.querySelectorAll('.intcc-radar-dot[data-availability="measured"]').length;
   // Un eje certificado publica CIFRA (porcentaje o conteo); uno sin certificar
   // publica la palabra. Se cuentan por separado porque son claims distintos.
   out.radarFigures = out.radarVals.filter(function(v){
     return /^\\d+%$/.test(v) || /^\\d+(?:[.,]\\d+)?\\s*\\/\\s*\\d+$/.test(v); }).length;
   out.radarNoData = out.radarVals.filter(function(v){ return /sin datos|no data/i.test(v); }).length;
-  out.radarDots   = host.querySelectorAll('.intcc-radar-dot:not(.is-unknown)').length;
+  out.radarDots   = host.querySelectorAll('.intcc-radar-dot').length;
   out.radarUnknownDots   = host.querySelectorAll('.intcc-radar-dot.is-unknown').length;
   out.radarUnknownSpokes = host.querySelectorAll('.intcc-radar-spoke.is-unknown').length;
   out.radarArea   = host.querySelectorAll('.intcc-radar-area').length;
@@ -414,8 +463,8 @@ const MEASURE = `(function(){
     var svg = host.querySelector('.intcc-radar-svg'); if (!svg) return null;
     var cx = 110, cy = 106, R = 76;
     var r = function(el){ return Math.hypot(+el.getAttribute('cx') - cx, +el.getAttribute('cy') - cy); };
-    var filled = [].map.call(svg.querySelectorAll('.intcc-radar-dot:not(.is-unknown)'), r);
-    var hollow = [].map.call(svg.querySelectorAll('.intcc-radar-dot.is-unknown'), r);
+    var filled = [].map.call(svg.querySelectorAll('.intcc-radar-dot[data-availability="measured"]'), r);
+    var hollow = [].map.call(svg.querySelectorAll('.intcc-radar-dot[data-availability="unknown"]'), r);
     return { filled: filled, hollow: hollow, R: R,
       // ningún marcador en el centro ni en el vértice, y disponibilidad SIEMPRE
       // más lejos que cualquier valor certificado
@@ -541,26 +590,55 @@ for (const vp of VIEWPORTS) {
     JSON.stringify(m.radarLabels));
   // Un eje certificado lleva CIFRA: un porcentaje o un conteo («1,3 / 7»). Sólo
   // los no certificados dicen «sin datos», y son exactamente los atenuados.
-  check(vp, 'the uncertified axes say "sin datos" and are visibly attenuated',
+  // SUPREME CLOSURE §5 — la limitación se declara en el TEXTO, no en la figura.
+  check(vp, 'the uncertified axes say "sin datos", attenuated IN THEIR LABEL',
     m.radarVals.length === 5 && m.radarFigures === 3
-    && m.radarNoData === 2 && m.radarDimmed === 2,
-    JSON.stringify({ vals: m.radarVals, figures: m.radarFigures, dimmed: m.radarDimmed }));
+    && m.radarNoData === 2 && m.radarDimmed === 2 && m.radarDimmedVals === 2
+    && m.radarDimmedAxes === 0,
+    JSON.stringify({ vals: m.radarVals, figures: m.radarFigures,
+      labels: m.radarDimmed, vals2: m.radarDimmedVals, axes: m.radarDimmedAxes }));
+  check(vp, 'the five axes are enumerated in the accessible description',
+    !!m.radarA11y && m.radarA11y.axes === '5' && m.radarA11y.noData === 2 && m.radarA11y.len > 40,
+    JSON.stringify(m.radarA11y));
   // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ─────────────────────────
   // Esta comprobación exigía `radarArea === 1 && radarAreaPts === 3`, es decir un
   // POLÍGONO CERRADO sobre los tres ejes medidos. Con `stability` y `growth` sin
   // certificar —y están intercalados— los lados de esa figura ATRAVIESAN los ejes
   // desconocidos, que es lo que §8 prohíbe por su nombre. Fosilizaba una limitación
   // como contrato; se sustituye por los invariantes que §8 sí pide.
-  check(vp, 'five availability markers, three certified vertices (unknown never a value)',
-    m.radarArea === 0 && m.radarDots === 3 && m.radarUnknownDots === 2
-    && m.radarUnknownSpokes === 2 && m.radarOpen === '1' && m.radarEdges === 1,
+  // ── SUPREME CLOSURE §5 · LA FIGURA ES UNIFORME, MEDIDA EN PÍXELES ────────
+  // §8/§11 metieron el estado dentro de la figura (marcador hueco, tramo
+  // neutral) y este probe lo fosilizó exigiendo `hollow === 2`. La QA del
+  // founder sobre la pantalla real leyó ese hueco como un defecto de pintado, y
+  // el §5 retira las dos señales gráficas. Lo que NO se retira —y es lo que este
+  // probe ahora mide— es el invariante financiero: sin los cinco certificados no
+  // hay ÁREA, la figura se declara abierta y sólo puntúan los medidos.
+  check(vp, 'five markers, five segments, zero area (unknown never a value)',
+    m.radarArea === 0 && m.radarDots === 5 && m.radarEdges === 5
+    && m.radarOpen === '1'
+    && m.radarUnknownAvail === 2 && m.radarMeasuredAvail === 3,
     JSON.stringify({ area: m.radarArea, open: m.radarOpen, edges: m.radarEdges,
-      filled: m.radarDots, hollow: m.radarUnknownDots, spokes: m.radarUnknownSpokes }));
+      dots: m.radarDots, unknown: m.radarUnknownAvail, measured: m.radarMeasuredAvail }));
+  check(vp, 'the five markers are pixel-identical (shape, size, fill, border, opacity, glow)',
+    !!m.radarDotStyles && m.radarDotStyles.total === 5 && m.radarDotStyles.distinct === 1
+    && !/none/.test(String(m.radarDotStyles.sample || '').split('|')[0]),
+    JSON.stringify(m.radarDotStyles));
+  check(vp, 'the five segments are pixel-identical, and none is dashed',
+    !!m.radarEdgeStyles && m.radarEdgeStyles.total === 5
+    && m.radarEdgeStyles.distinct === 1 && m.radarEdgeStyles.dashed === false,
+    JSON.stringify(m.radarEdgeStyles));
   check(vp, 'no marker sits at the centre or on the outer vertex (uniform graphic margin)',
     !!m.radarRadii && m.radarRadii.noneAtCentre === true && m.radarRadii.noneAtVertex === true,
     JSON.stringify(m.radarRadii));
-  check(vp, 'the availability marker lives OUTSIDE the series band (unknown is not a high value)',
-    !!m.radarRadii && m.radarRadii.hollowOutside === true,
+  // §11 ya había bajado el marcador desconocido al límite INTERIOR de referencia
+  // (pegado al marco se leía como «máximo»), así que «fuera de la banda» dejó de
+  // ser el contrato. Lo que se mide ahora es lo que el §5 autoriza: una posición
+  // interior NEUTRAL, DETERMINISTA y compartida por todos los desconocidos, que
+  // sólo existe para cerrar la figura.
+  check(vp, 'the unknown marker sits at the shared, deterministic interior reference',
+    !!m.radarRadii && m.radarRadii.hollow.length === 2
+    && Math.abs(m.radarRadii.hollow[0] - m.radarRadii.hollow[1]) < 0.5
+    && m.radarRadii.hollow.every(function(v){ return v < Math.max.apply(null, m.radarRadii.filled) + 0.5; }),
     JSON.stringify(m.radarRadii && { filled: m.radarRadii.filled, hollow: m.radarRadii.hollow }));
   check(vp, 'no reserved column is left empty where a module fail-closed',
     m.emptyGridGap === false, 'gapPx=' + m.gapPx);
@@ -580,7 +658,12 @@ for (const vp of VIEWPORTS) {
   check(vp, 'the leading conclusion is larger than its explanation',
     m.headFs != null && m.whyFs != null && m.headFs > m.whyFs, m.headFs + ' vs ' + m.whyFs);
   check(vp, 'cockpit hierarchy: ' + EXPECTED_ORDER[vp.name].join(' → '),
-    JSON.stringify(m.order) === JSON.stringify(EXPECTED_ORDER[vp.name]),
+    // La card de pregunta es CONDICIONAL por contrato (sin pregunta no se pinta),
+    // así que se compara contra la jerarquía SIN ella cuando no está presente.
+    JSON.stringify(m.order) === JSON.stringify(
+      (m.order || []).indexOf('intv12-qcard') === -1
+        ? EXPECTED_ORDER[vp.name].filter(function(k){ return k !== 'intv12-qcard'; })
+        : EXPECTED_ORDER[vp.name]),
     JSON.stringify(m.order));
   check(vp, 'no font below 11px', m.tinyFonts.length === 0, JSON.stringify(m.tinyFonts));
   if (vp.mobile) check(vp, 'tap targets ≥ 44px', m.tapSmall.length === 0, JSON.stringify(m.tapSmall));

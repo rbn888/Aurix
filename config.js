@@ -8,3 +8,11 @@ const SUPABASE_ANON_KEY = 'sb_publishable_wlZsjnPGXay9jsRqcXA08Q_bVhmI7sU';
 // are co-hosted on the custom domain, set this to '' so the app calls a
 // same-origin /api (e.g. https://app.aurixsystem.io/api) with no CORS.
 window.AURIX_API_BASE = 'https://isa-portfolio-ten.vercel.app';
+
+// ── SPEC SUPREME CLOSURE §7 · ENDPOINT DEL CHAT ─────────────────────────────
+// VACÍO A PROPÓSITO. La Edge Function `aurix-chat` está construida pero NO
+// desplegada, y mientras esta cadena esté vacía la esfera NO promete
+// conversación: sin affordance, sin panel y sin una sola petición. Es el gate
+// del §7 hecho configuración en vez de código.
+// Cuando el founder despliegue la función, aquí va su URL https:// y nada más.
+window.AURIX_CHAT_URL = '';

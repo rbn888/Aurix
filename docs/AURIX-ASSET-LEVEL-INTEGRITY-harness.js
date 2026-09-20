@@ -479,10 +479,18 @@ console.log('\n19–23 · Chart, Performance, Reader, Preview, User Health:');
     && /portfolio_snapshot_user_health_upsert/.test(ts));
   ok('23.2 the observability flush still runs AFTER every financial write',
     ts.indexOf("admin.from('portfolio_snapshots').insert(") < ts.indexOf('// ── Per-user observability flush'));
-  ok('23.3 no schema change is required by this SPEC — one migration, unchanged',
+  // «UNA migración» convertía en contrato de ESTE spec el recuento del
+  // directorio entero: otro trabajo con su propia migración lo ponía en rojo
+  // sin haber tocado nada suyo. Lo que este spec garantiza es que NINGUNA
+  // migración toca lo que él certifica.
+  ok('23.3 no schema change is required by this SPEC — ninguna migración toca sus tablas',
     (function () {
-      let m = []; try { m = fs.readdirSync(path.join(ROOT, 'supabase', 'migrations')).filter(f => /\.sql$/.test(f)); } catch (e) { m = []; }
-      return m.length === 1;
+      const D = path.join(ROOT, 'supabase', 'migrations');
+      let m = []; try { m = fs.readdirSync(D).filter(f => /\.sql$/.test(f)); } catch (e) { m = []; }
+      // DDL, no lecturas: la migración certificada de observabilidad LEE
+      // `user_portfolios` a propósito, y leer no cambia ningún esquema.
+      const DDL = /\b(alter\s+table|create\s+table|drop\s+table|add\s+column|drop\s+column|alter\s+column)\b[^;]{0,200}\b(user_portfolios|holdings|quantity|category_history)\b/i;
+      return m.every(f => !DDL.test(fs.readFileSync(path.join(D, f), 'utf8')));
     })());
   ok('23.4 the snapshot insert gained no new column and lost none (exactly 12)',
     (function () {

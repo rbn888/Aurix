@@ -132,10 +132,10 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
-  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
+  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -143,11 +143,11 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixFlowCounterpartObserved','_aurixInvestablePerformance','_aurixCatHistRows',
   '_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow','_aurixCatExposureDelta',
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
-  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixIntelligenceCore',
+  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore',
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
@@ -411,11 +411,17 @@ console.log('\n4 · Una raíz, una lectura primaria — con trabajos distintos p
 console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
 {
   const h = render(MOVED).html;
-  ok('5.1 un eje sin dato NO tiene vértice (desconocido no puede parecer cero)',
+  // SUPREME CLOSURE §5 — el marcador deja de ser el canal. Los cinco son
+  // idénticos; lo que no puede pasar es que un eje sin dato PUNTÚE. Se mide eso
+  // directamente: `data-availability` por eje, y el recuento de desconocidos
+  // cuadra con `data-unavailable`.
+  ok('5.1 un eje sin dato NO puntúa (desconocido no puede parecer cero)',
     (() => { const unavail = (num(h, /data-unavailable="([^"]*)"/) || '').split(',').filter(Boolean);
       const dots = count(h, /class="intcc-radar-dot"/g);
       const measured = Number(num(h, /data-measured="(\d+)"/));
-      return dots === measured && unavail.length === 5 - measured; })(),
+      return dots === 5 && count(h, /data-availability="measured"/g) === measured
+        && count(h, /data-availability="unknown"/g) === unavail.length
+        && unavail.length === 5 - measured; })(),
     JSON.stringify({ measured: num(h, /data-measured="(\d+)"/), dots: count(h, /class="intcc-radar-dot"/g) }));
   // RE-DECIDIDO (§8): el margen ya no es sólo inferior. La banda de la serie tiene
   // margen a los DOS extremos —antes un 100 certificado caía exactamente en el
@@ -889,11 +895,10 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   ok('10.19 cinco ejes, cinco etiquetas y cinco marcadores de disponibilidad',
     svg(/data-svg-axes="(\d+)"/) === '5'
     && count(rr, /class="intcc-radar-label[ "]/g) === 5
-    && (count(rr, /class="intcc-radar-dot"/g) + count(rr, /class="intcc-radar-dot is-unknown"/g)) === 5,
+    && count(rr, /class="intcc-radar-dot"/g) === 5,
     JSON.stringify({ axes: svg(/data-svg-axes="(\d+)"/),
       labels: count(rr, /class="intcc-radar-label[ "]/g),
-      filled: count(rr, /class="intcc-radar-dot"/g),
-      hollow: count(rr, /class="intcc-radar-dot is-unknown"/g) }));
+      dots: count(rr, /class="intcc-radar-dot"/g) }));
   // RE-DECIDIDO (§8): «no entran en el polígono» se medía contra un polígono
   // CERRADO que §8 prohíbe cuando hay huecos. El invariante financiero es el
   // mismo y se mide sobre el trazo abierto: los desconocidos no participan, no
@@ -901,32 +906,36 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   ok('10.20 tres certificados y dos DESCONOCIDOS, y los desconocidos no entran en la serie',
     (() => { const measured = Number(svg(/data-svg-measured="(\d+)"/));
       const unknown = Number(svg(/data-svg-unknown="(\d+)"/));
-      const unkXY = (rr.match(/class="intcc-radar-dot is-unknown" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g) || [])
-        .map(m => (m.match(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/) || []).slice(1).join(','));
-      const edges = rr.match(/class="intcc-radar-edge"[^>]*>/g) || [];
+      // §5: los desconocidos SÍ reciben coordenada (la posición interior neutral
+      // que cierra la figura) y siguen sin puntuar y sin rellenar. Lo que se
+      // verifica es el invariante financiero, no la ausencia de un píxel: no hay
+      // ÁREA, la figura está declarada abierta, y el conteo de medidos es el que
+      // el motor certificó — nunca cinco.
       return measured === 3 && unknown === 2
         && !/intcc-radar-area/.test(rr) && svg(/data-svg-open="(\d)"/) === '1'
-        && count(rr, /class="intcc-radar-dot"/g) === 3
-        && count(rr, /class="intcc-radar-dot is-unknown"/g) === 2
-        // ninguna coordenada de un marcador desconocido aparece en un segmento
-        && unkXY.every(xy => edges.every(e => e.indexOf(xy.split(',')[0]) === -1
-                                           || e.indexOf(xy.split(',')[1]) === -1)); })(),
+        && count(rr, /class="intcc-radar-dot"/g) === 5
+        && count(rr, /data-availability="measured"/g) === 3
+        && count(rr, /data-availability="unknown"/g) === 2; })(),
     JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
   // Las tres señales que distinguen «no medido» de «medido en cero», y ninguna es
   // la coordenada: marcador HUECO (`fill: none`), su tramo de trayectoria en tono
   // NEUTRAL —sólido, no partido: el SPEC de cierre re-decidió la discontinua
   // porque hacía parecer roto el gráfico entero— y la palabra «sin datos» bajo la
   // etiqueta (10.22). La radial al centro se retiró: el centro no es un dato.
-  ok('10.21 un eje DESCONOCIDO se distingue por relleno, tono y texto, no por su radio',
-    /class="intcc-radar-dot is-unknown"[^>]*data-availability="unknown"/.test(rr)
-    && /class="intcc-radar-edge is-unknown"/.test(rr)
+  ok('10.21 un eje DESCONOCIDO se distingue por TEXTO, nunca por la figura',
+    /data-availability="unknown"/.test(rr)
+    && !/is-unknown/.test(rr)
     && !/intcc-radar-spoke/.test(rr)
     // El ámbito es el SVG DEL RADAR: `rr` es la pintura completa y el anillo de
     // Salud emite su propio `stroke-dasharray` como atributo.
     && !/stroke-dasharray/.test((rr.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0])
-    && /\.intcc-radar-dot\.is-unknown\s*\{[^}]*fill:\s*none/.test(css)
-    && /\.intcc-radar-edge\.is-unknown\s*\{[^}]*stroke:\s*rgba\(138,166,214/.test(css),
-    JSON.stringify((rr.match(/class="intcc-radar-dot is-unknown"[^>]*/g) || []).slice(0, 1)));
+    // El CSS no puede conservar NINGUNA vía de reintroducir el hueco.
+    && !/intcc-radar-dot\.is-unknown/.test(css)
+    && !/intcc-radar-edge\.is-unknown/.test(css)
+    // …y el canal que sustituye al relleno existe y enumera los cinco.
+    && /data-svg-a11y-axes="5"/.test(rr)
+    && (((rr.match(/aria-label="([^"]+)"/g) || []).join(' ').match(/sin datos/g) || []).length === 2),
+    JSON.stringify((rr.match(/aria-label="[^"]*sin datos[^"]*"/g) || []).slice(0, 1)));
   ok('10.22 …dice «sin datos» y su etiqueta está atenuada',
     count(rr, /class="intcc-radar-val is-unavailable"/g) === 2
     && count(rr, /class="intcc-radar-label is-unavailable"/g) === 2
@@ -978,8 +987,14 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
       const at = (now, owner) => JSON.stringify(run('_intv4ExploreRotation('
         + JSON.stringify(ids) + ', ' + now + ', ' + JSON.stringify(owner) + ')', c));
       const day0 = 1757000000000;
+      // SUPREME CLOSURE · §4.3 — la cadencia deja de ser diaria: «como máximo una
+      // pregunta por semana». Lo que esta aserción mide sigue siendo lo mismo
+      // (estable dentro del periodo, distinto entre cuentas); lo que cambia es
+      // que el periodo ahora es la SEMANA, así que cuatro días ya no mueven nada
+      // y eso es el contrato, no un fallo.
       return at(day0, 'u1') === at(day0 + 3600e3, 'u1')     // misma jornada ⇒ mismo conjunto
-        && at(day0, 'u1') !== at(day0 + 4 * 864e5, 'u1')    // otro día ⇒ rota la posición diaria
+        && at(day0, 'u1') === at(day0 + 4 * 864e5, 'u1')    // mismos 7 días ⇒ NADA se mueve
+        && at(day0, 'u1') !== at(day0 + 28 * 864e5, 'u1')   // un ciclo completo ⇒ rota
         && at(day0, 'u1') !== at(day0, 'u2'); })());        // otra cuenta ⇒ otro conjunto
   ok('10.31 …nunca repite concepto y respeta el tope de cuatro',
     (() => { const c = makeCtx(APPLE);

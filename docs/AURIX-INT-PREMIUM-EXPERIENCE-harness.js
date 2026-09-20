@@ -73,7 +73,7 @@ function extractDict(langIdx) {
     // A2 — el primer eje ya no se llama «Diversificación». Sin esta clave el
     // renderer produce una etiqueta VACÍA y el pentágono parece de cuatro ejes.
     'intcc_dim_breadth',
-    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
+    'intv7_axis_unavailable','intv7_axis_span_days','intv7_radar_legend','intv7_radar_pending',
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
     // y 13B.9 dejaría de ver los nombres.
@@ -128,10 +128,10 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
-  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_CADENCE','_INTV4_PERIMETER','_INTV5_TIER'];
+  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -139,11 +139,11 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixFlowCounterpartObserved','_aurixInvestablePerformance','_aurixCatHistRows',
   '_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow','_aurixCatExposureDelta',
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
-  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixIntelligenceCore',
+  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore',
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
@@ -434,7 +434,11 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   // CON SU UNIDAD y uno sin certificar lleve una PALABRA.
   ok('3.5g a certified axis carries its unit; an uncertified one carries a WORD, not a figure',
     (() => { const vals = attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
-      const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v));
+      // RESIDUAL B — un eje medido sobre una serie RECORTADA publica además su
+      // cobertura («82 % · 90 d medidos»), que sigue siendo una cifra con su
+      // unidad y no un porcentaje pelado. Es una declaración MÁS, no menos.
+      const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v)
+        || /^\d+%\s·\s.+$/.test(v));
       const pending  = vals.filter(v => v === 'sin datos');
       return vals.length === 5 && measured.length === 3 && pending.length === 2; })(),
     JSON.stringify(attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
@@ -803,7 +807,8 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
              measured: (h.match(/data-measured="(\d+)"/) || [, null])[1],
              pending: (h.match(/data-unavailable="([^"]*)"/) || [, null])[1],
              dots: (h.match(/class="intcc-radar-dot"/g) || []).length,
-             dimAxes: (h.match(/class="intcc-radar-axis is-unavailable"/g) || []).length,
+             dimAxes: (h.match(/class="intcc-radar-label is-unavailable"/g) || []).length,
+             unknownDots: (h.match(/data-availability="unknown"/g) || []).length,
              pts: pts ? pts.split(/\s+/) : [],
              spokes: (h.match(/class="intcc-radar-spoke"/g) || []).length,
              ctx: rr.ctx,
@@ -837,13 +842,22 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   // prohíbe literalmente. Fosilizaban una limitación como contrato; se sustituyen
   // por el invariante que §8 pide, conservando lo que de verdad protegían: un eje
   // no certificado NO recibe vértice de serie y no se arrastra al centro.
-  ok('13B.6 an uncertified axis gets NO vertex — it is not dragged to the centre',
-    founder.dots === 3 && founder.pts.length === 0
-    && !/class="intcc-radar-dot" cx="110.0" cy="106.0"/.test(founder.html),
-    JSON.stringify({ pts: founder.pts, dots: founder.dots }));
-  ok('13B.7 exactly the certified dimensions carry a vertex, and the figure is OPEN',
-    [five, founder, one].every(x => x.dots === 3 && x.pts.length === 0
-      && /data-svg-open="1"/.test(x.html)));
+  // SUPREME CLOSURE §5 RE-DECIDE ESTO OTRA VEZ, y en la dirección contraria a
+  // §8/§11. Lo que protegían —«un eje sin certificar no afirma un valor»— NO se
+  // pierde y no puede perderse: sigue sin entrar en el ÁREA (`data-svg-open="1"`),
+  // sigue sin puntuar y sigue rotulado «sin datos». Lo que cambia es que su
+  // MARCADOR deja de ser una señal visual distinta, porque el §5 exige cinco
+  // puntos idénticos y la QA real leyó el hueco como un defecto de pintado.
+  // El discriminador pasa a ser `data-availability`, que es texto para el gate y
+  // para el lector de pantalla, y cero píxeles para el ojo.
+  ok('13B.6 un eje sin certificar NO entra en el área ni se arrastra al centro',
+    founder.dots === 5 && founder.pts.length === 0
+    && founder.unknownDots === 2
+    && !/cx="110.0" cy="106.0"/.test(founder.html),
+    JSON.stringify({ pts: founder.pts, dots: founder.dots, unknown: founder.unknownDots }));
+  ok('13B.7 exactamente las dimensiones certificadas puntúan, y la figura NO se rellena',
+    [five, founder, one].every(x => x.dots === 5 && x.unknownDots === 2 && x.pts.length === 0
+      && /data-svg-open="1"/.test(x.html) && /data-svg-measured="3"/.test(x.html)));
   // ── RE-DECIDIDO POR §11, Y LA GARANTÍA SE MANTIENE POR OTRA VÍA ──────────
   // Este assert fosilizaba «un solo segmento» como contrato, y era la causa
   // visual del defecto que el founder reportó: con dos ejes sin datos el radar
@@ -859,13 +873,14 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   // Pasa a sólido NEUTRAL (grupo propio `is-neutral`, color apagado, sin glow), así
   // que la trayectoria de los cinco ejes se sigue de un vistazo y sigue sin poder
   // leerse como una medición certificada. El relleno sigue exigiendo los cinco.
-  ok('13B.7c la figura recorre los CINCO ejes y el tramo desconocido va sólido NEUTRAL',
+  ok('13B.7c la figura recorre los CINCO ejes con CINCO segmentos idénticos',
     [five, founder, one].every(x => /data-svg-edges="5"/.test(x.html))
     // Tres medidos intercalados ⇒ los cuatro tramos que tocan `stability` o
     // `growth` son neutrales, y el par adyacente 4↔0 es el único medido.
     && [five, founder, one].every(x => /data-svg-neutral="4"/.test(x.html))
     && [five, founder, one].every(x =>
-         (x.html.match(/class="intcc-radar-edge is-unknown"/g) || []).length === 4)
+         (x.html.match(/class="intcc-radar-edge"/g) || []).length === 5)
+    && [five, founder, one].every(x => !/is-unknown/.test(x.html))
     && [five, founder, one].every(x =>
          !/stroke-dasharray/.test((x.html.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0]))
     && [five, founder, one].every(x => !/intcc-radar-area/.test(x.html)),
@@ -883,9 +898,14 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.7c the drawing order is FROZEN, not derived from what is certified today',
     /_INTV7_RADAR_DIMS = Object\.freeze\(\[/.test(app)
     && !/unavailable[\s\S]{0,80}sort|sort[\s\S]{0,80}owner/.test(fnSrc('_intv7RadarAxes')));
-  ok('13B.8 the uncertified axes are visually attenuated, and only those two',
+  // §5 — LA ATENUACIÓN SE QUEDA EN LA ETIQUETA, NO EN LA FIGURA. La radial y el
+  // marcador son idénticos para los cinco; lo que distingue al eje sin datos es
+  // su rótulo y la enumeración accesible.
+  ok('13B.8 los ejes sin certificar se atenúan SÓLO en su etiqueta, y sólo esos dos',
     [five, founder, one].every(x => x.dimAxes === 2
-      && (x.html.match(/class="intcc-radar-label is-unavailable"/g) || []).length === 2));
+      && (x.html.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 2
+      && (x.html.match(/class="intcc-radar-axis"/g) || []).length === 5
+      && !/intcc-radar-axis is-unavailable/.test(x.html)));
   // RE-DECIDIDO · HERO FINALIZATION: el founder retiró «Qué mide cada eje». Lo que
   // esta aserción protege —que un eje pendiente NO se quede en silencio— sigue
   // siendo cierto y de forma más directa: su nombre y la marca «sin datos» están
@@ -917,8 +937,9 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
         && vals.length === 5 && vals.filter(v => v.trim() === 'sin datos').length === 4
         && !/intcc-radar-area/.test(h)
         && !/intcc-radar-spoke/.test(h)
-        && (h.match(/class="intcc-radar-dot"[^>]*/g) || []).length === 1
-        && (h.match(/class="intcc-radar-dot is-unknown"[^>]*/g) || []).length === 4; })(),
+        && (h.match(/class="intcc-radar-dot"[^>]*/g) || []).length === 5
+        && (h.match(/data-availability="measured"/g) || []).length === 1
+        && (h.match(/data-availability="unknown"/g) || []).length === 4; })(),
     run('_intv7RadarHtml(s => s)', makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }))));
   // A1/A2 · RE-DECIDIDO. El eje ya NO lee `_aurixEffectiveDiversification`: leerlo
   // era publicar la MISMA magnitud que el anillo de Salud con otra normalización
@@ -1127,14 +1148,19 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
   ok('15.6 un eje medido publica su cifra, y uno sin medir su marca de ausencia',
     /intcc-radar-val/.test(dipped.html) && !/intv7-radar-mean/.test(dipped.html)
     && /sin datos/.test(render(SHORT).html));
-  ok('15.7 el eje nuevo respeta el contrato: porcentaje en rango y sin vértice si no está medido',
+  ok('15.7 el eje nuevo respeta el contrato: porcentaje en rango y SIN PUNTUAR si no está medido',
     (() => { const vals = attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
       // Un eje certificado lleva CIFRA CON SU UNIDAD: porcentaje, o conteo con su
       // taxonomía cuando ningún 0-100 es defensible para esa magnitud.
-      const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v));
+      // RESIDUAL B — un eje medido sobre una serie RECORTADA publica además su
+      // cobertura («82 % · 90 d medidos»): sigue siendo cifra con unidad, y es
+      // una declaración MÁS, no menos.
+      const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v)
+        || /^\d+%\s·\s.+$/.test(v));
       return vals.length === 5 && measured.length === 4
         && vals.filter(v => v === 'sin datos').length === 1
-        && (dipped.html.match(/class="intcc-radar-dot"/g) || []).length === 4; })(),
+        && (dipped.html.match(/class="intcc-radar-dot"/g) || []).length === 5
+        && (dipped.html.match(/data-availability="unknown"/g) || []).length === 1; })(),
     JSON.stringify(attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
 
   // ── D · MEMORIA PATRIMONIAL ──────────────────────────────────────────────
@@ -1155,9 +1181,15 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
       const item = m.slice(i, m.indexOf('</ul>'));
       return /data-fact="investable_/.test(item) && !/%/.test(item); })(),
     section(dipped.html, 'intcc-timeline').slice(0, 600));
-  ok('15.10 un usuario NUEVO conserva el estado honesto de siempre',
-    /intv4-memory is-accruing/.test(young.html) &&
-    /acumulando tu historia patrimonial/.test(young.html));
+  // SUPREME CLOSURE · §4.5 — el estado vacío pasa a ser COMPACTO y a decir una
+  // sola frase. La línea de tiempo animada con cinco nodos y dos párrafos
+  // ocupaba el alto de una card llena para comunicar una ausencia, que es
+  // justamente lo que el §4.5 prohíbe («el estado vacío debe ser compacto»).
+  ok('15.10 un usuario NUEVO conserva el estado honesto, ahora compacto y en una frase',
+    /intv4-memory is-accruing/.test(young.html)
+    && /data-compact="1"/.test(young.html)
+    && /Aún no hay historial suficiente para mostrar tu evolución/.test(young.html)
+    && !/intv6-accrue-node/.test(young.html));
   ok('15.11 historia SÍ pero estable ⇒ estado propio, con fecha y observaciones',
     (() => { const flat = render(Object.assign({}, MATURE, {
         rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] }));
@@ -1328,6 +1360,9 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
     /\(b\.priority - a\.priority\) \|\| \(endAt\(b\) - endAt\(a\)\)/.test(fnSrc('_intv4MemoryEvents')));
   ok('16.10 y el renderer pasa las reclamaciones de la Memoria a Qué ha cambiado',
     /_intv4MemoryClaims\(core, publishedKeys\)/.test(fnSrc('_renderIntelligenceCommandCenter')) &&
+    // §4.6 — la firma vuelve a sus cuatro argumentos: la marca de visita se
+    // retiró como referencia (es un timestamp de presentación, no un extremo de
+    // medición), así que la card no necesita nada del almacenamiento.
     /_intv4ChangedHtml\(core, esc, publishedKeys, memoryClaims\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
   // Cada superficie conserva su propósito: la Memoria sigue fechando, y Qué ha
   // cambiado sigue siendo una lista de novedades con dirección.

@@ -266,12 +266,25 @@ console.log('\n2-TER · Repo-driven schema: migration ≡ certified SQL:');
   const MIG_DIR = path.join(ROOT, 'supabase', 'migrations');
   let files = [];
   try { files = fs.readdirSync(MIG_DIR).filter(f => /\.sql$/.test(f)).sort(); } catch (e) { files = []; }
-  ok('2t.1 exactly one migration exists', files.length === 1, files.join(' '));
+  // SE MIDE LA MIGRACIÓN DE ESTE SPEC, NO EL RECUENTO DEL DIRECTORIO.
+  // Estaba escrito como «existe exactamente UNA migración», y eso convierte en
+  // contrato de ESTE spec algo que no le pertenece: cualquier otro trabajo que
+  // añada su propia migración lo pone en rojo sin haber tocado nada suyo. Lo
+  // que este spec sí debe garantizar es que SU migración existe, se llama como
+  // el CLI espera y es byte-idéntica al fichero certificado de `db/`.
+  const MINE = files.filter(f => /_portfolio_snapshot_user_health\.sql$/.test(f));
+  ok('2t.1 la migración de este SPEC existe, y sólo una', MINE.length === 1, files.join(' '));
   ok('2t.2 its name carries a CLI-parseable version (YYYYMMDDHHMMSS_slug.sql)',
-    files.length === 1 && /^\d{14}_[a-z0-9_]+\.sql$/.test(files[0]), files[0] || '(none)');
+    MINE.length === 1 && /^\d{14}_[a-z0-9_]+\.sql$/.test(MINE[0]), MINE[0] || '(none)');
   ok('2t.3 it is BYTE-IDENTICAL to the certified db/ file — no drift possible',
-    files.length === 1 && fs.readFileSync(path.join(MIG_DIR, files[0]), 'utf8') === sql,
-    files.length === 1 ? 'differs' : 'no migration');
+    MINE.length === 1 && fs.readFileSync(path.join(MIG_DIR, MINE[0]), 'utf8') === sql,
+    MINE.length === 1 ? 'differs' : 'no migration');
+  // …y que ninguna OTRA migración toca las tablas de este spec, que es el
+  // riesgo real que «sólo una» intentaba cubrir de forma indirecta.
+  ok('2t.1b ninguna otra migración toca las tablas de este SPEC',
+    files.filter(f => MINE.indexOf(f) === -1)
+      .every(f => !/portfolio_snapshot|snapshot_health/i.test(fs.readFileSync(path.join(MIG_DIR, f), 'utf8'))),
+    files.filter(f => MINE.indexOf(f) === -1).join(' '));
   // Everything the certified file guarantees therefore holds for what production runs:
   // one transaction, no destructive statement, no financial table written.
   ok('2t.4 …so the applied text is transactional and non-destructive by inheritance',

@@ -322,8 +322,14 @@ console.log('\nH) rollback flags + scope containment:');
     const r2 = guard(next, prev);
     return r2.ps.byRange['7d'] === next.byRange['7d'] && Object.keys(r2.ps.byRange).length === Object.keys(next.byRange).length;
   })());
-  ok('H5 no threshold moved', vm.runInContext('JSON.stringify(_AURIX_RETURN_COMPARABLE_RATIO)', PS)
-    === JSON.stringify({ '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 }));
+  // SUPREME CLOSURE §4.5 — la tabla gana periodos largos. El invariante es que
+  // ningún umbral YA ADOPTADO se mueva y que un periodo nuevo no sea más
+  // permisivo que 'all'; el número de claves nunca lo fue.
+  ok('H5 no threshold moved', (() => {
+    const R = JSON.parse(vm.runInContext('JSON.stringify(_AURIX_RETURN_COMPARABLE_RATIO)', PS));
+    const BASE = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
+    return Object.keys(BASE).every(k => R[k] === BASE[k])
+      && Object.keys(R).filter(k => !(k in BASE)).every(k => R[k] > 0 && R[k] <= BASE.all); })());
   ok('H6 min-history floor unchanged', vm.runInContext('_AURIX_RETURN_MIN_HISTORY_MS', PS) === 90 * 1000);
   ok('H7 flow-dominance unchanged', vm.runInContext('_AURIX_RETURN_FLOW_DOMINANCE', PS) === 0.5);
   ok('H8 established-frac + stable-step unchanged',

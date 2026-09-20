@@ -711,7 +711,26 @@ const TOUCHED_EXISTING = ['.intcc-hero-body', '.intcc-hero-orb-wrap', '.intcc-he
   // le da, en vez de dejar un hueco muerto). Ni color ni tipografía.
   '.aurix-intcc .intv4-memory',
   // Tokens del corredor de la esfera en el contenedor de la rejilla.
-  '.aurix-intv6 {'];
+  '.aurix-intv6 {',
+  ];
+// ── §6 · COMPARADOR · ALLOWLIST EXACTA ─────────────────────────────────────
+// Insertar una card entre el Radar y «Lo que importa hoy» obliga a correr un
+// peldaño los `order` que venían detrás (N.8c prohíbe repetirlos, con razón:
+// un empate lo resolvería el orden del DOM, que no se lee en la hoja de
+// estilos). Es COMPOSICIÓN pura y el orden visual relativo no se mueve.
+//
+// VAN EN UNA LISTA EXACTA, NO DE PREFIJO, y la diferencia importa: con
+// `startsWith`, añadir `.intv9-disc` habría abierto la puerta a
+// `.intv9-disc-item`, `-mark`, `-body` y `-text`, que sí llevan color y
+// tipografía. Una allowlist que se ensancha sola deja de ser una allowlist.
+// Esta lista sólo autoriza el selector ESCRITO, y N.8 sigue comprobando que
+// encima de él sólo haya propiedades de composición.
+const TOUCHED_EXISTING_EXACT = ['.intcc-watch', '.intcc-timeline', '.intv5-structure',
+  '.intv4-changed', '.intv4-discovery', '.intcc-disclaimer', '.intv9-disc'];
+const _touchedExisting = (head) => {
+  const h = String(head || '').trim();
+  return TOUCHED_EXISTING_EXACT.indexOf(h) !== -1 || TOUCHED_EXISTING.some(t => h.startsWith(t));
+};
 // `.intcc-tl-item.is-declared …` es un selector COMPUESTO que exige una clase
 // NUEVA: no puede alterar el render de un item de memoria existente, así que es
 // scoping y no modificación. Se lista aparte para que quede explícito.
@@ -720,21 +739,21 @@ const NEW_SCOPED = ['.intcc-tl-item.is-declared'];
 // contador trazable (el enlace al destino, la card de pregunta y el control
 // «Entendido»). Reconocerlas aquí no relaja nada: siguen siendo clases propias
 // que no existían antes y que no pueden alterar el render de nada heredado.
-const isNew = l => /intv8-|intv9-|intv10-|intv11-|intv12-|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
+const isNew = l => /intv8-|intv9-|intv10-|intv11-|intv12-|intv13-|intv14-|intv15-|intcc-orb-cta|intcc-orb\.is-interactive|intv4-chg-ref|is-tone-neutral/.test(l) || NEW_SCOPED.some(t => l.trim().startsWith(t))
   // El contenedor de la rejilla sólo recibe TOKENS del corredor de la esfera.
   || l.trim().startsWith('.aurix-intv6 {');
 ok('N.7 sólo se tocan 4 selectores heredados, y son los que exige el hero adaptativo',
   newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
-    .every(l => isNew(l) || TOUCHED_EXISTING.some(t => l.trim().startsWith(t))),
+    .every(l => isNew(l) || _touchedExisting(l.trim().split('{')[0])),
   newCss.split('\n').filter(l => /^\.[a-z]/.test(l.trim()) && l.includes('{'))
-    .filter(l => !isNew(l) && !TOUCHED_EXISTING.some(t => l.trim().startsWith(t))));
+    .filter(l => !isNew(l) && !_touchedExisting(l.trim().split('{')[0])));
 ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipografía',
   (() => { const bad = [];
     newCss.split(/(?<=\})/).forEach(rule => {
       const head = (rule.match(/^[\s]*([^{]+)\{/) || [])[1] || '';
-      if (!TOUCHED_EXISTING.some(t => head.trim().startsWith(t))) return;
+      if (!_touchedExisting(head)) return;
       const props = (rule.match(/[a-z-]+\s*:/g) || []).map(x => x.replace(/\s*:$/, ''));
-      const OK_PROPS = ['padding-right', 'padding-top', 'padding-bottom', 'position', 'z-index',
+      const OK_PROPS = ['order', 'padding-right', 'padding-top', 'padding-bottom', 'position', 'z-index',
         'pointer-events', 'align-items', 'grid-row', 'justify-content', 'gap', 'display',
         'flex-direction', 'min-height', 'margin', 'font-size', 'letter-spacing',
         'flex-wrap', 'row-gap',
@@ -752,7 +771,7 @@ ok('N.8 …y sobre ellos sólo propiedades de composición, nunca color ni tipog
   JSON.stringify((() => { const bad = [];
     newCss.split(/(?<=\})/).forEach(rule => {
       const head = (rule.match(/^[\s]*([^{]+)\{/) || [])[1] || '';
-      if (!TOUCHED_EXISTING.some(t => head.trim().startsWith(t))) return;
+      if (!_touchedExisting(head)) return;
       (rule.match(/[a-z-]+\s*:/g) || []).map(x => x.replace(/\s*:$/, ''))
         .forEach(pr => bad.push(head.trim() + ' -> ' + pr));
     }); return bad; })()));
@@ -798,7 +817,10 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
 {
   // Diccionarios reales: se extraen las líneas `intel_*` y las `intcc_*` que la
   // lectura consume, de cada uno de los dos bloques de idioma.
-  const NEEDED = /^\s*(intel_[a-z0-9_]+|intcc_(read|sub)_[a-z_]+|intcc_health_title|intcc_health_suffix|intcc_band_empty):/;
+  // §4.7 — la frase de liquidez nombra ahora su PERIODO, así que el diccionario
+  // real de rangos (`intv4_r_*`) entra en la extracción: stubearlo dejaría pasar
+  // justamente un periodo vacío, que es el defecto que se está corrigiendo.
+  const NEEDED = /^\s*(intel_[a-z0-9_]+|intv4_r_[a-z0-9]+|intcc_(read|sub)_[a-z_]+|intcc_health_title|intcc_health_suffix|intcc_band_empty):/;
   // Se agrupa POR CLAVE y se toma la 1ª aparición para ES y la 2ª para EN. Un
   // límite de línea global no sirve: los dos diccionarios no declaran las claves
   // en el mismo orden, así que partir el fichero por una clave concreta atribuía
@@ -829,6 +851,10 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
     + block('const _AURIX_INTEL_HEALTH_POSITIVE = Object.freeze(', ');') + '\n'
     + "const _AURIX_AI_SEVERITY = { NOTABLE_CHANGE: 'notable_change' };\n"
     + fnSrc('_intelCoherentState') + '\n'
+    // §4.7 — la frase de liquidez pasa a nombrar DATO y PERIODO, así que su
+    // renderer necesita el mapa de periodos. Se carga el owner REAL: stubearlo
+    // dejaría pasar exactamente el defecto que este assert busca.
+    + fnSrc('_intv4RangeLabel') + '\n'
     + fnSrc('_intelDiscoveryText') + '\n' + fnSrc('_intelQuestionText') + '\n'
     + fnSrc('_intv5Reading') + '\n'
     + 'globalThis.READ = _intv5Reading; globalThis.DT = _intelDiscoveryText;'
@@ -861,7 +887,8 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
     });
     DISCOVERY_CODES.forEach(code => {
       let txt = null;
-      try { txt = sb2.DT({ code, values: { positions: 7, effectiveN: 2.5, topWeightPct: 68, observations: 4, count: 3 } }); }
+      try { txt = sb2.DT({ code, values: { positions: 7, effectiveN: 2.5, topWeightPct: 68,
+        observations: 4, count: 3, cashPct: 6, changePp: -4.2, window: '30D' } }); }
       catch (e) { badDisc.push([lang, code, 'THROW ' + e.message]); return; }
       if (!txt || /undefined|\[object/.test(txt)) badDisc.push([lang, code, txt]);
     });
@@ -1516,24 +1543,42 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
   ok('U.19 la rotación es DETERMINISTA: mismas entradas ⇒ mismo conjunto, y cambia de periodo',
     (() => { // Se ejecutan los owners REALES en el sandbox, con su tope declarado.
       const rot = vm.runInContext(block('const _INTV4_EXPLORE_MAX', ';')
-        + block('const _INTV4_EXPLORE_CADENCE', ');') + ';'
+        + block('const _INTV4_EXPLORE_PERIOD_WEEKS', ';') + ';'
         + fnSrc('_intv4ExploreSeed') + ';'
         + fnSrc('_intv4ExploreRotation') + ';_intv4ExploreRotation', sandbox);
       const ids = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'];
       const day = 1757000000000;
       const a = JSON.stringify(rot(ids, day, 'u1'));
       const b = JSON.stringify(rot(ids, day + 3600e3, 'u1'));
-      const c = JSON.stringify(rot(ids, day + 5 * 864e5, 'u1'));
+      // §4.3 — la cadencia pasa de DIARIA a SEMANAL ESCALONADA, así que el
+      // conjunto ya no puede cambiar en cinco días: se mide contra una frontera
+      // de periodo real (cuatro semanas cubren el ciclo completo).
+      const c = JSON.stringify(rot(ids, day + 5 * 7 * 864e5, 'u1'));
       return a === b && a !== c && JSON.parse(a).length === 4
         && new Set(JSON.parse(a)).size === 4; })());
   ok('U.19b el id anotado coincide EXACTAMENTE con el que lee Explora',
     (() => { const m = 'data-intcc-q="top_position_intent"';
       return ('x:' + m.slice(14, -1)).slice(2) === 'top_position_intent'; })());
-  ok('U.19c las cadencias están declaradas (una diaria, dos semanales, una mensual)',
-    (() => { const cad = block('const _INTV4_EXPLORE_CADENCE', ');');
-      return /'day'/.test(cad) && (cad.match(/'week'/g) || []).length === 2 && /'month'/.test(cad)
+  // SUPREME CLOSURE · §4.3 — «cambiar como máximo una pregunta por semana». No
+  // basta con ralentizar: hay que ESCALONAR, porque cuatro cadencias semanales
+  // cruzan la misma frontera a la vez. Se mide la propiedad EJECUTANDO el owner
+  // un año entero, que es la única forma de demostrar un techo de cambio.
+  ok('U.19c ninguna semana mueve más de UNA pregunta, y la rotación sigue viva',
+    (() => { // El owner YA está en el sandbox (U.19 lo cargó): redeclararlo sería
+      // un SyntaxError, y además mediría una copia en vez del mismo objeto.
+      const rot = vm.runInContext('_intv4ExploreRotation', sandbox);
+      const ids = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9'];
+      let prev = null, maxDelta = 0, movedDays = 0;
+      for (let d = 0; d < 365; d++) {
+        const r = rot(ids, d * 864e5, 'u1');
+        if (prev) { const delta = r.filter((x, i) => x !== prev[i]).length;
+          if (delta > maxDelta) maxDelta = delta;
+          if (delta) movedDays++; }
+        prev = r;
+      }
+      return maxDelta === 1 && movedDays >= 50 && movedDays <= 53
         && /Math\.floor\(day \/ 7\)/.test(fnSrc('_intv4ExploreRotation'))
-        && /Math\.floor\(day \/ 30\)/.test(fnSrc('_intv4ExploreRotation')); })());
+        && /Math\.floor\(\(week - slot\) \/ P\)/.test(fnSrc('_intv4ExploreRotation')); })());
   ok('U.19d las anotaciones se filtran en LAS DOS puertas al Core',
     (src.match(/indexOf\('x:'\) === 0\)\)/g) || []).length >= 2);
   ok('U.20 el desempate final es el id: mismo estado ⇒ mismo orden',
@@ -1656,24 +1701,29 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
   const sb4 = { console, Object, Number, Math, Array, Set, JSON, isFinite, window: undefined };
   vm.createContext(sb4);
   sb4.t = k => ({ intv9_mem_goal_grow: 'g', intv9_mem_horizon_long: 'h' })[k];
-  sb4._INTV4_MEMORY_MAX = 8;
+  sb4._INTV4_MEMORY_MAX = 3;
   sb4._intv4MemoryEvents = (core) => ((core && core.ev) || []).map((e, i) =>
     ({ f: { semanticKey: 'k' + i, window: { endAt: e }, causalRoot: 'wealth_level' }, txt: 'E' + i }));
   sb4._intv4WhyText = () => '';
   vm.runInContext(fnSrc('_intv4T') + '\n' + fnSrc('_intv4MemoryDeclared')
-    + '\n' + fnSrc('_intv4MemoryRows') + '\nglobalThis.ROWS = _intv4MemoryRows;', sb4);
+    + '\n' + fnSrc('_aurixFactPeriodDegraded') + '\n' + fnSrc('_aurixFactPeriodNamedAs') + '\n' + fnSrc('_intv4MemoryRows') + '\nglobalThis.ROWS = _intv4MemoryRows;', sb4);
   const ctx9 = { context: { fields: {
     primary_goal: { value: 'grow', provenance: 'user_answer', answeredAt: 5000 },
     horizon: { value: 'long', provenance: 'user_answer', answeredAt: 100 } } } };
-  ok('V.14 la memoria presentada se acota a 8 recuerdos',
-    sb4.ROWS({ ev: [9000, 8000, 7000, 6000, 4000, 3000, 2000, 1000, 900, 800] }, [], ctx9).length === 8);
-  ok('V.15 …ordenada por lo más RECIENTE arriba, mezclando declarados e hitos',
+  // SUPREME CLOSURE · §4.5 RE-DECIDE LAS TRES. La card mezclaba hitos medidos con
+  // respuestas declaradas, y el §4.5 prohíbe publicar aquí «prioridad declarada,
+  // confirmaciones, concentración aceptada y preguntas respondidas». Lo declarado
+  // no se borra —sigue siendo contexto y sigue moviendo interpretación— pero deja
+  // de ser una FILA. Así que lo que estas aserciones miden cambia de objeto: el
+  // techo baja a tres y la lista contiene UNA sola clase de contenido.
+  ok('V.14 la evolución presentada se acota a 3 hechos certificados',
+    sb4.ROWS({ ev: [9000, 8000, 7000, 6000, 4000] }, [], ctx9).length === 3);
+  ok('V.15 …ordenada por lo más RECIENTE arriba, y SIN respuestas declaradas',
     (() => { const r = sb4.ROWS({ ev: [9000, 200] }, [], ctx9);
-      return r[0].at === 9000 && r[1].at === 5000 && r[1].kind === 'declared'
-        && r[2].at === 200 && r[3].at === 100; })());
-  ok('V.16 …y sólo con recuerdos REALES: nada que no venga de una fuente o del usuario',
-    (() => { const r = sb4.ROWS({ ev: [] }, [], { context: { fields: {
-        primary_goal: { value: 'grow', provenance: 'inferred', answeredAt: 1 } } } });
+      return r.length === 2 && r[0].at === 9000 && r[1].at === 200
+        && r.every(x => x.kind === 'event'); })());
+  ok('V.16 …y sólo con hechos REALES: sin hechos no hay filas, responda lo que responda',
+    (() => { const r = sb4.ROWS({ ev: [] }, [], ctx9);
       return r.length === 0; })());
   ok('V.17 UNA sola lista: la unión blanca del raíl se resuelve por estructura',
     (() => { const m = fnSrc('_intv4MemoryHtml');
@@ -1791,7 +1841,12 @@ group('W · finalización del hero · lo que la captura de producción demostró
     !/\.intcc-hero-body \{ min-height: 228px; \}/.test(css)
     && !/\.intcc-hero-body \{ min-height: 216px; \}/.test(css)
     && /@media \(min-width: 1024px\)[\s\S]{0,300}\.intcc-hero-body \{ justify-content: center; \}/.test(css)
-    && /intelQCardHtml = intelQHtml \? `[\s\S]{0,200}intv12-qcard/.test(src));
+    // §4.2 — la card de la pregunta pasa a hospedar también la puerta de
+    // liquidez, así que su condición es el CUERPO (`_qCardBody`), no la pregunta
+    // sola. Lo que esta aserción protege sigue intacto: sigue siendo CONDICIONAL
+    // —sin contenido no hay card— y sigue viviendo fuera del hero.
+    && /const _qCardBody = intelQHtml \+ liqCtaHtml;/.test(src)
+    && /intelQCardHtml = _qCardBody \? `[\s\S]{0,240}intv12-qcard/.test(src));
   ok('W.13b …y el CSS declara POR QUÉ se retiró, con la medida que lo demuestra',
     /reserva HUÉRFANA|RESERVA HUÉRFANA/.test(css) && /105px de espacio muerto/.test(css));
   ok('W.13c la dock se compacta para que el espacio reservado sea el mínimo',

@@ -66,7 +66,12 @@ console.log('\nDeterminism end-to-end: same shared history ⇒ identical windowe
 
 console.log('\nSource — window + anchor are deterministic (no Date.now()/live-value in the canonical path):');
 ok('7 _aurixInvestableSnapshots windows on the source last-snapshot ts (nowRef), Date.now only as fallback',
-   /let nowRef = 0;\s*for \(const _p of _src\)[\s\S]*?if \(!\(nowRef > 0\)\) nowRef = Date\.now\(\);\s*const ms =[\s\S]*?const start = range === 'all' \? 0 : nowRef - /.test(fnSrc('_aurixInvestableSnapshots')));
+   // SUPREME CLOSURE §4.5 — entre el fallback y la tabla `ms` hay ahora un
+   // comentario que explica por qué se declaran los periodos largos, así que el
+   // patrón admite ese hueco. Lo que certifica sigue siendo lo mismo: la ventana
+   // se ancla en el ÚLTIMO SNAPSHOT de la fuente y `Date.now()` es sólo el
+   // recurso defensivo cuando no hay ninguno.
+   /let nowRef = 0;\s*for \(const _p of _src\)[\s\S]*?if \(!\(nowRef > 0\)\) nowRef = Date\.now\(\);[\s\S]*?const ms = \{[\s\S]*?const start = range === 'all' \? 0 : nowRef - /.test(fnSrc('_aurixInvestableSnapshots')));
 ok('8 _aurixEligibleInvestableSeries anchors on the last shared snapshot value (live only as fallback)',
    /let anchor = raw\[raw\.length - 1\]\.value;\s*if \(!\(anchor > 0\)\) \{ try \{ anchor = \(typeof investableValueBase/.test(fnSrc('_aurixEligibleInvestableSeries')));
 
