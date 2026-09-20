@@ -91,13 +91,13 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_RANK_WEIGHTS',
   '_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
-  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_AURIX_CMP_FLAG_KEY','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_INTV5_TIER'];
+  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_AURIX_CMP_FLAG_KEY','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_AURIX_AI_COVERAGE','_AURIX_AI_AVAIL','_AURIX_AI_LABEL','_AURIX_INTEL_HEALTH_BANDS','_INTV5_TIER'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
   'assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
   '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixInvestablePerformance',
   '_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow',
-  '_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger',
+  '_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification','_aurixIntelDispersion','_aurixIntelHealth','_aurixFactLedger',
   '_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged',
   '_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc',
   '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
@@ -657,13 +657,19 @@ for (const vp of VIEWPORTS) {
   check(vp, 'no percentage repeated more than twice', m.dupPercents.length === 0, JSON.stringify(m.dupPercents));
   check(vp, 'the leading conclusion is larger than its explanation',
     m.headFs != null && m.whyFs != null && m.headFs > m.whyFs, m.headFs + ' vs ' + m.whyFs);
-  check(vp, 'cockpit hierarchy: ' + EXPECTED_ORDER[vp.name].join(' → '),
-    // La card de pregunta es CONDICIONAL por contrato (sin pregunta no se pinta),
-    // así que se compara contra la jerarquía SIN ella cuando no está presente.
-    JSON.stringify(m.order) === JSON.stringify(
-      (m.order || []).indexOf('intv12-qcard') === -1
-        ? EXPECTED_ORDER[vp.name].filter(function(k){ return k !== 'intv12-qcard'; })
-        : EXPECTED_ORDER[vp.name]),
+  // CARDS CONDICIONALES POR CONTRATO. La de pregunta no se pinta sin pregunta, y
+  // el comparador se publicó APAGADO POR DEFECTO, así que su ausencia es el
+  // estado correcto de todos los usuarios. Lo que esta comprobación mide es el
+  // ORDEN RELATIVO de lo que sí está: exigir la presencia de una card opcional
+  // convertía el estado correcto en un rojo permanente en la propia herramienta
+  // de QA del founder — un gate fosilizando como contrato una condición que no
+  // lo es, otra vez.
+  const OPTIONAL_CARDS = ['intv12-qcard', 'intv14-cmp'];
+  const expectedHere = EXPECTED_ORDER[vp.name].filter(function(k){
+    return OPTIONAL_CARDS.indexOf(k) === -1 || (m.order || []).indexOf(k) !== -1;
+  });
+  check(vp, 'cockpit hierarchy: ' + expectedHere.join(' → '),
+    JSON.stringify(m.order) === JSON.stringify(expectedHere),
     JSON.stringify(m.order));
   check(vp, 'no font below 11px', m.tinyFonts.length === 0, JSON.stringify(m.tinyFonts));
   if (vp.mobile) check(vp, 'tap targets ≥ 44px', m.tapSmall.length === 0, JSON.stringify(m.tapSmall));
