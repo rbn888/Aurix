@@ -93,7 +93,22 @@ for (const [w, h] of VIEWPORTS) {
       return true;
     })()`);
     await page.waitForTimeout(700);
-    // al final del recorrido, que es donde una barra fija puede tapar
+    // ENTRADA: el CTA entero sin que el usuario haga nada.
+    const e0 = await page.evaluate(`(function(){
+      var root=document.getElementById('aurixWorkspace');
+      var R=function(e){if(!e)return null;var b=e.getBoundingClientRect();
+        return {t:+b.top.toFixed(1),b:+b.bottom.toFixed(1),h:+b.height.toFixed(1)};};
+      var stage=root.querySelector('.wsfc-stage');
+      var cta=R(root.querySelector('.wsfc-cta')), wrap=R(root.querySelector('.wsfc-cta-wrap')), sr=R(stage);
+      var navEl=document.getElementById('bottomNav');
+      var navVis=!!navEl && getComputedStyle(navEl).display!=='none' && navEl.getBoundingClientRect().height>0;
+      var nav=navVis?R(navEl):null;
+      return {ctaH:cta?cta.h:0, scrollTop:stage.scrollTop,
+        ctaWhole: !!cta && cta.t>=sr.t-0.5 && cta.b<=sr.b+0.5,
+        ctaAboveNav: (nav&&cta) ? cta.b<=nav.t+0.5 : !!cta,
+        wrapAboveNav: (nav&&wrap) ? wrap.b<=nav.t+0.5 : !!wrap};
+    })()`);
+    // al final del recorrido, que es donde se comprueba que nada quede inalcanzable
     await page.evaluate(() => {
       const st = document.querySelector('#aurixWorkspace .wsfc-stage');
       if (st) st.scrollTop = st.scrollHeight;
@@ -122,9 +137,10 @@ for (const [w, h] of VIEWPORTS) {
         sideBySide: cards.length === 2 ? Math.abs(cards[0].t - cards[1].t) <= 1 : false,
         gapY: cards.length === 2 ? +(cards[1].t - cards[0].b).toFixed(1) : null,
         discAfterCards: !!disc && cards.length === 2 && disc.t >= cards[1].b - 0.5,
+        capsAllVisible: caps.every(c => { const sr = R(stage); return c.t >= sr.t - 0.5 && c.b <= sr.b + 0.5; }),
         capsHitCta: caps.some(c => hit(c, cta)),
         capsUnderNav: nav ? caps.some(c => c.b > nav.t + 0.5) : false,
-        ctaHitAny: !cta ? true : [...cards, ...caps, disc].some(x => hit(cta, x)),
+        ctaHitAny: !cta ? true : [...cards, ...caps, disc].some(x => hit(R(q('.wsfc-cta-wrap')), x)),
         ctaReachable: !!cta && cta.b <= window.innerHeight + 0.5 && cta.t >= 0,
         ctaAboveNav: (nav && cta) ? cta.b <= nav.t + 0.5 : !!cta,
         ctaH: cta ? cta.h : 0,
@@ -148,8 +164,11 @@ for (const [w, h] of VIEWPORTS) {
     ok(`WK.${tag} el encabezado empieza tras la 2ª tarjeta y nada queda bajo el CTA ni la navegación`,
       g.discAfterCards === true && g.capsHitCta === false && g.capsUnderNav === false && g.ctaHitAny === false,
       JSON.stringify({ tras: g.discAfterCards, capsCta: g.capsHitCta, capsNav: g.capsUnderNav, ctaAlgo: g.ctaHitAny }));
-    ok(`WK.${tag} el CTA es alcanzable, mide ≥44 px y queda sobre la navegación`,
-      g.ctaReachable && g.ctaAboveNav && g.ctaH >= 44, JSON.stringify({ alcanzable: g.ctaReachable, sobreNav: g.ctaAboveNav, alto: g.ctaH }));
+    ok(`WK.${tag} al ENTRAR el CTA se ve entero y por encima de la navegación`,
+      e0.ctaWhole && e0.ctaAboveNav && e0.wrapAboveNav && e0.ctaH >= 52 && e0.scrollTop === 0, JSON.stringify(e0));
+    ok(`WK.${tag} al final del recorrido el CTA sigue entero y ninguna capacidad queda inalcanzable`,
+      g.ctaReachable && g.ctaAboveNav && g.ctaH >= 44 && g.capsAllVisible === true,
+      JSON.stringify({ alcanzable: g.ctaReachable, sobreNav: g.ctaAboveNav, alto: g.ctaH, capsVisibles: g.capsAllVisible }));
     ok(`WK.${tag} ninguna rejilla se pinta fuera de su caja`,
       g.itemsFits && g.capsFits, JSON.stringify({ tarjetas: g.itemsBox + '←' + g.itemsContent, capacidades: g.capsBox + '←' + g.capsContent }));
     ok(`WK.${tag} cero overflow horizontal y cero texto recortado`,

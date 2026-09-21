@@ -27143,7 +27143,8 @@ button.intv14-cmp-clear {
   color: rgba(222,232,250,0.92);
 }
 /* El CTA es lo último que se comprime: `margin-top:auto` lo ancla abajo cuando
-   sobra altura, y nunca se encoge cuando falta. */
+   sobra altura, y nunca se encoge cuando falta. En móvil, además, se convierte en
+   una barra fijada al pie del contenedor — ver el bloque `max-width:767px`. */
 .wsfc-cta-wrap {
   flex: 0 0 auto; margin-top: auto;
   display: flex; flex-direction: column; gap: 8px;
@@ -27176,6 +27177,42 @@ button.intv14-cmp-clear {
 @media (prefers-reduced-motion: reduce) {
   .wsfc-item, .wsfc-cta, .wsfc-item-open i, .wsfc-item-shot .ws-asset-img { transition: none; }
   .wsfc-item:hover .wsfc-item-open i { transform: none; }
+}
+/* ── EL CTA, COMPLETO DESDE LA ENTRADA (SÓLO MÓVIL) ─────────────────────────
+   POR QUÉ SÓLO AQUÍ: de 768 px en adelante la portada CABE entera —medido: 906 px
+   de contenedor para ~700 px de composición— y el CTA ya se ve completo al entrar
+   sin ayuda de nadie. Por debajo no cabe, y no por descuido: en 360×740 el
+   contenedor tiene 622 px y la composición pide 747 px. Esos 125 px no se pueden
+   recuperar sin rehacer la densidad —imágenes, tipografía y ritmo— que es
+   justamente lo que hay que conservar. Así que el botón se queda fijado al pie.
+
+   Y ES `sticky`, NO `fixed`, que es toda la diferencia con el defecto que este
+   bloque cerró: un elemento sticky SIGUE EN EL FLUJO. Ocupa su sitio al final del
+   contenido, así que la reserva de espacio se calcula sola —ningún número mágico
+   que mantener sincronizado con nada— y al llegar al final del recorrido las
+   capacidades terminan POR ENCIMA del botón. Antes la última fila quedaba debajo
+   PARA SIEMPRE, sin forma de alcanzarla; ahora no hay nada inalcanzable.
+
+   Se lee como CHROME y no como una tarjeta flotando: fondo opaco (`--bg` es el
+   mismo lienzo, no un cuarto tono), filete superior y sangre completa hasta los
+   dos bordes —los −16px son exactamente el padding lateral de `.wsfc-stage`—. Un
+   degradado semitransparente, que fue el primer intento, deja el texto de detrás
+   medio borrado y se lee como un fallo de pintado, no como una barra.
+
+   El `padding-bottom` del contenedor pasa a 0 y lo pone la barra: si lo pusieran
+   los dos, el botón daría un salto de 12 px justo al final del recorrido. El área
+   segura de iOS NO se suma aquí y no es un olvido — `.wsfc-stage` ya la descuenta
+   en `--aurix-ws-chrome`, así que su borde inferior coincide exactamente con el
+   borde superior de la navegación y el indicador de inicio queda por debajo. */
+@media (max-width: 767px) {
+  .wsfc-stage { padding-bottom: 0; }
+  .wsfc-cta-wrap {
+    position: sticky; bottom: 0; z-index: 2;
+    margin-left: -16px; margin-right: -16px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--color-border-subtle);
+  }
 }
 /* ── TABLET (768–1023) ─────────────────────────────────────────────────────── */
 @media (min-width: 560px) {

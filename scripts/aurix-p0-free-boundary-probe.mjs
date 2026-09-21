@@ -733,10 +733,53 @@ ok('D.free: un rail local falsificado no concede persistencia', await ev(`(funct
 const SHOTS = join(OUT, 'shots');
 async function wsfcGeometry(w, h, L) {
   const tag = `${w}×${h} ${L.toUpperCase()}`;
-  // al final del recorrido: es donde la barra fija puede tapar
-  await ev(`(function(){var st=document.querySelector('#aurixWorkspace .wsfc-stage');
-    if(st) st.scrollTop = st.scrollHeight; window.scrollTo(0, document.documentElement.scrollHeight); return true;})()`);
-  await sleep(200);
+  // ── DOS POSICIONES, PORQUE EL CONTRATO TIENE DOS MITADES ──────────────────
+  // ENTRADA (`scrollTop = 0`): el CTA tiene que verse ENTERO sin que el usuario
+  // haga nada. Es la mitad que faltaba: la versión anterior lo dejaba al final de
+  // un flujo que había que desplazar, y en 360×740 y en 390×844 ES no se veía al
+  // entrar. En móvil es una barra `sticky`, así que esto mide la barra fijada.
+  const AT = async (where) => {
+    await ev(`(function(){var st=document.querySelector('#aurixWorkspace .wsfc-stage');
+      if(st) st.scrollTop = ${where === 'fin' ? 'st.scrollHeight' : '0'};
+      window.scrollTo(0, ${where === 'fin' ? 'document.documentElement.scrollHeight' : '0'}); return true;})()`);
+    await sleep(200);
+  };
+  await AT('entrada');
+  const e0 = await J(`(function(){
+    var root=document.getElementById('aurixWorkspace');
+    var R=function(e){if(!e)return null;var b=e.getBoundingClientRect();
+      return {t:+b.top.toFixed(1),b:+b.bottom.toFixed(1),h:+b.height.toFixed(1)};};
+    var stage=root.querySelector('.wsfc-stage');
+    var cta=R(root.querySelector('.wsfc-cta')), wrap=R(root.querySelector('.wsfc-cta-wrap')), sr=R(stage);
+    var navEl=document.getElementById('bottomNav');
+    var navVis=!!navEl && getComputedStyle(navEl).display!=='none' && navEl.getBoundingClientRect().height>0;
+    var nav=navVis?R(navEl):null;
+    return JSON.stringify({
+      ctaH: cta?cta.h:0,
+      // «entero», y no «su borde inferior entra en el viewport»: las dos aristas
+      // dentro del contenedor visible. Un botón cortado por arriba también está
+      // cortado, y la aserción vieja lo habría dado por bueno.
+      ctaWhole: !!cta && cta.t >= sr.t - 0.5 && cta.b <= sr.b + 0.5,
+      ctaAboveNav: nav && cta ? cta.b <= nav.t + 0.5 : !!cta,
+      wrapAboveNav: nav && wrap ? wrap.b <= nav.t + 0.5 : !!wrap,
+      // LA INVARIANTE QUE HACE SEGURA EL ÁREA SEGURA, y que sí es medible sin
+      // un iPhone: el borde inferior del contenedor coincide con el borde
+      // superior de la navegación. La barra de navegación ya incluye el inset
+      // dentro de su propia altura, así que si el contenedor termina justo donde
+      // ella empieza, NADA de la portada puede caer sobre el indicador de inicio
+      // — valga 0 px o 34 px. Lo que no se puede medir aquí es el inset real; lo
+      // que se mide es que la portada no depende de cuánto valga.
+      stageMeetsNav: nav ? Math.abs(sr.b - nav.t) <= 1 : null,
+      scrollTop: stage.scrollTop
+    });})()`);
+  ok(`E.${tag} WSFC · al ENTRAR el CTA se ve entero, por encima de la navegación`,
+    e0.ctaWhole === true && e0.ctaAboveNav === true && e0.wrapAboveNav === true && e0.ctaH >= 52 && e0.scrollTop === 0,
+    JSON.stringify(e0));
+  if (e0.stageMeetsNav !== null) ok(`E.${tag} WSFC · el contenedor termina donde empieza la navegación (área segura a salvo sea cual sea su valor)`,
+    e0.stageMeetsNav === true, 'Δ=' + JSON.stringify(e0.stageMeetsNav));
+  // FINAL del recorrido: es donde se comprueba que no hay nada INALCANZABLE, que
+  // es el defecto real que tenía la portada — no que el botón tape al pasar.
+  await AT('fin');
   const g = await J(`(function(){
     var root=document.getElementById('aurixWorkspace');
     var q=function(s){return root.querySelector(s);};
@@ -757,6 +800,7 @@ async function wsfcGeometry(w, h, L) {
     var names=qa('.wsfc-item-name').map(R), descs=qa('.wsfc-item-desc').map(R), opens=qa('.wsfc-item-open').map(R);
     var caps=qa('.wsfc-cap').map(R), capEls=qa('.wsfc-cap');
     var disc=R(q('.wsfc-disc-label')), cta=R(q('.wsfc-cta')), ctaEl=q('.wsfc-cta');
+    var ctaWrap=R(q('.wsfc-cta-wrap'));
     // La barra inferior sólo cuenta si está PINTADA: en escritorio está oculta y
     // medir su rectángulo de ceros daba un falso rojo en 1366 y 1440.
     var navEl=document.getElementById('bottomNav');
@@ -806,12 +850,19 @@ async function wsfcGeometry(w, h, L) {
       // 4 · el encabezado de capacidades empieza tras el borde REAL de la 2ª
       discAfterCards: (disc && cards.length===2) ? (disc.t >= cards[1].b-0.5) : false,
       discHit: cards.some(function(c){return hit(c,disc);}),
-      // 5 · las capacidades, ni bajo el CTA ni bajo la navegación
+      // 5 · las capacidades, ni bajo el CTA ni bajo la navegación, y TODAS
+      //     enteras dentro del contenedor al final del recorrido: ésa es la
+      //     definición operativa de «accesible».
+      capsAllVisible: caps.every(function(c){return c.t >= R(stage).t - 0.5 && c.b <= R(stage).b + 0.5;}),
       capsHitCta: caps.some(function(c){return hit(c,cta);}),
       capsUnderNav: nav ? caps.some(function(c){return c.b>nav.t+0.5;}) : false,
       capsHitDisc: caps.some(function(c){return hit(c,disc);}),
       // 6 · el CTA no interseca NADA, y sigue siendo alcanzable
-      ctaHitAny: [].concat(cards,caps,[disc]).some(function(x){return hit(cta,x);}),
+      // Se mide la BARRA entera (el wrap), no sólo el botón: en móvil la barra
+      // tiene fondo opaco y filete, así que lo que puede tapar algo es ella.
+      // (Sin acentos graves en este comentario: viaja dentro de un template
+      //  literal y uno solo lo cortaría en seco — ya pasó dos veces.)
+      ctaHitAny: [].concat(cards,caps,[disc]).some(function(x){return hit(ctaWrap,x);}),
       ctaReachable: !!cta && cta.b<=window.innerHeight+0.5 && cta.t>=0,
       ctaAboveNav: nav ? cta.b<=nav.t+0.5 : true,
       ctaH: cta?cta.h:0,
@@ -854,9 +905,9 @@ async function wsfcGeometry(w, h, L) {
   ok(`E.${tag} WSFC · el encabezado de capacidades empieza tras el borde REAL de la 2ª tarjeta`,
     g.discAfterCards === true && g.discHit === false && g.capsHitDisc === false,
     JSON.stringify({ tras: g.discAfterCards, solapeTarjeta: g.discHit, solapeCaps: g.capsHitDisc }));
-  ok(`E.${tag} WSFC · las capacidades, ni bajo el CTA ni bajo la navegación`,
-    g.capsHitCta === false && g.capsUnderNav === false,
-    JSON.stringify({ cta: g.capsHitCta, nav: g.capsUnderNav }));
+  ok(`E.${tag} WSFC · las capacidades: todas alcanzables, ni bajo el CTA ni bajo la navegación`,
+    g.capsHitCta === false && g.capsUnderNav === false && g.capsAllVisible === true,
+    JSON.stringify({ cta: g.capsHitCta, nav: g.capsUnderNav, todasVisibles: g.capsAllVisible }));
   ok(`E.${tag} WSFC · el CTA no interseca nada, es alcanzable y queda sobre la navegación`,
     g.ctaHitAny === false && g.ctaReachable === true && g.ctaAboveNav === true && g.ctaH >= 44,
     JSON.stringify({ interseca: g.ctaHitAny, alcanzable: g.ctaReachable, sobreNav: g.ctaAboveNav, alto: g.ctaH }));
