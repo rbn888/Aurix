@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '696'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '697'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5621,6 +5621,13 @@ const T = {
     cmp_provider_error: 'El proveedor de mercado no ha respondido. Los datos de tu patrimonio no se han visto afectados.',
     cmp_loading: 'Cargando la comparación…',
     cmp_available_from: (d) => `Comparación disponible desde el ${d}`,
+    // ── CIERRE 24H · LA VENTANA EFECTIVA, CON SUS DOS EXTREMOS Y SU HORA ──
+    // El proveedor no devuelve «las últimas 24 h»: devuelve el DÍA NATURAL en
+    // curso (bitcoin, 16,4 h medidas) o la SESIÓN de hoy (S&P 500, 2,9 h). Dos
+    // superficies que dicen «24 h» no pueden publicar rentabilidades distintas
+    // sin decir sobre qué han medido cada una.
+    cmp_window_effective: (a, b) => `Esta comparación mide del ${a} al ${b}, que es la historia común disponible — no el periodo completo del botón.`,
+    cmp_too_few: 'No hay suficientes puntos comunes para dibujar una comparación fiable en este periodo.',
     // ── CHECKPOINT I.9 · NI «POR DELANTE» NI «POR DETRÁS» ────────────────
     // Las dos eran lenguaje de carrera —sugieren que ganar al índice es el
     // objetivo— y encima omitían CONTRA QUÉ, así que la frase no se sostenía
@@ -8505,6 +8512,8 @@ const T = {
     cmp_provider_error: 'The market data provider did not respond. Your own portfolio data is unaffected.',
     cmp_loading: 'Loading the comparison…',
     cmp_available_from: (d) => `Comparison available from ${d}`,
+    cmp_window_effective: (a, b) => `This comparison measures from ${a} to ${b}, the common history available — not the full period on the button.`,
+    cmp_too_few: 'There are not enough common points to draw a reliable comparison for this period.',
     cmp_diff_more:   (pp, bm) => `Over this period, your wealth returned ${pp} percentage points more than ${bm}.`,
     cmp_diff_less:   (pp, bm) => `Over this period, your wealth returned ${pp} percentage points less than ${bm}.`,
     cmp_disc_index:  'The comparison uses the index price change, without dividends.',
@@ -61364,6 +61373,18 @@ function _intccDate(ts) {
   } catch (_) { return ''; }
 }
 
+// ── CIERRE 24H · CUANDO LA VENTANA ES DE HORAS, LA FECHA NO BASTA ─────────
+// `_intccDate` publica «21 sept 2026». Para una comparación que en realidad
+// empieza hoy a las 00:00 —y que el botón etiqueta «24H»— esa cadena no dice
+// nada: el lector no puede distinguir 24 horas de tres. Con hora sí.
+function _intccDateTime(ts) {
+  try {
+    const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-US' : 'es-ES';
+    return new Date(ts).toLocaleString(loc, { day: 'numeric', month: 'short',
+      hour: '2-digit', minute: '2-digit' });
+  } catch (_) { return ''; }
+}
+
 // ── Visual primitives (pure SVG/CSS, no external assets) ────────────────────
 
 // Animated Aurix energy orb — glow + pulse + ECG, tone driven by reading state.
@@ -64080,6 +64101,25 @@ function _aurixCmpEnabled() {
 // I.9 — por debajo de 0,01 pp la diferencia no sobrevive al redondeo con el
 // que se publica (dos decimales): es ruido, y se declara equivalencia.
 const _AURIX_CMP_FLAT_PP = 0.01;
+// ── CIERRE 24H · CUÁNTO DEL PERIODO CUBRE DE VERDAD ───────────────────────
+// Medido contra el proveedor desplegado el 2026-09-21: `BTC-USD@24h` devuelve
+// 16,4 h (el día natural, desde las 00:00) y `^GSPC@24h` devuelve 2,9 h (la
+// sesión de hoy). El botón decía «24H» y la card declaraba el inicio como una
+// FECHA sin hora, así que una comparación de tres horas se leía como un día.
+// Se publica la cobertura real y se declara cuando no llega.
+const _AURIX_CMP_NOMINAL_MS = Object.freeze({
+  '24h': 24 * 3600e3, '7d': 7 * 864e5, '30d': 30 * 864e5,
+  '90d': 90 * 864e5, '1y': 365 * 864e5,     // 'all' no tiene nominal
+});
+// Por debajo de esto la ventana efectiva se DECLARA con sus dos extremos y su
+// hora. No es un umbral de calidad del dato: es el punto en el que la etiqueta
+// del botón deja de describir lo que se está midiendo.
+const _AURIX_CMP_COVERAGE_MIN = 0.9;
+// Y una comparación institucional no se dibuja con dos o tres puntos. Seis es
+// el mínimo para que una línea signifique algo; por debajo se dice por qué.
+const _AURIX_CMP_MIN_POINTS = 6;
+// Las ventanas intradía necesitan HORA; para las largas la fecha basta.
+const _AURIX_CMP_INTRADAY = Object.freeze(['24h', '7d']);
 // I.9 — índices y renta variable SÍ tienen dividendos que el precio no
 // incorpora, así que hay que decirlo. El oro y las criptomonedas no los
 // tienen: mencionarlos ahí inventaría una carencia.
@@ -64537,6 +64577,20 @@ async function _aurixComparison(range, benchmarkId, opts) {
   // acabó en el cierre de ayer se publica bajo la etiqueta «24H» como si
   // llegara hasta ahora.
   out.availableFrom = (al.from > (idx.timestamps[0] || al.from)) ? al.from : null;
+  // ── COBERTURA REAL DE LA VENTANA COMÚN ─────────────────────────────────
+  out.points = al.buckets;
+  out.nominalMs = _AURIX_CMP_NOMINAL_MS[r] || null;
+  out.coveredMs = Math.max(0, al.to - al.from);
+  out.coverage = out.nominalMs ? +(out.coveredMs / out.nominalMs).toFixed(4) : null;
+  // DENSIDAD · una línea de dos o tres puntos no es una comparación.
+  if (al.buckets < _AURIX_CMP_MIN_POINTS) {
+    out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = 'too_few_common_points';
+    out.mine = null; out.other = null; return out;
+  }
+  // Y si la ventana común no cubre el periodo del botón, se DECLARA: la
+  // etiqueta no puede seguir hablando por ella.
+  out.windowPartial = !!(out.coverage !== null && out.coverage < _AURIX_CMP_COVERAGE_MIN);
+  out.withHour = _AURIX_CMP_INTRADAY.indexOf(r) !== -1;
   out.endsBefore = (al.to < (idx.timestamps[idx.timestamps.length - 1] || al.to)) ? al.to : null;
   // DIFERENCIA EN PUNTOS PORCENTUALES, no un porcentaje entre porcentajes:
   // (mío − 100) − (otro − 100). Con las dos series en base 100 es una resta.
@@ -64784,7 +64838,7 @@ function _intv14ComparatorHtml(esc, cmp) {
   const providerError = cmp.state === _AURIX_CMP_STATE.PROVIDER_ERROR;
   // I.10 — «historia común parcial» es un estado distinto de «disponible», y
   // se declara para que la QA y el gate puedan verlo sin leer la prosa.
-  const partial = !!(cmp.availableFrom || cmp.endsBefore);
+  const partial = !!(cmp.availableFrom || cmp.endsBefore || cmp.windowPartial);
   // EL SIGNO ERA LO ÚNICO QUE IMPORTABA Y SE PERDÍA. `Math.abs` hacía que ir
   // 12 pp por detrás y 12 pp por delante imprimieran la MISMA frase, carácter
   // por carácter. Se dice la dirección con palabras —que es lo que el usuario
@@ -64811,6 +64865,8 @@ function _intv14ComparatorHtml(esc, cmp) {
              data-fx="${esc(cmp.fxPair || '')}"
              data-diff-pp="${esc(Number.isFinite(cmp.diffPp) ? String(cmp.diffPp) : '')}"
              data-partial="${partial ? '1' : '0'}"
+             data-coverage="${esc(cmp.coverage == null ? '' : String(cmp.coverage))}"
+             data-points="${esc(cmp.points == null ? '' : String(cmp.points))}"
              data-reason="${esc(cmp.reason || '')}">
       <h3 class="intcc-card-title">${esc(_intv4T('cmp_title'))}</h3>
       <div class="intv14-cmp-controls">
@@ -64872,12 +64928,24 @@ function _intv14ComparatorHtml(esc, cmp) {
         ${hasOther && bm ? `<li class="intv14-cmp-key is-other"><span class="intv14-cmp-swatch" aria-hidden="true"></span>${esc(_aurixCmpLabel(bm))}</li>` : ''}
       </ul>
       ${diffTxt ? `<p class="intv14-cmp-diff">${esc(diffTxt)}</p>` : ''}
-      ${insufficient ? `<p class="intv14-cmp-note">${esc(_intv4T('cmp_insufficient'))}</p>` : ''}
+      ${insufficient ? `<p class="intv14-cmp-note">${esc(cmp.reason === 'too_few_common_points'
+        ? _intv4T('cmp_too_few') : _intv4T('cmp_insufficient'))}</p>` : ''}
       ${providerError ? `<p class="intv14-cmp-note is-error">${esc(_intv4T('cmp_provider_error'))}</p>` : ''}
-      ${(!insufficient && cmp.availableFrom) ? `<p class="intv14-cmp-note">${
-        esc(_intv4T('cmp_available_from', _intccDate(cmp.availableFrom)))}</p>` : ''}
-      ${(!insufficient && cmp.endsBefore) ? `<p class="intv14-cmp-note">${
-        esc(_intv4T('cmp_ends', _intccDate(cmp.endsBefore)))}</p>` : ''}
+      ${/* ── CIERRE 24H · LA VENTANA EFECTIVA MANDA SOBRE LA ETIQUETA ────
+            Cuando la historia común no cubre el periodo del botón se publican
+            SUS DOS EXTREMOS, y con hora si el periodo es intradía: el
+            proveedor devuelve el día natural (bitcoin) o la sesión (S&P), no
+            las últimas 24 h, y «disponible desde el 21 sept» no distingue un
+            día de tres horas. Sustituye a las dos notas de antes, que decían
+            lo mismo peor y por separado. */''}
+      ${(!insufficient && hasOther && cmp.windowPartial && Number.isFinite(cmp.from) && Number.isFinite(cmp.to))
+        ? `<p class="intv14-cmp-note is-window">${esc(_intv4T('cmp_window_effective',
+            (cmp.withHour ? _intccDateTime(cmp.from) : _intccDate(cmp.from)),
+            (cmp.withHour ? _intccDateTime(cmp.to)   : _intccDate(cmp.to))))}</p>`
+        : `${(!insufficient && cmp.availableFrom) ? `<p class="intv14-cmp-note">${
+            esc(_intv4T('cmp_available_from', _intccDate(cmp.availableFrom)))}</p>` : ''}
+           ${(!insufficient && cmp.endsBefore) ? `<p class="intv14-cmp-note">${
+            esc(_intv4T('cmp_ends', _intccDate(cmp.endsBefore)))}</p>` : ''}`}
       ${/* I.9 — el disclosure lo elige la NATURALEZA del instrumento, no un
             texto único. Fail-closed: un `kind` que no esté en el mapa cae en
             la frase de precio, que es verdadera para cualquiera de ellos y no

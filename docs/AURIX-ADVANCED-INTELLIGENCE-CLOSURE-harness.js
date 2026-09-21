@@ -201,7 +201,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow','_aurixCatExposureDelta',
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
   '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore',
-  '_aurixHealthScore','_intccScoreTone','_intccHealthLimiters','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
+  '_aurixHealthScore','_intccScoreTone','_intccHealthLimiters','_intccHealthScore','_intccClamp','_intccEsc','_intccDate','_intccDateTime',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
   '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
@@ -2608,10 +2608,10 @@ console.log('\nSC · §6 · comparador de rentabilidad');
   const cmpFns = ['_aurixCmpEnabled','_aurixCmpResolvableUSD','_aurixCmpFromRegistry','_aurixCmpProviderRange','_aurixCmpLabel','_aurixCmpRecent','_aurixCmpPushRecent','_aurixCmpFxFor','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize',
                   '_aurixCmpConvert',
                   '_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState',
-                  '_intv14CmpAxisHtml','_intv14CmpSvg','_intv14ComparatorHtml','_intv4T','_intv4Num','_intccEsc','_intccDate',
+                  '_intv14CmpAxisHtml','_intv14CmpSvg','_intv14ComparatorHtml','_intv4T','_intv4Num','_intccEsc','_intccDate','_intccDateTime',
                   '_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner'];
   const cmpAsync = ['_aurixCmpFxSeries','_aurixCmpBenchmarkSeries','_aurixComparison'];
-  const cmpConsts = ['_AURIX_CMP_FLAG_KEY','_AURIX_CMP_FLAT_PP','_AURIX_CMP_DISCLOSURE','ASSET_DB','_AURIX_CMP_KIND_OF','_AURIX_CMP_US_ETFS','_AURIX_CMP_USD_INDICES','_AURIX_CMP_GROUPS','_AURIX_CMP_RECENT_KEY','_AURIX_CMP_RECENT_MAX','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_PROVIDER_REASONS','_AURIX_CMP_PROVIDER_RANGE',
+  const cmpConsts = ['_AURIX_CMP_FLAG_KEY','_AURIX_CMP_FLAT_PP','_AURIX_CMP_NOMINAL_MS','_AURIX_CMP_COVERAGE_MIN','_AURIX_CMP_MIN_POINTS','_AURIX_CMP_INTRADAY','_AURIX_CMP_DISCLOSURE','ASSET_DB','_AURIX_CMP_KIND_OF','_AURIX_CMP_US_ETFS','_AURIX_CMP_USD_INDICES','_AURIX_CMP_GROUPS','_AURIX_CMP_RECENT_KEY','_AURIX_CMP_RECENT_MAX','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_PROVIDER_REASONS','_AURIX_CMP_PROVIDER_RANGE',
                      '_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_INTV4_PERIMETER'];
   function afnSrc(name) {
     const s0 = 'async function ' + name + '('; const i = app.indexOf(s0);
@@ -3473,6 +3473,103 @@ console.log('\nSC · §6 · comparador de rentabilidad');
         feed: { '^GSPC': { series: MKT(T_0, 40, D1, 5000, 0.001) } } });   // sin EURUSD
       const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', c);
       return r.state === 'provider_error' && r.reason === 'fx_insufficient'; })());
+  // ── CIERRE 24H · LA CAPTURA DEL FOUNDER, REPRODUCIDA ────────────────
+  // MEDIDO contra el proveedor desplegado el 2026-09-21:
+  //   BTC-USD@24h → 198 pts, 00:00 → 16:24  (16,4 h: el DÍA NATURAL)
+  //   ^GSPC@24h   →  36 pts, 13:30 → 16:24  ( 2,9 h: la SESIÓN de hoy)
+  // El botón decía «24H» y la card declaraba «disponible desde el 21 sept»,
+  // una fecha sin hora. La cartera, en esa ventana recortada, hizo ≈ 0
+  // mientras su 24 h real era +2,78 %.
+  {
+    const HH = 3600e3, MM = 60e3;
+    const AHORA = Date.UTC(2026, 8, 21, 16, 24);
+    const MEDIANOCHE = Date.UTC(2026, 8, 21, 0, 0);
+    const APERTURA = Date.UTC(2026, 8, 21, 13, 30);
+    // Cartera: 97 snapshots cada 15 min cubriendo 24 h REALES, +2,78 % total,
+    // y con TODA la subida antes de medianoche (plano a partir de ahí), que es
+    // exactamente lo que la captura enseña.
+    const cartera = (() => { const out = [];
+      for (let t = AHORA - 24 * HH; t <= AHORA; t += 15 * MM) {
+        const antesDeMedianoche = t < MEDIANOCHE;
+        const frac = antesDeMedianoche ? (t - (AHORA - 24 * HH)) / (MEDIANOCHE - (AHORA - 24 * HH)) : 1;
+        out.push({ time: t, value: 100 * (1 + 0.0278 * frac) });
+      }
+      return out; })();
+    const provider = (from, n, drift, p0) => { const out = [], step = (AHORA - from) / (n - 1);
+      for (let i = 0; i < n; i++) out.push({ time: Math.round(from + i * step), value: p0 * (1 + drift * (i / (n - 1))) });
+      return out; };
+    const ctx24 = (feed) => cmpCtx({
+      perf: { valid: true, fallbackReason: null, index: { basis: 'flow_neutral_index', base: 100,
+        intervals: cartera.length - 1, timestamps: cartera.map(p => p.time), values: cartera.map(p => p.value) } },
+      feed });
+
+    okA('C24.1 EL CASO · «24H» con bitcoin mide el DÍA NATURAL, y se declara con HORA',
+      (async () => { const c = ctx24({ 'BTC-USD': { series: provider(MEDIANOCHE, 198, 0.0586, 60000) } });
+        run('_intv14CmpSetState({ benchmarkId: "btc", range: "24h" })', c);
+        const r = await run('_aurixComparison("24h", "btc", {})', c);
+        if (r.state !== 'ready') return false;
+        const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(r) + ')', c);
+        return r.windowPartial === true                       // no cubre las 24 h
+          && r.coverage < 0.75 && r.coverage > 0.6            // ~16,4/24 = 0,68
+          && r.withHour === true
+          && /intv14-cmp-note is-window/.test(h)
+          && /data-coverage="0\.6[0-9]*"/.test(h)
+          // …y la nota lleva HORA en los DOS extremos, no una fecha suelta.
+          && (h.match(/\d{1,2}:\d{2}/g) || []).length >= 2
+          && h.indexOf('disponible desde') === -1; })(),
+      'la ventana efectiva se declara');
+    okA('C24.2 …y la cifra de la cartera es la de ESA ventana, no la de 24 h',
+      (async () => { const c = ctx24({ 'BTC-USD': { series: provider(MEDIANOCHE, 198, 0.0586, 60000) } });
+        const r = await run('_aurixComparison("24h", "btc", {})', c);
+        const ret = (s) => (s[s.length - 1].value / s[0].value - 1) * 100;
+        // La cartera subió ANTES de medianoche, así que en la ventana común
+        // está plana: ése es el ≈ −0,01 % de la captura. Lo que cambia es que
+        // ahora la card DICE sobre qué ventana lo mide.
+        return Math.abs(ret(r.mine)) < 0.05 && Math.abs(ret(r.other) - 5.86) < 0.05; })(),
+      'cifras de la captura');
+    okA('C24.3 S&P 500 fuera de mercado: 2,9 h de sesión ⇒ se declara, no se etiqueta 24H',
+      (async () => { const c = ctx24({ '^GSPC': { series: provider(APERTURA, 36, 0.004, 5000) } });
+        run('_intv14CmpSetState({ benchmarkId: "sp500", range: "24h" })', c);
+        const r = await run('_aurixComparison("24h", "sp500", {})', c);
+        const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(r) + ')', c);
+        return r.state === 'ready' && r.windowPartial === true
+          && r.coverage < 0.2                                  // 2,9/24 ≈ 0,12
+          && /intv14-cmp-note is-window/.test(h); })(),
+      'sesión de 3 h');
+    okA('C24.4 DENSIDAD · una comparación de 3 puntos NO se dibuja, y se dice por qué',
+      (async () => { const c = ctx24({ 'BTC-USD': { series: provider(AHORA - 2 * HH, 3, 0.01, 60000) } });
+        const r = await run('_aurixComparison("24h", "btc", {})', c);
+        const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(r) + ')', c);
+        return r.state === 'insufficient' && r.reason === 'too_few_common_points'
+          && r.mine === null && r.other === null
+          && h.indexOf(DICT.es.cmp_too_few) !== -1; })(),
+      'densidad mínima');
+    okA('C24.5 7D con cobertura casi completa NO se declara parcial (no se grita por nada)',
+      (async () => { const c = cmpCtx({ perf: PERF_OK,
+          feed: { 'BTC-USD': { series: MKT(T_0, 40, D1, 60000, 0.002) } } });
+        const r = await run('_aurixComparison("all", "btc", {})', c);
+        // 'all' no tiene nominal ⇒ nunca se declara parcial por cobertura.
+        return r.state === 'ready' && r.coverage === null && r.windowPartial === false; })());
+    okA('C24.6 30D · la ventana efectiva se declara SIN hora (no es intradía)',
+      (async () => { const HHb = 3600e3;
+        const fin = Date.UTC(2026, 8, 21, 16, 0), ini = fin - 30 * 24 * HHb;
+        const mine30 = (() => { const out = [];
+          for (let t = ini; t <= fin; t += 6 * HHb) out.push({ time: t, value: 100 * (1 + 0.05 * ((t - ini) / (fin - ini))) });
+          return out; })();
+        const c = cmpCtx({ perf: { valid: true, fallbackReason: null,
+            index: { basis: 'flow_neutral_index', base: 100, intervals: mine30.length - 1,
+              timestamps: mine30.map(p => p.time), values: mine30.map(p => p.value) } },
+          feed: { 'BTC-USD': { series: (() => { const o = [], from = fin - 10 * 24 * HHb;
+            for (let i = 0; i < 60; i++) o.push({ time: Math.round(from + i * (fin - from) / 59), value: 60000 * (1 + 0.03 * i / 59) });
+            return o; })() } } });
+        run('_intv14CmpSetState({ benchmarkId: "btc", range: "30d" })', c);
+        const r = await run('_aurixComparison("30d", "btc", {})', c);
+        const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(r) + ')', c);
+        return r.state === 'ready' && r.windowPartial === true && r.withHour === false
+          && /intv14-cmp-note is-window/.test(h)
+          && (h.match(/is-window[^<]*<\/p>|is-window">[^<]*/g) || []).join('').indexOf(':') === -1; })(),
+      '30D sin hora');
+  }
   ok('6.16 el comparador NO crea un segundo motor de rentabilidad',
     (() => { const src0 = fnSrc('_aurixComparison') + fnSrc('_aurixComparisonSync')
         + fnSrc('_aurixCmpAlign') + fnSrc('_aurixCmpBenchmarkSeries');

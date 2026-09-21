@@ -26894,6 +26894,9 @@ button.intv14-cmp-clear {
    periodo o quitar la comparación. */
 .intv14-cmp[data-loading="1"] .intv14-cmp-controls { opacity: 1; }
 .intv14-cmp-note.is-error { color: rgba(243, 207, 154, 0.9); }
+/* La ventana efectiva no es un error: es el dato que hace legible la cifra de
+   arriba. Se lee antes que una nota cualquiera, sin gritar. */
+.intv14-cmp-note.is-window { color: rgba(214, 228, 252, 0.78); }
 @media (prefers-reduced-motion: reduce) {
   button.intv14-cmp-range { transition: none !important; }
 }
