@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '697'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '698'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -24312,10 +24312,14 @@ function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults()
 //     construido y nada más;
 //   · ningún precio ni condición comercial — el paywall canónico es el owner.
 //
-// CABE SIN SCROLL EN MÓVIL VERTICAL, y no por recorte: la altura se reparte con
-// `min-height:0` + `flex` sobre `100dvh` menos las barras, así que en una pantalla
-// pequeña se comprime el ESPACIO y no el contenido. Con zoom o texto ampliado el
-// contenedor permite scroll (`overflow:auto`), que es lo que §2 exige y lo que
+// LA ALTURA LA PONE EL CONTENIDO. Aquí se afirmaba que la portada cabía SIEMPRE
+// sin scroll en móvil vertical porque `min-height:0` + `flex` «comprimían el
+// espacio y no el contenido». No era cierto —`gap` y `padding` no son encogibles,
+// así que flex sólo podía comprimir las CAJAS— y en 360×740 las imágenes, «Abrir»
+// y la última fila de capacidades acababan pintadas fuera de su tarjeta y encima
+// del CTA. El detalle completo, con las medidas, está sobre `.wsfc-stage` en
+// styles.css. Ahora las rejillas no se encogen y, cuando la suma no cabe, se
+// desplaza el contenedor (`overflow:auto`), que es lo que §2 exige y lo que
 // `overflow:hidden` habría roto.
 function _renderWorkspaceFreeCover() {
   const esc = _escapeWorkspaceText;

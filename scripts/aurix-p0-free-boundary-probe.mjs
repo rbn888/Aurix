@@ -172,6 +172,17 @@ async function load(w, h, mobile) {
     await sleep(250);
   }
   await sleep(600);
+  // ── PARA QUE LA CAPTURA MUESTRE LA APP, Y NO UN RECTÁNGULO NEGRO ──────────
+  // `#bootLoader` es la pantalla de arranque y `#appRoot` nace en `opacity:0`
+  // hasta que la sesión revela la app. Sin sesión, las dos cosas se quedan como
+  // están: las MEDIDAS eran correctas —`getBoundingClientRect` no depende de la
+  // opacidad— pero cada captura salía en negro. Se descubre la app por las mismas
+  // dos palancas de presentación que la sesión movería, y NO se toca una sola
+  // regla del layout que se está certificando.
+  await ev(`(function(){
+    var bl=document.getElementById('bootLoader'); if(bl) bl.remove();
+    var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1';
+    return true;})()`).catch(() => {});
   await assertUsableOrigin();
 }
 // Monta la persona escribiendo la superficie saneada del resolver. Nada más.
@@ -696,6 +707,185 @@ ok('D.free: un rail local falsificado no concede persistencia', await ev(`(funct
 // ══════════════════════════════════════════════════════════════════════════
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// GEOMETRÍA REAL DE LA PORTADA FREE DE WORKSPACE
+// ════════════════════════════════════════════════════════════════════════════
+// POR QUÉ ESTAS ASERCIONES EXISTEN, que es la parte que importa:
+//   este bloque daba VERDE mientras en 360×740 las dos imágenes se salían de su
+//   tarjeta, «Abrir» aterrizaba sobre la tarjeta siguiente y la última fila de
+//   capacidades se metía dentro del CTA. Podía darlo porque de toda la portada
+//   medía UN rectángulo —el del CTA— y de él sólo si su borde inferior entraba en
+//   el viewport. Nunca comparó dos elementos ENTRE SÍ, y un solape es por
+//   definición una relación entre dos cajas: con una sola caja es indetectable.
+//
+//   Y había un segundo agujero, más sutil: la causa raíz era que las rejillas se
+//   encogían por debajo de su contenido, así que `scrollHeight === clientHeight`
+//   en el contenedor. Para el motor de layout TODO CABÍA. Cualquier prueba
+//   construida sobre «¿cabe?» —incluida `document.scrollWidth/Height`— tenía que
+//   decir que sí. Por eso aquí se pregunta por CAJA CONTRA CONTENIDO en cada
+//   rejilla (`scrollHeight > clientHeight`) y por INTERSECCIÓN entre vecinos, que
+//   son las dos preguntas que el defecto no podía contestar en verde.
+//
+// SE MIDE CON EL CONTENEDOR AL FINAL DE SU RECORRIDO. Las intersecciones entre
+// hermanos del mismo scroller no dependen del scroll, pero la navegación inferior
+// es `position:fixed` y sí depende: el sitio donde el contenido puede quedar
+// debajo de la barra es el FINAL del desplazamiento, no el principio.
+const SHOTS = join(OUT, 'shots');
+async function wsfcGeometry(w, h, L) {
+  const tag = `${w}×${h} ${L.toUpperCase()}`;
+  // al final del recorrido: es donde la barra fija puede tapar
+  await ev(`(function(){var st=document.querySelector('#aurixWorkspace .wsfc-stage');
+    if(st) st.scrollTop = st.scrollHeight; window.scrollTo(0, document.documentElement.scrollHeight); return true;})()`);
+  await sleep(200);
+  const g = await J(`(function(){
+    var root=document.getElementById('aurixWorkspace');
+    var q=function(s){return root.querySelector(s);};
+    var qa=function(s){return [].slice.call(root.querySelectorAll(s));};
+    var R=function(e){if(!e)return null;var b=e.getBoundingClientRect();
+      return {t:+b.top.toFixed(1),b:+b.bottom.toFixed(1),l:+b.left.toFixed(1),r:+b.right.toFixed(1),w:+b.width.toFixed(1),h:+b.height.toFixed(1)};};
+    // 0,5 px de tolerancia: es subpíxel de redondeo, no holgura de diseño.
+    var hit=function(a,b){if(!a||!b)return false;
+      return !(a.b<=b.t+0.5 || b.b<=a.t+0.5 || a.r<=b.l+0.5 || b.r<=a.l+0.5);};
+    var ins=function(c,p){if(!c||!p)return false;
+      return c.t>=p.t-0.5 && c.b<=p.b+0.5 && c.l>=p.l-0.5 && c.r<=p.r+0.5;};
+    var stage=q('.wsfc-stage'), items=q('.wsfc-items'), capsUl=q('.wsfc-caps');
+    if(!stage||!items||!capsUl) return JSON.stringify({missing:true});
+    var cardEls=qa('.wsfc-item');
+    var cards=cardEls.map(R);
+    var shots=qa('.wsfc-item-shot').map(R);
+    var imgs=qa('.wsfc-item-shot .ws-asset-img');
+    var names=qa('.wsfc-item-name').map(R), descs=qa('.wsfc-item-desc').map(R), opens=qa('.wsfc-item-open').map(R);
+    var caps=qa('.wsfc-cap').map(R), capEls=qa('.wsfc-cap');
+    var disc=R(q('.wsfc-disc-label')), cta=R(q('.wsfc-cta')), ctaEl=q('.wsfc-cta');
+    // La barra inferior sólo cuenta si está PINTADA: en escritorio está oculta y
+    // medir su rectángulo de ceros daba un falso rojo en 1366 y 1440.
+    var navEl=document.getElementById('bottomNav');
+    var navVis=!!navEl && getComputedStyle(navEl).display!=='none' && navEl.getBoundingClientRect().height>0;
+    var nav=navVis?R(navEl):null;
+    // «object-fit:cover» y caja con dimensiones controladas: se pregunta al estilo
+    // computado, no al que creemos haber escrito.
+    var imgFit=imgs.map(function(i){var s=getComputedStyle(i);return s.objectFit;});
+    var shotBox=qa('.wsfc-item-shot').map(function(e){var s=getComputedStyle(e);
+      return {w:s.width,h:s.height,ov:s.overflow};});
+    // Texto recortado: caja de render contra caja de contenido, elemento a elemento.
+    var textEls=qa('.wsfc-title,.wsfc-sub,.wsfc-eyebrow,.wsfc-block-label,.wsfc-item-name,.wsfc-item-desc,.wsfc-item-open,.wsfc-cap-name,.wsfc-cta');
+    var clipped=textEls.filter(function(e){
+      return e.scrollWidth>e.clientWidth+1 || e.scrollHeight>e.clientHeight+1;
+    }).map(function(e){return String(e.className||'')+':'+e.scrollWidth+'x'+e.scrollHeight+'>'+e.clientWidth+'x'+e.clientHeight;});
+    return JSON.stringify({
+      cardCount:cards.length,
+      // 1 · cada imagen, entera dentro de su tarjeta
+      imgInCard: shots.map(function(sh,i){return ins(sh,cards[i]);}),
+      imgLoaded: [].map.call(imgs,function(i){return i.naturalWidth>0;}),
+      imgFit: imgFit, shotBox: shotBox,
+      // 2 · título, descripción y «Abrir», dentro de su tarjeta
+      nameInCard: names.map(function(x,i){return ins(x,cards[i]);}),
+      descInCard: descs.map(function(x,i){return ins(x,cards[i]);}),
+      openInCard: opens.map(function(x,i){return ins(x,cards[i]);}),
+      // 3 · la primera tarjeta no interseca la segunda, y están separadas
+      //   LA FORMA LA DICTA LA REJILLA, NO LA SONDA. «Apiladas» es el contrato de
+      //   MÓVIL; a partir de 560px la portada pone las dos tarjetas en paralelo a
+      //   propósito. Se lee el número REAL de columnas del estilo computado y se
+      //   exige simetría en el eje que corresponda: exigir siempre apilado ponía
+      //   en rojo tablet y escritorio por un layout que es el correcto.
+      // La FORMA se deduce de la GEOMETRÍA, y no de parsear grid-template-columns.
+      //   Motivo concreto, y es un error que esta sonda ya cometió: la expresión
+      //   viaja dentro de un template literal, donde la secuencia barra-s no es un
+      //   escape válido y JS la colapsa a una simple s. El split acabó partiendo
+      //   por la letra «s» y contando UNA columna en un layout de dos.
+      //   Dos tarjetas comparten fila si comparten borde superior; si no, están
+      //   apiladas. Eso es observable y no depende de cómo se escriba el CSS.
+      cardsSideBySide: cards.length===2 ? Math.abs(cards[0].t-cards[1].t)<=1 : false,
+      cardsHit: cards.length===2 ? hit(cards[0],cards[1]) : true,
+      cardGapY: cards.length===2 ? +(cards[1].t-cards[0].b).toFixed(1) : null,
+      cardGapX: cards.length===2 ? +(cards[1].l-cards[0].r).toFixed(1) : null,
+      cardWidthDelta: cards.length===2 ? +Math.abs(cards[0].w-cards[1].w).toFixed(1) : null,
+      cardHeightDelta: cards.length===2 ? +Math.abs(cards[0].h-cards[1].h).toFixed(1) : null,
+      cardLeftDelta: cards.length===2 ? +Math.abs(cards[0].l-cards[1].l).toFixed(1) : null,
+      cardTopDelta: cards.length===2 ? +Math.abs(cards[0].t-cards[1].t).toFixed(1) : null,
+      // 4 · el encabezado de capacidades empieza tras el borde REAL de la 2ª
+      discAfterCards: (disc && cards.length===2) ? (disc.t >= cards[1].b-0.5) : false,
+      discHit: cards.some(function(c){return hit(c,disc);}),
+      // 5 · las capacidades, ni bajo el CTA ni bajo la navegación
+      capsHitCta: caps.some(function(c){return hit(c,cta);}),
+      capsUnderNav: nav ? caps.some(function(c){return c.b>nav.t+0.5;}) : false,
+      capsHitDisc: caps.some(function(c){return hit(c,disc);}),
+      // 6 · el CTA no interseca NADA, y sigue siendo alcanzable
+      ctaHitAny: [].concat(cards,caps,[disc]).some(function(x){return hit(cta,x);}),
+      ctaReachable: !!cta && cta.b<=window.innerHeight+0.5 && cta.t>=0,
+      ctaAboveNav: nav ? cta.b<=nav.t+0.5 : true,
+      ctaH: cta?cta.h:0,
+      // LA PREGUNTA QUE EL DEFECTO NO PODÍA CONTESTAR EN VERDE:
+      // ¿mide cada rejilla al menos lo que mide su contenido?
+      itemsBoxFitsContent: items.scrollHeight<=items.clientHeight+1,
+      capsBoxFitsContent: capsUl.scrollHeight<=capsUl.clientHeight+1,
+      itemsBox:items.clientHeight, itemsContent:items.scrollHeight,
+      capsBox:capsUl.clientHeight, capsContent:capsUl.scrollHeight,
+      // 7 · cero overflow horizontal, en el documento y en el propio contenedor
+      docOverflowX: document.documentElement.scrollWidth>window.innerWidth+1,
+      stageOverflowX: stage.scrollWidth>stage.clientWidth+1,
+      // 8 · cero texto recortado
+      clipped: clipped,
+      // objetivos táctiles
+      taps: cardEls.concat([ctaEl]).filter(Boolean).map(function(e){var b=e.getBoundingClientRect();
+        return Math.round(Math.min(b.width,b.height));}),
+      capNotButton: capEls.every(function(e){return e.tagName==='LI' && !e.querySelector('button');})
+    });})()`);
+  if (g.missing) { ok(`E.${tag} portada Workspace presente`, false, 'sin .wsfc-stage'); return; }
+  const all = a => Array.isArray(a) && a.length > 0 && a.every(Boolean);
+  ok(`E.${tag} WSFC · cada imagen, ENTERA dentro de su tarjeta`,
+    g.cardCount === 2 && all(g.imgInCard) && all(g.imgLoaded)
+    && g.imgFit.every(f => f === 'cover') && g.shotBox.every(b => b.ov === 'hidden' && parseFloat(b.w) > 0 && parseFloat(b.h) > 0),
+    JSON.stringify({ dentro: g.imgInCard, cargada: g.imgLoaded, fit: g.imgFit, caja: g.shotBox }));
+  ok(`E.${tag} WSFC · título, descripción y «Abrir», dentro de su tarjeta`,
+    all(g.nameInCard) && all(g.descInCard) && all(g.openInCard),
+    JSON.stringify({ n: g.nameInCard, d: g.descInCard, o: g.openInCard }));
+  const apiladas = !g.cardsSideBySide;
+  ok(`E.${tag} WSFC · las dos tarjetas: ${apiladas ? 'apiladas' : 'en paralelo'}, separadas y simétricas`,
+    g.cardsHit === false && g.cardWidthDelta <= 1
+    && (apiladas ? (g.cardGapY > 0 && g.cardLeftDelta <= 1)
+                 : (g.cardGapX > 0 && g.cardTopDelta <= 1 && g.cardHeightDelta <= 1)),
+    JSON.stringify({ enParalelo: g.cardsSideBySide, solape: g.cardsHit, sepY: g.cardGapY, sepX: g.cardGapX,
+      Δancho: g.cardWidthDelta, Δalto: g.cardHeightDelta, Δizq: g.cardLeftDelta, Δtop: g.cardTopDelta }));
+  // El contrato de MÓVIL, explícito y sin depender de la rejilla: en un teléfono
+  // las dos tarjetas van una debajo de otra, nunca en paralelo.
+  if (w < 560) ok(`E.${tag} WSFC · en móvil las dos tarjetas van APILADAS`,
+    g.cardsSideBySide === false && g.cardGapY > 0, JSON.stringify({ enParalelo: g.cardsSideBySide, sepY: g.cardGapY }));
+  ok(`E.${tag} WSFC · el encabezado de capacidades empieza tras el borde REAL de la 2ª tarjeta`,
+    g.discAfterCards === true && g.discHit === false && g.capsHitDisc === false,
+    JSON.stringify({ tras: g.discAfterCards, solapeTarjeta: g.discHit, solapeCaps: g.capsHitDisc }));
+  ok(`E.${tag} WSFC · las capacidades, ni bajo el CTA ni bajo la navegación`,
+    g.capsHitCta === false && g.capsUnderNav === false,
+    JSON.stringify({ cta: g.capsHitCta, nav: g.capsUnderNav }));
+  ok(`E.${tag} WSFC · el CTA no interseca nada, es alcanzable y queda sobre la navegación`,
+    g.ctaHitAny === false && g.ctaReachable === true && g.ctaAboveNav === true && g.ctaH >= 44,
+    JSON.stringify({ interseca: g.ctaHitAny, alcanzable: g.ctaReachable, sobreNav: g.ctaAboveNav, alto: g.ctaH }));
+  // LA ASERCIÓN DE CAUSA RAÍZ. Si alguien vuelve a declarar las rejillas
+  // encogibles para forzar que «quepa», esta línea se pone roja sola.
+  ok(`E.${tag} WSFC · ninguna rejilla se pinta fuera de su caja`,
+    g.itemsBoxFitsContent === true && g.capsBoxFitsContent === true,
+    JSON.stringify({ tarjetas: g.itemsBox + '←' + g.itemsContent, capacidades: g.capsBox + '←' + g.capsContent }));
+  ok(`E.${tag} WSFC · cero overflow horizontal y cero texto recortado`,
+    g.docOverflowX === false && g.stageOverflowX === false && g.clipped.length === 0,
+    JSON.stringify({ doc: g.docOverflowX, stage: g.stageOverflowX, recortado: g.clipped }));
+  ok(`E.${tag} WSFC · objetivos táctiles ≥ 44 px y capacidades que no son botones`,
+    g.taps.every(x => x >= 44) && g.capNotButton === true, JSON.stringify({ taps: g.taps, li: g.capNotButton }));
+  // ── LA CAPTURA, QUE HAY QUE MIRAR ─────────────────────────────────────────
+  // Dos: la portada al entrar y el final del recorrido. Las medidas de arriba no
+  // sustituyen a mirarlas —la primera versión de esta sonda las guardaba en negro
+  // porque `#appRoot` seguía en `opacity:0`, y ninguna medida lo delató—.
+  mkdirSync(SHOTS, { recursive: true });
+  const shot = async (suf) => {
+    const png = await S('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(join(SHOTS, `wsfc-${w}x${h}-${L}-${suf}.png`), Buffer.from(png.data, 'base64'));
+  };
+  await shot('fin');
+  await ev(`(function(){var st=document.querySelector('#aurixWorkspace .wsfc-stage');
+    if(st) st.scrollTop=0; window.scrollTo(0,0); return true;})()`);
+  await sleep(200);
+  await shot('inicio');
+}
+
 if (run('E')) {
 console.log('\nE · VISUAL RESPONSIVE');
 // ══════════════════════════════════════════════════════════════════════════
@@ -789,9 +979,21 @@ for (const [w, h] of VIEWPORTS) {
         return JSON.stringify({top:Math.round(r.top),bottom:Math.round(r.bottom),vh:window.innerHeight,
           h:Math.round(r.height),docOverflowX:document.documentElement.scrollWidth>window.innerWidth+1,
           pageScroll:Math.max(0, document.documentElement.scrollHeight - window.innerHeight)});})()`);
-      ok(`E.${w}×${h} ${L.toUpperCase()} CTA de la portada ${pname} visible sin scroll`,
-        !c.missing && c.bottom <= c.vh && c.h >= 44 && c.docOverflowX === false, JSON.stringify(c));
-      if (pname === 'intelligence') await ev(`(function(){ if (window.__realFacts) _aurixIntelligencePreviewFacts = window.__realFacts; return true; })()`);
+      // La portada de Workspace YA NO exige el CTA sobre el pliegue, y la razón es
+      // el P0 que este bloque no supo ver. Esa exigencia es la que empujó a
+      // declarar las dos rejillas encogibles para que todo «cupiera»: en 360×740
+      // cupo la CAJA y no el CONTENIDO, y las imágenes, «Abrir» y la última fila de
+      // capacidades acabaron pintadas fuera de su tarjeta y sobre el CTA. Lo que se
+      // exige ahora es lo que de verdad importa: que el CTA sea ALCANZABLE, que
+      // mida lo que debe medir y que no tape nada. El de Intelligence no comparte
+      // ni el defecto ni el owner de CSS, así que conserva su contrato.
+      if (pname === 'intelligence') {
+        ok(`E.${w}×${h} ${L.toUpperCase()} CTA de la portada ${pname} visible sin scroll`,
+          !c.missing && c.bottom <= c.vh && c.h >= 44 && c.docOverflowX === false, JSON.stringify(c));
+        await ev(`(function(){ if (window.__realFacts) _aurixIntelligencePreviewFacts = window.__realFacts; return true; })()`);
+      } else {
+        await wsfcGeometry(w, h, L);
+      }
     }
   }
 }

@@ -26991,18 +26991,34 @@ button.intv14-cmp-clear {
 /* ════════════════════════════════════════════════════════════════════════════
    WORKSPACE COMPLETION · §2 — PORTADA FREE
    ════════════════════════════════════════════════════════════════════════════
-   CABE SIN SCROLL EN MÓVIL VERTICAL, y la forma importa: la altura disponible se
-   reparte con flex sobre `100dvh` menos la cabecera y la navegación inferior, así
-   que en una pantalla corta se comprime el ESPACIO (gaps y paddings) y nunca el
-   contenido. `100dvh` y no `100vh` porque en el navegador móvil la barra de URL
-   aparece y desaparece: con `100vh` la portada medía siempre la pantalla SIN
-   barras y el CTA quedaba justo debajo del borde.
+   EL CONTENIDO MANDA SOBRE LA ALTURA, y esto es la corrección de un P0 visual.
+   Antes esta portada afirmaba caber SIEMPRE sin scroll en móvil vertical: la
+   altura se acotaba a `100dvh` menos cabecera y navegación, y las dos rejillas
+   —tarjetas y capacidades— se declaraban encogibles (`flex:0 1 auto` +
+   `min-height:0`) «para que se comprimiera el ESPACIO y nunca el contenido».
+   Esa frase describía algo que el modelo de caja no puede hacer: `gap` y
+   `padding` NO son encogibles, así que lo único que flex podía comprimir era la
+   caja de cada rejilla. En 360×740 la caja de las tarjetas quedó en 153,9 px para
+   170 px de contenido y la de capacidades en 127,2 px para 174 px — y como las
+   rejillas de dentro conservan su tamaño, se pintaron FUERA de su caja: la imagen
+   de cada tarjeta 15,3 px por debajo de su borde, «Abrir» sobre la tarjeta
+   siguiente y la última fila de capacidades 46,8 px dentro del CTA.
+
+   Y lo peor: `scrollHeight === clientHeight`. Al encogerse obedientemente, para el
+   motor de layout TODO CABÍA, así que el `overflow:auto` de abajo no llegaba a
+   producir barra nunca y ninguna medida de «¿cabe?» podía delatar el solape.
+
+   Ahora las rejillas NO se encogen (`flex:0 0 auto`): cada caja mide lo que mide
+   su contenido y, cuando la suma no cabe, el que se desplaza es el contenedor
+   —que para eso es `overflow:auto`—. El CTA viaja en el flujo normal, al final:
+   con altura de sobra `margin-top:auto` lo ancla abajo, y sin ella se alcanza
+   desplazándose. No se queda fijo tapando tarjetas, que es la otra mitad del
+   mismo defecto. `100dvh` y no `100vh` porque en el navegador móvil la barra de
+   URL aparece y desaparece.
 
    Lo que §2 prohíbe explícitamente y aquí no se usa: `overflow:hidden` para
-   esconder lo que no cabe, y tipografías diminutas. El contenedor permite scroll
-   accesible (`overflow:auto`), que es lo que salva el caso de zoom o texto
-   ampliado: ahí el contenido deja de caber por decisión del usuario y la respuesta
-   correcta es dejarle desplazarse, no recortarle la frase. */
+   esconder lo que no cabe, alturas rígidas que disimulen el desbordamiento, y
+   tipografías diminutas. */
 .wsfc { display: block; }
 .wsfc-stage {
   /* `--aurix-ws-chrome` declara lo que ocupan cabecera + navegación inferior +
@@ -27034,7 +27050,9 @@ button.intv14-cmp-clear {
 /* Los accesos incluidos. Dos columnas en cuanto el ancho las hace legibles; una
    sola por debajo, que es fallback por ANCHO y no una rejilla a medio usar. */
 .wsfc-items {
-  flex: 0 1 auto; min-height: 0;
+  /* `0 0 auto`, y el `min-height:0` retirado: una rejilla encogible bajo una
+     altura acotada se queda más corta que sus tarjetas y las pinta por fuera. */
+  flex: 0 0 auto;
   display: grid; grid-template-columns: 1fr; gap: 10px;
 }
 .wsfc-item {
@@ -27104,7 +27122,9 @@ button.intv14-cmp-clear {
    elipsis, porque cortar el nombre de una capacidad es exactamente perder lo que
    esta superficie viene a demostrar. */
 .wsfc-caps {
-  flex: 0 1 auto; min-height: 0; list-style: none; margin: 0; padding: 0;
+  /* Misma razón que `.wsfc-items`: la tercera fila salía 46,8 px fuera de su caja
+     y aterrizaba encima del CTA. */
+  flex: 0 0 auto; list-style: none; margin: 0; padding: 0;
   display: grid; grid-template-columns: 1fr 1fr; gap: 9px;
 }
 .wsfc-cap {

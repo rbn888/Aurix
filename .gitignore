@@ -11,6 +11,11 @@ docs/*-preview/
 # Visual-QA captures: the repo root IS the Pages site, so 2.5 MB of PNGs would be
 # published and bloat every deploy. The measurements JSON is the committed evidence.
 docs/*-visual-qa/*.png
+# Misma regla para las capturas de la portada Free (Chrome y WebKit): 11,7 MB de
+# PNG por pasada. Se miran, se archivan en local y lo que se commitea es la
+# medición — `docs/p0-free-boundary/measurements.json`.
+docs/p0-free-boundary/shots/
+docs/p0-free-boundary/shots-webkit/
 
 # Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
 supabase/.temp/
