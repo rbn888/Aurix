@@ -91,9 +91,9 @@ function extractDict(langIdx) {
     'intel_h_v_weak','intel_h_v_watch','intel_h_v_stable','intel_h_v_balanced',
     'intel_h_v_solid','intel_h_v_excellent','intel_dock_label',
     'intel_now_monitoring','intel_sub_monitoring',
-    'intel_now_material','intel_now_discovery','intel_now_changed','intel_now_stable_nc',
+    'intel_now_material','intel_now_discovery','intel_now_changed',
     'intel_now_stable','intel_now_history','intel_now_context',
-    'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
+    'intel_sub_material','intel_sub_changed','intel_sub_history',
     'intel_d_apparent','intel_d_conc_rising','intel_d_capital','intel_d_intent','intel_d_liq_need',
     // §17 — `intel_d_persisting` RETIRADA con su descubrimiento: «esta lectura
     // sigue igual tras 11 observaciones» no dice qué condición, ni durante qué
@@ -129,10 +129,10 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
-  '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
+  '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -147,7 +147,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
-  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryRows','_intelDiscoveryText',
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText',
   '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned',
   '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
@@ -161,7 +161,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -173,6 +173,24 @@ function makeCtx(opts) {
   sb.usdToEur = 0.92;
   sb.lang = o.lang || 'es';
   sb._aurixFxRate = c => ({ USD: 1, EUR: 0.92 })[String(c).toUpperCase()];
+  // ── EL RELOJ DE LA FIXTURE ────────────────────────────────────────────
+  // «Hoy» se mide contra un reloj, no contra el último snapshot (checkpoint F).
+  // Las fixtures de este gate mezclan filas ancladas a una constante con flujos
+  // anclados a `Date.now()`, así que sin fijar el presente unas serían de hoy y
+  // otras de hace un año. Se declara: el presente de la fixture es el final de
+  // su propia serie. Producción sigue usando `Date.now()`; esto vive sólo aquí.
+  sb._aurixNow = () => {
+    // La serie de observación que construye el Core sale de `categoryHistory`
+    // —las filas LOCALES—, y es ésa la que fecha las ventanas de los hechos.
+    // Estas fixtures anclan las filas locales a una constante y los snapshots
+    // de servidor a `Date.now()`: hay quince meses entre unas y otros. Tomar el
+    // máximo de los dos dejaba todos los hechos «viejos» y vaciaba las cards.
+    // El presente de la fixture es el final de la serie que la fecha.
+    const rows = (o.rows && o.rows.length) ? o.rows : (o.serverRows || []);
+    const last = rows.length ? rows[rows.length - 1] : null;
+    const ts = last && (last.ts != null ? last.ts : last.time);
+    return Number.isFinite(ts) ? ts : Date.now();
+  };
   sb.t = k => DICT[sb.lang][k];
   sb._escapeWorkspaceText = s => String(s == null ? '' : s);
   sb.reducedMotion = true;
@@ -486,7 +504,13 @@ console.log('\n4 · What Changed is financially honest:');
   // now lives inline beside the disclaimer) and check nothing else asserts one.
   const withoutQuality = html
     .replace(/<section class="intcc-card intv4-quality"[\s\S]*?<\/section>/g, '')
-    .replace(/<span class="intv5-honesty">[\s\S]*?<\/span>/g, '');
+    // CHECKPOINT J — la limitación se mudó del pie a la card de Factores, que
+    // es el análisis que limita. El invariante no cambia: fuera de esa línea,
+    // NADA puede atribuir rendimiento por posición.
+    .replace(/<p class="intcc-drv-limit">[\s\S]*?<\/p>/g, '')
+    // CHECKPOINT J — la limitación de atribución ya no vive en Factores: va a
+    // la card cuya afirmación acota (Hoy o Evolución). El invariante no cambia.
+    .replace(/<p class="intcc-surface-limit">[\s\S]*?<\/p>/g, '');
   ok('4.4 no per-position attribution of return is asserted',
     !/explic[oó]|explained by|atribu/i.test(withoutQuality));
   // A1 · RE-DECIDIDO. El invariante real es que una deriva NUNCA se enuncie como
@@ -677,9 +701,17 @@ console.log('\n11 · A limit is explained, never turned into a figure:');
   // INT.05 §6 — a permanent giant card is not the right weight for this. The
   // limit is now a quiet line beside the disclaimer, and Explore still offers it
   // as a full question when it is genuinely relevant.
-  const sec = (html.match(/<span class="intv5-honesty">([\s\S]*?)<\/span>/) || [, ''])[1];
-  ok('11.1 the honest limit is published as an inline line, not a giant card',
-    !!sec && !/intv4-quality/.test(html));
+  const sec = (html.match(/<p class="intcc-(?:drv|surface)-limit">([\s\S]*?)<\/p>/) || [, ''])[1];
+  ok('11.1 the honest limit is an inline line inside the analysis it limits, not a giant card',
+    !!sec && !/intv4-quality/.test(html)
+    // …y ya no cuelga del disclaimer global, que vuelve a decir una sola cosa.
+    && !/intv5-honesty/.test(html)
+    // CHECKPOINT J — la de atribución vive en «Lo que importa hoy» o en «Tu
+    // evolución», nunca en Factores: el ranking de exposición es exacto y no
+    // tiene por qué pedir perdón por algo que hace bien.
+    && (/intv5-matters[\s\S]*intcc-surface-limit/.test(html)
+        || /intv4-memory[\s\S]*intcc-surface-limit/.test(html))
+    && !/intcc-drivers[\s\S]*?intcc-drv-limit/.test(html));
   ok('11.2 it contains no percentage and no currency figure',
     !/\d+([.,]\d+)?\s*%/.test(sec) && !/[€$]\s?\d/.test(sec), sec.slice(0, 240));
   ok('11.3 a raw status token never leaks to the UI',
@@ -1190,12 +1222,22 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
     && /data-compact="1"/.test(young.html)
     && /Aún no hay historial suficiente para mostrar tu evolución/.test(young.html)
     && !/intv6-accrue-node/.test(young.html));
-  ok('15.11 historia SÍ pero estable ⇒ estado propio, con fecha y observaciones',
+  // ── CHECKPOINT G · «ESTABLE» ERA UN VEREDICTO QUE NADIE HABÍA MEDIDO ───
+  // Este assert exigía literalmente «se mantiene estable desde el …» y
+  // «observaciones». Las dos cosas son justo lo que el checkpoint retira: la
+  // primera convierte «no detecté un evento material» en una afirmación sobre
+  // el patrimonio, y la segunda publica un contador interno. El estado pasa a
+  // declarar COBERTURA, que es lo único que Aurix sabe aquí.
+  ok('15.11 historia SÍ pero sin hechos ⇒ se declara COBERTURA, no estabilidad',
     (() => { const flat = render(Object.assign({}, MATURE, {
         rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] }));
       const m = section(flat.html, 'intcc-timeline');
-      return /intv4-memory is-stable/.test(m) && !/is-accruing/.test(m)
-        && /se mantiene estable desde el/.test(m) && /observaciones/.test(m); })(),
+      return /intv4-memory is-coverage/.test(m) && !/is-accruing/.test(m)
+        && /historial certificado/.test(m)
+        && /data-coverage-days="\d+"/.test(m)
+        // …y NI UN contador interno ni la palabra retirada.
+        && !/observacion/i.test(m) && !/memoria/i.test(m)
+        && !/se mantiene estable/.test(m); })(),
     section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] })).html, 'intcc-timeline').slice(0, 400));
 
   // ── E · QUÉ HA CAMBIADO ──────────────────────────────────────────────────

@@ -28,6 +28,9 @@
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+// El gate se lee a sí mismo para poder afirmar que una certificación previa
+// SIGUE existiendo, sin duplicar su medición aquí.
+const s_self = fs.readFileSync(__filename, 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
 function blockOf(a,z){ const i=app.indexOf(a); if(i<0) throw new Error('missing '+a);
   const e=app.indexOf(z,i); return app.slice(i,e+z.length); }
@@ -91,6 +94,9 @@ function extractDict(langIdx) {
     'intcc_band_empty','intcc_eyebrow','intcc_radar_title','intcc_drivers_title','intcc_drv_explain_asset',
     'intcc_drv_explain_cash','intcc_drv_kind_eng','intcc_drv_kind_liq','intcc_drv_none',
     'intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
+    // CHECKPOINT B — el limitador y la dimensión no medible: sin estas claves
+    // el renderer emite una etiqueta VACÍA, que es el defecto que venían a cerrar.
+    'intcc_chip_limit_spread','intcc_chip_nodata','intv4_brief_stale','intv4_brief_stale_note',
     'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
     'intcc_read_balanced','intcc_sub_attention','intcc_sub_concentrated','intcc_sub_growing',
     'intcc_sub_healthy','intcc_sub_balanced',
@@ -121,9 +127,9 @@ function extractDict(langIdx) {
     'intel_h_v_weak','intel_h_v_watch','intel_h_v_stable','intel_h_v_balanced',
     'intel_h_v_solid','intel_h_v_excellent','intel_dock_label',
     'intel_now_monitoring','intel_sub_monitoring',
-    'intel_now_material','intel_now_discovery','intel_now_changed','intel_now_stable_nc',
+    'intel_now_material','intel_now_discovery','intel_now_changed',
     'intel_now_stable','intel_now_history','intel_now_context',
-    'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
+    'intel_sub_material','intel_sub_changed','intel_sub_history',
     'intel_d_apparent','intel_d_conc_rising','intel_d_capital','intel_d_intent','intel_d_liq_need',
     // §17 — `intel_d_persisting` RETIRADA con su descubrimiento: «esta lectura
     // sigue igual tras 11 observaciones» no dice qué condición, ni durante qué
@@ -184,10 +190,10 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
-  '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
-  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT',
-  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
+  '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_INTCC_HEALTH_DIM_LABEL','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT',
+  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -195,14 +201,14 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow','_aurixCatExposureDelta',
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
   '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore',
-  '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
+  '_aurixHealthScore','_intccScoreTone','_intccHealthLimiters','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
   '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
-  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryRows','_intelDiscoveryText',
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText',
   '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned',
   '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
@@ -218,7 +224,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -230,6 +236,24 @@ function makeCtx(opts) {
   sb.usdToEur = 0.92;
   sb.lang = o.lang || 'es';
   sb._aurixFxRate = c => ({ USD: 1, EUR: 0.92 })[String(c).toUpperCase()];
+  // ── EL RELOJ DE LA FIXTURE ────────────────────────────────────────────
+  // «Hoy» se mide contra un reloj, no contra el último snapshot (checkpoint F).
+  // Las fixtures de este gate mezclan filas ancladas a una constante con flujos
+  // anclados a `Date.now()`, así que sin fijar el presente unas serían de hoy y
+  // otras de hace un año. Se declara: el presente de la fixture es el final de
+  // su propia serie. Producción sigue usando `Date.now()`; esto vive sólo aquí.
+  sb._aurixNow = () => {
+    // La serie de observación que construye el Core sale de `categoryHistory`
+    // —las filas LOCALES—, y es ésa la que fecha las ventanas de los hechos.
+    // Estas fixtures anclan las filas locales a una constante y los snapshots
+    // de servidor a `Date.now()`: hay quince meses entre unas y otros. Tomar el
+    // máximo de los dos dejaba todos los hechos «viejos» y vaciaba las cards.
+    // El presente de la fixture es el final de la serie que la fecha.
+    const rows = (o.rows && o.rows.length) ? o.rows : (o.serverRows || []);
+    const last = rows.length ? rows[rows.length - 1] : null;
+    const ts = last && (last.ts != null ? last.ts : last.time);
+    return Number.isFinite(ts) ? ts : Date.now();
+  };
   sb.t = k => DICT[sb.lang][k];
   // EL ESCAPER ES EL REAL, no un pass-through. `<1%` (§12) contiene un `<`, así
   // que un stub que no escapa publicaría en el gate un HTML distinto del de
@@ -945,9 +969,49 @@ console.log('\n§8 · etiquetas con evidencia');
         && !tiny.some(c => c.tone === 'context'); })(),
     JSON.stringify(CHIPS([], { band: 'weight_in_few' }, { context: { fields: {
       concentration_intent: { value: 'deliberate', provenance: 'user_answer', subject: 'Bitcoin' } } } })));
-  ok('8.7c la lista de Salud en móvil sólo puede contener confirmaciones verificadas',
-    /goodChips = chips\.filter\(c => c && c\.tone !== 'context'\)/.test(fnSrc('_renderIntelligenceCommandCenter'))
-    && /goodChips\.map\(c => `<li class="intcc-m-concl-row/.test(fnSrc('_renderIntelligenceCommandCenter')));
+  // ── CHECKPOINT B · LA REGLA CAMBIÓ, Y CON ELLA LO QUE HAY QUE MEDIR ────
+  // Este assert exigía `goodChips.map(...)` LITERAL: fosilizaba la
+  // implementación, no el invariante. Y el invariante de entonces —«sólo
+  // confirmaciones»— es justo lo que el checkpoint B corrige: la lista tiene
+  // que poder decir qué limita la cifra. Lo que NO puede cambiar es que el
+  // «✓» signifique confirmado.
+  ok('8.7c el «✓» de la lista de Salud sólo acompaña a una CONFIRMACIÓN',
+    (() => { const src0 = fnSrc('_renderIntelligenceCommandCenter');
+      const m = src0.match(/intcc-m-concl-check"[^>]*>\$\{([^}]*)\}/);
+      return !!m && /c\.tone === 'good' \? '✓'/.test(m[1]); })());
+  ok('8.7f …y ninguna fila NO verificada lo lleva, medido sobre el HTML pintado',
+    (() => { const h = render(CUENTA_B).html;
+      const rows = h.match(/<li class="intcc-m-concl-row is-([a-z]+)"><span class="intcc-m-concl-check"[^>]*>([^<]*)</g) || [];
+      return rows.every((r) => /is-good"/.test(r) === /✓/.test(r)); })(),
+    JSON.stringify((render(CUENTA_B).html.match(/intcc-m-concl-row is-[a-z]+/g) || [])));
+  // NO-VACUIDAD. Sin esto, 8.7f pasa con la lista vacía y con el limitador
+  // nunca emitido — que es exactamente el defecto que el checkpoint B cierra.
+  ok('8.7g el limitador SE EMITE de verdad: Salud publica por qué no es mayor',
+    (() => { const h = render(CUENTA_B).html;
+      return /class="intcc-chip is-limit"/.test(h)
+        && /equivale a/.test(h) && /con el mismo peso/.test(h)
+        && /registradas/.test(h); })(),
+    JSON.stringify(attrs(render(CUENTA_B).html, 'class="intcc-chip is-([a-z]+)"')));
+  ok('8.7g2 la frase del limitador es LENGUAJE DE USUARIO, no la fórmula leída',
+    (() => { const es = DICT.es.intcc_chip_limit_spread('2,5', 4);
+      const en = DICT.en.intcc_chip_limit_spread('2.5', 4);
+      return !/^Tu peso/.test(es) && !/tu peso se reparte/i.test(es)
+        && /equivale a 2,5 posiciones con el mismo peso, de las 4 registradas/.test(es)
+        && !/^Your weight/.test(en) && /equally weighted/.test(en)
+        // …y sigue diciendo EXACTAMENTE lo que el owner calcula: los dos términos.
+        && es.indexOf('2,5') !== -1 && es.indexOf('4') !== -1; })(),
+    DICT.es.intcc_chip_limit_spread('2,5', 4));
+  ok('8.7h el limitador sale del MISMO owner que la cifra, no de una derivación',
+    /limiters:\s*_intccHealthLimiters\(h\)/.test(fnSrc('_intccHealthScore'))
+    && /\(\(score && score\.limiters\) \|\| \[\]\)/.test(fnSrc('_intv5Chips')));
+  ok('8.7i con el anillo NO publicable no se añade una segunda frase encima del estado',
+    /h\.ringPublishable && Number\.isFinite\(h\.ring\) && h\.ring < 100/.test(fnSrc('_intccHealthLimiters')));
+  ok('8.7j una dimensión no medible se DECLARA, nunca se penaliza',
+    (() => { const src0 = fnSrc('_intccHealthLimiters');
+      return /!== _AURIX_AI_AVAIL\.AVAILABLE/.test(src0)
+        && /tone: 'unknown'/.test(src0) && !/tone: 'warn'/.test(src0); })());
+  ok('8.7e el contexto declarado sigue SIN entrar en la lista de Salud',
+    /goodChips = chips\.filter\(c => c && c\.tone !== 'context'\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
   ok('8.10 en la CUENTA A no se fabrica una etiqueta verde para rellenar',
     (() => { const h = render(CUENTA_A).html;
       const chips = attrs(h, 'class="intcc-chip is-(good)"');
@@ -1088,9 +1152,13 @@ console.log('\n§10 · acuse de recibo');
   ok('10.6 el owner devuelve FALSO cuando no puede atribuir el acuse a un dueño',
     /return okw;/.test(fnSrc('_aurixIntelAcknowledge'))
     && /if \(!conceptId\) return false;/.test(fnSrc('_aurixIntelAcknowledge')));
+  // CHECKPOINT H — la lista sigue siendo el HISTORIAL completo (`all: true`);
+  // lo único que se añade es la exclusión de lo que «Lo que importa hoy» ya
+  // reclamó, que no borra nada: mueve el hecho de superficie.
   ok('10.7 el acuse NO borra la fila del historial: cambia de estado',
     /rows\.map\(x => `/.test(fnSrc('_intv4ChangedHtml'))
-    && /_intv4FindingRows\(core, \{ all: true \}\)/.test(fnSrc('_intv4ChangedHtml')));
+    && /_intv4FindingRows\(core, \{ all: true \}\)/.test(fnSrc('_intv4ChangedHtml'))
+    && /reviewed: all \? !active\.has\(id\) : false/.test(fnSrc('_intv4FindingRows')));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1568,8 +1636,12 @@ console.log('\n§14 · lo que importa hoy');
   // cuenta B eso era justo lo que llenaba la card: ahora se encoge, que es lo
   // que el §4.4 pide («un vacío compacto» antes que inventar actualidad). La
   // ventana declarada se comprueba donde SIGUE habiendo una historia de hoy.
-  ok('14.8 …pero la ventana sigue DECLARADA para la QA y el gate',
-    /data-window="/.test(render(CUENTA_C).html),
+  // CHECKPOINT H — el hecho puede vivir en «hoy» o en «qué ha cambiado», pero
+  // nunca en las dos. La ventana tiene que estar declarada allá donde caiga.
+  ok('14.8 …pero la ventana sigue DECLARADA para la QA y el gate, caiga donde caiga',
+    (() => { const h = render(CUENTA_C).html;
+      const w = h.match(/data-window="([^"]*)"/g) || [];
+      return w.length > 0 && w.some((x) => x !== 'data-window=""'); })(),
     (render(CUENTA_C).html.match(/data-window="[^"]*"/g) || []).join(','));
   ok('14.8b …y en una cuenta cuyo único contenido era un estado, la card se ENCOGE',
     (() => { const h = render(CUENTA_B).html;
@@ -1640,8 +1712,18 @@ console.log('\n§15 · memoria patrimonial');
   ok('15.9 la card declara cuántos recuerdos hay y si va a recortar',
     /data-rows="\$\{rows\.length\}"/.test(fnSrc('_intv4MemoryHtml'))
     && /data-scroll="\$\{rows\.length > 4 \? '1' : '0'\}"/.test(fnSrc('_intv4MemoryHtml')));
+  // CHECKPOINT G — la fila publica ahora FECHA · PERIODO. El invariante no es
+  // el literal de la plantilla: es que sin fecha no se estampa una, y que el
+  // periodo sólo se imprime si el hecho lo nombra.
   ok('15.10 no se estampa la fecha de hoy sobre historia antigua',
-    /r\.at \? `<span class="intcc-tl-date">/.test(fnSrc('_intv4MemoryHtml')));
+    (() => { const src0 = fnSrc('_intv4MemoryHtml');
+      return /\(r\.at \|\| r\.period\) \? `<span class="intcc-tl-date">/.test(src0)
+        && /r\.at \? _intccDate\(r\.at\) : ''/.test(src0)
+        && /r\.period \? _intv4RangeLabel\(r\.period\) : ''/.test(src0); })());
+  ok('15.11 el PERIODO es visible, no sólo un data-attribute',
+    (() => { const h = render(CUENTA_B).html;
+      const rows = h.match(/<li class="intcc-tl-item"[^>]*data-period="([^"]+)"[\s\S]*?<\/li>/g) || [];
+      return rows.length === 0 || rows.every((r) => /class="intcc-tl-date"/.test(r)); })());
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1952,8 +2034,25 @@ console.log('\nSC · §4.5 · «Tu evolución» publica hechos, no respuestas');
 {
   ok('SC.5.1 la card se llama «Tu evolución» en los dos idiomas',
     DICT.es.intv4_memory_title === 'Tu evolución' && DICT.en.intv4_memory_title === 'Your evolution');
-  ok('SC.5.2 el techo son TRES hechos históricos certificados',
-    /const _INTV4_MEMORY_MAX = 3;/.test(app));
+  // CHECKPOINT G — «entre uno y cuatro hechos». El techo sube a cuatro y la
+  // selección reserva como mucho uno por ventana, que es lo que convierte la
+  // card en evolución y no en cuatro formas de decir la misma semana.
+  ok('SC.5.2 el techo son CUATRO hechos históricos certificados',
+    /const _INTV4_MEMORY_MAX = 4;/.test(app));
+  const _divCtx = makeCtx(CUENTA_B);
+  const _div = (rows, n) => run('_intv4MemoryDiversify(' + JSON.stringify(rows) + ', ' + n + ')', _divCtx);
+  ok('SC.5.2b …y no pueden salir todos de la MISMA ventana',
+    (() => { const mk = (w, k) => ({ kind: 'event', at: 1, key: k, txt: k, period: w });
+      const rows = _div([mk('7d','a'), mk('7d','b'), mk('7d','c'), mk('30d','d'), mk('1y','e')], 4);
+      const ws = rows.map((r) => r.period);
+      return rows.length === 4 && new Set(ws.slice(0, 3)).size === 3
+        && ws.indexOf('7d') < ws.indexOf('30d') && ws.indexOf('30d') < ws.indexOf('1y'); })(),
+    JSON.stringify(_div([{kind:'event',at:1,key:'a',period:'7d'},{kind:'event',at:1,key:'b',period:'7d'},
+       {kind:'event',at:1,key:'c',period:'7d'},{kind:'event',at:1,key:'d',period:'30d'},
+       {kind:'event',at:1,key:'e',period:'1y'}], 4).map((r) => r.period)));
+  ok('SC.5.2c una ventana que el catálogo no nombra no se pierde',
+    (() => { const rows = _div([{ kind: 'event', at: 1, key: 'x', period: 'raro' }], 4);
+      return rows.length === 1 && rows[0].period === 'raro'; })());
   ok('SC.5.3 ninguna respuesta declarada se publica como fila',
     !/_intv4MemoryDeclared/.test(fnSrc('_intv4MemoryRows'))
     && !/kind: 'declared'/.test(fnSrc('_intv4MemoryRows')));
@@ -2506,13 +2605,13 @@ console.log('\nSC · CHECKPOINT B · el sobre del hecho certificado');
 // histórico, diferencia en pp y los estados) se ejecuta de verdad.
 console.log('\nSC · §6 · comparador de rentabilidad');
 {
-  const cmpFns = ['_aurixCmpEnabled','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize',
+  const cmpFns = ['_aurixCmpEnabled','_aurixCmpResolvableUSD','_aurixCmpFromRegistry','_aurixCmpProviderRange','_aurixCmpLabel','_aurixCmpRecent','_aurixCmpPushRecent','_aurixCmpFxFor','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize',
                   '_aurixCmpConvert',
                   '_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState',
-                  '_intv14CmpSvg','_intv14ComparatorHtml','_intv4T','_intv4Num','_intccEsc','_intccDate',
+                  '_intv14CmpAxisHtml','_intv14CmpSvg','_intv14ComparatorHtml','_intv4T','_intv4Num','_intccEsc','_intccDate',
                   '_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner'];
   const cmpAsync = ['_aurixCmpFxSeries','_aurixCmpBenchmarkSeries','_aurixComparison'];
-  const cmpConsts = ['_AURIX_CMP_FLAG_KEY','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE',
+  const cmpConsts = ['_AURIX_CMP_FLAG_KEY','_AURIX_CMP_FLAT_PP','_AURIX_CMP_DISCLOSURE','ASSET_DB','_AURIX_CMP_KIND_OF','_AURIX_CMP_US_ETFS','_AURIX_CMP_USD_INDICES','_AURIX_CMP_GROUPS','_AURIX_CMP_RECENT_KEY','_AURIX_CMP_RECENT_MAX','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_PROVIDER_REASONS','_AURIX_CMP_PROVIDER_RANGE',
                      '_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_INTV4_PERIMETER'];
   function afnSrc(name) {
     const s0 = 'async function ' + name + '('; const i = app.indexOf(s0);
@@ -2534,10 +2633,15 @@ console.log('\nSC · §6 · comparador de rentabilidad');
     sb.__store = {};
     sb.localStorage = { getItem: k => (Object.prototype.hasOwnProperty.call(sb.__store, k) ? sb.__store[k] : null),
                         setItem: (k, v) => { sb.__store[k] = String(v); }, removeItem: k => { delete sb.__store[k]; } };
-    // EL COMPARADOR SE PUBLICA APAGADO. El resto de este bloque mide qué hace
-    // cuando está encendido, así que se le da el opt-in explícito — salvo
-    // cuando el caso mide precisamente la puerta (`opt.noOptIn`).
-    if (!opt.noOptIn) sb.__store['aurix_cmp_enabled_v1'] = '1';
+    // ── CHECKPOINT I.2 · LA PUERTA ES UN ENTITLEMENT, NO UNA CLAVE LOCAL ──
+    // El resto de este bloque mide qué hace el comparador cuando está
+    // ENCENDIDO, así que se le concede la capacidad — salvo cuando el caso
+    // mide precisamente la puerta. `hasFeature` es el owner real: se inyecta
+    // aquí con la misma semántica que en producción (booleano estricto, y
+    // false mientras no haya evidencia).
+    sb.__features = opt.noFeature ? {} : { 'intelligence.comparator': true };
+    sb.hasFeature = (k) => sb.__features[k] === true;
+    if (opt.localOff) sb.__store['aurix_cmp_enabled_v1'] = '0';
     sb.lang = opt.lang || 'es';
     sb.t = k => DICT[sb.lang][k];
     sb._escapeWorkspaceText = s0 => String(s0 == null ? '' : s0)
@@ -2551,6 +2655,9 @@ console.log('\nSC · §6 · comparador de rentabilidad');
       AurixChartAdapters: {
         yahooHistoryAdapter: (args) => {
           sb.__calls.push(args.symbol + '@' + args.range);
+          // I.10 — el camino «el proveedor LANZÓ», que es distinto de
+          // «respondió sin puntos» y de «no hay adaptador».
+          if (opt.providerThrows && args.symbol === opt.providerThrows) throw new Error('net');
           const f = (opt.feed || {})[args.symbol];
           if (!f) return Promise.resolve({ series: [], meta: { currency: 'USD', status: 'no_history' } });
           return Promise.resolve({ series: f.series, meta: { currency: f.currency || 'USD', status: 'ready' } });
@@ -2559,8 +2666,11 @@ console.log('\nSC · §6 · comparador de rentabilidad');
     };
     if (opt.kill) sb.window.__AURIX_CMP_KILL = true;
     vm.runInContext('var window = globalThis.window;', sb);
-    cmpConsts.forEach(n => vm.runInContext(konstSrc(n), sb));
+    // LAS FUNCIONES PRIMERO. `_AURIX_CMP_CATALOG` se DERIVA del registro de
+    // Market llamando a `_aurixCmpFromRegistry()` en su propia definición, así
+    // que declarar las constantes antes reventaba con «is not defined».
     cmpFns.forEach(n => vm.runInContext(fnSrc(n), sb));
+    cmpConsts.forEach(n => vm.runInContext(konstSrc(n), sb));
     cmpAsync.forEach(n => vm.runInContext(afnSrc(n), sb));
     // El owner del retorno se INYECTA: su certificación es suya y tiene su
     // propio gate; lo que aquí se mide es qué hace el comparador con él.
@@ -2580,37 +2690,122 @@ console.log('\nSC · §6 · comparador de rentabilidad');
   // El founder autorizó publicar el CÓDIGO del comparador, no su exposición.
   // Sin mecanismo por cuenta en el cliente, el defecto es APAGADO y sólo un
   // opt-in explícito lo enciende. Esto se mide, no se declara en un comentario.
-  ok('6.0a APAGADO POR DEFECTO: sin opt-in, el comparador no existe para nadie',
-    run('_aurixCmpEnabled()', cmpCtx({ noOptIn: true })) === false);
-  ok('6.0b …y un opt-in explícito lo enciende',
+  ok('6.0a SIN la capacidad concedida, el comparador no existe para nadie',
+    run('_aurixCmpEnabled()', cmpCtx({ noFeature: true })) === false);
+  ok('6.0b …y con la capacidad concedida por el SERVIDOR, se enciende',
     run('_aurixCmpEnabled()', cmpCtx({})) === true);
-  ok('6.0c el KILL SWITCH manda por encima del opt-in',
+  ok('6.0c el KILL SWITCH manda por encima de la capacidad',
     run('_aurixCmpEnabled()', cmpCtx({ kill: true })) === false);
+  ok('6.0c2 un usuario FREE no puede encenderlo tocando `localStorage`',
+    (() => { const c = cmpCtx({ noFeature: true });
+      run('localStorage.setItem("aurix_cmp_enabled_v1", "1")', c);
+      // …ni escribiendo cualquier otra cosa: la clave local sólo puede APAGAR.
+      return run('_aurixCmpEnabled()', c) === false; })());
+  ok('6.0c3 …y el apagado LOCAL sí funciona (vía de rollback del propio usuario)',
+    run('_aurixCmpEnabled()', cmpCtx({ localOff: true })) === false);
+  ok('6.0c4 sin evidencia de entitlement cargada, falla CERRADO',
+    (() => { const c = cmpCtx({});
+      run('hasFeature = function () { return false; }', c);
+      return run('_aurixCmpEnabled()', c) === false; })());
+  ok('6.0c5 la capacidad está DECLARADA en el canon, o el cliente la negaría con la BD correcta',
+    /'intelligence\.comparator'/.test(konstSrc('_AURIX_ENT_CANON_EXTRA')));
+  ok('6.0c6 el paso manual existe, es ADITIVO y NINGÚN plan concede la capacidad',
+    (() => { const sql = fs.readFileSync(path.join(ROOT, 'db', 'intelligence_comparator_key_1.sql'), 'utf8');
+      return /insert into public\.plan_features/.test(sql)
+        && /\('free',\s*'intelligence\.comparator', false\)/.test(sql)
+        && /\('premium',\s*'intelligence\.comparator', false\)/.test(sql)
+        && /on conflict \(plan, feature_key\) do update/.test(sql)
+        // …y no toca esquema, políticas ni privilegios.
+        && !/\b(create|alter|drop|grant|revoke)\s+(table|policy|function|schema)/i.test(sql)
+        && /NO APLICADO/.test(sql); })());
+  ok('6.0c7 …y el canary local ya NO es el mecanismo: la clave sólo puede apagar',
+    (() => { const src0 = fnSrc('_aurixCmpEnabled');
+      return /hasFeature\('intelligence\.comparator'\)/.test(src0)
+        && /=== '0'/.test(src0) && !/=== '1'/.test(src0); })());
   ok('6.0d apagado ⇒ la superficie no se pinta y NO se publica ninguna serie',
-    (() => { const c = cmpCtx({ noOptIn: true });
+    (() => { const c = cmpCtx({ noFeature: true });
       return run('_intv14ComparatorHtml(_escapeWorkspaceText, null) === ""', c) === true
         && run('_aurixComparisonSync("all").reason', c) === 'flag_off'; })());
-  ok('6.1 el catálogo es CERRADO y con identificadores autoritativos',
+  // ── CHECKPOINT I.4 · EL CATÁLOGO YA NO ES CERRADO: ES DERIVADO ────────
+  // Eran cuatro entradas a mano. Ahora sale del registro autoritativo de
+  // Market, así que el invariante deja de ser «son exactamente estas cuatro»
+  // —que fosilizaba una limitación— y pasa a ser el que importa: todo lo que
+  // entra tiene identificador inequívoco, nombre, naturaleza conocida y tipo
+  // de rentabilidad declarado, y nada se duplica.
+  ok('6.1 el catálogo se DERIVA del registro de Market y no se mantiene dos veces',
     (() => { const c = cmpCtx({});
       const cat = run('_AURIX_CMP_CATALOG', c);
       const bySym = cat.reduce((a, b) => (a[b.id] = b.symbol, a), {});
-      return cat.length === 4
+      // El techo dejó de ser «cuantos más mejor»: la revisión financiera
+      // demostró que ~20 entradas del registro no las resuelve el endpoint
+      // histórico y que seis índices cotizan en otra divisa. El contrato es
+      // «todo lo que se ofrece se puede comparar de verdad».
+      return cat.length >= 25
+        && /ASSET_DB/.test(fnSrc('_aurixCmpFromRegistry'))
+        // las cuatro declaradas conservan su id: un comparador guardado sigue resolviendo
         && bySym.sp500 === '^GSPC' && bySym.ndx100 === '^NDX'
         && bySym.btc === 'BTC-USD' && bySym.gold === 'GC=F'; })(),
-    JSON.stringify(run('_AURIX_CMP_CATALOG', cmpCtx({})).map(b => b.id + '=' + b.symbol)));
-  // EL FOUNDER LO PIDIÓ POR SU NOMBRE: Nasdaq 100 es ^NDX. El registro de Market
-  // sólo tenía el Composite (^IXIC), que es OTRO índice —3.000 valores frente a
-  // 100— y su rentabilidad no es la misma.
-  ok('6.1b Nasdaq 100 es ^NDX y NUNCA el Composite ^IXIC',
+    JSON.stringify({ n: run('_AURIX_CMP_CATALOG', cmpCtx({})).length }));
+  ok('6.1a TODA entrada tiene símbolo, nombre, naturaleza y tipo de rentabilidad',
     (() => { const cat = run('_AURIX_CMP_CATALOG', cmpCtx({}));
-      return cat.some(b => b.symbol === '^NDX')
-        && !cat.some(b => b.symbol === '^IXIC')
-        && !/\^IXIC/.test(konstSrc('_AURIX_CMP_CATALOG')); })());
+      const kinds = run('_AURIX_CMP_GROUPS', cmpCtx({}));
+      const c2 = cmpCtx({});
+      return cat.every(b => !!b.symbol && !!(b.name || b.labelKey)
+          && kinds.indexOf(b.kind) !== -1 && b.returnType === 'price_return')
+        // …y el nombre visible nunca sale vacío, vengan de donde vengan.
+        && cat.every(b => String(run('_aurixCmpLabel(' + JSON.stringify(b) + ')', c2) || '').length > 0); })());
+  ok('6.1a2 ni ids ni símbolos duplicados, y las cinco categorías están cubiertas',
+    (() => { const cat = run('_AURIX_CMP_CATALOG', cmpCtx({}));
+      const kinds = new Set(cat.map(b => b.kind));
+      return new Set(cat.map(b => b.id)).size === cat.length
+        && new Set(cat.map(b => b.symbol)).size === cat.length
+        && ['index', 'etf', 'stock', 'crypto', 'metal'].every(k => kinds.has(k)); })(),
+    JSON.stringify(Array.from(new Set(run('_AURIX_CMP_CATALOG', cmpCtx({})).map(b => b.kind)))));
+  ok('6.1a3 FALLA CERRADA: una entrada del registro sin metadato esencial no entra',
+    // `ASSET_DB` es `const` en el bundle, así que no se reasigna: se construye
+    // un sandbox limpio con un registro degradado y se mide el filtro.
+    (() => { const sb2 = {}; vm.createContext(sb2);
+      vm.runInContext('const ASSET_DB = ['
+        + '{ ticker: "X", name: "", type: "stock", marketSymbol: "X" },'
+        + '{ ticker: "Y", name: "Y", type: "desconocido", marketSymbol: "Y" },'
+        + '{ ticker: "Z", name: "Z", type: "stock", marketSymbol: "" }];\n'
+        + konstSrc('_AURIX_CMP_KIND_OF') + '\n' + fnSrc('_aurixCmpFromRegistry'), sb2);
+      return vm.runInContext('_aurixCmpFromRegistry().length', sb2) === 0; })());
+  // EL FOUNDER LO PIDIÓ POR SU NOMBRE: Nasdaq 100 es ^NDX. El Composite (^IXIC)
+  // es OTRO índice —3.000 valores frente a 100—. Los dos pueden ofrecerse; lo
+  // que no puede pasar es que uno se publique con el nombre del otro.
+  ok('6.1b Nasdaq 100 es ^NDX, y ^IXIC sólo puede llamarse Composite',
+    (() => { const c = cmpCtx({});
+      const cat = run('_AURIX_CMP_CATALOG', c);
+      const ndx = cat.find(b => b.symbol === '^NDX');
+      const ixic = cat.find(b => b.symbol === '^IXIC');
+      const nameOf = (b) => String(run('_aurixCmpLabel(' + JSON.stringify(b) + ')', c) || '');
+      return !!ndx && /Nasdaq 100/i.test(nameOf(ndx))
+        && (!ixic || (/composite/i.test(nameOf(ixic)) && !/Nasdaq 100/i.test(nameOf(ixic)))); })(),
+    JSON.stringify(run('_AURIX_CMP_CATALOG', cmpCtx({}))
+      .filter(b => /NDX|IXIC/.test(b.symbol)).map(b => b.symbol + '=' + (b.name || b.labelKey))));
   ok('6.1c el tipo de rentabilidad se DECLARA y no se mezcla (ninguno finge total return)',
     (() => { const cat = run('_AURIX_CMP_CATALOG', cmpCtx({}));
       return cat.every(b => b.returnType === 'price_return')
-        && typeof DICT.es.cmp_price_return === 'string'
-        && /dividendos/.test(DICT.es.cmp_price_return); })());
+        // I.9 — el disclosure ya no es un texto único: lo elige la naturaleza.
+        && cat.every(b => !!b.kind)
+        && /dividendos/.test(DICT.es.cmp_disc_index)
+        && /dividendos|distribuciones/.test(DICT.es.cmp_disc_equity)
+        // …y NO se mencionan dividendos donde no existen.
+        && !/dividendo/.test(DICT.es.cmp_disc_price); })());
+  ok('6.1d el oro y el bitcoin NO reciben la frase de dividendos',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      const mk = (bid) => ({ state: 'ready', benchmarkId: bid,
+        mine: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }],
+        other: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 106 }],
+        diffPp: -2, from: T_0, to: T_0 + D1, returnType: 'price_return' });
+      run('_intv14CmpSetState({ benchmarkId: "gold" })', c);
+      const gold = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk('gold')) + ')', c);
+      run('_intv14CmpSetState({ benchmarkId: "sp500" })', c);
+      const spx  = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk('sp500')) + ')', c);
+      return gold.indexOf(DICT.es.cmp_disc_price) !== -1 && !/dividendo/.test(gold)
+        && spx.indexOf(DICT.es.cmp_disc_index) !== -1; })(),
+    'disclosure por naturaleza');
   ok('6.2 SIN COMPARACIÓN el gráfico publica SÓLO la serie propia, en base 100',
     (() => { const c = cmpCtx({ perf: PERF_OK });
       const r = run('_aurixComparisonSync("all")', c);
@@ -2674,7 +2869,9 @@ console.log('\nSC · §6 · comparador de rentabilidad');
       const r = await run('_aurixComparison("all", "sp500", {})', c);
       const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(r) + ')', c);
       return /data-state="no_return"/.test(h)
-        && (h.match(/data-cmp-range="/g) || []).length === 5
+        // I.5 — son SEIS desde que `90d` (3M) entra: el único periodo nuevo
+        // que las dos tablas de span certifican.
+        && (h.match(/data-cmp-range="/g) || []).length === 6
         && !/data-cmp-select/.test(h); })(),
     'controles en el estado no_return');
   okA('6.10b …y una serie de VALOR nunca se reinterpreta como rentabilidad',
@@ -2807,13 +3004,31 @@ console.log('\nSC · §6 · comparador de rentabilidad');
     (() => { const c = cmpCtx({ perf: PERF_OK });
       const mk = (d) => ({ state: 'ready', mine: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }],
         other: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 116 }], diffPp: d, from: T_0, to: T_0 + D1 });
+      // Bitcoin y no el S&P: su nombre no lleva `&`, así que la comparación es
+      // contra el texto tal cual y no contra su forma escapada.
+      run('_intv14CmpSetState({ benchmarkId: "btc" })', c);
       const behind = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk(-12)) + ')', c);
       const ahead  = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk(12)) + ')', c);
+      const bmName = DICT.es.cmp_b_btc;
       return behind !== ahead
-        && behind.indexOf(DICT.es.cmp_diff_behind(12)) !== -1
-        && ahead.indexOf(DICT.es.cmp_diff_ahead(12)) !== -1
-        && /data-diff-pp="-12"/.test(behind); })(),
+        && behind.indexOf(DICT.es.cmp_diff_less('12', bmName)) !== -1
+        && ahead.indexOf(DICT.es.cmp_diff_more('12', bmName)) !== -1
+        && /data-diff-pp="-12"/.test(behind)
+        // I.9 — y ninguna de las dos usa lenguaje de carrera.
+        && !/POR DELANTE|POR DETR|AHEAD|BEHIND/.test(behind + ahead)
+        // …ni omite contra quién se compara.
+        && behind.indexOf(bmName) !== -1; })(),
     'frases de dirección');
+  ok('6.19b por debajo de la tolerancia DECLARADA se dice equivalencia, no una diferencia',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      const mk = (d) => ({ state: 'ready', benchmarkId: 'sp500',
+        mine: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }],
+        other: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }], diffPp: d,
+        from: T_0, to: T_0 + D1 });
+      run('_intv14CmpSetState({ benchmarkId: "sp500" })', c);
+      const flat = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(mk(0.004)) + ')', c);
+      return flat.indexOf(DICT.es.cmp_diff_flat) !== -1
+        && run('_AURIX_CMP_FLAT_PP', c) === 0.01; })());
   // (4) MEDIO: no se declaraba el FIN de la ventana comparable.
   ok('6.20 MEDIO · se declaran los DOS extremos de la ventana comparable',
     /out\.endsBefore = \(al\.to </.test(fnSrc('_aurixComparison'))
@@ -2828,11 +3043,1105 @@ console.log('\nSC · §6 · comparador de rentabilidad');
       // sola vez: dentro, un repintado dejaba el selector marcado y la segunda
       // línea desaparecida.
       return iWire > 0 && iCall > iWire && /SE DISPARA EN CADA PINTURA/.test(s0); })());
+  // ── I.4/I.6 · EL PAR FX LO ELIGE LA COTIZACIÓN, NO LA BASE ───────────
+  const MKT = (from, n, step, p0, drift) => { const out = [];
+    for (let i = 0; i < n; i++) out.push({ time: from + i * step, value: p0 * (1 + drift * i) });
+    return out; };
+  const fxCtx = (ccy) => cmpCtx({ base: 'EUR',
+    perf: { valid: true, index: IDX(T_0, 40, D1, 0.002), fallbackReason: null },
+    feed: { '^GSPC': { series: MKT(T_0, 40, D1, 5000, 0.002), currency: ccy },
+            'EURUSD=X': { series: MKT(T_0, 40, D1, 1.05, 0.001) } } });
+  okA('6.22 CRÍTICO · un benchmark en OTRA divisa NO se convierte con el par de la base',
+    (async () => { const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', fxCtx('GBP'));
+      // Se DETIENE. Hoy corta todavía antes —la divisa reportada no coincide
+      // con la DECLARADA en el catálogo—, que es la puerta que la revisión
+      // financiera pidió: el adaptador rellena «USD» cuando el proveedor no
+      // confirma nada, así que fiarse de lo reportado era fiarse de un valor
+      // por defecto. Lo que importa es que NO publica.
+      return r.state === 'insufficient'
+        && ['quote_currency_mismatch', 'currency_not_supported'].indexOf(r.reason) !== -1; })(),
+    'GBP no puede convertirse');
+  okA('6.22b …y con una dirección certificada, convierte y compara',
+    (async () => { const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', fxCtx('USD'));
+      return r.state === 'ready' && r.quoted === 'USD' && r.fxPair === 'EURUSD=X'; })());
+  okA('6.22c una divisa reportada que NO es la declarada tampoco pasa',
+    (async () => { const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', fxCtx('EUR'));
+      return r.state === 'insufficient' && r.reason === 'quote_currency_mismatch'; })());
+  ok('6.22d el resolutor de pares es POR DIRECCIÓN y sólo publica lo certificado',
+    (() => { const c = cmpCtx({});
+      const f = (a, b) => run('_aurixCmpFxFor(' + JSON.stringify(a) + ',' + JSON.stringify(b) + ')', c);
+      return f('USD', 'USD').same === true
+        && f('USD', 'EUR').symbol === 'EURUSD=X' && f('USD', 'EUR').invert === true
+        && f('EUR', 'USD').symbol === 'EURUSD=X' && f('EUR', 'USD').invert === false
+        && f('GBP', 'EUR') === null && f('USD', 'JPY') === null; })());
+  // ── CHECKPOINT I.3 · EL SELECTOR ES DE AURIX ────────────────────────
+  {
+    const c = cmpCtx({ perf: PERF_OK });
+    run('_intv14CmpSetState({ benchmarkId: "btc" })', c);
+    const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(
+      { state: 'ready', mine: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }],
+        other: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 106 }], diffPp: -2,
+        from: T_0, to: T_0 + D1, returnType: 'price_return' }) + ')', c);
+    ok('I3.1 el `<select>` nativo YA NO existe en la superficie',
+      !/<select/.test(h) && !/data-cmp-select/.test(h));
+    ok('I3.2 es un combobox ARIA: disparador con estado y UN solo `listbox`',
+      /role="combobox"/.test(h) && /aria-haspopup="listbox"/.test(h)
+      && /aria-expanded="false"/.test(h) && /aria-controls="intv14-cmp-panel"/.test(h)
+      && (h.match(/role="listbox"/g) || []).length === 1);
+    ok('I3.3 tiene BUSCADOR, y busca por nombre Y por símbolo',
+      /data-cmp-search/.test(h) && /type="search"/.test(h)
+      && /data-name="[^"]+"/.test(h) && /data-sym="[^"]+"/.test(h)
+      && /getAttribute\('data-name'\)/.test(app) && /getAttribute\('data-sym'\)/.test(app));
+    ok('I3.4 las opciones vienen AGRUPADAS por naturaleza, en el orden declarado',
+      (() => { const groups = (h.match(/class="intv14-cmp-optgroup">([^<]+)</g) || [])
+          .map(x => x.replace(/.*>/, '').replace(/<$/, ''));
+        const want = ['cmp_g_index', 'cmp_g_etf', 'cmp_g_stock', 'cmp_g_crypto', 'cmp_g_metal']
+          .map(k => DICT.es[k]);
+        const idx = want.map(w => groups.indexOf(w));
+        return idx.every(i => i >= 0) && idx.every((v, i) => i === 0 || v > idx[i - 1]); })(),
+      JSON.stringify((h.match(/class="intv14-cmp-optgroup">([^<]+)</g) || []).map(x => x.replace(/.*>/, ''))));
+    ok('I3.5 el panel se cierra con Escape, con la ✕ y al pulsar FUERA',
+      /e\.key === 'Escape'/.test(app) && /data-cmp-close/.test(h)
+      && /!t\.closest\('\.intv14-cmp-pick'\)/.test(app));
+    ok('I3.6 navegación por teclado completa, y el foco vuelve al disparador',
+      (() => { const a = app;
+        return /e\.key === 'ArrowDown'/.test(a) && /e\.key === 'ArrowUp'/.test(a)
+          && /e\.key === 'Home'/.test(a) && /e\.key === 'End'/.test(a)
+          && /e\.key === 'Enter'/.test(a)
+          && /aria-activedescendant/.test(a)
+          && /if \(focusBack\) tr\.focus\(\)/.test(a); })());
+    ok('I3.7 la opción elegida no se distingue SÓLO por color',
+      /\.intv14-cmp-opt\[aria-selected="true"\]::after \{ content: '✓'/.test(css));
+    ok('I3.8b el área táctil de 44 px cubre TAMBIÉN 834 px y cualquier puntero grueso',
+    (() => { const b = (css.split('@media (pointer: coarse), (max-width: 1023px)')[1] || '').slice(0, 500);
+      return /button\.intv14-cmp-trigger, button\.intv14-cmp-clear \{ min-height: 44px; \}/.test(b)
+        && /\.intv14-cmp-opt \{ min-height: 44px; \}/.test(b)
+        && /input\.intv14-cmp-search \{ min-height: 44px; \}/.test(b); })());
+  ok('I3.8c el patrón ARIA vive en el elemento ENFOCADO, no partido en dos',
+    (() => { const a = app;
+      return /<input type="search"[\s\S]{0,240}role="combobox"/.test(a)
+        && /aria-controls="intv14-cmp-list"/.test(a)
+        && /<ul class="intv14-cmp-list" id="intv14-cmp-list" role="listbox"/.test(a)
+        && !/class="intv14-cmp-trigger"[\s\S]{0,160}role="combobox"/.test(a); })());
+  ok('I3.8d el bloqueo de scroll NO puede sobrevivir a un repintado ajeno',
+    /function _cmpSyncLock\(\)/.test(app)
+    && /if \(!p \|\| p\.hidden\) document\.documentElement\.classList\.remove\('aurix-cmp-open'\)/.test(app)
+    && /_cmpSyncLock\(\);/.test(app));
+  ok('I3.8e sustituir la card NO pierde el foco: se restituye en el nodo equivalente',
+    /const act = document\.activeElement;/.test(app)
+    && /const back = next\.querySelector\(keep\)/.test(app));
+  ok('I3.8 foco visible y área táctil de 44 px en los controles del selector',
+      /button\.intv14-cmp-trigger:focus-visible/.test(css)
+      && /input\.intv14-cmp-search:focus-visible/.test(css)
+      && /button\.intv14-cmp-trigger, button\.intv14-cmp-clear \{ min-height: 44px; \}/.test(css)
+      && /\.intv14-cmp-opt \{ min-height: 44px; \}/.test(css)
+      && /button\.intv14-cmp-panel-x \{[^}]*min-height: 44px/.test(css.replace(/\n/g, ' ')));
+    ok('I3.9 ESCRITORIO popover anclado; MÓVIL hoja inferior con safe-area y scroll propio',
+      /\.intv14-cmp-panel \{[^}]*position: absolute[^}]*top: calc\(100% \+ 8px\)[^}]*right: 0/.test(css.replace(/\n/g, ' '))
+      && /\.intv14-cmp-panel \{[^}]*position: fixed[^}]*inset: auto 0 0 0/.test(css.replace(/\n/g, ' '))
+      && /env\(safe-area-inset-bottom/.test(css)
+      && /\.intv14-cmp-list \{[^}]*overflow-y: auto/.test(css.replace(/\n/g, ' ')));
+    ok('I3.10 el panel NO se sale del viewport',
+      /width: min\(340px, calc\(100vw - 32px\)\)/.test(css));
+    ok('I3.11 cerrar la hoja NO deja la página bloqueada',
+      /html\.aurix-cmp-open, html\.aurix-cmp-open body \{ overflow: hidden; \}/.test(css)
+      && /classList\.remove\('aurix-cmp-open'\)/.test(app)
+      && /classList\.add\('aurix-cmp-open'\)/.test(app));
+    ok('I3.12 respeta `prefers-reduced-motion`',
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.intv14-cmp-panel \{ animation: none/.test(css));
+    ok('I3.13 NO abre un endpoint nuevo ni descarga el catálogo al abrirse',
+      !/fetch\(/.test(fnSrc('_intv14ComparatorHtml'))
+      && /_AURIX_CMP_CATALOG\.filter/.test(fnSrc('_intv14ComparatorHtml')));
+  }
+  ok('I3.14 los RECIENTES son comodidad y se VALIDAN contra el catálogo',
+    (() => { const c = cmpCtx({});
+      run('_aurixActiveUserId = "rec-user"', c);
+      run('_aurixCmpPushRecent("btc")', c);
+      run('_aurixCmpPushRecent("inventado")', c);       // no está en el catálogo
+      run('_aurixCmpPushRecent("gold")', c);
+      const r = run('_aurixCmpRecent()', c);
+      return r.length === 2 && r[0] === 'gold' && r[1] === 'btc'
+        && r.indexOf('inventado') === -1; })(),
+    JSON.stringify((() => { const c = cmpCtx({}); run('_aurixActiveUserId = "rec-user2"', c);
+      run('_aurixCmpPushRecent("btc")', c); run('_aurixCmpPushRecent("inventado")', c);
+      return run('_aurixCmpRecent()', c); })()));
+  ok('I3.15 …y NO son autoridad: un reciente no selecciona nada por sí solo',
+    (() => { const c = cmpCtx({});
+      run('_aurixActiveUserId = "rec-user3"', c);
+      run('_aurixCmpPushRecent("btc")', c);
+      return run('_intv14CmpState().benchmarkId', c) === null; })());
+  // ── CHECKPOINT I.7 · TOOLTIP ─────────────────────────────────────────
+  {
+    const c = cmpCtx({ perf: PERF_OK });
+    run('_intv14CmpSetState({ benchmarkId: "btc" })', c);
+    const mine = [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }, { ts: T_0 + 2 * D1, value: 99.79 }];
+    const oth  = [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 103 }, { ts: T_0 + 2 * D1, value: 100.34 }];
+    const svg = run('_intv14CmpSvg(' + JSON.stringify(mine) + ',' + JSON.stringify(oth) + ', {})', c);
+    ok('I7.1 el SVG publica su GEOMETRÍA y sus series ALINEADAS por índice',
+      (() => { const g = (svg.match(/data-cmp-geo="([^"]+)"/) || [, ''])[1];
+        const p = (svg.match(/data-cmp-series="([^"]+)"/) || [, ''])[1];
+        const un = (x) => JSON.parse(x.replace(/&quot;/g, '"').replace(/&amp;/g, '&'));
+        const geo = un(g), pts = un(p);
+        return Number.isFinite(geo.W) && Number.isFinite(geo.t0) && Number.isFinite(geo.hi)
+          && pts.length === 3 && pts[1][0] === T_0 + D1
+          // MISMO ÍNDICE ⇒ MISMO BUCKET: las dos cifras no pueden ser de fechas distintas.
+          && pts.every((x) => x.length === 3); })(),
+      (svg.match(/data-cmp-series="[^"]{0,90}/) || [''])[0]);
+    ok('I7.2 dibuja guía vertical y DOS marcadores, ocultos hasta que se lee',
+      /data-cmp-guide="1"[^>]*hidden/.test(svg)
+      && /data-cmp-dot="mine"[^>]*hidden/.test(svg)
+      && /data-cmp-dot="other"[^>]*hidden/.test(svg));
+    ok('I7.3 el plot es FOCALIZABLE y aloja un tooltip con `aria-live`',
+      (() => { const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(
+          { state: 'ready', mine, other: oth, diffPp: -0.55, from: T_0, to: T_0 + 2 * D1,
+            returnType: 'price_return' }) + ')', c);
+        return /data-cmp-plot="1"[^>]*tabindex="0"/.test(h)
+          && /data-cmp-tip="1"[^>]*role="status"[^>]*aria-live="polite"/.test(h); })());
+  }
+  ok('I7.4 ratón, DEDO y teclado: los tres caminos existen',
+    /addEventListener\('pointermove'/.test(app) && /addEventListener\('touchstart'/.test(app)
+    && /e\.key === 'ArrowRight'/.test(app) && /e\.key === 'ArrowLeft'/.test(app)
+    && /_tipHide\(\)/.test(app));
+  ok('I7.5 el primer toque FIJA y un toque fuera lo retira',
+    /_tipPinned = true;/.test(app)
+    && /if \(!plot\) \{ if \(_tipPinned\) _tipHide\(\); return; \}/.test(app));
+  ok('I7.6 un gesto VERTICAL no se captura: la página sigue desplazándose',
+    /\.intv14-cmp-plot \{[^}]*touch-action: pan-y/.test(css.replace(/\n/g, ' '))
+    && /\{ passive: true \}/.test(app));
+  ok('I7.7 la DIFERENCIA va en puntos porcentuales y con signo, nunca en %',
+    (() => { const es = DICT.es.cmp_tip_pp('0,55'), en = DICT.en.cmp_tip_pp('0.55');
+      return /puntos porcentuales/.test(es) && !/%/.test(es)
+        && /percentage points/.test(en) && !/%/.test(en)
+        && /dpp > 0 \? '\+' : '−'/.test(app); })(),
+    DICT.es.cmp_tip_pp('0,55'));
+  ok('I7.8 las dos rentabilidades salen del MISMO índice del array alineado',
+    (() => { const src0 = app.slice(app.indexOf('function _tipShow'), app.indexOf('function _tipFromClientX'));
+      return /const \[ts, mv, ov\] = d\.pts\[idx\];/.test(src0)
+        && !/d\.pts\[[^\]]*\+/.test(src0.replace('d.pts[idx]', '')); })());
+  ok('I7.9 el tooltip se voltea en los extremos y no se sale',
+    /tip\.classList\.toggle\('is-right', frac > 0\.5\)/.test(app)
+    // El ancho es el que HACE que el volteo baste: anclado a la izquierda su
+    // borde llega a `50% + ancho`, así que con 48 % el peor caso cabe.
+    && /\.intv14-cmp-tip \{[\s\S]*?max-width: min\(240px, 48%\)/.test(css)
+    && /\.intv14-cmp-tip\.is-right \{ transform: translateX\(-10px\); \}/.test(css));
+  ok('I7.10 …y NO intercepta el puntero, así que no tapa el dato de forma permanente',
+    /\.intv14-cmp-tip \{[^}]*pointer-events: none/.test(css.replace(/\n/g, ' '))
+    && /\.intv14-cmp-guide \{[^}]*pointer-events: none/.test(css.replace(/\n/g, ' ')));
+  ok('I7.11 el separador decimal lo pone el locale, sobre la MAGNITUD',
+    /_intv4Num\(Math\.abs\(retOf\(v\)\), 2\)/.test(app));
+  // ── RESIDUAL 1 · EL CERO NO TIENE SIGNO ─────────────────────────────
+  {
+    const c = cmpCtx({ perf: PERF_OK });
+    run('_intv14CmpSetState({ benchmarkId: "btc" })', c);
+    const tipOf = (mine1, other1) => {
+      // Se ejecuta el MISMO camino del tooltip: se compone la fila de
+      // diferencia con los valores que tendría en pantalla.
+      const retOf = (v) => Math.round((v - 100) * 100) / 100;
+      const dppRaw = retOf(mine1) - retOf(other1);
+      const FLAT = run('_AURIX_CMP_FLAT_PP', c);
+      const dpp = (Math.abs(dppRaw) < FLAT) ? 0 : dppRaw;
+      return (dpp === 0)
+        ? DICT.es.cmp_tip_pp(run('_intv4Num(0, 2)', c))
+        : ((dpp > 0 ? '+' : '−') + DICT.es.cmp_tip_pp(
+            run('_intv4Num(' + Math.abs(Math.round(dpp * 100) / 100) + ', 2)', c)));
+    };
+    ok('R1.1 POSITIVA · una diferencia real a favor se publica con «+»',
+      tipOf(104, 101).indexOf('+3') === 0, tipOf(104, 101));
+    ok('R1.2 NEGATIVA · una diferencia real en contra se publica con «−»',
+      tipOf(101, 104).indexOf('−3') === 0, tipOf(101, 104));
+    ok('R1.3 DENTRO DE TOLERANCIA · nunca «−0,00»: cero sin signo',
+      (() => { const t1 = tipOf(100.001, 100.004);     // dpp negativo minúsculo
+        const t2 = tipOf(100.004, 100.001);            // …y el positivo
+        return t1 === t2 && !/^[+−]/.test(t1) && /^0/.test(t1)
+          && !/−0/.test(t1) && !/\+0/.test(t1); })(),
+      JSON.stringify([tipOf(100.001, 100.004), tipOf(100.004, 100.001)]));
+    ok('R1.4 …y la normalización usa LA MISMA tolerancia que la frase de debajo',
+      (() => { const src0 = app.slice(app.indexOf('const dppRaw = retOf(mv)'),
+          app.indexOf('const dppRaw = retOf(mv)') + 420);
+        return /Math\.abs\(dppRaw\) < _AURIX_CMP_FLAT_PP/.test(src0)
+          && /dpp === 0/.test(src0); })());
+  }
+  // ── CHECKPOINT I.8 · SE PUEDE LEER LA ESCALA ────────────────────────
+  {
+    const c = cmpCtx({});
+    const mine = [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }, { ts: T_0 + 2 * D1, value: 97.5 }];
+    const ax = run('_intv14CmpAxisHtml(' + JSON.stringify(mine) + ', null, _intccEsc)', c);
+    ok('I8.1 el gráfico publica etiquetas de escala: techo, suelo y el origen',
+      // `_intv4Num` recorta los decimales que no aportan, así que el techo es
+      // «+4 %» y no «+4,00 %»: se mide lo que de verdad publica.
+      (() => { const n = (ax.match(/intv14-cmp-axis-t/g) || []).length;
+        return n === 3 && /is-base/.test(ax)
+          && /\+4 %/.test(ax) && /−2,5 %/.test(ax) && /\+0 %/.test(ax); })(),
+      ax.replace(/<[^>]+>/g, '|').slice(0, 160));
+    ok('I8.2 …tres y no más: informan sin saturar',
+      (run('_intv14CmpAxisHtml(' + JSON.stringify(mine) + ', null, _intccEsc)', c)
+        .match(/intv14-cmp-axis-t/g) || []).length <= 3);
+    ok('I8.3 el origen NO se rotula si cae fuera de la banda visible',
+      (() => { const far = [{ ts: T_0, value: 140 }, { ts: T_0 + D1, value: 150 }];
+        const a2 = run('_intv14CmpAxisHtml(' + JSON.stringify(far) + ', null, _intccEsc)', c);
+        return !/is-base/.test(a2) && (a2.match(/intv14-cmp-axis-t/g) || []).length === 2; })());
+    ok('I8.4 van en HTML, no dentro del SVG estirado (la tipografía no se deforma)',
+      /<div class="intv14-cmp-axis"/.test(ax)
+      && !/<text/.test(run('_intv14CmpSvg(' + JSON.stringify(mine) + ', null, {})', c)));
+    ok('I8.5 las dos series se distinguen por color Y por trazo, y la leyenda también',
+      /\.intv14-cmp-line\.is-other \{[^}]*stroke-dasharray/.test(css.replace(/\n/g, ' '))
+      && /\.intv14-cmp-key\.is-other \.intv14-cmp-swatch \{[^}]*border-top-style: dashed/.test(css.replace(/\n/g, ' ')));
+  }
+  // ── CHECKPOINT I.10 · ESTADOS ───────────────────────────────────────
+  ok('I10.1 un fallo del PROVEEDOR no se disfraza de «datos insuficientes»',
+    (() => { const c = cmpCtx({});
+      const states = run('_AURIX_CMP_STATE', c);
+      return states.PROVIDER_ERROR === 'provider_error'
+        && run('_AURIX_CMP_PROVIDER_REASONS', c).indexOf('adapter_unavailable') !== -1
+        && /no ha respondido/.test(DICT.es.cmp_provider_error)
+        && /unaffected/.test(DICT.en.cmp_provider_error); })());
+  okA('I10.2 …y se ALCANZA de verdad cuando el adaptador no está',
+    (async () => { const c = cmpCtx({ perf: PERF_OK });
+      run('window.AurixChartAdapters = null', c);
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      return r.state === 'provider_error' && r.reason === 'adapter_unavailable'; })(),
+    'sin adaptador');
+  okA('I10.2b …y cuando el proveedor LANZA, también es un error suyo',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, providerThrows: '^GSPC',
+        feed: { '^GSPC': { series: [] } } });
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      return r.state === 'provider_error' && r.reason === 'benchmark_fetch_failed'; })(),
+    'el adaptador lanzó');
+  okA('I10.3 «respondió sin puntos» sigue siendo INSUFICIENCIA, no un error',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, feed: {} });
+      const r = await run('_aurixComparison("all", "sp500", {})', c);
+      return r.state === 'insufficient' && r.reason === 'benchmark_insufficient'; })());
+  ok('I10.4 la HISTORIA COMÚN PARCIAL se declara como estado propio',
+    (() => { const c = cmpCtx({ perf: PERF_OK });
+      run('_intv14CmpSetState({ benchmarkId: "sp500" })', c);
+      const h = run('_intv14ComparatorHtml(_intccEsc, ' + JSON.stringify(
+        { state: 'ready', mine: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }],
+          other: [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 106 }], diffPp: -2,
+          from: T_0, to: T_0 + D1, availableFrom: T_0, returnType: 'price_return' }) + ')', c);
+      return /data-partial="1"/.test(h); })());
+  ok('I10.5 una petición obsoleta se CANCELA, no sólo se descarta',
+    /if \(_cmpAbort\) _cmpAbort\.abort\(\)/.test(app)
+    && /new AbortController\(\)/.test(app)
+    && /signal: ctl \? ctl\.signal : undefined/.test(app)
+    && /seq !== _cmpSeq/.test(app));
+  ok('I10.6 cargando se DECLARA, y los controles no se apagan (son la salida del estado)',
+    /host\.setAttribute\('aria-busy', 'true'\)/.test(app)
+    && /\.intv14-cmp\[data-loading="1"\] \.intv14-cmp-controls \{ opacity: 1; \}/.test(css));
+  // ── CHECKPOINT I.1 · EL ORDEN QUE FIJÓ EL FOUNDER, MEDIDO ───────────
+  {
+    // ESCRITORIO · Hero/Salud → Radar·Factores·Explora → Comparador → Hoy·Evolución → Cambios.
+    const rowOf = (sel, ctxSel) => {
+      const re = new RegExp((ctxSel || '') + '\\' + sel.replace('.', '.') + '\\s*\\{[^}]*grid-row:\\s*(\\d+)');
+      const m = css.match(re); return m ? Number(m[1]) : null;
+    };
+    const wCmp = (sel) => { const m = css.match(new RegExp(
+      '\\.aurix-intcc:has\\(\\.intv14-cmp\\) \\' + sel + '\\s*\\{[^}]*grid-row:\\s*(\\d+)'));
+      return m ? Number(m[1]) : null; };
+    ok('I1.1 ESCRITORIO · el comparador va tras Radar·Factores·Explora y ANTES de Hoy/Evolución',
+      (() => { const cmp = wCmp('.intv14-cmp'), watch = wCmp('.intcc-watch'),
+          tl = wCmp('.intcc-timeline'), chg = wCmp('.intv4-changed');
+        const radar = rowOf('.intcc-radar');
+        return radar === 2 && cmp === 3 && watch === 4 && tl === 4 && chg === 5; })(),
+      JSON.stringify({ radar: rowOf('.intcc-radar'), cmp: wCmp('.intv14-cmp'),
+        watch: wCmp('.intcc-watch'), tl: wCmp('.intcc-timeline'), chg: wCmp('.intv4-changed') }));
+    ok('I1.2 …a ANCHO COMPLETO, en su propia fila',
+      /\.aurix-intcc:has\(\.intv14-cmp\) \.intv14-cmp\s*\{ grid-column: 1 \/ 13;/.test(css));
+    ok('I1.3 …y con pregunta Y comparador todo baja una fila, sin solaparse',
+      (() => { const q = (sel) => { const m = css.match(new RegExp(
+          '\\.aurix-intcc:has\\(\\.intv12-qcard\\):has\\(\\.intv14-cmp\\) \\' + sel + '\\s*\\{[^}]*grid-row:\\s*(\\d+)'));
+          return m ? Number(m[1]) : null; };
+        return q('.intv14-cmp') === 4 && q('.intcc-watch') === 5 && q('.intv4-changed') === 6; })());
+    ok('I1.4 SIN comparador la rejilla es la de antes, byte por byte (`:has` condicionado)',
+      /\.aurix-intcc:has\(\.intv14-cmp\)/.test(css)
+      && /\.intcc-watch     \{ grid-column: 1 \/ 7;  grid-row: 3; \}/.test(css));
+  }
+  // ── CHECKPOINT I.6 · EL CONTRATO FINANCIERO, INTACTO ────────────────
+  ok('I6.1 la serie propia sigue siendo el ÍNDICE flow-neutral base 100 del owner certificado',
+    /_aurixInvestablePerformance\(/.test(fnSrc('_aurixComparison'))
+    && /\.index/.test(fnSrc('_aurixComparison'))
+    && !/_aurixTwrChain|Modified/.test(fnSrc('_aurixComparison')));
+  ok('I6.2 ninguna cantidad monetaria absoluta se compara contra un precio',
+    (() => { const src0 = fnSrc('_aurixComparison') + fnSrc('_intv14CmpSvg');
+      return !/totUSD|investableValueUSD|formatCurrency/.test(src0); })());
+  ok('I6.3 `pending` y `value_fallback` siguen siendo incompatibles con comparar',
+    (() => { const src0 = fnSrc('_aurixComparison');
+      return /perf && perf\.valid/.test(src0) || /!perf\.valid/.test(src0)
+        || /fallbackReason/.test(src0); })());
+  ok('I6.4 misma fecha inicial y final para las DOS series (las declara el owner)',
+    /out\.availableFrom = /.test(fnSrc('_aurixComparison'))
+    && /out\.endsBefore = /.test(fnSrc('_aurixComparison'))
+    && /out\.from = al\.from; out\.to = al\.to;/.test(fnSrc('_aurixComparison').replace(/\s+/g, ' ')));
+  ok('I6.5 el join sigue siendo AS-OF con tolerancia derivada, nunca bucket ciego',
+    /toleranceMs/.test(fnSrc('_aurixCmpAlign'))
+    && /_aurixCmpMedianStep/.test(fnSrc('_aurixCmpAlign')));
+  ok('I6.6 NUNCA se interpola ni se arrastra un valor entre buckets',
+    /NO interpola/.test(app) && !/interpolate|lerp/i.test(fnSrc('_aurixCmpBucketize')));
+  ok('I6.7 usar el comparador NO cambia el patrimonio: no escribe en ningún owner',
+    (() => { const src0 = fnSrc('_aurixComparison') + fnSrc('_intv14CmpSetState')
+        + fnSrc('_aurixCmpPushRecent');
+      return !/_aurixPersist|savePortfolio|holdings\s*=|assets\s*=|upsert|supabaseClient/.test(src0); })());
+  // ── CHECKPOINT P · 15/16/17 · los tres casos del comparador ────────
+    const MKT2 = (from, n, step, p0, drift) => { const out = [];
+      for (let i = 0; i < n; i++) out.push({ time: from + i * step, value: p0 * (1 + drift * i) });
+      return out; };
+    okA('P.15 comparador con historia PARCIAL: se declara desde cuándo, sin inventar',
+      (async () => { const c = cmpCtx({ perf: PERF_OK,
+          feed: { '^GSPC': { series: MKT2(T_0 + 20 * D1, 20, D1, 5000, 0.001) } } });
+        const r = await run('_aurixComparison("all", "sp500", {})', c);
+        return r.state === 'ready' && Number.isFinite(r.availableFrom) && r.availableFrom > T_0; })(),
+      'historia parcial');
+    okA('P.16 proveedor SIN puntos: insuficiencia declarada y la serie propia SOBREVIVE',
+      (async () => { const c = cmpCtx({ perf: PERF_OK, feed: {} });
+        const r = await run('_aurixComparison("all", "sp500", {})', c);
+        // La propia SOBREVIVE por el camino SÍNCRONO, que es el que pinta la
+        // card: el asíncrono devuelve el estado, no una serie a medias.
+        const sync = run('_aurixComparisonSync("all")', c);
+        return r.state === 'insufficient' && r.other === null
+          && Array.isArray(sync.mine) && sync.mine.length >= 2 && sync.other === null; })(),
+      'sin puntos');
+    okA('P.17 cambio RÁPIDO de activo y periodo: gana la última selección',
+      (async () => { const c = cmpCtx({ perf: PERF_OK,
+          feed: { '^GSPC': { series: MKT2(T_0, 40, D1, 5000, 0.001) },
+                  'BTC-USD': { series: MKT2(T_0, 40, D1, 40000, 0.004) } } });
+        // Se lanzan las dos sin esperar y se resuelven a la vez: la del
+        // benchmark pedido en último lugar tiene que traer SU símbolo.
+        const [, b] = await Promise.all([
+          run('_aurixComparison("30d", "sp500", {})', c),
+          run('_aurixComparison("all", "btc", {})', c)]);
+        return b.symbol === 'BTC-USD' && b.range === 'all'; })(),
+      'última selección');
+  // ── REVISIÓN FINANCIERA · LOS CUATRO P1, REPRODUCIDOS ────────────────
+  ok('RF.1 el limitador de Salud CONSERVA el decimal (no dice «2 de 2»)',
+    (() => { const es = DICT.es.intcc_chip_limit_spread('1,98', 2);
+      return /_intv4Num\(h\.effectiveN, 1\)/.test(fnSrc('_intccHealthLimiters'))
+        && !/_aurixPctNum\(h\.effectiveN/.test(fnSrc('_intccHealthLimiters'))
+        && /1,98/.test(es); })(),
+    'antes `_aurixPctNum` ignoraba el 2º argumento y redondeaba a entero');
+  ok('RF.2 la cobertura NO se afirma desde un campo inexistente',
+    // SOBRE CÓDIGO, NO SOBRE PROSA: el comentario que explica el defecto cita
+    // los nombres antiguos a propósito, y medir el fichero entero los
+    // encontraría ahí.
+    (() => { const src0 = fnSrc('_intv4AnswerHtml').replace(/^\s*\/\/.*$/gm, '');
+      return !/core\.snapshot\.uncertifiablePositions/.test(src0)
+        && !/avail\.uncertifiablePositions/.test(src0)
+        && /_aurixHealthSnapshot\(\) \|\| \{\}\)\.uncertifiablePositions/.test(src0)
+        // …y sin owner que lo sepa, NO se afirma totalidad.
+        && /else if \(coverKnown\) out\.push\(_intv4T\('intv4_dq_cover_full'\)\)/.test(src0)
+        && /const coverKnown = typeof _aurixHealthSnapshot === 'function'/.test(src0); })());
+  ok('RF.3 «3M» se traduce al vocabulario del PROVEEDOR antes de pedirle nada',
+    (() => { const c = cmpCtx({});
+      return run('_aurixCmpProviderRange("90d")', c) === '3m'
+        && run('_aurixCmpProviderRange("30d")', c) === '30d'
+        && /range: _aurixCmpProviderRange\(range\)/.test(fnSrc('_aurixCmpBenchmarkSeries'))
+        && /range: _aurixCmpProviderRange\(range\)/.test(fnSrc('_aurixCmpFxSeries')); })(),
+    'el adaptador conoce `3m`, no `90d`');
+  okA('RF.3b EJECUTADO · con «90d» el adaptador recibe «3m» y la comparación sale',
+    (async () => { const c = cmpCtx({ perf: PERF_OK,
+        feed: { '^GSPC': { series: MKT(T_0, 40, D1, 5000, 0.001) } } });
+      // El doble de adaptador SÓLO responde a rangos que conoce, igual que el real.
+      run('window.AurixChartAdapters.yahooHistoryAdapter = function (a) {'
+        + ' __calls.push(a.symbol + "@" + a.range);'
+        + ' if (["24h","7d","30d","3m","1y","all"].indexOf(a.range) === -1)'
+        + '   return Promise.resolve({ series: [], meta: { currency: "USD", status: "bad-request" } });'
+        + ' return Promise.resolve({ series: ' + JSON.stringify(MKT(T_0, 40, D1, 5000, 0.001))
+        + ', meta: { currency: "USD", status: "ready" } }); }', c);
+      const r = await run('_aurixComparison("90d", "sp500", {})', c);
+      return r.state === 'ready' && run('__calls', c).some((x) => /@3m$/.test(x)); })(),
+    'rango traducido');
+  okA('RF.4 una divisa REPORTADA distinta de la declarada DETIENE, no convierte',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, base: 'EUR',
+        feed: { '^GSPC': { series: MKT(T_0, 40, D1, 5000, 0.001), currency: 'EUR' },
+                'EURUSD=X': { series: MKT(T_0, 40, D1, 1.05, 0.001) } } });
+      const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', c);
+      return r.state === 'insufficient' && r.reason === 'quote_currency_mismatch'; })(),
+    'la divisa declarada manda sobre la que el adaptador rellena');
+  ok('RF.5 el catálogo SÓLO ofrece lo que el histórico resuelve y cotiza en USD',
+    (() => { const cat = run('_AURIX_CMP_CATALOG', cmpCtx({}));
+      const syms = cat.map(b => b.symbol);
+      return cat.every(b => String(b.quoteCcy || 'USD') === 'USD')
+        // fuera los índices en otra divisa y el DAX, que es de rentabilidad TOTAL
+        && ['^GDAXI', '^IBEX', '^FCHI', '^N225', '^FTSE', '^STOXX50E'].every(x => syms.indexOf(x) === -1)
+        // fuera los UCITS de ticker desnudo, que el histórico no resuelve
+        && ['IWDA', 'VWCE', 'EUNL', 'CSPX', 'SXR8'].every(x => syms.indexOf(x) === -1)
+        // …y sigue habiendo catálogo de verdad, en las cinco categorías
+        && cat.length >= 25
+        && ['index', 'etf', 'stock', 'crypto', 'metal']
+          .every(k => cat.some(b => b.kind === k)); })(),
+    JSON.stringify({ n: run('_AURIX_CMP_CATALOG', cmpCtx({})).length }));
+  okA('RF.6 un fallo del FX se declara del PROVEEDOR, no del historial del usuario',
+    (async () => { const c = cmpCtx({ perf: PERF_OK, base: 'EUR',
+        feed: { '^GSPC': { series: MKT(T_0, 40, D1, 5000, 0.001) } } });   // sin EURUSD
+      const r = await run('_aurixComparison("all", "sp500", { base: "EUR" })', c);
+      return r.state === 'provider_error' && r.reason === 'fx_insufficient'; })());
   ok('6.16 el comparador NO crea un segundo motor de rentabilidad',
     (() => { const src0 = fnSrc('_aurixComparison') + fnSrc('_aurixComparisonSync')
         + fnSrc('_aurixCmpAlign') + fnSrc('_aurixCmpBenchmarkSeries');
       return !/_aurixTwrChain|_aurixEligibleInvestableSeries|Modified|deltaPct/.test(src0); })());
 }
+console.log('\nDC · H · «qué ha cambiado» no repite y declara contra qué');
+{
+  // Casi todo lo que el checkpoint H pide ya estaba certificado (18.3 para la
+  // card vacía, SC.6.x para la referencia, 1.1/8.11 para hero = detalle). Lo
+  // que NO tenía gate propio es la regla de arbitraje: si un hecho es elegible
+  // en dos superficies, UN owner decide UNA ubicación — no dos derivaciones.
+  const surfaces = (h) => ({
+    hoy: (h.match(/<section class="intcc-card intcc-watch[\s\S]*?<\/section>/) || [''])[0],
+    cambios: (h.match(/<section[^>]*intv4-changed[\s\S]*?<\/section>/) || [''])[0],
+    evol: (h.match(/<section class="intcc-card intcc-timeline[\s\S]*?<\/section>/) || [''])[0],
+  });
+  const keysIn = (frag) => (frag.match(/data-fact="([^"]+)"|data-semantic="([^"]+)"/g) || [])
+    .map((m) => m.replace(/.*="|"$/g, ''));
+  [['CUENTA_B', CUENTA_B], ['CUENTA_C', CUENTA_C]].forEach(([name, acc]) => {
+    const h = render(acc).html;
+    const s0 = surfaces(h);
+    ok('H.1 ' + name + ' · ningún hecho ocupa «hoy» y «qué ha cambiado» a la vez',
+      (() => { const a = new Set(keysIn(s0.hoy)), b = keysIn(s0.cambios);
+        return b.every((k) => !a.has(k)); })(),
+      JSON.stringify({ hoy: keysIn(s0.hoy), cambios: keysIn(s0.cambios) }));
+    ok('H.2 ' + name + ' · …ni «qué ha cambiado» y «tu evolución»',
+      (() => { const a = new Set(keysIn(s0.evol)), b = keysIn(s0.cambios);
+        return b.every((k) => !a.has(k)); })(),
+      JSON.stringify({ evol: keysIn(s0.evol), cambios: keysIn(s0.cambios) }));
+  });
+  ok('H.3 el arbitraje lo hace UN owner y viaja explícito, no se deduce dos veces',
+    (() => { const r = fnSrc('_renderIntelligenceCommandCenter');
+      return /const publishedKeys = \[\];/.test(r)
+        && /_intv4MemoryHtml\(core, esc, publishedKeys,/.test(r)
+        && /const memoryClaims = _intv4MemoryClaims\(core, publishedKeys\);/.test(r)
+        && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
+  ok('H.4 «Entendido» y su persistencia siguen intactos',
+    /data-intel-ack/.test(app) && /_aurixIntelAcknowledge/.test(app)
+    && typeof DICT.es.intel_ack === 'string' && typeof DICT.en.intel_ack === 'string');
+  // Una cuenta PLANA de verdad: sin flujos, sin snapshots y con el nivel
+  // inmóvil. Con la serie creciente de CUENTA_B sí hay cambio material, así
+  // que el assert medía una premisa falsa.
+  const PLANA = Object.assign({}, CUENTA_B, { flows: [], serverRows: [],
+    rows: inv([90000, 90000, 90000, 90000, 90000, 90000]) });
+  ok('H.5 sin cambio material no se emite NI card NI línea',
+    (() => { const h = render(PLANA).html;
+      const c = (h.match(/<section[^>]*intv4-changed[\s\S]*?<\/section>/) || [''])[0];
+      return c === '' && !/data-changed-state="rows"/.test(h); })(),
+    (render(PLANA).html.match(/data-changed-state="[^"]*"/) || [''])[0]);
+  ok('H.6 cada cambio declara CONTRA QUÉ compara, y la referencia sale de los datos',
+    /_intv4ChangedRef/.test(app)
+    && /rows/.test(fnSrc('_intv4ChangedRef'))
+    && !/visit|visita/i.test(fnSrc('_intv4ChangedRef')));
+}
+
+console.log('\nDC · E · Explora pregunta lo que Aurix puede contestar');
+{
+  // La cobertura la publica el owner de Salud, así que el sandbox tiene que
+  // tenerlo: sin él, `coverKnown` es false y la parte de cobertura se calla —
+  // que es justo el fail-closed que RF.2 introduce.
+  const ansOf = (q, core0, uncert) => { const c = makeCtx(CUENTA_B);
+    run('_aurixHealthSnapshot = function () { return { uncertifiablePositions: '
+      + (uncert || 0) + ' }; }', c);
+    return run('_intv4AnswerHtml(' + JSON.stringify(q) + ', '
+      + JSON.stringify(core0) + ', _intccEsc)', c); };
+  const DQ = { id: 'q_data_quality', family: 'data_quality', answer: { factKeys: [] } };
+
+  ok('E.1 la pregunta de calidad ya no es «¿qué puede saber Aurix de mí?»',
+    (() => { const es = DICT.es.intv4_q_q_data_quality, en = DICT.en.intv4_q_q_data_quality;
+      return /qué parte de mi patrimonio puede analizar aurix/i.test(es)
+        && !/saber de mí|saber Aurix de mí/i.test(es)
+        && /how much of my wealth can aurix analyse/i.test(en); })(),
+    DICT.es.intv4_q_q_data_quality);
+  ok('E.2 …y su respuesta tiene las CUATRO partes: cobertura, historia, qué puede y qué no',
+    (() => { const h = ansOf(DQ, { dataAvailability: {
+        uncertifiablePositions: 0,
+        observation: { spanMs: 33 * 864e5, endAt: 1 },
+        roots: ['top_position', 'cash_weight'],
+        gaps: [{ semanticKey: 'per_asset_attribution' }] } });
+      return h.indexOf(DICT.es.intv4_dq_cover_full) !== -1
+        && h.indexOf(DICT.es.intv4_dq_history(33)) !== -1
+        && h.indexOf(DICT.es.intv4_dq_can(DICT.es.intcc_dim_conc + ', ' + DICT.es.intcc_dim_liq)) !== -1
+        && h.indexOf(DICT.es.intv4_dq_cannot_intro) !== -1
+        && h.indexOf(DICT.es.intv4_gap_per_asset_attribution) !== -1; })(),
+    ansOf(DQ, { dataAvailability: {
+      observation: { spanMs: 33 * 864e5, endAt: 1 }, roots: ['top_position', 'cash_weight'],
+      gaps: [{ semanticKey: 'per_asset_attribution' }] } }).slice(0, 400));
+  ok('E.3 con posiciones NO valorables la cobertura lo dice, y no finge totalidad',
+    (() => { const h = ansOf(DQ, { dataAvailability: {
+        observation: { spanMs: 864e5, endAt: 1 }, roots: [], gaps: [] } }, 2);
+      return h.indexOf(DICT.es.intv4_dq_cover_partial(2)) !== -1
+        && h.indexOf(DICT.es.intv4_dq_cover_full) === -1; })());
+  ok('E.4 sin historia certificada lo DECLARA en vez de callar esa parte',
+    (() => { const h = ansOf(DQ, { dataAvailability: {
+        observation: {}, roots: [], gaps: [] } });
+      return h.indexOf(DICT.es.intv4_dq_history_none) !== -1; })());
+  ok('E.5 las dimensiones legibles salen de las RAÍCES del ledger, no de un catálogo aspiracional',
+    (() => { const src0 = fnSrc('_intv4AnswerHtml');
+      return /avail\.roots \|\| \[\]/.test(src0)
+        && /_AURIX_ROOT_READABLE\[r\]/.test(src0); })());
+
+  // ── «¿CUÁNTO VALE?» — UNA CIFRA REPETIDA NO ES UNA RESPUESTA ─────────
+  const CV = { id: 'q_current_value', family: 'wealth_level',
+    answer: { factKeys: ['investable_level'] } };
+  const coreCV = (endAt) => ({ dataAvailability: { observation: endAt ? { endAt } : {} },
+    ledger: { facts: [{ semanticKey: 'investable_level', family: 'wealth_level',
+      value: 93869, values: { usd: 93869 }, window: { range: 'now' } }] } });
+  ok('E.6 la respuesta añade HASTA CUÁNDO está certificada la valoración',
+    (() => { const h = ansOf(CV, coreCV(1750432000000));
+      return h.indexOf(DICT.es.intv4_cv_asof(run('_intccDate(1750432000000)', makeCtx(CUENTA_B)))) !== -1; })(),
+    ansOf(CV, coreCV(1750432000000)).slice(0, 300));
+  ok('E.7 …y SIN esa referencia la pregunta no se publica (no repite una cifra a secas)',
+    ansOf(CV, coreCV(null)) === '');
+
+  // ── «FRENTE A SU PROPIA HISTORIA» EXIGE HISTORIA EN LA RESPUESTA ─────
+  const HI = { id: 'q_historical', family: 'historical_behaviour',
+    answer: { factKeys: ['investable_level', 'investable_all_time_high'] } };
+  const coreHI = (withHigh) => ({ dataAvailability: { observation: { endAt: 1750432000000 } },
+    ledger: { facts: [{ semanticKey: 'investable_level', family: 'wealth_level', value: 93869,
+        values: { usd: 93869 }, window: { range: 'now' } }].concat(withHigh
+      ? [{ semanticKey: 'investable_all_time_high', family: 'wealth_level', value: 93869,
+          values: { usd: 93869 }, window: { range: 'all', startAt: 1750000000000, endAt: 1750432000000 } }]
+      : []) } });
+  ok('E.8 sin comparación histórica PUBLICABLE la pregunta histórica NO se publica',
+    ansOf(HI, coreHI(false)) === '');
+  ok('E.9 NO-VACUIDAD · con el máximo certificado SÍ responde, y con la comparación dentro',
+    (() => { const h = ansOf(HI, coreHI(true));
+      return h !== '' && (h.match(/<p>/g) || []).length >= 2; })(),
+    ansOf(HI, coreHI(true)).slice(0, 300));
+  ok('E.10 la pregunta sobre el origen del crecimiento sigue RETIRADA',
+    !/q_capital_flows/.test(app));
+  ok('E.11 el techo de Explora siguen siendo CUATRO',
+    /const _INTV4_EXPLORE_MAX = 4;/.test(app));
+  ok('E.12 la rotación es determinista POR CUENTA, no por dispositivo',
+    /_aurixIntelOwner\(\{\}\)/.test(fnSrc('_intv4ExploreHtml'))
+    && /_INTV4_EXPLORE_PERIOD_WEEKS/.test(fnSrc('_intv4ExploreRotation')));
+}
+
+console.log('\nDC · P · matriz de fixtures · 18 cuentas');
+{
+  // Las dieciocho que el checkpoint P enumera. Se reutiliza el sandbox de este
+  // gate: montar uno nuevo sería un segundo motor de pruebas para medir lo
+  // mismo. Cada caso afirma lo que ESA cuenta debe producir, no un genérico.
+  const DAYD = 864e5;
+  const ramp = (n, from, to) => { const out = [];
+    for (let i = 0; i < n; i++) out.push({ ts: T0 + i * DAYD, total: from + (to - from) * (i / Math.max(1, n - 1)), real_estate: 0 });
+    return out; };
+  const flat = (n, v) => ramp(n, v, v);
+  const base = (rows, extra) => Object.assign({ assets: B_ASSETS, snap: B_SNAP, rows, serverRows: [], flows: [] }, extra || {});
+  const noKeys = (h) => !/\b(intv4_|intcc_|cmp_)[a-z0-9_]{3,}\b/.test(h.replace(/<[^>]+>/g, ' '))
+    && !/undefined|NaN/.test(h.replace(/<[^>]+>/g, ' '));
+  const F = [
+    ['P.1  3 días de historia',            base(ramp(3, 90000, 92000))],
+    ['P.2  33 días',                       base(ramp(33, 90000, 99000))],
+    ['P.3  más de 1 año',                  base(ramp(400, 60000, 99000))],
+    ['P.4  más de 2 años',                 base(ramp(800, 40000, 99000))],
+    ['P.5  base USD',                      base(ramp(60, 90000, 99000), { baseCurrency: 'USD' })],
+    ['P.6  base EUR',                      base(ramp(60, 90000, 99000), { baseCurrency: 'EUR' })],
+    ['P.7  sin flujos',                    base(ramp(60, 90000, 99000), { flows: [] })],
+    ['P.8  con aportaciones y retiradas',  base(ramp(60, 90000, 99000), { flows: [
+        { id: 'in1', ts: T0 + 10 * DAYD, recordedAt: T0 + 10 * DAYD, amountUSD: 5000, kind: 'deposit', source: 'user' },
+        { id: 'out1', ts: T0 + 20 * DAYD, recordedAt: T0 + 20 * DAYD, amountUSD: -2000, kind: 'withdrawal', source: 'user' }] })],
+    ['P.9  fila LEGACY sin recorded_at',   base(ramp(60, 90000, 99000), { flows: [
+        { id: 'lg', ts: T0 + 5 * DAYD, amountUSD: 3000, kind: 'deposit', source: 'user' }] })],
+    ['P.10 una sola posición',             base(ramp(40, 90000, 95000), {
+        snap: Object.assign({}, B_SNAP, { assetCount: 1, categoryCount: 1,
+          topInvestedAsset: { name: 'BTC', ticker: 'BTC', type: 'crypto', pctTotal: 100 } }) })],
+    ['P.11 varias categorías',             base(ramp(40, 90000, 95000), {
+        snap: Object.assign({}, B_SNAP, { assetCount: 9, categoryCount: 5 }) })],
+    ['P.12 historia insuficiente',         base(flat(1, 90000))],
+    ['P.13 hidratación PENDIENTE',         base([], { snap: Object.assign({}, B_SNAP, { hydrationPending: true }) })],
+    ['P.14 value_fallback',                base(ramp(40, 90000, 95000), {
+        snap: Object.assign({}, B_SNAP, { uncertifiablePositions: 1 }) })],
+    ['P.18 aislamiento · cuenta A',        base(ramp(40, 90000, 95000), { owner: 'P-a' })],
+    ['P.18 aislamiento · cuenta B',        base(ramp(40, 70000, 71000), { owner: 'P-b' })],
+  ];
+  F.forEach(([name, fx]) => {
+    let h = '', threw = '';
+    try { h = render(fx).html; } catch (e) { threw = String(e && e.message || e); }
+    ok(name + ' · pinta sin excepción y sin clave cruda',
+      !threw && h.length > 0 && noKeys(h), threw || (h.replace(/<[^>]+>/g, ' ')
+        .match(/\b(intv4_|cmp_)[a-z0-9_]{3,}\b|undefined|NaN/) || [''])[0]);
+    ok(name + ' · Salud publica cifra o «sin datos», nunca un juicio en blanco',
+      (() => { const m = h.match(/data-health-state="([^"]*)"/);
+        return !!m && m[1].length > 0; })(),
+      (h.match(/data-health-state="[^"]*"/) || [''])[0]);
+    ok(name + ' · «Hoy» no publica nada fuera de la ventana de 72 h',
+      (() => { const card = (h.match(/<section class="intcc-card intcc-watch[\s\S]*?<\/section>/) || [''])[0];
+        // Si hay filas, todas tienen que declarar ventana; si no hay, la card
+        // se encoge o declara su estado. Ninguna de las dos puede mentir.
+        return /data-items="0"/.test(card) || /data-window="/.test(card) || card === ''; })());
+  });
+}
+
+console.log('\nDC · K · responsive · 390 / 834 / 1440');
+{
+  // Lo que un gate estático PUEDE demostrar: que no existan anchos fijos que
+  // provoquen desbordamiento, que las áreas táctiles lleguen a 44 px, que el
+  // padding respete las áreas seguras y que nada se recorte por CSS. Lo que NO
+  // puede —píxeles reales en tres viewports— lo mide la QA visual, y se declara
+  // como tal en el informe en vez de fingir aquí que está cubierto.
+  const mob = css.split('@media (max-width: 640px)').slice(1).join('\n');
+  ok('K.1 nada del comparador fija un ancho en px que pueda desbordar 390',
+    (() => { const seg = css.slice(css.indexOf('.intv14-cmp-pick'), css.indexOf('.intv14-cmp-legend'));
+      const fixed = seg.match(/(?<!max-|min-)width:\s*(\d{3,})px/g) || [];
+      return fixed.length === 0; })(),
+    JSON.stringify((css.slice(css.indexOf('.intv14-cmp-pick'), css.indexOf('.intv14-cmp-legend'))
+      .match(/width:\s*\d{3,}px/g) || [])));
+  ok('K.2 en móvil TODO lo accionable del comparador llega a 44 px',
+    /button\.intv14-cmp-range \{ min-height: 44px/.test(mob)
+    && /button\.intv14-cmp-trigger, button\.intv14-cmp-clear \{ min-height: 44px; \}/.test(mob)
+    && /\.intv14-cmp-opt \{ min-height: 44px; \}/.test(mob));
+  ok('K.3 la hoja del selector respeta el área segura inferior',
+    /padding: 12px 12px calc\(12px \+ env\(safe-area-inset-bottom, 0px\)\)/.test(mob));
+  ok('K.4 el gráfico y el radar se adaptan sin ancho fijo',
+    /\.intv14-cmp-svg \{ display: block; width: 100%;/.test(css)
+    && /\.intv14-cmp-plot \{ width: 100%;/.test(css));
+  ok('K.5 ninguna card de Intelligence introduce `overflow-x: scroll`',
+    !/\.aurix-intcc[^{]*\{[^}]*overflow-x:\s*(scroll|auto)/.test(css.replace(/\n/g, ' ')));
+  ok('K.6 el hero móvil crece con su contenido (sin alto fijo ni truncado)',
+    (() => { const i = css.indexOf('--orb-c:');
+      const b = css.slice(css.lastIndexOf('{', i), css.indexOf('}', i));
+      return !/height:\s*\d/.test(b) && !/line-clamp/.test(mob.slice(0, 4000)); })());
+  ok('K.7 TODA card nueva declara su `order` en ≤1023px, o se pinta antes del hero',
+    // Hay VARIOS bloques `1023px` en la hoja; el que importa es el que
+    // declara los `order` de Intelligence. Se busca en todos.
+    (() => { const blocks = css.split('@media (max-width: 1023px)').slice(1);
+      return blocks.some(b => /\.intv14-cmp\s*\{ order: \d+; \}/.test(b)
+        && /\.intcc-watch\s*\{ order: \d+; \}/.test(b)); })(),
+    JSON.stringify((css.match(/\.(intv14-cmp|intcc-watch|intcc-timeline)\s*\{ order: \d+; \}/g) || [])));
+}
+
+console.log('\nDC · L · coherencia entre dispositivos');
+{
+  // La regla es la del checkpoint: los ESTADOS LOCALES de interfaz pueden
+  // diferir; la VERDAD FINANCIERA no. Así que se mide qué entra en cada cosa.
+  ok('L.1 la verdad financiera NO depende de nada local: el Core no lee `localStorage`',
+    (() => { const src0 = fnSrc('_aurixIntelligenceCore');
+      return !/localStorage/.test(src0); })());
+  ok('L.2 «Lo que importa hoy» se ancla a un RELOJ, no al historial local de presentación',
+    (() => { const src0 = fnSrc('_intv5MattersStories');
+      return /_aurixNow\(\)/.test(src0) && !/_intv4ReadShown/.test(src0); })());
+  ok('L.3 la elegibilidad de preguntas sale del LEDGER, no del dispositivo',
+    (() => { const src0 = fnSrc('_aurixContextualQuestions');
+      return !/localStorage|navigator|window\./.test(src0); })());
+  ok('L.4 la rotación de Explora es determinista POR CUENTA',
+    /_aurixIntelOwner\(\{\}\)/.test(fnSrc('_intv4ExploreHtml')));
+  ok('L.5 el comparador se habilita por ENTITLEMENT del usuario, así que viaja con la cuenta',
+    /hasFeature\('intelligence\.comparator'\)/.test(fnSrc('_aurixCmpEnabled')));
+  ok('L.6 …y su estado y sus recientes van SELLADOS por cuenta',
+    /_aurixIntelReadOwned/.test(fnSrc('_intv14CmpState'))
+    && /_aurixIntelReadOwned/.test(fnSrc('_aurixCmpRecent')));
+  ok('L.7 el muestreo interno NUNCA se expone: cero contadores de observación en copy',
+    (() => { const leak = ['intv4_memory_coverage', 'intv4_brief_stale', 'intel_sub_no_news']
+        .map(k => String(typeof DICT.es[k] === 'function' ? DICT.es[k](33) : DICT.es[k]));
+      return !leak.some(t => /observacion|snapshot|bucket|muestreo/i.test(t)); })(),
+    JSON.stringify(['intv4_memory_coverage'].map(k => DICT.es[k](33))));
+  // El aislamiento del comparador entre cuentas ya se ejecuta en §6 (6.9,
+  // «el comparador de A no aparece en B»); aquí se mide lo que aquel no
+  // cubre: que el sello por cuenta esté en el OWNER y no en el llamador.
+  ok('L.8 el sello por cuenta vive en el owner del estado, no en quien lo usa',
+    /_aurixIntelWriteOwned\(_AURIX_CMP_STATE_KEY/.test(app)
+    && /_aurixIntelWriteOwned\(_AURIX_CMP_RECENT_KEY/.test(app));
+}
+
+console.log('\nDC · M · idiomas y accesibilidad');
+{
+  ok('M.1 TODA clave nueva de este cierre existe en los DOS idiomas',
+    (() => { const keys = ['intcc_chip_limit_spread', 'intcc_chip_nodata', 'intv4_memory_coverage',
+        'intv4_brief_stale', 'intv4_brief_stale_note', 'intv4_dq_cover_full', 'intv4_dq_cover_partial',
+        'intv4_dq_history', 'intv4_dq_history_none', 'intv4_dq_can', 'intv4_dq_cannot_intro',
+        'intv4_cv_asof', 'cmp_diff_more', 'cmp_diff_less', 'cmp_diff_flat',
+        'cmp_disc_index', 'cmp_disc_equity', 'cmp_disc_price', 'cmp_pick_none', 'cmp_pick_search',
+        'cmp_pick_close', 'cmp_pick_empty', 'cmp_pick_recent', 'cmp_pick_title',
+        'cmp_g_index', 'cmp_g_etf', 'cmp_g_stock', 'cmp_g_crypto', 'cmp_g_metal',
+        'cmp_kind_index', 'cmp_kind_etf', 'cmp_kind_stock', 'cmp_kind_crypto', 'cmp_kind_metal',
+        'cmp_tip_mine', 'cmp_tip_diff', 'cmp_tip_pp', 'cmp_range_90d',
+        'cmp_provider_error', 'cmp_loading'];
+      const missing = keys.filter(k => DICT.es[k] === undefined || DICT.en[k] === undefined);
+      return missing.length === 0; })(),
+    JSON.stringify(['intcc_chip_limit_spread', 'cmp_tip_pp', 'cmp_range_90d']
+      .filter(k => DICT.es[k] === undefined || DICT.en[k] === undefined)));
+  ok('M.2 …y NINGUNA se queda con el texto del otro idioma',
+    (() => { const pairs = [['cmp_pick_search', 'Buscar', 'Search'], ['cmp_g_stock', 'Acciones', 'Stocks'],
+        ['cmp_provider_error', 'proveedor', 'provider'], ['cmp_pick_close', 'Cerrar', 'Close']];
+      return pairs.every(([k, es, en]) => String(DICT.es[k]).indexOf(es) !== -1
+        && String(DICT.en[k]).indexOf(en) !== -1); })());
+  ok('M.3 ninguna clave cruda llega a la superficie en ninguno de los dos idiomas',
+    (() => { const bad = /\b(intv4_|intcc_|cmp_|intel_)[a-z0-9_]{3,}\b/;
+      return ['es', 'en'].every((lg) => {
+        const h = render(Object.assign({}, CUENTA_B, { lang: lg })).html;
+        const txt = h.replace(/<[^>]+>/g, ' ');
+        return !bad.test(txt) && !/undefined|NaN/.test(txt); }); })(),
+    JSON.stringify(['es', 'en'].map((lg) => (render(Object.assign({}, CUENTA_B, { lang: lg })).html
+      .replace(/<[^>]+>/g, ' ').match(/\b(intv4_|cmp_)[a-z0-9_]{3,}\b/) || [''])[0])));
+  ok('M.4 foco visible en TODO lo accionable que este cierre añade',
+    /button\.intv14-cmp-trigger:focus-visible/.test(css)
+    && /input\.intv14-cmp-search:focus-visible/.test(css)
+    && /button\.intv14-cmp-panel-x:focus-visible/.test(css)
+    && /\.intv14-cmp-plot:focus-visible/.test(css));
+  ok('M.5 el selector, los periodos y el tooltip se manejan con teclado',
+    (() => { const a = app;
+      return /role="combobox"/.test(a) && /aria-activedescendant/.test(a)
+        && /<button type="button" class="intv14-cmp-range/.test(a)
+        && /data-cmp-plot="1" tabindex="0"/.test(a)
+        && /e\.key === 'ArrowRight'/.test(a); })());
+  ok('M.6 nada se distingue SÓLO por color',
+    /\.intv14-cmp-line\.is-other \{[^}]*stroke-dasharray/.test(css.replace(/\n/g, ' '))
+    && /\.intcc-chip\.is-limit::before\s*\{\s*content: '!'/.test(css)
+    && /\.intcc-chip\.is-unknown::before\s*\{\s*content: '·'/.test(css)
+    && /\.intv14-cmp-opt\[aria-selected="true"\]::after\s*\{\s*content: '✓'/.test(css));
+  ok('M.7 `prefers-reduced-motion` cubre TODA animación nueva',
+    (() => { const blocks = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+      return /\.intv14-cmp-panel \{ animation: none/.test(blocks); })());
+  ok('M.8b la pista de teclado del gráfico está ENLAZADA, no sólo definida',
+    /aria-describedby="intv14-cmp-hint"/.test(app)
+    && /id="intv14-cmp-hint"/.test(app)
+    && /\.intcc-sr-only \{/.test(css)
+    && typeof DICT.es.cmp_tip_hint === 'string' && typeof DICT.en.cmp_tip_hint === 'string');
+  ok('M.8 el tooltip se anuncia a un lector de pantalla',
+    /data-cmp-tip="1" role="status" aria-live="polite"/.test(app));
+  ok('M.9 el panel del selector es un `listbox` con nombre accesible',
+    /role="listbox" data-cmp-list="1"\s*\n?\s*aria-label=/.test(app.replace(/\s+/g, ' ')
+      .replace('role="listbox" data-cmp-list="1" aria-label=', 'role="listbox" data-cmp-list="1"\naria-label=')));
+}
+
+console.log('\nDC · C y D · el radar y los factores, preservados y verificados');
+{
+  // Los dos checkpoints dicen «preservar»: aquí no se cambia nada, se MIDE que
+  // sigue en pie lo que ya estaba certificado, más lo que el cierre añade por
+  // su nombre y no tenía assert propio.
+  const hA = render(CUENTA_A).html, hB = render(CUENTA_B).html;
+
+  // ── C · RADAR ───────────────────────────────────────────────────────
+  ok('C.1 ningún segmento del radar se dibuja punteado ni «roto»',
+    (() => { const seg = css.slice(css.indexOf('.intcc-radar-edge'), css.indexOf('.intcc-radar-edge') + 900);
+      return !/stroke-dasharray/.test(seg)
+        && !/stroke-dasharray/.test((hA.match(/class="intcc-radar-edge[^"]*"[^>]*/g) || []).join(' ')); })());
+  // La clase EXACTA: `intcc-radar-dot` sin comilla de cierre también casa con
+  // el grupo contenedor, y contarlo así devolvía seis.
+  ok('C.2 cinco marcadores y cinco segmentos en las DOS cuentas de referencia',
+    [hA, hB].every((h) => (h.match(/class="intcc-radar-dot"/g) || []).length === 5
+      && /data-svg-edges="5"/.test(h)),
+    JSON.stringify([hA, hB].map((h) => ({
+      dots: (h.match(/class="intcc-radar-dot"/g) || []).length,
+      edges: (h.match(/data-svg-edges="(\d+)"/) || [, '?'])[1] }))));
+  ok('C.3 los cinco marcadores comparten radio, relleno y trazo (sin `is-unknown`)',
+    (() => { const dots = (hA.match(/<circle class="intcc-radar-dot"[^>]*>/g) || []);
+      const cls = dots.map((d) => (d.match(/class="([^"]+)"/) || [, ''])[1]);
+      const r = dots.map((d) => (d.match(/ r="([^"]+)"/) || [, ''])[1]);
+      return dots.length === 5 && new Set(cls).size === 1 && new Set(r).size === 1
+        && !/is-unknown/.test(hA); })(),
+    JSON.stringify((hA.match(/<circle class="intcc-radar-dot"[^>]*>/g) || []).map(
+      (d) => (d.match(/class="([^"]+)"/) || [, ''])[1])));
+  ok('C.4 un eje sin datos se declara SÓLO con texto, nunca con un porcentaje',
+    (() => { const svg = (hA.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0];
+      const unk = (svg.match(/data-availability="unavailable"/g) || []).length;
+      // Si hay ejes sin datos, ninguno de ellos puede llevar un `%` en su rótulo.
+      const labels = (svg.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || []).map(x => x.replace(/.*>/, ''));
+      return unk === 0 || labels.some((l) => l === DICT.es.intv7_axis_unavailable); })(),
+    JSON.stringify((hA.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || []).map(x => x.replace(/.*>/, ''))));
+  ok('C.5 el tamaño logrado no se reduce: el marco sigue entre el 50 % y el 58 % del viewBox',
+    /11\.26 el marco exterior ocupa entre el 50 % y el 58 %/.test(s_self));
+
+  // ── D · FACTORES ────────────────────────────────────────────────────
+  ok('D.1 el titular coincide con el PUESTO 1 del ranking',
+    (() => { const sec = section(hB, 'intcc-drivers');
+      const lead = (sec.match(/class="intcc-drv-explain">([^<]*)</) || [, ''])[1];
+      const first = (sec.match(/class="intcc-drv-name">([^<]*)/) || [, ''])[1];
+      return !!lead && !!first && lead.indexOf(first) !== -1; })(),
+    JSON.stringify({ lead: (section(hB, 'intcc-drivers').match(/class="intcc-drv-explain">([^<]*)</) || [, ''])[1],
+      first: (section(hB, 'intcc-drivers').match(/class="intcc-drv-name">([^<]*)/) || [, ''])[1] }));
+  ok('D.2 el ranking y los pesos salen del MISMO owner de exposición',
+    /buildPortfolioDrivers\(snap\)/.test(fnSrc('_intv5DriversHtml'))
+    && !/investableValueUSD|_aurixCategoryBucket/.test(fnSrc('_intv5DriversHtml')));
+  ok('D.3 va de mayor a menor, sin empates mal resueltos',
+    (() => { const sec = section(hB, 'intcc-drivers');
+      // OJO: `data-pct-raw` contiene guiones, así que limpiar por caracteres
+      // corrompía el número. Se extrae el grupo capturado.
+      const raw = (sec.match(/data-pct-raw="([^"]*)"/g) || [])
+        .map(x => Number((x.match(/="([^"]*)"/) || [, ''])[1]));
+      if (raw.length < 2) return true;
+      for (let i = 1; i < raw.length; i++) if (!(raw[i] <= raw[i - 1])) return false;
+      return true; })(),
+    JSON.stringify((section(hB, 'intcc-drivers').match(/data-pct-raw="[^"]*"/g) || [])));
+  ok('D.4 la sección habla de PATRIMONIO y no mezcla perímetros sin declararlo',
+    (() => { const sec = section(hB, 'intcc-drivers');
+      return /patrimonio/i.test(sec) || /wealth/i.test(sec); })());
+  ok('D.5 cero activos ficticios: cada fila sale de una posición del snapshot',
+    (() => { const sec = section(hB, 'intcc-drivers');
+      const names = (sec.match(/class="intcc-drv-name">([^<]*)/g) || []).map(x => x.replace(/.*>/, ''));
+      const known = (CUENTA_B.snap.topInvestedAsset ? [CUENTA_B.snap.topInvestedAsset.name] : [])
+        .concat(['Bitcoin', 'Ethereum', 'Euros', 'BTC', 'ETH', 'EUR', 'Apple', 'Microsoft', 'AAPL', 'MSFT']);
+      return names.length > 0 && names.every((n) => known.some((k) => n.indexOf(k) !== -1)); })(),
+    JSON.stringify((section(hB, 'intcc-drivers').match(/class="intcc-drv-name">([^<]*)/g) || [])
+      .map(x => x.replace(/.*>/, ''))));
+}
+
+console.log('\nDC · J · cada limitación, junto a la afirmación que limita');
+{
+  const G = (k) => ({ dataAvailability: { gaps: [
+    { semanticKey: k, status: 'not_yet_supported' }] } });
+  const by = (k) => run('_aurixGapsBySurface(' + JSON.stringify(G(k)) + ')', makeCtx(CUENTA_B));
+  ok('J.1 la atribución de rendimiento ACTUAL va a «Lo que importa hoy»',
+    (() => { const r = by('per_asset_attribution');
+      return r.today === DICT.es.intv4_gap_per_asset_attribution
+        && !r.drivers && !r.evolution; })(),
+    JSON.stringify(by('per_asset_attribution')));
+  ok('J.2 …y la caída DEL PERIODO también',
+    (() => { const r = by('position_period_decline'); return !!r.today && !r.drivers; })());
+  ok('J.3 el resultado desde la COMPRA y el MÁXIMO por posición van a «Tu evolución»',
+    (() => { const a = by('position_below_cost'), b = by('position_drawdown_from_peak');
+      return !!a.evolution && !a.drivers && !a.today
+        && !!b.evolution && !b.drivers && !b.today; })());
+  ok('J.4 NINGUNA de las cinco cae en Factores: ninguna limita la exposición',
+    (() => ['per_asset_attribution', 'position_period_decline', 'position_below_cost',
+            'position_drawdown_from_peak', 'position_fx_attribution']
+      .every((k) => by(k).drivers === ''))());
+  ok('J.5 una clave SIN destino no se publica en ningún sitio (fail-closed)',
+    (() => { const r = by('clave_que_no_existe');
+      return !r.today && !r.evolution && !r.drivers; })());
+  ok('J.6 …y el mapa es explícito, no una heurística sobre el nombre',
+    (() => { const m = run('_AURIX_GAP_SURFACE', makeCtx(CUENTA_B));
+      return Object.keys(m).length === 5
+        && Object.values(m).every((v) => ['today', 'evolution', 'drivers'].indexOf(v) !== -1); })());
+  ok('J.7 la limitación del COMPARADOR no pasa por este mapa: es naturaleza, no hueco',
+    (() => { const m = run('_AURIX_GAP_SURFACE', makeCtx(CUENTA_B));
+      return Object.values(m).indexOf('comparator') === -1
+        && /_AURIX_CMP_DISCLOSURE\[bm\.kind\]/.test(fnSrc('_intv14ComparatorHtml')); })());
+  ok('J.8 el pie publica SÓLO la advertencia de producto',
+    (() => { const h = render(CUENTA_B).html;
+      const d = (h.match(/<p class="intcc-disclaimer">[\s\S]*?<\/p>/) || [''])[0];
+      return d.indexOf(DICT.es.intcc_disclaimer) !== -1
+        && !/intv5-honesty/.test(h)
+        && !/por posici/i.test(d); })());
+  ok('J.9 y la frase reescrita ya no usa el nombre interno del owner',
+    (() => { const es = DICT.es.intv4_gap_position_drawdown_from_peak;
+      return !/máximo conservado/i.test(es) && /máximo de tu patrimonio/.test(es)
+        && !/retained peak/i.test(DICT.en.intv4_gap_position_drawdown_from_peak); })(),
+    DICT.es.intv4_gap_position_drawdown_from_peak);
+  // NO-VACUIDAD · que el enrutado llegue de verdad al DOM de cada card.
+  ok('J.10 la limitación de HOY se pinta dentro de la card de Hoy, no en otra',
+    (() => { const c = makeCtx(CUENTA_B);
+      const now = 1760000000000;
+      run('_aurixNow = function () { return ' + now + '; };', c);
+      // La historia tiene que RENDERIZAR de verdad: `_intv4StoryHtml` devuelve
+      // '' sin copy, y entonces el assert pasaría por ausencia de card.
+      const core0 = { topStories: [{ semanticKey: 'cash_drift_7d', causalRoot: 'cash_weight',
+          priority: 5, window: { range: '7D', endAt: now - 3600e3 },
+          values: { pct: 12, deltaPp: 3 } },
+          { semanticKey: 'positions_registered_today', causalRoot: 'registered_operation',
+            priority: 9, value: 2, window: { range: 'today', endAt: now - 3600e3 },
+            values: { operations: 2, amountKind: null, grossUSD: null } }],
+        ledger: { facts: [{ semanticKey: 'cash_drift_7d' }] },
+        dataAvailability: { observation: { endAt: now - 3600e3 } } };
+      const h = run('_intv5MattersHtml(' + JSON.stringify(core0)
+        + ', _intccEsc, "standard", [], null, {}, ' + JSON.stringify('LIMITE-HOY') + ')', c);
+      return /data-items="[1-9]/.test(h)
+        && /intcc-surface-limit/.test(h) && h.indexOf('LIMITE-HOY') !== -1; })(),
+    'la limitación de Hoy');
+  ok('J.11 …y sin contenido que acotar, la limitación NO se pinta sola',
+    (() => { const c = makeCtx(CUENTA_B);
+      const now = 1760000000000;
+      run('_aurixNow = function () { return ' + now + '; };', c);
+      const vacio = { topStories: [], ledger: { facts: [] },
+        dataAvailability: { observation: { endAt: now - 3600e3 } } };
+      const h = run('_intv5MattersHtml(' + JSON.stringify(vacio)
+        + ', _intccEsc, "standard", [], null, {}, ' + JSON.stringify('LIMITE-HOY') + ')', c);
+      return h.indexOf('LIMITE-HOY') === -1; })());
+}
+
+console.log('\nDC · R2/R3 · residuales del cierre');
+{
+  // ── R2 · RECONOCER LO VIEJO NO PUEDE ENTERRAR LO NUEVO ───────────────
+  // El veto se construía sobre `findingsAll` —el historial COMPLETO—, así que
+  // una raíz acusada en el pasado quedaba vetada para siempre y un
+  // acontecimiento nuevo y material de esa misma raíz no podía volver a
+  // titular «Lo que importa hoy».
+  const NOWR = 1760000000000, H = 3600e3;
+  const ctxR = () => { const c = makeCtx(CUENTA_B);
+    run('_aurixNow = function () { return ' + NOWR + '; };', c); return c; };
+  // Dos acontecimientos DISTINTOS de la MISMA raíz, separados en el tiempo.
+  // Se usa un hecho con copy certificada, o la card saldría vacía por otra
+  // razón y el assert pasaría por ausencia de caso.
+  const FACT = { semanticKey: 'positions_registered_today', causalRoot: 'registered_operation',
+    priority: 9, value: 2, window: { range: 'today', endAt: NOWR - 2 * H },
+    values: { operations: 2, amountKind: null, grossUSD: null } };
+  const VIEJO = { findingId: 'f-viejo', semanticKey: 'positions_registered_today',
+    rootCause: 'registered_operation', conceptId: 'op-viejo' };
+  const NUEVO = { findingId: 'f-nuevo', semanticKey: 'positions_registered_today',
+    rootCause: 'registered_operation', conceptId: 'op-nuevo' };
+  const coreR = (activos) => ({
+    topStories: [FACT],
+    // El historial CONSERVA los dos; lo que cambia es cuál sigue ACTIVO.
+    findingsAll: [VIEJO, NUEVO],
+    findings: activos,
+    ledger: { facts: [FACT] },
+    dataAvailability: { observation: { endAt: NOWR - 2 * H, observations: 9 } },
+  });
+  const cardR = (activos) => run('_intv5MattersHtml(' + JSON.stringify(coreR(activos))
+    + ', _intccEsc, "standard", [], null, {}, "")', ctxR());
+  ok('R2.1 con el acontecimiento NUEVO activo, «hoy» cede la raíz al destino',
+    /data-items="0"/.test(cardR([NUEVO])),
+    (cardR([NUEVO]).match(/data-items="\d+"/) || [''])[0]);
+  ok('R2.2 REGRESIÓN · acusado el VIEJO, el NUEVO vuelve a poder publicarse',
+    (() => { const h = cardR([]);          // nada activo: sólo queda historial
+      return /data-items="1"/.test(h); })(),
+    (cardR([]).match(/data-items="\d+"/) || [''])[0]);
+  ok('R2.3 el veto se construye sobre la REVISIÓN ACTUAL, no sobre el historial',
+    (() => { const src0 = fnSrc('_intv5MattersHtml');
+      return /_intv4FindingRows\(core\)/.test(src0)
+        && !/findingsAll/.test(src0.replace(/^\s*\/\/.*$/gm, ''))
+        // …y lo mismo para la decisión «titular = hecho o significado».
+        && (src0.match(/_intv4FindingRows\(core\)/g) || []).length >= 2; })());
+  ok('R2.4 …y un hallazgo SIN copy publicable ya no veta una raíz que no pinta',
+    (() => { const src0 = fnSrc('_intv4FindingRows');
+      // `_intv4FindingRows` filtra por `!!x.txt`, así que lo que veta es
+      // exactamente lo que va a rendir fila.
+      return /\.filter\(x => !!x\.txt\)/.test(src0); })());
+
+  // ── R3 · UN RELOJ ATRASADO TAMBIÉN MIENTE ────────────────────────────
+  const stale = (nowAt, endAt) => run('_aurixTodayDataStale('
+    + JSON.stringify({ dataAvailability: { observation: { endAt } } }) + ', ' + nowAt + ')', ctxR());
+  ok('R3.1 reloj ATRASADO respecto al último dato certificado ⇒ no se publica «hoy»',
+    stale(NOWR - 48 * H, NOWR) === true);
+  ok('R3.2 reloj correcto y dato fresco ⇒ sí se publica',
+    stale(NOWR, NOWR - 2 * H) === false);
+  ok('R3.3 reloj ADELANTADO más allá de la ventana ⇒ sigue sin publicarse',
+    stale(NOWR + 100 * H, NOWR) === true);
+  ok('R3.4 la referencia es la observación CERTIFICADA que ya teníamos, sin fuente nueva',
+    (() => { const src0 = fnSrc('_aurixTodayDataStale');
+      return /if \(nowAt < o\.endAt\) return true;/.test(src0)
+        && /dataAvailability && core\.dataAvailability\.observation/.test(src0)
+        && !/fetch|Date\.now|performance/.test(src0); })());
+  ok('R3.5 …y NO se usa para medir la antigüedad: eso volvería a rebobinar «hoy»',
+    /_aurixTodayFresh\(st, _nowAt\)/.test(fnSrc('_intv5MattersStories'))
+    && !/o\.endAt/.test(fnSrc('_aurixTodayFresh')));
+}
+
+console.log('\nDC · F · «hoy» tiene un borde, y el borde es el PRESENTE');
+{
+  // ── POR QUÉ EL ANCLA NO PUEDE SER EL ÚLTIMO SNAPSHOT ─────────────────
+  // Mi primera versión medía la antigüedad contra la última observación
+  // certificada. Con una cuenta parada tres semanas, un flujo de hace veinte
+  // días queda «a un día» de ese snapshot y se publica como actualidad: eso
+  // es rebobinar «hoy» hasta donde convenga. La verdad financiera sigue
+  // anclada a datos certificados; la ACTUALIDAD se mide contra un reloj.
+  const HOUR = 3600e3, DAYMS = 864e5;
+  const PRESENTE = 1760000000000;
+  // El reloj se FIJA en el sandbox redefiniendo la costura. Producción sólo
+  // tiene `Date.now()`: no se añade ninguna variable ni puerta trasera.
+  const ctxAt = (now) => { const c = makeCtx(CUENTA_B);
+    run('_aurixNow = function () { return ' + now + '; };', c); return c; };
+  const coreOf = (obsAgeH, factAgeH) => ({
+    topStories: [
+      { semanticKey: 'recorded_capital_net', causalRoot: 'capital_flow', priority: 9,
+        window: { range: '30D', endAt: PRESENTE - factAgeH * HOUR }, values: {} },
+    ],
+    ledger: { facts: [] },
+    dataAvailability: { observation: { endAt: PRESENTE - obsAgeH * HOUR } },
+  });
+  const sel = (obsAgeH, factAgeH, now) => run('_intv5MattersStories('
+    + JSON.stringify(coreOf(obsAgeH, factAgeH)) + ', [], null, {})', ctxAt(now == null ? PRESENTE : now));
+
+  ok('F.1 la antigüedad se mide contra el PRESENTE, con un reloj inyectable',
+    (() => { const c = ctxAt(PRESENTE);
+      const f = (ageH) => run('_aurixTodayFresh({ window: { endAt: '
+        + (PRESENTE - ageH * HOUR) + ' } }, _aurixNow())', c);
+      return f(2) === true && f(72) === true && f(73) === false && f(24 * 40) === false; })());
+  ok('F.2 un ESTADO sin fecha no lo filtra esta puerta (no tiene nada que comparar)',
+    run('_aurixTodayFresh({ values: {} }, _aurixNow())', ctxAt(PRESENTE)) === true);
+  ok('F.2b SIN serie todavía NO se afirma rancidez: no es viejo, es que no existe',
+    (() => { const c = ctxAt(PRESENTE);
+      return run('_aurixTodayDataStale({ dataAvailability: { observation: { observations: 0, endAt: null } } }, _aurixNow())', c) === false
+        && run('_aurixTodayDataStale({}, _aurixNow())', c) === false; })());
+  ok('F.3 SIN reloj no se afirma actualidad (fail-closed)',
+    run('_aurixTodayFresh({ window: { endAt: 1 } }, null)', ctxAt(PRESENTE)) === false);
+  ok('F.4 el owner NO usa el último snapshot como ancla de antigüedad',
+    (() => { const src0 = fnSrc('_intv5MattersStories');
+      return /_aurixTodayFresh\(st, _nowAt\)/.test(src0)
+        && /const _nowAt = _aurixNow\(\);/.test(src0)
+        && !/_todayAnchor/.test(src0); })());
+  ok('F.5 las DOS ventanas están declaradas como constantes, no incrustadas',
+    /const _AURIX_TODAY_MAX_AGE_MS = 72 \* 3600 \* 1000;/.test(app)
+    && /const _AURIX_TODAY_STALE_MS = 72 \* 3600 \* 1000;/.test(app));
+
+  // ── LA FIXTURE QUE EL FOUNDER PIDIÓ ──────────────────────────────────
+  // Último snapshot ANTIGUO (21 días) y un flujo PEGADO a ese snapshot (a 12 h
+  // de él) pero viejo respecto al presente. Con el ancla anterior habría
+  // salido publicado como actualidad.
+  ok('F.6 CUENTA PARADA · un hecho pegado al último snapshot pero VIEJO no se publica',
+    (() => { const r = sel(21 * 24, 21 * 24 + 12);
+      return r.stale === true && r.stories.length === 0; })(),
+    JSON.stringify(sel(21 * 24, 21 * 24 + 12).stories.map((x) => x.semanticKey)));
+  ok('F.6b …y un hecho fechado HOY sí sobrevive a una serie de valor rancia',
+    (() => { const core0 = coreOf(21 * 24, 2);      // snapshot de hace 21 d, hecho de hace 2 h
+      const r = run('_intv5MattersStories(' + JSON.stringify(core0) + ', [], null, {})', ctxAt(PRESENTE));
+      return r.stale === true && r.stories.length === 1; })(),
+    'el timestamp certificado del hecho manda sobre la edad de la serie');
+  ok('F.6c …y entonces la card DECLARA que el valor no está al día',
+    (() => { const h = run('_intv5MattersHtml(' + JSON.stringify(coreOf(21 * 24, 2))
+        + ', _intccEsc, "standard", [], null, {})', ctxAt(PRESENTE));
+      return /intv4-brief-stale-note/.test(h)
+        && h.indexOf(DICT.es.intv4_brief_stale_note) !== -1; })());
+  ok('F.7 …y la card lo DECLARA en vez de callar o rellenar con historia',
+    (() => { const c = ctxAt(PRESENTE);
+      const h = run('_intv5MattersHtml(' + JSON.stringify(coreOf(21 * 24, 21 * 24 + 12))
+        + ', _intccEsc, "standard", [], null, {})', c);
+      return /data-stale="1"/.test(h)
+        && h.indexOf(DICT.es.intv4_brief_stale) !== -1
+        && !/recorded_capital_net/.test(h); })());
+  ok('F.8 NO-VACUIDAD · con datos frescos y hecho fresco, SÍ se publica',
+    (() => { const r = sel(1, 2);
+      return r.stale !== true && r.stories.length === 1
+        && r.stories[0].semanticKey === 'recorded_capital_net'; })(),
+    JSON.stringify(sel(1, 2).stories.map((x) => x.semanticKey)));
+  ok('F.9 datos FRESCOS pero hecho VIEJO: la card vive, el hecho no entra',
+    (() => { const r = sel(1, 24 * 40);
+      return r.stale !== true && r.stories.length === 0; })());
+  ok('F.10 la guardia de frescura es independiente del filtro por hecho',
+    (() => { const src0 = fnSrc('_aurixTodayDataStale');
+      return /_AURIX_TODAY_STALE_MS/.test(src0)
+        && /return true;/.test(src0)            // fail-closed sin observación
+        && !/_AURIX_TODAY_MAX_AGE_MS/.test(src0); })());
+  ok('F.11 el techo siguen siendo TRES hechos',
+    /const _INTV4_BRIEF_MAX = 3;/.test(app));
+}
+
+console.log('\nDC · A · hero · una sola referencia, y verificable');
+{
+  // El titular decía «desde tu última visita» y el subtítulo «con la última
+  // revisión». Dos referencias para una afirmación, y ninguna medible.
+  const heroKeys = ['intel_now_no_news','intel_sub_no_news','intel_now_reviewed',
+                    'intel_sub_reviewed','intel_now_novelty'];
+  ok('A.1 NINGUNA copy del hero invoca una «última visita» (ES y EN)',
+    (() => heroKeys.every((k) => {
+      const hits = app.match(new RegExp("^\\s*" + k + ":\\s*(.*)$", 'gm')) || [];
+      return hits.length === 2 && !hits.some((h) => /última visita|last visit/i.test(h));
+    }))(),
+    JSON.stringify(heroKeys.map((k) => (app.match(new RegExp("^\\s*" + k + ":", 'gm')) || []).length)));
+  ok('A.2 …y la rama MUERTA que la publicaba ya no existe',
+    !/case 'stable_no_change':/.test(app)
+    && !/intel_(now|sub)_stable_nc/.test(app));
+  ok('A.3 el estado sigue reasignándose SIEMPRE, así que retirarla no abre un hueco',
+    (() => { const b = blockOf("} else if (nowState === 'stable_no_change'", "let title, sub;");
+      return /nowState = hasEvidence \? 'no_news' : 'insufficient_history';/.test(b); })());
+  ok('A.4 el subtítulo nombra la base REAL de la comparación, no una visita ni una revisión',
+    /intel_sub_no_news:\s*'Aurix ha comparado tu patrimonio con los datos certificados/.test(app)
+    && !/intel_sub_no_news:.*última revisión/.test(app));
+  ok('A.5 y no se cuela un contador interno en la frase',
+    (() => { const hits = app.match(/^\s*intel_sub_no_news:\s*(.*)$/gm) || [];
+      return hits.length === 2 && !hits.some((h) => /observacion|observation|snapshot|bucket|\d/.test(h)); })());
+  // MÓVIL · sin «…». La explicación es la que sostiene el titular: cortarla a dos
+  // líneas dejaba la referencia temporal fuera de pantalla justamente en el
+  // viewport donde el founder la leyó.
+  ok('A.6 el hero móvil NO trunca: sin line-clamp ni ellipsis en su explicación',
+    (() => { const i = css.indexOf('.intcc-m-hero-hint {');
+      const b = css.slice(i, css.indexOf('}', i));
+      return i > 0 && !/line-clamp|text-overflow|-webkit-box/.test(b); })());
+  ok('A.7 …y su altura la manda el contenido (la fila es flex, el orbe conserva su caja)',
+    // Se ancla en `--orb-c`, que sólo declara la regla de layout del hero móvil:
+    // buscar `.intcc-m-hero {` a secas caía en `.aurix-intv5 .intcc-m-hero {`,
+    // que es otra regla y no dice nada del alto.
+    (() => { const i = css.indexOf('--orb-c:');
+      const b = css.slice(css.lastIndexOf('{', i), css.indexOf('}', i));
+      return i > 0 && /display: flex/.test(b) && !/height:\s*\d/.test(b)
+        && /align-items: center/.test(b); })());
+}
+
 function _AURIX_CMP_RANGES_OK(r) { return ['24h','7d','30d','1y','all'].indexOf(r) !== -1; }
 
 (async () => { await drainAsserts();

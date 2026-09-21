@@ -20391,6 +20391,23 @@ body.gs-open { overflow: hidden; }
   font-weight: 500;
 }
 .intcc-chip.is-context::before { content: none; }
+/* ── CHECKPOINT B · LOS DOS TONOS QUE FALTABAN ────────────────────────────
+   `is-limit` explica la cifra (ámbar sobrio, marca «!»), `is-unknown` declara
+   una dimensión no medible (neutro, marca «·»). Ninguno usa el verde ni el
+   «✓»: la marca de verificación es una confirmación y esto no lo es. No se
+   depende SÓLO del color —cada tono trae su propio glifo—, que es lo que el
+   checkpoint M exige para accesibilidad. */
+/* CHECKPOINT J — la limitación vive al pie de la card cuya afirmación acota,
+   no en el disclaimer global. Mismo tratamiento en las tres superficies para
+   que se lea como una nota, no como un aviso: apagada, menor, sin competir
+   con el contenido. */
+.intcc-drv-limit,
+.intcc-surface-limit { margin: 12px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text-muted); opacity: 0.9; }
+.intv4-brief-stale-note { margin: 12px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
+.intcc-chip.is-limit   { border-color: rgba(233,168,87,0.30); color: #f3cf9a; background: rgba(233,168,87,0.09); box-shadow: inset 0 0 12px rgba(233,168,87,0.10); }
+.intcc-chip.is-limit::before   { content: '!'; font-size: 10px; font-weight: 800; opacity: 0.95; }
+.intcc-chip.is-unknown { border-color: rgba(150,170,200,0.26); color: var(--text-muted); background: rgba(150,170,200,0.07); }
+.intcc-chip.is-unknown::before { content: '·'; font-size: 13px; font-weight: 800; line-height: 0; opacity: 0.9; }
 
 /* Energy orb — pure SVG/CSS, no external assets */
 .intcc-orb {
@@ -20864,7 +20881,12 @@ body.gs-open { overflow: hidden; }
    measured 23px apart on desktop. Both panels now START at the same offset from
    the hero's padding, and only the orb keeps its vertical centring. */
 .aurix-intv6 .intcc-hero { align-items: stretch; }
-.aurix-intv6 .intcc-hero-score { justify-content: flex-start; padding-top: 14px; }
+/* K · EL RESIDUAL DE 3 px, MEDIDO Y CERRADO. Los dos paneles arrancan con el
+   mismo `padding-top`, pero SÓLO el de Salud tiene borde de 1px, así que su
+   contenido empieza un píxel más abajo — y su etiqueta usa un interletrado
+   menor, que desplaza la caja óptica otro poco. Se compensa el borde en el
+   panel que lo tiene. Un píxel, en una sola regla, sin tocar la composición. */
+.aurix-intv6 .intcc-hero-score { justify-content: flex-start; padding-top: 13px; }
 .aurix-intv6 .intcc-hero-intel { align-items: flex-start; padding-top: 14px; }
 .aurix-intv6 .intcc-hero-orb-wrap { align-self: center; }
 .aurix-intv6 .intcc-hero-body { padding-top: 0; }
@@ -21250,9 +21272,14 @@ body.gs-open { overflow: hidden; }
     margin: 0 0 6px; font-size: 19px; line-height: 1.2; font-weight: 700;
     letter-spacing: -0.01em; color: var(--text-bright, #fff);
   }
+  /* CHECKPOINT A · EL HERO NO TRUNCA. El `-webkit-line-clamp: 2` cortaba la
+     explicación con «…» justo en el sitio donde vive la referencia temporal
+     («…no ha encontrado cambios que requieran tu atención»), así que en móvil
+     la frase que sostiene el titular se quedaba a medias. La altura pasa a ser
+     dinámica: la fila es flex, el texto crece y el orbe conserva su caja, así
+     que crecer no lo solapa. */
   .intcc-m-hero-hint {
     margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-muted);
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .intcc-m-orb { flex: 0 0 auto; display: grid; place-items: center; }
   .intcc-m-orb .intcc-orb { width: 72px; height: 72px; }   /* INT.2ZA — orb V3 +~12% */
@@ -21283,6 +21310,10 @@ body.gs-open { overflow: hidden; }
     color: #8fe6b6; background: rgba(63,191,127,0.14); border: 1px solid rgba(63,191,127,0.30);
   }
   .intcc-m-concl-row.is-warn .intcc-m-concl-check { color: #f3cf9a; background: rgba(233,168,87,0.14); border-color: rgba(233,168,87,0.30); }
+  /* CHECKPOINT B — mismos dos tonos en la card móvil de Salud. */
+  .intcc-m-concl-row.is-limit .intcc-m-concl-check { color: #f3cf9a; background: rgba(233,168,87,0.14); border-color: rgba(233,168,87,0.30); }
+  .intcc-m-concl-row.is-unknown { color: var(--text-muted); }
+  .intcc-m-concl-row.is-unknown .intcc-m-concl-check { color: var(--text-muted); background: rgba(150,170,200,0.10); border-color: rgba(150,170,200,0.26); }
 
   /* Bloque 4/5/6/9 — compact cards on mobile */
   .intcc-card { padding: 14px 15px; }
@@ -26709,11 +26740,80 @@ button.intv14-cmp-range.is-active {
   font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
   color: rgba(159, 194, 255, 0.85);
 }
-select.intv14-cmp-select {
+/* ── CHECKPOINT I.3 · EL SELECTOR PERTENECE A AURIX ────────────────────────
+   El `<select>` nativo abría el menú gris/blanco del sistema en mitad de una
+   superficie oscura. Esto es un combobox propio: disparador + panel. Sin
+   librerías, sin dependencias nuevas y con el mismo lenguaje visual que el
+   resto de la card. */
+.intv14-cmp-pick { position: relative; }
+button.intv14-cmp-trigger {
   cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600;
   color: var(--text-bright); background: var(--elev-2);
   border: 1px solid rgba(var(--aurix-blue-rgb), 0.22); border-radius: 9px;
   padding: 7px 10px; min-height: 36px; max-width: 100%;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+button.intv14-cmp-trigger:hover { border-color: rgba(var(--aurix-blue-rgb), 0.38); }
+button.intv14-cmp-trigger[aria-expanded="true"] { border-color: rgba(var(--aurix-blue-rgb), 0.55); }
+.intv14-cmp-trigger-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 15ch; }
+.intv14-cmp-trigger-caret { width: 14px; height: 14px; flex: 0 0 auto; opacity: 0.7; }
+.intv14-cmp-trigger-caret svg { width: 100%; height: 100%; display: block; }
+button.intv14-cmp-trigger[aria-expanded="true"] .intv14-cmp-trigger-caret { transform: rotate(180deg); }
+
+/* ESCRITORIO · popover anclado al disparador, y anclado al BORDE DERECHO para
+   que no se salga del viewport en la columna de la card. */
+.intv14-cmp-panel {
+  position: absolute; z-index: 40; top: calc(100% + 8px); right: 0;
+  width: min(340px, calc(100vw - 32px));
+  background: rgba(14, 22, 38, 0.97);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.28); border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55), inset 0 0 22px rgba(var(--aurix-blue-rgb), 0.06);
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  animation: intv14CmpIn 140ms ease-out;
+}
+@keyframes intv14CmpIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.intv14-cmp-panel[hidden] { display: none; }
+.intv14-cmp-panel-head { display: none; align-items: center; justify-content: space-between; }
+.intv14-cmp-panel-title { font-size: 13px; font-weight: 700; color: var(--text-bright); }
+button.intv14-cmp-panel-x {
+  cursor: pointer; background: transparent; border: 0; color: rgba(197,214,245,0.8);
+  font-size: 16px; line-height: 1; min-width: 44px; min-height: 44px;
+}
+input.intv14-cmp-search {
+  font-family: inherit; font-size: 13px; color: var(--text-bright);
+  /* NO alfa blanco: sobre este lienzo se lee como gris sucio (lección de
+     GLOBAL POLISH). Se usa la escalera de elevación, que es el tono correcto. */
+  background: var(--elev-1);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.20); border-radius: 9px;
+  padding: 9px 11px; min-height: 40px; width: 100%;
+}
+input.intv14-cmp-search::placeholder { color: rgba(197,214,245,0.45); }
+.intv14-cmp-list {
+  list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 46vh;
+  -webkit-overflow-scrolling: touch;
+}
+.intv14-cmp-optgroup {
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  color: rgba(159, 194, 255, 0.7); padding: 10px 8px 4px;
+}
+.intv14-cmp-optgroup[hidden], .intv14-cmp-opt[hidden] { display: none; }
+.intv14-cmp-opt {
+  cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 8px; border-radius: 9px; min-height: 40px;
+}
+.intv14-cmp-opt:hover, .intv14-cmp-opt.is-active { background: rgba(var(--aurix-blue-rgb), 0.14); }
+.intv14-cmp-opt[aria-selected="true"] { background: rgba(var(--aurix-blue-rgb), 0.20); }
+/* …y no SÓLO color: la opción elegida lleva su propia marca. */
+.intv14-cmp-opt[aria-selected="true"]::after { content: '✓'; font-size: 11px; font-weight: 800; color: #8fe6b6; }
+.intv14-cmp-opt-name { font-size: 13px; color: var(--text-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.intv14-cmp-opt-meta { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.intv14-cmp-opt-sym { font-size: 10.5px; font-weight: 700; color: rgba(159,194,255,0.85); }
+.intv14-cmp-opt-kind { font-size: 10px; color: rgba(197,214,245,0.5); }
+.intv14-cmp-noresult { margin: 4px 8px 8px; font-size: 12px; color: rgba(197,214,245,0.62); }
+/* FOCO VISIBLE en todo lo accionable del selector (checkpoint M). */
+button.intv14-cmp-trigger:focus-visible, input.intv14-cmp-search:focus-visible,
+button.intv14-cmp-panel-x:focus-visible {
+  outline: 2px solid rgba(var(--aurix-blue-rgb), 0.85); outline-offset: 2px;
 }
 button.intv14-cmp-clear {
   cursor: pointer; font-family: inherit; font-size: 11.5px; font-weight: 600;
@@ -26721,7 +26821,57 @@ button.intv14-cmp-clear {
   border: 1px solid rgba(var(--aurix-blue-rgb), 0.18); border-radius: 9px;
   padding: 7px 10px; min-height: 36px;
 }
-.intv14-cmp-plot { width: 100%; }
+/* ── CHECKPOINT I.7 · TOOLTIP INSTITUCIONAL ───────────────────────────────
+   `touch-action: pan-y` es la pieza que hace que leer el gráfico con el dedo
+   NO impida desplazar la página: el gesto vertical se lo queda el scroll y el
+   horizontal llega aquí. Sin esto, el gráfico se convertiría en una trampa de
+   scroll en móvil, que es lo que el checkpoint prohíbe por su nombre. */
+.intv14-cmp-plot { width: 100%; position: relative; touch-action: pan-y; }
+.intv14-cmp-plot:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.85); outline-offset: 3px; border-radius: 10px; }
+.intv14-cmp-guide { stroke: rgba(160, 190, 245, 0.34); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
+.intv14-cmp-dot { pointer-events: none; }
+.intv14-cmp-dot.is-mine  { fill: #6aa0ff; stroke: rgba(10,16,28,0.9); stroke-width: 1.5; }
+.intv14-cmp-dot.is-other { fill: rgba(224, 233, 255, 0.95); stroke: rgba(10,16,28,0.9); stroke-width: 1.5; }
+/* I.8 — etiquetas de escala. Superpuestas y sin capturar el puntero: informan
+   y no estorban a la lectura del tooltip. */
+.intcc-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+.intv14-cmp-axis { position: absolute; inset: 0; pointer-events: none; }
+.intv14-cmp-axis-t {
+  position: absolute; right: 2px; transform: translateY(-50%);
+  font-size: 9.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  /* P2 · AA. A 9,5px no aplica el umbral de texto grande, así que hacen falta
+     4,5:1 y con 0.5 sobre un fondo semitransparente salían 3,97:1. Se sube el
+     texto y se opaca el fondo de la propia etiqueta. */
+  color: rgba(214, 228, 252, 0.82); background: rgba(10, 16, 28, 0.86);
+  padding: 0 3px; border-radius: 3px; letter-spacing: 0.01em;
+}
+.intv14-cmp-axis-t.is-base { color: rgba(159, 194, 255, 0.75); }
+.intv14-cmp-tip {
+  position: absolute; top: 6px; z-index: 5; pointer-events: none;
+  /* P1 · SE SALÍA EN LA FRANJA CENTRAL. Se voltea de lado en el punto medio,
+     así que anclado a la izquierda su borde llega como mucho a `50% + ancho`:
+     con un 82 % de ancho eso es 132 %, o sea desbordaba justo en la zona que
+     más se recorre. Con un 48 % el peor caso es 98 % y siempre cabe. */
+  min-width: 132px; max-width: min(240px, 48%);
+  background: rgba(12, 20, 34, 0.96);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.26); border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
+  /* Se ancla por el lado CONTRARIO al punto, así que nunca lo tapa y nunca
+     se sale por el borde: el desplazamiento lo pone el propio contenedor. */
+  transform: translateX(10px);
+}
+.intv14-cmp-tip.is-right { transform: translateX(-10px); }
+.intv14-cmp-tip[hidden] { display: none; }
+.intv14-cmp-tip-when { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(159,194,255,0.8); }
+.intv14-cmp-tip-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; }
+.intv14-cmp-tip-row em { font-style: normal; color: rgba(197,214,245,0.72); }
+.intv14-cmp-tip-row b { color: var(--text-bright); font-weight: 700; font-variant-numeric: tabular-nums; }
+.intv14-cmp-tip-row.is-diff { border-top: 1px solid rgba(var(--aurix-blue-rgb), 0.16); padding-top: 4px; margin-top: 2px; }
+.intv14-cmp-tip-row.is-diff b { font-size: 11.5px; }
 .intv14-cmp-svg { display: block; width: 100%; height: 180px; overflow: visible; }
 /* La línea del cero: base 100, que es el origen común de las dos series. */
 .intv14-cmp-base { stroke: rgba(150,180,240,0.16); stroke-width: 1; stroke-dasharray: 3 4; }
@@ -26739,16 +26889,56 @@ button.intv14-cmp-clear {
 .intv14-cmp-diff { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--text-bright); }
 .intv14-cmp-note { margin: 6px 0 0; font-size: 11.5px; line-height: 1.45; color: rgba(197,214,245,0.66); }
 .intv14-cmp[data-loading="1"] .intv14-cmp-plot { opacity: 0.55; }
+/* I.10 — los CONTROLES nunca se atenúan ni se desactivan: son la salida del
+   estado, y un usuario atrapado en «cargando» tiene que poder cambiar de
+   periodo o quitar la comparación. */
+.intv14-cmp[data-loading="1"] .intv14-cmp-controls { opacity: 1; }
+.intv14-cmp-note.is-error { color: rgba(243, 207, 154, 0.9); }
 @media (prefers-reduced-motion: reduce) {
   button.intv14-cmp-range { transition: none !important; }
 }
-@media (max-width: 640px) {
-  /* Área táctil mínima 44x44 en móvil (§6.3). */
+@media (prefers-reduced-motion: reduce) {
+  .intv14-cmp-panel { animation: none !important; }
+}
+/* ── P1 · EL ÁREA TÁCTIL NO EMPIEZA EN 640 px ──────────────────────────────
+   Las concesiones de 44 px vivían dentro de `max-width: 640px`, así que a
+   834 px —uno de los tres viewports obligatorios, y el tamaño real de una
+   tablet táctil— el disparador seguía en 36 px y las opciones en 40. El
+   tamaño del objetivo lo decide el PUNTERO, no el ancho: `pointer: coarse`
+   cubre cualquier pantalla táctil, y el rango ≤1023px cubre las tablets que
+   no lo anuncian. */
+@media (pointer: coarse), (max-width: 1023px) {
   button.intv14-cmp-range { min-height: 44px; padding: 10px 12px; }
-  select.intv14-cmp-select, button.intv14-cmp-clear { min-height: 44px; }
+  button.intv14-cmp-trigger, button.intv14-cmp-clear { min-height: 44px; }
+  .intv14-cmp-opt { min-height: 44px; }
+  input.intv14-cmp-search { min-height: 44px; }
+}
+@media (max-width: 640px) {
+  button.intv14-cmp-range { min-height: 44px; padding: 10px 12px; }
+  button.intv14-cmp-trigger, button.intv14-cmp-clear { min-height: 44px; }
   .intv14-cmp-pick { margin-left: 0; width: 100%; }
-  select.intv14-cmp-select { flex: 1 1 auto; }
+  button.intv14-cmp-trigger { flex: 1 1 auto; width: 100%; justify-content: space-between; }
+  .intv14-cmp-trigger-txt { max-width: none; }
   .intv14-cmp-svg { height: 150px; }
+  /* ── MÓVIL · HOJA INFERIOR ─────────────────────────────────────────────
+     Un popover de 340px anclado al disparador se sale de un viewport de 390
+     y queda tapado por la navegación inferior. En móvil el panel es una hoja:
+     fija abajo, con su propio scroll interno, cierre evidente y respeto por
+     las áreas seguras. */
+  .intv14-cmp-panel {
+    position: fixed; inset: auto 0 0 0; top: auto; right: 0; width: 100%;
+    max-height: 78vh; border-radius: 18px 18px 0 0;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    animation: intv14CmpSheetIn 180ms ease-out;
+  }
+  @keyframes intv14CmpSheetIn { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .intv14-cmp-panel-head { display: flex; }
+  .intv14-cmp-list { max-height: 52vh; }
+  .intv14-cmp-opt { min-height: 44px; }
+  /* El scroll de la PÁGINA se bloquea sólo mientras la hoja está abierta, y
+     la clase se retira al cerrarla: el SPEC pide por su nombre que cerrarla no
+     deje la página bloqueada. */
+  html.aurix-cmp-open, html.aurix-cmp-open body { overflow: hidden; }
 }
 /* §4.6 — la referencia de «Qué ha cambiado». Una línea discreta bajo el título:
    dice contra qué compara la lista sin competir con ninguna cifra. */

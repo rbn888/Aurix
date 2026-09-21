@@ -50,7 +50,7 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
-  '_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_INTV4_BRIEF_MAX','_INTV5_TIER'];
+  '_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_INTV4_BRIEF_MAX','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS'];
 const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal',
   'assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal',
@@ -58,7 +58,7 @@ const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlo
   '_aurixFlowCounterpartObserved','_aurixInvestablePerformance','_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct',
   '_aurixCatHistWindow','_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification',
   '_aurixFactLedger','_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions',
-  '_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore','_intv5RecencyTier','_intv5MattersStories'];
+  '_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore','_aurixNow','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_intv5MattersStories'];
 
 function makeCtx(opts) {
   const o = opts || {};
@@ -218,6 +218,11 @@ console.log('\n2 · Lo de HOY por encima de un movimiento de liquidez histórico
   const nowTs = T0 + 5 * DAY + 12 * HOUR;
   const { core: k, ctx } = caseCore(nowTs);
   ctx.__c = k;
+  // EL PRESENTE DE LA FIXTURE. «Lo que importa hoy» mide la actualidad contra
+  // un reloj (checkpoint F): sin fijarlo, el caso —fechado en `nowTs`— sería
+  // de hace más de un año frente al reloj real y la operación quedaría fuera
+  // de la ventana de 72 h. Se declara el presente del caso.
+  run('_aurixNow = function () { return ' + nowTs + '; };', ctx);
   const sel = run('_intv5MattersStories(__c, [], null, {})', ctx);
   const first = (sel.stories || [])[0];
   ok('2.1 la primera entrada de «Lo que importa hoy» es la operación de hoy',

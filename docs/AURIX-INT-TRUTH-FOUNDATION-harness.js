@@ -110,7 +110,7 @@ function makeCtx(extraFns) {
   ['formatCurrency','formatBase','toBase'].forEach(n => vm.runInContext(fnSrc(n), sb));
   vm.runInContext(konstSrc('_AURIX_TWR_COVERAGE_JUMP'), sb);
   ['_aurixUsdSnapshotsForRange','_aurixTwrChain','computeAurixTWRSeries','_intccClamp','_intccEsc',
-   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccGrowthPct',
+   '_aurixHealthScore','_intccScoreTone','_intccHealthLimiters','_intccHealthScore','_intccGrowthPct',
    '_intccRadar','_intccRadarSvg','_intccTimeline','_intccReading','_intccIdentity','_intv4T']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   (extraFns || []).forEach(src => vm.runInContext(src, sb));

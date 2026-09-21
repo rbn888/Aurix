@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '695'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '696'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4168,6 +4168,11 @@ const USER_SCOPED_LOCAL_KEYS = [
   // §6.2 — el comparador se guarda «solo sesión/local y separada por cuenta».
   // Va sellado con su dueño como los dos de arriba, y además se purga aquí.
   'aurix_cmp_state_v1',
+  // I.3 — y sus RECIENTES, por la misma razón. El sello de dueño ya impide que
+  // la cuenta B los lea, así que no había fuga; lo que había era una clave de A
+  // quedándose huérfana en el dispositivo para siempre. La invariante de M.06
+  // es que tras un cambio de usuario NO quede ninguna clave del anterior.
+  'aurix_cmp_recent_v1',
   // SPEC ADVANCED INTELLIGENCE · A1 — linaje de clasificación. Es el mapa
   // activo→bucket de UNA cartera y su bitácora de cambios: con el de A vivo, una
   // afirmación de exposición histórica de B podría declararse «clasificación
@@ -5253,6 +5258,24 @@ const T = {
     intcc_sub_growing:       pct => `Tu cartera ha generado cerca de un ${pct}% de rendimiento en el periodo registrado, ya neutralizadas tus aportaciones y retiradas.`,
     intcc_sub_attention:     'Se observan algunos puntos que conviene mirar con calma, sin urgencia.',
     intcc_sub_concentrated:  name => name ? `Una parte relevante de tu patrimonio se apoya en ${name}.` : 'Una parte relevante de tu patrimonio se apoya en pocas posiciones.',
+    // ── CHECKPOINT B · LO QUE LIMITA LA CIFRA, DEL MISMO OWNER ───────────
+    // La card publicaba 66 % y, al lado, TRES señales verdes. Ninguna mentía
+    // —cada una tiene su hecho— pero juntas describían una cartera impecable
+    // con una nota mediana, y el usuario no puede reconciliarlas. Faltaba lo
+    // único que explica la cifra: QUÉ la limita.
+    // No se toca el cálculo. El anillo ES el índice de dispersión de pesos, así
+    // que lo que lo limita son sus propios términos —`effectiveN` frente a
+    // `positions`—, que `_aurixIntelHealth` ya publica en `components`. Se
+    // enseña ese término, no una causa nueva.
+    // «Tu peso se reparte como 2,5 de 4 posiciones» era la fórmula leída en voz
+    // alta, no una frase: «tu peso» no significa nada para quien no sabe que el
+    // anillo mide dispersión, y «2,5 de 4» parece un recuento roto. El cálculo
+    // del owner es exactamente éste —cuántas posiciones EQUIPONDERADAS producen
+    // la misma dispersión que las que hay—, así que se dice así, entero.
+    intcc_chip_limit_spread: (effN, pos) => `La distribución de tu cartera equivale a ${effN} posiciones con el mismo peso, de las ${pos} registradas`,
+    // Y cuando una dimensión no se puede medir se dice eso, ni un juicio
+    // positivo ni uno negativo.
+    intcc_chip_nodata: (dim) => `${dim}: sin datos suficientes`,
     intcc_chip_div:    'Diversificación adecuada',
     intcc_chip_liq:    'Liquidez suficiente',
     intcc_chip_conc:   'Concentración controlada',
@@ -5302,8 +5325,18 @@ const T = {
     intel_sub_review:      n => `${n} ${n === 1 ? 'cambio merece' : 'cambios merecen'} revisión.`,
     intel_now_reviewed:    'Todo revisado',
     intel_sub_reviewed:    'No tienes cambios pendientes. Aurix seguirá observando la evolución de tu patrimonio.',
-    intel_now_no_news:     'Sin novedades significativas desde tu última visita',
-    intel_sub_no_news:     'Aurix ha comparado tu patrimonio con la última revisión y no ha encontrado cambios que requieran tu atención.',
+    // ── CHECKPOINT A · UNA SOLA REFERENCIA, Y QUE SEA VERIFICABLE ─────────
+    // El titular decía «desde tu última visita» y el subtítulo «con la última
+    // revisión»: dos referencias distintas para la misma afirmación, y NINGUNA
+    // de las dos es una frontera de medición. La visita no se mide (el marcador
+    // de visita ya se retiró de `_intv4ChangedRef` por esto mismo: era un sello
+    // de presentación), y a este estado se llega precisamente cuando NO existe
+    // ninguna revisión —`allCount === 0`—, así que nombrarla es describir algo
+    // que no ha ocurrido. Lo que Aurix SÍ puede nombrar es sobre qué comparó:
+    // los datos certificados de la cuenta, con evidencia suficiente para
+    // afirmar ausencia (`hasEvidence`, ≥2 observaciones). Sin contadores.
+    intel_now_no_news:     'No hay novedades significativas',
+    intel_sub_no_news:     'Aurix ha comparado tu patrimonio con los datos certificados de tu cuenta y no ha encontrado cambios que requieran tu atención.',
     intel_ack_done:        'Entendido ✓',
     intel_ack_failed:      'No se ha podido guardar. Inténtalo de nuevo.',
     // §8 — «Entendido» no borra nada: baja la prioridad de presentación. El hecho
@@ -5313,7 +5346,6 @@ const T = {
     intel_now_material:    'Ha cambiado algo que importa',
     intel_now_discovery:   'Aurix ha visto algo en tu estructura',
     intel_now_changed:     'Tu estructura se ha movido',
-    intel_now_stable_nc:   'Sin novedades significativas desde tu última visita',
     intel_now_stable:      'Tu estructura se mantiene',
     intel_now_history:     'Aurix necesita más historia para leer tu evolución',
     intel_now_context:     'Aurix puede leerlo mejor con un dato tuyo',
@@ -5324,7 +5356,6 @@ const T = {
     // frase también: dice cuántas cosas hay y que están abajo.
     intel_sub_material:    n => `${n} ${n === 1 ? 'lectura' : 'lecturas'} que Aurix considera que merecen tu atención, justo abajo.`,
     intel_sub_changed:     n => `${n} ${n === 1 ? 'lectura se ha movido' : 'lecturas se han movido'}. Las tienes detalladas abajo.`,
-    intel_sub_stable_nc:   'Aurix ha comparado tu estructura con la de tu última visita y no ha encontrado nada relevante.',
     intel_sub_history:     'Las conclusiones de evolución aparecerán solas en cuanto haya observaciones suficientes.',
     // Descubrimientos: cada uno nace de una RELACIÓN entre hechos, nunca de una causa inventada.
     intel_d_apparent:      (pos, eff) => `Tienes ${pos} posiciones, pero tu peso se reparte como si tuvieras ${eff}.`,
@@ -5530,6 +5561,11 @@ const T = {
     // Cada clave se corresponde con un `semanticKey` del ledger, así que un hecho sin
     // copy no puede publicarse y un copy sin hecho no puede existir.
     intv4_brief_title: 'Lo que importa hoy',
+    // CHECKPOINT F — la card promete ACTUALIDAD. Cuando el dato certificado
+    // más reciente ya está fuera de la ventana no hay actualidad que publicar,
+    // y callar sin decir por qué se lee como «no pasa nada». Se declara.
+    intv4_brief_stale_note: 'El valor de tu patrimonio no se ha actualizado recientemente: lo de arriba es lo último que Aurix puede certificar.',
+    intv4_brief_stale: 'Aurix no tiene datos suficientemente recientes para decir qué importa hoy. Volverá a hablar en cuanto tu patrimonio se actualice.',
     intv4_brief_empty: 'Aurix está leyendo tu patrimonio. En cuanto haya un hecho que pueda demostrar, aparecerá aquí.',
     intv4_changed_title: 'Qué ha cambiado',
     intv4_changed_ref_since: (d) => `Sobre lo registrado desde el ${d}.`,
@@ -5581,18 +5617,56 @@ const T = {
     cmp_mine: 'Mi patrimonio',
     cmp_clear: 'Quitar comparación',
     cmp_insufficient: 'Datos insuficientes',
+    // I.10 — cada estado dice lo suyo, y en una línea.
+    cmp_provider_error: 'El proveedor de mercado no ha respondido. Los datos de tu patrimonio no se han visto afectados.',
+    cmp_loading: 'Cargando la comparación…',
     cmp_available_from: (d) => `Comparación disponible desde el ${d}`,
-    cmp_diff_ahead:  (pp) => `En este periodo vas ${pp} puntos porcentuales POR DELANTE.`,
-    cmp_diff_behind: (pp) => `En este periodo vas ${pp} puntos porcentuales POR DETRÁS.`,
-    cmp_diff_flat:   'En este periodo vais prácticamente igual.',
+    // ── CHECKPOINT I.9 · NI «POR DELANTE» NI «POR DETRÁS» ────────────────
+    // Las dos eran lenguaje de carrera —sugieren que ganar al índice es el
+    // objetivo— y encima omitían CONTRA QUÉ, así que la frase no se sostenía
+    // sola fuera de su card. Ahora dicen el hecho: cuánto, en qué dirección y
+    // frente a quién. Ni mejor ni peor, ni recomendación.
+    cmp_diff_more:   (pp, bm) => `En este periodo, tu patrimonio obtuvo ${pp} puntos porcentuales más que ${bm}.`,
+    cmp_diff_less:   (pp, bm) => `En este periodo, tu patrimonio obtuvo ${pp} puntos porcentuales menos que ${bm}.`,
+    cmp_diff_flat:   'En este periodo, ambas rentabilidades fueron equivalentes.',
+    // ── DISCLOSURE DINÁMICO, POR NATURALEZA DEL INSTRUMENTO ──────────────
+    // Un texto único decía «no incorporan dividendos» también al comparar con
+    // bitcoin o con el oro, que no pagan dividendos: mencionar lo que no
+    // existe siembra una duda falsa. Cada naturaleza dice lo suyo.
+    cmp_disc_index:  'La comparación utiliza la variación del índice sin dividendos.',
+    cmp_disc_equity: 'La comparación utiliza la variación del precio y no incorpora dividendos o distribuciones.',
+    cmp_disc_price:  'La comparación utiliza la variación del precio.',
     cmp_ends: (d) => `La comparación llega hasta el ${d}.`,
     cmp_no_return: 'Aurix todavía no puede certificar una rentabilidad para este periodo, así que no hay nada que comparar. La comparación es entre rentabilidades, no entre importes.',
     cmp_price_return: 'Los comparadores usan la variación de precio del índice o del activo; no incorporan dividendos.',
     cmp_range_aria: 'Periodo de la comparación',
     cmp_range_24h: '24H', cmp_range_7d: '7D', cmp_range_30d: '30D',
-    cmp_range_1y: '1A', cmp_range_all: 'TOTAL',
+    cmp_range_90d: '3M', cmp_range_1y: '1A', cmp_range_all: 'TOTAL',
     cmp_a11y: (mine, other) => `Comparación de rentabilidad entre ${mine} y ${other}, con base 100 en la primera fecha común.`,
     cmp_b_sp500: 'S&P 500', cmp_b_ndx100: 'Nasdaq 100', cmp_b_btc: 'Bitcoin', cmp_b_gold: 'Oro',
+    // ── CHECKPOINT I.3 · EL SELECTOR ES DE AURIX, NO DEL SISTEMA ─────────
+    // El `<select>` nativo abría el menú gris/blanco del sistema operativo en
+    // mitad de una superficie oscura, sin buscador y sin forma de agrupar 54
+    // instrumentos. Se sustituye por un combobox propio.
+    cmp_pick_none: 'Elegir comparador',
+    cmp_pick_search: 'Buscar por nombre o símbolo',
+    cmp_pick_close: 'Cerrar',
+    cmp_pick_empty: 'Ningún instrumento coincide con esa búsqueda.',
+    cmp_pick_recent: 'Recientes',
+    cmp_pick_title: 'Comparar con',
+    // ── CHECKPOINT I.7 · EL TOOLTIP ──────────────────────────────────────
+    // «Puntos porcentuales» va ENTERO y sin abreviar: la diferencia entre dos
+    // rentabilidades no es un porcentaje, y abreviarlo a «pp» invita a leerlo
+    // como si lo fuera. Es la misma distinción que el §6 ya protege en la
+    // frase de debajo del gráfico.
+    cmp_tip_mine: 'Mi patrimonio',
+    cmp_tip_diff: 'Diferencia',
+    cmp_tip_pp: (v) => `${v} puntos porcentuales`,
+    cmp_tip_hint: 'Recorre el gráfico con las flechas; Escape lo cierra.',
+    cmp_g_index: 'Índices', cmp_g_etf: 'ETFs', cmp_g_stock: 'Acciones',
+    cmp_g_crypto: 'Criptomonedas', cmp_g_metal: 'Metales',
+    cmp_kind_index: 'índice', cmp_kind_etf: 'ETF', cmp_kind_stock: 'acción',
+    cmp_kind_crypto: 'cripto', cmp_kind_metal: 'metal',
     intv4_r_24h: 'las últimas 24 h', intv4_r_7d: 'los últimos 7 días', intv4_r_30d: 'los últimos 30 días',
     intv4_r_90d: 'los últimos 90 días',
     intv4_r_all: 'todo el periodo registrado', intv4_r_now: 'ahora mismo',
@@ -5731,7 +5805,12 @@ const T = {
     // Lo que Aurix NO sabe, dicho una vez y sin disculparse.
     intv4_gap_position_below_cost: 'Sin un coste de adquisición registrado, Aurix no puede decir cuánto llevas ganado o perdido en una posición.',
     intv4_gap_position_period_decline: 'Aurix todavía no guarda historia por activo, así que no puede separar la caída de un periodo de la pérdida desde la compra.',
-    intv4_gap_position_drawdown_from_peak: 'El máximo conservado que Aurix certifica es el de tu patrimonio, no el de cada posición.',
+    // CHECKPOINT J — la frase original («El máximo conservado que Aurix
+    // certifica es el de tu patrimonio, no el de cada posición») usaba «máximo
+    // conservado», que es el nombre INTERNO del owner (`_aurixPeakRetention`),
+    // y pedía al lector reconstruir la comparación. Dice lo mismo en el orden
+    // en que se piensa.
+    intv4_gap_position_drawdown_from_peak: 'Aurix sabe cuál ha sido el máximo de tu patrimonio, pero todavía no el de cada posición por separado.',
     intv4_gap_position_fx_attribution: 'Aurix no guarda el tipo de cambio del día de la compra, así que no puede separar qué parte del resultado es divisa.',
     intv4_f_top1: (name, pct) => `${name} concentra el ${pct}% de tu patrimonio invertible`,
     intv4_f_top3: pct => `Tus tres mayores posiciones suman el ${pct}%`,
@@ -5759,7 +5838,25 @@ const T = {
     intv4_q_q_structure: '¿Cómo se reparte hoy mi patrimonio?',
     intv4_q_q_historical: '¿Dónde está mi patrimonio frente a su propia historia?',
     intv4_q_q_current_value: '¿Cuánto vale actualmente mi cartera financiera?',
-    intv4_q_q_data_quality: '¿Qué puede saber Aurix de mí ahora mismo?',
+    // ── CHECKPOINT E · «¿QUÉ PUEDE SABER AURIX DE MÍ?» ERA DEMASIADO VAGA ──
+    // No decía sobre qué: se leía como una pregunta sobre privacidad. Y su
+    // respuesta era sólo la lista de lo que Aurix NO puede hacer, o sea una
+    // disculpa sin contexto. La pregunta pasa a ser la que el usuario tiene de
+    // verdad —cuánto de esto es fiable— y la respuesta tiene cuatro partes:
+    // qué cobertura hay, cuánta historia certificada, qué puede calcular y qué
+    // todavía no puede afirmar.
+    intv4_q_q_data_quality: '¿Qué parte de mi patrimonio puede analizar Aurix con los datos actuales?',
+    // Las cuatro partes. Ninguna inventa una cifra: todas salen de la
+    // disponibilidad que el Core ya publica.
+    intv4_dq_cover_full: 'Aurix analiza todas las posiciones que tienes registradas.',
+    intv4_dq_cover_partial: (n) => `Hay ${n} ${n === 1 ? 'posición que Aurix no puede valorar' : 'posiciones que Aurix no puede valorar'}, así que su análisis va sobre el resto.`,
+    intv4_dq_history: (d) => `Tu historial certificado cubre ${d} ${d === 1 ? 'día' : 'días'}.`,
+    intv4_dq_history_none: 'Todavía no hay historial certificado suficiente para leer tu evolución.',
+    intv4_dq_can: (list) => `Con eso Aurix ya puede leer: ${list}.`,
+    intv4_dq_cannot_intro: 'Lo que todavía no puede afirmar:',
+    // La referencia que convierte una cifra repetida en una respuesta: hasta
+    // cuándo está certificada. Sin ella la pregunta no se publica.
+    intv4_cv_asof: (d) => `Valorado con los datos certificados hasta el ${d}.`,
     intv4_gap_per_asset_attribution: 'Aurix todavía no puede decirte qué activo explicó tu rendimiento: la historia por posición es demasiado corta para afirmarlo.',
     intv4_gap_generic: familia => `Todavía no hay historia suficiente para ${familia}.`,
     // ── SPEC INT.05 · el módulo ESTRUCTURA que ocupa el hueco del radar ────────
@@ -5777,9 +5874,17 @@ const T = {
     intv6_comp_single: 'Todo tu patrimonio invertible está en una sola clase de activo.',
     intv6_memory_accruing: 'Aurix está acumulando tu historia patrimonial.',
     // M.03 D — historia SÍ, acontecimientos no: se dice lo que es verdad.
-    intv4_memory_stable_t: (since) => `Tu patrimonio se mantiene estable desde el ${since}.`,
-    intv4_memory_stable_b: (n, d) => `Aurix ha registrado ${n} observaciones en ${d} días y no encuentra ningún movimiento material que merezca entrar en tu memoria.`,
-    intv4_memory_stable_b_nodays: (n) => `Aurix ha registrado ${n} observaciones y no encuentra ningún movimiento material que merezca entrar en tu memoria.`,
+    // ── CHECKPOINT G · NI TELEMETRÍA NI «MEMORIA» ────────────────────────
+    // Decía «Aurix ha registrado 2.599 observaciones en 5.001 días y no
+    // encuentra ningún movimiento material que merezca entrar en tu memoria».
+    // Tres defectos en una frase: publicaba un CONTADOR INTERNO (el usuario no
+    // tiene por qué saber qué es una observación), llamaba «memoria» a la
+    // sección —concepto de interfaz retirado— y convertía «no detecté ningún
+    // evento material» en «tu patrimonio se mantiene estable», que es una
+    // afirmación sobre el patrimonio y no sobre lo que Aurix pudo medir.
+    // Queda lo único cierto y útil: cuánta historia certificada hay y qué
+    // falta para que aparezcan las comparaciones largas.
+    intv4_memory_coverage: (d) => `Aurix dispone de ${d} ${d === 1 ? 'día' : 'días'} de historial certificado. Las comparaciones de mayor plazo aparecerán a medida que crezca tu historial.`,
     intv6_memory_accruing_sub: 'Todavía no hay suficientes eventos registrados para construir tu memoria. Cada observación que Aurix guarda la hace más profunda.',
     intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
     intv5_cat_crypto: 'Cripto', intv5_cat_metal: 'Metales', intv5_cat_liquidity: 'Liquidez',
@@ -8125,6 +8230,8 @@ const T = {
     intcc_sub_growing:       pct => `Your portfolio has generated around ${pct}% return over the recorded period, with your contributions and withdrawals already neutralised.`,
     intcc_sub_attention:     'A few points are worth looking at calmly, with no urgency.',
     intcc_sub_concentrated:  name => name ? `A relevant part of your wealth rests on ${name}.` : 'A relevant part of your wealth rests on a few positions.',
+    intcc_chip_limit_spread: (effN, pos) => `Your portfolio spreads like ${effN} equally weighted positions, out of the ${pos} you hold`,
+    intcc_chip_nodata: (dim) => `${dim}: not enough data`,
     intcc_chip_div:    'Adequate diversification',
     intcc_chip_liq:    'Sufficient liquidity',
     intcc_chip_conc:   'Concentration in check',
@@ -8149,8 +8256,8 @@ const T = {
     intel_sub_review:      n => `${n} ${n === 1 ? 'change deserves a review' : 'changes deserve a review'}.`,
     intel_now_reviewed:    'All reviewed',
     intel_sub_reviewed:    'You have no pending changes. Aurix will keep watching how your wealth evolves.',
-    intel_now_no_news:     'No significant news since your last visit',
-    intel_sub_no_news:     'Aurix compared your wealth with the last review and found no change that needs your attention.',
+    intel_now_no_news:     'No significant news',
+    intel_sub_no_news:     'Aurix compared your wealth against your account\'s certified data and found no changes that need your attention.',
     intel_ack_done:        'Reviewed ✓',
     intel_ack_failed:      'Could not be saved. Please try again.',
     intel_ack:             'Understood',
@@ -8158,13 +8265,11 @@ const T = {
     intel_now_material:    'Something that matters has changed',
     intel_now_discovery:   'Aurix spotted something in your structure',
     intel_now_changed:     'Your structure has moved',
-    intel_now_stable_nc:   'No significant news since your last visit',
     intel_now_stable:      'Your structure is holding',
     intel_now_history:     'Aurix needs more history to read your evolution',
     intel_now_context:     'Aurix can read this better with one detail from you',
     intel_sub_material:    n => `${n} ${n === 1 ? 'reading' : 'readings'} Aurix thinks deserve your attention, right below.`,
     intel_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} moved. They are detailed below.`,
-    intel_sub_stable_nc:   'Aurix compared your structure with your last visit and found nothing relevant.',
     intel_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
     intel_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
     intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
@@ -8348,6 +8453,8 @@ const T = {
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
     // SPEC INT.04 — presentation layer for the Intelligence Core (see the ES block).
     intv4_brief_title: 'What matters today',
+    intv4_brief_stale_note: 'Your portfolio value has not refreshed recently: the above is the latest Aurix can certify.',
+    intv4_brief_stale: 'Aurix does not have recent enough data to say what matters today. It will speak again as soon as your portfolio updates.',
     intv4_brief_empty: 'Aurix is reading your wealth. As soon as there is a fact it can prove, it will appear here.',
     intv4_changed_title: 'What changed',
     intv4_changed_ref_since: (d) => `Against what is recorded since ${d}.`,
@@ -8395,18 +8502,37 @@ const T = {
     cmp_mine: 'My wealth',
     cmp_clear: 'Remove comparison',
     cmp_insufficient: 'Insufficient data',
+    cmp_provider_error: 'The market data provider did not respond. Your own portfolio data is unaffected.',
+    cmp_loading: 'Loading the comparison…',
     cmp_available_from: (d) => `Comparison available from ${d}`,
-    cmp_diff_ahead:  (pp) => `Over this period you are ${pp} percentage points AHEAD.`,
-    cmp_diff_behind: (pp) => `Over this period you are ${pp} percentage points BEHIND.`,
-    cmp_diff_flat:   'Over this period you are essentially level.',
+    cmp_diff_more:   (pp, bm) => `Over this period, your wealth returned ${pp} percentage points more than ${bm}.`,
+    cmp_diff_less:   (pp, bm) => `Over this period, your wealth returned ${pp} percentage points less than ${bm}.`,
+    cmp_disc_index:  'The comparison uses the index price change, without dividends.',
+    cmp_disc_equity: 'The comparison uses the price change and does not include dividends or distributions.',
+    cmp_disc_price:  'The comparison uses the price change.',
+    cmp_diff_flat:   'Over this period, both returns were equivalent.',
     cmp_ends: (d) => `The comparison runs up to ${d}.`,
     cmp_no_return: 'Aurix cannot certify a return for this period yet, so there is nothing to compare. The comparison is between returns, not between amounts.',
     cmp_price_return: 'Comparators use the price change of the index or asset; they do not include dividends.',
     cmp_range_aria: 'Comparison period',
     cmp_range_24h: '24H', cmp_range_7d: '7D', cmp_range_30d: '30D',
-    cmp_range_1y: '1Y', cmp_range_all: 'ALL',
+    cmp_range_90d: '3M', cmp_range_1y: '1Y', cmp_range_all: 'ALL',
     cmp_a11y: (mine, other) => `Performance comparison between ${mine} and ${other}, rebased to 100 at the first common date.`,
     cmp_b_sp500: 'S&P 500', cmp_b_ndx100: 'Nasdaq 100', cmp_b_btc: 'Bitcoin', cmp_b_gold: 'Gold',
+    cmp_pick_none: 'Choose comparator',
+    cmp_pick_search: 'Search by name or symbol',
+    cmp_pick_close: 'Close',
+    cmp_pick_empty: 'No instrument matches that search.',
+    cmp_pick_recent: 'Recent',
+    cmp_pick_title: 'Compare with',
+    cmp_tip_mine: 'My wealth',
+    cmp_tip_diff: 'Difference',
+    cmp_tip_pp: (v) => `${v} percentage points`,
+    cmp_tip_hint: 'Move through the chart with the arrow keys; Escape closes it.',
+    cmp_g_index: 'Indices', cmp_g_etf: 'ETFs', cmp_g_stock: 'Stocks',
+    cmp_g_crypto: 'Crypto', cmp_g_metal: 'Metals',
+    cmp_kind_index: 'index', cmp_kind_etf: 'ETF', cmp_kind_stock: 'stock',
+    cmp_kind_crypto: 'crypto', cmp_kind_metal: 'metal',
     intv4_r_24h: 'the last 24h', intv4_r_7d: 'the last 7 days', intv4_r_30d: 'the last 30 days',
     intv4_r_90d: 'the last 90 days',
     intv4_r_all: 'the whole recorded period', intv4_r_now: 'right now',
@@ -8468,7 +8594,7 @@ const T = {
     intv4_why_position_result: 'The more a position weighs, the more its result influences your overall wealth. It may be useful to review whether its thesis, horizon and size still fit your strategy.',
     intv4_gap_position_below_cost: 'Without a recorded acquisition cost, Aurix cannot say how much you are up or down on a position.',
     intv4_gap_position_period_decline: 'Aurix does not store per-asset history yet, so it cannot separate a period decline from your loss since purchase.',
-    intv4_gap_position_drawdown_from_peak: 'The retained peak Aurix certifies is your portfolio\'s, not each position\'s.',
+    intv4_gap_position_drawdown_from_peak: 'Aurix knows your portfolio\'s all-time high, but not yet each position\'s on its own.',
     intv4_gap_position_fx_attribution: 'Aurix does not store the exchange rate on your purchase date, so it cannot separate the currency part of a result.',
     intv4_f_top1: (name, pct) => `${name} holds ${pct}% of your investable wealth`,
     intv4_f_top3: pct => `Your three largest positions add up to ${pct}%`,
@@ -8493,7 +8619,14 @@ const T = {
     intv4_q_q_structure: 'How is my wealth split today?',
     intv4_q_q_historical: 'Where is my wealth against its own history?',
     intv4_q_q_current_value: 'How much is my financial portfolio worth right now?',
-    intv4_q_q_data_quality: 'What can Aurix know about me right now?',
+    intv4_q_q_data_quality: 'How much of my wealth can Aurix analyse with the current data?',
+    intv4_dq_cover_full: 'Aurix analyses every position you have recorded.',
+    intv4_dq_cover_partial: (n) => `${n} ${n === 1 ? 'position cannot be valued' : 'positions cannot be valued'}, so the analysis covers the rest.`,
+    intv4_dq_history: (d) => `Your certified history covers ${d} ${d === 1 ? 'day' : 'days'}.`,
+    intv4_dq_history_none: 'There is not enough certified history yet to read your evolution.',
+    intv4_dq_can: (list) => `With that, Aurix can already read: ${list}.`,
+    intv4_dq_cannot_intro: 'What it cannot state yet:',
+    intv4_cv_asof: (d) => `Valued with certified data up to ${d}.`,
     intv4_gap_per_asset_attribution: 'Aurix cannot yet tell you which asset explained your return: the per-position history is too short to state it.',
     intv4_gap_generic: family => `There is not enough history yet for ${family}.`,
     // SPEC INT.05 — the STRUCTURE module that occupies the radar slot.
@@ -8508,9 +8641,7 @@ const T = {
     intv6_comp_legend: 'Weight of each asset class in your investable wealth.',
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
-    intv4_memory_stable_t: (since) => `Your wealth has been stable since ${since}.`,
-    intv4_memory_stable_b: (n, d) => `Aurix has recorded ${n} observations over ${d} days and finds no material move worth entering your memory.`,
-    intv4_memory_stable_b_nodays: (n) => `Aurix has recorded ${n} observations and finds no material move worth entering your memory.`,
+    intv4_memory_coverage: (d) => `Aurix has ${d} ${d === 1 ? 'day' : 'days'} of certified history. Longer-horizon comparisons will appear as your history grows.`,
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
     intv5_cat_crypto: 'Crypto', intv5_cat_metal: 'Metals', intv5_cat_liquidity: 'Cash',
@@ -60832,6 +60963,55 @@ function _intccRadar(snap, drivers, growthPct) {
 // Fail closed: no canonical engine, or no canonical score, ⇒ no score.
 // `drivers` is kept in the signature for call-site compatibility; top-3
 // concentration is the canonical engine's business now, not a second opinion.
+// ── CHECKPOINT B · QUÉ IMPIDE UNA PUNTUACIÓN SUPERIOR ──────────────────────
+// El SPEC lo pide con estas palabras: «mostrar de forma concisa al menos la
+// causa principal que impide una puntuación superior, o declarar la dimensión
+// no medible», y «las etiquetas deben derivar del mismo owner que calcula la
+// puntuación». Las dos condiciones se cumplen leyendo `h`, que es lo que
+// `_aurixIntelHealth` acaba de devolver: aquí no se mide nada.
+//
+// EL ANILLO ES UN ÍNDICE DE DISPERSIÓN DE PESOS. Por construcción, lo único que
+// puede bajarlo es el reparto: `effectiveN` frente a `positions`. Decirlo es
+// explicar la cifra con sus propios términos, no inventarle una causa.
+//
+// SIN DATOS ≠ 0 % (principio 6): un componente que el owner marca como no
+// disponible se declara como tal y NUNCA como penalización.
+const _INTCC_HEALTH_DIM_LABEL = Object.freeze({
+  top_position: 'intcc_dim_conc',
+  liquidity:    'intcc_dim_liq',
+});
+function _intccHealthLimiters(h) {
+  const out = [];
+  if (!h) return out;
+  const comps = Array.isArray(h.components) ? h.components : [];
+  const avail = (id) => {
+    const c = comps.find((x) => x && x.id === id);
+    return c ? c.availability : null;
+  };
+  // 1 · LA CAUSA PRINCIPAL. Sólo si el anillo es publicable y no está al máximo:
+  // con el anillo no publicable el estado YA dice «datos insuficientes», y
+  // repetirlo sería la tercera frase compitiendo con el donut que §6 retiró.
+  if (h.ringPublishable && Number.isFinite(h.ring) && h.ring < 100
+      && Number.isFinite(h.effectiveN) && Number.isFinite(h.positions) && h.positions >= 2) {
+    out.push({ tone: 'limit', key: 'spread',
+      // `_aurixPctNum` acepta UN argumento y termina en `Math.round`: el `1`
+      // se ignoraba y el decimal desaparecía. Con 2 posiciones 55/45,
+      // `effectiveN = 1,98` se publicaba como «equivale a 2 posiciones con el
+      // mismo peso, de las 2 registradas» — o sea, la causa que impide subir
+      // el anillo describía un reparto PERFECTO. `_intv4Num` sí respeta los
+      // decimales y el separador del locale.
+      label: t('intcc_chip_limit_spread')(_intv4Num(h.effectiveN, 1), h.positions) });
+  }
+  // 2 · LAS DIMENSIONES NO MEDIBLES. Se declaran; no puntúan en ninguna
+  // dirección. Se ordenan por el catálogo para que la salida sea determinista.
+  Object.keys(_INTCC_HEALTH_DIM_LABEL).forEach((id) => {
+    if (avail(id) && avail(id) !== _AURIX_AI_AVAIL.AVAILABLE) {
+      out.push({ tone: 'unknown', key: id,
+        label: t('intcc_chip_nodata')(t(_INTCC_HEALTH_DIM_LABEL[id])) });
+    }
+  });
+  return out;
+}
 function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-unused-vars
   // SPEC AURIX INTELLIGENCE · FASE 6 — ESTA SUPERFICIE YA NO PUBLICA UN «HEALTH 0–100».
   //
@@ -60933,6 +61113,11 @@ function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-u
     // del hero dejaba de ser aceptable. Quien necesite auditar el índice lo tiene
     // en el contrato del owner y en el gate, no en una card que rompe el hero.
     label:   t(STATE_LABEL[h.state] || 'intel_h_coverage'),
+    // ── CHECKPOINT B · EL LIMITADOR, DERIVADO Y NO CALCULADO ─────────────
+    // Sale de `h` —la MISMA llamada que produjo la cifra—, así que no puede
+    // desmentirla: son los términos del propio índice. Cero umbrales nuevos,
+    // cero agregación, cero segundo owner.
+    limiters: _intccHealthLimiters(h),
     detail,
     confidence: h.confidence,
     contextNote: h.contextNote ? t('intel_h_note_deliberate') : '',
@@ -61550,6 +61735,86 @@ function _intv4SetFactDepth(d) {
 // listado: 1–3 elementos. Cinco conclusiones no priorizan, reparten. Y Explora
 // muestra 4 como máximo.
 const _INTV4_BRIEF_MAX = 3;
+// ── EL RELOJ, COMO COSTURA ────────────────────────────────────────────────
+// Actualidad editorial ≠ verdad financiera. La verdad financiera se ancla a
+// timestamps CERTIFICADOS y no se toca. Pero «hoy» es una afirmación sobre el
+// presente, y el presente no lo da un snapshot: lo da un reloj. Se aísla en
+// una función para que las pruebas puedan fijarlo sin tocar el reloj global y
+// sin dejar una puerta trasera en producción (el gate redefine esta función
+// dentro de su sandbox; el bundle sólo tiene esta definición).
+function _aurixNow() { return Date.now(); }
+
+// ── CHECKPOINT F · «HOY» TIENE UN BORDE, Y HASTA AHORA NO LO TENÍA ────────
+// La QA del founder encontró una ENTRADA DE LIQUIDEZ DEL 18 DE AGOSTO dentro
+// de «Lo que importa hoy». El cierre anterior había puesto dos filtros
+// concretos —la rentabilidad de todo el periodo y el nivel estático de
+// liquidez— y una escalera que ORDENA por actualidad. Pero ordenar no es
+// filtrar: con pocos hechos, el peldaño más viejo sube igual a pantalla.
+//
+// La regla que faltaba es de tiempo, no de tipo: un hecho FECHABLE sólo entra
+// si su fecha cae dentro de la ventana. Prioridad 24 h; se amplía a 72 h y se
+// DECLARA en la frase, que es lo que el checkpoint autoriza. Un hecho sin
+// fecha es un estado y ya lo acotan los dos filtros anteriores: éste no lo
+// toca, porque no tiene nada que comparar.
+const _AURIX_TODAY_MAX_AGE_MS = 72 * 3600 * 1000;
+// ── Y LA GUARDIA DE FRESCURA, QUE ES OTRA COSA ──────────────────────────
+// Anclar la antigüedad al ÚLTIMO SNAPSHOT era un error, y de los caros: una
+// cuenta que lleva tres semanas sin actualizarse tiene su última observación
+// en el pasado, así que un flujo de hace veinte días queda «a un día» de ese
+// snapshot y se publica como actualidad. Eso es rebobinar «hoy» hasta donde
+// convenga, que es exactamente lo que la card no puede hacer.
+// La antigüedad se mide contra el PRESENTE. Y si la propia observación más
+// reciente cae fuera de la ventana, entonces no existe NINGÚN dato certificado
+// suficientemente reciente: la card no tiene nada que afirmar y lo dice, en
+// vez de enseñar historia con un titular que promete hoy.
+const _AURIX_TODAY_STALE_MS = 72 * 3600 * 1000;
+// El instante FECHABLE de un hecho. `endAt` es el cierre de su ventana —lo
+// último que el hecho afirma—, y sin ventana se admite la marca del evento.
+// Devuelve null cuando no hay ninguna: eso es un estado, no un hecho viejo.
+function _aurixTodayDatedAt(st) {
+  const w = st && st.window;
+  if (w && Number.isFinite(w.endAt)) return w.endAt;
+  const v = (st && st.values) || {};
+  if (Number.isFinite(v.at)) return v.at;
+  if (Number.isFinite(st && st.at)) return st.at;
+  return null;
+}
+// ¿Es este hecho ACTUAL? Contra el presente, siempre. La ventana de medición
+// del hecho sigue siendo suya y sigue anclada a datos certificados: lo único
+// que se decide aquí es si merece aparecer bajo un titular que dice «hoy».
+function _aurixTodayFresh(st, nowAt) {
+  const at = _aurixTodayDatedAt(st);
+  if (at === null) return true;                  // estado: lo acotan otros filtros
+  if (!Number.isFinite(nowAt)) return false;     // sin reloj no se afirma actualidad
+  return (nowAt - at) <= _AURIX_TODAY_MAX_AGE_MS;
+}
+// ¿Hay ALGÚN dato certificado suficientemente reciente? Si la observación más
+// nueva ya está fuera de la ventana, nada de lo que hay dentro está
+// certificado, y la card no puede hablar de actualidad. Fail-closed: sin
+// observación tampoco.
+function _aurixTodayDataStale(core, nowAt) {
+  const o = (core && core.dataAvailability && core.dataAvailability.observation) || {};
+  // SIN SERIE TODAVÍA NO HAY RANCIDEZ. El Core publica
+  // `{observations:0, endAt:null}` por defecto, así que una cuenta recién
+  // creada —o el primer pintado antes de que resuelva el histórico— caía en
+  // «el valor de tu patrimonio no se ha actualizado recientemente», que es
+  // falso: no es que esté viejo, es que no existe. Ese caso lo cubren los
+  // estados de historia insuficiente, no éste.
+  if (!Number.isFinite(o.endAt)) return false;
+  if (!Number.isFinite(nowAt)) return true;          // sin reloj, fail-closed
+  // ── UN RELOJ ATRASADO TAMBIÉN MIENTE ─────────────────────────────────
+  // La ventana sólo protegía contra el reloj adelantado. Con el reloj del
+  // dispositivo DETRÁS del último dato certificado, un hecho viejo vuelve a
+  // caer dentro de las 72 h y «Hoy» lo publica como actualidad.
+  // La referencia autoritativa ya está en la mano y no hace falta inventar
+  // nada: `observation.endAt` es el cierre de la última observación
+  // CERTIFICADA por el servidor. El reloj no puede ser anterior a un dato que
+  // ya hemos recibido; si lo es, el reloj no es de fiar y no se afirma
+  // actualidad. No se usa para MEDIR la antigüedad —eso sería volver a
+  // rebobinar «hoy»—, sólo para detectar que el reloj no sirve.
+  if (nowAt < o.endAt) return true;                  // reloj atrasado ⇒ fail-closed
+  return (nowAt - o.endAt) > _AURIX_TODAY_STALE_MS;
+}
 const _INTV4_EXPLORE_MAX = 4;
 // Mapa dimensión→raíz causal. Es el puente entre el ranking del motor (que razona
 // por dimensión) y las superficies heredadas (que agrupan por raíz). Explícito y
@@ -61578,7 +61843,19 @@ function _aurixIntelRootsOf(intel) {
 // necesitaba sitio para las dos cosas. Ahora publica una sola clase de contenido
 // —hechos con sujeto, resultado, periodo y cobertura— y tres es el techo que el
 // §4.5 fija: una card de perspectiva histórica no es un registro de auditoría.
-const _INTV4_MEMORY_MAX = 3;
+// CHECKPOINT G — «entre uno y cuatro hechos». Eran tres, y el techo cortaba
+// horizontes que sí estaban cubiertos.
+const _INTV4_MEMORY_MAX = 4;
+// ── DIVERSIDAD DE HORIZONTE ───────────────────────────────────────────────
+// El SPEC pide hechos «procedentes de periodos diferentes». Ordenar por
+// prioridad y cortar a N devolvía cuatro lecturas de la MISMA ventana cuando
+// esa ventana era la más productiva, y entonces «Tu evolución» no mostraba
+// evolución: mostraba cuatro maneras de decir la semana pasada.
+// Se reserva como mucho UN hecho por ventana, recorriendo las ventanas de más
+// corta a más larga. No se inventa ninguna: sólo entran las que el hecho ya
+// declara, así que una cuenta sin historia larga sigue publicando lo que tiene.
+const _INTV4_MEMORY_WINDOW_ORDER = Object.freeze(
+  ['24h', '7d', '14d', '30d', '3m', '6m', '1y', '2y', '5y', 'all']);
 
 // ════════════════════════════════════════════════════════════════════════════
 // EL PERÍMETRO SE NOMBRA UNA VEZ, Y SIN MENTIR SOBRE EL DENOMINADOR
@@ -62170,6 +62447,14 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims) {
             data-fact="${esc(x.fd.semanticKey)}"
             data-reviewed="${x.reviewed ? '1' : '0'}"
             data-cause="${x.fd.causeKnown ? 'user' : 'unknown'}"
+            ${/* CHECKPOINT H — al ceder «Lo que importa hoy» el hecho puede vivir
+                  SÓLO aquí, así que su ventana tiene que declararse aquí o deja
+                  de estar declarada en ninguna parte. Mismo owner que la copy:
+                  se publica el nombre que el periodo puede sostener, y nada si
+                  no lo sostiene. */''}
+            data-window="${esc((x.f && x.f.window
+              && (typeof _aurixFactPeriodNamedAs === 'function'
+                ? (_aurixFactPeriodNamedAs(x.f.window) || '') : (x.f.window.range || ''))) || '')}"
             data-diluted="${(x.f && x.f.values && x.f.values.dilutedBy) ? esc(x.f.values.dilutionKind || 'pure') : ''}">
           <span class="intv4-chg-dot" aria-hidden="true"></span>
           <span class="intv4-chg-text">${esc(x.txt)}</span>
@@ -62336,25 +62621,85 @@ function _intv4ExploreHtml(core, esc, intel) {
 // An answer is the rendered fact(s) the Core attached to the question — never a
 // re-derivation. A DATA_QUALITY question answers with the honest limit, which is
 // premium content in its own right (SPEC §6/§14).
+// CHECKPOINT E — qué dimensiones sabe leer Aurix HOY, dichas con el nombre que
+// ya usa el radar. No es un catálogo nuevo: es la traducción de las raíces
+// causales que el ledger ha producido de verdad en esta pasada.
+const _AURIX_ROOT_READABLE = Object.freeze({
+  top_position:      'intcc_dim_conc',
+  category_mix:      'intcc_dim_breadth',
+  cash_weight:       'intcc_dim_liq',
+  investable_return: 'intcc_dim_growth',
+  wealth_level:      'intcc_dim_stab',
+});
 function _intv4AnswerHtml(q, core, esc) {
+  const avail = (core && core.dataAvailability) || {};
+  const obs = avail.observation || {};
   if (q.family === 'data_quality') {
-    const gaps = (core.dataAvailability && core.dataAvailability.gaps) || [];
-    const lines = gaps.map(g => {
-      const specific = _intv4T('intv4_gap_' + g.semanticKey);
-      return specific || '';
-    }).filter(Boolean);
-    const uniq = Array.from(new Set(lines)).slice(0, 3);
-    if (!uniq.length) return '';
-    return uniq.map(l => `<p>${esc(l)}</p>`).join('');
+    // ── LAS CUATRO PARTES QUE EL CHECKPOINT E EXIGE ────────────────────
+    // Antes esto era sólo la lista de carencias: una disculpa sin contexto,
+    // bajo una pregunta que no decía sobre qué. Ahora responde lo que
+    // pregunta —cuánto de esto es fiable— y las cuatro partes salen de la
+    // disponibilidad que el Core ya publica. Cero cifras nuevas.
+    const out = [];
+    // 1 · COBERTURA
+    // FAIL-OPEN CORREGIDO. Leía `avail.uncertifiablePositions` y
+    // `core.snapshot.uncertifiablePositions`, y NINGUNO de los dos existe:
+    // `dataAvailability` sólo publica status/gaps/factCount/roots/observation,
+    // y el Core no tiene clave `snapshot`. `uncert` era 0 por construcción, así
+    // que la respuesta afirmaba SIEMPRE «Aurix analiza todas las posiciones que
+    // tienes registradas» — incluso con una posición sin valorar y el anillo de
+    // Salud apagado por esa misma causa, en la misma pantalla.
+    // Ahora se lee del owner que de verdad lo sabe, y sin él NO se afirma
+    // totalidad: se calla esa parte.
+    const uncert = Number((typeof _aurixHealthSnapshot === 'function'
+      ? (_aurixHealthSnapshot() || {}).uncertifiablePositions : null) || 0);
+    const coverKnown = typeof _aurixHealthSnapshot === 'function';
+    if (uncert > 0) out.push(_intv4T('intv4_dq_cover_partial', uncert));
+    else if (coverKnown) out.push(_intv4T('intv4_dq_cover_full'));
+    // 2 · HISTORIAL CERTIFICADO
+    const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
+    out.push(days ? _intv4T('intv4_dq_history', days) : _intv4T('intv4_dq_history_none'));
+    // 3 · QUÉ PUEDE CALCULAR — las raíces que el ledger ha producido, no una
+    // lista de aspiraciones.
+    const readable = Array.from(new Set((avail.roots || [])
+      .map(r => _AURIX_ROOT_READABLE[r]).filter(Boolean)))
+      .map(k => _intv4T(k)).filter(Boolean);
+    if (readable.length) out.push(_intv4T('intv4_dq_can', readable.join(', ')));
+    // 4 · QUÉ TODAVÍA NO PUEDE AFIRMAR
+    const gapLines = Array.from(new Set(((avail.gaps) || [])
+      .map(g => _intv4T('intv4_gap_' + g.semanticKey)).filter(Boolean))).slice(0, 2);
+    if (gapLines.length) {
+      out.push(_intv4T('intv4_dq_cannot_intro'));
+      gapLines.forEach(l => out.push(l));
+    }
+    return out.map(l => `<p>${esc(l)}</p>`).join('');
   }
   const facts = (core.ledger && core.ledger.facts) || [];
-  const lines = (q.answer && q.answer.factKeys || [])
+  const chosen = (q.answer && q.answer.factKeys || [])
     .map(k => facts.find(f => f.semanticKey === k))
-    .filter(Boolean)
-    .map(f => _intv4FactText(f))
     .filter(Boolean);
+  const lines = chosen.map(f => _intv4FactText(f)).filter(Boolean);
   if (!lines.length) return '';
-  return lines.slice(0, 3).map(l => `<p>${esc(l)}</p>`).join('');
+  // ── CHECKPOINT E · «FRENTE A SU PROPIA HISTORIA» EXIGE HISTORIA ────────
+  // La puerta de elegibilidad ya pedía un hecho histórico certificado, pero si
+  // ese hecho no tenía copy publicable la respuesta degeneraba en el valor
+  // actual a secas — la pregunta prometía una comparación y devolvía un nivel.
+  // Sin al menos una línea que NO sea el nivel, la pregunta no se publica.
+  if (q.family === 'historical_behaviour') {
+    const hist = chosen.filter(f => f.semanticKey !== 'investable_level')
+      .map(f => _intv4FactText(f)).filter(Boolean);
+    if (!hist.length) return '';
+  }
+  // ── CHECKPOINT E · UNA CIFRA REPETIDA NO ES UNA RESPUESTA ──────────────
+  // «¿Cuánto vale mi cartera?» devolvía el mismo número que ya está arriba.
+  // Se conserva porque es la pregunta honesta cuando no hay historia, pero
+  // sólo si puede añadir la referencia que la hace útil: HASTA CUÁNDO está
+  // certificada esa valoración. Sin esa fecha, no se publica.
+  if (q.family === 'wealth_level') {
+    if (!Number.isFinite(obs.endAt)) return '';
+    lines.push(_intv4T('intv4_cv_asof', _intccDate(obs.endAt)));
+  }
+  return lines.slice(0, 4).map(l => `<p>${esc(l)}</p>`).join('');
 }
 
 // FINANCIAL MEMORY — WHAT / WHEN / MAGNITUDE / WHY IT MATTERS, and nothing that
@@ -62414,7 +62759,11 @@ function _intv4MemoryEvents(core, alreadyPublished) {
     .map(f => ({ f, txt: _intv4FactText(f) }))
     .filter(x => !!x.txt)
     .filter(x => { const k = x.f.semanticKey; if (seen.has(k)) return false; seen.add(k); return true; })
-    .slice(0, _INTV4_MEMORY_MAX);
+    // CHECKPOINT G — el POOL, no la selección. Cortar aquí a cuatro dejaba a
+    // `_intv4MemoryDiversify` sin candidatos de otras ventanas, así que la
+    // diversidad de horizonte era imposible por construcción. El corte final
+    // lo hace quien selecciona; aquí sólo se acota para no recorrer de más.
+    .slice(0, _INTV4_MEMORY_MAX * 4);
 }
 // Lo que la Memoria RECLAMA: sus claves y sus raíces causales. Es el contrato que
 // consume Qué ha cambiado para no republicar el mismo hecho.
@@ -62483,8 +62832,27 @@ function _intv4MemoryDeclared(intel, excludeFields) {
 // pone `_intv4WindowLabel`, que ya degrada a «efectivo: N días» cuando la ventana
 // no cubre su nombre nominal (el §4.5 prohíbe comparar periodos parciales con
 // completos SIN INDICARLO, no prohíbe publicarlos).
+// CHECKPOINT G · UNA VENTANA, UN HECHO — y el resto en orden declarado.
+// Determinista por construcción: mismas entradas ⇒ mismas filas y en el mismo
+// orden, así que refrescar no cambia nada y sólo se mueve la fila cuyo hecho
+// se ha movido. Eso es lo que el SPEC llama «no sustituir todos a la vez».
+function _intv4MemoryDiversify(rows, max) {
+  const byWindow = new Map();
+  const rest = [];
+  rows.forEach((r) => {
+    const w = String(r.period || '');
+    if (!w) { rest.push(r); return; }
+    if (!byWindow.has(w)) byWindow.set(w, r); else rest.push(r);
+  });
+  const ordered = _INTV4_MEMORY_WINDOW_ORDER
+    .filter((w) => byWindow.has(w))
+    .map((w) => byWindow.get(w));
+  // Ventanas que el catálogo no nombra: van detrás, nunca se pierden.
+  byWindow.forEach((r, w) => { if (_INTV4_MEMORY_WINDOW_ORDER.indexOf(w) === -1) ordered.push(r); });
+  return ordered.concat(rest).slice(0, max);
+}
 function _intv4MemoryRows(core, alreadyPublished, intel, excludeFields) {
-  return _intv4MemoryEvents(core, alreadyPublished)
+  return _intv4MemoryDiversify(_intv4MemoryEvents(core, alreadyPublished)
     .map(x => ({ kind: 'event', at: (x.f.window && (x.f.window.endAt || x.f.window.startAt)) || 0,
       txt: x.txt, why: _intv4WhyText(x.f), key: x.f.semanticKey,
       // §4.5 — «cada hecho debe incluir sujeto, resultado, PERIODO y COBERTURA».
@@ -62495,10 +62863,9 @@ function _intv4MemoryRows(core, alreadyPublished, intel, excludeFields) {
       coverage: !x.f.window ? ''
         : (_aurixFactPeriodDegraded(x.f.window) ? 'partial'
           : (x.f.window.coversNominal === true ? 'nominal' : '')) }))
-    .sort((a, b) => (b.at - a.at) || (a.key < b.key ? -1 : 1))
-    .slice(0, _INTV4_MEMORY_MAX);
+    .sort((a, b) => (b.at - a.at) || (a.key < b.key ? -1 : 1)), _INTV4_MEMORY_MAX);
 }
-function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
+function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, limitLine) {
   const declared = _intv4MemoryDeclared(intel, excludeFields);
   const rows = _intv4MemoryRows(core, alreadyPublished, intel, excludeFields);
   // Anything the Brief already said above is NOT repeated here. Memory is the
@@ -62522,16 +62889,19 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
   // propio: el estado «acumulando historial» sería falso.
   if (!rows.length) {
     const nObs = Number(obs.observations) || 0;
-    if (nObs >= 3 && Number.isFinite(obs.startAt)) {
-      const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
+    // ── CHECKPOINT G · HISTORIA CORTA: COBERTURA, NO UN VEREDICTO ────────
+    // Con historial pero sin hechos materiales, lo honesto es decir CUÁNTA
+    // historia hay —que es lo que gobierna qué comparaciones son posibles— y
+    // no afirmar estabilidad, que es una conclusión que nadie ha medido.
+    // Se exige `spanMs`: sin él no hay cobertura que declarar y se cae al
+    // estado vacío, que no afirma nada.
+    const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
+    if (nObs >= 3 && days) {
       return `
-        <section class="intcc-card intcc-timeline intv4-memory is-stable"
-                 data-obs="${esc(String(nObs))}">
+        <section class="intcc-card intcc-timeline intv4-memory is-coverage"
+                 data-coverage-days="${esc(String(days))}">
           <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-          <p class="intv4-mem-stable-t">${esc(_intv4T('intv4_memory_stable_t', _intccDate(obs.startAt)))}</p>
-          <p class="intv4-mem-stable-b">${esc(days
-            ? _intv4T('intv4_memory_stable_b', nObs, days)
-            : _intv4T('intv4_memory_stable_b_nodays', nObs))}</p>
+          <p class="intv4-mem-coverage">${esc(_intv4T('intv4_memory_coverage', days))}</p>
         </section>`;
     }
     // ── SUPREME CLOSURE · §4.5 · EL ESTADO VACÍO ES COMPACTO ──────────────
@@ -62560,10 +62930,22 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields) {
           <span class="intcc-tl-node" aria-hidden="true"></span>
           <div class="intcc-tl-text">
             <span class="intv4-mem-what">${esc(r.txt)}</span>
-            ${r.at ? `<span class="intcc-tl-date">${esc(_intccDate(r.at))}</span>` : ''}
+            ${/* CHECKPOINT G — «cada hecho declara su periodo exacto». Estaba
+                  sólo en `data-period`, o sea visible para el gate y no para
+                  el usuario; la fecha de la fila es CUÁNDO, no SOBRE CUÁNTO.
+                  Se publica junto a la fecha, y sólo si el hecho lo nombra:
+                  un periodo degradado devuelve null y no se inventa. */''}
+            ${(r.at || r.period) ? `<span class="intcc-tl-date">${
+              esc([r.at ? _intccDate(r.at) : '', r.period ? _intv4RangeLabel(r.period) : '']
+                .filter(Boolean).join(' · '))}</span>` : ''}
             ${r.why ? `<span class="intv4-mem-why">${esc(r.why)}</span>` : ''}
           </div></li>`).join('')}</ul></div>`
       : `<p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>`}
+      ${/* CHECKPOINT J — la limitación HISTÓRICA (resultado desde la compra,
+            máximo por posición, divisa) se publica aquí, que es donde vive la
+            afirmación que acota. Sólo si hay filas: una limitación colgando de
+            un estado vacío no acota nada. */''}
+      ${(limitLine && rows.length) ? `<p class="intcc-surface-limit">${esc(limitLine)}</p>` : ''}
     </section>`;
 }
 
@@ -62866,8 +63248,12 @@ function _intv5Reading(core, score, snap, intel, findingCount) {
       title = _intv4T('intel_now_monitoring'); sub = _intv4T('intel_sub_monitoring'); break;
     case 'readings_changed':
       title = _intv4T('intel_now_changed'); sub = _intv4T('intel_sub_changed', changeCount); break;
-    case 'stable_no_change':
-      title = _intv4T('intel_now_stable_nc'); sub = _intv4T('intel_sub_stable_nc'); break;
+    // `stable_no_change` NO aparece aquí a propósito: la cadena de estados de
+    // arriba lo reasigna SIEMPRE (a `no_news` con evidencia, a
+    // `insufficient_history` sin ella), así que esta rama era inalcanzable —y
+    // publicaba «desde tu última visita», la referencia que no existe—. Se
+    // retira en vez de corregir su copy: una rama muerta que miente es peor
+    // que una rama muerta.
     default:
       title = _intv4T('intel_now_stable'); sub = _intv4T('intcc_sub_balanced'); break;
   }
@@ -62893,6 +63279,11 @@ function _intv5Chips(core, score, intel) {
   const facts = (core && core.ledger && core.ledger.facts) || [];
   const by = k => facts.find(f => f.semanticKey === k) || null;
   const out = [];
+  // ── CHECKPOINT B · LO QUE LIMITA LA CIFRA VA PRIMERO ───────────────────
+  // Va DELANTE de los elogios a propósito: si sólo hay sitio para tres filas,
+  // la que explica el número no puede ser la que se cae. Viene del owner de
+  // Salud (`score.limiters`), no de una segunda derivación.
+  ((score && score.limiters) || []).forEach(l => { if (l && l.label) out.push(l); });
   const eff = by('effective_holdings'), cash = by('cash_weight'), top1 = by('top_position_weight');
   const cf = (intel && intel.context && intel.context.fields) || {};
   const liqNeed = (cf.liquidity_need && cf.liquidity_need.value) || null;
@@ -63224,7 +63615,58 @@ function _intv7RadarHtml(esc) {
 // top-3 BREAKDOWN, which is strictly more information than the single
 // concentration fact, and the Brief no longer headlines that fact when this
 // module publishes it.
-function _intv5DriversHtml(snap, esc) {
+// ── CHECKPOINT J · CADA LIMITACIÓN, JUNTO A LA AFIRMACIÓN QUE LIMITA ──────
+// Mi primera versión las mandaba TODAS a Factores porque las cinco hablan «de
+// posiciones». Eso es agruparlas por su sujeto gramatical, no por lo que
+// limitan: «Aurix no puede decirte qué activo explicó tu rendimiento» no
+// limita el ranking de exposición —que es exacto y no necesita disculpa—,
+// limita lo que Hoy afirma sobre rendimiento. Puesta en Factores, la card
+// pedía perdón por algo que hace bien mientras la afirmación afectada seguía
+// sin su matiz.
+//
+// El criterio es la AFIRMACIÓN:
+//   · atribución de rendimiento ACTUAL      → «Lo que importa hoy»
+//   · resultado o máximo HISTÓRICO          → «Tu evolución»
+//   · exposición y concentración            → «Factores principales»
+//   · naturaleza del comparador             → el propio comparador
+// Una clave que no esté aquí NO se publica en ningún sitio: es preferible
+// perder un matiz a colgarlo de una card que no le corresponde. Fail-closed.
+const _AURIX_GAP_SURFACE = Object.freeze({
+  per_asset_attribution:        'today',      // «qué activo explicó tu rendimiento»
+  position_period_decline:      'today',      // la caída DEL PERIODO que Hoy publica
+  position_below_cost:          'evolution',  // resultado desde la compra
+  position_drawdown_from_peak:  'evolution',  // el máximo, que es historia
+  position_fx_attribution:      'evolution',  // descomponer un resultado en el tiempo
+});
+// El comparador NO entra en este mapa: su limitación no es un hueco de datos
+// sino la naturaleza del instrumento, y ya la publica `_AURIX_CMP_DISCLOSURE`
+// dentro de su propia card.
+function _aurixGapsBySurface(core) {
+  const out = { today: '', evolution: '', drivers: '' };
+  const seen = new Set();
+  ((core && core.dataAvailability && core.dataAvailability.gaps) || [])
+    .filter(g => g && g.status === _AURIX_FACT_STATUS.NOT_YET_SUPPORTED)
+    .forEach((g) => {
+      const surface = _AURIX_GAP_SURFACE[g.semanticKey];
+      if (!surface || out[surface]) return;              // sin destino, no se publica
+      const line = _intv4T('intv4_gap_' + g.semanticKey);
+      if (!line || seen.has(line)) return;
+      seen.add(line); out[surface] = line;
+    });
+  return out;
+}
+
+// CHECKPOINT J · LA LIMITACIÓN VIVE DONDE DUELE, NO EN EL PIE
+// Las cinco limitaciones que Aurix publica hoy (`position_below_cost`,
+// `position_period_decline`, `position_drawdown_from_peak`,
+// `position_fx_attribution`, `per_asset_attribution`) dicen todas lo mismo en
+// distintas palabras: lo que Aurix NO puede afirmar POR POSICIÓN. Colgadas del
+// disclaimer global aparecían como jerga al final de la página, lejos de la
+// única card que habla de posiciones. Aquí se leen como lo que son: el límite
+// de ESTE análisis.
+// El disclaimer de la página se conserva intacto —es el que el checkpoint J
+// manda mantener— y deja de arrastrar la coletilla técnica.
+function _intv5DriversHtml(snap, esc, limitLine) {
   let drivers = { items: [], pct: 0 };
   try { drivers = (typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : drivers; } catch (_) {}
   const items = (drivers.items || []).slice(0, 3);
@@ -63248,6 +63690,7 @@ function _intv5DriversHtml(snap, esc) {
             </li>`).join('')}
         </ol>`
         : `<p class="intcc-empty-body">${esc(_intv4T('intcc_drv_none'))}</p>`}
+      ${limitLine ? `<p class="intcc-drv-limit">${esc(limitLine)}</p>` : ''}
     </section>`;
 }
 
@@ -63343,6 +63786,22 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
   const cashMoved = ((core && core.ledger && core.ledger.facts) || [])
     .some(f => f && typeof f.semanticKey === 'string'
             && f.semanticKey.indexOf('cash_drift_') === 0);
+  // EL PRESENTE, no el último snapshot.
+  //
+  // ── POR QUÉ LA GUARDIA NO PUEDE CORTAR ANTES DE FILTRAR ───────────────
+  // Mi primera versión devolvía la card vacía en cuanto la serie de valor
+  // estaba rancia. Eso borraba un caso legítimo: «hoy has registrado dos
+  // operaciones» es cierto por el timestamp CERTIFICADO de la propia
+  // operación, y no depende de que el snapshot de valor se haya refrescado.
+  // Un usuario que registra algo y no ve nada concluiría que Aurix no lo ha
+  // recibido.
+  // La corrección real —la que arregla el defecto que el founder describe— es
+  // el filtro POR HECHO contra el reloj: un hecho derivado de una serie rancia
+  // arrastra un `endAt` viejo y se cae solo. La guardia de frescura sigue
+  // existiendo, pero hace lo que le toca: DECLARAR el estado del dato, y
+  // elegir el texto honesto cuando no queda nada que publicar.
+  const _nowAt = _aurixNow();
+  const _stale = _aurixTodayDataStale(core, _nowAt);
   const stories = (core.topStories || [])
     .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
     // EL DISCRIMINADOR ES LA RAÍZ, NO LA FAMILIA, y el gate lo demostró en el
@@ -63352,6 +63811,10 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
     // fuera de ventana; el resultado de una POSICIÓN es otra raíz y se queda.
     .filter(st => !(st.causalRoot === _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN && !isCurrentWindow(st)))
     .filter(st => !(st.semanticKey === 'cash_weight' && !cashMoved))
+    // CHECKPOINT F — la puerta de tiempo. Va ANTES de la escalera de orden a
+    // propósito: ordenar lo viejo al final no impide que salga cuando hay
+    // hueco, y el §F prohíbe usar hechos antiguos para completar la card.
+    .filter(st => _aurixTodayFresh(st, _nowAt))
     .filter(st => !skip.has(st.causalRoot))
     // ── SE RE-ELIGE, NO SE DESCARTA ────────────────────────────────────────
     // Filtrar la historia acusada reintroducía en la capa de HISTORIAS el mismo
@@ -63415,9 +63878,9 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
       return (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1);
     })
     .slice(0, _INTV4_BRIEF_MAX);
-  return { stories, rankedBy: rank.size ? 'intelligence' : 'core' };
+  return { stories, rankedBy: rank.size ? 'intelligence' : 'core', stale: _stale };
 }
-function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks) {
+function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) {
   const sel = _intv5MattersStories(core, skipRoots, intel, acks);
   // A2 — qué hechos publica ya el destino del contador. Los que coinciden se
   // titulan aquí por su SIGNIFICADO y llevan el hecho como evidencia de apoyo,
@@ -63425,13 +63888,44 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks) {
   // EL HISTORIAL COMPLETO es lo que publica «Qué ha cambiado» desde que acusar
   // deja la fila en su sitio, así que la exclusión por repetición literal se mide
   // contra ESA lista y no contra la activa.
-  const publishedKeys = new Set(((core && core.findingsAll) || (core && core.findings) || [])
-    .map(f => f.semanticKey));
+  // Misma razón que abajo: decide si el titular es el HECHO o su SIGNIFICADO,
+  // y colgarlo del historial completo dejaba esa decisión congelada para
+  // siempre por algo que el usuario dio por visto hace meses.
+  const publishedKeys = new Set(((typeof _intv4FindingRows === 'function')
+    ? _intv4FindingRows(core) : []).map(x => x && x.fd && x.fd.semanticKey).filter(Boolean));
+  // ── CHECKPOINT H · LA EXCLUSIÓN ES POR RAÍZ, NO POR CLAVE ──────────────
+  // Por clave, la novedad decidía cuál de los hechos de una raíz se elegía y
+  // por tanto SI se excluía: el contenido de esta card pasaba a depender del
+  // historial de presentación, que es local. Por raíz es estable —las raíces
+  // de la lista canónica no cambian con la novedad, medido— y además es el
+  // criterio que este proyecto ya usa: dos claves de la misma raíz son el
+  // mismo fenómeno contado de dos maneras.
+  //
+  // ── PERO SÓLO CONTRA LA REVISIÓN ACTUAL ────────────────────────────────
+  // Se construía sobre `findingsAll`, que es el historial COMPLETO e incluye
+  // lo ya acusado. Dos consecuencias, las dos malas: una raíz que el usuario
+  // dio por vista en septiembre quedaba vetada aquí PARA SIEMPRE, de modo que
+  // un acontecimiento nuevo y material de esa misma raíz no podía volver a
+  // titular; y un hallazgo SIN copy publicable aportaba su raíz sin pintar
+  // fila, así que el hecho desaparecía de las dos superficies.
+  // `_intv4FindingRows(core)` es exactamente lo que hace falta: los hallazgos
+  // ACTIVOS —la revisión de ahora— y sólo los que de verdad rinden fila.
+  const publishedRoots = new Set(((typeof _intv4FindingRows === 'function')
+    ? _intv4FindingRows(core) : [])
+    .map(x => x && x.fd && (x.fd.rootCause || x.fd.causalRoot)).filter(Boolean));
   const cards = sel.stories
-    // SIN SIGNIFICADO PROPIO NO SE REPITE EL HECHO. Si la frase disponible es
-    // exactamente la que el destino ya publica y no hay un «por qué» que aportar,
-    // esta card no tiene nada que decir sobre ella: callar es mejor que duplicar.
-    .filter(st => !(publishedKeys.has(st.semanticKey) && !_intv4WhyText(st)))
+    // ── CHECKPOINT H · UN HECHO, UNA UBICACIÓN ─────────────────────────────
+    // La regla anterior dejaba pasar el hecho si esta card podía añadirle un
+    // «por qué», y eso publicaba `positions_registered_today` en «Lo que
+    // importa hoy» Y en «Qué ha cambiado» a la vez. Con distinta redacción,
+    // pero el mismo hecho dos veces en una pantalla.
+    //
+    // Y LA QUE CEDE ES ÉSTA, no la otra. El hero anuncia un RECUENTO sobre la
+    // lista canónica y promete llevar a ella: quitar una fila de ese destino
+    // rompería la promesa numérica, que está certificada. Así que el hecho que
+    // ya vive en «Qué ha cambiado» no vuelve a salir aquí — su significado
+    // sigue publicado allí, en su fila.
+    .filter(st => !publishedRoots.has(st.causalRoot))
     .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
     .filter(Boolean);
   // EL CONTROL «ENTENDIDO» VIVE EN UN SOLO SITIO. Aquí se construía una segunda
@@ -63441,10 +63935,18 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks) {
   // el acuse se queda donde vive el hecho: en «Qué ha cambiado».
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
-             data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}">
+             data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}"
+             data-stale="${sel.stale ? '1' : '0'}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_brief_title'))}</h3>
       ${cards.length ? `<div class="intv4-story-list">${cards.join('')}</div>`
-                     : `<p class="intcc-empty-body">${esc(_intv4T('intv4_brief_empty'))}</p>`}
+                     : `<p class="intcc-empty-body">${esc(_intv4T(
+                         sel.stale ? 'intv4_brief_stale' : 'intv4_brief_empty'))}</p>`}
+      ${/* Y si el dato está rancio pero SÍ hay algo fechado hoy, se publica lo
+            que hay y se declara el estado del dato: ni se oculta un hecho
+            cierto ni se deja creer que el resto está al día. */''}
+      ${(sel.stale && cards.length) ? `<p class="intv4-brief-stale-note">${
+        esc(_intv4T('intv4_brief_stale_note'))}</p>` : ''}
+      ${(limitLine && cards.length) ? `<p class="intcc-surface-limit">${esc(limitLine)}</p>` : ''}
     </section>`;
 }
 
@@ -63544,11 +64046,20 @@ const _AURIX_CMP_FLAG_KEY = 'aurix_cmp_enabled_v1';
 // determinista se publica entera igual.
 function _aurixCmpEnabled() {
   try {
+    // 1 · KILL SWITCH GLOBAL. Manda sobre todo lo demás, y es lo primero que
+    //     se comprueba para que apagarlo no dependa de nada más.
     if (typeof window !== 'undefined' && window.__AURIX_CMP_KILL === true) return false;
-    if (typeof window !== 'undefined' && window.__AURIX_CMP_FORCE === true) return true;
-    if (typeof localStorage !== 'undefined') return localStorage.getItem(_AURIX_CMP_FLAG_KEY) === '1';
-  } catch (_) {}
-  return false;
+    // 2 · LA AUTORIDAD ES EL ENTITLEMENT DEL USUARIO AUTENTICADO. No una clave
+    //     local, no un plan: la capacidad concreta. `hasFeature` devuelve false
+    //     mientras no haya evidencia cargada, así que esto falla CERRADO.
+    if (typeof hasFeature !== 'function') return false;
+    if (!hasFeature('intelligence.comparator')) return false;
+    // 3 · Y un apagado LOCAL sigue pudiendo apagarlo —nunca encenderlo—, que es
+    //     la vía de rollback rápida del propio usuario.
+    if (typeof localStorage !== 'undefined'
+        && localStorage.getItem(_AURIX_CMP_FLAG_KEY) === '0') return false;
+  } catch (_) { return false; }
+  return true;
 }
 // ── CATÁLOGO CERRADO ───────────────────────────────────────────────────────
 // Cuatro entradas, identificadores AUTORITATIVOS y verificados contra el
@@ -63566,19 +64077,167 @@ function _aurixCmpEnabled() {
 // bitcoin no tienen dividendo que incorporar. No se inventa un total return que
 // el proveedor no da, y no se mezclan los dos tipos en una misma comparación
 // porque no hay ninguno del otro tipo en el catálogo.
+// I.9 — por debajo de 0,01 pp la diferencia no sobrevive al redondeo con el
+// que se publica (dos decimales): es ruido, y se declara equivalencia.
+const _AURIX_CMP_FLAT_PP = 0.01;
+// I.9 — índices y renta variable SÍ tienen dividendos que el precio no
+// incorpora, así que hay que decirlo. El oro y las criptomonedas no los
+// tienen: mencionarlos ahí inventaría una carencia.
+const _AURIX_CMP_DISCLOSURE = Object.freeze({
+  index: 'cmp_disc_index', stock: 'cmp_disc_equity', etf: 'cmp_disc_equity',
+  crypto: 'cmp_disc_price', metal: 'cmp_disc_price',
+});
+// ── CHECKPOINT I.4 · EL CATÁLOGO SALE DEL REGISTRO DE MARKET ──────────────
+// Eran cuatro entradas escritas a mano. El checkpoint pide un catálogo amplio
+// y, con la misma frase, prohíbe mantener DOS catálogos distintos. Así que no
+// se escribe uno nuevo: se DERIVA de `ASSET_DB`, que es el registro
+// autoritativo de Market —52 instrumentos, todos con `marketSymbol`, que es
+// justo el identificador que el adaptador histórico necesita—.
+//
+// QUÉ SE AÑADE A MANO, Y POR QUÉ SÓLO ESTO:
+//   · `^NDX`. El registro sólo tiene el Composite (`^IXIC`), que es OTRO
+//     índice. Los dos se ofrecen, cada uno con su nombre; lo que el SPEC
+//     prohíbe es sustituir el uno por el otro, no publicarlos.
+//   · `BTC-USD`. La cripto no vive en `ASSET_DB` (allí se identifica por
+//     `coinId` de CoinGecko, que no sirve para el adaptador histórico). Se
+//     añade la ÚNICA que la sonda del cierre verificó en los cinco rangos. No
+//     se derivan `ETH-USD`, `SOL-USD` y compañía a partir del ticker: serían
+//     identificadores inventados, y el SPEC lo prohíbe con esas palabras.
+//
+// FALLA CERRADA: una entrada sin nombre, sin símbolo o sin tipo conocido no
+// entra. Y el tipo de rentabilidad es `price_return` para todas porque es lo
+// único que el proveedor da — no se finge un total return que no existe.
+const _AURIX_CMP_KIND_OF = Object.freeze({
+  index: 'index', stock: 'stock', etf: 'etf', metal: 'metal', crypto: 'crypto',
+});
+// ── QUÉ DEL REGISTRO PUEDE COMPARARSE DE VERDAD ──────────────────────────
+// Derivar el catálogo entero de `ASSET_DB` metía tres clases de instrumento
+// que NO cumplen las condiciones que el propio checkpoint I.4 exige, y la
+// revisión financiera las encontró una a una:
+//
+//  · ETFs UCITS con TICKER DESNUDO (IWDA, VWCE, EUNL, CSPX…). Su sufijo de
+//    mercado lo resuelve el router de `api/prices/snapshot.js`, no el
+//    endpoint histórico: pedir su historia devuelve 404 y la card acabaría
+//    culpando al proveedor de forma permanente. Sólo entran los ETFs
+//    cotizados en EE. UU., que el histórico sí resuelve tal cual.
+//  · ÍNDICES EN OTRA DIVISA (^IBEX, ^GDAXI, ^FCHI, ^N225, ^FTSE, ^STOXX50E).
+//    El adaptador, cuando el proveedor no confirma un ISO-4217, DEVUELVE
+//    «USD» por defecto: un índice en euros mal etiquetado se convertiría —o
+//    no— con el par equivocado y publicaría una diferencia que incorpora un
+//    movimiento de divisa inexistente. No falla cerrado: publica. Hasta que
+//    una sonda confirme la divisa de cada uno, no se ofrecen.
+//  · ^GDAXI además es un índice de RENTABILIDAD TOTAL —reinvierte
+//    dividendos—, así que publicarlo bajo «variación del índice sin
+//    dividendos» sería sencillamente falso.
+//
+// La regla resultante es una sola y es fail-closed: entra lo que el endpoint
+// histórico resuelve por sí mismo Y cotiza en USD sin ambigüedad.
+const _AURIX_CMP_US_ETFS = Object.freeze(['SPY', 'QQQ', 'VTI', 'VOO', 'URTH', 'VEA']);
+const _AURIX_CMP_USD_INDICES = Object.freeze(['^GSPC', '^NDX', '^DJI']);
+function _aurixCmpResolvableUSD(a, symbol, kind) {
+  if (kind === 'index')  return _AURIX_CMP_USD_INDICES.indexOf(symbol) !== -1;
+  if (kind === 'etf')    return _AURIX_CMP_US_ETFS.indexOf(String(a.ticker || '')) !== -1;
+  if (kind === 'metal')  return /=F$/.test(symbol);          // futuros, cotizados en USD
+  if (kind === 'crypto') return /-USD$/.test(symbol);
+  // Acciones: las del registro son estadounidenses o ADR en EE. UU., y el
+  // histórico las resuelve con el ticker desnudo.
+  return kind === 'stock' && /^[A-Z.]{1,6}$/.test(symbol);
+}
+function _aurixCmpFromRegistry() {
+  const reg = (typeof ASSET_DB !== 'undefined' && Array.isArray(ASSET_DB)) ? ASSET_DB : [];
+  const seen = new Set(['^GSPC', '^NDX', 'BTC-USD', 'GC=F']);
+  const out = [];
+  reg.forEach((a) => {
+    if (!a) return;
+    const symbol = String(a.marketSymbol || '').trim();
+    const name = String(a.name || '').trim();
+    const kind = _AURIX_CMP_KIND_OF[String(a.type || '')];
+    if (!symbol || !name || !kind) return;            // metadato esencial ausente ⇒ fuera
+    if (seen.has(symbol)) return;                     // ya declarado arriba, con su copy
+    if (!_aurixCmpResolvableUSD(a, symbol, kind)) return;
+    seen.add(symbol);
+    out.push(Object.freeze({ id: 'r:' + symbol, symbol, name, kind,
+      quoteCcy: 'USD', returnType: 'price_return' }));
+  });
+  return out;
+}
 const _AURIX_CMP_CATALOG = Object.freeze([
-  Object.freeze({ id: 'sp500',  symbol: '^GSPC',   labelKey: 'cmp_b_sp500',  returnType: 'price_return' }),
-  Object.freeze({ id: 'ndx100', symbol: '^NDX',    labelKey: 'cmp_b_ndx100', returnType: 'price_return' }),
-  Object.freeze({ id: 'btc',    symbol: 'BTC-USD', labelKey: 'cmp_b_btc',    returnType: 'price_return' }),
-  Object.freeze({ id: 'gold',   symbol: 'GC=F',    labelKey: 'cmp_b_gold',   returnType: 'price_return' }),
-]);
+  // Las cuatro DECLARADAS conservan su `id` y su copy traducida: cambiarles el
+  // identificador invalidaría el comparador que un usuario ya tenga guardado.
+  // `kind` gobierna el disclosure (I.9) y la agrupación del selector (I.4).
+  Object.freeze({ id: 'sp500',  symbol: '^GSPC',   labelKey: 'cmp_b_sp500',  kind: 'index',  quoteCcy: 'USD',  returnType: 'price_return' }),
+  Object.freeze({ id: 'ndx100', symbol: '^NDX',    labelKey: 'cmp_b_ndx100', kind: 'index',  quoteCcy: 'USD',  returnType: 'price_return' }),
+  Object.freeze({ id: 'btc',    symbol: 'BTC-USD', labelKey: 'cmp_b_btc',    kind: 'crypto', quoteCcy: 'USD', returnType: 'price_return' }),
+  Object.freeze({ id: 'gold',   symbol: 'GC=F',    labelKey: 'cmp_b_gold',   kind: 'metal',  quoteCcy: 'USD',  returnType: 'price_return' }),
+].concat(_aurixCmpFromRegistry()));
 function _aurixCmpBenchmark(id) {
   return _AURIX_CMP_CATALOG.find(b => b.id === String(id || '')) || null;
+}
+// El nombre visible. Las cuatro declaradas traducen («Oro»/«Gold»); las que
+// vienen del registro publican su nombre propio, que es un nombre propio y no
+// se traduce. Sin nombre no hay entrada, así que esto nunca devuelve vacío.
+function _aurixCmpLabel(bm) {
+  if (!bm) return '';
+  return bm.labelKey ? _intv4T(bm.labelKey) : String(bm.name || '');
+}
+// Agrupación del selector (I.4). El orden es el declarado, no alfabético: los
+// índices primero porque son la comparación que casi todo el mundo busca.
+const _AURIX_CMP_GROUPS = Object.freeze(['index', 'etf', 'stock', 'crypto', 'metal']);
+// ── RECIENTES · COMODIDAD, NUNCA AUTORIDAD ────────────────────────────────
+// El SPEC lo dice con esas palabras. Son tres ids en almacenamiento local, y
+// se VALIDAN contra el catálogo al leerlos: un id que ya no existe —o que
+// alguien escribió a mano— no entra. No deciden nada, sólo ahorran scroll.
+// Van sellados por cuenta, como el resto del estado de Intelligence.
+const _AURIX_CMP_RECENT_KEY = 'aurix_cmp_recent_v1';
+const _AURIX_CMP_RECENT_MAX = 3;
+function _aurixCmpRecent() {
+  try {
+    // Se guarda un OBJETO con un campo declarado, no un array suelto:
+    // `_aurixIntelWriteOwned` sella el dueño DENTRO del valor, y sellar un
+    // array lo convierte en un objeto con índices numéricos — el array no
+    // sobrevive al viaje de ida y vuelta.
+    const raw = _aurixIntelReadOwned ? _aurixIntelReadOwned(_AURIX_CMP_RECENT_KEY) : null;
+    const arr = (raw && Array.isArray(raw.ids)) ? raw.ids : [];
+    return arr.filter(id => typeof id === 'string' && !!_aurixCmpBenchmark(id))
+      .slice(0, _AURIX_CMP_RECENT_MAX);
+  } catch (_) { return []; }
+}
+function _aurixCmpPushRecent(id) {
+  try {
+    if (!id || !_aurixCmpBenchmark(id)) return;
+    const next = [id].concat(_aurixCmpRecent().filter(x => x !== id)).slice(0, _AURIX_CMP_RECENT_MAX);
+    if (_aurixIntelWriteOwned) _aurixIntelWriteOwned(_AURIX_CMP_RECENT_KEY, { ids: next });
+  } catch (_) {}
 }
 // El par FX. Aurix admite EXACTAMENTE dos divisas base —USD y EUR, ver
 // `baseCurrency`— así que el adaptador histórico necesita UNA pareja. No se
 // promete ninguna otra: una divisa sin datos fiables no se ofrece.
-const _AURIX_CMP_FX_PAIR = Object.freeze({ EUR: { symbol: 'EURUSD=X', invert: true } });
+// ── FX · POR PAR (COTIZACIÓN → BASE), NO POR BASE ─────────────────────────
+// DEFECTO LATENTE QUE ESTO CIERRA, y conviene dejarlo escrito porque no era
+// visible: el par se elegía SÓLO por la divisa base, y luego se aplicaba a las
+// DOS series. Con el catálogo de cuatro entradas —todas cotizadas en USD— eso
+// era correcto por accidente. En cuanto el catálogo incluya un instrumento
+// cotizado en otra divisa deja de serlo: con base EUR y un benchmark en GBP,
+// «Mi patrimonio» (USD) se convertía bien y el benchmark (GBP) se dividía
+// también por EURUSD, que no significa nada. No fallaba cerrado: publicaba una
+// comparación FALSA.
+//
+// Ahora cada serie se convierte DESDE SU PROPIA divisa. Y sólo con pares
+// CERTIFICADOS: la sonda del cierre midió `EURUSD=X` y nada más, así que eso
+// es exactamente lo que se declara. Cualquier otra dirección responde
+// `currency_not_supported` y la comparación se detiene — sin inventar un
+// cruce por USD que nadie ha medido.
+const _AURIX_CMP_FX_PAIR = Object.freeze({
+  // clave: `<desde>|<hacia>`
+  'USD|EUR': { symbol: 'EURUSD=X', invert: true },    // EURUSD cotiza USD por EUR ⇒ dividir
+  'EUR|USD': { symbol: 'EURUSD=X', invert: false },   // …y multiplicar en la dirección contraria
+});
+function _aurixCmpFxFor(from, to) {
+  const a = String(from || 'USD').toUpperCase(), b = String(to || 'USD').toUpperCase();
+  if (a === b) return { same: true };
+  const pair = _AURIX_CMP_FX_PAIR[a + '|' + b];
+  return pair ? { same: false, symbol: pair.symbol, invert: pair.invert === true } : null;
+}
 
 // ── MEDIANA DE INTERVALO — el bucket se DERIVA, no se elige ────────────────
 // Un umbral de "cada cuánto es comparable" elegido a ojo sería exactamente lo
@@ -63619,25 +64278,24 @@ function _aurixCmpBucketize(points, bucketMs) {
 // EL TIPO ACTUAL NO SE USA JAMÁS PARA CONVERTIR HISTORIA. `toBase()` existe y
 // convierte al tipo de HOY; aplicarlo a una serie de hace un año publicaría una
 // rentabilidad que nunca ocurrió. Esta función devuelve la SERIE.
-async function _aurixCmpFxSeries(range, base, opts) {
+async function _aurixCmpFxSeries(range, from, to, opts) {
   const o = opts || {};
-  const b = String(base || 'USD').toUpperCase();
-  if (b === 'USD') return { ok: true, series: null, pair: null };   // nada que convertir
-  const pair = _AURIX_CMP_FX_PAIR[b];
+  const pair = _aurixCmpFxFor(from, to);
   if (!pair) return { ok: false, reason: 'currency_not_supported', series: null, pair: null };
+  if (pair.same) return { ok: true, series: null, pair: null, same: true };   // nada que convertir
   const ad = (typeof window !== 'undefined' && window.AurixChartAdapters) ? window.AurixChartAdapters : null;
   if (!ad || typeof ad.yahooHistoryAdapter !== 'function') {
     return { ok: false, reason: 'adapter_unavailable', series: null, pair: pair.symbol };
   }
   let res = null;
   // El adaptador certificado recibe un OBJETO, no argumentos posicionales.
-  try { res = await ad.yahooHistoryAdapter({ symbol: pair.symbol, range, signal: o.signal }); } catch (_) { res = null; }
+  try { res = await ad.yahooHistoryAdapter({ symbol: pair.symbol, range: _aurixCmpProviderRange(range), signal: o.signal }); } catch (_) { res = null; }
   const series = (res && Array.isArray(res.series))
     ? res.series.filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0)
         .map(p => ({ ts: p.time, value: p.value }))
     : [];
   if (series.length < 2) return { ok: false, reason: 'fx_insufficient', series: null, pair: pair.symbol };
-  return { ok: true, series, pair: pair.symbol, invert: pair.invert === true };
+  return { ok: true, series, pair: pair.symbol, invert: pair.invert === true, same: false };
 }
 
 // ── SERIE DEL BENCHMARK, YA EN LA DIVISA BASE ──────────────────────────────
@@ -63649,8 +64307,12 @@ async function _aurixCmpBenchmarkSeries(id, range, opts) {
   if (!bm) return { ok: false, reason: 'unknown_benchmark' };
   const ad = (typeof window !== 'undefined' && window.AurixChartAdapters) ? window.AurixChartAdapters : null;
   if (!ad || typeof ad.yahooHistoryAdapter !== 'function') return { ok: false, reason: 'adapter_unavailable' };
-  let res = null;
-  try { res = await ad.yahooHistoryAdapter({ symbol: bm.symbol, range, signal: o.signal }); } catch (_) { res = null; }
+  let res = null, threw = false;
+  try { res = await ad.yahooHistoryAdapter({ symbol: bm.symbol, range: _aurixCmpProviderRange(range), signal: o.signal }); }
+  catch (_) { res = null; threw = true; }
+  // I.10 — «no respondió» y «respondió sin puntos» son cosas distintas: la
+  // primera es un fallo del proveedor, la segunda es un dato sobre la ventana.
+  if (threw || res === null) return { ok: false, reason: 'benchmark_fetch_failed', symbol: bm.symbol };
   const raw = (res && Array.isArray(res.series))
     ? res.series.filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0)
         .map(p => ({ ts: p.time, value: p.value }))
@@ -63659,7 +64321,17 @@ async function _aurixCmpBenchmarkSeries(id, range, opts) {
   // dato: el oro no tiene serie de 5 minutos en 24H (medido: 0 puntos). No es
   // un error, es «este comparador no existe en esta ventana».
   if (raw.length < 2) return { ok: false, reason: 'benchmark_insufficient', symbol: bm.symbol };
-  const quoted = (res && res.meta && res.meta.currency) ? String(res.meta.currency).toUpperCase() : 'USD';
+  // LA DIVISA DECLARADA MANDA. El adaptador devuelve «USD» cuando el proveedor
+  // no confirma un ISO-4217, así que su valor no distingue «es USD» de «no lo
+  // sé». Todo lo que el catálogo ofrece cotiza en USD por construcción (ver
+  // `_aurixCmpResolvableUSD`), y si el proveedor dijera otra cosa se PARA en
+  // vez de convertir a ciegas.
+  const declared = String(bm.quoteCcy || 'USD').toUpperCase();
+  const reported = (res && res.meta && res.meta.currency) ? String(res.meta.currency).toUpperCase() : null;
+  if (reported && reported !== declared) {
+    return { ok: false, reason: 'quote_currency_mismatch', symbol: bm.symbol };
+  }
+  const quoted = declared;
   // SE DEVUELVE EN SU DIVISA DE COTIZACIÓN, SIN CONVERTIR. La conversión la hace
   // `_aurixComparison` sobre LAS DOS series a la vez: convertir aquí sólo el
   // benchmark fue un defecto crítico —ver el comentario de `_aurixComparison`—
@@ -63705,7 +64377,16 @@ function _aurixCmpConvert(series, fxByBucket, stepMs, invert) {
 // insuficientes, y disponible-desde cuando el benchmark empieza más tarde.
 const _AURIX_CMP_STATE = Object.freeze({
   OFF: 'off', NO_RETURN: 'no_return', INSUFFICIENT: 'insufficient', READY: 'ready',
+  // ── CHECKPOINT I.10 · UN FALLO DEL PROVEEDOR NO ES «DATOS INSUFICIENTES» ─
+  // Se confundían: si el adaptador no estaba o la red caía, la card decía
+  // «no hay datos suficientes para comparar», que culpa a los datos del
+  // usuario de un problema nuestro y sugiere esperar historia que ya tiene.
+  // Son dos estados distintos porque la acción del usuario es distinta:
+  // reintentar frente a esperar.
+  PROVIDER_ERROR: 'provider_error',
 });
+// Las razones que son del PROVEEDOR y no del historial de la cuenta.
+const _AURIX_CMP_PROVIDER_REASONS = Object.freeze(['adapter_unavailable', 'benchmark_fetch_failed', 'fx_insufficient']);
 function _aurixCmpAlign(mineIdx, other) {
   // ── EL BUCKET CIEGO EMPAREJABA OBSERVACIONES DE MESES DISTINTOS ────────
   // La versión anterior agrupaba las dos series en buckets de tamaño
@@ -63795,7 +64476,9 @@ async function _aurixComparison(range, benchmarkId, opts) {
   // ── PUERTA 2 · EL BENCHMARK, EN SU DIVISA DE COTIZACIÓN ────────────────
   const bm = await _aurixCmpBenchmarkSeries(benchmarkId, r, o);
   if (!bm.ok) {
-    out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = bm.reason;
+    out.state = (_AURIX_CMP_PROVIDER_REASONS.indexOf(bm.reason) !== -1)
+      ? _AURIX_CMP_STATE.PROVIDER_ERROR : _AURIX_CMP_STATE.INSUFFICIENT;
+    out.reason = bm.reason;
     out.symbol = bm.symbol || null;
     return out;                                   // la serie propia sigue en `out.mine`
   }
@@ -63807,21 +64490,41 @@ async function _aurixComparison(range, benchmarkId, opts) {
   // retorno en la divisa de COTIZACIÓN, igual que el benchmark. Si la base es
   // otra, se convierten LAS DOS con la MISMA serie FX y los MISMOS buckets.
   // Convertir sólo una era el defecto crítico que encontró la revisión.
-  if (base !== bm.quoted) {
-    const fx = await _aurixCmpFxSeries(r, base, o);
-    if (!fx.ok) { out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = fx.reason; return out; }
-    out.fxPair = fx.pair;
+  // CADA SERIE, DESDE SU PROPIA DIVISA. «Mi patrimonio» llega en USD (así lo
+  // produce `_aurixInvestableSnapshots`) y el benchmark en la suya. Antes se
+  // usaba UN solo par elegido por la base y se aplicaba a las dos, que sólo es
+  // correcto si las dos cotizan en USD.
+  const MINE_CCY = 'USD';
+  // El estado de un fallo del FX se decide con la MISMA regla que el del
+  // benchmark: si la causa es del proveedor, se dice que es del proveedor. Que
+  // la red se caiga pidiendo EURUSD no es que al usuario le falten datos.
+  const fxState = (reason) => ((_AURIX_CMP_PROVIDER_REASONS.indexOf(reason) !== -1)
+    ? _AURIX_CMP_STATE.PROVIDER_ERROR : _AURIX_CMP_STATE.INSUFFICIENT);
+  const fxMine  = await _aurixCmpFxSeries(r, MINE_CCY, base, o);
+  if (!fxMine.ok) { out.state = fxState(fxMine.reason); out.reason = fxMine.reason; return out; }
+  const fxOther = await _aurixCmpFxSeries(r, bm.quoted, base, o);
+  if (!fxOther.ok) { out.state = fxState(fxOther.reason); out.reason = fxOther.reason; return out; }
+  out.fxPair = fxOther.pair || fxMine.pair || null;
+  out.quoted = bm.quoted;
+  if (!fxMine.same || !fxOther.same) {
+    // UN SOLO PASO DE BUCKET para todo lo que interviene: las dos series y las
+    // una o dos series FX. Alinear con pasos distintos volvería a emparejar
+    // observaciones que no se corresponden.
     const step = Math.max(_aurixCmpMedianStep(mineRaw) || 0, _aurixCmpMedianStep(otherRaw) || 0,
-                          _aurixCmpMedianStep(fx.series) || 0);
+                          _aurixCmpMedianStep(fxMine.series) || 0,
+                          _aurixCmpMedianStep(fxOther.series) || 0);
     if (!(step > 0)) { out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = 'no_common_step'; return out; }
-    const fxB = _aurixCmpBucketize(fx.series, step);
-    const cm = _aurixCmpConvert(mineRaw, fxB, step, fx.invert === true);
-    const co = _aurixCmpConvert(otherRaw, fxB, step, fx.invert === true);
-    if (cm.series.length < 2 || co.series.length < 2) {
+    if (!fxMine.same) {
+      const cm = _aurixCmpConvert(mineRaw, _aurixCmpBucketize(fxMine.series, step), step, fxMine.invert === true);
+      mineRaw = cm.series; out.fxDropped = (out.fxDropped || 0) + cm.dropped;
+    }
+    if (!fxOther.same) {
+      const co = _aurixCmpConvert(otherRaw, _aurixCmpBucketize(fxOther.series, step), step, fxOther.invert === true);
+      otherRaw = co.series; out.fxDropped = (out.fxDropped || 0) + co.dropped;
+    }
+    if (mineRaw.length < 2 || otherRaw.length < 2) {
       out.state = _AURIX_CMP_STATE.INSUFFICIENT; out.reason = 'fx_coverage_insufficient'; return out;
     }
-    mineRaw = cm.series; otherRaw = co.series;
-    out.fxDropped = cm.dropped + co.dropped;
   }
   // ── PUERTA 4 · PRIMERA FECHA COMÚN VÁLIDA, Y NORMALIZAR DESPUÉS ────────
   const al = _aurixCmpAlign(mineRaw, otherRaw);
@@ -63886,7 +64589,34 @@ function _aurixComparisonSync(range) {
 // que el comparador de A no puede aparecer en la sesión de B. Estado inicial:
 // SIN COMPARACIÓN. No se crea persistencia remota.
 // Los rangos CANÓNICOS, los mismos cinco que el resto del producto ofrece.
-const _AURIX_CMP_RANGES = Object.freeze(['24h', '7d', '30d', '1y', 'all']);
+// ── CHECKPOINT I.5 · SÓLO LOS PERIODOS QUE LOS DOS MOTORES CERTIFICAN ─────
+// El checkpoint pide añadir 3M, 6M, 2A y 5A «cuando ambos motores los
+// certifiquen». Medido: NO los certifican. Las dos tablas de span gemelas
+// —`_aurixInvestableSnapshots` y el `_nominal` de
+// `_aurixInvestablePerformance`— conocen exactamente `24h`, `7d`, `30d`, `90d`
+// y `1y`, y su caída por defecto es `|| 2592e6`. Pedir «6m» no devolvería un
+// error: devolvería TREINTA DÍAS etiquetados como seis meses, con la cobertura
+// declarada como buena porque el nominal tampoco sabría desmentirlo. Es la
+// misma trampa que la revisión financiera ya documentó ahí dentro.
+//
+// Así que se añade el ÚNICO que sí está certificado por las dos tablas y por
+// el guardia de retención WN.12: `90d`, que son los tres meses que el
+// checkpoint pide. `6m`, `2y` y `5y` quedan FUERA y declarados: ampliarlos es
+// tocar los dos motores y su guardia, y eso es un SPEC financiero propio.
+const _AURIX_CMP_RANGES = Object.freeze(['24h', '7d', '30d', '90d', '1y', 'all']);
+// ── EL PROVEEDOR HABLA OTRO VOCABULARIO, Y NADIE LO TRADUCÍA ──────────────
+// Los dos motores propios certifican `90d`; el adaptador histórico, no: su
+// tabla de rangos dice `3m`. Se le pasaba `90d` crudo, `_validRange` lo
+// rechazaba y devolvía un resultado VACÍO sin lanzar, así que la card
+// terminaba en «Datos insuficientes» — 3M no habría comparado NUNCA, con
+// ningún instrumento, en ninguna cuenta, y encima culpando al historial del
+// usuario de un defecto de vocabulario nuestro.
+// La traducción es explícita y sólo cubre lo que las dos partes miden igual
+// (90 días). Un rango sin traducción viaja tal cual, que es lo que ya hacía.
+const _AURIX_CMP_PROVIDER_RANGE = Object.freeze({ '90d': '3m' });
+function _aurixCmpProviderRange(r) {
+  return _AURIX_CMP_PROVIDER_RANGE[String(r || '')] || r;
+}
 const _AURIX_CMP_STATE_KEY = 'aurix_cmp_state_v1';
 function _intv14CmpState() {
   const def = { range: 'all', benchmarkId: null };
@@ -63932,14 +64662,62 @@ function _intv14CmpSvg(mine, other, opts) {
     ? `<line class="intv14-cmp-base" x1="${PAD_X}" y1="${y(100).toFixed(1)}" x2="${W - PAD_X}" y2="${y(100).toFixed(1)}"/>` : '';
   const oth = (other && other.length >= 2)
     ? `<path class="intv14-cmp-line is-other" d="${path(other)}"/>` : '';
+  // ── CHECKPOINT I.7 · LO QUE EL TOOLTIP NECESITA, PUBLICADO AQUÍ ────────
+  // Las dos series ya vienen ALINEADAS por `_aurixCmpAlign`: mismo número de
+  // puntos y mismo bucket certificado en cada índice. Así que el tooltip lee
+  // por ÍNDICE y es imposible que enseñe dos fechas distintas — que es
+  // exactamente lo que el checkpoint prohíbe. Se serializan enteros y
+  // centésimas para no engordar el DOM.
+  const pairs = mine.map((p, i) => [p.ts,
+    Math.round(p.value * 100) / 100,
+    (other && other[i] && Number.isFinite(other[i].value)) ? Math.round(other[i].value * 100) / 100 : null]);
+  const geo = { W, H, PAD_X, PAD_Y, t0, t1, lo, hi };
   return `
     <svg class="intv14-cmp-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
          role="img" aria-label="${_intccEsc(o.a11y || '')}"
-         data-cmp-points="${mine.length}" data-cmp-other="${(other || []).length}">
+         data-cmp-points="${mine.length}" data-cmp-other="${(other || []).length}"
+         data-cmp-geo="${_intccEsc(JSON.stringify(geo))}"
+         data-cmp-series="${_intccEsc(JSON.stringify(pairs))}">
       ${base100}
       ${oth}
       <path class="intv14-cmp-line is-mine" d="${path(mine)}"/>
+      ${/* Capas de lectura. Nacen ocultas y sólo las mueve el puntero, el dedo
+            o el teclado: sin interacción el gráfico es exactamente el de antes. */''}
+      <line class="intv14-cmp-guide" data-cmp-guide="1" x1="0" y1="${PAD_Y}" x2="0" y2="${H - PAD_Y}" hidden/>
+      <circle class="intv14-cmp-dot is-mine" data-cmp-dot="mine" r="3.5" cx="0" cy="0" hidden/>
+      <circle class="intv14-cmp-dot is-other" data-cmp-dot="other" r="3.5" cx="0" cy="0" hidden/>
     </svg>`;
+}
+
+// ── CHECKPOINT I.8 · LAS ETIQUETAS MÍNIMAS PARA PODER LEER EL GRÁFICO ─────
+// El gráfico no tenía NINGUNA referencia numérica: dos curvas sin escala, así
+// que la magnitud sólo se podía adivinar. El checkpoint pide «las mínimas
+// suficientes para interpretarlo, sin saturarlo»: tres —techo, suelo y el
+// origen común— y ninguna más.
+//
+// VAN EN HTML, NO DENTRO DEL SVG, y no es un capricho: el `<svg>` usa
+// `preserveAspectRatio="none"` para estirarse al ancho de la card, y un texto
+// dentro de él se estiraría con la misma deformación. Superpuestas en el
+// contenedor, la tipografía es la de Aurix a su tamaño real.
+function _intv14CmpAxisHtml(mine, other, esc) {
+  const all = (mine || []).concat(other || []);
+  if (!Array.isArray(mine) || mine.length < 2 || !all.length) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const p of all) { if (p.value < lo) lo = p.value; if (p.value > hi) hi = p.value; }
+  if (!(hi > lo)) { hi = lo + 1; lo = lo - 1; }
+  // Las MISMAS constantes que el SVG: si se separan, las etiquetas dejan de
+  // corresponder con las líneas y sería peor que no tenerlas.
+  const H = 180, PAD_Y = 14;
+  const topPct = (v) => ((PAD_Y + (1 - (v - lo) / (hi - lo)) * (H - PAD_Y * 2)) / H) * 100;
+  const fmt = (v) => { const r = Math.round((v - 100) * 100) / 100;
+    return (r >= 0 ? '+' : '−') + _intv4Num(Math.abs(r), 2) + ' %'; };
+  const rows = [{ v: hi, cls: '' }, { v: lo, cls: '' }];
+  // El origen común sólo se rotula si está DENTRO de la banda visible: fuera
+  // de ella sería una etiqueta apuntando a una línea que no se dibuja.
+  if (lo <= 100 && hi >= 100) rows.push({ v: 100, cls: ' is-base' });
+  return `<div class="intv14-cmp-axis" aria-hidden="true">${rows.map(r =>
+    `<span class="intv14-cmp-axis-t${r.cls}" style="top:${topPct(r.v).toFixed(2)}%">${
+      esc(fmt(r.v))}</span>`).join('')}</div>`;
 }
 
 // ── LA CARD ────────────────────────────────────────────────────────────────
@@ -63955,10 +64733,29 @@ function _intv14ComparatorHtml(esc, cmp) {
     `<button type="button" class="intv14-cmp-range${r === st.range ? ' is-active' : ''}"
        data-cmp-range="${esc(r)}" aria-pressed="${r === st.range ? 'true' : 'false'}">${
       esc(_intv4T('cmp_range_' + r))}</button>`).join('');
-  const options = [`<option value="">${esc(_intv4T('cmp_none'))}</option>`].concat(
-    _AURIX_CMP_CATALOG.map(b =>
-      `<option value="${esc(b.id)}"${b.id === st.benchmarkId ? ' selected' : ''}>${esc(_intv4T(b.labelKey))}</option>`)
-  ).join('');
+  // ── CHECKPOINT I.3 · LA LISTA DEL SELECTOR PROPIO ──────────────────────
+  // Agrupada por naturaleza y en el orden declarado. Todo local: el catálogo
+  // vive en el bundle, así que abrir el selector no descarga nada, no llama a
+  // ningún endpoint y no necesita debounce — el SPEC pide evitar exactamente
+  // eso, y la forma de evitarlo es no tenerlo.
+  const _recent = _aurixCmpRecent();
+  const _optionRow = (b) => `<li role="option" class="intv14-cmp-opt"
+      id="cmpopt-${esc(b.id)}" data-cmp-opt="${esc(b.id)}"
+      data-name="${esc(_aurixCmpLabel(b).toLowerCase())}" data-sym="${esc(String(b.symbol).toLowerCase())}"
+      aria-selected="${b.id === st.benchmarkId ? 'true' : 'false'}">
+      <span class="intv14-cmp-opt-name">${esc(_aurixCmpLabel(b))}</span>
+      <span class="intv14-cmp-opt-meta"><span class="intv14-cmp-opt-sym">${esc(b.symbol)}</span>
+        <span class="intv14-cmp-opt-kind">${esc(_intv4T('cmp_kind_' + b.kind))}</span></span>
+    </li>`;
+  const _groupHtml = (key, list) => (!list.length ? '' : `
+    <li role="presentation" class="intv14-cmp-optgroup">${esc(_intv4T('cmp_g_' + key))}</li>
+    ${list.map(_optionRow).join('')}`);
+  const recentRows = _recent.map(id => _aurixCmpBenchmark(id)).filter(Boolean);
+  const options = `
+    ${recentRows.length ? `<li role="presentation" class="intv14-cmp-optgroup">${
+      esc(_intv4T('cmp_pick_recent'))}</li>${recentRows.map(_optionRow).join('')}` : ''}
+    ${_AURIX_CMP_GROUPS.map(k => _groupHtml(k,
+      _AURIX_CMP_CATALOG.filter(b => b.kind === k))).join('')}`;
   // SIN RENTABILIDAD CERTIFICADA no se dibuja una comparación porcentual, y se
   // dice por qué en vez de callar (§6.2). `pending` y `value_fallback` entran
   // por aquí, y NO se reinterpreta una serie de valor como rentabilidad.
@@ -63984,49 +64781,109 @@ function _intv14ComparatorHtml(esc, cmp) {
   const bm = _aurixCmpBenchmark(st.benchmarkId);
   const hasOther = !!(cmp.other && cmp.other.length >= 2);
   const insufficient = cmp.state === _AURIX_CMP_STATE.INSUFFICIENT;
+  const providerError = cmp.state === _AURIX_CMP_STATE.PROVIDER_ERROR;
+  // I.10 — «historia común parcial» es un estado distinto de «disponible», y
+  // se declara para que la QA y el gate puedan verlo sin leer la prosa.
+  const partial = !!(cmp.availableFrom || cmp.endsBefore);
   // EL SIGNO ERA LO ÚNICO QUE IMPORTABA Y SE PERDÍA. `Math.abs` hacía que ir
   // 12 pp por detrás y 12 pp por delante imprimieran la MISMA frase, carácter
   // por carácter. Se dice la dirección con palabras —que es lo que el usuario
   // lee— y el valor absoluto acompaña; el signo crudo sigue en `data-diff-pp`
   // para la QA y el gate.
-  const diffTxt = (hasOther && Number.isFinite(cmp.diffPp))
-    ? (Math.abs(cmp.diffPp) < 0.01
+  // I.9 — TOLERANCIA DECLARADA, no un número suelto en una condición. Por
+  // debajo de ella la diferencia no es distinguible del redondeo de dos
+  // decimales con el que se publica, así que llamarla diferencia sería
+  // publicar ruido con signo.
+  const _bmName = _aurixCmpLabel(bm);
+  const diffTxt = (hasOther && Number.isFinite(cmp.diffPp) && _bmName)
+    ? (Math.abs(cmp.diffPp) < _AURIX_CMP_FLAT_PP
         ? _intv4T('cmp_diff_flat')
-        : _intv4T(cmp.diffPp > 0 ? 'cmp_diff_ahead' : 'cmp_diff_behind', _intv4Num(Math.abs(cmp.diffPp), 2)))
+        : _intv4T(cmp.diffPp > 0 ? 'cmp_diff_more' : 'cmp_diff_less',
+                  _intv4Num(Math.abs(cmp.diffPp), 2), _bmName))
     : '';
   const a11y = _intv4T('cmp_a11y', _intv4T('cmp_mine'),
-    bm ? _intv4T(bm.labelKey) : _intv4T('cmp_none'));
+    bm ? _aurixCmpLabel(bm) : _intv4T('cmp_none'));
   return `
     <section class="intcc-card intv14-cmp"
              data-state="${esc(cmp.state)}" data-range="${esc(st.range)}"
              data-benchmark="${esc(st.benchmarkId || '')}"
              data-return-type="${esc(cmp.returnType || '')}"
              data-fx="${esc(cmp.fxPair || '')}"
-             data-diff-pp="${esc(Number.isFinite(cmp.diffPp) ? String(cmp.diffPp) : '')}">
+             data-diff-pp="${esc(Number.isFinite(cmp.diffPp) ? String(cmp.diffPp) : '')}"
+             data-partial="${partial ? '1' : '0'}"
+             data-reason="${esc(cmp.reason || '')}">
       <h3 class="intcc-card-title">${esc(_intv4T('cmp_title'))}</h3>
       <div class="intv14-cmp-controls">
         <div class="intv14-cmp-ranges" role="group" aria-label="${esc(_intv4T('cmp_range_aria'))}">${rangeBtns}</div>
-        <label class="intv14-cmp-pick">
-          <span class="intv14-cmp-pick-label">${esc(_intv4T('cmp_with'))}</span>
-          <select class="intv14-cmp-select" data-cmp-select="1"
-                  aria-label="${esc(_intv4T('cmp_with'))}">${options}</select>
-        </label>
+        ${/* COMBOBOX ARIA, no un `<select>`: botón + panel `listbox`. El botón
+              anuncia estado y el panel es el único nodo con `role="listbox"`,
+              así que un lector de pantalla lo recorre como lo que es. */''}
+        <div class="intv14-cmp-pick">
+          <span class="intv14-cmp-pick-label" id="cmp-pick-lbl">${esc(_intv4T('cmp_with'))}</span>
+          ${/* EL PATRÓN ARIA VA SOBRE EL ELEMENTO QUE RECIBE EL FOCO.
+                Tenía `role="combobox"` el BOTÓN y `aria-activedescendant` el
+                buscador: la cadena combobox→listbox quedaba partida entre dos
+                nodos y ningún lector de pantalla garantiza anunciar la opción
+                resaltada. El botón pasa a ser lo que es —un disclosure— y el
+                combobox es el input, que es donde vive el foco al navegar. */''}
+          <button type="button" class="intv14-cmp-trigger" data-cmp-open="1"
+                  aria-haspopup="listbox" aria-expanded="false"
+                  aria-controls="intv14-cmp-panel" aria-labelledby="cmp-pick-lbl">
+            <span class="intv14-cmp-trigger-txt">${esc(bm ? _aurixCmpLabel(bm) : _intv4T('cmp_pick_none'))}</span>
+            <span class="intv14-cmp-trigger-caret" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </span>
+          </button>
+          <div class="intv14-cmp-panel" id="intv14-cmp-panel" data-cmp-panel="1" hidden>
+            <div class="intv14-cmp-panel-head">
+              <span class="intv14-cmp-panel-title">${esc(_intv4T('cmp_pick_title'))}</span>
+              <button type="button" class="intv14-cmp-panel-x" data-cmp-close="1"
+                      aria-label="${esc(_intv4T('cmp_pick_close'))}">✕</button>
+            </div>
+            <input type="search" class="intv14-cmp-search" data-cmp-search="1"
+                   role="combobox" aria-expanded="true" aria-autocomplete="list"
+                   aria-controls="intv14-cmp-list"
+                   autocomplete="off" spellcheck="false"
+                   placeholder="${esc(_intv4T('cmp_pick_search'))}"
+                   aria-label="${esc(_intv4T('cmp_pick_search'))}">
+            <ul class="intv14-cmp-list" id="intv14-cmp-list" role="listbox" data-cmp-list="1"
+                aria-label="${esc(_intv4T('cmp_pick_title'))}">${options}</ul>
+            <p class="intv14-cmp-noresult" data-cmp-empty="1" hidden>${esc(_intv4T('cmp_pick_empty'))}</p>
+          </div>
+        </div>
         ${st.benchmarkId ? `<button type="button" class="intv14-cmp-clear" data-cmp-clear="1">${
           esc(_intv4T('cmp_clear'))}</button>` : ''}
       </div>
-      <div class="intv14-cmp-plot">${_intv14CmpSvg(cmp.mine, hasOther ? cmp.other : null, { a11y })}</div>
+      ${/* I.7 — el plot es FOCALIZABLE para poder recorrerlo con el teclado, y
+            aloja el tooltip en coordenadas propias para poder voltearlo en los
+            extremos sin salirse. */''}
+      <div class="intv14-cmp-plot" data-cmp-plot="1" tabindex="0"
+           aria-label="${esc(a11y)}" aria-describedby="intv14-cmp-hint">${
+        _intv14CmpSvg(cmp.mine, hasOther ? cmp.other : null, { a11y })}
+        ${_intv14CmpAxisHtml(cmp.mine, hasOther ? cmp.other : null, esc)}
+        <div class="intv14-cmp-tip" data-cmp-tip="1" role="status" aria-live="polite" hidden></div>
+        ${/* La pista estaba en el diccionario y no la usaba nadie: quien tabula
+              hasta el gráfico no sabía que responde a flechas. Va enlazada por
+              `aria-describedby` y oculta a la vista. */''}
+        <span class="intcc-sr-only" id="intv14-cmp-hint">${esc(_intv4T('cmp_tip_hint'))}</span>
+      </div>
       <ul class="intv14-cmp-legend">
         <li class="intv14-cmp-key is-mine"><span class="intv14-cmp-swatch" aria-hidden="true"></span>${esc(_intv4T('cmp_mine'))}</li>
-        ${hasOther && bm ? `<li class="intv14-cmp-key is-other"><span class="intv14-cmp-swatch" aria-hidden="true"></span>${esc(_intv4T(bm.labelKey))}</li>` : ''}
+        ${hasOther && bm ? `<li class="intv14-cmp-key is-other"><span class="intv14-cmp-swatch" aria-hidden="true"></span>${esc(_aurixCmpLabel(bm))}</li>` : ''}
       </ul>
       ${diffTxt ? `<p class="intv14-cmp-diff">${esc(diffTxt)}</p>` : ''}
       ${insufficient ? `<p class="intv14-cmp-note">${esc(_intv4T('cmp_insufficient'))}</p>` : ''}
+      ${providerError ? `<p class="intv14-cmp-note is-error">${esc(_intv4T('cmp_provider_error'))}</p>` : ''}
       ${(!insufficient && cmp.availableFrom) ? `<p class="intv14-cmp-note">${
         esc(_intv4T('cmp_available_from', _intccDate(cmp.availableFrom)))}</p>` : ''}
       ${(!insufficient && cmp.endsBefore) ? `<p class="intv14-cmp-note">${
         esc(_intv4T('cmp_ends', _intccDate(cmp.endsBefore)))}</p>` : ''}
-      ${(hasOther && cmp.returnType === 'price_return') ? `<p class="intv14-cmp-note">${
-        esc(_intv4T('cmp_price_return'))}</p>` : ''}
+      ${/* I.9 — el disclosure lo elige la NATURALEZA del instrumento, no un
+            texto único. Fail-closed: un `kind` que no esté en el mapa cae en
+            la frase de precio, que es verdadera para cualquiera de ellos y no
+            afirma nada sobre dividendos. */''}
+      ${(hasOther && bm && cmp.returnType === 'price_return') ? `<p class="intv14-cmp-note">${
+        esc(_intv4T(_AURIX_CMP_DISCLOSURE[bm.kind] || 'cmp_disc_price'))}</p>` : ''}
     </section>`;
 }
 
@@ -64436,6 +65293,40 @@ function _renderIntelligenceCommandCenter() {
       _aurixIntelResolveCertified(_resolved, {});
     }
   } catch (_) {}
+  const radarHtml     = _intv7RadarHtml(esc);
+  // CHECKPOINT J — Explora se resuelve ANTES que Factores porque la limitación
+  // que Factores va a publicar no puede repetir una frase que Explora ya haya
+  // contestado en la misma pantalla. Las dos funciones son puras y no comparten
+  // estado, así que el orden de cálculo no cambia nada más.
+  const exploreHtml   = _intv4ExploreHtml(core, esc, intel);
+  // Cada limitación a su superficie, y ninguna dos veces: si Explora ya la ha
+  // contestado en esta misma pantalla, no se repite.
+  const _gaps = _aurixGapsBySurface(core);
+  Object.keys(_gaps).forEach((k) => { if (_gaps[k] && exploreHtml.indexOf(_gaps[k]) !== -1) _gaps[k] = ''; });
+  const driversHtml   = _intv5DriversHtml(snap, esc, _gaps.drivers);
+  // ESTRUCTURA se RETIRA de la presentación por decisión de producto: republicaba
+  // diversificación efectiva, equivalencia de posiciones y concentración principal,
+  // que ya publican Salud, Radar y Factores. `_intv5StructureHtml` y todo lo que la
+  // alimenta quedan INTACTOS —los consumen el motor y los gates—, así que esto es
+  // una retirada de superficie, no de dominio. La rejilla se recompone sola:
+  // `:not(:has(.intv5-structure)) .intv4-changed { grid-column: 1/13 }` ya existe.
+  const structureHtml = '';
+
+  // ── Row 3 — WHAT MATTERS TODAY · WEALTH MEMORY ──────────────────────────
+  // The drivers module already publishes the top-3 breakdown, so the Brief does
+  // not ALSO headline the concentration root: one phenomenon, one place.
+  const skipRoots = (driversHtml && /intcc-drv-row/.test(driversHtml)) ? [_AURIX_CAUSAL_ROOT.TOP_POSITION] : [];
+  // UNA SOLA SELECCIÓN, y de ella salen TODAS las exclusiones. Antes había cuatro
+  // derivaciones distintas de «lo que el Brief publica», todas con el orden del
+  // CORE mientras la card pinta con el orden del MOTOR: con límite 3 eso hacía que
+  // Memoria, Qué ha cambiado y Descubrimientos suprimieran un hecho que nadie
+  // estaba mostrando y republicaran otro que sí. Es exactamente la duplicación que
+  // estas superficies existen para evitar.
+  const mattersSel = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
+
+  // NOTA DE ORDEN — este bloque se resuelve aquí, antes del recuento, porque
+  // «Lo que importa hoy» necesita saber qué publica «Qué ha cambiado» para no
+  // repetirlo. Todas las funciones implicadas son puras.
   const findingCount = (typeof _intv4FindingRows === 'function') ? _intv4FindingRows(core).length : 0;
   const reading = _intv5Reading(core, score, snap, intel, findingCount);
   const chips   = _intv5Chips(core, score, intel);
@@ -64604,7 +65495,12 @@ function _renderIntelligenceCommandCenter() {
           <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
         </div>
         ${goodChips.length ? `<ul class="intcc-m-concl">
-          ${goodChips.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}
+          ${/* CHECKPOINT B · EL «✓» ES UNA CONFIRMACIÓN, ASÍ QUE SÓLO PUEDE
+                ACOMPAÑAR A UNA. Un limitador con marca de verificación decía
+                literalmente «confirmado: tu peso se reparte mal», que es la
+                contradicción de partida con otro disfraz. Cada tono trae su
+                propia marca y su propio color. */''}
+          ${goodChips.slice(0, 3).map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">${c.tone === 'good' ? '✓' : (c.tone === 'unknown' ? '·' : '!')}</span>${esc(c.label)}</li>`).join('')}
         </ul>` : ''}
         </div>
     </section>`;
@@ -64641,28 +65537,6 @@ function _renderIntelligenceCommandCenter() {
   //   ORIENTACIÓN (hero) → COMPRENSIÓN (radar) → DIAGNÓSTICO (factores) →
   //   EXPLORACIÓN (explora) → QUÉ IMPORTA → EVOLUCIÓN (memoria) → PROFUNDIDAD
   //   (estructura · cambios). The grid pins each slot; the mobile order mirrors it.
-  const radarHtml     = _intv7RadarHtml(esc);
-  const driversHtml   = _intv5DriversHtml(snap, esc);
-  const exploreHtml   = _intv4ExploreHtml(core, esc, intel);
-  // ESTRUCTURA se RETIRA de la presentación por decisión de producto: republicaba
-  // diversificación efectiva, equivalencia de posiciones y concentración principal,
-  // que ya publican Salud, Radar y Factores. `_intv5StructureHtml` y todo lo que la
-  // alimenta quedan INTACTOS —los consumen el motor y los gates—, así que esto es
-  // una retirada de superficie, no de dominio. La rejilla se recompone sola:
-  // `:not(:has(.intv5-structure)) .intv4-changed { grid-column: 1/13 }` ya existe.
-  const structureHtml = '';
-
-  // ── Row 3 — WHAT MATTERS TODAY · WEALTH MEMORY ──────────────────────────
-  // The drivers module already publishes the top-3 breakdown, so the Brief does
-  // not ALSO headline the concentration root: one phenomenon, one place.
-  const skipRoots = (driversHtml && /intcc-drv-row/.test(driversHtml)) ? [_AURIX_CAUSAL_ROOT.TOP_POSITION] : [];
-  // UNA SOLA SELECCIÓN, y de ella salen TODAS las exclusiones. Antes había cuatro
-  // derivaciones distintas de «lo que el Brief publica», todas con el orden del
-  // CORE mientras la card pinta con el orden del MOTOR: con límite 3 eso hacía que
-  // Memoria, Qué ha cambiado y Descubrimientos suprimieran un hecho que nadie
-  // estaba mostrando y republicaran otro que sí. Es exactamente la duplicación que
-  // estas superficies existen para evitar.
-  const mattersSel = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
   // ── §6 · COMPARADOR ──────────────────────────────────────────────────────
   // Se construye SÍNCRONO y con la serie propia solamente: `_aurixComparison`
   // es async por el benchmark, pero «Mi patrimonio» sale del índice que ya está
@@ -64679,7 +65553,7 @@ function _renderIntelligenceCommandCenter() {
       cmpHtml = _intv14ComparatorHtml(esc, _cmpSync);
     }
   } catch (_) { cmpHtml = ''; }
-  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap);
+  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap, _gaps.today);
   const publishedKeys = [];
   mattersSel.forEach(st => {
     publishedKeys.push(st.semanticKey);
@@ -64699,7 +65573,7 @@ function _renderIntelligenceCommandCenter() {
   const discFields = [];
   if (/declared_goal_distant_from_observed_structure/.test(discHtml)) discFields.push('primary_goal');
   if (/liquidity_fell_while_need_declared/.test(discHtml)) discFields.push('liquidity_need');
-  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys, intel, discFields);
+  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys, intel, discFields, _gaps.evolution);
   // M.04 · 0 — la Memoria se pinta antes, así que RECLAMA primero. Sus claves y
   // raíces viajan a Qué ha cambiado para que la misma verdad no ocupe las dos.
   const memoryClaims = _intv4MemoryClaims(core, publishedKeys);
@@ -64717,15 +65591,6 @@ function _renderIntelligenceCommandCenter() {
   // Data honesty stays available but does not occupy a permanent giant card: it
   // is a quiet line beside the disclaimer, and the Explore catalogue still offers
   // it as a full question when it is genuinely relevant.
-  const gaps = (core.dataAvailability && core.dataAvailability.gaps) || [];
-  const honestyLine = Array.from(new Set(gaps
-    .filter(g => g.status === _AURIX_FACT_STATUS.NOT_YET_SUPPORTED)
-    .map(g => _intv4T('intv4_gap_' + g.semanticKey))
-    .filter(Boolean)))
-    // Explora es una consulta INICIADA por el usuario y contesta con esta misma
-    // frase cuando la pregunta de calidad de datos entra en su rotación. Publicar
-    // las dos es la misma frase dos veces en una pantalla.
-    .filter(l => exploreHtml.indexOf(l) === -1)[0] || '';
 
   try {
     const shown = mattersSel.map(st => st.semanticKey);
@@ -64764,7 +65629,10 @@ function _renderIntelligenceCommandCenter() {
       ${discHtml}
       ${changedHtml}
       ${discoveryHtml}
-      <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}${honestyLine ? ` <span class="intv5-honesty">${esc(honestyLine)}</span>` : ''}</p>
+      ${/* CHECKPOINT J — el pie publica SÓLO la advertencia de producto. La
+            limitación técnica que colgaba aquí se ha ido a la card de Factores,
+            que es el análisis que limita. */''}
+      <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}</p>
     </div>`;
 }
 
@@ -64989,14 +65857,26 @@ function _initIntelligenceCommandCenter() {
     // Una sola generación viva: un cambio de selector cancela la anterior, así
     // que una respuesta lenta no puede pisar a una posterior.
     let _cmpSeq = 0;
+    // ── CHECKPOINT I.10 · CANCELAR, NO SÓLO DESCARTAR ─────────────────
+    // El guardia de secuencia ya impedía que una respuesta vieja pisara una
+    // selección nueva, pero la petición seguía viva: cambiar de comparador
+    // cinco veces dejaba cinco descargas compitiendo, y el usuario paga ese
+    // ancho de banda en móvil. Ahora la anterior se ABORTA, y el adaptador ya
+    // acepta `signal` —no hace falta ningún endpoint ni mecanismo nuevo—.
+    let _cmpAbort = null;
     const repaint = async () => {
       const seq = ++_cmpSeq;
+      try { if (_cmpAbort) _cmpAbort.abort(); } catch (_) {}
+      const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+      _cmpAbort = ctl;
       const host = document.querySelector('.intv14-cmp');
       if (!host) return;
       const st = _intv14CmpState();
       host.setAttribute('data-loading', '1');
+      host.setAttribute('aria-busy', 'true');
       let res = null;
-      try { res = await _aurixComparison(st.range, st.benchmarkId, {}); } catch (_) { res = null; }
+      try { res = await _aurixComparison(st.range, st.benchmarkId, { signal: ctl ? ctl.signal : undefined }); }
+      catch (_) { res = null; }
       if (seq !== _cmpSeq) return;                       // llegó tarde: se descarta
       const host2 = document.querySelector('.intv14-cmp');
       if (!host2) return;
@@ -65004,10 +65884,27 @@ function _initIntelligenceCommandCenter() {
       try {
         const html = _intv14ComparatorHtml(_intccEsc, res);
         if (!html) { host2.removeAttribute('data-loading'); return; }
+        // P1 · REEMPLAZAR EL NODO BORRABA EL FOCO. `replaceWith` destruye el
+        // control que el usuario acababa de accionar, y quitar del DOM el
+        // elemento enfocado devuelve el foco a `<body>`: con teclado o lector
+        // de pantalla se pierde la posición y hay que recorrer la página
+        // entera otra vez. Se anota QUÉ tenía el foco y se restituye en el
+        // nodo equivalente del árbol nuevo.
+        const act = document.activeElement;
+        const keep = (act && host2.contains(act))
+          ? (act.closest('[data-cmp-range]') ? '[data-cmp-range="' + act.getAttribute('data-cmp-range') + '"]'
+            : act.closest('[data-cmp-open]') ? '[data-cmp-open]'
+            : act.closest('[data-cmp-clear]') ? '[data-cmp-clear]'
+            : act.closest('[data-cmp-plot]') ? '[data-cmp-plot]' : null)
+          : null;
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
         const next = tmp.firstElementChild;
-        if (next) host2.replaceWith(next);
+        if (next) {
+          host2.replaceWith(next);
+          _cmpSyncLock();
+          if (keep) { const back = next.querySelector(keep); if (back) { try { back.focus(); } catch (_) {} } }
+        }
       } catch (_) { host2.removeAttribute('data-loading'); }
     };
     document.addEventListener('click', (e) => {
@@ -65036,6 +65933,276 @@ function _initIntelligenceCommandCenter() {
       // UN solo comparador a la vez: el estado guarda un id, no una lista.
       const id = v && _aurixCmpBenchmark(v) ? v : null;
       if (_intv14CmpSetState({ benchmarkId: id })) repaint();
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // CHECKPOINT I.3 · EL SELECTOR PROPIO
+    // ══════════════════════════════════════════════════════════════════
+    // Delegación en el documento, una sola vez, igual que el resto de esta
+    // superficie. No hay listeners por opción: 54 instrumentos serían 54
+    // suscripciones que habría que limpiar en cada repintado.
+    const _cmpPanel = () => document.querySelector('[data-cmp-panel]');
+    const _cmpTrigger = () => document.querySelector('[data-cmp-open]');
+    const _cmpOpts = () => Array.prototype.slice.call(
+      document.querySelectorAll('[data-cmp-opt]:not([hidden])'));
+    function _cmpSetActive(el) {
+      _cmpOpts().forEach(o => o.classList.remove('is-active'));
+      if (!el) return;
+      el.classList.add('is-active');
+      // `aria-activedescendant` y no foco real: el foco se queda en el
+      // buscador para poder seguir escribiendo mientras se navega la lista.
+      const inp = document.querySelector('[data-cmp-search]');
+      if (inp) inp.setAttribute('aria-activedescendant', el.id || '');
+      if (el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest' }); } catch (_) {} }
+    }
+    // P1 · EL BLOQUEO DE SCROLL NO PUEDE SOBREVIVIR A LA CARD QUE LO PUSO.
+    // La hoja se cierra con `_cmpClose`, pero la pestaña se repinta por otros
+    // caminos (`_aurixIntelCtxPull`, cambios de contexto) que sustituyen el
+    // HTML entero sin pasar por aquí: el panel desaparecía y
+    // `html.aurix-cmp-open` se quedaba puesto, dejando la página con
+    // `overflow: hidden` hasta recargar. La clase se retira siempre que su
+    // panel ya no esté en el DOM.
+    function _cmpSyncLock() {
+      try {
+        const p = document.querySelector('[data-cmp-panel]');
+        if (!p || p.hidden) document.documentElement.classList.remove('aurix-cmp-open');
+      } catch (_) {}
+    }
+    function _cmpClose(focusBack) {
+      const p = _cmpPanel(), tr = _cmpTrigger();
+      if (!p || p.hidden) return;
+      p.hidden = true;
+      if (tr) { tr.setAttribute('aria-expanded', 'false'); if (focusBack) tr.focus(); }
+      document.documentElement.classList.remove('aurix-cmp-open');
+    }
+    function _cmpOpen() {
+      const p = _cmpPanel(), tr = _cmpTrigger();
+      if (!p || !tr) return;
+      p.hidden = false;
+      tr.setAttribute('aria-expanded', 'true');
+      // Sólo en móvil, donde el panel es una hoja: evita el scroll de fondo
+      // MIENTRAS está abierta, y se retira al cerrar (el SPEC lo pide por su
+      // nombre). En escritorio la clase no hace nada.
+      document.documentElement.classList.add('aurix-cmp-open');
+      const inp = p.querySelector('[data-cmp-search]');
+      if (inp) { inp.value = ''; _cmpFilter(''); try { inp.focus(); } catch (_) {} }
+      _cmpSetActive(_cmpOpts()[0] || null);
+    }
+    function _cmpFilter(q) {
+      const term = String(q || '').trim().toLowerCase();
+      const p = _cmpPanel(); if (!p) return;
+      let visible = 0;
+      Array.prototype.slice.call(p.querySelectorAll('[data-cmp-opt]')).forEach((o) => {
+        // Por NOMBRE y por SÍMBOLO, que es lo que el SPEC pide. Los dos van
+        // ya en minúsculas en el DOM para no recalcularlos en cada tecla.
+        const hit = !term || (o.getAttribute('data-name') || '').indexOf(term) !== -1
+                          || (o.getAttribute('data-sym') || '').indexOf(term) !== -1;
+        o.hidden = !hit; if (hit) visible++;
+      });
+      // Una cabecera de grupo sin opciones visibles es ruido: se esconde.
+      Array.prototype.slice.call(p.querySelectorAll('.intv14-cmp-optgroup')).forEach((g) => {
+        let n = g.nextElementSibling, any = false;
+        while (n && !n.classList.contains('intv14-cmp-optgroup')) {
+          if (n.hasAttribute('data-cmp-opt') && !n.hidden) { any = true; break; }
+          n = n.nextElementSibling;
+        }
+        g.hidden = !any;
+      });
+      const empty = p.querySelector('[data-cmp-empty]');
+      if (empty) empty.hidden = visible > 0;
+      _cmpSetActive(_cmpOpts()[0] || null);
+    }
+    function _cmpChoose(id) {
+      const valid = id && _aurixCmpBenchmark(id) ? id : null;
+      _aurixCmpPushRecent(valid);
+      _cmpClose(true);
+      if (_intv14CmpSetState({ benchmarkId: valid })) repaint();
+    }
+    document.addEventListener('click', (e) => {
+      const t = e.target; if (!t || !t.closest) return;
+      if (t.closest('[data-cmp-open]')) {
+        e.preventDefault();
+        const p = _cmpPanel();
+        if (p && p.hidden) _cmpOpen(); else _cmpClose(true);
+        return;
+      }
+      if (t.closest('[data-cmp-close]')) { e.preventDefault(); _cmpClose(true); return; }
+      const opt = t.closest('[data-cmp-opt]');
+      if (opt) { e.preventDefault(); _cmpChoose(opt.getAttribute('data-cmp-opt')); return; }
+      // CLIC FUERA: cierra. Se comprueba contra el contenedor entero para que
+      // pulsar dentro del panel (buscador incluido) no lo cierre.
+      const p = _cmpPanel();
+      if (p && !p.hidden && !t.closest('.intv14-cmp-pick')) _cmpClose(false);
+    });
+    document.addEventListener('input', (e) => {
+      const inp = e.target && e.target.closest ? e.target.closest('[data-cmp-search]') : null;
+      if (inp) _cmpFilter(inp.value);
+    });
+
+    // ══════════════════════════════════════════════════════════════════
+    // CHECKPOINT I.7 · TOOLTIP INSTITUCIONAL
+    // ══════════════════════════════════════════════════════════════════
+    // Lee POR ÍNDICE sobre las series ya alineadas, así que las dos cifras
+    // salen SIEMPRE del mismo bucket certificado: no hay ninguna ruta por la
+    // que pueda mezclar dos fechas. Y no calcula nada: la rentabilidad
+    // acumulada de un índice base 100 es `valor − 100`, que es aritmética de
+    // presentación sobre un dato ya certificado, no un motor nuevo.
+    let _tipIdx = -1, _tipPinned = false;
+    const _tipPlot = () => document.querySelector('[data-cmp-plot]');
+    function _tipData(plot) {
+      const svg = plot && plot.querySelector('.intv14-cmp-svg');
+      if (!svg) return null;
+      try {
+        return { svg,
+          geo: JSON.parse(svg.getAttribute('data-cmp-geo') || 'null'),
+          pts: JSON.parse(svg.getAttribute('data-cmp-series') || 'null') };
+      } catch (_) { return null; }
+    }
+    function _tipHide() {
+      const plot = _tipPlot(); if (!plot) return;
+      _tipIdx = -1; _tipPinned = false;
+      const tip = plot.querySelector('[data-cmp-tip]'); if (tip) tip.hidden = true;
+      ['[data-cmp-guide]', '[data-cmp-dot="mine"]', '[data-cmp-dot="other"]']
+        .forEach(sel => { const n = plot.querySelector(sel); if (n) n.setAttribute('hidden', ''); });
+    }
+    function _tipShow(i) {
+      const plot = _tipPlot(); const d = _tipData(plot);
+      if (!plot || !d || !d.geo || !Array.isArray(d.pts) || !d.pts.length) return;
+      const idx = Math.max(0, Math.min(d.pts.length - 1, i));
+      _tipIdx = idx;
+      const [ts, mv, ov] = d.pts[idx];
+      const g = d.geo;
+      const X = g.PAD_X + ((ts - g.t0) / Math.max(1, g.t1 - g.t0)) * (g.W - g.PAD_X * 2);
+      const Y = (v) => g.PAD_Y + (1 - (v - g.lo) / Math.max(1e-9, g.hi - g.lo)) * (g.H - g.PAD_Y * 2);
+      const guide = plot.querySelector('[data-cmp-guide]');
+      if (guide) { guide.setAttribute('x1', X); guide.setAttribute('x2', X); guide.removeAttribute('hidden'); }
+      const dm = plot.querySelector('[data-cmp-dot="mine"]');
+      if (dm) { dm.setAttribute('cx', X); dm.setAttribute('cy', Y(mv)); dm.removeAttribute('hidden'); }
+      const doo = plot.querySelector('[data-cmp-dot="other"]');
+      if (doo) {
+        if (ov == null) doo.setAttribute('hidden', '');
+        else { doo.setAttribute('cx', X); doo.setAttribute('cy', Y(ov)); doo.removeAttribute('hidden'); }
+      }
+      const tip = plot.querySelector('[data-cmp-tip]'); if (!tip) return;
+      const bm = _aurixCmpBenchmark(_intv14CmpState().benchmarkId);
+      // El índice es base 100, así que la rentabilidad acumulada es `v − 100`.
+      // El signo se imprime aparte para que el separador decimal del locale lo
+      // ponga `_intv4Num` sobre la MAGNITUD y no sobre un número con signo.
+      const retOf = (v) => Math.round((v - 100) * 100) / 100;
+      const fmtRet = (v) => (retOf(v) >= 0 ? '+' : '−') + _intv4Num(Math.abs(retOf(v)), 2) + ' %';
+      const rows = ['<span class="intv14-cmp-tip-when">' + _intccEsc(_intccDate(ts)) + '</span>',
+        '<span class="intv14-cmp-tip-row"><em>' + _intccEsc(_intv4T('cmp_tip_mine'))
+          + '</em><b>' + _intccEsc(fmtRet(mv)) + '</b></span>'];
+      if (ov != null && bm) {
+        rows.push('<span class="intv14-cmp-tip-row"><em>' + _intccEsc(_aurixCmpLabel(bm))
+          + '</em><b>' + _intccEsc(fmtRet(ov)) + '</b></span>');
+        // LA DIFERENCIA VA EN PUNTOS PORCENTUALES Y CON SIGNO. Nunca en %.
+        //
+        // ── EL CERO NO TIENE SIGNO ─────────────────────────────────────
+        // Con `dpp` en (−0,005, 0) se imprimía «−0,00 puntos porcentuales»
+        // mientras la frase de debajo decía «ambas rentabilidades fueron
+        // equivalentes»: dos lecturas distintas del mismo instante, y una de
+        // ellas afirmando una dirección que no existe. El cero se normaliza
+        // con LA MISMA tolerancia financiera que gobierna esa frase
+        // (`_AURIX_CMP_FLAT_PP`), no con un redondeo aparte.
+        const dppRaw = retOf(mv) - retOf(ov);
+        const dpp = (Math.abs(dppRaw) < _AURIX_CMP_FLAT_PP) ? 0 : dppRaw;
+        const dppTxt = (dpp === 0)
+          ? _intv4T('cmp_tip_pp', _intv4Num(0, 2))
+          : ((dpp > 0 ? '+' : '−') + _intv4T('cmp_tip_pp',
+              _intv4Num(Math.abs(Math.round(dpp * 100) / 100), 2)));
+        rows.push('<span class="intv14-cmp-tip-row is-diff"><em>' + _intccEsc(_intv4T('cmp_tip_diff'))
+          + '</em><b>' + _intccEsc(dppTxt) + '</b></span>');
+      }
+      tip.innerHTML = rows.join('');
+      tip.hidden = false;
+      // NO SE SALE, Y NO TAPA EL PUNTO. Se coloca al lado contrario del cursor
+      // dentro del propio plot, que es el sistema de coordenadas que controla.
+      const frac = X / g.W;
+      tip.classList.toggle('is-right', frac > 0.5);
+      tip.style.left = (frac > 0.5 ? '' : (frac * 100).toFixed(2) + '%');
+      tip.style.right = (frac > 0.5 ? ((1 - frac) * 100).toFixed(2) + '%' : '');
+    }
+    function _tipFromClientX(plot, clientX) {
+      const d = _tipData(plot); if (!d || !d.geo || !Array.isArray(d.pts) || !d.pts.length) return;
+      const r = plot.getBoundingClientRect();
+      if (!(r.width > 0)) return;
+      const g = d.geo;
+      const vx = ((clientX - r.left) / r.width) * g.W;
+      const ts = g.t0 + ((vx - g.PAD_X) / Math.max(1, g.W - g.PAD_X * 2)) * (g.t1 - g.t0);
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < d.pts.length; i++) {
+        const dd = Math.abs(d.pts[i][0] - ts);
+        if (dd < bd) { bd = dd; best = i; }
+      }
+      _tipShow(best);
+    }
+    document.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;                 // el dedo tiene su propio contrato
+      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+      if (!plot) return;
+      _tipFromClientX(plot, e.clientX);
+    });
+    document.addEventListener('pointerleave', (e) => {
+      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+      if (plot && !_tipPinned) _tipHide();
+    }, true);
+    // TOQUE · el primer toque FIJA el punto; el segundo fuera lo retira. El
+    // gesto VERTICAL no se captura —`touch-action: pan-y` deja que la página
+    // siga desplazándose—, así que leer el gráfico no impide hacer scroll.
+    document.addEventListener('touchstart', (e) => {
+      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+      if (!plot) { if (_tipPinned) _tipHide(); return; }
+      const tch = e.touches && e.touches[0]; if (!tch) return;
+      _tipPinned = true;
+      _tipFromClientX(plot, tch.clientX);
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!_tipPinned) return;
+      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+      const tch = e.touches && e.touches[0];
+      if (plot && tch) _tipFromClientX(plot, tch.clientX);
+    }, { passive: true });
+    // TECLADO · el plot es focalizable y se recorre con las flechas.
+    document.addEventListener('keydown', (e) => {
+      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+      if (!plot) return;
+      const d = _tipData(plot); if (!d || !Array.isArray(d.pts) || !d.pts.length) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); _tipShow(_tipIdx < 0 ? 0 : _tipIdx + 1); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); _tipShow(_tipIdx < 0 ? d.pts.length - 1 : _tipIdx - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); _tipShow(0); }
+      else if (e.key === 'End') { e.preventDefault(); _tipShow(d.pts.length - 1); }
+      else if (e.key === 'Escape') { e.preventDefault(); _tipHide(); }
+    });
+    document.addEventListener('focusout', (e) => {
+      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+      if (plot && !_tipPinned) _tipHide();
+    });
+    document.addEventListener('keydown', (e) => {
+      const p = _cmpPanel();
+      const inPick = e.target && e.target.closest && e.target.closest('.intv14-cmp-pick');
+      if (!p || p.hidden) {
+        // Abrir con teclado desde el disparador: patrón combobox estándar.
+        if (inPick && e.target.closest('[data-cmp-open]')
+            && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault(); _cmpOpen();
+        }
+        return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); _cmpClose(true); return; }
+      if (!inPick) return;
+      const opts = _cmpOpts();
+      if (!opts.length) return;
+      const cur = opts.indexOf(p.querySelector('[data-cmp-opt].is-active'));
+      if (e.key === 'ArrowDown') { e.preventDefault(); _cmpSetActive(opts[Math.min(opts.length - 1, cur + 1)]); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); _cmpSetActive(opts[Math.max(0, cur - 1)]); }
+      else if (e.key === 'Home') { e.preventDefault(); _cmpSetActive(opts[0]); }
+      else if (e.key === 'End') { e.preventDefault(); _cmpSetActive(opts[opts.length - 1]); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        const a = p.querySelector('[data-cmp-opt].is-active');
+        if (a) _cmpChoose(a.getAttribute('data-cmp-opt'));
+      }
     });
     _intv14CmpRepaint = repaint;
   }
@@ -75806,6 +76973,16 @@ const _AURIX_ENT_CANON_EXTRA = Object.freeze([
   'intelligence.full',            // toda la seccion Intelligence
   'premium.settings',             // gestion del plan
   'workspace.catalog_preview',    // vista de inventario interno (solo founder)
+  // ── CHECKPOINT I.2 · EL COMPARADOR, POR ENTITLEMENT ─────────────────────
+  // El canary era `localStorage`, y eso no es un canary: es por navegador, no
+  // sobrevive a cambiar de dispositivo y cualquiera puede escribirlo desde la
+  // consola. Pasa al MISMO mecanismo server-side que ya usa
+  // `workspace.catalog_preview`: ninguna fila de plan la concede (`allowed =
+  // false`), así que la única via es un override explicito, y el resolver la
+  // recoge sola porque deriva sus claves de `plan_features`.
+  // Consecuencia buscada: se deriva del usuario AUTENTICADO, viaja entre
+  // dispositivos y un usuario Free no puede encenderla tocando el cliente.
+  'intelligence.comparator',      // comparador de rentabilidad (solo founder)
 ]);
 const _AURIX_ENT_CANON = Object.freeze(
   Array.from(new Set(

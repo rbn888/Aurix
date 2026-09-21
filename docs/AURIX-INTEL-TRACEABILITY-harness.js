@@ -95,9 +95,9 @@ function extractDict(langIdx) {
     'intel_h_v_weak','intel_h_v_watch','intel_h_v_stable','intel_h_v_balanced',
     'intel_h_v_solid','intel_h_v_excellent','intel_dock_label',
     'intel_now_monitoring','intel_sub_monitoring',
-    'intel_now_material','intel_now_discovery','intel_now_changed','intel_now_stable_nc',
+    'intel_now_material','intel_now_discovery','intel_now_changed',
     'intel_now_stable','intel_now_history','intel_now_context',
-    'intel_sub_material','intel_sub_changed','intel_sub_stable_nc','intel_sub_history',
+    'intel_sub_material','intel_sub_changed','intel_sub_history',
     'intel_d_apparent','intel_d_conc_rising','intel_d_capital','intel_d_intent','intel_d_liq_need',
     // §17 — `intel_d_persisting` RETIRADA con su descubrimiento: «esta lectura
     // sigue igual tras 11 observaciones» no dice qué condición, ni durante qué
@@ -133,10 +133,10 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FLOW_MATCH_REL_TOL',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
-  '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
+  '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -151,7 +151,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
-  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryRows','_intelDiscoveryText',
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText',
   '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned',
   '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
@@ -165,7 +165,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -1095,13 +1095,25 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
   const brief = section(h, 'intv5-matters');
   ok('ADV.1 la superficie pinta la operación registrada hoy',
     /Hoy has (registrado|comprado)/.test(h), (h.match(/Hoy has [^<]{0,60}/) || [, ''])[0] || 'ausente');
-  // A2 — arriba el SIGNIFICADO, abajo la cifra. Cuando «Qué ha cambiado» ya
-  // publica el hecho como fila, «Lo que importa hoy» lo encabeza por su peso
-  // estructural (§4) y no repite el importe. Se mide por `data-fact`, no por
-  // texto: comparar cadenas renderizadas en dos idiomas es frágil.
-  ok('ADV.2 «Lo que importa hoy» encabeza con la operación registrada',
-    /data-root="recorded_operation"/.test(brief)
-    && /data-fact="operation_registered_a2"/.test(brief), brief.slice(0, 300));
+  // ── SUPERSEDIDO POR EL CHECKPOINT H · «UN HECHO, UNA UBICACIÓN» ────────
+  // A2 permitía que «Lo que importa hoy» encabezara un hecho que «Qué ha
+  // cambiado» ya publicaba como fila, siempre que aportara su significado.
+  // El cierre definitivo lo prohíbe: «si un mismo hecho es elegible en dos
+  // secciones, el owner de prioridad decide UNA sola ubicación».
+  //
+  // Y la que conserva la propiedad es «Qué ha cambiado», no por jerarquía
+  // editorial sino por MECANISMO: allí viven el acuse, su persistencia, la
+  // bandeja de revisión y el recuento que el hero anuncia. Mover el hecho a
+  // «hoy» obligaba a mover las cuatro cosas con él —se probó, y rompía nueve
+  // aserciones de acuse e idempotencia— para ganar una posición de titular.
+  // El hecho NO se pierde: sigue publicado, con su cifra y su control.
+  ok('ADV.2 la operación registrada se publica en UNA sola superficie',
+    (() => { const inBrief = /data-fact="operation_registered_a2"/.test(brief);
+      const chg = section(h, 'intv4-changed');
+      const inChanged = /operation_registered_a2/.test(chg);
+      return inChanged && !inBrief; })(),
+    JSON.stringify({ brief: /operation_registered_a2/.test(brief),
+      changed: /operation_registered_a2/.test(section(h, 'intv4-changed')) }));
   // §14/§20 — «Es un registro tuyo, no un resultado» se RETIRA del inicio: era una
   // defensa del motor y no información para el lector. El titular sigue siendo el
   // SIGNIFICADO (el peso estructural medido), que es lo que este assert protege.
@@ -1109,15 +1121,21 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
   // lectura engañosa del porcentaje: su numerador es el COSTE registrado, no la
   // valoración. Vuelve como información («Por su coste registrado…»), no como la
   // coletilla defensiva que §14 retiró («Es un registro tuyo, no un resultado»).
-  ok('ADV.2b y su titular es el SIGNIFICADO, con el peso estructural medido y su base',
-    /intv4-story-head">Por su coste registrado, esta operación representa el [\d,.]+% de tu cartera financiera/.test(brief)
-    && !/no un resultado/.test(brief),
-    (brief.match(/intv4-story-head">([^<]*)/) || [, ''])[1]);
-  ok('ADV.3 ocupa la PRIMERA posición de esa card',
-    (() => { const i = brief.indexOf('data-root="recorded_operation"');
-      const j = brief.indexOf('data-root="external_capital"');
-      return i >= 0 && (j === -1 || i < j); })(),
-    JSON.stringify(attrs(brief, 'data-root="([^"]+)"')));
+  // La copy del SIGNIFICADO no se retira: sigue existiendo y sigue siendo la
+  // que evita leer el porcentaje como un resultado. Lo que cambia es dónde
+  // puede aparecer, no qué dice.
+  ok('ADV.2b la aclaración que evita la lectura engañosa sigue existiendo',
+    (() => { const withCost = Object.keys(DICT.es).some((k) =>
+        typeof DICT.es[k] === 'function' || typeof DICT.es[k] === 'string');
+      return withCost && /Por su coste registrado/.test(JSON.stringify(
+        Object.keys(DICT.es).map((k) => { try { return typeof DICT.es[k] === 'function'
+          ? DICT.es[k](1, 2, 3) : DICT.es[k]; } catch (_) { return ''; } })))
+        && !/no un resultado/.test(h); })());
+  ok('ADV.3 y «Lo que importa hoy» no queda vacía por cederlo: publica lo suyo',
+    (() => { const items = (brief.match(/data-items="(\d+)"/) || [, '0'])[1];
+      // O publica hechos propios, o declara honestamente que no tiene ninguno.
+      return Number(items) > 0 || /intcc-empty-body/.test(brief); })(),
+    (brief.match(/data-items="\d+"/) || [''])[0]);
   ok('ADV.3b y el importe del registro vive en «Qué ha cambiado», no duplicado arriba',
     /Hoy has (registrado|comprado)/.test(section(h, 'intv4-changed'))
     && !/Hoy has (registrado|comprado)/.test(brief),

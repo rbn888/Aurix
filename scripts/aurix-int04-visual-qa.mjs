@@ -61,6 +61,17 @@ function dict(langIdx){
     'healthScoreExplainHigh','intcc_band_empty','intcc_eyebrow','intcc_radar_title','intcc_drivers_title',
     'intcc_drv_explain_asset','intcc_drv_explain_cash','intcc_drv_kind_eng','intcc_drv_kind_liq',
     'intcc_drv_none','intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
+    // CIERRE DEFINITIVO — el limitador de Salud, el disclosure por naturaleza
+    // del comparador y la copy de su selector y su tooltip.
+    'intcc_chip_limit_spread','intcc_chip_nodata',
+    'cmp_title','cmp_with','cmp_none','cmp_clear','cmp_mine','cmp_a11y','cmp_insufficient',
+    'cmp_no_return','cmp_available_from','cmp_ends','cmp_range_aria','cmp_provider_error','cmp_loading',
+    'cmp_range_24h','cmp_range_7d','cmp_range_30d','cmp_range_90d','cmp_range_1y','cmp_range_all',
+    'cmp_b_sp500','cmp_b_ndx100','cmp_b_btc','cmp_b_gold','cmp_diff_more','cmp_diff_less','cmp_diff_flat',
+    'cmp_disc_index','cmp_disc_equity','cmp_disc_price','cmp_pick_none','cmp_pick_search','cmp_pick_close',
+    'cmp_pick_empty','cmp_pick_recent','cmp_pick_title','cmp_g_index','cmp_g_etf','cmp_g_stock',
+    'cmp_g_crypto','cmp_g_metal','cmp_kind_index','cmp_kind_etf','cmp_kind_stock','cmp_kind_crypto',
+    'cmp_kind_metal','cmp_tip_mine','cmp_tip_diff','cmp_tip_pp',
     'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
     'intcc_read_balanced','intcc_sub_attention','intcc_sub_concentrated','intcc_sub_growing',
     'intcc_sub_healthy','intcc_sub_balanced',
@@ -91,15 +102,15 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_REGISTERED_OP_KINDS','_AURIX_REGISTERED_OP_BATCH_MIN','_AURIX_RANK_WEIGHTS',
   '_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
-  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_AURIX_CMP_FLAG_KEY','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_AURIX_AI_COVERAGE','_AURIX_AI_AVAIL','_AURIX_AI_LABEL','_AURIX_INTEL_HEALTH_BANDS','_INTV5_TIER'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
+  '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER','_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_DISC_MAX','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_AURIX_CMP_FLAG_KEY','_AURIX_CMP_FLAT_PP','_AURIX_CMP_DISCLOSURE','ASSET_DB','_AURIX_CMP_KIND_OF','_AURIX_CMP_US_ETFS','_AURIX_CMP_USD_INDICES','_AURIX_CMP_GROUPS','_AURIX_CMP_RECENT_KEY','_AURIX_CMP_RECENT_MAX','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_PROVIDER_REASONS','_AURIX_CMP_PROVIDER_RANGE','_AURIX_CMP_RANGES','_AURIX_CMP_STATE_KEY','_AURIX_AI_COVERAGE','_AURIX_AI_AVAIL','_AURIX_AI_LABEL','_AURIX_INTEL_HEALTH_BANDS','_INTCC_HEALTH_DIM_LABEL','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_intelCoherentState','_intelDiscoveryText','_intelQuestionText','_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryDeclared','_aurixIntelRootsOf','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowDuplicateIds','_aurixFlowUnpairableDerived','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_intv4FindingRows','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
   'assetValueUSD','_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
   '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain','_aurixInvestablePerformance',
   '_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct','_aurixCatHistWindow',
   '_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification','_aurixIntelDispersion','_aurixIntelHealth','_aurixFactLedger',
   '_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged',
-  '_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc',
+  '_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthLimiters','_intccHealthScore','_intccClamp','_intccEsc',
   '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml','_intv4ChangedRef','_intv4ChangedHtml',
   '_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml','_intv4QualityHtml',
@@ -107,8 +118,8 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // INT.05 — restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_aurixPctNum','_aurixPctLabel','_intccPctLabel','_aurixPeakRetention','_intccHydrationPending','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixFlowCounterpartObserved','_aurixFlowRowFromLocal','_aurixCmpEnabled','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize','_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState','_intv14CmpSvg','_intv14ComparatorHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
-  '_renderIntelligenceCommandCenter','_intv7PendingReasonKey','_intv5MattersStories','_intv9DiscoveriesHtml','_intv4MemoryRows'];
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_aurixPctNum','_aurixPctLabel','_intccPctLabel','_aurixPeakRetention','_intccHydrationPending','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixFlowCounterpartObserved','_aurixFlowRowFromLocal','_aurixCmpEnabled','_aurixCmpResolvableUSD','_aurixCmpFromRegistry','_aurixCmpProviderRange','_aurixCmpLabel','_aurixCmpRecent','_aurixCmpPushRecent','_aurixCmpFxFor','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize','_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState','_intv14CmpAxisHtml','_intv14CmpSvg','_intv14ComparatorHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
+  '_renderIntelligenceCommandCenter','_intv7PendingReasonKey','_intv5MattersStories','_intv9DiscoveriesHtml','_intv4MemoryDiversify','_intv4MemoryRows'];
 
 function srvRow(ts, cats){ let tot=0; for(const k in cats) tot+=cats[k];
   return { ts, total_value_usd:+tot.toFixed(2), real_estate: cats.real_estate||0, category_values: Object.assign({},cats) }; }
@@ -156,8 +167,17 @@ function buildHtml(lang) {
     setItem:(k,v)=>{ sb.__store[k]=String(v); }, removeItem:k=>{ delete sb.__store[k]; } };
   sb._aurixCapitalFlowsComplete = () => true;
   vm.runInContext('var _aurixLineageColumnSeen = true;', sb);
-  CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
+  // LAS FUNCIONES PRIMERO: `_AURIX_CMP_CATALOG` se DERIVA del registro de
+  // Market llamando a `_aurixCmpFromRegistry()` en su propia definición, así
+  // que declarar las constantes antes reventaba con «is not defined».
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
+  CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
+  // EL PRESENTE DE LA FIXTURE. «Lo que importa hoy» mide la actualidad contra
+  // un reloj (checkpoint F), y esta sonda ancla sus filas a una constante: sin
+  // fijarlo, sus hechos serían de hace más de un año y la card saldría vacía.
+  // Va DESPUÉS de inyectar las funciones, o la definición real lo pisaría.
+  vm.runInContext('_aurixNow = function () { return '
+    + (sb.__rows[sb.__rows.length - 1].ts + 3600e3) + '; };', sb);
   vm.runInContext("__store[_AURIX_CAPITAL_FLOWS_KEY] = " + JSON.stringify(JSON.stringify(
     [{ id:'d1', ts:T0+1.5*DAY, amountUSD:400, kind:'deposit', source:'user' }])), sb);
   vm.runInContext("__store[_AURIX_LINEAGE_KEY] = " + JSON.stringify(JSON.stringify(

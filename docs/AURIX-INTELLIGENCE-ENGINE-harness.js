@@ -734,7 +734,10 @@ const _touchedExisting = (head) => {
 // `.intcc-tl-item.is-declared …` es un selector COMPUESTO que exige una clase
 // NUEVA: no puede alterar el render de un item de memoria existente, así que es
 // scoping y no modificación. Se lista aparte para que quede explícito.
-const NEW_SCOPED = ['.intcc-tl-item.is-declared'];
+// `.intcc-sr-only` es una utilidad NUEVA —texto sólo para lector de pantalla,
+// que la pista de teclado del gráfico necesita—: no existía y no altera el
+// render de nada heredado.
+const NEW_SCOPED = ['.intcc-tl-item.is-declared', '.intcc-sr-only'];
 // La serie de prefijos siguió creciendo: `intv12-` son las clases NUEVAS del
 // contador trazable (el enlace al destino, la card de pregunta y el control
 // «Entendido»). Reconocerlas aquí no relaja nada: siguen siendo clases propias
@@ -1613,8 +1616,9 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
   ok('U.23 las cuatro superficies reciben el motor desde el renderer',
     (() => { const r = fnSrc('_renderIntelligenceCommandCenter');
       return /_intv4ExploreHtml\(core, esc, intel\)/.test(r)
-        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap\)/.test(r)
-        && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields\)/.test(r)
+        // CHECKPOINT J — las dos reciben además la limitación que les toca.
+        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap, _gaps\.today\)/.test(r)
+        && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields, _gaps\.evolution\)/.test(r)
         && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
 }
 
@@ -1706,7 +1710,12 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
     ({ f: { semanticKey: 'k' + i, window: { endAt: e }, causalRoot: 'wealth_level' }, txt: 'E' + i }));
   sb4._intv4WhyText = () => '';
   vm.runInContext(fnSrc('_intv4T') + '\n' + fnSrc('_intv4MemoryDeclared')
-    + '\n' + fnSrc('_aurixFactPeriodDegraded') + '\n' + fnSrc('_aurixFactPeriodNamedAs') + '\n' + fnSrc('_intv4MemoryRows') + '\nglobalThis.ROWS = _intv4MemoryRows;', sb4);
+    + '\n' + fnSrc('_aurixFactPeriodDegraded') + '\n' + fnSrc('_aurixFactPeriodNamedAs')
+    // CHECKPOINT G — la diversificación por ventana vive en su propia función y
+    // necesita su catálogo: sin él, `_intv4MemoryRows` revienta en el sandbox.
+    + '\n' + (src.match(/const _INTV4_MEMORY_WINDOW_ORDER[\s\S]*?\);/) || [''])[0]
+    + '\n' + fnSrc('_intv4MemoryDiversify')
+    + '\n' + fnSrc('_intv4MemoryRows') + '\nglobalThis.ROWS = _intv4MemoryRows;', sb4);
   const ctx9 = { context: { fields: {
     primary_goal: { value: 'grow', provenance: 'user_answer', answeredAt: 5000 },
     horizon: { value: 'long', provenance: 'user_answer', answeredAt: 100 } } } };
