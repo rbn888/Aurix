@@ -21696,6 +21696,193 @@ body.gs-open { overflow: hidden; }
   .wsh-fp-node { animation: none !important; opacity: 1 !important; }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE OPERATIVO · §1/§3 — LA BARRA DE CABECERA COMPARTIDA
+   ════════════════════════════════════════════════════════════════════════════
+   LO QUE SUSTITUYE, con la medida que lo justifica: ocho copias de una TARJETA
+   de presentación (`.wsh-card.wsb-header`) con el retorno en su propia línea, un
+   `<h2>` de 22px, un subtítulo descriptivo y a veces una nota y un chip de plan.
+   En 390×844 eran 117–152 px de cabecera y 244 px hasta el primer campo editable;
+   en Objetivos la acción de crear caía en 862 px, fuera de pantalla.
+
+   Esto es una BARRA, no una tarjeta: sin cristal, sin borde y sin los 18 px de
+   `padding` del panel. El retorno conserva sus 44 px táctiles aunque se lea
+   discreto, y el título baja a la banda que pide §3 (21 px móvil / 26 px
+   escritorio), no por debajo.
+
+   CSS ACOTADO A WORKSPACE a propósito (`.aurix-wsh` como raíz): `wsh-bar-*` no
+   puede alcanzar ninguna otra sección aunque el nombre se repitiera. */
+.aurix-wsh .wsh-bar {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  padding: 2px 2px 0; min-height: 44px;
+}
+.aurix-wsh .wsh-bar-back {
+  font: inherit; cursor: pointer; flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 3px;
+  /* 44 px de alto REAL, no de apariencia: el objetivo táctil no se negocia
+     aunque el control se lea secundario (§3). */
+  min-height: 44px; padding: 0 12px 0 8px;
+  font-size: 13px; font-weight: 600; color: #aecbff;
+  border-radius: 999px; background: rgba(74,130,240,0.10);
+  border: 1px solid rgba(74,130,240,0.28);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.aurix-wsh .wsh-bar-back:hover { background: rgba(74,130,240,0.20); color: #cfe0ff; border-color: rgba(74,130,240,0.5); }
+.aurix-wsh .wsh-bar-back:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+.aurix-wsh .wsh-bar-chev { font-size: 17px; line-height: 1; margin-top: -2px; }
+.aurix-wsh .wsh-bar-backtxt { white-space: nowrap; }
+.aurix-wsh .wsh-bar-id { flex: 1 1 auto; min-width: 0; }
+.aurix-wsh .wsh-bar-title {
+  margin: 0; font-size: 21px; font-weight: 700; line-height: 1.2;
+  letter-spacing: -0.01em; color: var(--text-bright, #fff);
+  overflow-wrap: anywhere;
+}
+/* EL NOMBRE DEL DOCUMENTO, DISTINGUIBLE DEL TIPO DE PLANTILLA (§1). Va debajo del
+   título, en otro peso y otro color, y con su punto azul: «Mi plan 2030» no se
+   puede confundir con «Interés compuesto». 12,5 px y no 11: es información
+   necesaria —saber QUÉ documento se está editando— y §3 prohíbe 11 px para eso. */
+.aurix-wsh .wsh-bar-doc {
+  display: flex; align-items: center; gap: 6px;
+  margin: 1px 0 0; font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  color: rgba(159,194,255,0.92);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.aurix-wsh .wsh-bar-doc::before {
+  content: ''; flex: 0 0 auto; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--aurix-blue, #4A82F0); box-shadow: 0 0 6px rgba(74,130,240,0.55);
+}
+/* ── LA AYUDA: `<details>` NATIVO ──────────────────────────────────────────
+   Subtítulo, notas de permanencia y supuestos siguen publicados; dejan de ocupar
+   la pantalla. Es un `<details>`, así que funciona con teclado y lo anuncia el
+   lector de pantalla sin que este bloque escriba un solo manejador nuevo.
+   El cuerpo se posiciona sobre la barra (no empuja el contenido) y tiene su
+   propio scroll: una ayuda larga no puede volver a mover la primera pantalla. */
+.aurix-wsh .wsh-bar-help { flex: 0 0 auto; position: static; }
+.aurix-wsh .wsh-bar-helpsum {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  /* El objetivo táctil llega a 44 px por el área extendida, sin agrandar el
+     círculo visible — el mismo patrón que ya usa `.wsh-pin`. */
+  position: relative; cursor: pointer; list-style: none;
+  font-size: 14px; font-weight: 700; color: #aecbff;
+  border-radius: 50%; background: rgba(74,130,240,0.10);
+  border: 1px solid rgba(74,130,240,0.28);
+}
+.aurix-wsh .wsh-bar-helpsum::-webkit-details-marker { display: none; }
+.aurix-wsh .wsh-bar-helpsum::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
+.aurix-wsh .wsh-bar-helpsum:hover { background: rgba(74,130,240,0.20); color: #cfe0ff; }
+.aurix-wsh .wsh-bar-helpsum:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+.aurix-wsh .wsh-bar-help[open] .wsh-bar-helpsum { background: rgba(74,130,240,0.24); color: #e6efff; }
+.aurix-wsh .wsh-bar-helpbody {
+  position: absolute; z-index: 6; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: 46vh; overflow: auto; -webkit-overflow-scrolling: touch;
+  padding: 14px 16px; border-radius: 14px;
+  border: 1px solid rgba(74,130,240,0.30);
+  /* Fondo OPACO: una ayuda translúcida sobre campos deja el texto de detrás
+     medio visible y se lee como un fallo de pintado, no como un panel. */
+  background: #121a2c;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.44);
+}
+.aurix-wsh .wsh-bar-helpbody p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.5; color: rgba(214,226,255,0.88); }
+.aurix-wsh .wsh-bar-helpbody p:last-child { margin-bottom: 0; }
+@media (min-width: 1024px) {
+  .aurix-wsh .wsh-bar { gap: 14px; padding-top: 4px; }
+  .aurix-wsh .wsh-bar-title { font-size: 26px; }
+  .aurix-wsh .wsh-bar-doc { font-size: 13.5px; }
+  .aurix-wsh .wsh-bar-helpbody { left: auto; width: min(520px, 100%); }
+}
+/* Por debajo de 380 px el destino del retorno se lee en el `aria-label`: el
+   chevron solo conserva los 44 px y deja el ancho al título. */
+@media (max-width: 379px) {
+  .aurix-wsh .wsh-bar-backtxt { display: none; }
+  .aurix-wsh .wsh-bar-back { padding: 0 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurix-wsh .wsh-bar-back { transition: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WORKSPACE OPERATIVO · §3 — SUELO DE LEGIBILIDAD Y DE TOQUE, ACOTADO A WORKSPACE
+   ════════════════════════════════════════════════════════════════════════════
+   RE-DECIDE el suelo de 11 px que fijó el bloque de polish: §3 lo sube a 12 px
+   para «información necesaria», y una etiqueta de KPI, el estado de un cobro o el
+   tipo de una operación lo son — son lo que da sentido a la cifra de al lado. El
+   suelo anterior no era un error, era otro criterio; éste lo sustituye y sólo
+   dentro de Workspace, que es el alcance del bloque.
+
+   Y el suelo TÁCTIL: `.wsh-cta` medía 29 px de alto siendo la acción PRIMARIA
+   (Guardar, Crear objetivo, Añadir operación). Los controles de icono no crecen
+   —eso rompería las filas que habitan— sino que extienden su área de toque a
+   44 px con un pseudoelemento, que es el patrón que `.wsh-pin` ya usaba. */
+.aurix-wsh .wstool-res-label,
+.aurix-wsh .wstool-res-orient,
+.aurix-wsh .wstool-res-k,
+.aurix-wsh .wsloan-hero-lbl,
+.aurix-wsh .wsloan-kpi-k,
+.aurix-wsh .wsloan-insights-t,
+.aurix-wsh .wsre-sum-vlbl,
+.aurix-wsh .wsre-kpi-k,
+.aurix-wsh .wsre-card-city,
+.aurix-wsh .wsre-type-chip,
+.aurix-wsh .wsre-form-sec-t,
+.aurix-wsh .wsre-subkpi i,
+.aurix-wsh .wsrecv-kpi-k,
+.aurix-wsh .wsrecv-sumbar-lbl,
+.aurix-wsh .wsrecv-overdue-badge,
+.aurix-wsh .wsrecv-status,
+.aurix-wsh .wsjrn-type-chip,
+.aurix-wsh .wsjrn-row i,
+.aurix-wsh .wsb-impact-label,
+.aurix-wsh .wsb-impact-pct,
+.aurix-wsh .wsb-impact-pct.is-na,
+.aurix-wsh .wsb-row.is-cause b,
+.aurix-wsh .wsrecv-amt i,
+.aurix-wsh .wsjrn-ccy,
+.aurix-wsh .wsb-pill,
+.aurix-wsh .wsbud-chart-title,
+.aurix-wsh .wstool-ms-title,
+.aurix-wsh .wsg-pv-title,
+.aurix-wsh .wsg-savestate,
+.aurix-wsh .wsb-disclaimer,
+.aurix-wsh .wsp-leg {
+  font-size: 12px;
+}
+/* Las que llevaban `letter-spacing` amplio necesitan recuperar el ancho que les
+   quita el punto de más: se ajusta el espaciado, no se baja el tamaño. */
+.aurix-wsh .wsre-type-chip,
+.aurix-wsh .wsjrn-type-chip,
+.aurix-wsh .wsb-pill,
+.aurix-wsh .wsrecv-status { letter-spacing: 0.02em; }
+/* La acción primaria de una superficie es un objetivo táctil de pleno derecho. */
+.aurix-wsh .wsh-cta {
+  min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+}
+.aurix-wsh .wsh-cta.is-primary { display: inline-flex; }
+.aurix-wsh .wsg-text, .aurix-wsh .wsg-select { min-height: 44px; }
+/* 16 px es la REFERENCIA de §3 para texto operativo e inputs, no sólo el umbral
+   de zoom de iOS: el owner compartido que evita ese zoom es mobile-only, así que
+   en escritorio los campos de Workspace se quedaban en 14–15 px. Se igualan. */
+.aurix-wsh .ws4-num, .aurix-wsh .wsg-text, .aurix-wsh .wsg-select,
+.aurix-wsh .wsjrn-select { font-size: 16px; }
+/* Iconos de acción: el círculo visible no crece, el área sí. */
+.aurix-wsh .wsre-mini, .aurix-wsh .wsh-scard-x { position: relative; }
+.aurix-wsh .wsre-mini::after, .aurix-wsh .wsh-scard-x::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
+/* Los tres subtotales del inmobiliario, en fila: apilados gastaban 72 px. Misma
+   lección que arriba: `minmax(0,1fr)`, o la celda no encoge y se sale. */
+.aurix-wsh .wsre-subkpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.aurix-wsh .wsre-subkpi { min-width: 0; }
+.aurix-wsh .wsre-subkpi b { font-size: 13px; overflow-wrap: anywhere; }
+/* Y el mismo `minmax(0,·)` en las otras rejillas que este bloque puso en fila. */
+.aurix-wsh .wsjrn-sum-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.aurix-wsh .wsjrn-sum-grid > * { min-width: 0; }
+.aurix-wsh .wstool-res-v, .aurix-wsh .wsre-kpi-v, .aurix-wsh .wsrecv-kpi-v { overflow-wrap: anywhere; }
+
 /* ── WS.2 — Scenario Builder (inside Workspace, wsb-* namespace) ── */
 .wsb-header { position: relative; }
 .wsb-back {
@@ -21963,7 +22150,9 @@ body.gs-open { overflow: hidden; }
 .wsb-impact-cap { font-size: 12px; color: var(--text-muted); margin-left: auto; }
 
 @media (max-width: 720px) {
-  .wsg-form { grid-template-columns: 1fr; }
+  /* WORKSPACE OPERATIVO §2 — seis campos apilados eran 433 px y dejaban la
+     acción de crear en 791 px, fuera de pantalla. */
+  .wsg-form { grid-template-columns: 1fr 1fr; }
   .wsg-grid { grid-template-columns: 1fr; }
   .wsg-create-body { grid-template-columns: 1fr; }
   .wsg-form-preview { position: static; }
@@ -22196,8 +22385,11 @@ body.gs-open { overflow: hidden; }
 .wsjrn-card-acts { display: flex; align-items: center; gap: 7px; margin-top: 2px; }
 @media (max-width: 720px) {
   .wsjrn-form-grid { grid-template-columns: 1fr 1fr; }
-  .wsjrn-sum-grid { grid-template-columns: 1fr; }
-  .wsjrn-summary .wstool-res-final { font-size: 38px; }
+  /* WORKSPACE OPERATIVO §2 — eran TRES cifras apiladas: 212 px de resumen que
+     empujaban el registro de operaciones a 662 px, fuera de la primera pantalla.
+     Caben en fila; lo que sobraba era el apilado, no el dato. */
+  .wsjrn-sum-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .wsjrn-summary .wstool-res-final { font-size: 34px; }
 }
 @media (max-width: 640px) {
   .wsjrn-list { grid-template-columns: 1fr; }
@@ -22489,10 +22681,25 @@ body.gs-open { overflow: hidden; }
 .wspv-re-tpl .wspv-re-eq { font-size: 15px; }
 @media (max-width: 920px) { .wsre-grid { grid-template-columns: repeat(2, 1fr); } .wsre-form-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) {
-  .wsre-kpis { grid-template-columns: 1fr; }
+  /* WORKSPACE OPERATIVO §2 — el resumen medía 619 px y el inventario empezaba en
+     777: había que desplazarse para ver el primer inmueble de la cartera. Los tres
+     KPI caben en fila sin tocar ninguna cifra, pero `1fr` NO es `minmax(0,1fr)`:
+     con el mínimo automático la celda se niega a encoger por debajo de su
+     contenido y la tercera se salía de la tarjeta. Lo destapó la captura, no la
+     medida de «¿cabe?» — por eso la sonda pasa a preguntar por desbordamiento de
+     fila e intersección entre celdas. */
+  /* DOS columnas, no tres: con importes largos (355.000,00 US$) las tres celdas
+     de 105 px partían el número a mitad de dígito —«355.00 / 0,00 US / $»— y
+     recortaban la etiqueta de la tercera. Un número partido es un número mal
+     leído, así que la densidad se cobra en filas, no en legibilidad: 156 px
+     frente a los 231 px del apilado, y cada cifra entera en una línea. */
+  .wsre-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .wsre-kpi:nth-child(3) { grid-column: 1 / -1; }
+  .wsre-kpi { padding: 12px 13px; }
+  .wsre-kpi-v { font-size: clamp(16px, 4.6vw, 21px); }
   .wsre-grid { grid-template-columns: 1fr; }
   .wsre-form-grid { grid-template-columns: 1fr 1fr; }
-  .wsre-detail-kpis { grid-template-columns: 1fr; }
+  .wsre-detail-kpis { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
 
 /* ════════ WS.12 (v2) — Workspace Operating System ═══════════════════════════ */
@@ -22752,7 +22959,7 @@ body.gs-open { overflow: hidden; }
 .wsre-form-section:first-of-type { border-top: 0; padding-top: 4px; }
 .wsre-form-sec-t { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(224,177,92,0.85); margin-bottom: 10px; }
 .wsre-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-@media (max-width: 640px) { .wsre-form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .wsre-form-grid { grid-template-columns: 1fr 1fr; } }
 
 /* ════════ WS.15 — Asset Price Tracker (petrol-blue trading table) ═══════════ */
 .wstool-result.wsap-result { grid-template-columns: 1.1fr 1.4fr; gap: 16px; }
@@ -27272,10 +27479,16 @@ input.ws4-num.is-invalid {
 /* La apreciación latente se lee atenuada: es real, pero no está cobrada. */
 .wsre-layer.is-latent { background: var(--elev-1); }
 .wsre-layer.is-latent i, .wsre-layer.is-latent b { color: rgba(198,214,246,0.60); }
+/* DOS COLUMNAS SÓLO CUANDO CABEN. Se probaron desde 360 px y el resultado fue el
+   defecto que la captura destapó: «Resultado operativo» y su importe chocaban con
+   la columna de al lado, porque `space-between` no encoge nada — reparte. Con
+   importes largos (545.000,00 US$) una capa necesita la fila entera. */
 @media (min-width: 560px) {
   .wsre-layers { grid-template-columns: 1fr 1fr; }
   .wsre-layer.is-total { grid-column: 1 / -1; }
 }
+.wsre-layer { min-width: 0; }
+.wsre-layer i, .wsre-layer b { min-width: 0; overflow-wrap: anywhere; }
 
 /* ════════════════════════════════════════════════════════════════════════════
    WORKSPACE COMPLETION · SUPUESTOS, PARÁMETROS Y ESTADO DE GUARDADO
@@ -27352,6 +27565,8 @@ input.ws4-num.is-invalid {
 .wsb-params-grid {
   display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px;
 }
+/* Dos columnas ya en móvil: tres campos apilados eran 218 px de editor. */
+.wsb-params-grid { grid-template-columns: 1fr 1fr; }
 @media (min-width: 560px) { .wsb-params-grid { grid-template-columns: repeat(3, 1fr); } }
 .wsb-note.is-warn {
   margin-top: 10px; padding: 9px 11px; border-radius: 10px;
@@ -27522,6 +27737,21 @@ input.ws4-num.is-invalid {
 .wsbud-split .wstool-res-v, .wstool-res-split.is-quad .wstool-res-v {
   font-size: clamp(14px, 4.2vw, 19px);
 }
+/* ── LA EXCEPCIÓN DEL RESUMEN DEL DIARIO, Y POR QUÉ ES UNA EXCEPCIÓN ────────
+   La regla de arriba fija `nowrap` a propósito: una cifra no se parte nunca, y si
+   no cupiera se vería desbordar para que la sonda lo cazara. Aquí la celda no
+   contiene una cifra sino DOS TOKENS —«NVDA +31,9%», el activo y su
+   rentabilidad— y en una columna de 106 px se salía de la tarjeta. Se permite el
+   salto POR EL ESPACIO que ya existe entre ellos (`break-word`), no dentro del
+   número: la razón de la regla se conserva, su literalidad no. */
+.wsjrn-sum-grid .wstool-res-v {
+  white-space: normal; overflow-wrap: break-word;
+  font-size: clamp(14px, 4.2vw, 19px);
+}
+/* Y la misma excepción en Préstamos, por la misma razón: la cuota y los KPI
+   llevan cifra + unidad («1.122,61 US$») y en 390 px se salían 10 px de su caja
+   con `nowrap`. Parten por el espacio, nunca dentro del número. */
+.wsloan-hero-v, .wsloan-kpi-v { white-space: normal; overflow-wrap: break-word; }
 /* La cifra grande de un resultado tiene su propio tamaño y su propia caja: se
    escala igual, con su rango. */
 .wstool-res-final {

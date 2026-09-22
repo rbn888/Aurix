@@ -834,9 +834,20 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     ok('M3.8 el cover reutiliza un asset YA existente de esa plantilla (no se añade ninguno)',
       /realestate:\s+'realestate_apartment'/.test(app) &&
       fs.existsSync(path.join(root, 'assets/workspace/realestate_apartment.webp')));
-    ok('M3.9 ninguna cabecera de herramienta pinta un "Pro" decorativo',
-      !/wsh-pro-badge/.test(app) &&
-      /_wsTierChip\('tpl_realestate'\)/.test(app) && /_wsTierChip\('loan_simulation'\)/.test(app));
+    // RE-DECIDIDO (WORKSPACE OPERATIVO §1). Esto exigía que las cabeceras de
+    // Préstamos y Portfolio inmobiliario pintaran el chip del CATÁLOGO, y era la
+    // forma correcta de cerrar el "Pro" decorativo que el founder reportó. §1
+    // retira el chip de las cabeceras enteras: dentro de la capacidad el usuario
+    // ya tiene el derecho, así que la etiqueta no informa. Lo que M3.9 protegía
+    // —que nadie invente una etiqueta de plan— se comprueba ahora más fuerte:
+    // cero "Pro" en todo el bundle, cero chips en las ocho cabeceras, y el owner
+    // que sabe pintarlos sigue leyendo el catálogo y no un literal.
+    ok('M3.9 ninguna cabecera de herramienta afirma un plan: ni "Pro" ni chip',
+      !/wsh-pro-badge/.test(app)
+      && ['_renderLoanTool', '_renderRealEstateTool', '_renderCompoundTool', '_renderBudgetTool',
+          '_renderJournalTool', '_renderReceivablesTool', '_renderScenarioBuilder', '_renderGoals']
+         .every(fn => !/_wsSurfaceHeadHtml\([\s\S]{0,300}(_wsTierChip|wsh-tier|wstier_premium)/.test(fnSource(fn)))
+      && /_wsCommercialLabel\(entry\)/.test(fnSource('_wsTierChip')));
     ok('M3.10 y la etiqueta que pinta esa cabecera es la REAL del catálogo',
       free._wsCommercialLabel(e) === 'Premium' &&
       free._wsCommercialLabel(free._wsCatalogEntry('loan_simulation')) === 'Premium');

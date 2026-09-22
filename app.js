@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '699'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '700'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6195,6 +6195,16 @@ const T = {
     wsback_internal:      'Volver a Interno',
     wsback_templates:     'Volver a Plantillas',
     wsback_space:         'Volver a Mi espacio',
+    // Reservado y traducido: el retorno al Dashboard existe como destino desde el
+    // día que el Dashboard abra una capacidad. Hoy nadie fija ese origen.
+    wsback_dashboard:     'Volver al Dashboard',
+    // La etiqueta CORTA de la barra compacta. La larga sigue siendo la accesible.
+    wsback_s_tools:       'Herramientas',
+    wsback_s_internal:    'Interno',
+    wsback_s_templates:   'Plantillas',
+    wsback_s_space:       'Mi espacio',
+    wsback_s_dashboard:   'Dashboard',
+    wsh_help_aria:        'Ayuda y supuestos',
     wstool_back:          'Volver a Herramientas',
     // ── §4 · EL ESTADO DE GUARDADO, SIN AFIRMAR LO QUE NO SE PUEDE DEMOSTRAR ──
     // Hay DOS estados de éxito porque son dos hechos distintos, y llamar
@@ -6403,6 +6413,7 @@ const T = {
     wsrecv_kpi_collected:'Cobrado',
     wsrecv_kpi_overdue: 'Vencido',
     wsrecv_list_title:  'Pendientes',
+    wsjrn_list_title:   'Operaciones',
     wsrecv_total:       'Total',
     wsrecv_paid:        'Pagado',
     wsrecv_pending:     'Pendiente',
@@ -6561,6 +6572,7 @@ const T = {
     wsre_sec_financing: 'Financiación',
     wsre_sec_notes:     'Notas',
     wsre_back_portfolio:'Volver a la cartera',
+    wsre_back_s_portfolio:'Cartera',
     wsre_d_finance:     'Resumen financiero',
     wsre_d_gross:       'Rentabilidad bruta',
     wsre_d_roi:         'ROI simple',
@@ -8931,6 +8943,13 @@ const T = {
     wsback_internal:      'Back to Internal',
     wsback_templates:     'Back to Templates',
     wsback_space:         'Back to My space',
+    wsback_dashboard:     'Back to Dashboard',
+    wsback_s_tools:       'Tools',
+    wsback_s_internal:    'Internal',
+    wsback_s_templates:   'Templates',
+    wsback_s_space:       'My space',
+    wsback_s_dashboard:   'Dashboard',
+    wsh_help_aria:        'Help and assumptions',
     wstool_back:          'Back to Tools',
     wsfc_eyebrow:      'WORKSPACE',
     wsfc_title:        'Turn your numbers into a plan',
@@ -9115,6 +9134,7 @@ const T = {
     wsrecv_kpi_collected:'Collected',
     wsrecv_kpi_overdue: 'Overdue',
     wsrecv_list_title:  'Receivables',
+    wsjrn_list_title:   'Trades',
     wsrecv_total:       'Total',
     wsrecv_paid:        'Paid',
     wsrecv_pending:     'Pending',
@@ -9265,6 +9285,7 @@ const T = {
     wsre_sec_financing: 'Financing',
     wsre_sec_notes:     'Notes',
     wsre_back_portfolio:'Back to portfolio',
+    wsre_back_s_portfolio:'Portfolio',
     wsre_d_finance:     'Financial summary',
     wsre_d_gross:       'Gross yield',
     wsre_d_roi:         'Simple ROI',
@@ -20605,9 +20626,88 @@ let _wsReturnTab = 'tools'; // WS.14A — tab to return to from a tool/app/view 
 // había salido. El destino YA se sabía (`_wsReturnTab`, que lo fija quien abre);
 // lo único que faltaba era que la etiqueta lo leyera.
 function _wsBackLabel() {
-  const tab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools';
-  const k = tab === 'space' ? 'wsback_space' : tab === 'templates' ? 'wsback_templates' : tab === 'internal' ? 'wsback_internal' : 'wsback_tools';
+  const o = _wsBackOrigin();
+  const k = o === 'space' ? 'wsback_space' : o === 'templates' ? 'wsback_templates'
+    : o === 'internal' ? 'wsback_internal' : o === 'dashboard' ? 'wsback_dashboard' : 'wsback_tools';
   return t(k) || t('wstool_back');
+}
+// ── EL ORIGEN DEL RETORNO, Y POR QUÉ NO ES `_wsReturnTab` A SECAS ───────────
+// `_wsReturnTab` sólo sabe de PESTAÑAS de Workspace, y la SPEC pide dejar
+// preparado el retorno al Dashboard sin construir todavía su sección. Así que el
+// origen se resuelve en UN sitio y admite un valor que no es una pestaña.
+// Hoy nadie escribe `'dashboard'`: es el punto de enganche declarado, no una
+// rama muerta escondida — cuando el Dashboard abra una capacidad, basta con que
+// fije `_wsReturnTab = 'dashboard'` y el retorno ya sabe a dónde ir y cómo se
+// llama en los dos idiomas.
+const _WS_BACK_ORIGINS = Object.freeze(['space', 'templates', 'tools', 'internal', 'dashboard']);
+function _wsBackOrigin() {
+  const o = String(_wsReturnTab || '');
+  return _WS_BACK_ORIGINS.indexOf(o) !== -1 ? o : 'tools';
+}
+// La etiqueta CORTA, que es la que cabe en una barra compacta. La larga sigue
+// siendo la accesible (`aria-label`): un lector de pantalla oye «Volver a
+// Herramientas», no «Herramientas» suelto.
+function _wsBackShort() {
+  const o = _wsBackOrigin();
+  const k = o === 'space' ? 'wsback_s_space' : o === 'templates' ? 'wsback_s_templates'
+    : o === 'internal' ? 'wsback_s_internal' : o === 'dashboard' ? 'wsback_s_dashboard' : 'wsback_s_tools';
+  return t(k) || _wsBackLabel();
+}
+// El NOMBRE del documento abierto, que no es el nombre de la plantilla. Vacío
+// mientras no se ha guardado nada: una simulación sin guardar no tiene nombre y
+// fingir uno haría creer que ya está a salvo.
+function _wsToolDocName() {
+  if (!_wsToolEditId) return '';
+  try { const p = _ws4Projects().find(x => x && x.id === _wsToolEditId); return (p && p.customName) || ''; }
+  catch (_) { return ''; }
+}
+// ════════════════════════════════════════════════════════════════════════════
+// LA CABECERA DE UNA SUPERFICIE DE WORKSPACE, EN UN SOLO SITIO
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE HABÍA: ocho copias de la misma tarjeta `.wsh-card.wsb-header` —botón de
+// retorno en su propia línea, `<h2>` de 22px, subtítulo descriptivo y a veces una
+// nota y un chip de plan—, y justo debajo un `<header class="wsh-head">` con el
+// título de sección repetido («DATOS DE ENTRADA» bajo «Interés compuesto»). Medido
+// en 390×844: 117 px de cabecera, 244 px hasta el primer campo editable, y en
+// Objetivos la acción de crear caía en 862 px, fuera de pantalla. El usuario
+// atravesaba una presentación para llegar a la herramienta que ya había elegido.
+//
+// AHORA es una BARRA funcional: retorno discreto (44 px táctiles, etiqueta corta
+// y `aria-label` completo), título compacto, nombre del documento cuando lo hay, y
+// las acciones que la superficie necesite.
+//
+// LO QUE NO SE PIERDE, y por eso no es un recorte: subtítulo, notas y supuestos
+// siguen publicados en una ayuda desplegable —un `<details>` nativo, alcanzable
+// con teclado y anunciado por lector de pantalla—. Se retira sólo lo que era
+// EVIDENTE (el título de sección repetido) y lo que era decorativo (el chip
+// «Premium» dentro de una capacidad a la que el usuario ya ha entrado: si está
+// dentro, ya tiene el derecho, así que el chip no informa de nada).
+function _wsSurfaceHeadHtml(o) {
+  const esc = _intccEsc;
+  o = o || {};
+  const doc = o.doc ? String(o.doc) : '';
+  const help = (o.help || []).filter(x => typeof x === 'string' && x.trim());
+  // El retorno por defecto es el del origen real. Una vista ANIDADA (el detalle de
+  // un inmueble vuelve a su portfolio, no a Herramientas) declara el suyo, y lo
+  // hace por esta puerta para que no aparezca un segundo botón de retorno con otro
+  // aspecto — que es como empezaron las ocho cabeceras que este bloque unifica.
+  const backAttr = o.backAttr || 'data-wsh-nav="back"';
+  const backTxt  = o.backText || _wsBackShort();
+  const backAria = o.backAria || _wsBackLabel();
+  return `
+    <header class="wsh-bar">
+      <button type="button" class="wsh-bar-back" ${backAttr} aria-label="${esc(backAria)}">
+        <span class="wsh-bar-chev" aria-hidden="true">‹</span><span class="wsh-bar-backtxt">${esc(backTxt)}</span>
+      </button>
+      <div class="wsh-bar-id">
+        <h2 class="wsh-bar-title">${esc(o.title || '')}</h2>
+        ${doc ? `<p class="wsh-bar-doc">${esc(doc)}</p>` : ''}
+      </div>
+      ${help.length ? `<details class="wsh-bar-help">
+        <summary class="wsh-bar-helpsum" aria-label="${esc(t('wsh_help_aria'))}"><span aria-hidden="true">?</span></summary>
+        <div class="wsh-bar-helpbody" role="note">${help.map(h => `<p>${esc(h)}</p>`).join('')}</div>
+      </details>` : ''}
+    </header>`;
 }
 // WS.6 — Compound Growth tool working state.
 // WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
@@ -20903,7 +21003,13 @@ function _wshWireOnce() {
       return;
     }
     // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
-    if (nav === 'back') { _wshView = 'home'; _ws4ActiveId = null; _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome(); return; }
+    if (nav === 'back') {
+      _wshView = 'home'; _ws4ActiveId = null;
+      // El retorno al DASHBOARD está preparado y es el mismo owner: no hay un
+      // segundo camino de vuelta que mantener. Hoy nadie fija este origen.
+      if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; try { switchTab('dashboard'); } catch (_) { _wshRepaintHome(); } return; }
+      _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome(); return;
+    }
     if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; _wshRepaintHome(); return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
     if (t.hasAttribute('data-wstool-saveas')) { _wsToolSaveAs(); return; }
@@ -21872,6 +21978,14 @@ function _wsAppIdentity(id) { return _WS_APP_IDENTITY[id] || { type: 'app', cate
 // registro de identidad queda como dato descriptivo heredado SIN autoridad: ya no
 // decide ni la etiqueta ni el gate.
 function _wsToolTier(id) { return _wsCommercialTierClass(_wsCatalogEntry(id)); }
+// ── SIN LLAMADOR DESDE «WORKSPACE OPERATIVO», Y A PROPÓSITO ────────────────
+// Sus dos consumidores eran las cabeceras de Préstamos y Portfolio inmobiliario,
+// y §1 retira el chip de ahí: dentro de una capacidad abierta el usuario ya tiene
+// el derecho, así que «Premium» no informaba de nada — sólo gastaba una línea.
+// La función se conserva porque es el ÚNICO owner que sabe pintar un chip de plan
+// leyendo el catálogo, y su contrato está anclado (M9): si mañana vuelve a hacer
+// falta un chip en alguna superficie, el camino correcto ya existe y no se
+// reinventa con un literal «Pro» como el que M3.9 vino a cerrar.
 function _wsTierChip(id) {
   const entry = _wsCatalogEntry(id);
   const tier = _wsCommercialTierClass(entry);
@@ -22952,9 +23066,11 @@ function _renderScenarioBuilder() {
   const spreadPct = cmp.pctApplicable && baseProj > 0 ? Math.round(spread / baseProj * 100) : null;
   const impactHtml = `
     <section class="wsh-card wsb-impact is-feature" data-wsb-impact>${_wsbImpactInnerHtml(cmp)}
-    </section>
-    ${/* §C — LOS CONTROLES, VISIBLES AL ENTRAR. Base, horizonte y tasa son comunes
-          a la comparación, así que viven arriba y no dentro de cada tarjeta. */''}
+    </section>`;
+  // §C — LOS CONTROLES, VISIBLES AL ENTRAR. Base, horizonte y tasa son comunes a
+  // la comparación, así que viven arriba y no dentro de cada tarjeta. Ahora,
+  // además, van ANTES del impacto: el editor es lo primero que se alcanza.
+  const paramsHtml = `
     <section class="wsh-card wsb-params">
       <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_params_title'))}</h3></header>
       <div class="wsb-params-grid">
@@ -22976,12 +23092,15 @@ function _renderScenarioBuilder() {
 
   return `
     <div class="aurix-wsh wsh-sb is-revealed" data-wsh-view="scenario">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wsb_title'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wsb_subtitle'))}</p>
-      </section>
+      ${_wsSurfaceHeadHtml({ title: t('wsb_title'), help: [t('wsb_subtitle')] })}
 
+      ${/* ── EL EDITOR PRIMERO, LA LECTURA DESPUÉS ────────────────────────────
+            Los parámetros comunes (base, horizonte, tasa) son lo que el usuario
+            viene a mover, y estaban DEBAJO de la tarjeta de impacto: había que
+            cruzar una conclusión para poder cambiar la hipótesis que la produce.
+            Los escenarios de ejemplo siguen donde estaban — son ejemplos, no el
+            editor, y §2 pide que no lo sustituyan. */''}
+      ${paramsHtml}
       ${impactHtml}
 
       ${AURIX_WS_USE_REAL_DATA ? `<section class="wsh-card wsb-current">
@@ -24066,9 +24185,9 @@ function _renderGoals() {
         <div class="wsg-form">
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="${esc(_wsFormatInputNumber(100000))}" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="${esc(_wsFormatInputNumber(0))}" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="${esc(_wsFormatInputNumber(300))}" min="0" step="50"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
         </div>
         <aside class="wsg-form-preview">
@@ -24112,18 +24231,23 @@ function _renderGoals() {
       </div>`;
   }).join('') : `<p class="wsh-empty">${esc(t('wsg_empty'))}</p>`;
 
-  return `
-    <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wsg_title'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wsg_subtitle'))}</p>
-      </section>
-      ${createCard}
+  // ── LO QUE YA EXISTE VA PRIMERO ───────────────────────────────────────────
+  // El formulario de creación abría la pantalla SIEMPRE, así que quien ya tenía
+  // objetivos debía cruzar un formulario entero para ver y editar los suyos —y la
+  // acción «Crear» caía en 862 px, fuera de pantalla—. Con objetivos, la lista
+  // manda y el formulario va detrás; sin objetivos, el formulario ES la pantalla y
+  // la tarjeta de lista vacía no se pinta (repetiría con otras palabras lo que el
+  // propio formulario ya está diciendo).
+  const listCard = goals.length ? `
       <section class="wsh-card wsg-list-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsg_list_title'))}</h3></header>
         <div class="wsg-grid">${listInner}</div>
-      </section>
+      </section>` : '';
+  return `
+    <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">
+      ${_wsSurfaceHeadHtml({ title: t('wsg_title'), help: [t('wsg_subtitle')] })}
+      ${listCard}
+      ${createCard}
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
 }
@@ -24914,13 +25038,11 @@ function _renderCompoundTool() {
     </label>`;
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wstool_compound_n'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wstool_compound_d'))}</p>
-      </section>
+      ${_wsSurfaceHeadHtml({ title: t('wstool_compound_n'), doc: _wsToolDocName(), help: [t('wstool_compound_d')] })}
+      ${/* «DATOS DE ENTRADA» debajo de «Interés compuesto» no informaba de nada:
+            los campos ya son visiblemente los datos de entrada. Se retira el
+            título de sección, no los campos. */''}
       <section class="wsh-card wstool-inputs-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
         <div class="wstool-fields">
           ${field('initial', t('wstool_in_initial'), _wsToolCcy())}
           ${field('monthly', t('wstool_in_monthly'), _wsToolCcy())}
@@ -25061,11 +25183,10 @@ function _renderBudgetTool() {
     </label>`;
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wstool_budget_n'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wstool_budget_d'))}</p>
-      </section>
+      ${/* Aquí los DOS títulos de sección sí informan —Ingresos y Gastos son dos
+            bloques distintos— así que se conservan. Lo que se retira es la
+            tarjeta de presentación de encima. */''}
+      ${_wsSurfaceHeadHtml({ title: t('wstool_budget_n'), doc: _wsToolDocName(), help: [t('wstool_budget_d')] })}
       <section class="wsh-card wstool-inputs-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
         <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>
@@ -25404,7 +25525,10 @@ function _wsJrnListHtml(res) {
         </div>
       </div>`;
   }).join('');
-  return `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_journal_n'))}</h3></header><div class="wsjrn-list">${cards}</div></section>`;
+  // El título de esta sección era `wstool_journal_n`, es decir EL MISMO que el de
+  // la herramienta: «Diario de operaciones» encima de «Diario de operaciones».
+  // La sección no es el diario, es su LISTA.
+  return `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wsjrn_list_title'))}</h3></header><div class="wsjrn-list">${cards}</div></section>`;
 }
 
 function _renderJournalTool() {
@@ -25414,15 +25538,18 @@ function _renderJournalTool() {
   const res = calculateTradeJournal(_wsToolInputs.trades);
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wstool_journal_n'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wstool_journal_d'))}</p>
-      </section>
-      <section class="wsh-card wstool-out-card">
+      ${_wsSurfaceHeadHtml({ title: t('wstool_journal_n'), doc: _wsToolDocName(), help: [t('wstool_journal_d')] })}
+      ${/* ── UN RESUMEN DE NADA NO ES UN RESUMEN ──────────────────────────────
+            Con el diario vacío esta tarjeta publicaba cuatro guiones y empujaba
+            el formulario 300 px hacia abajo: lo primero que veía el usuario era
+            el vacío de lo que todavía no ha hecho. Sin operaciones no se pinta
+            —no se inventa un cero, simplemente no hay nada que resumir— y el
+            registro queda arriba. Con operaciones vuelve, porque entonces SÍ
+            resume algo. */''}
+      ${res.list.length ? `<section class="wsh-card wstool-out-card">
         ${_wsJrnSummaryHtml(res)}
         ${res.closedCount ? `<div class="wstool-chart wsjrn-chartbox"><span class="wsbud-chart-title">${esc(t('wsjrn_chart_title'))}</span>${_wsJrnChartHtml(res)}</div>` : ''}
-      </section>
+      </section>` : ''}
       ${_wsJrnFormHtml()}
       ${_wsJrnListHtml(res)}
       <section class="wsh-card wsg-foot-card">
@@ -25821,11 +25948,11 @@ function _wsReDetailHtml(p) {
   const tlItems = (p.timeline || []).slice().reverse().map(ev => `<li class="wsre-tl-item"><span class="wsre-tl-dot is-${esc(ev.kind || 'note')}"></span><span class="wsre-tl-label">${esc(ev.label)}</span>${ev.date ? `<span class="wsre-tl-date">${esc(ev.date)}</span>` : ''}</li>`).join('');
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsre-back>‹ ${esc(t('wsre_back_portfolio'))}</button>
-        <h2 class="wsb-title">${esc(p.name)}</h2>
-        <p class="wsb-subtitle">${esc(p.city || '')}${p.city ? ' · ' : ''}${esc(t('wsre_t_' + p.ptype))}</p>
-      </section>
+      ${_wsSurfaceHeadHtml({
+        title: p.name,
+        doc: (p.city ? p.city + ' · ' : '') + t('wsre_t_' + p.ptype),
+        backAttr: 'data-wsre-back', backText: t('wsre_back_s_portfolio'), backAria: t('wsre_back_portfolio'),
+      })}
       <section class="wsh-card wsre-detail-hero">
         <div class="wsre-detail-cover ${p.photo ? 'has-photo' : 'is-' + (p.ptype || 'flat')}"${p.photo ? ` style="background-image:url(${p.photo})"` : ''}>${p.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(p.ptype)}</svg>` + _wsAssetImg(_WSRE_ASSET[p.ptype || 'flat'], esc(p.name || ''))}<span class="wsre-status is-${esc(one.status)}"></span></div>
         <div class="wsre-detail-kpis">
@@ -25874,13 +26001,14 @@ function _renderRealEstateTool() {
     : `<div class="wsre-grid is-premium-preview">${_wsReDemo().map(d => _wsRePropCard(calculateRealEstatePortfolio([d]).list[0])).join('')}</div><p class="wsre-empty-hint">${esc(t('wsre_empty'))}</p>`;
   return `
     <div class="aurix-wsh wsh-tool-view wsh-re-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wsre_n'))} <span class="wsb-title-tier">${_wsTierChip('tpl_realestate')}</span></h2>
-        <p class="wsb-subtitle">${esc(t('wsre_d'))}</p>
-        <p class="wsb-note">${esc(t('wsre_local_note'))}</p>
-      </section>
-      <section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>
+      ${/* El chip de plan se retira de la cabecera: si el usuario está DENTRO de
+            la capacidad ya tiene el derecho, así que el chip no informa — sólo
+            ocupaba una línea. La nota de permanencia local no se pierde: viaja a
+            la ayuda, junto al subtítulo. */''}
+      ${_wsSurfaceHeadHtml({ title: t('wsre_n'), doc: _wsToolDocName(), help: [t('wsre_d'), t('wsre_local_note')] })}
+      ${/* Sin inmuebles, el resumen serían seis ceros y una rejilla de capas
+            vacía. No se pinta: lo primero es la acción de añadir el primero. */''}
+      ${r.count ? `<section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>` : ''}
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_grid_title'))}</h3></header>
         ${gridOrEmpty}
@@ -26108,12 +26236,8 @@ function _renderReceivablesTool() {
   const r = calculateReceivables(items);
   return `
     <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wsapp_receivables_n'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wsrecv_sub'))}</p>
-      </section>
-      <section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>
+      ${_wsSurfaceHeadHtml({ title: t('wsapp_receivables_n'), doc: _wsToolDocName(), help: [t('wsrecv_sub')] })}
+      ${r.list.length ? `<section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>` : ''}
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
         ${r.list.length ? `<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}">` : ''}
@@ -26334,13 +26458,8 @@ function _renderLoanTool() {
   const field = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wsloan_n'))} <span class="wsb-title-tier">${_wsTierChip('loan_simulation')}</span></h2>
-        <p class="wsb-subtitle">${esc(t('wsloan_sub'))}</p>
-      </section>
+      ${_wsSurfaceHeadHtml({ title: t('wsloan_n'), doc: _wsToolDocName(), help: [t('wsloan_sub')] })}
       <section class="wsh-card wsloan-inputs-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
         <div class="wsloan-fields">
           ${field('principal', t('wsloan_in_amount'), _wsToolCcy())}
           ${field('rate', t('wsloan_in_rate'), '%')}

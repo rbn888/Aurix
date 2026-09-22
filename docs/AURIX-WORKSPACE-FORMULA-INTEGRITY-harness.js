@@ -630,11 +630,17 @@ function catalog() {
      konstSrc('_WS_TABS'));
   OK('M2 sin desv\u00edo silencioso: `templates` ya no cae a Herramientas',
      !/if \(tab === 'templates'\) tab = 'tools'/.test(app));
-  OK('M3 un solo predicado decide qué pestaña es válida, y lo usan TODOS sus lectores',
-     (app.match(/_wsTabOk\(/g) || []).length >= 4 &&
+  // WORKSPACE OPERATIVO — el ORIGEN del retorno deja de ser «una pestaña»: admite
+  // `dashboard`, que no lo es. Así que hay DOS predicados y cada uno responde su
+  // pregunta (`_wsTabOk` = ¿es pestaña válida?, `_wsBackOrigin` = ¿de dónde vengo?),
+  // pero sigue sin haber ni una comparación suelta escrita a mano, que es lo que
+  // M3 protege.
+  OK('M3 un solo predicado por pregunta, y ni una comparación suelta escrita a mano',
+     (app.match(/_wsTabOk\(/g) || []).length >= 3 &&
+     (app.match(/_wsBackOrigin\(\)/g) || []).length >= 3 &&
      !/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/.test(app) &&
      !/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/.test(app),
-     String((app.match(/_wsTabOk\(/g) || []).length));
+     String((app.match(/_wsTabOk\(/g) || []).length) + '/' + String((app.match(/_wsBackOrigin\(\)/g) || []).length));
   const home = fn('_renderWorkspaceHome');
   // WORKSPACE COMPLETION §§1,3 — el conjunto publicado ha crecido (cuatro Premium
   // más el Diario, ya con su contrato de divisa única certificado), así que lo que
