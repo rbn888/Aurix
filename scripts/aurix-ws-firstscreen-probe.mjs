@@ -22,6 +22,13 @@
  * motor de layout —que es lo que se certifica— pero no la barra de URL dinámica,
  * el `env(safe-area-inset-bottom)` real ni el zoom al enfocar un input.
  *
+ * CONTRA LO PÚBLICO CUANDO SE PIDE:
+ *   AURIX_WS_URL=https://app.aurixsystem.io (+ AURIX_WS_RESOLVE=dominio=IP, que el
+ *   sandbox necesita porque no resuelve el dominio) ejecuta las MISMAS medidas
+ *   sobre los bytes DESPLEGADOS, interceptando la respuesta del CDN para aplicar
+ *   el único parche declarado: la navegación de auth. WebKit no admite regla de
+ *   resolución, así que contra lo público sólo corre Chromium — y se dice.
+ *
  *   node scripts/aurix-ws-firstscreen-probe.mjs
  */
 import { createServer } from 'node:http';
@@ -48,7 +55,22 @@ const server = createServer(async (req, res) => {
   } catch (_) { res.writeHead(404).end('nf'); }
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
-const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+const PUBLIC_URL = String(process.env.AURIX_WS_URL || '').replace(/\/$/, '');
+const RESOLVE = String(process.env.AURIX_WS_RESOLVE || '');
+const ORIGIN = PUBLIC_URL || `http://127.0.0.1:${server.address().port}`;
+const AUTH_PATCH = t => String(t)
+  .replace('function safeRedirect(path, source) {', 'function safeRedirect(path, source) { return false;')
+  .replace(/location\.replace\(base \+ 'login\.html'\)/g, 'void 0');
+// Un solo sitio crea contextos: así el parche no se puede olvidar en uno de los
+// tres puntos de montaje.
+async function newCtx(browser, opts) {
+  const ctx = await browser.newContext(opts);
+  if (PUBLIC_URL) await ctx.route('**/app.js*', async route => {
+    const r = await route.fetch();
+    await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
+  });
+  return ctx;
+}
 
 const PW = process.env.AURIX_PW || '/tmp/aurix-pw/node_modules/playwright/index.mjs';
 let chromium, webkit;
@@ -199,6 +221,9 @@ const VIEWPORTS = [[390, 844], [1440, 900]];
 
 async function mount(page) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
+  // Sin sesión el build público navega a `login.html` y los globals desaparecen:
+  // es un límite del ORIGEN, no un fallo del candidato, y se declara como tal.
+  if (PUBLIC_URL && /login\.html/.test(page.url())) throw new Error('origen no ejercitable: la app pública redirige sin sesión (' + page.url() + ')');
   await page.waitForFunction(`typeof renderWorkspaceHome === 'function' && typeof switchTab === 'function'`, null, { timeout: 60000 });
   await page.waitForTimeout(800);
   await page.evaluate(`(function(){
@@ -220,14 +245,15 @@ async function asPremium(page, L) {
 }
 
 console.log('AURIX · WORKSPACE OPERATIVO — primera pantalla útil (Chromium + WebKit)');
-console.log('origen: ' + ORIGIN + '  (copia de trabajo)\n');
+console.log('origen: ' + ORIGIN + (PUBLIC_URL ? '  (PÚBLICO · bytes desplegados)' : '  (copia de trabajo)') + '\n');
 mkdirSync(OUT, { recursive: true });
 
 for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
-  const browser = await launcher.launch();
+  if (ENG === 'WK' && PUBLIC_URL && RESOLVE) { console.log('  (WebKit omitido contra lo público: no admite regla de resolución)'); continue; }
+  const browser = await launcher.launch({ args: (ENG === 'CR' && RESOLVE) ? ['--host-resolver-rules=MAP ' + RESOLVE.split('=')[0] + ' ' + RESOLVE.split('=')[1]] : [] });
   for (const [w, h] of VIEWPORTS) {
     for (const L of ['es', 'en']) {
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
+      const ctx = await newCtx(browser, { viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
       const page = await ctx.newPage();
       await mount(page);
       await asPremium(page, L);
@@ -282,7 +308,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   // `_wsOpenTool`), no una réplica: el defecto que estas pruebas buscan es
   // precisamente que el camino guardado y el previsualizado diverjan.
   {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    const ctx = await newCtx(browser, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     await mount(page); await asPremium(page, 'es');
     const r = await page.evaluate(`(function(){
@@ -343,7 +369,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   // §5: abrir desde el catálogo y desde Mi espacio, y que «Volver» devuelva a la
   // pestaña de origen — no a otra, que es el defecto que `_wsBackLabel` cerró.
   {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    const ctx = await newCtx(browser, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     await mount(page); await asPremium(page, 'es');
     for (const [tab, label] of [['tools', 'Herramientas'], ['templates', 'Plantillas'], ['space', 'Mi espacio']]) {
