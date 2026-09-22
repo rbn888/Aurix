@@ -94,48 +94,83 @@ const MEASURE = `(function(){
   // INTERSECCIÓN, no «¿cabe?»: es lo único que ve un solape entre vecinos.
   var hit=function(a,b){ return !!a&&!!b&&!(a.b<=b.t+0.5||b.b<=a.t+0.5||a.r<=b.l+0.5||b.r<=a.l+0.5); };
   var ins=function(c,p){ return !!c&&!!p&&c.t>=p.t-0.5&&c.b<=p.b+0.5&&c.l>=p.l-0.5&&c.r<=p.r+0.5; };
-  var stage=q('.wsfc-stage'), card=q('.wsfc-card'), capsUl=q('.wsfc-caps');
-  if(!stage||!card||!capsUl) return {mounted:false};
-  var sr=R(stage), cardR=R(card), caps=qa('.wsfc-cap').map(R), capEls=qa('.wsfc-cap');
-  var head=R(q('.wsfc-head')), notice=R(q('.wsfc-notice')), wrap=R(q('.wsfc-cta-wrap')), cta=R(q('.wsfc-cta'));
+  var stage=q('.wsfc-stage'), panel=q('.wsfc-panel'), capsUl=q('.wsfc-caps');
+  if(!stage||!panel||!capsUl) return {mounted:false};
+  var sr=R(stage), panelR=R(panel), capEls=qa('.wsfc-cap'), caps=capEls.map(R);
+  var head=R(q('.wsfc-eyebrow')), title=q('.wsfc-title'), sub=R(q('.wsfc-sub'));
+  var wrap=R(q('.wsfc-cta-wrap')), ctaEl=q('.wsfc-cta'), cta=R(ctaEl);
   var navEl=document.getElementById('bottomNav');
   var navVis=!!navEl&&getComputedStyle(navEl).display!=='none'&&navEl.getBoundingClientRect().height>0;
   var nav=navVis?R(navEl):null;
-  var textEls=qa('.wsfc-title,.wsfc-sub,.wsfc-eyebrow,.wsfc-cap-name,.wsfc-cta,.wsfc-notice-text');
-  var boxes=[head,notice,cardR,wrap].filter(Boolean);
-  var neighbourHit=false;
-  for(var i=0;i<boxes.length;i++) for(var j=i+1;j<boxes.length;j++) if(hit(boxes[i],boxes[j])) neighbourHit=true;
-  var scaled=qa('.wsfc-stage,.wsfc-card,.wsfc-caps,.wsfc-cap,.wsfc-cta').some(function(e){
+  var textEls=qa('.wsfc-title,.wsfc-sub,.wsfc-eyebrow,.wsfc-cap-name,.wsfc-cta');
+  // ── FILAS IGUALES Y REJILLA DECLARADA ────────────────────────────────────
+  var cols=getComputedStyle(capsUl).gridTemplateColumns.split(' ').filter(Boolean).length;
+  var rows={}, ragged=false, misaligned=false;
+  caps.forEach(function(c,i){ var k=Math.round(c.t); (rows[k]=rows[k]||[]).push(i); });
+  Object.keys(rows).forEach(function(k){
+    var idx=rows[k]; var h0=caps[idx[0]].h, w0=caps[idx[0]].w;
+    idx.forEach(function(i){ if(Math.abs(caps[i].h-h0)>1||Math.abs(caps[i].w-w0)>1) ragged=true; });
+  });
+  // Los iconos alineados: mismo tamaño y mismo desplazamiento respecto a su celda.
+  var icos=qa('.wsfc-cap-ico').map(R);
+  var i0=icos[0];
+  icos.forEach(function(ic,i){ if(!i0||Math.abs(ic.w-i0.w)>0.5||Math.abs(ic.h-i0.h)>0.5) misaligned=true;
+    if(Math.abs((ic.l-caps[i].l)-(i0.l-caps[0].l))>0.5) misaligned=true; });
+  // ── NO SON BOTONES, Y SE MIDE ────────────────────────────────────────────
+  var fakeBtn = capEls.some(function(e){
+    var cs=getComputedStyle(e);
+    return e.tagName!=='LI' || cs.cursor==='pointer' || e.hasAttribute('tabindex')
+      || e.getAttribute('role')==='button' || !!e.querySelector('button,a,[tabindex]');
+  });
+  // ── LAS CELDAS, MÁS OSCURAS QUE EL PANEL ────────────────────────────────
+  // SIN '\\d': esto vive dentro de un template literal de JS, y ahí '\\d' no es un
+  // escape válido — se convierte en 'd' y el regex pasa a buscar la letra d. El
+  // resultado era NaN y la comprobación de color daba rojo siempre.
+  var lum=function(c){ var m=String(c).match(/[0-9.]+/g)||[0,0,0]; return 0.2126*(+m[0])+0.7152*(+m[1])+0.0722*(+m[2]); };
+  var panelBg=getComputedStyle(panel).backgroundColor, capBg=capEls[0]?getComputedStyle(capEls[0]).backgroundColor:'';
+  var scaled=qa('.wsfc-stage,.wsfc-panel,.wsfc-caps,.wsfc-cap,.wsfc-cta').some(function(e){
     var tr=getComputedStyle(e).transform; return tr&&tr!=='none'&&/matrix\\(\\s*(?!1,\\s*0,\\s*0,\\s*1)/.test(tr); });
   var minFont=Math.min.apply(null, textEls.map(function(e){ return parseFloat(getComputedStyle(e).fontSize)||99; }));
-  var hidden=qa('.wsfc-stage,.wsfc-card,.wsfc-caps').filter(function(e){ return getComputedStyle(e).overflow==='hidden'; }).length;
+  var nameFont=Math.min.apply(null, qa('.wsfc-cap-name').map(function(e){ return parseFloat(getComputedStyle(e).fontSize)||99; }));
+  var hidden=qa('.wsfc-stage,.wsfc-panel,.wsfc-caps').filter(function(e){ return getComputedStyle(e).overflow==='hidden'; }).length;
+  var ellipsis=qa('.wsfc-cap-name').filter(function(e){ return getComputedStyle(e).textOverflow==='ellipsis' || e.scrollWidth>e.clientWidth+1; }).length;
+  // El HUECO más grande entre dos bloques consecutivos del panel: §A prohíbe los
+  // grandes vacíos, y un reparto automático los produce sin que nada «falle».
+  var blocks=[head,R(title),sub,R(capsUl),wrap].filter(Boolean).sort(function(a,b){return a.t-b.t;});
+  var maxGap=0; for(var i=1;i<blocks.length;i++) maxGap=Math.max(maxGap, +(blocks[i].t-blocks[i-1].b).toFixed(1));
   return {
-    mounted:true, caps:caps.length,
-    capsInCard: capEls.map(function(e){ return ins(R(e), cardR); }).every(Boolean),
-    capsInStage: caps.every(function(c){ return c.t>=sr.t-0.5&&c.b<=sr.b+0.5; }),
-    cardFits: card.scrollHeight<=card.clientHeight+1,
+    mounted:true, caps:caps.length, cols:cols,
+    capsInPanel: capEls.every(function(e){ return ins(R(e), panelR); }),
+    ctaInPanel: ins(wrap, panelR),
+    panelInStage: !!panelR && panelR.t>=sr.t-0.5 && panelR.b<=sr.b+0.5,
     capsFits: capsUl.scrollHeight<=capsUl.clientHeight+1,
-    capsBox: capsUl.clientHeight, capsContent: capsUl.scrollHeight,
     stageFits: stage.scrollHeight<=stage.clientHeight+1,
     stageBox: stage.clientHeight, stageContent: stage.scrollHeight,
-    neighbourHit: neighbourHit,
-    ctaHitCaps: caps.some(function(c){ return hit(c, wrap); }),
+    ragged: ragged, misaligned: misaligned, fakeBtn: fakeBtn,
+    capDarker: lum(capBg) < lum(panelBg),
+    panelBg: panelBg, capBg: capBg,
+    neighbourHit: (function(){ for(var i=1;i<blocks.length;i++) if(hit(blocks[i-1],blocks[i])) return true; return false; })(),
+    maxGap: maxGap,
     ctaWhole: !!cta&&cta.t>=sr.t-0.5&&cta.b<=sr.b+0.5,
     ctaInFlow: !!wrap&&getComputedStyle(q('.wsfc-cta-wrap')).position==='static',
     ctaAboveNav: (nav&&cta)?cta.b<=nav.t+0.5:!!cta,
+    ctaGapToNav: (nav&&cta)?+(nav.t-cta.b).toFixed(1):null,
     ctaH: cta?cta.h:0,
-    voidBeforeCta: (wrap&&cardR)?+(wrap.t-cardR.b).toFixed(1):null,
     scrollTop: stage.scrollTop,
     docOverflowX: document.documentElement.scrollWidth>window.innerWidth+1,
     stageOverflowX: stage.scrollWidth>stage.clientWidth+1,
-    clipped: textEls.filter(function(e){ return e.scrollWidth>e.clientWidth+1||e.scrollHeight>e.clientHeight+1; }).length,
-    scaled: scaled, minFont: minFont, overflowHidden: hidden,
-    hasNotice: !!notice, openers: root.querySelectorAll('[data-wsfc-open]').length,
+    clipped: textEls.filter(function(e){ return e.scrollWidth>e.clientWidth+1; }).length,
+    ellipsis: ellipsis,
+    scaled: scaled, minFont: minFont, nameFont: nameFont, overflowHidden: hidden,
+    openers: root.querySelectorAll('[data-wsfc-open]').length,
+    notice: root.querySelectorAll('.wsfc-notice,[data-wsfc-notice-close]').length,
+    titleTxt: title?(title.textContent||'').trim():'',
+    names: qa('.wsfc-cap-name').map(function(e){ return (e.textContent||'').trim(); }),
   };
 })()`;
 
 // Un solo sitio crea contextos, así que el parche de auth no se puede olvidar en
-// uno de los tres puntos de montaje.
+// ninguno de los puntos de montaje.
 async function newCtx(browser, opts) {
   const ctx = await browser.newContext(opts);
   if (PUBLIC_URL) await ctx.route('**/app.js*', async route => {
@@ -145,9 +180,16 @@ async function newCtx(browser, opts) {
   return ctx;
 }
 
+// El título APROBADO, literal. Si alguien lo cambia sin pasar por el founder,
+// esto se pone rojo en los doce viewports a la vez.
+const EXPECTED_TITLE = {
+  es: 'Organiza, calcula y planifica tu patrimonio',
+  en: 'Organize, calculate and plan your wealth',
+};
+
 const VIEWPORTS = [[360, 740], [390, 844], [430, 932], [768, 1024], [1366, 768], [1440, 900]];
 
-async function mount(page, L, { priorWork = false } = {}) {
+async function mount(page, L) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
   // Sin sesión el build público navega a `login.html` y los globals desaparecen.
   // Se declara como límite del ORIGEN, no como fallo del candidato.
@@ -159,7 +201,6 @@ async function mount(page, L, { priorWork = false } = {}) {
     var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1';
     document.getElementById('aurixWorkspace').style.display='block';
     return true; })()`);
-  if (priorWork) await page.evaluate(`localStorage.setItem('aurix_ws_projects_v1', JSON.stringify([{id:'p1',type:'compound_growth',name:'Mi plan'}]))`);
   // ASIGNACIÓN DESNUDA, y no `window.algo = …`: `lang`, `_aurixEnt` y `_wshView` se
   // declaran con `let` en el ámbito léxico global, que NO es `window`. Escribir
   // `window.lang` crea una propiedad que la app no lee nunca.
@@ -185,50 +226,46 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       const g = await page.evaluate(MEASURE);
       const tag = `${ENG}.${w}×${h} ${L.toUpperCase()}`;
       if (!g || !g.mounted || g.caps !== 8) { ok(`${tag} la portada monta con sus OCHO capacidades`, false, JSON.stringify(g && { m: g.mounted, c: g.caps })); await ctx.close(); continue; }
-      ok(`${tag} monta con las OCHO capacidades y ninguna es un acceso`,
-        g.caps === 8 && g.openers === 0, JSON.stringify({ caps: g.caps, accesos: g.openers }));
+      ok(`${tag} monta las OCHO capacidades, con su nombre y sin accesos`,
+        g.caps === 8 && g.openers === 0 && g.names.every(n => n.length > 3),
+        JSON.stringify({ caps: g.caps, accesos: g.openers, nombres: g.names }));
+      ok(`${tag} el aviso de cambio de plan ya no existe`,
+        g.notice === 0, 'quedan ' + g.notice + ' restos del aviso');
+      ok(`${tag} el título es el aprobado`,
+        g.titleTxt === EXPECTED_TITLE[L], JSON.stringify(g.titleTxt));
+      // §A fija la rejilla: 2×4 en móvil y en anchos intermedios, 4×2 sólo cuando
+      // los nombres caben cómodamente (escritorio).
+      ok(`${tag} rejilla ${w >= 1024 ? '4×2' : '2×4'}`,
+        g.cols === (w >= 1024 ? 4 : 2), 'columnas=' + g.cols);
+      ok(`${tag} celdas iguales por fila, iconos alineados y padding consistente`,
+        g.ragged === false && g.misaligned === false,
+        JSON.stringify({ desiguales: g.ragged, iconos: g.misaligned }));
+      ok(`${tag} las capacidades son contenido, no falsos botones`,
+        g.fakeBtn === false, 'li sin cursor, sin tabindex, sin rol de botón');
+      ok(`${tag} las celdas son MÁS OSCURAS que el panel, no más claras`,
+        g.capDarker === true, JSON.stringify({ panel: g.panelBg, celda: g.capBg }));
       ok(`${tag} cabe entera sin scroll vertical ni horizontal`,
         g.stageFits && !g.docOverflowX && !g.stageOverflowX && g.scrollTop === 0,
         JSON.stringify({ caja: g.stageBox, contenido: g.stageContent, docX: g.docOverflowX, stageX: g.stageOverflowX }));
-      ok(`${tag} ninguna rejilla se pinta fuera de su caja`,
-        g.capsFits && g.cardFits && g.capsInCard && g.capsInStage,
-        JSON.stringify({ caps: g.capsBox + '←' + g.capsContent, enCard: g.capsInCard, enStage: g.capsInStage }));
-      ok(`${tag} ningún bloque se solapa con su vecino`,
-        g.neighbourHit === false && g.ctaHitCaps === false,
-        JSON.stringify({ vecinos: g.neighbourHit, ctaSobreCaps: g.ctaHitCaps }));
-      ok(`${tag} el CTA está entero, en el flujo y por encima de la navegación`,
-        g.ctaWhole && g.ctaInFlow && g.ctaAboveNav && g.ctaH >= 52,
-        JSON.stringify({ entero: g.ctaWhole, enFlujo: g.ctaInFlow, sobreNav: g.ctaAboveNav, alto: g.ctaH }));
+      ok(`${tag} nada se pinta fuera de su caja ni pisa a su vecino`,
+        g.capsFits && g.capsInPanel && g.ctaInPanel && g.panelInStage && g.neighbourHit === false,
+        JSON.stringify({ capsCaben: g.capsFits, enPanel: g.capsInPanel, cta: g.ctaInPanel, solape: g.neighbourHit }));
+      // ── SIN GRANDES VACÍOS, Y SIN PEGAR EL CTA A LA NAVEGACIÓN ────────────
+      ok(`${tag} espaciado controlado: ningún hueco desproporcionado entre bloques`,
+        g.maxGap <= 34, 'mayor hueco=' + g.maxGap);
+      ok(`${tag} el CTA está entero, en el flujo, y no pegado a la navegación`,
+        g.ctaWhole && g.ctaInFlow && g.ctaAboveNav && g.ctaH >= 52
+        && (g.ctaGapToNav === null || g.ctaGapToNav >= 8),
+        JSON.stringify({ entero: g.ctaWhole, enFlujo: g.ctaInFlow, sobreNav: g.ctaAboveNav, alto: g.ctaH, holgura: g.ctaGapToNav }));
       ok(`${tag} el encaje NO se fuerza: sin scale, sin overflow:hidden, sin texto diminuto`,
         g.scaled === false && g.overflowHidden === 0 && g.minFont >= 11 && g.clipped === 0,
         JSON.stringify({ scale: g.scaled, hidden: g.overflowHidden, minPx: g.minFont, recortado: g.clipped }));
-      if (w >= 768) {
-        ok(`${tag} sin grandes vacíos en escritorio entre la card y el CTA`,
-          g.voidBeforeCta !== null && g.voidBeforeCta <= 40,
-          'hueco=' + g.voidBeforeCta);
-      }
+      ok(`${tag} nombres legibles (≥14 px) y sin elipsis`,
+        g.nameFont >= 14 && g.ellipsis === 0,
+        JSON.stringify({ px: g.nameFont, elipsis: g.ellipsis }));
       await page.screenshot({ path: join(OUT, `wsfc-${ENG.toLowerCase()}-${w}x${h}-${L}.png`) });
       await ctx.close();
     }
-  }
-
-  // ── EL AVISO, Y QUE NO ROMPE EL ENCAJE EN EL VIEWPORT MÁS ESTRECHO ────────
-  {
-    const ctx = await newCtx(browser, { viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
-    const page = await ctx.newPage();
-    await mount(page, 'es', { priorWork: true });
-    const g = await page.evaluate(MEASURE);
-    ok(`${ENG}.aviso · con trabajo guardado el aviso aparece y la portada sigue cabiendo`,
-      g.hasNotice === true && g.stageFits && g.neighbourHit === false && g.ctaWhole && g.ctaAboveNav,
-      JSON.stringify({ aviso: g.hasNotice, caja: g.stageBox, contenido: g.stageContent, cta: g.ctaWhole }));
-    await page.screenshot({ path: join(OUT, `wsfc-${ENG.toLowerCase()}-360x740-es-aviso.png`) });
-    // Y se puede cerrar: es un control real, no un adorno.
-    await page.evaluate(`document.querySelector('.wsfc-notice-x').click()`);
-    await page.waitForTimeout(150);
-    ok(`${ENG}.aviso · se puede cerrar, y el CTA sigue entero después`,
-      await page.evaluate(`!document.querySelector('.wsfc-notice')`),
-      'el cierre es del despachador delegado');
-    await ctx.close();
   }
 
   // ── ALTURA EXCEPCIONAL: ANTES SCROLL ACCESIBLE QUE CORTAR ────────────────
@@ -240,7 +277,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await mount(page, 'es');
     const g = await page.evaluate(MEASURE);
     ok(`${ENG}.altura excepcional · el contenedor se desplaza en vez de recortar`,
-      g.stageFits === false && g.capsFits && g.cardFits && g.neighbourHit === false && g.overflowHidden === 0 && g.clipped === 0,
+      g.stageFits === false && g.capsFits && g.capsInPanel && g.neighbourHit === false && g.overflowHidden === 0 && g.clipped === 0,
       JSON.stringify({ desplaza: !g.stageFits, capsCaben: g.capsFits, solape: g.neighbourHit, recortado: g.clipped }));
     // Y al final del recorrido nada queda inalcanzable.
     await page.evaluate(`(function(){ var s=document.querySelector('#aurixWorkspace .wsfc-stage'); s.scrollTop=s.scrollHeight; })()`);

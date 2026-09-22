@@ -6104,7 +6104,7 @@ const T = {
     ws4_read_fire_nosol:    'Con esta aportación y esta rentabilidad supuesta, la meta no se alcanza en 60 años.',
     // WS.5 — Goals Engine
     wsg_cta_create: 'Crear objetivo', wsg_cta_view: 'Ver objetivos',
-    wsg_title: 'Objetivos', wsg_subtitle: 'Convierte tus metas en objetivos medibles.',
+    wsg_title: 'Objetivos financieros', wsg_subtitle: 'Convierte tus metas en objetivos medibles.',
     wsg_create_title: 'Crear objetivo', wsg_list_title: 'Tus objetivos',
     wsg_empty: 'Aún no has definido objetivos. Crea el primero arriba.',
     wsg_f_type: 'Tipo', wsg_f_name: 'Nombre', wsg_f_target: 'Cantidad objetivo',
@@ -6183,7 +6183,9 @@ const T = {
     wsh_space_cta:     'Crear desde plantilla',
     wstpl_use:         'Usar plantilla',
     wstpl_plans_title: 'Planes',
-    wstool_compound_n: 'Calculadora de interés compuesto',
+    // El nombre visible aprobado. Lo lee la tarjeta del catálogo, la cabecera de
+    // la herramienta, el paywall y la portada: una sola cadena para las cuatro.
+    wstool_compound_n: 'Interés compuesto',
     wstool_compound_d: 'Proyecta capital, aportaciones y crecimiento.',
     wstool_budget_n:   'Presupuesto mensual',
     wstool_budget_d:   'Controla ingresos, gastos y ahorro libre.',
@@ -6211,28 +6213,14 @@ const T = {
     // «sincronizado» a un guardado local es exactamente lo que §4 prohíbe. El que
     // se publica depende de si la escritura remota OCURRIÓ, no de si había sesión
     // ni de si la tabla debería existir.
-    // ── §2 · PORTADA FREE DE WORKSPACE ───────────────────────────────────────
-    // El beneficio Premium nombra lo que EXISTE construido —presupuesto, cobros,
-    // diario, precios, objetivos y escenarios— y nada más. Ni una promesa de algo
-    // que no esté implementado, ni un precio: eso es del paywall.
+    // ── §A · PORTADA FREE DE WORKSPACE ───────────────────────────────────────
+    // Copy aprobado por el founder. Las OCHO claves `wsfc_n_*` se retiran: el
+    // nombre de cada capacidad lo pone el CATÁLOGO, así que portada y tarjeta no
+    // pueden volver a llamar distinto a la misma cosa.
     wsfc_eyebrow:      'WORKSPACE',
-    wsfc_title:        'Convierte tus números en un plan',
-    wsfc_sub:          'Calcula escenarios, organiza tus finanzas y guarda tus planes para retomarlos cuando los necesites.',
-    // Los NOMBRES de las ocho capacidades. Son sustantivos, no verbos: la portada
-    // presenta el producto, no reparte acciones que el usuario no puede ejecutar.
-    wsfc_n_compound:   'Interés compuesto',
-    wsfc_n_realestate: 'Portfolio inmobiliario',
-    wsfc_n_loan:       'Préstamos',
-    wsfc_n_scenario:   'Escenarios',
-    wsfc_n_budget:     'Presupuesto mensual',
-    wsfc_n_receivables:'Control de cobros',
-    wsfc_n_goals:      'Objetivos',
-    wsfc_n_journal:    'Diario de operaciones',
+    wsfc_title:        'Organiza, calcula y planifica tu patrimonio',
+    wsfc_sub:          'Tus herramientas y plantillas para explorar escenarios, ordenar tus finanzas y dar forma a tus planes.',
     wsfc_cta:          'Descubrir Workspace completo',
-    // El aviso de quien ya tenía trabajo guardado. Dice las dos cosas que importan
-    // —qué cambia y qué NO se pierde— y nada más.
-    wsfc_notice:       'Workspace ahora forma parte de Premium. Tus datos guardados se conservan.',
-    wsfc_notice_close: 'Cerrar aviso',
     // La espera mientras el servidor resuelve el plan. No afirma NADA del plan.
     wsfc_pending:      'Preparando tu espacio de trabajo…',
     ws_sync_idle:         'Sin cambios sin guardar',
@@ -8705,7 +8693,7 @@ const T = {
     wsh_goal_eta:          'Estimated date',
     wsh_goal_confidence:   'Confidence',
     wsh_pending:           'Not set',
-    wsh_scenario_title:    'Scenario Builder',
+    wsh_scenario_title:    'Scenario builder',
     wsh_scenario_current:  'Current scenario',
     wsh_scenario_best:     'Best saved scenario',
     wsh_scenario_empty:    'Create your first scenario to compare decisions before you make them.',
@@ -8857,7 +8845,7 @@ const T = {
     ws4_read_fire_nosol:    'With this contribution and this assumed return, the target is not reached within 60 years.',
     // WS.5 — Goals Engine
     wsg_cta_create: 'Create goal', wsg_cta_view: 'View goals',
-    wsg_title: 'Goals', wsg_subtitle: 'Turn your aspirations into measurable goals.',
+    wsg_title: 'Financial goals', wsg_subtitle: 'Turn your aspirations into measurable goals.',
     wsg_create_title: 'Create goal', wsg_list_title: 'Your goals',
     wsg_empty: 'You have no goals yet. Create your first one above.',
     wsg_f_type: 'Type', wsg_f_name: 'Name', wsg_f_target: 'Target amount',
@@ -8932,11 +8920,11 @@ const T = {
     wsh_space_cta:     'Create from template',
     wstpl_use:         'Use template',
     wstpl_plans_title: 'Plans',
-    wstool_compound_n: 'Compound Interest Calculator',
+    wstool_compound_n: 'Compound interest',
     wstool_compound_d: 'Project capital, contributions and growth.',
-    wstool_budget_n:   'Monthly Budget',
+    wstool_budget_n:   'Monthly budget',
     wstool_budget_d:   'Track income, expenses and free savings.',
-    wstool_journal_n:  'Trade Journal',
+    wstool_journal_n:  'Trade journal',
     wstool_journal_d:  'Log buys, sells and returns.',
     // WS.6 — Compound Growth tool
     wsback_tools:         'Back to Tools',
@@ -8952,19 +8940,9 @@ const T = {
     wsh_help_aria:        'Help and assumptions',
     wstool_back:          'Back to Tools',
     wsfc_eyebrow:      'WORKSPACE',
-    wsfc_title:        'Turn your numbers into a plan',
-    wsfc_sub:          'Model scenarios, organize your finances, and save your plans so you can pick them up whenever you need them.',
-    wsfc_n_compound:   'Compound interest',
-    wsfc_n_realestate: 'Property portfolio',
-    wsfc_n_loan:       'Loans',
-    wsfc_n_scenario:   'Scenarios',
-    wsfc_n_budget:     'Monthly budget',
-    wsfc_n_receivables:'Receivables tracking',
-    wsfc_n_goals:      'Goals',
-    wsfc_n_journal:    'Trade journal',
+    wsfc_title:        'Organize, calculate and plan your wealth',
+    wsfc_sub:          'Your tools and templates to explore scenarios, put your finances in order and give shape to your plans.',
     wsfc_cta:          'Explore the full Workspace',
-    wsfc_notice:       'Workspace is now part of Premium. Your saved data is preserved.',
-    wsfc_notice_close: 'Dismiss notice',
     wsfc_pending:      'Preparing your workspace…',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
@@ -9115,7 +9093,7 @@ const T = {
     wsmse2_tool_empty_t: 'No tools yet.',
     wsmse2_tool_empty_b: 'Star one, or save a named document, and it will show up here.',
     wsmse2_tool_empty_cta: 'See tools',
-    wsapp_receivables_n:'Payment Control',
+    wsapp_receivables_n:'Payment control',
     wsapp_assets_n:     'Asset prices',
     wstool_financial_n: 'Financial calculator',
     wstool_analyzer_n:  'Investment analyzer',
@@ -9154,7 +9132,7 @@ const T = {
     wsrecv_f_due:       'Due date',
     wsrecv_f_notes:     'Notes',
     // WS.14 — Loan Simulator Pro
-    wsloan_n:           'Loan Simulator',
+    wsloan_n:           'Loan simulator',
     wsloan_sub:         'Simulate any financing and understand its real cost.',
     wsloan_save:        'Save simulation',
     wsloan_in_amount:   'Loan amount',
@@ -20926,7 +20904,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsfc-notice-close],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -20967,17 +20945,11 @@ function _wshWireOnce() {
     // §4 — el reintento explícito. Va aquí, en el dispatcher que ya existe, para
     // que no haya un segundo camino de guardado.
     if (t.getAttribute('data-ws-sync-retry')) { _wsDocsRetry(); return; }
-    // ── §2 · LA PORTADA FREE YA NO ABRE NADA ──────────────────────────────────
-    // `data-wsfc-open` se retira con las dos tarjetas gratuitas: no queda ninguna
-    // capacidad que un usuario Free pueda abrir, así que un manejador de apertura
-    // en esta superficie sólo podría ser una puerta sin llave detrás. Lo único
-    // pulsable que queda aquí es el CTA (que lo despacha el owner canónico) y el
-    // cierre del aviso, que es presentación y no toca ningún derecho.
-    if (t.getAttribute('data-wsfc-notice-close')) {
-      const _nt = t.closest('.wsfc-notice');
-      if (_nt && _nt.parentNode) _nt.parentNode.removeChild(_nt);
-      return;
-    }
+    // ── §A · LA PORTADA FREE NO TIENE NADA QUE DESPACHAR ─────────────────────
+    // `data-wsfc-open` se retiró con las dos tarjetas gratuitas y
+    // `data-wsfc-notice-close` con el aviso. Lo único pulsable de esta superficie
+    // es el CTA, y lo despacha el owner canónico de conversión, no este
+    // manejador: aquí no queda ninguna puerta que vigilar.
     // ── EL CTA DE LA PORTADA YA NO PASA POR AQUÍ ──────────────────────────────
     // Abría `openUpgradeIntent`, que montaba el overlay intermedio «Función
     // premium / Ver AURIX Premium» y exigía un SEGUNDO clic para llegar a los
@@ -22141,8 +22113,28 @@ function _wsGlyph(k) {
     target:   '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.3"/>',
     cashflow: '<path d="M3 17l5-5 4 3 6-7"/><path d="M5 20h14"/><path d="M18 5h3v3"/>',
     portfolio:'<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/>',
+    // ── CINCO METÁFORAS NUEVAS, MISMA FAMILIA ────────────────────────────────
+    // No se añade una biblioteca: se amplía `_wsGlyph`, que ya es la familia de
+    // Workspace (24×24, trazo 1.7, extremos redondos, sin relleno). Es lo que
+    // hace que las ocho capacidades se lean como un conjunto y no como ocho
+    // iconos de sitios distintos — el defecto que la portada anterior tenía por
+    // mezclar `_wsTplViz` (64×40, con áreas rellenas y anillos de progreso) con
+    // glifos de 24. Cada una cabe en la MISMA caja óptica de ~18px y no pasa de
+    // tres trazos: pocas formas, reconocibles, sin 3D y sin anillos que parezcan
+    // una carga en curso.
+    growth:   '<path d="M4 4v16h16"/><path d="M6.8 17c3.4-.5 5.2-3.1 6.7-6.8S17.2 5.4 20 5"/>',
+    calc:     '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7"/><path d="M9.2 12h.01M12 12h.01M14.8 12h.01M9.2 16.2h.01M12 16.2h.01M14.8 16.2h.01"/>',
+    paths:    '<path d="M3.8 17.4c4.6-.3 6.6-3.4 8.2-7S16.8 4.6 20.2 4.2"/><path d="M3.8 20.4c4.6 0 6.6-1.2 8.2-2.9s4.4-2.8 8.2-3.2"/>',
+    split:    '<rect x="3" y="8.5" width="18" height="7" rx="2"/><path d="M9.6 8.5v7"/>',
+    receipt:  '<path d="M6 3h12v17.5l-3-2-3 2-3-2-3 2z"/><path d="M9.2 11.6l2 2 3.6-4"/>',
+    log:      '<path d="M4 7h9M4 12h9M4 17h9"/><path d="M17.3 5.6l2.4 2.4-2.4 2.4"/><path d="M19.7 14.6 17.3 17l2.4 2.4"/>',
   };
   return G[k] || G.target;
+}
+// El icono de una capacidad en la portada: misma familia, mismo trazo, misma
+// caja. Un solo sitio para que no puedan divergir entre sí.
+function _wsCapIconHtml(k) {
+  return `<svg class="wsfc-cap-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(k)}</svg>`;
 }
 function _wsGoalGlyph(type) { return ({ wealth: 'target', emergency: 'shield', home: 'house', fire: 'flame', free: 'flag' })[type] || 'flag'; }
 function _wsGlyphTile(glyph, accent) {
@@ -24477,95 +24469,90 @@ function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults()
 // cabe, el contenedor se desplaza (`overflow:auto`) — que es lo que §3 exige y lo
 // que `overflow:hidden` habría roto.
 //
-// ── EL AVISO DE QUIEN YA ESTABA ────────────────────────────────────────────
-// «Workspace ahora forma parte de Premium. Tus datos guardados se conservan.»
-// Sólo lo ve quien tiene trabajo guardado de antes: a una cuenta nueva ese texto
-// le hablaría de un cambio que nunca vivió. Se muestra UNA vez, es `role="status"`
-// (se anuncia sin robar el foco), se puede cerrar y NO es un paso previo al pago:
-// el CTA sigue a un clic con el aviso en pantalla.
-const _WSFC_NOTICE_KEY = 'aurix_ws_premium_notice_v1';
-// Las claves locales donde vive el trabajo de Workspace. Si alguna tiene algo,
-// esta cuenta USÓ Workspace antes de que fuera Premium. Son las mismas que declara
-// el inventario de persistencia; se leen en CRUDO y sin parsear porque la pregunta
-// es «¿hay algo?», no «¿qué hay?».
-const _WSFC_WORK_KEYS = Object.freeze([
-  'aurix_ws_projects_v1', 'aurix_ws_goals_v1', 'aurix_ws_goal_funding_v1',
-  'aurix_ws_scenarios_v1', 'aurix_ws_planning_v1', 'aurix_ws_tool_state_v1',
-  'aurix_ws_pinned_v1', 'aurix_ws_recent_v1',
-]);
-function _wsfcHasPriorWork() {
-  for (let i = 0; i < _WSFC_WORK_KEYS.length; i++) {
-    let raw = null;
-    try { raw = localStorage.getItem(_WSFC_WORK_KEYS[i]); } catch (_) { return false; }
-    if (!raw) continue;
-    // Una clave escrita y vaciada no es trabajo guardado. Sin esto, cualquiera que
-    // hubiera abierto Workspace una vez recibía un aviso sobre datos que no tiene.
-    const v = String(raw).trim();
-    if (v === '' || v === '[]' || v === '{}' || v === 'null') continue;
-    return true;
-  }
-  return false;
-}
-function _wsfcNoticeDue() {
-  let seen = null;
-  try { seen = localStorage.getItem(_WSFC_NOTICE_KEY); } catch (_) { return false; }
-  if (seen) return false;
-  return _wsfcHasPriorWork();
-}
-function _wsfcNoticeMarkSeen() {
-  try { localStorage.setItem(_WSFC_NOTICE_KEY, '1'); } catch (_) {}
-}
-// Las OCHO capacidades, en el orden en que el producto las cuenta. Los nombres y
-// el orden se declaran aquí, pero la PERTENENCIA la decide el catálogo: cada clave
-// se resuelve por su entrada publicada (`_wsSurfaceEntry`), así que la portada no
-// puede presumir de algo que el producto no publica. Los iconos son los que ya usa
-// cada capacidad por dentro (`_wsTplViz`): ningún asset nuevo, ninguna dependencia.
+// ── EL AVISO SE RETIRA, Y NO SE SUSTITUYE POR OTRO ─────────────────────────
+// Aquí vivían `_WSFC_NOTICE_KEY`, `_WSFC_WORK_KEYS`, `_wsfcHasPriorWork`,
+// `_wsfcNoticeDue` y `_wsfcNoticeMarkSeen`: el aviso «Workspace ahora forma parte
+// de Premium. Tus datos guardados se conservan.» que se enseñaba una vez a quien
+// tuviera trabajo guardado. Se retira ENTERO —render, textos, lógica y estilos—
+// y no se reemplaza por otro cartel.
+//
+// LO QUE **NO** SE HACE, y es deliberado: no se borra `aurix_ws_premium_notice_v1`
+// de los navegadores que ya lo tienen. Es una clave inerte de un byte; barrerla
+// exigiría una migración que sólo existiría para limpiarse a sí misma, y este
+// bloque no toca datos de usuario para nada.
+
+// ── LAS OCHO CAPACIDADES DE LA PORTADA ─────────────────────────────────────
+// El ORDEN y el ICONO se declaran aquí. El NOMBRE no: sale del catálogo, por la
+// misma clave de diccionario que usa la tarjeta de cada capacidad. Antes había
+// ocho claves `wsfc_n_*` propias de esta superficie, y así es exactamente como la
+// portada y el catálogo acaban llamando distinto a la misma cosa («Interés
+// compuesto» aquí, «Calculadora de interés compuesto» allí). Una fuente.
 const _WSFC_CAPS = Object.freeze([
-  { k: 'compound',    viz: 'curve'   },
-  { k: 'realestate',  viz: 'house'   },
-  { k: 'loan',        viz: 'donut'   },
-  { k: 'scenario',    viz: 'compare' },
-  { k: 'budget',      viz: 'budget'  },
-  { k: 'receivables', viz: 'table'   },
-  { k: 'goals',       viz: 'target'  },
-  { k: 'journal',     viz: 'journal' },
+  { k: 'compound',    icon: 'growth'   },
+  { k: 'realestate',  icon: 'house'    },
+  { k: 'loan',        icon: 'calc'     },
+  { k: 'scenario',    icon: 'paths'    },
+  { k: 'budget',      icon: 'split'    },
+  { k: 'receivables', icon: 'receipt'  },
+  { k: 'goals',       icon: 'target'   },
+  { k: 'journal',     icon: 'log'      },
 ]);
-function _wsfcPublishedCaps() {
-  return _WSFC_CAPS.filter(c => {
-    const e = _wsSurfaceEntry(c.k);
-    return !!e && e.published === true;
-  });
+// La clave de diccionario con la que el CATÁLOGO nombra una entrada. Sale de los
+// mapas de render, que ya son el owner de «cómo se pinta cada entrada».
+function _wsEntryNameKey(entryId) {
+  const r = _WS_TOOL_RENDER[entryId] || _WS_TPL_RENDER[entryId] || null;
+  return r && r.nameKey ? r.nameKey : null;
 }
+function _wsfcPublishedCaps() {
+  return _WSFC_CAPS.map(c => {
+    const e = _wsSurfaceEntry(c.k);
+    if (!e || e.published !== true) return null;
+    const nameKey = _wsEntryNameKey(e.id);
+    return nameKey ? { k: c.k, icon: c.icon, nameKey: nameKey } : null;
+  }).filter(Boolean);
+}
+// ════════════════════════════════════════════════════════════════════════════
+// §A · PORTADA FREE DE WORKSPACE
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE NO LLEVA, y cada ausencia es una regla:
+//   · ninguna lectura de patrimonio — eso es de Intelligence;
+//   · ninguna promesa inventada: se nombran capacidades que existen construidas;
+//   · ningún precio ni condición comercial — el paywall canónico es el owner;
+//   · ninguna tarjeta «Próximamente» para completar la rejilla.
+//
+// ── UNA SOLA SUPERFICIE, Y POR QUÉ ────────────────────────────────────────
+// La versión anterior eran TRES bloques sueltos sobre el lienzo (cabecera, card
+// de capacidades y CTA) repartidos con `space-between`: eso dejaba ~135 px de
+// vacío entre cada uno y el CTA terminaba pegado a la navegación. Y las ocho
+// celdas usaban `--elev-2`, un gris azulado CLARO que sobre este lienzo se lee
+// como ocho botones — justo lo que no son.
+//
+// Ahora es UNA composición continua dentro de un panel que comparte ADN con la
+// portada de Intelligence (`.intprev-card`): mismo negro azulado, mismo borde
+// azul tenue, misma profundidad discreta. Las capacidades son `<li>`: sin hover,
+// sin cursor de enlace y sin orden de tabulación — no son accionables y no lo
+// aparentan. El único elemento accionable es el CTA, y se distingue por ser el
+// único con peso dorado.
 function _renderWorkspaceFreeCover() {
   const esc = _escapeWorkspaceText;
   const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : (fb || ''); } catch (_) { return fb || ''; } };
   const caps = _wsfcPublishedCaps();
-  const notice = _wsfcNoticeDue();
-  if (notice) _wsfcNoticeMarkSeen();
-  const noticeHtml = notice ? `
-        <div class="wsfc-notice" role="status">
-          <p class="wsfc-notice-text">${esc(tx('wsfc_notice', ''))}</p>
-          <button type="button" class="wsfc-notice-x" data-wsfc-notice-close="1"
-                  aria-label="${esc(tx('wsfc_notice_close', 'Cerrar aviso'))}">×</button>
-        </div>` : '';
   return `
     <div class="aurix-wsh wsfc" data-wsh-view="free_cover">
       <section class="wsfc-stage">
-        <header class="wsfc-head">
+        <div class="wsfc-panel">
           <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'WORKSPACE'))}</p>
           <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
           <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
-        </header>${noticeHtml}
-        <div class="wsfc-card">
           <ul class="wsfc-caps" data-wsfc-caps="${caps.length}">
             ${caps.map(c => `<li class="wsfc-cap">
-              <span class="wsfc-cap-ico">${_wsTplViz(c.viz)}</span>
-              <span class="wsfc-cap-name">${esc(tx('wsfc_n_' + c.k, ''))}</span>
+              <span class="wsfc-cap-ico">${_wsCapIconHtml(c.icon)}</span>
+              <span class="wsfc-cap-name">${esc(tx(c.nameKey, ''))}</span>
             </li>`).join('')}
           </ul>
-        </div>
-        <div class="wsfc-cta-wrap">
-          <button type="button" class="wsfc-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
+          <div class="wsfc-cta-wrap">
+            <button type="button" class="wsfc-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
+          </div>
         </div>
       </section>
     </div>`;

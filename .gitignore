@@ -21,6 +21,8 @@ docs/p0-free-boundary/shots-webkit/
 docs/wsfc-premium-cover/
 # Y las de la sonda de primera pantalla útil (8 capacidades × 2 viewports).
 docs/ws-firstscreen/
+# Y las de «Tus planes» en el Dashboard.
+docs/ws-dashboard-plans/
 
 # Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
 supabase/.temp/

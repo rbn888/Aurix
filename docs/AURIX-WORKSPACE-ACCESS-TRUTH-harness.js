@@ -95,7 +95,7 @@ function ctx(persona, langCode) {
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
    '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
-   '_WSFC_NOTICE_KEY','_WSFC_WORK_KEYS','_WSFC_CAPS',
+   '_WSFC_CAPS',
    '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL',
    '_WS_FOUNDER_VIEW_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',
@@ -107,7 +107,7 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType',
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
    '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover',
-   '_wsfcHasPriorWork','_wsfcNoticeDue','_wsfcNoticeMarkSeen','_wsfcPublishedCaps',
+   '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml',
    '_wsCanPersist','_wsPersistUpsell','_wsOpenSurface','_wsTogglePin','_wsTouch',
    // SPEC P0 — el guard de vista, la vista técnica de fundador y el contrato de
    // documento (revisión + tombstone). Se ejecutan los REALES, no un stub.
@@ -682,48 +682,40 @@ console.log('\n8 · Portada Free: una card, ocho capacidades, un CTA y ningún a
         return out.join('|') === '[]|[]';
       })());
   });
-  ok('8.8 los controles de la portada están en el selector del despachador',
-    /\[data-wsfc-notice-close\],\[data-wsh-lock\]/.test(app)
-    && !/\[data-wsfc-open\]/.test(app)
+  // 8.8 SE INVIERTE. Vigilaba que los controles de la portada estuvieran en el
+  // `closest()` del despachador, porque no estarlo los dejaba muertos —fue un
+  // defecto real—. Ya no hay controles que despachar aquí: las dos aperturas se
+  // fueron con las tarjetas gratuitas y el cierre del aviso con el aviso. Lo
+  // único pulsable es el CTA, y lo despacha el owner canónico de conversión.
+  ok('8.8 la portada no tiene controles en el despachador: sólo el CTA canónico',
+    !/\[data-wsfc-open\]/.test(app) && !/\[data-wsfc-notice-close\]/.test(app.replace(/^\s*\/\/.*$/gm, ''))
+    && /data-premium-cta="workspace\.full"/.test(app)
     && /\[data-ws-sync-retry\]/.test(app),
-    'sin esto los botones no reciben el clic (era el defecto reportado)');
+    'el CTA va por `_initFounderUI` → `openAurixPremiumModal`, no por `_wshWireOnce`');
   // 8.9 SE INVIERTE, y era el P0 FREE BOUNDARY: la portada NO es de un solo uso.
   ok('8.9 la portada NO se gasta: no queda estado de «ya la has visto»',
     !/_wsFreeCoverSeen\s*=/.test(app.replace(/\/\/[^\n]*/g, '')),
     'un guard no se gasta');
   ok('8.10 y sigue decidiéndose por el plan, sin bloquear la sección',
     !/hasAurixPremiumAccess/.test(fnSrc('renderWorkspace')));
-  // ── §5 · EL AVISO DE QUIEN YA TENÍA TRABAJO GUARDADO ──────────────────────
+  // ── EL AVISO SE RETIRÓ, Y NO SE SUSTITUYE ────────────────────────────────
+  // 8.11–8.16 certificaban el aviso «Workspace ahora forma parte de Premium…»:
+  // a quién se le enseñaba, que fuera una sola vez y que no bloqueara el pago.
+  // El founder lo retira, así que la afirmación correcta es que NO existe — ni
+  // él ni un sustituto. Lo que sí se conserva es lo que el aviso protegía: que
+  // los datos guardados siguen ahí, y eso lo certifica el ciclo de vida del
+  // documento (5.x de AURIX-WORKSPACE-OPERATIVE y la sonda de primera pantalla).
   {
-    const nuevo = ctx('free', 'es');
-    const h0 = R(nuevo, '_renderWorkspaceFreeCover()');
-    ok('8.11 una cuenta Free NUEVA no recibe el aviso de cambio de plan',
-      h0.indexOf('wsfc-notice') === -1);
-    const viejo = ctx('free', 'es');
-    R(viejo, 'localStorage.setItem("aurix_ws_projects_v1", JSON.stringify([{ id: "p1", type: "compound_growth" }]))');
-    const h1 = R(viejo, '_renderWorkspaceFreeCover()');
-    ok('8.12 una cuenta Free CON trabajo guardado sí lo recibe, y dice que se conserva',
-      h1.indexOf('wsfc-notice') !== -1
-      && h1.indexOf(R(viejo, 't("wsfc_notice")')) !== -1
-      && /role="status"/.test(h1));
-    const h2 = R(viejo, '_renderWorkspaceFreeCover()');
-    ok('8.13 y se muestra UNA sola vez: el segundo pintado ya no lo lleva',
-      h2.indexOf('wsfc-notice') === -1);
-    ok('8.14 el aviso no es un paso previo al pago: el CTA sigue en la misma pantalla',
-      /data-premium-cta="workspace\.full"/.test(h1)
-      && h1.indexOf('wsfc-notice') < h1.indexOf('data-premium-cta'));
-    // Una clave escrita y VACIADA no es trabajo guardado.
-    const vacio = ctx('free', 'es');
-    R(vacio, 'localStorage.setItem("aurix_ws_projects_v1", "[]"); localStorage.setItem("aurix_ws_pinned_v1", "[]")');
-    ok('8.15 una clave vacía no cuenta como trabajo previo',
-      R(vacio, '_renderWorkspaceFreeCover()').indexOf('wsfc-notice') === -1);
-    // Y el aviso NO se le enseña a quien sí tiene acceso: Premium no llega a esta
-    // superficie porque el despachador lo manda a `home` (ver 8.17 y el probe P0).
-    const prem = ctx('premium', 'es');
-    ok('8.16 Premium conserva las dos capacidades que dejaron de ser gratuitas',
-      R(prem, '_wsToolAccess("compound").ok') === true
-      && R(prem, '_wsToolAccess("realestate").ok') === true,
-      JSON.stringify([R(prem, 'JSON.stringify(_wsToolAccess("compound"))'), R(prem, 'JSON.stringify(_wsToolAccess("realestate"))')]));
+    const c = ctx('free', 'es');
+    R(c, 'localStorage.setItem("aurix_ws_projects_v1", JSON.stringify([{ id: "p1", type: "compound_growth" }]))');
+    const html = R(c, '_renderWorkspaceFreeCover()');
+    ok('8.11 con trabajo guardado NO se pinta ningún aviso de cambio de plan',
+      html.indexOf('wsfc-notice') === -1 && !/forma parte de Premium|now part of Premium/.test(html));
+    ok('8.12 y no queda lógica del aviso en el bundle',
+      !/_wsfcNoticeDue|_wsfcHasPriorWork|_WSFC_NOTICE_KEY|data-wsfc-notice-close/.test(app.replace(/^\s*\/\/.*$/gm, '')));
+    ok('8.13 ni se ha sustituido por otro cartel: la portada son cuatro piezas',
+      (html.match(/class="wsfc-(eyebrow|title|sub|caps|cta-wrap)"/g) || []).length === 5
+      && html.indexOf('role="status"') === -1 && html.indexOf('role="alert"') === -1);
   }
   // ── §4 · LA RENDIJA DEL GUARD, CERRADA ────────────────────────────────────
   // El despachador dejaba montada la vista `tool` si su gate la concedía. Existía

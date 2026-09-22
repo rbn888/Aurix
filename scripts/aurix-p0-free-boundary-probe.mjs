@@ -383,7 +383,7 @@ for (const cap of ['compound', 'realestate']) {
     return JSON.stringify({
       text:txt,
       cards:document.querySelectorAll('#aurixWorkspace .wsfc-item').length,
-      capsBox:document.querySelectorAll('#aurixWorkspace .wsfc-card').length,
+      capsBox:document.querySelectorAll('#aurixWorkspace .wsfc-panel').length,
       imgs:imgs,
       caps:[].map.call(document.querySelectorAll('#aurixWorkspace .wsfc-cap-name'),function(e){return (e.innerText||'').trim();}),
       capButtons:document.querySelectorAll('#aurixWorkspace .wsfc-cap button, #aurixWorkspace button.wsfc-cap').length,
@@ -868,8 +868,8 @@ for (const [w, h] of VIEWPORTS) {
         // (`aurix-wsfc-cover-probe.mjs`). Aquí basta con que la superficie MONTE
         // en este viewport: si no montara, lo de allí mediría otra cosa.
         ok(`E.${w}×${h} ${L.toUpperCase()} la portada Free monta en este viewport`,
-          await ev(`!!document.querySelector('#aurixWorkspace .wsfc-stage .wsfc-card')`),
-          'sin .wsfc-card');
+          await ev(`!!document.querySelector('#aurixWorkspace .wsfc-stage .wsfc-panel')`),
+          'sin .wsfc-panel');
       }
     }
   }

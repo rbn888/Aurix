@@ -116,7 +116,7 @@ function ctx(persona, langCode) {
    '_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL','_WS_FOUNDER_VIEW_KEY','_AURIX_ENT_CANON_EXTRA',
    '_AURIX_ENT_CANON','_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_TOOL_REQUIRED','_WS_PROJ_CONV',
    '_WSH_SPACE_HIDDEN_KEY','_WSH_SPACE_TOP_KEY',
-   '_WSFC_NOTICE_KEY','_WSFC_WORK_KEYS','_WSFC_CAPS'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSFC_CAPS'].forEach(n => vm.runInContext(konstSrc(n), sb));
   vm.runInContext('var _aurixEnt = { loaded:false, loading:false, error:null, plan:"free", status:"none", source:"default", validUntil:null, features:Object.create(null), sources:Object.create(null), fetchedAt:0 };', sb);
   ['hasFeature','_aurixEntLoaded','hasAurixPremiumAccess','_aurixEntIsCatalogPreview',
    '_wsPremiumShell','_renderWorkspacePending','_wsFounderViewFlag','_wsInternalViewOn',
@@ -128,7 +128,7 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType','_wsGlyphTile',
    '_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml','_wsLabel','_wsTypeLabel',
    '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsCanPersist','_wsPersistUpsell','_wshReveal',
-   '_wsfcHasPriorWork','_wsfcNoticeDue','_wsfcNoticeMarkSeen','_wsfcPublishedCaps',
+   '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml',
    '_wshMetrics','_wshRefreshMetrics','_wsTogglePin','_wsTouch','_wsSpaceHidden','_wsSpaceTop','_wsSpaceTopRank',
    '_ws4ProjectsRaw','_ws4Projects','_ws4SaveAll','_wsDocStamp','_ws4Persist','_ws4Tombstone',
    '_wsgGoalsRaw','_wsgGoals','_wsgSaveAll','_wsgTombstone','_wsgPersist','_wsgGet','_wsgStored',

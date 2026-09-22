@@ -683,7 +683,10 @@ const newCss = (() => {
     // El banner de la portada Free se renombró al convertirse Workspace en Premium
     // entero. Sin esta marca el bloque de Intelligence volvía a cortar hasta el
     // final del fichero y N.7 acusaba selectores `.wsfc-*` que no son suyos.
-    'CIERRE WORKSPACE PREMIUM · §2/§3 — PORTADA FREE'];
+    'CIERRE WORKSPACE PREMIUM · §2/§3 — PORTADA FREE',
+    // Tercer nombre del mismo bloque. Es una línea por rebautizo, y a cambio el
+    // bloque de Intelligence nunca hereda reglas que no son suyas.
+    'CIERRE VISUAL WORKSPACE · §A — PORTADA FREE'];
   let to = css.length;
   NEXT_BLOCKS.forEach(m => { const i = css.indexOf(m, from); if (i > from && i < to) to = i; });
   return css.slice(from, to);
