@@ -95,6 +95,7 @@ function ctx(persona, langCode) {
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
    '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
+   '_WSFC_NOTICE_KEY','_WSFC_WORK_KEYS','_WSFC_CAPS',
    '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL',
    '_WS_FOUNDER_VIEW_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',
@@ -106,6 +107,7 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType',
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
    '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover',
+   '_wsfcHasPriorWork','_wsfcNoticeDue','_wsfcNoticeMarkSeen','_wsfcPublishedCaps',
    '_wsCanPersist','_wsPersistUpsell','_wsOpenSurface','_wsTogglePin','_wsTouch',
    // SPEC P0 — el guard de vista, la vista técnica de fundador y el contrato de
    // documento (revisión + tombstone). Se ejecutan los REALES, no un stub.
@@ -330,14 +332,27 @@ const PUBLIC = (function () {
         ok('3.6 premium/' + lg + ' · y ninguna presenta paywall',
           dests.every(x => x.d.kind !== 'paywall'));
       } else {
+        // CIERRE WORKSPACE PREMIUM — 3.7 SE INVIERTE. Exigía que Free abriera
+        // EXACTAMENTE `tool:compound` y `tool:realestate`, que eran las dos
+        // capacidades del plan Free. Ya no hay ninguna: la decisión aprobada es que
+        // las ocho requieren Premium, así que la afirmación correcta es la contraria
+        // —Free no abre NI UNA— y se comprueba con el mismo despachador real.
         const openFree = dests.filter(x => x.d.kind === 'opened').map(x => x.d.what).sort();
-        ok('3.7 free/' + lg + ' · abre EXACTAMENTE las dos capacidades gratuitas',
-          JSON.stringify(openFree) === JSON.stringify(['tool:compound', 'tool:realestate']),
-          JSON.stringify(openFree));
-        ok('3.8 free/' + lg + ' · las otras seis llevan al paywall con su clave real',
-          dests.filter(x => x.d.kind === 'paywall').length === 6
+        ok('3.7 free/' + lg + ' · no abre NINGUNA capacidad: las ocho son Premium',
+          openFree.length === 0, JSON.stringify(openFree));
+        ok('3.8 free/' + lg + ' · las OCHO llevan al paywall con su clave real',
+          dests.filter(x => x.d.kind === 'paywall').length === 8
           && dests.filter(x => x.d.kind === 'paywall').every(x => /^workspace\./.test(x.d.featureKey)),
           JSON.stringify(dests.map(x => x.d.kind + ':' + (x.d.featureKey || x.d.what || ''))));
+        // Y el derecho que se deniega es el SUYO, no uno prestado: si las dos nuevas
+        // colgaran de `intelligence.full` o de una clave global, esto lo delataría.
+        const fks = dests.filter(x => x.d.kind === 'paywall').map(x => x.d.featureKey).sort();
+        ok('3.9 free/' + lg + ' · cada capacidad deniega con SU propia clave, sin global',
+          new Set(fks).size === 8
+          && fks.indexOf('workspace.compound') !== -1
+          && fks.indexOf('workspace.realestate') !== -1
+          && fks.indexOf('workspace.full') === -1,
+          JSON.stringify(fks));
       }
     });
   });
@@ -361,13 +376,15 @@ console.log('\n4 · «Abrir» cuando se puede abrir; «Premium» cuando no:');
       && (hp.match(/wsh-tool-go is-lock/g) || []).length === 0
       && (hp.match(/wsh-pill/g) || []).length === 0,
       String((hp.match(/wsh-tool-go/g) || []).length));
-    ok('4.3 free/' + lg + ' · las seis Premium llevan su etiqueta, y las dos Free ninguna',
-      (hf.match(/wsh-tier is-premium/g) || []).length === 6
+    // CIERRE WORKSPACE PREMIUM — eran «las seis Premium» y «las dos Free». Ya no
+    // hay ninguna Free: las ocho llevan etiqueta Premium y ninguna ofrece «Abrir».
+    ok('4.3 free/' + lg + ' · las OCHO llevan etiqueta Premium, y ninguna dice «Incluido»',
+      (hf.match(/wsh-tier is-premium/g) || []).length === 8
       && hf.indexOf('wsh-tier is-free') === -1,
       String((hf.match(/wsh-tier is-premium/g) || []).length));
-    ok('4.4 free/' + lg + ' · y ninguna de las seis dice «Abrir» para luego denegar',
-      (hf.match(/wsh-tool-go">/g) || []).length === 2
-      && (hf.match(/wsh-tool-go is-lock/g) || []).length === 6,
+    ok('4.4 free/' + lg + ' · y ninguna dice «Abrir» para luego denegar',
+      (hf.match(/wsh-tool-go">/g) || []).length === 0
+      && (hf.match(/wsh-tool-go is-lock/g) || []).length === 8,
       JSON.stringify([(hf.match(/wsh-tool-go">/g) || []).length, (hf.match(/wsh-tool-go is-lock/g) || []).length]));
     ok('4.5 free/' + lg + ' · la tarjeta bloqueada es accesible y dice qué le falta',
       cards(hf).filter(cd => cd.lock).every(cd => cd.interactive && cd.aria && cd.aria.indexOf(R(free, 't("wsh_lock_aria")')) !== -1),
@@ -603,19 +620,22 @@ console.log('\n7 · Ninguna ruta directa abre lo que el catálogo no publica:');
 // ════════════════════════════════════════════════════════════════════════════
 // 8 · LA PORTADA FREE DE WORKSPACE
 // ════════════════════════════════════════════════════════════════════════════
-console.log('\n8 · Portada Free: un CTA, dos accesos vivos, cero promesas falsas:');
+// CIERRE WORKSPACE PREMIUM — esta sección cambia de contrato, y el cambio es la
+// decisión de producto: la portada ya NO tiene dos accesos vivos. Las afirmaciones
+// que aquí se invierten (8.1 y 8.7) decían literalmente «dos tarjetas Free» y «los
+// dos accesos abren la capacidad de verdad»; mantenerlas habría fosilizado como
+// contrato justo lo que se acaba de retirar, que es la lección que este proyecto
+// lleva pagada diez veces.
+console.log('\n8 · Portada Free: una card, ocho capacidades, un CTA y ningún acceso:');
 {
   ['es', 'en'].forEach(lg => {
     const c = ctx('free', lg);
     const html = R(c, '_renderWorkspaceFreeCover()');
-    ok('8.1 ' + lg + ' · dos tarjetas Free, y son las dos capacidades gratuitas',
-      html.indexOf('data-wsfc-count="2"') !== -1
-      && /data-wsfc-open="compound"/.test(html) && /data-wsfc-open="realestate"/.test(html));
-    // SPEC P0 §2 — RE-DECIDIDO: `data-wsfc-upgrade` abría `openUpgradeIntent`, que
-    // montaba el overlay intermedio «Función premium → Ver AURIX Premium» y pedía
-    // un SEGUNDO clic para llegar a los planes. El CTA pasa al MISMO atributo
-    // canónico que usa Intelligence, así que las dos portadas comparten owner de
-    // pago y no hay paso intermedio que mantener.
+    ok('8.1 ' + lg + ' · ningún acceso a capacidades: no hay tarjeta que abrir',
+      html.indexOf('data-wsfc-open') === -1
+      && html.indexOf('data-wsfc-count') === -1
+      && html.indexOf('wsfc-item') === -1,
+      html.slice(0, 120));
     ok('8.2 ' + lg + ' · UN solo CTA, por el owner canónico de planes, sin paso intermedio',
       (html.match(/data-premium-cta="workspace\.full"/g) || []).length === 1
       && (html.match(/wsfc-cta/g) || []).length === 2
@@ -624,38 +644,95 @@ console.log('\n8 · Portada Free: un CTA, dos accesos vivos, cero promesas falsa
       && html.indexOf('wsfc-skip') === -1);
     ok('8.2b ' + lg + ' · y declara su origen para la medición del embudo',
       /data-premium-source="workspace:free_cover"/.test(html));
-    ok('8.3 ' + lg + ' · el CTA dice «Ver Workspace completo», no «Ver Premium»',
+    ok('8.3 ' + lg + ' · el CTA dice «Descubrir Workspace completo», no «Ver Premium»',
       html.indexOf(R(c, 't("wsfc_cta")')) !== -1
-      && !/Ver Premium|See Premium|Explorar Workspace|Explore Workspace/.test(html),
+      && !/Ver Premium|See Premium/.test(html),
       R(c, 't("wsfc_cta")'));
-    // 8.4 SE INVIERTE (SPEC PORTADAS FREE DE CONVERSIÓN). Exigía que la portada
-    // recitara las SEIS entradas premium del catálogo bajo un rótulo «Con Premium»:
-    // antes del clic el usuario leía una lista de lo que NO puede hacer. Ahora la
-    // portada publica SEIS CAPACIDADES como acciones, sin nombrar el plan. Lo que se
-    // conserva —y es lo que importaba de 8.4— es que sean seis y que ninguna sea un
-    // permiso: por eso se mide el contador de capacidades y la ausencia de «Premium».
-    ok('8.4 ' + lg + ' · la portada publica SEIS capacidades como acciones, no permisos',
-      html.indexOf('data-wsfc-caps="6"') !== -1 && html.indexOf('data-wsfc-premium') === -1,
+    // 8.4 — OCHO capacidades, y son las OCHO PUBLICADAS. No se compara contra una
+    // lista escrita en el test: se deriva del catálogo, así que despublicar una
+    // entrada y dejarla anunciada en la portada sale como fallo.
+    const PUB8 = PUBLIC.length;
+    ok('8.4 ' + lg + ' · publica las OCHO capacidades como acciones, no como permisos',
+      html.indexOf('data-wsfc-caps="' + PUB8 + '"') !== -1
+      && PUB8 === 8
+      && html.indexOf('data-wsfc-premium') === -1
+      && !/wsfc-cap[^>]*(button|role="button")/.test(html),
       (/data-wsfc-caps="(\d+)"/.exec(html) || [])[1]);
+    ok('8.4b ' + lg + ' · y las ocho aparecen con su nombre, ninguno vacío',
+      (function () {
+        const names = (html.match(/class="wsfc-cap-name">([^<]*)</g) || []).map(x => x.replace(/.*>([^<]*)<$/, '$1'));
+        return names.length === 8 && names.every(n => n.trim().length > 2);
+      })(), html.slice(html.indexOf('wsfc-caps'), html.indexOf('wsfc-caps') + 160));
     ok('8.5 ' + lg + ' · y no nombra Seguimiento de precios, que sigue interno',
       html.indexOf(R(c, 't("wsapp_assets_n")')) === -1
       && !/seguimiento de precios|price watchlist/i.test(html));
     ok('8.6 ' + lg + ' · sin precios en la portada: el precio vive en el paywall',
       !/59|7,99|7\.99|€\s*\/|\/año|\/year|\/mes|\/month/.test(html));
-    ok('8.7 ' + lg + ' · los dos accesos abren la capacidad de verdad',
+    // §2 pide retirar tres cosas por su nombre. Se comprueban por LITERAL, no por
+    // clase: renombrar la clase y dejar el texto no arreglaría nada.
+    ok('8.6b ' + lg + ' · fuera «Empieza ahora», «Incluido» y «Con Premium»',
+      !/Empieza ahora|Start now/.test(html)
+      && html.indexOf(R(c, 't("wstier_free")')) === -1
+      && html.indexOf(R(c, 't("wstier_premium")')) === -1
+      && !/Con Premium|With Premium/.test(html));
+    // 8.7 SE INVIERTE: era «los dos accesos abren la capacidad de verdad».
+    ok('8.7 ' + lg + ' · Free ya no puede abrir Interés compuesto ni Portfolio inmobiliario',
       (function () {
         const out = ['compound', 'realestate'].map(k => { R(c, '__opened.length = 0; _wsOpenTool(' + JSON.stringify(k) + ')'); return R(c, 'JSON.stringify(__opened)'); });
-        return out.join('|') === '["tool:compound"]|["tool:realestate"]';
+        return out.join('|') === '[]|[]';
       })());
   });
   ok('8.8 los controles de la portada están en el selector del despachador',
-    /\[data-wsfc-open\],\[data-wsh-lock\]/.test(app)
-    && /\[data-wsh-lock\]/.test(app) && /\[data-ws-sync-retry\]/.test(app),
+    /\[data-wsfc-notice-close\],\[data-wsh-lock\]/.test(app)
+    && !/\[data-wsfc-open\]/.test(app)
+    && /\[data-ws-sync-retry\]/.test(app),
     'sin esto los botones no reciben el clic (era el defecto reportado)');
-  ok('8.9 la portada es de UN SOLO USO: reentrar en la sección da el catálogo',
-    /if \(_wshView === 'free_cover' && _wsFreeCoverSeen\) _wshView = 'home';/.test(fnSrc('renderWorkspace')));
+  // 8.9 SE INVIERTE, y era el P0 FREE BOUNDARY: la portada NO es de un solo uso.
+  ok('8.9 la portada NO se gasta: no queda estado de «ya la has visto»',
+    !/_wsFreeCoverSeen\s*=/.test(app.replace(/\/\/[^\n]*/g, '')),
+    'un guard no se gasta');
   ok('8.10 y sigue decidiéndose por el plan, sin bloquear la sección',
     !/hasAurixPremiumAccess/.test(fnSrc('renderWorkspace')));
+  // ── §5 · EL AVISO DE QUIEN YA TENÍA TRABAJO GUARDADO ──────────────────────
+  {
+    const nuevo = ctx('free', 'es');
+    const h0 = R(nuevo, '_renderWorkspaceFreeCover()');
+    ok('8.11 una cuenta Free NUEVA no recibe el aviso de cambio de plan',
+      h0.indexOf('wsfc-notice') === -1);
+    const viejo = ctx('free', 'es');
+    R(viejo, 'localStorage.setItem("aurix_ws_projects_v1", JSON.stringify([{ id: "p1", type: "compound_growth" }]))');
+    const h1 = R(viejo, '_renderWorkspaceFreeCover()');
+    ok('8.12 una cuenta Free CON trabajo guardado sí lo recibe, y dice que se conserva',
+      h1.indexOf('wsfc-notice') !== -1
+      && h1.indexOf(R(viejo, 't("wsfc_notice")')) !== -1
+      && /role="status"/.test(h1));
+    const h2 = R(viejo, '_renderWorkspaceFreeCover()');
+    ok('8.13 y se muestra UNA sola vez: el segundo pintado ya no lo lleva',
+      h2.indexOf('wsfc-notice') === -1);
+    ok('8.14 el aviso no es un paso previo al pago: el CTA sigue en la misma pantalla',
+      /data-premium-cta="workspace\.full"/.test(h1)
+      && h1.indexOf('wsfc-notice') < h1.indexOf('data-premium-cta'));
+    // Una clave escrita y VACIADA no es trabajo guardado.
+    const vacio = ctx('free', 'es');
+    R(vacio, 'localStorage.setItem("aurix_ws_projects_v1", "[]"); localStorage.setItem("aurix_ws_pinned_v1", "[]")');
+    ok('8.15 una clave vacía no cuenta como trabajo previo',
+      R(vacio, '_renderWorkspaceFreeCover()').indexOf('wsfc-notice') === -1);
+    // Y el aviso NO se le enseña a quien sí tiene acceso: Premium no llega a esta
+    // superficie porque el despachador lo manda a `home` (ver 8.17 y el probe P0).
+    const prem = ctx('premium', 'es');
+    ok('8.16 Premium conserva las dos capacidades que dejaron de ser gratuitas',
+      R(prem, '_wsToolAccess("compound").ok') === true
+      && R(prem, '_wsToolAccess("realestate").ok') === true,
+      JSON.stringify([R(prem, 'JSON.stringify(_wsToolAccess("compound"))'), R(prem, 'JSON.stringify(_wsToolAccess("realestate"))')]));
+  }
+  // ── §4 · LA RENDIJA DEL GUARD, CERRADA ────────────────────────────────────
+  // El despachador dejaba montada la vista `tool` si su gate la concedía. Existía
+  // porque el plan Free incluía dos capacidades. Ya no incluye ninguna, así que la
+  // excepción sólo podría dejar pasar un derecho mal revocado.
+  ok('8.17 sin Premium confirmado, el despachador no deja NINGUNA vista interior',
+    !/_openOk/.test(fnSrc('renderWorkspaceHome'))
+    && /_wsPrem === false\)\s*\{[\s\S]*?_wshView = 'free_cover';/.test(fnSrc('renderWorkspaceHome')),
+    'la rendija `_wshView === "tool" && _wsToolAccess(...).ok` debe estar retirada');
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

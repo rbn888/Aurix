@@ -353,14 +353,24 @@ for (const [label, js] of PATHS) {
 await load(390, 844, true); await showWs(); await persona('free');
 await ev(`switchTab('workspace'); true`); await sleep(250);
 ok('B.recarga → la portada Free permanece', (await wsView()) === 'free_cover', await wsView());
-// las dos capacidades Free abren, y salir devuelve a la portada
+// ── CIERRE WORKSPACE PREMIUM · LAS DOS QUE ERAN GRATUITAS ─────────────────
+// Esto comprobaba que «la capacidad Free abre» pulsando su tarjeta. Ya no hay
+// tarjeta ni capacidad gratuita: lo que hay que demostrar es que la ruta de
+// apertura —el mismo owner que usaba la tarjeta— NO las monta y lleva al pago.
 for (const cap of ['compound', 'realestate']) {
-  await ev(`(function(){var b=document.querySelector('[data-wsfc-open="${cap}"]'); if(b) b.click(); return !!b;})()`);
-  await sleep(200);
-  ok('B.capacidad Free «' + cap + '» abre', (await wsView()) === 'tool', await wsView());
-  await ev(`(function(){var b=document.querySelector('#aurixWorkspace [data-wsh-nav="back"]'); if(b) b.click(); return !!b;})()`);
-  await sleep(200);
-  ok('B.salir de «' + cap + '» devuelve a la portada, no al interior', (await wsView()) === 'free_cover', await wsView());
+  await ev(`_wshView='free_cover'; renderWorkspaceHome(); if(window.closeAurixPremiumModal)window.closeAurixPremiumModal(); true`);
+  await sleep(120);
+  await ev(`_wsOpenTool(${JSON.stringify(cap)}); true`);
+  await sleep(220);
+  ok('B.«' + cap + '» ya no abre para Free: la portada permanece', (await wsView()) === 'free_cover', await wsView());
+  ok('B.«' + cap + '» lleva al paywall canónico, no a un overlay intermedio', await ev(`(function(){
+    var pay=document.querySelector('.aurix-premium-overlay');
+    var mid=document.getElementById('upgradeOverlay');
+    return !!(pay && pay.style.display==='flex') && !(mid && mid.classList.contains('open'));
+  })()`));
+  await ev(`if(window.closeAurixPremiumModal)window.closeAurixPremiumModal(); true`);
+  await sleep(120);
+  ok('B.y cancelar devuelve a la portada, no al interior', (await wsView()) === 'free_cover', await wsView());
 }
 // ── CONTRATO DE LA PORTADA (SPEC PORTADAS FREE DE CONVERSIÓN) ──────────────
 {
@@ -373,6 +383,7 @@ for (const cap of ['compound', 'realestate']) {
     return JSON.stringify({
       text:txt,
       cards:document.querySelectorAll('#aurixWorkspace .wsfc-item').length,
+      capsBox:document.querySelectorAll('#aurixWorkspace .wsfc-card').length,
       imgs:imgs,
       caps:[].map.call(document.querySelectorAll('#aurixWorkspace .wsfc-cap-name'),function(e){return (e.innerText||'').trim();}),
       capButtons:document.querySelectorAll('#aurixWorkspace .wsfc-cap button, #aurixWorkspace button.wsfc-cap').length,
@@ -381,13 +392,15 @@ for (const cap of ['compound', 'realestate']) {
       freeLabel:(document.querySelector('#aurixWorkspace .wsfc-block-label')||{}).innerText||''
     });
   })()`);
-  ok('B.portada · las 2 tarjetas Free usan la IMAGEN REAL y ninguna 404',
-    c.imgs.length === 2 && c.imgs.every(i => i.w > 0 && i.h > 0)
-    && /tool_compound\.webp/.test(c.imgs[0].src + c.imgs[1].src)
-    && /realestate_apartment\.webp/.test(c.imgs[0].src + c.imgs[1].src), JSON.stringify(c.imgs));
-  ok('B.portada · las 6 capacidades se publican como ACCIONES', c.caps.length === 6 && c.caps.every(x => x.length > 3), JSON.stringify(c.caps));
+  ok('B.portada · una sola card, sin tarjetas de acceso ni imágenes de producto',
+    c.cards === 0 && c.imgs.length === 0 && c.freeLabel === '',
+    JSON.stringify({ tarjetas: c.cards, imgs: c.imgs.length, rotulo: c.freeLabel }));
+  ok('B.portada · las OCHO capacidades se publican como ACCIONES, con su nombre',
+    c.caps.length === 8 && c.caps.every(x => x.length > 3), JSON.stringify(c.caps));
   ok('B.portada · las capacidades NO son botones ni abren rutas',
-    c.capButtons === 0 && c.opens.length === 2, JSON.stringify({ btns: c.capButtons, opens: c.opens }));
+    c.capButtons === 0 && c.opens.length === 0, JSON.stringify({ btns: c.capButtons, opens: c.opens }));
+  ok('B.portada · fuera «Empieza ahora» / «Start now»',
+    !/Empieza ahora|Start now/.test(c.text), c.text.slice(0, 100));
   ok('B.portada · CERO «Premium», «Con Premium» o «Incluido» antes del clic',
     !/premium/i.test(c.text) && !/\bIncluido\b/i.test(c.text), c.text.slice(0, 120));
   ok('B.portada · CERO precio y CERO lenguaje de bloqueo antes del clic',
@@ -731,211 +744,19 @@ ok('D.free: un rail local falsificado no concede persistencia', await ev(`(funct
 // es `position:fixed` y sí depende: el sitio donde el contenido puede quedar
 // debajo de la barra es el FINAL del desplazamiento, no el principio.
 const SHOTS = join(OUT, 'shots');
-async function wsfcGeometry(w, h, L) {
-  const tag = `${w}×${h} ${L.toUpperCase()}`;
-  // ── DOS POSICIONES, PORQUE EL CONTRATO TIENE DOS MITADES ──────────────────
-  // ENTRADA (`scrollTop = 0`): el CTA tiene que verse ENTERO sin que el usuario
-  // haga nada. Es la mitad que faltaba: la versión anterior lo dejaba al final de
-  // un flujo que había que desplazar, y en 360×740 y en 390×844 ES no se veía al
-  // entrar. En móvil es una barra `sticky`, así que esto mide la barra fijada.
-  const AT = async (where) => {
-    await ev(`(function(){var st=document.querySelector('#aurixWorkspace .wsfc-stage');
-      if(st) st.scrollTop = ${where === 'fin' ? 'st.scrollHeight' : '0'};
-      window.scrollTo(0, ${where === 'fin' ? 'document.documentElement.scrollHeight' : '0'}); return true;})()`);
-    await sleep(200);
-  };
-  await AT('entrada');
-  const e0 = await J(`(function(){
-    var root=document.getElementById('aurixWorkspace');
-    var R=function(e){if(!e)return null;var b=e.getBoundingClientRect();
-      return {t:+b.top.toFixed(1),b:+b.bottom.toFixed(1),h:+b.height.toFixed(1)};};
-    var stage=root.querySelector('.wsfc-stage');
-    var cta=R(root.querySelector('.wsfc-cta')), wrap=R(root.querySelector('.wsfc-cta-wrap')), sr=R(stage);
-    var navEl=document.getElementById('bottomNav');
-    var navVis=!!navEl && getComputedStyle(navEl).display!=='none' && navEl.getBoundingClientRect().height>0;
-    var nav=navVis?R(navEl):null;
-    return JSON.stringify({
-      ctaH: cta?cta.h:0,
-      // «entero», y no «su borde inferior entra en el viewport»: las dos aristas
-      // dentro del contenedor visible. Un botón cortado por arriba también está
-      // cortado, y la aserción vieja lo habría dado por bueno.
-      ctaWhole: !!cta && cta.t >= sr.t - 0.5 && cta.b <= sr.b + 0.5,
-      ctaAboveNav: nav && cta ? cta.b <= nav.t + 0.5 : !!cta,
-      wrapAboveNav: nav && wrap ? wrap.b <= nav.t + 0.5 : !!wrap,
-      // LA INVARIANTE QUE HACE SEGURA EL ÁREA SEGURA, y que sí es medible sin
-      // un iPhone: el borde inferior del contenedor coincide con el borde
-      // superior de la navegación. La barra de navegación ya incluye el inset
-      // dentro de su propia altura, así que si el contenedor termina justo donde
-      // ella empieza, NADA de la portada puede caer sobre el indicador de inicio
-      // — valga 0 px o 34 px. Lo que no se puede medir aquí es el inset real; lo
-      // que se mide es que la portada no depende de cuánto valga.
-      stageMeetsNav: nav ? Math.abs(sr.b - nav.t) <= 1 : null,
-      scrollTop: stage.scrollTop
-    });})()`);
-  ok(`E.${tag} WSFC · al ENTRAR el CTA se ve entero, por encima de la navegación`,
-    e0.ctaWhole === true && e0.ctaAboveNav === true && e0.wrapAboveNav === true && e0.ctaH >= 52 && e0.scrollTop === 0,
-    JSON.stringify(e0));
-  if (e0.stageMeetsNav !== null) ok(`E.${tag} WSFC · el contenedor termina donde empieza la navegación (área segura a salvo sea cual sea su valor)`,
-    e0.stageMeetsNav === true, 'Δ=' + JSON.stringify(e0.stageMeetsNav));
-  // FINAL del recorrido: es donde se comprueba que no hay nada INALCANZABLE, que
-  // es el defecto real que tenía la portada — no que el botón tape al pasar.
-  await AT('fin');
-  const g = await J(`(function(){
-    var root=document.getElementById('aurixWorkspace');
-    var q=function(s){return root.querySelector(s);};
-    var qa=function(s){return [].slice.call(root.querySelectorAll(s));};
-    var R=function(e){if(!e)return null;var b=e.getBoundingClientRect();
-      return {t:+b.top.toFixed(1),b:+b.bottom.toFixed(1),l:+b.left.toFixed(1),r:+b.right.toFixed(1),w:+b.width.toFixed(1),h:+b.height.toFixed(1)};};
-    // 0,5 px de tolerancia: es subpíxel de redondeo, no holgura de diseño.
-    var hit=function(a,b){if(!a||!b)return false;
-      return !(a.b<=b.t+0.5 || b.b<=a.t+0.5 || a.r<=b.l+0.5 || b.r<=a.l+0.5);};
-    var ins=function(c,p){if(!c||!p)return false;
-      return c.t>=p.t-0.5 && c.b<=p.b+0.5 && c.l>=p.l-0.5 && c.r<=p.r+0.5;};
-    var stage=q('.wsfc-stage'), items=q('.wsfc-items'), capsUl=q('.wsfc-caps');
-    if(!stage||!items||!capsUl) return JSON.stringify({missing:true});
-    var cardEls=qa('.wsfc-item');
-    var cards=cardEls.map(R);
-    var shots=qa('.wsfc-item-shot').map(R);
-    var imgs=qa('.wsfc-item-shot .ws-asset-img');
-    var names=qa('.wsfc-item-name').map(R), descs=qa('.wsfc-item-desc').map(R), opens=qa('.wsfc-item-open').map(R);
-    var caps=qa('.wsfc-cap').map(R), capEls=qa('.wsfc-cap');
-    var disc=R(q('.wsfc-disc-label')), cta=R(q('.wsfc-cta')), ctaEl=q('.wsfc-cta');
-    var ctaWrap=R(q('.wsfc-cta-wrap'));
-    // La barra inferior sólo cuenta si está PINTADA: en escritorio está oculta y
-    // medir su rectángulo de ceros daba un falso rojo en 1366 y 1440.
-    var navEl=document.getElementById('bottomNav');
-    var navVis=!!navEl && getComputedStyle(navEl).display!=='none' && navEl.getBoundingClientRect().height>0;
-    var nav=navVis?R(navEl):null;
-    // «object-fit:cover» y caja con dimensiones controladas: se pregunta al estilo
-    // computado, no al que creemos haber escrito.
-    var imgFit=imgs.map(function(i){var s=getComputedStyle(i);return s.objectFit;});
-    var shotBox=qa('.wsfc-item-shot').map(function(e){var s=getComputedStyle(e);
-      return {w:s.width,h:s.height,ov:s.overflow};});
-    // Texto recortado: caja de render contra caja de contenido, elemento a elemento.
-    var textEls=qa('.wsfc-title,.wsfc-sub,.wsfc-eyebrow,.wsfc-block-label,.wsfc-item-name,.wsfc-item-desc,.wsfc-item-open,.wsfc-cap-name,.wsfc-cta');
-    var clipped=textEls.filter(function(e){
-      return e.scrollWidth>e.clientWidth+1 || e.scrollHeight>e.clientHeight+1;
-    }).map(function(e){return String(e.className||'')+':'+e.scrollWidth+'x'+e.scrollHeight+'>'+e.clientWidth+'x'+e.clientHeight;});
-    return JSON.stringify({
-      cardCount:cards.length,
-      // 1 · cada imagen, entera dentro de su tarjeta
-      imgInCard: shots.map(function(sh,i){return ins(sh,cards[i]);}),
-      imgLoaded: [].map.call(imgs,function(i){return i.naturalWidth>0;}),
-      imgFit: imgFit, shotBox: shotBox,
-      // 2 · título, descripción y «Abrir», dentro de su tarjeta
-      nameInCard: names.map(function(x,i){return ins(x,cards[i]);}),
-      descInCard: descs.map(function(x,i){return ins(x,cards[i]);}),
-      openInCard: opens.map(function(x,i){return ins(x,cards[i]);}),
-      // 3 · la primera tarjeta no interseca la segunda, y están separadas
-      //   LA FORMA LA DICTA LA REJILLA, NO LA SONDA. «Apiladas» es el contrato de
-      //   MÓVIL; a partir de 560px la portada pone las dos tarjetas en paralelo a
-      //   propósito. Se lee el número REAL de columnas del estilo computado y se
-      //   exige simetría en el eje que corresponda: exigir siempre apilado ponía
-      //   en rojo tablet y escritorio por un layout que es el correcto.
-      // La FORMA se deduce de la GEOMETRÍA, y no de parsear grid-template-columns.
-      //   Motivo concreto, y es un error que esta sonda ya cometió: la expresión
-      //   viaja dentro de un template literal, donde la secuencia barra-s no es un
-      //   escape válido y JS la colapsa a una simple s. El split acabó partiendo
-      //   por la letra «s» y contando UNA columna en un layout de dos.
-      //   Dos tarjetas comparten fila si comparten borde superior; si no, están
-      //   apiladas. Eso es observable y no depende de cómo se escriba el CSS.
-      cardsSideBySide: cards.length===2 ? Math.abs(cards[0].t-cards[1].t)<=1 : false,
-      cardsHit: cards.length===2 ? hit(cards[0],cards[1]) : true,
-      cardGapY: cards.length===2 ? +(cards[1].t-cards[0].b).toFixed(1) : null,
-      cardGapX: cards.length===2 ? +(cards[1].l-cards[0].r).toFixed(1) : null,
-      cardWidthDelta: cards.length===2 ? +Math.abs(cards[0].w-cards[1].w).toFixed(1) : null,
-      cardHeightDelta: cards.length===2 ? +Math.abs(cards[0].h-cards[1].h).toFixed(1) : null,
-      cardLeftDelta: cards.length===2 ? +Math.abs(cards[0].l-cards[1].l).toFixed(1) : null,
-      cardTopDelta: cards.length===2 ? +Math.abs(cards[0].t-cards[1].t).toFixed(1) : null,
-      // 4 · el encabezado de capacidades empieza tras el borde REAL de la 2ª
-      discAfterCards: (disc && cards.length===2) ? (disc.t >= cards[1].b-0.5) : false,
-      discHit: cards.some(function(c){return hit(c,disc);}),
-      // 5 · las capacidades, ni bajo el CTA ni bajo la navegación, y TODAS
-      //     enteras dentro del contenedor al final del recorrido: ésa es la
-      //     definición operativa de «accesible».
-      capsAllVisible: caps.every(function(c){return c.t >= R(stage).t - 0.5 && c.b <= R(stage).b + 0.5;}),
-      capsHitCta: caps.some(function(c){return hit(c,cta);}),
-      capsUnderNav: nav ? caps.some(function(c){return c.b>nav.t+0.5;}) : false,
-      capsHitDisc: caps.some(function(c){return hit(c,disc);}),
-      // 6 · el CTA no interseca NADA, y sigue siendo alcanzable
-      // Se mide la BARRA entera (el wrap), no sólo el botón: en móvil la barra
-      // tiene fondo opaco y filete, así que lo que puede tapar algo es ella.
-      // (Sin acentos graves en este comentario: viaja dentro de un template
-      //  literal y uno solo lo cortaría en seco — ya pasó dos veces.)
-      ctaHitAny: [].concat(cards,caps,[disc]).some(function(x){return hit(ctaWrap,x);}),
-      ctaReachable: !!cta && cta.b<=window.innerHeight+0.5 && cta.t>=0,
-      ctaAboveNav: nav ? cta.b<=nav.t+0.5 : true,
-      ctaH: cta?cta.h:0,
-      // LA PREGUNTA QUE EL DEFECTO NO PODÍA CONTESTAR EN VERDE:
-      // ¿mide cada rejilla al menos lo que mide su contenido?
-      itemsBoxFitsContent: items.scrollHeight<=items.clientHeight+1,
-      capsBoxFitsContent: capsUl.scrollHeight<=capsUl.clientHeight+1,
-      itemsBox:items.clientHeight, itemsContent:items.scrollHeight,
-      capsBox:capsUl.clientHeight, capsContent:capsUl.scrollHeight,
-      // 7 · cero overflow horizontal, en el documento y en el propio contenedor
-      docOverflowX: document.documentElement.scrollWidth>window.innerWidth+1,
-      stageOverflowX: stage.scrollWidth>stage.clientWidth+1,
-      // 8 · cero texto recortado
-      clipped: clipped,
-      // objetivos táctiles
-      taps: cardEls.concat([ctaEl]).filter(Boolean).map(function(e){var b=e.getBoundingClientRect();
-        return Math.round(Math.min(b.width,b.height));}),
-      capNotButton: capEls.every(function(e){return e.tagName==='LI' && !e.querySelector('button');})
-    });})()`);
-  if (g.missing) { ok(`E.${tag} portada Workspace presente`, false, 'sin .wsfc-stage'); return; }
-  const all = a => Array.isArray(a) && a.length > 0 && a.every(Boolean);
-  ok(`E.${tag} WSFC · cada imagen, ENTERA dentro de su tarjeta`,
-    g.cardCount === 2 && all(g.imgInCard) && all(g.imgLoaded)
-    && g.imgFit.every(f => f === 'cover') && g.shotBox.every(b => b.ov === 'hidden' && parseFloat(b.w) > 0 && parseFloat(b.h) > 0),
-    JSON.stringify({ dentro: g.imgInCard, cargada: g.imgLoaded, fit: g.imgFit, caja: g.shotBox }));
-  ok(`E.${tag} WSFC · título, descripción y «Abrir», dentro de su tarjeta`,
-    all(g.nameInCard) && all(g.descInCard) && all(g.openInCard),
-    JSON.stringify({ n: g.nameInCard, d: g.descInCard, o: g.openInCard }));
-  const apiladas = !g.cardsSideBySide;
-  ok(`E.${tag} WSFC · las dos tarjetas: ${apiladas ? 'apiladas' : 'en paralelo'}, separadas y simétricas`,
-    g.cardsHit === false && g.cardWidthDelta <= 1
-    && (apiladas ? (g.cardGapY > 0 && g.cardLeftDelta <= 1)
-                 : (g.cardGapX > 0 && g.cardTopDelta <= 1 && g.cardHeightDelta <= 1)),
-    JSON.stringify({ enParalelo: g.cardsSideBySide, solape: g.cardsHit, sepY: g.cardGapY, sepX: g.cardGapX,
-      Δancho: g.cardWidthDelta, Δalto: g.cardHeightDelta, Δizq: g.cardLeftDelta, Δtop: g.cardTopDelta }));
-  // El contrato de MÓVIL, explícito y sin depender de la rejilla: en un teléfono
-  // las dos tarjetas van una debajo de otra, nunca en paralelo.
-  if (w < 560) ok(`E.${tag} WSFC · en móvil las dos tarjetas van APILADAS`,
-    g.cardsSideBySide === false && g.cardGapY > 0, JSON.stringify({ enParalelo: g.cardsSideBySide, sepY: g.cardGapY }));
-  ok(`E.${tag} WSFC · el encabezado de capacidades empieza tras el borde REAL de la 2ª tarjeta`,
-    g.discAfterCards === true && g.discHit === false && g.capsHitDisc === false,
-    JSON.stringify({ tras: g.discAfterCards, solapeTarjeta: g.discHit, solapeCaps: g.capsHitDisc }));
-  ok(`E.${tag} WSFC · las capacidades: todas alcanzables, ni bajo el CTA ni bajo la navegación`,
-    g.capsHitCta === false && g.capsUnderNav === false && g.capsAllVisible === true,
-    JSON.stringify({ cta: g.capsHitCta, nav: g.capsUnderNav, todasVisibles: g.capsAllVisible }));
-  ok(`E.${tag} WSFC · el CTA no interseca nada, es alcanzable y queda sobre la navegación`,
-    g.ctaHitAny === false && g.ctaReachable === true && g.ctaAboveNav === true && g.ctaH >= 44,
-    JSON.stringify({ interseca: g.ctaHitAny, alcanzable: g.ctaReachable, sobreNav: g.ctaAboveNav, alto: g.ctaH }));
-  // LA ASERCIÓN DE CAUSA RAÍZ. Si alguien vuelve a declarar las rejillas
-  // encogibles para forzar que «quepa», esta línea se pone roja sola.
-  ok(`E.${tag} WSFC · ninguna rejilla se pinta fuera de su caja`,
-    g.itemsBoxFitsContent === true && g.capsBoxFitsContent === true,
-    JSON.stringify({ tarjetas: g.itemsBox + '←' + g.itemsContent, capacidades: g.capsBox + '←' + g.capsContent }));
-  ok(`E.${tag} WSFC · cero overflow horizontal y cero texto recortado`,
-    g.docOverflowX === false && g.stageOverflowX === false && g.clipped.length === 0,
-    JSON.stringify({ doc: g.docOverflowX, stage: g.stageOverflowX, recortado: g.clipped }));
-  ok(`E.${tag} WSFC · objetivos táctiles ≥ 44 px y capacidades que no son botones`,
-    g.taps.every(x => x >= 44) && g.capNotButton === true, JSON.stringify({ taps: g.taps, li: g.capNotButton }));
-  // ── LA CAPTURA, QUE HAY QUE MIRAR ─────────────────────────────────────────
-  // Dos: la portada al entrar y el final del recorrido. Las medidas de arriba no
-  // sustituyen a mirarlas —la primera versión de esta sonda las guardaba en negro
-  // porque `#appRoot` seguía en `opacity:0`, y ninguna medida lo delató—.
-  mkdirSync(SHOTS, { recursive: true });
-  const shot = async (suf) => {
-    const png = await S('Page.captureScreenshot', { format: 'png' });
-    writeFileSync(join(SHOTS, `wsfc-${w}x${h}-${L}-${suf}.png`), Buffer.from(png.data, 'base64'));
-  };
-  await shot('fin');
-  await ev(`(function(){var st=document.querySelector('#aurixWorkspace .wsfc-stage');
-    if(st) st.scrollTop=0; window.scrollTo(0,0); return true;})()`);
-  await sleep(200);
-  await shot('inicio');
-}
+// ── LA GEOMETRÍA DE LA PORTADA TIENE OWNER PROPIO, Y ESTÁ FUERA ────────────
+// Aquí vivía `wsfcGeometry`: ~200 líneas que medían caja-contra-contenido e
+// intersección sobre las DOS tarjetas gratuitas, sus imágenes, «Abrir» y el
+// rótulo de descubrimiento. El CIERRE WORKSPACE PREMIUM retira esa composición
+// entera —no hay capacidad gratuita que abrir— así que esos selectores ya no
+// existen y mantenerlos aquí sólo produciría rojo sobre algo que se fue.
+//
+// Y no se reescribe aquí: la misma medida vive ahora en
+// `scripts/aurix-wsfc-cover-probe.mjs`, que hace las MISMAS preguntas en
+// Chromium Y en WebKit —el P0 fue un reparto de flex, y eso lo decide el motor—
+// y cubre además el aviso de cambio de plan y el caso de altura excepcional.
+// Una medida, un owner. Esta sonda conserva lo suyo: el GUARD, las rutas de
+// escape, el pago y los inputs numéricos.
 
 if (run('E')) {
 console.log('\nE · VISUAL RESPONSIVE');
@@ -1043,7 +864,12 @@ for (const [w, h] of VIEWPORTS) {
           !c.missing && c.bottom <= c.vh && c.h >= 44 && c.docOverflowX === false, JSON.stringify(c));
         await ev(`(function(){ if (window.__realFacts) _aurixIntelligencePreviewFacts = window.__realFacts; return true; })()`);
       } else {
-        await wsfcGeometry(w, h, L);
+        // La geometría de la portada Free se certifica en su sonda de dos motores
+        // (`aurix-wsfc-cover-probe.mjs`). Aquí basta con que la superficie MONTE
+        // en este viewport: si no montara, lo de allí mediría otra cosa.
+        ok(`E.${w}×${h} ${L.toUpperCase()} la portada Free monta en este viewport`,
+          await ev(`!!document.querySelector('#aurixWorkspace .wsfc-stage .wsfc-card')`),
+          'sin .wsfc-card');
       }
     }
   }

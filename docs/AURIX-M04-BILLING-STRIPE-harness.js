@@ -751,12 +751,17 @@ console.log('\nG · convergencia, founder e INTERNAL');
     /free\._WS_CATALOG|_WS_CATALOG/.test(app) &&
     !/catalog_preview/.test(SQL) &&
     /e\.featureKey !== 'workspace\.catalog_preview'/.test(read('docs/AURIX-MONETIZATION-PRODUCT-ENTITLEMENT-harness.js')));
-  ok('G.6 el catálogo de Workspace no cambia con este bloque (Free/Premium/Internal intactos)',
+  // Lo que G.6 vigila es que BILLING no se acople al catálogo, no que el catálogo
+  // sea inmutable: la frontera Free/Premium es una decisión de producto y se movió
+  // en el CIERRE WORKSPACE PREMIUM (las ocho capacidades pasan a Premium). Lo que
+  // se conserva —y es lo único que este bloque puede romper— es que cada entrada
+  // publicada declare su derecho y que aquí no entren ids ni importes de Stripe.
+  ok('G.6 el catálogo de Workspace sigue sin acoplarse a billing, y cada entrada declara su derecho',
     (() => { const cat = noComments(app.slice(app.indexOf('const _WS_CATALOG = Object.freeze(['),
                                    app.indexOf('function _wsCatalogEntry')));
-      return /id: 'compound_growth',[^}]*featureKey: null/.test(cat)
+      return /id: 'compound_growth',[^}]*featureKey: 'workspace\.compound'/.test(cat)
         && /id: 'loan_simulation',[^}]*featureKey: 'workspace\.loan'/.test(cat)
-        && /id: 'tpl_realestate',[^}]*published: true[^}]*commercialTier: 'free'/.test(cat)
+        && /id: 'tpl_realestate',[^}]*published: true[^}]*commercialTier: 'premium'/.test(cat)
         // El catálogo de Workspace no adquiere acoplamiento con billing: los ids
         // de proveedor y los importes viven en `billing_prices`, no aquí.
         && !/stripe|amount_cents|provider_price/.test(cat); })());

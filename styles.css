@@ -26989,36 +26989,39 @@ button.intv14-cmp-clear {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   WORKSPACE COMPLETION · §2 — PORTADA FREE
+   CIERRE WORKSPACE PREMIUM · §2/§3 — PORTADA FREE
    ════════════════════════════════════════════════════════════════════════════
-   EL CONTENIDO MANDA SOBRE LA ALTURA, y esto es la corrección de un P0 visual.
-   Antes esta portada afirmaba caber SIEMPRE sin scroll en móvil vertical: la
-   altura se acotaba a `100dvh` menos cabecera y navegación, y las dos rejillas
-   —tarjetas y capacidades— se declaraban encogibles (`flex:0 1 auto` +
-   `min-height:0`) «para que se comprimiera el ESPACIO y nunca el contenido».
-   Esa frase describía algo que el modelo de caja no puede hacer: `gap` y
-   `padding` NO son encogibles, así que lo único que flex podía comprimir era la
-   caja de cada rejilla. En 360×740 la caja de las tarjetas quedó en 153,9 px para
-   170 px de contenido y la de capacidades en 127,2 px para 174 px — y como las
-   rejillas de dentro conservan su tamaño, se pintaron FUERA de su caja: la imagen
-   de cada tarjeta 15,3 px por debajo de su borde, «Abrir» sobre la tarjeta
-   siguiente y la última fila de capacidades 46,8 px dentro del CTA.
+   EL CONTENIDO MANDA SOBRE LA ALTURA, y esto es la memoria de un P0 visual que no
+   se puede reabrir. La versión anterior afirmaba caber SIEMPRE sin scroll en móvil
+   vertical: la altura se acotaba a `100dvh` menos cabecera y navegación, y las dos
+   rejillas —tarjetas gratuitas y capacidades— se declaraban encogibles
+   (`flex:0 1 auto` + `min-height:0`) «para que se comprimiera el ESPACIO y nunca
+   el contenido». El modelo de caja no puede hacer eso: `gap` y `padding` no son
+   encogibles, así que lo único que flex comprimía era la CAJA de cada rejilla. En
+   360×740 la caja de las tarjetas quedó en 153,9 px para 170 px de contenido y la
+   de capacidades en 127,2 px para 174 px, y como las rejillas de dentro conservan
+   su tamaño se pintaron FUERA de su caja: «Abrir» sobre la tarjeta siguiente y la
+   última fila de capacidades 46,8 px dentro del CTA.
 
-   Y lo peor: `scrollHeight === clientHeight`. Al encogerse obedientemente, para el
-   motor de layout TODO CABÍA, así que el `overflow:auto` de abajo no llegaba a
-   producir barra nunca y ninguna medida de «¿cabe?» podía delatar el solape.
+   Y lo peor: al encogerse obedientemente quedaba `scrollHeight === clientHeight`,
+   así que para el motor TODO CABÍA y ninguna medida de «¿cabe?» podía delatar el
+   solape. Por eso el gate pregunta caja-contra-contenido e INTERSECCIÓN entre
+   vecinos, no `scrollHeight`.
 
-   Ahora las rejillas NO se encogen (`flex:0 0 auto`): cada caja mide lo que mide
-   su contenido y, cuando la suma no cabe, el que se desplaza es el contenedor
-   —que para eso es `overflow:auto`—. El CTA viaja en el flujo normal, al final:
-   con altura de sobra `margin-top:auto` lo ancla abajo, y sin ella se alcanza
-   desplazándose. No se queda fijo tapando tarjetas, que es la otra mitad del
-   mismo defecto. `100dvh` y no `100vh` porque en el navegador móvil la barra de
-   URL aparece y desaparece.
+   CÓMO CABE AHORA, y es por contenido y no por compresión: la portada perdió los
+   dos bloques anteriores —«Empieza ahora» con sus dos tarjetas grandes y su rótulo,
+   y el rótulo de descubrimiento— y quedó en cabecera + UNA card de ocho filas
+   compactas + CTA. En 360×740 eso son ~525 px de composición para 622 px de
+   contenedor, así que el CTA entra completo sin barra pegajosa y sin `scale`.
 
-   Lo que §2 prohíbe explícitamente y aquí no se usa: `overflow:hidden` para
-   esconder lo que no cabe, alturas rígidas que disimulen el desbordamiento, y
-   tipografías diminutas. */
+   Ninguna rejilla se encoge (`flex:0 0 auto`): cada caja mide lo que mide su
+   contenido y, si con texto ampliado la suma no cabe, el que se desplaza es el
+   contenedor —que para eso es `overflow:auto`—. `100dvh` y no `100vh` porque en el
+   navegador móvil la barra de URL aparece y desaparece.
+
+   Lo que §3 prohíbe explícitamente y aquí no se usa: `overflow:hidden` para
+   esconder lo que no cabe, rejillas encogibles, `transform:scale`, tipografías
+   diminutas y un CTA superpuesto a las capacidades. */
 .wsfc { display: block; }
 .wsfc-stage {
   /* `--aurix-ws-chrome` declara lo que ocupan cabecera + navegación inferior +
@@ -27030,7 +27033,7 @@ button.intv14-cmp-clear {
   overflow: auto;                      /* zoom / texto ampliado: scroll accesible */
   -webkit-overflow-scrolling: touch;
   display: flex; flex-direction: column;
-  gap: clamp(12px, 2.4vh, 22px);
+  gap: clamp(12px, 2.4vh, 20px);
   padding: clamp(14px, 2.6vh, 26px) 16px calc(12px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
@@ -27047,111 +27050,75 @@ button.intv14-cmp-clear {
   margin: 0; font-size: clamp(13px, 3.4vw, 15px); line-height: 1.5;
   color: rgba(198,214,246,0.76);
 }
-/* Los accesos incluidos. Dos columnas en cuanto el ancho las hace legibles; una
-   sola por debajo, que es fallback por ANCHO y no una rejilla a medio usar. */
-.wsfc-items {
-  /* `0 0 auto`, y el `min-height:0` retirado: una rejilla encogible bajo una
-     altura acotada se queda más corta que sus tarjetas y las pinta por fuera. */
+/* ── EL AVISO DE QUIEN YA TENÍA TRABAJO GUARDADO ────────────────────────────
+   No es un paso previo al pago: es una línea informativa en el flujo, con su
+   cierre. Azul y no dorado — el dorado en esta superficie es del CTA, y usarlo
+   aquí haría competir un aviso con la única acción de la pantalla. */
+.wsfc-notice {
   flex: 0 0 auto;
-  display: grid; grid-template-columns: 1fr; gap: 10px;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 10px 10px 13px; border-radius: 13px;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.22);
+  background: var(--elev-1);
 }
-.wsfc-item {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  gap: 12px; width: 100%; min-height: 64px; text-align: left;
-  padding: 13px 14px; border-radius: 16px; cursor: pointer;
+.wsfc-notice-text {
+  flex: 1 1 auto; margin: 0; font-size: 12.5px; line-height: 1.45;
+  color: rgba(214,228,252,0.92);
+}
+.wsfc-notice-x {
+  flex: 0 0 auto; width: 28px; height: 28px; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  font-size: 18px; line-height: 1; color: rgba(198,214,246,0.7);
+  background: transparent; border: none; border-radius: 8px;
+}
+.wsfc-notice-x:hover { color: var(--text-bright); background: var(--elev-2); }
+.wsfc-notice-x:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+/* ── LA CARD ÚNICA CON LAS OCHO CAPACIDADES ─────────────────────────────────
+   Son ACCIONES del producto, no permisos: ni «Premium», ni candado, ni precio, ni
+   ruta. No son botones —son `<li>`—, así que no hay nada que pulsar y nada que
+   denegar. El nombre va COMPLETO en hasta dos líneas: sin elipsis, porque cortar
+   el nombre de una capacidad es perder justo lo que esta superficie demuestra. */
+.wsfc-card {
+  flex: 0 0 auto;
+  padding: 12px; border-radius: 18px;
   border: 1px solid rgba(var(--aurix-blue-rgb), 0.18);
   /* NO alfa blanco: sobre el lienzo oscuro se lee como gris neutro y rompe la
-     escalera de elevación. Es la lección de GLOBAL POLISH y de DASHBOARD
-     FAST-CLOSE — sólo el TONO cambia, la alfa se conserva. */
+     escalera de elevación. Es la lección de GLOBAL POLISH y DASHBOARD FAST-CLOSE
+     — sólo el TONO cambia, la alfa se conserva. */
   background: var(--elev-1);
-  transition: background .18s, border-color .18s;
 }
-.wsfc-item:hover { background: var(--elev-2); border-color: rgba(var(--aurix-blue-rgb), 0.34); }
-.wsfc-item:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
-.wsfc-item-ico {
-  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px;
-  font-size: 16px; color: rgba(180,208,255,0.95);
-  background: rgba(90,140,255,0.10); border: 1px solid rgba(120,170,255,0.22);
-}
-.wsfc-item-body { min-width: 0; }
-.wsfc-item-name {
-  display: block; font-size: 14.5px; font-weight: 700; line-height: 1.3;
-  color: var(--text-bright);
-}
-.wsfc-item-desc {
-  display: block; margin-top: 2px; font-size: 12px; line-height: 1.4;
-  color: rgba(198,214,246,0.66);
-}
-.wsfc-item-open {
-  /* La acción de la tarjeta. La tarjeta ENTERA es el botón (es un <button>), así
-     que esto es afordancia, no un segundo destino: no recibe eventos propios. */
-  display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
-  font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
-  color: rgba(150,190,255,0.95);
-}
-.wsfc-item-open i { font-style: normal; transition: transform .18s; }
-.wsfc-item:hover .wsfc-item-open i { transform: translateX(3px); }
-/* ── PORTADA REAL DE CADA CAPACIDAD GRATUITA ────────────────────────────────
-   Miniatura lateral con la imagen que la capacidad YA usa por dentro. Ratio fijo
-   y `object-fit:cover`, así que la imagen no deforma ni provoca layout shift: la
-   caja reserva su tamaño antes de que el WebP cargue. Si el archivo faltara,
-   `_wsAssetImg` se autoelimina (onerror) y queda visible el glifo de debajo, que
-   por eso sigue existiendo en el DOM en vez de haberse borrado. */
-.wsfc-item-shot {
-  position: relative; overflow: hidden; flex: 0 0 auto;
-  width: 78px; height: 78px; border-radius: 13px;
-  display: grid; place-items: center;
-  background: rgba(90,140,255,0.10); border: 1px solid rgba(120,170,255,0.22);
-}
-.wsfc-item-ico { font-size: 20px; color: rgba(180,208,255,0.95); }
-.wsfc-item-shot .ws-asset-img {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; opacity: 0; transition: opacity .25s;
-}
-.wsfc-item-shot .ws-asset-img.is-loaded { opacity: 1; }
-/* ── RÓTULO DE BLOQUE (compartido con Intelligence en ritmo y escala) ──────── */
-.wsfc-block-label {
-  flex: 0 0 auto; margin: 2px 0 0; font-size: 11px; font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase; color: rgba(150,185,255,0.78);
-}
-.wsfc-disc-label { color: rgba(198,214,246,0.62); }
-/* ── LAS SEIS CAPACIDADES ───────────────────────────────────────────────────
-   Son ACCIONES, no permisos: ni «Premium», ni candado, ni precio, ni ruta. No son
-   botones —son <li>—, así que no hay nada que pulsar y nada que denegar. 2×3 en
-   móvil y 3×2 en escritorio, con el nombre COMPLETO en hasta dos líneas: sin
-   elipsis, porque cortar el nombre de una capacidad es exactamente perder lo que
-   esta superficie viene a demostrar. */
 .wsfc-caps {
-  /* Misma razón que `.wsfc-items`: la tercera fila salía 46,8 px fuera de su caja
-     y aterrizaba encima del CTA. */
+  /* `0 0 auto`: una rejilla encogible bajo altura acotada se queda más corta que
+     sus filas y las pinta por fuera. Ver la nota de arriba. */
   flex: 0 0 auto; list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 9px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
 }
 .wsfc-cap {
-  display: flex; align-items: center; gap: 10px; min-height: 52px;
-  padding: 10px 11px; border-radius: 13px;
+  display: flex; align-items: center; gap: 9px; min-height: 52px;
+  padding: 9px 10px; border-radius: 12px;
   border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
-  background: var(--elev-1);
+  background: var(--elev-2);
 }
 .wsfc-cap-ico {
-  flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 26px;
+  flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 24px;
   color: rgba(150,190,255,0.9);
 }
-.wsfc-cap-ico svg { width: 30px; height: 20px; }
+.wsfc-cap-ico svg { width: 28px; height: 19px; }
 .wsfc-cap-name {
   min-width: 0; font-size: 12.5px; font-weight: 650; line-height: 1.3;
   color: rgba(222,232,250,0.92);
 }
 /* El CTA es lo último que se comprime: `margin-top:auto` lo ancla abajo cuando
-   sobra altura, y nunca se encoge cuando falta. En móvil, además, se convierte en
-   una barra fijada al pie del contenedor — ver el bloque `max-width:767px`. */
+   sobra altura, y nunca se encoge cuando falta. Entero, en el flujo y por encima
+   de la navegación — nunca superpuesto a las capacidades. */
 .wsfc-cta-wrap {
   flex: 0 0 auto; margin-top: auto;
   display: flex; flex-direction: column; gap: 8px;
 }
 .wsfc-cta {
   /* 52px: suelo táctil de la SPEC de conversión para el CTA móvil (por encima del
-     mínimo de 44px que rige el resto de objetivos). */
+     mínimo de 44px que rige el resto de objetivos). El dorado, discreto y sólo
+     aquí: es el único acento cálido de la superficie. */
   width: 100%; min-height: 52px; font-size: 15px; font-weight: 700; cursor: pointer;
   color: rgba(18,16,10,0.94); border: none; border-radius: 14px;
   background: linear-gradient(180deg, rgba(240,212,142,1), rgba(212,178,104,1));
@@ -27161,109 +27128,71 @@ button.intv14-cmp-clear {
 .wsfc-cta:hover { filter: brightness(1.06); }
 .wsfc-cta:active { transform: translateY(1px); }
 .wsfc-cta:focus-visible { outline: 2px solid rgba(240,212,142,0.95); outline-offset: 3px; }
-.wsfc-skip {
-  width: 100%; min-height: 44px; font-size: 13.5px; font-weight: 600; cursor: pointer;
-  color: rgba(198,214,246,0.72); background: transparent;
-  border: 1px solid rgba(var(--aurix-blue-rgb), 0.16); border-radius: 13px;
-  transition: background .18s, color .18s;
-}
-.wsfc-skip:hover { background: var(--elev-1); color: var(--text-bright); }
-.wsfc-skip:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
-/* Hover no desplaza el layout: sólo cambian color/borde/sombra y la flecha, que
-   se mueve dentro de su propia caja. */
-@media (hover: none) {
-  .wsfc-item:hover { background: var(--elev-1); border-color: rgba(var(--aurix-blue-rgb), 0.18); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .wsfc-item, .wsfc-cta, .wsfc-item-open i, .wsfc-item-shot .ws-asset-img { transition: none; }
-  .wsfc-item:hover .wsfc-item-open i { transform: none; }
+  .wsfc-cta { transition: none; }
+  .wsfc-cta:active { transform: none; }
 }
-/* ── EL CTA, COMPLETO DESDE LA ENTRADA (SÓLO MÓVIL) ─────────────────────────
-   POR QUÉ SÓLO AQUÍ: de 768 px en adelante la portada CABE entera —medido: 906 px
-   de contenedor para ~700 px de composición— y el CTA ya se ve completo al entrar
-   sin ayuda de nadie. Por debajo no cabe, y no por descuido: en 360×740 el
-   contenedor tiene 622 px y la composición pide 747 px. Esos 125 px no se pueden
-   recuperar sin rehacer la densidad —imágenes, tipografía y ritmo— que es
-   justamente lo que hay que conservar. Así que el botón se queda fijado al pie.
-
-   Y ES `sticky`, NO `fixed`, que es toda la diferencia con el defecto que este
-   bloque cerró: un elemento sticky SIGUE EN EL FLUJO. Ocupa su sitio al final del
-   contenido, así que la reserva de espacio se calcula sola —ningún número mágico
-   que mantener sincronizado con nada— y al llegar al final del recorrido las
-   capacidades terminan POR ENCIMA del botón. Antes la última fila quedaba debajo
-   PARA SIEMPRE, sin forma de alcanzarla; ahora no hay nada inalcanzable.
-
-   Se lee como CHROME y no como una tarjeta flotando: fondo opaco (`--bg` es el
-   mismo lienzo, no un cuarto tono), filete superior y sangre completa hasta los
-   dos bordes —los −16px son exactamente el padding lateral de `.wsfc-stage`—. Un
-   degradado semitransparente, que fue el primer intento, deja el texto de detrás
-   medio borrado y se lee como un fallo de pintado, no como una barra.
-
-   El `padding-bottom` del contenedor pasa a 0 y lo pone la barra: si lo pusieran
-   los dos, el botón daría un salto de 12 px justo al final del recorrido. El área
-   segura de iOS NO se suma aquí y no es un olvido — `.wsfc-stage` ya la descuenta
-   en `--aurix-ws-chrome`, así que su borde inferior coincide exactamente con el
-   borde superior de la navegación y el indicador de inicio queda por debajo. */
+/* ── LA BARRA PEGAJOSA SE RETIRA, Y ESO ES LO QUE DEMUESTRA EL CAMBIO ───────
+   La versión anterior necesitaba `position:sticky` en el CTA por debajo de 768px:
+   en 360×740 el contenedor tenía 622 px y la composición pedía 747 px, y esos
+   125 px no se recuperaban sin rehacer la densidad. Rehacer la densidad es
+   exactamente lo que este bloque ha hecho —fuera las dos tarjetas con imagen y los
+   dos rótulos—, así que la composición cabe y el `sticky` sobra. Mantenerlo sería
+   dejar chrome permanente sobre un contenido que ya no lo necesita. */
+/* ── MÓVIL: EL HUECO SE REPARTE, NO SE AMONTONA ────────────────────────────
+   El CTA sigue anclado al pie (es el pulgar quien lo alcanza), pero con
+   `margin-top:auto` TODO el espacio sobrante caía en un solo hueco negro de ~250px
+   entre la card y el botón, y eso se lee como un fallo de pintado, no como aire.
+   `space-between` reparte el mismo sobrante entre los huecos que ya existen: la
+   cabecera arriba, el CTA abajo y la card respirando en medio. Sin free space
+   —360×520, texto ampliado— se comporta exactamente igual que antes. */
 @media (max-width: 767px) {
-  .wsfc-stage { padding-bottom: 0; }
-  .wsfc-cta-wrap {
-    position: sticky; bottom: 0; z-index: 2;
-    margin-left: -16px; margin-right: -16px;
-    padding: 12px 16px;
-    background: var(--bg);
-    border-top: 1px solid var(--color-border-subtle);
-  }
-}
-/* ── TABLET (768–1023) ─────────────────────────────────────────────────────── */
-@media (min-width: 560px) {
-  .wsfc-items { grid-template-columns: 1fr 1fr; }
+  .wsfc-stage { justify-content: space-between; }
+  .wsfc-cta-wrap { margin-top: 0; }
 }
 /* 360px: se permite bajar el padding lateral a 16px antes que comprimir texto. */
 @media (max-width: 374px) {
   .wsfc-stage { padding-left: 16px; padding-right: 16px; }
-  .wsfc-item-shot { width: 72px; height: 72px; }
   .wsfc-cap-name { font-size: 12px; }
+  .wsfc-cap { gap: 8px; padding: 9px; }
 }
+/* ── TABLET (≥768) ─────────────────────────────────────────────────────────
+   La composición se centra en vez de repartirse: con 906 px de contenedor para
+   ~600 px de contenido, `margin-top:auto` dejaba 300 px de vacío entre la card y
+   el CTA. Un margen automático gana a `justify-content`, así que se anula aquí. */
 @media (min-width: 768px) {
-  .wsfc-stage { gap: 20px; padding: 28px 24px; max-width: 760px; margin: 0 auto; }
-  .wsfc-cta-wrap { flex-direction: row; align-items: center; }
-  .wsfc-cta { width: auto; min-width: 240px; }
-  .wsfc-skip { width: auto; min-width: 180px; }
+  .wsfc-stage {
+    gap: 20px; padding: 28px 24px; max-width: 860px; margin: 0 auto;
+    justify-content: center;
+  }
+  .wsfc-caps { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .wsfc-card { padding: 14px; }
+  .wsfc-cta-wrap { margin-top: 4px; flex-direction: row; align-items: center; }
+  .wsfc-cta { width: auto; min-width: 280px; }
 }
 /* ── ESCRITORIO (≥1024) ─────────────────────────────────────────────────────
-   El contenedor se acota a 1040px y se centra, y la portada arranca 32–48px bajo
-   la navegación. Sin `max-height`: en escritorio la altura la pone el contenido,
-   que es lo que evita la tarjeta diminuta flotando en un vacío negro. */
+   Mismo ancho visual que la portada de Intelligence (`.intprev-card`, 860px) y su
+   misma escala tipográfica: 32–34px de título, 16px de subtítulo a 74ch, CTA de
+   54px. Sin `max-height`: en escritorio la altura la pone el contenido, y la
+   composición se centra para no dejar un vacío negro debajo. */
 @media (min-width: 1024px) {
   .wsfc-stage {
-    max-width: 1040px; margin: 0 auto;
-    min-height: auto; max-height: none; overflow: visible;
-    padding: clamp(32px, 4vh, 48px) 24px 40px;
-    gap: clamp(16px, 2.2vh, 24px);
+    max-width: 860px; margin: 0 auto;
+    min-height: calc(100dvh - 68px); max-height: none; overflow: visible;
+    padding: clamp(28px, 4vh, 44px) 24px 36px;
+    gap: clamp(16px, 2.2vh, 22px);
+    justify-content: center;
   }
-  .wsfc-title { font-size: 34px; }
+  .wsfc-title { font-size: 32px; }
   .wsfc-sub   { font-size: 16px; max-width: 74ch; }
-  .wsfc-items { gap: 16px; }
-  .wsfc-item  { min-height: 116px; padding: 16px; align-items: center; }
-  .wsfc-item-shot { width: 96px; height: 96px; border-radius: 14px; }
-  .wsfc-item-name { font-size: 16px; }
-  .wsfc-item-desc { font-size: 13px; }
-  .wsfc-caps  { grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .wsfc-cap   { min-height: 58px; padding: 12px 14px; }
+  .wsfc-caps  { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .wsfc-cap   { min-height: 56px; padding: 11px 13px; }
   .wsfc-cap-name { font-size: 13.5px; }
-  /* El bloque @media 768 de arriba deja el CTA en `width:auto;min-width:240px`, y a
-     1440 px eso lo convierte en un botón pequeño y huérfano bajo una retícula ancha.
-     Aquí recupera presencia sin ocupar todo el ancho. */
+  .wsfc-cap-ico { width: 30px; height: 26px; }
+  .wsfc-cap-ico svg { width: 30px; height: 20px; }
+  .wsfc-notice-text { font-size: 13px; }
   .wsfc-cta-wrap { margin-top: 8px; align-self: flex-start; width: min(420px, 100%); }
   .wsfc-cta { width: 100%; min-width: 0; min-height: 54px; font-size: 15.5px; }
-  /* Escritorio alto: la portada se centra en el viewport en vez de quedar pegada
-     arriba con un vacío debajo. `justify-content` sólo reparte el espacio SOBRANTE,
-     así que en 1366×768 (donde no sobra) la composición no se mueve. */
-  .wsfc-stage { min-height: calc(100dvh - 68px); justify-content: center; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .wsfc-item, .wsfc-cta, .wsfc-skip { transition: none; }
-  .wsfc-cta:active { transform: none; }
 }
 
 /* ── VALIDACIÓN VISIBLE, Y NO SÓLO UN `return` ───────────────────────────────
@@ -27564,7 +27493,6 @@ input.ws4-num.is-invalid {
 .wsre-type-chip { font-size: 11px; letter-spacing: 0.02em; }
 .wsre-form-sec-t { font-size: 11px; letter-spacing: 0.05em; }
 .wsfc-eyebrow { font-size: 11px; letter-spacing: 0.13em; }
-.wsfc-block-label { font-size: 11px; letter-spacing: 0.12em; }
 /* Las leyendas dentro de los SVG (ejes del gráfico de compound y del donut de
    préstamos) estaban entre 8 y 10px. En un SVG el tamaño escala con el viewBox,
    así que se sube al suelo legible y el `viewBox` las sigue acomodando. */
@@ -27673,7 +27601,7 @@ input.ws4-num.is-invalid {
 .wsh-toolcard[role="button"]:focus-visible,
 .wsh-tpl[role="button"]:focus-visible,
 .wsh-mse2-card[role="button"]:focus-visible,
-.wsh-tab:focus-visible, .wsfc-item:focus-visible, .wsfc-cta:focus-visible {
+.wsh-tab:focus-visible, .wsfc-cta:focus-visible, .wsfc-notice-x:focus-visible {
   outline: 2px solid rgba(var(--aurix-blue-rgb,77,141,255), 0.85);
   outline-offset: 2px;
 }

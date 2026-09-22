@@ -82,7 +82,7 @@ function makeApi(overrides) {
       hasFeature, _aurixEntitlementsLoad, _aurixEntIsCatalogPreview, _aurixEntLoaded,
       _aurixEntReset, _wsCatalogFor, _wsCatalogVisible, _wsCommercialLabel,
       _wsCommercialTierClass, _wsToolFeatureKey, _wsCatalogEntry, _wsMseToolPreview, _wsToolAccess,
-      _wsSurfaceEntry, _wsCatalogInternal, _wsEntryOpenable, _wsWs4Access,
+      _wsSurfaceEntry, _wsCatalogInternal, _wsEntryOpenable, _wsWs4Access, _wsEntrySurfaceKey,
       openUpgradeIntent, requireFeature, _WS_CATALOG,
       state: () => _aurixEnt, setState: (s) => { _aurixEnt = s; },
     };`;
@@ -233,12 +233,32 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   console.log('\nC · MATRIZ DE USUARIO — ejecutada');
   const mk = (st) => { const x = makeApi({}); x.setState(loaded(st)); return x; };
   const free = mk(ST.free), prem = mk(ST.premium), fdr = mk(ST.founder);
+  // ── UN PREMIUM CON EL CATÁLOGO COMPLETO ───────────────────────────────────
+  // `ST.premium` es el fixture de M.02 y sólo declara CUATRO claves, así que no
+  // sirve para preguntar «¿conserva Premium lo que acaba de pasar a Premium?»:
+  // respondería que no por una carencia del fixture, no del producto. Este estado
+  // concede todas las claves que el catálogo declara —derivadas, no escritas— que
+  // es exactamente lo que `plan_features` concede al plan premium.
+  const premFull = (() => {
+    const keys = [...new Set(fdr._WS_CATALOG.map(e => e.featureKey).filter(Boolean))]
+      .concat(['intelligence.full', 'premium.settings'])
+      .filter(k => k !== 'workspace.catalog_preview');
+    const features = {}, sources = {};
+    keys.forEach(k => { features[k] = true; sources[k] = 'plan'; });
+    features['workspace.catalog_preview'] = false; sources['workspace.catalog_preview'] = 'default';
+    return mk({ plan: 'premium', status: 'active', source: 'subscription',
+                validUntil: '2027-01-01', sources, features });
+  })();
 
   ok('C.1 FREE · Loan gateado', !free.hasFeature('workspace.loan'));
   ok('C.2 FREE · Intelligence completa no accesible', !free.hasFeature('intelligence.full'));
   ok('C.3 FREE · premium.settings denegado', !free.hasFeature('premium.settings'));
-  ok('C.4 FREE · Compound NO tiene featureKey ⇒ nada que gatear',
-    free._wsToolFeatureKey('compound') === null);
+  // CIERRE WORKSPACE PREMIUM — C.4 se invierte: Compound era la capacidad sin
+  // derecho («nada que gatear»), y un `featureKey` nulo es precisamente lo que
+  // impedía denegarla. Ahora declara el suyo y se gatea como las demás.
+  ok('C.4 FREE · Compound declara su featureKey y queda gateado',
+    free._wsToolFeatureKey('compound') === 'workspace.compound' &&
+    !free.hasFeature('workspace.compound'));
   ok('C.5 FREE · Loan sí tiene featureKey workspace.loan',
     free._wsToolFeatureKey('loan') === 'workspace.loan');
   // ── RE-DECIDIDO · WORKSPACE COMPLETION · publicación de las cinco Premium ──
@@ -327,7 +347,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // ══ D. ETIQUETAS = VERDAD COMERCIAL (§12) ══════════════════════════════
   console.log('\nD · ETIQUETAS');
   const lbl = (id) => fdr._wsCommercialLabel(fdr._wsCatalogEntry(id));
-  ok('D.1 Compound → "Incluido"', lbl('compound_growth') === 'Incluido');
+  ok('D.1 Compound → "Premium" (dejó de ser la herramienta incluida)',
+    lbl('compound_growth') === 'Premium');
   ok('D.2 Loan → "Premium"', lbl('loan_simulation') === 'Premium');
   ok('D.3 no publicada → "Interno"', lbl('monthly_budget') === 'Interno' && lbl('tpl_fire') === 'Interno');
   ok('D.4 "Premium" SÓLO si hay featureKey que Premium concede de verdad',
@@ -354,6 +375,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     (() => {
       const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
                    'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql',
+                   'db/workspace_premium_3_all_premium.sql',
                    'db/monetization_entitlement_resolver_1.sql']
         .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
       const premium = fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium');
@@ -378,7 +400,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('D.5b toda capacidad Premium publicada tiene su derecho concedido en un SQL del repo',
     (() => {
       const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
-                   'db/workspace_premium_2_plan_features.sql']
+                   'db/workspace_premium_2_plan_features.sql', 'db/workspace_premium_3_all_premium.sql']
         .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
       return fdr._WS_CATALOG.filter(e => e.published && e.commercialTier === 'premium')
         .every(e => e.featureKey === 'workspace.loan'
@@ -387,8 +409,10 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     JSON.stringify(fdr._WS_CATALOG.filter(e => e.published && e.commercialTier === 'premium').map(e => e.featureKey)));
   ok('D.6 ninguna entrada publicada queda sin decidir',
     fdr._WS_CATALOG.filter(e => e.published).every(e => e.commercialTier !== 'undecided'));
-  ok('D.7 una convención única de etiqueta: Incluido | Premium | Preview',
-    [...new Set(fdr._WS_CATALOG.map(e => fdr._wsCommercialLabel(e)))].sort().join(',') === 'Incluido,Interno,Premium');
+  // Ya no queda ninguna entrada «Incluido»: las ocho publicadas son Premium y el
+  // resto, interno. La convención no cambia; el catálogo dejó de usar una etiqueta.
+  ok('D.7 una convención única de etiqueta, y ya no hay nada «Incluido»',
+    [...new Set(fdr._WS_CATALOG.map(e => fdr._wsCommercialLabel(e)))].sort().join(',') === 'Interno,Premium');
 
   // ══ E. NO PUBLICAR CÓDIGO DORMIDO (§18) ════════════════════════════════
   console.log('\nE · GATE DE PUBLICACIÓN (§18)');
@@ -450,7 +474,19 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('E.9c Loan para Free SÍ produce razón comercial con su clave',
     (() => { const a = free._wsToolAccess('loan');
       return a.ok === false && a.reason === 'entitlement' && a.featureKey === 'workspace.loan'; })());
-  ok('E.9d Compound abre para Free', free._wsToolAccess('compound').ok === true);
+  ok('E.9d Compound ya NO abre para Free, y deniega por razón comercial',
+    (() => { const a = free._wsToolAccess('compound');
+      return a.ok === false && a.reason === 'entitlement' && a.featureKey === 'workspace.compound'; })());
+  ok('E.9d2 …y sí abre para Premium (el derecho existe, no se ha perdido)',
+    premFull._wsToolAccess('compound').ok === true && premFull._wsToolAccess('realestate').ok === true);
+  ok('E.9d3 un Premium abre las OCHO capacidades publicadas, sin excepción',
+    premFull._WS_CATALOG.filter(e => e.published)
+      .map(e => e.opens || premFull._wsEntrySurfaceKey(e))
+      .filter(Boolean)
+      .every(k => premFull._wsToolAccess(k).ok === true),
+    JSON.stringify(premFull._WS_CATALOG.filter(e => e.published)
+      .map(e => (e.opens || premFull._wsEntrySurfaceKey(e)))
+      .filter(k => k && premFull._wsToolAccess(k).ok !== true)));
   ok('E.9e Loan abre para Premium', prem._wsToolAccess('loan').ok === true);
   ok('E.9f el founder abre lo interno', fdr._wsToolAccess('assets').ok === true);
   // HIGH-2 de la revisión de producto: la recencia es una AFIRMACIÓN.
@@ -729,9 +765,9 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     !/getPlan/.test(fnSource('_aurixMenuTier')));
   ok('G.21 el log de intención está namespaced por usuario',
     /_AURIX_UPGRADE_INTENT_KEY \+ \(_aurixActiveUserId \? \('_' \+ _aurixActiveUserId\) : ''\)/.test(app));
-  ok('G.15 Compound conserva su featureKey nulo y su tier free',
+  ok('G.15 Compound: published + premium + workspace.compound',
     (() => { const e = free._wsCatalogEntry('compound_growth');
-      return e && e.featureKey === null && e.commercialTier === 'free' && e.published === true; })());
+      return e && e.featureKey === 'workspace.compound' && e.commercialTier === 'premium' && e.published === true; })());
   ok('G.16 Loan: published + premium + workspace.loan',
     (() => { const e = free._wsCatalogEntry('loan_simulation');
       return e && e.featureKey === 'workspace.loan' && e.commercialTier === 'premium' && e.published === true; })());
@@ -744,17 +780,22 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   console.log('\nM3 · WORKSPACE FREE V1 (M.03 A)');
   {
     const e = free._wsCatalogEntry('tpl_realestate');
-    ok('M3.1 Real Estate Portfolio: plantilla PUBLICADA, gratis y sin featureKey',
+    // CIERRE WORKSPACE PREMIUM — M.03 A la publicó como la plantilla GRATUITA. La
+    // decisión aprobada la pasa a Premium. Lo que M3 protege y sigue intacto es el
+    // invariante de M.03 A: un solo hogar público por superficie, la entrada de
+    // herramienta interna y el acceso resuelto por la entrada PUBLICADA.
+    ok('M3.1 Real Estate Portfolio: plantilla PUBLICADA, Premium y con su featureKey',
       !!e && e.kind === 'template' && e.published === true &&
-      e.commercialTier === 'free' && e.featureKey === null, JSON.stringify(e));
+      e.commercialTier === 'premium' && e.featureKey === 'workspace.realestate', JSON.stringify(e));
     ok('M3.2 declara la superficie que abre, y el resolver de superficie la elige',
       e.opens === 'realestate' &&
       free._wsSurfaceEntry('realestate') === e);
-    ok('M3.3 un usuario FREE la abre de verdad',
-      free._wsToolAccess('realestate').ok === true &&
-      free._wsToolAccess('realestate').featureKey === null);
-    ok('M3.3b …y el founder también, por el mismo camino',
-      fdr._wsToolAccess('realestate').ok === true);
+    ok('M3.3 un usuario FREE ya NO la abre, y se le deniega por su clave',
+      free._wsToolAccess('realestate').ok === false &&
+      free._wsToolAccess('realestate').reason === 'entitlement' &&
+      free._wsToolAccess('realestate').featureKey === 'workspace.realestate');
+    ok('M3.3b …y Premium sí la abre, por el mismo camino',
+      premFull._wsToolAccess('realestate').ok === true);
     // El punto delicado: la MISMA superficie conserva su entrada de herramienta
     // del inventario de M.02, y esa sigue interna. Publicar la plantilla no puede
     // haber publicado la herramienta.
@@ -797,7 +838,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       !/wsh-pro-badge/.test(app) &&
       /_wsTierChip\('tpl_realestate'\)/.test(app) && /_wsTierChip\('loan_simulation'\)/.test(app));
     ok('M3.10 y la etiqueta que pinta esa cabecera es la REAL del catálogo',
-      free._wsCommercialLabel(e) === 'Incluido' &&
+      free._wsCommercialLabel(e) === 'Premium' &&
       free._wsCommercialLabel(free._wsCatalogEntry('loan_simulation')) === 'Premium');
     // La plantilla gratuita SÍ guarda trabajo y sus claves no viajan en el sync:
     // se declara, no se promete permanencia.
@@ -854,7 +895,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('H.2 toda clave vendible del catálogo está declarada en un SQL del repo',
     (() => {
       const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
-                   'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql']
+                   'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql',
+                   'db/workspace_premium_3_all_premium.sql']
         .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
       const keys = [...new Set(free._WS_CATALOG.map(e => e.featureKey).filter(Boolean))];
       return keys.length >= 1 && keys.every(k => sql.indexOf("'" + k + "'") !== -1);

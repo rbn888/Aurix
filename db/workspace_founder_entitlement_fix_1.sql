@@ -25,6 +25,13 @@
 --   lo que tiene que cuadrar con Stripe. Un override declara lo que es: un
 --   derecho concedido, con su motivo escrito.
 --
+-- ⚠ EL `reason` DE ABAJO NO PASA LA RESTRICCIÓN, y se descubrió el 2026-09-22
+--   ejecutando su equivalente de este bloque: `entitlement_overrides_reason_chk`
+--   (db/monetization_commercial_truth_1.sql) sólo admite 'founder' | 'comp' |
+--   'qa' | 'support'. Si este fichero se ejecuta tal cual, Postgres lo rechaza.
+--   Sustituir la frase por 'founder' antes de ejecutarlo; el motivo largo vive en
+--   esta cabecera, que es donde se lee.
+--
 -- VERIFICACIÓN: volver a ejecutar la consulta 2 del fichero de lectura.
 -- ROLLBACK: al final de este fichero, comentado.
 -- ============================================================================

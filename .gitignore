@@ -16,6 +16,9 @@ docs/*-visual-qa/*.png
 # medición — `docs/p0-free-boundary/measurements.json`.
 docs/p0-free-boundary/shots/
 docs/p0-free-boundary/shots-webkit/
+# Misma regla para la sonda de dos motores del cierre Workspace Premium
+# (`scripts/aurix-wsfc-cover-probe.mjs`): 3 MB de PNG por pasada.
+docs/wsfc-premium-cover/
 
 # Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
 supabase/.temp/

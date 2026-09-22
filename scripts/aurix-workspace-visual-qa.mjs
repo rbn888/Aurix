@@ -262,8 +262,8 @@ const MEASURE = `(function(){
   // que el fundador fotografió en las etiquetas de plan.
   var TEXT = ['.wsh-tool-name','.wsh-tpl-name','.wsh-tier','.wsh-tool-go','.wsh-pill',
               '.wsh-mse2-name','.wsh-mse2-meta','.wsh-mse2-empty-t','.wsh-mse2-empty-b',
-              '.wsh-title','.wsh-tab','.wsfc-title','.wsfc-sub','.wsfc-item-name',
-              '.wsfc-item-desc','.wsfc-item-tag','.wsfc-premium-i','.wsfc-cta',
+              '.wsh-title','.wsh-tab','.wsfc-title','.wsfc-sub','.wsfc-cap-name',
+              '.wsfc-notice-text','.wsfc-eyebrow','.wsfc-cta',
               '.intprev-title','.intprev-fact-text','.intprev-fact-label','.intprev-q',
               '.intprev-premium','.intprev-cta','.intprev-lock-tag','.intprev-badge'];
   var clipped = [], tiny = [], tapSmall = [], fontMin = 99;
@@ -344,9 +344,11 @@ const MEASURE = `(function(){
     out.ctaBottom = Math.round(cta.getBoundingClientRect().bottom);
     out.ctaInFold = out.ctaBottom <= innerHeight + 1 ? 1 : 0;
     out.pageScroll = Math.max(0, document.documentElement.scrollHeight - innerHeight);
-    var items = Array.prototype.slice.call(host.querySelectorAll('.wsfc-item')).filter(vis);
-    out.freeItems = items.length;
-    out.itemsInFold = items.every(function(el){ return el.getBoundingClientRect().bottom <= innerHeight + 1; }) ? 1 : 0;
+    // CIERRE WORKSPACE PREMIUM — `.wsfc-item` eran las dos tarjetas gratuitas y ya
+    // no existen. Lo que hay que ver entero es la card de capacidades.
+    var caps = Array.prototype.slice.call(host.querySelectorAll('.wsfc-cap')).filter(vis);
+    out.capItems = caps.length;
+    out.itemsInFold = caps.length > 0 && caps.every(function(el){ return el.getBoundingClientRect().bottom <= innerHeight + 1; }) ? 1 : 0;
   }
   return out;
 })()`;
@@ -444,10 +446,10 @@ for (const vp of VIEWPORTS) {
       check(label + ' filas de la rejilla alineadas', m.raggedRows === 0, 'filas desiguales=' + m.raggedRows);
     }
     if (sf.kind === 'cover' && vp.width <= 430) {
-      check(label + ' embudo completo sin scroll (CTA y tarjetas)',
+      check(label + ' embudo completo sin scroll (CTA y capacidades)',
         m.ctaInFold === 1 && m.itemsInFold === 1 && m.pageScroll <= 1,
-        JSON.stringify({ ctaBottom: m.ctaBottom, vh: m.vh, scroll: m.pageScroll, items: m.freeItems }));
-      check(label + ' las dos tarjetas Free están presentes', m.freeItems === 2, String(m.freeItems));
+        JSON.stringify({ ctaBottom: m.ctaBottom, vh: m.vh, scroll: m.pageScroll, caps: m.capItems }));
+      check(label + ' las OCHO capacidades están presentes', m.capItems === 8, String(m.capItems));
     }
     if (sf.kind === 'intcover') {
       check(label + ' dos descubrimientos visibles y uno bloqueado',

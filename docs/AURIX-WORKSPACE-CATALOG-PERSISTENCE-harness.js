@@ -61,11 +61,14 @@ const CAT = run('_WS_CATALOG', FREE);
 {
   // El catálogo declarado por la SPEC, con su tier. OCHO y no nueve: Seguimiento de
   // precios se queda INTERNA por la regla que §J trae consigo (ver 1.9).
+  // CIERRE WORKSPACE PREMIUM — `tpl_realestate` y `compound_growth` eran las dos
+  // últimas `free`. La decisión aprobada las pasa a Premium, así que las ocho
+  // publicadas son Premium y NINGUNA entrada publicada queda en `free`.
   const SPEC = {
-    tpl_realestate: ['template', 'free'],
+    tpl_realestate: ['template', 'premium'],
     tpl_mbudget:    ['template', 'premium'], tpl_receivables: ['template', 'premium'],
     tpl_journal:    ['template', 'premium'], tpl_goals:       ['template', 'premium'],
-    compound_growth: ['tool', 'free'], loan_simulation: ['tool', 'premium'],
+    compound_growth: ['tool', 'premium'], loan_simulation: ['tool', 'premium'],
     scenario:        ['tool', 'premium'],
   };
   ok('1.1 las ocho capacidades publicables del catálogo canónico existen con su kind y su tier',
@@ -76,8 +79,14 @@ const CAT = run('_WS_CATALOG', FREE);
   ok('1.2 toda entrada Premium declara su featureKey (nada «Premium» decorativo)',
     CAT.filter(e => e.commercialTier === 'premium').every(e => !!e.featureKey),
     JSON.stringify(CAT.filter(e => e.commercialTier === 'premium' && !e.featureKey).map(e => e.id)));
-  ok('1.3 y las Free NO declaran ninguna: lo incluido no se gatea',
-    CAT.filter(e => e.commercialTier === 'free').every(e => !e.featureKey));
+  // 1.3 SE INVIERTE: ya no queda ninguna entrada `free`, y eso es el contrato.
+  // Una entrada publicada sin `featureKey` no tendría frontera que aplicar —
+  // `_wsToolAccess` devolvería `ok:true` para cualquiera— así que la afirmación
+  // que importa es que NO exista.
+  ok('1.3 no queda NINGUNA capacidad publicada gratuita: Workspace es Premium entero',
+    CAT.filter(e => e.published === true && e.commercialTier === 'free').length === 0
+    && CAT.filter(e => e.published === true).every(e => typeof e.featureKey === 'string' && e.featureKey),
+    JSON.stringify(CAT.filter(e => e.published === true && !e.featureKey).map(e => e.id)));
   // UN HOGAR. Dos entradas publicadas para la misma superficie hacen que
   // `_wsSurfaceEntry` devuelva null y el acceso DENIEGUE — es fail-closed, no un
   // reparto. Así que no puede haberlas.
@@ -248,9 +257,19 @@ console.log('\n3 · Objetivos, Escenarios y Proyección ya no se abren a mano:')
     JSON.stringify(['goals','prices','projection'].map(k => k + ':' + run('_wsToolAccess(' + JSON.stringify(k) + ')', FREE).reason)));
   ok('3.8 el founder sí puede abrirlas', run('_wsToolAccess("scenario")', FOUNDER).ok === true);
   // Lo ya publicado no se rompe.
-  ok('3.9 compound sigue abierto para todos y realestate sigue siendo Free',
-    run('_wsToolAccess("compound")', FREE).ok === true
-    && run('_wsToolAccess("realestate")', FREE).ok === true);
+  // 3.9 SE INVIERTE con la misma decisión: eran las dos capacidades gratuitas y ya
+  // no lo son. Se deniegan por motivo COMERCIAL (no «no publicado»), que es lo que
+  // autoriza a ofrecer el upgrade, y el founder las sigue abriendo.
+  ok('3.9 compound y realestate ya no son Free: deniegan por entitlement, no por publicación',
+    run('_wsToolAccess("compound")', FREE).ok === false
+    && run('_wsToolAccess("compound")', FREE).reason === 'entitlement'
+    && run('_wsToolAccess("compound")', FREE).featureKey === 'workspace.compound'
+    && run('_wsToolAccess("realestate")', FREE).ok === false
+    && run('_wsToolAccess("realestate")', FREE).reason === 'entitlement'
+    && run('_wsToolAccess("realestate")', FREE).featureKey === 'workspace.realestate'
+    && run('_wsToolAccess("compound")', FOUNDER).ok === true
+    && run('_wsToolAccess("realestate")', FOUNDER).ok === true,
+    JSON.stringify([run('_wsToolAccess("compound")', FREE), run('_wsToolAccess("realestate")', FREE)]));
   ok('3.10 el upgrade sólo se ofrece cuando la razón ES comercial',
     /if \(acc\.reason === 'entitlement'\)/.test(fnSrc('_wsOpenSurface')));
 }

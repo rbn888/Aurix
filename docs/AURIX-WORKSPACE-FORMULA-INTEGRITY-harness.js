@@ -645,12 +645,15 @@ function catalog() {
   //     deniega y la tarjeta pintaría «Premium» sin un derecho que la conceda—,
   //   · nada publicado queda en `undecided`, y
   //   · la rejilla se sigue derivando del catálogo, no de un literal.
+  // CIERRE WORKSPACE PREMIUM — M4 exigía exactamente UNA plantilla publicada `free`
+  // (`tpl_realestate`) y sin featureKey. La decisión aprobada retira esa excepción:
+  // cero plantillas gratuitas, y todas las publicadas con su derecho declarado.
   OK('M4 toda plantilla publicada declara su estado comercial real; el inventario interno sigue interno',
      (() => { const tpl = catalog().filter(e => e.kind === 'template');
        const pub = tpl.filter(e => e.published === true);
        const free = pub.filter(e => e.tier === 'free');
        return tpl.length >= 12 && tpl.filter(e => e.published === false).length >= 7 &&
-              free.length === 1 && free[0].id === 'tpl_realestate' && free[0].featureKey === null &&
+              free.length === 0 &&
               pub.filter(e => e.tier === 'premium').every(e => typeof e.featureKey === 'string' && e.featureKey.startsWith('workspace.')) &&
               pub.every(e => e.tier === 'free' || e.tier === 'premium') &&
               // La galería se sigue derivando del catálogo, no de un literal: el mapa

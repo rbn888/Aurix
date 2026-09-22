@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '698'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '699'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6206,24 +6206,23 @@ const T = {
     // diario, precios, objetivos y escenarios— y nada más. Ni una promesa de algo
     // que no esté implementado, ni un precio: eso es del paywall.
     wsfc_eyebrow:      'WORKSPACE',
-    wsfc_title:        'Planifica tus próximos pasos con claridad',
-    wsfc_sub:          'Herramientas y plantillas para calcular escenarios, ordenar tus finanzas y convertir decisiones en planes.',
-    wsfc_free_label:   'Empieza ahora',
+    wsfc_title:        'Convierte tus números en un plan',
+    wsfc_sub:          'Calcula escenarios, organiza tus finanzas y guarda tus planes para retomarlos cuando los necesites.',
+    // Los NOMBRES de las ocho capacidades. Son sustantivos, no verbos: la portada
+    // presenta el producto, no reparte acciones que el usuario no puede ejecutar.
     wsfc_n_compound:   'Interés compuesto',
-    wsfc_d_compound:   'Proyecta cómo puede crecer tu capital.',
-    wsfc_ico_compound: '∑',
     wsfc_n_realestate: 'Portfolio inmobiliario',
-    wsfc_d_realestate: 'Controla tus inmuebles, su deuda y su rentabilidad.',
-    wsfc_ico_realestate: '⌂',
-    wsfc_open:         'Abrir',
-    wsfc_disc_label:   'Todo lo que puedes hacer en Workspace',
-    wsfc_c_loans:      'Simula préstamos',
-    wsfc_c_scenarios:  'Compara escenarios',
-    wsfc_c_budget:     'Controla tu presupuesto',
-    wsfc_c_receivables:'Organiza tus cobros',
-    wsfc_c_goals:      'Define objetivos',
-    wsfc_c_journal:    'Registra tus operaciones',
+    wsfc_n_loan:       'Préstamos',
+    wsfc_n_scenario:   'Escenarios',
+    wsfc_n_budget:     'Presupuesto mensual',
+    wsfc_n_receivables:'Control de cobros',
+    wsfc_n_goals:      'Objetivos',
+    wsfc_n_journal:    'Diario de operaciones',
     wsfc_cta:          'Descubrir Workspace completo',
+    // El aviso de quien ya tenía trabajo guardado. Dice las dos cosas que importan
+    // —qué cambia y qué NO se pierde— y nada más.
+    wsfc_notice:       'Workspace ahora forma parte de Premium. Tus datos guardados se conservan.',
+    wsfc_notice_close: 'Cerrar aviso',
     // La espera mientras el servidor resuelve el plan. No afirma NADA del plan.
     wsfc_pending:      'Preparando tu espacio de trabajo…',
     ws_sync_idle:         'Sin cambios sin guardar',
@@ -8934,24 +8933,19 @@ const T = {
     wsback_space:         'Back to My space',
     wstool_back:          'Back to Tools',
     wsfc_eyebrow:      'WORKSPACE',
-    wsfc_title:        'Plan your next steps with clarity',
-    wsfc_sub:          'Tools and templates to model scenarios, organize your finances, and turn decisions into plans.',
-    wsfc_free_label:   'Start now',
+    wsfc_title:        'Turn your numbers into a plan',
+    wsfc_sub:          'Model scenarios, organize your finances, and save your plans so you can pick them up whenever you need them.',
     wsfc_n_compound:   'Compound interest',
-    wsfc_d_compound:   'Project how your capital can grow.',
-    wsfc_ico_compound: '∑',
     wsfc_n_realestate: 'Property portfolio',
-    wsfc_d_realestate: 'Track your properties, their debt and their return.',
-    wsfc_ico_realestate: '⌂',
-    wsfc_open:         'Open',
-    wsfc_disc_label:   'Everything you can do in Workspace',
-    wsfc_c_loans:      'Simulate loans',
-    wsfc_c_scenarios:  'Compare scenarios',
-    wsfc_c_budget:     'Control your budget',
-    wsfc_c_receivables:'Organize receivables',
-    wsfc_c_goals:      'Set goals',
-    wsfc_c_journal:    'Record transactions',
+    wsfc_n_loan:       'Loans',
+    wsfc_n_scenario:   'Scenarios',
+    wsfc_n_budget:     'Monthly budget',
+    wsfc_n_receivables:'Receivables tracking',
+    wsfc_n_goals:      'Goals',
+    wsfc_n_journal:    'Trade journal',
     wsfc_cta:          'Explore the full Workspace',
+    wsfc_notice:       'Workspace is now part of Premium. Your saved data is preserved.',
+    wsfc_notice_close: 'Dismiss notice',
     wsfc_pending:      'Preparing your workspace…',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
@@ -20705,13 +20699,21 @@ function renderWorkspaceHome(container) {
     return;
   }
   if (_wsPrem === false) {
-    // Una capacidad incluida en el plan Free puede estar abierta; cualquier otra
-    // vista —`home`, `workspace`, `goals`, `scenario`, `planning`— es interior y
-    // no se monta. Se revalida por el MISMO owner que decide la apertura, así que
-    // una ruta directa o una referencia fijada antigua no puede colarse.
-    const _openOk = (_wshView === 'tool')
-      && (function () { try { return _wsToolAccess(_wsToolActive).ok === true; } catch (_) { return false; } })();
-    if (!_openOk) _wshView = 'free_cover';
+    // ── CIERRE WORKSPACE PREMIUM · YA NO HAY EXCEPCIÓN QUE CONCEDER ──────────
+    // Aquí había una rendija: si la vista era `tool` y el gate de esa herramienta
+    // la concedía, se dejaba montada. Existía porque el plan Free INCLUÍA dos
+    // capacidades (Interés compuesto y Portfolio inmobiliario) y bloquearlas
+    // habría sido mentir sobre el producto. Ahora el plan Free no incluye
+    // NINGUNA, así que la rendija ya no puede conceder nada legítimo y lo único
+    // que podría hacer es dejar pasar una capacidad cuyo derecho se revocara mal.
+    //
+    // Se retira y la regla queda de una sola pieza: sin Premium confirmado, la
+    // ÚNICA vista alcanzable de Workspace es la portada. Ruta directa, historial,
+    // favorito antiguo, recarga o estado conservado de la sesión anterior: todos
+    // aterrizan aquí. Y no es la única barrera —cada capacidad sigue declarando
+    // su `featureKey` y `_wsOpenTool` sigue gateando cada apertura—, que es la
+    // diferencia entre denegar y esconder.
+    _wshView = 'free_cover';
   } else if (_wshView === 'free_cover') {
     // Premium nunca ve la portada comercial: entra directamente en Workspace.
     _wshView = 'home';
@@ -20824,7 +20826,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsfc-open],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsfc-notice-close],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -20865,11 +20867,17 @@ function _wshWireOnce() {
     // §4 — el reintento explícito. Va aquí, en el dispatcher que ya existe, para
     // que no haya un segundo camino de guardado.
     if (t.getAttribute('data-ws-sync-retry')) { _wsDocsRetry(); return; }
-    // ── §2 · los tres controles de la portada Free ────────────────────────────
-    // El acceso abre la superficie por el OWNER de apertura, así que pasa por el
-    // mismo gate que cualquier otra entrada: la portada no puede conceder nada.
-    const _fcOpen = t.getAttribute('data-wsfc-open');
-    if (_fcOpen) { _wsReturnTab = 'tools'; _wsOpenTool(_fcOpen); return; }
+    // ── §2 · LA PORTADA FREE YA NO ABRE NADA ──────────────────────────────────
+    // `data-wsfc-open` se retira con las dos tarjetas gratuitas: no queda ninguna
+    // capacidad que un usuario Free pueda abrir, así que un manejador de apertura
+    // en esta superficie sólo podría ser una puerta sin llave detrás. Lo único
+    // pulsable que queda aquí es el CTA (que lo despacha el owner canónico) y el
+    // cierre del aviso, que es presentación y no toca ningún derecho.
+    if (t.getAttribute('data-wsfc-notice-close')) {
+      const _nt = t.closest('.wsfc-notice');
+      if (_nt && _nt.parentNode) _nt.parentNode.removeChild(_nt);
+      return;
+    }
     // ── EL CTA DE LA PORTADA YA NO PASA POR AQUÍ ──────────────────────────────
     // Abría `openUpgradeIntent`, que montaba el overlay intermedio «Función
     // premium / Ver AURIX Premium» y exigía un SEGUNDO clic para llegar a los
@@ -20878,11 +20886,10 @@ function _wshWireOnce() {
     // despacha el MISMO owner canónico que el CTA de Intelligence
     // (`_initFounderUI` → `openAurixPremiumModal`): un solo camino de conversión,
     // un solo sitio con precios, cero pasos intermedios.
-    // El botón «Explorar Workspace» se retiró (la portada lleva UN CTA), y la salida
-    // sin comprar son las dos tarjetas Free más el hecho de que la portada es de un
-    // solo uso: al reentrar en la sección se ve el catálogo completo (ver
-    // `renderWorkspace`). El manejador se conserva porque el paso de largo sigue
-    // siendo un estado válido del despachador si alguna superficie lo necesita.
+    // El botón «Explorar Workspace» se retiró (la portada lleva UN CTA). La salida
+    // sin comprar es la navegación inferior, que está siempre ahí: la portada no
+    // atrapa a nadie, pero tampoco concede nada — ya no hay capacidad gratuita ni
+    // portada de un solo uso.
     if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); _wsOpenSurface('goals', { before: () => { if (ty) _wsgPrefill = ty; } }); return; }
     if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
     if (cta === 'tool') { _wsOpenTool(t.getAttribute('data-wstool') || 'compound'); return; }
@@ -21503,7 +21510,17 @@ const _WS_APP_IDENTITY = {
 // (las claves `aurix_ws_*_v1` no viajan en el sync), así que siguen internos.
 const _WS_CATALOG = Object.freeze([
   // ── herramientas PUBLICADAS ────────────────────────────────────────────────
-  { id: 'compound_growth',       kind: 'tool',     published: true,  featureKey: null,              commercialTier: 'free' },
+  // ── CIERRE WORKSPACE PREMIUM · YA NO QUEDA NINGUNA ENTRADA GRATUITA ───────
+  // Interes compuesto y Portfolio inmobiliario eran las dos ultimas capacidades
+  // con `commercialTier: 'free'` y `featureKey: null`. Un `featureKey` nulo NO es
+  // una frontera: `_wsToolAccess` devuelve `ok:true` para cualquiera, asi que lo
+  // unico que las cerraba habria sido el guard de shell — esconder, no denegar.
+  // Ahora cada una declara su derecho y se deniegan por el MISMO camino que las
+  // otras seis. Sus filas de `plan_features` estan en
+  // db/workspace_premium_3_all_premium.sql, y el orden es ese fichero primero:
+  // invertirlo no abre nada (una clave ausente se resuelve DENEGADA) pero deja a
+  // una cuenta Premium viendo denegado lo que el catalogo le ofrece.
+  { id: 'compound_growth',       kind: 'tool',     published: true,  featureKey: 'workspace.compound',    commercialTier: 'premium' },
   { id: 'loan_simulation',       kind: 'tool',     published: true,  featureKey: 'workspace.loan',  commercialTier: 'premium' },
   // ── herramientas INTERNAS (las evalúa el founder, un usuario normal NO las ve) ─
   // SPEC WORKSPACE COMPLETION · §1 — El SIMULADOR DE ESCENARIOS es una
@@ -21526,13 +21543,18 @@ const _WS_CATALOG = Object.freeze([
   { id: 'receivables',           kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'asset_prices',          kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   // ── plantillas PUBLICADAS ──────────────────────────────────────────────────
-  // M.03 A · FREE V1 — Real Estate Portfolio es la plantilla gratuita. Se publica
-  // la entrada de PLANTILLA, no la de herramienta: la superficie es la misma y su
-  // sitio en el producto es la galería de plantillas. Por eso declara `opens`, y
-  // `real_estate_portfolio` (la entrada de herramienta del inventario de M.02) se
-  // queda interna — una superficie no puede tener dos estados comerciales, así que
-  // la que decide el acceso es la PUBLICADA (ver `_wsSurfaceEntry`).
-  { id: 'tpl_realestate',        kind: 'template', published: true,  featureKey: null,              commercialTier: 'free', opens: 'realestate' },
+  // M.03 A — Real Estate Portfolio se publica como PLANTILLA, no como herramienta:
+  // la superficie es la misma y su sitio en el producto es la galería de plantillas.
+  // Por eso declara `opens`, y `real_estate_portfolio` (la entrada de herramienta
+  // del inventario de M.02) se queda interna — una superficie no puede tener dos
+  // estados comerciales, así que la que decide el acceso es la PUBLICADA (ver
+  // `_wsSurfaceEntry`). Su tier lo re-decide el CIERRE WORKSPACE PREMIUM: ya no es
+  // gratuita.
+  // CIERRE WORKSPACE PREMIUM — deja de ser la plantilla gratuita (ver la nota
+  // sobre `compound_growth`). Registrar un INMUEBLE en el patrimonio sigue siendo
+  // del Dashboard y NO pasa por aqui: lo que se cobra es la plantilla de gestion
+  // (deuda, rentabilidad, linea temporal), no la incorporacion del activo.
+  { id: 'tpl_realestate',        kind: 'template', published: true,  featureKey: 'workspace.realestate',  commercialTier: 'premium', opens: 'realestate' },
   // ── plantillas INTERNAS ────────────────────────────────────────────────────
   // ── LAS PLANTILLAS PREMIUM DEL CATÁLOGO CANÓNICO ────────────────────
   // Cada una declara su `featureKey`, su tier y la superficie que abre, y están
@@ -24305,76 +24327,103 @@ function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults()
 // §2 · PORTADA FREE DE WORKSPACE
 // ════════════════════════════════════════════════════════════════════════════
 // LO QUE NO LLEVA, y cada ausencia es una regla de la SPEC:
-//   · el catálogo Premium completo — enseñar seis candados no es una propuesta;
 //   · ninguna lectura de patrimonio — eso es de Intelligence, y mezclarlas fue
 //     justo el defecto que el principio de separación de espacios corrigió;
-//   · ninguna promesa inventada: el beneficio Premium nombra lo que existe
-//     construido y nada más;
+//   · ninguna promesa inventada: se nombran capacidades que existen construidas;
 //   · ningún precio ni condición comercial — el paywall canónico es el owner.
 //
-// LA ALTURA LA PONE EL CONTENIDO. Aquí se afirmaba que la portada cabía SIEMPRE
-// sin scroll en móvil vertical porque `min-height:0` + `flex` «comprimían el
-// espacio y no el contenido». No era cierto —`gap` y `padding` no son encogibles,
-// así que flex sólo podía comprimir las CAJAS— y en 360×740 las imágenes, «Abrir»
-// y la última fila de capacidades acababan pintadas fuera de su tarjeta y encima
-// del CTA. El detalle completo, con las medidas, está sobre `.wsfc-stage` en
-// styles.css. Ahora las rejillas no se encogen y, cuando la suma no cabe, se
-// desplaza el contenedor (`overflow:auto`), que es lo que §2 exige y lo que
-// `overflow:hidden` habría roto.
+// ── QUÉ CAMBIA EN EL CIERRE WORKSPACE PREMIUM, Y POR QUÉ ───────────────────
+// La portada anterior tenía DOS bloques y un rótulo cada uno: «Empieza ahora»
+// con las dos tarjetas grandes gratuitas y su botón «Abrir», y debajo «Todo lo
+// que puedes hacer en Workspace» con seis capacidades. Eso ya no puede existir:
+// no queda ninguna capacidad gratuita que abrir, así que las tarjetas serían un
+// botón hacia un paywall disfrazado de acceso, y los dos rótulos partían en dos
+// una propuesta que ahora es UNA.
+//
+// Queda una sola card con las OCHO capacidades. Son una PRESENTACIÓN del
+// producto —`<li>`, no botones—: no hay nada que pulsar, así que no hay nada que
+// denegar, y el usuario no lee una lista de candados antes de decidir. Un solo
+// CTA, que es el único punto de conversión.
+//
+// LA ALTURA LA PONE EL CONTENIDO, y por eso la composición se acortó en vez de
+// comprimirse. La lección de la pasada anterior sigue escrita sobre `.wsfc-stage`
+// en styles.css: una rejilla encogible bajo altura acotada se pinta FUERA de su
+// caja y `scrollHeight === clientHeight` hace creer al motor que todo cabe. Aquí
+// ninguna rejilla se encoge (`flex:0 0 auto`) y, si con texto ampliado la suma no
+// cabe, el contenedor se desplaza (`overflow:auto`) — que es lo que §3 exige y lo
+// que `overflow:hidden` habría roto.
+//
+// ── EL AVISO DE QUIEN YA ESTABA ────────────────────────────────────────────
+// «Workspace ahora forma parte de Premium. Tus datos guardados se conservan.»
+// Sólo lo ve quien tiene trabajo guardado de antes: a una cuenta nueva ese texto
+// le hablaría de un cambio que nunca vivió. Se muestra UNA vez, es `role="status"`
+// (se anuncia sin robar el foco), se puede cerrar y NO es un paso previo al pago:
+// el CTA sigue a un clic con el aviso en pantalla.
+const _WSFC_NOTICE_KEY = 'aurix_ws_premium_notice_v1';
+// Las claves locales donde vive el trabajo de Workspace. Si alguna tiene algo,
+// esta cuenta USÓ Workspace antes de que fuera Premium. Son las mismas que declara
+// el inventario de persistencia; se leen en CRUDO y sin parsear porque la pregunta
+// es «¿hay algo?», no «¿qué hay?».
+const _WSFC_WORK_KEYS = Object.freeze([
+  'aurix_ws_projects_v1', 'aurix_ws_goals_v1', 'aurix_ws_goal_funding_v1',
+  'aurix_ws_scenarios_v1', 'aurix_ws_planning_v1', 'aurix_ws_tool_state_v1',
+  'aurix_ws_pinned_v1', 'aurix_ws_recent_v1',
+]);
+function _wsfcHasPriorWork() {
+  for (let i = 0; i < _WSFC_WORK_KEYS.length; i++) {
+    let raw = null;
+    try { raw = localStorage.getItem(_WSFC_WORK_KEYS[i]); } catch (_) { return false; }
+    if (!raw) continue;
+    // Una clave escrita y vaciada no es trabajo guardado. Sin esto, cualquiera que
+    // hubiera abierto Workspace una vez recibía un aviso sobre datos que no tiene.
+    const v = String(raw).trim();
+    if (v === '' || v === '[]' || v === '{}' || v === 'null') continue;
+    return true;
+  }
+  return false;
+}
+function _wsfcNoticeDue() {
+  let seen = null;
+  try { seen = localStorage.getItem(_WSFC_NOTICE_KEY); } catch (_) { return false; }
+  if (seen) return false;
+  return _wsfcHasPriorWork();
+}
+function _wsfcNoticeMarkSeen() {
+  try { localStorage.setItem(_WSFC_NOTICE_KEY, '1'); } catch (_) {}
+}
+// Las OCHO capacidades, en el orden en que el producto las cuenta. Los nombres y
+// el orden se declaran aquí, pero la PERTENENCIA la decide el catálogo: cada clave
+// se resuelve por su entrada publicada (`_wsSurfaceEntry`), así que la portada no
+// puede presumir de algo que el producto no publica. Los iconos son los que ya usa
+// cada capacidad por dentro (`_wsTplViz`): ningún asset nuevo, ninguna dependencia.
+const _WSFC_CAPS = Object.freeze([
+  { k: 'compound',    viz: 'curve'   },
+  { k: 'realestate',  viz: 'house'   },
+  { k: 'loan',        viz: 'donut'   },
+  { k: 'scenario',    viz: 'compare' },
+  { k: 'budget',      viz: 'budget'  },
+  { k: 'receivables', viz: 'table'   },
+  { k: 'goals',       viz: 'target'  },
+  { k: 'journal',     viz: 'journal' },
+]);
+function _wsfcPublishedCaps() {
+  return _WSFC_CAPS.filter(c => {
+    const e = _wsSurfaceEntry(c.k);
+    return !!e && e.published === true;
+  });
+}
 function _renderWorkspaceFreeCover() {
   const esc = _escapeWorkspaceText;
   const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : (fb || ''); } catch (_) { return fb || ''; } };
-  // Los DOS recursos incluidos se LEEN DEL CATÁLOGO, no se escriben aquí: si mañana
-  // cambia qué entra en Free, esta portada lo refleja sin tocarla. Y se resuelven
-  // por su entrada publicada, así que nunca puede ofrecer algo que el gate deniegue.
-  let freeItems = [];
-  try {
-    freeItems = _WS_CATALOG
-      .filter(e => e.published === true && e.commercialTier === 'free')
-      .map(e => {
-        const surface = e.opens || (e.kind === 'tool' ? _wsCatalogSurfaceKey(e.id) : null);
-        return surface ? { id: e.id, surface: surface } : null;
-      })
-      .filter(Boolean);
-  } catch (_) { freeItems = []; }
-  // ── LA RETAHÍLA DE «CON PREMIUM» SE RETIRA ────────────────────────────────
-  // Aquí se leía del catálogo la lista de entradas premium y se pintaba bajo un
-  // rótulo «Con Premium». Era honesta y estaba viva, pero vendía PERMISOS: antes
-  // del clic el usuario leía una lista de cosas que NO puede hacer. La SPEC de
-  // conversión lo invierte — se muestran CAPACIDADES como acciones, sin nombrar
-  // el plan, sin candados y sin precio — así que la lectura del catálogo premium
-  // desaparece de esta superficie. El catálogo sigue siendo el owner de qué es
-  // premium; simplemente esta portada ya no lo recita.
-  // Las seis capacidades son ACCIONES y usan iconos YA EXISTENTES (_wsTplViz):
-  // ningún asset nuevo, ninguna ruta nueva, no son botones y no abren nada.
-  const CAPS = [
-    { k: 'loans',       viz: 'donut'   },
-    { k: 'scenarios',   viz: 'compare' },
-    { k: 'budget',      viz: 'budget'  },
-    { k: 'receivables', viz: 'table'   },
-    { k: 'goals',       viz: 'target'  },
-    { k: 'journal',     viz: 'journal' },
-  ];
-  // Portada de las DOS gratuitas: se reutiliza la imagen REAL que ya usa cada
-  // capacidad por dentro (tool_compound / realestate_apartment, ambas presentes en
-  // assets/workspace/). Ni icono genérico ni asset duplicado. Si el WebP faltara,
-  // `_wsAssetImg` se autoelimina con onerror y queda la escena CSS de debajo.
-  const SHOT = { compound: 'tool_compound', realestate: 'realestate_apartment' };
-  const card = it => {
-    const name = tx('wsfc_n_' + it.surface, it.surface);
-    return `
-        <button type="button" class="wsfc-item" data-wsfc-open="${esc(it.surface)}">
-          <span class="wsfc-item-shot" aria-hidden="true">
-            <span class="wsfc-item-ico">${esc(tx('wsfc_ico_' + it.surface, '◈'))}</span>
-            ${SHOT[it.surface] ? _wsAssetImg(SHOT[it.surface], '') : ''}
-          </span>
-          <span class="wsfc-item-body">
-            <span class="wsfc-item-name">${esc(name)}</span>
-            <span class="wsfc-item-desc">${esc(tx('wsfc_d_' + it.surface, ''))}</span>
-            <span class="wsfc-item-open">${esc(tx('wsfc_open', 'Abrir'))} <i aria-hidden="true">→</i></span>
-          </span>
-        </button>`;
-  };
+  const caps = _wsfcPublishedCaps();
+  const notice = _wsfcNoticeDue();
+  if (notice) _wsfcNoticeMarkSeen();
+  const noticeHtml = notice ? `
+        <div class="wsfc-notice" role="status">
+          <p class="wsfc-notice-text">${esc(tx('wsfc_notice', ''))}</p>
+          <button type="button" class="wsfc-notice-x" data-wsfc-notice-close="1"
+                  aria-label="${esc(tx('wsfc_notice_close', 'Cerrar aviso'))}">×</button>
+        </div>` : '';
   return `
     <div class="aurix-wsh wsfc" data-wsh-view="free_cover">
       <section class="wsfc-stage">
@@ -24382,18 +24431,15 @@ function _renderWorkspaceFreeCover() {
           <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'WORKSPACE'))}</p>
           <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
           <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
-        </header>
-        <p class="wsfc-block-label">${esc(tx('wsfc_free_label', 'Empieza ahora'))}</p>
-        <div class="wsfc-items" data-wsfc-count="${freeItems.length}">
-          ${freeItems.map(card).join('')}
+        </header>${noticeHtml}
+        <div class="wsfc-card">
+          <ul class="wsfc-caps" data-wsfc-caps="${caps.length}">
+            ${caps.map(c => `<li class="wsfc-cap">
+              <span class="wsfc-cap-ico">${_wsTplViz(c.viz)}</span>
+              <span class="wsfc-cap-name">${esc(tx('wsfc_n_' + c.k, ''))}</span>
+            </li>`).join('')}
+          </ul>
         </div>
-        <p class="wsfc-block-label wsfc-disc-label">${esc(tx('wsfc_disc_label', ''))}</p>
-        <ul class="wsfc-caps" data-wsfc-caps="${CAPS.length}">
-          ${CAPS.map(c => `<li class="wsfc-cap">
-            <span class="wsfc-cap-ico">${_wsTplViz(c.viz)}</span>
-            <span class="wsfc-cap-name">${esc(tx('wsfc_c_' + c.k, ''))}</span>
-          </li>`).join('')}
-        </ul>
         <div class="wsfc-cta-wrap">
           <button type="button" class="wsfc-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
         </div>
@@ -78460,6 +78506,10 @@ const FEATURE_LABELS = {
   'workspace.journal':     { i18nKey: 'wstool_journal_n' },
   'workspace.goals':       { i18nKey: 'wsg_title' },
   'workspace.scenarios':   { i18nKey: 'wsh_scenario_title' },
+  // CIERRE WORKSPACE PREMIUM · las dos que dejaron de ser gratuitas. Misma regla:
+  // el paywall nombra la capacidad EXACTAMENTE como la nombra su tarjeta.
+  'workspace.compound':    { i18nKey: 'wstool_compound_n' },
+  'workspace.realestate':  { i18nKey: 'wsre_n' },
   // CLAVE DE ETIQUETA, NO DE GATE. `_wsCanPersist` pregunta por el PLAN; esto sólo
   // existe para que el paywall diga «Guardar tu trabajo» en vez de una clave cruda.
   // No está en `plan_features` ni en `_AURIX_ENT_CANON`, así que ningún

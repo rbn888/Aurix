@@ -115,7 +115,8 @@ function ctx(persona, langCode) {
    '_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY','_WSH_SCENARIOS_KEY',
    '_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL','_WS_FOUNDER_VIEW_KEY','_AURIX_ENT_CANON_EXTRA',
    '_AURIX_ENT_CANON','_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_TOOL_REQUIRED','_WS_PROJ_CONV',
-   '_WSH_SPACE_HIDDEN_KEY','_WSH_SPACE_TOP_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSH_SPACE_HIDDEN_KEY','_WSH_SPACE_TOP_KEY',
+   '_WSFC_NOTICE_KEY','_WSFC_WORK_KEYS','_WSFC_CAPS'].forEach(n => vm.runInContext(konstSrc(n), sb));
   vm.runInContext('var _aurixEnt = { loaded:false, loading:false, error:null, plan:"free", status:"none", source:"default", validUntil:null, features:Object.create(null), sources:Object.create(null), fetchedAt:0 };', sb);
   ['hasFeature','_aurixEntLoaded','hasAurixPremiumAccess','_aurixEntIsCatalogPreview',
    '_wsPremiumShell','_renderWorkspacePending','_wsFounderViewFlag','_wsInternalViewOn',
@@ -127,6 +128,7 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType','_wsGlyphTile',
    '_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml','_wsLabel','_wsTypeLabel',
    '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsCanPersist','_wsPersistUpsell','_wshReveal',
+   '_wsfcHasPriorWork','_wsfcNoticeDue','_wsfcNoticeMarkSeen','_wsfcPublishedCaps',
    '_wshMetrics','_wshRefreshMetrics','_wsTogglePin','_wsTouch','_wsSpaceHidden','_wsSpaceTop','_wsSpaceTopRank',
    '_ws4ProjectsRaw','_ws4Projects','_ws4SaveAll','_wsDocStamp','_ws4Persist','_ws4Tombstone',
    '_wsgGoalsRaw','_wsgGoals','_wsgSaveAll','_wsgTombstone','_wsgPersist','_wsgGet','_wsgStored',
@@ -229,13 +231,31 @@ console.log('1 · El guard de Workspace:');
   ok('1.4 free · y no se pintó NADA interior por el camino (ni una vez)',
     JSON.parse(R(free, 'JSON.stringify(__rendered)')).length === 0,
     R(free, 'JSON.stringify(__rendered)'));
-  // Las dos capacidades del plan Free SÍ abren, y se revalidan por el gate de
-  // apertura, no por una lista escrita en el guard.
+  // ── CIERRE WORKSPACE PREMIUM · 1.5 SE INVIERTE ───────────────────────────
+  // Decía «la capacidad gratuita abre de verdad» y era correcto mientras el plan
+  // Free incluía Interés compuesto y Portfolio inmobiliario. La decisión aprobada
+  // las pasa a Premium, así que lo que hay que demostrar es lo contrario: que NO
+  // abren, que la denegación es COMERCIAL (no «no publicado») y que el usuario
+  // acaba en el flujo de pago en vez de en un botón muerto.
   ['compound','realestate'].forEach(k => {
-    R(free, '__rendered.length=0; _wsOpenTool(' + JSON.stringify(k) + ');');
-    ok('1.5 free · la capacidad gratuita «' + k + '» abre de verdad',
-      view(free) === 'tool' && R(free, '_wsToolActive') === k, view(free) + '/' + R(free, '_wsToolActive'));
+    R(free, '__rendered.length=0; __paywall.length=0; _wshView="free_cover"; _wsToolActive=null; _wsOpenTool(' + JSON.stringify(k) + ');');
+    ok('1.5 free · «' + k + '» ya NO abre: es Premium y lleva al flujo comercial',
+      view(free) === 'free_cover'
+      && R(free, '_wsToolActive') !== k
+      && JSON.parse(R(free, 'JSON.stringify(__paywall)')).length === 1
+      && R(free, '_wsToolAccess(' + JSON.stringify(k) + ').reason') === 'entitlement',
+      view(free) + '/' + R(free, '_wsToolActive') + '/paywall=' + R(free, '__paywall.length'));
   });
+  // Y el derecho que se deniega es el SUYO: dos claves nuevas, no una global.
+  ok('1.5b cada una deniega con su propia clave de catálogo',
+    R(free, '_wsToolAccess("compound").featureKey') === 'workspace.compound'
+    && R(free, '_wsToolAccess("realestate").featureKey') === 'workspace.realestate',
+    R(free, '_wsToolAccess("compound").featureKey') + '/' + R(free, '_wsToolAccess("realestate").featureKey'));
+  // El guard ya no tiene excepción que conceder: la rendija `_wshView === 'tool'
+  // && _wsToolAccess(...).ok` existía porque el plan Free incluía dos capacidades.
+  ok('1.5c el despachador ya no tiene excepción para la vista `tool`',
+    !/_openOk/.test(fnSrc('renderWorkspaceHome')),
+    'la rendija debe estar retirada, no sólo vacía');
   // `_wsOpenTool` deniega ANTES de tocar la vista, así que lo que se comprueba es
   // que la capacidad no queda activa y que el paywall canónico se abrió.
   ok('1.6 free · una capacidad Premium NO abre, y lleva al flujo comercial',
@@ -244,7 +264,7 @@ console.log('1 · El guard de Workspace:');
         && JSON.parse(R(free, 'JSON.stringify(__paywall)')).length === 1; })(),
     R(free, '_wsToolActive') + ' paywall=' + R(free, '__paywall.length'));
   ok('1.7 free · salir de una capacidad devuelve a la portada, nunca al catálogo',
-    (function () { R(free, '_wsOpenTool("compound");');
+    (function () { R(free, '_wshView="tool"; _wsToolActive="compound";');
       R(free, '_wshView="home"; _wsTab=_wsTabOk(_wsReturnTab)?_wsReturnTab:"tools"; _wshRepaintHome();');
       return view(free) === 'free_cover'; })(), view(free));
   // Y la portada NO se gasta: se vuelve a pintar tantas veces como se entre.
