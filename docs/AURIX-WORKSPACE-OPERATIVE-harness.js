@@ -128,8 +128,13 @@ console.log('\n2 · Volver a donde se venía:');
   ok('2.3 el retorno al Dashboard existe en el owner único de «Volver»',
     /_wsBackOrigin\(\) === 'dashboard'/.test(fnSrc('_wshWireOnce'))
     && /switchTab\('dashboard'\)/.test(fnSrc('_wshWireOnce')));
-  ok('2.4 …y todavía nadie lo fija: es punto de enganche, no una rama viva',
-    (app.replace(/^\s*\/\/.*$/gm, '').match(/_wsReturnTab = 'dashboard'/g) || []).length === 0);
+  // 2.4 SE ACTUALIZA: el punto de enganche YA TIENE quien lo escriba. «Tus
+  // planes» (§B del cierre visual) abre una plantilla desde el Dashboard, así
+  // que el retorno tiene que volver ahí. Lo que se sigue vigilando es que haya
+  // UN solo escritor y que sea ése — no que no haya ninguno.
+  ok('2.4 el origen `dashboard` lo escribe EXACTAMENTE un sitio: «Continuar»',
+    (app.replace(/^\s*\/\/.*$/gm, '').match(/_wsReturnTab = 'dashboard'/g) || []).length === 1
+    && /_wsReturnTab = 'dashboard';/.test(fnSrc('_wsPlansOpen')));
   // El `aria-label` lleva el destino COMPLETO aunque la barra enseñe la corta:
   // un usuario de lector de pantalla oye «Volver a Plantillas», no «Plantillas».
   {

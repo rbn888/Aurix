@@ -27366,6 +27366,86 @@ button.intv14-cmp-clear {
   .wsfc-cta { min-width: 320px; min-height: 54px; font-size: 15.5px; }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   §B · «TUS PLANES» — LAS PLANTILLAS GUARDADAS, EN EL DASHBOARD
+   ════════════════════════════════════════════════════════════════════════════
+   RESUMEN OPERATIVO, NO CATÁLOGO. El catálogo de Workspace vende con fotografía
+   y escena; esto es la mesa de trabajo: nombre propio, tipo, hasta dos cifras y
+   una acción. Sin imágenes grandes a propósito — aquí el usuario no elige qué
+   plantilla quiere, vuelve a un documento que ya es suyo. */
+.wspl-sec { margin: 22px 0 0; }
+.wspl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.wspl-title {
+  margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  color: var(--text-bright, #fff);
+}
+.wspl-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.wspl-card {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  padding: 14px; border-radius: 16px;
+  border: 1px solid rgba(74,130,240,0.16);
+  /* Sin alfa BLANCA: sobre el lienzo oscuro se lee como gris neutro y rompe la
+     escalera de elevación (la lección de GLOBAL POLISH). */
+  background: var(--elev-1);
+}
+.wspl-card-id { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.wspl-ico {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 10px;
+  color: var(--aurix-blue, #4A82F0);
+  background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.22);
+}
+.wspl-ico .wsfc-cap-svg { width: 20px; height: 20px; }
+.wspl-card-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* EL NOMBRE PROPIO MANDA, y el tipo lo acompaña: dos plantillas del mismo tipo
+   sólo se distinguen por su nombre, así que cortarlo las haría indistinguibles. */
+.wspl-name {
+  font-size: 15px; font-weight: 700; line-height: 1.3; color: var(--text-bright);
+  overflow-wrap: anywhere;
+}
+.wspl-type { font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
+.wspl-metrics { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.wspl-m { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.wspl-m i { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.wspl-m b {
+  font-size: 15px; font-weight: 700; color: var(--text-bright);
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.wspl-go {
+  align-self: flex-start; font: inherit; cursor: pointer;
+  min-height: 44px; padding: 0 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: #aecbff;
+  display: inline-flex; align-items: center;
+  background: rgba(74,130,240,0.10); border: 1px solid rgba(74,130,240,0.30);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.wspl-go:hover { background: rgba(74,130,240,0.20); color: #cfe0ff; border-color: rgba(74,130,240,0.5); }
+.wspl-go:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+/* PREMIUM SIN DOCUMENTOS: una línea, no una gran card vacía. El enlace lleva a
+   Plantillas, que es donde se crea el primero. */
+.wspl-note {
+  margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-muted);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+}
+.wspl-note.is-warn { color: rgba(225,196,122,0.92); }
+.wspl-link {
+  font: inherit; cursor: pointer; min-height: 44px; padding: 0 4px;
+  font-size: 13px; font-weight: 700; color: #aecbff;
+  background: none; border: 0; text-decoration: underline; text-underline-offset: 3px;
+}
+.wspl-link:hover { color: #cfe0ff; }
+.wspl-link:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+@media (min-width: 700px) {
+  .wspl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wspl-title { font-size: 16px; }
+}
+@media (min-width: 1024px) {
+  /* Hasta TRES columnas, `minmax(0,·)` para que una celda no se niegue a encoger
+     y se salga — la lección del bloque anterior. */
+  .wspl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .wspl-go { transition: none; } }
+
 /* ── VALIDACIÓN VISIBLE, Y NO SÓLO UN `return` ───────────────────────────────
    Un campo obligatorio vacío marca el campo y publica UNA línea de razón junto al
    botón que se acaba de pulsar. No es un estado de error del formulario entero:

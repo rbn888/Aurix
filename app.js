@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '700'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '701'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6223,6 +6223,22 @@ const T = {
     wsfc_cta:          'Descubrir Workspace completo',
     // La espera mientras el servidor resuelve el plan. No afirma NADA del plan.
     wsfc_pending:      'Preparando tu espacio de trabajo…',
+    // ── §B · «TUS PLANES» EN EL DASHBOARD ────────────────────────────────────
+    // Ninguna etiqueta nombra un PERIODO: «este mes» exigiría un selector que el
+    // Presupuesto todavía no tiene, y nombrarlo sería inventarlo.
+    wspl_title:           'Tus planes',
+    wspl_continue:        'Continuar',
+    wspl_empty:           'Todavía no has guardado ningún plan.',
+    wspl_empty_cta:       'Ver plantillas',
+    wspl_loading:         'Comprobando tus planes guardados…',
+    wspl_error:           'No se han podido cargar tus planes guardados.',
+    wspl_m_income:        'Ingresos',
+    wspl_m_expenses:      'Gastos',
+    wspl_m_pending:       'Pendiente',
+    wspl_m_collected:     'Cobrado',
+    wspl_m_units:         'Inmuebles',
+    wspl_m_value:         'Valor',
+    wspl_m_trades:        'Operaciones',
     ws_sync_idle:         'Sin cambios sin guardar',
     ws_sync_saving:       'Guardando…',
     ws_sync_saved_synced: 'Guardado y sincronizado',
@@ -8944,6 +8960,19 @@ const T = {
     wsfc_sub:          'Your tools and templates to explore scenarios, put your finances in order and give shape to your plans.',
     wsfc_cta:          'Explore the full Workspace',
     wsfc_pending:      'Preparing your workspace…',
+    wspl_title:           'Your plans',
+    wspl_continue:        'Continue',
+    wspl_empty:           'You have not saved any plan yet.',
+    wspl_empty_cta:       'See templates',
+    wspl_loading:         'Checking your saved plans…',
+    wspl_error:           'Your saved plans could not be loaded.',
+    wspl_m_income:        'Income',
+    wspl_m_expenses:      'Expenses',
+    wspl_m_pending:       'Pending',
+    wspl_m_collected:     'Collected',
+    wspl_m_units:         'Properties',
+    wspl_m_value:         'Value',
+    wspl_m_trades:        'Trades',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
     ws_sync_saved_synced: 'Saved and synced',
@@ -22348,6 +22377,187 @@ function _wshAllProjects() {
   return out;
 }
 function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? all.reduce((a, b) => (b.ts > a.ts ? b : a), all[0]) : null; }
+
+// ════════════════════════════════════════════════════════════════════════════
+// §B · «TUS PLANES» — LAS PLANTILLAS GUARDADAS, VISTAS DESDE EL DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+// QUÉ ES Y QUÉ NO ES. Es una VISTA: lee el mismo almacén de Workspace
+// (`aurix_ws_projects_v1` a través de `_ws4Projects`, que ya filtra tombstones),
+// los mismos IDs y la misma sincronización. No copia un documento, no crea una
+// segunda persistencia y no escribe nada. Guardar, renombrar o eliminar en
+// Workspace se refleja aquí solo, porque aquí no hay estado propio que mantener.
+//
+// Y NO TOCA EL PATRIMONIO. Un presupuesto o una simulación no añaden un activo,
+// un movimiento ni un euro al Dashboard: esta sección vive DEBAJO de las
+// categorías y no alimenta ningún total. Es la frontera que el producto lleva
+// defendiendo desde WS.11A y no se cruza por enseñar un resumen.
+//
+// SÓLO PLANTILLAS, y sólo las cuatro que guardan un documento con nombre propio.
+// Objetivos y Escenarios viven en sus propios almacenes y las herramientas
+// (Interés compuesto, Préstamos) no son plantillas: quedan fuera de esta primera
+// entrega por decisión de la SPEC, no por olvido.
+const _WSPL_TYPES = Object.freeze({
+  monthly_budget:        { tool: 'budget',      nameKey: 'wstool_budget_n',     icon: 'split'   },
+  receivables_app:       { tool: 'receivables', nameKey: 'wsapp_receivables_n', icon: 'receipt' },
+  trade_journal:         { tool: 'journal',     nameKey: 'wstool_journal_n',    icon: 'log'     },
+  real_estate_portfolio: { tool: 'realestate',  nameKey: 'wsre_n',              icon: 'house'   },
+});
+// Los documentos que se publican: plantilla, guardada de verdad y con su
+// capacidad todavía ABIERTA para esta cuenta. Ofrecer «Continuar» sobre algo que
+// el gate va a denegar sería la misma mentira que una tarjeta que dice «Abrir» y
+// luego niega — el defecto que el catálogo cerró en su día.
+function _wsPlansDocs() {
+  let list = [];
+  try { list = _ws4Projects(); } catch (_) { return []; }
+  return list
+    .filter(p => p && p.id && _WSPL_TYPES[p.type])
+    .filter(p => { try { return _wsToolAccess(_WSPL_TYPES[p.type].tool).ok === true; } catch (_) { return false; } })
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+}
+// HASTA DOS MÉTRICAS, Y SÓLO SI SON CIERTAS. Se calculan con el MISMO motor que
+// la plantilla usa por dentro —no hay una segunda matemática— y si el documento
+// no tiene datos suficientes se devuelve la lista vacía: nombre y tipo sin
+// cifras es una respuesta honesta; un cero inventado no lo es.
+// Ninguna afirma un PERIODO: «este mes» exigiría un selector que el Presupuesto
+// todavía no tiene, y nombrarlo sería inventarlo.
+function _wsPlanMetrics(p) {
+  const inp = (p && p.inputs) || {};
+  const m = (k, v) => ({ k: t(k), v: v });
+  try {
+    if (p.type === 'monthly_budget') {
+      const r = calculateMonthlyBudget(inp);
+      if (!(r.income > 0) && !(r.expenses > 0)) return [];
+      return [m('wspl_m_income', formatBase(r.income)), m('wspl_m_expenses', formatBase(r.expenses))];
+    }
+    if (p.type === 'receivables_app') {
+      const r = calculateReceivables(inp.items);
+      if (!r.count) return [];
+      return [m('wspl_m_pending', formatBase(r.totalPendiente)), m('wspl_m_collected', formatBase(r.totalCobrado))];
+    }
+    if (p.type === 'real_estate_portfolio') {
+      const r = calculateRealEstatePortfolio(inp.properties);
+      if (!r.count) return [];
+      // El VALOR sólo si alguien lo ha declarado: sin valoraciones, `valueTotal`
+      // es cero y publicar «0» diría que la cartera no vale nada.
+      const out = [m('wspl_m_units', String(r.count))];
+      if (r.valueTotal > 0) out.push(m('wspl_m_value', formatBase(r.valueTotal)));
+      return out;
+    }
+    if (p.type === 'trade_journal') {
+      const n = Array.isArray(inp.trades) ? inp.trades.length : 0;
+      if (!n) return [];
+      // SÓLO EL RECUENTO. La rentabilidad de un diario con divisas mezcladas no
+      // es publicable (su propio resumen lo declara), así que aquí no se intenta.
+      return [m('wspl_m_trades', String(n))];
+    }
+  } catch (_) { return []; }
+  return [];
+}
+// ¿PUEDE ESTA CUENTA AFIRMAR QUE NO TIENE PLANES?
+// Sólo si la lectura remota ha ido bien. Con la tabla sin confirmar o con un
+// error de sincronización, cero documentos locales NO significa cero documentos:
+// significa que todavía no se sabe, y decir «no tienes planes» sería afirmar un
+// vacío que puede no existir.
+function _wsPlansEmptyState() {
+  let session = null;
+  try { session = _wsDocsSession(); } catch (_) { session = null; }
+  if (!session) return 'empty';                     // sin cuenta no hay nada remoto que esperar
+  let worst = 'idle';
+  try { worst = _wsDocSyncWorst(); } catch (_) {}
+  if (worst === 'error') return 'error';
+  if (_wsDocTableState === 'yes') return 'empty';
+  if (_wsDocTableState === 'no') return 'empty';    // no hay tabla: lo local ES todo lo que hay
+  return 'loading';
+}
+function _renderDashboardPlans() {
+  const esc = _intccEsc;
+  const docs = _wsPlansDocs();
+  if (!docs.length) {
+    const st = _wsPlansEmptyState();
+    const body = st === 'loading'
+      ? `<p class="wspl-note">${esc(t('wspl_loading'))}</p>`
+      : st === 'error'
+        ? `<p class="wspl-note is-warn">${esc(t('wspl_error'))} <button type="button" class="wspl-link" data-ws-sync-retry>${esc(t('ws_sync_retry'))}</button></p>`
+        : `<p class="wspl-note">${esc(t('wspl_empty'))} <button type="button" class="wspl-link" data-wspl-templates>${esc(t('wspl_empty_cta'))}</button></p>`;
+    return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>${body}`;
+  }
+  const cards = docs.map(p => {
+    const spec = _WSPL_TYPES[p.type];
+    const mets = _wsPlanMetrics(p);
+    return `
+      <article class="wspl-card" data-wspl-id="${esc(p.id)}">
+        <div class="wspl-card-id">
+          <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
+          <span class="wspl-card-txt">
+            <span class="wspl-name">${esc(_wsLabel('workspace', p))}</span>
+            <span class="wspl-type">${esc(t(spec.nameKey))}</span>
+          </span>
+        </div>
+        ${mets.length ? `<div class="wspl-metrics">${mets.map(x =>
+          `<span class="wspl-m"><i>${esc(x.k)}</i><b>${esc(x.v)}</b></span>`).join('')}</div>` : ''}
+        <button type="button" class="wspl-go" data-wspl-open="${esc(p.id)}">${esc(t('wspl_continue'))}</button>
+      </article>`;
+  }).join('');
+  return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>
+    <div class="wspl-grid" data-wspl-n="${docs.length}">${cards}</div>`;
+}
+// EL GUARD DE LA SECCIÓN, Y FALLA CERRADO. Sin Premium CONFIRMADO no se pinta
+// nada: ni la sección, ni un hueco reservado, ni un candado, ni un teaser. Y
+// perder Premium la OCULTA — no borra un solo documento, que siguen en su
+// almacén esperando a que el derecho vuelva.
+function updateDashboardPlans() {
+  const sec = document.getElementById('wsPlansSection');
+  if (!sec) return;
+  let prem = false;
+  try { prem = hasAurixPremiumAccess() === true; } catch (_) { prem = false; }
+  // En el detalle de una categoría el Dashboard sustituye su contenido por la
+  // lista filtrada: esta sección se comporta igual que las categorías.
+  let drill = false;
+  try { drill = (typeof activeCategory !== 'undefined') && activeCategory !== null; } catch (_) {}
+  if (!prem || drill) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
+  sec.innerHTML = _renderDashboardPlans();
+  sec.style.display = '';
+}
+// Los dos controles de la sección, en el mismo despachador delegado y armado una
+// sola vez. `data-ws-sync-retry` ya lo despacha Workspace, así que aquí sólo
+// viven los dos que son propios.
+let _wsPlansWired = false;
+function _wsPlansWireOnce() {
+  if (_wsPlansWired || typeof document === 'undefined') return;
+  _wsPlansWired = true;
+  document.addEventListener('click', e => {
+    const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-templates],[data-ws-sync-retry]') : null;
+    if (!el || !el.closest('#wsPlansSection')) return;
+    if (el.hasAttribute('data-ws-sync-retry')) { try { _wsDocsRetry(); } catch (_) {} return; }
+    if (el.hasAttribute('data-wspl-templates')) {
+      _wshView = 'home'; _wsTab = 'templates';
+      try { switchTab('workspace'); } catch (_) {}
+      return;
+    }
+    const id = el.getAttribute('data-wspl-open');
+    if (id) _wsPlansOpen(id);
+  });
+}
+// «Continuar» abre LA MISMA instancia, por el owner de apertura de siempre: el
+// gate se vuelve a preguntar aquí, así que un derecho revocado entre el pintado y
+// el clic no cuela. Y el retorno es el que el bloque anterior dejó preparado —
+// `_wsReturnTab = 'dashboard'`—, que hasta hoy no tenía quien lo escribiera.
+function _wsPlansOpen(id) {
+  let p = null;
+  try { p = _ws4Projects().find(x => x && x.id === id) || null; } catch (_) { p = null; }
+  if (!p) return;
+  const spec = _WSPL_TYPES[p.type];
+  if (!spec) return;
+  let acc = { ok: false, reason: 'unpublished', featureKey: null };
+  try { acc = _wsToolAccess(spec.tool); } catch (_) {}
+  if (!acc.ok) {
+    if (acc.reason === 'entitlement') { try { openUpgradeIntent({ featureKey: acc.featureKey, source: 'dashboard:plans' }); } catch (_) {} }
+    return;
+  }
+  _wsReturnTab = 'dashboard';
+  try { switchTab('workspace'); } catch (_) {}
+  _wsOpenTool(spec.tool, id);
+}
 
 function _wsxOpen(ref) {
   _wsReturnTab = 'space';   // WS.14A — opened from Mi Espacio → "Volver" returns there
@@ -55015,6 +55225,11 @@ function _aurixCatReturnDisplay(type) {
 function updateCategoryCards() {
   const section = document.getElementById('categoriesSection');
   const grid    = document.getElementById('categoriesGrid');
+  // §B — «Tus planes» vive DEBAJO de las categorías y se repinta con ellas.
+  // Va antes del `return` por ausencia de rejilla y antes del corte por detalle
+  // de categoría a propósito: su propio guard decide, y así no hay un segundo
+  // sitio que tenga que acordarse de ocultarla.
+  try { _wsPlansWireOnce(); updateDashboardPlans(); } catch (_) {}
   if (!section || !grid) return;
 
   // In category drill-down, this section is replaced by the filtered asset list.
@@ -77322,6 +77537,9 @@ function _aurixEntRevalidate(reason) {
         _aurixEntLastSig = sig;
         const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
         if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
+        // §B — «Tus planes» también depende del derecho: perderlo la OCULTA y
+        // recuperarlo la devuelve, sin recargar y sin tocar ningún documento.
+        try { updateDashboardPlans(); } catch (_) {}
         if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
       } catch (_) {}
     });
