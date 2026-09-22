@@ -18,6 +18,15 @@
  * ni el `env(safe-area-inset-bottom)` real de un dispositivo con notch. `100dvh`
  * y las áreas seguras siguen necesitando el teléfono del founder.
  *
+ * CONTRA EL LOCAL POR DEFECTO, CONTRA LO PÚBLICO CUANDO SE PIDE:
+ *   AURIX_WSFC_URL=https://app.aurixsystem.io  ejecuta las MISMAS medidas sobre
+ *   los bytes DESPLEGADOS. El sandbox no resuelve el dominio, así que a Chromium
+ *   se le pasa la regla de resolución (el `--resolve` de curl) con
+ *   AURIX_WSFC_RESOLVE=app.aurixsystem.io=185.199.109.153.
+ *   El ÚNICO parche sigue siendo el mismo y se aplica interceptando la respuesta:
+ *   la navegación de auth, porque el sandbox no tiene sesión (OTP-only). Ni una
+ *   regla de CSS ni una medida de layout se tocan.
+ *
  *   node scripts/aurix-wsfc-cover-probe.mjs
  */
 import { createServer } from 'node:http';
@@ -45,7 +54,14 @@ const server = createServer(async (req, res) => {
   } catch (_) { res.writeHead(404).end('nf'); }
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
-const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+const PUBLIC_URL = String(process.env.AURIX_WSFC_URL || '').replace(/\/$/, '');
+const RESOLVE = String(process.env.AURIX_WSFC_RESOLVE || '');
+const ORIGIN = PUBLIC_URL || `http://127.0.0.1:${server.address().port}`;
+// El mismo parche del servidor local, aplicado a la respuesta REAL del CDN: se
+// pide el recurso tal cual y sólo se neutraliza la navegación de auth.
+const AUTH_PATCH = t => String(t)
+  .replace('function safeRedirect(path, source) {', 'function safeRedirect(path, source) { return false;')
+  .replace(/location\.replace\(base \+ 'login\.html'\)/g, 'void 0');
 
 // Playwright NO es dependencia del proyecto y no debe serlo por una sonda: el
 // deployment de Vercel es Hobby y el repo se publica con allowlist. Se resuelve
@@ -66,7 +82,7 @@ let pass = 0; const fails = [];
 const ok = (n, c, info) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fails.push(n + (info ? '  [' + info + ']' : '')); console.log('  ✗ ' + n + (info ? '  [' + info + ']' : '')); } };
 
 console.log('AURIX · PORTADA FREE DE WORKSPACE — Chromium + WebKit');
-console.log('origen: ' + ORIGIN + '  (copia de trabajo)\n');
+console.log('origen: ' + ORIGIN + (PUBLIC_URL ? '  (PÚBLICO · bytes desplegados)' : '  (copia de trabajo)') + '\n');
 mkdirSync(OUT, { recursive: true });
 
 // ── LA MEDIDA, EN UNA SOLA FUNCIÓN QUE CORRE DENTRO DE LA PÁGINA ───────────
@@ -118,10 +134,24 @@ const MEASURE = `(function(){
   };
 })()`;
 
+// Un solo sitio crea contextos, así que el parche de auth no se puede olvidar en
+// uno de los tres puntos de montaje.
+async function newCtx(browser, opts) {
+  const ctx = await browser.newContext(opts);
+  if (PUBLIC_URL) await ctx.route('**/app.js*', async route => {
+    const r = await route.fetch();
+    await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
+  });
+  return ctx;
+}
+
 const VIEWPORTS = [[360, 740], [390, 844], [430, 932], [768, 1024], [1366, 768], [1440, 900]];
 
 async function mount(page, L, { priorWork = false } = {}) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
+  // Sin sesión el build público navega a `login.html` y los globals desaparecen.
+  // Se declara como límite del ORIGEN, no como fallo del candidato.
+  if (PUBLIC_URL && /login\.html/.test(page.url())) throw new Error('origen no ejercitable: la app pública redirige sin sesión (' + page.url() + ')');
   await page.waitForFunction(`typeof renderWorkspaceHome === 'function' && typeof switchTab === 'function'`, null, { timeout: 60000 });
   await page.waitForTimeout(700);
   await page.evaluate(`(function(){
@@ -143,10 +173,13 @@ async function mount(page, L, { priorWork = false } = {}) {
 }
 
 for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
-  const browser = await launcher.launch();
+  // WebKit no acepta `--host-resolver-rules`; contra lo público sólo Chromium
+  // puede saltarse el DNS del sandbox. Se declara en vez de fingir cobertura.
+  if (ENG === 'WK' && PUBLIC_URL && RESOLVE) { console.log('  (WebKit omitido contra lo público: no admite regla de resolución)'); continue; }
+  const browser = await launcher.launch({ args: (ENG === 'CR' && RESOLVE) ? ['--host-resolver-rules=MAP ' + RESOLVE.split('=')[0] + ' ' + RESOLVE.split('=')[1]] : [] });
   for (const [w, h] of VIEWPORTS) {
     for (const L of ['es', 'en']) {
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
+      const ctx = await newCtx(browser, { viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
       const page = await ctx.newPage();
       await mount(page, L);
       const g = await page.evaluate(MEASURE);
@@ -181,7 +214,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
 
   // ── EL AVISO, Y QUE NO ROMPE EL ENCAJE EN EL VIEWPORT MÁS ESTRECHO ────────
   {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    const ctx = await newCtx(browser, { viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     await mount(page, 'es', { priorWork: true });
     const g = await page.evaluate(MEASURE);
@@ -202,7 +235,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   // §3 lo dice explícitamente. Con 360×520 la composición NO cabe, y lo correcto
   // es que el contenedor se desplace —no que recorte, no que encoja las rejillas.
   {
-    const ctx = await browser.newContext({ viewport: { width: 360, height: 520 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    const ctx = await newCtx(browser, { viewport: { width: 360, height: 520 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     await mount(page, 'es');
     const g = await page.evaluate(MEASURE);
