@@ -393,6 +393,91 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${ENG}.scn · un supuesto incompleto no se guarda, ni forzando el commit`,
       noSave.dis === true && noSave.after === noSave.before, JSON.stringify(noSave));
   }
+
+  // ══ §7 · PERSISTENCIA REAL: RECARGAR Y SEGUIR AHÍ ════════════════════════
+  // Guardar en memoria y pintar «Guardado ✓» es fácil. Lo que el usuario cree
+  // que ha pasado es que su trabajo SOBREVIVE a cerrar la app, así que se
+  // recarga la página de verdad y se vuelve a preguntar.
+  {
+    const before = await page.evaluate(`(function(){
+      return JSON.stringify(_ws4Projects().map(function(p){ return { id: p.id, t: p.type, n: p.customName }; }));})()`).then(JSON.parse);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(`typeof renderWorkspaceHome === 'function'`, null, { timeout: 60000 });
+    await page.waitForTimeout(700);
+    await page.evaluate(`(function(){
+      var bl=document.getElementById('bootLoader'); if(bl) bl.remove();
+      var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1';
+      document.getElementById('aurixWorkspace').style.display='block';
+      var f=Object.create(null);
+      _AURIX_ENT_CANON.forEach(function(k){ f[k] = (k !== 'workspace.catalog_preview'); });
+      _aurixEnt={loaded:true,loading:false,error:null,plan:'premium',status:'active',source:'plan',validUntil:null,features:f,sources:Object.create(null),fetchedAt:Date.now()};
+      _wsDocTableState='yes';
+      switchTab('workspace'); return true; })()`);
+    await page.waitForTimeout(250);
+    const after = await page.evaluate(`(function(){
+      return JSON.stringify(_ws4Projects().map(function(p){ return { id: p.id, t: p.type, n: p.customName }; }));})()`).then(JSON.parse);
+    ok(`${ENG}.persistencia · los documentos sobreviven a una recarga completa`,
+      after.length === before.length && before.length > 0 &&
+      before.every(b => after.some(a => a.id === b.id && a.n === b.n && a.t === b.t)),
+      JSON.stringify({ antes: before.length, despues: after.length }));
+    // Y se reabren con SUS datos, no con los del último borrador.
+    const reopened = await page.evaluate(`(function(){
+      var scn = _ws4Projects().filter(function(p){ return p.type === 'scenario_compare'; })
+        .sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); });
+      if (scn.length < 2) return JSON.stringify({ n: scn.length });
+      _wsbOpenDoc(scn[0].id); var p1 = _wsbParams();
+      var a = { alt: String(p1.altMonthly), edit: _wsbEditId === scn[0].id };
+      _wsbOpenDoc(scn[1].id); var p2 = _wsbParams();
+      var b = { alt: String(p2.altMonthly), edit: _wsbEditId === scn[1].id };
+      return JSON.stringify({ n: scn.length, a: a, b: b });})()`).then(JSON.parse);
+    ok(`${ENG}.persistencia · tras recargar, CADA comparación se reabre con SUS supuestos`,
+      reopened.n === 2 && reopened.a.alt === '300' && reopened.b.alt === '3000' &&
+      reopened.a.edit === true && reopened.b.edit === true, JSON.stringify(reopened));
+  }
+
+  // ══ §7 · AISLAMIENTO ENTRE CUENTAS, EN EL MISMO NAVEGADOR ════════════════
+  // LO QUE ESTO SÍ DEMUESTRA: que un cambio de usuario no deja los documentos
+  // del anterior legibles, y que al volver se recuperan en vez de perderse. Se
+  // ejecuta el owner REAL del cambio de cuenta, no una imitación.
+  // LO QUE NO DEMUESTRA, y no se va a insinuar: aislamiento en el SERVIDOR
+  // (RLS) ni sincronización entre dos dispositivos. Eso exige dos cuentas
+  // reales y no se puede afirmar desde aquí.
+  {
+    const r = await page.evaluate(`(function(){
+      var A = 'user-A-probe', B = 'user-B-probe';
+      _aurixActiveUserId = A; currentUser = { id: A, email: 'a@probe.test' };
+      localStorage.setItem('aurix_ws_projects_v1', JSON.stringify([
+        { id: 'docA', type: 'monthly_budget', customName: 'Presupuesto de A',
+          inputs: { salary: 2000 }, revision: 1, createdAt: 1, updatedAt: 1 }]));
+      var seenByA = _ws4Projects().length;
+      _aurixEnforceCacheOwner(A);
+      // ── ENTRA B ──────────────────────────────────────────────────────────
+      // El cambio de cuenta REAL son dos piezas y hay que ejecutar las dos: el
+      // purgado/aparcado de lo del saliente y la comprobación de sello del
+      // entrante, que es la que DESAPARCA lo suyo. Probar sólo la primera
+      // acusaría de pérdida de datos a un mecanismo que sí devuelve el trabajo.
+      _aurixActiveUserId = B; currentUser = { id: B, email: 'b@probe.test' };
+      _clearLocalUserState(_AURIX_PURGE.USER_SWITCH, A);
+      _aurixEnforceCacheOwner(B);
+      var seenByB = _ws4Projects().length;
+      var rawB = localStorage.getItem('aurix_ws_projects_v1');
+      var leaks = /Presupuesto de A/.test(String(rawB || ''));
+      // B guarda lo suyo.
+      localStorage.setItem('aurix_ws_projects_v1', JSON.stringify([
+        { id: 'docB', type: 'monthly_budget', customName: 'Presupuesto de B',
+          inputs: { salary: 900 }, revision: 1, createdAt: 2, updatedAt: 2 }]));
+      // ── VUELVE A ─────────────────────────────────────────────────────────
+      _aurixActiveUserId = A; currentUser = { id: A, email: 'a@probe.test' };
+      _clearLocalUserState(_AURIX_PURGE.USER_SWITCH, B);
+      _aurixEnforceCacheOwner(A);
+      var backForA = _ws4Projects();
+      return JSON.stringify({ seenByA: seenByA, seenByB: seenByB, leaks: leaks,
+        backNames: backForA.map(function(p){ return p.customName; }) });})()`).then(JSON.parse);
+    ok(`${ENG}.aislamiento · al entrar B no queda legible NI UN documento de A`,
+      r.seenByA === 1 && r.seenByB === 0 && r.leaks === false, JSON.stringify(r));
+    ok(`${ENG}.aislamiento · y al volver A recupera lo suyo (aparcar no es borrar)`,
+      r.backNames.length === 1 && r.backNames[0] === 'Presupuesto de A', JSON.stringify(r));
+  }
   await ctx.close();
   await browser.close();
 }

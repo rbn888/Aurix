@@ -258,6 +258,23 @@ console.log('\n5 · Una simulación nunca es patrimonio:');
   ok('5.2 y se pinta DEBAJO de las categorías, fuera de cualquier total',
     html.indexOf('id="categoriesSection"') < html.indexOf('id="wsPlansSection"')
     && html.indexOf('id="wsPlansSection"') < html.indexOf('id="assetsSection"'));
+  // ── NI SE LO CUENTA A INTELLIGENCE ──────────────────────────────────────
+  // Un presupuesto puede ser el de un familiar y un cobro puede ser hipotético.
+  // Que el Dashboard OFREZCA abrirlos no los convierte en hechos del patrimonio
+  // de nadie, así que esta vista no puede alimentar al motor de interpretación
+  // ni sembrar el formulario de alta de activos. Es una vista de acceso, y su
+  // único verbo es «continuar».
+  // `_intccEsc` NO cuenta y se exceptúa a propósito: es el escapador de HTML
+  // compartido, una función pura que vive en ese namespace por historia. Lo que
+  // este assert persigue es un FLUJO DE DATOS hacia el motor, no un prefijo.
+  const allNoEsc = all.replace(/_intccEsc/g, 'esc');
+  ok('5.3 la sección no alimenta Intelligence ni siembra el alta de activos',
+    !/_aurixIntel|intelligence|_intcc|_intv|factLedger|_aurixFacts|openModal\(|prefill|seedAsset/i.test(allNoEsc),
+    (allNoEsc.match(/intelligence|_intcc|openModal\(|prefill/gi) || []).join(' '));
+  // Y no escribe NADA: una vista que persiste es una vista que puede corromper
+  // el documento que sólo venía a enseñar.
+  ok('5.4 y sigue sin escribir en ningún almacén (ni local, ni remoto)',
+    !/setItem|removeItem|_ws4Persist|_wshWriteStore|\.upsert\(|\.insert\(|\.update\(/.test(all));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

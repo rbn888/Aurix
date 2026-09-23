@@ -28433,3 +28433,76 @@ input.ws4-num.is-invalid {
 @media (min-width: 641px) {
   .wsrecv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PORTFOLIO INMOBILIARIO · EL DESGLOSE SE PLIEGA SÓLO DONDE ESTORBA
+   ════════════════════════════════════════════════════════════════════════════
+   MEDIDO en 360×740: el resumen ocupaba 552 px y empujaba el inventario a 741 px
+   con el suelo en 680, así que se entraba a la capacidad sin ver ni un inmueble.
+   Los 207 px que faltaban eran subKPIs (63) y capas (144) —las cifras DERIVADAS,
+   con el cashflow mensual repetido de la fila de KPIs—, así que se pliegan.
+   A partir de 560 px NO hay plegado: el `summary` desaparece y el cuerpo queda
+   visible siempre, de modo que en tablet y escritorio la información sigue
+   exactamente donde estaba. Nada se oculta y nada encoge de tamaño. */
+.wsre-more {
+  margin-top: 12px; border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+  background: var(--elev-1);
+}
+.wsre-more-sum {
+  cursor: pointer; width: 100%; text-align: left;
+  padding: 11px 13px; min-height: 44px; box-sizing: border-box;
+  background: transparent; border: 0;
+  font-size: 12.5px; font-weight: 650; color: rgba(198,214,246,0.86);
+  display: flex; align-items: center; gap: 8px;
+}
+.wsre-more-sum::after {
+  content: '›'; margin-left: auto; font-size: 15px; line-height: 1;
+  color: rgba(159,194,255,0.62); transition: transform 160ms ease;
+}
+.wsre-more.is-open > .wsre-more-sum::after { transform: rotate(90deg); }
+.wsre-more-sum:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.9); outline-offset: -2px; }
+/* El plegado es NUESTRO, no del navegador: `display:none` gobernado por una
+   clase y por la media query, sin `content-visibility` de por medio. */
+.wsre-more-body { display: none; padding: 2px 13px 12px; }
+.wsre-more.is-open > .wsre-more-body { display: block; }
+.wsre-more-body .wsre-subkpis { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .wsre-more-sum::after { transition: none; }
+}
+/* ── DESDE 560 px NO SE PLIEGA ──────────────────────────────────────────────
+   El plegado existe por FALTA DE ALTURA, no por jerarquía, así que en cuanto hay
+   sitio desaparece: sin `summary` que pulsar y con el cuerpo visible pase lo que
+   pase con el atributo `open`. Es la regla del navegador para un `<details>`
+   cerrado (`display:none` en todo lo que no sea el summary) la que se está
+   venciendo aquí, a propósito y en un solo sitio. */
+@media (min-width: 560px) {
+  .wsre-more { border: 0; background: none; border-radius: 0; margin-top: 0; overflow: visible; }
+  .wsre-more > .wsre-more-sum { display: none; }
+  .wsre-more > .wsre-more-body { display: block; padding: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .wsre-more-sum::after { transition: none; } }
+
+/* ── LOS KPI DEL INMOBILIARIO: LA CIFRA SE ESCALA, NO SE PARTE ─────────────
+   La captura de 360×740 lo enseñó y ninguna medida lo acusaba: «+1320,00 US$»
+   se partía como «+1320,00 U / S$». La causa es conocida y está escrita en el
+   bloque «LA CIFRA NO SE ROMPE, SE ESCALA»: `Intl` une importe y moneda con un
+   espacio DE NO RUPTURA, así que `overflow-wrap: anywhere` sólo encuentra un
+   punto donde partir — dentro de «US$», que no significa nada. El arreglo es el
+   mismo que ya se aplicó a `.wstool-res-v` y `.wsloan-kpi-v`, y que a estos tres
+   KPI no se les había extendido: no se parte nunca y el tamaño se adapta.
+   Lo encontró la INSPECCIÓN DE LA CAPTURA, no un assert geométrico. */
+.aurix-wsh .wsre-kpi-v {
+  white-space: nowrap; overflow-wrap: normal; word-break: normal;
+  font-size: clamp(15px, 5.2vw, 24px);
+}
+@media (min-width: 560px) { .aurix-wsh .wsre-kpi-v { font-size: clamp(17px, 2.4vw, 24px); } }
+/* Y en el móvil estrecho, UNA columna. Con dos, la celda queda en 119 px para un
+   importe de 147 y la única salida sería bajar la cifra a ~12 px, que es el
+   suelo de legibilidad de Workspace. La regla del repo es la de siempre: la
+   densidad se cobra en FILAS. Cabe de sobra — el inventario sigue empezando
+   dentro de la primera pantalla. */
+@media (max-width: 430px) {
+  .aurix-wsh .wsre-kpis { grid-template-columns: 1fr; }
+  .aurix-wsh .wsre-kpi:nth-child(3) { grid-column: auto; }
+}

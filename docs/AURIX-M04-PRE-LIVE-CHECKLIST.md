@@ -223,3 +223,35 @@ Publicación definitiva = revisión del titular + retirada del aviso.
 | **D** | Defecto conocido y medido: en **360×740** el inventario de Portfolio inmobiliario empieza **61 px por debajo** del primer viewport (su resumen ocupa 552 px). No es regresión; cerrarlo exige rehacer esa densidad. | Decisión del fundador |
 | **E** | **Revisar y aprobar** los textos legales, rellenar los huecos marcados, retirar el aviso de borrador y **sólo después** copiar las URL reales a Stripe. | Fundador (+ asesoría) |
 | **F** | **Corte LIVE de la base de datos** (§8.5), `ready_for_live: true` sin bloqueos y **compra real controlada**. Únicamente con autorización expresa. | Fundador |
+
+---
+
+# ANEXO · WORKSPACE · SEGUNDA RONDA DE CAPACIDADES (inventario, sin implementar)
+
+Estado **comprobado sobre el código**, no sobre la intención. Ninguna de estas
+siete se ha implementado en este trabajo: esto es el inventario que decide cuáles
+merecen construirse y cuáles serían un duplicado con nombre nuevo.
+
+Recordatorio de lo que YA existe y está publicado (8): Interés compuesto,
+Simulador de préstamos, Simulador de escenarios, Portfolio inmobiliario,
+Presupuesto mensual, Control de cobros, Objetivos y Diario de operaciones.
+
+| # | Candidata | Estado real | Qué habría que decidir |
+|---|---|---|---|
+| 1 | **Conversor de divisas** | **NO EXISTE** como capacidad. Sí existe la infraestructura: `_AURIX_FX_PAIRS` mantiene cambios para **USD, EUR, GBP, CHF y JPY** (cinco, no «múltiples»), con TTL de **12 h**, refresco best-effort por el proxy de precios y un **fallback estático aproximado** que el propio código marca como `approx`. | Ampliar el juego de pares o declarar las cinco divisas como el alcance. **No se puede prometer cotización en tiempo real**: el dato es de hasta 12 h y a veces aproximado, y eso hay que decirlo en pantalla. Definir qué es un «documento» guardable aquí (¿un par fijado? ¿una lista?) para que aparezca en Tus planes. |
+| 2 | **Proyección patrimonial** | **EXISTE PARCIALMENTE, INTERNA.** Hay superficie (`_renderWealthProjection`, vista `planning`) y motor (`projectWealthPlan`), y una entrada de catálogo `tpl_projection` con `published:false` / `featureKey:null` / `commercialTier:'undecided'`. **No guarda documento** y **no se conecta al patrimonio real**. | Es la candidata prioritaria y la de mayor riesgo de duplicado: hoy se solapa con Interés compuesto y con Escenarios. Su diferencia tendría que ser **partir del patrimonio real y recalcular al cambiar los datos**, y eso obliga a decidir la frecuencia de actualización REAL y qué pasa con un escenario guardado cuando el patrimonio cambia por debajo (¿se recalcula y deja de ser lo que se guardó, o se congela?). Sin esa decisión no se debe construir. |
+| 3 | **Jubilación / FIRE** | **EXISTE PARCIALMENTE, en tres sitios distintos.** (a) `fire` es un **tipo de objetivo** dentro de Objetivos, que está **publicado**; (b) hay una hoja legacy `ws4` interna con su subtítulo (`ws4_sub_fire`); (c) queda una plantilla antigua `ws_tpl_fire_*` en el mapa histórico. | **Alto riesgo de duplicar Objetivos.** Antes de construir nada: decidir si FIRE es un objetivo con mejor cálculo (extender lo publicado) o una capacidad aparte. Tres representaciones del mismo concepto es justamente lo que el catálogo canónico vino a cerrar. |
+| 4 | **Ingresos de cartera** | **NO EXISTE.** Sólo hay categorías de dividendos en el catálogo de activos; ninguna capacidad de planificación de rentas. | Definir de dónde saldría el dato: Aurix **no** tiene dividendos por activo ni calendario de pagos. Sin fuente, sería una hoja de entrada manual — legítima, pero hay que decirlo y no venderla como «tus ingresos». |
+| 5 | **Distribución patrimonial** | **EXISTE FUERA DE WORKSPACE.** El Dashboard ya publica la distribución por categorías con su donut, y hay además una hoja legacy `networth` interna. | Duplicaría el Dashboard. Sólo tendría sentido si aporta algo que allí no cabe (objetivo de reparto, desviación frente a él, simulación de rebalanceo). Si no, **no construir**. |
+| 6 | **Informes patrimoniales** | **NO EXISTE.** La exportación está deshabilitada desde v584 (código intacto). Existen dos claves de texto muertas (`ap_p_reports`, `ap_std_b4`) que **no se pintan en ningún sitio**: nadie está anunciando informes que no existan. | Decidir formato (¿PDF? ¿qué motor?) y, sobre todo, si el primer paso no es simplemente **reactivar la exportación** que ya está escrita. |
+| 7 | **Revisión financiera anual** | **NO EXISTE.** Ni superficie, ni motor, ni textos. | Definir qué revisa y con qué datos. Es la más cara de las siete y la única sin ninguna base construida. |
+
+**Observación colateral:** en el diccionario quedan cadenas comerciales muertas de
+una iteración anterior (entre ellas un `5.99€/mo`). No se pintan en ninguna parte
+—verificado— así que no contradicen el precio vigente, pero conviene saber que
+están ahí antes de reutilizar ese bloque de claves.
+
+**Orden recomendado:** consolidar las ocho actuales (este trabajo) → decidir
+§2 (Proyección patrimonial) con sus dos preguntas abiertas resueltas → §1
+(Conversor) por ser el de alcance más acotado → descartar §5 salvo que aporte
+reparto objetivo → el resto, después.

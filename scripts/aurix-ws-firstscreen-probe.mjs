@@ -98,19 +98,16 @@ const SURFACES = [
     whole: ['.wstool-fields .ws4-num'],      starts: ['.wstool-inputs-card'] },
   { id: 'journal',     open: `_wsOpenTool('journal')`,
     whole: ['[data-wsjrn-input]'],           starts: ['.wsjrn-form-card'] },
-  // ── UNA LIMITACIÓN DECLARADA, NO UN GATE RELAJADO ───────────────────────
-  // MEDIDO: en 360×740 el resumen de Portfolio inmobiliario ocupa 552 px él solo
-  // (KPIs + subKPIs + capas), así que el inventario empieza en 741 con el suelo
-  // en 680. No cabe, y no cabe por DENSIDAD: en 390×844 la misma tarjeta mide 564
-  // y entra sólo porque la pantalla es 104 px más alta. Recuperar esos 100 px
-  // exige rehacer ese resumen, que este SPEC no toca.
-  // Así que la afirmación se ACOTA a donde se ha demostrado (≥ 800 px de alto) en
-  // vez de fingir que se cumple en todas partes, y el hueco se IMPRIME en cada
-  // ejecución para que no desaparezca de la vista. El resto del contrato
-  // —contención, desbordamiento, toque, legibilidad— se sigue exigiendo en 360.
+  // ── LA EXENCIÓN SE RETIRA: EL HUECO ESTÁ CERRADO ────────────────────────
+  // Aquí había un `startsMinH: 800` declarado y medido: en 360×740 el resumen
+  // ocupaba 552 px y el inventario empezaba en 741 con el suelo en 680. Se
+  // cerró plegando en móvil las cifras DERIVADAS (subKPIs y capas, 207 px, con
+  // el cashflow ya publicado arriba): el resumen baja a 377 px y el inventario
+  // empieza en 566. Sin ocultar nada —el desglose se despliega y desde 560 px
+  // ni siquiera se pliega— y sin tocar la tipografía. Así que la afirmación
+  // vuelve a exigirse en TODAS las anchuras.
   { id: 'realestate',  open: `_wsOpenTool('realestate')`,
-    whole: [],                               starts: ['.wsre-summary-card', '.wsre-grid, .wsre-empty-hint, [data-wsre-add]'],
-    startsMinH: 800, startsGap: 'Portfolio inmobiliario · el inventario empieza en 741 px con el suelo en 680 (360×740): 552 px de resumen' },
+    whole: [],                               starts: ['.wsre-summary-card', '.wsre-grid, .wsre-empty-hint, [data-wsre-add]'] },
   { id: 'receivables', open: `_wsOpenTool('receivables')`,
     whole: [],                               starts: ['.wsrecv-summary-card', '[data-wsrecv-list]'] },
   // §11 RE-DECIDE QUÉ ES «EMPEZAR» AQUÍ. Era `.wsb-impact`, el resumen del rango
@@ -392,6 +389,56 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       d.reopened === true && d.reopenedValue === '20.000' && d.reopenedDoc === 'Mi plan 2030', r);
     await page.screenshot({ path: join(OUT, 'ws-doc-name-390x844-es.png') });
     await ctx.close();
+  }
+
+  // ── EL DESGLOSE DEL INMOBILIARIO: PLEGADO DONDE ESTORBA, ENTERO DONDE CABE
+  // El plegado se hizo para recuperar 207 px en 360×740. La trampa evidente es
+  // «pliego y ya no se ve en ningún sitio»: el primer intento lo hizo —un
+  // `<details>` cerrado usa `content-visibility`, así que la regla de CSS que
+  // pretendía desplegarlo siempre no lo vencía y el desglose DESAPARECÍA en
+  // tablet y escritorio—. Se mide lo PINTADO, no el atributo.
+  {
+    for (const [w, folds] of [[360, true], [559, true], [560, false], [1024, false]]) {
+      const ctx = await newCtx(browser, { viewport: { width: w, height: 900 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+      const page = await ctx.newPage();
+      await mount(page); await asPremium(page, 'es');
+      await page.evaluate(`(function(){ _wshView='home'; renderWorkspaceHome(); _wsOpenTool('realestate'); renderWorkspaceHome(); return true; })()`);
+      await page.waitForTimeout(220);
+      const vis = () => page.evaluate(`(function(){
+        var box = document.querySelector('[data-wsre-more]');
+        if (!box) return JSON.stringify({ box: false });
+        var btn = box.querySelector('[data-wsre-more-toggle]');
+        var body = box.querySelector('.wsre-more-body');
+        var painted = body.checkVisibility
+          ? body.checkVisibility({ contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true })
+          : body.getBoundingClientRect().height > 0;
+        return JSON.stringify({ box: true,
+          toggle: getComputedStyle(btn).display !== 'none',
+          expanded: btn.getAttribute('aria-expanded'),
+          painted: painted,
+          tap: Math.round(Math.min(btn.getBoundingClientRect().width, btn.getBoundingClientRect().height)),
+          // Lo que el desglose CONTIENE tiene que seguir existiendo siempre:
+          // plegar no es borrar.
+          layers: box.querySelectorAll('.wsre-layer').length,
+          subkpis: box.querySelectorAll('.wsre-subkpi').length });})()`).then(JSON.parse);
+      const a = await vis();
+      if (folds) {
+        ok(`${ENG}.${w} desglose · se pliega, con un botón tocable, y lo plegado NO se pinta`,
+          a.box && a.toggle === true && a.painted === false && a.expanded === 'false' && a.tap >= 44,
+          JSON.stringify(a));
+        await page.click('[data-wsre-more-toggle]');
+        await page.waitForTimeout(140);
+        const b = await vis();
+        ok(`${ENG}.${w} desglose · un toque lo despliega de verdad (y lo dice a quien no ve)`,
+          b.painted === true && b.expanded === 'true', JSON.stringify(b));
+      } else {
+        ok(`${ENG}.${w} desglose · con ancho no hay plegado: se ve entero y sin botón`,
+          a.box && a.toggle === false && a.painted === true, JSON.stringify(a));
+      }
+      ok(`${ENG}.${w} desglose · plegar no borra: las capas y los subKPIs siguen ahí`,
+        a.layers >= 3 && a.subkpis === 3, JSON.stringify(a));
+      await ctx.close();
+    }
   }
 
   // ── DE DÓNDE SE VIENE Y A DÓNDE SE VUELVE ────────────────────────────────

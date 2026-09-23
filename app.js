@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '705'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '706'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6575,6 +6575,7 @@ const T = {
     wsre_l_cf:    'Flujo tras deuda',
     wsre_l_appr:  'Apreciación latente',
     wsre_basis_title: 'Cómo se calculan estas cifras',
+    wsre_more_title:  'Desglose del mes y capas',
     wsre_basis_yield: 'La rentabilidad del conjunto es Σ(resultado operativo anual) / Σ(coste de compra), no la media de las rentabilidades de cada inmueble.',
     wsre_basis_debt:  'La cuota incluye la parte que amortiza capital, que NO es un gasto operativo: construye equity. Por eso el resultado operativo se publica antes de la deuda.',
     wsre_basis_appr:  'La apreciación es LATENTE: es la diferencia entre el valor que has declarado y lo que pagaste, y no entra en el flujo de caja porque no se ha cobrado.',
@@ -9338,6 +9339,7 @@ const T = {
     wsre_l_cf:    'Cash flow after debt',
     wsre_l_appr:  'Unrealised appreciation',
     wsre_basis_title: 'How these figures are worked out',
+    wsre_more_title:  'Monthly breakdown and layers',
     wsre_basis_yield: 'The portfolio yield is Σ(annual operating result) / Σ(purchase cost), not the average of each property\'s yield.',
     wsre_basis_debt:  'The payment includes the part that repays capital, which is NOT an operating expense: it builds equity. That is why the operating result is shown before debt.',
     wsre_basis_appr:  'Appreciation is UNREALISED: it is the difference between the value you declared and what you paid, and it does not enter cash flow because it has not been received.',
@@ -21032,7 +21034,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21146,6 +21148,14 @@ function _wshWireOnce() {
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
     if (t.hasAttribute('data-wsb2-save')) { _wsbSaveInstance(); return; }
+    if (t.hasAttribute('data-wsre-more-toggle')) {
+      const box = t.closest('[data-wsre-more]');
+      if (box) {
+        const open = box.classList.toggle('is-open');
+        t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      return;
+    }
   });
   // WS.3/WS.4/WS.5 — live recompute on input (no full rebuild → inputs keep focus).
   document.addEventListener('input', e => {
@@ -21928,11 +21938,19 @@ const _WS_APP_IDENTITY = {
   receivables:           { type: 'app',  category: 'operations', visualTone: 'payment-control',  accentColor: 'bordeaux', previewType: 'receivables-list', layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
   asset_prices:          { type: 'app',  category: 'investment',  visualTone: 'portfolio-tracking', accentColor: 'petrol-blue', previewType: 'asset-table',   layoutType: 'tracker', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'core' },
   compound_growth:       { type: 'tool', category: 'planning',   visualTone: 'future-growth',    accentColor: 'blue',     previewType: 'growth-curve',     layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'free' },
-  scenario:              { type: 'tool', category: 'planning',   visualTone: 'comparison',       accentColor: 'violet',   previewType: 'compare',          layoutType: 'view', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'free' },
+  // ── EL ACENTO DE LAS TRES HERRAMIENTAS PUBLICADAS ES EL AZUL DE AURIX ────
+  // `violet` y `steel-blue` vienen de cuando cada capacidad se dibujaba como una
+  // «app» distinta, con su propio color. Hoy las ocho son la MISMA superficie y
+  // el mismo plan, así que tres iconos de tres familias cromáticas —uno morado,
+  // otro gris azulado y otro azul— sólo comunican desorden: ninguno de los dos
+  // colores está en el sistema (azul eléctrico, dorado discreto). Se unifican
+  // los que SE PINTAN; las entradas internas conservan el suyo porque no se
+  // publican y cambiarlo no demostraría nada.
+  scenario:              { type: 'tool', category: 'planning',   visualTone: 'comparison',       accentColor: 'blue',     previewType: 'compare',          layoutType: 'view', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'free' },
   goal:                  { type: 'tool', category: 'planning',   visualTone: 'milestones',       accentColor: 'amber',    previewType: 'progress',         layoutType: 'view', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
   financial_calc:        { type: 'tool', category: 'utility',    visualTone: 'control',          accentColor: 'green',    previewType: 'inputs',           layoutType: 'tool', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
   investment_analyzer:   { type: 'tool', category: 'investing',  visualTone: 'risk-return',      accentColor: 'navy',     previewType: 'risk',             layoutType: 'tool',       canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
-  loan_simulation:       { type: 'tool', category: 'financing',  visualTone: 'banking',          accentColor: 'steel-blue', previewType: 'loan-summary',   layoutType: 'calculator', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'premium' },  // M.01B — frontera comercial declarada
+  loan_simulation:       { type: 'tool', category: 'financing',  visualTone: 'banking',          accentColor: 'blue',       previewType: 'loan-summary',   layoutType: 'calculator', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'premium' },  // M.01B — frontera comercial declarada
 };
 // ════════════════════════════════════════════════════════════════════════════
 // MONETIZATION V1 · M.02 B4 — CATÁLOGO CON ESTADO COMERCIAL (fuente ÚNICA)
@@ -26938,22 +26956,50 @@ function _wsReSummaryHtml(r) {
         <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
         <div class="wsre-kpi is-yield"><span class="wsre-kpi-v">${esc(_wsJrnPct(r.avgYield))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_yield'))}</span></div>
       </div>
-      <div class="wsre-subkpis">
-        <span class="wsre-subkpi"><b>${esc(formatBase(r.mortgageTotal))}</b><i>${esc(t('wsre_kpi_mortgage'))}</i></span>
-        <span class="wsre-subkpi"><b>${esc((r.cashflowAnnual >= 0 ? '+' : '') + formatBase(r.cashflowAnnual))}</b><i>${esc(t('wsre_kpi_cf_annual'))}</i></span>
-        <span class="wsre-subkpi"><b>${esc(formatBase(r.buyTotal))}</b><i>${esc(t('wsre_kpi_buy'))}</i></span>
-      </div>
-      ${/* ── §E · LAS TRES CAPAS, SEPARADAS Y A LA VISTA ──────────────────────
-            «Separar resultado operativo, pago de deuda y apreciación.» Antes sólo
-            se publicaba el flujo YA NETO de la cuota, así que era imposible saber
-            cuánto rinde el inmueble y cuánto se lleva la deuda — dos hechos
-            distintos que se leían como uno. La apreciación va aparte y se nombra
-            LATENTE: no es dinero cobrado y no entra en el flujo. */''}
-      <div class="wsre-layers">
-        <span class="wsre-layer"><i>${esc(t('wsre_l_noi'))}</i><b>${esc((r.noiMonthlyTotal >= 0 ? '+' : '') + formatBase(r.noiMonthlyTotal))}</b></span>
-        <span class="wsre-layer"><i>${esc(t('wsre_l_debt'))}</i><b>${esc('−' + formatBase(Math.abs(r.debtServiceMonthlyTotal)))}</b></span>
-        <span class="wsre-layer is-total"><i>${esc(t('wsre_l_cf'))}</i><b class="${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</b></span>
-        ${r.valuesDeclared > 0 ? `<span class="wsre-layer is-latent"><i>${esc(t('wsre_l_appr'))}</i><b>${esc((r.appreciationTotal >= 0 ? '+' : '') + formatBase(r.appreciationTotal))}</b></span>` : ''}
+      ${/* ── EL DESGLOSE, PLEGADO SÓLO DONDE ESTORBA ─────────────────────────
+            MEDIDO en 360×740: el resumen ocupaba 552 px él solo y empujaba el
+            inventario a 741 px, con el suelo en 680 — se entraba a la capacidad
+            sin ver ni un inmueble. Los 207 px que faltaban están aquí: subKPIs
+            (63) y capas (144). Y son precisamente las cifras DERIVADAS: el
+            cashflow mensual, que es la respuesta a «¿cuánto renta?», ya está
+            arriba en su KPI, y estas dos filas lo descomponen.
+            No se oculta nada ni se encoge la tipografía: se pliega en un
+            `<details>` NATIVO —teclado y lector de pantalla incluidos— que en
+            560 px o más NI SIQUIERA se pliega (ver `legal`/`styles`: el summary
+            desaparece y el cuerpo queda visible). §E sigue cumpliéndose: las
+            tres capas se publican separadas, a un toque en el móvil y a la vista
+            en cuanto hay ancho. */''}
+      <div class="wsre-more" data-wsre-more>
+        ${/* NO es un `<details>`, y la razón está medida: un `<details>` cerrado
+              se implementa hoy con `content-visibility: hidden` sobre su slot
+              interno, así que la regla de CSS que pretendía «desplegarlo
+              siempre» por encima de 560 px no lo vencía — el desglose
+              DESAPARECÍA entero en tablet y escritorio, que es peor que el
+              defecto que se venía a arreglar. Con un botón y una clase el
+              estado es nuestro, es determinista en los dos motores y responde
+              al giro del dispositivo sin volver a renderizar. */''}
+        <button type="button" class="wsre-more-sum" data-wsre-more-toggle
+                aria-expanded="false" aria-controls="wsreMoreBody">${esc(t('wsre_more_title'))}</button>
+        <div class="wsre-more-body" id="wsreMoreBody">
+          <div class="wsre-subkpis">
+            <span class="wsre-subkpi"><b>${esc(formatBase(r.mortgageTotal))}</b><i>${esc(t('wsre_kpi_mortgage'))}</i></span>
+            <span class="wsre-subkpi"><b>${esc((r.cashflowAnnual >= 0 ? '+' : '') + formatBase(r.cashflowAnnual))}</b><i>${esc(t('wsre_kpi_cf_annual'))}</i></span>
+            <span class="wsre-subkpi"><b>${esc(formatBase(r.buyTotal))}</b><i>${esc(t('wsre_kpi_buy'))}</i></span>
+          </div>
+          ${/* ── §E · LAS TRES CAPAS, SEPARADAS ────────────────────────────
+                «Separar resultado operativo, pago de deuda y apreciación.» Antes
+                sólo se publicaba el flujo YA NETO de la cuota, así que era
+                imposible saber cuánto rinde el inmueble y cuánto se lleva la
+                deuda — dos hechos distintos que se leían como uno. La
+                apreciación va aparte y se nombra LATENTE: no es dinero cobrado
+                y no entra en el flujo. */''}
+          <div class="wsre-layers">
+            <span class="wsre-layer"><i>${esc(t('wsre_l_noi'))}</i><b>${esc((r.noiMonthlyTotal >= 0 ? '+' : '') + formatBase(r.noiMonthlyTotal))}</b></span>
+            <span class="wsre-layer"><i>${esc(t('wsre_l_debt'))}</i><b>${esc('−' + formatBase(Math.abs(r.debtServiceMonthlyTotal)))}</b></span>
+            <span class="wsre-layer is-total"><i>${esc(t('wsre_l_cf'))}</i><b class="${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</b></span>
+            ${r.valuesDeclared > 0 ? `<span class="wsre-layer is-latent"><i>${esc(t('wsre_l_appr'))}</i><b>${esc((r.appreciationTotal >= 0 ? '+' : '') + formatBase(r.appreciationTotal))}</b></span>` : ''}
+          </div>
+        </div>
       </div>
       <details class="wstool-asm wsre-basis">
         <summary class="wstool-asm-sum">${esc(t('wsre_basis_title'))}</summary>
