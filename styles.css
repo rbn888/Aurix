@@ -27446,6 +27446,122 @@ button.intv14-cmp-clear {
 }
 @media (prefers-reduced-motion: reduce) { .wspl-go { transition: none; } }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   §4/§6 · LA DECISIÓN DE GUARDADO Y LA BARRA DE ACCIONES
+   ════════════════════════════════════════════════════════════════════════════
+   LO QUE CORRIGE, con la medida de la captura del fundador: cuatro botones en
+   fila —Guardar, Guardar como, Renombrar, Eliminar— se salían por la derecha en
+   móvil y «Renombrar» aparecía cortado. Y mentían sobre la jerarquía: Eliminar
+   no compite con Guardar. Ahora hay UNA acción primaria y un menú secundario. */
+.aurix-wsh .wsg-savebar { flex-wrap: wrap; gap: 10px; row-gap: 8px; }
+.aurix-wsh .wsg-savestate { flex: 1 1 auto; min-width: 0; }
+.aurix-wsh .wsg-savebtn { flex: 0 0 auto; }
+.aurix-wsh .wsg-menu { flex: 0 0 auto; position: static; }
+.aurix-wsh .wsg-menu-sum {
+  display: grid; place-items: center; position: relative; cursor: pointer;
+  width: 40px; height: 44px; list-style: none;
+  font-size: 17px; font-weight: 700; line-height: 1; color: #aecbff;
+  border-radius: 12px; background: rgba(74,130,240,0.10);
+  border: 1px solid rgba(74,130,240,0.28);
+}
+.aurix-wsh .wsg-menu-sum::-webkit-details-marker { display: none; }
+.aurix-wsh .wsg-menu-sum:hover { background: rgba(74,130,240,0.20); color: #cfe0ff; }
+.aurix-wsh .wsg-menu-sum:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+.aurix-wsh .wsg-menu[open] .wsg-menu-sum { background: rgba(74,130,240,0.24); color: #e6efff; }
+/* El cuerpo del menú se posiciona sobre la tarjeta que lo contiene, no sobre el
+   documento: así no puede quedar bajo la navegación ni fuera del viewport. */
+.aurix-wsh .wsg-foot-card, .aurix-wsh .wsg-card-foot { position: relative; }
+.aurix-wsh .wsg-menu-body {
+  position: absolute; z-index: 7; right: 0; bottom: calc(100% + 8px);
+  min-width: 200px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; padding: 6px; border-radius: 14px;
+  border: 1px solid rgba(74,130,240,0.30);
+  background: #121a2c;                       /* opaco: un menú translúcido sobre
+                                                texto se lee como un fallo */
+  box-shadow: 0 18px 44px rgba(0,0,0,0.44);
+}
+.aurix-wsh .wsg-menu-item {
+  font: inherit; cursor: pointer; text-align: left;
+  min-height: 44px; padding: 0 12px; border-radius: 10px;
+  font-size: 13.5px; font-weight: 600; color: rgba(222,232,250,0.95);
+  background: transparent; border: 0;
+}
+.aurix-wsh .wsg-menu-item:hover { background: rgba(74,130,240,0.16); color: #fff; }
+.aurix-wsh .wsg-menu-item:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: -2px; }
+.aurix-wsh .wsg-menu-item.is-danger { color: rgba(240,150,150,0.96); }
+.aurix-wsh .wsg-menu-item.is-danger:hover { background: rgba(230,120,120,0.16); }
+
+/* ── EL MODAL DE ELECCIÓN Y EL SELECTOR DE DOCUMENTO ───────────────────────
+   Las opciones son objetivos táctiles de pleno derecho y se leen como filas, no
+   como botones apretados: la decisión entre actualizar y crear otra es la que
+   decide si un documento sobrevive, y merece espacio para leerse. */
+.ws-modal.is-choice, .ws-modal.is-pick { max-width: 460px; }
+.ws-modal-choices { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 4px; }
+.ws-modal-choice {
+  font: inherit; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 3px;
+  min-height: 56px; padding: 11px 14px; border-radius: 13px;
+  color: rgba(228,236,252,0.96);
+  background: rgba(6,10,20,0.55);
+  border: 1px solid rgba(90,140,255,0.20);
+}
+.ws-modal-choice:hover { border-color: rgba(90,140,255,0.44); background: rgba(74,130,240,0.12); }
+.ws-modal-choice:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+.ws-modal-choice.is-primary { border-color: rgba(90,140,255,0.42); }
+.ws-modal-choice-t { font-size: 14.5px; font-weight: 700; overflow-wrap: anywhere; }
+.ws-modal-choice-h { font-size: 12.5px; line-height: 1.4; color: var(--text-muted); }
+.ws-modal-picklist {
+  display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px;
+  max-height: 46vh; overflow: auto; -webkit-overflow-scrolling: touch;
+}
+.ws-modal-pick {
+  font: inherit; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  min-height: 52px; padding: 10px 13px; border-radius: 12px;
+  color: rgba(228,236,252,0.96);
+  background: rgba(6,10,20,0.55);
+  border: 1px solid rgba(90,140,255,0.18);
+}
+/* SIN PRESELECCIÓN: ninguna fila nace marcada, y el botón de confirmar nace
+   deshabilitado. Elegir el destino de un reemplazo es del usuario. */
+.ws-modal-pick.is-on { border-color: rgba(90,140,255,0.62); background: rgba(74,130,240,0.16); }
+.ws-modal-pick:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+.ws-modal-pick-n { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.ws-modal-pick-m { font-size: 12.5px; color: var(--text-muted); }
+.ws-modal-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* ── §5 · EL RÓTULO DE SIMULACIÓN EN «TUS PLANES» ──────────────────────────
+   Un capital final proyectado y un saldo de cobros no son la misma clase de
+   número. La tarjeta lo dice, discreto y sin dorado. */
+.wspl-sim {
+  align-self: flex-start;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 3px 9px; border-radius: 999px;
+  color: rgba(159,194,255,0.92);
+  background: rgba(74,130,240,0.12);
+  border: 1px solid rgba(74,130,240,0.24);
+}
+
+/* ── §7 · CERO ACTIVOS CONFIRMADOS: UN SOLO ESTADO ─────────────────────────
+   Seis tarjetas vacías no son información. Una sola llamada a la acción, con el
+   flujo de alta que ya existe detrás. */
+.cat-empty {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+  padding: 20px; border-radius: 18px;
+  border: 1px dashed rgba(74,130,240,0.28);
+  background: rgba(74,130,240,0.05);
+}
+.cat-empty-t { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+.cat-empty-cta {
+  font: inherit; cursor: pointer; min-height: 44px; padding: 0 18px;
+  font-size: 14px; font-weight: 700; color: #aecbff;
+  border-radius: 999px; background: rgba(74,130,240,0.12);
+  border: 1px solid rgba(74,130,240,0.34);
+}
+.cat-empty-cta:hover { background: rgba(74,130,240,0.22); color: #cfe0ff; }
+.cat-empty-cta:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+
 /* ── VALIDACIÓN VISIBLE, Y NO SÓLO UN `return` ───────────────────────────────
    Un campo obligatorio vacío marca el campo y publica UNA línea de razón junto al
    botón que se acaba de pulsar. No es un estado de error del formulario entero:

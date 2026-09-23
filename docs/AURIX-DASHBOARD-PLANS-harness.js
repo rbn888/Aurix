@@ -76,8 +76,19 @@ console.log('1 · El conjunto publicado:');
     { id: 'x4', type: 'monthly_budget',   customName: 'Borrado',    updatedAt: 950, deletedAt: 1, inputs: {} },
   ]) });
   const ids = JSON.parse(R(c, 'JSON.stringify(_wsPlansDocs().map(p => p.id))'));
-  ok('1.1 sólo las CUATRO plantillas: ni herramientas ni inventario interno',
-    JSON.stringify(ids) === JSON.stringify(['d1', 'd2', 'd3', 'd4', 'd5']), JSON.stringify(ids));
+  // ── RE-DECIDIDO (§5) ─────────────────────────────────────────────────────
+  // Esto exigía SÓLO las cuatro plantillas, y era alcance declarado. Resultó ser
+  // un contrato roto: Interés compuesto ofrece «Guardar», el usuario guarda y su
+  // documento no aparecía en ningún sitio. Ningún botón puede prometer guardar
+  // mientras su instancia queda fuera. Ahora entran TODAS las capacidades que
+  // guardan documento… y lo INTERNO sigue fuera, que es la otra mitad: `x3` es
+  // `asset_prices`, no está publicada, y el gate de apertura la deja fuera sola.
+  ok('1.1 TODA instancia guardada de una capacidad publicada, incluidas herramientas',
+    ids.indexOf('x1') !== -1 && ids.indexOf('x2') !== -1
+    && ['d1','d2','d3','d4','d5'].every(x => ids.indexOf(x) !== -1)
+    && ids.length === 7, JSON.stringify(ids));
+  ok('1.1b …y lo INTERNO sigue fuera: no publicado no aparece',
+    ids.indexOf('x3') === -1, JSON.stringify(ids));
   ok('1.2 un documento con tombstone NO resucita en esta vista',
     ids.indexOf('x4') === -1);
   // El más recién editado primero: es el que el usuario probablemente retoma.
@@ -88,6 +99,13 @@ console.log('1 · El conjunto publicado:');
   // Dos presupuestos distintos conservan identidad y nombre propios: es lo único
   // que los distingue, porque comparten tipo.
   const html1 = R(c, '_renderDashboardPlans()');
+  // Una simulación se rotula como tal: un capital final proyectado no es un
+  // hecho patrimonial, y la tarjeta tiene que decirlo.
+  ok('1.3b las simulaciones se rotulan como proyección, y las plantillas no',
+    (() => { const h = R(c, '_renderDashboardPlans()');
+      const simCards = (h.match(/wspl-sim/g) || []).length;
+      return simCards === 2; })(),
+    (R(c, '_renderDashboardPlans()').match(/wspl-sim/g) || []).length + ' rótulos');
   ok('1.4 dos plantillas del MISMO tipo mantienen nombre e identidad propios',
     /data-wspl-id="d1"/.test(html1) && /data-wspl-id="d2"/.test(html1)
     && html1.indexOf('Presupuesto casa') !== -1 && html1.indexOf('Presupuesto viaje') !== -1

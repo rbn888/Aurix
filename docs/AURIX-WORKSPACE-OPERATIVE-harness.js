@@ -214,10 +214,23 @@ console.log('\n5 · Guardar, Guardar como, Renombrar y Eliminar:');
     && /data-wstool-rename/.test(open) && /data-wstool-delete/.test(open));
   // «Guardar como» crea otra instancia; «Guardar» actualiza. Es la diferencia que
   // impide que renombrar una simulación destruya la anterior.
-  ok('5.3 «Guardar» actualiza y «Guardar como» fuerza instancia nueva',
-    /_wsToolCommit\(null, false\)/.test(fnSrc('_wsToolSave'))
-    && /_wsToolCommit\([^)]*true\)/.test(fnSrc('_wsToolSaveAs'))
-    && /forceNew \? null : \(_wsToolEditId[\s\S]{0,80}|!forceNew && _wsToolEditId/.test(fnSrc('_wsToolCommit')));
+  // RE-DECIDIDO (§4). Antes «Guardar» ACTUALIZABA sin preguntar, y eso es lo que
+  // este assert fijaba. Equivocarse hacia actualizar destruye un documento sin
+  // autorización, así que ahora la decisión se PREGUNTA por un owner compartido
+  // y «actualizar» es una de las respuestas, no la respuesta por defecto.
+  ok('5.3 «Guardar» ya no decide solo: delega en el owner de decisión de §4',
+    /_wsSaveDecide\(\{/.test(fnSrc('_wsToolSave'))
+    && !/_wsToolCommit\(null, false\)/.test(fnSrc('_wsToolSave')));
+  ok('5.3b el escritor distingue actualizar, crear y REEMPLAZAR un destino explícito',
+    /!forceNew && _wsToolEditId/.test(fnSrc('_wsToolCommit'))
+    && /targetId/.test(fnSrc('_wsToolCommit'))
+    && /if \(targetId && !existing\)/.test(fnSrc('_wsToolCommit')));
+  // Y el destino de un reemplazo NUNCA se deduce: se elige, y el selector nace
+  // sin nada marcado y con el confirmar deshabilitado.
+  ok('5.3c el selector de reemplazo no preselecciona y no confirma sin elección',
+    /chosen = -1/.test(fnSrc('_wsPickDocModal'))
+    && /disabled/.test(fnSrc('_wsPickDocModal'))
+    && /if \(chosen < 0/.test(fnSrc('_wsPickDocModal')));
   // Y el estado de guardado sigue siendo honesto: pendiente ≠ guardado.
   ok('5.4 el estado distingue sin guardar / pendiente / guardado',
     /state = _wsToolEditId \? \(_wsToolDirty \? 'dirty' : 'saved'\) : 'unsaved'/.test(fnSrc('_wsToolSaveBarHtml')));

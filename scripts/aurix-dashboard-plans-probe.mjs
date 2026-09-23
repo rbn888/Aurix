@@ -275,6 +275,67 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       r.conPlan === 5 && r.sinPlan === 'none' && r.docs === 5, JSON.stringify(r));
     await ctx.close();
   }
+
+  // ══ §7 · CATEGORÍAS VACÍAS ════════════════════════════════════════════════
+  // La visibilidad sale del INVENTARIO canónico de posiciones activas, no del
+  // valor ni de la cotización: un activo sin precio sigue siendo una posición.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
+    const page = await ctx.newPage();
+    await mount(page);
+    const setAssets = (list) => page.evaluate(`(function(){
+      assets = ${JSON.stringify(list)};
+      try { updateCategoryCards(); } catch (_) {}
+      var g=document.getElementById('categoriesGrid');
+      return JSON.stringify({
+        cards: [].slice.call(g.querySelectorAll('.cat-card[data-type]')).map(function(c){return c.dataset.type;}),
+        empty: g.querySelectorAll('.cat-empty').length,
+        cta: g.querySelectorAll('[data-cat-empty-add]').length,
+        cols: getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length });})()`).then(JSON.parse);
+
+    let r = await setAssets([]);
+    ok(`${ENG}.cat · cero activos confirmados: UN estado con «Añadir activo», no seis cards`,
+      r.cards.length === 0 && r.empty === 1 && r.cta === 1, JSON.stringify(r));
+
+    r = await setAssets([{ id: 'a1', name: 'AAPL', type: 'stock', qty: 3, price: 100 }]);
+    ok(`${ENG}.cat · la primera posición muestra SU categoría y sólo esa`,
+      JSON.stringify(r.cards) === JSON.stringify(['stock']) && r.empty === 0, JSON.stringify(r));
+
+    r = await setAssets([{ id: 'a1', name: 'AAPL', type: 'stock', qty: 3, price: 100 },
+                         { id: 'a2', name: 'BTC', type: 'crypto', qty: 1 }]);
+    ok(`${ENG}.cat · una posición SIN cotización no vacía su categoría`,
+      r.cards.indexOf('crypto') !== -1 && r.cards.length === 2, JSON.stringify(r));
+
+    r = await setAssets([{ id: 'a1', name: 'AAPL', type: 'stock', qty: 3, price: 100 },
+                         { id: 'a3', name: 'Oro', type: 'metal', qty: 0.0001, price: 0 }]);
+    ok(`${ENG}.cat · valor cero tampoco vacía una categoría`,
+      r.cards.indexOf('metal') !== -1, JSON.stringify(r));
+
+    r = await setAssets([{ id: 'a1', name: 'AAPL', type: 'stock', qty: 3, price: 100 },
+                         { id: 'a2', name: 'BTC', type: 'crypto', qty: 0, lifecycleStatus: 'closed' }]);
+    ok(`${ENG}.cat · la última posición CERRADA oculta su categoría, sin borrar nada`,
+      r.cards.indexOf('crypto') === -1 && r.cards.indexOf('stock') !== -1, JSON.stringify(r));
+
+    r = await setAssets([{ id: 'c1', type: 'crypto', qty: 1, price: 1 },
+                         { id: 's1', type: 'stock', qty: 1, price: 1 },
+                         { id: 'm1', type: 'metal', qty: 1, price: 1 }]);
+    const orderOk = await page.evaluate(`(function(){
+      var order = (_catOrder.length === CAT_DEFAULT_ORDER.length ? _catOrder : CAT_DEFAULT_ORDER);
+      var shown = [].slice.call(document.querySelectorAll('#categoriesGrid .cat-card[data-type]')).map(function(c){return c.dataset.type;});
+      return JSON.stringify(shown) === JSON.stringify(order.filter(function(x){return shown.indexOf(x)!==-1;}));})()`);
+    ok(`${ENG}.cat · el orden se conserva (es un filtro, no una lista nueva)`, orderOk === true, JSON.stringify(r.cards));
+    ok(`${ENG}.cat · escritorio nunca pasa de tres columnas`, r.cols <= 3, 'columnas=' + r.cols);
+
+    // ── CARGANDO NO ES VACÍO ────────────────────────────────────────────────
+    const notReady = await page.evaluate(`(function(){
+      assets = null;
+      var g=document.getElementById('categoriesGrid');
+      try { updateCategoryCards(); } catch (_) {}
+      return JSON.stringify({ empty: g.querySelectorAll('.cat-empty').length });})()`).then(JSON.parse);
+    ok(`${ENG}.cat · inventario no disponible NO se afirma como vacío`,
+      notReady.empty === 0, JSON.stringify(notReady));
+    await ctx.close();
+  }
   await browser.close();
 }
 

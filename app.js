@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '701'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '702'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6239,6 +6239,15 @@ const T = {
     wspl_m_units:         'Inmuebles',
     wspl_m_value:         'Valor',
     wspl_m_trades:        'Operaciones',
+    wsg_more_aria:        'Más acciones del documento',
+    catEmptyTitle:        'Todavía no has añadido ningún activo.',
+    catEmptyCta:          'Añadir activo',
+    wspl_m_final:         'Capital final',
+    wspl_m_years:         'Años',
+    wspl_m_payment:       'Cuota',
+    wspl_m_interest:      'Intereses',
+    wspl_m_rows:          'Registros',
+    wspl_sim:             'Proyección',
     ws_sync_idle:         'Sin cambios sin guardar',
     ws_sync_saving:       'Guardando…',
     ws_sync_saved_synced: 'Guardado y sincronizado',
@@ -6602,6 +6611,22 @@ const T = {
     wsname_save_title:  'Guardar en Mi espacio',
     wsname_saveas_title:'Guardar como…',
     wsname_field:       'Nombre',
+    // ── §4 · LA DECISIÓN DE GUARDADO ─────────────────────────────────────────
+    wssave_title:         'Guardar',
+    wssave_open_text:     'Estás editando un documento guardado.',
+    wssave_update:        'Actualizar «{n}»',
+    wssave_update_hint:   'Modifica ese documento y conserva su historial.',
+    wssave_new:           'Guardar como nueva',
+    wssave_new_hint:      'Crea un documento independiente.',
+    wssave_exists_text:   'Ya tienes {n} documento(s) de este tipo.',
+    wssave_replace:       'Reemplazar una existente',
+    wssave_replace_hint:  'Elige cuál en el paso siguiente.',
+    wssave_pick_title:    '¿Cuál quieres reemplazar?',
+    wssave_pick_text:     'Se sustituirá el contenido del documento que elijas. Su nombre no cambia.',
+    wssave_replace_ok:    'Reemplazar',
+    wssave_confirm_title: 'Reemplazar documento',
+    wssave_confirm_text:  'Vas a sustituir el contenido de «{n}». Esta acción no se puede deshacer.',
+    wssave_target_gone:   'Ese documento ya no existe. No se ha guardado nada.',
     wsname_ok:          'Guardar',
     wsname_required:    'Escribe un nombre para guardarlo.',
     wstool_saveas:      'Guardar como…',
@@ -8973,6 +8998,15 @@ const T = {
     wspl_m_units:         'Properties',
     wspl_m_value:         'Value',
     wspl_m_trades:        'Trades',
+    wsg_more_aria:        'More document actions',
+    catEmptyTitle:        'You have not added any asset yet.',
+    catEmptyCta:          'Add asset',
+    wspl_m_final:         'Final capital',
+    wspl_m_years:         'Years',
+    wspl_m_payment:       'Payment',
+    wspl_m_interest:      'Interest',
+    wspl_m_rows:          'Rows',
+    wspl_sim:             'Projection',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
     ws_sync_saved_synced: 'Saved and synced',
@@ -9314,6 +9348,21 @@ const T = {
     wsname_save_title:  'Save to My Space',
     wsname_saveas_title:'Save as…',
     wsname_field:       'Name',
+    wssave_title:         'Save',
+    wssave_open_text:     'You are editing a saved document.',
+    wssave_update:        'Update “{n}”',
+    wssave_update_hint:   'Changes that document and keeps its history.',
+    wssave_new:           'Save as new',
+    wssave_new_hint:      'Creates an independent document.',
+    wssave_exists_text:   'You already have {n} document(s) of this type.',
+    wssave_replace:       'Replace an existing one',
+    wssave_replace_hint:  'You will choose which one next.',
+    wssave_pick_title:    'Which one do you want to replace?',
+    wssave_pick_text:     'The content of the document you choose will be replaced. Its name stays the same.',
+    wssave_replace_ok:    'Replace',
+    wssave_confirm_title: 'Replace document',
+    wssave_confirm_text:  'You are about to replace the content of “{n}”. This cannot be undone.',
+    wssave_target_gone:   'That document no longer exists. Nothing was saved.',
     wsname_ok:          'Save',
     wsname_required:    'Type a name to save it.',
     wstool_saveas:      'Save as…',
@@ -21075,7 +21124,30 @@ function _wshWireOnce() {
   const _wsFmtTarget = el => el && el.classList && el.classList.contains('ws4-num')
     && el.getAttribute('inputmode') === 'decimal'
     && el.getAttribute('data-wsg-form') !== 'year';
-  document.addEventListener('focusin', e => { const el = e.target; if (_wsFmtTarget(el)) el.value = _wsStripThousands(el.value); });
+  // ── AL ENTRAR SE QUITAN LOS MILES, Y EL CURSOR SE QUEDA DONDE ESTABA ──────
+  // Asignar `.value` reposiciona el cursor AL FINAL, así que tocar en medio de
+  // «1.000» para corregir un dígito colocaba el cursor detrás del último y la
+  // siguiente pulsación borraba o escribía en el sitio equivocado. Es la otra
+  // mitad de «tengo que seleccionar todo».
+  //   · si no hay nada que quitar, NO se asigna (una asignación idéntica también
+  //     mueve el cursor en algunos motores);
+  //   · si hay separadores, el cursor se recoloca descontando los que había
+  //     ANTES de él, que es su posición equivalente en el texto sin agrupar.
+  document.addEventListener('focusin', e => {
+    const el = e.target;
+    if (!_wsFmtTarget(el)) return;
+    const before = String(el.value);
+    const after = _wsStripThousands(before);
+    if (after === before) return;
+    let pos = null;
+    try { pos = el.selectionStart; } catch (_) { pos = null; }
+    el.value = after;
+    if (pos != null) {
+      const removed = before.slice(0, pos).length - _wsStripThousands(before.slice(0, pos)).length;
+      const next = Math.max(0, Math.min(after.length, pos - removed));
+      try { el.setSelectionRange(next, next); } catch (_) {}
+    }
+  });
   // ── AL PERDER EL FOCO, EL ESTADO GUARDA UN NÚMERO ─────────────────────────
   // WS.15A guarda el valor CRUDO mientras se edita —es lo que permite borrar un
   // campo— y eso es correcto. El problema es que ese texto se PERSISTE y `_wsNum`
@@ -21338,12 +21410,13 @@ function _wsConfirm(onConfirm) {
         <button type="button" class="ws-modal-btn is-danger" data-wsmodal="ok">${esc(t('wsmodal_delete'))}</button>
       </div>
     </div>`;
+  let _cfired = false;
   const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = e => { if (e.key === 'Escape') close(); };
   ov.addEventListener('click', e => {
     if (e.target === ov) { close(); return; }
     const b = e.target.closest ? e.target.closest('[data-wsmodal]') : null; if (!b) return;
-    if (b.getAttribute('data-wsmodal') === 'ok') { close(); try { onConfirm(); } catch (_) {} } else { close(); }
+    if (b.getAttribute('data-wsmodal') === 'ok') { if (_cfired) return; _cfired = true; close(); try { onConfirm(); } catch (_) {} } else { close(); }
   });
   document.addEventListener('keydown', onKey);
   document.body.appendChild(ov);
@@ -21366,17 +21439,217 @@ function _wsModal2(o) {
         <button type="button" class="ws-modal-btn ${o.danger ? 'is-danger' : 'is-primary'}" data-wsmodal="ok">${esc(o.okLabel)}</button>
       </div>
     </div>`;
+  // Mismo latch que `_wsPrompt`: confirmar dos veces un reemplazo o un borrado
+  // es justo lo que no puede ocurrir por un dedo.
+  let _fired = false;
   const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = e => { if (e.key === 'Escape') close(); };
   ov.addEventListener('click', e => {
     if (e.target === ov) { close(); return; }
     const b = e.target.closest ? e.target.closest('[data-wsmodal]') : null; if (!b) return;
-    if (b.getAttribute('data-wsmodal') === 'ok') { close(); try { o.onOk(); } catch (_) {} } else { close(); }
+    if (b.getAttribute('data-wsmodal') === 'ok') { if (_fired) return; _fired = true; close(); try { o.onOk(); } catch (_) {} } else { close(); }
   });
   document.addEventListener('keydown', onKey);
   document.body.appendChild(ov);
   requestAnimationFrame(() => ov.classList.add('is-open'));
 }
+// ════════════════════════════════════════════════════════════════════════════
+// §4 · GUARDAR: ACTUALIZAR O CREAR OTRA, SIN AMBIGÜEDAD
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE HABÍA: `Guardar` decidía solo. Con una instancia abierta actualizaba sin
+// preguntar; sin ella creaba una nueva sin avisar de que ya existían documentos
+// del mismo tipo. Las dos decisiones son legítimas y NINGUNA es adivinable: la
+// diferencia entre «corregir mi presupuesto» y «guardar el de este mes» no está
+// en el estado de la pantalla, está en la cabeza del usuario. Y equivocarse
+// hacia el lado de actualizar DESTRUYE un documento sin autorización.
+//
+// Ahora la decisión se pregunta, y el destino se identifica siempre por su
+// NOMBRE. Nunca se preselecciona un reemplazo, nunca se elige por tipo, por
+// nombre igual, por mes igual ni por última apertura.
+//
+// Un modal de ELECCIÓN, hermano de `_wsModal2`: mismo overlay, mismo cierre por
+// Esc y por fondo, misma restauración de foco. Hasta tres opciones, cada una con
+// su acción; Cancelar no escribe nada y conserva el borrador.
+function _wsChoiceModal(o) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
+  const opener = (typeof document !== 'undefined') ? document.activeElement : null;
+  const ov = document.createElement('div');
+  ov.id = 'wsConfirmModal'; ov.className = 'ws-modal-overlay';
+  const opts = (o.options || []).filter(Boolean);
+  ov.innerHTML = `
+    <div class="ws-modal is-choice" role="dialog" aria-modal="true" aria-labelledby="wsModalTitle">
+      <h3 class="ws-modal-title" id="wsModalTitle">${esc(o.title)}</h3>
+      ${o.text ? `<p class="ws-modal-text">${esc(o.text)}</p>` : ''}
+      <div class="ws-modal-choices">
+        ${opts.map((x, i) => `<button type="button" class="ws-modal-choice${x.primary ? ' is-primary' : ''}${x.danger ? ' is-danger' : ''}" data-wschoice="${i}">
+          <span class="ws-modal-choice-t">${esc(x.label)}</span>
+          ${x.hint ? `<span class="ws-modal-choice-h">${esc(x.hint)}</span>` : ''}
+        </button>`).join('')}
+      </div>
+      <div class="ws-modal-actions">
+        <button type="button" class="ws-modal-btn is-cancel" data-wschoice="cancel">${esc(t('wsmodal_cancel'))}</button>
+      </div>
+    </div>`;
+  let done = false;
+  const close = () => {
+    if (done) return; done = true;
+    ov.remove(); document.removeEventListener('keydown', onKey);
+    try { if (opener && opener.focus) opener.focus(); } catch (_) {}
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { close(); return; }
+    const b = e.target.closest ? e.target.closest('[data-wschoice]') : null; if (!b) return;
+    const k = b.getAttribute('data-wschoice');
+    // Protección frente al doble toque: la primera pulsación cierra y desarma.
+    if (done) return;
+    if (k === 'cancel') { close(); try { if (o.onCancel) o.onCancel(); } catch (_) {} return; }
+    const pick = opts[Number(k)];
+    close();
+    if (pick && typeof pick.run === 'function') { try { pick.run(); } catch (_) {} }
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => {
+    ov.classList.add('is-open');
+    const first = ov.querySelector('.ws-modal-choice'); if (first) { try { first.focus(); } catch (_) {} }
+  });
+}
+// El selector de DOCUMENTO CONCRETO. Sin preselección: nace sin nada marcado y
+// el botón de confirmar está deshabilitado hasta que el usuario elige. Cada fila
+// dice lo que hace falta para no confundir dos documentos del mismo tipo: su
+// nombre, su periodo si lo tiene, y cuándo se actualizó.
+function _wsPickDocModal(o) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
+  const opener = (typeof document !== 'undefined') ? document.activeElement : null;
+  const docs = (o.docs || []).filter(Boolean);
+  const ov = document.createElement('div');
+  ov.id = 'wsConfirmModal'; ov.className = 'ws-modal-overlay';
+  ov.innerHTML = `
+    <div class="ws-modal is-pick" role="dialog" aria-modal="true" aria-labelledby="wsModalTitle">
+      <h3 class="ws-modal-title" id="wsModalTitle">${esc(o.title)}</h3>
+      ${o.text ? `<p class="ws-modal-text">${esc(o.text)}</p>` : ''}
+      <div class="ws-modal-picklist" role="radiogroup" aria-labelledby="wsModalTitle">
+        ${docs.map((d, i) => `<button type="button" class="ws-modal-pick" role="radio" aria-checked="false" data-wspick="${i}">
+          <span class="ws-modal-pick-n">${esc(d.name)}</span>
+          <span class="ws-modal-pick-m">${esc(d.meta || '')}</span>
+        </button>`).join('')}
+      </div>
+      <div class="ws-modal-actions">
+        <button type="button" class="ws-modal-btn is-cancel" data-wspick="cancel">${esc(t('wsmodal_cancel'))}</button>
+        <button type="button" class="ws-modal-btn is-primary" data-wspick="ok" disabled>${esc(o.okLabel || t('wsname_ok'))}</button>
+      </div>
+    </div>`;
+  let chosen = -1, done = false;
+  const okBtn = () => ov.querySelector('[data-wspick="ok"]');
+  const close = () => {
+    if (done) return; done = true;
+    ov.remove(); document.removeEventListener('keydown', onKey);
+    try { if (opener && opener.focus) opener.focus(); } catch (_) {}
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { close(); return; }
+    const b = e.target.closest ? e.target.closest('[data-wspick]') : null; if (!b) return;
+    const k = b.getAttribute('data-wspick');
+    if (k === 'cancel') { close(); return; }
+    if (k === 'ok') {
+      if (chosen < 0 || done) return;                 // sin elección no hay destino
+      const d = docs[chosen]; close();
+      if (d && typeof o.onPick === 'function') { try { o.onPick(d); } catch (_) {} }
+      return;
+    }
+    chosen = Number(k);
+    Array.prototype.forEach.call(ov.querySelectorAll('.ws-modal-pick'), (el, i) => {
+      const on = i === chosen;
+      el.classList.toggle('is-on', on);
+      el.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    const ob = okBtn(); if (ob) ob.removeAttribute('disabled');
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => {
+    ov.classList.add('is-open');
+    const first = ov.querySelector('.ws-modal-pick'); if (first) { try { first.focus(); } catch (_) {} }
+  });
+}
+// Los documentos GUARDADOS del mismo tipo, los que pueden ser destino de un
+// reemplazo. Se ordenan por última edición y cada uno se describe con lo que lo
+// distingue de otro del mismo tipo.
+function _wsSaveCandidates(type, excludeId) {
+  let list = [];
+  try { list = _ws4Projects(); } catch (_) { return []; }
+  return list
+    .filter(p => p && p.id && p.type === type && p.id !== excludeId)
+    .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
+    .map(p => {
+      const bits = [];
+      // El PERIODO sólo si el documento lo declara. No se infiere de `createdAt`:
+      // inventarlo aquí haría elegir un reemplazo por un dato que nadie escribió.
+      const per = p.inputs && p.inputs.periodKey ? String(p.inputs.periodKey) : '';
+      if (per) bits.push(per);
+      const ts = p.updatedAt || p.createdAt || 0;
+      if (ts) { try { bits.push(_wsRelTime(ts)); } catch (_) {} }
+      return { id: p.id, name: _wsLabel('workspace', p), meta: bits.join(' · ') };
+    });
+}
+// ── LA DECISIÓN, EN UN SOLO SITIO ──────────────────────────────────────────
+// Tres casos, y cada uno pregunta lo justo:
+//   A. borrador nuevo y no hay nada del mismo tipo ⇒ pedir nombre y crear.
+//   B. instancia abierta ⇒ Actualizar «nombre» | Guardar como nueva | Cancelar.
+//   C. borrador nuevo con documentos del mismo tipo ⇒ Guardar como nueva |
+//      Reemplazar una existente (y entonces ELEGIR cuál) | Cancelar.
+// `ctx.commit(name, forceNew, targetId)` es el escritor de siempre: aquí no se
+// escribe nada, sólo se decide.
+function _wsSaveDecide(ctx) {
+  const type = ctx.type, currentId = ctx.currentId || null;
+  const cands = _wsSaveCandidates(type, currentId);
+  const askName = (title, suggested, run) => _wsToolNamePrompt(title, suggested, run);
+
+  if (currentId) {
+    const curName = ctx.currentName || '';
+    return _wsChoiceModal({
+      title: t('wssave_title'),
+      text: t('wssave_open_text'),
+      options: [
+        { label: String(t('wssave_update') || '').replace('{n}', curName), primary: true,
+          hint: t('wssave_update_hint'),
+          run: () => ctx.commit(null, false, null) },
+        { label: t('wssave_new'), hint: t('wssave_new_hint'),
+          run: () => askName(t('wsname_saveas_title'), curName ? (curName + ' ' + t('wsg_copy_suffix')) : ctx.suggest(),
+            name => ctx.commit(name, true, null)) },
+      ],
+    });
+  }
+  if (!cands.length) {
+    return askName(t('wsname_save_title'), ctx.suggest(), name => ctx.commit(name, true, null));
+  }
+  return _wsChoiceModal({
+    title: t('wssave_title'),
+    text: String(t('wssave_exists_text') || '').replace('{n}', String(cands.length)),
+    options: [
+      { label: t('wssave_new'), primary: true, hint: t('wssave_new_hint'),
+        run: () => askName(t('wsname_save_title'), ctx.suggest(), name => ctx.commit(name, true, null)) },
+      { label: t('wssave_replace'), hint: t('wssave_replace_hint'),
+        run: () => _wsPickDocModal({
+          title: t('wssave_pick_title'), text: t('wssave_pick_text'), docs: cands,
+          okLabel: t('wssave_replace_ok'),
+          onPick: d => _wsModal2({
+            // La confirmación NOMBRA el destino: reemplazar es destructivo y el
+            // usuario tiene que leer QUÉ documento va a dejar de existir tal cual.
+            title: t('wssave_confirm_title'),
+            text: String(t('wssave_confirm_text') || '').replace('{n}', d.name),
+            okLabel: t('wssave_replace_ok'),
+            onOk: () => ctx.commit(null, false, d.id),
+          }),
+        }) },
+    ],
+  });
+}
+
 // ── UN SOLO MODAL DE NOMBRE, PARA LAS TRES ACCIONES ────────────────────────
 // `_wsPrompt` era el modal de RENOMBRAR y ya tenía la forma correcta (un campo de
 // texto, Cancelar / Guardar, Esc y Enter). La SPEC pide exactamente esta caja
@@ -21410,7 +21683,15 @@ function _wsPrompt(o) {
     </div>`;
   const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'Enter') doOk(); };
+  // ── PROTECCIÓN FRENTE AL DOBLE TOQUE ────────────────────────────────────
+  // Lo destapó la sonda de guardado: dos pulsaciones rápidas en «Guardar» del
+  // modal de nombre creaban DOS documentos con el mismo nombre y distinto id.
+  // En un móvil eso no es un caso raro — es un dedo. El `close()` de abajo ya
+  // quita el overlay, pero entre el primer click y el reflow cabe el segundo,
+  // así que el latch va en el CALLBACK, que es lo que escribe.
+  let _fired = false;
   const doOk = () => {
+    if (_fired) return;
     const el = ov.querySelector('#wsRenameInput');
     const v = String((el && el.value) || '').trim();
     // Obligatorio significa que el modal se queda y lo dice, no que se cierre y
@@ -21421,6 +21702,7 @@ function _wsPrompt(o) {
       if (el) { el.setAttribute('aria-invalid', 'true'); el.classList.add('is-invalid'); try { el.focus(); } catch (_) {} }
       return;
     }
+    _fired = true;
     close();
     try { o.onOk(v); } catch (_) {}
   };
@@ -22396,11 +22678,24 @@ function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? a
 // Objetivos y Escenarios viven en sus propios almacenes y las herramientas
 // (Interés compuesto, Préstamos) no son plantillas: quedan fuera de esta primera
 // entrega por decisión de la SPEC, no por olvido.
+// ── RE-DECIDIDO (§5): TODA INSTANCIA GUARDADA, NO SÓLO LAS PLANTILLAS ─────
+// La entrega anterior limitaba esta vista a las cuatro PLANTILLAS y lo declaraba
+// como alcance. Era un contrato roto en la práctica: Interés compuesto ofrece
+// «Guardar», el usuario guarda, y su documento no aparecía en ninguna parte del
+// Dashboard. Ningún botón puede prometer guardar mientras su instancia queda
+// excluida. Ahora entran TODAS las capacidades que guardan un documento.
+//
+// `sim: true` marca las que son SIMULACIÓN —proyecciones sobre supuestos, no
+// hechos patrimoniales— porque su tarjeta tiene que decirlo: un capital final
+// proyectado y un saldo de cobros pendiente no son la misma clase de número.
 const _WSPL_TYPES = Object.freeze({
   monthly_budget:        { tool: 'budget',      nameKey: 'wstool_budget_n',     icon: 'split'   },
   receivables_app:       { tool: 'receivables', nameKey: 'wsapp_receivables_n', icon: 'receipt' },
   trade_journal:         { tool: 'journal',     nameKey: 'wstool_journal_n',    icon: 'log'     },
   real_estate_portfolio: { tool: 'realestate',  nameKey: 'wsre_n',              icon: 'house'   },
+  compound_growth:       { tool: 'compound',    nameKey: 'wstool_compound_n',   icon: 'growth', sim: true },
+  loan_simulation:       { tool: 'loan',        nameKey: 'wsloan_n',            icon: 'calc',   sim: true },
+  asset_prices:          { tool: 'assets',      nameKey: 'wsapp_assets_n',      icon: 'log'     },
 });
 // Los documentos que se publican: plantilla, guardada de verdad y con su
 // capacidad todavía ABIERTA para esta cuenta. Ofrecer «Continuar» sobre algo que
@@ -22420,6 +22715,18 @@ function _wsPlansDocs() {
 // cifras es una respuesta honesta; un cero inventado no lo es.
 // Ninguna afirma un PERIODO: «este mes» exigiría un selector que el Presupuesto
 // todavía no tiene, y nombrarlo sería inventarlo.
+// El importe EN LA DIVISA DEL DOCUMENTO, no en la de visualización del usuario:
+// un plan guardado en euros no se convierte a dólares para pintarlo, porque la
+// cifra convertida no es la que el documento afirma.
+function _wsPlanMoney(cents, currency) {
+  const n = Number(cents);
+  if (!Number.isFinite(n)) return '—';
+  const cur = String(currency || (typeof baseCurrency !== 'undefined' ? baseCurrency : 'EUR') || 'EUR').toUpperCase();
+  try {
+    return new Intl.NumberFormat((typeof lang !== 'undefined' && lang === 'en') ? 'en-IE' : 'es-ES',
+      { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n);
+  } catch (_) { return String(Math.round(n)) + ' ' + cur; }
+}
 function _wsPlanMetrics(p) {
   const inp = (p && p.inputs) || {};
   const m = (k, v) => ({ k: t(k), v: v });
@@ -22449,6 +22756,30 @@ function _wsPlanMetrics(p) {
       // SÓLO EL RECUENTO. La rentabilidad de un diario con divisas mezcladas no
       // es publicable (su propio resumen lo declara), así que aquí no se intenta.
       return [m('wspl_m_trades', String(n))];
+    }
+    // ── LAS DOS SIMULACIONES ────────────────────────────────────────────────
+    // Se leen de `results`, que es lo que el documento GUARDÓ con su propia
+    // convención y su propia divisa. Recalcular aquí con la convención de hoy
+    // publicaría una cifra distinta de la que el usuario guardó — es el defecto
+    // que ya costó 2.684 € de divergencia entre la tarjeta y la herramienta.
+    if (p.type === 'compound_growth') {
+      const r = p.results || {};
+      if (!Number.isFinite(Number(r.final))) return [];
+      const out = [m('wspl_m_final', _wsPlanMoney(r.final, p.currency))];
+      if (Number(r.years) > 0) out.push(m('wspl_m_years', String(r.years)));
+      return out;
+    }
+    if (p.type === 'loan_simulation') {
+      const r = p.results || {};
+      if (!Number.isFinite(Number(r.monthlyPayment))) return [];
+      const out = [m('wspl_m_payment', _wsPlanMoney(r.monthlyPayment, p.currency))];
+      if (Number.isFinite(Number(r.totalInterest))) out.push(m('wspl_m_interest', _wsPlanMoney(r.totalInterest, p.currency)));
+      return out;
+    }
+    if (p.type === 'asset_prices') {
+      const n = Array.isArray(inp.rows) ? inp.rows.length : 0;
+      if (!n) return [];
+      return [m('wspl_m_rows', String(n))];
     }
   } catch (_) { return []; }
   return [];
@@ -22495,6 +22826,7 @@ function _renderDashboardPlans() {
         </div>
         ${mets.length ? `<div class="wspl-metrics">${mets.map(x =>
           `<span class="wspl-m"><i>${esc(x.k)}</i><b>${esc(x.v)}</b></span>`).join('')}</div>` : ''}
+        ${spec.sim ? `<span class="wspl-sim">${esc(t('wspl_sim'))}</span>` : ''}
         <button type="button" class="wspl-go" data-wspl-open="${esc(p.id)}">${esc(t('wspl_continue'))}</button>
       </article>`;
   }).join('');
@@ -24950,9 +25282,19 @@ function _wsToolSave() {
   if (!_wsCanPersist()) return _wsPersistUpsell('tool:' + String(_wsToolActive || ''));
   const missing = _wsToolMissingRequired();
   if (missing.length) return _wsToolShowRequired(missing);
-  // Instancia YA guardada ⇒ actualiza en su sitio, sin modal y sin duplicar.
-  if (_wsToolEditId) return _wsToolCommit(null, false);
-  _wsToolNamePrompt(t('wsname_save_title'), _wsToolSuggestName(), name => _wsToolCommit(name, true));
+  // ── YA NO DECIDE SOLO ────────────────────────────────────────────────────
+  // Antes: con instancia abierta actualizaba sin preguntar, y sin ella creaba
+  // otra sin avisar de que ya existían documentos del mismo tipo. Las dos
+  // decisiones son legítimas y ninguna es adivinable — y equivocarse hacia
+  // «actualizar» destruye un documento sin autorización. §4.
+  let curName = '';
+  try { const p = _ws4Projects().find(x => x && x.id === _wsToolEditId); curName = (p && p.customName) || ''; } catch (_) {}
+  _wsSaveDecide({
+    type: _wsToolStateType(_wsToolActive),
+    currentId: _wsToolEditId, currentName: curName,
+    suggest: () => _wsToolSuggestName(),
+    commit: (name, forceNew, targetId) => _wsToolCommit(name, forceNew, targetId),
+  });
 }
 // «Guardar como…» — el MISMO modal, y una copia con ID nuevo. Un nombre repetido
 // no sobrescribe nada: la identidad es el ID.
@@ -24995,11 +25337,19 @@ function _wsToolNamePrompt(title, suggested, onName) {
     onOk: v => { const name = String(v || '').trim(); if (!name) return; onName(name); },
   });
 }
-function _wsToolCommit(name, forceNew) {
+// `targetId` es el destino EXPLÍCITO de un reemplazo elegido por el usuario en
+// el selector de §4. Sin él, el comportamiento es el de siempre: actualizar la
+// instancia abierta o crear una nueva. Nunca se deduce un destino.
+function _wsToolCommit(name, forceNew, targetId) {
   if (!_wsToolInputs) return;
   const now = Date.now();
   const list = _ws4Projects();
-  const existing = (!forceNew && _wsToolEditId) ? list.find(p => p && p.id === _wsToolEditId) : null;
+  const existing = targetId
+    ? list.find(p => p && p.id === targetId && p.type === _wsToolStateType(_wsToolActive))
+    : ((!forceNew && _wsToolEditId) ? list.find(p => p && p.id === _wsToolEditId) : null);
+  // Un destino que ya no existe —borrado en otro dispositivo entre la elección y
+  // la confirmación— no se convierte en «crea otro»: se dice y no se escribe.
+  if (targetId && !existing) { try { _wsToolSaveError(t('wssave_target_gone')); } catch (_) {} return; }
   let type, results;
   if (_wsToolActive === 'assets') {
     const r = calculateAssetPrices(_wsToolInputs.rows);
@@ -25078,6 +25428,22 @@ function _wsToolCommit(name, forceNew) {
   _ws4Persist(proj);
   _wsToolEditId = proj.id; _wsToolDirty = false;
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); }
+  // §5 — el Dashboard es una VISTA del mismo guardado, así que se repinta aquí
+  // mismo: el usuario no debería tener que recargar para ver su plan.
+  try { updateDashboardPlans(); } catch (_) {}
+}
+// Un guardado que NO ocurrió se dice donde el usuario estaba mirando, junto al
+// botón que acaba de pulsar. Nunca se cierra en silencio fingiendo éxito.
+function _wsToolSaveError(msg) {
+  const root = document.querySelector('.wsh-tool-view') || document.getElementById('aurixWorkspace');
+  if (!root) return;
+  const bar = root.querySelector('[data-wstool-savebar]');
+  const host = (bar && bar.parentNode) || root;
+  const prev = host.querySelector('.wsg-reqerr'); if (prev) prev.remove();
+  const p = document.createElement('p');
+  p.className = 'wsg-reqerr'; p.setAttribute('role', 'alert');
+  p.textContent = String(msg || '');
+  host.appendChild(p);
 }
 
 function _wsToolSaveBarHtml() {
@@ -25101,10 +25467,21 @@ function _wsToolSaveBarHtml() {
   // porque sin ellas no hay forma de tener dos instancias de la misma capacidad:
   // «Guardar como…» crea una copia con ID nuevo, «Renombrar» toca sólo el nombre y
   // «Eliminar» pide confirmación y deja tombstone.
+  // ── §6 · UNA ACCIÓN PRIMARIA, Y EL RESTO EN UN MENÚ ─────────────────────
+  // Los cuatro botones en fila se salían por la derecha en móvil —«Renombrar»
+  // cortado, medido en la captura del fundador— y además mentían sobre la
+  // jerarquía: Eliminar no compite con Guardar. Ahora Guardar es la única
+  // acción primaria y el ciclo de vida vive en un menú secundario, que es un
+  // `<details>` NATIVO: teclado y lector de pantalla sin un manejador nuevo.
   const lifecycle = _wsToolEditId ? `
-    <button type="button" class="wsg-act" data-wstool-saveas>${esc(t('wstool_saveas'))}</button>
-    <button type="button" class="wsg-act" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
-    <button type="button" class="wsg-act is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>` : '';
+    <details class="wsg-menu">
+      <summary class="wsg-menu-sum" aria-label="${esc(t('wsg_more_aria'))}"><span aria-hidden="true">···</span></summary>
+      <div class="wsg-menu-body" role="group" aria-label="${esc(t('wsg_more_aria'))}">
+        <button type="button" class="wsg-menu-item" data-wstool-saveas>${esc(t('wstool_saveas'))}</button>
+        <button type="button" class="wsg-menu-item" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
+        <button type="button" class="wsg-menu-item is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>
+      </div>
+    </details>` : '';
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
     <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>
@@ -55222,6 +55599,35 @@ function _aurixCatReturnDisplay(type) {
   const sign = pct >= 0 ? '+' : '−';
   return { text: sign + Math.abs(pct).toFixed(2) + '%', tone: tone };
 }
+// ════════════════════════════════════════════════════════════════════════════
+// §7 · LAS CATEGORÍAS VACÍAS NO OCUPAN SITIO
+// ════════════════════════════════════════════════════════════════════════════
+// LA REGLA, Y LO QUE NO ES. Una categoría se ve si TIENE POSICIONES ACTIVAS, y
+// eso se decide con el inventario canónico (`activeAssets()`, que filtra las
+// cerradas) más la categoría canónica de cada activo. NO se decide por valor > 0,
+// ni por cotización conocida, ni por snapshots, ni por historial: un activo sin
+// precio sigue siendo una posición, y esconder su categoría sería esconder
+// patrimonio porque un proveedor no contestó.
+//
+// TRES RESPUESTAS, NO DOS. Si el inventario todavía no es un array, NO SE SABE:
+// se conserva lo que hubiera pintado antes y no se afirma un vacío. Cargando o
+// con error no equivale a ausencia — es la misma distinción que el resolver
+// comercial hace entre «contestó que no» y «no pudo contestar».
+//   Set     → estas categorías tienen posiciones (puede ser un Set vacío).
+//   null    → inventario no disponible todavía.
+function _aurixActiveCategorySet() {
+  let list = null;
+  try { list = Array.isArray(assets) ? activeAssets() : null; } catch (_) { list = null; }
+  if (!Array.isArray(list)) return null;
+  const set = new Set();
+  list.forEach(a => {
+    if (!a) return;
+    let key = null;
+    try { key = _aurixDisplayCategory(a.type); } catch (_) { key = null; }
+    if (key) set.add(key);
+  });
+  return set;
+}
 function updateCategoryCards() {
   const section = document.getElementById('categoriesSection');
   const grid    = document.getElementById('categoriesGrid');
@@ -55244,9 +55650,41 @@ function updateCategoryCards() {
   }
 
   // Ordered list — respects user's saved drag order
-  const ALL_CATEGORIES = _catOrder.length === CAT_DEFAULT_ORDER.length
+  const _ORDERED = _catOrder.length === CAT_DEFAULT_ORDER.length
     ? _catOrder
     : CAT_DEFAULT_ORDER;
+  // §7 — se FILTRA el render, no se borra ni un dato ni una categoría del
+  // catálogo: la que hoy no tiene posiciones vuelve sola en cuanto haya una.
+  // El orden se conserva exactamente (es un filtro sobre la lista ordenada).
+  const _activeCats = _aurixActiveCategorySet();
+  const ALL_CATEGORIES = _activeCats ? _ORDERED.filter(tp => _activeCats.has(tp)) : _ORDERED;
+  // ── CERO ACTIVOS CONFIRMADOS: UN SOLO ESTADO ────────────────────────────
+  // Seis tarjetas vacías no son información, son ruido — y es exactamente lo
+  // que el fundador fotografió. Con el inventario CONFIRMADO vacío se publica
+  // una sola llamada a la acción, por el flujo de alta que ya existe. Si el
+  // inventario no se sabe todavía, esta rama no se toma: no se afirma un vacío.
+  if (_activeCats && ALL_CATEGORIES.length === 0) {
+    if (!grid.dataset.emptyWired) {
+      grid.dataset.emptyWired = '1';
+      // Un solo manejador delegado, armado una vez: el CTA abre el MISMO flujo de
+      // alta que el botón de la cabecera, no una variante nueva.
+      grid.addEventListener('click', e => {
+        const b = e.target && e.target.closest ? e.target.closest('[data-cat-empty-add]') : null;
+        if (!b) return;
+        try { openModal(); } catch (_) {}
+      });
+    }
+    if (grid.dataset.sig !== 'empty') {
+      grid.dataset.sig = 'empty';
+      grid.innerHTML = `<div class="cat-empty">
+        <p class="cat-empty-t">${_intccEsc(t('catEmptyTitle'))}</p>
+        <button type="button" class="cat-empty-cta" data-cat-empty-add>${_intccEsc(t('catEmptyCta'))}</button>
+        ${''}
+      </div>`;
+    }
+    section.style.display = '';
+    return;
+  }
 
   // AURIX-INVESTABLE-WEALTH-1 — cards use the investable distribution, but WITH
   // the non-investable real-estate group included so its card keeps showing its
@@ -73228,10 +73666,41 @@ function _aw8dApplyFormatToSelection(format) {
 // ── Global keyboard + mouse wiring ───────────────────────────────────────────
 // All gated on the workspace tab being active. Edit-input focus is left alone
 // so users can still type natively inside the cell / formula bar.
+// ── P0 · POR QUÉ ESTE GUARD SE ENSANCHA, Y LO QUE COSTÓ ───────────────────
+// Esto decidía «¿está el usuario escribiendo?» y sólo conocía DOS campos: los de
+// la hoja de cálculo legacy. Cualquier otro campo de Workspace quedaba fuera, y
+// el manejador global de más abajo hace `preventDefault()` sobre Delete y
+// Backspace mientras la pestaña activa es `workspace`.
+//
+// CONSECUENCIA MEDIDA, y es el defecto que el fundador reportó en su iPhone: en
+// TODOS los campos numéricos de las ocho capacidades, Backspace no borraba nada
+// —el carácter «reaparecía» porque nunca llegó a irse, y ni siquiera se emitía
+// un evento `input`—, y `Cmd/Ctrl+A` tampoco seleccionaba el texto porque el
+// mismo manejador lo secuestra para seleccionar celdas de la hoja. De ahí el
+// «tengo que seleccionar todo» y que tampoco funcionara.
+//
+// No era de Safari: reproducido en Chromium Y en WebKit con teclado real
+// (`scripts/aurix-ws-numeric-edit-probe.mjs`). Las sondas anteriores no lo
+// veían porque asignaban `.value` y despachaban `input` a mano, que es
+// exactamente el camino que el `preventDefault()` NO toca.
+//
+// La regla correcta no es enumerar los campos de la hoja: es que un manejador
+// global NUNCA secuestre una tecla de edición mientras el foco está en algo
+// editable. Se pregunta eso.
 function _aw8dIsInEditInput(target) {
-  return !!(target && target.closest && (
-    target.closest('[data-cell-edit-input]') ||
-    target.closest('[data-formula-bar-input]')
+  const el = (target && target.nodeType === 1) ? target : null;
+  if (!el) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+    // Un campo deshabilitado o de sólo lectura no está recibiendo escritura, así
+    // que ahí los atajos de la hoja siguen siendo legítimos.
+    return !(el.disabled || el.readOnly);
+  }
+  return !!(el.closest && (
+    el.closest('[contenteditable=""],[contenteditable="true"]') ||
+    el.closest('[data-cell-edit-input]') ||
+    el.closest('[data-formula-bar-input]')
   ));
 }
 

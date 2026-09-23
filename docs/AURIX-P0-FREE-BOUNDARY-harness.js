@@ -177,10 +177,16 @@ function ctx(persona, langCode) {
     function calculateLoan(i){ return { monthlyPayment:1, totalInterest:1, totalPaid:1, principal:_wsNum(i.principal), annual:1, years:_wsNum(i.years) }; }
     function _wsCompoundProjection(i){ return { final:1, initial:1, contributed:1, growth:1, assumptions:{ convention:'effective', annualRatePct:1, currency:'EUR' } }; }
     var __modal = []; function _wsPrompt(o){ __modal.push(o); }
+    var __choice = []; function _wsChoiceModal(o){ __choice.push(o); }
+    var __pick = []; function _wsPickDocModal(o){ __pick.push(o); }
+    function _wsToolSaveError(m){ __modal.push({ error: m }); }
     function _wsModal2(o){ __modal.push(o); }
     function _wsConfirm(f){ __modal.push({ confirm: true, run: f }); }
   `, sb);
   ['_wsToolSave','_wsToolSaveAs','_wsToolRename','_wsToolDelete','_wsToolNamePrompt','_wsToolCommit',
+   // §4 — el owner de DECISIÓN de guardado y sus dos diálogos. `_wsToolSave`
+   // ya no decide solo, así que sin esto ni siquiera se puede cargar.
+   '_wsSaveDecide','_wsSaveCandidates',
    'openUpgradeIntent','requireFeature','renderWorkspaceHome','_wsOpenTool']
     .forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
   const P = {
@@ -362,6 +368,11 @@ console.log('\n3 · Guardado nombrado y ciclo de vida:');
   const c = ctx('premium','es');
   const setup = () => R(c, '_wsToolActive="budget"; _wsToolInputs=_wsToolDefaultsFor("budget"); _wsToolEditId=null; _wsToolDirty=true; __modal.length=0;');
   const confirm = name => R(c, '(function(){ var m=__modal[__modal.length-1]; m.onOk(' + JSON.stringify(name) + '); })()');
+  // §4 — con candidatos del mismo tipo o con una instancia abierta, Guardar
+  // PREGUNTA primero. Estos dos helpers responden la pregunta como lo haría el
+  // usuario: `pick(0)` es la opción primaria, `pick(1)` la segunda.
+  const pick = i => R(c, '(function(){ var m=__choice[__choice.length-1]; m.options[' + i + '].run(); })()');
+  const lastChoice = () => JSON.parse(R(c, 'JSON.stringify((__choice[__choice.length-1]||{}).options||[])'));
   const live = () => JSON.parse(R(c, 'JSON.stringify(_ws4Projects().map(function(p){ return { id:p.id, n:p.customName, rev:p.revision }; }))'));
 
   setup(); R(c, '_wsToolSave();');
@@ -388,21 +399,52 @@ console.log('\n3 · Guardado nombrado y ciclo de vida:');
       return p.type === 'monthly_budget' && !!p.inputs && p.currency === 'EUR'
         && p.bodyVersion === 1 && p.createdAt > 0 && p.updatedAt > 0; })(),
     R(c, 'JSON.stringify(Object.keys(_ws4Projects()[0]))'));
-  // Guardar de nuevo ACTUALIZA: sin modal y sin duplicar.
+  // ── RE-DECIDIDO (§4) ─────────────────────────────────────────────────────
+  // 3.7 exigía que guardar con una instancia abierta ACTUALIZARA sin preguntar.
+  // Es la decisión que destruye trabajo cuando se acierta al revés, así que
+  // ahora se pregunta: actualizar es UNA respuesta, no la respuesta por defecto.
   const rev1 = live()[0].rev;
-  R(c, '_wsToolDirty=true; __modal.length=0; _wsToolSave();');
-  ok('3.7 guardar la instancia abierta ACTUALIZA: no pregunta, no duplica',
-    live().length === 1 && JSON.parse(R(c, 'JSON.stringify(__modal)')).length === 0
-    && live()[0].rev === rev1 + 1, JSON.stringify(live()));
+  R(c, '_wsToolDirty=true; __modal.length=0; __choice.length=0; _wsToolSave();');
+  const opts = lastChoice();
+  ok('3.7 guardar con una instancia abierta PREGUNTA, y nombra el documento',
+    opts.length === 2 && /Presupuesto personal/.test(String(opts[0].label))
+    && live().length === 1 && live()[0].rev === rev1,
+    JSON.stringify(opts.map(o => o.label)));
+  pick(0);
+  ok('3.7b «Actualizar» modifica ESE id, sube revisión y no duplica',
+    live().length === 1 && live()[0].rev === rev1 + 1, JSON.stringify(live()));
   // Dos instancias de la MISMA capacidad, y un nombre repetido no sobrescribe.
-  setup(); R(c, '_wsToolSave();'); confirm('Presupuesto empresa');
-  setup(); R(c, '_wsToolSave();'); confirm('Presupuesto empresa');
+  // Con candidatos, la primera opción es «Guardar como nueva».
+  setup(); R(c, '__choice.length=0; _wsToolSave();'); pick(0); confirm('Presupuesto empresa');
+  setup(); R(c, '__choice.length=0; _wsToolSave();'); pick(0); confirm('Presupuesto empresa');
   const l3 = live();
   ok('3.8 varias instancias de la misma capacidad conviven',
     l3.length === 3, JSON.stringify(l3.map(x => x.n)));
   ok('3.9 un nombre repetido NO sobrescribe: la identidad es el ID',
     new Set(l3.map(x => x.id)).size === 3
     && l3.filter(x => x.n === 'Presupuesto empresa').length === 2, JSON.stringify(l3));
+  // ── EL REEMPLAZO EXPLÍCITO (§4·C) ────────────────────────────────────────
+  // La segunda opción abre el SELECTOR, que no preselecciona y describe cada
+  // candidato por su nombre. Reemplazar conserva el id y el nombre del destino.
+  {
+    setup(); R(c, '__choice.length=0; __pick.length=0; _wsToolSave();');
+    pick(1);
+    const pk = JSON.parse(R(c, 'JSON.stringify((__pick[__pick.length-1]||{}).docs||[])'));
+    ok('3.7c «Reemplazar» abre un selector con los candidatos, descritos por su nombre',
+      pk.length === live().length && pk.every(d => !!d.id && !!d.name), JSON.stringify(pk.map(d => d.name)));
+    const target = pk.find(d => d.name === 'Presupuesto personal');
+    const revBefore = live().find(x => x.id === target.id).rev;
+    R(c, '__modal.length=0; (function(){ var m=__pick[__pick.length-1]; m.onPick(' + JSON.stringify(target) + '); })()');
+    const conf = JSON.parse(R(c, 'JSON.stringify(__modal[__modal.length-1]||{})'));
+    ok('3.7d …y la confirmación NOMBRA el documento que se va a reemplazar',
+      /Presupuesto personal/.test(String(conf.text || '')), String(conf.text || '').slice(0, 90));
+    const n0 = live().length;
+    R(c, '(function(){ var m=__modal[__modal.length-1]; m.onOk(); })()');
+    const after = live();
+    ok('3.7e reemplazar toca SÓLO ese id: conserva su nombre, sube revisión y no crea otro',
+      after.length === n0 && (after.find(x => x.id === target.id) || {}).n === 'Presupuesto personal'
+      && (after.find(x => x.id === target.id) || {}).rev === revBefore + 1, JSON.stringify(after));
+  }
   // Guardar como… reutiliza el MISMO modal y crea una copia nueva.
   R(c, '__modal.length=0; _wsToolSaveAs();');
   const mAs = JSON.parse(R(c, 'JSON.stringify(__modal[0])'));
