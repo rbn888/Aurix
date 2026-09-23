@@ -1,5 +1,11 @@
 # AURIX · M.04 · REQUISITOS PRE-LIVE
 
+> **ESTADO (2026-09-23): STRIPE PAUSADO, NO CERRADO.** El código del cutover a
+> LIVE está preparado y verde (`b487bfc`); lo que falta es configuración en
+> Stripe y una compra real, y las dos las decide el fundador. Nada de esta lista
+> se ha retirado ni se ha dado por hecho. Los SPECs posteriores de Workspace y
+> Dashboard **no tocan** billing, secretos, precios, checkout, webhook ni portal.
+
 Lo que hay que hacer **antes** de cobrar dinero real. No es documentación del
 diseño (eso vive en `db/monetization_m04_billing_stripe_1.sql` y en el harness):
 es la lista de lo que la certificación TEST deja deliberadamente abierto.
