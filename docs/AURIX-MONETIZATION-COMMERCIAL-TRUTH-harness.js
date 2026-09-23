@@ -718,8 +718,12 @@ ok('N.3 el billing del servidor está acotado a api/billing/ y su webhook verifi
     // está en el tope de 12 Serverless del plan Hobby; los dos contratos siguen
     // en ficheros separados, con prefijo `_` para que Vercel no les cree
     // entrypoint. Ver la sección J del gate de billing.
+    // `_status.js` es SÓLO LECTURA y sólo para la cuenta fundadora: contesta si
+    // la configuración de cobro es coherente y del entorno correcto, sin exponer
+    // un secreto y sin abrir sesión de pago. Entra por el mismo `[op].js` y con
+    // prefijo `_`, así que no añade función y el cupo de Hobby no se mueve.
     const files = fs.readdirSync(dir).sort().join(',');
-    if (files !== ['[op].js', '_checkout.js', '_portal.js', 'webhook.mjs'].sort().join(',')) return false;
+    if (files !== ['[op].js', '_checkout.js', '_portal.js', '_status.js', 'webhook.mjs'].sort().join(',')) return false;
     const wh = fs.readFileSync(path.join(dir, 'webhook.mjs'), 'utf8');
     return /stripe-signature/.test(wh) && /crypto\.subtle\.sign/.test(wh)
         && /STRIPE_WEBHOOK_SECRET/.test(wh);

@@ -52,3 +52,73 @@ los mismos tres eventos (`customer.subscription.created/updated/deleted`), y pon
 
 `rbn892+m04a@gmail.com` queda con una suscripción TEST en la BD de producción.
 Decidir si se conserva como cuenta de QA o se limpia antes de LIVE.
+
+---
+
+# CUTOVER A LIVE · ESTADO Y HERRAMIENTAS (2026-09-23)
+
+## 0 · Cómo se comprueba, sin cobrar y sin secretos
+
+`POST /api/billing/status` — **sólo lectura, sólo cuenta fundadora**
+(`workspace.catalog_preview`, resuelto por el mismo resolver server-side; no hay
+allowlist de email). Contesta en una llamada:
+
+* `mode` — `live` / `test` / `unset`, **derivado del prefijo de la clave**. El
+  valor de la clave nunca sale.
+* por intervalo: fila activa del catálogo, importe, divisa, trial, y el precio
+  **leído de Stripe**: `livemode`, `active`, `unit_amount`, `currency`,
+  recurrencia. Con sus `checks` cruzados.
+* `webhook`: si el signing secret está puesto (booleano) y si existe un endpoint
+  **del mismo modo**, habilitado y con los tres eventos.
+* `portal`: si hay configuración de Customer Portal, y de qué modo.
+* `blockers[]` y `ready_for_live`.
+
+Desde la app, con sesión iniciada, en la consola del navegador:
+
+```js
+(async () => {
+  const { data } = await supabaseClient.auth.getSession();
+  const r = await fetch(AURIX_API_ORIGIN + '/api/billing/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',
+               Authorization: 'Bearer ' + data.session.access_token },
+  });
+  console.log(JSON.stringify(await r.json(), null, 2));
+})();
+```
+
+No pide ni imprime ningún secreto. No crea sesiones. No cobra.
+
+## 6 · Precios LIVE — el SQL ya está escrito
+
+`db/billing_live_cutover_1.sql` (pareja: `_rollback.sql`). Transaccional,
+acotado a `(stripe, premium, year|month)`, **no borra ninguna fila** y **no toca**
+`subscriptions`, `billing_customers`, `entitlement_overrides` ni `plan_features`.
+
+Hay que sustituir **dos** literales: los `price_…` de LIVE. El script **se niega
+a ejecutarse** con los marcadores puestos, con dos IDs iguales, o si al final no
+queda exactamente una fila activa por intervalo con 5999 / 799 EUR.
+
+## 7 · El defecto que habría bloqueado la primera compra real
+
+Un `cus_…` creado en TEST **no existe** para una clave LIVE. Quien lo descubría
+era el guard anti-doble-cargo de `_checkout.js`, que falla CERRADO: toda cuenta
+con mapeo de TEST —las de QA y la del fundador, justo las de la primera compra—
+se habría quedado con un `503 check_failed` que además parece un problema de
+pago. **Corregido**: si el proveedor responde 404 sobre el cliente mapeado (o lo
+da por `deleted`), el mapeo se retira —acotado a ese usuario— y se crea uno nuevo
+por el camino de siempre. Un fallo de transporte **no** invalida el mapeo. Lo
+fijan D.21–D.24 del gate de billing.
+
+## 8 · Orden del cutover
+
+1. Crear producto y **dos precios en Stripe LIVE** (59,99 €/año, 7,99 €/mes, EUR,
+   recurrentes, sin trial).
+2. Crear el **event destination LIVE** con la URL del webhook y los tres eventos
+   `customer.subscription.created/updated/deleted`.
+3. En Vercel (Production): `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` **de
+   LIVE** (rotados, §2), y borrar `BILLING_ALLOW_TEST_EVENTS`.
+4. Configurar el **Customer Portal en LIVE** (cancelación).
+5. Ejecutar `db/billing_live_cutover_1.sql` con los dos IDs LIVE.
+6. `POST /api/billing/status` ⇒ `ready_for_live: true`, `blockers: []`.
+7. Sólo entonces, la **compra real controlada** del fundador.

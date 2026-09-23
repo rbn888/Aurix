@@ -1,4 +1,4 @@
-// /api/billing/[op]  ·  op = checkout | portal
+// /api/billing/[op]  ·  op = checkout | portal | status
 // ============================================================================
 // AURIX-MONETIZATION-M04 · la ÚNICA función Serverless de billing.
 // ----------------------------------------------------------------------------
@@ -35,8 +35,13 @@
 
 import checkout from './_checkout.js';
 import portal   from './_portal.js';
+// `status` es SÓLO LECTURA y sólo para la cuenta fundadora: contesta si la
+// configuración de cobro es coherente y del entorno correcto, sin exponer un
+// secreto y sin abrir una sesión de pago. Entra por aquí —con su prefijo `_`—
+// porque `api/` está en el tope de funciones del plan.
+import status   from './_status.js';
 
-const OPS = { checkout, portal };
+const OPS = { checkout, portal, status };
 
 export default async function handler(req, res) {
   const op = String((req.query && req.query.op) || '');

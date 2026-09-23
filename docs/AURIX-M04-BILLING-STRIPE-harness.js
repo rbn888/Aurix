@@ -332,6 +332,10 @@ console.log('\nD · checkout · identidad y precio de record');
                trial_days: 0, billing_interval: 'year' }]) };
       }
       if (u.includes('/billing_customers')) {
+        // El DESENLACE de un mapeo obsoleto es un DELETE acotado por usuario.
+        if (((init && init.method) || 'GET').toUpperCase() === 'DELETE') {
+          return { ok: !opts.unlinkFails, status: opts.unlinkFails ? 403 : 204, json: async () => null };
+        }
         return { ok: true, status: 200, json: async () => (opts.customers || []) };
       }
       // Fila propia de `subscriptions` (vía PostgREST).
@@ -345,6 +349,17 @@ console.log('\nD · checkout · identidad y precio de record');
           : { ok: true, status: 200, json: async () => ({ data: opts.providerSubs || [] }) };
       }
       if (u.includes('api.stripe.com/v1/customers')) {
+        // La LECTURA de un cliente concreto (3a) y la CREACIÓN son dos cosas
+        // distintas, y el defecto del cutover sólo aparece en la primera.
+        const isLookup = ((init && init.method) || 'GET').toUpperCase() === 'GET';
+        if (isLookup) {
+          const mode = opts.customerLookup || 'found';
+          if (mode === 'missing') return { ok: false, status: 404, json: async () => ({ error: { code: 'resource_missing' } }) };
+          if (mode === 'deleted') return { ok: true, status: 200, json: async () => ({ id: 'cus_old', deleted: true }) };
+          if (mode === 'error')   return { ok: false, status: 500, json: async () => null };
+          if (mode === 'throw')   throw new Error('network');
+          return { ok: true, status: 200, json: async () => ({ id: 'cus_old' }) };
+        }
         return { ok: true, status: 200, json: async () => ({ id: 'cus_new' }) };
       }
       if (u.includes('rpc/aurix_billing_link_customer')) {
@@ -413,12 +428,72 @@ console.log('\nD · checkout · identidad y precio de record');
   const junkInterval = await callCheckout({ body: { interval: 'decade' } });
   ok('D.10 un intervalo inventado cae al anual, no a un precio arbitrario',
     junkInterval.calls.some(c => c.url.includes('billing_interval=eq.year')));
+  // ── EL DEFECTO DEL CUTOVER A LIVE, Y SU ARREGLO ─────────────────────────
+  // Un `cus_…` creado en TEST no existe para una clave LIVE. Antes, quien lo
+  // descubría era el guard anti-doble-cargo, que falla CERRADO: toda cuenta con
+  // mapeo de TEST —las de QA y la del founder, que son las que harán la primera
+  // compra real— quedaba sin poder comprar, con un 503 que además parece un
+  // problema de pago. Un cliente que no existe no tiene suscripciones, así que
+  // ahí no hay doble cargo que proteger: el mapeo se retira y se crea uno nuevo.
+  {
+    const MAPPED = [{ provider_customer_id: 'cus_old' }];
+    const stale = await callCheckout({ customers: MAPPED, customerLookup: 'missing' });
+    ok('D.21 un mapeo de cliente que NO existe en este modo no bloquea la compra',
+      stale.res.code === 200 && stale.res.payload.ok === true,
+      JSON.stringify(stale.res.payload));
+    ok('D.21b …se retira el mapeo obsoleto, acotado a ESE usuario, y se crea uno nuevo',
+      (() => { const del = stale.calls.find(c => c.url.includes('/billing_customers') &&
+                 ((c.init && c.init.method) || '').toUpperCase() === 'DELETE');
+        return !!del && del.url.includes('user_id=eq.user-1') && del.url.includes('provider=eq.stripe')
+          && stale.calls.some(c => c.url.includes('rpc/aurix_billing_link_customer')); })(),
+      JSON.stringify(stale.calls.filter(c => c.url.includes('billing_customers')).map(c => ((c.init&&c.init.method)||'GET') + ' ' + c.url)));
+    ok('D.21c …y la sesión se abre para el cliente NUEVO, nunca para el obsoleto',
+      (() => { const sess = stale.calls.find(c => c.url.includes('checkout/sessions'));
+        const b = decodeBody(sess.init.body);
+        return b.includes('customer=cus_new') && !b.includes('cus_old'); })());
+    const deleted = await callCheckout({ customers: MAPPED, customerLookup: 'deleted' });
+    ok('D.21d un cliente BORRADO en el proveedor cuenta igual que uno inexistente',
+      deleted.res.code === 200 && deleted.calls.some(c => c.url.includes('/billing_customers') &&
+        ((c.init && c.init.method) || '').toUpperCase() === 'DELETE'));
+    // Y la distinción que hace segura la reparación: un fallo de TRANSPORTE no
+    // invalida un mapeo. Borrarlo ahí sería crear un cliente nuevo por cada
+    // hipo de red, y con él la posibilidad de una segunda suscripción.
+    const netErr = await callCheckout({ customers: MAPPED, customerLookup: 'error' });
+    ok('D.22 un error transitorio del proveedor NO retira el mapeo',
+      !netErr.calls.some(c => c.url.includes('/billing_customers') &&
+        ((c.init && c.init.method) || '').toUpperCase() === 'DELETE'),
+      String(netErr.res.code));
+    const thrown = await callCheckout({ customers: MAPPED, customerLookup: 'throw' });
+    ok('D.22b tampoco lo retira una excepción de red',
+      !thrown.calls.some(c => c.url.includes('/billing_customers') &&
+        ((c.init && c.init.method) || '').toUpperCase() === 'DELETE'));
+    // Si el desenlace no se puede escribir, se para: crear un cliente nuevo con
+    // el mapeo viejo intacto dejaría dos clientes para un usuario.
+    const cantUnlink = await callCheckout({ customers: MAPPED, customerLookup: 'missing', unlinkFails: true });
+    ok('D.23 si el mapeo obsoleto no se puede retirar, NO se crea un segundo cliente',
+      cantUnlink.res.code === 503 && !cantUnlink.calls.some(c => c.url.includes('checkout/sessions'))
+      && !cantUnlink.calls.some(c => c.url.includes('api.stripe.com/v1/customers') &&
+           ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST'),
+      JSON.stringify(cantUnlink.res.payload));
+    // Y el camino normal no cambia: un mapeo VÁLIDO se reutiliza sin tocar nada.
+    const fine = await callCheckout({ customers: MAPPED, customerLookup: 'found' });
+    ok('D.24 un mapeo válido se reutiliza: ni se borra, ni se crea otro cliente',
+      fine.res.code === 200
+      && !fine.calls.some(c => c.url.includes('/billing_customers') && ((c.init && c.init.method) || '').toUpperCase() === 'DELETE')
+      && !fine.calls.some(c => c.url.includes('api.stripe.com/v1/customers') && ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST')
+      && decodeBody(fine.calls.find(c => c.url.includes('checkout/sessions')).init.body).includes('customer=cus_old'));
+  }
+
   ok('D.11 la creación de cliente es idempotente por usuario (doble click ⇒ un cliente)',
     (() => { const c = okCall.calls.find(x => x.url.includes('api.stripe.com/v1/customers'));
       return !!c && (c.init.headers['Idempotency-Key'] || '').includes('user-1'); })());
   const existing = await callCheckout({ customers: [{ provider_customer_id: 'cus_old' }] });
-  ok('D.12 con cliente ya mapeado NO se crea otro',
-    !existing.calls.some(c => c.url.includes('api.stripe.com/v1/customers')) &&
+  // Ahora SÍ hay una llamada a `/v1/customers` con un mapeo presente: es la
+  // LECTURA de 3a, que comprueba que el cliente existe en este modo. Lo que D.12
+  // protege —y sigue protegiendo— es que no se CREE un segundo cliente.
+  ok('D.12 con cliente ya mapeado NO se crea otro (la lectura de 3a no cuenta)',
+    !existing.calls.some(c => c.url.includes('api.stripe.com/v1/customers') &&
+      ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST') &&
     decodeBody(existing.calls.find(c => c.url.includes('checkout/sessions')).init.body).includes('customer=cus_old'));
   // ── EL DOBLE CARGO ────────────────────────────────────────────────────────
   const dupOwn = await callCheckout({ ownSub: [{ plan: 'premium', status: 'active' }] });
@@ -859,7 +934,7 @@ console.log('\nJ · desplegabilidad en Vercel');
     const mkRes = () => { const r = { code: 0, body: null, setHeader() {},
       status(n) { r.code = n; return r; }, json(o) { r.body = o; return r; }, end() { return r; } }; return r; };
     const load = () => loadHandler(DISP.replace(/^import .*$/gm, ''),
-      { checkout: spy('checkout'), portal: spy('portal') });
+      { checkout: spy('checkout'), portal: spy('portal'), status: spy('status') });
 
     const hit = async (op) => {
       calls.length = 0;
@@ -871,9 +946,11 @@ console.log('\nJ · desplegabilidad en Vercel');
 
     const rCheckout = await hit('checkout');
     const rPortal   = await hit('portal');
-    ok('J.7 op=checkout ejecuta checkout y op=portal ejecuta portal, cada uno el suyo',
-      rCheckout.calls.join() === 'checkout' && rPortal.calls.join() === 'portal',
-      `checkout→${rCheckout.calls.join()||'nada'} portal→${rPortal.calls.join()||'nada'}`);
+    const rStatus   = await hit('status');
+    ok('J.7 cada `op` ejecuta SU owner y ninguno el del vecino',
+      rCheckout.calls.join() === 'checkout' && rPortal.calls.join() === 'portal'
+      && rStatus.calls.join() === 'status',
+      `checkout→${rCheckout.calls.join()||'nada'} portal→${rPortal.calls.join()||'nada'} status→${rStatus.calls.join()||'nada'}`);
 
     const bad = [];
     for (const op of [undefined, '', 'webhook', 'Checkout', 'constructor', '__proto__', 'toString']) {

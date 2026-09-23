@@ -153,6 +153,8 @@ export default async function handler(req, res) {
     return res.status(503).json({ ok: false, error: 'price_unavailable' });
   }
 
+  // Los dos clientes del proveedor se declaran ANTES del bloque 3 porque la
+  // comprobación de mapeo obsoleto (3a) ya necesita leer del proveedor.
   const stripe = (path, payload, idem) => fetch(`https://api.stripe.com/v1${path}`, {
     method: 'POST',
     headers: {
@@ -176,6 +178,49 @@ export default async function handler(req, res) {
       `&select=provider_customer_id`);
     if (r.ok) { const rows = await r.json().catch(() => []); customerId = (rows[0] || {}).provider_customer_id || null; }
   } catch (_) { customerId = null; }
+
+  // ── 3a · ¿EXISTE ESE CLIENTE EN ESTE MODO? EL DEFECTO DEL CUTOVER ────────
+  // Un `cus_…` de TEST no existe para una clave LIVE: Stripe responde
+  // `resource_missing`. Sin esta comprobación, la llamada que de verdad lo
+  // descubría era el guard anti-doble-cargo de 3b, que falla CERRADO y devuelve
+  // 503 `check_failed` — correcto para un fallo de red, y catastrófico aquí:
+  // TODA cuenta con mapeo de TEST (las de QA y la del founder, que son
+  // exactamente las que harán la primera compra real) quedaría sin poder
+  // comprar, con un error que además parece un problema de pago.
+  //
+  // Un cliente que NO EXISTE no puede tener suscripciones, así que aquí no hay
+  // riesgo de doble cargo que proteger: el mapeo está obsoleto y lo correcto es
+  // retirarlo y crear uno nuevo por el MISMO camino de siempre (3b más abajo).
+  // Se distingue con cuidado de un fallo de transporte: sólo un 404 del
+  // proveedor —o un cliente marcado `deleted`— invalida el mapeo. Cualquier otra
+  // cosa lo deja intacto y deja que 3b decida.
+  if (customerId) {
+    let stale = false;
+    try {
+      const r = await stripeGet(`/customers/${encodeURIComponent(customerId)}`);
+      if (r.status === 404) stale = true;
+      else if (r.ok) { const c = await r.json().catch(() => null); if (c && c.deleted === true) stale = true; }
+    } catch (_) { /* transporte: no se toca el mapeo */ }
+    if (stale) {
+      // `aurix_billing_link_customer` devuelve el handle EXISTENTE y nunca
+      // re-apunta —es su guard contra la fuga entre usuarios—, así que la única
+      // forma de recolocar el mapeo es retirar la fila de ESTE usuario. El
+      // borrado está acotado por `provider` y `user_id`: no puede alcanzar la
+      // fila de nadie más, y el guard de conflicto sigue intacto para el enlace.
+      try {
+        const d = await sb(`/billing_customers?provider=eq.${PROVIDER}&user_id=eq.${user.id}`, { method: 'DELETE' });
+        if (!d.ok) {
+          console.error('[billing/checkout] stale customer unlink failed', d.status);
+          return res.status(503).json({ ok: false, error: 'check_failed' });
+        }
+      } catch (e) {
+        console.error('[billing/checkout] stale customer unlink error', (e && e.message) || e);
+        return res.status(503).json({ ok: false, error: 'check_failed' });
+      }
+      console.error('[billing/checkout] stale customer mapping replaced');
+      customerId = null;
+    }
+  }
 
   if (!customerId) {
     try {
