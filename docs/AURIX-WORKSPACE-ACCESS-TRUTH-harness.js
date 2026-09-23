@@ -95,7 +95,7 @@ function ctx(persona, langCode) {
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
    '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
-   '_WSFC_CAPS',
+   '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA',
    '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL',
    '_WS_FOUNDER_VIEW_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',
@@ -107,7 +107,7 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType',
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
    '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover',
-   '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml',
+   '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon','_wsBudgetCurrentPeriod',
    '_wsCanPersist','_wsPersistUpsell','_wsOpenSurface','_wsTogglePin','_wsTouch',
    // SPEC P0 — el guard de vista, la vista técnica de fundador y el contrato de
    // documento (revisión + tombstone). Se ejecutan los REALES, no un stub.

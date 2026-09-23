@@ -21796,9 +21796,18 @@ body.gs-open { overflow: hidden; }
 }
 /* Por debajo de 380 px el destino del retorno se lee en el `aria-label`: el
    chevron solo conserva los 44 px y deja el ancho al título. */
-@media (max-width: 379px) {
+/* ── §9 · EN MÓVIL, EL RETORNO ES UN ICONO CON NOMBRE ACCESIBLE ────────────
+   La píldora con el destino escrito («Herramientas», «Mi espacio») ocupa hasta
+   120 px de una barra de 390, y ese ancho se lo quita al TÍTULO, que es lo que
+   el usuario necesita leer para saber dónde está — se veía partido en tres
+   líneas en la captura del fundador. Por debajo de 768 px queda el chevron con
+   sus 44 px táctiles y el destino COMPLETO en el `aria-label`, así que un lector
+   de pantalla sigue oyendo «Volver a Herramientas». De 768 en adelante sobra
+   ancho y el texto vuelve. */
+@media (max-width: 767px) {
   .aurix-wsh .wsh-bar-backtxt { display: none; }
-  .aurix-wsh .wsh-bar-back { padding: 0 10px; }
+  .aurix-wsh .wsh-bar-back { padding: 0; width: 44px; justify-content: center; }
+  .aurix-wsh .wsh-bar-chev { margin-top: 0; font-size: 19px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .aurix-wsh .wsh-bar-back { transition: none; }
@@ -27561,6 +27570,93 @@ button.intv14-cmp-clear {
 }
 .cat-empty-cta:hover { background: rgba(74,130,240,0.22); color: #cfe0ff; }
 .cat-empty-cta:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   §8 · MI ESPACIO — UNA SOLA FAMILIA DE ICONOS, UNA SOLA CAJA
+   ════════════════════════════════════════════════════════════════════════════
+   LO QUE CORRIGE: la miniatura de un documento era un RECORTE DE SU CONTENIDO a
+   52 px, así que una tarjeta se ilustraba con «25…» —el principio de una cifra
+   cortada— mientras las vecinas traían fotografías minúsculas o glifos de otro
+   peso. Tres lenguajes visuales en una rejilla de dos columnas.
+
+   Ahora la caja es CONSTANTE y no se encoge, el icono va centrado y es de la
+   misma familia que el resto de Workspace (`_wsGlyph`, 24×24, trazo 1.7). La
+   distinción entre documento y favorito no la hace el icono —no puede, son la
+   misma capacidad— sino el filete de color y el metadato. */
+.wsh-mse2-pv {
+  /* Ni foto ni recorte: un tile de icono. Sin `overflow:hidden` recortando
+     contenido, porque ya no hay contenido que recortar. */
+  flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
+  display: grid; place-items: center;
+  background: rgba(74,130,240,0.10);
+  border: 1px solid rgba(74,130,240,0.20);
+}
+.wsh-mse2-ic2 { display: grid; place-items: center; width: 24px; height: 24px; color: var(--aurix-blue, #4A82F0); }
+.wsh-mse2-ic2 svg { width: 22px; height: 22px; display: block; }
+/* El nombre de un documento es lo único que lo distingue de otro del mismo
+   tipo, así que no se recorta con elipsis: cabe en dos líneas. */
+.wsh-mse2-name { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
+/* Alturas COMPARABLES sin forzarlas: las filas de la rejilla se estiran solas y
+   la tarjeta ocupa la suya entera. Con texto ampliado crece, no recorta. */
+.wsh-mse2-list { align-content: start; }
+.wsh-mse2-card { align-items: center; height: auto; }
+
+/* ── §8 · EL ICONO DE UNA HERRAMIENTA DEL CATÁLOGO ─────────────────────────
+   Caja constante, centrada y no encogible, con el trazo de la familia. No lleva
+   `overflow:hidden` porque ya no hay una fotografía que recortar debajo. */
+.wsh-toolcard-ic.is-glyph {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 44px; height: 44px; border-radius: 12px;
+  color: var(--aurix-blue, #4A82F0);
+  background: rgba(74,130,240,0.10);
+  border: 1px solid rgba(74,130,240,0.20);
+}
+.wsh-toolcard-ic.is-glyph .wsfc-cap-svg { width: 23px; height: 23px; }
+/* El acento de la tarjeta sigue tiñendo su icono: la identidad por capacidad no
+   se pierde, sólo deja de competir con una fotografía. */
+.wsh-toolcard.is-gold  .wsh-toolcard-ic.is-glyph { color: rgba(226,188,110,0.95); background: rgba(226,188,110,0.10); border-color: rgba(226,188,110,0.22); }
+.wsh-toolcard.is-teal  .wsh-toolcard-ic.is-glyph { color: rgba(80,205,190,0.95);  background: rgba(80,205,190,0.10);  border-color: rgba(80,205,190,0.22); }
+.wsh-toolcard.is-green .wsh-toolcard-ic.is-glyph { color: rgba(110,210,160,0.95); background: rgba(110,210,160,0.10); border-color: rgba(110,210,160,0.22); }
+
+/* ── §10 · PRESUPUESTO · PERIODO Y RESUMEN, ARRIBA ─────────────────────────
+   El usuario abre esta plantilla para ver cuánto le queda. Antes esa cifra
+   estaba enterrada detrás de diez campos. */
+.wsbud-top { display: flex; flex-direction: column; gap: 12px; }
+.wsbud-period { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wsbud-period-lbl { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
+.wsbud-period-sel { flex: 1 1 180px; min-width: 0; max-width: 260px; }
+/* DOS columnas en móvil y el disponible en su propia fila. Con tres, cada celda
+   quedaba en 83 px para un importe de 96 («2.500,00 US$») y se salía. La
+   densidad no se cobra en legibilidad: se cobra en filas. */
+.wsbud-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wsbud-kpi.is-main { grid-column: 1 / -1; }
+@media (min-width: 560px) {
+  .wsbud-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wsbud-kpi.is-main { grid-column: auto; }
+}
+.wsbud-kpi {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 10px 11px; border-radius: 12px;
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+}
+.wsbud-kpi i { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.wsbud-kpi b {
+  /* `overflow-wrap: normal`: con `anywhere` el importe se partía a mitad de la
+     unidad («920,00 U / S$»). El salto tiene que caer en el espacio que ya hay
+     entre la cifra y su moneda. */
+  font-size: clamp(13px, 3.8vw, 18px); font-weight: 800; color: var(--text-bright);
+  font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal;
+}
+.wsbud-kpi i { overflow-wrap: normal; }
+/* El disponible es la cifra por la que se abre la plantilla: pesa más. */
+.wsbud-kpi.is-main { border-color: rgba(var(--aurix-blue-rgb), 0.34); background: var(--elev-2); }
+.wsbud-kpi b.is-pos { color: rgba(120,215,170,0.98); }
+.wsbud-kpi b.is-neg { color: rgba(240,170,110,0.98); }
+@media (min-width: 768px) {
+  .wsbud-top { flex-direction: row; align-items: center; gap: 18px; }
+  .wsbud-period { flex: 0 0 auto; }
+  .wsbud-kpis { flex: 1 1 auto; }
+}
 
 /* ── VALIDACIÓN VISIBLE, Y NO SÓLO UN `return` ───────────────────────────────
    Un campo obligatorio vacío marca el campo y publica UNA línea de razón junto al

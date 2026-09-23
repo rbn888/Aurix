@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '702'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '703'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6239,6 +6239,9 @@ const T = {
     wspl_m_units:         'Inmuebles',
     wspl_m_value:         'Valor',
     wspl_m_trades:        'Operaciones',
+    wsbud_period:         'Periodo',
+    wsbud_period_none:    'Sin periodo',
+    wstool_bud_rate_basis:'Sobre los ingresos del plan',
     wsg_more_aria:        'Más acciones del documento',
     catEmptyTitle:        'Todavía no has añadido ningún activo.',
     catEmptyCta:          'Añadir activo',
@@ -6297,7 +6300,10 @@ const T = {
     wstool_bud_leisure:   'Ocio',
     wstool_bud_education: 'Formación',
     wstool_bud_other:     'Otros',
-    wstool_bud_avail:     'Disponible este mes',
+    // §10 — sin «este mes»: afirmaba un periodo que el documento puede no tener
+    // declarado, y el propio SPEC lo prohíbe por su nombre. El periodo, cuando
+    // existe, lo dice su selector; la cifra es del PLAN, no del calendario.
+    wstool_bud_avail:     'Disponible',
     wstool_bud_saverate:  'Tasa de ahorro',
     wstool_bud_income_t:  'Ingresos totales',
     wstool_bud_expenses_t:'Gastos totales',
@@ -8998,6 +9004,9 @@ const T = {
     wspl_m_units:         'Properties',
     wspl_m_value:         'Value',
     wspl_m_trades:        'Trades',
+    wsbud_period:         'Period',
+    wsbud_period_none:    'No period',
+    wstool_bud_rate_basis:'Of the plan income',
     wsg_more_aria:        'More document actions',
     catEmptyTitle:        'You have not added any asset yet.',
     catEmptyCta:          'Add asset',
@@ -9053,7 +9062,7 @@ const T = {
     wstool_bud_leisure:   'Leisure',
     wstool_bud_education: 'Education',
     wstool_bud_other:     'Other',
-    wstool_bud_avail:     'Available this month',
+    wstool_bud_avail:     'Available',
     wstool_bud_saverate:  'Savings rate',
     wstool_bud_income_t:  'Total income',
     wstool_bud_expenses_t:'Total expenses',
@@ -21116,7 +21125,11 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsap-input')) { _wsApOnInput(el); return; }
   });
   // WS.12 — property photo upload (file input → downscaled data URL).
-  document.addEventListener('change', e => { const el = e.target; if (el && el.getAttribute && el.hasAttribute('data-wsre-photo')) _wsRePhoto(el); });
+  document.addEventListener('change', e => {
+    const el = e.target; if (!el || !el.getAttribute) return;
+    if (el.hasAttribute('data-wsre-photo')) { _wsRePhoto(el); return; }
+    if (el.hasAttribute('data-wsbud-period')) { _wsBudgetPeriodChange(el); return; }
+  });
   // WS.10A — natural editing + thousands formatting on numeric Workspace inputs.
   // ws4-num is a Workspace-only class; only decimal-mode money/qty fields, never
   // the year field or text fields (asset/notes have no inputmode). Strip
@@ -21339,10 +21352,18 @@ function _wsCanonicalNumStr(n) {
 // quedan exactamente como están hoy: no mejora, pero tampoco congela una
 // interpretación inventada. La ambigüedad se reduce al conjunto donde de verdad
 // existe, y ahí se declara en vez de resolverse a ciegas.
+// ── LAS CLAVES QUE NO SON NÚMEROS, DECLARADAS ─────────────────────────────
+// `periodKey` es «2026-09», y eso ENCAJA en el patrón de un número escrito:
+// `_wsNum` lo lee como 2026 en los dos idiomas, la canonización lo daría por
+// inequívoco y REESCRIBIRÍA el periodo del documento a «2026». Una lista de
+// exclusión explícita es lo correcto: el parser numérico no tiene forma de saber
+// qué campo es un número y qué campo sólo se le parece.
+const _WS_NON_NUMERIC_INPUT_KEYS = Object.freeze(['periodKey', 'currency', 'notes', 'name', 'asset', 'atype', 'ptype', 'status', 'dueDate', 'buyDate', 'sellDate', 'concept', 'personOrCompany', 'photo', 'city']);
 function _wsCanonicalizeInputs(obj) {
   if (!obj || typeof obj !== 'object') return obj;
   const out = Array.isArray(obj) ? obj.slice() : Object.assign({}, obj);
   for (const k in out) {
+    if (_WS_NON_NUMERIC_INPUT_KEYS.indexOf(k) !== -1) continue;
     const v = out[k];
     if (typeof v !== 'string' || v.trim() === '') continue;
     if (!/^[\d.,\-\s]+$/.test(v)) continue;            // no es un número escrito
@@ -22594,51 +22615,17 @@ function _wsCatPreviewHtml(cat) {
 
 // WS.11B — saved-project preview built from the project's OWN stored data
 // (reuses the WS.10 visual language). Used in Mi Espacio > Trabajo diario.
-function _wsProjPreviewHtml(p) {
-  const esc = _intccEsc;
-  if (p.kind === 'goal') {
-    const tgt = Math.max(0, Number(p.target) || 0), cur = Math.max(0, Number(p.current) || 0);
-    const pct = tgt > 0 ? Math.min(100, Math.round(cur / tgt * 100)) : 0;
-    return `<div class="wspv wspv-goal"><div class="wspv-goal-top"><span class="wspv-goal-glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(p.gtype || 'free'))}</svg></span><span class="wspv-goal-pct">${pct}%</span></div><div class="wspv-goal-track"><span class="wspv-goal-fill" style="width:${pct}%"></span></div></div>`;
-  }
-  const r = p.results || {};
-  if (p.type === 'compound_growth') {
-    return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final || 0))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,30 6,26 40,16 80,8 114,3 120,2 120,30"/><polyline class="wspv-spark-line" points="0,28 40,16 80,8 120,2"/></svg></div>`;
-  }
-  if (p.type === 'monthly_budget') {
-    return `<div class="wspv wspv-budget"><div class="wspv-rows">
-      <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.income || 0))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_income'))}</i></span>
-      <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.expenses || 0))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_expenses'))}</i></span>
-      <span class="wspv-row is-free"><b class="wspv-row-v">${esc(formatBase(r.free || 0))}</b><i class="wspv-row-k">${esc(t('wstool_bud_free'))}</i></span>
-    </div></div>`;
-  }
-  if (p.type === 'trade_journal') {
-    const np = r.netProfit || 0;
-    return `<div class="wspv wspv-jsum"><span class="wspv-jsum-v is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-jsum-k">${r.winRate != null ? r.winRate + '% ' + esc(t('wsjrn_sum_winrate')) : esc(t('wsjrn_sum_net'))}</span></div>`;
-  }
-  if (p.type === 'real_estate_portfolio') {
-    const cover = (p.inputs && Array.isArray(p.inputs.properties) && p.inputs.properties.find(x => x && x.photo)) || null;
-    const cf = r.cashflowMonthly || 0;
-    const coverStyle = cover ? `background-image:url(${cover.photo})` : '';
-    return `<div class="wspv wspv-re${cover ? ' has-photo' : ''}"${cover ? ` style="${coverStyle}"` : ''}><div class="wspv-re-ov"><span class="wspv-re-eq">${esc(formatBase(r.equityTotal || 0))}</span><span class="wspv-re-lbl">${esc(t('wsre_kpi_equity'))}</span></div><div class="wspv-re-foot"><span>${(r.count != null ? r.count : 0)} ${esc(t('wsre_unit'))}</span><span class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span></div></div>`;
-  }
-  if (p.type === 'receivables_app') {
-    const pct = r.porcentajeCobrado != null ? Math.max(0, Math.min(100, r.porcentajeCobrado)) : 0;
-    return `<div class="wspv wspv-recvw"><div class="wspv-recvw-top"><span class="wspv-recvw-amt">${esc(formatBase(r.totalPendiente || 0))}</span><span class="wspv-recvw-lbl">${esc(t('wsrecv_kpi_pending'))}</span></div><div class="wspv-recvw-bar"><span class="wspv-recvw-fill" style="width:${pct}%"></span></div><div class="wspv-recvw-foot"><span>${(r.count != null ? r.count : 0)} · ${pct}% ${esc(t('wsrecv_kpi_collected').toLowerCase())}</span>${r.totalVencido ? `<span class="is-overdue">${esc(formatBase(r.totalVencido))} ${esc(t('wsrecv_st_vencido').toLowerCase())}</span>` : ''}</div></div>`;
-  }
-  if (p.type === 'asset_prices') {
-    // `|| 0` convertiría el null de divisas mezcladas en un cero afirmado.
-    const np = r.netProfitLoss;
-    return `<div class="wspv wspv-ap"><div class="wspv-ap-top"><span class="wspv-ap-amt${np == null ? '' : (np >= 0 ? ' is-win' : ' is-loss')}">${esc(np == null ? '—' : (np >= 0 ? '+' : '') + _wsJrnMoney(np, r.currency))}</span><span class="wspv-ap-lbl">${esc(t('wsap_kpi_net'))}</span></div><div class="wspv-ap-foot"><span>${(r.openCount != null ? r.openCount : 0)} ${esc(t('wsap_kpi_open').toLowerCase())}</span>${(r.bestName && r.bestPct != null) ? `<span class="is-win">${esc(r.bestName)} ${esc(_wsJrnPct(r.bestPct))}</span>` : ''}</div></div>`;
-  }
-  if (p.type === 'loan_simulation') {
-    const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
-    return `<div class="wspv wspv-loan"><div class="wspv-loan-top"><span class="wspv-loan-amt">${esc(formatBase(r.monthlyPayment || 0))}${esc(t('wsre_permonth'))}</span><span class="wspv-loan-lbl">${esc(t('wsloan_kpi_monthly'))}</span></div><div class="wspv-loan-foot"><span>${esc(t('wsloan_kpi_interest'))} ${esc(formatBase(r.totalInterest || 0))}</span><span>${esc(String((r.annual != null ? r.annual : 0)).replace('.', sep))}%</span></div></div>`;
-  }
-  if (p.kind === 'scenario') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
-  const A = _WS_ARCH[p.type] || { accent: 'blue', glyph: 'portfolio' };
-  return _wsGlyphTile(A.glyph, A.accent);
-}
+// ── RETIRADA EN §8: `_wsProjPreviewHtml` ───────────────────────────────────
+// Construía la miniatura de un documento desde SUS `results` guardados, y nació
+// para cerrar un defecto real: la versión anterior usaba la ilustración de la
+// CATEGORÍA, que lee el borrador local de la herramienta, así que la tarjeta de
+// «Presupuesto empresa» podía enseñar las cifras del último presupuesto EDITADO.
+//
+// §8 retira la miniatura de contenido ENTERA —a 44 px un recorte de cifra se lee
+// «25…», que es lo que el fundador fotografió— y la sustituye por un icono
+// semántico de la familia única. Sin contenido en la miniatura, el defecto que
+// esta función cerraba deja de ser posible por construcción, y la función se va
+// con él en vez de quedarse dormida.
 
 // WS.6A — smart entry tab: never land on an empty "Mi espacio".
 function _wsSmartTab() {
@@ -23109,14 +23096,6 @@ function _renderWorkspaceHome(metrics) {
       return {
         mtype: 'doc', ref: it.ref, name: it.name, typeLabel: it.typeLabel,
         entryId: entry.id, cat: r.cat || entry.id, viz: r.viz || 'bars',
-        // El documento ENTERO viaja con la tarjeta, porque su miniatura tiene que
-        // salir de SUS datos. La primera versión usaba la ilustración de la
-        // CATEGORÍA (`_wsCatPreviewHtml`), que lee `_wsToolStateGet` —el borrador
-        // local de la herramienta— así que la tarjeta de «Presupuesto empresa»
-        // podía enseñar las cifras del último presupuesto EDITADO. Ese owner ya
-        // existía y es `_wsProjPreviewHtml`: construye la vista previa desde los
-        // `results` guardados del documento.
-        proj: it,
         ts: Number(it.ts) || 0,
       };
     }).filter(Boolean);
@@ -23130,28 +23109,38 @@ function _renderWorkspaceHome(metrics) {
     // El metadato, y sólo lo que se puede demostrar. Un favorito dice cuándo se
     // abrió por última vez SI se abrió; un documento dice de qué capacidad es y
     // cuándo se actualizó. Nunca «guardado» sobre algo que no está guardado.
+    // §8 — se retira «último uso» de los favoritos. Es el metadato más largo de
+    // la tarjeta y describe un criterio que el producto YA abandonó: la
+    // pertenencia a Mi espacio es intencional, no por uso. Un documento sí dice
+    // de qué capacidad es y cuándo se actualizó, que es lo que lo distingue de
+    // otro documento del mismo tipo.
     const mseMeta = it => it.mtype === 'doc'
       ? [it.typeLabel, it.ts ? (t('wsmse2_updated') + ' ' + _wsRelTime(it.ts)) : ''].filter(Boolean).join(' · ')
-      : [t('wsmse2_fav'), it.used ? (t('wsmse2_last') + ': ' + _wsRelTime(it.used)) : ''].filter(Boolean).join(' · ');
+      : t('wsmse2_fav');
     // Abrir: un favorito abre la CAPACIDAD (por su ref fijada), un documento abre
     // SU instancia (por su ref de documento). Los dos por owners que ya existen.
     const openAttrs = it => it.mtype === 'doc'
       ? ` role="button" tabindex="0" data-wsx-open="${esc(it.ref)}"`
       : _wsCardAttrs(it.model);
-    // La miniatura de un DOCUMENTO sale de sus propios datos; si el tipo no tiene
-    // vista previa propia, cae en la ilustración de su categoría —una ilustración,
-    // no una cifra ajena—.
-    const docPreview = it => {
-      let h = '';
-      try { h = _wsProjPreviewHtml(it.proj) || ''; } catch (_) { h = ''; }
-      return h || _wsCatPreviewHtml(it.cat);
-    };
+    // ── §8 · UN ICONO SEMÁNTICO, NO UNA FOTO DIMINUTA NI UN RECORTE ─────────
+    // LO QUE HABÍA, y es lo que el fundador fotografió: la miniatura de un
+    // documento era un RECORTE DE SU CONTENIDO a 34 px, así que una tarjeta de
+    // Mi espacio se ilustraba con «25…» —el principio de una cifra cortada— y
+    // las de al lado con fotografías minúsculas o glifos de otro peso. Tres
+    // lenguajes visuales en una rejilla de dos columnas.
+    //
+    // Ahora las dos clases de tarjeta usan el MISMO icono de la MISMA familia
+    // (`_wsGlyph`, 24×24, trazo 1.7), elegido por la superficie a la que
+    // pertenecen. La distinción entre documento guardado y capacidad favorita no
+    // la hace la miniatura —no puede, son la misma capacidad— sino el filete de
+    // color de la tarjeta y su metadato, que es donde se lee.
+    const mseIcon = it => `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(it.cat))}</span>`;
     // `aria-hidden` en la miniatura: es una ILUSTRACIÓN de 34 px en móvil, con
     // etiquetas de 7,5 px que nadie lee y que un lector de pantalla no debe
     // dictar. El nombre accesible de la tarjeta es el del documento, que ya está.
     const card = it => `
       <div class="wsh-mse2-card is-${it.mtype}" data-wsmse-type="${it.mtype}"${openAttrs(it)} aria-label="${esc(it.name)}">
-        <div class="wsh-mse2-pv" aria-hidden="true">${it.mtype === 'doc' ? docPreview(it) : _wsMseToolPreview(it)}</div>
+        <div class="wsh-mse2-pv" aria-hidden="true">${mseIcon(it)}</div>
         <div class="wsh-mse2-body">
           <p class="wsh-mse2-name">${esc(it.name)}</p>
           <span class="wsh-mse2-meta">${esc(mseMeta(it))}</span>
@@ -23202,7 +23191,13 @@ function _renderWorkspaceHome(metrics) {
     const toolCard = m => `
       <div class="wsh-tool wsh-toolcard ${accent(m.id)} is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
         ${m.pinRef ? pinBtn(m.pinRef) : ''}
-        <div class="wsh-toolcard-ic${_WS_TOOL_ASSET[m.id] ? ' has-asset' : ''}">${_wsTplViz(m.viz)}${_wsAssetImg(_WS_TOOL_ASSET[m.id], '')}</div>
+        ${/* §8 — HERRAMIENTAS: iconos coherentes, no una mezcla. Aquí convivían
+              una fotografía minúscula superpuesta (`_wsAssetImg`) y un glifo de
+              64×40 con áreas rellenas (`_wsTplViz`), así que la rejilla tenía dos
+              lenguajes a la vez. Se usa la MISMA familia que el resto de
+              Workspace. Las PLANTILLAS conservan sus fotografías: son su
+              identidad y §8 pide preservarlas. */''}
+        <div class="wsh-toolcard-ic is-glyph">${_wsCapIconHtml(_wsSurfaceIcon(m.cat))}</div>
         <p class="wsh-tool-name">${esc(m.name)}</p>
         <div class="wsh-toolcard-foot">${_wsCardFoot(m)}</div>
       </div>`;
@@ -23232,7 +23227,7 @@ function _renderWorkspaceHome(metrics) {
         <div class="wsh-tool-grid wsh-toolbox" data-wsgrid-n="${list.length}">
           ${list.map(m => `
             <div class="wsh-tool wsh-toolcard is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
-              <div class="wsh-toolcard-ic">${_wsTplViz(m.viz)}</div>
+              <div class="wsh-toolcard-ic is-glyph">${_wsCapIconHtml(_wsSurfaceIcon(m.cat))}</div>
               <p class="wsh-tool-name">${esc(m.name)}</p>
               <div class="wsh-toolcard-foot">${_wsCardFoot(m)}</div>
             </div>`).join('')}
@@ -25045,6 +25040,19 @@ function _wsEntryNameKey(entryId) {
   const r = _WS_TOOL_RENDER[entryId] || _WS_TPL_RENDER[entryId] || null;
   return r && r.nameKey ? r.nameKey : null;
 }
+// El ICONO de una superficie, de la familia única de Workspace. El mapa sale de
+// `_WSFC_CAPS` —el mismo que usa la portada— más las superficies internas, que
+// también necesitan uno para no caer en un glifo genérico.
+const _WS_SURFACE_ICON_EXTRA = Object.freeze({
+  assets: 'log', projection: 'growth', planning: 'growth',
+  networth: 'portfolio', property: 'house', business: 'portfolio', fire: 'target',
+});
+function _wsSurfaceIcon(key) {
+  const k = String(key || '');
+  const c = _WSFC_CAPS.find(x => x.k === k);
+  if (c) return c.icon;
+  return _WS_SURFACE_ICON_EXTRA[k] || 'portfolio';
+}
 function _wsfcPublishedCaps() {
   return _WSFC_CAPS.map(c => {
     const e = _wsSurfaceEntry(c.k);
@@ -25147,12 +25155,23 @@ function _wsOpenTool(toolKey, projectId) {
     // Se canoniza al ABRIR lo que ya estaba guardado, en la medida en que se puede
     // hacer sin adivinar (ver `_wsCanonicalizeInputs`).
     if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(p.inputs)); _wsToolEditId = projectId; _wsToolDirty = false; }
-    else { _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false; }
+    else {
+      _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false;
+      // §10 — sólo un borrador NUEVO nace con el mes local actual. Un documento
+      // cargado conserva lo suyo: si no trae periodo, se lee «Sin periodo» hasta
+      // que el usuario elija. Por eso esto NO vive en los defaults, que también
+      // alimentan la carga de un documento existente.
+      if (key === 'budget' && _wsToolInputs.periodKey === undefined) _wsToolInputs.periodKey = _wsBudgetCurrentPeriod();
+    }
   } else {
     // WS.7A — quick access: restore the tool's last local state (NOT a project).
     const last = _wsToolStateGet(key);
     _wsToolInputs = last ? Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(last)) : _wsToolDefaultsFor(key);
     _wsToolEditId = null; _wsToolDirty = false;
+    // §10 — un borrador NUEVO nace con el mes local actual. `undefined` y no
+    // «falsy»: si el usuario eligió «Sin periodo» el valor es `''`, y volver a
+    // ponerle el mes de hoy sería deshacer su decisión en cada apertura.
+    if (key === 'budget' && _wsToolInputs.periodKey === undefined) _wsToolInputs.periodKey = _wsBudgetCurrentPeriod();
   }
   _wshView = 'tool'; renderWorkspaceHome();
 }
@@ -25166,6 +25185,24 @@ function _wsToolOnInput(el) {
   const root = document.querySelector('.wsh-tool-view');
   const out = root && root.querySelector('[data-wstool-out]');
   if (out) out.innerHTML = _wsToolOutHtmlFor(_wsToolActive, _wsToolInputs);
+  // §10 — el resumen superior del Presupuesto es la misma lectura, arriba: se
+  // repinta por su propio contenedor, nunca reemplazando el campo enfocado.
+  const top = root && root.querySelector('[data-wsbud-top]');
+  if (top && _wsToolActive === 'budget') top.innerHTML = _wsBudgetTopHtml(_wsToolInputs);
+  const bar = root && root.querySelector('[data-wstool-savebar]');
+  if (bar) bar.innerHTML = _wsToolSaveBarHtml();
+}
+// ── EL SELECTOR DE PERIODO EDITA EL BORRADOR, Y NADA MÁS ──────────────────
+// No guarda, no duplica, no mueve el documento y no abre otro. Cambiar el mes
+// es una edición como cualquier otra: marca el borrador como sucio y espera a
+// que el usuario decida qué hacer con él en §4.
+function _wsBudgetPeriodChange(el) {
+  if (!_wsToolInputs) return;
+  const v = String((el && el.value) || '');
+  _wsToolInputs.periodKey = /^\d{4}-\d{2}$/.test(v) ? v : '';
+  _wsToolDirty = true;
+  try { _wsToolStateSet(_wsToolActive, _wsToolInputs); } catch (_) {}
+  const root = document.querySelector('.wsh-tool-view');
   const bar = root && root.querySelector('[data-wstool-savebar]');
   if (bar) bar.innerHTML = _wsToolSaveBarHtml();
 }
@@ -25696,6 +25733,71 @@ function _wsBudgetChartHtml(res) {
     </div>`;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// §10 · EL PERIODO DEL PRESUPUESTO — OPCIONAL, EXPLÍCITO Y NUNCA INFERIDO
+// ════════════════════════════════════════════════════════════════════════════
+// `periodKey` es «YYYY-MM» y vive en el payload del documento, así que viaja con
+// la sincronización sin tocar el esquema. Es OPCIONAL por compatibilidad: un
+// documento anterior no lo tiene y se lee «Sin periodo» hasta que el usuario
+// elija uno. NO se deduce de `createdAt` ni de la fecha de hoy — inferirlo sería
+// afirmar que un presupuesto guardado en marzo ES el de marzo, que es justo lo
+// que nadie ha declarado.
+//
+// Y el selector EDITA EL BORRADOR. No guarda, no duplica, no mueve el documento
+// y no abre otro: cambiar el mes no puede ser una operación de archivo.
+function _wsBudgetCurrentPeriod() {
+  const d = new Date();
+  return String(d.getFullYear()) + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function _wsPeriodLabel(key) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
+  if (!m) return t('wsbud_period_none');
+  const y = Number(m[1]), mo = Number(m[2]);
+  if (!(mo >= 1 && mo <= 12)) return t('wsbud_period_none');
+  try {
+    return new Intl.DateTimeFormat((typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES',
+      { month: 'long', year: 'numeric' }).format(new Date(y, mo - 1, 1));
+  } catch (_) { return m[1] + '-' + m[2]; }
+}
+// Las opciones: «Sin periodo», los doce meses anteriores, el actual, el
+// siguiente, y —si el documento trae uno fuera de ese rango— el suyo. Un
+// documento de 2019 no puede quedarse sin su propia opción en la lista.
+function _wsPeriodOptions(current) {
+  const out = [];
+  const now = new Date();
+  for (let i = 12; i >= -1; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(String(d.getFullYear()) + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  const cur = String(current || '');
+  if (/^\d{4}-\d{2}$/.test(cur) && out.indexOf(cur) === -1) out.unshift(cur);
+  return out;
+}
+// El RESUMEN y el PERIODO, arriba del todo. Antes el usuario tenía que cruzar
+// diez campos para ver cuánto le queda, que es la única cifra por la que abre
+// esta plantilla.
+function _wsBudgetTopHtml(inp) {
+  const esc = _intccEsc;
+  const res = calculateMonthlyBudget(inp);
+  const cur = (inp && inp.periodKey) ? String(inp.periodKey) : '';
+  const opts = _wsPeriodOptions(cur);
+  return `
+    <div class="wsbud-top">
+      <label class="wsbud-period">
+        <span class="wsbud-period-lbl">${esc(t('wsbud_period'))}</span>
+        <select class="wsg-select wsbud-period-sel" data-wsbud-period>
+          <option value=""${cur ? '' : ' selected'}>${esc(t('wsbud_period_none'))}</option>
+          ${opts.map(k => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(_wsPeriodLabel(k))}</option>`).join('')}
+        </select>
+      </label>
+      <div class="wsbud-kpis">
+        <span class="wsbud-kpi"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
+        <span class="wsbud-kpi"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
+        <span class="wsbud-kpi is-main"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b></span>
+      </div>
+      ${res.deficit ? `<p class="wsb-note is-warn">${esc(String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free))))}</p>` : ''}
+    </div>`;
+}
 function _wsBudgetOutHtml(inp) {
   const esc = _intccEsc;
   const res = calculateMonthlyBudget(inp);
@@ -25714,15 +25816,14 @@ function _wsBudgetOutHtml(inp) {
     : String(t('wstool_bud_read_neutral') || '').replace('{r}', String(rate));
   return `
     <div class="wstool-result wsbud-result">
+      ${/* §10 — la TASA se decía DOS veces en esta misma tarjeta (bajo la cifra
+            grande y otra vez como celda) y los tres totales se repetían con el
+            resumen de arriba. Aquí queda una sola vez, y los totales viven en la
+            cabecera operativa, que es donde el usuario los busca. */''}
       <div class="wstool-res-main">
-        <span class="wstool-res-label">${esc(t('wstool_bud_avail'))}</span>
-        <span class="wstool-res-final ${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</span>
-        <span class="wstool-res-orient">${esc(t('wstool_bud_saverate'))} · ${esc(rateTxt)}</span>
-      </div>
-      <div class="wsbud-split">
-        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.income))}</span><span class="wstool-res-k">${esc(t('wstool_bud_income_t'))}</span></div>
-        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.expenses))}</span><span class="wstool-res-k">${esc(t('wstool_bud_expenses_t'))}</span></div>
-        <div class="wstool-res-cell ${res.free < 0 ? 'is-neg' : 'is-gain'}"><span class="wstool-res-v">${esc(rateTxt)}</span><span class="wstool-res-k">${esc(t('wstool_bud_saverate'))}</span></div>
+        <span class="wstool-res-label">${esc(t('wstool_bud_saverate'))}</span>
+        <span class="wstool-res-final ${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(rateTxt)}</span>
+        <span class="wstool-res-orient">${esc(t('wstool_bud_rate_basis'))}</span>
       </div>
     </div>
     <div class="wstool-chart wsbud-chartbox">
@@ -25761,6 +25862,11 @@ function _renderBudgetTool() {
             bloques distintos— así que se conservan. Lo que se retira es la
             tarjeta de presentación de encima. */''}
       ${_wsSurfaceHeadHtml({ title: t('wstool_budget_n'), doc: _wsToolDocName(), help: [t('wstool_budget_d')] })}
+      ${/* §10 — periodo y resumen ARRIBA. El usuario abre esta plantilla para
+            ver cuánto le queda; antes tenía que cruzar diez campos para llegar
+            a esa cifra. Se repinta con cada tecla por su propio contenedor, así
+            que no hay un segundo camino de cálculo. */''}
+      <section class="wsh-card wsbud-top-card" data-wsbud-top>${_wsBudgetTopHtml(inp)}</section>
       <section class="wsh-card wstool-inputs-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
         <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>

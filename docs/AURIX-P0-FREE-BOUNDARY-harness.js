@@ -116,7 +116,7 @@ function ctx(persona, langCode) {
    '_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL','_WS_FOUNDER_VIEW_KEY','_AURIX_ENT_CANON_EXTRA',
    '_AURIX_ENT_CANON','_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_TOOL_REQUIRED','_WS_PROJ_CONV',
    '_WSH_SPACE_HIDDEN_KEY','_WSH_SPACE_TOP_KEY',
-   '_WSFC_CAPS'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA'].forEach(n => vm.runInContext(konstSrc(n), sb));
   vm.runInContext('var _aurixEnt = { loaded:false, loading:false, error:null, plan:"free", status:"none", source:"default", validUntil:null, features:Object.create(null), sources:Object.create(null), fetchedAt:0 };', sb);
   ['hasFeature','_aurixEntLoaded','hasAurixPremiumAccess','_aurixEntIsCatalogPreview',
    '_wsPremiumShell','_renderWorkspacePending','_wsFounderViewFlag','_wsInternalViewOn',
@@ -128,7 +128,7 @@ function ctx(persona, langCode) {
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType','_wsGlyphTile',
    '_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml','_wsLabel','_wsTypeLabel',
    '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsCanPersist','_wsPersistUpsell','_wshReveal',
-   '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml',
+   '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon',
    '_wshMetrics','_wshRefreshMetrics','_wsTogglePin','_wsTouch','_wsSpaceHidden','_wsSpaceTop','_wsSpaceTopRank',
    '_ws4ProjectsRaw','_ws4Projects','_ws4SaveAll','_wsDocStamp','_ws4Persist','_ws4Tombstone',
    '_wsgGoalsRaw','_wsgGoals','_wsgSaveAll','_wsgTombstone','_wsgPersist','_wsgGet','_wsgStored',
@@ -632,14 +632,17 @@ console.log('\n6 · Mi espacio:');
   ok('6.5 un DOCUMENTO guardado sí, con SU nombre y su tipo propio',
     (h.match(/data-wsmse-type="doc"/g) || []).length === 1
     && h.indexOf('Presupuesto empresa') !== -1 && /data-wsmse-tpl="1"/.test(h));
-  // LA MINIATURA DE UN DOCUMENTO SALE DE SUS PROPIOS DATOS. Usar la ilustración de
-  // la CATEGORÍA la hacía leer `_wsToolStateGet` —el borrador local de la
-  // herramienta—, así que la tarjeta de un presupuesto podía enseñar las cifras del
-  // último presupuesto EDITADO, no las suyas. Dos documentos, una sola miniatura.
-  ok('6.5b la miniatura del documento la construye el owner de SUS datos',
-    /_wsProjPreviewHtml\(it\.proj\)/.test(app)
-    && /const r = p\.results \|\| \{\};/.test(fnSrc('_wsProjPreviewHtml'))
-    && !/_wsToolStateGet/.test(fnSrc('_wsProjPreviewHtml')));
+  // RE-DECIDIDO (§8), Y MÁS FUERTE. Esto exigía que la miniatura del documento
+  // se construyera desde SUS `results`, porque la versión anterior leía el
+  // borrador local de la herramienta y la tarjeta de un presupuesto podía
+  // enseñar las cifras del último presupuesto EDITADO. Ahora NO HAY miniatura de
+  // contenido: a 44 px un recorte de cifra se lee «25…», que es lo que el
+  // fundador fotografió. Es un icono semántico, así que el defecto es imposible
+  // por construcción y no depende de que nadie recuerde qué owner usar.
+  ok('6.5b la miniatura es un ICONO semántico, no un recorte del contenido',
+    /class="wsh-mse2-ic2"/.test(app)
+    && /_wsCapIconHtml\(_wsSurfaceIcon\(it\.cat\)\)/.test(app)
+    && !/_wsProjPreviewHtml/.test(app.replace(/^\s*\/\/.*$/gm, '')));
   ok('6.5c y la miniatura es una ilustración: no la dicta un lector de pantalla',
     /class="wsh-mse2-pv" aria-hidden="true"/.test(app));
   ok('6.6 el favorito y el documento NO se fusionan',

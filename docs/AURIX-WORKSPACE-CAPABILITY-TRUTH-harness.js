@@ -40,7 +40,7 @@ function ctx(lang) {
                console: { warn(){}, log(){} } };
   vm.createContext(sb);
   sb.lang = lang || 'es';
-  ['_WSBUD_INCOME','_WSBUD_EXPENSES'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
+  ['_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_NON_NUMERIC_INPUT_KEYS'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
   ['_wsNum','_wsCanonicalNumStr','_wsNumInLang','_wsCanonicalizeInputs','_wsNumOrNull','_wsJrnPct','calculateLoan',
    'calculateRealEstatePortfolio','calculateMonthlyBudget','calculateAssetPrices','calculateTradeJournal']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
@@ -406,6 +406,7 @@ console.log('\n8 · Regresión de la revisión financiera:');
       const sb = { Math, Number, String, Object, Array, JSON, isFinite, isNaN, parseFloat, console: { warn(){} } };
       vm.createContext(sb);
       vm.runInContext('var lang = "es";', sb);
+      vm.runInContext(konstSrc('_WS_NON_NUMERIC_INPUT_KEYS'), sb);
       ['_wsNum', '_wsCanonicalNumStr', '_wsNumInLang', '_wsCanonicalizeInputs'].forEach(n => vm.runInContext(fnSrc(n), sb));
       const out = vm.runInContext('_wsCanonicalizeInputs(' + JSON.stringify({
         claro: '250000', coma: '3,5', mixto: '1.234,56', ambiguo: '250.000',
@@ -426,8 +427,16 @@ console.log('\n8 · Regresión de la revisión financiera:');
     /saveRate: r\.saveRate == null \? null : Math\.round\(r\.saveRate\)/.test(app));
   ok('8.16 la etiqueta de cobros dice «no aplicable», no «0%»',
     /r\.porcentajeCobrado == null \? t\('wstool_bud_na'\)/.test(app));
-  ok('8.17 y el mejor activo no se publica como «+null%»',
-    /\(r\.bestName && r\.bestPct != null\)/.test(app));
+  // RE-DECIDIDO (§8 del SPEC de edición/guardado). El guard vivía dentro de
+  // `_wsProjPreviewHtml`, la miniatura que pintaba el CONTENIDO del documento en
+  // 44 px — y que se retiró porque a ese tamaño un recorte de cifra se lee
+  // «25…». Sin esa superficie, «+null%» ya no tiene dónde aparecer. Lo que sí
+  // sigue importando, y es la raíz, es que el documento GUARDE `null` y no un
+  // cero cuando la rentabilidad no es calculable.
+  ok('8.17 el mejor activo se PERSISTE como null, no como un 0 inventado',
+    /bestPct: \(r\.best && r\.best\.returnPct != null\) \? Math\.round\(r\.best\.returnPct\) : null/.test(app));
+  ok('8.17b y ninguna superficie pinta `bestPct` en crudo',
+    !/\$\{[^}]*bestPct[^}]*\}/.test(app));
 
   // ── [medio] `null` NO COMPITE EN UNA COMPARACIÓN ──────────────────────────
   const AP = rows => run('calculateAssetPrices(' + JSON.stringify(rows) + ')');
