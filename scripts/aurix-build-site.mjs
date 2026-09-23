@@ -31,6 +31,11 @@ const out = isAbsolute(_outArg) ? _outArg : join(root, _outArg);
 // Lo que el sitio necesita, y nada más. Un fichero que no esté aquí NO se publica.
 const FILES = [
   'index.html', 'login.html', 'reset.html', 'reset-password.html',
+  // Páginas PÚBLICAS de soporte y legales. Tienen que poder abrirse sin sesión
+  // —Stripe exige URLs públicas de soporte y condiciones—, así que entran en la
+  // allowlist explícitamente. Si faltaran aquí, el enlace desde la app resolvería
+  // a 404 y este mismo script lo detectaría antes de publicar.
+  'support.html', 'privacy.html', 'terms.html', 'legal.css', 'legal.js',
   'app.js', 'styles.css', 'config.js', 'aurora-bg.js', 'orb.js',
   'version.json', 'manifest.webmanifest', '.nojekyll',
   'icon.svg', 'icon-maskable.svg', 'apple-touch-icon.png',

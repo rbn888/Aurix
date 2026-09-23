@@ -106,7 +106,7 @@
       'modal.title': 'Solicita acceso privado.',
       'modal.sub': 'Déjanos tus datos y contactaremos con usuarios seleccionados.',
       'footer.tag': 'Plataforma de inteligencia patrimonial',
-      'footer.product': 'Plataforma', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.social': 'Social',
+      'footer.product': 'Plataforma', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.support': 'Soporte', 'footer.social': 'Social',
       'footer.desc': 'Aurix es una plataforma de inteligencia patrimonial diseñada para ayudar a las personas a centralizar su patrimonio, entender su evolución y ganar claridad sobre su futuro financiero.',
 
       'pos.eyebrow': 'Plataforma de inteligencia patrimonial',
@@ -211,7 +211,7 @@
       'modal.title': 'Request private access.',
       'modal.sub': 'Leave your details and we’ll contact selected users.',
       'footer.tag': 'Wealth Intelligence Platform',
-      'footer.product': 'Platform', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.social': 'Social',
+      'footer.product': 'Platform', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.support': 'Support', 'footer.social': 'Social',
       'footer.desc': 'Aurix is a Wealth Intelligence Platform designed to help people centralize their wealth, understand its evolution and gain clarity over their financial future.',
 
       'pos.eyebrow': 'Wealth Intelligence Platform',
@@ -296,6 +296,9 @@
 
     // Keep "Enter Aurix" links carrying the active language across origins.
     updateAppLinks();
+    // Y lo mismo con las legales: viven en el dominio de la app, así que sin
+    // `?lang=` un lector en inglés abriría Privacidad en español.
+    updateLegalLinks();
     // Re-render the launch countdown copy in the active language.
     if (typeof applyLaunchGate === 'function') applyLaunchGate();
   }
@@ -441,6 +444,18 @@
   function updateAppLinks() {
     var links = document.querySelectorAll('[data-app-link]');
     for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlForLang());
+  }
+  // Soporte y legales: páginas PÚBLICAS servidas por el dominio de la app. El
+  // idioma viaja en `?lang=` (elección explícita, no una pista): quien está
+  // leyendo la landing en inglés no debe aterrizar en un texto legal en español.
+  var LEGAL_URLS = { privacy: 'privacy.html', terms: 'terms.html', support: 'support.html' };
+  function updateLegalLinks() {
+    var v = (lang === 'en' ? 'en' : 'es');
+    var links = document.querySelectorAll('[data-legal-link]');
+    for (var i = 0; i < links.length; i++) {
+      var page = LEGAL_URLS[links[i].getAttribute('data-legal-link')];
+      if (page) links[i].setAttribute('href', APP_URL + page + '?lang=' + v);
+    }
   }
 
   /* ── Init ───────────────────────────────────────────── */

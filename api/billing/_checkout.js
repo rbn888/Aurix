@@ -171,6 +171,57 @@ export default async function handler(req, res) {
     headers: { Authorization: `Bearer ${STRIPE_KEY}`, 'Stripe-Version': STRIPE_API_VERSION },
   });
 
+  // ── 2b · LO QUE SE MUESTRA ES LO QUE SE COBRA, O NO SE COBRA ─────────────
+  // Hasta aquí el catálogo propio decidía DOS cosas que nadie contrastaba entre
+  // sí: el importe que el paywall PINTA (`amount_cents`) y el precio que Stripe
+  // COBRA (`provider_price_id`). Son dos columnas de la misma fila y nada las
+  // ataba: basta con cambiar el importe y olvidar el id —o al revés, reapuntar
+  // el id a otro precio— para que la pantalla diga 69,99 € y el cargo sea otro.
+  // No es hipotético: este SPEC cambia el precio anual y los dos valores viajan
+  // por caminos distintos (una migración de BD y un precio creado en Stripe).
+  //
+  // Así que antes de abrir una sesión se lee el precio EN EL PROVEEDOR y se
+  // contrasta importe, divisa, recurrencia, que esté activo y que su modo
+  // coincida con la clave. Cualquier discrepancia FALLA CERRADO: no se crea
+  // sesión, no se cobra, y el motivo queda en el log del servidor. Cobrar de más
+  // es peor que no cobrar, y cobrar algo distinto de lo anunciado no es una
+  // incidencia técnica.
+  //
+  // Coste: un GET de sólo lectura por intento de compra. Es el precio de no
+  // tener que confiar en que dos sistemas se hayan actualizado a la vez.
+  {
+    const wantCents = Number(price.amount_cents);
+    const wantCur   = String(price.currency || '').toLowerCase();
+    let sp = null, spStatus = 0;
+    try {
+      const r = await stripeGet('/prices/' + encodeURIComponent(price.provider_price_id));
+      spStatus = r.status;
+      sp = await r.json().catch(() => null);
+      if (!r.ok || !sp || !sp.id) sp = null;
+    } catch (_) { sp = null; }
+    // No poder comprobarlo NO es poder cobrarlo: sin lectura del proveedor no se
+    // abre la sesión. Es el mismo criterio que el guard anti-doble-cargo.
+    if (!sp) {
+      console.error('[billing/checkout] price verify unreadable', interval, spStatus);
+      return res.status(503).json({ ok: false, error: 'price_verification_unavailable' });
+    }
+    const rec = sp.recurring || {};
+    const mismatch = [];
+    if (Number(sp.unit_amount) !== wantCents) mismatch.push('amount');
+    if (String(sp.currency || '').toLowerCase() !== wantCur) mismatch.push('currency');
+    if (rec.interval !== interval || (Number(rec.interval_count) || 1) !== 1) mismatch.push('recurrence');
+    if (sp.active !== true) mismatch.push('inactive');
+    // Un precio de TEST con una clave LIVE (o al revés) no es un desajuste de
+    // importe, es un desajuste de ENTORNO, y la mezcla de entornos es justo lo
+    // que el cutover tiene que impedir.
+    if (sp.livemode !== /^(sk|rk)_live_/.test(STRIPE_KEY)) mismatch.push('mode');
+    if (mismatch.length) {
+      console.error('[billing/checkout] price mismatch', interval, mismatch.join(','),
+        'db=' + wantCents + wantCur, 'stripe=' + sp.unit_amount + String(sp.currency || ''));
+      return res.status(409).json({ ok: false, error: 'price_mismatch', fields: mismatch });
+    }
+  }
+
   // ── 3 · CUSTOMER. Reuse before create, and link server-side. ─────────────
   let customerId = null;
   try {

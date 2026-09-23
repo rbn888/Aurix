@@ -103,8 +103,16 @@ ok('5.3 no se introdujo backend, programación ni envío de notificaciones',
 // asunto y cuerpo precargados en español, que es texto de producto sin traducir dentro de
 // un enlace; y prerrellenar el correo del usuario no es decisión del producto.
 const mailtos = [...html.matchAll(/mailto:[^"']*/g)].map(m => m[0]);
+// CORREGIDO (2026-09-23): este assert fijaba `aurixsystemoficial@` —con UNA efe—
+// porque es lo que había en el HTML el día que se escribió. La dirección real es
+// `aurixsystemofficial@`, así que el gate llevaba meses certificando que el
+// soporte apuntaba a un buzón que no existe. Es la lección de siempre: un gate
+// que copia lo que hay no comprueba nada, fosiliza el defecto. Ahora la
+// dirección se escribe partida para que un copiar-pegar no vuelva a arrastrar
+// la errata sin que nadie la lea.
+const SUPPORT_MAIL = 'mailto:' + ['aurixsystem', 'official', '@gmail.com'].join('');
 ok('5.4 Ayuda usa EXACTAMENTE el correo indicado y NADA más',
-   mailtos.length === 1 && mailtos[0] === 'mailto:aurixsystemoficial@gmail.com', mailtos.join(' | '));
+   mailtos.length === 1 && mailtos[0] === SUPPORT_MAIL, mailtos.join(' | '));
 ok('5.5 el mailto no precarga asunto ni cuerpo (ni texto en ningún idioma)',
    !/mailto:[^"']*[?&](subject|body)=/i.test(html) &&
    !/Soporte%20Aurix|equipo%20de%20Aurix|Necesito%20ayuda/i.test(html));

@@ -363,9 +363,15 @@
         </div>
         <div class="footer-col">
           <h4 data-i18n="footer.legal">Legal</h4>
-          <!-- TODO(AURIX-LANDING): real legal pages pending — disabled, no dead links. -->
-          <span class="is-disabled" aria-disabled="true" data-i18n="footer.privacy" data-todo="legal-privacy">Privacy</span>
-          <span class="is-disabled" aria-disabled="true" data-i18n="footer.terms" data-todo="legal-terms">Terms</span>
+          <!-- M.04 · las páginas legales YA EXISTEN y son públicas. Viven en el
+               dominio de la app (GitHub Pages las publica; la landing la sirve
+               Vercel), así que el enlace es absoluto a propósito. El idioma
+               activo viaja en `?lang=` para no cambiar de idioma a mitad de
+               lectura: lo reescribe `updateLegalLinks()` en cada `applyLang()`,
+               igual que ya se hace con los CTA de la app. -->
+          <a href="https://app.aurixsystem.io/privacy.html" data-legal-link="privacy" data-i18n="footer.privacy">Privacy</a>
+          <a href="https://app.aurixsystem.io/terms.html" data-legal-link="terms" data-i18n="footer.terms">Terms</a>
+          <a href="https://app.aurixsystem.io/support.html" data-legal-link="support" data-i18n="footer.support">Support</a>
         </div>
         <!-- AURIX-WEBSITE-MESSAGING-1: Social column. All four channels live,
              open in a new tab with rel="noopener noreferrer". -->

@@ -24,6 +24,7 @@ const WH   = read('api/billing/webhook.mjs');
 const CO   = read('api/billing/_checkout.js');
 const PO   = read('api/billing/_portal.js');
 const DISP = read('api/billing/[op].js');
+const ST   = read('api/billing/_status.js');
 
 let pass = 0, fail = 0; const failed = [];
 function ok(n, c, info) {
@@ -328,8 +329,26 @@ console.log('\nD · checkout · identidad y precio de record');
       }
       if (u.includes('/billing_prices')) {
         return { ok: true, status: 200, json: async () => (opts.prices !== undefined ? opts.prices
-          : [{ provider_price_id: 'price_annual_real', amount_cents: 5999, currency: 'EUR',
+          : [{ provider_price_id: 'price_annual_real', amount_cents: 6999, currency: 'EUR',
                trial_days: 0, billing_interval: 'year' }]) };
+      }
+      // ── EL PRECIO EN EL PROVEEDOR (2b) ──────────────────────────────────
+      // El checkout lee el precio en Stripe antes de abrir sesión, así que el
+      // doble del proveedor tiene que servirlo. Por defecto coincide con el
+      // catálogo; cada caso de desajuste lo altera a propósito.
+      if (/api\.stripe\.com\/v1\/prices\//.test(u)) {
+        if (opts.stripePrice === null) return { ok: false, status: 404, json: async () => ({ error: { code: 'resource_missing' } }) };
+        if (opts.stripePrice === 'throw') throw new Error('network');
+        // El doble coherente se DERIVA de la fila del catálogo que este mismo
+        // fixture acaba de servir: así el caso normal no puede quedar verde por
+        // una coincidencia de constantes, y el desajuste hay que pedirlo.
+        const row = (opts.prices !== undefined ? opts.prices : [{ provider_price_id: 'price_annual_real',
+          amount_cents: 6999, currency: 'EUR', trial_days: 0, billing_interval: 'year' }])[0] || {};
+        return { ok: true, status: 200, json: async () => Object.assign({
+          id: row.provider_price_id, active: true, livemode: false,
+          unit_amount: Number(row.amount_cents), currency: String(row.currency || '').toLowerCase(),
+          recurring: { interval: row.billing_interval, interval_count: 1 },
+        }, opts.stripePrice || {}) };
       }
       if (u.includes('/billing_customers')) {
         // El DESENLACE de un mapeo obsoleto es un DELETE acotado por usuario.
@@ -537,10 +556,59 @@ console.log('\nD · checkout · identidad y precio de record');
       return !b.includes('trial_period_days') && /Number\(price\.trial_days\)/.test(CO)
         && !/trial_period_days: 14|trial_days = 14/.test(CO); })());
   const withTrial = await callCheckout({ prices: [{ provider_price_id: 'price_annual_real',
-    amount_cents: 5999, currency: 'EUR', trial_days: 14, billing_interval: 'year' }] });
+    amount_cents: 6999, currency: 'EUR', trial_days: 14, billing_interval: 'year' }] });
   ok('D.16 …y con 14 días en el catálogo, el trial viaja al proveedor',
     decodeBody(withTrial.calls.find(c => c.url.includes('checkout/sessions')).init.body)
       .includes('subscription_data[trial_period_days]=14'));
+  // ══ LO QUE SE MUESTRA ES LO QUE SE COBRA, O NO SE COBRA ════════════════
+  // El catálogo decide DOS cosas que hasta ahora nadie contrastaba entre sí: el
+  // importe que el paywall PINTA y el precio que Stripe COBRA. Son dos columnas
+  // de la misma fila y basta con que una se actualice sin la otra —justo lo que
+  // pasa al cambiar de precio, porque los dos valores viajan por caminos
+  // distintos— para que la pantalla anuncie un importe y el cargo sea otro.
+  // Estos asserts fijan que ningún desajuste llega a cobrar.
+  const badAmount = await callCheckout({ stripePrice: { unit_amount: 5999 } });
+  ok('D.25 si Stripe cobraría OTRO importe, no se abre sesión (409, y cero sesiones)',
+    badAmount.res.code === 409 && badAmount.res.payload.error === 'price_mismatch' &&
+    badAmount.res.payload.fields.includes('amount') &&
+    !badAmount.calls.some(c => c.url.includes('checkout/sessions')),
+    JSON.stringify(badAmount.res.payload));
+  const badCur = await callCheckout({ stripePrice: { currency: 'usd' } });
+  ok('D.26 una divisa distinta de la anunciada tampoco se cobra',
+    badCur.res.code === 409 && badCur.res.payload.fields.includes('currency') &&
+    !badCur.calls.some(c => c.url.includes('checkout/sessions')));
+  const badRec = await callCheckout({ stripePrice: { recurring: { interval: 'month', interval_count: 1 } } });
+  ok('D.27 un precio ANUAL que en Stripe es mensual se rechaza (o se cobraría 12 veces)',
+    badRec.res.code === 409 && badRec.res.payload.fields.includes('recurrence'));
+  const inactive = await callCheckout({ stripePrice: { active: false } });
+  ok('D.28 un precio archivado en Stripe no se vende',
+    inactive.res.code === 409 && inactive.res.payload.fields.includes('inactive'));
+  // El desajuste de ENTORNO es el que este cutover tiene que impedir: un precio
+  // de TEST con una clave LIVE no falla al configurarlo, falla al cobrar.
+  const badMode = await callCheckout({ env: { STRIPE_SECRET_KEY: 'sk_live_x' },
+    stripePrice: { livemode: false } });
+  ok('D.29 un precio de TEST con una clave LIVE es un desajuste de entorno, no un detalle',
+    badMode.res.code === 409 && badMode.res.payload.fields.includes('mode'));
+  const unreadable = await callCheckout({ stripePrice: null });
+  ok('D.30 no poder comprobar el precio NO es poder cobrarlo: 503 y cero sesiones',
+    unreadable.res.code === 503 &&
+    unreadable.res.payload.error === 'price_verification_unavailable' &&
+    !unreadable.calls.some(c => c.url.includes('checkout/sessions')));
+  const throwing = await callCheckout({ stripePrice: 'throw' });
+  ok('D.31 …y un fallo de red en esa comprobación se trata igual, no se ignora',
+    throwing.res.code === 503 && throwing.res.payload.error === 'price_verification_unavailable');
+  // Y se comprueba ANTES de crear cliente: un desajuste no debe dejar rastro en
+  // el proveedor ni en nuestro mapeo.
+  ok('D.32 el desajuste se detecta antes de crear cliente: no se escribe nada en el proveedor',
+    !badAmount.calls.some(c => c.url.includes('api.stripe.com/v1/customers') &&
+      ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST') &&
+    !badAmount.calls.some(c => c.url.includes('rpc/aurix_billing_link_customer')));
+  // El importe aprobado que el diagnóstico contrasta es el VIGENTE, y el anterior
+  // no sobrevive en ninguna ruta activa.
+  ok('D.33 el precio anual aprobado es 69,99 € y 59,99 € no queda en ninguna ruta activa',
+    /amount_cents: 6999/.test(ST) && !/5999/.test(ST) && !/5999/.test(CO),
+    (ST.match(/amount_cents: \d+/g) || []).join(' '));
+
   // Un rechazo del proveedor era OPACO: mismo cuerpo para "falló crear el
   // customer" y "falló crear la sesión", así que la causa sólo vivía en los logs
   // de la plataforma. Ahora se publica DÓNDE falló y el código PÚBLICO de Stripe,
@@ -575,6 +643,85 @@ console.log('\nD · checkout · identidad y precio de record');
     /billing_customers[\s\S]{0,120}user_id=eq\.\$\{user\.id\}/.test(PO) &&
     /if \(!customerId\) return res\.status\(404\)/.test(PO) &&
     !/req\.body[\s\S]{0,40}customer/.test(PO));
+}
+
+// ══ P · EL PORTAL: CAMBIAR DE PLAN, CANCELAR Y LOS CAMBIOS DIFERIDOS ══════
+// El portal de Stripe es una superficie que NO controlamos y que puede cambiar
+// la suscripción por su cuenta: mensual↔anual, cancelar a fin de periodo y
+// —si está configurado así— programar el cambio para más adelante con un
+// `subscription_schedule`. La pregunta que hay que responder con pruebas no es
+// «¿funciona el portal?» sino «¿qué hace Aurix cuando el portal ya ha actuado?».
+console.log('\nP · portal · cambio de plan, cancelación y cambios diferidos');
+{
+  // 1 · CAMBIO DE PLAN. Llega como `customer.subscription.updated` con OTRO
+  // precio; lo que el webhook manda a la base es el precio NUEVO, no el de la
+  // compra original. Si mandara el viejo, un usuario que pasa a anual seguiría
+  // figurando como mensual y su periodo de validez sería el equivocado.
+  const swap = await callWebhook(SUB_EVENT({ id: 'evt_swap', object: {
+    items: { data: [{ price: { id: 'price_monthly_real' } }] },
+    current_period_end: 1790000000 } }));
+  const swapBody = (swap.calls[0] || {}).body || {};
+  ok('P.1 un cambio de plan en el portal viaja con el precio NUEVO y su nuevo periodo',
+    swap.status === 200 && swapBody.p_price_id === 'price_monthly_real' &&
+    swapBody.p_event_type === 'customer.subscription.updated' &&
+    /1790000000|2026|2027/.test(String(swapBody.p_current_period_end)),
+    JSON.stringify({ price: swapBody.p_price_id, end: swapBody.p_current_period_end }));
+
+  // 2 · CANCELACIÓN A FIN DE PERIODO. Es lo que el portal hace por defecto, y es
+  // la promesa comercial: «cancelas y conservas hasta que acabe lo pagado».
+  const cancelAtEnd = await callWebhook(SUB_EVENT({ id: 'evt_cae', object: {
+    status: 'active', cancel_at_period_end: true } }));
+  const caeBody = (cancelAtEnd.calls[0] || {}).body || {};
+  ok('P.2 cancelar a fin de periodo se transmite como tal, con el estado AÚN activo',
+    cancelAtEnd.status === 200 && caeBody.p_cancel_at_period_end === true &&
+    caeBody.p_status === 'active', JSON.stringify(caeBody.p_status + '/' + caeBody.p_cancel_at_period_end));
+  // Y el escritor no lo usa para degradar: la bandera se GUARDA, pero el plan lo
+  // decide el `status`. Si `cancel_at_period_end` degradara, cancelar el día 2 de
+  // un anual quitaría Premium once meses antes de tiempo.
+  ok('P.3 …y el escritor no degrada por esa bandera: el plan lo decide el estado',
+    /cancel_at_period_end\s*=\s*excluded\.cancel_at_period_end/.test(SQL) &&
+    !/if\s+.{0,40}p_cancel_at_period_end[\s\S]{0,200}v_plan\s*:=\s*'free'/.test(SQL));
+  // La baja EFECTIVA sí degrada, y llega por su propio evento.
+  const deleted = await callWebhook(SUB_EVENT({ id: 'evt_del', type: 'customer.subscription.deleted' }));
+  ok('P.4 la baja efectiva llega por `deleted` y se transmite como cancelada',
+    deleted.status === 200 && ((deleted.calls[0] || {}).body || {}).p_status === 'canceled');
+
+  // 3 · CAMBIOS DIFERIDOS (subscription schedules). Aurix NO escucha
+  // `subscription_schedule.*` — y no debe empezar a hacerlo a ciegas: un cambio
+  // PROGRAMADO todavía no ha ocurrido, así que aplicarlo al recibirlo sería
+  // ADELANTAR el plan. Lo que importa es que el evento se ignore de forma
+  // REGISTRADA (no silenciosa) y que el cambio llegue cuando de verdad ocurre,
+  // por el `customer.subscription.updated` de la transición.
+  const sched = await callWebhook(SUB_EVENT({ id: 'evt_sched', type: 'subscription_schedule.updated' }));
+  ok('P.5 un cambio PROGRAMADO no se aplica al anunciarse: se ignora y queda registrado',
+    sched.status === 200 && sched.json && sched.json.outcome === 'ignored_type' &&
+    sched.calls.length === 1 && /aurix_billing_record_ignored|p_status.*ignored|ignored/.test(JSON.stringify(sched.calls[0].body)),
+    JSON.stringify({ outcome: sched.json && sched.json.outcome, calls: sched.calls.length }));
+
+  // 4 · AURIX NO PISA LO QUE EL PORTAL CREA. La única forma de sobrescribir un
+  // schedule del portal sería que Aurix escribiera suscripciones o schedules en
+  // el proveedor. No lo hace por ninguna ruta: sólo crea sesiones de checkout,
+  // sesiones de portal y clientes. Esto es estructural, así que se fija leyendo
+  // TODO el código de billing en vez de probar un caso.
+  const BILLING_SRC = CO + PO + ST;
+  ok('P.6 Aurix nunca escribe suscripciones ni schedules en el proveedor (no puede pisar al portal)',
+    !/method:\s*'POST'[\s\S]{0,400}\/v1\/subscriptions|stripe\('\/subscriptions/.test(BILLING_SRC) &&
+    !/subscription_schedules/.test(BILLING_SRC) &&
+    !/\/v1\/subscriptions\/[^'"`]*['"`],\s*\{/.test(BILLING_SRC),
+    'rutas de escritura encontradas en el código de billing');
+  // Lo único que Aurix LEE de suscripciones es la comprobación anti-doble-cargo.
+  ok('P.7 …y lo único que lee de suscripciones es el guard anti-doble-cargo, con GET',
+    (() => { const m = CO.match(/stripeGet\(`?\/subscriptions[^)]*\)/g) || [];
+      return m.length >= 1 && !/\bstripe\(`?'?\/subscriptions/.test(CO); })(),
+    (CO.match(/stripeGet\(`?\/subscriptions[^)]*\)/g) || []).join(' '));
+  // El portal es de SÓLO IDA: abre la sesión y nada más. No escribe estado.
+  // Se mira el CÓDIGO, no los comentarios: la cabecera de `_portal.js` explica
+  // precisamente que el webhook es quien escribe `subscriptions`, y una búsqueda
+  // ingenua confundiría esa frase con una escritura.
+  const PO_CODE = noComments(PO);
+  ok('P.8 abrir el portal no escribe estado comercial en ningún sitio',
+    !/billing_prices|rest\/v1\/subscriptions|aurix_billing_apply_event|entitlement/i.test(PO_CODE) &&
+    /billing_portal\/sessions/.test(PO_CODE));
 }
 
 // ══ E · SQL: EL ESCRITOR ÚNICO ════════════════════════════════════════════
@@ -651,8 +798,13 @@ console.log('\nE · SQL · escritor único, idempotente y cerrado');
     !/create or replace function public\.aurix_entitlements/.test(SQL) &&
     !/alter table public\.subscriptions/.test(SQL) &&
     !/drop (table|function) if exists public\.(subscriptions|plan_features|entitlement_overrides|aurix_entitlements)/.test(SQL));
-  ok('E.17 el importe canónico es el del producto (7,99 / 59,99) y en céntimos',
-    /799, 'EUR'/.test(SQL) && /5999, 'EUR'/.test(SQL));
+  // RE-DECIDIDO (2026-09-23): el anual pasa de 59,99 € a 69,99 €. Lo que el assert
+  // protege no es la cifra por la cifra, sino que el importe canónico viva EN
+  // CÉNTIMOS y EN EUR dentro del SQL que siembra el catálogo — la alternativa
+  // (leerlo de Stripe) es justo la que permite que la pantalla y el cargo no
+  // coincidan. Se mueve el importe, no el contrato.
+  ok('E.17 el importe canónico es el del producto (7,99 / 69,99) y en céntimos',
+    /799, 'EUR'/.test(SQL) && /6999, 'EUR'/.test(SQL));
   ok('E.18 y no aparece ningún precio legacy en el bloque comercial',
     !/1499|3900|5900\b/.test(SQL));
 }
@@ -758,7 +910,9 @@ console.log('\nF2 · el paywall renderizado (cinco estados)');
   `, sb);
   const run = (e) => vm.runInContext(e, sb);
   const nb = (x) => String(x).replace(/\u00a0|\u202f/g, ' ');
-  const REAL = "[{billing_interval:'year',amount_cents:5999,currency:'EUR',trial_days:0}," +
+  // 2026-09-23 · el anual es 69,99 € (6999). El fixture usa el importe VIGENTE
+  // para que el paywall se pruebe con el precio que se va a cobrar.
+  const REAL = "[{billing_interval:'year',amount_cents:6999,currency:'EUR',trial_days:0}," +
                "{billing_interval:'month',amount_cents:799,currency:'EUR',trial_days:0}]";
 
   const empty = run('_buildHtml()');
@@ -770,14 +924,18 @@ console.log('\nF2 · el paywall renderizado (cinco estados)');
   const full = run('_buildHtml()');
   const amounts = [...full.matchAll(/price-amount">([^<]+)</g)].map(m => nb(m[1]));
   const order   = [...full.matchAll(/data-premium-buy="(\w+)"/g)].map(m => m[1]);
-  ok('F2.2 los importes que se muestran son 7,99 € y 59,99 €, en EUR y sin convertir',
-    amounts.length === 2 && amounts.includes('59,99 €') && amounts.includes('7,99 €'),
+  ok('F2.2 los importes que se muestran son 7,99 € y 69,99 €, en EUR y sin convertir',
+    amounts.length === 2 && amounts.includes('69,99 €') && amounts.includes('7,99 €'),
     JSON.stringify(amounts));
   ok('F2.3 ANUAL PRIMERO en el DOM y destacada',
-    order.join(',') === 'year,month' && /is-featured[\s\S]{0,400}59,99/.test(full),
+    order.join(',') === 'year,month' && /is-featured[\s\S]{0,400}69,99/.test(full),
     order.join(','));
-  ok('F2.4 el ahorro anual es el REAL (59,99 vs 12×7,99 = 37 %), no un porcentaje inventado',
-    /Equivale a 5,00 € al mes · ahorras un 37%/.test(nb(full)),
+  // El porcentaje se DERIVA de los dos importes del catálogo, así que cambiar el
+  // precio lo cambia solo: 69,99 frente a 12×7,99 = 95,88 son 27 %, y 5,83 €/mes.
+  // Si esto se hubiera escrito a mano en el copy, el paywall estaría anunciando
+  // hoy un 37 % que ya no existe.
+  ok('F2.4 el ahorro anual es el REAL (69,99 vs 12×7,99 = 27 %), no un porcentaje inventado',
+    /Equivale a 5,83 € al mes · ahorras un 27%/.test(nb(full)),
     (full.match(/Equivale a [^<]+/) || ['(sin nota)'])[0]);
   ok('F2.5 sin trial en el catálogo, el paywall no promete prueba',
     !/d[íi]as de prueba/.test(full));

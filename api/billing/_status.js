@@ -42,10 +42,14 @@ const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || '2024-06-20';
 // ── LOS PRECIOS APROBADOS, ESCRITOS AQUÍ A PROPÓSITO ────────────────────────
 // Si este endpoint se limitara a repetir lo que dice la base de datos, no sería
 // una comprobación: sería un espejo. La decisión comercial del founder es 7,99 €
-// al mes y 59,99 € al año, así que se declara y se CONTRASTA. Cambiar el precio
+// al mes y 69,99 € al año, así que se declara y se CONTRASTA. Cambiar el precio
 // exige cambiar esta línea, que es justo la fricción que debe tener.
+// PRECIO ANUAL ACTUALIZADO (2026-09-23): 59,99 € → 69,99 €. Mientras la BD siga
+// con el importe anterior, este endpoint devolverá `amount_not_approved:year` y
+// `ready_for_live:false` — que es exactamente lo que debe hacer hasta que el
+// corte LIVE se ejecute.
 const APPROVED = Object.freeze({
-  year:  { amount_cents: 5999, currency: 'eur' },
+  year:  { amount_cents: 6999, currency: 'eur' },
   month: { amount_cents: 799,  currency: 'eur' },
 });
 // Anual primero, igual que el paywall.

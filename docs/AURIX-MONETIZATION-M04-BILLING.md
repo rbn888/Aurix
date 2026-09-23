@@ -41,7 +41,7 @@ Una sola fuente: `public.billing_prices`. Ni el bundle ni el paywall llevan impo
 | Plan | Importe | Intervalo |
 |---|---|---|
 | Aurix Premium mensual | **7,99 €** (`799`, EUR) | `month` |
-| Aurix Premium anual | **59,99 €** (`5999`, EUR) | `year` |
+| Aurix Premium anual | **69,99 €** (`6999`, EUR) | `year` |  ← 2026-09-23; antes 59,99 € (`5999`)
 
 Trial de 14 días: **modelado y compatible** con Stripe (`subscription_data.trial_period_days`),
 y **apagado** (`trial_days = 0`). Se enciende con un UPDATE en la tabla, sin deploy.
@@ -61,7 +61,7 @@ y **apagado** (`trial_days = 0`). Se enciende con un UPDATE en la tabla, sin dep
    El gate lo fija (J.6).
 
 1. **Stripe → Productos.** Crear un producto "Aurix Premium" con **dos precios
-   recurrentes**: 7,99 € / mes y 59,99 € / año, ambos en EUR. Copiar los dos
+   recurrentes**: 7,99 € / mes y 69,99 € / año, ambos en EUR. Copiar los dos
    `price_…`.
 2. **Supabase → SQL editor.** Pegar y ejecutar `db/monetization_m04_billing_stripe_1.sql`
    completo. Después, descomentar los dos INSERT del final del fichero, pegar los dos

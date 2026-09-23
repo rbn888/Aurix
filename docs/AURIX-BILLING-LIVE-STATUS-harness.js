@@ -72,11 +72,11 @@ function run(opts) {
 }
 
 const LIVE_ROWS = [
-  { billing_interval: 'year',  provider_price_id: 'price_live_year',  amount_cents: 5999, currency: 'eur', trial_days: 0, active: true },
+  { billing_interval: 'year',  provider_price_id: 'price_live_year',  amount_cents: 6999, currency: 'eur', trial_days: 0, active: true },
   { billing_interval: 'month', provider_price_id: 'price_live_month', amount_cents: 799,  currency: 'eur', trial_days: 0, active: true },
 ];
 const LIVE_PRICES = {
-  price_live_year:  { id: 'price_live_year',  livemode: true, active: true, unit_amount: 5999, currency: 'eur', recurring: { interval: 'year',  interval_count: 1 }, product: 'prod_x' },
+  price_live_year:  { id: 'price_live_year',  livemode: true, active: true, unit_amount: 6999, currency: 'eur', recurring: { interval: 'year',  interval_count: 1 }, product: 'prod_x' },
   price_live_month: { id: 'price_live_month', livemode: true, active: true, unit_amount: 799,  currency: 'eur', recurring: { interval: 'month', interval_count: 1 }, product: 'prod_x' },
 };
 
@@ -229,11 +229,11 @@ console.log('\n4 · Los bloqueos, uno a uno:');
 // ══════════════════════════════════════════════════════════════════════════
 // 5 · LOS IMPORTES APROBADOS ESTÁN ESCRITOS, NO ESPEJADOS
 // ══════════════════════════════════════════════════════════════════════════
-console.log('\n5 · 7,99 €/mes y 59,99 €/año, y anual primero:');
+console.log('\n5 · 7,99 €/mes y 69,99 €/año, y anual primero:');
 {
   const r = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES });
   ok('5.1 el endpoint declara los importes aprobados y los contrasta',
-    r.body.approved.year.amount_cents === 5999 && r.body.approved.month.amount_cents === 799
+    r.body.approved.year.amount_cents === 6999 && r.body.approved.month.amount_cents === 799
     && r.body.approved.year.currency === 'eur' && r.body.approved.month.currency === 'eur');
   ok('5.2 el anual se publica primero, igual que en el paywall',
     r.body.catalogue[0].interval === 'year' && r.body.catalogue[1].interval === 'month');

@@ -1,6 +1,12 @@
 -- ============================================================================
 -- AURIX · M.04 PRODUCCIÓN · PASO 5 — SEED de los dos precios Stripe TEST
 -- ----------------------------------------------------------------------------
+-- *** HISTÓRICO · SOLO ENTORNO TEST · NO USAR PARA LIVE (2026-09-23) ***
+-- El precio anual APROBADO pasó a 69,99 € (6999). Este fichero NO se actualiza a
+-- propósito: describe lo que se sembró en su día para los precios de Stripe TEST,
+-- que siguen siendo de 59,99 €. Reescribirlo haría que el seed mintiera sobre el
+-- entorno que describe. El catálogo LIVE lo escribe `db/billing_live_cutover_1.sql`,
+-- y ese sí lleva 6999.
 -- Los importes son la decisión de producto de M.04 (7,99 €/mes · 59,99 €/año).
 -- Esta tabla es el precio DE RECORD: no ajustar aquí para cuadrar con Stripe.
 -- Idempotente por PK (provider, provider_price_id). Fail-closed contra

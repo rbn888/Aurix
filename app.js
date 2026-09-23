@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '704'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '705'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4922,6 +4922,14 @@ const T = {
     acSoon:               'Próximamente',
     acContactSupport:     'Contactar con soporte',
     acContactSupportSub:  'Se abrirá tu cliente de correo. No se adjunta ningún dato.',
+    // M.04 · legales públicas. Se abren en una pestaña nueva y SIN sesión: son
+    // páginas estáticas propias, no una vista de la app.
+    acSupportPage:        'Centro de soporte',
+    acSupportPageSub:     'Cómo contactar, qué contarnos y tu suscripción.',
+    acPrivacy:            'Política de privacidad',
+    acPrivacySub:         'Qué datos trata Aurix y quién interviene.',
+    acTerms:              'Condiciones de servicio',
+    acTermsSub:           'Qué es Aurix, planes, renovación y cancelación.',
     // ACCOUNT-CENTER-I18N-1 — textos del Account Center que se pintan desde JS. Antes
     // vivían como ternarios `lang === 'es' ? … : …` dentro de _settingsPopulate, es decir
     // un segundo diccionario paralelo que applyI18n() no podía alcanzar: con la tarjeta
@@ -7965,6 +7973,12 @@ const T = {
     acSoon:               'Coming soon',
     acContactSupport:     'Contact support',
     acContactSupportSub:  'Opens your email client. No data is attached.',
+    acSupportPage:        'Support centre',
+    acSupportPageSub:     'How to reach us, what to tell us, and your subscription.',
+    acPrivacy:            'Privacy policy',
+    acPrivacySub:         'What data Aurix handles and who is involved.',
+    acTerms:              'Terms of service',
+    acTermsSub:           'What Aurix is, plans, renewal and cancellation.',
     // ACCOUNT-CENTER-I18N-1 — see the ES block: these were inline `lang === 'es'`
     // ternaries inside _settingsPopulate (a parallel dictionary applyI18n could not
     // reach), so the open card kept Status/Email/plan in the previous language.

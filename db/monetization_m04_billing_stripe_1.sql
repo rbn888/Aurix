@@ -853,7 +853,7 @@ commit;
 --   (provider, provider_price_id, plan, billing_interval, amount_cents, currency, trial_days, active)
 -- values
 --   ('stripe', 'price_XXXXXXXXXXXXMONTHLY', 'premium', 'month',  799, 'EUR', 0, true),
---   ('stripe', 'price_XXXXXXXXXXXXANNUAL',  'premium', 'year',  5999, 'EUR', 0, true)
+--   ('stripe', 'price_XXXXXXXXXXXXANNUAL',  'premium', 'year',  6999, 'EUR', 0, true)   -- 69,99 € desde 2026-09-23
 -- on conflict (provider, provider_price_id) do update
 --   set plan = excluded.plan, billing_interval = excluded.billing_interval,
 --       amount_cents = excluded.amount_cents, currency = excluded.currency,

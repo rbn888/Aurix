@@ -17,8 +17,11 @@ begin;
 
 create temporary table _rollback(interval_name text primary key, price_id text not null) on commit drop;
 insert into _rollback(interval_name, price_id) values
-  ('year',  'PEGAR_AQUI_PRICE_ID_TEST_ANUAL'),
-  ('month', 'PEGAR_AQUI_PRICE_ID_TEST_MENSUAL');
+  -- Los IDs de TEST son conocidos (`db/m04_prod/04_seed_test_prices_prod.sql`), asi
+  -- que se dejan pegados: un rollback que exige buscar dos identificadores es un
+  -- rollback que no se puede ejecutar cuando hace falta, que es siempre con prisa.
+  ('year',  'price_1UBetMKuk0nQ7dBISxq3UtoB'),
+  ('month', 'price_1UBeqjKuk0nQ7dBIPx0Luq1i');
 
 do $$
 declare v_bad int;
