@@ -27658,6 +27658,88 @@ button.intv14-cmp-clear {
   .wsbud-kpis { flex: 1 1 auto; }
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   §11 · ESCENARIOS · BASE Y ALTERNATIVA
+   ════════════════════════════════════════════════════════════════════════════
+   Dos supuestos comparables sobre el mismo capital y el mismo horizonte. Las
+   series se distinguen por COLOR Y POR ETIQUETA —§11 prohíbe que el color sea
+   la única señal— y el gráfico lleva su alternativa textual. */
+.wsb2-cols { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 10px; }
+.wsb2-col {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  padding: 12px; border-radius: 14px;
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.16);
+}
+.wsb2-col.is-b { border-color: rgba(226,188,110,0.26); }
+.wsb2-col-t {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(214,226,255,0.9);
+}
+.wsb2-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.wsb2-dot.is-a { background: #5c9cff; box-shadow: 0 0 8px rgba(92,156,255,0.6); }
+.wsb2-dot.is-b { background: #e2bc6e; box-shadow: 0 0 8px rgba(226,188,110,0.55); }
+.wsb2-inherit { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.wsb2-out { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.wsb2-ends { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wsb2-end {
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 10px 11px; border-radius: 12px; background: var(--elev-2);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+}
+.wsb2-end.is-b { border-color: rgba(226,188,110,0.26); }
+.wsb2-end i { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.wsb2-end b {
+  font-size: clamp(14px, 4vw, 19px); font-weight: 800; color: var(--text-bright);
+  font-variant-numeric: tabular-nums; overflow-wrap: normal;
+}
+.wsb2-diff { display: flex; flex-direction: column; gap: 2px; }
+.wsb2-diff-v { font-size: clamp(20px, 6vw, 28px); font-weight: 800; font-variant-numeric: tabular-nums; }
+.wsb2-diff-v.is-pos { color: rgba(120,215,170,0.98); }
+.wsb2-diff-v.is-neg { color: rgba(240,170,110,0.98); }
+.wsb2-diff-k { font-size: 12px; color: var(--text-muted); }
+.wsb2-break { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.wsb2-brk { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.wsb2-brk i { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.wsb2-brk b { font-size: 14px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsb2-chart { display: grid; place-items: center; }
+.wsb2-svg { width: 100%; max-width: 460px; height: auto; }
+.wsb2-axis { stroke: rgba(150,180,240,0.18); stroke-width: 1; }
+.wsb2-line { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wsb2-line.is-a { stroke: #5c9cff; }
+.wsb2-line.is-b { stroke: #e2bc6e; stroke-dasharray: 6 4; }   /* también por TRAZO,
+                                                                 no sólo por color */
+.wsb2-tick { fill: rgba(214,226,255,0.7); font-size: 11px; font-weight: 700; }
+/* La alternativa textual del gráfico: para lector de pantalla, no en pantalla. */
+.wsb2-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* La barra de guardado de la comparación: MISMO vocabulario visual que la de las
+   herramientas (estado a la izquierda, una sola acción primaria a la derecha),
+   porque es el mismo contrato de guardado y no debe parecer otro. */
+.wsb2-savebar {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px 12px; margin-top: 14px;
+  padding-top: 12px; border-top: 1px solid rgba(150,180,240,0.12);
+}
+.wsb2-savebar .wsg-savestate { flex: 1 1 auto; min-width: 0; }
+.wsb2-savebar .wsg-savebtn { flex: 0 0 auto; }
+@media (min-width: 700px) {
+  .wsb2-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Escritorio: supuestos a la izquierda, resultado y gráfico a la derecha. */
+@media (min-width: 1024px) {
+  .wsb2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
+  .wsb2 > .wsh-head { grid-column: 1 / -1; }
+  .wsb2-cols { grid-template-columns: 1fr; margin-top: 0; }
+  .wsb2 > [data-wsb2-out] { margin-top: 0; }
+  .wsb2-out { margin-top: 0; }
+  /* A lo ancho y al final: el guardado cierra la tarjeta, no cuelga de la
+     columna de supuestos como si guardase sólo esa mitad. */
+  .wsb2 > [data-wsb2-savebar] { grid-column: 1 / -1; }
+}
+
 /* ── VALIDACIÓN VISIBLE, Y NO SÓLO UN `return` ───────────────────────────────
    Un campo obligatorio vacío marca el campo y publica UNA línea de razón junto al
    botón que se acaba de pulsar. No es un estado de error del formulario entero:
@@ -28291,3 +28373,63 @@ input.ws4-num.is-invalid {
 /* 4 · UNA PÍLDORA A 10,5 px. El suelo de legibilidad del producto es 11 px y se
       aplica a TODA superficie publicada, también a la vista interna. */
 .wsh-pill { font-size: 11px; }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MATRIZ VISUAL AMPLIADA · LO QUE SÓLO SE VE EN 360 Y EN TABLET
+   ════════════════════════════════════════════════════════════════════════════
+   La sonda de primera pantalla medía en 390 y en 1440. Al añadir 360×740 y
+   768×1024 aparecieron defectos REALES que ninguna de las dos anchuras podía
+   enseñar, y todos de la misma familia: una rejilla con un número FIJO de
+   columnas no encoge por debajo de su contenido, así que en la anchura
+   intermedia la celda se sale de su tarjeta. No se reduce ninguna fuente por
+   debajo de su suelo ni se recorta con `overflow:hidden`: se reparte en menos
+   columnas, que es pagar la densidad en filas. */
+
+/* Escenarios · las tres tarjetas de ejemplo. En 768 `repeat(3, 1fr)` daba
+   tarjetas de 242 px para filas de 224 px de contenido: los importes se
+   recortaban y la tercera tarjeta pintaba su píldora y su botón FUERA de la
+   sección. Con `auto-fit` el tablet reparte dos y el escritorio sigue con tres. */
+.wsb-grid { grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); }
+@media (max-width: 720px) {
+  .wsb-grid { grid-template-columns: 1fr; }
+}
+/* Y dentro de cada fila, la ETIQUETA es lo que cede. La cifra no se parte nunca
+   —esa regla ya está pagada y sigue en pie—, así que el que tiene que poder
+   ajustarse es el texto que la nombra. */
+.wsb-row > span { min-width: 0; overflow-wrap: break-word; }
+.wsb-row > b { flex: 0 0 auto; }
+
+/* Interés compuesto · los cuatro resultados. En 768 la celda quedaba en 160 px
+   para un importe de 140: falta sitio, no sobra tamaño. En la franja de tablet
+   se piden columnas más anchas y salen tres en vez de cuatro. */
+@media (min-width: 700px) and (max-width: 1023px) {
+  .wstool-res-split.is-quad { grid-template-columns: repeat(auto-fit, minmax(176px, 1fr)); }
+}
+
+/* Presupuesto · los KPI. La tercera columna entraba en 560 px y el importe no
+   cabía hasta bien pasada esa anchura (116 px de cifra en una celda de 109).
+   Se retrasa el salto a tres columnas hasta donde la cifra cabe de verdad. */
+@media (min-width: 560px) and (max-width: 899px) {
+  .wsbud-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wsbud-kpi.is-main { grid-column: 1 / -1; }
+}
+
+/* Diario · el resumen. En 360 la celda deja 69 px útiles y «Rentabilidad» es UNA
+   palabra de 71: no hay punto de ruptura legítimo dentro de una palabra, así que
+   el sitio tiene que salir de algún sitio. NO de una segunda fila —probado: baja
+   el primer campo del formulario 44 px y lo saca de la primera pantalla, que es
+   justo lo que §2 pide conservar— sino del relleno lateral de la celda, que en
+   360 puede permitirse ser más estrecho. */
+@media (max-width: 400px) {
+  .wsjrn-sum-grid { gap: 8px; }
+  .wsjrn-sum-grid .wstool-res-cell { padding-left: 10px; padding-right: 10px; }
+}
+
+/* Cobros · la rejilla de fichas. `repeat(2, 1fr)` otra vez: en 768 las dos
+   columnas no encogían por debajo de su contenido y la ficha derecha pintaba su
+   importe y su estado 5 px fuera de la tarjeta. `minmax(0, ·)` es la cura que
+   este repo ya tiene escrita para las demás rejillas. */
+@media (min-width: 641px) {
+  .wsrecv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

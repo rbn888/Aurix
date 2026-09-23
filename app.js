@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '703'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '704'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6239,6 +6239,20 @@ const T = {
     wspl_m_units:         'Inmuebles',
     wspl_m_value:         'Valor',
     wspl_m_trades:        'Operaciones',
+    // ── §11 · BASE Y ALTERNATIVA ─────────────────────────────────────────────
+    wsb2_title:           'Comparar dos supuestos',
+    wsb2_base:            'Base',
+    wsb2_alt:             'Alternativa',
+    wsb2_monthly:         'Aportación mensual',
+    wsb2_common:          'supuesto común',
+    wsb2_diff:            'Diferencia al final del horizonte',
+    wsb2_suspended:       'Faltan datos para comparar: {w}. No se publican resultados.',
+    wsb2_need_base:       'patrimonio de partida',
+    wsb2_need_years:      'horizonte',
+    wsb2_save:            'Guardar comparación',
+    wsb2_update:          'Actualizar comparación',
+    wsb2_diff_short:      'Diferencia',
+    wsb_chart_alt:        'Proyección a {y} años. Base: {a}. Alternativa: {b}.',
     wsbud_period:         'Periodo',
     wsbud_period_none:    'Sin periodo',
     wstool_bud_rate_basis:'Sobre los ingresos del plan',
@@ -9004,6 +9018,19 @@ const T = {
     wspl_m_units:         'Properties',
     wspl_m_value:         'Value',
     wspl_m_trades:        'Trades',
+    wsb2_title:           'Compare two assumptions',
+    wsb2_base:            'Base',
+    wsb2_alt:             'Alternative',
+    wsb2_monthly:         'Monthly contribution',
+    wsb2_common:          'shared assumption',
+    wsb2_diff:            'Difference at the end of the horizon',
+    wsb2_suspended:       'Missing data to compare: {w}. No results are published.',
+    wsb2_need_base:       'starting wealth',
+    wsb2_need_years:      'horizon',
+    wsb2_save:            'Save comparison',
+    wsb2_update:          'Update comparison',
+    wsb2_diff_short:      'Difference',
+    wsb_chart_alt:        'Projection over {y} years. Base: {a}. Alternative: {b}.',
     wsbud_period:         'Period',
     wsbud_period_none:    'No period',
     wstool_bud_rate_basis:'Of the plan income',
@@ -20991,7 +21018,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21104,6 +21131,7 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsg-create')) { _wsgCreate(); return; }
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
+    if (t.hasAttribute('data-wsb2-save')) { _wsbSaveInstance(); return; }
   });
   // WS.3/WS.4/WS.5 — live recompute on input (no full rebuild → inputs keep focus).
   document.addEventListener('input', e => {
@@ -21864,6 +21892,7 @@ function _wsTypeLabel(type) {
   if (type === 'receivables_app') return t('wsapp_receivables_n');
   if (type === 'loan_simulation') return t('wsloan_n');
   if (type === 'asset_prices') return t('wsapp_assets_n');
+  if (type === 'scenario_compare') return t('wsh_scenario_title');
   return t('wsh_ws_' + type);
 }
 function _wsLabel(kind, item) {
@@ -22118,6 +22147,11 @@ function _wsOpenSurface(key, opts) {
     return false;
   }
   if (opts && opts.before) { try { opts.before(); } catch (_) {} }
+  // §11 — entrar al simulador por el catálogo es empezar un borrador, no seguir
+  // editando lo último que se guardó. Sin esto, `Guardar` habría ACTUALIZADO en
+  // silencio un documento que el usuario no abrió, que es exactamente la decisión
+  // que §4 prohíbe tomar por él.
+  if (k === 'scenario' && !(opts && opts.keepDoc)) { _wsbEditId = null; _wsbDirty = true; }
   _wshView = (k === 'projection') ? 'planning' : k;
   renderWorkspaceHome();
   return true;
@@ -22683,6 +22717,11 @@ const _WSPL_TYPES = Object.freeze({
   compound_growth:       { tool: 'compound',    nameKey: 'wstool_compound_n',   icon: 'growth', sim: true },
   loan_simulation:       { tool: 'loan',        nameKey: 'wsloan_n',            icon: 'calc',   sim: true },
   asset_prices:          { tool: 'assets',      nameKey: 'wsapp_assets_n',      icon: 'log'     },
+  // §11 — una comparación guardada es un documento como los demás: mismo
+  // almacén, misma identidad, misma tarjeta. Su `tool` es la superficie
+  // `scenario`, así que el gate que ya decide si esta cuenta puede abrir el
+  // simulador es el MISMO que decide si la tarjeta se publica.
+  scenario_compare:      { tool: 'scenario',    nameKey: 'wsh_scenario_title',  icon: 'paths',  sim: true },
 });
 // Los documentos que se publican: plantilla, guardada de verdad y con su
 // capacidad todavía ABIERTA para esta cuenta. Ofrecer «Continuar» sobre algo que
@@ -22767,6 +22806,17 @@ function _wsPlanMetrics(p) {
       const n = Array.isArray(inp.rows) ? inp.rows.length : 0;
       if (!n) return [];
       return [m('wspl_m_rows', String(n))];
+    }
+    // §11 — la comparación publica LO QUE GUARDÓ, no lo que daría hoy: sus dos
+    // supuestos vivían en parámetros COMPARTIDOS por toda la superficie, así que
+    // recalcular aquí leería los del último borrador y la tarjeta afirmaría una
+    // comparación que ese documento nunca hizo.
+    if (p.type === 'scenario_compare') {
+      const r = p.results || {};
+      if (!Number.isFinite(Number(r.altFinal))) return [];
+      const out = [{ k: t('wsb2_alt'), v: _wsPlanMoney(r.altFinal, p.currency) }];
+      if (Number.isFinite(Number(r.diff))) out.push({ k: t('wsb2_diff_short'), v: (r.diff >= 0 ? '+' : '−') + _wsPlanMoney(Math.abs(r.diff), p.currency) });
+      return out;
     }
   } catch (_) { return []; }
   return [];
@@ -22875,6 +22925,10 @@ function _wsPlansOpen(id) {
   }
   _wsReturnTab = 'dashboard';
   try { switchTab('workspace'); } catch (_) {}
+  // La comparación no es una herramienta con su propio editor: es una SUPERFICIE.
+  // Abrirla por `_wsOpenTool` la habría degradado a `compound` (su `else` final) y
+  // el usuario habría aterrizado en otra capacidad con otros datos.
+  if (spec.tool === 'scenario') { _wsbOpenDoc(id); return; }
   _wsOpenTool(spec.tool, id);
 }
 
@@ -22883,7 +22937,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wsOpenSurface('goals'); }
   else if (kind === 'scenario') { _wsOpenSurface('scenario'); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else if (p.type === 'asset_prices') { _wsOpenTool('assets', id); } else if (_wsWs4Access(p.type).ok) { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else if (p.type === 'asset_prices') { _wsOpenTool('assets', id); } else if (p.type === 'scenario_compare') { _wsbOpenDoc(id); } else if (_wsWs4Access(p.type).ok) { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -23316,6 +23370,17 @@ function _wsbParams() {
     baseImportedAt: Number.isFinite(Number(o.baseImportedAt)) ? Number(o.baseImportedAt) : null,
     baseImportedValue: o.baseImportedValue != null ? o.baseImportedValue : null,
     convention: o.convention || _WS_PROJ_CONV_DEFAULT,
+    // ── §11 · BASE Y ALTERNATIVA ────────────────────────────────────────────
+    // Dos supuestos comparables sobre el MISMO capital de partida y el MISMO
+    // horizonte —§11 lo exige: comparar con distinto horizonte no compara nada—.
+    // Lo que varía es lo que el usuario decide: cuánto aporta y qué rentabilidad
+    // supone. La base nace SIN aportación porque es el «si no hago nada».
+    baseMonthly: o.baseMonthly != null ? o.baseMonthly : '0',
+    altMonthly:  o.altMonthly  != null ? o.altMonthly  : '300',
+    // La rentabilidad de la alternativa hereda la común mientras nadie la toque:
+    // así la primera comparación aísla UNA variable (la aportación), que es la
+    // única forma de leer la diferencia sin adivinar a qué se debe.
+    altRet: o.altRet != null ? o.altRet : null,
   };
 }
 function _wsbParamsSet(patch) {
@@ -23398,6 +23463,81 @@ function _wsbCompare(scenarios) {
   };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// §11 · LA COMPARACIÓN DE DOS SUPUESTOS, CON EL MOTOR COMPARTIDO
+// ════════════════════════════════════════════════════════════════════════════
+// Las dos proyecciones salen de `_wsProject`, así que comparten capitalización,
+// calendario y redondeo por construcción: comparar dos matemáticas distintas
+// sería exactamente el defecto que el motor compartido vino a cerrar.
+//
+// QUÉ SE COMPARA Y QUÉ NO: el capital de partida y el horizonte son COMUNES
+// —§11 lo pide— y lo que varía es la aportación y la rentabilidad supuesta. La
+// diferencia se descompone en lo que has puesto de más y lo que ha crecido, y
+// las dos partes suman el total por construcción.
+//
+// ESTADO INVÁLIDO: sin base declarada o sin horizonte no se publican resultados.
+// Se dice qué falta. Un resultado calculado sobre un supuesto incompleto se lee
+// como vigente y no lo es.
+function _wsbTwoWay() {
+  const p = _wsbParams();
+  const base = _wsbBase();
+  const years = Math.max(0, Math.round(_wsNum(p.years)));
+  const ratePct = _wsNum(p.ret);
+  const altRetRaw = (p.altRet == null || String(p.altRet) === '') ? p.ret : p.altRet;
+  const altRatePct = _wsNum(altRetRaw);
+  const conv = (p.convention === _WS_PROJ_CONV.NOMINAL12) ? _WS_PROJ_CONV.NOMINAL12 : _WS_PROJ_CONV_DEFAULT;
+  const missing = [];
+  if (!base.known) missing.push('base');
+  if (!(years > 0)) missing.push('years');
+  const mk = (monthly, rate) => _wsProject({
+    initial: base.value, monthly: monthly, years: years,
+    annualRatePct: rate, convention: conv,
+  });
+  const a = mk(p.baseMonthly, ratePct);
+  const b = mk(p.altMonthly, altRatePct);
+  const diff = b.final - a.final;
+  const byContribution = b.contributed - a.contributed;
+  return {
+    ok: missing.length === 0, missing,
+    years, base, convention: conv,
+    a: { monthly: _wsNum(p.baseMonthly), ratePct, proj: a },
+    b: { monthly: _wsNum(p.altMonthly), ratePct: altRatePct, proj: b },
+    diff, byContribution, byGrowth: diff - byContribution,
+    // El porcentaje NO aplica si la referencia es cero: dividir por cero no es
+    // un 0 %, y publicarlo afirmaría una mejora que no se puede medir.
+    diffPct: a.final > 0 ? (diff / a.final) * 100 : null,
+    assumptions: a.assumptions,
+  };
+}
+// DOS SERIES, ETIQUETADAS. §11 prohíbe distinguirlas sólo por color: cada línea
+// lleva su nombre al final, y el gráfico entero tiene una alternativa textual
+// para quien no puede verlo.
+function _wsbTwoLineChartHtml(cmp) {
+  const esc = _intccEsc;
+  const W = 360, H = 190, padL = 12, padR = 12, padT = 16, padB = 28;
+  const sa = cmp.a.proj.series || [], sb = cmp.b.proj.series || [];
+  const n = Math.max(sa.length, sb.length);
+  if (n < 2) return '';
+  const maxV = Math.max.apply(null, sa.concat(sb).map(x => x.value).concat([1]));
+  const minV = Math.min(0, Math.min.apply(null, sa.concat(sb).map(x => x.value)));
+  const xF = i => padL + (i / (n - 1)) * (W - padL - padR);
+  const yF = v => (H - padB) - ((v - minV) / ((maxV - minV) || 1)) * (H - padT - padB);
+  const pts = arr => arr.map((x, i) => xF(i).toFixed(1) + ',' + yF(x.value).toFixed(1)).join(' ');
+  const endA = sa[sa.length - 1], endB = sb[sb.length - 1];
+  const alt = String(t('wsb_chart_alt') || '')
+    .replace('{y}', String(cmp.years))
+    .replace('{a}', formatBase(endA ? endA.value : 0))
+    .replace('{b}', formatBase(endB ? endB.value : 0));
+  return `
+    <svg class="wsb2-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(alt)}">
+      <line class="wsb2-axis" x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}"/>
+      <polyline class="wsb2-line is-a" points="${pts(sa)}"/>
+      <polyline class="wsb2-line is-b" points="${pts(sb)}"/>
+      <text class="wsb2-tick" x="${padL}" y="${H - 9}" text-anchor="start">${esc(t('wsp_axis_now'))}</text>
+      <text class="wsb2-tick" x="${W - padR}" y="${H - 9}" text-anchor="end">${esc(String(t('wsp_axis_year')(cmp.years)))}</text>
+    </svg>
+    <p class="wsb2-sr">${esc(alt)}</p>`;
+}
 // Real, read-only baseline for the "Escenario actual" block.
 function _wsbBaseline() {
   if (!AURIX_WS_USE_REAL_DATA) return { wealth: 0, wealthFmt: '—', liq: null, top: null };  // WS.11A — decoupled (dormant)
@@ -23526,6 +23666,11 @@ function _wsbImpactInnerHtml(cmp) {
 function _wsbParamInput(el) {
   const k = el.getAttribute('data-wsb-param');
   if (!k) return;
+  // ¿CAMBIA algo de verdad? Al salir de un campo numérico se reemite el valor
+  // canónico como `input`, así que guardar y salir del campo marcaba el documento
+  // como «cambios pendientes» sin que el usuario hubiera tocado nada — y eso
+  // invita a un segundo guardado que no guarda nada nuevo.
+  const changed = String((_wsbParams() || {})[k]) !== String(el.value);
   const patch = {}; patch[k] = el.value;          // crudo: se puede borrar
   _wsbParamsSet(patch);
   const root = document.querySelector('.wsh-sb');
@@ -23545,6 +23690,15 @@ function _wsbParamInput(el) {
   // junto al resultado nuevo.
   const asm = root.querySelector('[data-wsb-asm]');
   if (asm) asm.innerHTML = _wsbAssumptionsListHtml(cmp);
+  // §11 — la comparación de dos supuestos se repinta por SU contenedor, así que
+  // el campo que se está editando nunca es el nodo reemplazado.
+  const twoOut = root.querySelector('[data-wsb2-out]');
+  if (twoOut) twoOut.innerHTML = _wsbTwoWayOutHtml(_wsbTwoWay());
+  // Tocar un supuesto deja la instancia abierta DESALINEADA con lo que se ve, y
+  // la barra lo dice en el mismo gesto: nada de un «Guardado ✓» que describa
+  // unos números que ya no están en pantalla.
+  if (changed) _wsbDirty = true;
+  _wsbSaveBarSync(root);
 }
 // Los supuestos de la comparación, en su propio owner para que el render inicial y
 // el repintado por parámetro no puedan divergir.
@@ -23560,6 +23714,257 @@ function _wsbAssumptionsListHtml(cmp) {
   ];
   return rows.filter(Boolean).map(r => `<li>${esc(r)}</li>`).join('');
 }
+// La CARD de la comparación: dos columnas editables, la diferencia explícita y
+// las dos curvas. Se repinta por su propio contenedor para que el campo que se
+// está editando nunca sea reemplazado.
+function _wsbTwoWayHtml() {
+  return `<section class="wsh-card wsb2" data-wsb2>${_wsbTwoWayInnerHtml()}</section>`;
+}
+function _wsbTwoWayInnerHtml() {
+  const esc = _intccEsc;
+  const cmp = _wsbTwoWay();
+  const p = _wsbParams();
+  const num = (key, label, unit, val) => `
+    <label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span>
+      <span class="ws4-field-input">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="${esc(key)}" value="${esc(_wsFormatInputNumber(val))}">
+        <span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span>
+      </span></label>`;
+  const head = `<header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb2_title'))}</h3></header>`;
+  // El CAPITAL de partida y el HORIZONTE son comunes y viven en la tarjeta de
+  // supuestos: repetir aquí sus campos crearía DOS inputs para la misma clave, y
+  // repintar uno mientras se teclea en el otro es precisamente cómo se pierde el
+  // foco. La rentabilidad de la BASE se muestra, no se edita dos veces.
+  const cols = `
+    <div class="wsb2-cols">
+      <div class="wsb2-col is-a">
+        <span class="wsb2-col-t"><i class="wsb2-dot is-a" aria-hidden="true"></i>${esc(t('wsb2_base'))}</span>
+        ${num('baseMonthly', t('wsb2_monthly'), _wsToolCcy(), p.baseMonthly)}
+        <p class="wsb2-inherit">${esc(t('wsb_p_ret'))}: ${esc(_wsFormatInputNumber(p.ret))}% · ${esc(t('wsb2_common'))}</p>
+      </div>
+      <div class="wsb2-col is-b">
+        <span class="wsb2-col-t"><i class="wsb2-dot is-b" aria-hidden="true"></i>${esc(t('wsb2_alt'))}</span>
+        ${num('altMonthly', t('wsb2_monthly'), _wsToolCcy(), p.altMonthly)}
+        ${num('altRet', t('wsb_p_ret'), '%', (p.altRet == null || String(p.altRet) === '') ? p.ret : p.altRet)}
+      </div>
+    </div>`;
+  // ── SIN SUPUESTO COMPLETO NO HAY RESULTADO ───────────────────────────────
+  // §11: un borrador inválido suspende los resultados; no se presentan como
+  // vigentes ni se dejan los anteriores sin decir que lo son.
+  // El contenedor de salida existe SIEMPRE, también en estado inválido: es lo
+  // único que se repinta al teclear, y si desapareciera no habría dónde escribir
+  // el resultado cuando el supuesto vuelve a estar completo.
+  // La barra de guardado vive FUERA de `[data-wsb2-out]`: se repinta con cada
+  // tecla igual que el resultado, pero en su propio contenedor, y así el estado
+  // («sin guardar» / «cambios pendientes») no puede quedarse contando una
+  // historia vieja junto a una cifra nueva.
+  return `${head}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div><div data-wsb2-savebar>${_wsbSaveBarHtml()}</div>`;
+}
+// La SALIDA, aparte: es lo único que se repinta mientras se teclea, así que el
+// campo enfocado nunca puede ser el nodo reemplazado.
+function _wsbTwoWayOutHtml(cmp) {
+  const esc = _intccEsc;
+  if (!cmp.ok) {
+    const what = cmp.missing.map(k => t(k === 'base' ? 'wsb2_need_base' : 'wsb2_need_years')).join(' · ');
+    return `<p class="wsb-note is-warn">${esc(String(t('wsb2_suspended') || '').replace('{w}', what))}</p>`;
+  }
+  const sign = cmp.diff >= 0 ? '+' : '−';
+  const pct = cmp.diffPct == null ? t('wsb_pct_na') : (cmp.diff >= 0 ? '+' : '−') + Math.abs(Math.round(cmp.diffPct)) + '%';
+  return `
+    <div class="wsb2-out">
+      <div class="wsb2-ends">
+        <span class="wsb2-end is-a"><i>${esc(t('wsb2_base'))}</i><b>${esc(formatBase(cmp.a.proj.final))}</b></span>
+        <span class="wsb2-end is-b"><i>${esc(t('wsb2_alt'))}</i><b>${esc(formatBase(cmp.b.proj.final))}</b></span>
+      </div>
+      <div class="wsb2-diff">
+        <span class="wsb2-diff-v ${cmp.diff >= 0 ? 'is-pos' : 'is-neg'}">${esc(sign + formatBase(Math.abs(cmp.diff)))}</span>
+        <span class="wsb2-diff-k">${esc(t('wsb2_diff'))} · ${esc(pct)}</span>
+      </div>
+      ${/* La diferencia, DESCOMPUESTA: lo que has puesto de más y lo que ha
+            crecido. Las dos partes suman el total por construcción. */''}
+      <div class="wsb2-break">
+        <span class="wsb2-brk"><i>${esc(t('wsb_by_contrib'))}</i><b>${esc(formatBase(cmp.byContribution))}</b></span>
+        <span class="wsb2-brk"><i>${esc(t('wsb_by_growth'))}</i><b>${esc(formatBase(cmp.byGrowth))}</b></span>
+      </div>
+      <div class="wsb2-chart">${_wsbTwoLineChartHtml(cmp)}</div>
+    </div>`;
+}
+// ════════════════════════════════════════════════════════════════════════════
+// §11 · LA COMPARACIÓN SE GUARDA COMO INSTANCIA (§4 decide, §5 la publica)
+// ════════════════════════════════════════════════════════════════════════════
+// Lo que había: `_wsbSaveScenario` guardaba uno de los TRES ejemplos predefinidos
+// en un almacén propio (`aurix_ws_scenarios_v1`), una sola vez y sin nombre. Los
+// supuestos del USUARIO —su capital, su horizonte, su aportación— no se guardaban
+// en ninguna parte, así que el Dashboard no podía mostrarlos y volver al día
+// siguiente no devolvía nada. Eso sigue existiendo para los ejemplos; lo que se
+// añade es el documento real, en el almacén de documentos, por el MISMO flujo de
+// decisión que las siete herramientas.
+let _wsbEditId = null;     // instancia abierta, o null = borrador nuevo
+let _wsbDirty  = true;     // ¿hay cambios sin guardar respecto a la instancia?
+// Los supuestos que definen la comparación. Es la lista EXHAUSTIVA de lo que se
+// guarda y de lo que se restaura: si un parámetro influye en el resultado y no
+// está aquí, reabrir el documento lo recalcularía con el del último borrador.
+const _WSB_DOC_KEYS = Object.freeze(['baseMode', 'baseManual', 'years', 'ret', 'convention', 'baseMonthly', 'altMonthly', 'altRet']);
+function _wsbDocInputs() {
+  const p = _wsbParams(), o = {};
+  _WSB_DOC_KEYS.forEach(k => { o[k] = p[k]; });
+  return o;
+}
+function _wsbSuggestName() {
+  let n = 0;
+  try { n = _ws4Projects().filter(p => p && p.type === 'scenario_compare').length; } catch (_) { n = 0; }
+  const base = t('wsh_scenario_title');
+  return n > 0 ? base + ' ' + (n + 1) : base;
+}
+// El estado de guardado de la comparación, con el MISMO vocabulario que la barra
+// de las herramientas: sin instancia, con cambios pendientes, o al día.
+function _wsbSaveBarHtml() {
+  const esc = _intccEsc;
+  const cmp = _wsbTwoWay();
+  if (!_wsCanPersist()) {
+    return `<div class="wsb2-savebar">
+      <span class="wsg-savestate is-local">${esc(t('wstool_save_session'))}</span>
+      <button type="button" class="wsh-cta wsg-savebtn is-lock" data-wsb2-save>${esc(t('wsb2_save'))}<span class="wsh-tier is-premium">${esc(t('wstier_premium'))}</span></button>
+    </div>`;
+  }
+  const v = _wsbSaveBarState(cmp);
+  return `<div class="wsb2-savebar">
+    <span class="wsg-savestate is-${v.state}">${esc(v.lbl)}</span>
+    <button type="button" class="wsh-cta wsg-savebtn" data-wsb2-save${v.dis ? ' disabled' : ''}>${esc(v.btn)}</button>
+  </div>`;
+}
+function _wsbSaveBarState(cmp) {
+  const state = _wsbEditId ? (_wsbDirty ? 'dirty' : 'saved') : 'unsaved';
+  return {
+    state,
+    lbl: { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state],
+    btn: _wsbEditId ? t('wsb2_update') : t('wsb2_save'),
+    // Un supuesto incompleto no se puede guardar: el documento afirmaría una
+    // comparación que la pantalla se niega a publicar.
+    dis: (!cmp.ok || !!(_wsbEditId && !_wsbDirty)),
+  };
+}
+// ── EL BOTÓN NO SE REEMPLAZA MIENTRAS SE PULSA ──────────────────────────────
+// Repintar la barra con `innerHTML` en cada tecla parecía inofensivo (no contiene
+// campos), y NO lo era: al salir de un campo numérico se reemite el valor
+// canónico como `input`, así que el `focusout` que provoca el propio toque sobre
+// «Guardar» destruía el botón ENTRE `mousedown` y `mouseup`. El click no llegaba
+// nunca a un nodo con `data-wsb2-save` y el guardado no ocurría — el usuario ve
+// que pulsa y no pasa nada, y tiene que pulsar dos veces. Medido en la sonda.
+// Así que el estado se actualiza SOBRE los nodos que ya existen: el botón que hay
+// bajo el dedo sigue siendo el mismo nodo de principio a fin del gesto.
+function _wsbSaveBarSync(root) {
+  const bar = (root || document).querySelector('.wsb2-savebar');
+  if (!bar) return;
+  if (!_wsCanPersist()) return;   // la variante bloqueada no tiene estado que mover
+  const v = _wsbSaveBarState(_wsbTwoWay());
+  const st = bar.querySelector('.wsg-savestate');
+  if (st) { st.className = 'wsg-savestate is-' + v.state; st.textContent = v.lbl; }
+  const btn = bar.querySelector('[data-wsb2-save]');
+  if (btn) {
+    if (btn.textContent !== v.btn) btn.textContent = v.btn;
+    if (v.dis) btn.setAttribute('disabled', ''); else btn.removeAttribute('disabled');
+  }
+}
+function _wsbSaveInstance() {
+  if (!_wsCanPersist()) return _wsPersistUpsell('surface:scenario');
+  const cmp = _wsbTwoWay();
+  if (!cmp.ok) return;   // el botón ya está deshabilitado; esto cierra la puerta
+  let curName = '';
+  try { const p = _ws4Projects().find(x => x && x.id === _wsbEditId); curName = (p && p.customName) || ''; } catch (_) {}
+  _wsSaveDecide({
+    type: 'scenario_compare',
+    currentId: _wsbEditId, currentName: curName,
+    suggest: () => _wsbSuggestName(),
+    commit: (name, forceNew, targetId) => _wsbCommit(name, forceNew, targetId),
+  });
+}
+function _wsbCommit(name, forceNew, targetId) {
+  const cmp = _wsbTwoWay();
+  if (!cmp.ok) return;
+  const now = Date.now();
+  const list = _ws4Projects();
+  const existing = targetId
+    ? list.find(p => p && p.id === targetId && p.type === 'scenario_compare')
+    : ((!forceNew && _wsbEditId) ? list.find(p => p && p.id === _wsbEditId) : null);
+  if (targetId && !existing) { try { _wsbSaveError(t('wssave_target_gone')); } catch (_) {} return; }
+  // Se guarda lo que la pantalla ESTÁ publicando, calculado por el mismo motor y
+  // con su convención dentro: reabrirlo otro día no lo reinterpreta.
+  const results = {
+    baseFinal: Math.round(cmp.a.proj.final),
+    altFinal:  Math.round(cmp.b.proj.final),
+    diff:      Math.round(cmp.diff),
+    byContribution: Math.round(cmp.byContribution),
+    byGrowth:  Math.round(cmp.byGrowth),
+    // El porcentaje conserva su `null`: con base cero no aplica, y redondearlo
+    // aquí convertiría «no se puede medir» en un 0 % afirmado para siempre.
+    diffPct:   cmp.diffPct == null ? null : Math.round(cmp.diffPct * 10) / 10,
+    years:     cmp.years,
+    baseMonthly: cmp.a.monthly, altMonthly: cmp.b.monthly,
+    annualRatePct: cmp.a.ratePct, altRatePct: cmp.b.ratePct,
+    convention: cmp.convention,
+    baseValue: cmp.base.value, baseSource: cmp.base.source,
+  };
+  const proj = {
+    id: existing ? existing.id : ('ws4_' + now + '_' + Math.random().toString(36).slice(2, 7)),
+    type: 'scenario_compare',
+    customName: name || (existing ? existing.customName : undefined),
+    inputs: _wsbDocInputs(),
+    results,
+    currency: (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency) : 'EUR',
+    bodyVersion: 1,
+    revision: existing ? (Number(existing.revision) || 1) : 0,
+    createdAt: existing ? (existing.createdAt || now) : now,
+    updatedAt: now,
+  };
+  _ws4Persist(proj);
+  _wsbEditId = proj.id; _wsbDirty = false;
+  _wsbRepaintSurface();
+  try { updateDashboardPlans(); } catch (_) {}
+}
+// ── REPINTAR LA SUPERFICIE CUANDO YA ESTÁ MONTADA ───────────────────────────
+// El despachador de vistas es IDEMPOTENTE a propósito (`if (shown === 'scenario')
+// return`): entrar otra vez en la vista en la que ya estás no debe reconstruirla
+// y tirar el scroll. Pero guardar y ABRIR OTRO DOCUMENTO sí cambian lo que la
+// pantalla debe decir, y por esa puerta la pantalla se quedaba con los supuestos
+// anteriores mientras el modelo ya tenía los nuevos: la peor forma de fallar,
+// porque no parece un fallo. Aquí se fuerza el repintado, y sólo aquí.
+function _wsbRepaintSurface() {
+  const c = document.getElementById('aurixWorkspace');
+  if (!c) return;
+  if (!c.querySelector('.aurix-wsh[data-wsh-view="scenario"]')) { renderWorkspaceHome(); return; }
+  c.innerHTML = _renderScenarioBuilder();
+  _wshReveal(c);
+}
+// Un guardado que NO ocurrió se dice donde el usuario estaba mirando.
+function _wsbSaveError(msg) {
+  const bar = document.querySelector('.wsb2-savebar');
+  if (!bar) return;
+  const prev = bar.parentNode.querySelector('.wsg-reqerr'); if (prev) prev.remove();
+  const el = document.createElement('p');
+  el.className = 'wsg-reqerr'; el.setAttribute('role', 'alert');
+  el.textContent = String(msg || '');
+  bar.parentNode.appendChild(el);
+}
+// Abrir una comparación guardada: sus supuestos sustituyen al borrador y la
+// instancia queda abierta, así que `Guardar` actualiza ESA y no crea otra.
+function _wsbOpenDoc(id) {
+  let p = null;
+  try { p = _ws4Projects().find(x => x && x.id === id && x.type === 'scenario_compare') || null; } catch (_) { p = null; }
+  if (!p) return false;
+  // El gate se vuelve a preguntar en la apertura, como en todas las demás.
+  const patch = {};
+  _WSB_DOC_KEYS.forEach(k => { if (p.inputs && p.inputs[k] !== undefined) patch[k] = p.inputs[k]; });
+  const opened = _wsOpenSurface('scenario', {
+    keepDoc: true,
+    before: () => { _wsbParamsSet(patch); _wsbEditId = id; _wsbDirty = false; },
+  });
+  // Ya estando en el simulador, el despachador no repinta: abrir OTRA comparación
+  // habría dejado en pantalla los supuestos de la anterior.
+  if (opened) _wsbRepaintSurface();
+  return opened;
+}
+
 function _renderScenarioBuilder() {
   const esc = _intccEsc;
   const bl  = _wsbBaseline();
@@ -23630,6 +24035,7 @@ function _renderScenarioBuilder() {
             Los escenarios de ejemplo siguen donde estaban — son ejemplos, no el
             editor, y §2 pide que no lo sustituyan. */''}
       ${paramsHtml}
+      ${_wsbTwoWayHtml()}
       ${impactHtml}
 
       ${AURIX_WS_USE_REAL_DATA ? `<section class="wsh-card wsb-current">

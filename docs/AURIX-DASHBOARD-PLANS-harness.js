@@ -49,6 +49,7 @@ function ctx(opts) {
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    'calculateMonthlyBudget','calculateReceivables','calculateRealEstatePortfolio','_wsRecvStatus',
+   '_wsPlanMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState','_renderDashboardPlans']
     .forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
   if (opts.docs) vm.runInContext('localStorage.setItem(_WSH_PROJECTS_KEY, ' + JSON.stringify(JSON.stringify(opts.docs)) + ');', sb);
@@ -74,6 +75,12 @@ console.log('1 · El conjunto publicado:');
     { id: 'x2', type: 'loan_simulation',  customName: 'Hipoteca',   updatedAt: 880, inputs: {} },
     { id: 'x3', type: 'asset_prices',     customName: 'Precios',    updatedAt: 870, inputs: {} },
     { id: 'x4', type: 'monthly_budget',   customName: 'Borrado',    updatedAt: 950, deletedAt: 1, inputs: {} },
+    // §11 — la comparación de supuestos también guarda documento, así que
+    // también aparece. Lleva SUS resultados dentro, que es de donde debe leer la
+    // tarjeta: recalcular aquí usaría los parámetros del último borrador.
+    { id: 'x5', type: 'scenario_compare', customName: 'Aportar 300', updatedAt: 860,
+      currency: 'EUR', inputs: { baseManual: '100000', years: '20', ret: '6', baseMonthly: '0', altMonthly: '300' },
+      results: { baseFinal: 320714, altFinal: 456745, diff: 136031, byContribution: 72000, byGrowth: 64031, years: 20 } },
   ]) });
   const ids = JSON.parse(R(c, 'JSON.stringify(_wsPlansDocs().map(p => p.id))'));
   // ── RE-DECIDIDO (§5) ─────────────────────────────────────────────────────
@@ -83,10 +90,13 @@ console.log('1 · El conjunto publicado:');
   // mientras su instancia queda fuera. Ahora entran TODAS las capacidades que
   // guardan documento… y lo INTERNO sigue fuera, que es la otra mitad: `x3` es
   // `asset_prices`, no está publicada, y el gate de apertura la deja fuera sola.
+  // AMPLIADO en §11 con `x5` (comparación de escenarios): la lista crece cuando
+  // crece el conjunto de capacidades que guardan documento — no se ha aflojado
+  // nada, se ha añadido un tipo que antes no existía.
   ok('1.1 TODA instancia guardada de una capacidad publicada, incluidas herramientas',
-    ids.indexOf('x1') !== -1 && ids.indexOf('x2') !== -1
+    ids.indexOf('x1') !== -1 && ids.indexOf('x2') !== -1 && ids.indexOf('x5') !== -1
     && ['d1','d2','d3','d4','d5'].every(x => ids.indexOf(x) !== -1)
-    && ids.length === 7, JSON.stringify(ids));
+    && ids.length === 8, JSON.stringify(ids));
   ok('1.1b …y lo INTERNO sigue fuera: no publicado no aparece',
     ids.indexOf('x3') === -1, JSON.stringify(ids));
   ok('1.2 un documento con tombstone NO resucita en esta vista',
@@ -104,12 +114,21 @@ console.log('1 · El conjunto publicado:');
   ok('1.3b las simulaciones se rotulan como proyección, y las plantillas no',
     (() => { const h = R(c, '_renderDashboardPlans()');
       const simCards = (h.match(/wspl-sim/g) || []).length;
-      return simCards === 2; })(),
+      return simCards === 3; })(),
     (R(c, '_renderDashboardPlans()').match(/wspl-sim/g) || []).length + ' rótulos');
   ok('1.4 dos plantillas del MISMO tipo mantienen nombre e identidad propios',
     /data-wspl-id="d1"/.test(html1) && /data-wspl-id="d2"/.test(html1)
     && html1.indexOf('Presupuesto casa') !== -1 && html1.indexOf('Presupuesto viaje') !== -1
     && (html1.match(/data-wspl-open="d[12]"/g) || []).length === 2);
+  // Y sus dos cifras salen de lo GUARDADO. Si la tarjeta recalculase, leería los
+  // parámetros vivos de la superficie —que son de OTRO borrador— y publicaría una
+  // comparación que ese documento nunca hizo.
+  ok('1.4b la comparación guardada publica SUS cifras, no un recálculo',
+    (() => {
+      const m = JSON.parse(R(c, `JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === 'x5')).map(x => x.v))`));
+      return m.length === 2 && /456\.7|456,7|456745/.test(m[0]) && /136\.0|136,0|136031/.test(m[1]);
+    })(),
+    R(c, `JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === 'x5')))`));
   ok('1.5 esta vista no escribe: no hay una segunda persistencia',
     !/setItem|_wshWriteStore|_ws4Persist|_ws4SaveAll/.test(
       fnSrc('_wsPlansDocs') + fnSrc('_wsPlanMetrics') + fnSrc('_renderDashboardPlans') + fnSrc('updateDashboardPlans')));

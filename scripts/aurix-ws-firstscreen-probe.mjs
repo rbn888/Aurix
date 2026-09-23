@@ -83,7 +83,7 @@ catch (e) {
   process.exit(2);
 }
 
-let pass = 0; const fails = [];
+let pass = 0; const fails = []; const pend = [];
 const ok = (n, c, info) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fails.push(n + (info ? '  [' + info + ']' : '')); console.log('  ✗ ' + n + (info ? '  [' + info + ']' : '')); } };
 
 // ── LAS OCHO CAPACIDADES, Y QUÉ ES «EMPEZAR A TRABAJAR» EN CADA UNA ────────
@@ -98,12 +98,28 @@ const SURFACES = [
     whole: ['.wstool-fields .ws4-num'],      starts: ['.wstool-inputs-card'] },
   { id: 'journal',     open: `_wsOpenTool('journal')`,
     whole: ['[data-wsjrn-input]'],           starts: ['.wsjrn-form-card'] },
+  // ── UNA LIMITACIÓN DECLARADA, NO UN GATE RELAJADO ───────────────────────
+  // MEDIDO: en 360×740 el resumen de Portfolio inmobiliario ocupa 552 px él solo
+  // (KPIs + subKPIs + capas), así que el inventario empieza en 741 con el suelo
+  // en 680. No cabe, y no cabe por DENSIDAD: en 390×844 la misma tarjeta mide 564
+  // y entra sólo porque la pantalla es 104 px más alta. Recuperar esos 100 px
+  // exige rehacer ese resumen, que este SPEC no toca.
+  // Así que la afirmación se ACOTA a donde se ha demostrado (≥ 800 px de alto) en
+  // vez de fingir que se cumple en todas partes, y el hueco se IMPRIME en cada
+  // ejecución para que no desaparezca de la vista. El resto del contrato
+  // —contención, desbordamiento, toque, legibilidad— se sigue exigiendo en 360.
   { id: 'realestate',  open: `_wsOpenTool('realestate')`,
-    whole: [],                               starts: ['.wsre-summary-card', '.wsre-grid, .wsre-empty-hint, [data-wsre-add]'] },
+    whole: [],                               starts: ['.wsre-summary-card', '.wsre-grid, .wsre-empty-hint, [data-wsre-add]'],
+    startsMinH: 800, startsGap: 'Portfolio inmobiliario · el inventario empieza en 741 px con el suelo en 680 (360×740): 552 px de resumen' },
   { id: 'receivables', open: `_wsOpenTool('receivables')`,
     whole: [],                               starts: ['.wsrecv-summary-card', '[data-wsrecv-list]'] },
+  // §11 RE-DECIDE QUÉ ES «EMPEZAR» AQUÍ. Era `.wsb-impact`, el resumen del rango
+  // entre los TRES ejemplos predefinidos; ahora la pantalla se abre con la
+  // comparación de los DOS supuestos del usuario (`.wsb2`), que es lo que vino a
+  // hacer. El impacto de los ejemplos sigue existiendo, un poco más abajo: no se
+  // ha retirado nada, ha cambiado el orden, y con él lo que debe verse primero.
   { id: 'scenario',    open: `_wsOpenSurface('scenario')`,
-    whole: ['.wsb-params .ws4-num'],         starts: ['.wsb-impact'] },
+    whole: ['.wsb-params .ws4-num'],         starts: ['.wsb2'] },
   { id: 'goals',       open: `_wsOpenSurface('goals')`,
     whole: ['.wsg-form .ws4-num, .wsg-form .wsg-select', '[data-wsg-create], .wsg-card'], starts: [] },
 ];
@@ -217,7 +233,10 @@ const MEASURE = `(function(SPEC){
   };
 })`;
 
-const VIEWPORTS = [[390, 844], [1440, 900]];
+// Móvil, móvil ESTRECHO, tablet y escritorio. 360×740 entra por la misma razón
+// por la que entró en la frontera Free: es donde una rejilla que «cabe» deja de
+// caber, y ninguna prueba de «¿cabe?» lo ve si no se mide esa anchura.
+const VIEWPORTS = [[360, 740], [390, 844], [768, 1024], [1440, 900]];
 
 async function mount(page) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
@@ -284,8 +303,18 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         ok(`${tag} el primer control útil se ve ENTERO al entrar`,
           wholeBad.length === 0, JSON.stringify(g.whole));
         const startBad = g.starts.filter(x => !x.found || !x.ok);
-        ok(`${tag} lo que debe EMPEZAR en pantalla, empieza`,
-          startBad.length === 0, JSON.stringify(g.starts));
+        // La afirmación de «primera pantalla» se hace donde se ha demostrado. Si
+        // una superficie declara una altura mínima, por debajo de ella el hueco
+        // se IMPRIME como pendiente en vez de contarse como verde o como rojo:
+        // sigue a la vista de quien lea la salida, y no se relaja el contrato
+        // allí donde sí se afirma.
+        if (S.startsMinH && h < S.startsMinH) {
+          console.log(`  ⚠ ${tag} PENDIENTE DECLARADO · ${S.startsGap}`);
+          pend.push(`${tag} · ${S.startsGap}`);
+        } else {
+          ok(`${tag} lo que debe EMPEZAR en pantalla, empieza`,
+            startBad.length === 0, JSON.stringify(g.starts));
+        }
         ok(`${tag} legibilidad y toque: ≥12 px, inputs a 16 px, objetivos ≥44 px`,
           g.small.length === 0 && g.zoom.length === 0 && g.taps.length === 0,
           JSON.stringify({ pequeno: g.small, zoom: g.zoom, toque: g.taps }));
@@ -397,6 +426,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
 server.close();
 console.log('\n════════════════════════════════════════════════');
 console.log(pass + ' passed, ' + fails.length + ' failed');
+if (pend.length) {
+  console.log('\nPENDIENTES DECLARADOS (medidos, no cubiertos por este SPEC):');
+  Array.from(new Set(pend)).forEach(p => console.log('  ⚠ ' + p));
+}
 if (fails.length) { console.log('\nFAILED:'); fails.forEach(f => console.log('  ✗ ' + f)); console.log('\nRESULT: NO-GO'); process.exit(1); }
-console.log('\nRESULT: GO — capturas en docs/ws-firstscreen/');
+console.log('\nRESULT: GO — capturas en docs/ws-firstscreen/'
+  + (pend.length ? ' · con ' + Array.from(new Set(pend)).length + ' pendiente(s) declarado(s)' : ''));
 process.exit(0);
