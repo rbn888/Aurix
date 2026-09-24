@@ -752,8 +752,19 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       const blk = app.slice(i, i + 900);
       const promiseTok = /TOKEN_REFRESHED/.test(blk);
       return !promiseTok || /_aurixEntRevalidate\('token-refreshed'\)/.test(app); })());
+  // ACTUALIZADO (2026-09-24): la siembra de la firma ya no está escrita en el
+  // boot, está en `_aurixEntApplyToUi`, el owner ÚNICO de «qué se repinta cuando
+  // el servidor confirma un plan». Había tres copias del mismo gesto y sólo una
+  // refrescaba «Tus planes», así que comprar desde el Resumen concedía el derecho
+  // y dejaba la sección sin aparecer. El contrato que este assert protege —el
+  // primer foco no repinta sin motivo— es el mismo; lo que cambia es dónde vive.
   ok('G.17d la firma se siembra en el boot (el primer foco no repinta sin motivo)',
-    /_aurixEntLastSig = JSON\.stringify\(_aurixEnt\.features\);/.test(app));
+    /_aurixEntLastSig = JSON\.stringify\(features\);/.test(fnSource('_aurixEntApplyToUi')) &&
+    /_aurixEntApplyToUi\(_aurixEnt\.features\)/.test(app));
+  ok('G.17e y los TRES caminos (boot, revalidación y retorno de pago) pasan por ese owner',
+    (app.match(/_aurixEntApplyToUi\(/g) || []).length === 4 &&
+    /updateDashboardPlans/.test(fnSource('_aurixEntApplyToUi')),
+    'llamadas: ' + ((app.match(/_aurixEntApplyToUi\(/g) || []).length - 1));
   ok('G.18 la revalidación respeta el TTL (no fuerza en cada foco) y no hace polling',
     /_aurixEntitlementsLoad\(\)\.then\(\(st\) =>/.test(app) &&
     !/setInterval\([^)]*_aurixEnt/.test(app));

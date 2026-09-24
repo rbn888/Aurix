@@ -193,6 +193,55 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       direct.up.indexOf('workspace.loan') !== -1 && direct.up.indexOf('workspace.scenarios') !== -1,
       JSON.stringify(direct));
 
+    // ══ 6 · EL RETORNO DEL CHECKOUT NO CONCEDE NADA POR SÍ SOLO ═══════════
+    // `?billing=success` sólo significa «vuelve a preguntarle al servidor». Si
+    // la app se lo creyera, bastaría con escribir ese parámetro en la barra de
+    // direcciones para verse Premium. Y si el webhook aún no ha llegado, la
+    // espera tiene que ser honesta y ACOTADA, no un «¡activado!» anticipado ni
+    // un polling eterno.
+    await mount(page, 'free');   // el servidor todavía dice Free
+    const ret = await page.evaluate(`(function(){
+      window.__TOASTS = [];
+      var _t = _aurixBillingToast;
+      _aurixBillingToast = function(msg, kind){ window.__TOASTS.push(String(msg)); return _t ? undefined : undefined; };
+      history.replaceState({}, '', location.pathname + '?billing=success');
+      _aurixBillingReturnFlow();
+      return JSON.stringify({ urlAfter: location.search });})()`).then(JSON.parse);
+    ok(`${tag} checkout · el parámetro de retorno se limpia de la URL al instante`,
+      ret.urlAfter.indexOf('billing=success') === -1, JSON.stringify(ret));
+    await page.waitForTimeout(600);
+    const mid = await page.evaluate(`(function(){
+      return JSON.stringify({ toasts: window.__TOASTS.slice(), premium: hasAurixPremiumAccess() });})()`).then(JSON.parse);
+    ok(`${tag} checkout · mientras el servidor no confirma, se dice «confirmando» y NO se concede`,
+      /Confirmando|Confirming/i.test(mid.toasts.join(' ')) &&
+      !/activado|activated/i.test(mid.toasts.join(' ')) && mid.premium === false,
+      JSON.stringify(mid));
+    // Ahora el webhook «llega»: el servidor pasa a decir Premium.
+    await page.evaluate(`(function(){ window.__ENT_PLAN = 'premium'; return true; })()`);
+    await page.waitForTimeout(3200);   // cae dentro de la ventana de reintentos
+    const done = await page.evaluate(`(function(){
+      return JSON.stringify({ toasts: window.__TOASTS.slice(), premium: hasAurixPremiumAccess(),
+        calls: window.__ENT_CALLS });})()`).then(JSON.parse);
+    ok(`${tag} checkout · cuando el SERVIDOR lo confirma, y sólo entonces, se anuncia activado`,
+      /activado|activated/i.test(done.toasts.join(' ')) && done.premium === true,
+      JSON.stringify(done));
+    const v = await view(page);
+    ok(`${tag} checkout · y la interfaz pasa a Premium sin recargar ni CTA residual`,
+      v.cover === false && v.buyCta === 0, JSON.stringify(v));
+    // El reintento está ACOTADO: no puede quedarse llamando para siempre.
+    ok(`${tag} checkout · los reintentos son finitos y declarados`,
+      await page.evaluate(`Array.isArray(_AURIX_BILLING_RETRY_MS) && _AURIX_BILLING_RETRY_MS.length <= 6 && Object.isFrozen(_AURIX_BILLING_RETRY_MS)`));
+
+    // ══ 7 · «TUS PLANES» TAMBIÉN DEPENDE DEL DERECHO ══════════════════════
+    // Tres sitios reaccionaban a un plan confirmado y sólo uno refrescaba esta
+    // sección, así que comprar desde el Resumen dejaba el derecho concedido y
+    // la sección sin aparecer hasta cambiar de pestaña. Un owner, y se
+    // comprueba que los tres pasan por él.
+    ok(`${tag} el repintado por plan confirmado es UN owner, y refresca «Tus planes»`,
+      await page.evaluate(`(function(){
+        var src = String(_aurixEntApplyToUi);
+        return /updateDashboardPlans/.test(src) && /switchTab/.test(src) && /_aurixRenderMenuIdentity/.test(src);})()`));
+
     await ctx.close();
   }
   await browser.close();
@@ -207,10 +256,13 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   const app = await readFile(join(ROOT, 'app.js'), 'utf8');
   const boot = app.slice(app.indexOf('_aurixEntitlementsLoad({ force: true }).then(() => {'),
                          app.indexOf('_aurixEntitlementsLoad({ force: true }).then(() => {') + 1400);
-  ok('BOOT · la primera lectura del servidor repinta la pestaña activa',
-    /_aurixEntLastSig = JSON\.stringify\(_aurixEnt\.features\)/.test(boot) &&
-    /if \(tab === 'workspace' \|\| tab === 'intelligence'\) switchTab\(tab\)/.test(boot),
-    boot.slice(0, 120));
+  ok('BOOT · la primera lectura del servidor repinta por el MISMO owner que el resto',
+    /_aurixEntApplyToUi\(_aurixEnt\.features\)/.test(boot), boot.slice(0, 160));
+  // Y no queda ninguna copia suelta del gesto: tres sitios hacían lo mismo de
+  // tres maneras y sólo uno refrescaba «Tus planes».
+  const applyCalls = (app.match(/_aurixEntApplyToUi\(/g) || []).length;
+  ok('BOOT · los tres caminos (arranque, revalidación y retorno) usan ese owner',
+    applyCalls === 4, 'definición + ' + (applyCalls - 1) + ' llamadas');
 }
 
 console.log('\n════════════════════════════════════════════════');

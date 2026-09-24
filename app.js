@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '706'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '707'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -7207,13 +7207,11 @@ const T = {
     pw_prem_tier:      'Con Premium',
     pw_free_tier:      'Ya incluido en Free',
     pw_b_intel:        'Intelligence completa: radar, memoria patrimonial y qué ha cambiado',
-    pw_b_loan:         'Simulador de préstamos en Workspace',
+    pw_b_workspace:    'Workspace completo: las ocho capacidades',
     pw_b_plan:         'Gestión de tu plan y facturación',
     pw_b_future:       'Y lo que Aurix publique en Premium a partir de ahora',
     pw_fb_dash:        'Dashboard y evolución de tu patrimonio',
     pw_fb_market:      'Market con seguimiento y búsqueda',
-    pw_fb_compound:    'Calculadora de interés compuesto',
-    pw_fb_re:          'Plantilla de portfolio inmobiliario',
     pw_fb_preview:     'Vista previa de Intelligence',
     pw_trust:          'Pago gestionado por Stripe. Aurix no almacena tu tarjeta.',
     pw_micro:          'Tu plan se activa cuando el pago se confirma, no antes.',
@@ -9931,13 +9929,11 @@ const T = {
     pw_prem_tier:      'With Premium',
     pw_free_tier:      'Already in Free',
     pw_b_intel:        'Full Intelligence: radar, wealth memory and what changed',
-    pw_b_loan:         'Loan simulator in Workspace',
+    pw_b_workspace:    'The whole Workspace: all eight capabilities',
     pw_b_plan:         'Plan and billing management',
     pw_b_future:       'And whatever Aurix ships in Premium from now on',
     pw_fb_dash:        'Dashboard and your wealth evolution',
     pw_fb_market:      'Market with tracking and search',
-    pw_fb_compound:    'Compound interest calculator',
-    pw_fb_re:          'Real estate portfolio template',
     pw_fb_preview:     'Intelligence preview',
     pw_trust:          'Payments handled by Stripe. Aurix never stores your card.',
     pw_micro:          'Your plan activates when the payment is confirmed, not before.',
@@ -10428,6 +10424,16 @@ function switchLang(newLang) {
   });
   applyI18n();
   applyTypeMetaLabels();
+  // ── EL INDICADOR DE GUARDADO TAMBIÉN ES TEXTO ────────────────────────────
+  // Su etiqueta se escribe UNA vez, cuando cambia el estado, así que `applyI18n`
+  // no puede alcanzarla: cambiar de idioma con «Guardando…» en pantalla dejaba
+  // esa palabra en español dentro de una app en inglés hasta el siguiente
+  // guardado. Se re-emite el estado ACTUAL —no se inventa uno— por su owner.
+  try {
+    const _ss = document.getElementById('saveStatus');
+    const _st = _ss && !_ss.hidden ? _ss.getAttribute('data-state') : null;
+    if (_st && _st !== 'saved-faded') _setSaveStatus(_st);
+  } catch (_) {}
   // SPEC GLOBAL-LANGUAGE — retranslate DERIVED Settings surfaces that applyI18n() cannot reach
   // (they are not [data-i18n]): the Investor-Profile summary values + the segmented button
   // active state. Idempotent no-ops when the Settings modal is closed. Fixes the "Investor
@@ -73706,12 +73712,9 @@ function _aurixPreloadBootIcons() {
           // Se siembra la firma aquí: sin esto, el PRIMER regreso a primer plano
           // disparaba un switchTab (fade + re-render completo) aunque nada hubiera
           // cambiado, porque `_aurixEntLastSig` seguía en null.
-          try { _aurixEntLastSig = JSON.stringify(_aurixEnt.features); } catch (_) {}
-          const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
-          if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
           // Y el badge lo pinta `_aurixRenderMenuIdentity`; `_aurixMenuTier` es un
-          // getter y no repintaba nada.
-          if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
+          // getter y no repintaba nada. Todo eso vive ahora en un solo owner.
+          _aurixEntApplyToUi(_aurixEnt.features);
         } catch (_) {}
         // M.04 — VUELTA DEL CHECKOUT. Se engancha DESPUÉS de la primera lectura del
         // servidor, porque el flujo consiste precisamente en volver a preguntarle:
@@ -78566,6 +78569,27 @@ function _aurixEntLoaded() { return _aurixEnt.loaded === true; }
 // escritorio abierta todo el día no dispararía el primero y ahí el kill switch volvería
 // a ser ilimitado. Respeta el TTL (sin `force`) para no llamar en cada foco. Sin
 // polling: no hay intervalos.
+// ── LO QUE SE REPINTA CUANDO EL SERVIDOR CONFIRMA UN PLAN ──────────────────
+// Había TRES sitios haciendo esto: el arranque, la revalidación al volver la
+// pestaña y el retorno del checkout. Y hacían cosas distintas: sólo la
+// revalidación refrescaba «Tus planes», así que un usuario que compraba estando
+// en el Resumen tenía su derecho concedido y la sección seguía sin aparecer
+// hasta cambiar de pestaña y volver. No era una pantalla rota, era una divergencia
+// entre tres copias del mismo gesto — y la siguiente pieza que dependa del plan
+// nacería con el mismo problema. Un owner, tres llamadas.
+function _aurixEntApplyToUi(features) {
+  try { _aurixEntLastSig = JSON.stringify(features); } catch (_) {}
+  // La pestaña activa, si su contenido depende del derecho.
+  try {
+    const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
+    if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
+  } catch (_) {}
+  // «Tus planes» vive en el Resumen y también depende del derecho: perderlo la
+  // oculta y recuperarlo la devuelve, sin recargar y sin tocar un documento.
+  try { updateDashboardPlans(); } catch (_) {}
+  // Y el distintivo del menú, que es donde el usuario comprueba su plan.
+  try { if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity(); } catch (_) {}
+}
 function _aurixEntRevalidate(reason) {
   try {
     if (typeof currentUser === 'undefined' || !currentUser) return;
@@ -78575,13 +78599,7 @@ function _aurixEntRevalidate(reason) {
       try {
         const sig = JSON.stringify(st.features);
         if (sig === _aurixEntLastSig) return;
-        _aurixEntLastSig = sig;
-        const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
-        if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
-        // §B — «Tus planes» también depende del derecho: perderlo la OCULTA y
-        // recuperarlo la devuelve, sin recargar y sin tocar ningún documento.
-        try { updateDashboardPlans(); } catch (_) {}
-        if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
+        _aurixEntApplyToUi(st.features);
       } catch (_) {}
     });
   } catch (_) {}
@@ -78815,12 +78833,7 @@ function _aurixBillingReturnFlow() {
     _aurixEntitlementsLoad({ force: true }).then((st) => {
       if (st && st.loaded && st.plan === 'premium') {
         _aurixBillingToast(t('pw_active'), 'success');
-        try {
-          _aurixEntLastSig = JSON.stringify(st.features);
-          if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity();
-          const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
-          if (tab === 'workspace' || tab === 'intelligence') switchTab(tab);
-        } catch (_) {}
+        _aurixEntApplyToUi(st.features);
         return;
       }
       i++;
@@ -80175,8 +80188,21 @@ try {
   // Deliberadamente NO se listan Objetivos, Informes, Diario ni el resto del
   // inventario interno: no están publicados, así que prometerlos aquí sería
   // vender producto inexistente.
-  const PREM_B = ['pw_b_intel', 'pw_b_loan', 'pw_b_plan', 'pw_b_future'];
-  const FREE_B = ['pw_fb_dash', 'pw_fb_market', 'pw_fb_compound', 'pw_fb_re', 'pw_fb_preview'];
+  // ── LO QUE EL PAYWALL PROMETE TIENE QUE SER LO QUE EL CATÁLOGO CONCEDE ──
+  // DEFECTO REAL, encontrado leyendo la captura del paywall: «Ya incluido en
+  // Free» listaba «Calculadora de interés compuesto» y «Plantilla de portfolio
+  // inmobiliario». Las dos dejaron de ser gratuitas en el CIERRE WORKSPACE
+  // PREMIUM (v739): hoy declaran `workspace.compound` y `workspace.realestate`
+  // y el plan Free NO las concede — está en `plan_features`, con `false`
+  // explícito. Es decir, la pantalla de venta invitaba a un usuario Free a usar
+  // dos capacidades que el gate le va a denegar: la misma mentira que el
+  // catálogo cerró, sólo que al revés y en el punto de máxima intención.
+  // Y por el otro lado se quedaba corta: Premium anunciaba UNA capacidad de
+  // Workspace («simulador de préstamos») cuando concede las OCHO.
+  // La comprobación no puede ser una lista escrita a mano dos veces, así que el
+  // gate de billing contrasta estas claves contra `_WS_CATALOG` (F.9b).
+  const PREM_B = ['pw_b_intel', 'pw_b_workspace', 'pw_b_plan', 'pw_b_future'];
+  const FREE_B = ['pw_fb_dash', 'pw_fb_market', 'pw_fb_preview'];
   const li = (keys, cls) => keys.map(k => `<li class="${cls}">${esc(t(k))}</li>`).join('');
 
   // ANUAL PRIMERO: es la decisión de producto, así que es la tarjeta destacada y

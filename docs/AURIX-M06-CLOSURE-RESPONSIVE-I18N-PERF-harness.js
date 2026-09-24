@@ -218,8 +218,26 @@ section('D — ES/EN global: simetría total y cero claves huérfanas:');
     return !/mktSortRelevance/.test(prev) && !/mktSortChangeAsc/.test(prev) && !/mktSortPriceAsc/.test(prev);
   })());
   // Los precios no pueden depender del idioma: no hay ninguno en el cliente.
+  // Se añade 69,99 (precio anual vigente desde 2026-09-23) al mismo contrato: lo
+  // que protege el assert no es una cifra concreta sino que NINGUNA viva aquí.
   ok('D.6 el precio no cambia por idioma porque el cliente NO tiene precios',
-     !/7[,.]99|59[,.]99|14[,.]99/.test(appB) && !/7[,.]99|59[,.]99|14[,.]99/.test(idxB));
+     !/7[,.]99|59[,.]99|69[,.]99|14[,.]99/.test(appB) && !/7[,.]99|59[,.]99|69[,.]99|14[,.]99/.test(idxB));
+  // ── EL TEXTO QUE SE ESCRIBE UNA VEZ TAMBIÉN CAMBIA DE IDIOMA ─────────────
+  // `applyI18n` sólo alcanza lo que lleva `data-i18n`. El indicador de guardado
+  // escribe su etiqueta cuando CAMBIA DE ESTADO, así que cambiar de idioma con
+  // «Guardando…» en pantalla dejaba esa palabra en español dentro de una app en
+  // inglés hasta el siguiente guardado. MEDIDO en vivo antes de arreglarlo.
+  // `switchLang` —owner único del idioma— re-emite el estado ACTUAL por su
+  // propio owner, sin inventarse uno.
+  ok('D.7 al cambiar de idioma se re-emite el indicador de guardado visible', (() => {
+    const sl = app.slice(app.indexOf('function switchLang('), app.indexOf('function switchLang(') + 2600);
+    return /getElementById\('saveStatus'\)/.test(sl) && /_setSaveStatus\(_st\)/.test(sl)
+        && /data-state/.test(sl);
+  })(), 'switchLang no re-emite el estado de guardado');
+  ok('D.7b …y sólo si hay uno visible: no se inventa un estado que no existe', (() => {
+    const sl = app.slice(app.indexOf('function switchLang('), app.indexOf('function switchLang(') + 2600);
+    return /!_ss\.hidden/.test(sl) && /_st !== 'saved-faded'/.test(sl);
+  })());
 }
 
 // ══════════════════════════════════════════════════════════════════════════

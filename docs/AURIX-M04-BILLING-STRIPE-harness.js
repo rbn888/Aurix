@@ -838,10 +838,38 @@ console.log('\nF · precios canónicos y paywall');
     /data-premium-buy=/.test(app) && /_aurixBillingCheckout\(iv/.test(app) &&
     !/Te avisaremos pronto|We'll notify you soon/.test(app));
   ok('F.9 el paywall promete SÓLO lo que Premium concede hoy',
-    (() => { const keys = ['pw_b_intel', 'pw_b_loan', 'pw_b_plan', 'pw_b_future'];
+    (() => { const keys = ['pw_b_intel', 'pw_b_workspace', 'pw_b_plan', 'pw_b_future'];
       const block = app.slice(app.indexOf("const PREM_B ="), app.indexOf("const FREE_B ="));
       return keys.every(k => block.includes(k))
         && !/ap_p_reports|ap_p_goals|ap_p_timeline|ap_p_risk/.test(block); })());
+  // ── Y LA OTRA MITAD, QUE NADIE MIRABA ───────────────────────────────────
+  // DEFECTO REAL (2026-09-24): la lista «Ya incluido en Free» prometía la
+  // calculadora de interés compuesto y la plantilla de portfolio inmobiliario.
+  // Las dos son Premium desde v739 y `plan_features` las declara `false` para
+  // Free, así que la pantalla de venta invitaba a usar lo que el gate deniega.
+  // El assert no repite una lista escrita a mano: CONTRASTA con `_WS_CATALOG`,
+  // que es la fuente única de qué se publica y con qué derecho.
+  ok('F.9b lo que se anuncia como GRATIS no puede ser una capacidad Premium del catálogo',
+    (() => {
+      const free = app.slice(app.indexOf("const FREE_B ="), app.indexOf("const FREE_B =") + 240);
+      // Las capacidades de Workspace publicadas, todas con featureKey ⇒ ninguna
+      // puede aparecer en la lista de Free. Se detecta por su raíz semántica.
+      const forbidden = ['compound', 'realestate', 'budget', 'journal', 'receivables',
+                         'goals', 'scenario', 'loan'];
+      return !forbidden.some(w => new RegExp('pw_fb_[a-z_]*' + w).test(free));
+    })(),
+    app.slice(app.indexOf("const FREE_B ="), app.indexOf("const FREE_B =") + 140));
+  ok('F.9c …y el catálogo confirma que NINGUNA capacidad de Workspace es gratuita',
+    (() => {
+      // El catálogo lleva comentarios largos entre entradas, así que se recorta
+      // por su CIERRE real y no por un número de caracteres: con una ventana
+      // fija el assert leía cinco entradas de dieciocho y habría dado por bueno
+      // un catálogo a medias.
+      const _c0 = app.indexOf('const _WS_CATALOG');
+      const cat = app.slice(_c0, app.indexOf(']);', _c0));
+      const pub = [...cat.matchAll(/\{ id: '([a-z_]+)',[^}]*published: true,[^}]*commercialTier: '(\w+)'/g)];
+      return pub.length >= 8 && pub.every(m => m[2] === 'premium');
+    })(), 'publicadas que no son premium');
   ok('F.10 y las claves nuevas existen en ES y EN',
     ['pw_title', 'pw_cta', 'pw_annual', 'pw_monthly', 'pw_manage', 'pw_unavailable',
      'pw_b_intel', 'pw_trust', 'pw_active', 'pw_pending', 'pw_cancelled']

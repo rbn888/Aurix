@@ -251,7 +251,106 @@ una iteración anterior (entre ellas un `5.99€/mo`). No se pintan en ninguna p
 —verificado— así que no contradicen el precio vigente, pero conviene saber que
 están ahí antes de reutilizar ese bloque de claves.
 
+**Precisión sobre la candidata 2 (conservada del encargo):** la Proyección
+patrimonial debe usar el patrimonio **actualizado** *cuando el usuario elija
+conectarlo* —conexión explícita, opt-in, no automática—, permitir explorar
+supuestos y aportar algo más que una calculadora de interés compuesto. Su diseño
+sigue **pendiente**; y no se pueden prometer cotizaciones en tiempo real sin un
+dato que las soporte (hoy: 5 divisas, TTL 12 h, fallback aproximado).
+
 **Orden recomendado:** consolidar las ocho actuales (este trabajo) → decidir
 §2 (Proyección patrimonial) con sus dos preguntas abiertas resueltas → §1
 (Conversor) por ser el de alcance más acotado → descartar §5 salvo que aporte
 reparto objetivo → el resto, después.
+
+---
+
+# ANEXO · PROCEDIMIENTO DE CIERRE OPERATIVO M.04 (para el fundador)
+
+Verificado contra el repositorio real el **2026-09-24**. Nada de esto se ha
+ejecutado: **ni cutover, ni compra, ni cambio en Stripe, ni aprobación legal**.
+
+## Paso 0 · Lo que ya está hecho y NO hay que repetir
+
+| | Estado | Evidencia |
+|---|---|---|
+| Precio anual 69,99 € en código, SQL, diagnóstico y pruebas | ✅ | gate de billing, §9 de este documento |
+| El checkout se niega a cobrar si Stripe y el catálogo no coinciden | ✅ | D.25–D.33 |
+| Portal: cambio de plan, cancelación a fin de periodo, cambios diferidos | ✅ | P.1–P.8 |
+| Webhook: firma, replay, entrega desordenada, correspondencia usuario/cliente | ✅ | C.1–C.14, E.6c–E.12 |
+| URLs públicas de soporte, privacidad y condiciones | ✅ **HTTP 200 sin sesión** | comprobado hoy |
+| Correo de soporte publicado | ✅ `aurixsystemofficial@gmail.com` | comprobado hoy en las tres páginas |
+| `anon` sin privilegios sobre las tablas sensibles | ✅ `42501` en las cinco | sonda en vivo, hoy |
+
+## Paso 1 · Decisiones legales (sólo tuyas)
+
+Los huecos marcados en las páginas publicadas, **uno por uno**:
+
+- **Privacidad**: identidad y contacto del responsable · base jurídica de cada
+  tratamiento · plazos de conservación tras la baja · región de cada proveedor y
+  transferencias internacionales · marco legal aplicable y autoridad de control ·
+  enumeración formal de derechos.
+- **Condiciones**: identidad jurídica y datos fiscales · edad mínima · plazo de
+  preaviso de cambio de precio · derecho de desistimiento y reembolsos ·
+  compromiso de disponibilidad (si asumes alguno) · responsabilidad, garantías,
+  ley aplicable y jurisdicción.
+- **Soporte**: plazo de respuesta comprometido (o dejarlo sin comprometer).
+
+Cuando estén decididos: rellenar los huecos, **retirar el aviso de borrador**
+(`.lg-draft` en `privacy.html` y `terms.html`) y desplegar. **Sólo entonces**
+copiar las URLs a Stripe. No las copies antes: hoy abren un borrador declarado.
+
+## Paso 2 · El corte LIVE de base de datos
+
+- **Script:** `db/billing_live_cutover_1.sql` · **Rollback:** `db/billing_live_cutover_1_rollback.sql`
+- **Qué hace:** desactiva las filas de precio de TEST y activa las de LIVE para
+  `(stripe, premium, year|month)`. Una transacción. **No borra ninguna fila** y no
+  toca `subscriptions`, `billing_customers`, `entitlement_overrides` ni `plan_features`.
+- **Precondiciones:** los dos precios LIVE ya existen y sus IDs están pegados
+  (anual `price_1UIu7S3l0aCDKMqE3UCE6FtO`, mensual `price_1UIu3n3l0aCDKMqEL5ocVJ5A`);
+  clave y webhook secret de LIVE en Vercel; portal LIVE configurado.
+- **Se aborta solo** si quedan marcadores sin sustituir, si los dos IDs son
+  iguales, o si al terminar no hay exactamente una fila activa por intervalo con
+  **6999 / 799 EUR**. La verificación va DENTRO de la transacción: si falla, no
+  hay `commit`.
+- **Rollback:** el mismo mecanismo en sentido inverso, con los IDs de TEST ya
+  pegados.
+
+## Paso 3 · El diagnóstico, antes de vender
+
+`POST /api/billing/status` **desde tu cuenta autenticada** (es la única con
+`workspace.catalog_preview`; cualquier otra recibe 403). Sólo lectura: no escribe
+en Stripe, no crea sesiones, no concede nada.
+
+Esperado para vender: `mode: "live"`, `ready_for_live: true`, `blockers: []`.
+
+**Detente si aparece cualquiera de estos:** `stripe_key_not_live`,
+`amount_not_approved:*`, `price_mode_mismatch:*`, `price_not_found_in_stripe:*`,
+`recurrence_mismatch:*`, `trial_enabled:*`, `portal_unconfigured`,
+`portal_mode_mismatch`, `webhook_endpoint_missing_for_mode`, `test_events_allowed`.
+
+Hoy, con el catálogo aún en TEST, **debe** devolver `amount_not_approved:year` y
+`ready_for_live: false`. Eso es correcto, no un fallo.
+
+## Paso 4 · Después del corte (comprobaciones, sin cobrar)
+
+1. Repetir el Paso 3 → `ready_for_live: true`.
+2. Abrir el paywall: los importes tienen que leerse **69,99 €** y **7,99 €**, con
+   el ahorro derivado (**27 %**, 5,83 €/mes). Si no coinciden, no sigas.
+3. No hace falta comprar para saber si el precio está bien: **el checkout
+   compara con Stripe antes de abrir sesión** y se niega si no cuadra.
+
+## Paso 5 · La compra real controlada (requiere tu autorización expresa)
+
+1. Con tu cuenta, elegir plan y completar el pago **real**.
+2. Al volver: la app dice «Confirmando tu pago…», consulta al servidor y sólo
+   anuncia «Premium activado» cuando el servidor lo confirma. Si el webhook
+   tarda, avisa de que se activará en unos minutos — **no se queda reintentando
+   para siempre**.
+3. Comprobar acceso: Workspace completo, Intelligence completa y «Tus planes».
+4. Recargar y abrir en otro dispositivo: el estado Premium tiene que sobrevivir.
+5. Probar el portal: cambiar de plan y cancelar a fin de periodo. Tras cancelar,
+   **Premium debe seguir activo hasta el final del periodo pagado**.
+
+**Condición de parada en cualquier punto:** si la app anuncia Premium y el
+servidor no lo confirma, o al revés, detener y revisar antes de anunciar nada.
