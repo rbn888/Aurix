@@ -187,10 +187,19 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var c = document.querySelector('#wsPlansSection [data-wspl-id="d1"]');
       return JSON.stringify({ tab: currentTab, n: _ws4Projects().length,
         metric: c ? (c.querySelector('.wspl-m b')||{}).textContent : null,
-        first: document.querySelector('#wsPlansSection .wspl-card').getAttribute('data-wspl-id') });
+        first: document.querySelector('#wsPlansSection .wspl-card').getAttribute('data-wspl-id'),
+        // Y lo PINTADO, no sólo la variable: ver abajo por qué.
+        mainShown: (function(){ var m = document.querySelector('main');
+          return !!m && getComputedStyle(m).display !== 'none' && m.getBoundingClientRect().height > 100; })() });
     })()`).then(JSON.parse);
-    ok(`${ENG}.volver · «Volver» devuelve al Dashboard, no a Herramientas`,
-      r.tab === 'dashboard', JSON.stringify(r));
+    // ── ESTE ASSERT PASABA CON LA PANTALLA EN NEGRO ─────────────────────────
+    // Comprobaba `currentTab === 'dashboard'`, y esa variable se ponía aunque el
+    // despachador NO montara nada: `_applyTab` guarda el nombre de la pestaña
+    // antes de decidir qué pintar. Así que medía la intención, no el resultado,
+    // y certificó en verde un Resumen sin contenido. Ahora se exige el id REAL
+    // (`home`) y, sobre todo, que el Resumen esté PINTADO.
+    ok(`${ENG}.volver · «Volver» devuelve al Dashboard, y el Dashboard se PINTA`,
+      r.tab === 'home' && r.mainShown === true, JSON.stringify(r));
     ok(`${ENG}.guardar · la cifra editada se ve al volver, y sin duplicar el documento`,
       r.n === 5 && /3\.?000|3,000/.test(String(r.metric)) && r.first === 'd1', JSON.stringify(r));
 

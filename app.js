@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '710'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '711'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -21169,7 +21169,10 @@ function _wshWireOnce() {
       _wshView = 'home'; _ws4ActiveId = null;
       // El retorno al DASHBOARD está preparado y es el mismo owner: no hay un
       // segundo camino de vuelta que mantener. Hoy nadie fija este origen.
-      if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; try { switchTab('dashboard'); } catch (_) { _wshRepaintHome(); } return; }
+      // `'home'` es el id REAL de la pestaña del Resumen (el alias se normaliza
+      // igualmente en `switchTab`, pero el llamador no tiene por qué depender
+      // de esa traducción).
+      if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; try { switchTab('home'); } catch (_) { _wshRepaintHome(); } return; }
       _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome(); return;
     }
     if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; _wshRepaintHome(); return; }
@@ -68169,6 +68172,20 @@ function _initIntelligenceCommandCenter() {
 function switchTab(tab) {
   // IA.1 — legacy alias (see _applyTab): old 'metrics'/'profile' → 'intelligence'.
   if (tab === 'metrics' || tab === 'profile') tab = 'intelligence';
+  // ── «dashboard» ES «home», Y NO DARLO POR SABIDO CUESTA UNA PANTALLA EN
+  //    NEGRO ─────────────────────────────────────────────────────────────
+  // La pestaña del Resumen se llama `home` en el despachador. Quien la llamara
+  // `dashboard` —que es como se llama en el producto, en la navegación y en el
+  // informe— no daba error: `_applyTab` VACÍA los contenedores dinámicos antes
+  // de decidir y después no encontraba ninguna rama que montar, así que dejaba
+  // cabecera, navegación y fondo sin contenido. Una pantalla que parece
+  // terminada y está vacía, sin nada que reintentar.
+  // Pasó de verdad: el retorno desde «Tus planes» pedía `switchTab('dashboard')`
+  // y el comentario de ese código decía «hoy nadie fija este origen»; cuando
+  // «Tus planes» empezó a fijarlo, el camino se volvió alcanzable.
+  // Se normaliza AQUÍ, en la entrada, y no sólo en el llamador: el siguiente que
+  // escriba el nombre natural tampoco se va a encontrar un Resumen en negro.
+  if (tab === 'dashboard') tab = 'home';
   const myToken = ++_tabToken;
   if (_tabTimer) { clearTimeout(_tabTimer); _tabTimer = null; }
   if (_tabRaf)   { cancelAnimationFrame(_tabRaf); _tabRaf = null; }

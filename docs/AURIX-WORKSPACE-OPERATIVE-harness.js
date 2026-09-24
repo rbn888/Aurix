@@ -123,11 +123,22 @@ console.log('\n2 · Volver a donde se venía:');
     ok('2.2 ' + lg + ' · un origen desconocido cae en Herramientas, no en vacío',
       R(c, '_wsBackOrigin()') === 'tools' && !!R(c, '_wsBackShort()'));
   });
-  // El retorno a DASHBOARD está preparado y lo despacha el MISMO owner: no hay un
-  // segundo camino de vuelta escondido. Nadie lo fija todavía, y eso es correcto.
-  ok('2.3 el retorno al Dashboard existe en el owner único de «Volver»',
+  // ── CORREGIDO (2026-09-24) · ESTE ASSERT FIJABA EL DEFECTO ───────────────
+  // Exigía literalmente `switchTab('dashboard')`… y esa pestaña NO EXISTE: en el
+  // despachador el Resumen es `home`. Mientras «nadie fijaba este origen» la
+  // rama era inalcanzable y nadie lo notó; en cuanto «Tus planes» empezó a
+  // fijarlo, volver desde un documento dejaba el Resumen EN NEGRO —cabecera,
+  // navegación y fondo, sin contenido—, porque `_applyTab` vacía los
+  // contenedores antes de decidir y luego no encontraba rama que montar.
+  // El gate certificaba en verde exactamente la línea que rompía la pantalla.
+  // Ahora se exige el id REAL, y además que el despachador normalice el alias
+  // para que el siguiente que escriba el nombre natural no repita el defecto.
+  ok('2.3 el retorno al Dashboard usa el id REAL de la pestaña (`home`)',
     /_wsBackOrigin\(\) === 'dashboard'/.test(fnSrc('_wshWireOnce'))
-    && /switchTab\('dashboard'\)/.test(fnSrc('_wshWireOnce')));
+    && /switchTab\('home'\)/.test(fnSrc('_wshWireOnce'))
+    && !/switchTab\('dashboard'\)/.test(fnSrc('_wshWireOnce')));
+  ok('2.3b …y «dashboard» se normaliza en la ENTRADA del despachador',
+    /if \(tab === 'dashboard'\) tab = 'home';/.test(fnSrc('switchTab')));
   // 2.4 SE ACTUALIZA: el punto de enganche YA TIENE quien lo escriba. «Tus
   // planes» (§B del cierre visual) abre una plantilla desde el Dashboard, así
   // que el retorno tiene que volver ahí. Lo que se sigue vigilando es que haya
