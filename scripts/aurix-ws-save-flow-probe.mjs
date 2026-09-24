@@ -328,11 +328,21 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       return JSON.stringify({ shown: sec ? sec.style.display !== 'none' : false,
         inDocs: _wsPlansDocs().some(function(p){ return p.type === 'scenario_compare'; }),
         card: !!card, txt: sec ? sec.innerText.replace(/\s+/g, ' ') : '', mets: mets });})()`).then(JSON.parse);
-    ok(`${ENG}.scn · la comparación guardada aparece en el Dashboard con su nombre`,
-      dash.shown && dash.inDocs && dash.card && /Comparación A/.test(dash.txt), JSON.stringify(dash).slice(0, 200));
-    ok(`${ENG}.scn · sus dos métricas salen de lo GUARDADO, no de un recálculo`,
+    // RE-DECIDIDO (2026-09-24): «Tus planes» publica documentos de PLANTILLAS.
+    // El simulador de escenarios es una HERRAMIENTA, así que su documento se
+    // abre desde su propia capacidad. Lo que se exige aquí es lo que importa:
+    // que NO esté en el Resumen y que SÍ tenga puerta propia.
+    ok(`${ENG}.scn · la comparación NO se publica en el Resumen (es de herramienta)`,
+      dash.inDocs === false && dash.card === false, JSON.stringify(dash).slice(0, 160));
+    ok(`${ENG}.scn · pero sus dos métricas siguen saliendo de lo GUARDADO`,
       dash.mets.length === 2 && /Alternativa|Alternative/.test(dash.mets[0]) && /Diferencia|Difference/.test(dash.mets[1]),
       JSON.stringify(dash.mets));
+    ok(`${ENG}.scn · y el simulador ofrece «Abrir guardado» con su documento dentro`,
+      await page.evaluate(`(function(){
+        var btn = document.querySelector('[data-wsb2-open]');
+        var docs = _wsSaveCandidates('scenario_compare', null);
+        return !!btn && docs.length >= 1 && docs.some(function(d){ return d.name === 'Comparación A'; });})()`),
+      'la puerta dentro de la herramienta');
 
     // Tocar un supuesto deja la instancia desalineada, y la barra lo dice.
     await page.click('[data-wsb-param="altMonthly"]');
@@ -367,7 +377,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await page.evaluate(`(function(){
       var first = _ws4Projects().filter(function(p){ return p.type === 'scenario_compare'; })
         .sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); })[0];
-      _wsPlansOpen(first.id); return first.id; })()`);
+      // Por la puerta NUEVA: la de la propia herramienta.
+      _wsbOpenDoc(first.id); return first.id; })()`);
     await page.waitForTimeout(280);
     const back = await page.evaluate(`(function(){
       var first = _ws4Projects().filter(function(p){ return p.type === 'scenario_compare'; })
@@ -376,7 +387,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       return JSON.stringify({ id: first.id, edit: _wsbEditId, dirty: _wsbDirty,
         alt: String(p.altMonthly), years: String(p.years), base: String(p.baseManual),
         field: (document.querySelector('[data-wsb-param="altMonthly"]')||{}).value });})()`).then(JSON.parse);
-    ok(`${ENG}.scn · reabrir desde el Dashboard restaura SUS supuestos y abre ESA instancia`,
+    ok(`${ENG}.scn · reabrir desde «Abrir guardado» restaura SUS supuestos y abre ESA instancia`,
       back.edit === back.id && back.dirty === false && back.alt === '300' && back.years === '20'
       && back.base === '100000' && back.field === '300', JSON.stringify(back));
 

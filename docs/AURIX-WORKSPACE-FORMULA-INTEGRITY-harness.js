@@ -539,11 +539,17 @@ function catalog() {
   // usuario no puede abrir (`state === 'open'` para el favorito, `_wsToolAccess`
   // para el documento). El gate lo verifica EJECUTANDO en ACCESS-TRUTH §5.8; aquí
   // se ancla que las dos ramas siguen preguntando.
+  // RE-DECIDIDO (2026-09-24): Mi Espacio vuelve a tener UNA sola fuente. Los
+  // documentos salen de aquí —el contrato de producto separa capacidad,
+  // favorito y documento— y con ellos se va la rama `_wsToolAccess` que este
+  // assert anclaba. La garantía NO se pierde: lo que queda es el favorito, y un
+  // favorito sólo entra si su capacidad está `state === 'open'`, que es
+  // exactamente «el usuario puede abrirla». Un filtro en vez de dos porque hay
+  // una fuente en vez de dos.
   OK('L15 Mi Espacio no puede ofrecer una capacidad que el usuario no puede abrir',
      /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
      /const toolList = colItems\(_WS_TOOL_RENDER, 'tool'\);/.test(app) &&
-     /\.filter\(m => m\.state === 'open' && m\.pinRef && _wsIsPinned\(m\.pinRef\)\)/.test(app) &&
-     /if \(!acc\.ok\) return null;/.test(app));
+     /\.filter\(m => m\.state === 'open' && m\.pinRef && _wsIsPinned\(m\.pinRef\)\)/.test(app));
   OK('L15b …y la última apertura ya NO es condición de pertenencia',
      !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
      !/\.filter\(x => x\.ts > 0\)/.test(app));

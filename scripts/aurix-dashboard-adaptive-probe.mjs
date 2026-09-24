@@ -149,15 +149,15 @@ const measure = page => page.evaluate(`(function(){
 const DOCS2 = [
   { id: 'd1', type: 'monthly_budget', customName: 'Presupuesto de casa con un nombre muy largo para probar',
     inputs: { salary: 2500, housing: 700 }, revision: 1, createdAt: 1, updatedAt: 9 },
-  { id: 'd2', type: 'scenario_compare', customName: 'Aportar 300', currency: 'EUR',
-    inputs: { baseManual: '100000', years: '20', ret: '6', baseMonthly: '0', altMonthly: '300' },
-    results: { baseFinal: 320714, altFinal: 456745, diff: 136031, byContribution: 72000, byGrowth: 64031, years: 20 },
+  // Documentos de PLANTILLA: son los que publica «Tus planes». Los de
+  // herramienta se abren desde su capacidad, así que aquí no pintan nada.
+  { id: 'd2', type: 'receivables_app', customName: 'Clientes 2026', currency: 'EUR',
+    inputs: { items: [{ id: 'r1', units: 1, unitPrice: 1000, paidAmount: 400 }] },
     revision: 1, createdAt: 2, updatedAt: 8 },
 ];
 const DOCS_MANY = DOCS2.concat([3, 4, 5].map(i => ({
-  id: 'd' + i, type: 'loan_simulation', customName: 'Hipoteca ' + i, currency: 'EUR',
-  inputs: { amount: 200000, years: 25, rate: 3 },
-  results: { monthlyPayment: 949, totalInterest: 84700, totalPaid: 284700, principal: 200000, annual: 3, years: 25 },
+  id: 'd' + i, type: 'monthly_budget', customName: 'Presupuesto ' + i, currency: 'EUR',
+  inputs: { salary: 2000 + i * 100, housing: 600, food: 250 },
   revision: 1, createdAt: i, updatedAt: i })));
 
 const VIEWPORTS = [[360, 740], [390, 844], [768, 1024], [1180, 800], [1440, 900]];
@@ -257,12 +257,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       g.plans.shown === true && g.plans.open === 2 && g.disc.shown === false && g.disc.html === 0,
       JSON.stringify({ plans: g.plans.open, disc: g.disc.shown }));
     ok(`${ENG}.premium · y los resúmenes salen del documento guardado`,
-      /Aportar 300/.test(g.plans.txt) || /Presupuesto/.test(g.plans.txt), g.plans.txt);
+      /Clientes 2026/.test(g.plans.txt) || /Presupuesto/.test(g.plans.txt), g.plans.txt);
     await page.screenshot({ path: join(OUT, `premium-docs-1440-${ENG}.png`) });
 
     // PREMIUM con UN solo documento: composición contenida, no una tarjeta
     // estirada de lado a lado.
-    await mount(page, { n: 2, plan: 'premium', docs: [DOCS2[1]] });
+    await mount(page, { n: 2, plan: 'premium', docs: [DOCS2[1]] });   // un solo documento de plantilla
     const one = await page.evaluate(`(function(){
       var sec = document.getElementById('wsPlansSection');
       var cards = sec.querySelectorAll('.wspl-card');

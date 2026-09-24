@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '709'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '710'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6576,6 +6576,11 @@ const T = {
     wsre_l_appr:  'Apreciación latente',
     wsre_basis_title: 'Cómo se calculan estas cifras',
     wsre_more_title:  'Desglose del mes y capas',
+    wstool_open_saved: 'Abrir guardado',
+    wspin_failed:      'No hemos podido guardar tu favorito. Inténtalo de nuevo.',
+    wstool_open_title: 'Tus documentos guardados',
+    wstool_open_text: 'Elige cuál quieres abrir. El que tengas en pantalla no se pierde: se queda como está hasta que lo guardes.',
+    wstool_open_none: 'Todavía no has guardado ninguno en esta capacidad.',
     // DESCUBRIMIENTO EN EL RESUMEN (sólo Free). Copy CONCEPTUAL: ni una cifra,
     // ni una señal, ni una promesa de muestra gratuita — los permisos no la dan.
     dsc_int_t:        'Aurix Intelligence',
@@ -9350,6 +9355,11 @@ const T = {
     wsre_l_appr:  'Unrealised appreciation',
     wsre_basis_title: 'How these figures are worked out',
     wsre_more_title:  'Monthly breakdown and layers',
+    wstool_open_saved: 'Open saved',
+    wspin_failed:      'We could not save your favourite. Please try again.',
+    wstool_open_title: 'Your saved documents',
+    wstool_open_text: 'Pick the one you want to open. What you have on screen is not lost: it stays as it is until you save it.',
+    wstool_open_none: 'You have not saved any in this capability yet.',
     dsc_int_t:        'Aurix Intelligence',
     dsc_int_b:        'Understand what is moving your wealth: structure, concentrations and what changed.',
     dsc_int_cta:      'Explore Intelligence',
@@ -21083,7 +21093,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21102,6 +21112,7 @@ function _wshWireOnce() {
     const gAct = t.getAttribute('data-wsg-act'); if (gAct) { const id = t.getAttribute('data-wsg-id'); if (gAct === 'dup') _wsgDuplicate(id); else if (gAct === 'del') _wsgDelete(id); else if (gAct === 'rename') _wsgRename(id); return; }
     // P5 — workspace save + lifecycle
     const w4Save = t.getAttribute('data-ws4-save'); if (w4Save !== null && t.hasAttribute('data-ws4-save')) { _ws4SaveDraft(); return; }
+    if (t.hasAttribute('data-wstool-open')) { _wsToolOpenSaved(); return; }
     const w4Act = t.getAttribute('data-ws4-act'); if (w4Act) { if (w4Act === 'dup') _ws4Duplicate(); else if (w4Act === 'del') _ws4Delete(); else if (w4Act === 'rename') _ws4Rename(); return; }
     // P4 — Mis Proyectos: open / duplicate / delete by entity ref
     const xOpen = t.getAttribute('data-wsx-open'); if (xOpen) { _wsxOpen(xOpen); return; }
@@ -21197,6 +21208,16 @@ function _wshWireOnce() {
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
     if (t.hasAttribute('data-wsb2-save')) { _wsbSaveInstance(); return; }
+    if (t.hasAttribute('data-wsb2-open')) {
+      const docs = _wsSaveCandidates('scenario_compare', null);
+      if (!docs.length) return;
+      _wsPickDocModal({
+        title: t('wstool_open_title'), text: t('wstool_open_text'),
+        docs: docs, okLabel: t('wstool_open_saved'),
+        onPick: d => { if (d && d.id) _wsbOpenDoc(d.id); },
+      });
+      return;
+    }
     if (t.hasAttribute('data-wsre-more-toggle')) {
       const box = t.closest('[data-wsre-more]');
       if (box) {
@@ -22437,10 +22458,29 @@ function _wsTogglePin(ref) {
   // fijó algo cuando fijar no estaba gateado se quedaba con la estrella encendida y
   // cada clic le abría el paywall en vez de apagarla. Retirar lo propio nunca
   // requiere plan; añadir, sí.
-  if (i >= 0) { list.splice(i, 1); _wshWriteStore(_WSH_PINNED_KEY, list); return; }
+  // ── SI NO SE PUDO GUARDAR, SE DICE ──────────────────────────────────────
+  // `_wshWriteStore` ya devolvía `false` cuando el almacén rechaza la escritura
+  // (cuota llena, modo privado), pero nadie miraba el valor: la estrella se
+  // repintaba desde el almacén —así que no quedaba un estado falso, eso estaba
+  // bien— y el usuario veía que su clic «no hacía nada», sin saber por qué.
+  // Ahora se le dice. El repintado sigue saliendo del almacén: la verdad es lo
+  // que se guardó, nunca lo que se pulsó.
+  // El aviso va SIEMPRE entre guardas: avisar de un fallo no puede convertirse
+  // en un fallo. Sin esto, un entorno donde el toast no exista rompía el propio
+  // toggle — lo cazaron dos asserts de «quitar la estrella siempre funciona».
+  const _warn = () => { try { if (typeof _wsPinFailed === 'function') _wsPinFailed(); } catch (_) {} };
+  if (i >= 0) {
+    list.splice(i, 1);                       // quitar es quitar de la lista
+    if (!_wshWriteStore(_WSH_PINNED_KEY, list)) _warn();
+    return;
+  }
   if (!_wsCanPersist()) return _wsPersistUpsell('pin');
   list.push({ ref, ts: Date.now() });
-  _wshWriteStore(_WSH_PINNED_KEY, list);
+  if (!_wshWriteStore(_WSH_PINNED_KEY, list)) _warn();
+}
+// Un aviso breve, por el canal que ya existe para los avisos de Workspace.
+function _wsPinFailed() {
+  try { _aurixBillingToast(t('wspin_failed'), 'error'); } catch (_) {}
 }
 // ── DSH.WORKSPACE.01 — usage recency (Aurix learns from real behaviour) ─────
 // Every open records lastUsedAt for the item's canonical ref. Mi Espacio orders
@@ -22580,6 +22620,47 @@ function _wsGlyph(k) {
 }
 // El icono de una capacidad en la portada: misma familia, mismo trazo, misma
 // caja. Un solo sitio para que no puedan divergir entre sí.
+// ── LAS TRES HERRAMIENTAS TAMBIÉN TIENEN PORTADA ───────────────────────────
+// Las cinco plantillas se presentan con una fotografía y las tres herramientas
+// con un icono de 23 px: la misma rejilla, dos niveles de acabado, y el de
+// menos calidad justo en capacidades que cuestan lo mismo. No hay fotografía
+// que encaje —ni se va a traer una de fuera, que sería una dependencia frágil—,
+// así que la portada es una ILUSTRACIÓN propia, en SVG, dibujada con el mismo
+// vocabulario del producto: trazo de la familia, azul Aurix y un acento dorado.
+//
+// Deliberadamente ABSTRACTAS: ninguna lleva cifras ni simula una interfaz. Una
+// portada decorativa con números legibles acaba leyéndose como un dato, y aquí
+// no hay ningún dato — la misma razón por la que la miniatura de Mi espacio
+// dejó de ser un recorte del contenido.
+const _WS_TOOL_COVER = Object.freeze({
+  // Interés compuesto: una curva que se acelera, con su área. La aceleración ES
+  // el concepto; no hay eje ni escala porque no hay magnitud que mostrar.
+  compound: '<path class="wsc-area" d="M4 52 C 30 50, 52 44, 70 32 S 100 10, 116 6 L 116 52 Z"/>'
+    + '<path class="wsc-line" d="M4 52 C 30 50, 52 44, 70 32 S 100 10, 116 6"/>'
+    + '<circle class="wsc-dot" cx="116" cy="6" r="3.2"/>',
+  // Préstamos: la deuda que baja por tramos. Barras decrecientes, sin etiquetas.
+  loan: '<g class="wsc-bars">'
+    + '<rect x="8"  y="14" width="13" height="38" rx="3"/>'
+    + '<rect x="27" y="20" width="13" height="32" rx="3"/>'
+    + '<rect x="46" y="27" width="13" height="25" rx="3"/>'
+    + '<rect x="65" y="34" width="13" height="18" rx="3"/>'
+    + '<rect x="84" y="41" width="13" height="11" rx="3"/>'
+    + '<rect class="wsc-bar-last" x="103" y="46" width="13" height="6" rx="3"/></g>',
+  // Escenarios: dos caminos que se separan desde el mismo punto. El dorado
+  // distingue la alternativa sin decir cuál es mejor.
+  scenario: '<path class="wsc-line" d="M6 44 C 34 42, 56 36, 76 24 S 106 8, 118 6"/>'
+    + '<path class="wsc-line is-alt" d="M6 44 C 34 45, 58 46, 80 44 S 108 40, 118 38"/>'
+    + '<circle class="wsc-dot" cx="6" cy="44" r="3"/>',
+});
+function _wsToolCoverHtml(key) {
+  const body = _WS_TOOL_COVER[String(key || '')];
+  if (!body) return '';
+  // `viewBox` fijo: la caja la reserva el CSS, así que la tarjeta no salta
+  // cuando la ilustración entra, y no hay descarga que esperar ni que falle.
+  return '<span class="wsh-toolcover" aria-hidden="true">'
+    + '<svg viewBox="0 0 120 56" preserveAspectRatio="xMidYMid meet" fill="none" '
+    + 'stroke-linecap="round" stroke-linejoin="round">' + body + '</svg></span>';
+}
 function _wsCapIconHtml(k) {
   return `<svg class="wsfc-cap-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(k)}</svg>`;
 }
@@ -22795,14 +22876,20 @@ const _WSPL_TYPES = Object.freeze({
   receivables_app:       { tool: 'receivables', nameKey: 'wsapp_receivables_n', icon: 'receipt' },
   trade_journal:         { tool: 'journal',     nameKey: 'wstool_journal_n',    icon: 'log'     },
   real_estate_portfolio: { tool: 'realestate',  nameKey: 'wsre_n',              icon: 'house'   },
-  compound_growth:       { tool: 'compound',    nameKey: 'wstool_compound_n',   icon: 'growth', sim: true },
-  loan_simulation:       { tool: 'loan',        nameKey: 'wsloan_n',            icon: 'calc',   sim: true },
-  asset_prices:          { tool: 'assets',      nameKey: 'wsapp_assets_n',      icon: 'log'     },
+  // ── SÓLO PLANTILLAS ──────────────────────────────────────────────────────
+  // Aquí vivían también los documentos de las tres HERRAMIENTAS (interés
+  // compuesto, préstamos, escenarios). El contrato de producto los separa: el
+  // Resumen publica el trabajo de las PLANTILLAS y cada herramienta guarda el
+  // suyo en su propia casa. No se ha retirado nada hasta que esa casa existió:
+  // el menú de la barra de guardado abre ahora «Abrir guardado» con la lista
+  // completa de documentos de esa capacidad (`_wsToolOpenSaved`, y su gemelo en
+  // el simulador de escenarios).
+  // NO SE BORRA NI SE MIGRA UN SOLO DOCUMENTO: siguen en el mismo almacén, con
+  // el mismo id y el mismo contenido; lo que cambia es dónde se ofrecen.
   // §11 — una comparación guardada es un documento como los demás: mismo
   // almacén, misma identidad, misma tarjeta. Su `tool` es la superficie
   // `scenario`, así que el gate que ya decide si esta cuenta puede abrir el
   // simulador es el MISMO que decide si la tarjeta se publica.
-  scenario_compare:      { tool: 'scenario',    nameKey: 'wsh_scenario_title',  icon: 'paths',  sim: true },
 });
 // Los documentos que se publican: plantilla, guardada de verdad y con su
 // capacidad todavía ABIERTA para esta cuenta. Ofrecer «Continuar» sobre algo que
@@ -23164,7 +23251,11 @@ function _renderWorkspaceHome(metrics) {
 
   // Small pin/star toggle for tool & template cards (stops the card's open click
   // because the delegated handler matches [data-wspin] before [data-wsh-cta]).
-  const pinBtn = ref => { const on = _wsIsPinned(ref); return `<button type="button" class="wsh-pin${on ? ' is-on' : ''}" data-wspin="${esc(ref)}" title="${esc(on ? t('wspin_remove') : t('wspin'))}" aria-label="${esc(on ? t('wspin_remove') : t('wspin'))}"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.6 5.5 6 .6-4.5 4.1 1.3 5.9L12 16.9 6.6 19.6l1.3-5.9L3.4 9.6l6-.6z"/></svg></button>`; };
+  // `aria-pressed` además de la etiqueta: un botón que ALTERNA tiene que
+  // declarar su estado, no sólo cambiar de nombre. Sin él, un lector de pantalla
+  // no puede decir si la capacidad ya está en Mi espacio sin leer la etiqueta
+  // entera, y no hay forma de anunciarlo al cambiar.
+  const pinBtn = ref => { const on = _wsIsPinned(ref); return `<button type="button" class="wsh-pin${on ? ' is-on' : ''}" data-wspin="${esc(ref)}" aria-pressed="${on ? 'true' : 'false'}" title="${esc(on ? t('wspin_remove') : t('wspin'))}" aria-label="${esc(on ? t('wspin_remove') : t('wspin'))}"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.6 5.5 6 .6-4.5 4.1 1.3 5.9L12 16.9 6.6 19.6l1.3-5.9L3.4 9.6l6-.6z"/></svg></button>`; };
 
   // ── UN SOLO MODELO DE TARJETA, Y LO DECIDE EL ACCESO REAL ──────────────────
   // Antes cada rejilla derivaba sus atributos por su cuenta y el chip comercial se
@@ -23269,38 +23360,15 @@ function _renderWorkspaceHome(metrics) {
         ts: Math.max(pinTs(m.pinRef), _wsRecentTs(m.pinRef)),
       }));
 
-    // ── 2 · DOCUMENTOS GUARDADOS ─────────────────────────────────────────────
-    // `_wshAllProjects` es la vista unificada de los tres almacenes y ya oculta los
-    // tombstones (sus lectores los filtran). Cada documento se atribuye a la
-    // capacidad que lo abre, y de ahí sale su columna: un presupuesto es una
-    // PLANTILLA, una simulación de interés compuesto es una HERRAMIENTA.
-    const docSurface = it => {
-      if (!it) return null;
-      if (it.kind === 'goal') return 'goals';
-      if (it.kind === 'scenario') return 'scenario';
-      return _wsToolKeyForProjectType(it.type);
-    };
-    const allDocs = (function () { try { return _wshAllProjects(); } catch (_) { return []; } })();
-    const docItems = kind => allDocs.map(it => {
-      const sf = docSurface(it);
-      if (!sf) return null;
-      const entry = _wsSurfaceEntry(sf);
-      if (!entry || entry.kind !== kind) return null;
-      // El MISMO gate que la apertura: un documento de una capacidad que esta
-      // cuenta no puede abrir no se ofrece como si pudiera abrirlo.
-      let acc = { ok: false };
-      try { acc = _wsToolAccess(sf); } catch (_) {}
-      if (!acc.ok) return null;
-      const r = _WS_TOOL_RENDER[entry.id] || _WS_TPL_RENDER[entry.id] || {};
-      return {
-        mtype: 'doc', ref: it.ref, name: it.name, typeLabel: it.typeLabel,
-        entryId: entry.id, cat: r.cat || entry.id, viz: r.viz || 'bars',
-        ts: Number(it.ts) || 0,
-      };
-    }).filter(Boolean);
-
+    // ── MI ESPACIO SON FAVORITOS. Y NADA MÁS. ──────────────────────────────
+    // Aquí se concatenaban favoritos Y documentos guardados, y de ahí venía la
+    // mezcla: una tarjeta era «una capacidad que fijé» y la de al lado «un
+    // presupuesto que guardé» —dos cosas distintas con la misma forma—, y una
+    // capacidad con tres documentos aparecía cuatro veces. Son tres entidades
+    // separadas: capacidad, favorito y documento. Mi espacio publica la
+    // segunda; el Resumen, la tercera de las plantillas; y cada herramienta, la
+    // tercera de la suya.
     const colItems = (map, kind) => favItems(map, kind)
-      .concat(docItems(kind))
       .sort((a, b) => (b.ts - a.ts) || String(a.name).localeCompare(String(b.name)));
     const tplList = colItems(_WS_TPL_RENDER, 'template');
     const toolList = colItems(_WS_TOOL_RENDER, 'tool');
@@ -23396,7 +23464,7 @@ function _renderWorkspaceHome(metrics) {
               lenguajes a la vez. Se usa la MISMA familia que el resto de
               Workspace. Las PLANTILLAS conservan sus fotografías: son su
               identidad y §8 pide preservarlas. */''}
-        <div class="wsh-toolcard-ic is-glyph">${_wsCapIconHtml(_wsSurfaceIcon(m.cat))}</div>
+        ${_wsToolCoverHtml(m.cat) || `<div class="wsh-toolcard-ic is-glyph">${_wsCapIconHtml(_wsSurfaceIcon(m.cat))}</div>`}
         <p class="wsh-tool-name">${esc(m.name)}</p>
         <div class="wsh-toolcard-foot">${_wsCardFoot(m)}</div>
       </div>`;
@@ -23973,8 +24041,15 @@ function _wsbSaveBarHtml() {
     </div>`;
   }
   const v = _wsbSaveBarState(cmp);
+  // La misma puerta que las demás herramientas: volver a una comparación
+  // guardada se hace sin salir del simulador.
+  let _saved = 0;
+  try { _saved = _wsSaveCandidates('scenario_compare', null).length; } catch (_) { _saved = 0; }
+  const open = _saved > 0
+    ? `<button type="button" class="wsg-menu-item wsb2-open" data-wsb2-open>${esc(t('wstool_open_saved'))}</button>` : '';
   return `<div class="wsb2-savebar">
     <span class="wsg-savestate is-${v.state}">${esc(v.lbl)}</span>
+    ${open}
     <button type="button" class="wsh-cta wsg-savebtn" data-wsb2-save${v.dis ? ' disabled' : ''}>${esc(v.btn)}</button>
   </div>`;
 }
@@ -25884,6 +25959,30 @@ function _wsToolSave() {
     commit: (name, forceNew, targetId) => _wsToolCommit(name, forceNew, targetId),
   });
 }
+// ── ABRIR UN GUARDADO SIN SALIR DE LA HERRAMIENTA ──────────────────────────
+// Hasta ahora la ÚNICA puerta a un documento guardado estaba fuera: Mi espacio y
+// el Resumen. Es decir, para volver a un cálculo había que abandonar la
+// capacidad donde se hizo. Y en cuanto Mi espacio pasa a ser sólo favoritos y el
+// Resumen sólo publica documentos de PLANTILLAS, las tres herramientas se
+// quedarían sin ninguna: el trabajo guardado seguiría existiendo y nadie podría
+// llegar a él. Así que la puerta se construye ANTES de cerrar las otras.
+// Reutiliza el selector que ya existe para elegir destino de un reemplazo: mismo
+// componente, mismo teclado, misma lista ordenada por última edición.
+function _wsToolOpenSaved() {
+  const type = _wsToolStateType(_wsToolActive);
+  const docs = _wsSaveCandidates(type, null);
+  if (!docs.length) { try { _wsToolSaveError(t('wstool_open_none')); } catch (_) {} return; }
+  _wsPickDocModal({
+    title: t('wstool_open_title'), text: t('wstool_open_text'),
+    docs: docs, okLabel: t('wstool_open_saved'),
+    onPick: (d) => {
+      if (!d || !d.id) return;
+      // Por el owner de apertura de siempre: vuelve a preguntar el gate y carga
+      // los inputs del documento, no los del borrador que hubiera en pantalla.
+      _wsOpenTool(_wsToolActive, d.id);
+    },
+  });
+}
 // «Guardar como…» — el MISMO modal, y una copia con ID nuevo. Un nombre repetido
 // no sobrescribe nada: la identidad es el ID.
 function _wsToolSaveAs() {
@@ -26061,13 +26160,28 @@ function _wsToolSaveBarHtml() {
   // jerarquía: Eliminar no compite con Guardar. Ahora Guardar es la única
   // acción primaria y el ciclo de vida vive en un menú secundario, que es un
   // `<details>` NATIVO: teclado y lector de pantalla sin un manejador nuevo.
-  const lifecycle = _wsToolEditId ? `
+  // ── «ABRIR GUARDADO» NO PUEDE DEPENDER DE TENER UNO ABIERTO ─────────────
+  // El menú sólo existía con una instancia abierta, porque sólo ofrecía su ciclo
+  // de vida. Pero volver a un cálculo guardado se hace precisamente cuando NO
+  // tienes ninguno abierto, así que el menú aparece también cuando hay algo que
+  // abrir. Es la puerta que sustituye a la que tenían en Mi espacio y en el
+  // Resumen, y va PRIMERA porque es la que más se usa.
+  let _savedCount = 0;
+  // Sin excluir el abierto: la puerta existe si hay ALGO guardado. Excluirlo
+  // hacía desaparecer «Abrir guardado» justo cuando sólo hay un documento, que
+  // es cuando más natural es querer volver a la lista.
+  try { _savedCount = _wsSaveCandidates(_wsToolStateType(_wsToolActive), null).length; } catch (_) { _savedCount = 0; }
+  const _openItem = _savedCount > 0
+    ? `<button type="button" class="wsg-menu-item" data-wstool-open>${esc(t('wstool_open_saved'))}</button>` : '';
+  const _lifeItems = _wsToolEditId ? `
+        <button type="button" class="wsg-menu-item" data-wstool-saveas>${esc(t('wstool_saveas'))}</button>
+        <button type="button" class="wsg-menu-item" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
+        <button type="button" class="wsg-menu-item is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>` : '';
+  const lifecycle = (_openItem || _lifeItems) ? `
     <details class="wsg-menu">
       <summary class="wsg-menu-sum" aria-label="${esc(t('wsg_more_aria'))}"><span aria-hidden="true">···</span></summary>
       <div class="wsg-menu-body" role="group" aria-label="${esc(t('wsg_more_aria'))}">
-        <button type="button" class="wsg-menu-item" data-wstool-saveas>${esc(t('wstool_saveas'))}</button>
-        <button type="button" class="wsg-menu-item" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
-        <button type="button" class="wsg-menu-item is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>
+        ${_openItem}${_lifeItems}
       </div>
     </details>` : '';
   return `

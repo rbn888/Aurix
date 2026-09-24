@@ -629,9 +629,15 @@ console.log('\n6 · Mi espacio:');
   ok('6.4 quitar la estrella lo saca', h.indexOf('wsh-mse2-card') === -1);
   R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id:"p1", type:"monthly_budget", customName:"Presupuesto empresa", revision:1, updatedAt:7, results:{} }]));');
   h = space();
-  ok('6.5 un DOCUMENTO guardado sí, con SU nombre y su tipo propio',
-    (h.match(/data-wsmse-type="doc"/g) || []).length === 1
-    && h.indexOf('Presupuesto empresa') !== -1 && /data-wsmse-tpl="1"/.test(h));
+  // RE-DECIDIDO (2026-09-24): Mi Espacio son FAVORITOS. Este assert exigía lo
+  // contrario —que un documento guardado apareciera aquí— y esa mezcla era el
+  // defecto: capacidad, favorito y documento son tres cosas distintas y se
+  // pintaban como dos. El documento no desaparece: se abre desde el Resumen (si
+  // es de plantilla) o desde «Abrir guardado» de su herramienta. Lo que aquí se
+  // exige ahora es que guardar NO ensucie la lista de favoritos.
+  ok('6.5 guardar un documento NO lo mete en Mi espacio (ni toca los favoritos)',
+    (h.match(/data-wsmse-type="doc"/g) || []).length === 0
+    && h.indexOf('Presupuesto empresa') === -1 && /data-wsmse-tpl="0"/.test(h));
   // RE-DECIDIDO (§8), Y MÁS FUERTE. Esto exigía que la miniatura del documento
   // se construyera desde SUS `results`, porque la versión anterior leía el
   // borrador local de la herramienta y la tarjeta de un presupuesto podía
@@ -645,9 +651,12 @@ console.log('\n6 · Mi espacio:');
     && !/_wsProjPreviewHtml/.test(app.replace(/^\s*\/\/.*$/gm, '')));
   ok('6.5c y la miniatura es una ilustración: no la dicta un lector de pantalla',
     /class="wsh-mse2-pv" aria-hidden="true"/.test(app));
-  ok('6.6 el favorito y el documento NO se fusionan',
-    /mtype: 'fav'/.test(app) && /mtype: 'doc'/.test(app)
-    && /data-wsmse-type="\$\{it\.mtype\}"/.test(app));
+  // Y no se fusionan porque ya ni siquiera conviven: Mi Espacio tiene UNA
+  // fuente. El tipo se sigue declarando en el DOM —es lo que permite afirmar
+  // que ahí sólo hay favoritos— y la composición ya no concatena documentos.
+  ok('6.6 el favorito y el documento NO se fusionan: Mi espacio tiene UNA fuente',
+    /mtype: 'fav'/.test(app) && /data-wsmse-type="\$\{it\.mtype\}"/.test(app)
+    && !/favItems\([^)]*\)\s*\n?\s*\.concat\(docItems/.test(app));
   ok('6.7 «actualizado hace…» sobrevive sólo como metadato, no como pertenencia',
     /t\('wsmse2_updated'\)/.test(app) && /t\('wsmse2_fav'\)/.test(app)
     && !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app));

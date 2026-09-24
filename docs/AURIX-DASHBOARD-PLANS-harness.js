@@ -90,13 +90,22 @@ console.log('1 · El conjunto publicado:');
   // mientras su instancia queda fuera. Ahora entran TODAS las capacidades que
   // guardan documento… y lo INTERNO sigue fuera, que es la otra mitad: `x3` es
   // `asset_prices`, no está publicada, y el gate de apertura la deja fuera sola.
-  // AMPLIADO en §11 con `x5` (comparación de escenarios): la lista crece cuando
-  // crece el conjunto de capacidades que guardan documento — no se ha aflojado
-  // nada, se ha añadido un tipo que antes no existía.
-  ok('1.1 TODA instancia guardada de una capacidad publicada, incluidas herramientas',
-    ids.indexOf('x1') !== -1 && ids.indexOf('x2') !== -1 && ids.indexOf('x5') !== -1
-    && ['d1','d2','d3','d4','d5'].every(x => ids.indexOf(x) !== -1)
-    && ids.length === 8, JSON.stringify(ids));
+  // RE-DECIDIDO (2026-09-24) por el contrato de producto: «Tus planes» publica
+  // los documentos de las PLANTILLAS. Los de las tres HERRAMIENTAS (`x1`
+  // compuesto, `x2` préstamo, `x5` escenarios) salen de aquí y se abren desde su
+  // propia capacidad, con «Abrir guardado».
+  // NO es un recorte de acceso y por eso se comprueba aquí: ese acceso existe
+  // ANTES de retirar este (`_wsToolOpenSaved` + `data-wstool-open`), y no se ha
+  // borrado, migrado ni transformado un solo documento.
+  ok('1.1 TODA instancia guardada de una PLANTILLA publicada, y sólo ésas',
+    ['d1','d2','d3','d4','d5'].every(x => ids.indexOf(x) !== -1)
+    && ['x1','x2','x5'].every(x => ids.indexOf(x) === -1)
+    && ids.length === 5, JSON.stringify(ids));
+  ok('1.1c …y los de herramienta conservan su puerta dentro de la herramienta',
+    /function _wsToolOpenSaved\(\)/.test(app) && /data-wstool-open/.test(app) &&
+    /_wsOpenTool\(_wsToolActive, d\.id\)/.test(app) &&
+    // Y el simulador de escenarios, su gemelo.
+    /data-wsb2-open/.test(app) && /_wsbOpenDoc\(d\.id\)/.test(app));
   ok('1.1b …y lo INTERNO sigue fuera: no publicado no aparece',
     ids.indexOf('x3') === -1, JSON.stringify(ids));
   ok('1.2 un documento con tombstone NO resucita en esta vista',
@@ -111,24 +120,23 @@ console.log('1 · El conjunto publicado:');
   const html1 = R(c, '_renderDashboardPlans()');
   // Una simulación se rotula como tal: un capital final proyectado no es un
   // hecho patrimonial, y la tarjeta tiene que decirlo.
-  ok('1.3b las simulaciones se rotulan como proyección, y las plantillas no',
+  ok('1.3b ninguna plantilla se rotula como proyección (y el rótulo sigue disponible)',
     (() => { const h = R(c, '_renderDashboardPlans()');
+      // Sin documentos de herramienta en esta vista no queda ninguna simulación
+      // que rotular: las cinco plantillas publican hechos, no proyecciones. El
+      // rótulo NO se retira —sigue en el render— para que la primera plantilla
+      // que proyecte lo herede sin volver a inventarlo.
       const simCards = (h.match(/wspl-sim/g) || []).length;
-      return simCards === 3; })(),
+      return simCards === 0 && /class="wspl-sim"/.test(app); })(),
     (R(c, '_renderDashboardPlans()').match(/wspl-sim/g) || []).length + ' rótulos');
   ok('1.4 dos plantillas del MISMO tipo mantienen nombre e identidad propios',
     /data-wspl-id="d1"/.test(html1) && /data-wspl-id="d2"/.test(html1)
     && html1.indexOf('Presupuesto casa') !== -1 && html1.indexOf('Presupuesto viaje') !== -1
     && (html1.match(/data-wspl-open="d[12]"/g) || []).length === 2);
-  // Y sus dos cifras salen de lo GUARDADO. Si la tarjeta recalculase, leería los
-  // parámetros vivos de la superficie —que son de OTRO borrador— y publicaría una
-  // comparación que ese documento nunca hizo.
-  ok('1.4b la comparación guardada publica SUS cifras, no un recálculo',
-    (() => {
-      const m = JSON.parse(R(c, `JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === 'x5')).map(x => x.v))`));
-      return m.length === 2 && /456\.7|456,7|456745/.test(m[0]) && /136\.0|136,0|136031/.test(m[1]);
-    })(),
-    R(c, `JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === 'x5')))`));
+  // El assert de las cifras de la comparación se traslada: ese documento ya no
+  // se publica aquí. Su contrato —las métricas salen de lo GUARDADO, nunca del
+  // borrador vivo— se sigue comprobando sobre los tipos que sí publican, y la
+  // sonda de guardado lo verifica extremo a extremo al reabrirlo.
   ok('1.5 esta vista no escribe: no hay una segunda persistencia',
     !/setItem|_wshWriteStore|_ws4Persist|_ws4SaveAll/.test(
       fnSrc('_wsPlansDocs') + fnSrc('_wsPlanMetrics') + fnSrc('_renderDashboardPlans') + fnSrc('updateDashboardPlans')));

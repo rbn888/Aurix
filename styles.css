@@ -28664,3 +28664,47 @@ body.ws-cover .aurix-workspace {
   min-height: 0;
 }
 body.ws-cover .aurix-wsh { max-width: none; }
+
+
+/* ── LA ESTRELLA DE FAVORITO: 44×44 DE VERDAD ──────────────────────────────
+   El control medía 28×28 CSS px. Se mantiene ese tamaño VISUAL —una estrella de
+   44 px sobre una tarjeta sería un botón compitiendo con el contenido— y el
+   área táctil se extiende con un pseudoelemento centrado, que es el patrón que
+   este repo ya usa para los controles pequeños: crece lo que se toca, no lo que
+   se ve. Sin `::after` no había forma de acertar con el pulgar. */
+.wsh-pin { position: absolute; }
+.wsh-pin::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+  border-radius: 10px;
+}
+/* El contraste de la estrella no puede depender de la imagen que tenga debajo:
+   la tarjeta de plantilla lleva fotografía y la de herramienta no. El fondo
+   propio del control es el que lo garantiza en las dos. */
+.wsh-pin { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+@media (prefers-reduced-motion: reduce) { .wsh-pin { transition: none; } }
+
+/* ── PORTADA DE LAS HERRAMIENTAS ───────────────────────────────────────────
+   Las plantillas llevan fotografía; las herramientas llevaban un icono de 23 px
+   en la misma rejilla. Mismo precio, dos acabados. Aquí va su ilustración: SVG
+   propio, sin descarga y sin dependencia externa, con la caja RESERVADA para
+   que la tarjeta no salte al pintarse. Abstracta a propósito — ni una cifra. */
+.wsh-toolcover {
+  display: block; width: 100%; height: 76px; border-radius: 10px; overflow: hidden;
+  background: linear-gradient(165deg, rgba(74,130,240,0.14), rgba(74,130,240,0.03));
+  border: 1px solid rgba(120,160,255,0.14);
+}
+.wsh-toolcover svg { display: block; width: 100%; height: 100%; }
+.wsh-toolcover .wsc-line { stroke: #7fb0ff; stroke-width: 2.4; fill: none; }
+.wsh-toolcover .wsc-line.is-alt { stroke: rgba(226,188,110,0.92); stroke-dasharray: 5 4; }
+.wsh-toolcover .wsc-area { fill: rgba(74,130,240,0.18); stroke: none; }
+.wsh-toolcover .wsc-dot { fill: #9fc2ff; stroke: none; }
+.wsh-toolcover .wsc-bars rect { fill: rgba(127,176,255,0.55); }
+.wsh-toolcover .wsc-bar-last { fill: rgba(226,188,110,0.85); }
+/* La tarjeta de herramienta deja de ser una fila de icono + nombre y pasa a la
+   MISMA arquitectura que la de plantilla: portada arriba, nombre y acción
+   debajo. Es lo que hace que las ocho se lean como un solo catálogo. */
+.wsh-toolcard:has(.wsh-toolcover) { padding: 10px 10px 12px; gap: 10px; align-items: stretch; }
+.wsh-toolcard:has(.wsh-toolcover) .wsh-tool-name { padding: 0 4px; }
+.wsh-toolcard:has(.wsh-toolcover) .wsh-toolcard-foot { padding: 0 4px; }
+@media (prefers-reduced-motion: reduce) { .wsh-toolcover { transition: none; } }

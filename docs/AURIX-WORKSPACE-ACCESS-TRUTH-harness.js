@@ -95,7 +95,7 @@ function ctx(persona, langCode) {
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
    '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
-   '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA',
+   '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA','_WS_TOOL_COVER',
    '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL',
    '_WS_FOUNDER_VIEW_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',
@@ -108,12 +108,19 @@ function ctx(persona, langCode) {
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
    '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover',
    '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon','_wsBudgetCurrentPeriod',
+   // La portada ilustrada de las tres herramientas: se ejecuta la REAL, no un
+   // stub, porque es la que decide qué pinta cada tarjeta del catálogo.
+   '_wsToolCoverHtml',
    '_wsCanPersist','_wsPersistUpsell','_wsOpenSurface','_wsTogglePin','_wsTouch',
    // SPEC P0 — el guard de vista, la vista técnica de fundador y el contrato de
    // documento (revisión + tombstone). Se ejecutan los REALES, no un stub.
    '_wsPremiumShell','_renderWorkspacePending','_wsFounderViewFlag','_wsInternalViewOn',
    '_ws4ProjectsRaw','_ws4Projects','_wsDocStamp','_wsScenariosRaw','_wsScenarios',
-   '_wsgGoalsRaw','_wsgGoals','_wsxOpen'].forEach(n => {
+   '_wsgGoalsRaw','_wsgGoals','_wsxOpen',
+   // El listado de documentos de UNA capacidad: es la lista que alimenta tanto
+   // el selector de reemplazo como «Abrir guardado», la puerta que sustituye a
+   // la que los documentos tenían en Mi Espacio.
+   '_wsSaveCandidates','_wsLabel','_wsRelTime'].forEach(n => {
      try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); }
    });
   // `_wsOpenTool` se instrumenta: se conserva su CUERPO real (con sus gates) y sólo
@@ -435,50 +442,56 @@ console.log('\n5 · Mi espacio:');
       const h = home(c, 'space');
       return h.indexOf('wsh-mse2-card') === -1; })());
   R(c, '_wsTogglePin("tool:compound")');
-  // 2 · un DOCUMENTO guardado puebla la columna de SU capacidad, con SU nombre.
+  // ── RE-DECIDIDO (2026-09-24): MI ESPACIO SON FAVORITOS, Y NADA MÁS ───────
+  // Este bloque exigía que un DOCUMENTO guardado poblara la columna de su
+  // capacidad en Mi Espacio. El contrato de producto separa tres entidades
+  // —capacidad, favorito y documento— y esa mezcla era justo el defecto: una
+  // tarjeta decía «capacidad que fijé» y la de al lado «presupuesto que
+  // guardé», con la misma forma, y una capacidad con tres documentos aparecía
+  // cuatro veces.
+  // Las GARANTÍAS de los asserts que había aquí no se pierden: se comprueban
+  // donde los documentos viven ahora — la lista de documentos de la capacidad,
+  // que alimenta «Abrir guardado» y el Resumen.
   R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: Date.now(), results: {} }]))');
   const both = home(c, 'space');
-  ok('5.5 un documento GUARDADO puebla su columna aunque no se haya abierto hoy',
-    both.indexOf('data-wsmse-tpl="1"') !== -1 && both.indexOf('data-wsmse-tool="1"') !== -1,
+  ok('5.5 un documento guardado NO entra en Mi Espacio: allí sólo hay favoritos',
+    both.indexOf('data-wsmse-type="doc"') === -1 && both.indexOf('data-wsmse-tpl="0"') !== -1,
     both.slice(both.indexOf('data-wsmse-cols'), both.indexOf('data-wsmse-cols') + 70));
-  ok('5.6 …y lleva el NOMBRE que le puso el usuario, no el de la plantilla',
-    names(both).indexOf('Presupuesto empresa') !== -1
-    && both.indexOf('data-wsmse-type="doc"') !== -1,
-    JSON.stringify(names(both)));
-  ok('5.6b un favorito y un documento no se fusionan: son tipos distintos',
+  ok('5.5b …y el favorito que SÍ hay sigue estando, intacto',
     (both.match(/data-wsmse-type="fav"/g) || []).length === 1
-    && (both.match(/data-wsmse-type="doc"/g) || []).length === 1);
-  ok('5.6c VARIAS instancias de la MISMA capacidad conviven, sin sobrescribirse',
+    && both.indexOf('data-wsmse-tool="1"') !== -1, JSON.stringify(names(both)));
+  ok('5.6 el documento existe y conserva el NOMBRE que le puso el usuario',
+    (function () {
+      const d = JSON.parse(R(c, 'JSON.stringify(_wsSaveCandidates("monthly_budget", null))'));
+      return d.length === 1 && d[0].name === 'Presupuesto empresa';
+    })(), R(c, 'JSON.stringify(_wsSaveCandidates("monthly_budget", null).map(function(d){return d.name;}))'));
+  ok('5.6c VARIAS instancias de la MISMA capacidad conviven, sin deduplicar por título',
     (function () {
       R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([' +
         '{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 2, results: {} },' +
         '{ id: "p2", type: "monthly_budget", customName: "Presupuesto personal", revision: 1, updatedAt: 3, results: {} },' +
         '{ id: "p3", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 4, results: {} }]))');
-      const h = home(c, 'space');
-      return h.indexOf('data-wsmse-tpl="3"') !== -1
-        && (h.match(/data-wsmse-type="doc"/g) || []).length === 3;
-    })());
-  ok('5.6d un documento con tombstone desaparece y NO resucita',
+      const d = JSON.parse(R(c, 'JSON.stringify(_wsSaveCandidates("monthly_budget", null))'));
+      // TRES, con dos títulos repetidos: la identidad es el id, nunca el nombre.
+      return d.length === 3 && new Set(d.map(x => x.id)).size === 3
+        && d.filter(x => x.name === 'Presupuesto empresa').length === 2;
+    })(), R(c, 'JSON.stringify(_wsSaveCandidates("monthly_budget", null).map(function(d){return d.id + ":" + d.name;}))'));
+  ok('5.6d un documento con tombstone no se ofrece, y su registro NO se borra',
     (function () {
       R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([' +
         '{ id: "p1", type: "monthly_budget", customName: "Borrado", revision: 2, deletedAt: 9, updatedAt: 9, results: {} },' +
         '{ id: "p2", type: "monthly_budget", customName: "Vivo", revision: 1, updatedAt: 3, results: {} }]))');
-      const h = home(c, 'space');
+      const d = JSON.parse(R(c, 'JSON.stringify(_wsSaveCandidates("monthly_budget", null))'));
       const raw = R(c, '_ws4ProjectsRaw().length'), live = R(c, '_ws4Projects().length');
-      return h.indexOf('data-wsmse-tpl="1"') !== -1
-        && names(h).indexOf('Vivo') !== -1 && names(h).indexOf('Borrado') === -1
-        // el tombstone SIGUE en el almacén: es lo que se sube como `deleted_at`
-        && raw === 2 && live === 1;
-    })(),
-    JSON.stringify({ tpl: (home(c, 'space').match(/data-wsmse-tpl="\d+"/) || [])[0],
-                     names: names(home(c, 'space')),
-                     raw: R(c, '_ws4ProjectsRaw().length'), live: R(c, '_ws4Projects().length') }));
-  ok('5.7 las tarjetas de Mi espacio abren de verdad (el favorito su capacidad, el documento su instancia)',
+      return d.length === 1 && d[0].name === 'Vivo' && raw === 2 && live === 1;
+    })());
+  // Con una sola fuente hay una sola tarjeta: la del favorito. Y abre.
+  ok('5.7 las tarjetas de Mi espacio abren de verdad (cada favorito, su capacidad)',
     (function () {
       R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 5, results: {} }]))');
       const h = home(c, 'space');
       const cd = cards(h).filter(x => /wsh-mse2-card/.test(x.cls));
-      return cd.length === 2 && cd.every(x => destination(c, x).kind === 'opened');
+      return cd.length === 1 && cd.every(x => destination(c, x).kind === 'opened');
     })(),
     JSON.stringify(cards(home(c, 'space')).filter(x => /wsh-mse2-card/.test(x.cls)).map(x => destination(c, x))));
   // Y un usuario Free no puede ver en Mi Espacio algo que no puede abrir.

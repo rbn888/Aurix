@@ -837,9 +837,12 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     // DOCUMENTOS guardados (atribuidos a su capacidad por `_wsSurfaceEntry`). La
     // garantía que este assert protege —que no hay un segundo catálogo escrito a
     // mano— sigue anclada, ahora sobre las dos fuentes.
+    // ACTUALIZADO (2026-09-24): `_wsSurfaceEntry(sf)` vivía en la rama de
+    // DOCUMENTOS, que se ha retirado de Mi Espacio —ahora son sólo favoritos—.
+    // Lo que este assert protege sigue en pie y es lo que importa: la columna se
+    // deriva del CATÁLOGO, no de una lista escrita a mano.
     ok('M3.7 la columna "Mis plantillas" de Mi Espacio se DERIVA del catálogo',
       /const favItems = \(map, kind\) => _wsCatalogFor\(kind\)/.test(app) &&
-      /const entry = _wsSurfaceEntry\(sf\);/.test(app) &&
       /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
       !/const TPL_CAT = \[\];/.test(app));
     ok('M3.8 el cover reutiliza un asset YA existente de esa plantilla (no se añade ninguno)',
@@ -876,11 +879,19 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     // usuario, así que el espacio se llenaba con lo que pasó por delante. Ahora
     // pertenecer es INTENCIONAL (favorito o documento nombrado) y la última
     // apertura sobrevive sólo como METADATO de un favorito.
-    ok('M3.13 Mi Espacio distingue el FAVORITO (acceso) del DOCUMENTO (instancia)',
-      /mtype: 'fav'/.test(app) && /mtype: 'doc'/.test(app) &&
+    // RE-DECIDIDO otra vez, y hasta el final: distinguirlos no bastaba. Un
+    // favorito y un documento son entidades DISTINTAS —acceso a una capacidad
+    // frente a trabajo guardado— y convivir en la misma rejilla hacía que una
+    // capacidad con tres documentos apareciera cuatro veces. Mi Espacio publica
+    // favoritos; el trabajo guardado se abre desde el Resumen (plantillas) o
+    // desde «Abrir guardado» de su herramienta.
+    ok('M3.13 Mi Espacio publica FAVORITOS, y el documento tiene su propia casa',
+      /mtype: 'fav'/.test(app) &&
       /data-wsmse-type="\$\{it\.mtype\}"/.test(app) &&
-      (app.match(/wsmse2_fav:/g) || []).length === 2 &&
-      (app.match(/wsmse2_updated:/g) || []).length === 2);
+      !/favItems\([^)]*\)\s*\n?\s*\.concat\(docItems/.test(app) &&
+      // Y la casa existe de verdad: la puerta dentro de la herramienta.
+      /function _wsToolOpenSaved\(\)/.test(app) && /data-wstool-open/.test(app) &&
+      (app.match(/wsmse2_fav:/g) || []).length === 2);
     ok('M3.13b y la última apertura ya NO decide la pertenencia, sólo acompaña',
       !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
       /used: _wsRecentTs\(m\.pinRef\)/.test(app));
