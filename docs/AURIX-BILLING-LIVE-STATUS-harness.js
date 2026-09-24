@@ -181,8 +181,20 @@ console.log('\n4 · Los bloqueos, uno a uno:');
     ['precio archivado en Stripe', { rows: LIVE_ROWS, stripePrices: Object.assign({}, LIVE_PRICES, {
         price_live_month: Object.assign({}, LIVE_PRICES.price_live_month, { active: false }) }) },
       ['price_inactive_in_stripe:month']],
-    ['prueba gratuita encendida sin decisión', { rows: [Object.assign({}, LIVE_ROWS[0], { trial_days: 7 }), LIVE_ROWS[1]], stripePrices: LIVE_PRICES },
-      ['trial_enabled:year']],
+    // RENOMBRADO (2026-09-24): el bloqueo se llamaba `trial_enabled`, que no
+    // decía DÓNDE estaba encendido. Hay dos sitios y sólo se miraba uno.
+    ['prueba gratuita encendida en NUESTRO catálogo', { rows: [Object.assign({}, LIVE_ROWS[0], { trial_days: 7 }), LIVE_ROWS[1]], stripePrices: LIVE_PRICES },
+      ['trial_in_catalogue:year']],
+    // ── EL HUECO QUE ESTE ENDPOINT TENÍA ──────────────────────────────────
+    // Un precio de Stripe puede llevar su propio `trial_period_days`. No pasa
+    // por nuestra tabla —lo aplica Stripe, no nuestro checkout—, así que el
+    // diagnóstico decía «sin trial» mientras la pasarela enseñaba un periodo de
+    // prueba. Exactamente la pregunta que el fundador no podía responder sin
+    // abrir el panel a ojo.
+    ['prueba gratuita configurada en el PRECIO de Stripe', { rows: LIVE_ROWS, stripePrices: Object.assign({}, LIVE_PRICES, {
+        price_live_year: Object.assign({}, LIVE_PRICES.price_live_year, {
+          recurring: { interval: 'year', interval_count: 1, trial_period_days: 14 } }) }) },
+      ['trial_in_stripe_price:year']],
     ['sin signing secret', { env: { STRIPE_WEBHOOK_SECRET: '' }, rows: LIVE_ROWS, stripePrices: LIVE_PRICES },
       ['webhook_secret_missing']],
     ['el webhook LIVE no existe', { rows: LIVE_ROWS, stripePrices: LIVE_PRICES, hooks: [] },

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '708'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '709'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -10453,6 +10453,21 @@ function switchLang(newLang) {
     const _st = _ss && !_ss.hidden ? _ss.getAttribute('data-state') : null;
     if (_st && _st !== 'saved-faded') _setSaveStatus(_st);
   } catch (_) {}
+  // ── Y LA ETIQUETA DE ESTADO DEL GRÁFICO ──────────────────────────────────
+  // MEDIDO: con la app en inglés se leía «Historial insuficiente». El resolver
+  // del gráfico traduce bien —devuelve «Insufficient history» cuando se le
+  // pregunta—, pero esa etiqueta se ESCRIBE en el pintado y `applyI18n` no la
+  // alcanza: la que ya estaba en pantalla se quedaba en el idioma anterior
+  // hasta el siguiente repintado del gráfico.
+  //
+  // Lo que se hace aquí es un cambio de IDIOMA, no de estado: se sustituye el
+  // texto por el equivalente de la MISMA clave en el nuevo idioma, y sólo si
+  // coincide EXACTAMENTE con uno de los cinco textos de estado conocidos. No se
+  // vuelve a ejecutar nada del motor, no se recalcula ninguna serie y no se
+  // toca ningún criterio de suficiencia: si el texto no es uno de los cinco, no
+  // se toca. Repintar el gráfico para traducir una palabra sería rehacer
+  // trabajo financiero por un motivo tipográfico.
+  try { _aurixRelabelChartStateTexts(); } catch (_) {}
   // SPEC GLOBAL-LANGUAGE — retranslate DERIVED Settings surfaces that applyI18n() cannot reach
   // (they are not [data-i18n]): the Investor-Profile summary values + the segmented button
   // active state. Idempotent no-ops when the Settings modal is closed. Fixes the "Investor
@@ -20951,6 +20966,15 @@ function renderWorkspaceHome(container) {
     // Premium nunca ve la portada comercial: entra directamente en Workspace.
     _wshView = 'home';
   }
+
+  // ── LA PORTADA Y LA ESPERA NO SON EL INTERIOR ───────────────────────────
+  // Se declara la VISTA en el body para que el CSS pueda acotar el full-bleed:
+  // la portada comercial y la espera comparten shell con el resto de la app
+  // (mismo header, mismos márgenes, misma columna que Intelligence), y el
+  // interior conserva su ancho completo. Es una marca de superficie, no de plan.
+  try {
+    document.body.classList.toggle('ws-cover', _wshView === 'free_cover' || _wshView === 'pending');
+  } catch (_) {}
 
   if (_wshView === 'scenario') {
     if (shown === 'scenario') return;
@@ -38763,6 +38787,42 @@ function _aurixResolveReturnPresentation(frc) {
   return 'RETURN_UNAVAILABLE';
 }
 try { if (typeof window !== 'undefined') window._aurixResolveReturnPresentation = _aurixResolveReturnPresentation; } catch (_) {}
+// ── TRADUCIR LO YA PINTADO, SIN VOLVER A PINTARLO ──────────────────────────
+// Las cinco etiquetas de estado del gráfico se escriben en el pintado, así que
+// un cambio de idioma en caliente no las alcanza. Esto las sustituye por su
+// equivalente en el idioma activo, y NADA MÁS: recorre los nodos de etiqueta,
+// compara el texto con los cinco valores conocidos del OTRO idioma y, si hay
+// coincidencia exacta, escribe el de este. Cualquier otro contenido se queda
+// como está. No lee series, no recalcula y no decide estados.
+const _AURIX_CHART_STATE_KEYS = Object.freeze([
+  'chartPartialHistory', 'chartAvailableHistory', 'chartInsufficientHistory',
+  'chartReturnUnavailable', 'chartCalculating',
+]);
+function _aurixRelabelChartStateTexts(root) {
+  if (typeof document === 'undefined' || typeof T === 'undefined') return 0;
+  const cur = (typeof lang !== 'undefined' && T[lang]) ? T[lang] : null;
+  if (!cur) return 0;
+  // El diccionario del que venimos es el OTRO: con dos idiomas, es el que no es
+  // el activo. Se construye el mapa texto-anterior → texto-nuevo por CLAVE.
+  const map = new Map();
+  Object.keys(T).forEach(code => {
+    if (code === lang || !T[code]) return;
+    _AURIX_CHART_STATE_KEYS.forEach(k => {
+      const from = T[code][k], to = cur[k];
+      if (typeof from === 'string' && typeof to === 'string' && from && to && from !== to) map.set(from, to);
+    });
+  });
+  if (!map.size) return 0;
+  let n = 0;
+  const scope = root || document;
+  scope.querySelectorAll('.wsc-metric-val, .wsc-metric-calc').forEach(el => {
+    if (el.children.length) return;                  // sólo hojas de texto
+    const txt = (el.textContent || '').trim();
+    const next = map.get(txt);
+    if (next) { el.textContent = next; n++; }
+  });
+  return n;
+}
 // Texto visible de cada estado de presentación (uno solo, para pintor y auditoría).
 function _aurixReturnPresentationText(pres) {
   const i18n = (k, f) => (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n(k, f) : f;
@@ -61520,8 +61580,18 @@ function _applyTab(tab) {
   // rejilla real es la única que se pinta y el full-bleed pasa a depender sólo de la
   // pestaña. (Antes: el preview debía renderizar en el shell normal para que el
   // logo no se moviera; ese caso ya no existe.)
+  // ── EL FULL-BLEED SIGUE DEPENDIENDO SÓLO DE LA PESTAÑA ──────────────────
+  // Se intentó hacerlo depender también del plan para que la portada Free
+  // compartiera geometría con Intelligence, y el gate G.2 lo rechazó con razón:
+  // acoplar el SHELL al derecho es la puerta por la que volvió a entrar, en su
+  // día, el bloqueo global de Workspace. La diferencia real no es de plan sino
+  // de VISTA —la portada es otra superficie—, así que la marca el render con
+  // `body.ws-cover` y el CSS acota ahí las reglas de full-bleed.
   const _wsFullBleed = (tab === 'workspace');
   document.body.classList.toggle('workspace-active', _wsFullBleed);
+  // Fuera de Workspace no hay portada que marcar: se limpia con su hermana para
+  // que ninguna regla acotada sobreviva a la navegación.
+  if (!_wsFullBleed) { try { document.body.classList.remove('ws-cover'); } catch (_) {} }
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');
   const workspaceEl = document.getElementById('aurixWorkspace');
@@ -61843,7 +61913,14 @@ function _aurixIntelligencePreviewHTML() {
 
   const style = ''
     + '<style>'
-    + '.intprev-stage{position:relative;width:100%;display:flex;align-items:stretch;justify-content:center;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    // ── COMPACTACIÓN MÓVIL: LA TARJETA SE AJUSTA A SU CONTENIDO ──────────
+    // Con `align-items:stretch` la tarjeta se estiraba a todo el alto de la
+    // pestaña y, como el CTA lleva `margin-top:auto`, el estado sin activos
+    // dejaba un agujero de ~600 px entre el texto y el botón. `flex-start`
+    // la deja del tamaño de lo que dice; el `max-height` sigue puesto, así
+    // que con muchos hechos la tarjeta se topa y hace su scroll interno
+    // como hasta ahora. En ≥768 px manda `align-items:center`, que ya estaba.
+    + '.intprev-stage{position:relative;width:100%;display:flex;align-items:flex-start;justify-content:center;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
     // SIN `min-height` EN MÓVIL. La medición encontró los últimos 24 px de scroll de
     // página en 360×740: el stage pedía `100dvh − 116px` (624 px) mientras `#appRoot`
     // YA reserva 68 px de padding para la navegación, así que el alto se contaba dos
@@ -61884,8 +61961,10 @@ function _aurixIntelligencePreviewHTML() {
     + '.intprev-sub{flex:0 0 auto;font-size:13.5px;line-height:1.5;color:rgba(198,214,246,0.76);margin:0 0 14px;}'
     + '.intprev-bridge{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.78);margin:0 0 6px;}'
     + '.intprev-bridge-b{flex:0 0 auto;font-size:14px;line-height:1.45;color:rgba(214,228,250,0.9);margin:0 0 12px;}'
-    + '.intprev-cta{width:100%;font-size:15px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.14);border:1px solid rgba(120,170,255,0.44);border-radius:14px;min-height:52px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
-    + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
+    // MISMO CTA que la portada de Workspace: el gesto es el mismo y no puede
+    // pintarse en dos idiomas visuales. Azul Aurix sólido, el de «Continuar».
+    + '.intprev-cta{width:100%;font-size:15px;font-weight:700;color:#fff;background:linear-gradient(180deg,rgba(90,145,255,1),rgba(58,110,232,1));border:1px solid rgba(120,170,255,0.55);border-radius:14px;min-height:52px;padding:0 20px;cursor:pointer;box-shadow:0 6px 20px rgba(60,110,255,0.22);transition:filter .2s;}'
+    + '.intprev-cta:hover{filter:brightness(1.08);}'
     + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;flex:0 0 auto;margin-top:auto;}'
     + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
     + '.intprev-hold-body{flex:0 1 auto;min-height:0;overflow-y:auto;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
@@ -78938,20 +79017,34 @@ function _aurixBillingReturnFlow() {
     }
   } catch (_) { flag = null; }
   if (!flag) return;
-  if (flag === 'cancelled') { _aurixBillingToast(t('pw_cancelled'), 'info'); return; }
+  // ── EL EMBUDO, HASTA EL FINAL ────────────────────────────────────────────
+  // El registro existente cubría hasta «pulsó comprar». De ahí en adelante no
+  // había nada, así que era imposible distinguir «volvió del checkout» de
+  // «se confirmó de verdad» — y son justo los dos pasos donde se pierde gente.
+  // Se reutiliza el MISMO ledger local (sin proveedor nuevo, sin importes, sin
+  // documentos y sin datos personales) con claves propias del embudo, que no se
+  // pueden confundir con una intención sobre una capacidad.
+  // No se duplica por repintado: el parámetro de retorno se borra de la URL
+  // antes de esto, así que este camino corre UNA vez por vuelta del checkout.
+  const _funnel = (step) => { try { _aurixRecordFunnelStep(step); } catch (_) {} };
+  if (flag === 'cancelled') { _funnel('cancelled'); _aurixBillingToast(t('pw_cancelled'), 'info'); return; }
   if (flag !== 'success') return;
+  _funnel('returned');
   _aurixBillingToast(t('pw_confirming'), 'info');
   let i = 0;
   const tick = () => {
     _aurixEntitlementsLoad({ force: true }).then((st) => {
       if (st && st.loaded && st.plan === 'premium') {
+        // CONFIRMACIÓN AUTORITATIVA: la dice el servidor, no el retorno. Es el
+        // único evento del embudo que significa «vendido».
+        _funnel('confirmed');
         _aurixBillingToast(t('pw_active'), 'success');
         _aurixEntApplyToUi(st.features);
         return;
       }
       i++;
       if (i < _AURIX_BILLING_RETRY_MS.length) setTimeout(tick, _AURIX_BILLING_RETRY_MS[i]);
-      else _aurixBillingToast(t('pw_pending'), 'info');
+      else { _funnel('pending_timeout'); _aurixBillingToast(t('pw_pending'), 'info'); }
     });
   };
   setTimeout(tick, _AURIX_BILLING_RETRY_MS[0]);
@@ -80059,6 +80152,28 @@ let _aurixUpgradeIntents = [];
 // apertura del paywall y la elección de intervalo se iban a la consola y no dejaban
 // rastro. Mismo almacén, misma cota, mismas reglas (nada de PII, nada sale del
 // dispositivo); lo único que cambia es que ahora hay más de un emisor.
+// ── EL EMBUDO TIENE SU PROPIO REGISTRO, Y NO SE MEZCLA CON LAS INTENCIONES ─
+// Una INTENCIÓN es una inferencia («pulsó algo Premium, luego lo quería») y su
+// registro tiene una regla dura: no se anota durante la ventana de boot, porque
+// un Premium de pago que pulse antes de que conteste el resolver ensuciaría la
+// línea base. Un paso del EMBUDO no es una inferencia: es un hecho ocurrido
+// —volvió del checkout, el servidor confirmó—, y ocurre precisamente cuando la
+// página acaba de cargar y el resolver aún no ha contestado.
+// Meterlos en el mismo sitio obligaba a agujerear aquella regla. Se separan: dos
+// hechos distintos, dos registros. Mismo estilo —local, acotado, namespaced por
+// usuario y sin PII—, ningún proveedor nuevo.
+const _AURIX_FUNNEL_KEY = 'aurix_funnel_v1';
+function _aurixRecordFunnelStep(step) {
+  const entry = { step: String(step || '').trim().slice(0, 32), ts: Date.now() };
+  if (!entry.step) return;
+  try {
+    const K = _AURIX_FUNNEL_KEY + (_aurixActiveUserId ? ('_' + _aurixActiveUserId) : '');
+    const raw = localStorage.getItem(K);
+    const arr = raw ? (JSON.parse(raw) || []) : [];
+    arr.push(entry);
+    localStorage.setItem(K, JSON.stringify(arr.slice(-50)));
+  } catch (_) {}
+}
 function _aurixRecordUpgradeIntent(featureKey, source) {
   const entry = { featureKey: String(featureKey || '').trim(),
                   source: String(source || 'unknown').trim(), ts: Date.now() };

@@ -238,6 +238,29 @@ section('D — ES/EN global: simetría total y cero claves huérfanas:');
     const sl = app.slice(app.indexOf('function switchLang('), app.indexOf('function switchLang(') + 2600);
     return /!_ss\.hidden/.test(sl) && /_st !== 'saved-faded'/.test(sl);
   })());
+  // ── LA ETIQUETA DE ESTADO DEL GRÁFICO, MISMO PROBLEMA ───────────────────
+  // MEDIDO en vivo: con la app en inglés se leía «Historial insuficiente». El
+  // resolver del gráfico traduce bien; lo que fallaba es que esa etiqueta se
+  // ESCRIBE en el pintado, así que la ya pintada se quedaba en el idioma
+  // anterior. Se traduce lo pintado SIN repintar el gráfico: repintarlo para
+  // cambiar una palabra sería rehacer trabajo financiero por tipografía.
+  ok('D.8 al cambiar de idioma se re-etiquetan los estados YA pintados del gráfico', (() => {
+    const sl = app.slice(app.indexOf('function switchLang('), app.indexOf('function switchLang(') + 3400);
+    return /_aurixRelabelChartStateTexts\(\)/.test(sl);
+  })());
+  ok('D.8b …por CLAVE y sólo con coincidencia exacta de los cinco textos de estado', (() => {
+    const f = app.slice(app.indexOf('function _aurixRelabelChartStateTexts('),
+                        app.indexOf('// Texto visible de cada estado de presentación'));
+    return /_AURIX_CHART_STATE_KEYS/.test(f) && /map\.get\(txt\)/.test(f)
+        && /el\.children\.length/.test(f)
+        // Y que NO toque nada del motor: ni series, ni recálculo, ni estados.
+        && !/buildProductionPortfolioChart|_aurixResolveChartReturnContract|updateChart|points|returnPct/.test(f);
+  })(), 'la re-etiqueta no puede tocar el motor');
+  ok('D.8c las cinco claves de estado existen en LOS DOS idiomas', (() => {
+    const ES = keysOf(dict('\n  es: {')), EN2 = keysOf(dict('\n  en: {'));
+    return ['chartPartialHistory', 'chartAvailableHistory', 'chartInsufficientHistory',
+            'chartReturnUnavailable', 'chartCalculating'].every(k => ES.has(k) && EN2.has(k));
+  })());
 }
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -232,6 +232,25 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} checkout · los reintentos son finitos y declarados`,
       await page.evaluate(`Array.isArray(_AURIX_BILLING_RETRY_MS) && _AURIX_BILLING_RETRY_MS.length <= 6 && Object.isFrozen(_AURIX_BILLING_RETRY_MS)`));
 
+    // El embudo queda registrado hasta el final, y la confirmación sólo cuenta
+    // cuando la dice el SERVIDOR. Sin importes, sin documentos, sin PII.
+    const funnel = await page.evaluate(`(function(){
+      // El embudo tiene su PROPIO registro: mezclarlo con el de intenciones
+      // obligaba a agujerear la regla que protege esa línea base.
+      var K = _AURIX_FUNNEL_KEY + (_aurixActiveUserId ? ('_' + _aurixActiveUserId) : '');
+      var raw = localStorage.getItem(K); var arr = raw ? (JSON.parse(raw) || []) : [];
+      var steps = arr.map(function(e){ return e.step; });
+      return JSON.stringify({ steps: steps, all: arr.length,
+        // Ni un importe, ni un nombre de documento, ni un correo en el ledger.
+        clean: !/@|\\d+[,.]\\d{2}|presupuesto|budget/i.test(JSON.stringify(arr)) });})()`).then(JSON.parse);
+    ok(`${tag} checkout · el embudo registra el retorno y la confirmación, y no se duplica`,
+      funnel.steps.indexOf('returned') !== -1 && funnel.steps.indexOf('confirmed') !== -1 &&
+      funnel.steps.filter(x => x === 'returned').length === 1 &&
+      funnel.steps.filter(x => x === 'confirmed').length === 1,
+      JSON.stringify(funnel.steps));
+    ok(`${tag} checkout · y el registro no lleva importes, documentos ni correos`,
+      funnel.clean === true, JSON.stringify(funnel).slice(0, 140));
+
     // ══ 7 · «TUS PLANES» TAMBIÉN DEPENDE DEL DERECHO ══════════════════════
     // Tres sitios reaccionaban a un plan confirmado y sólo uno refrescaba esta
     // sección, así que comprar desde el Resumen dejaba el derecho concedido y

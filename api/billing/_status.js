@@ -175,7 +175,7 @@ export default async function handler(req, res) {
     // §2 — «no añadir pruebas gratuitas». Un trial se enciende desde la BD sin
     // desplegar, así que se comprueba aquí.
     entry.checks.no_trial = entry.db.trial_days === 0;
-    if (!entry.checks.no_trial) blockers.push('trial_enabled:' + interval);
+    if (!entry.checks.no_trial) blockers.push('trial_in_catalogue:' + interval);
 
     if (mode === 'unset' || mode === 'publishable_invalid') { catalogue.push(entry); continue; }
     // ── EL PRECIO, EN EL PROVEEDOR. Sólo lectura. ───────────────────────────
@@ -194,6 +194,16 @@ export default async function handler(req, res) {
           currency: String(p.currency || '').toLowerCase(),
           interval: rec.interval || null, interval_count: Number(rec.interval_count) || 0,
           product: typeof p.product === 'string' ? p.product : null,
+          // ── EL TRIAL DEL PROVEEDOR, QUE ANTES NO SE MIRABA ──────────────
+          // Este endpoint comprobaba `trial_days` de NUESTRO catálogo y daba el
+          // asunto por cerrado. Pero un precio de Stripe puede llevar su propio
+          // periodo de prueba (`recurring.trial_period_days`), y ése no pasa por
+          // nuestra tabla: el checkout no lo envía, lo aplica Stripe. Así que
+          // alguien podía ver «período de prueba» en la pasarela con el
+          // diagnóstico diciendo que no hay trial, y la única forma de saberlo
+          // era abrir el panel de Stripe a ojo — exactamente lo que este
+          // endpoint existe para evitar.
+          trial_period_days: Number(rec.trial_period_days) || 0,
         };
         entry.checks.mode_matches_key = (mode === 'live') === (p.livemode === true);
         entry.checks.price_active = p.active === true;
@@ -205,6 +215,11 @@ export default async function handler(req, res) {
         if (!entry.checks.amount_matches_db) blockers.push('amount_mismatch_db_vs_stripe:' + interval);
         if (!entry.checks.currency_matches_db) blockers.push('currency_mismatch_db_vs_stripe:' + interval);
         if (!entry.checks.recurrence_matches) blockers.push('recurrence_mismatch:' + interval);
+        // «Sin prueba gratuita» es una decisión de producto, y hay DOS sitios
+        // donde puede encenderse. Se comprueban los dos y se distinguen por
+        // nombre: saber cuál de los dos lo enciende es la mitad del arreglo.
+        entry.checks.no_trial_in_stripe = entry.stripe.trial_period_days === 0;
+        if (!entry.checks.no_trial_in_stripe) blockers.push('trial_in_stripe_price:' + interval);
       }
     } catch (e) {
       entry.stripe = { found: false, error: 'request_failed' };

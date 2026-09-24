@@ -287,6 +287,81 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       g2.ctaWhole && g2.ctaAboveNav && g2.ctaH >= 52, JSON.stringify({ entero: g2.ctaWhole, sobreNav: g2.ctaAboveNav }));
     await ctx.close();
   }
+
+  // ══ LAS DOS PORTADAS FREE SON LA MISMA CASA ══════════════════════════════
+  // El fundador lo vio antes que ninguna medida: «el botón de menú cambia de
+  // posición», «Workspace empieza más abajo», «parecen sistemas diferentes».
+  // Y era cierto y medible: `workspace-active` libera el shell —quita el
+  // max-width y el padding de `.app` y da al header su propio gutter— y eso se
+  // aplicaba también a la PORTADA, no sólo al interior. Diferencias medidas
+  // antes del arreglo: inicio del contenido 46 vs 58 px (390), margen lateral
+  // 32 vs 12 (768) y 112 vs 170 (1440), ancho 1216 vs 1100.
+  // Se compara coordenada a coordenada, en las dos pestañas, mismo viewport.
+  for (const [w, h] of [[360, 740], [390, 844], [768, 1024], [1440, 900]]) {
+    const ctx = await newCtx(browser, { viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
+    const page = await ctx.newPage();
+    await mount(page, 'es');
+    const geo = async (tab) => {
+      await page.evaluate(`(function(){ switchTab(${JSON.stringify(tab)}); return true; })()`);
+      await page.waitForTimeout(500);
+      return page.evaluate(`(function(){
+        var R = function(e){ if(!e) return null; var r = e.getBoundingClientRect();
+          return { t: Math.round(r.top), l: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) }; };
+        // La SUPERFICIE visible de cada portada (el panel), no su contenedor:
+        // comparar el contenedor de una con la tarjeta de la otra daba números
+        // que no se parecían a lo que se ve.
+        var host = document.querySelector('#aurixWorkspace .wsfc-panel, #tabPlaceholder .intprev-card');
+        var cta  = document.querySelector('#aurixWorkspace .wsfc-cta, #tabPlaceholder .intprev-cta');
+        // NINGUNA de las dos puede nombrar el plan: el precio y el plan viven en
+        // el paywall. Se busca el nombre, no una clase concreta.
+        var surf = document.querySelector('#aurixWorkspace .wsfc-panel, #tabPlaceholder .intprev-card');
+        var names = surf ? /premium|incluido|included/i.test(surf.textContent || '') : false;
+        var ctaCs = cta ? getComputedStyle(cta) : null;
+        return JSON.stringify({ menu: R(document.getElementById('menuToggle')), host: R(host),
+          radius: ctaCs ? ctaCs.borderRadius : null, minH: ctaCs ? ctaCs.minHeight : null,
+          bg: ctaCs ? ctaCs.backgroundImage.slice(0, 60) : null,
+          names: names, docH: document.documentElement.scrollHeight, vh: window.innerHeight });})()`).then(JSON.parse);
+    };
+    const I = await geo('intelligence');
+    const W = await geo('workspace');
+    const tag = `${ENG}.${w}×${h} portadas`;
+    ok(`${tag} · el botón de menú está EN EL MISMO SITIO en las dos`,
+      I.menu && W.menu && I.menu.t === W.menu.t && I.menu.l === W.menu.l && I.menu.w === W.menu.w,
+      JSON.stringify({ int: I.menu, ws: W.menu }));
+    // NO se exige la misma ALTURA de inicio: las dos portadas centran su panel
+    // en el escenario y dicen cosas de largo distinto, así que igualar el top
+    // exigiría un hueco artificial — justo lo que el encargo prohíbe. Lo que sí
+    // se exige es que la columna sea la misma.
+    ok(`${tag} · el panel arranca dentro del primer viewport en las dos`,
+      I.host.t >= 0 && W.host.t >= 0 && I.host.t < I.vh && W.host.t < W.vh,
+      JSON.stringify({ int: I.host.t, ws: W.host.t }));
+    ok(`${tag} · mismos márgenes laterales y mismo ancho de columna`,
+      Math.abs(I.host.l - W.host.l) <= 1 && Math.abs(I.host.w - W.host.w) <= 1,
+      JSON.stringify({ int: [I.host.l, I.host.w], ws: [W.host.l, W.host.w] }));
+    ok(`${tag} · el CTA es el MISMO componente (radio, alto y familia de color)`,
+      I.radius === W.radius && I.minH === W.minH &&
+      /gradient/.test(String(I.bg)) && I.bg === W.bg,
+      JSON.stringify({ int: [I.radius, I.minH, I.bg], ws: [W.radius, W.minH, W.bg] }));
+    // RE-DECIDIDO sobre la marcha: llegué a poner un distintivo «PREMIUM» en las
+    // dos portadas para que el dorado fuera coherente, y DOS gates lo rechazaron
+    // —la portada no nombra el plan; eso es del paywall—. Tienen razón y la
+    // regla se queda: lo que se comparte es la geometría y el componente, no una
+    // etiqueta comercial.
+    ok(`${tag} · ninguna de las dos nombra el plan (eso es del paywall)`,
+      I.names === false && W.names === false, JSON.stringify({ int: I.names, ws: W.names }));
+    // Y ninguna obliga a desplazar para existir en móvil.
+    if (w <= 430) {
+      ok(`${tag} · ninguna de las dos desborda el alto del móvil`,
+        I.docH <= I.vh + 1 && W.docH <= W.vh + 1, JSON.stringify({ int: [I.docH, I.vh], ws: [W.docH, W.vh] }));
+    }
+    await page.evaluate(`(function(){ switchTab('intelligence'); return true; })()`);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: join(OUT, `par-intelligence-${w}x${h}-${ENG}.png`) });
+    await page.evaluate(`(function(){ switchTab('workspace'); return true; })()`);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: join(OUT, `par-workspace-${w}x${h}-${ENG}.png`) });
+    await ctx.close();
+  }
   await browser.close();
 }
 

@@ -10752,7 +10752,7 @@ body.is-detail-view .mobile-slide            { height: auto !important; }
 }
 
 /* AW-6.1 §2: liberar el .app shell sólo cuando workspace está activo. */
-body.workspace-active .app {
+body.workspace-active:not(.ws-cover) .app {
   max-width: none;
   padding: 0;
 }
@@ -10760,7 +10760,7 @@ body.workspace-active .app {
 /* Header: sin padding lateral del .app, le damos su propio gutter para que
    logo/menu no queden pegados al borde. Coincide con el gutter del workspace
    para mantener alineación visual vertical. */
-body.workspace-active .header {
+body.workspace-active:not(.ws-cover) .header {
   padding-left: clamp(16px, 2.5vw, 36px);
   padding-right: clamp(16px, 2.5vw, 36px);
 }
@@ -10776,12 +10776,18 @@ body.workspace-active .header {
 /* AW-6.1 §8: mobile full-width — el workspace usa todo el ancho disponible
    con padding interno mínimo y safe-area awareness para notch/bottom-nav. */
 @media (max-width: 1023.98px) {
-  body.workspace-active .aurix-workspace {
+  body.workspace-active:not(.ws-cover) .aurix-workspace {
     padding: var(--space-2)
              max(var(--space-2), env(safe-area-inset-left))
              96px
              max(var(--space-2), env(safe-area-inset-right));
   }
+}
+/* Y la de escritorio, por el mismo motivo: `.aurix-workspace` fija su padding
+   también en `min-width: 1024px`, así que sin acotarla a full-bleed la portada
+   volvería a separarse de la columna de Intelligence en escritorio. */
+@media (min-width: 1024px) {
+  body.ws-cover .aurix-workspace { padding: 0; }
 }
 
 .aurix-shell {
@@ -27262,9 +27268,17 @@ button.intv14-cmp-clear {
   -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
   box-shadow: 0 0 80px rgba(60,110,255,0.10), inset 0 1px 0 rgba(255,255,255,0.06);
 }
+/* ── EL RÓTULO, LA MISMA PÍLDORA QUE INTELLIGENCE ─────────────────────────
+   Era texto suelto en mayúsculas mientras Intelligence usaba una píldora con
+   borde: dos sistemas visuales distintos en dos portadas hermanas, y se nota al
+   cambiar de pestaña. Gana la píldora porque es la referencia declarada del
+   producto (`.intprev-card`). */
 .wsfc-eyebrow {
-  margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em;
-  text-transform: uppercase; color: rgba(150,185,255,0.85);
+  display: inline-block; align-self: flex-start;
+  margin: 0 0 12px; padding: 5px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: rgba(150,185,255,0.95);
+  border: 1px solid rgba(120,170,255,0.35); background: rgba(90,140,255,0.08);
 }
 .wsfc-title {
   margin: 0 0 8px; font-size: clamp(20px, 5.2vw, 25px); font-weight: 800;
@@ -27319,23 +27333,42 @@ button.intv14-cmp-clear {
    Dorado discreto, y sólo aquí: ocho marcos dorados habrían convertido el acento
    en ruido. 52 px es el suelo táctil del CTA móvil. */
 .wsfc-cta-wrap { margin-top: clamp(14px, 2.4vh, 20px); display: flex; }
+/* ── EL CTA, AZUL AURIX EN LAS DOS PORTADAS ───────────────────────────────
+   Era una losa dorada a todo lo ancho mientras Intelligence usaba un botón azul:
+   el mismo gesto —«ir a ver el producto de pago»— pintado en dos idiomas
+   visuales. El azul eléctrico es la identidad principal y es el que ya usan el
+   paywall («Continuar») y las promos del Resumen, así que es el que se
+   comparte. El dorado no desaparece: baja a ACENTO, en el distintivo Premium
+   del rótulo, que es donde refuerza la jerarquía sin gritar. */
 .wsfc-cta {
   width: 100%; min-height: 52px; font-size: 15px; font-weight: 700; cursor: pointer;
-  color: rgba(18,16,10,0.94); border: none; border-radius: 14px;
-  background: linear-gradient(180deg, rgba(240,212,142,1), rgba(212,178,104,1));
-  box-shadow: 0 6px 20px rgba(190,160,90,0.22);
+  color: #fff; border: 1px solid rgba(120,170,255,0.55); border-radius: 14px;
+  background: linear-gradient(180deg, rgba(90,145,255,1), rgba(58,110,232,1));
+  box-shadow: 0 6px 20px rgba(60,110,255,0.22);
   transition: filter .18s, transform .18s;
 }
-.wsfc-cta:hover { filter: brightness(1.06); }
+.wsfc-cta:hover { filter: brightness(1.08); }
 .wsfc-cta:active { transform: translateY(1px); }
-.wsfc-cta:focus-visible { outline: 2px solid rgba(240,212,142,0.95); outline-offset: 3px; }
+.wsfc-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.95); outline-offset: 3px; }
+/* El acento dorado, discreto y en el MISMO sitio en las dos portadas. Dice que
+   lo de abajo es el producto de pago; no dice que la cuenta ya lo tenga. */
+.cvr-tier {
+  display: inline-block; margin-left: 8px; padding: 3px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(238,206,150,0.98);
+  border: 1px solid rgba(226,188,110,0.38); background: rgba(226,188,110,0.10);
+}
 @media (prefers-reduced-motion: reduce) {
   .wsfc-cta { transition: none; }
   .wsfc-cta:active { transform: none; }
 }
 /* 360px: se baja el padding lateral antes que comprimir texto. */
 @media (max-width: 374px) {
-  .wsfc-stage { padding-left: 10px; padding-right: 10px; }
+  /* El escenario conserva los 14 px de Intelligence también aquí: con 10 las dos
+     portadas empezaban su superficie en columnas distintas (22 px frente a 26)
+     en los móviles más estrechos. Los 4 px se recuperan dentro del panel, que en
+     esta anchura ya baja su propio relleno. */
+  .wsfc-stage { padding-left: 14px; padding-right: 14px; }
   .wsfc-panel { padding: 14px 12px; }
   .wsfc-cap { gap: 8px; padding: 9px 8px; }
   .wsfc-cap-ico { width: 26px; height: 26px; border-radius: 8px; }
@@ -27347,7 +27380,9 @@ button.intv14-cmp-clear {
    líneas en una celda de 170 px—. La composición se centra y no reparte vacío. */
 @media (min-width: 768px) {
   .wsfc-stage { padding: 20px 24px; }
-  .wsfc-panel { max-width: 860px; margin: 0 auto; padding: 28px 30px; border-radius: 26px; }
+  /* Tablet: `.intprev-card` corta en 620, así que aquí también — misma columna
+     en la misma anchura, que es lo que hace que se lean como una sola casa. */
+  .wsfc-panel { max-width: 620px; margin: 0 auto; padding: 28px 30px; border-radius: 26px; }
   .wsfc-caps { gap: 10px; }
   .wsfc-cap { min-height: 62px; padding: 12px 14px; }
   .wsfc-cta-wrap { justify-content: flex-start; }
@@ -27363,7 +27398,10 @@ button.intv14-cmp-clear {
     min-height: calc(100dvh - 68px); max-height: none; overflow: visible;
     padding: clamp(24px, 4vh, 40px) 24px;
   }
-  .wsfc-panel { max-width: 900px; padding: 34px 36px 30px; border-radius: 28px; }
+  /* 860 px, el MISMO ancho que `.intprev-card`, que es la referencia declarada
+     de esta familia. Con 900 las dos portadas Free tenían columnas distintas y
+     al cambiar de pestaña la superficie saltaba 40 px. */
+  .wsfc-panel { max-width: 860px; padding: 34px 36px 30px; border-radius: 28px; }
   .wsfc-title { font-size: 28px; }
   .wsfc-sub   { font-size: 16px; max-width: 74ch; margin-bottom: 22px; }
   .wsfc-caps  { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -28608,3 +28646,21 @@ input.ws4-num.is-invalid {
 @media (prefers-reduced-motion: reduce) {
   .wsdisc-cta { transition: none; }
 }
+
+
+/* ── LA PORTADA FREE DE WORKSPACE, EN LA MISMA GEOMETRÍA QUE INTELLIGENCE ──
+   Con el full-bleed reservado al interior (ver `_wsFullBleed` en app.js), la
+   portada vive dentro del shell normal. Lo único que faltaba era su propio
+   tope de ancho: `.aurix-wsh` corta en 1100 px y el shell de Intelligence llega
+   a 1216, así que en 1440 la portada quedaba 116 px más estrecha y con 58 px
+   más de margen exterior. Fuera del full-bleed manda el shell, que es lo que
+   hace que las dos portadas empiecen en la misma columna. */
+body.ws-cover .aurix-workspace {
+  /* Cero por los cuatro lados: fuera del full-bleed el hueco lo pone el shell,
+     igual que en Intelligence. Con su padding propio la portada arrancaba 14–16
+     px más abajo que la de Intelligence en las tres anchuras medidas, que es la
+     diferencia que se veía al cambiar de pestaña. */
+  padding: 0;
+  min-height: 0;
+}
+body.ws-cover .aurix-wsh { max-width: none; }

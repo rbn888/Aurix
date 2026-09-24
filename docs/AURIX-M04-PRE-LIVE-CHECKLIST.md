@@ -313,8 +313,20 @@ copiar las URLs a Stripe. No las copies antes: hoy abren un borrador declarado.
   iguales, o si al terminar no hay exactamente una fila activa por intervalo con
   **6999 / 799 EUR**. La verificación va DENTRO de la transacción: si falla, no
   hay `commit`.
-- **Rollback:** el mismo mecanismo en sentido inverso, con los IDs de TEST ya
-  pegados.
+- **Rollback — QUÉ ES Y QUÉ NO ES.** Activa de nuevo las filas de TEST. Analizado
+  antes de recomendarlo:
+  - **No rompe a los clientes que ya pagaron.** El escritor del webhook busca el
+    precio por `provider_price_id` **sin exigir `active`**, y el cutover no borra
+    ninguna fila: una renovación sobre el precio LIVE se sigue resolviendo y
+    conservando el Premium. (Si el escritor filtrara por `active`, este rollback
+    dejaría a un cliente de pago en `unknown_price`, es decir, sin Premium.)
+  - **Sí detiene la venta, y limpiamente.** Con una clave LIVE, los `price_…` de
+    TEST no existen en ese entorno: el checkout lo detecta ANTES de abrir sesión
+    y responde `503`, sin cobrar nada.
+  - **Pero deja el escaparate mintiendo:** el paywall pasaría a mostrar los
+    importes de TEST (59,99 €) para algo que no se puede comprar. Por eso este
+    script es un **interruptor de PARAR**, no una vuelta a un estado vendible:
+    úsalo para dejar de vender, y después decide.
 
 ## Paso 3 · El diagnóstico, antes de vender
 
@@ -326,8 +338,20 @@ Esperado para vender: `mode: "live"`, `ready_for_live: true`, `blockers: []`.
 
 **Detente si aparece cualquiera de estos:** `stripe_key_not_live`,
 `amount_not_approved:*`, `price_mode_mismatch:*`, `price_not_found_in_stripe:*`,
-`recurrence_mismatch:*`, `trial_enabled:*`, `portal_unconfigured`,
-`portal_mode_mismatch`, `webhook_endpoint_missing_for_mode`, `test_events_allowed`.
+`recurrence_mismatch:*`, **`trial_in_catalogue:*`**, **`trial_in_stripe_price:*`**,
+`portal_unconfigured`, `portal_mode_mismatch`, `webhook_endpoint_missing_for_mode`,
+`test_events_allowed`.
+
+> **Los DOS sitios del «período de prueba» (corregido el 2026-09-24).** Hasta hoy
+> este endpoint sólo miraba `trial_days` de NUESTRO catálogo y llamaba al bloqueo
+> `trial_enabled`. Pero un precio de Stripe puede llevar su propio
+> `recurring.trial_period_days`, que **no pasa por nuestra tabla** —lo aplica
+> Stripe, no nuestro checkout—, así que el diagnóstico podía decir «sin prueba»
+> mientras la pasarela enseñaba un periodo de prueba. Ahora se leen los dos y el
+> bloqueo dice cuál es: `trial_in_catalogue:*` (lo arreglas con un UPDATE en
+> `billing_prices`) o `trial_in_stripe_price:*` (lo arreglas en Stripe, creando
+> el precio sin trial). La respuesta la da el campo
+> `catalogue[].stripe.trial_period_days`.
 
 Hoy, con el catálogo aún en TEST, **debe** devolver `amount_not_approved:year` y
 `ready_for_live: false`. Eso es correcto, no un fallo.
