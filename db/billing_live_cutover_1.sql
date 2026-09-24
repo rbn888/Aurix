@@ -1,67 +1,84 @@
 -- ============================================================================
 -- AURIX · CUTOVER A STRIPE LIVE  ·  el catálogo de precios
---                        *** PENDIENTE DE APLICAR · IDs LIVE ya pegados ***
+--                        *** PENDIENTE DE APLICAR ***
 -- ----------------------------------------------------------------------------
 -- QUE HACE, Y NADA MAS
---   Desactiva las filas de precio de TEST y activa las de LIVE para
---   (stripe, premium, year) y (stripe, premium, month). Una sola transaccion.
---   No toca `subscriptions`, ni `billing_customers`, ni `entitlement_overrides`,
---   ni `plan_features`. No concede ni retira un derecho a nadie.
+--   Desactiva las filas de precio anteriores y activa las dos LIVE aprobadas
+--   para (stripe, premium, year) y (stripe, premium, month). Una transaccion.
+--   La UNICA tabla que se escribe es `public.billing_prices` (mas una tabla
+--   temporal que se destruye al terminar). No toca `subscriptions`, ni
+--   `billing_customers`, ni `entitlement_overrides`, ni `plan_features`, ni
+--   usuarios, ni permisos, ni webhooks. No concede ni retira un derecho.
+--   No llama a Stripe: es SQL puro.
 --
 -- POR QUE NO SE PUEDEN TENER LAS CUATRO A LA VEZ
 --   `billing_prices_active_uidx` es UNICO sobre (provider, plan, billing_interval)
---   WHERE active. Los `price_id` de TEST y de LIVE no pueden coexistir activos
---   para el mismo intervalo: el paywall no tendria forma de elegir. Por eso el
---   orden dentro de la transaccion es desactivar y DESPUES activar.
+--   WHERE active. Los `price_id` antiguos y los nuevos no pueden coexistir
+--   activos para el mismo intervalo: el paywall no tendria forma de elegir. Por
+--   eso el orden dentro de la transaccion es desactivar y DESPUES activar.
 --
--- ANTES DE EJECUTAR: los dos precios ya existen en Stripe LIVE y sus IDs estan
--- pegados abajo. Los importes NO se copian de Stripe: se declaran aqui y se
--- contrastan contra el proveedor DESPUES, por dos caminos independientes:
---   · `POST /api/billing/status` (diagnostico del founder, solo lectura), y
---   · el propio checkout, que desde 2026-09-23 lee el precio en Stripe antes de
---     abrir sesion y se NIEGA a cobrar si importe, divisa, recurrencia, estado
---     o entorno no coinciden con esta tabla.
--- Asi que si este SQL y Stripe no dicen lo mismo, no se vende: no se cobra de
--- mas ni se anuncia un precio que no es el que se cobra.
+-- IMPORTES APROBADOS: anual 69,99 EUR (6999) · mensual 7,99 EUR (799).
+-- SIN PRUEBA GRATUITA: trial_days = 0 en las dos.
+-- Las filas antiguas NO se borran: son el precio de record de lo ya vendido, y
+-- `subscriptions` las referencia.
 --
--- IMPORTES APROBADOS (2026-09-23): anual 69,99 EUR (6999) · mensual 7,99 EUR (799).
--- El anual ANTERIOR era 59,99 EUR (5999) y queda fuera de toda ruta activa. Las
--- filas antiguas NO se borran: son el precio de record de lo ya vendido.
--- SIN PRUEBA GRATUITA: trial_days = 0 en las dos. Encender un trial es una
--- decision comercial aparte y el diagnostico la marca como bloqueo si aparece.
---
--- ESTE FICHERO SE NIEGA A EJECUTARSE con los marcadores sin sustituir, asi que
--- no puede dejar el catalogo a medias por un copiar-pegar incompleto.
+-- LO QUE ESTE SQL NO PUEDE SABER: si esos identificadores son de LIVE o de TEST.
+-- Eso lo dicen `POST /api/billing/status` y el propio checkout, que lee el
+-- precio en Stripe antes de abrir sesion y se NIEGA a cobrar si importe,
+-- divisa, recurrencia, estado o entorno no coinciden con esta tabla.
 -- ============================================================================
 
 begin;
 
--- ── LOS DOS UNICOS VALORES QUE HAY QUE EDITAR ──────────────────────────────
--- Sustituir por los IDs de Stripe LIVE. Empiezan por `price_`.
-create temporary table _cutover(interval_name text primary key, price_id text not null) on commit drop;
-insert into _cutover(interval_name, price_id) values
-  ('year',  'price_1UIu7S3l0aCDKMqE3UCE6FtO'),
-  ('month', 'price_1UIu3n3l0aCDKMqEL5ocVJ5A');
+-- ── LOS DOS PRECIOS APROBADOS ──────────────────────────────────────────────
+-- Fuente unica de este script: cualquier comprobacion posterior se hace contra
+-- esta tabla, no contra literales repetidos por el fichero.
+create temporary table _cutover(
+  interval_name text primary key,
+  price_id      text    not null,
+  amount_cents  integer not null,
+  currency      text    not null,
+  trial_days    integer not null
+) on commit drop;
 
--- Guarda: marcadores sin sustituir, o IDs que no tienen forma de price.
+insert into _cutover(interval_name, price_id, amount_cents, currency, trial_days) values
+  ('year',  'price_1UIu7S3l0aCDKMqE3UCE6FtO', 6999, 'EUR', 0),
+  ('month', 'price_1UIu3n3l0aCDKMqEL5ocVJ5A',  799, 'EUR', 0);
+
+-- ── GUARDA PREVIA ──────────────────────────────────────────────────────────
+-- Antes de tocar nada: que los datos de partida sean los aprobados.
 do $$
-declare v_bad int;
+declare
+  v_bad int;
+  v_n   int;
 begin
-  select count(*) into v_bad from _cutover
-   where price_id like 'PEGAR_AQUI_%' or price_id !~ '^price_[A-Za-z0-9_]+$';
-  if v_bad > 0 then
-    raise exception 'CUTOVER ABORTADO: faltan por sustituir % identificadores de precio LIVE', v_bad;
+  select count(*) into v_n from _cutover;
+  if v_n <> 2 then
+    raise exception 'CUTOVER ABORTADO: se esperaban 2 precios declarados y hay %', v_n;
   end if;
-  -- Y que no se peguen dos veces el mismo: seria vender el anual al precio del mensual.
+
+  select count(*) into v_bad from _cutover
+   where price_id !~ '^price_[A-Za-z0-9]+$';
+  if v_bad > 0 then
+    raise exception 'CUTOVER ABORTADO: % identificador(es) no tienen forma de price de Stripe', v_bad;
+  end if;
+
+  -- Dos veces el mismo id seria vender el anual al precio del mensual.
   if (select count(distinct price_id) from _cutover) <> 2 then
     raise exception 'CUTOVER ABORTADO: los dos identificadores de precio son iguales';
+  end if;
+
+  select count(*) into v_bad from _cutover
+   where currency <> 'EUR' or trial_days <> 0
+      or (interval_name = 'year'  and amount_cents <> 6999)
+      or (interval_name = 'month' and amount_cents <>  799);
+  if v_bad > 0 then
+    raise exception 'CUTOVER ABORTADO: % fila(s) declarada(s) no coinciden con lo aprobado (6999/799 EUR, sin trial)', v_bad;
   end if;
 end $$;
 
 -- ── 1 · LO QUE HABIA, DESACTIVADO ──────────────────────────────────────────
--- Acotado a los dos intervalos de este cutover. No se borra ninguna fila: un
--- precio retirado sigue siendo el precio de record de las suscripciones que se
--- vendieron con el, y `subscriptions` lo referencia.
+-- Acotado a los dos intervalos de este cutover. No se borra ninguna fila.
 update public.billing_prices
    set active = false
  where provider = 'stripe'
@@ -70,15 +87,14 @@ update public.billing_prices
    and active
    and provider_price_id not in (select price_id from _cutover);
 
--- ── 2 · LOS PRECIOS LIVE, ACTIVOS ──────────────────────────────────────────
+-- ── 2 · LOS PRECIOS APROBADOS, ACTIVOS ─────────────────────────────────────
 -- `on conflict` sobre la clave primaria (provider, provider_price_id): si el
--- precio ya existiera en la tabla, se reactiva con los valores aprobados en
+-- precio ya existiera en la tabla, se reescribe con los valores aprobados en
 -- lugar de fallar.
 insert into public.billing_prices
   (provider, provider_price_id, plan, billing_interval, amount_cents, currency, trial_days, active)
 select 'stripe', c.price_id, 'premium', c.interval_name,
-       case c.interval_name when 'year' then 6999 else 799 end,
-       'EUR', 0, true
+       c.amount_cents, c.currency, c.trial_days, true
   from _cutover c
 on conflict (provider, provider_price_id) do update
    set plan             = excluded.plan,
@@ -89,39 +105,67 @@ on conflict (provider, provider_price_id) do update
        active           = true;
 
 -- ── 3 · LA COMPROBACION VA DENTRO DE LA TRANSACCION ────────────────────────
--- Si el resultado no es exactamente una fila activa por intervalo con el importe
--- aprobado, esto revienta y el `commit` no llega a ocurrir.
+-- Si el estado final no es EXACTAMENTE el aprobado, esto lanza una excepcion,
+-- la transaccion se aborta y el `commit` no llega a ocurrir: la base queda como
+-- estaba. Se comprueban las seis cosas, no solo el importe.
 do $$
-declare v_n int; v_year int; v_month int;
+declare
+  v_active int;
+  r        record;
 begin
-  select count(*) into v_n from public.billing_prices
-   where provider='stripe' and plan='premium' and billing_interval in ('year','month') and active;
-  if v_n <> 2 then
-    raise exception 'CUTOVER ABORTADO: quedan % filas activas, deberian ser 2', v_n;
+  -- a) EXACTAMENTE dos filas activas en los dos intervalos.
+  select count(*) into v_active
+    from public.billing_prices
+   where provider = 'stripe' and plan = 'premium'
+     and billing_interval in ('year','month') and active;
+  if v_active <> 2 then
+    raise exception 'CUTOVER ABORTADO: hay % fila(s) activa(s) en year|month, deberian ser exactamente 2', v_active;
   end if;
-  select amount_cents into v_year  from public.billing_prices
-   where provider='stripe' and plan='premium' and billing_interval='year'  and active;
-  select amount_cents into v_month from public.billing_prices
-   where provider='stripe' and plan='premium' and billing_interval='month' and active;
-  if v_year <> 6999 or v_month <> 799 then
-    raise exception 'CUTOVER ABORTADO: importes % / %, aprobados 6999 / 799', v_year, v_month;
+
+  -- b) Y esas dos son las esperadas CAMPO A CAMPO: id, intervalo, importe,
+  --    moneda y trial. Se recorre la declaracion para poder decir cual falla.
+  for r in select * from _cutover order by interval_name loop
+    perform 1
+       from public.billing_prices p
+      where p.provider          = 'stripe'
+        and p.plan              = 'premium'
+        and p.active
+        and p.provider_price_id = r.price_id
+        and p.billing_interval  = r.interval_name
+        and p.amount_cents      = r.amount_cents
+        and p.currency          = r.currency
+        and p.trial_days        = r.trial_days;
+    if not found then
+      raise exception 'CUTOVER ABORTADO: la fila activa de % no coincide con lo aprobado (id=%, importe=%, moneda=%, trial=%)',
+        r.interval_name, r.price_id, r.amount_cents, r.currency, r.trial_days;
+    end if;
+  end loop;
+
+  -- c) Y ninguna otra fila activa de esos intervalos se ha colado.
+  if exists (
+    select 1 from public.billing_prices p
+     where p.provider = 'stripe' and p.plan = 'premium'
+       and p.billing_interval in ('year','month') and p.active
+       and p.provider_price_id not in (select price_id from _cutover)
+  ) then
+    raise exception 'CUTOVER ABORTADO: queda activa una fila que no es ninguna de las dos aprobadas';
   end if;
 end $$;
 
 commit;
 
 -- ============================================================================
--- VERIFICACION (solo lectura). «Lo ejecute y no dio error» NO es prueba.
+-- VERIFICACION (solo lectura, despues del commit).
+-- Esperado: DOS filas con active = true — year 6999 EUR y month 799 EUR, las
+-- dos con trial_days = 0 — y las anteriores con active = false, sin borrar.
 -- ============================================================================
--- select billing_interval, provider_price_id, amount_cents, currency, trial_days, active
---   from public.billing_prices
---  where provider='stripe' and plan='premium'
---  order by active desc, billing_interval;
--- -- esperado: DOS filas con active=true (year 6999 EUR, month 799 EUR, trial 0)
--- --           y las de TEST con active=false, sin borrar.
---
--- Y DESPUES, la comprobacion que de verdad importa —que esos IDs existen en
--- Stripe LIVE, con esos importes y esa recurrencia, y que el webhook y el
--- portal son del mismo entorno— con `POST /api/billing/status` desde la cuenta
--- fundadora. Este SQL no puede saberlo: solo escribe el catalogo.
--- ============================================================================
+select billing_interval,
+       provider_price_id,
+       amount_cents,
+       currency,
+       trial_days,
+       active
+  from public.billing_prices
+ where provider = 'stripe'
+   and plan = 'premium'
+ order by active desc, billing_interval;

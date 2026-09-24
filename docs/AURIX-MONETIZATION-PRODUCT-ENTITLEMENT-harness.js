@@ -761,9 +761,15 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('G.17d la firma se siembra en el boot (el primer foco no repinta sin motivo)',
     /_aurixEntLastSig = JSON\.stringify\(features\);/.test(fnSource('_aurixEntApplyToUi')) &&
     /_aurixEntApplyToUi\(_aurixEnt\.features\)/.test(app));
-  ok('G.17e y los TRES caminos (boot, revalidación y retorno de pago) pasan por ese owner',
-    (app.match(/_aurixEntApplyToUi\(/g) || []).length === 4 &&
-    /updateDashboardPlans/.test(fnSource('_aurixEntApplyToUi')),
+  // ACTUALIZADO (2026-09-24): los caminos que aprenden un plan confirmado eran
+  // tres y ahora son CUATRO — «Comprobar estado», la salida que se ofrece
+  // cuando la espera del retorno se agota. El número deja de fijarse: lo que
+  // importa es que ninguno repinte por su cuenta.
+  ok('G.17e y TODOS los caminos que confirman plan pasan por ese owner',
+    (app.match(/_aurixEntApplyToUi\(/g) || []).length >= 5 &&
+    /updateDashboardPlans/.test(fnSource('_aurixEntApplyToUi')) &&
+    ['_aurixEntRevalidate', '_aurixBillingReturnFlow', '_aurixBillingRecheck']
+      .every(fn => /_aurixEntApplyToUi\(/.test(fnSource(fn))),
     'llamadas: ' + ((app.match(/_aurixEntApplyToUi\(/g) || []).length - 1));
   ok('G.18 la revalidación respeta el TTL (no fuerza en cada foco) y no hace polling',
     /_aurixEntitlementsLoad\(\)\.then\(\(st\) =>/.test(app) &&

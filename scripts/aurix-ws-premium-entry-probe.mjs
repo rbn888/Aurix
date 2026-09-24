@@ -251,6 +251,57 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} checkout · y el registro no lleva importes, documentos ni correos`,
       funnel.clean === true, JSON.stringify(funnel).slice(0, 140));
 
+    // ══ 6b · CUANDO LA ESPERA SE AGOTA, HAY SALIDA ════════════════════════
+    // El 24/09/2026 una compra REAL se quedó sin activar: el webhook apuntaba a
+    // un host que responde 405, así que el servidor nunca supo del pago. Lo que
+    // el usuario encontró fue un aviso que se desvanecía y ninguna acción. Aquí
+    // se comprueba que ahora el aviso SE QUEDA, que ofrece volver a preguntar
+    // al servidor, y que NO ofrece pagar otra vez.
+    await mount(page, 'free');
+    const timeout = await page.evaluate(`(function(){
+      // Se agota la espera por el camino real del retorno.
+      _aurixBillingPendingNotice();
+      var el = document.querySelector('.aurix-toast.has-action');
+      return JSON.stringify({ shown: !!el,
+        txt: el ? (el.textContent || '') : '',
+        act: el ? (el.querySelector('.aurix-toast-act') || {}).textContent : null,
+        // Ni un botón de compra en el aviso.
+        buy: el ? el.querySelectorAll('[data-premium-buy],[data-premium-cta]').length : -1 });})()`).then(JSON.parse);
+    ok(`${tag} espera agotada · el aviso se queda y ofrece «Comprobar estado»`,
+      timeout.shown === true && /Comprobar estado|Check status/i.test(String(timeout.act)) &&
+      /confirmando|being confirmed|activará|activated/i.test(timeout.txt),
+      JSON.stringify(timeout));
+    ok(`${tag} espera agotada · y NO empuja a pagar otra vez`,
+      timeout.buy === 0, JSON.stringify(timeout));
+    // Y no se desvanece: a los 7 s sigue ahí (el toast normal dura ≤6 s).
+    await page.waitForTimeout(7000);
+    ok(`${tag} espera agotada · el aviso no se desvanece solo`,
+      await page.evaluate(`!!document.querySelector('.aurix-toast.has-action')`));
+    // «Comprobar estado» pregunta AL SERVIDOR. Si dice premium, se aplica.
+    await page.evaluate(`(function(){ window.__ENT_PLAN = 'premium'; return true; })()`);
+    await page.click('.aurix-toast-act');
+    await page.waitForTimeout(700);
+    const rechecked = await page.evaluate(`(function(){
+      return JSON.stringify({ premium: hasAurixPremiumAccess(),
+        toasts: [].slice.call(document.querySelectorAll('.aurix-toast')).map(function(e){ return e.textContent; }) });})()`).then(JSON.parse);
+    ok(`${tag} espera agotada · «Comprobar estado» activa Premium cuando el servidor lo confirma`,
+      rechecked.premium === true, JSON.stringify(rechecked).slice(0, 160));
+    const v6 = await view(page);
+    ok(`${tag} espera agotada · y la interfaz pasa a Premium sin recargar`,
+      v6.cover === false && v6.buyCta === 0, JSON.stringify(v6));
+    // Y si el servidor SIGUE diciendo Free, se dice, con soporte y sin cobrar.
+    await mount(page, 'free');
+    await page.evaluate(`_aurixBillingRecheck()`);
+    await page.waitForTimeout(700);
+    const still = await page.evaluate(`(function(){
+      var el = document.querySelector('.aurix-toast.has-action');
+      return JSON.stringify({ shown: !!el, txt: el ? el.textContent : '',
+        act: el ? (el.querySelector('.aurix-toast-act') || {}).textContent : null,
+        premium: hasAurixPremiumAccess() });})()`).then(JSON.parse);
+    ok(`${tag} espera agotada · si sigue sin constar, lo dice y ofrece soporte (no pagar)`,
+      still.shown === true && /soporte|support/i.test(String(still.act)) && still.premium === false,
+      JSON.stringify(still).slice(0, 180));
+
     // ══ 7 · «TUS PLANES» TAMBIÉN DEPENDE DEL DERECHO ══════════════════════
     // Tres sitios reaccionaban a un plan confirmado y sólo uno refrescaba esta
     // sección, así que comprar desde el Resumen dejaba el derecho concedido y
@@ -279,9 +330,16 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     /_aurixEntApplyToUi\(_aurixEnt\.features\)/.test(boot), boot.slice(0, 160));
   // Y no queda ninguna copia suelta del gesto: tres sitios hacían lo mismo de
   // tres maneras y sólo uno refrescaba «Tus planes».
+  // Los caminos que aprenden un plan confirmado pasan TODOS por el owner. Eran
+  // tres (arranque, revalidación y retorno del checkout) y ahora son cuatro:
+  // «Comprobar estado» es el cuarto, y por eso el número no se fija — lo que se
+  // fija es que no exista un segundo camino que repinte por su cuenta.
   const applyCalls = (app.match(/_aurixEntApplyToUi\(/g) || []).length;
-  ok('BOOT · los tres caminos (arranque, revalidación y retorno) usan ese owner',
-    applyCalls === 4, 'definición + ' + (applyCalls - 1) + ' llamadas');
+  ok('BOOT · todos los caminos que confirman plan pasan por el owner único',
+    applyCalls >= 5 &&
+    ['_aurixEntRevalidate', '_aurixBillingReturnFlow', '_aurixBillingRecheck']
+      .every(fn => new RegExp(fn + '[\\s\\S]{0,1800}_aurixEntApplyToUi\\(').test(app)),
+    'definición + ' + (applyCalls - 1) + ' llamadas');
 }
 
 console.log('\n════════════════════════════════════════════════');

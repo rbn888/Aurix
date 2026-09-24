@@ -51,6 +51,9 @@ function run(opts) {
       const p = (opts.stripePrices || {})[id];
       return p ? J(p) : { ok: false, status: 404, json: async () => ({ error: { code: 'resource_missing' } }) };
     }
+    if (/\/rest\/v1\/billing_events/.test(u)) return J(opts.events === undefined
+      ? [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'applied' }]
+      : opts.events);
     if (/\/v1\/billing_portal\/configurations/.test(u)) return J({ data: opts.portal === undefined ? [{ livemode: true, is_default: true }] : opts.portal });
     if (/\/v1\/webhook_endpoints/.test(u)) return J({ data: opts.hooks === undefined ? [{
       url: 'https://isa-portfolio-ten.vercel.app/api/billing/webhook', status: 'enabled', livemode: true,
@@ -119,8 +122,17 @@ console.log('\n2 · No toca nada:');
     writes.length === 0, JSON.stringify(writes));
   ok('2.3 no crea sesiones de pago ni de portal',
     !r.calls.some(c => /checkout\/sessions|billing_portal\/sessions/.test(c)), JSON.stringify(r.calls));
+  // ACTUALIZADO (2026-09-24): el assert prohibía APARECER, no escribir, y el
+  // diagnóstico ahora LEE `billing_events` a propósito — es la única evidencia
+  // de que el webhook ha entregado alguna vez de verdad. Leer no es escribir:
+  // se exige lo que el título siempre dijo, que ninguna de esas tablas se
+  // MODIFIQUE, y se comprueba además que la lectura es un GET.
   ok('2.4 no escribe en subscriptions, billing_customers ni billing_events',
-    !r.calls.some(c => /subscriptions|billing_customers|billing_events/.test(c)));
+    !writes.some(c => /subscriptions|billing_customers|billing_events/.test(c)),
+    JSON.stringify(writes));
+  ok('2.4b y la evidencia de entrega se obtiene LEYENDO el ledger, con GET',
+    r.calls.some(c => /^GET\s.*billing_events/.test(c)),
+    JSON.stringify(r.calls.filter(c => /billing_events/.test(c))));
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -207,6 +219,16 @@ console.log('\n4 · Los bloqueos, uno a uno:');
         url: 'https://isa-portfolio-ten.vercel.app/api/billing/webhook', status: 'enabled', livemode: false,
         enabled_events: ['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'] }] },
       ['webhook_endpoint_missing_for_mode']],
+    // ── EL FALSO VERDE QUE COSTÓ UNA COMPRA REAL (24/09/2026) ─────────────
+    // El destino estaba en el dominio de la APP —GitHub Pages, ficheros
+    // estáticos, 405 a cualquier POST— en vez de en el de la API. El filtro
+    // sólo miraba el FINAL de la URL, así que pasó como bueno: `blockers: []`,
+    // `ready_for_live: true`, y un pago de 7,99 € que no activó nada.
+    // Este caso falla con el código anterior y es el que impide repetirlo.
+    ['el webhook apunta al dominio de la APP, no al de la API', { rows: LIVE_ROWS, stripePrices: LIVE_PRICES, hooks: [{
+        url: 'https://app.aurixsystem.io/api/billing/webhook', status: 'enabled', livemode: true,
+        enabled_events: ['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'] }] },
+      ['webhook_endpoint_missing_for_mode', 'webhook_url_not_api_origin']],
     ['portal de cliente sin configurar', { rows: LIVE_ROWS, stripePrices: LIVE_PRICES, portal: [] },
       ['portal_unconfigured']],
     ['portal del entorno equivocado', { rows: LIVE_ROWS, stripePrices: LIVE_PRICES, portal: [{ livemode: false, is_default: true }] },
@@ -241,6 +263,31 @@ console.log('\n4 · Los bloqueos, uno a uno:');
 // ══════════════════════════════════════════════════════════════════════════
 // 5 · LOS IMPORTES APROBADOS ESTÁN ESCRITOS, NO ESPEJADOS
 // ══════════════════════════════════════════════════════════════════════════
+console.log('\n4b · «Configurado» no es «entregado»:');
+{
+  // Con TODO en verde pero sin un solo evento procesado, el endpoint no puede
+  // decir que la activación esté probada. Decirlo es lo que permitió anunciar
+  // «listo para vender» sobre un webhook que nunca entregó.
+  const r = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, events: [] });
+  ok('4b.1 configuración coherente ⇒ ready_for_live, pero activación NO verificada',
+    r.body.ready_for_live === true && r.body.activation_verified === false &&
+    r.body.webhook.delivery.verified === 'never_observed',
+    JSON.stringify({ ready: r.body.ready_for_live, act: r.body.activation_verified,
+      del: r.body.webhook && r.body.webhook.delivery }));
+  ok('4b.2 …y lo dice en texto, para que nadie lea «verde» como «probado»',
+    /entrega del webhook NO observada/i.test(String(r.body.note || '')), String(r.body.note));
+  const r2 = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES,
+    events: [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'applied' }] });
+  ok('4b.3 con eventos procesados de verdad, la activación SÍ consta observada',
+    r2.body.activation_verified === true && r2.body.webhook.delivery.verified === 'observed' &&
+    r2.body.webhook.delivery.last_type === 'customer.subscription.updated',
+    JSON.stringify(r2.body.webhook.delivery));
+  ok('4b.4 y el destino esperado se publica, para poder compararlo a simple vista',
+    String(r2.body.webhook.expected_url || '').endsWith('/api/billing/webhook') &&
+    !/app\.aurixsystem\.io/.test(String(r2.body.webhook.expected_url)),
+    String(r2.body.webhook.expected_url));
+}
+
 console.log('\n5 · 7,99 €/mes y 69,99 €/año, y anual primero:');
 {
   const r = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES });

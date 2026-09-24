@@ -378,3 +378,71 @@ Hoy, con el catálogo aún en TEST, **debe** devolver `amount_not_approved:year`
 
 **Condición de parada en cualquier punto:** si la app anuncia Premium y el
 servidor no lo confirma, o al revés, detener y revisar antes de anunciar nada.
+
+
+---
+
+# ANEXO · 24/09/2026 · LA PRIMERA COMPRA REAL, Y LO QUE ENSEÑÓ
+
+## Lo que pasó
+
+Catálogo en 69,99 €/7,99 € con `trial_days = 0`, claves LIVE desplegadas y
+`POST /api/billing/status` devolviendo `mode: live`, `blockers: []`,
+`ready_for_live: true`. Se hizo una **compra real mensual de 7,99 €**. Al
+volver, Aurix decía «confirmando pago» y seguía en Free, incluso recargando.
+
+Causa: Stripe entregaba en `https://app.aurixsystem.io/api/billing/webhook` y
+recibía **HTTP 405**. Ese dominio es **GitHub Pages**: ficheros estáticos, ahí no
+hay ninguna función. El webhook vive en Vercel
+(`https://isa-portfolio-ten.vercel.app/api/billing/webhook`). Corregido a mano el
+destino y reenviado `customer.subscription.updated`: **HTTP 200** y Premium
+activo tras recargar.
+
+## Por qué el diagnóstico dijo que todo estaba bien
+
+El endpoint buscaba los destinos con `/\/api\/billing\/webhook$/` — una
+expresión que sólo mira el FINAL de la URL. **Cualquier host valía.** El destino
+equivocado estaba `enabled`, en `livemode` y con los tres eventos, así que pasó
+como bueno. Un fallo mío, y del tipo más caro: el diagnóstico existía justamente
+para evitar esto.
+
+**Corregido:**
+- Se compara la **URL completa** contra la esperada (`BILLING_API_ORIGIN`, por
+  defecto el origen de la API). Si sólo falla el host, el bloqueo lo dice por su
+  nombre: **`webhook_url_not_api_origin`**, y se publica `webhook.expected_url`
+  para poder compararlo de un vistazo.
+- **`ready_for_live` ya no se lee como «probado»**: significa «la configuración
+  es coherente». Se añade **`activation_verified`**, que sólo es `true` si
+  nuestro propio ledger `billing_events` tiene eventos procesados. Sin ninguno,
+  `webhook.delivery.verified = 'never_observed'` y una nota lo dice en texto.
+  Que Stripe LISTE un destino no prueba que entregue.
+- Lo fija el caso `el webhook apunta al dominio de la APP, no al de la API` del
+  gate de billing, que **falla con el código anterior**.
+
+## Y lo que le pasaba al usuario mientras tanto
+
+Al agotarse los reintentos del retorno, el aviso se desvanecía y no quedaba nada
+que pulsar: había pagado, la app decía Free y el único camino era recargar.
+**Ahora el aviso se queda y ofrece «Comprobar estado»**, que vuelve a preguntar
+al MISMO resolver autoritativo (sin segunda fuente de verdad y sin conceder nada
+desde el cliente). Si sigue sin constar, lo dice y ofrece **soporte** —nunca
+pagar otra vez—. La cadencia de reintentos pasa a `0, 1.2, 2.5, 5, 9, 15 s`:
+sigue acotada, pero detecta antes.
+
+## Estado del checklist
+
+| | |
+|---|---|
+| Precio | **RESUELTO** · 69,99 €/año y 7,99 €/mes, `trial_days = 0` |
+| Compra real | **RECUPERADA** a mano (reenvío del evento). No repetir |
+| Portal y cancelación | **VERIFICADOS** · cancelación programada 24/10/2026, Premium conservado |
+| Reembolso | **DESCARTADO** por decisión del fundador |
+| Activación automática | **PENDIENTE de evidencia** · la recuperación manual NO demuestra que el retorno funcione solo |
+| M.04 | **ABIERTO** |
+
+## Lo único que falta para cerrar la activación automática
+
+Una compra de prueba **en TEST** (no LIVE, no un cargo nuevo) con el destino ya
+corregido, comprobando que Premium aparece **sin recargar**. Alternativa sin
+compra: reenviar desde Stripe un `customer.subscription.updated` y confirmar que
+`activation_verified` pasa a `true` y la interfaz se actualiza sola.

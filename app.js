@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '711'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '712'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -7238,6 +7238,9 @@ const T = {
     // usuario necesita saber es que NO se le ha cobrado nada; lo que NO se puede
     // hacer es insinuarle que ya tiene una suscripción.
     pw_err_price:      'El precio mostrado no coincide con el del proveedor de pago, así que no hemos abierto el cobro. No se te ha cobrado nada.',
+    pw_check:          'Comprobar estado',
+    pw_still_pending:  'Tu pago sigue sin constar. No se te ha cobrado de nuevo: escríbenos y lo resolvemos.',
+    pw_support:        'Escribir a soporte',
     pw_err_generic:    'No hemos podido abrir el pago. Inténtalo de nuevo.',
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'LA INTELIGENCIA DE TU PATRIMONIO',
@@ -9972,6 +9975,9 @@ const T = {
     pw_err_auth:       'Sign in to continue.',
     pw_err_soon:       'Purchasing is not available yet.',
     pw_err_price:      'The price shown does not match the payment provider, so we did not start the charge. You have not been charged.',
+    pw_check:          'Check status',
+    pw_still_pending:  'Your payment is still not showing. You have not been charged again: write to us and we will sort it out.',
+    pw_support:        'Contact support',
     pw_err_generic:    "We couldn't open the payment. Please try again.",
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'THE INTELLIGENCE OF YOUR WEALTH',
@@ -79125,8 +79131,8 @@ async function _aurixBillingPortal() {
   } catch (_) { _aurixBillingToast(t('pw_err_generic'), 'error'); }
   return false;
 }
-function _aurixBillingToast(msg, variant) {
-  try { if (typeof _aurixShowToast === 'function') _aurixShowToast(msg, { variant: variant || 'info' }); }
+function _aurixBillingToast(msg, variant, opts) {
+  try { if (typeof _aurixShowToast === 'function') _aurixShowToast(msg, Object.assign({ variant: variant || 'info' }, opts || {})); }
   catch (_) {}
 }
 // ── VUELTA DEL CHECKOUT ─────────────────────────────────────────────────────
@@ -79136,7 +79142,11 @@ function _aurixBillingToast(msg, variant) {
 // caminos independientes y el primero puede llegar unos segundos después. Si tras
 // los reintentos el servidor sigue diciendo Free, la app dice exactamente eso —
 // no hay un estado intermedio "premium provisional".
-const _AURIX_BILLING_RETRY_MS = Object.freeze([0, 2500, 6000, 15000]);
+// Seis intentos en 15 s, más juntos al principio: el webhook suele llegar en
+// los primeros segundos y con la cadencia anterior (0, 2.5, 6, 15) una
+// confirmación a los 3 s no se veía hasta los 6. Sigue siendo ACOTADO: no hay
+// bucle infinito, y lo que pasa al agotarse está definido abajo.
+const _AURIX_BILLING_RETRY_MS = Object.freeze([0, 1200, 2500, 5000, 9000, 15000]);
 function _aurixBillingReturnFlow() {
   let flag = null;
   try {
@@ -79175,12 +79185,53 @@ function _aurixBillingReturnFlow() {
       }
       i++;
       if (i < _AURIX_BILLING_RETRY_MS.length) setTimeout(tick, _AURIX_BILLING_RETRY_MS[i]);
-      else { _funnel('pending_timeout'); _aurixBillingToast(t('pw_pending'), 'info'); }
+      else { _funnel('pending_timeout'); _aurixBillingPendingNotice(); }
     });
   };
   setTimeout(tick, _AURIX_BILLING_RETRY_MS[0]);
 }
 
+// ── CUANDO LA ESPERA SE AGOTA, HAY SALIDA ─────────────────────────────────
+// Antes, al agotarse los reintentos se publicaba un aviso que se desvanecía y
+// ahí acababa todo: el usuario había pagado, la app decía Free y no había nada
+// que pulsar. Pasó de verdad el 24/09/2026 —con el webhook apuntando a un host
+// que devolvía 405— y el único camino fue recargar una y otra vez.
+// Ahora el aviso SE QUEDA y ofrece volver a preguntarle al servidor. Lo que NO
+// ofrece es pagar otra vez: el cobro ya se hizo y empujar a repetirlo sería la
+// peor respuesta posible.
+function _aurixBillingPendingNotice() {
+  _aurixBillingToast(t('pw_pending'), 'info', {
+    sticky: true,
+    action: { label: t('pw_check'), onClick: _aurixBillingRecheck },
+  });
+}
+// «Comprobar estado» pregunta al MISMO resolver autoritativo. No hay una
+// segunda fuente de verdad, ni un escritor nuevo, ni nada que conceda Premium
+// desde el cliente: si el servidor no lo dice, no se concede.
+function _aurixBillingRecheck() {
+  _aurixBillingToast(t('pw_confirming'), 'info');
+  let p = null;
+  try { p = _aurixEntitlementsLoad({ force: true }); } catch (_) { p = null; }
+  if (!p || typeof p.then !== 'function') return;
+  p.then(st => {
+    if (st && st.loaded && st.plan === 'premium') {
+      try { _aurixRecordFunnelStep('confirmed_recheck'); } catch (_) {}
+      _aurixBillingToast(t('pw_active'), 'success');
+      _aurixEntApplyToUi(st.features);
+      return;
+    }
+    // Sigue sin constar. Se dice con todas las letras, se deja la puerta de
+    // soporte —no la de pagar— y el aviso vuelve a quedarse por si quiere
+    // reintentar más tarde.
+    _aurixBillingToast(t('pw_still_pending'), 'info', {
+      sticky: true,
+      action: {
+        label: t('pw_support'),
+        onClick: () => { try { window.open('mailto:aurixsystemofficial@gmail.com', '_blank', 'noopener'); } catch (_) {} },
+      },
+    });
+  }).catch(() => _aurixBillingPendingNotice());
+}
 function _aurixEntIsCatalogPreview() {
   return hasFeature('workspace.catalog_preview');
 }
@@ -79875,14 +79926,44 @@ function _aurixShowToast(message, opts) {
     }
     const el = document.createElement('div');
     el.className = `aurix-toast aurix-toast--${variant}`;
-    el.textContent = String(message || '');
+    // ── UN AVISO PUEDE NECESITAR UNA SALIDA ──────────────────────────────
+    // Un toast que se desvanece sirve para «guardado»; no sirve para «tu pago
+    // se está confirmando y todavía no consta». Ahí el usuario necesita poder
+    // HACER algo, y que el aviso siga estando cuando decida hacerlo. Con
+    // `action` el toast lleva un botón y con `sticky` no se va solo.
+    const txt = document.createElement('span');
+    txt.className = 'aurix-toast-txt';
+    txt.textContent = String(message || '');
+    el.appendChild(txt);
+    const close = () => {
+      el.classList.remove('is-open');
+      setTimeout(() => { try { el.remove(); } catch (_) {} }, 360);
+    };
+    if (o.action && o.action.label) {
+      el.classList.add('has-action');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'aurix-toast-act';
+      b.textContent = String(o.action.label);
+      b.addEventListener('click', () => {
+        // El aviso se retira SIEMPRE: si la acción falla, quien la lanzó
+        // publicará el suyo. Un aviso que no se puede quitar es una trampa.
+        close();
+        try { if (typeof o.action.onClick === 'function') o.action.onClick(); } catch (_) {}
+      });
+      el.appendChild(b);
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'aurix-toast-x';
+      x.setAttribute('aria-label', (typeof t === 'function' ? t('wsmodal_cancel') : 'Cerrar'));
+      x.textContent = '✕';
+      x.addEventListener('click', close);
+      el.appendChild(x);
+    }
     host.appendChild(el);
     // Trigger CSS transition on next frame.
     requestAnimationFrame(() => el.classList.add('is-open'));
-    setTimeout(() => {
-      el.classList.remove('is-open');
-      setTimeout(() => { try { el.remove(); } catch (_) {} }, 360);
-    }, ms);
+    if (!o.sticky) setTimeout(close, ms);
   } catch (_) {}
 }
 

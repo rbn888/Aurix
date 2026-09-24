@@ -37,6 +37,15 @@ const ALLOWED_ORIGINS = (process.env.BILLING_ALLOWED_ORIGINS || APP_ORIGIN)
 
 const PROVIDER = 'stripe';
 const PLAN     = 'premium';
+// ── DÓNDE VIVE DE VERDAD EL WEBHOOK ────────────────────────────────────────
+// `APP_ORIGIN` es el dominio de la APP (GitHub Pages: ficheros estáticos). El
+// webhook es una FUNCIÓN, y las funciones las sirve Vercel. Son dos orígenes
+// distintos y confundirlos costó una compra real: Stripe entregaba en
+// `app.aurixsystem.io/api/billing/webhook`, que responde 405 porque allí no hay
+// función ninguna, y el usuario pagó y se quedó en Free.
+const API_ORIGIN = String(process.env.BILLING_API_ORIGIN || 'https://isa-portfolio-ten.vercel.app')
+  .trim().replace(/\/+$/, '');
+const EXPECTED_WEBHOOK_URL = API_ORIGIN + '/api/billing/webhook';
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || '2024-06-20';
 
 // ── LOS PRECIOS APROBADOS, ESCRITOS AQUÍ A PROPÓSITO ────────────────────────
@@ -260,20 +269,72 @@ export default async function handler(req, res) {
       const j = await r.json().catch(() => null);
       if (r.ok && j && Array.isArray(j.data)) {
         const want = ['customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'];
-        const mine = j.data
-          .filter(e => e && typeof e.url === 'string' && /\/api\/billing\/webhook$/.test(e.url))
+        // ── LA URL ENTERA, NO LA RUTA ───────────────────────────────────────
+        // Este filtro era `/\/api\/billing\/webhook$/`, que sólo mira el FINAL
+        // de la URL: cualquier host valía. Así fue como un destino apuntando al
+        // dominio de la app —donde no hay función y todo POST responde 405—
+        // pasó como bueno, `ready_for_live` dijo `true`, y una compra real se
+        // quedó sin activar. Ahora se compara la URL COMPLETA con la esperada.
+        const norm = u => String(u || '').trim().replace(/\/+$/, '');
+        const all = j.data
+          .filter(e => e && typeof e.url === 'string' && /\/api\/billing\/webhook\/?$/.test(e.url))
           .map(e => ({
             url: e.url, status: e.status, livemode: e.livemode === true,
+            url_matches_api: norm(e.url) === EXPECTED_WEBHOOK_URL,
             covers_all: want.every(w => Array.isArray(e.enabled_events) &&
               (e.enabled_events.includes(w) || e.enabled_events.includes('*'))),
             api_version: e.api_version || null,
           }));
-        webhook.endpoints = mine;
-        const good = mine.filter(e => e.status === 'enabled' && e.covers_all && e.livemode === (mode === 'live'));
-        if (!good.length) blockers.push('webhook_endpoint_missing_for_mode');
+        webhook.expected_url = EXPECTED_WEBHOOK_URL;
+        webhook.endpoints = all;
+        const good = all.filter(e => e.status === 'enabled' && e.covers_all
+          && e.livemode === (mode === 'live') && e.url_matches_api);
+        if (!good.length) {
+          blockers.push('webhook_endpoint_missing_for_mode');
+          // Y si lo que falla es SÓLO el host, se dice por su nombre: es el
+          // error que se comete y el que no se ve en el panel de un vistazo.
+          const wrongHost = all.filter(e => !e.url_matches_api && e.status === 'enabled'
+            && e.livemode === (mode === 'live'));
+          if (wrongHost.length) blockers.push('webhook_url_not_api_origin');
+        }
       } else { blockers.push('webhook_check_failed'); }
     } catch (_) { blockers.push('webhook_check_failed'); }
   }
+
+  // ── 6 · «CONFIGURADO» NO ES «ENTREGADO» ───────────────────────────────────
+  // Que Stripe LISTE un destino no prueba que entregue, y que exista un secreto
+  // no prueba que se procese. La única evidencia de extremo a extremo que
+  // tenemos es NUESTRO propio ledger: si el webhook ha corrido alguna vez, hay
+  // filas en `billing_events`. Sin filas, el estado honesto no es «bien», es
+  // «nunca observado» — y eso es exactamente lo que faltó cuando una compra
+  // real se perdió contra un host que devolvía 405.
+  // No se marca como bloqueo por sí solo: una cuenta nueva sin ventas tampoco
+  // tiene eventos. Se publica el HECHO y que lo lea quien decide.
+  let delivery = { verified: 'unknown', events_total: null, last_received_at: null, last_type: null };
+  try {
+    const r = await sb(`/billing_events?provider=eq.${PROVIDER}` +
+      `&select=event_type,received_at,outcome&order=received_at.desc&limit=1`);
+    if (r.ok) {
+      const rows = await r.json().catch(() => []);
+      // El recuento total viene en `content-range`, pero es OPCIONAL: si la
+      // cabecera no está, eso no puede invalidar la comprobación entera. La
+      // pregunta que importa es «¿ha procesado el webhook algo alguna vez?», y
+      // eso lo responde la propia fila.
+      let total = NaN;
+      try { total = Number(String((r.headers && r.headers.get && r.headers.get('content-range')) || '').split('/')[1]); } catch (_) { total = NaN; }
+      delivery.events_total = Number.isFinite(total) ? total : (Array.isArray(rows) ? rows.length : null);
+      if (Array.isArray(rows) && rows.length) {
+        delivery.verified = 'observed';
+        delivery.last_received_at = rows[0].received_at || null;
+        delivery.last_type = rows[0].event_type || null;
+      } else {
+        // Ni un evento procesado NUNCA. Con el modo en LIVE y el catálogo listo,
+        // esto es lo que hay que mirar antes de anunciar que se puede vender.
+        delivery.verified = 'never_observed';
+      }
+    } else { delivery.verified = 'unknown'; }
+  } catch (_) { delivery.verified = 'unknown'; }
+  webhook.delivery = delivery;
 
   const uniq = Array.from(new Set(blockers));
   return res.status(200).json({
@@ -287,6 +348,13 @@ export default async function handler(req, res) {
     allow_test_events_effective: allowTestEvents,
     warnings,
     blockers: uniq,
+    // `ready_for_live` significa «la CONFIGURACIÓN es coherente», nunca «ya se
+    // ha entregado y activado una compra». Se nombran las dos por separado
+    // porque confundirlas es lo que dejó pasar el webhook mal apuntado.
     ready_for_live: uniq.length === 0,
+    activation_verified: webhook.delivery && webhook.delivery.verified === 'observed',
+    note: uniq.length === 0 && (!webhook.delivery || webhook.delivery.verified !== 'observed')
+      ? 'configuracion coherente; entrega del webhook NO observada todavia'
+      : undefined,
   });
 }
