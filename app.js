@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '707'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '708'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6576,6 +6576,14 @@ const T = {
     wsre_l_appr:  'Apreciación latente',
     wsre_basis_title: 'Cómo se calculan estas cifras',
     wsre_more_title:  'Desglose del mes y capas',
+    // DESCUBRIMIENTO EN EL RESUMEN (sólo Free). Copy CONCEPTUAL: ni una cifra,
+    // ni una señal, ni una promesa de muestra gratuita — los permisos no la dan.
+    dsc_int_t:        'Aurix Intelligence',
+    dsc_int_b:        'Entiende qué está moviendo tu patrimonio: estructura, concentraciones y lo que ha cambiado.',
+    dsc_int_cta:      'Explorar Intelligence',
+    dsc_ws_t:         'Aurix Workspace',
+    dsc_ws_b:         'Calcula, organiza y planifica: presupuesto, préstamos, escenarios, objetivos y más.',
+    dsc_ws_cta:       'Explorar Workspace',
     wsre_basis_yield: 'La rentabilidad del conjunto es Σ(resultado operativo anual) / Σ(coste de compra), no la media de las rentabilidades de cada inmueble.',
     wsre_basis_debt:  'La cuota incluye la parte que amortiza capital, que NO es un gasto operativo: construye equity. Por eso el resultado operativo se publica antes de la deuda.',
     wsre_basis_appr:  'La apreciación es LATENTE: es la diferencia entre el valor que has declarado y lo que pagaste, y no entra en el flujo de caja porque no se ha cobrado.',
@@ -7221,6 +7229,10 @@ const T = {
     pw_cancelled:      'Has salido del pago. No se ha cobrado nada.',
     pw_err_auth:       'Inicia sesión para continuar.',
     pw_err_soon:       'La compra todavía no está disponible.',
+    // El precio anunciado y el que cobraría el proveedor no coinciden. Lo que el
+    // usuario necesita saber es que NO se le ha cobrado nada; lo que NO se puede
+    // hacer es insinuarle que ya tiene una suscripción.
+    pw_err_price:      'El precio mostrado no coincide con el del proveedor de pago, así que no hemos abierto el cobro. No se te ha cobrado nada.',
     pw_err_generic:    'No hemos podido abrir el pago. Inténtalo de nuevo.',
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'LA INTELIGENCIA DE TU PATRIMONIO',
@@ -9338,6 +9350,12 @@ const T = {
     wsre_l_appr:  'Unrealised appreciation',
     wsre_basis_title: 'How these figures are worked out',
     wsre_more_title:  'Monthly breakdown and layers',
+    dsc_int_t:        'Aurix Intelligence',
+    dsc_int_b:        'Understand what is moving your wealth: structure, concentrations and what changed.',
+    dsc_int_cta:      'Explore Intelligence',
+    dsc_ws_t:         'Aurix Workspace',
+    dsc_ws_b:         'Calculate, organise and plan: budget, loans, scenarios, goals and more.',
+    dsc_ws_cta:       'Explore Workspace',
     wsre_basis_yield: 'The portfolio yield is Σ(annual operating result) / Σ(purchase cost), not the average of each property\'s yield.',
     wsre_basis_debt:  'The payment includes the part that repays capital, which is NOT an operating expense: it builds equity. That is why the operating result is shown before debt.',
     wsre_basis_appr:  'Appreciation is UNREALISED: it is the difference between the value you declared and what you paid, and it does not enter cash flow because it has not been received.',
@@ -9943,6 +9961,7 @@ const T = {
     pw_cancelled:      'You left the payment. Nothing was charged.',
     pw_err_auth:       'Sign in to continue.',
     pw_err_soon:       'Purchasing is not available yet.',
+    pw_err_price:      'The price shown does not match the payment provider, so we did not start the charge. You have not been charged.',
     pw_err_generic:    "We couldn't open the payment. Please try again.",
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'THE INTELLIGENCE OF YOUR WEALTH',
@@ -22925,6 +22944,60 @@ function updateDashboardPlans() {
   sec.innerHTML = _renderDashboardPlans();
   sec.style.display = '';
 }
+// ════════════════════════════════════════════════════════════════════════════
+// DESCUBRIMIENTO EN EL RESUMEN · SÓLO PARA UN PLAN FREE CONFIRMADO
+// ════════════════════════════════════════════════════════════════════════════
+// El hueco que ocupan los documentos guardados no puede quedarse en blanco para
+// quien no los tiene, y tampoco puede llenarse con un paywall. Lo que va aquí
+// son dos tarjetas HERMANAS —mismo ancho, mismo relleno, misma jerarquía, el CTA
+// en el mismo sitio— que dicen qué hacen Intelligence y Workspace y llevan a SU
+// portada. No inician el cobro, no enseñan una cifra y no prometen una muestra
+// que los permisos no dan.
+//
+// TRES ESTADOS, NO DOS. `hasAurixPremiumAccess()` devuelve false tanto para
+// «Free» como para «todavía no lo sé», y pintar una promo comercial a un cliente
+// que ha pagado —aunque sea medio segundo mientras el resolver contesta— es
+// exactamente el destello que este producto no puede permitirse. Así que la
+// decisión la toma `_wsPremiumShell()`, el MISMO owner de tres estados que ya
+// gobierna el shell de Workspace: 'pending' no pinta nada.
+function _renderDashboardDiscover() {
+  const esc = _intccEsc;
+  const card = (kind, icon, title, body, cta, nav) => `
+    <article class="wsdisc-card is-${kind}">
+      <div class="wsdisc-viz" aria-hidden="true">${icon}</div>
+      <div class="wsdisc-body">
+        <h3 class="wsdisc-t">${esc(title)}</h3>
+        <p class="wsdisc-b">${esc(body)}</p>
+      </div>
+      <button type="button" class="wsdisc-cta" data-dsc-go="${esc(nav)}">${esc(cta)}
+        <span class="wsdisc-chev" aria-hidden="true">›</span>
+      </button>
+    </article>`;
+  // Intelligence: un halo, no un dato. Es CSS puro (sin imagen, sin animación
+  // permanente) para no competir con las cifras del patrimonio que hay arriba.
+  const orb = `<span class="wsdisc-orb"></span>`;
+  // Workspace: TRES iconos de su propia familia, no el catálogo entero.
+  const tools = `<span class="wsdisc-icons">${['split', 'calc', 'paths']
+    .map(g => `<span class="wsdisc-ic">${_wsCapIconHtml(g)}</span>`).join('')}</span>`;
+  return `
+    <div class="wsdisc-grid">
+      ${card('int', orb,   t('dsc_int_t'), t('dsc_int_b'), t('dsc_int_cta'), 'intelligence')}
+      ${card('ws',  tools, t('dsc_ws_t'),  t('dsc_ws_b'),  t('dsc_ws_cta'),  'workspace')}
+    </div>`;
+}
+function updateDashboardDiscover() {
+  const sec = document.getElementById('dashDiscoverSection');
+  if (!sec) return;
+  let shell = 'pending';
+  try { shell = _wsPremiumShell(); } catch (_) { shell = 'pending'; }
+  let drill = false;
+  try { drill = (typeof activeCategory !== 'undefined') && activeCategory !== null; } catch (_) {}
+  // Premium ve sus documentos; 'pending' no ve nada; en el detalle de una
+  // categoría el Resumen cede su sitio a la lista filtrada, igual que el resto.
+  if (shell !== false || drill) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
+  sec.innerHTML = _renderDashboardDiscover();
+  sec.style.display = '';
+}
 // Los dos controles de la sección, en el mismo despachador delegado y armado una
 // sola vez. `data-ws-sync-retry` ya lo despacha Workspace, así que aquí sólo
 // viven los dos que son propios.
@@ -22932,7 +23005,17 @@ let _wsPlansWired = false;
 function _wsPlansWireOnce() {
   if (_wsPlansWired || typeof document === 'undefined') return;
   _wsPlansWired = true;
+  // El descubrimiento entra por el MISMO despachador: una promo que lleva a su
+  // portada no merece un segundo manejador global.
   document.addEventListener('click', e => {
+    const go = e.target && e.target.closest ? e.target.closest('[data-dsc-go]') : null;
+    if (go && go.closest('#dashDiscoverSection')) {
+      const dest = go.getAttribute('data-dsc-go');
+      // Lleva a la PORTADA del producto, que es donde vive su flujo comercial.
+      // No abre el checkout: comprar se decide allí, con el precio delante.
+      try { switchTab(dest === 'workspace' ? 'workspace' : 'intelligence'); } catch (_) {}
+      return;
+    }
     const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-templates],[data-ws-sync-retry]') : null;
     if (!el || !el.closest('#wsPlansSection')) return;
     if (el.hasAttribute('data-ws-sync-retry')) { try { _wsDocsRetry(); } catch (_) {} return; }
@@ -56213,7 +56296,7 @@ function updateCategoryCards() {
   // Va antes del `return` por ausencia de rejilla y antes del corte por detalle
   // de categoría a propósito: su propio guard decide, y así no hay un segundo
   // sitio que tenga que acordarse de ocultarla.
-  try { _wsPlansWireOnce(); updateDashboardPlans(); } catch (_) {}
+  try { _wsPlansWireOnce(); updateDashboardPlans(); updateDashboardDiscover(); } catch (_) {}
   if (!section || !grid) return;
 
   // In category drill-down, this section is replaced by the filtered asset list.
@@ -56254,6 +56337,7 @@ function updateCategoryCards() {
     }
     if (grid.dataset.sig !== 'empty') {
       grid.dataset.sig = 'empty';
+      grid.dataset.catN = '0';
       grid.innerHTML = `<div class="cat-empty">
         <p class="cat-empty-t">${_intccEsc(t('catEmptyTitle'))}</p>
         <button type="button" class="cat-empty-cta" data-cat-empty-add>${_intccEsc(t('catEmptyCta'))}</button>
@@ -56290,6 +56374,7 @@ function updateCategoryCards() {
     .map(tp => `${tp}:${(distMap[tp]?.valueBase || 0) > 0 ? '1' : '0'}`)
     .join('|');
   if (grid.dataset.sig === sig && grid.children.length === ALL_CATEGORIES.length) {
+    grid.dataset.catN = String(ALL_CATEGORIES.length);
     ALL_CATEGORIES.forEach(type => {
       const dist = distMap[type] || { type, valueBase: 0, pct: 0 };
       const card = grid.querySelector(`.cat-card[data-type="${type}"]`);
@@ -56323,6 +56408,15 @@ function updateCategoryCards() {
     return;
   }
   grid.dataset.sig = sig;
+  // ── CUÁNTAS CATEGORÍAS HAY, DECLARADO EN EL DOM ─────────────────────────
+  // La rejilla era de tres columnas fijas pase lo que pase, así que UNA sola
+  // categoría se quedaba en el primer tercio con dos tercios vacíos al lado, y
+  // CUATRO daban 3+1 con la última suelta. El reparto no puede depender de
+  // cuántas caben: depende de cuántas HAY. Se publica el número y el CSS decide
+  // (1 → estrecha y centrada · 2 → dos · 3 → tres · 4 → 2+2 · 5 y 6 → tres).
+  // Va aquí y también en el camino de repintado silencioso, porque ese camino
+  // existe precisamente para no reconstruir el DOM.
+  grid.dataset.catN = String(ALL_CATEGORIES.length);
 
   const hint = `<span class="cat-card-hint">${t('viewHint')}</span>`;
   grid.innerHTML = ALL_CATEGORIES.map(type => {
@@ -78587,6 +78681,9 @@ function _aurixEntApplyToUi(features) {
   // «Tus planes» vive en el Resumen y también depende del derecho: perderlo la
   // oculta y recuperarlo la devuelve, sin recargar y sin tocar un documento.
   try { updateDashboardPlans(); } catch (_) {}
+  // Y su hermana: al confirmarse Premium la promo Free tiene que IRSE, no
+  // quedarse debajo de los documentos que acaban de aparecer.
+  try { updateDashboardDiscover(); } catch (_) {}
   // Y el distintivo del menú, que es donde el usuario comprueba su plan.
   try { if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity(); } catch (_) {}
 }
@@ -78723,8 +78820,24 @@ async function _aurixBillingCheckout(interval, source) {
       _aurixBillingToast(t('pw_err_generic'), 'error');
       return false;
     }
-    if (r.status === 503 || (j && (j.error === 'billing_unconfigured' || j.error === 'price_unavailable'))) {
+    // `price_verification_unavailable` (503) llega aquí a propósito: no poder
+    // comprobar el precio es «todavía no se puede comprar», que es la verdad.
+    // Se nombra para que deje de depender de que el status coincida.
+    if (r.status === 503 || (j && (j.error === 'billing_unconfigured' || j.error === 'price_unavailable'
+                                   || j.error === 'price_verification_unavailable'))) {
       _aurixBillingToast(t('pw_err_soon'), 'info');
+      return false;
+    }
+    // ── 409 NO SIGNIFICA YA UNA SOLA COSA ───────────────────────────────────
+    // DEFECTO REAL: desde v747 el servidor devuelve TAMBIÉN `409 price_mismatch`
+    // cuando el importe anunciado no coincide con el que Stripe cobraría. Esta
+    // rama lo estaba tratando como «ya tienes una suscripción» y, peor, su
+    // camino alternativo publica «el pago se está confirmando»: al usuario se le
+    // decía que había pagado cuando no se había abierto ni la sesión. Justo el
+    // caso que aparece durante el cutover, con la clave ya en LIVE y el catálogo
+    // todavía en TEST. Se discrimina por el CÓDIGO, no por el status.
+    if (j && j.error === 'price_mismatch') {
+      _aurixBillingToast(t('pw_err_price'), 'error');
       return false;
     }
     // 409 — ya hay una suscripción viva (posiblemente creada hace segundos y

@@ -874,6 +874,27 @@ console.log('\nF · precios canónicos y paywall');
     ['pw_title', 'pw_cta', 'pw_annual', 'pw_monthly', 'pw_manage', 'pw_unavailable',
      'pw_b_intel', 'pw_trust', 'pw_active', 'pw_pending', 'pw_cancelled']
       .every(k => (app.match(new RegExp('\\n\\s+' + k + ':', 'g')) || []).length === 2));
+  // ── EL CLIENTE TIENE QUE SABER DISTINGUIR DOS 409 ──────────────────────
+  // DEFECTO REAL (2026-09-24): el servidor devuelve 409 para «ya tienes una
+  // suscripción» Y para «el precio anunciado no es el que se cobraría». El
+  // cliente los trataba igual, así que un desajuste de precio le decía al
+  // usuario que ya tenía suscripción o que su pago «se está confirmando» —
+  // cuando no se había abierto ni la sesión. Es el caso exacto del cutover:
+  // clave en LIVE y catálogo todavía en TEST.
+  ok('F.11z el cliente distingue `price_mismatch` de `already_subscribed` (los dos son 409)',
+    (() => { const f = fnSrc(app, '_aurixBillingCheckout');
+      const iMis = f.indexOf("j.error === 'price_mismatch'");
+      const i409 = f.indexOf("r.status === 409");
+      return iMis > -1 && i409 > -1 && iMis < i409 && /pw_err_price/.test(f); })(),
+    'orden de las ramas en _aurixBillingCheckout');
+  ok('F.11y …y ese aviso dice que NO se ha cobrado, sin insinuar una suscripción',
+    (() => {
+      const es = (app.match(/pw_err_price:\s*'([^']*)'/) || [])[1] || '';
+      const en = (app.match(/pw_err_price:\s*'([^']*)'/g) || []).length;
+      return en === 2 && /no se te ha cobrado/i.test(es) && !/suscripci[óo]n/i.test(es);
+    })(), (app.match(/pw_err_price:\s*'([^']*)'/) || [])[1]);
+  ok('F.11x no poder VERIFICAR el precio se trata como «todavía no disponible», y por su nombre',
+    /price_verification_unavailable/.test(fnSrc(app, '_aurixBillingCheckout')));
   ok('F.11 un cliente ve GESTIONAR PLAN (la ruta de cancelación), no comprar otra vez',
     /const managed = \(\(typeof hasFeature === 'function'\) && hasFeature\('premium\.settings'\)\) \|\|[\s\S]{0,160}_aurixBillingIsCustomer\(\)/.test(app) &&
     /data-premium-portal/.test(app));

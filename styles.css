@@ -28506,3 +28506,105 @@ input.ws4-num.is-invalid {
   .aurix-wsh .wsre-kpis { grid-template-columns: 1fr; }
   .aurix-wsh .wsre-kpi:nth-child(3) { grid-column: auto; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DASHBOARD · LA REJILLA DE CATEGORÍAS SE ADAPTA A CUÁNTAS HAY
+   ════════════════════════════════════════════════════════════════════════════
+   LO QUE HABÍA: tres columnas fijas en escritorio, pasara lo que pasara. Con
+   UNA categoría la tarjeta se quedaba en el primer tercio y dos tercios de la
+   fila vacíos al lado; con DOS, un hueco a la derecha; con CUATRO, 3+1 y la
+   última suelta. El reparto no puede depender de cuántas caben: depende de
+   cuántas HAY, y eso lo declara el render en `data-cat-n`.
+
+   Reglas (escritorio; el móvil sigue en una columna como hasta ahora):
+     1 → una columna ESTRECHA y centrada — 60 % del contenedor, dentro de la
+         banda 55–65 % pedida, para que una sola tarjeta no se lea como una
+         fila rota ni estire sus datos a los extremos.
+     2 → dos columnas iguales.
+     3 → tres columnas iguales.
+     4 → DOS columnas (2+2): con tres quedaría 3+1, y una tarjeta sola en la
+         última fila es justo lo que hay que evitar. Ninguna se ensancha.
+     5 → tres (3+2) · 6 → tres (3+3).
+   Las alturas las sigue igualando `grid-auto-rows: 1fr`, que ya estaba: no se
+   fija ninguna altura rígida que pueda cortar una traducción larga o el zoom. */
+@media (min-width: 769px) {
+  .categories-grid[data-cat-n="1"] {
+    /* 62 % del contenedor, pero con TECHO. La banda de referencia es 55–65 %, y
+       en una pantalla ancha ese porcentaje da una tarjeta tan larga que su
+       cabecera manda el título a un extremo y el estado de mercado al otro:
+       datos relacionados a 700 px de distancia. El tope mantiene la tarjeta en
+       una anchura legible sin salirse de la banda en los anchos normales. */
+    grid-template-columns: minmax(0, min(62%, 680px));
+    justify-content: center;
+  }
+  .categories-grid[data-cat-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .categories-grid[data-cat-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Entre 701 y 768 px la rejilla ya era de tres; con una sola categoría se
+   aplica el mismo criterio, con algo más de ancho porque hay menos sitio. */
+@media (min-width: 701px) and (max-width: 768px) {
+  .categories-grid[data-cat-n="1"] { grid-template-columns: minmax(0, 72%); justify-content: center; }
+}
+/* Tablet en dos columnas: una sola sigue sin merecer media fila vacía. */
+@media (min-width: 481px) and (max-width: 700px) {
+  .categories-grid[data-cat-n="1"] { grid-template-columns: minmax(0, 80%); justify-content: center; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   RESUMEN · DESCUBRIMIENTO DE INTELLIGENCE Y WORKSPACE (sólo Free)
+   ════════════════════════════════════════════════════════════════════════════
+   Dos tarjetas HERMANAS: mismo ancho, mismo relleno, misma jerarquía y el CTA
+   siempre abajo, a la misma altura, aunque un texto ocupe una línea más (por eso
+   el cuerpo crece y el botón se empuja con `margin-top:auto`, en vez de fijar
+   alturas que romperían una traducción larga o el zoom). Densidad controlada:
+   sin banner, sin paywall y sin copiar las portadas. */
+.wsdisc-sec { margin-top: var(--space-3, 16px); }
+.wsdisc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3, 16px); }
+.wsdisc-card {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 18px 20px; border-radius: 16px;
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.16);
+}
+.wsdisc-viz { display: flex; align-items: center; min-height: 44px; }
+.wsdisc-body { min-width: 0; }
+.wsdisc-t { margin: 0 0 6px; font-size: 16px; font-weight: 750; color: var(--text-bright); letter-spacing: -0.005em; }
+.wsdisc-b { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
+.wsdisc-cta {
+  margin-top: auto; align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 44px; padding: 0 18px; border-radius: 12px; cursor: pointer;
+  background: rgba(var(--aurix-blue-rgb), 0.14);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.34);
+  color: #cfe0ff; font-size: 14px; font-weight: 700;
+}
+.wsdisc-cta:hover { background: rgba(var(--aurix-blue-rgb), 0.22); }
+.wsdisc-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.9); outline-offset: 2px; }
+.wsdisc-chev { font-size: 16px; line-height: 1; opacity: 0.8; }
+
+/* El halo de Intelligence: gradiente, no imagen ni animación permanente. Está
+   para situar el producto, no para competir con las cifras de arriba. */
+.wsdisc-orb {
+  width: 40px; height: 40px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 30%, rgba(190,215,255,0.95), rgba(90,150,255,0.55) 38%, rgba(40,80,190,0.30) 62%, transparent 72%),
+    radial-gradient(circle at 50% 50%, rgba(74,130,240,0.30), transparent 70%);
+  box-shadow: 0 0 18px rgba(74,130,240,0.28);
+}
+/* Los iconos de Workspace: tres de su propia familia, no el catálogo entero. */
+.wsdisc-icons { display: inline-flex; gap: 8px; }
+.wsdisc-ic {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
+  color: var(--aurix-blue, #4A82F0);
+  background: rgba(74,130,240,0.10); border: 1px solid rgba(74,130,240,0.20);
+}
+.wsdisc-ic .wsfc-cap-svg { width: 21px; height: 21px; }
+
+@media (max-width: 700px) {
+  /* Apiladas, con la MISMA arquitectura: no cambia el orden ni la jerarquía. */
+  .wsdisc-grid { grid-template-columns: 1fr; gap: 12px; }
+  .wsdisc-card { padding: 16px 16px; }
+  .wsdisc-cta { align-self: stretch; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsdisc-cta { transition: none; }
+}
