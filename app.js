@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '713'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '714'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -79156,10 +79156,15 @@ function _aurixBillingToast(msg, variant, opts) {
 // número y por ventana—, no que tenga pocos intentos.
 // Ahora: uno inmediato y después uno cada 1,5 s durante 30 s. Veinte llamadas
 // como mucho, ventana cerrada, sin `setInterval` y sin bucle infinito.
+// El hueco NO es 2000 aunque el objetivo sea «≤2 s»: la latencia real es el
+// hueco MÁS la ida y vuelta del resolver, y en una red móvil mala esa ida y
+// vuelta se come medio segundo largo. Con 1,2 s quedan ~800 ms de margen para
+// la red antes de incumplir. Medido en el peor punto del ciclo: 1503 ms con
+// 1,5 s de hueco, que dejaba demasiado poco aire.
 const _AURIX_BILLING_WAIT = Object.freeze({
   firstMs:  0,       // el primero, inmediato: el webhook suele haber llegado ya
-  everyMs:  1500,    // hueco CONSTANTE — es lo que acota la latencia de detección
-  maxTries: 20,      // 20 × 1,5 s = 30 s. Acotado por número Y por ventana.
+  everyMs:  1200,    // hueco CONSTANTE — es lo que acota la latencia de detección
+  maxTries: 25,      // 25 × 1,2 s = 28,8 s. Acotado por número Y por ventana.
 });
 
 // ── LA ESPERA SOBREVIVE A SALIR DE LA APP ──────────────────────────────────

@@ -200,6 +200,27 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(([e]) =>
       s2.premium === true && s2.cover === false && s2.clicks === 0 && s2.ms !== null && s2.ms <= TARGET_MS,
       JSON.stringify(s2));
 
+    // ══ 2c · EL PEOR CASO, A PROPÓSITO ═════════════════════════════════════
+    // Las medidas de arriba son afortunadas: la confirmación cae a mitad de
+    // hueco. El peor caso es que caiga JUSTO DESPUÉS de una consulta, y hay que
+    // medirlo, porque es el que decide si el objetivo se cumple o no. Los
+    // detección no puede llegar antes de la consulta siguiente. El momento se
+    // deriva de la propia cadencia: si alguien la cambia, esto sigue midiendo
+    // el peor caso y no un punto afortunado que se quedó escrito.
+    await mount(page);
+    const every = await page.evaluate(`_AURIX_BILLING_WAIT.everyMs`);
+    await page.evaluate(`(function(){
+      history.replaceState({}, '', location.pathname + '?billing=success');
+      _aurixBillingReturnFlow(); return true; })()`);
+    await page.waitForTimeout(every + 60);
+    await flip(page);
+    await waitPremium(page, 8000).catch(() => {});
+    const s2c = await read(page);
+    times.push([`${tag} PEOR CASO (justo tras una consulta)`, s2c.ms]);
+    ok(`${tag} 2c · incluso en el peor punto del ciclo, Premium en ≤${TARGET_MS} ms`,
+      s2c.premium === true && s2c.clicks === 0 && s2c.ms !== null && s2c.ms <= TARGET_MS,
+      JSON.stringify(s2c));
+
     // ══ 3 · EL HUECO QUE ANTES DURABA NUEVE SEGUNDOS ═══════════════════════
     // Con la cadencia anterior los intentos caían en 0 · 1,2 · 3,7 · 8,7 · 17,7 s.
     // Una confirmación a los ~9,3 s no se veía hasta los 17,7. Este tramo es
