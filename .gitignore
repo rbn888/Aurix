@@ -23,6 +23,12 @@ docs/wsfc-premium-cover/
 docs/ws-firstscreen/
 # Y las de «Tus planes» en el Dashboard.
 docs/ws-dashboard-plans/
+# Y las de Intelligence en el móvil (`scripts/aurix-intelligence-mobile-probe.mjs`).
+docs/intelligence-mobile/
+# El markup de Intelligence que vuelca la QA visual con AURIX_INT04_DUMP=1: es
+# un artefacto REGENERABLE a partir de app.js. Commitearlo sería congelar una
+# copia que envejece en silencio mientras la superficie cambia.
+docs/int04-visual-qa/markup-*.html
 
 # Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
 supabase/.temp/

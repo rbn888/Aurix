@@ -20623,6 +20623,30 @@ body.gs-open { overflow: hidden; }
   border-radius: 4px;
   color: var(--color-text-primary);
 }
+/* ── EL ÁREA TÁCTIL, SIN CAMBIAR LA COMPOSICIÓN ─────────────────────────────
+   Este enlace es la ÚNICA acción del hero de Intelligence y medía 20 px de
+   alto. El contrato de la superficie pide 44 px en móvil, pero la sonda que lo
+   vigila nombraba dos selectores (`.intcc-x-q, .intv4-more-sum`) en vez de
+   preguntar por todo lo que se puede pulsar, así que esta afordancia —añadida
+   después— nunca se midió. Es el mismo patrón de siempre: el gate fija la
+   lista que existía el día que se escribió.
+   Agrandar la caja subiría 24 px el hero, y de esta pantalla lo que se ha
+   pedido es justamente menos scroll. Así que el área de toque crece por
+   encima y por debajo con un pseudo-elemento: el texto no se mueve ni un píxel
+   y el dedo tiene 44 px. Se mide por IMPACTO (`elementFromPoint` en los dos
+   extremos de la banda), no por la altura de la caja, que es lo que dejó pasar
+   el defecto. */
+.intv12-see-changes { position: relative; }
+.intv12-see-changes::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 44px;
+  /* Decorativo y sin fondo: sólo existe para el dedo. */
+  pointer-events: auto;
+}
 /* El encabezado del destino recibe el foco por programa (`tabindex="-1"`). No
    puede dibujar un anillo al hacer clic con el ratón — sólo cuando la llegada es
    por teclado, que es cuando el usuario necesita ver dónde ha aterrizado. */
@@ -20773,7 +20797,9 @@ body.gs-open { overflow: hidden; }
 .intcc-tl-item.is-up .intcc-tl-node { background: #5fd6a0; box-shadow: 0 0 0 4px rgba(63,191,127,0.16), 0 0 10px rgba(63,191,127,0.5); }
 .intcc-tl-item.is-down .intcc-tl-node { background: #e9a857; box-shadow: 0 0 0 4px rgba(233,168,87,0.16), 0 0 10px rgba(233,168,87,0.5); }
 .intcc-tl-text { margin: 0 0 4px; font-size: 13.5px; line-height: 1.45; color: var(--text-bright); }
-.intcc-tl-date { font-size: 10.5px; font-weight: 600; color: rgba(150,180,240,0.6); letter-spacing: 0.06em; text-transform: uppercase; }
+/* 10,5 px quedaba medio píxel por debajo del suelo de legibilidad de la
+   superficie, y esta línea lleva la FECHA del hito: es dato, no adorno. */
+.intcc-tl-date { font-size: 11px; font-weight: 600; color: rgba(150,180,240,0.6); letter-spacing: 0.06em; text-transform: uppercase; }
 
 /* ════════════════════════════════════════════════════════════════════════════
    SPEC INT.04 · INTELLIGENCE PREMIUM EXPERIENCE
@@ -21393,7 +21419,14 @@ body.gs-open { overflow: hidden; }
   .intcc-drv-row { grid-template-columns: 20px minmax(56px, 0.9fr) 2.1fr auto; gap: 8px; }
   .intcc-drv-track { height: 5.7px; }
   .intcc-drv-name { font-size: 13px; font-weight: 600; }
-  .intcc-drv-kind { font-size: 7.5px; letter-spacing: 0.05em; color: rgba(150,180,240,0.42); }
+  /* La intención era «secundario», y el resultado era ILEGIBLE: 7,5 px al 42 %
+     de opacidad, y en un teléfono de 360 px se pinta aún más pequeño. Pero
+     «EXPOSICIÓN» / «LIQUIDEZ» no es decoración: dice de qué tipo es la fila, y
+     un texto que no se puede leer no está de-enfatizado, está de adorno.
+     Se sube al suelo de legibilidad (11 px) y la jerarquía se mantiene por
+     donde debe mantenerse —peso y color—, no encogiendo la letra: el nombre
+     sigue a 13 px y en claro, esto queda en 11 px y apagado. */
+  .intcc-drv-kind { font-size: 11px; letter-spacing: 0.04em; color: rgba(150,180,240,0.58); }
   .intcc-drv-pct  { font-size: 13.5px; font-weight: 800; min-width: 38px; }
   .intcc-drv-rank { width: 20px; height: 20px; }
 

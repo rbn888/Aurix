@@ -187,6 +187,19 @@ function buildHtml(lang) {
 const HTML = { es: buildHtml('es'), en: buildHtml('en') };
 mkdirSync(OUT, { recursive: true });
 
+// ── EL MARKUP, REUTILIZABLE ────────────────────────────────────────────────
+// Generarlo cuesta 180 líneas de fixture y es exactamente el mismo markup que
+// necesita cualquier otra medida sobre esta superficie. Con `AURIX_INT04_DUMP=1`
+// se vuelca y se sale: la alternativa era una segunda copia de la fixture, que
+// es como dos sondas acaban midiendo cosas distintas y llamándolas igual.
+// La parte de geometría de ESTA sonda pide Node ≥ 22 (WebSocket global + CDP);
+// el volcado no, así que sigue sirviendo donde la otra mitad no puede correr.
+if (process.env.AURIX_INT04_DUMP === '1') {
+  for (const l of ['es', 'en']) writeFileSync(join(OUT, 'markup-' + l + '.html'), HTML[l]);
+  console.log('markup volcado en ' + OUT + ' (es, en) — ' + HTML.es.length + ' / ' + HTML.en.length + ' bytes');
+  process.exit(0);
+}
+
 // ── 2 · Chrome + CDP ────────────────────────────────────────────────────────
 const PORT = 9820 + (process.pid % 120);
 const profile = mkdtempSync(join(tmpdir(), 'aurix-int04-'));
