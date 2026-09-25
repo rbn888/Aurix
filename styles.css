@@ -26957,6 +26957,30 @@ button.intv15-stop { padding: 0 12px; background: var(--elev-2); }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* ── EL COMPARADOR, EN SU CASA NUEVA ───────────────────────────────────────
+   La card trae su propio rótulo («Comparar rentabilidad») porque en
+   Intelligence era una entre nueve y tenía que decir cuál era. En Workspace la
+   cabecera compartida ya la nombra, así que el rótulo repetía el título justo
+   debajo del título — exactamente los 44 px que el bloque de cabeceras
+   operativas quitó de las otras ocho capacidades para que el primer control
+   útil no empiece a mitad de pantalla.
+   Se OCULTA A LA VISTA, no se borra: sigue siendo el encabezado de la sección
+   para un lector de pantalla, que sí necesita la estructura. Y se hace con una
+   regla acotada a esta superficie: en Intelligence la card ya no existe, pero
+   si algún día volviera, su rótulo seguiría estando donde debe. */
+.wsh-cmp-view .intv14-cmp > .intcc-card-title {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* Y la card deja el borde y el fondo de Intelligence: dentro de Workspace ya
+   está dentro de una superficie, y una caja dentro de otra caja es ruido. */
+.wsh-cmp-view .intv14-cmp {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding-top: 0;
+}
 /* La esfera, cuando el gate abre, es un BOTÓN de verdad: enfocable, con nombre
    accesible y con su rótulo visible. Sin el gate conserva su markup de siempre
    y estas reglas no la alcanzan. */

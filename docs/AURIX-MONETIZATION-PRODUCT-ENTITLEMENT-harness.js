@@ -654,7 +654,11 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     ok('E.16 §18 todo renderer declarado pertenece al catálogo (nada huérfano)',
       // Los dos mapas salieron de la función y son constantes de módulo; la tercera
       // y cuarta copia (las de Mi Espacio) dejaron de existir, que es el arreglo.
-      TR && PR && TR.length === 11 && PR.length === 12 &&
+      // 12 (2026-09-25): el COMPARADOR DE RENTABILIDAD llega desde Intelligence.
+      // El número se mantiene fijado a propósito —un renderer que aparece sin
+      // que nadie lo decida es exactamente lo que este assert caza— y lo que de
+      // verdad protege es la línea de abajo: ninguno puede ser huérfano.
+      TR && PR && TR.length === 12 && PR.length === 12 &&
       [...TR, ...PR].every(k => ids.has(k)) &&
       !/_MSE_TOOL_RENDER|_MSE_TPL_RENDER/.test(app),
       'huérfanos: ' + [...(TR || []), ...(PR || [])].filter(k => !ids.has(k)));
@@ -934,8 +938,14 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
 
   // ══ H. FUERA DE ALCANCE / VERSIONADO ═══════════════════════════════════
   console.log('\nH · ALCANCE Y DEPLOY');
-  ok('H.1 sin herramientas ni plantillas nuevas: el inventario es el que ya existía',
-    free._WS_CATALOG.length === 23, 'entradas: ' + free._WS_CATALOG.length);
+  // RE-DECIDIDO (2026-09-25): 23 → 24. El COMPARADOR DE RENTABILIDAD entra como
+  // entrada de herramienta (`return_comparator`) porque se MUDA desde
+  // Intelligence: no es inventario nuevo inventado, es una capacidad que ya
+  // existía construida y cambia de casa. Sigue fijado en un número porque una
+  // entrada que aparece sin que nadie la decida es justo lo que esto caza, y
+  // entra INTERNA — la condición de publicación la vigila H.2d.
+  ok('H.1 el inventario sólo crece cuando se decide: 24 entradas',
+    free._WS_CATALOG.length === 24, 'entradas: ' + free._WS_CATALOG.length);
   // Sin features VENDIBLES nuevas. `workspace.catalog_preview` (M.02 B4) sí es una
   // clave nueva, y es la excepción declarada: ningún plan la concede, no se vende y
   // no gatea nada del catálogo — sólo decide si se VE el inventario interno. El
@@ -951,7 +961,11 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     (() => {
       const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
                    'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql',
-                   'db/workspace_premium_3_all_premium.sql']
+                   'db/workspace_premium_3_all_premium.sql',
+                   // El comparador llega con DOS ficheros: el que declaró su
+                   // clave heredada (free false / premium false — no la vende
+                   // ningún plan) y el que la venderá cuando se aplique.
+                   'db/intelligence_comparator_key_1.sql', 'db/workspace_comparator_1.sql']
         .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
       const keys = [...new Set(free._WS_CATALOG.map(e => e.featureKey).filter(Boolean))];
       return keys.length >= 1 && keys.every(k => sql.indexOf("'" + k + "'") !== -1);
@@ -967,6 +981,28 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       return /\*\*\* APLICADO EN PRODUCCION · 2026-09-16 \*\*\*/.test(sql)
         && /10 filas para las cinco claves/.test(sql) && !/SIN APLICAR/.test(sql)
         && /on conflict \(plan, feature_key\) do update/.test(sql); })());
+  // ── LA MITAD QUE NO SE COMPROBABA ──────────────────────────────────────
+  // H.2 exige que toda clave vendible esté DECLARADA en un SQL, y su comentario
+  // dice además «y su entrada NO puede estar publicada hasta aplicarlo». Eso
+  // segundo no lo comprobaba nadie: era una frase. Aquí se convierte en regla —
+  // si el SQL que concede una clave dice PENDIENTE DE APLICAR, su entrada tiene
+  // que seguir interna. Es exactamente el orden que costó el cierre Premium:
+  // publicar antes que el SQL deja a una cuenta Premium viendo denegado lo que
+  // el catálogo le ofrece.
+  ok('H.2d ninguna entrada publicada depende de un SQL sin aplicar',
+    (() => {
+      const FILES = ['db/workspace_premium_2_plan_features.sql', 'db/workspace_premium_3_all_premium.sql',
+                     'db/intelligence_comparator_key_1.sql', 'db/workspace_comparator_1.sql'];
+      const pending = new Set();
+      FILES.forEach(f => {
+        let src = ''; try { src = read(f); } catch (_) { return; }
+        if (!/PENDIENTE DE APLICAR/.test(src)) return;
+        [...src.matchAll(/\('(?:free|premium)',\s*'([\w.]+)'/g)].forEach(m => pending.add(m[1]));
+      });
+      return free._WS_CATALOG.every(e =>
+        !(e.published === true && e.featureKey && pending.has(e.featureKey)));
+    })(),
+    'una entrada publicada cuelga de un SQL pendiente');
   ok('H.2b la única clave nueva no es vendible por ningún plan',
     (() => { const sql = read('db/monetization_catalog_preview_key_1.sql');
       return /'workspace\.catalog_preview', false/.test(sql) &&

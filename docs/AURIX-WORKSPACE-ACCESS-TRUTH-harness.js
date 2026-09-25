@@ -69,7 +69,16 @@ function dictFor(langCode) {
 //              catálogo, no escritas a mano) + intelligence.full + premium.settings
 //   founder  → lo de premium MÁS workspace.catalog_preview
 const CAT_KEYS = (function () {
-  const m = konstSrc('_WS_CATALOG');
+  // ── SE LEE EL CÓDIGO, NO LOS COMENTARIOS ────────────────────────────────
+  // Esto extraía las claves con una expresión sobre el TEXTO del catálogo, y
+  // un comentario que documentaba una clave futura («cuando el SQL esté
+  // aplicado, esta entrada pasa a featureKey: 'workspace.comparator'») entraba
+  // como si fuera una entrada real: el harness exigía que el cliente conociera
+  // una clave que nadie declara todavía. Un instrumento al que se le puede
+  // cambiar el veredicto escribiendo un comentario no mide el catálogo.
+  const m = konstSrc('_WS_CATALOG')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
   return Array.from(new Set((m.match(/featureKey:\s*'([\w.]+)'/g) || []).map(x => x.replace(/.*'([\w.]+)'.*/, '$1'))));
 })();
 function ctx(persona, langCode) {

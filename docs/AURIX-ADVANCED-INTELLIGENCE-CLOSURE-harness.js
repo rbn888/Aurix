@@ -3035,14 +3035,34 @@ console.log('\nSC · §6 · comparador de rentabilidad');
     && /cmp\.endsBefore/.test(fnSrc('_intv14ComparatorHtml'))
     && typeof DICT.es.cmp_ends === 'function' && typeof DICT.en.cmp_ends === 'function');
   // (5) El repintado tras un re-render de la pestaña.
-  ok('6.21 tras repintar la pestaña, el comparador guardado vuelve a cargarse',
-    (() => { const s0 = fnSrc('_initIntelligenceCommandCenter');
-      const iWire = s0.indexOf('_intv14CmpRepaint = repaint;');
-      const iCall = s0.indexOf('_intv14CmpRepaint();');
-      // La llamada tiene que estar FUERA del bloque de cableado, que corre una
-      // sola vez: dentro, un repintado dejaba el selector marcado y la segunda
-      // línea desaparecida.
-      return iWire > 0 && iCall > iWire && /SE DISPARA EN CADA PINTURA/.test(s0); })());
+  // ── EL COMPARADOR SE MUDÓ A WORKSPACE (2026-09-25) ────────────────────
+  // El invariante que este assert protege NO cambia —el repintado tiene que
+  // correr en CADA pintura, no sólo al cablear; si no, el selector queda
+  // marcado y la segunda línea desaparecida— pero cambia de casa. El cableado
+  // sale de `_initIntelligenceCommandCenter` a `_initComparatorWiring` y el
+  // disparo a `_cmpKickRepaint`, y quien los llama es el despachador de
+  // Workspace al montar la herramienta, en ese orden.
+  ok('6.21 al montar la herramienta, el comparador guardado vuelve a cargarse',
+    (() => {
+      const wire = fnSrc('_initComparatorWiring');
+      const kick = fnSrc('_cmpKickRepaint');
+      if (!/_intv14CmpRepaint = repaint;/.test(wire)) return false;
+      if (!/_intv14CmpRepaint\(\)/.test(kick)) return false;
+      // Y el orden en el montaje: primero se cablea, después se dispara.
+      const iWire = app.indexOf('_initComparatorWiring();');
+      const iKick = app.indexOf('_cmpKickRepaint();');
+      return iWire > 0 && iKick > iWire;
+    })());
+  // Y que no vuelva a colarse en Intelligence: el renderer de la pestaña no
+  // puede construir la card. Si alguien la re-añade ahí, vuelve el acoplamiento
+  // que hacía que la herramienta sólo respondiera tras abrir Intelligence.
+  ok('6.21b Intelligence ya NO construye el comparador',
+    !/_intv14ComparatorHtml\(/.test(fnSrc('_renderIntelligenceCommandCenter')) &&
+    !/_intv14ComparatorHtml\(/.test(fnSrc('_initIntelligenceCommandCenter')));
+  // Y Workspace sí: una capacidad, un hogar.
+  ok('6.21c el comparador lo monta la herramienta de Workspace',
+    /_intv14ComparatorHtml\(/.test(fnSrc('_renderComparatorTool')) &&
+    /_wsToolActive === 'comparator' \? _renderComparatorTool\(\)/.test(app));
   // ── I.4/I.6 · EL PAR FX LO ELIGE LA COTIZACIÓN, NO LA BASE ───────────
   const MKT = (from, n, step, p0, drift) => { const out = [];
     for (let i = 0; i < n; i++) out.push({ time: from + i * step, value: p0 * (1 + drift * i) });

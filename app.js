@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '716'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '717'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6476,6 +6476,14 @@ const T = {
     // WS.14 — Loan Simulator Pro (Préstamos Pro)
     wsloan_n:           'Simulador de préstamos',
     wsloan_sub:         'Simula cualquier financiación y entiende su coste real.',
+    // COMPARADOR DE RENTABILIDAD (WS.16). El nombre dice lo que hace y no
+    // promete lo que no hace: compara TU rentabilidad con la de un índice, no
+    // predice ni recomienda. El subtítulo declara el tipo de rentabilidad,
+    // porque mezclar price return con total return sería comparar dos cosas
+    // distintas y llamarlo comparación.
+    wscmp_n:            'Comparador de rentabilidad',
+    wscmp_sub:          'Compara la rentabilidad de tu patrimonio con la de un índice de referencia. Los cuatro índices se publican como rentabilidad de precio, sin dividendos.',
+    wscmp_off:          'El comparador está desactivado en este dispositivo.',
     wsloan_save:        'Guardar simulación',
     wsloan_in_amount:   'Importe solicitado',
     wsloan_in_rate:     'Interés anual',
@@ -9266,6 +9274,9 @@ const T = {
     // WS.14 — Loan Simulator Pro
     wsloan_n:           'Loan simulator',
     wsloan_sub:         'Simulate any financing and understand its real cost.',
+    wscmp_n:            'Return comparator',
+    wscmp_sub:          'Compare your portfolio return against a benchmark index. All four are published as price return, without dividends.',
+    wscmp_off:          'The comparator is switched off on this device.',
     wsloan_save:        'Save simulation',
     wsloan_in_amount:   'Loan amount',
     wsloan_in_rate:     'Annual rate',
@@ -20889,6 +20900,12 @@ const AURIX_WS13_TOOL = true;
 const AURIX_WS14_TOOL = true;
 // WS.15 ACTIVE — Asset Price Tracker (Precios de activos).
 const AURIX_WS15_TOOL = true;
+// ── WS.16 · COMPARADOR DE RENTABILIDAD ────────────────────────────────────
+// Llega desde Intelligence, donde estuvo publicado sólo para la cuenta
+// fundadora (`intelligence.comparator`). El flag existe por simetría con las
+// quince superficies anteriores: quien pueda abrirla lo decide el CATÁLOGO, no
+// esta constante.
+const AURIX_WS16_TOOL = true;
 // WS.11A — Workspace is AUTONOMOUS: it must not auto-read Dashboard/portfolio/
 // liquidity/health/intelligence. The real-data bridges (_ws4Real / _wsbBaseline /
 // _wspInitialWealth) are DORMANT behind this flag; "Usar datos de Aurix" will be
@@ -21020,6 +21037,14 @@ function renderWorkspaceHome(container) {
     if (shown === 'tool') return;
     container.innerHTML = _wsRenderTool();
     _wshReveal(container);
+    // El comparador trae su cableado de Intelligence y hay que MONTARLO aquí:
+    // es delegación en `document` con guardia de una sola vez, así que llamarlo
+    // en cada apertura es idempotente. Sin esto la card se pinta y ningún botón
+    // hace nada — un fallo mudo, que es el peor de los que deja una mudanza.
+    if (_wsToolActive === 'comparator') {
+      try { _initComparatorWiring(); } catch (_) {}
+      try { _cmpKickRepaint(); } catch (_) {}
+    }
     return;
   }
   if (_wshView === 'free_cover') {
@@ -22092,6 +22117,20 @@ const _WS_CATALOG = Object.freeze([
   { id: 'trade_journal',         kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'receivables',           kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'asset_prices',          kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
+  // ── COMPARADOR DE RENTABILIDAD · INTERNO HASTA QUE EXISTA SU DERECHO ─────
+  // Venía de Intelligence y su clave sigue siendo `intelligence.comparator`,
+  // que HOY sólo tiene la cuenta fundadora por override. Publicarlo exige una
+  // fila nueva en `plan_features` (`workspace.comparator`, free false / premium
+  // true) que está escrita en db/workspace_comparator_1.sql y todavía SIN
+  // aplicar. El orden importa y es el mismo que enseñó el cierre Premium:
+  // publicar antes que el SQL no abre nada —una clave ausente se resuelve
+  // DENEGADA— pero deja a una cuenta Premium viendo denegado lo que el catálogo
+  // le ofrece. Así que se queda interna: el fundador la abre (su entrada es
+  // `openable` por `workspace.catalog_preview`) y nadie más la ve.
+  // Cuando el SQL esté aplicado, esta entrada pasa a
+  //   published: true, featureKey: 'workspace.comparator', commercialTier: 'premium'
+  // y la portada Free pasa de ocho capacidades a nueve.
+  { id: 'return_comparator',     kind: 'tool',     published: false, featureKey: 'intelligence.comparator', commercialTier: 'undecided' },
   // ── plantillas PUBLICADAS ──────────────────────────────────────────────────
   // M.03 A — Real Estate Portfolio se publica como PLANTILLA, no como herramienta:
   // la superficie es la misma y su sitio en el producto es la galería de plantillas.
@@ -22182,6 +22221,7 @@ const _WS_TOOLKEY_TO_ID = Object.freeze({
   // null y el gate no podía decidir sobre Objetivos: se abrían por `_wshView`
   // directo, sin comprobar publicación ni derecho.
   goals: 'goal', scenario: 'scenario', projection: 'tpl_projection', planning: 'tpl_projection',
+  comparator: 'return_comparator',
 });
 // §1 — LAS SUPERFICIES QUE NO PASAN POR `_wsOpenTool`. Objetivos, Escenarios y
 // Proyección se abrían asignando `_wshView` en SEIS sitios distintos (el catálogo,
@@ -22205,6 +22245,7 @@ const _WS_VIEW_SURFACES = Object.freeze(['goals', 'scenario', 'projection', 'pla
 const _WS_TOOL_RENDER = Object.freeze({
   compound_growth:       { nameKey: 'wstool_compound_n',   viz: 'curve',   tool: 'compound',    cat: 'compound' },
   loan_simulation:       { nameKey: 'wsloan_n',            viz: 'donut',   tool: 'loan',        cat: 'loan' },
+  return_comparator:     { nameKey: 'wscmp_n',             viz: 'compare', tool: 'comparator',  cat: 'comparator' },
   scenario:              { nameKey: 'wsh_scenario_title',  viz: 'compare', cta: 'scenario',     cat: 'scenario' },
   goal:                  { nameKey: 'wsg_title',           viz: 'target',  cta: 'goals',        cat: 'goals' },
   financial_calc:        { nameKey: 'wstool_financial_n',  viz: 'bars' },
@@ -25748,11 +25789,11 @@ function _wsCatalogSurfaceKey(entryId) {
   for (const k in _WS_TOOLKEY_TO_ID) { if (_WS_TOOLKEY_TO_ID[k] === entryId) return k; }
   return null;
 }
-function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _wsToolActive === 'assets' ? _renderAssetPricesTool() : _renderCompoundTool(); }
+function _wsRenderTool() { return _wsToolActive === 'comparator' ? _renderComparatorTool() : _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _wsToolActive === 'assets' ? _renderAssetPricesTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : key === 'loan' ? _wsLoanOutHtml(inp) : _wsToolOutHtml(inp); }
 
 function _wsOpenTool(toolKey, projectId) {
-  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables' || toolKey === 'loan' || toolKey === 'assets') ? toolKey : 'compound';
+  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables' || toolKey === 'loan' || toolKey === 'assets' || toolKey === 'comparator') ? toolKey : 'compound';
   if (key === 'compound'    && !AURIX_WS6_TOOL) return;   // WS.6 gate
   if (key === 'budget'      && !AURIX_WS7_TOOL) return;   // WS.7 gate
   if (key === 'journal'     && !AURIX_WS8_TOOL) return;   // WS.8 gate
@@ -25760,6 +25801,7 @@ function _wsOpenTool(toolKey, projectId) {
   if (key === 'receivables' && !AURIX_WS13_TOOL) return;  // WS.13 gate
   if (key === 'loan'        && !AURIX_WS14_TOOL) return;  // WS.14 gate
   if (key === 'assets'      && !AURIX_WS15_TOOL) return;  // WS.15 gate
+  if (key === 'comparator'  && !AURIX_WS16_TOOL) return;  // WS.16 gate
   // MONETIZATION V1 · M.02 B4 — ENTITLEMENT GATE, en el OWNER de la apertura.
   // Va aquí y no en la tarjeta a propósito: `_wsOpenTool` es el único camino por
   // el que se abre una herramienta (catálogo, Mi Espacio, proyecto guardado,
@@ -27832,6 +27874,38 @@ function _wsLoanCmpInner(inp) {
     <div class="wsloan-cmp-head"><h3 class="wsh-title">${esc(t('wsloan_cmp_title'))}</h3><button type="button" class="wsre-mini" data-wsloan-cmp aria-label="${esc(t('wsjrn_cancel'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="wsloan-cmp-grid">${num('bPrincipal', t('wsloan_in_amount'), '€')}${num('bRate', t('wsloan_in_rate'), '%')}${num('bYears', t('wsloan_in_years'), t('wstool_unit_years'))}</div>
     <div class="wsloan-cmp-out" data-wsloan-cmp-out>${_wsLoanCmpOutHtml(inp)}</div>`;
+}
+// ── COMPARADOR DE RENTABILIDAD · LA SUPERFICIE EN WORKSPACE ───────────────
+// El contenido lo pinta el MISMO owner que lo pintaba en Intelligence
+// (`_intv14ComparatorHtml`): su catálogo de cuatro índices, su tipo de
+// rentabilidad declarado y su cobertura por rango no se han tocado. Lo único
+// nuevo es la cabecera compartida, para que esta capacidad se lea igual que las
+// otras y su retorno sea el mismo botón que el resto.
+//
+// SIN DOCUMENTOS, Y A PROPÓSITO. Las ocho capacidades guardan porque el usuario
+// ESCRIBE en ellas. Aquí no escribe nada: elige un índice y un plazo, que es
+// preferencia de VISTA y ya vive en `_intv14CmpState`. Inventarle documentos,
+// revisiones y borrado lógico a un estado de dos campos sería construir un
+// almacén para no guardar nada.
+function _renderComparatorTool() {
+  const esc = _intccEsc;
+  let card = '';
+  try {
+    // SÍNCRONO primero: «Mi patrimonio» sale del índice que ya está en memoria,
+    // así que la superficie se pinta entera aunque el benchmark tarde o falle.
+    // El benchmark entra después por `_cmpKickRepaint`.
+    const st = _intv14CmpState();
+    card = _intv14ComparatorHtml(esc, _aurixComparisonSync(st.range));
+  } catch (_) { card = ''; }
+  // Si el gate del comparador está cerrado (kill switch o apagado local del
+  // propio usuario), `_intv14ComparatorHtml` devuelve cadena vacía. No se
+  // inventa una card: se dice que no está disponible y no se afirma por qué,
+  // porque desde aquí no se puede distinguir un kill switch de un apagado.
+  return `
+    <div class="aurix-wsh wsh-tool-view wsh-cmp-view is-revealed" data-wsh-view="tool">
+      ${_wsSurfaceHeadHtml({ title: t('wscmp_n'), help: [t('wscmp_sub')] })}
+      ${card || `<section class="wsh-card"><p class="wsh-empty">${esc(t('wscmp_off'))}</p></section>`}
+    </div>`;
 }
 function _renderLoanTool() {
   const esc = _intccEsc;
@@ -67288,22 +67362,17 @@ function _renderIntelligenceCommandCenter() {
   //   ORIENTACIÓN (hero) → COMPRENSIÓN (radar) → DIAGNÓSTICO (factores) →
   //   EXPLORACIÓN (explora) → QUÉ IMPORTA → EVOLUCIÓN (memoria) → PROFUNDIDAD
   //   (estructura · cambios). The grid pins each slot; the mobile order mirrors it.
-  // ── §6 · COMPARADOR ──────────────────────────────────────────────────────
-  // Se construye SÍNCRONO y con la serie propia solamente: `_aurixComparison`
-  // es async por el benchmark, pero «Mi patrimonio» sale del índice que ya está
-  // en memoria. Si el benchmark falla o tarda, esta card ya está pintada con su
-  // serie principal — que es la garantía estructural que pide el §6.3.
-  // Su sitio: escritorio/tablet a ancho completo bajo la fila Radar–Factores–
-  // Explora; móvil detrás del Radar. Lo decide el CSS; aquí sólo importa que
-  // vaya entre `exploreHtml` y `mattersHtml` en el DOM.
-  let cmpHtml = '';
-  try {
-    if (_aurixCmpEnabled()) {
-      const _cmpSt = _intv14CmpState();
-      const _cmpSync = _aurixComparisonSync(_cmpSt.range);
-      cmpHtml = _intv14ComparatorHtml(esc, _cmpSync);
-    }
-  } catch (_) { cmpHtml = ''; }
+  // ── §6 · EL COMPARADOR SE MUDÓ A WORKSPACE ───────────────────────────────
+  // Estuvo aquí y ya no está: comparar tu rentabilidad con un índice es una
+  // HERRAMIENTA —eliges qué y en qué plazo, y obtienes un resultado—, no una
+  // lectura que Intelligence te ofrezca sin pedirla. Su sitio es Workspace,
+  // junto al resto de capacidades que se abren a propósito.
+  // Su owner (`_intv14ComparatorHtml`), su catálogo cerrado de cuatro índices y
+  // su cableado NO se han tocado: sólo cambia quién los monta. Las reglas de
+  // rejilla `.aurix-intcc:has(.intv14-cmp)` de styles.css dejan de encontrar
+  // nada y el resto de cards recupera su fila base, que es la que tenían antes
+  // de que el comparador existiera.
+
   const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap, _gaps.today);
   const publishedKeys = [];
   mattersSel.forEach(st => {
@@ -67373,7 +67442,6 @@ function _renderIntelligenceCommandCenter() {
       ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
-      ${cmpHtml}
       ${mattersHtml}
       ${memoryHtml}
       ${structureHtml}
@@ -67533,6 +67601,383 @@ function _initIntelSeeChanges(root) {
   });
 }
 
+// ── EL COMPARADOR YA NO VIVE EN INTELLIGENCE ───────────────────────────────
+// Su cableado estaba DENTRO de `_initIntelligenceCommandCenter`, así que la
+// superficie sólo respondía si esa pestaña se había pintado alguna vez. Ahora
+// la capacidad vive en Workspace y esa dependencia sería un fallo silencioso:
+// la card pintada y ningún botón haciendo nada. Se extrae tal cual —misma
+// delegación en `document`, mismo guardia de una sola vez— y la monta quien la
+// enseña. Cuerpo idéntico: esto es una mudanza, no una reescritura.
+function _initComparatorWiring() {
+if (!_intv14CmpWired) {
+  _intv14CmpWired = true;
+  // Una sola generación viva: un cambio de selector cancela la anterior, así
+  // que una respuesta lenta no puede pisar a una posterior.
+  let _cmpSeq = 0;
+  // ── CHECKPOINT I.10 · CANCELAR, NO SÓLO DESCARTAR ─────────────────
+  // El guardia de secuencia ya impedía que una respuesta vieja pisara una
+  // selección nueva, pero la petición seguía viva: cambiar de comparador
+  // cinco veces dejaba cinco descargas compitiendo, y el usuario paga ese
+  // ancho de banda en móvil. Ahora la anterior se ABORTA, y el adaptador ya
+  // acepta `signal` —no hace falta ningún endpoint ni mecanismo nuevo—.
+  let _cmpAbort = null;
+  const repaint = async () => {
+    const seq = ++_cmpSeq;
+    try { if (_cmpAbort) _cmpAbort.abort(); } catch (_) {}
+    const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    _cmpAbort = ctl;
+    const host = document.querySelector('.intv14-cmp');
+    if (!host) return;
+    const st = _intv14CmpState();
+    host.setAttribute('data-loading', '1');
+    host.setAttribute('aria-busy', 'true');
+    let res = null;
+    try { res = await _aurixComparison(st.range, st.benchmarkId, { signal: ctl ? ctl.signal : undefined }); }
+    catch (_) { res = null; }
+    if (seq !== _cmpSeq) return;                       // llegó tarde: se descarta
+    const host2 = document.querySelector('.intv14-cmp');
+    if (!host2) return;
+    if (!res) { host2.removeAttribute('data-loading'); return; }
+    try {
+      const html = _intv14ComparatorHtml(_intccEsc, res);
+      if (!html) { host2.removeAttribute('data-loading'); return; }
+      // P1 · REEMPLAZAR EL NODO BORRABA EL FOCO. `replaceWith` destruye el
+      // control que el usuario acababa de accionar, y quitar del DOM el
+      // elemento enfocado devuelve el foco a `<body>`: con teclado o lector
+      // de pantalla se pierde la posición y hay que recorrer la página
+      // entera otra vez. Se anota QUÉ tenía el foco y se restituye en el
+      // nodo equivalente del árbol nuevo.
+      const act = document.activeElement;
+      const keep = (act && host2.contains(act))
+        ? (act.closest('[data-cmp-range]') ? '[data-cmp-range="' + act.getAttribute('data-cmp-range') + '"]'
+          : act.closest('[data-cmp-open]') ? '[data-cmp-open]'
+          : act.closest('[data-cmp-clear]') ? '[data-cmp-clear]'
+          : act.closest('[data-cmp-plot]') ? '[data-cmp-plot]' : null)
+        : null;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const next = tmp.firstElementChild;
+      if (next) {
+        host2.replaceWith(next);
+        _cmpSyncLock();
+        if (keep) { const back = next.querySelector(keep); if (back) { try { back.focus(); } catch (_) {} } }
+      }
+    } catch (_) { host2.removeAttribute('data-loading'); }
+  };
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const rb = t.closest('[data-cmp-range]');
+    if (rb) {
+      e.preventDefault();
+      const r = rb.getAttribute('data-cmp-range');
+      if (_AURIX_CMP_RANGES.indexOf(r) === -1) return;   // un rango inventado no entra
+      if (_intv14CmpSetState({ range: r })) repaint();
+      return;
+    }
+    // «Quitar comparación» en UN toque: vuelve a «Sin comparación» y la serie
+    // principal se queda donde estaba.
+    const cb = t.closest('[data-cmp-clear]');
+    if (cb) {
+      e.preventDefault();
+      if (_intv14CmpSetState({ benchmarkId: null })) repaint();
+    }
+  });
+  document.addEventListener('change', (e) => {
+    const sel = e.target && e.target.closest ? e.target.closest('[data-cmp-select]') : null;
+    if (!sel) return;
+    const v = String(sel.value || '');
+    // UN solo comparador a la vez: el estado guarda un id, no una lista.
+    const id = v && _aurixCmpBenchmark(v) ? v : null;
+    if (_intv14CmpSetState({ benchmarkId: id })) repaint();
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // CHECKPOINT I.3 · EL SELECTOR PROPIO
+  // ══════════════════════════════════════════════════════════════════
+  // Delegación en el documento, una sola vez, igual que el resto de esta
+  // superficie. No hay listeners por opción: 54 instrumentos serían 54
+  // suscripciones que habría que limpiar en cada repintado.
+  const _cmpPanel = () => document.querySelector('[data-cmp-panel]');
+  const _cmpTrigger = () => document.querySelector('[data-cmp-open]');
+  const _cmpOpts = () => Array.prototype.slice.call(
+    document.querySelectorAll('[data-cmp-opt]:not([hidden])'));
+  function _cmpSetActive(el) {
+    _cmpOpts().forEach(o => o.classList.remove('is-active'));
+    if (!el) return;
+    el.classList.add('is-active');
+    // `aria-activedescendant` y no foco real: el foco se queda en el
+    // buscador para poder seguir escribiendo mientras se navega la lista.
+    const inp = document.querySelector('[data-cmp-search]');
+    if (inp) inp.setAttribute('aria-activedescendant', el.id || '');
+    if (el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest' }); } catch (_) {} }
+  }
+  // P1 · EL BLOQUEO DE SCROLL NO PUEDE SOBREVIVIR A LA CARD QUE LO PUSO.
+  // La hoja se cierra con `_cmpClose`, pero la pestaña se repinta por otros
+  // caminos (`_aurixIntelCtxPull`, cambios de contexto) que sustituyen el
+  // HTML entero sin pasar por aquí: el panel desaparecía y
+  // `html.aurix-cmp-open` se quedaba puesto, dejando la página con
+  // `overflow: hidden` hasta recargar. La clase se retira siempre que su
+  // panel ya no esté en el DOM.
+  function _cmpSyncLock() {
+    try {
+      const p = document.querySelector('[data-cmp-panel]');
+      if (!p || p.hidden) document.documentElement.classList.remove('aurix-cmp-open');
+    } catch (_) {}
+  }
+  function _cmpClose(focusBack) {
+    const p = _cmpPanel(), tr = _cmpTrigger();
+    if (!p || p.hidden) return;
+    p.hidden = true;
+    if (tr) { tr.setAttribute('aria-expanded', 'false'); if (focusBack) tr.focus(); }
+    document.documentElement.classList.remove('aurix-cmp-open');
+  }
+  function _cmpOpen() {
+    const p = _cmpPanel(), tr = _cmpTrigger();
+    if (!p || !tr) return;
+    p.hidden = false;
+    tr.setAttribute('aria-expanded', 'true');
+    // Sólo en móvil, donde el panel es una hoja: evita el scroll de fondo
+    // MIENTRAS está abierta, y se retira al cerrar (el SPEC lo pide por su
+    // nombre). En escritorio la clase no hace nada.
+    document.documentElement.classList.add('aurix-cmp-open');
+    const inp = p.querySelector('[data-cmp-search]');
+    if (inp) { inp.value = ''; _cmpFilter(''); try { inp.focus(); } catch (_) {} }
+    _cmpSetActive(_cmpOpts()[0] || null);
+  }
+  function _cmpFilter(q) {
+    const term = String(q || '').trim().toLowerCase();
+    const p = _cmpPanel(); if (!p) return;
+    let visible = 0;
+    Array.prototype.slice.call(p.querySelectorAll('[data-cmp-opt]')).forEach((o) => {
+      // Por NOMBRE y por SÍMBOLO, que es lo que el SPEC pide. Los dos van
+      // ya en minúsculas en el DOM para no recalcularlos en cada tecla.
+      const hit = !term || (o.getAttribute('data-name') || '').indexOf(term) !== -1
+                        || (o.getAttribute('data-sym') || '').indexOf(term) !== -1;
+      o.hidden = !hit; if (hit) visible++;
+    });
+    // Una cabecera de grupo sin opciones visibles es ruido: se esconde.
+    Array.prototype.slice.call(p.querySelectorAll('.intv14-cmp-optgroup')).forEach((g) => {
+      let n = g.nextElementSibling, any = false;
+      while (n && !n.classList.contains('intv14-cmp-optgroup')) {
+        if (n.hasAttribute('data-cmp-opt') && !n.hidden) { any = true; break; }
+        n = n.nextElementSibling;
+      }
+      g.hidden = !any;
+    });
+    const empty = p.querySelector('[data-cmp-empty]');
+    if (empty) empty.hidden = visible > 0;
+    _cmpSetActive(_cmpOpts()[0] || null);
+  }
+  function _cmpChoose(id) {
+    const valid = id && _aurixCmpBenchmark(id) ? id : null;
+    _aurixCmpPushRecent(valid);
+    _cmpClose(true);
+    if (_intv14CmpSetState({ benchmarkId: valid })) repaint();
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target; if (!t || !t.closest) return;
+    if (t.closest('[data-cmp-open]')) {
+      e.preventDefault();
+      const p = _cmpPanel();
+      if (p && p.hidden) _cmpOpen(); else _cmpClose(true);
+      return;
+    }
+    if (t.closest('[data-cmp-close]')) { e.preventDefault(); _cmpClose(true); return; }
+    const opt = t.closest('[data-cmp-opt]');
+    if (opt) { e.preventDefault(); _cmpChoose(opt.getAttribute('data-cmp-opt')); return; }
+    // CLIC FUERA: cierra. Se comprueba contra el contenedor entero para que
+    // pulsar dentro del panel (buscador incluido) no lo cierre.
+    const p = _cmpPanel();
+    if (p && !p.hidden && !t.closest('.intv14-cmp-pick')) _cmpClose(false);
+  });
+  document.addEventListener('input', (e) => {
+    const inp = e.target && e.target.closest ? e.target.closest('[data-cmp-search]') : null;
+    if (inp) _cmpFilter(inp.value);
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // CHECKPOINT I.7 · TOOLTIP INSTITUCIONAL
+  // ══════════════════════════════════════════════════════════════════
+  // Lee POR ÍNDICE sobre las series ya alineadas, así que las dos cifras
+  // salen SIEMPRE del mismo bucket certificado: no hay ninguna ruta por la
+  // que pueda mezclar dos fechas. Y no calcula nada: la rentabilidad
+  // acumulada de un índice base 100 es `valor − 100`, que es aritmética de
+  // presentación sobre un dato ya certificado, no un motor nuevo.
+  let _tipIdx = -1, _tipPinned = false;
+  const _tipPlot = () => document.querySelector('[data-cmp-plot]');
+  function _tipData(plot) {
+    const svg = plot && plot.querySelector('.intv14-cmp-svg');
+    if (!svg) return null;
+    try {
+      return { svg,
+        geo: JSON.parse(svg.getAttribute('data-cmp-geo') || 'null'),
+        pts: JSON.parse(svg.getAttribute('data-cmp-series') || 'null') };
+    } catch (_) { return null; }
+  }
+  function _tipHide() {
+    const plot = _tipPlot(); if (!plot) return;
+    _tipIdx = -1; _tipPinned = false;
+    const tip = plot.querySelector('[data-cmp-tip]'); if (tip) tip.hidden = true;
+    ['[data-cmp-guide]', '[data-cmp-dot="mine"]', '[data-cmp-dot="other"]']
+      .forEach(sel => { const n = plot.querySelector(sel); if (n) n.setAttribute('hidden', ''); });
+  }
+  function _tipShow(i) {
+    const plot = _tipPlot(); const d = _tipData(plot);
+    if (!plot || !d || !d.geo || !Array.isArray(d.pts) || !d.pts.length) return;
+    const idx = Math.max(0, Math.min(d.pts.length - 1, i));
+    _tipIdx = idx;
+    const [ts, mv, ov] = d.pts[idx];
+    const g = d.geo;
+    const X = g.PAD_X + ((ts - g.t0) / Math.max(1, g.t1 - g.t0)) * (g.W - g.PAD_X * 2);
+    const Y = (v) => g.PAD_Y + (1 - (v - g.lo) / Math.max(1e-9, g.hi - g.lo)) * (g.H - g.PAD_Y * 2);
+    const guide = plot.querySelector('[data-cmp-guide]');
+    if (guide) { guide.setAttribute('x1', X); guide.setAttribute('x2', X); guide.removeAttribute('hidden'); }
+    const dm = plot.querySelector('[data-cmp-dot="mine"]');
+    if (dm) { dm.setAttribute('cx', X); dm.setAttribute('cy', Y(mv)); dm.removeAttribute('hidden'); }
+    const doo = plot.querySelector('[data-cmp-dot="other"]');
+    if (doo) {
+      if (ov == null) doo.setAttribute('hidden', '');
+      else { doo.setAttribute('cx', X); doo.setAttribute('cy', Y(ov)); doo.removeAttribute('hidden'); }
+    }
+    const tip = plot.querySelector('[data-cmp-tip]'); if (!tip) return;
+    const bm = _aurixCmpBenchmark(_intv14CmpState().benchmarkId);
+    // El índice es base 100, así que la rentabilidad acumulada es `v − 100`.
+    // El signo se imprime aparte para que el separador decimal del locale lo
+    // ponga `_intv4Num` sobre la MAGNITUD y no sobre un número con signo.
+    const retOf = (v) => Math.round((v - 100) * 100) / 100;
+    const fmtRet = (v) => (retOf(v) >= 0 ? '+' : '−') + _intv4Num(Math.abs(retOf(v)), 2) + ' %';
+    const rows = ['<span class="intv14-cmp-tip-when">' + _intccEsc(_intccDate(ts)) + '</span>',
+      '<span class="intv14-cmp-tip-row"><em>' + _intccEsc(_intv4T('cmp_tip_mine'))
+        + '</em><b>' + _intccEsc(fmtRet(mv)) + '</b></span>'];
+    if (ov != null && bm) {
+      rows.push('<span class="intv14-cmp-tip-row"><em>' + _intccEsc(_aurixCmpLabel(bm))
+        + '</em><b>' + _intccEsc(fmtRet(ov)) + '</b></span>');
+      // LA DIFERENCIA VA EN PUNTOS PORCENTUALES Y CON SIGNO. Nunca en %.
+      //
+      // ── EL CERO NO TIENE SIGNO ─────────────────────────────────────
+      // Con `dpp` en (−0,005, 0) se imprimía «−0,00 puntos porcentuales»
+      // mientras la frase de debajo decía «ambas rentabilidades fueron
+      // equivalentes»: dos lecturas distintas del mismo instante, y una de
+      // ellas afirmando una dirección que no existe. El cero se normaliza
+      // con LA MISMA tolerancia financiera que gobierna esa frase
+      // (`_AURIX_CMP_FLAT_PP`), no con un redondeo aparte.
+      const dppRaw = retOf(mv) - retOf(ov);
+      const dpp = (Math.abs(dppRaw) < _AURIX_CMP_FLAT_PP) ? 0 : dppRaw;
+      const dppTxt = (dpp === 0)
+        ? _intv4T('cmp_tip_pp', _intv4Num(0, 2))
+        : ((dpp > 0 ? '+' : '−') + _intv4T('cmp_tip_pp',
+            _intv4Num(Math.abs(Math.round(dpp * 100) / 100), 2)));
+      rows.push('<span class="intv14-cmp-tip-row is-diff"><em>' + _intccEsc(_intv4T('cmp_tip_diff'))
+        + '</em><b>' + _intccEsc(dppTxt) + '</b></span>');
+    }
+    tip.innerHTML = rows.join('');
+    tip.hidden = false;
+    // NO SE SALE, Y NO TAPA EL PUNTO. Se coloca al lado contrario del cursor
+    // dentro del propio plot, que es el sistema de coordenadas que controla.
+    const frac = X / g.W;
+    tip.classList.toggle('is-right', frac > 0.5);
+    tip.style.left = (frac > 0.5 ? '' : (frac * 100).toFixed(2) + '%');
+    tip.style.right = (frac > 0.5 ? ((1 - frac) * 100).toFixed(2) + '%' : '');
+  }
+  function _tipFromClientX(plot, clientX) {
+    const d = _tipData(plot); if (!d || !d.geo || !Array.isArray(d.pts) || !d.pts.length) return;
+    const r = plot.getBoundingClientRect();
+    if (!(r.width > 0)) return;
+    const g = d.geo;
+    const vx = ((clientX - r.left) / r.width) * g.W;
+    const ts = g.t0 + ((vx - g.PAD_X) / Math.max(1, g.W - g.PAD_X * 2)) * (g.t1 - g.t0);
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < d.pts.length; i++) {
+      const dd = Math.abs(d.pts[i][0] - ts);
+      if (dd < bd) { bd = dd; best = i; }
+    }
+    _tipShow(best);
+  }
+  document.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;                 // el dedo tiene su propio contrato
+    const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+    if (!plot) return;
+    _tipFromClientX(plot, e.clientX);
+  });
+  document.addEventListener('pointerleave', (e) => {
+    const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+    if (plot && !_tipPinned) _tipHide();
+  }, true);
+  // TOQUE · el primer toque FIJA el punto; el segundo fuera lo retira. El
+  // gesto VERTICAL no se captura —`touch-action: pan-y` deja que la página
+  // siga desplazándose—, así que leer el gráfico no impide hacer scroll.
+  document.addEventListener('touchstart', (e) => {
+    const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+    if (!plot) { if (_tipPinned) _tipHide(); return; }
+    const tch = e.touches && e.touches[0]; if (!tch) return;
+    _tipPinned = true;
+    _tipFromClientX(plot, tch.clientX);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!_tipPinned) return;
+    const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+    const tch = e.touches && e.touches[0];
+    if (plot && tch) _tipFromClientX(plot, tch.clientX);
+  }, { passive: true });
+  // TECLADO · el plot es focalizable y se recorre con las flechas.
+  document.addEventListener('keydown', (e) => {
+    const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+    if (!plot) return;
+    const d = _tipData(plot); if (!d || !Array.isArray(d.pts) || !d.pts.length) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); _tipShow(_tipIdx < 0 ? 0 : _tipIdx + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); _tipShow(_tipIdx < 0 ? d.pts.length - 1 : _tipIdx - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); _tipShow(0); }
+    else if (e.key === 'End') { e.preventDefault(); _tipShow(d.pts.length - 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); _tipHide(); }
+  });
+  document.addEventListener('focusout', (e) => {
+    const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
+    if (plot && !_tipPinned) _tipHide();
+  });
+  document.addEventListener('keydown', (e) => {
+    const p = _cmpPanel();
+    const inPick = e.target && e.target.closest && e.target.closest('.intv14-cmp-pick');
+    if (!p || p.hidden) {
+      // Abrir con teclado desde el disparador: patrón combobox estándar.
+      if (inPick && e.target.closest('[data-cmp-open]')
+          && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault(); _cmpOpen();
+      }
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); _cmpClose(true); return; }
+    if (!inPick) return;
+    const opts = _cmpOpts();
+    if (!opts.length) return;
+    const cur = opts.indexOf(p.querySelector('[data-cmp-opt].is-active'));
+    if (e.key === 'ArrowDown') { e.preventDefault(); _cmpSetActive(opts[Math.min(opts.length - 1, cur + 1)]); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _cmpSetActive(opts[Math.max(0, cur - 1)]); }
+    else if (e.key === 'Home') { e.preventDefault(); _cmpSetActive(opts[0]); }
+    else if (e.key === 'End') { e.preventDefault(); _cmpSetActive(opts[opts.length - 1]); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const a = p.querySelector('[data-cmp-opt].is-active');
+      if (a) _cmpChoose(a.getAttribute('data-cmp-opt'));
+    }
+  });
+  _intv14CmpRepaint = repaint;
+}
+}
+// Y el primer pintado: el camino SÍNCRONO no trae benchmark, así que sin esto
+// el selector marca un comparador guardado y la segunda línea no está.
+function _cmpKickRepaint() {
+// SE DISPARA EN CADA PINTURA, NO SÓLO AL CABLEAR. El cableado ocurre UNA vez,
+// así que dejar aquí dentro la carga inicial dejaba un estado incoherente
+// tras cualquier repintado de la pestaña: el selector seguía marcando el
+// comparador guardado y la segunda línea había desaparecido, porque la card
+// se reconstruye desde el camino SÍNCRONO, que no tiene benchmark. Lo
+// encontró la revisión financiera.
+try {
+  if (typeof _intv14CmpRepaint === 'function' && _aurixCmpEnabled()
+      && _intv14CmpState().benchmarkId) _intv14CmpRepaint();
+} catch (_) {}
+}
 function _initIntelligenceCommandCenter() {
   try {
     const root = document.querySelector('.aurix-intcc');
@@ -67603,370 +68048,6 @@ function _initIntelligenceCommandCenter() {
   // todo aquí volvería a recorrer el Core, reescribiría la historia de
   // presentación y podría mover «Lo que importa hoy» al cambiar un selector
   // —una interacción del comparador no puede alterar otra superficie—.
-  if (!_intv14CmpWired) {
-    _intv14CmpWired = true;
-    // Una sola generación viva: un cambio de selector cancela la anterior, así
-    // que una respuesta lenta no puede pisar a una posterior.
-    let _cmpSeq = 0;
-    // ── CHECKPOINT I.10 · CANCELAR, NO SÓLO DESCARTAR ─────────────────
-    // El guardia de secuencia ya impedía que una respuesta vieja pisara una
-    // selección nueva, pero la petición seguía viva: cambiar de comparador
-    // cinco veces dejaba cinco descargas compitiendo, y el usuario paga ese
-    // ancho de banda en móvil. Ahora la anterior se ABORTA, y el adaptador ya
-    // acepta `signal` —no hace falta ningún endpoint ni mecanismo nuevo—.
-    let _cmpAbort = null;
-    const repaint = async () => {
-      const seq = ++_cmpSeq;
-      try { if (_cmpAbort) _cmpAbort.abort(); } catch (_) {}
-      const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
-      _cmpAbort = ctl;
-      const host = document.querySelector('.intv14-cmp');
-      if (!host) return;
-      const st = _intv14CmpState();
-      host.setAttribute('data-loading', '1');
-      host.setAttribute('aria-busy', 'true');
-      let res = null;
-      try { res = await _aurixComparison(st.range, st.benchmarkId, { signal: ctl ? ctl.signal : undefined }); }
-      catch (_) { res = null; }
-      if (seq !== _cmpSeq) return;                       // llegó tarde: se descarta
-      const host2 = document.querySelector('.intv14-cmp');
-      if (!host2) return;
-      if (!res) { host2.removeAttribute('data-loading'); return; }
-      try {
-        const html = _intv14ComparatorHtml(_intccEsc, res);
-        if (!html) { host2.removeAttribute('data-loading'); return; }
-        // P1 · REEMPLAZAR EL NODO BORRABA EL FOCO. `replaceWith` destruye el
-        // control que el usuario acababa de accionar, y quitar del DOM el
-        // elemento enfocado devuelve el foco a `<body>`: con teclado o lector
-        // de pantalla se pierde la posición y hay que recorrer la página
-        // entera otra vez. Se anota QUÉ tenía el foco y se restituye en el
-        // nodo equivalente del árbol nuevo.
-        const act = document.activeElement;
-        const keep = (act && host2.contains(act))
-          ? (act.closest('[data-cmp-range]') ? '[data-cmp-range="' + act.getAttribute('data-cmp-range') + '"]'
-            : act.closest('[data-cmp-open]') ? '[data-cmp-open]'
-            : act.closest('[data-cmp-clear]') ? '[data-cmp-clear]'
-            : act.closest('[data-cmp-plot]') ? '[data-cmp-plot]' : null)
-          : null;
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        const next = tmp.firstElementChild;
-        if (next) {
-          host2.replaceWith(next);
-          _cmpSyncLock();
-          if (keep) { const back = next.querySelector(keep); if (back) { try { back.focus(); } catch (_) {} } }
-        }
-      } catch (_) { host2.removeAttribute('data-loading'); }
-    };
-    document.addEventListener('click', (e) => {
-      const t = e.target;
-      if (!t || !t.closest) return;
-      const rb = t.closest('[data-cmp-range]');
-      if (rb) {
-        e.preventDefault();
-        const r = rb.getAttribute('data-cmp-range');
-        if (_AURIX_CMP_RANGES.indexOf(r) === -1) return;   // un rango inventado no entra
-        if (_intv14CmpSetState({ range: r })) repaint();
-        return;
-      }
-      // «Quitar comparación» en UN toque: vuelve a «Sin comparación» y la serie
-      // principal se queda donde estaba.
-      const cb = t.closest('[data-cmp-clear]');
-      if (cb) {
-        e.preventDefault();
-        if (_intv14CmpSetState({ benchmarkId: null })) repaint();
-      }
-    });
-    document.addEventListener('change', (e) => {
-      const sel = e.target && e.target.closest ? e.target.closest('[data-cmp-select]') : null;
-      if (!sel) return;
-      const v = String(sel.value || '');
-      // UN solo comparador a la vez: el estado guarda un id, no una lista.
-      const id = v && _aurixCmpBenchmark(v) ? v : null;
-      if (_intv14CmpSetState({ benchmarkId: id })) repaint();
-    });
-
-    // ══════════════════════════════════════════════════════════════════
-    // CHECKPOINT I.3 · EL SELECTOR PROPIO
-    // ══════════════════════════════════════════════════════════════════
-    // Delegación en el documento, una sola vez, igual que el resto de esta
-    // superficie. No hay listeners por opción: 54 instrumentos serían 54
-    // suscripciones que habría que limpiar en cada repintado.
-    const _cmpPanel = () => document.querySelector('[data-cmp-panel]');
-    const _cmpTrigger = () => document.querySelector('[data-cmp-open]');
-    const _cmpOpts = () => Array.prototype.slice.call(
-      document.querySelectorAll('[data-cmp-opt]:not([hidden])'));
-    function _cmpSetActive(el) {
-      _cmpOpts().forEach(o => o.classList.remove('is-active'));
-      if (!el) return;
-      el.classList.add('is-active');
-      // `aria-activedescendant` y no foco real: el foco se queda en el
-      // buscador para poder seguir escribiendo mientras se navega la lista.
-      const inp = document.querySelector('[data-cmp-search]');
-      if (inp) inp.setAttribute('aria-activedescendant', el.id || '');
-      if (el.scrollIntoView) { try { el.scrollIntoView({ block: 'nearest' }); } catch (_) {} }
-    }
-    // P1 · EL BLOQUEO DE SCROLL NO PUEDE SOBREVIVIR A LA CARD QUE LO PUSO.
-    // La hoja se cierra con `_cmpClose`, pero la pestaña se repinta por otros
-    // caminos (`_aurixIntelCtxPull`, cambios de contexto) que sustituyen el
-    // HTML entero sin pasar por aquí: el panel desaparecía y
-    // `html.aurix-cmp-open` se quedaba puesto, dejando la página con
-    // `overflow: hidden` hasta recargar. La clase se retira siempre que su
-    // panel ya no esté en el DOM.
-    function _cmpSyncLock() {
-      try {
-        const p = document.querySelector('[data-cmp-panel]');
-        if (!p || p.hidden) document.documentElement.classList.remove('aurix-cmp-open');
-      } catch (_) {}
-    }
-    function _cmpClose(focusBack) {
-      const p = _cmpPanel(), tr = _cmpTrigger();
-      if (!p || p.hidden) return;
-      p.hidden = true;
-      if (tr) { tr.setAttribute('aria-expanded', 'false'); if (focusBack) tr.focus(); }
-      document.documentElement.classList.remove('aurix-cmp-open');
-    }
-    function _cmpOpen() {
-      const p = _cmpPanel(), tr = _cmpTrigger();
-      if (!p || !tr) return;
-      p.hidden = false;
-      tr.setAttribute('aria-expanded', 'true');
-      // Sólo en móvil, donde el panel es una hoja: evita el scroll de fondo
-      // MIENTRAS está abierta, y se retira al cerrar (el SPEC lo pide por su
-      // nombre). En escritorio la clase no hace nada.
-      document.documentElement.classList.add('aurix-cmp-open');
-      const inp = p.querySelector('[data-cmp-search]');
-      if (inp) { inp.value = ''; _cmpFilter(''); try { inp.focus(); } catch (_) {} }
-      _cmpSetActive(_cmpOpts()[0] || null);
-    }
-    function _cmpFilter(q) {
-      const term = String(q || '').trim().toLowerCase();
-      const p = _cmpPanel(); if (!p) return;
-      let visible = 0;
-      Array.prototype.slice.call(p.querySelectorAll('[data-cmp-opt]')).forEach((o) => {
-        // Por NOMBRE y por SÍMBOLO, que es lo que el SPEC pide. Los dos van
-        // ya en minúsculas en el DOM para no recalcularlos en cada tecla.
-        const hit = !term || (o.getAttribute('data-name') || '').indexOf(term) !== -1
-                          || (o.getAttribute('data-sym') || '').indexOf(term) !== -1;
-        o.hidden = !hit; if (hit) visible++;
-      });
-      // Una cabecera de grupo sin opciones visibles es ruido: se esconde.
-      Array.prototype.slice.call(p.querySelectorAll('.intv14-cmp-optgroup')).forEach((g) => {
-        let n = g.nextElementSibling, any = false;
-        while (n && !n.classList.contains('intv14-cmp-optgroup')) {
-          if (n.hasAttribute('data-cmp-opt') && !n.hidden) { any = true; break; }
-          n = n.nextElementSibling;
-        }
-        g.hidden = !any;
-      });
-      const empty = p.querySelector('[data-cmp-empty]');
-      if (empty) empty.hidden = visible > 0;
-      _cmpSetActive(_cmpOpts()[0] || null);
-    }
-    function _cmpChoose(id) {
-      const valid = id && _aurixCmpBenchmark(id) ? id : null;
-      _aurixCmpPushRecent(valid);
-      _cmpClose(true);
-      if (_intv14CmpSetState({ benchmarkId: valid })) repaint();
-    }
-    document.addEventListener('click', (e) => {
-      const t = e.target; if (!t || !t.closest) return;
-      if (t.closest('[data-cmp-open]')) {
-        e.preventDefault();
-        const p = _cmpPanel();
-        if (p && p.hidden) _cmpOpen(); else _cmpClose(true);
-        return;
-      }
-      if (t.closest('[data-cmp-close]')) { e.preventDefault(); _cmpClose(true); return; }
-      const opt = t.closest('[data-cmp-opt]');
-      if (opt) { e.preventDefault(); _cmpChoose(opt.getAttribute('data-cmp-opt')); return; }
-      // CLIC FUERA: cierra. Se comprueba contra el contenedor entero para que
-      // pulsar dentro del panel (buscador incluido) no lo cierre.
-      const p = _cmpPanel();
-      if (p && !p.hidden && !t.closest('.intv14-cmp-pick')) _cmpClose(false);
-    });
-    document.addEventListener('input', (e) => {
-      const inp = e.target && e.target.closest ? e.target.closest('[data-cmp-search]') : null;
-      if (inp) _cmpFilter(inp.value);
-    });
-
-    // ══════════════════════════════════════════════════════════════════
-    // CHECKPOINT I.7 · TOOLTIP INSTITUCIONAL
-    // ══════════════════════════════════════════════════════════════════
-    // Lee POR ÍNDICE sobre las series ya alineadas, así que las dos cifras
-    // salen SIEMPRE del mismo bucket certificado: no hay ninguna ruta por la
-    // que pueda mezclar dos fechas. Y no calcula nada: la rentabilidad
-    // acumulada de un índice base 100 es `valor − 100`, que es aritmética de
-    // presentación sobre un dato ya certificado, no un motor nuevo.
-    let _tipIdx = -1, _tipPinned = false;
-    const _tipPlot = () => document.querySelector('[data-cmp-plot]');
-    function _tipData(plot) {
-      const svg = plot && plot.querySelector('.intv14-cmp-svg');
-      if (!svg) return null;
-      try {
-        return { svg,
-          geo: JSON.parse(svg.getAttribute('data-cmp-geo') || 'null'),
-          pts: JSON.parse(svg.getAttribute('data-cmp-series') || 'null') };
-      } catch (_) { return null; }
-    }
-    function _tipHide() {
-      const plot = _tipPlot(); if (!plot) return;
-      _tipIdx = -1; _tipPinned = false;
-      const tip = plot.querySelector('[data-cmp-tip]'); if (tip) tip.hidden = true;
-      ['[data-cmp-guide]', '[data-cmp-dot="mine"]', '[data-cmp-dot="other"]']
-        .forEach(sel => { const n = plot.querySelector(sel); if (n) n.setAttribute('hidden', ''); });
-    }
-    function _tipShow(i) {
-      const plot = _tipPlot(); const d = _tipData(plot);
-      if (!plot || !d || !d.geo || !Array.isArray(d.pts) || !d.pts.length) return;
-      const idx = Math.max(0, Math.min(d.pts.length - 1, i));
-      _tipIdx = idx;
-      const [ts, mv, ov] = d.pts[idx];
-      const g = d.geo;
-      const X = g.PAD_X + ((ts - g.t0) / Math.max(1, g.t1 - g.t0)) * (g.W - g.PAD_X * 2);
-      const Y = (v) => g.PAD_Y + (1 - (v - g.lo) / Math.max(1e-9, g.hi - g.lo)) * (g.H - g.PAD_Y * 2);
-      const guide = plot.querySelector('[data-cmp-guide]');
-      if (guide) { guide.setAttribute('x1', X); guide.setAttribute('x2', X); guide.removeAttribute('hidden'); }
-      const dm = plot.querySelector('[data-cmp-dot="mine"]');
-      if (dm) { dm.setAttribute('cx', X); dm.setAttribute('cy', Y(mv)); dm.removeAttribute('hidden'); }
-      const doo = plot.querySelector('[data-cmp-dot="other"]');
-      if (doo) {
-        if (ov == null) doo.setAttribute('hidden', '');
-        else { doo.setAttribute('cx', X); doo.setAttribute('cy', Y(ov)); doo.removeAttribute('hidden'); }
-      }
-      const tip = plot.querySelector('[data-cmp-tip]'); if (!tip) return;
-      const bm = _aurixCmpBenchmark(_intv14CmpState().benchmarkId);
-      // El índice es base 100, así que la rentabilidad acumulada es `v − 100`.
-      // El signo se imprime aparte para que el separador decimal del locale lo
-      // ponga `_intv4Num` sobre la MAGNITUD y no sobre un número con signo.
-      const retOf = (v) => Math.round((v - 100) * 100) / 100;
-      const fmtRet = (v) => (retOf(v) >= 0 ? '+' : '−') + _intv4Num(Math.abs(retOf(v)), 2) + ' %';
-      const rows = ['<span class="intv14-cmp-tip-when">' + _intccEsc(_intccDate(ts)) + '</span>',
-        '<span class="intv14-cmp-tip-row"><em>' + _intccEsc(_intv4T('cmp_tip_mine'))
-          + '</em><b>' + _intccEsc(fmtRet(mv)) + '</b></span>'];
-      if (ov != null && bm) {
-        rows.push('<span class="intv14-cmp-tip-row"><em>' + _intccEsc(_aurixCmpLabel(bm))
-          + '</em><b>' + _intccEsc(fmtRet(ov)) + '</b></span>');
-        // LA DIFERENCIA VA EN PUNTOS PORCENTUALES Y CON SIGNO. Nunca en %.
-        //
-        // ── EL CERO NO TIENE SIGNO ─────────────────────────────────────
-        // Con `dpp` en (−0,005, 0) se imprimía «−0,00 puntos porcentuales»
-        // mientras la frase de debajo decía «ambas rentabilidades fueron
-        // equivalentes»: dos lecturas distintas del mismo instante, y una de
-        // ellas afirmando una dirección que no existe. El cero se normaliza
-        // con LA MISMA tolerancia financiera que gobierna esa frase
-        // (`_AURIX_CMP_FLAT_PP`), no con un redondeo aparte.
-        const dppRaw = retOf(mv) - retOf(ov);
-        const dpp = (Math.abs(dppRaw) < _AURIX_CMP_FLAT_PP) ? 0 : dppRaw;
-        const dppTxt = (dpp === 0)
-          ? _intv4T('cmp_tip_pp', _intv4Num(0, 2))
-          : ((dpp > 0 ? '+' : '−') + _intv4T('cmp_tip_pp',
-              _intv4Num(Math.abs(Math.round(dpp * 100) / 100), 2)));
-        rows.push('<span class="intv14-cmp-tip-row is-diff"><em>' + _intccEsc(_intv4T('cmp_tip_diff'))
-          + '</em><b>' + _intccEsc(dppTxt) + '</b></span>');
-      }
-      tip.innerHTML = rows.join('');
-      tip.hidden = false;
-      // NO SE SALE, Y NO TAPA EL PUNTO. Se coloca al lado contrario del cursor
-      // dentro del propio plot, que es el sistema de coordenadas que controla.
-      const frac = X / g.W;
-      tip.classList.toggle('is-right', frac > 0.5);
-      tip.style.left = (frac > 0.5 ? '' : (frac * 100).toFixed(2) + '%');
-      tip.style.right = (frac > 0.5 ? ((1 - frac) * 100).toFixed(2) + '%' : '');
-    }
-    function _tipFromClientX(plot, clientX) {
-      const d = _tipData(plot); if (!d || !d.geo || !Array.isArray(d.pts) || !d.pts.length) return;
-      const r = plot.getBoundingClientRect();
-      if (!(r.width > 0)) return;
-      const g = d.geo;
-      const vx = ((clientX - r.left) / r.width) * g.W;
-      const ts = g.t0 + ((vx - g.PAD_X) / Math.max(1, g.W - g.PAD_X * 2)) * (g.t1 - g.t0);
-      let best = 0, bd = Infinity;
-      for (let i = 0; i < d.pts.length; i++) {
-        const dd = Math.abs(d.pts[i][0] - ts);
-        if (dd < bd) { bd = dd; best = i; }
-      }
-      _tipShow(best);
-    }
-    document.addEventListener('pointermove', (e) => {
-      if (e.pointerType === 'touch') return;                 // el dedo tiene su propio contrato
-      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
-      if (!plot) return;
-      _tipFromClientX(plot, e.clientX);
-    });
-    document.addEventListener('pointerleave', (e) => {
-      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
-      if (plot && !_tipPinned) _tipHide();
-    }, true);
-    // TOQUE · el primer toque FIJA el punto; el segundo fuera lo retira. El
-    // gesto VERTICAL no se captura —`touch-action: pan-y` deja que la página
-    // siga desplazándose—, así que leer el gráfico no impide hacer scroll.
-    document.addEventListener('touchstart', (e) => {
-      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
-      if (!plot) { if (_tipPinned) _tipHide(); return; }
-      const tch = e.touches && e.touches[0]; if (!tch) return;
-      _tipPinned = true;
-      _tipFromClientX(plot, tch.clientX);
-    }, { passive: true });
-    document.addEventListener('touchmove', (e) => {
-      if (!_tipPinned) return;
-      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
-      const tch = e.touches && e.touches[0];
-      if (plot && tch) _tipFromClientX(plot, tch.clientX);
-    }, { passive: true });
-    // TECLADO · el plot es focalizable y se recorre con las flechas.
-    document.addEventListener('keydown', (e) => {
-      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
-      if (!plot) return;
-      const d = _tipData(plot); if (!d || !Array.isArray(d.pts) || !d.pts.length) return;
-      if (e.key === 'ArrowRight') { e.preventDefault(); _tipShow(_tipIdx < 0 ? 0 : _tipIdx + 1); }
-      else if (e.key === 'ArrowLeft') { e.preventDefault(); _tipShow(_tipIdx < 0 ? d.pts.length - 1 : _tipIdx - 1); }
-      else if (e.key === 'Home') { e.preventDefault(); _tipShow(0); }
-      else if (e.key === 'End') { e.preventDefault(); _tipShow(d.pts.length - 1); }
-      else if (e.key === 'Escape') { e.preventDefault(); _tipHide(); }
-    });
-    document.addEventListener('focusout', (e) => {
-      const plot = e.target && e.target.closest ? e.target.closest('[data-cmp-plot]') : null;
-      if (plot && !_tipPinned) _tipHide();
-    });
-    document.addEventListener('keydown', (e) => {
-      const p = _cmpPanel();
-      const inPick = e.target && e.target.closest && e.target.closest('.intv14-cmp-pick');
-      if (!p || p.hidden) {
-        // Abrir con teclado desde el disparador: patrón combobox estándar.
-        if (inPick && e.target.closest('[data-cmp-open]')
-            && (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault(); _cmpOpen();
-        }
-        return;
-      }
-      if (e.key === 'Escape') { e.preventDefault(); _cmpClose(true); return; }
-      if (!inPick) return;
-      const opts = _cmpOpts();
-      if (!opts.length) return;
-      const cur = opts.indexOf(p.querySelector('[data-cmp-opt].is-active'));
-      if (e.key === 'ArrowDown') { e.preventDefault(); _cmpSetActive(opts[Math.min(opts.length - 1, cur + 1)]); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); _cmpSetActive(opts[Math.max(0, cur - 1)]); }
-      else if (e.key === 'Home') { e.preventDefault(); _cmpSetActive(opts[0]); }
-      else if (e.key === 'End') { e.preventDefault(); _cmpSetActive(opts[opts.length - 1]); }
-      else if (e.key === 'Enter') {
-        e.preventDefault();
-        const a = p.querySelector('[data-cmp-opt].is-active');
-        if (a) _cmpChoose(a.getAttribute('data-cmp-opt'));
-      }
-    });
-    _intv14CmpRepaint = repaint;
-  }
-  // SE DISPARA EN CADA PINTURA, NO SÓLO AL CABLEAR. El cableado ocurre UNA vez,
-  // así que dejar aquí dentro la carga inicial dejaba un estado incoherente
-  // tras cualquier repintado de la pestaña: el selector seguía marcando el
-  // comparador guardado y la segunda línea había desaparecido, porque la card
-  // se reconstruye desde el camino SÍNCRONO, que no tiene benchmark. Lo
-  // encontró la revisión financiera.
-  try {
-    if (typeof _intv14CmpRepaint === 'function' && _aurixCmpEnabled()
-        && _intv14CmpState().benchmarkId) _intv14CmpRepaint();
-  } catch (_) {}
 
   // ══════════════════════════════════════════════════════════════════════
   // §7 · CHAT DE LA ESFERA — CABLEADO
@@ -80431,6 +80512,13 @@ const FEATURE_LABELS = {
   // el paywall nombra la capacidad EXACTAMENTE como la nombra su tarjeta.
   'workspace.compound':    { i18nKey: 'wstool_compound_n' },
   'workspace.realestate':  { i18nKey: 'wsre_n' },
+  // COMPARADOR DE RENTABILIDAD. Se nombran las DOS claves: la que hoy abre la
+  // herramienta (heredada de Intelligence, sólo la cuenta fundadora) y la que
+  // la venderá cuando su fila de `plan_features` exista. Las dos apuntan al
+  // MISMO nombre del diccionario, así que la tarjeta y el modal no pueden
+  // divergir ni durante la mudanza.
+  'intelligence.comparator': { i18nKey: 'wscmp_n' },
+  'workspace.comparator':    { i18nKey: 'wscmp_n' },
   // CLAVE DE ETIQUETA, NO DE GATE. `_wsCanPersist` pregunta por el PLAN; esto sólo
   // existe para que el paywall diga «Guardar tu trabajo» en vez de una clave cruda.
   // No está en `plan_features` ni en `_AURIX_ENT_CANON`, así que ningún

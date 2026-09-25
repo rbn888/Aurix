@@ -185,6 +185,12 @@ function buildHtml(lang) {
   return vm.runInContext('_renderIntelligenceCommandCenter()', sb);
 }
 const HTML = { es: buildHtml('es'), en: buildHtml('en') };
+// La mudanza, fijada en el markup: si Intelligence vuelve a construir la card
+// del comparador, esto para el probe antes de medir nada.
+if (/intv14-cmp/.test(HTML.es) || /intv14-cmp/.test(HTML.en)) {
+  console.error('\n✗ Intelligence ha vuelto a construir el comparador, que vive en Workspace desde 2026-09-25.');
+  process.exit(1);
+}
 mkdirSync(OUT, { recursive: true });
 
 // ── EL MARKUP, REUTILIZABLE ────────────────────────────────────────────────
@@ -257,11 +263,16 @@ await S('Page.addScriptToEvaluateOnNewDocument', { source:
 // Radar → Factores → Explora, y ahí el probe ya medía lo correcto.
 // TABLET queda FIJADO con la jerarquía de móvil, que es la que la hoja de
 // estilos le aplica hoy (`≤1023px`) y la que el SPEC pide «fijar sin alterar».
-const MOBILE_HIERARCHY = ['intcc-m-hero','intcc-m-health','intv12-qcard','intcc-drivers','intcc-explore','intcc-radar','intv14-cmp','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'];
+// ── EL COMPARADOR SE MUDÓ A WORKSPACE (2026-09-25) ────────────────────────
+// `intv14-cmp` sale de las dos jerarquías esperadas. No es un cambio de orden:
+// la card ya NO la construye esta superficie. Dejarla aquí como «opcional»
+// habría mantenido verde un contrato sobre algo que no existe, y el día que
+// alguien la reintrodujera en Intelligence este probe lo habría bendecido.
+const MOBILE_HIERARCHY = ['intcc-m-hero','intcc-m-health','intv12-qcard','intcc-drivers','intcc-explore','intcc-radar','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'];
 const EXPECTED_ORDER = {
   mobile:  MOBILE_HIERARCHY,
   tablet:  ['intcc-hero','intv12-qcard'].concat(MOBILE_HIERARCHY.slice(3)),
-  desktop: ['intcc-hero','intv12-qcard','intcc-radar','intcc-drivers','intcc-explore','intv14-cmp','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
+  desktop: ['intcc-hero','intv12-qcard','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
 };
 // INT.07 §14 — a row must behave like a ROW: every card in it shares one bottom
 // baseline. The founder photographed the opposite (a broken mosaic with black
@@ -697,7 +708,8 @@ for (const vp of VIEWPORTS) {
   // convertía el estado correcto en un rojo permanente en la propia herramienta
   // de QA del founder — un gate fosilizando como contrato una condición que no
   // lo es, otra vez.
-  const OPTIONAL_CARDS = ['intv12-qcard', 'intv14-cmp'];
+  // `intv14-cmp` ya no es una card opcional de esta superficie: se mudó.
+  const OPTIONAL_CARDS = ['intv12-qcard'];
   const expectedHere = EXPECTED_ORDER[vp.name].filter(function(k){
     return OPTIONAL_CARDS.indexOf(k) === -1 || (m.order || []).indexOf(k) !== -1;
   });
