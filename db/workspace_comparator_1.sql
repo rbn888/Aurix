@@ -1,6 +1,12 @@
 -- ============================================================================
 -- AURIX · COMPARADOR DE RENTABILIDAD  ·  la NOVENA capacidad de Workspace
---                        *** PENDIENTE DE APLICAR ***
+--            *** APLICADO EN PRODUCCION · 2026-09-25 ***
+--   Verificado contra la base, no por ausencia de error:
+--     (1) workspace.comparator → free false / premium true   [2 filas]
+--     (2) concesiones al plan free                            [0]
+--     (3) override 'founder' de la cuenta del fundador        [allowed true]
+--     (4) las ocho claves anteriores, intactas                [sin cambios]
+--   Reejecutable sin dano: `on conflict … do update` en las dos sentencias.
 -- ----------------------------------------------------------------------------
 -- Aplicar: pegar este fichero entero en el editor SQL de Supabase del proyecto
 -- al que apunta SUPABASE_URL en config.js, y ejecutar.
@@ -40,9 +46,9 @@
 --   Invertirlo NO abre nada a nadie —`hasFeature()` exige `=== true`, asi que
 --   una clave ausente se resuelve como DENEGADA— pero deja una ventana en la
 --   que una cuenta Premium ve DENEGADA una capacidad publicada. Es una
---   degradacion visible, no un agujero. Por eso el cliente desplegado HOY deja
---   la entrada INTERNA: hasta que estas filas existan, la herramienta la ve
---   unicamente la cuenta fundadora.
+--   degradacion visible, no un agujero.
+--   SE RESPETO: el cliente se desplego primero con la entrada INTERNA (v757),
+--   despues se aplicaron estas filas, y solo entonces se publico la entrada.
 --
 -- QUE PASA CON `intelligence.comparator`
 --   Se deja INTACTA a proposito. Es la clave con la que la cuenta fundadora

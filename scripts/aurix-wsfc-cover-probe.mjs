@@ -225,9 +225,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       await mount(page, L);
       const g = await page.evaluate(MEASURE);
       const tag = `${ENG}.${w}×${h} ${L.toUpperCase()}`;
-      if (!g || !g.mounted || g.caps !== 8) { ok(`${tag} la portada monta con sus OCHO capacidades`, false, JSON.stringify(g && { m: g.mounted, c: g.caps })); await ctx.close(); continue; }
-      ok(`${tag} monta las OCHO capacidades, con su nombre y sin accesos`,
-        g.caps === 8 && g.openers === 0 && g.names.every(n => n.length > 3),
+      // OCHO → NUEVE (2026-09-25): el comparador de rentabilidad se publica
+      // como novena capacidad al mudarse de Intelligence.
+      if (!g || !g.mounted || g.caps !== 9) { ok(`${tag} la portada monta con sus NUEVE capacidades`, false, JSON.stringify(g && { m: g.mounted, c: g.caps })); await ctx.close(); continue; }
+      ok(`${tag} monta las NUEVE capacidades, con su nombre y sin accesos`,
+        g.caps === 9 && g.openers === 0 && g.names.every(n => n.length > 3),
         JSON.stringify({ caps: g.caps, accesos: g.openers, nombres: g.names }));
       ok(`${tag} el aviso de cambio de plan ya no existe`,
         g.notice === 0, 'quedan ' + g.notice + ' restos del aviso');

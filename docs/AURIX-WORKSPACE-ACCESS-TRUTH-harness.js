@@ -68,6 +68,14 @@ function dictFor(langCode) {
 //   premium  → las claves que `plan_features` concede a premium (derivadas del
 //              catálogo, no escritas a mano) + intelligence.full + premium.settings
 //   founder  → lo de premium MÁS workspace.catalog_preview
+// ── OCHO → NUEVE (2026-09-25) ─────────────────────────────────────────────
+// El COMPARADOR DE RENTABILIDAD se publica como novena capacidad: se mudó de
+// Intelligence y su derecho ya existe en la base (`workspace.comparator`,
+// db/workspace_comparator_1.sql, aplicado y verificado). El número se mantiene
+// FIJADO —una capacidad que aparece sin que nadie la decida es justo lo que
+// esto caza— y sube porque se decidió, no porque estorbara.
+const N_CAPS = 9;
+
 const CAT_KEYS = (function () {
   // ── SE LEE EL CÓDIGO, NO LOS COMENTARIOS ────────────────────────────────
   // Esto extraía las claves con una expresión sobre el TEXTO del catálogo, y
@@ -137,7 +145,7 @@ function ctx(persona, langCode) {
   vm.runInContext(fnSrc('_wsOpenTool')
     .replace('_wshView = \'tool\'; renderWorkspaceHome();', '__opened.push("tool:" + key);'), sb);
   vm.runInContext('function _wsToolDefaultsFor(){ return {}; } function _wsCanonicalizeInputs(o){ return o||{}; } function _wsToolStateGet(){ return null; } function _wsJrnNewDraft(){ return {}; } function _wsReNewDraft(){ return {}; } function _wsRecvNewDraft(){ return {}; } function _wsApNewDraft(){ return {}; }', sb);
-  vm.runInContext('var AURIX_WS6_TOOL=true, AURIX_WS7_TOOL=true, AURIX_WS8_TOOL=true, AURIX_WS12_TOOL=true, AURIX_WS13_TOOL=true, AURIX_WS14_TOOL=true, AURIX_WS15_TOOL=true;', sb);
+  vm.runInContext('var AURIX_WS6_TOOL=true, AURIX_WS7_TOOL=true, AURIX_WS8_TOOL=true, AURIX_WS12_TOOL=true, AURIX_WS13_TOOL=true, AURIX_WS14_TOOL=true, AURIX_WS15_TOOL=true, AURIX_WS16_TOOL=true;', sb);
   vm.runInContext('function _wshWriteStore(k,v){ localStorage.setItem(k, JSON.stringify(v)); return true; }', sb);
   vm.runInContext('function _wsDocsQueue(){} function _wsDocSyncSet(){}', sb);
   // La hoja legacy, con su gate real y su apertura observable.
@@ -287,7 +295,7 @@ console.log('\n2 · Interno y «Próximamente» fuera del producto:');
   const fdrPublic = home(fdr, 'tools') + home(fdr, 'templates') + home(fdr, 'space');
   ok('2.6 …y en su catálogo NORMAL ya no hay nada interno (era el defecto reportado)',
     leakedIds(fdr, fdrPublic, INTERNAL_IDS).length === 0
-    && cards(home(fdr, 'tools')).length + cards(home(fdr, 'templates')).length === 8,
+    && cards(home(fdr, 'tools')).length + cards(home(fdr, 'templates')).length === 9,
     JSON.stringify(leakedIds(fdr, fdrPublic, INTERNAL_IDS))
       + ' cards=' + (cards(home(fdr, 'tools')).length + cards(home(fdr, 'templates')).length));
   ok('2.7 `_wsCatalogVisible` ya no pregunta quién mira',
@@ -323,14 +331,14 @@ const PUBLIC = (function () {
   return JSON.parse(vm.runInContext('JSON.stringify(_WS_CATALOG.filter(e => e.published === true).map(e => ({ id: e.id, kind: e.kind, tier: e.commercialTier, fk: e.featureKey })))', sb));
 })();
 {
-  ok('3.0 el catálogo público son las OCHO capacidades declaradas',
-    PUBLIC.length === 8, JSON.stringify(PUBLIC.map(e => e.id)));
+    ok('3.0 el catálogo público son las NUEVE capacidades declaradas',
+    PUBLIC.length === N_CAPS, JSON.stringify(PUBLIC.map(e => e.id)));
   ['es', 'en'].forEach(lg => {
     ['free', 'premium'].forEach(persona => {
       const c = ctx(persona, lg);
       const all = ['templates', 'tools'].map(t2 => cards(home(c, t2))).reduce((a, b) => a.concat(b), []);
-      ok('3.1 ' + persona + '/' + lg + ' · se pintan las ocho tarjetas públicas, ni una más',
-        all.length === 8, String(all.length));
+      ok('3.1 ' + persona + '/' + lg + ' · se pintan las nueve tarjetas públicas, ni una más',
+        all.length === N_CAPS, String(all.length));
       const dests = all.map(cd => ({ cd, d: destination(c, cd) }));
       ok('3.2 ' + persona + '/' + lg + ' · ninguna tarjeta está muerta',
         dests.every(x => x.d.kind !== 'dead'),
@@ -342,7 +350,7 @@ const PUBLIC = (function () {
       ok('3.4 ' + persona + '/' + lg + ' · ninguna tarjeta declara descarga ni navegación externa',
         all.every(cd => !/download|href=|target=/.test(cd.attrs)));
       if (persona === 'premium') {
-        ok('3.5 premium/' + lg + ' · las OCHO abren dentro de Aurix',
+        ok('3.5 premium/' + lg + ' · las NUEVE abren dentro de Aurix',
           dests.every(x => x.d.kind === 'opened'),
           JSON.stringify(dests.filter(x => x.d.kind !== 'opened').map(x => x.d)));
         ok('3.6 premium/' + lg + ' · y ninguna presenta paywall',
@@ -354,17 +362,17 @@ const PUBLIC = (function () {
         // las ocho requieren Premium, así que la afirmación correcta es la contraria
         // —Free no abre NI UNA— y se comprueba con el mismo despachador real.
         const openFree = dests.filter(x => x.d.kind === 'opened').map(x => x.d.what).sort();
-        ok('3.7 free/' + lg + ' · no abre NINGUNA capacidad: las ocho son Premium',
+        ok('3.7 free/' + lg + ' · no abre NINGUNA capacidad: las nueve son Premium',
           openFree.length === 0, JSON.stringify(openFree));
-        ok('3.8 free/' + lg + ' · las OCHO llevan al paywall con su clave real',
-          dests.filter(x => x.d.kind === 'paywall').length === 8
+        ok('3.8 free/' + lg + ' · las NUEVE llevan al paywall con su clave real',
+          dests.filter(x => x.d.kind === 'paywall').length === N_CAPS
           && dests.filter(x => x.d.kind === 'paywall').every(x => /^workspace\./.test(x.d.featureKey)),
           JSON.stringify(dests.map(x => x.d.kind + ':' + (x.d.featureKey || x.d.what || ''))));
         // Y el derecho que se deniega es el SUYO, no uno prestado: si las dos nuevas
         // colgaran de `intelligence.full` o de una clave global, esto lo delataría.
         const fks = dests.filter(x => x.d.kind === 'paywall').map(x => x.d.featureKey).sort();
         ok('3.9 free/' + lg + ' · cada capacidad deniega con SU propia clave, sin global',
-          new Set(fks).size === 8
+          new Set(fks).size === N_CAPS
           && fks.indexOf('workspace.compound') !== -1
           && fks.indexOf('workspace.realestate') !== -1
           && fks.indexOf('workspace.full') === -1,
@@ -387,26 +395,26 @@ console.log('\n4 · «Abrir» cuando se puede abrir; «Premium» cuando no:');
     ok('4.1 premium/' + lg + ' · CERO etiquetas «Premium» e «Incluido» dentro de las tarjetas',
       hp.indexOf('wsh-tier') === -1,
       (hp.match(/wsh-tier is-\w+/g) || []).join(','));
-    ok('4.2 premium/' + lg + ' · las ocho tarjetas muestran UNA acción, y es «Abrir»',
-      (hp.match(/wsh-tool-go/g) || []).length === 8
+    ok('4.2 premium/' + lg + ' · las nueve tarjetas muestran UNA acción, y es «Abrir»',
+      (hp.match(/wsh-tool-go/g) || []).length === N_CAPS
       && (hp.match(/wsh-tool-go is-lock/g) || []).length === 0
       && (hp.match(/wsh-pill/g) || []).length === 0,
       String((hp.match(/wsh-tool-go/g) || []).length));
     // CIERRE WORKSPACE PREMIUM — eran «las seis Premium» y «las dos Free». Ya no
     // hay ninguna Free: las ocho llevan etiqueta Premium y ninguna ofrece «Abrir».
-    ok('4.3 free/' + lg + ' · las OCHO llevan etiqueta Premium, y ninguna dice «Incluido»',
-      (hf.match(/wsh-tier is-premium/g) || []).length === 8
+    ok('4.3 free/' + lg + ' · las NUEVE llevan etiqueta Premium, y ninguna dice «Incluido»',
+      (hf.match(/wsh-tier is-premium/g) || []).length === N_CAPS
       && hf.indexOf('wsh-tier is-free') === -1,
       String((hf.match(/wsh-tier is-premium/g) || []).length));
     ok('4.4 free/' + lg + ' · y ninguna dice «Abrir» para luego denegar',
       (hf.match(/wsh-tool-go">/g) || []).length === 0
-      && (hf.match(/wsh-tool-go is-lock/g) || []).length === 8,
+      && (hf.match(/wsh-tool-go is-lock/g) || []).length === N_CAPS,
       JSON.stringify([(hf.match(/wsh-tool-go">/g) || []).length, (hf.match(/wsh-tool-go is-lock/g) || []).length]));
     ok('4.5 free/' + lg + ' · la tarjeta bloqueada es accesible y dice qué le falta',
       cards(hf).filter(cd => cd.lock).every(cd => cd.interactive && cd.aria && cd.aria.indexOf(R(free, 't("wsh_lock_aria")')) !== -1),
       JSON.stringify(cards(hf).filter(cd => cd.lock).map(cd => cd.aria)));
     ok('4.6 ' + lg + ' · ningún nombre de tarjeta queda vacío ni imprime su id',
-      names(hp).length === 8 && names(hp).every(n => n && !/^tpl_|_growth$|_simulation$/.test(n)),
+      names(hp).length === N_CAPS && names(hp).every(n => n && !/^tpl_|_growth$|_simulation$/.test(n)),
       JSON.stringify(names(hp)));
   });
 }
@@ -670,20 +678,20 @@ console.log('\n8 · Portada Free: una card, ocho capacidades, un CTA y ningún a
       html.indexOf(R(c, 't("wsfc_cta")')) !== -1
       && !/Ver Premium|See Premium/.test(html),
       R(c, 't("wsfc_cta")'));
-    // 8.4 — OCHO capacidades, y son las OCHO PUBLICADAS. No se compara contra una
+    // 8.4 — NUEVE capacidades, y son las NUEVE PUBLICADAS. No se compara contra una
     // lista escrita en el test: se deriva del catálogo, así que despublicar una
     // entrada y dejarla anunciada en la portada sale como fallo.
     const PUB8 = PUBLIC.length;
-    ok('8.4 ' + lg + ' · publica las OCHO capacidades como acciones, no como permisos',
+    ok('8.4 ' + lg + ' · publica las NUEVE capacidades como acciones, no como permisos',
       html.indexOf('data-wsfc-caps="' + PUB8 + '"') !== -1
-      && PUB8 === 8
+      && PUB8 === N_CAPS
       && html.indexOf('data-wsfc-premium') === -1
       && !/wsfc-cap[^>]*(button|role="button")/.test(html),
       (/data-wsfc-caps="(\d+)"/.exec(html) || [])[1]);
-    ok('8.4b ' + lg + ' · y las ocho aparecen con su nombre, ninguno vacío',
+    ok('8.4b ' + lg + ' · y las nueve aparecen con su nombre, ninguno vacío',
       (function () {
         const names = (html.match(/class="wsfc-cap-name">([^<]*)</g) || []).map(x => x.replace(/.*>([^<]*)<$/, '$1'));
-        return names.length === 8 && names.every(n => n.trim().length > 2);
+        return names.length === N_CAPS && names.every(n => n.trim().length > 2);
       })(), html.slice(html.indexOf('wsfc-caps'), html.indexOf('wsfc-caps') + 160));
     ok('8.5 ' + lg + ' · y no nombra Seguimiento de precios, que sigue interno',
       html.indexOf(R(c, 't("wsapp_assets_n")')) === -1

@@ -27452,6 +27452,15 @@ button.intv14-cmp-clear {
   .wsfc-cap { gap: 8px; padding: 9px 8px; }
   .wsfc-cap-ico { width: 26px; height: 26px; border-radius: 8px; }
   .wsfc-cap-svg { width: 17px; height: 17px; }
+  /* ── LA NOVENA CAPACIDAD AÑADE UNA FILA ENTERA ──────────────────────────
+     En dos columnas, pasar de ocho a nueve no añade media fila: añade una
+     QUINTA, con su alto mínimo y su hueco. En 360×740 eso sacaba la portada
+     fuera de la pantalla por 11–22 px, y de esta portada el contrato es que
+     CABE ENTERA sin scroll — se cumplió rehaciendo la densidad, no con un
+     `sticky`, y la misma respuesta vale aquí. Se recuperan ~38 px repartidos
+     entre las cinco filas y sus cuatro huecos; el nombre no encoge. */
+  .wsfc-caps { gap: 5px; }
+  .wsfc-cap { min-height: 48px; padding: 7px 8px; }
 }
 /* ── ANCHOS INTERMEDIOS (768–1023) · dos por cuatro ────────────────────────
    §A lo pide explícitamente: cuatro columnas sólo cuando los nombres caben

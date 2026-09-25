@@ -176,34 +176,41 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} Intelligence no pinta ninguna card del comparador`,
       await page.evaluate(() => document.querySelectorAll('.intv14-cmp').length === 0));
 
-    // ══ 4 · PREMIUM NO LA VE NI LA ABRE (sigue interna) ═══════════════════
+    // ══ 4 · PREMIUM LA ABRE: SU DERECHO EXISTE EN LA BASE ═════════════════
+    // `workspace.comparator` está concedida al plan premium (SQL aplicado y
+    // verificado el 2026-09-25). Que un cliente que paga pueda abrir lo que el
+    // catálogo le ofrece es la mitad que el orden SQL-primero protege.
     await mount(page, 'premium');
     const accP = await page.evaluate(() => JSON.stringify(_wsToolAccess('comparator')));
-    ok(`${tag} premium · el gate la deniega por NO PUBLICADA, no por derecho`,
-      JSON.parse(accP).ok === false && JSON.parse(accP).reason === 'unpublished', accP);
+    ok(`${tag} premium · el gate concede: la capacidad es suya`,
+      JSON.parse(accP).ok === true && JSON.parse(accP).featureKey === 'workspace.comparator', accP);
     await page.evaluate(() => _wsOpenTool('comparator'));
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600);
     const v4 = await view(page);
-    ok(`${tag} premium · pedirla no abre nada`, v4.cmp === false && v4.toolActive !== 'comparator',
+    ok(`${tag} premium · la abre y se pinta`, v4.cmp === true && v4.toolActive === 'comparator',
       JSON.stringify(v4));
-    // Y no se le ofrece comprar algo que no está publicado: sería mentir.
-    ok(`${tag} premium · y no se le propone mejorar de plan por algo no publicado`,
-      await page.evaluate(() => {
-        const K = (typeof _AURIX_UPGRADE_INTENT_KEY !== 'undefined' ? _AURIX_UPGRADE_INTENT_KEY : '') + '_u-probe';
-        const raw = localStorage.getItem(K);
-        return !raw || raw.indexOf('comparator') === -1;
-      }));
-    ok(`${tag} premium · la rejilla de herramientas no la enseña`,
-      await page.evaluate(() => {
-        const root = document.getElementById('aurixWorkspace');
-        return root.querySelectorAll('[data-wstool="comparator"], [data-ws-tool="return_comparator"]').length === 0;
-      }));
 
-    // ══ 5 · FREE, IGUAL ═══════════════════════════════════════════════════
+    // ══ 5 · FREE NO, Y SE LE DICE POR QUÉ ═════════════════════════════════
+    // Denegada por DERECHO, no por publicación: existe, es Premium, y ésa es
+    // la razón honesta que puede llevar al paywall con su clave real.
     await mount(page, 'free');
     const accF = await page.evaluate(() => JSON.stringify(_wsToolAccess('comparator')));
-    ok(`${tag} free · denegada igual, y sin decir que es Premium`,
-      JSON.parse(accF).ok === false && JSON.parse(accF).reason === 'unpublished', accF);
+    ok(`${tag} free · denegada por derecho, con su clave propia (nunca una global)`,
+      JSON.parse(accF).ok === false && JSON.parse(accF).reason === 'entitlement'
+      && JSON.parse(accF).featureKey === 'workspace.comparator', accF);
+    await page.evaluate(() => _wsOpenTool('comparator'));
+    await page.waitForTimeout(400);
+    const v5 = await view(page);
+    ok(`${tag} free · y no se le abre nada`, v5.cmp === false && v5.toolActive !== 'comparator',
+      JSON.stringify(v5));
+    // La portada Free la ANUNCIA, con su nombre del catálogo: nueve capacidades.
+    ok(`${tag} free · la portada anuncia las NUEVE capacidades, con su nombre`,
+      await page.evaluate(() => {
+        const h = _renderWorkspaceFreeCover();
+        const names = (h.match(/class="wsfc-cap-name">([^<]*)</g) || []).map(x => x.replace(/.*>([^<]*)<$/, '$1'));
+        return h.indexOf('data-wsfc-caps="9"') !== -1 && names.length === 9
+          && names.some(n => /Comparador de rentabilidad|Return comparator/.test(n));
+      }));
 
     ok(`${tag} sin excepciones en consola durante todo el recorrido`,
       errors.length === 0, JSON.stringify(errors.slice(0, 3)));
@@ -221,14 +228,16 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
 {
   const app = await readFile(join(ROOT, 'app.js'), 'utf8');
   const sql = await readFile(join(ROOT, 'db', 'workspace_comparator_1.sql'), 'utf8');
-  // Mientras el SQL esté sin aplicar, la entrada NO puede estar publicada: si lo
-  // estuviera, una cuenta Premium vería una capacidad que se le deniega.
+  // El orden se respetó y se comprueba en su estado final: la entrada sólo
+  // puede estar publicada si el SQL que concede su clave YA está aplicado.
   const entry = app.slice(app.indexOf("{ id: 'return_comparator'"), app.indexOf('\n', app.indexOf("{ id: 'return_comparator'")));
   const pending = /PENDIENTE DE APLICAR/.test(sql);
-  ok('ORDEN · con el SQL sin aplicar, la entrada sigue interna',
-    !pending || /published: false/.test(entry), entry.trim().slice(0, 120));
-  ok('ORDEN · y la clave que la abre hoy es la heredada, no una que nadie concede',
-    /featureKey: 'intelligence\.comparator'/.test(entry), entry.trim().slice(0, 120));
+  ok('ORDEN · la entrada sólo se publica con su SQL aplicado',
+    !pending && /published: true/.test(entry), entry.trim().slice(0, 130));
+  ok('ORDEN · y la clave publicada es la que Premium concede, no la heredada',
+    /featureKey: 'workspace\.comparator'/.test(entry), entry.trim().slice(0, 130));
+  ok('ORDEN · el SQL declara que está aplicado, con su verificación',
+    /APLICADO EN PRODUCCION/.test(sql) && /Verificado contra la base/.test(sql));
   ok('SQL · declara la clave nueva para premium y la niega a free',
     /\('premium', 'workspace\.comparator', true\)/.test(sql) &&
     /\('free',\s+'workspace\.comparator', false\)/.test(sql));

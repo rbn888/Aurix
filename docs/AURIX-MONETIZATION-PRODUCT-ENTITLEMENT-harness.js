@@ -273,8 +273,10 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   const PUB_TOOLS = fdr._WS_CATALOG.filter(e => e.kind === 'tool' && e.published)
     .map(e => e.id).sort().join(',');
   const N_PUB_TOOLS = PUB_TOOLS.split(',').length;
-  ok('C.5b el conjunto publicado es el DECLARADO tras aplicar los dos SQL',
-    PUB_TOOLS === 'compound_growth,loan_simulation,scenario'
+  // NOVENA (2026-09-25): `return_comparator`, que se muda de Intelligence y se
+  // publica con `workspace.comparator` ya concedida en la base.
+  ok('C.5b el conjunto publicado es el DECLARADO tras aplicar los SQL',
+    PUB_TOOLS === 'compound_growth,loan_simulation,return_comparator,scenario'
     && PUB_TPL === 'tpl_goals,tpl_journal,tpl_mbudget,tpl_realestate,tpl_receivables',
     JSON.stringify({ tools: PUB_TOOLS, templates: PUB_TPL }));
   ok('C.5c y Seguimiento de precios NO está en él',
@@ -309,7 +311,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   // sin gate. El inventario vive ahora en `_wsCatalogInternal`, que falla cerrada.
   ok('C.14 FOUNDER · su catálogo público es el MISMO que el de cualquiera',
     fdr._wsCatalogFor('tool').length === free._wsCatalogFor('tool').length &&
-    fdr._wsCatalogFor('tool').length === 3, 've ' + fdr._wsCatalogFor('tool').length);
+    fdr._wsCatalogFor('tool').length === 4, 've ' + fdr._wsCatalogFor('tool').length);
   ok('C.15 FOUNDER · y sus plantillas públicas también, ni una más',
     fdr._wsCatalogFor('template').length === free._wsCatalogFor('template').length &&
     fdr._wsCatalogFor('template').length === 5, 've ' + fdr._wsCatalogFor('template').length);
@@ -375,7 +377,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     (() => {
       const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
                    'db/monetization_catalog_preview_key_1.sql', 'db/workspace_premium_2_plan_features.sql',
-                   'db/workspace_premium_3_all_premium.sql',
+                   'db/workspace_premium_3_all_premium.sql', 'db/workspace_comparator_1.sql',
                    'db/monetization_entitlement_resolver_1.sql']
         .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
       const premium = fdr._WS_CATALOG.filter(e => e.commercialTier === 'premium');
@@ -400,7 +402,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('D.5b toda capacidad Premium publicada tiene su derecho concedido en un SQL del repo',
     (() => {
       const sql = ['db/monetization_m04_billing_stripe_1.sql', 'db/monetization_commercial_truth_1.sql',
-                   'db/workspace_premium_2_plan_features.sql', 'db/workspace_premium_3_all_premium.sql']
+                   'db/workspace_premium_2_plan_features.sql', 'db/workspace_premium_3_all_premium.sql',
+                   'db/workspace_comparator_1.sql']
         .map(f => { try { return read(f); } catch (_) { return ''; } }).join('\n');
       return fdr._WS_CATALOG.filter(e => e.published && e.commercialTier === 'premium')
         .every(e => e.featureKey === 'workspace.loan'

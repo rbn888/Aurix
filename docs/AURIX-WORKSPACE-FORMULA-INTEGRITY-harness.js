@@ -473,8 +473,12 @@ function catalog() {
   // recuento a cero, porque una entrada interna que se colara aquí rompe el assert.
   // El conjunto publicado es DATO y se deriva del catálogo; lo que se ancla es su
   // contenido EXACTO, que es lo que delata una publicación accidental.
-  const PUBLISHED_IDS = 'compound_growth,loan_simulation,scenario,tpl_goals,tpl_journal,'
-                      + 'tpl_mbudget,tpl_realestate,tpl_receivables';
+  // NOVENA (2026-09-25): `return_comparator`. El comparador de rentabilidad se
+  // muda de Intelligence y se publica con su derecho ya aplicado en la base
+  // (`workspace.comparator`). El conjunto se sigue anclando EXACTO: eso es lo
+  // que delata una publicación accidental, y por eso crece a mano.
+  const PUBLISHED_IDS = 'compound_growth,loan_simulation,return_comparator,scenario,tpl_goals,'
+                      + 'tpl_journal,tpl_mbudget,tpl_realestate,tpl_receivables';
   OK('L11 sólo está publicado el conjunto declarado, y el filtro de visibilidad es \u00daNICO',
      catalog().filter(e => e.published === true).map(e => e.id).sort().join(',') === PUBLISHED_IDS &&
      /return _WS_CATALOG\.filter\(e => e\.kind === kind && _wsCatalogVisible\(e\)\);/.test(app));
@@ -498,7 +502,7 @@ function catalog() {
      // Y la SEXTA puerta, la única que quedaba sin gate: la hoja legacy.
      /const _acc4 = _wsWs4Access\(type\);/.test(fn('_ws4OpenOrCreate')));
   OK('L12 s\u00ed est\u00e1n las autorizadas, y en el CAT\u00c1LOGO (no en un literal)',
-     catalog().filter(e => e.published && e.kind === 'tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation,scenario' &&
+     catalog().filter(e => e.published && e.kind === 'tool').map(e => e.id).sort().join(',') === 'compound_growth,loan_simulation,return_comparator,scenario' &&
      catalog().filter(e => e.published && e.kind === 'template').map(e => e.id).sort().join(',') === 'tpl_goals,tpl_journal,tpl_mbudget,tpl_realestate,tpl_receivables');
   // L13 SUPERADO por MONETIZATION-V1 · M.01B: Plantillas vuelve como secci\u00f3n
   // estructural (bloque M m\u00e1s abajo). La regla que L13 proteg\u00eda \u2014no dejar una
@@ -522,7 +526,7 @@ function catalog() {
        vm.runInContext(fn('_wsRenderSurface'), sb);
        const pub = catalog().filter(e => e.published);
        const routeless = pub.filter(e => !vm.runInContext('_wsRenderSurface(' + JSON.stringify(e.id) + ')', sb));
-       return pub.length === 8 && routeless.length === 0;
+       return pub.length === 9 && routeless.length === 0;
      })());
   // M.03 A — `TPL_CAT` ya no es un array vacío escrito a mano: se DERIVA del
   // catálogo con el mismo filtro de visibilidad que las herramientas. La garantía

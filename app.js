@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '717'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '718'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -22117,20 +22117,17 @@ const _WS_CATALOG = Object.freeze([
   { id: 'trade_journal',         kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'receivables',           kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
   { id: 'asset_prices',          kind: 'tool',     published: false, featureKey: null,              commercialTier: 'undecided' },
-  // ── COMPARADOR DE RENTABILIDAD · INTERNO HASTA QUE EXISTA SU DERECHO ─────
-  // Venía de Intelligence y su clave sigue siendo `intelligence.comparator`,
-  // que HOY sólo tiene la cuenta fundadora por override. Publicarlo exige una
-  // fila nueva en `plan_features` (`workspace.comparator`, free false / premium
-  // true) que está escrita en db/workspace_comparator_1.sql y todavía SIN
-  // aplicar. El orden importa y es el mismo que enseñó el cierre Premium:
-  // publicar antes que el SQL no abre nada —una clave ausente se resuelve
-  // DENEGADA— pero deja a una cuenta Premium viendo denegado lo que el catálogo
-  // le ofrece. Así que se queda interna: el fundador la abre (su entrada es
-  // `openable` por `workspace.catalog_preview`) y nadie más la ve.
-  // Cuando el SQL esté aplicado, esta entrada pasa a
-  //   published: true, featureKey: 'workspace.comparator', commercialTier: 'premium'
-  // y la portada Free pasa de ocho capacidades a nueve.
-  { id: 'return_comparator',     kind: 'tool',     published: false, featureKey: 'intelligence.comparator', commercialTier: 'undecided' },
+  // ── COMPARADOR DE RENTABILIDAD · LA NOVENA CAPACIDAD ────────────────────
+  // Viene de Intelligence, donde vivía tras `intelligence.comparator`, una
+  // clave que no concede ningún plan. Se publica con clave propia porque el
+  // derecho ya EXISTE: db/workspace_comparator_1.sql aplicado el 2026-09-25 y
+  // verificado contra la base (premium true, free false, cero concesiones al
+  // plan Free). Ese es el orden y no se puede invertir: publicar antes que el
+  // SQL no abre nada —una clave ausente se resuelve DENEGADA— pero deja a una
+  // cuenta Premium viendo denegado lo que el catálogo le ofrece.
+  // `intelligence.comparator` se deja intacta a propósito: retirarla es un paso
+  // aparte y va en su propio fichero.
+  { id: 'return_comparator',     kind: 'tool',     published: true,  featureKey: 'workspace.comparator',    commercialTier: 'premium' },
   // ── plantillas PUBLICADAS ──────────────────────────────────────────────────
   // M.03 A — Real Estate Portfolio se publica como PLANTILLA, no como herramienta:
   // la superficie es la misma y su sitio en el producto es la galería de plantillas.
@@ -22665,6 +22662,11 @@ function _wsGlyph(k) {
     split:    '<rect x="3" y="8.5" width="18" height="7" rx="2"/><path d="M9.6 8.5v7"/>',
     receipt:  '<path d="M6 3h12v17.5l-3-2-3 2-3-2-3 2z"/><path d="M9.2 11.6l2 2 3.6-4"/>',
     log:      '<path d="M4 7h9M4 12h9M4 17h9"/><path d="M17.3 5.6l2.4 2.4-2.4 2.4"/><path d="M19.7 14.6 17.3 17l2.4 2.4"/>',
+    // COMPARADOR: dos series desde el mismo origen, la tuya continua y la del
+    // índice discontinua — exactamente como las dibuja la herramienta
+    // (`.intv14-cmp-line.is-other` va con `stroke-dasharray`). Se AMPLÍA la
+    // familia, que es la regla de esta rejilla: ni un icono de otra biblioteca.
+    compare:  '<path d="M4 4v16h16"/><path d="M7 16l3.5-4 2.5 1.8L19 7"/><path d="M7 18.5c4 0 8.5-2.2 12-6.5" stroke-dasharray="2.6 2.6"/>',
   };
   return G[k] || G.target;
 }
@@ -25709,6 +25711,7 @@ const _WSFC_CAPS = Object.freeze([
   { k: 'receivables', icon: 'receipt'  },
   { k: 'goals',       icon: 'target'   },
   { k: 'journal',     icon: 'log'      },
+  { k: 'comparator',  icon: 'compare'  },
 ]);
 // La clave de diccionario con la que el CATÁLOGO nombra una entrada. Sale de los
 // mapas de render, que ya son el owner de «cómo se pinta cada entrada».
@@ -65831,7 +65834,17 @@ function _aurixCmpEnabled() {
     //     local, no un plan: la capacidad concreta. `hasFeature` devuelve false
     //     mientras no haya evidencia cargada, así que esto falla CERRADO.
     if (typeof hasFeature !== 'function') return false;
-    if (!hasFeature('intelligence.comparator')) return false;
+    // ── LA CLAVE CAMBIÓ CON LA MUDANZA, Y ESTO SE QUEDÓ ATRÁS ─────────────
+    // Al publicar la herramienta en Workspace su derecho pasó a ser
+    // `workspace.comparator`, que es el que concede el plan Premium. Este gate
+    // seguía preguntando por la clave heredada —que no la concede NINGÚN
+    // plan—, así que un cliente Premium abría la herramienta y encontraba la
+    // cabecera con la tarjeta VACÍA: el owner devolvía cadena vacía. Lo
+    // encontró la sonda al pasar la persona premium de «no puede abrirla» a
+    // «puede», que es justo lo que cambió al publicarla.
+    // Se aceptan LAS DOS mientras la heredada siga existiendo: retirarla es un
+    // paso aparte, y hasta entonces hay cuentas cuyo acceso cuelga de ella.
+    if (!hasFeature('workspace.comparator') && !hasFeature('intelligence.comparator')) return false;
     // 3 · Y un apagado LOCAL sigue pudiendo apagarlo —nunca encenderlo—, que es
     //     la vía de rollback rápida del propio usuario.
     if (typeof localStorage !== 'undefined'

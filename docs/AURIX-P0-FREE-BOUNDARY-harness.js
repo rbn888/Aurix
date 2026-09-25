@@ -158,7 +158,7 @@ function ctx(persona, langCode) {
     function _renderGoals(){ __rendered.push('goals'); return '<div class="aurix-wsh" data-wsh-view="goals"></div>'; }
     function _wsRenderTool(){ __rendered.push('tool'); return '<div class="aurix-wsh wsh-tool-view" data-wsh-view="tool"></div>'; }
     var AURIX_WS6_TOOL=true, AURIX_WS7_TOOL=true, AURIX_WS8_TOOL=true, AURIX_WS12_TOOL=true,
-        AURIX_WS13_TOOL=true, AURIX_WS14_TOOL=true, AURIX_WS15_TOOL=true, AURIX_WS_HOME=true,
+        AURIX_WS13_TOOL=true, AURIX_WS14_TOOL=true, AURIX_WS15_TOOL=true, AURIX_WS16_TOOL=true, AURIX_WS_HOME=true,
         AURIX_WS_USE_REAL_DATA=false, IS_DEV=false;
     var baseCurrency='EUR';
     var _wshView='home', _wsTab=null, _wsToolActive='compound', _wsToolInputs=null, _wsToolEditId=null,
@@ -714,8 +714,12 @@ console.log('\n7 · Fuera de alcance, y demostrablemente intacto:');
     && /function calculateLoan\(/.test(app) && /function calculateCompoundGrowth\(/.test(app));
   ok('7.3 el radar y el interior Premium de Intelligence siguen en pie',
     /_renderIntelligenceCommandCenter\(\)/.test(app) && /_renderPremiumIntelligence\(\)/.test(app));
-  ok('7.4 no se publica ninguna capacidad interna (siguen siendo OCHO)',
-    (konstSrc('_WS_CATALOG').replace(/^\s*\/\/.*$/gm, '').match(/published: true/g) || []).length === 8,
+  // OCHO → NUEVE (2026-09-25): el comparador de rentabilidad se publica como
+  // novena capacidad tras mudarse de Intelligence, con su derecho ya aplicado
+  // en la base. El número sigue fijado: lo que esto caza es una capacidad que
+  // se publica sin que nadie lo decida.
+  ok('7.4 no se publica ninguna capacidad interna (son NUEVE, y la novena se decidió)',
+    (konstSrc('_WS_CATALOG').replace(/^\s*\/\/.*$/gm, '').match(/published: true/g) || []).length === 9,
     String((konstSrc('_WS_CATALOG').replace(/^\s*\/\/.*$/gm, '').match(/published: true/g) || []).length));
   ok('7.5 CSS no sustituye autorización: el guard no oculta, no monta',
     !/display:\s*none/.test(fnSrc('renderWorkspaceHome'))
