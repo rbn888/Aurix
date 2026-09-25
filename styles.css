@@ -16456,6 +16456,18 @@ body.gs-open { overflow: hidden; }
   transition: color .18s var(--ease-out), background .18s var(--ease-out);
 }
 .onb-skip:hover { color: #fff; background: rgba(255,255,255,0.06); }
+/* «Lo haré más tarde» medía 27 px. Es la salida del onboarding y está en una
+   esquina, así que agrandar la caja movería el texto o el fondo del hover: el
+   área de toque crece con un pseudo-elemento y la composición no se entera.
+   Mismo patrón que `.intv12-see-changes`, y por el mismo motivo. */
+.onb-skip::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 44px;
+}
 
 /* Steps — shared layout. ONBOARDING-2: tighter padding so each step
    feels intentional, not stretched. */
@@ -16630,6 +16642,16 @@ body.gs-open { overflow: hidden; }
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: 999px;
   padding: 10px 16px;
+  /* 43 px en 390 y 41 px en 360: uno y tres por debajo del objetivo táctil.
+     Y estos chips no son un adorno — `interests` es el ÚNICO dato del
+     onboarding con consumidor real (`_aurixBuildStarterWatchlist`), así que
+     fallar el toque aquí es empezar con la watchlist equivocada. El suelo se
+     pone por `min-height`, no por más padding, para que no crezcan a lo ancho
+     ni cambie la retícula. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: rgba(255,255,255,0.78);
   font-size: 13.5px;
   font-weight: 600;
