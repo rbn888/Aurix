@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '712'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '713'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -79142,11 +79142,71 @@ function _aurixBillingToast(msg, variant, opts) {
 // caminos independientes y el primero puede llegar unos segundos después. Si tras
 // los reintentos el servidor sigue diciendo Free, la app dice exactamente eso —
 // no hay un estado intermedio "premium provisional".
-// Seis intentos en 15 s, más juntos al principio: el webhook suele llegar en
-// los primeros segundos y con la cadencia anterior (0, 2.5, 6, 15) una
-// confirmación a los 3 s no se veía hasta los 6. Sigue siendo ACOTADO: no hay
-// bucle infinito, y lo que pasa al agotarse está definido abajo.
-const _AURIX_BILLING_RETRY_MS = Object.freeze([0, 1200, 2500, 5000, 9000, 15000]);
+//
+// ── LA CADENCIA, Y POR QUÉ SE REHIZO ───────────────────────────────────────
+// La anterior era [0, 1200, 2500, 5000, 9000, 15000] leída como HUECOS, así que
+// los intentos caían en 0 · 1,2 · 3,7 · 8,7 · 17,7 · 32,7 s: entre el cuarto y
+// el quinto había NUEVE segundos de silencio, y entre el quinto y el sexto
+// QUINCE. Una confirmación del servidor a los 9 s no se veía hasta los 17,7.
+// El objetivo del producto es reflejar Premium en ≤2 s desde que el servidor lo
+// confirma, y con huecos crecientes eso es imposible por construcción: el hueco
+// ES la latencia de detección en el peor caso.
+// El gate lo había fijado como «≤6 intentos», que era la LIMITACIÓN de entonces
+// y no el contrato. Lo que hay que garantizar es que la espera sea ACOTADA —por
+// número y por ventana—, no que tenga pocos intentos.
+// Ahora: uno inmediato y después uno cada 1,5 s durante 30 s. Veinte llamadas
+// como mucho, ventana cerrada, sin `setInterval` y sin bucle infinito.
+const _AURIX_BILLING_WAIT = Object.freeze({
+  firstMs:  0,       // el primero, inmediato: el webhook suele haber llegado ya
+  everyMs:  1500,    // hueco CONSTANTE — es lo que acota la latencia de detección
+  maxTries: 20,      // 20 × 1,5 s = 30 s. Acotado por número Y por ventana.
+});
+
+// ── LA ESPERA SOBREVIVE A SALIR DE LA APP ──────────────────────────────────
+// Los 30 s de arriba sólo cubren a quien se queda mirando la pantalla. Quien
+// vuelve al escritorio, cambia de aplicación o cierra la pestaña se salía de la
+// única ventana que existía, y al volver sólo corría la revalidación perezosa
+// —sin `force`, con TTL de 5 minutos—, que puede no preguntar nada. El derecho
+// estaba concedido en el servidor y la pantalla seguía diciendo Free.
+// Se deja una marca local mínima —cuándo se volvió del checkout y cuántas veces
+// se ha reintentado— y volver a primer plano gasta UNO de esos reintentos.
+// La marca no concede NADA: sólo autoriza a volver a preguntarle al servidor.
+const _AURIX_BILLING_PENDING_KEY = 'aurix_billing_pending_v1';
+const _AURIX_BILLING_PENDING_TTL_MS = 30 * 60 * 1000;  // media hora y se caduca
+const _AURIX_BILLING_PENDING_MAX_RESUMES = 6;          // y seis vueltas, no más
+function _aurixBillingPendingSlot() {
+  try {
+    return _AURIX_BILLING_PENDING_KEY +
+      ((typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? ('_' + _aurixActiveUserId) : '');
+  } catch (_) { return _AURIX_BILLING_PENDING_KEY; }
+}
+function _aurixBillingPendingRead() {
+  try {
+    const raw = localStorage.getItem(_aurixBillingPendingSlot());
+    if (!raw) return null;
+    const m = JSON.parse(raw);
+    if (!m || typeof m.at !== 'number') return null;
+    if (Date.now() - m.at > _AURIX_BILLING_PENDING_TTL_MS) { _aurixBillingPendingClear(); return null; }
+    return { at: m.at, resumes: Number(m.resumes) || 0 };
+  } catch (_) { return null; }
+}
+function _aurixBillingPendingMark() {
+  try { localStorage.setItem(_aurixBillingPendingSlot(), JSON.stringify({ at: Date.now(), resumes: 0 })); } catch (_) {}
+}
+function _aurixBillingPendingClear() {
+  try { localStorage.removeItem(_aurixBillingPendingSlot()); } catch (_) {}
+}
+
+// Lo que ocurre cuando el SERVIDOR confirma, lo pregunte quien lo pregunte. Un
+// solo sitio: el retorno del checkout, la vuelta a primer plano y «Comprobar
+// estado» hacen exactamente lo mismo, y ninguno concede nada por su cuenta.
+function _aurixBillingConfirmed(st, step) {
+  _aurixBillingPendingClear();
+  try { _aurixRecordFunnelStep(step); } catch (_) {}
+  _aurixBillingToast(t('pw_active'), 'success', { tag: 'billing' });
+  _aurixEntApplyToUi(st.features);
+}
+
 function _aurixBillingReturnFlow() {
   let flag = null;
   try {
@@ -79157,7 +79217,10 @@ function _aurixBillingReturnFlow() {
       window.history.replaceState({}, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams.toString() : '') + u.hash);
     }
   } catch (_) { flag = null; }
-  if (!flag) return;
+  // Sin parámetro de retorno esto no es una vuelta del checkout, pero sí puede
+  // ser el arranque de quien cerró la app en mitad de la espera. Ahí es donde se
+  // recupera: antes, recargar borraba la espera y la salida manual con ella.
+  if (!flag) { _aurixBillingResumeIfPending('boot'); return; }
   // ── EL EMBUDO, HASTA EL FINAL ────────────────────────────────────────────
   // El registro existente cubría hasta «pulsó comprar». De ahí en adelante no
   // había nada, así que era imposible distinguir «volvió del checkout» de
@@ -79171,25 +79234,69 @@ function _aurixBillingReturnFlow() {
   if (flag === 'cancelled') { _funnel('cancelled'); _aurixBillingToast(t('pw_cancelled'), 'info'); return; }
   if (flag !== 'success') return;
   _funnel('returned');
-  _aurixBillingToast(t('pw_confirming'), 'info');
-  let i = 0;
-  const tick = () => {
-    _aurixEntitlementsLoad({ force: true }).then((st) => {
-      if (st && st.loaded && st.plan === 'premium') {
-        // CONFIRMACIÓN AUTORITATIVA: la dice el servidor, no el retorno. Es el
-        // único evento del embudo que significa «vendido».
-        _funnel('confirmed');
-        _aurixBillingToast(t('pw_active'), 'success');
-        _aurixEntApplyToUi(st.features);
-        return;
-      }
-      i++;
-      if (i < _AURIX_BILLING_RETRY_MS.length) setTimeout(tick, _AURIX_BILLING_RETRY_MS[i]);
-      else { _funnel('pending_timeout'); _aurixBillingPendingNotice(); }
-    });
-  };
-  setTimeout(tick, _AURIX_BILLING_RETRY_MS[0]);
+  _aurixBillingPendingMark();
+  _aurixBillingToast(t('pw_confirming'), 'info', { tag: 'billing' });
+  _aurixBillingAwaitServer();
 }
+
+// La espera. Acotada por número de intentos Y por ventana, con hueco constante.
+// Un fallo de red CUENTA como intento fallido en vez de matar la cadena: antes
+// la promesa no tenía `catch`, así que una excepción en el `fetch` se llevaba
+// por delante los reintentos Y el aviso final — el usuario se quedaba sin
+// espera y sin salida, y sin nada en pantalla que dijera por qué.
+function _aurixBillingAwaitServer() {
+  let n = 0;
+  const again = () => {
+    n++;
+    if (n < _AURIX_BILLING_WAIT.maxTries) { setTimeout(tick, _AURIX_BILLING_WAIT.everyMs); return; }
+    try { _aurixRecordFunnelStep('pending_timeout'); } catch (_) {}
+    _aurixBillingPendingNotice();
+  };
+  const tick = () => {
+    let p = null;
+    try { p = _aurixEntitlementsLoad({ force: true }); } catch (_) { p = null; }
+    if (!p || typeof p.then !== 'function') { again(); return; }
+    p.then((st) => {
+      if (st && st.loaded && st.plan === 'premium') { _aurixBillingConfirmed(st, 'confirmed'); return; }
+      again();
+    }).catch(again);
+  };
+  setTimeout(tick, _AURIX_BILLING_WAIT.firstMs);
+}
+
+// ── VOLVER A PRIMER PLANO REANUDA LA ESPERA ────────────────────────────────
+// Sin esto la recuperación tras salir de la app era MANUAL: había que encontrar
+// el aviso y pulsar. Aquí la app pregunta sola, UNA vez por vuelta a primer
+// plano y como mucho seis veces en media hora. No es polling: si nadie vuelve,
+// no se hace ni una llamada. Y no concede nada — si el servidor sigue diciendo
+// Free, lo único que se repone es la salida manual.
+function _aurixBillingResumeIfPending(reason) {
+  const m = _aurixBillingPendingRead();
+  if (!m) return false;
+  if (m.resumes >= _AURIX_BILLING_PENDING_MAX_RESUMES) return false;
+  try {
+    localStorage.setItem(_aurixBillingPendingSlot(), JSON.stringify({ at: m.at, resumes: m.resumes + 1 }));
+  } catch (_) {}
+  let p = null;
+  try { p = _aurixEntitlementsLoad({ force: true }); } catch (_) { p = null; }
+  if (!p || typeof p.then !== 'function') return false;
+  p.then((st) => {
+    if (st && st.loaded && st.plan === 'premium') { _aurixBillingConfirmed(st, 'confirmed_resume'); return; }
+    _aurixBillingPendingNotice();
+  }).catch(() => {});
+  return true;
+}
+try {
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') _aurixBillingResumeIfPending('visible');
+    });
+  }
+  if (typeof window !== 'undefined') {
+    // bfcache: volver atrás restaura la página sin emitir `visibilitychange`.
+    window.addEventListener('pageshow', () => { _aurixBillingResumeIfPending('pageshow'); });
+  }
+} catch (_) {}
 
 // ── CUANDO LA ESPERA SE AGOTA, HAY SALIDA ─────────────────────────────────
 // Antes, al agotarse los reintentos se publicaba un aviso que se desvanecía y
@@ -79202,29 +79309,29 @@ function _aurixBillingReturnFlow() {
 function _aurixBillingPendingNotice() {
   _aurixBillingToast(t('pw_pending'), 'info', {
     sticky: true,
+    tag: 'billing',
     action: { label: t('pw_check'), onClick: _aurixBillingRecheck },
   });
 }
-// «Comprobar estado» pregunta al MISMO resolver autoritativo. No hay una
-// segunda fuente de verdad, ni un escritor nuevo, ni nada que conceda Premium
-// desde el cliente: si el servidor no lo dice, no se concede.
+// «Comprobar estado» es RECUPERACIÓN MANUAL. Existe justamente para cuando la
+// automática no ha bastado, así que tenerla NO demuestra que la automática
+// funcione y no puede presentarse como tal. Pregunta al MISMO resolver
+// autoritativo: no hay una segunda fuente de verdad, ni un escritor nuevo, ni
+// nada que conceda Premium desde el cliente. Si el servidor no lo dice, no se
+// concede.
 function _aurixBillingRecheck() {
-  _aurixBillingToast(t('pw_confirming'), 'info');
+  _aurixBillingToast(t('pw_confirming'), 'info', { tag: 'billing' });
   let p = null;
   try { p = _aurixEntitlementsLoad({ force: true }); } catch (_) { p = null; }
   if (!p || typeof p.then !== 'function') return;
   p.then(st => {
-    if (st && st.loaded && st.plan === 'premium') {
-      try { _aurixRecordFunnelStep('confirmed_recheck'); } catch (_) {}
-      _aurixBillingToast(t('pw_active'), 'success');
-      _aurixEntApplyToUi(st.features);
-      return;
-    }
+    if (st && st.loaded && st.plan === 'premium') { _aurixBillingConfirmed(st, 'confirmed_recheck'); return; }
     // Sigue sin constar. Se dice con todas las letras, se deja la puerta de
     // soporte —no la de pagar— y el aviso vuelve a quedarse por si quiere
     // reintentar más tarde.
     _aurixBillingToast(t('pw_still_pending'), 'info', {
       sticky: true,
+      tag: 'billing',
       action: {
         label: t('pw_support'),
         onClick: () => { try { window.open('mailto:aurixsystemofficial@gmail.com', '_blank', 'noopener'); } catch (_) {} },
@@ -79926,6 +80033,19 @@ function _aurixShowToast(message, opts) {
     }
     const el = document.createElement('div');
     el.className = `aurix-toast aurix-toast--${variant}`;
+    // ── UN AVISO POR ASUNTO ──────────────────────────────────────────────
+    // Los avisos se apilan, que es lo correcto para mensajes distintos. Pero
+    // el de «tu pago se está confirmando» se vuelve a emitir cada vez que se
+    // reanuda la espera, y tres copias del mismo aviso son ruido, no insistencia.
+    // Con `tag` el nuevo SUSTITUYE al anterior del mismo asunto; sin `tag`, el
+    // comportamiento no cambia.
+    if (o.tag) {
+      el.setAttribute('data-toast-tag', String(o.tag));
+      try {
+        host.querySelectorAll(`[data-toast-tag="${String(o.tag).replace(/"/g, '')}"]`)
+            .forEach(prev => { try { prev.remove(); } catch (_) {} });
+      } catch (_) {}
+    }
     // ── UN AVISO PUEDE NECESITAR UNA SALIDA ──────────────────────────────
     // Un toast que se desvanece sirve para «guardado»; no sirve para «tu pago
     // se está confirmando y todavía no consta». Ahí el usuario necesita poder

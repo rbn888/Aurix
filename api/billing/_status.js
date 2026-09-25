@@ -66,6 +66,22 @@ const INTERVALS = ['year', 'month'];
 // La clave que marca la cuenta del fundador. Ningún plan la concede.
 const FOUNDER_KEY = 'workspace.catalog_preview';
 
+// El texto que resume lo anterior en una frase, sin adornarlo. Cada rama dice
+// exactamente qué falta, porque «no listo» sin causa obliga a volver a mirar.
+function activationNote(blockers, delivery, entitlement) {
+  if (entitlement.environment_matches_key === false)
+    return 'hay una activacion persistida, pero pertenece a OTRO entorno que el de la clave actual';
+  if (delivery.processed === 'never_observed')
+    return 'el webhook no ha procesado NINGUN evento todavia: entrega no observada';
+  if (delivery.activation_applied === 'never_observed')
+    return 'el webhook corre, pero ningun evento que conceda se ha aplicado (mirar outcome de los rechazados)';
+  if (entitlement.persisted === 'never_observed')
+    return 'se aplico un evento que concede, pero no hay suscripcion premium activa escrita por el webhook';
+  if (delivery.processed === 'unknown' || entitlement.persisted === 'unknown')
+    return 'evidencia de activacion NO legible (fallo de lectura), no se afirma ni se niega';
+  if (blockers.length) return 'activacion de servidor observada, pero la configuracion tiene bloqueos';
+  return 'activacion de SERVIDOR observada en este entorno; la transicion visible y el recorrido desde checkout siguen sin comprobar';
+}
 function isAllowedOrigin(o) {
   return !!o && (ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o));
 }
@@ -301,40 +317,121 @@ export default async function handler(req, res) {
     } catch (_) { blockers.push('webhook_check_failed'); }
   }
 
-  // ── 6 · «CONFIGURADO» NO ES «ENTREGADO» ───────────────────────────────────
-  // Que Stripe LISTE un destino no prueba que entregue, y que exista un secreto
-  // no prueba que se procese. La única evidencia de extremo a extremo que
-  // tenemos es NUESTRO propio ledger: si el webhook ha corrido alguna vez, hay
-  // filas en `billing_events`. Sin filas, el estado honesto no es «bien», es
-  // «nunca observado» — y eso es exactamente lo que faltó cuando una compra
-  // real se perdió contra un host que devolvía 405.
-  // No se marca como bloqueo por sí solo: una cuenta nueva sin ventas tampoco
-  // tiene eventos. Se publica el HECHO y que lo lea quien decide.
-  let delivery = { verified: 'unknown', events_total: null, last_received_at: null, last_type: null };
+  // ── 6 · CUATRO PREGUNTAS DISTINTAS, Y NO SE RESPONDEN CON LA MISMA FILA ──
+  // La versión anterior daba `activation_verified: true` con que hubiera UNA
+  // fila cualquiera en `billing_events`. Eso es falso por tres motivos a la vez:
+  // una fila puede ser un evento RECHAZADO (`unknown_price`, `unknown_customer`,
+  // `ignored_type`…), puede ser de un tipo que no activa nada, y puede venir de
+  // TEST. «El webhook corrió» y «el derecho quedó concedido» son afirmaciones
+  // distintas, y ninguna de las dos es «el usuario vio su plan cambiar».
+  // Aquí se separan las cuatro, cada una con su evidencia y su limitación:
+  //
+  //   1. webhook_processed     — hay filas en `billing_events`: la función corre.
+  //   2. activation_applied    — una de esas filas es de un tipo que CONCEDE y
+  //                              se aplicó (`applied = true`).
+  //   3. entitlement_persisted — hay una fila en `subscriptions` premium/activa
+  //                              escrita por el webhook (`last_event_at`).
+  //   4. environment           — esa suscripción EXISTE para la clave actual.
+  //                              Es lo único que distingue LIVE de TEST, porque
+  //                              `billing_events` no guarda `livemode`.
+  //
+  // Lo que NO se puede afirmar desde aquí, y por eso se devuelve `null` en vez
+  // de `false`: si la interfaz reflejó el cambio sola, y si el recorrido salió
+  // de un checkout. Las dos exigen mirar una pantalla.
+  const ACTIVATING_TYPES = [
+    'checkout.session.completed',
+    'customer.subscription.created',
+    'customer.subscription.updated',
+  ];
+  const delivery = {
+    processed: 'unknown',            // 'observed' | 'never_observed' | 'unknown'
+    events_total: null,
+    last_received_at: null,
+    last_type: null,
+    last_outcome: null,
+    // Un evento que CONCEDE y que además se aplicó. Rechazados aparte: son la
+    // pista de por qué un pago "no funcionó", no ruido que se pueda esconder.
+    activation_applied: 'unknown',   // 'observed' | 'never_observed' | 'unknown'
+    activation_applied_at: null,
+    refused_total: null,
+  };
   try {
     const r = await sb(`/billing_events?provider=eq.${PROVIDER}` +
-      `&select=event_type,received_at,outcome&order=received_at.desc&limit=1`);
+      `&select=event_type,received_at,outcome,applied&order=received_at.desc&limit=200`);
     if (r.ok) {
-      const rows = await r.json().catch(() => []);
-      // El recuento total viene en `content-range`, pero es OPCIONAL: si la
-      // cabecera no está, eso no puede invalidar la comprobación entera. La
-      // pregunta que importa es «¿ha procesado el webhook algo alguna vez?», y
-      // eso lo responde la propia fila.
-      let total = NaN;
-      try { total = Number(String((r.headers && r.headers.get && r.headers.get('content-range')) || '').split('/')[1]); } catch (_) { total = NaN; }
-      delivery.events_total = Number.isFinite(total) ? total : (Array.isArray(rows) ? rows.length : null);
-      if (Array.isArray(rows) && rows.length) {
-        delivery.verified = 'observed';
+      const evs = await r.json().catch(() => []);
+      const rows = Array.isArray(evs) ? evs : [];
+      delivery.events_total = rows.length;
+      if (rows.length) {
+        delivery.processed = 'observed';
         delivery.last_received_at = rows[0].received_at || null;
         delivery.last_type = rows[0].event_type || null;
+        delivery.last_outcome = rows[0].outcome || null;
+        delivery.refused_total = rows.filter(e => e && e.applied !== true).length;
+        const act = rows.filter(e => e && e.applied === true && ACTIVATING_TYPES.includes(e.event_type));
+        delivery.activation_applied = act.length ? 'observed' : 'never_observed';
+        delivery.activation_applied_at = act.length ? (act[0].received_at || null) : null;
       } else {
         // Ni un evento procesado NUNCA. Con el modo en LIVE y el catálogo listo,
         // esto es lo que hay que mirar antes de anunciar que se puede vender.
-        delivery.verified = 'never_observed';
+        delivery.processed = 'never_observed';
+        delivery.activation_applied = 'never_observed';
+        delivery.refused_total = 0;
       }
-    } else { delivery.verified = 'unknown'; }
-  } catch (_) { delivery.verified = 'unknown'; }
+    }
+  } catch (_) { /* queda en 'unknown': un fallo de lectura no es una respuesta */ }
   webhook.delivery = delivery;
+
+  // ── EL DERECHO, PERSISTIDO ────────────────────────────────────────────────
+  // Que un evento se aplicara y que haya una suscripción viva son dos cosas:
+  // un `customer.subscription.updated` de una cancelación también se "aplica".
+  // Lo que acredita activación de servidor es una fila premium y activa que el
+  // webhook escribió — `last_event_at` lo demuestra: nadie más escribe ahí.
+  const entitlement = {
+    persisted: 'unknown',            // 'observed' | 'never_observed' | 'unknown'
+    active_rows: null,
+    last_event_at: null,
+    // El identificador NO se publica: se usa sólo para preguntarle a Stripe.
+    environment_matches_key: 'unknown',  // true | false | 'unknown'
+  };
+  let probeSubId = null;
+  try {
+    const r = await sb(`/subscriptions?provider=eq.${PROVIDER}&plan=eq.${PLAN}` +
+      `&status=in.(active,trialing)&provider_subscription_id=not.is.null` +
+      `&select=status,last_event_at,provider_subscription_id&order=last_event_at.desc.nullslast&limit=50`);
+    if (r.ok) {
+      const subs = await r.json().catch(() => []);
+      const rows = Array.isArray(subs) ? subs : [];
+      entitlement.active_rows = rows.length;
+      const written = rows.filter(x => x && x.last_event_at);
+      if (written.length) {
+        entitlement.persisted = 'observed';
+        entitlement.last_event_at = written[0].last_event_at || null;
+        probeSubId = written[0].provider_subscription_id || null;
+      } else {
+        entitlement.persisted = 'never_observed';
+      }
+    }
+  } catch (_) { /* 'unknown' */ }
+
+  // ── ¿Y ES DE ESTE ENTORNO? ────────────────────────────────────────────────
+  // `billing_events` no guarda `livemode`, así que una activación observada
+  // puede ser perfectamente de TEST. La única forma honesta de saberlo es
+  // preguntarle a Stripe por esa suscripción CON LA CLAVE ACTUAL: si existe,
+  // pertenece al mismo entorno; si devuelve 404, es del otro. Sólo lectura.
+  if (probeSubId && (mode === 'live' || mode === 'test')) {
+    try {
+      const r = await stripeGet(`/subscriptions/${encodeURIComponent(probeSubId)}`);
+      if (r.ok) {
+        const sub = await r.json().catch(() => null);
+        entitlement.environment_matches_key =
+          sub && typeof sub.livemode === 'boolean' ? (sub.livemode === (mode === 'live')) : true;
+      } else if (r.status === 404) {
+        entitlement.environment_matches_key = false;
+      }
+    } catch (_) { /* 'unknown' */ }
+  }
+  if (entitlement.environment_matches_key === false) blockers.push('activation_from_other_environment');
 
   const uniq = Array.from(new Set(blockers));
   return res.status(200).json({
@@ -352,9 +449,23 @@ export default async function handler(req, res) {
     // ha entregado y activado una compra». Se nombran las dos por separado
     // porque confundirlas es lo que dejó pasar el webhook mal apuntado.
     ready_for_live: uniq.length === 0,
-    activation_verified: webhook.delivery && webhook.delivery.verified === 'observed',
-    note: uniq.length === 0 && (!webhook.delivery || webhook.delivery.verified !== 'observed')
-      ? 'configuracion coherente; entrega del webhook NO observada todavia'
-      : undefined,
+    entitlement,
+    // ── LAS CUATRO AFIRMACIONES, POR SEPARADO ───────────────────────────
+    // `activation_verified` significa AHORA, y sólo, «el servidor concedió el
+    // derecho y lo hizo en este entorno». Ni una fila suelta lo demuestra.
+    activation_verified:
+      delivery.activation_applied === 'observed' &&
+      entitlement.persisted === 'observed' &&
+      entitlement.environment_matches_key === true,
+    // Y estas dos NO son observables desde el servidor. `null` no es «no»: es
+    // «esto no se responde desde aquí». Confundirlas es lo que dejó declarar
+    // funcionando un webhook que no podía entregar.
+    auto_activation_verified: null,
+    checkout_journey_verified: null,
+    not_observable_here: [
+      'auto_activation_verified: exige VER la transicion Free->Premium en la interfaz sin recargar ni pulsar',
+      'checkout_journey_verified: exige una cuenta inicialmente Free que pase por checkout y vuelva',
+    ],
+    note: activationNote(uniq, delivery, entitlement),
   });
 }

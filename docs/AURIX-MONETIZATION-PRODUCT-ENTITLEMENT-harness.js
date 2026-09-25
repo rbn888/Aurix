@@ -761,16 +761,32 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
   ok('G.17d la firma se siembra en el boot (el primer foco no repinta sin motivo)',
     /_aurixEntLastSig = JSON\.stringify\(features\);/.test(fnSource('_aurixEntApplyToUi')) &&
     /_aurixEntApplyToUi\(_aurixEnt\.features\)/.test(app));
-  // ACTUALIZADO (2026-09-24): los caminos que aprenden un plan confirmado eran
-  // tres y ahora son CUATRO — «Comprobar estado», la salida que se ofrece
-  // cuando la espera del retorno se agota. El número deja de fijarse: lo que
-  // importa es que ninguno repinte por su cuenta.
+  // ACTUALIZADO (2026-09-25): los caminos de COBRO dejan de llamar al owner cada
+  // uno por su lado. Eran tres, luego cuatro, y con la reanudación al volver a
+  // primer plano habrían sido cinco — cinco copias de «lo que pasa cuando el
+  // servidor confirma», que es exactamente el defecto que este assert nació
+  // para impedir. Ahora los tres pasan por `_aurixBillingConfirmed`, que es
+  // quien llama al owner y quien retira la marca de espera. El RECUENTO deja de
+  // fijarse del todo: subía y bajaba con cada camino nuevo sin decir nada.
   ok('G.17e y TODOS los caminos que confirman plan pasan por ese owner',
-    (app.match(/_aurixEntApplyToUi\(/g) || []).length >= 5 &&
     /updateDashboardPlans/.test(fnSource('_aurixEntApplyToUi')) &&
-    ['_aurixEntRevalidate', '_aurixBillingReturnFlow', '_aurixBillingRecheck']
-      .every(fn => /_aurixEntApplyToUi\(/.test(fnSource(fn))),
+    /_aurixEntApplyToUi\(/.test(fnSource('_aurixEntRevalidate')) &&
+    /_aurixEntApplyToUi\(/.test(fnSource('_aurixBillingConfirmed')) &&
+    ['_aurixBillingAwaitServer', '_aurixBillingResumeIfPending', '_aurixBillingRecheck']
+      .every(fn => /_aurixBillingConfirmed\(/.test(fnSource(fn))),
     'llamadas: ' + ((app.match(/_aurixEntApplyToUi\(/g) || []).length - 1));
+  // Y la espera: acotada por número Y por ventana, sin polling y sin que una
+  // marca local conceda nada por su cuenta. El gate anterior fijaba «≤6
+  // intentos», que era la limitación que hacía imposible el objetivo de ≤2 s.
+  ok('G.17f la espera del retorno es acotada, sin polling y sin concesión local',
+    /const _AURIX_BILLING_WAIT = Object\.freeze\(/.test(app) &&
+    /everyMs:\s*(\d+)/.test(app) &&
+    Number((app.match(/everyMs:\s*(\d+)/) || [])[1]) <= 2000 &&
+    Number((app.match(/maxTries:\s*(\d+)/) || [])[1]) <= 40 &&
+    /resumes >= _AURIX_BILLING_PENDING_MAX_RESUMES/.test(app) &&
+    !/setInterval\s*\([^)]*_aurixBilling/.test(app),
+    'everyMs=' + (app.match(/everyMs:\s*(\d+)/) || [])[1] +
+    ' maxTries=' + (app.match(/maxTries:\s*(\d+)/) || [])[1]);
   ok('G.18 la revalidación respeta el TTL (no fuerza en cada foco) y no hace polling',
     /_aurixEntitlementsLoad\(\)\.then\(\(st\) =>/.test(app) &&
     !/setInterval\([^)]*_aurixEnt/.test(app));

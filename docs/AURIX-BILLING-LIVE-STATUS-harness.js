@@ -52,8 +52,18 @@ function run(opts) {
       return p ? J(p) : { ok: false, status: 404, json: async () => ({ error: { code: 'resource_missing' } }) };
     }
     if (/\/rest\/v1\/billing_events/.test(u)) return J(opts.events === undefined
-      ? [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'applied' }]
+      ? [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'applied', applied: true }]
       : opts.events);
+    // El derecho PERSISTIDO es una pregunta distinta de «llegó un evento».
+    if (/\/rest\/v1\/subscriptions/.test(u)) return J(opts.subs === undefined
+      ? [{ status: 'active', last_event_at: '2026-09-24T10:00:01Z', provider_subscription_id: 'sub_probe' }]
+      : opts.subs);
+    // Y de qué ENTORNO es ese derecho sólo lo dice Stripe con la clave actual.
+    if (/\/v1\/subscriptions\//.test(u)) {
+      const id = decodeURIComponent(u.split('/v1/subscriptions/')[1]);
+      const sub = (opts.stripeSubs === undefined ? { sub_probe: { id: 'sub_probe', livemode: true } } : opts.stripeSubs)[id];
+      return sub ? J(sub) : { ok: false, status: 404, json: async () => ({ error: { code: 'resource_missing' } }) };
+    }
     if (/\/v1\/billing_portal\/configurations/.test(u)) return J({ data: opts.portal === undefined ? [{ livemode: true, is_default: true }] : opts.portal });
     if (/\/v1\/webhook_endpoints/.test(u)) return J({ data: opts.hooks === undefined ? [{
       url: 'https://isa-portfolio-ten.vercel.app/api/billing/webhook', status: 'enabled', livemode: true,
@@ -263,29 +273,102 @@ console.log('\n4 · Los bloqueos, uno a uno:');
 // ══════════════════════════════════════════════════════════════════════════
 // 5 · LOS IMPORTES APROBADOS ESTÁN ESCRITOS, NO ESPEJADOS
 // ══════════════════════════════════════════════════════════════════════════
-console.log('\n4b · «Configurado» no es «entregado»:');
+console.log('\n4b · «Configurado» no es «entregado», y «entregado» no es «activado»:');
 {
+  const APPLIED = [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'applied', applied: true }];
+  const SUB_OK  = [{ status: 'active', last_event_at: '2026-09-24T10:00:01Z', provider_subscription_id: 'sub_probe' }];
+
   // Con TODO en verde pero sin un solo evento procesado, el endpoint no puede
   // decir que la activación esté probada. Decirlo es lo que permitió anunciar
   // «listo para vender» sobre un webhook que nunca entregó.
-  const r = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, events: [] });
+  const r = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, events: [], subs: [] });
   ok('4b.1 configuración coherente ⇒ ready_for_live, pero activación NO verificada',
     r.body.ready_for_live === true && r.body.activation_verified === false &&
-    r.body.webhook.delivery.verified === 'never_observed',
+    r.body.webhook.delivery.processed === 'never_observed',
     JSON.stringify({ ready: r.body.ready_for_live, act: r.body.activation_verified,
       del: r.body.webhook && r.body.webhook.delivery }));
   ok('4b.2 …y lo dice en texto, para que nadie lea «verde» como «probado»',
-    /entrega del webhook NO observada/i.test(String(r.body.note || '')), String(r.body.note));
-  const r2 = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES,
-    events: [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'applied' }] });
-  ok('4b.3 con eventos procesados de verdad, la activación SÍ consta observada',
-    r2.body.activation_verified === true && r2.body.webhook.delivery.verified === 'observed' &&
-    r2.body.webhook.delivery.last_type === 'customer.subscription.updated',
-    JSON.stringify(r2.body.webhook.delivery));
-  ok('4b.4 y el destino esperado se publica, para poder compararlo a simple vista',
+    /no ha procesado NINGUN evento/i.test(String(r.body.note || '')), String(r.body.note));
+
+  // ── LO QUE UNA FILA SUELTA NO DEMUESTRA ─────────────────────────────────
+  // Tres casos que la versión anterior daba por activación verificada, y no lo
+  // son. Este bloque FALLA con el código anterior: ahí bastaba `events.length`.
+  const rRef = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, subs: [],
+    events: [{ event_type: 'customer.subscription.updated', received_at: '2026-09-24T10:00:00Z', outcome: 'unknown_price', applied: false }] });
+  ok('4b.3 un evento RECHAZADO acredita que el webhook corre, no que active',
+    rRef.body.webhook.delivery.processed === 'observed' &&
+    rRef.body.webhook.delivery.activation_applied === 'never_observed' &&
+    rRef.body.webhook.delivery.refused_total === 1 &&
+    rRef.body.activation_verified === false,
+    JSON.stringify(rRef.body.webhook.delivery));
+  ok('4b.3b …y el texto dice dónde mirar, no sólo que no está listo',
+    /ningun evento que conceda se ha aplicado/i.test(String(rRef.body.note || '')), String(rRef.body.note));
+
+  const rTipo = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, subs: SUB_OK,
+    events: [{ event_type: 'customer.subscription.deleted', received_at: '2026-09-24T10:00:00Z', outcome: 'applied', applied: true }] });
+  ok('4b.4 un evento aplicado que NO concede (una baja) tampoco es activación',
+    rTipo.body.webhook.delivery.activation_applied === 'never_observed' &&
+    rTipo.body.activation_verified === false,
+    JSON.stringify(rTipo.body.webhook.delivery));
+
+  const rSinSub = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, events: APPLIED, subs: [] });
+  ok('4b.5 evento aplicado SIN derecho persistido no es activación de servidor',
+    rSinSub.body.webhook.delivery.activation_applied === 'observed' &&
+    rSinSub.body.entitlement.persisted === 'never_observed' &&
+    rSinSub.body.activation_verified === false,
+    JSON.stringify({ d: rSinSub.body.webhook.delivery, e: rSinSub.body.entitlement }));
+  ok('4b.5b …y se nombra la pieza que falta',
+    /no hay suscripcion premium activa escrita por el webhook/i.test(String(rSinSub.body.note || '')),
+    String(rSinSub.body.note));
+
+  // ── Y DE QUÉ ENTORNO ES ─────────────────────────────────────────────────
+  // `billing_events` no guarda `livemode`: una activación observada puede ser
+  // de TEST. Con la clave LIVE, si Stripe no conoce esa suscripción, es del
+  // otro entorno — y eso NO puede pasar por activación verificada.
+  const rOtro = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, events: APPLIED, subs: SUB_OK,
+    stripeSubs: {} });
+  ok('4b.6 un derecho persistido que la clave actual no conoce es de OTRO entorno',
+    rOtro.body.entitlement.environment_matches_key === false &&
+    rOtro.body.activation_verified === false &&
+    (rOtro.body.blockers || []).includes('activation_from_other_environment'),
+    JSON.stringify({ e: rOtro.body.entitlement, b: rOtro.body.blockers }));
+  ok('4b.6b …y el aviso lo dice con esas palabras',
+    /pertenece a OTRO entorno/i.test(String(rOtro.body.note || '')), String(rOtro.body.note));
+
+  // ── LAS TRES PIEZAS A LA VEZ, Y SÓLO ENTONCES ───────────────────────────
+  const r2 = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES, events: APPLIED, subs: SUB_OK });
+  ok('4b.7 evento que concede + derecho persistido + mismo entorno ⇒ activación de SERVIDOR',
+    r2.body.activation_verified === true &&
+    r2.body.webhook.delivery.processed === 'observed' &&
+    r2.body.webhook.delivery.activation_applied === 'observed' &&
+    r2.body.entitlement.persisted === 'observed' &&
+    r2.body.entitlement.environment_matches_key === true,
+    JSON.stringify({ d: r2.body.webhook.delivery, e: r2.body.entitlement }));
+
+  // ── LO QUE ESTE ENDPOINT NO PUEDE RESPONDER ─────────────────────────────
+  // Y no lo responde con `false`, que sería otra afirmación: lo responde con
+  // `null` y lo declara. Ver la transición y recorrer el checkout exigen mirar
+  // una pantalla, y confundirlo con esto es de donde vino el falso verde.
+  ok('4b.8 la transición visible y el recorrido NO se afirman desde el servidor',
+    r2.body.auto_activation_verified === null && r2.body.checkout_journey_verified === null &&
+    Array.isArray(r2.body.not_observable_here) && r2.body.not_observable_here.length === 2,
+    JSON.stringify({ a: r2.body.auto_activation_verified, c: r2.body.checkout_journey_verified }));
+  ok('4b.8b …y el texto final no confunde activación de servidor con recorrido',
+    /transicion visible y el recorrido desde checkout siguen sin comprobar/i.test(String(r2.body.note || '')),
+    String(r2.body.note));
+
+  ok('4b.9 y el destino esperado se publica, para poder compararlo a simple vista',
     String(r2.body.webhook.expected_url || '').endsWith('/api/billing/webhook') &&
     !/app\.aurixsystem\.io/.test(String(r2.body.webhook.expected_url)),
     String(r2.body.webhook.expected_url));
+
+  // Un fallo de LECTURA no es una respuesta: ni afirma ni niega.
+  const rCiego = await run({ rows: LIVE_ROWS, stripePrices: LIVE_PRICES,
+    events: null, subs: null });
+  ok('4b.10 si la evidencia no se puede leer, no se afirma ni se niega',
+    rCiego.body.activation_verified === false &&
+    /NO legible|no ha procesado/i.test(String(rCiego.body.note || '')),
+    JSON.stringify({ d: rCiego.body.webhook.delivery, e: rCiego.body.entitlement, n: rCiego.body.note }));
 }
 
 console.log('\n5 · 7,99 €/mes y 69,99 €/año, y anual primero:');

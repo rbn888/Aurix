@@ -139,16 +139,41 @@ console.log('A · el cliente no concede');
   ok('A.1 el ÚNICO gate de acceso sigue siendo features[key] === true',
     /return _aurixEnt\.features\[featureKey\] === true;/.test(fnSrc(app, 'hasFeature')) &&
     !/billing|stripe|checkout/i.test(fnSrc(app, 'hasFeature')));
+  // ACTUALIZADO (2026-09-25): la lista incluye los caminos nuevos —la espera
+  // acotada, la reanudación al volver a primer plano y el punto único de
+  // confirmación—. Un camino nuevo que no estuviera aquí sería justo el que
+  // podría autoconcederse sin que nadie lo notara.
   ok('A.2 ninguna función del cliente escribe plan/estado comercial',
     (() => {
       const client = fnSrc(app, '_aurixBillingCheckout') + fnSrc(app, '_aurixBillingPortal') +
-                     fnSrc(app, '_aurixBillingReturnFlow') + fnSrc(app, '_aurixBillingPricesLoad');
+                     fnSrc(app, '_aurixBillingReturnFlow') + fnSrc(app, '_aurixBillingPricesLoad') +
+                     fnSrc(app, '_aurixBillingAwaitServer') + fnSrc(app, '_aurixBillingResumeIfPending') +
+                     fnSrc(app, '_aurixBillingConfirmed');
       return !/_aurixEnt\s*=|\.features\s*\[[^\]]+\]\s*=|plan\s*=\s*'premium'/.test(client); })());
+  // ACTUALIZADO (2026-09-25): el retorno ya no hace la espera él mismo —la
+  // delega en `_aurixBillingAwaitServer`, que es también quien la reanuda al
+  // volver a primer plano—. El contrato es el mismo y por eso el assert sigue:
+  // el parámetro de la URL no concede NADA, sólo obliga a volver a preguntarle
+  // al servidor, y lo único que concede es que el servidor diga `premium`.
   ok('A.3 `?billing=success` NO concede: sólo fuerza una revalidación',
-    (() => { const src = fnSrc(app, '_aurixBillingReturnFlow');
-      return /_aurixEntitlementsLoad\(\{ force: true \}\)/.test(src)
-        && /st\.plan === 'premium'/.test(src)
-        && !/features\[/.test(src) && !/hasFeature\s*=/.test(src); })());
+    (() => {
+      const flow = fnSrc(app, '_aurixBillingReturnFlow');
+      const wait = fnSrc(app, '_aurixBillingAwaitServer');
+      const resume = fnSrc(app, '_aurixBillingResumeIfPending');
+      const all = flow + wait + resume + fnSrc(app, '_aurixBillingConfirmed');
+      return /_aurixBillingAwaitServer\(\)/.test(flow)
+        && /_aurixEntitlementsLoad\(\{ force: true \}\)/.test(wait)
+        && /st\.plan === 'premium'/.test(wait)
+        && /_aurixEntitlementsLoad\(\{ force: true \}\)/.test(resume)
+        && /st\.plan === 'premium'/.test(resume)
+        && !/features\[/.test(all) && !/hasFeature\s*=/.test(all); })());
+  // Y la marca que permite reanudar no es un derecho: caduca, está acotada y
+  // lo único que autoriza es volver a preguntar.
+  ok('A.3b la marca de espera no concede nada: caduca y sólo autoriza preguntar',
+    (() => { const src = fnSrc(app, '_aurixBillingPendingRead') + fnSrc(app, '_aurixBillingResumeIfPending');
+      return /_AURIX_BILLING_PENDING_TTL_MS/.test(src)
+        && /resumes >= _AURIX_BILLING_PENDING_MAX_RESUMES/.test(src)
+        && !/premium/.test(fnSrc(app, '_aurixBillingPendingRead')); })());
   ok('A.4 …y el parámetro se borra de la URL antes de cualquier otra cosa',
     /searchParams\.delete\('billing'\)[\s\S]{0,200}history\.replaceState/.test(fnSrc(app, '_aurixBillingReturnFlow')));
   ok('A.5 el checkout devuelve SIEMPRE false (su retorno no puede leerse como acceso)',

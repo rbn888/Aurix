@@ -229,8 +229,19 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} checkout · y la interfaz pasa a Premium sin recargar ni CTA residual`,
       v.cover === false && v.buyCta === 0, JSON.stringify(v));
     // El reintento está ACOTADO: no puede quedarse llamando para siempre.
-    ok(`${tag} checkout · los reintentos son finitos y declarados`,
-      await page.evaluate(`Array.isArray(_AURIX_BILLING_RETRY_MS) && _AURIX_BILLING_RETRY_MS.length <= 6 && Object.isFrozen(_AURIX_BILLING_RETRY_MS)`));
+    // Esto decía «≤6 intentos», y esa cifra era la LIMITACIÓN de entonces, no el
+    // contrato: con seis intentos repartidos en huecos crecientes, el objetivo
+    // de reflejar Premium en ≤2 s era imposible por construcción. Lo que hay que
+    // fijar es que la espera esté acotada —por número Y por ventana—, y eso es
+    // lo que se comprueba ahora. La latencia la mide
+    // `scripts/aurix-billing-activation-probe.mjs`, que es su sitio.
+    ok(`${tag} checkout · la espera es finita, declarada y congelada`,
+      await page.evaluate(`(function(){
+        var w = _AURIX_BILLING_WAIT;
+        if (!w || !Object.isFrozen(w)) return false;
+        var total = w.firstMs + w.everyMs * (w.maxTries - 1);
+        return w.maxTries > 0 && w.maxTries <= 40 && w.everyMs > 0 && total <= 60000;
+      })()`));
 
     // El embudo queda registrado hasta el final, y la confirmación sólo cuenta
     // cuando la dice el SERVIDOR. Sin importes, sin documentos, sin PII.
@@ -330,15 +341,18 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     /_aurixEntApplyToUi\(_aurixEnt\.features\)/.test(boot), boot.slice(0, 160));
   // Y no queda ninguna copia suelta del gesto: tres sitios hacían lo mismo de
   // tres maneras y sólo uno refrescaba «Tus planes».
-  // Los caminos que aprenden un plan confirmado pasan TODOS por el owner. Eran
-  // tres (arranque, revalidación y retorno del checkout) y ahora son cuatro:
-  // «Comprobar estado» es el cuarto, y por eso el número no se fija — lo que se
-  // fija es que no exista un segundo camino que repinte por su cuenta.
+  // Los caminos de COBRO —la espera del retorno, la reanudación al volver a
+  // primer plano y «Comprobar estado»— ya no llaman al owner cada uno por su
+  // lado: pasan por `_aurixBillingConfirmed`, que es quien lo llama. Por eso lo
+  // que se fija no es un RECUENTO de llamadas (subía y bajaba con cada camino
+  // nuevo y no decía nada), sino que ningún camino repinte por su cuenta.
   const applyCalls = (app.match(/_aurixEntApplyToUi\(/g) || []).length;
   ok('BOOT · todos los caminos que confirman plan pasan por el owner único',
-    applyCalls >= 5 &&
-    ['_aurixEntRevalidate', '_aurixBillingReturnFlow', '_aurixBillingRecheck']
-      .every(fn => new RegExp(fn + '[\\s\\S]{0,1800}_aurixEntApplyToUi\\(').test(app)),
+    applyCalls >= 4 &&
+    /function _aurixBillingConfirmed\(st, step\) \{[\s\S]{0,600}_aurixEntApplyToUi\(/.test(app) &&
+    ['_aurixEntRevalidate'].every(fn => new RegExp(fn + '[\\s\\S]{0,1800}_aurixEntApplyToUi\\(').test(app)) &&
+    ['_aurixBillingAwaitServer', '_aurixBillingResumeIfPending', '_aurixBillingRecheck']
+      .every(fn => new RegExp(fn + '[\\s\\S]{0,1200}_aurixBillingConfirmed\\(').test(app)),
     'definición + ' + (applyCalls - 1) + ' llamadas');
 }
 
