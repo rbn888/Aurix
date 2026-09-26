@@ -22431,7 +22431,18 @@ body.gs-open { overflow: hidden; }
   /* `minmax(0, …)` en las dos pistas: con `1fr` (= `minmax(auto,1fr)`) una cifra larga se niega
      a encoger y la columna se sale de la rejilla. El `min-width: 0` de cada columna es la otra
      mitad de la misma condición. */
+  /* PROPORCIÓN MEDIDA, no elegida. Probé 0,88 / 1,12 para que la columna de edición se alargara y
+     cerrara el hueco que deja debajo: a 1440 el hueco bajaba de 289 a 266 px —nada— y a 1024 el
+     campo numérico caía a 86 px, demasiado estrecho para «2.500» con su unidad. Se vuelve a
+     1,05 / 0,95, y el hueco se ataca donde de verdad ayuda: el ANCHO DE LOS CAMPOS (abajo).
+     Que dos columnas tengan distinta altura no es un defecto — forzarlo sería decoración. */
   .wsbud-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 14px; align-items: start; }
+  /* §10 — LA EDICIÓN RESPIRA: en una columna de ~700 px, cuatro campos por fila dejan 131 px por
+     campo, y un importe de seis dígitos con su unidad va justo. Tres por fila dan ~185 px, que es
+     el mismo ancho cómodo que ya tienen a pantalla completa, y de paso la columna se alarga y el
+     vacío de debajo se reduce. Acotado a Presupuesto dentro de su cuerpo: no se toca la rejilla
+     compartida de las demás capacidades desde aquí. */
+  .wsbud-col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .wsbud-col-view { position: sticky; top: 12px; }
 }
 /* LA VISUALIZACIÓN SE HUNDE: más oscura que la tarjeta de edición, para que la respuesta se lea
