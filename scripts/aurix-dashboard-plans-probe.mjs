@@ -345,6 +345,136 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       notReady.empty === 0, JSON.stringify(notReady));
     await ctx.close();
   }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // WORKSPACE PREMIUM V2 · §16 §17 §18 §21 §22 — LO QUE SÓLO VE UN NAVEGADOR
+  // ════════════════════════════════════════════════════════════════════════
+  // La rejilla, el menú y el interruptor de visibilidad no se pueden certificar leyendo la
+  // hoja de estilos: hay que MEDIR columnas en cada ancho y EJERCITAR el menú con teclado.
+  // Los seis anchos son los del §47, incluidos 360 y 375, que es donde rompen las cosas.
+  {
+    const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    const page = await ctx2.newPage();
+    await mount(page);
+    await seed(page, DOCS); await persona(page, true); await paint(page);
+
+    // §18 — 1 / 2 / 3 columnas REALES, medidas por el motor de layout.
+    const want = [[360, 1], [375, 1], [390, 1], [768, 2], [1024, 3], [1440, 3]];
+    for (const [w, cols] of want) {
+      await page.setViewportSize({ width: w, height: 900 });
+      await page.waitForTimeout(90);
+      const got = await page.evaluate(`(function(){
+        var g=document.querySelector('#wsPlansSection .wspl-grid');
+        return g ? getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length : 0; })()`);
+      ok(`${ENG}.v2.grid ${w}px → ${cols} columna(s)`, got === cols, 'medidas=' + got);
+    }
+
+    // §47 — a 360 px, con el nombre deliberadamente largo, nada se sale y el ⋯ es táctil.
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.waitForTimeout(120);
+    const tight = await page.evaluate(`(function(){
+      var sec=document.getElementById('wsPlansSection');
+      var cards=[].slice.call(sec.querySelectorAll('.wspl-card'));
+      var spill=cards.some(function(c){ var cb=c.getBoundingClientRect();
+        return [].slice.call(c.querySelectorAll('*')).some(function(e){ var b=e.getBoundingClientRect();
+          return b.width && (b.right > cb.right + 1 || b.left < cb.left - 1); }); });
+      // el ⋯ no puede solaparse con el nombre: son hermanos en la misma fila
+      var over=cards.some(function(c){ var n=c.querySelector('.wspl-name'), m=c.querySelector('.wspl-menu');
+        if(!n||!m) return true; var a=n.getBoundingClientRect(), b=m.getBoundingClientRect();
+        return a.right > b.left + 0.5; });
+      var taps=cards.map(function(c){ var m=c.querySelector('.wspl-menu');
+        if(!m) return 0; var r=m.getBoundingClientRect(), af=getComputedStyle(m,'::after');
+        return Math.round(Math.min(parseFloat(af.width)||r.width, parseFloat(af.height)||r.height)); });
+      var doc=document.documentElement;
+      return JSON.stringify({ spill:spill, over:over, taps:taps, hscroll: doc.scrollWidth > doc.clientWidth + 1 });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.360 nada se pinta fuera de su card`, tight.spill === false, JSON.stringify(tight));
+    ok(`${ENG}.v2.360 el ⋯ no se solapa con el nombre`, tight.over === false, JSON.stringify(tight.over));
+    ok(`${ENG}.v2.360 el ⋯ tiene 44 px de área táctil`, tight.taps.every(x => x >= 44), JSON.stringify(tight.taps));
+    ok(`${ENG}.v2.360 sin scroll horizontal`, tight.hscroll === false);
+
+    // §16 — el título se VE en mayúsculas y el DOM sigue siendo una frase.
+    const ttl = await page.evaluate(`(function(){
+      var h=document.querySelector('#wsPlansSection .wspl-title');
+      return JSON.stringify({ txt:h.textContent, tt:getComputedStyle(h).textTransform });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.título en mayúsculas de presentación, no en el DOM`,
+      ttl.tt === 'uppercase' && ttl.txt === 'Tus planes', JSON.stringify(ttl));
+
+    // §17 — cada tarjeta trae el acento de SU capacidad, y no todas el mismo.
+    const acc = await page.evaluate(`(function(){
+      return JSON.stringify([].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card'))
+        .map(function(c){ return [c.getAttribute('data-wspl-accent'),
+          getComputedStyle(c.querySelector('.wspl-ico')).color]; }));})()`).then(JSON.parse);
+    ok(`${ENG}.v2.acento · cada tarjeta declara el suyo`, acc.every(a => !!a[0]), JSON.stringify(acc));
+    ok(`${ENG}.v2.acento · el color del icono cambia de verdad entre capacidades`,
+      new Set(acc.map(a => a[1])).size >= 3, JSON.stringify(acc.map(a => a[1])));
+
+    // §21 — el menú se abre, se cierra con Escape y devuelve el foco.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(90);
+    await page.click('#wsPlansSection .wspl-card[data-wspl-id="d1"] .wspl-menu');
+    await page.waitForTimeout(120);
+    const opened = await page.evaluate(`(function(){
+      var m=document.getElementById('wsPlansMenu');
+      return JSON.stringify({ open:!!m, items: m ? [].slice.call(m.querySelectorAll('[data-wsplmenu-act]')).map(function(b){return b.getAttribute('data-wsplmenu-act');}) : [],
+        inView: m ? (m.getBoundingClientRect().right <= innerWidth + 1 && m.getBoundingClientRect().bottom <= innerHeight + 1) : false });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.menú · se abre con las cinco acciones`,
+      opened.open && opened.items.join(',') === 'open,rename,dup,unpin,del', JSON.stringify(opened.items));
+    ok(`${ENG}.v2.menú · cabe en pantalla`, opened.inView === true);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(120);
+    const closed = await page.evaluate(`(function(){
+      return JSON.stringify({ open: !!document.getElementById('wsPlansMenu'),
+        focus: document.activeElement ? (document.activeElement.className||'') : '' });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.menú · Escape lo cierra y devuelve el foco al ⋯`,
+      closed.open === false && /wspl-menu/.test(closed.focus), JSON.stringify(closed));
+
+    // §22 — «Quitar del Dashboard» OCULTA y NO BORRA, y el viaje de vuelta existe.
+    await page.click('#wsPlansSection .wspl-card[data-wspl-id="d1"] .wspl-menu');
+    await page.waitForTimeout(120);
+    await page.click('#wsPlansMenu [data-wsplmenu-act="unpin"]');
+    await page.waitForTimeout(200);
+    const after = await page.evaluate(`(function(){
+      var ids=[].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){return c.getAttribute('data-wspl-id');});
+      var raw=JSON.parse(localStorage.getItem('aurix_ws_projects_v1')||'[]');
+      var d=raw.find(function(x){return x.id==='d1';});
+      return JSON.stringify({ ids:ids, exists:!!d, hidden:!!(d&&d.dashHidden), deleted:!!(d&&d.deletedAt),
+        inputs: d ? JSON.stringify(d.inputs) : null });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.quitar · desaparece de la sección`, after.ids.indexOf('d1') < 0, JSON.stringify(after.ids));
+    ok(`${ENG}.v2.quitar · el documento SIGUE existiendo, sin tombstone y con sus datos`,
+      after.exists && after.hidden && !after.deleted && after.inputs === JSON.stringify(DOCS[0].inputs), JSON.stringify(after));
+    ok(`${ENG}.v2.quitar · el resto de planes no se ve afectado`, after.ids.length === 4, JSON.stringify(after.ids));
+    // y sobrevive a un repintado (es una preferencia persistida, no un estado de pantalla)
+    await paint(page);
+    await page.waitForTimeout(120);
+    const again = await page.evaluate(`(function(){
+      return JSON.stringify([].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){return c.getAttribute('data-wspl-id');}));})()`).then(JSON.parse);
+    ok(`${ENG}.v2.quitar · sigue oculto tras repintar`, again.indexOf('d1') < 0, JSON.stringify(again));
+    // el interruptor inverso, por su owner
+    await page.evaluate(`(function(){ _wsPlanDashSet('d1', false); return true; })()`);
+    await page.waitForTimeout(180);
+    const back = await page.evaluate(`(function(){
+      var ids=[].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){return c.getAttribute('data-wspl-id');});
+      var raw=JSON.parse(localStorage.getItem('aurix_ws_projects_v1')||'[]');
+      var d=raw.find(function(x){return x.id==='d1';});
+      return JSON.stringify({ ids:ids, flag: d ? ('dashHidden' in d) : null });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.volver · «Añadir al Dashboard» lo devuelve y limpia la marca`,
+      back.ids.indexOf('d1') >= 0 && back.flag === false, JSON.stringify(back));
+
+    // §44 — un presupuesto sin datos no pinta barra.
+    await seed(page, [{ id: 'z1', type: 'monthly_budget', customName: 'Vacío', updatedAt: 9, revision: 1, inputs: {} }]);
+    await paint(page);
+    await page.waitForTimeout(120);
+    const bare = await page.evaluate(`(function(){
+      var sec=document.getElementById('wsPlansSection');
+      return JSON.stringify({ n: sec.querySelectorAll('.wspl-card').length,
+        share: sec.querySelectorAll('.wspl-share').length,
+        metrics: sec.querySelectorAll('.wspl-m').length });})()`).then(JSON.parse);
+    ok(`${ENG}.v2.sin datos · tarjeta sí, barra NO, cifras NO`,
+      bare.n === 1 && bare.share === 0 && bare.metrics === 0, JSON.stringify(bare));
+
+    await page.screenshot({ path: join(OUT, `v2-${ENG}-1440.png`) }).catch(() => {});
+    await ctx2.close();
+  }
   await browser.close();
 }
 

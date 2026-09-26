@@ -27510,25 +27510,50 @@ button.intv14-cmp-clear {
    plantilla quiere, vuelve a un documento que ya es suyo. */
 .wspl-sec { margin: 22px 0 0; }
 .wspl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+/* §16 — EL TÍTULO SE MUESTRA EN MAYÚSCULAS, y se hace con `text-transform` a propósito: el
+   texto del DOM sigue siendo «Tus planes», así que un lector de pantalla lo lee como una
+   frase y no deletreando un grito. El tracking abierto es lo que hace legible una caja alta;
+   sin él, la mayúscula sostenida se lee peor, no mejor. */
 .wspl-title {
-  margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  margin: 0; font-size: 12.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.10em;
   color: var(--text-bright, #fff);
 }
-.wspl-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+/* §18 — 1 / 2 / 3 columnas. `minmax(0, 1fr)` y no `1fr`: la pista necesita poder encoger por
+   debajo de su contenido, porque `1fr` es `minmax(auto, 1fr)` y con un nombre largo la
+   columna se niega a ceder y la tarjeta se sale de la rejilla. El `min-width: 0` de la
+   tarjeta es la otra mitad de la misma condición — hacen falta las dos. */
+.wspl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: stretch; }
+@media (min-width: 640px)  { .wspl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
+@media (min-width: 1024px) { .wspl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } }
+/* §16/§17 — SE DIFERENCIAN DE LAS TARJETAS PATRIMONIALES. Aquélla es sobria porque publica un
+   hecho del patrimonio; ésta es trabajo personal, así que lleva el acento de su capacidad en
+   el filete superior y en el pozo del icono. El acento es un TONO, no un relleno: el fondo
+   sigue siendo la escalera de elevación y nunca alfa blanca (lección de GLOBAL POLISH). */
 .wspl-card {
+  position: relative; overflow: hidden;
   display: flex; flex-direction: column; gap: 10px; min-width: 0;
   padding: 14px; border-radius: 16px;
   border: 1px solid rgba(74,130,240,0.16);
-  /* Sin alfa BLANCA: sobre el lienzo oscuro se lee como gris neutro y rompe la
-     escalera de elevación (la lección de GLOBAL POLISH). */
   background: var(--elev-1);
+  --wspl-a: 74,130,240;          /* azul Aurix por defecto */
+  --wspl-b: 120,170,255;
 }
+.wspl-card.is-teal   { --wspl-a: 45,190,180;  --wspl-b: 255,138,112; }
+.wspl-card.is-green  { --wspl-a: 64,190,120;  --wspl-b: 235,180,72;  }
+.wspl-card.is-blue   { --wspl-a: 74,130,240;  --wspl-b: 120,170,255; }
+.wspl-card.is-violet { --wspl-a: 150,120,245; --wspl-b: 96,150,255;  }
+.wspl-card::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 2px;
+  background: linear-gradient(90deg, rgba(var(--wspl-a),0.85), rgba(var(--wspl-b),0.35) 70%, transparent);
+}
+.wspl-card { border-color: rgba(var(--wspl-a), 0.22); }
 .wspl-card-id { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .wspl-ico {
   flex: 0 0 auto; display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 10px;
-  color: var(--aurix-blue, #4A82F0);
-  background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.22);
+  color: rgb(var(--wspl-a));
+  background: rgba(var(--wspl-a), 0.12); border: 1px solid rgba(var(--wspl-a), 0.24);
 }
 .wspl-ico .wsfc-cap-svg { width: 20px; height: 20px; }
 .wspl-card-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -27539,6 +27564,35 @@ button.intv14-cmp-clear {
   overflow-wrap: anywhere;
 }
 .wspl-type { font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
+/* §21 — EL ⋯ TIENE ESPACIO PROPIO, no se posa encima del contenido. Empuja al nombre por la
+   rejilla (`margin-left:auto` sobre un flex con `min-width:0` en el texto), así que un nombre
+   largo se parte pero nunca pasa por debajo del botón. Área táctil de 44 px por pseudoelemento
+   —como ya hace `.wsh-pin`— para no crecer visualmente. */
+.wspl-menu {
+  flex: 0 0 auto; margin-left: auto; position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border-radius: 8px;
+  font: inherit; font-size: 17px; line-height: 1; cursor: pointer;
+  color: var(--text-muted, #8aa0c4);
+  background: transparent; border: 1px solid transparent;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+.wspl-menu::after { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+.wspl-menu:hover { color: var(--text-bright, #fff); background: rgba(var(--wspl-a), 0.14); border-color: rgba(var(--wspl-a), 0.26); }
+.wspl-menu:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+/* §11/§17 — LA PROPORCIÓN, cuando se puede medir. Dos cajas, sin librería y sin canvas. La
+   anchura viene del motor; aquí no se decide ningún número. Si no hubiera dato, este nodo no
+   se pinta: preferimos una tarjeta sin barra a una barra sin verdad. */
+.wspl-share {
+  display: flex; width: 100%; height: 6px; border-radius: 999px; overflow: hidden;
+  background: rgba(var(--wspl-b), 0.16);
+}
+.wspl-share-a { display: block; height: 100%; background: rgba(var(--wspl-a), 0.85); transition: width 260ms ease; }
+.wspl-share-b { display: block; height: 100%; flex: 1 1 auto; background: rgba(var(--wspl-b), 0.55); }
+@media (prefers-reduced-motion: reduce) {
+  .wspl-share-a { transition: none; }
+  .wspl-menu { transition: none; }
+}
 .wspl-metrics { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .wspl-m { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .wspl-m i { font-style: normal; font-size: 12px; color: var(--text-muted); }
@@ -27547,6 +27601,10 @@ button.intv14-cmp-clear {
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
 .wspl-go {
+  /* §18 — el CTA se ALINEA entre tarjetas: `margin-top:auto` lo empuja al pie, así que tres
+     tarjetas con distinta cantidad de métricas siguen presentando su acción a la misma
+     altura sin fijar una altura de tarjeta (que partiría un nombre largo). */
+  margin-top: auto;
   align-self: flex-start; font: inherit; cursor: pointer;
   min-height: 44px; padding: 0 16px; border-radius: 999px;
   font-size: 13px; font-weight: 600; color: #aecbff;

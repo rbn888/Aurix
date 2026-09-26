@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '719'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '720'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6236,6 +6236,18 @@ const T = {
     // Presupuesto todavía no tiene, y nombrarlo sería inventarlo.
     wspl_title:           'Tus planes',
     wspl_continue:        'Continuar',
+    wspl_menu:            'Más opciones',
+    wspl_a_open:          'Abrir',
+    wspl_a_rename:        'Editar nombre',
+    wspl_a_dup:           'Duplicar',
+    wspl_a_unpin:         'Quitar del Dashboard',
+    wspl_a_del:           'Eliminar',
+    wspl_share_in:        'ingresos',
+    wspl_share_out:       'gastos',
+    wspl_share_done:      'cobrado',
+    wspl_share_due:       'pendiente',
+    wsmse_dash_add:       'Añadir al Dashboard',
+    wsmse_dash_remove:    'Quitar del Dashboard',
     wspl_empty:           'Todavía no has guardado ningún plan.',
     wspl_empty_cta:       'Ver plantillas',
     wspl_loading:         'Comprobando tus planes guardados…',
@@ -9048,6 +9060,18 @@ const T = {
     wsfc_pending:      'Preparing your workspace…',
     wspl_title:           'Your plans',
     wspl_continue:        'Continue',
+    wspl_menu:            'More options',
+    wspl_a_open:          'Open',
+    wspl_a_rename:        'Rename',
+    wspl_a_dup:           'Duplicate',
+    wspl_a_unpin:         'Remove from Dashboard',
+    wspl_a_del:           'Delete',
+    wspl_share_in:        'income',
+    wspl_share_out:       'expenses',
+    wspl_share_done:      'collected',
+    wspl_share_due:       'pending',
+    wsmse_dash_add:       'Add to Dashboard',
+    wsmse_dash_remove:    'Remove from Dashboard',
     wspl_empty:           'You have not saved any plan yet.',
     wspl_empty_cta:       'See templates',
     wspl_loading:         'Checking your saved plans…',
@@ -21911,6 +21935,18 @@ function _wsSpaceMenu(ref, anchor) {
   items.push({ k: 'open', label: t('wsh_proj_open') });
   if (!isPinned) items.push({ k: 'rename', label: t('wsg_act_rename') });
   items.push({ k: 'top', label: t('wsmse_menu_top') });
+  // §22 — GUARDAR y ESTAR EN EL DASHBOARD son acciones distintas, así que el interruptor
+  // tiene que existir en los DOS sentidos o «Quitar del Dashboard» sería una puerta sin
+  // vuelta. Se ofrece sólo donde significa algo: las clases de documento que el Resumen
+  // publica (`_WSPL_TYPES`). Para el resto no se pinta un elemento que no haría nada.
+  const dashDoc = (function () {
+    if (isPinned || ref.indexOf('workspace:') !== 0) return null;
+    try {
+      const d = _ws4Projects().find(x => x && x.id === ref.slice(10));
+      return (d && _WSPL_TYPES[d.type]) ? d : null;
+    } catch (_) { return null; }
+  })();
+  if (dashDoc) items.push({ k: 'dash', label: t(dashDoc.dashHidden === true ? 'wsmse_dash_add' : 'wsmse_dash_remove') });
   items.push({ k: 'remove', label: t('wspin_remove'), cls: '' });
   if (!isPinned) items.push({ k: 'delete', label: t('wsmse_del_ok'), cls: 'is-danger' });
   const menu = document.createElement('div');
@@ -21924,6 +21960,7 @@ function _wsSpaceMenu(ref, anchor) {
     const act = b.getAttribute('data-wsmenu-act'); close();
     if (act === 'open') { isPinned ? _wsPinOpen(ref) : _wsxOpen(ref); }
     else if (act === 'top') { _wsSpaceToggleTop(ref); reb(); }
+    else if (act === 'dash') { if (dashDoc) { _wsPlanDashSet(dashDoc.id, dashDoc.dashHidden !== true); reb(); } }
     else if (act === 'rename') { const cur = (_wshAllProjects().find(x => x.ref === ref) || {}).name || ''; _wsPrompt({ title: t('wsmse_rename_title'), current: cur, okLabel: t('wsmse_rename_save'), onOk: v => { _wsRename(ref, v); reb(); } }); }
     else if (act === 'remove') { if (isPinned) { _wsTogglePin(ref); reb(); } else { _wsModal2({ title: t('wsmse_remove_title'), text: t('wsmse_remove_text'), okLabel: t('wsmse_remove_ok'), danger: false, onOk: () => { _wsSpaceHide(ref); reb(); } }); } }
     else if (act === 'delete') { _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true, onOk: () => { _wsxAct('del', ref); } }); }
@@ -22923,11 +22960,17 @@ function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? a
 // `sim: true` marca las que son SIMULACIÓN —proyecciones sobre supuestos, no
 // hechos patrimoniales— porque su tarjeta tiene que decirlo: un capital final
 // proyectado y un saldo de cobros pendiente no son la misma clase de número.
+// `accent` es la IDENTIDAD de la capacidad dentro del sistema común (§4): no un color
+// suelto por tarjeta, sino la misma familia que ya usa su icono, publicada como clase para
+// que el tono viva en la hoja de estilos y no en el HTML. `share` declara si esta clase de
+// documento admite una proporción CIERTA —dos magnitudes del MISMO motor— y con qué
+// vocabulario se etiqueta. Sin `share` la tarjeta se queda en identidad: no se dibuja una
+// barra de algo que no se puede medir (§44).
 const _WSPL_TYPES = Object.freeze({
-  monthly_budget:        { tool: 'budget',      nameKey: 'wstool_budget_n',     icon: 'split'   },
-  receivables_app:       { tool: 'receivables', nameKey: 'wsapp_receivables_n', icon: 'receipt' },
-  trade_journal:         { tool: 'journal',     nameKey: 'wstool_journal_n',    icon: 'log'     },
-  real_estate_portfolio: { tool: 'realestate',  nameKey: 'wsre_n',              icon: 'house'   },
+  monthly_budget:        { tool: 'budget',      nameKey: 'wstool_budget_n',     icon: 'split',   accent: 'teal',   share: 'budget' },
+  receivables_app:       { tool: 'receivables', nameKey: 'wsapp_receivables_n', icon: 'receipt', accent: 'green',  share: 'recv'   },
+  trade_journal:         { tool: 'journal',     nameKey: 'wstool_journal_n',    icon: 'log',     accent: 'blue'    },
+  real_estate_portfolio: { tool: 'realestate',  nameKey: 'wsre_n',              icon: 'house',   accent: 'violet'  },
   // ── SÓLO PLANTILLAS ──────────────────────────────────────────────────────
   // Aquí vivían también los documentos de las tres HERRAMIENTAS (interés
   // compuesto, préstamos, escenarios). El contrato de producto los separa: el
@@ -22952,6 +22995,11 @@ function _wsPlansDocs() {
   try { list = _ws4Projects(); } catch (_) { return []; }
   return list
     .filter(p => p && p.id && _WSPL_TYPES[p.type])
+    // §22 — GUARDAR y ESTAR EN EL DASHBOARD son dos cosas distintas. `dashHidden` vive en el
+    // PROPIO documento (mismo almacén, mismo id, misma sincronización), así que esta sección
+    // sigue sin tener estado propio y hereda el aislamiento por cuenta y el cross-device.
+    // AUSENCIA = VISIBLE: ningún usuario existente pierde de vista un plan por este cambio.
+    .filter(p => p.dashHidden !== true)
     .filter(p => { try { return _wsToolAccess(_WSPL_TYPES[p.type].tool).ok === true; } catch (_) { return false; } })
     .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
 }
@@ -23057,6 +23105,123 @@ function _wsPlansEmptyState() {
   if (_wsDocTableState === 'no') return 'empty';    // no hay tabla: lo local ES todo lo que hay
   return 'loading';
 }
+// LA PROPORCIÓN SE MIDE, NO SE ILUSTRA. Dos magnitudes del MISMO motor que ya calcula las
+// métricas de la tarjeta —no hay una segunda matemática— y sólo si las dos son ciertas y su
+// suma es positiva. Si el documento no da para eso se devuelve `null` y la tarjeta se queda en
+// su identidad: una barra inventada sería exactamente el «fake data» que el §44 prohíbe, y un
+// 50/50 por defecto es la peor de las invenciones porque parece un dato.
+function _wsPlanShare(p) {
+  const spec = _WSPL_TYPES[p && p.type];
+  if (!spec || !spec.share) return null;
+  const inp = (p && p.inputs) || {};
+  try {
+    if (spec.share === 'budget') {
+      const r = calculateMonthlyBudget(inp);
+      const a = Number(r.income), b = Number(r.expenses);
+      if (!Number.isFinite(a) || !Number.isFinite(b) || !((a + b) > 0)) return null;
+      return { a: a, b: b, ka: 'wspl_share_in', kb: 'wspl_share_out' };
+    }
+    if (spec.share === 'recv') {
+      const r = calculateReceivables(inp.items);
+      if (!r || !r.count) return null;
+      // EL ORDEN DE LA BARRA ES EL ORDEN DE LAS CIFRAS. Lo destapó la captura: la barra
+      // empezaba por «cobrado» y la primera métrica debajo era «pendiente», así que el
+      // tramo de la izquierda y el número de la izquierda hablaban de cosas distintas.
+      // `_wsPlanMetrics` publica pendiente y luego cobrado; la barra hace lo mismo.
+      const a = Number(r.totalPendiente), b = Number(r.totalCobrado);
+      if (!Number.isFinite(a) || !Number.isFinite(b) || !((a + b) > 0)) return null;
+      return { a: a, b: b, ka: 'wspl_share_due', kb: 'wspl_share_done' };
+    }
+  } catch (_) { return null; }
+  return null;
+}
+// La barra es SVG-menos: dos cajas con su ancho en porcentaje. Sin librería, sin canvas y sin
+// animación permanente (§39). El `aria-label` publica la proporción en palabras porque una
+// barra sin texto no es un dato para quien usa lector de pantalla (§38).
+function _wsPlanShareHtml(sh) {
+  if (!sh) return '';
+  const esc = _intccEsc;
+  const tot = sh.a + sh.b;
+  const pa = Math.max(0, Math.min(100, (sh.a / tot) * 100));
+  const lbl = Math.round(pa) + '% ' + t(sh.ka) + ' · ' + (100 - Math.round(pa)) + '% ' + t(sh.kb);
+  return '<span class="wspl-share" role="img" aria-label="' + esc(lbl) + '">'
+    + '<span class="wspl-share-a" style="width:' + pa.toFixed(2) + '%"></span>'
+    + '<span class="wspl-share-b"></span></span>';
+}
+// §21 — EL MENÚ DE UNA INSTANCIA GUARDADA. Reutiliza el componente que ya existe en Mi espacio
+// (`.wsmse-menu`: Escape, clic fuera, reposicionamiento si no cabe abajo) en vez de traer un
+// segundo patrón de menú al producto. Las acciones son las que EXISTEN como owners: abrir por
+// el mismo gate que revalida el derecho, renombrar por `_wsRename`, duplicar y eliminar por
+// `_wsxAct`. «Quitar del Dashboard» NO borra nada: apaga la visibilidad en esta sección y el
+// documento sigue en su almacén, accesible desde su capacidad y desde Mi espacio, que es donde
+// se vuelve a encender.
+function _wsPlansMenu(anchor, id) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsPlansMenu');
+  if (prev) prev.remove();
+  const items = [
+    { k: 'open',   label: t('wspl_a_open') },
+    { k: 'rename', label: t('wspl_a_rename') },
+    { k: 'dup',    label: t('wspl_a_dup') },
+    { k: 'unpin',  label: t('wspl_a_unpin') },
+    { k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' },
+  ];
+  const menu = document.createElement('div');
+  menu.id = 'wsPlansMenu'; menu.className = 'wsmse-menu';
+  menu.setAttribute('role', 'menu');
+  menu.innerHTML = items.map(it => '<button type="button" role="menuitem" class="wsmse-menu-item ' + (it.cls || '')
+    + '" data-wsplmenu-act="' + it.k + '">' + esc(it.label) + '</button>').join('');
+  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey); document.removeEventListener('click', onDoc, true); };
+  const onKey = e => { if (e.key === 'Escape') { close(); try { anchor.focus(); } catch (_) {} } };
+  const onDoc = e => { if (!menu.contains(e.target)) close(); };
+  menu.addEventListener('click', e => {
+    const b = e.target.closest ? e.target.closest('[data-wsplmenu-act]') : null; if (!b) return;
+    const act = b.getAttribute('data-wsplmenu-act'); close();
+    const ref = 'workspace:' + id;
+    if (act === 'open') { _wsPlansOpen(id); return; }
+    if (act === 'rename') {
+      let cur = ''; try { const d = _ws4Projects().find(x => x && x.id === id); cur = (d && d.customName) || ''; } catch (_) {}
+      _wsPrompt({ title: t('wsmse_rename_title'), current: cur, okLabel: t('wsmse_rename_save'),
+        onOk: v => { _wsRename(ref, v); _wsPlansRepaint(); } });
+      return;
+    }
+    if (act === 'dup')   { try { _wsxAct('dup', ref); } catch (_) {} _wsPlansRepaint(); return; }
+    if (act === 'unpin') { _wsPlanDashSet(id, true); return; }
+    if (act === 'del')   {
+      _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true,
+        onOk: () => { try { _ws4Tombstone(id); } catch (_) {} _wsPlansRepaint(); } });
+    }
+  });
+  document.body.appendChild(menu);
+  try {
+    const r = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 210;
+    let left = r.right - mw; if (left < 8) left = 8;
+    let top = r.bottom + 6; if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+    menu.style.left = left + 'px'; menu.style.top = top + 'px';
+  } catch (_) {}
+  setTimeout(() => document.addEventListener('click', onDoc, true), 0);
+  document.addEventListener('keydown', onKey);
+  try { const f = menu.querySelector('.wsmse-menu-item'); if (f) f.focus(); } catch (_) {}
+}
+// La visibilidad en el Dashboard se escribe EN EL DOCUMENTO, por su propio owner de
+// persistencia, así que sube con el mismo push y llega al otro dispositivo como cualquier otro
+// campo. Se sella con `_wsDocStamp` a través de `_ws4Persist` porque sin sello nuevo la
+// sincronización union-by-ts no lo subiría: un cambio que no viaja no es una preferencia.
+function _wsPlanDashSet(id, hidden) {
+  try {
+    const d = _ws4Projects().find(x => x && x.id === id);
+    if (!d) return false;
+    if (hidden) d.dashHidden = true; else delete d.dashHidden;
+    _ws4Persist(d);
+  } catch (_) { return false; }
+  _wsPlansRepaint();
+  return true;
+}
+function _wsPlansRepaint() {
+  try { updateDashboardPlans(); } catch (_) {}
+  try { if (typeof _wshRepaintHome === 'function' && _wshView === 'home') _wshRepaintHome(); } catch (_) {}
+}
 function _renderDashboardPlans() {
   const esc = _intccEsc;
   const docs = _wsPlansDocs();
@@ -23072,15 +23237,23 @@ function _renderDashboardPlans() {
   const cards = docs.map(p => {
     const spec = _WSPL_TYPES[p.type];
     const mets = _wsPlanMetrics(p);
+    const share = _wsPlanShareHtml(_wsPlanShare(p));
+    const nm = _wsLabel('workspace', p);
     return `
-      <article class="wspl-card" data-wspl-id="${esc(p.id)}">
+      <article class="wspl-card is-${esc(spec.accent || 'blue')}" data-wspl-id="${esc(p.id)}" data-wspl-accent="${esc(spec.accent || 'blue')}">
         <div class="wspl-card-id">
           <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
           <span class="wspl-card-txt">
-            <span class="wspl-name">${esc(_wsLabel('workspace', p))}</span>
+            <span class="wspl-name">${esc(nm)}</span>
             <span class="wspl-type">${esc(t(spec.nameKey))}</span>
           </span>
+          <button type="button" class="wspl-menu" data-wspl-menu="${esc(p.id)}"
+            aria-haspopup="true" aria-expanded="false"
+            title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + nm)}">
+            <span aria-hidden="true">&#8943;</span>
+          </button>
         </div>
+        ${share}
         ${mets.length ? `<div class="wspl-metrics">${mets.map(x =>
           `<span class="wspl-m"><i>${esc(x.k)}</i><b>${esc(x.v)}</b></span>`).join('')}</div>` : ''}
         ${spec.sim ? `<span class="wspl-sim">${esc(t('wspl_sim'))}</span>` : ''}
@@ -23179,8 +23352,10 @@ function _wsPlansWireOnce() {
       try { switchTab(dest === 'workspace' ? 'workspace' : 'intelligence'); } catch (_) {}
       return;
     }
-    const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-templates],[data-ws-sync-retry]') : null;
+    const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-menu],[data-wspl-templates],[data-ws-sync-retry]') : null;
     if (!el || !el.closest('#wsPlansSection')) return;
+    const mid = el.getAttribute('data-wspl-menu');
+    if (mid) { e.preventDefault(); e.stopPropagation(); _wsPlansMenu(el, mid); return; }
     if (el.hasAttribute('data-ws-sync-retry')) { try { _wsDocsRetry(); } catch (_) {} return; }
     if (el.hasAttribute('data-wspl-templates')) {
       _wshView = 'home'; _wsTab = 'templates';

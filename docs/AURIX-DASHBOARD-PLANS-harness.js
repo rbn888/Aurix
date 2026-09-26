@@ -50,7 +50,12 @@ function ctx(opts) {
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    'calculateMonthlyBudget','calculateReceivables','calculateRealEstatePortfolio','_wsRecvStatus',
    '_wsPlanMoney',
-   '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState','_renderDashboardPlans']
+   '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState',
+   // SPRINT WORKSPACE PREMIUM V2 §17/§21 — la tarjeta publica ahora su proporción medida y su
+   // menú, así que sus owners entran al sandbox: si faltaran, el render lanzaría y este
+   // harness sería el primero en decirlo (es lo que pasó al añadirlos).
+   '_wsPlanShare','_wsPlanShareHtml',
+   '_renderDashboardPlans']
     .forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
   if (opts.docs) vm.runInContext('localStorage.setItem(_WSH_PROJECTS_KEY, ' + JSON.stringify(JSON.stringify(opts.docs)) + ');', sb);
   return sb;
@@ -279,10 +284,127 @@ console.log('\n5 · Una simulación nunca es patrimonio:');
   ok('5.3 la sección no alimenta Intelligence ni siembra el alta de activos',
     !/_aurixIntel|intelligence|_intcc|_intv|factLedger|_aurixFacts|openModal\(|prefill|seedAsset/i.test(allNoEsc),
     (allNoEsc.match(/intelligence|_intcc|openModal\(|prefill/gi) || []).join(' '));
-  // Y no escribe NADA: una vista que persiste es una vista que puede corromper
-  // el documento que sólo venía a enseñar.
-  ok('5.4 y sigue sin escribir en ningún almacén (ni local, ni remoto)',
+  // Y EL CAMINO DE PINTADO no escribe NADA: una vista que persiste al renderizar es una vista
+  // que puede corromper el documento que sólo venía a enseñar.
+  ok('5.4 el camino de PINTADO no escribe en ningún almacén (ni local, ni remoto)',
     !/setItem|removeItem|_ws4Persist|_wshWriteStore|\.upsert\(|\.insert\(|\.update\(/.test(all));
+  // SPRINT WORKSPACE PREMIUM V2 §22 — SE RE-ENUNCIA CON CAUSA. Antes este assert decía «la
+  // sección no escribe nada» sobre el conjunto entero, y era cierto porque la sección no tenía
+  // ninguna preferencia que guardar. Ahora sí la tiene: si «guardar» y «estar en el Dashboard»
+  // son acciones distintas (§22), la segunda es una ELECCIÓN del usuario y tiene que sobrevivir
+  // a un refresco y llegar al otro dispositivo. Lo que el invariante protegía de verdad —que
+  // esta vista no cree una SEGUNDA persistencia ni toque patrimonio— se sigue afirmando: el
+  // único escritor es `_wsPlanDashSet`, escribe UN campo del documento por el owner que ya
+  // existía (`_ws4Persist`) y no aparece en el camino de pintado.
+  const writer = fnSrc('_wsPlanDashSet');
+  ok('5.5 la preferencia de Dashboard se escribe por el owner EXISTENTE, sin almacén nuevo',
+    /_ws4Persist\(/.test(writer) && !/setItem|removeItem|_wshWriteStore|\.upsert\(|\.insert\(/.test(writer),
+    writer.slice(0, 0) || 'ok');
+  ok('5.6 …y ese escritor sigue sin tocar patrimonio',
+    !/assets|holdings|portfolio(Total|Value)|totalValueUSD|addAsset/.test(writer));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 6 · WORKSPACE PREMIUM V2 — §16 §17 §18 §21 §22
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
+{
+  const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
+  const block = css.slice(css.indexOf('.wspl-sec'), css.indexOf('.wspl-sec') + 6000);
+
+  // §16 — mayúsculas VISUALES. El texto del DOM sigue siendo una frase, que es lo que lee un
+  // lector de pantalla; gritar en el árbol de accesibilidad no es «premium».
+  ok('6.1 el título se muestra en MAYÚSCULAS por presentación, no gritando en el DOM',
+    /\.wspl-title\s*\{[^}]*text-transform:\s*uppercase/.test(block) && /wspl_title:\s*'Tus planes'/.test(app),
+    'css=' + /text-transform:\s*uppercase/.test(block));
+  ok('6.2 …y con tracking, que es lo que hace legible una caja alta',
+    /\.wspl-title\s*\{[^}]*letter-spacing:\s*0\.1/.test(block));
+
+  // §18 — 1 / 2 / 3 columnas declaradas, y pistas que PUEDEN encoger.
+  ok('6.3 la rejilla declara 1, 2 y 3 columnas por breakpoint',
+    /\.wspl-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, *1fr\)/.test(block) &&
+    /min-width: *640px\)\s*\{\s*\.wspl-grid\s*\{[^}]*repeat\(2, *minmax\(0, *1fr\)\)/.test(block) &&
+    /min-width: *1024px\)\s*\{\s*\.wspl-grid\s*\{[^}]*repeat\(3, *minmax\(0, *1fr\)\)/.test(block));
+  ok('6.4 el CTA se alinea al pie para que la rejilla no dependa de alturas fijas',
+    /\.wspl-go\s*\{[^}]*margin-top:\s*auto/.test(block));
+
+  // §16/§17 — se diferencia de la tarjeta patrimonial: cada capacidad trae su acento.
+  const accents = R(ctx({ docs: DOCS }), 'Object.keys(_WSPL_TYPES).map(k => _WSPL_TYPES[k].accent)');
+  ok('6.5 cada clase de documento declara su acento', accents.every(a => !!a), JSON.stringify(accents));
+  ok('6.6 …y no son todos el mismo (si lo fueran, no habría identidad)',
+    new Set(accents).size >= 3, String(new Set(accents).size) + ' distintos');
+  const h = R(ctx({ docs: DOCS }), '_renderDashboardPlans()');
+  ok('6.7 la tarjeta publica su acento como clase, no como color en el HTML',
+    /class="wspl-card is-[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h));
+  accents.forEach(a => ok('6.7.' + a + ' el acento ' + a + ' tiene tono propio en la hoja',
+    new RegExp('\\.wspl-card\\.is-' + a + '\\s*\\{[^}]*--wspl-a:').test(block)));
+
+  // §21 — el menú existe, tiene nombre accesible y área táctil.
+  ok('6.8 cada tarjeta ofrece su menú de instancia',
+    (h.match(/data-wspl-menu="/g) || []).length === DOCS.filter(d => !d.deletedAt).length,
+    (h.match(/data-wspl-menu="/g) || []).length + ' menús');
+  ok('6.9 el menú se anuncia con el NOMBRE del plan (no «más opciones» ×3)',
+    /aria-label="Más opciones — /.test(h));
+  ok('6.10 …y su área táctil llega a 44 px sin crecer visualmente',
+    /\.wspl-menu::after\s*\{[^}]*width: *44px;\s*height: *44px/.test(block));
+  const menu = fnSrc('_wsPlansMenu');
+  ok('6.11 reutiliza el componente de menú que YA existe, no trae un segundo patrón',
+    /wsmse-menu/.test(menu) && !/class="wspl-menu-pop/.test(menu));
+  ok('6.12 cierra con Escape y con clic fuera, y devuelve el foco',
+    /Escape/.test(menu) && /removeEventListener\('click'/.test(menu) && /anchor\.focus\(\)/.test(menu));
+  ok('6.13 las acciones delegan en los owners existentes, sin segunda matemática',
+    /_wsPlansOpen\(/.test(menu) && /_wsRename\(/.test(menu) && /_wsxAct\('dup'/.test(menu) && /_ws4Tombstone\(/.test(menu));
+  ok('6.14 eliminar sigue pidiendo confirmación', /_wsModal2\(/.test(menu) && /danger: true/.test(menu));
+
+  // §22 — guardar ≠ estar en el Dashboard, y la ausencia del campo es VISIBLE.
+  const one = DOCS.find(d => d.type === 'monthly_budget' && !d.deletedAt);
+  const visible = R(ctx({ docs: DOCS }), '_wsPlansDocs().map(p => p.id)');
+  ok('6.15 sin el campo, el plan se ve (ningún usuario existente pierde su vista)',
+    visible.indexOf(one.id) >= 0, JSON.stringify(visible));
+  const hidden = R(ctx({ docs: DOCS.map(d => (d.id === one.id ? Object.assign({}, d, { dashHidden: true }) : d)) }),
+    '_wsPlansDocs().map(p => p.id)');
+  ok('6.16 con `dashHidden` desaparece de ESTA vista…', hidden.indexOf(one.id) < 0, JSON.stringify(hidden));
+  ok('6.17 …y NO se borra: sigue en el almacén, con su id y su contenido',
+    R(ctx({ docs: DOCS.map(d => (d.id === one.id ? Object.assign({}, d, { dashHidden: true }) : d)) }),
+      '_ws4Projects().some(p => p.id === ' + JSON.stringify(one.id) + ')') === true);
+  ok('6.18 el resto de planes no se ve afectado', hidden.length === visible.length - 1,
+    hidden.length + ' vs ' + visible.length);
+  const sp = fnSrc('_wsSpaceMenu');
+  ok('6.19 el viaje de VUELTA existe: Mi espacio ofrece volver a añadirlo',
+    /wsmse_dash_add/.test(sp) && /wsmse_dash_remove/.test(sp) && /_wsPlanDashSet\(/.test(sp));
+  ok('6.20 …y sólo donde significa algo (las clases que el Resumen publica)',
+    /_WSPL_TYPES\[/.test(sp));
+
+  // §44 — la proporción se mide o no se pinta.
+  const shareOf = docs => R(ctx({ docs: docs }), '_renderDashboardPlans()');
+  ok('6.21 con datos, la barra se pinta y su anchura sale del motor',
+    /class="wspl-share"/.test(h) && /wspl-share-a" style="width:[0-9.]+%/.test(h));
+  const emptyBudget = [{ id: 'p_empty', type: 'monthly_budget', inputs: {}, createdAt: 1, updatedAt: 1 }];
+  const hEmpty = shareOf(emptyBudget);
+  ok('6.22 sin datos suficientes NO se pinta barra (ni un 50/50 inventado)',
+    !/class="wspl-share"/.test(hEmpty), hEmpty.indexOf('wspl-share') >= 0 ? 'pintó barra' : 'ok');
+  ok('6.23 la proporción se anuncia en palabras para quien no ve la barra',
+    /role="img" aria-label="[0-9]+% /.test(h));
+  // …y coincide con el motor, no con una estimación aparte.
+  const cmp = R(ctx({ docs: DOCS }), '(function(){ var p = _wsPlansDocs().find(x => x.type === "monthly_budget");' +
+    ' var r = calculateMonthlyBudget(p.inputs); var sh = _wsPlanShare(p);' +
+    ' return [r.income, r.expenses, sh.a, sh.b]; })()');
+  ok('6.24 la barra usa EXACTAMENTE las cifras del motor de la plantilla',
+    cmp[0] === cmp[2] && cmp[1] === cmp[3], JSON.stringify(cmp));
+
+  // EL ORDEN DE LA BARRA ES EL ORDEN DE LAS CIFRAS (lo destapó una captura, no un assert):
+  // el tramo de la izquierda y el número de la izquierda tienen que hablar de lo mismo.
+  const ord = R(ctx({ docs: DOCS }), '(function(){ var out = [];' +
+    ' _wsPlansDocs().forEach(function(p){ var sh = _wsPlanShare(p); if (!sh) return;' +
+    '   var ms = _wsPlanMetrics(p); if (!ms.length) return;' +
+    '   out.push([t(sh.ka), ms[0].k]); }); return out; })()');
+  ok('6.26 el primer tramo de la barra y la primera cifra hablan de lo mismo',
+    ord.length > 0 && ord.every(x => String(x[1]).toLowerCase().indexOf(String(x[0]).toLowerCase()) >= 0),
+    JSON.stringify(ord));
+
+  // §12/§38 — movimiento sólo donde aporta, y respetando la preferencia del sistema.
+  ok('6.25 la animación de la barra se desactiva con prefers-reduced-motion',
+    /prefers-reduced-motion: reduce\)\s*\{[^}]*\.wspl-share-a\s*\{\s*transition: *none/.test(block));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
