@@ -149,16 +149,27 @@ section('3 · UN solo camino de cálculo (§26: reordenar la caja, no duplicar e
 section('4 · §27 — las cuatro magnitudes se distinguen sin leer:');
 // ════════════════════════════════════════════════════════════════════════════
 {
+  // FASE 2 — estos KPI fueron el SEGUNDO consumidor que justificó extraer la API de acento: eran
+  // la misma idea que las tarjetas de TUS PLANES, escrita con rgba a mano. Ahora declaran
+  // `data-ws-accent` y el tono lo pone la API. El invariante es el mismo: identidad declarada,
+  // sin color inline, y tres tonos distintos.
   const top = fnSrc('_wsBudgetTopHtml');
-  ok('4.1 cada KPI declara su identidad como clase, no como color en el HTML',
-    /is-in/.test(top) && /is-out/.test(top) && /is-free/.test(top) && !/style="[^"]*color:/.test(top));
-  const bloc = css.slice(css.indexOf('.wsbud-kpi { position'), css.indexOf('.wsbud-kpi { position') + 900);
-  ok('4.2 …y cada identidad tiene tono propio en la hoja',
-    /\.wsbud-kpi\.is-in::before\s*\{[^}]*background:/.test(bloc) &&
-    /\.wsbud-kpi\.is-out::before\s*\{[^}]*background:/.test(bloc) &&
-    /\.wsbud-kpi\.is-free::before\s*\{[^}]*background:/.test(bloc));
+  ok('4.1 cada KPI declara su identidad por la API, no como color en el HTML',
+    /data-ws-accent="in"/.test(top) && /data-ws-accent="out"/.test(top) && /data-ws-accent="info"/.test(top) &&
+    !/style="[^"]*color:/.test(top));
+  // Anclado en el marcador ÚNICO del bloque (ver el mismo detalle en el harness de planes).
+  const apiAt = css.indexOf('FASE 2 · API DE ACENTO');
+  const api = css.slice(apiAt, apiAt + 3400);   // el comentario del contrato ocupa ~2,2 KB: la tabla empieza después
+  ok('4.2 …y cada identidad tiene tono propio en la API compartida',
+    /\[data-ws-accent="in"\]\s*\{[^}]*--ws-a:/.test(api) &&
+    /\[data-ws-accent="out"\]\s*\{[^}]*--ws-a:/.test(api) &&
+    /\[data-ws-accent="info"\]\s*\{[^}]*--ws-a:/.test(api));
+  const tones = ['in', 'out', 'info'].map(k => (new RegExp('\\[data-ws-accent="' + k + '"\\]\\s*\\{\\s*--ws-a: *([0-9, ]+);').exec(api) || [])[1]);
   ok('4.3 los tres tonos son distintos (si fueran iguales no habría identidad)',
-    new Set((bloc.match(/rgba\([0-9, .]+\)/g) || [])).size >= 3);
+    tones.every(Boolean) && new Set(tones.map(x => x.replace(/\s/g, ''))).size === 3, JSON.stringify(tones));
+  // …y el filete lo pinta la API, no una regla por KPI: eso es lo que evita el tercer sitio.
+  ok('4.4 el filete sale de los canales compartidos, sin una regla por magnitud',
+    /\.wsbud-kpi\[data-ws-accent\]::before\s*\{[^}]*rgba\(var\(--ws-a\)/.test(css));
 }
 
 // ════════════════════════════════════════════════════════════════════════════

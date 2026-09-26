@@ -422,7 +422,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // §17 — cada tarjeta trae el acento de SU capacidad, y no todas el mismo.
     const acc = await page.evaluate(`(function(){
       return JSON.stringify([].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card'))
-        .map(function(c){ return [c.getAttribute('data-wspl-accent'),
+        .map(function(c){ return [c.getAttribute('data-ws-accent'),
           getComputedStyle(c.querySelector('.wspl-ico')).color]; }));})()`).then(JSON.parse);
     ok(`${ENG}.v2.acento · cada tarjeta declara el suyo`, acc.every(a => !!a[0]), JSON.stringify(acc));
     ok(`${ENG}.v2.acento · el color del icono cambia de verdad entre capacidades`,
@@ -550,7 +550,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var sec = document.getElementById('wsPlansSection');
       var card = sec.querySelector('.wspl-card[data-wspl-kind="goal"]');
       return JSON.stringify({ card: !!card,
-        accent: card ? card.getAttribute('data-wspl-accent') : null,
+        accent: card ? card.getAttribute('data-ws-accent') : null,
         name: card ? (card.querySelector('.wspl-name') || {}).textContent : null,
         metrics: card ? [].slice.call(card.querySelectorAll('.wspl-m b')).map(function(b){ return b.textContent.trim(); }) : [],
         share: card ? !!card.querySelector('.wspl-share') : false,

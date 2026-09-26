@@ -22483,13 +22483,14 @@ body.gs-open { overflow: hidden; }
 /* §27 — IDENTIDAD DE LAS CUATRO MAGNITUDES. Un filete de 2 px y el tono de la cifra: entra
    (turquesa), sale (coral), queda (azul Aurix). Nada de rellenos de color, que compiten con el
    dato; y el contraste del texto no baja, que es lo que el §38 protege. */
+/* CONSUMEN LA API, no sus propios rgba: los tres KPI declaran `data-ws-accent` y el filete y la
+   cifra salen de los mismos dos canales que usan las tarjetas de TUS PLANES. Es la razón por la
+   que la API existe — antes esto era la misma idea escrita a mano en un segundo sitio. */
 .wsbud-kpi { position: relative; overflow: hidden; }
 .wsbud-kpi::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 2px; background: transparent; }
-.wsbud-kpi.is-in::before   { background: rgba(55,199,184,0.85); }
-.wsbud-kpi.is-out::before  { background: rgba(224,122,159,0.85); }
-.wsbud-kpi.is-free::before { background: rgba(74,130,240,0.9); }
-.wsbud-kpi.is-in b  { color: #5fd8cb; }
-.wsbud-kpi.is-out b { color: #f0a0b8; }
+.wsbud-kpi[data-ws-accent]::before { background: rgba(var(--ws-a), 0.85); }
+.wsbud-kpi[data-ws-accent="in"] b,
+.wsbud-kpi[data-ws-accent="out"] b { color: rgb(var(--ws-b)); }
 @media (prefers-reduced-motion: reduce) { .wsbud-arc { transition: none; } }
 @media (max-width: 720px) {
   .wsbud-result .wstool-res-final { font-size: 38px; }
@@ -27611,6 +27612,49 @@ button.intv14-cmp-clear {
 .wspl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: stretch; }
 @media (min-width: 640px)  { .wspl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
 @media (min-width: 1024px) { .wspl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } }
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   FASE 2 · API DE ACENTO POR CAPACIDAD  —  `data-ws-accent`
+   ══════════════════════════════════════════════════════════════════════════════════════════
+   SE EXTRAE PORQUE YA TENÍA DOS CONSUMIDORES, no «por si acaso» (§5 de la dirección): las
+   tarjetas de TUS PLANES publicaban su acento por un canal propio del namespace `wspl`, y los
+   KPI del Presupuesto repetían la misma idea con rgba escritos a mano. Era la MISMA decisión
+   derivada dos veces, y dos derivaciones de una misma decisión siempre acaban divergiendo.
+
+   EL CONTRATO, y es deliberadamente pequeño:
+   · Un elemento declara su acento con `data-ws-accent="<nombre>"`.
+   · Eso publica DOS canales como custom properties: `--ws-a` (primario) y `--ws-b` (secundario).
+   · Cualquier descendiente los consume con `rgba(var(--ws-a), α)`. Nada más.
+   · CERO color en el HTML: el atributo dice QUÉ acento, la hoja dice cuál es su tono. Un
+     `style="color:…"` en la plantilla es exactamente lo que este contrato impide.
+   · Se hereda por el árbol, así que una superficie lo declara una vez y su icono, su filete, su
+     barra y su menú lo cogen sin repetirlo.
+   NO es un design system ni una consolidación de tokens (§6 de la dirección): son dos variables
+   y una tabla de nombres. Los `--elev-*`, los `--text-*` y los 138 tokens existentes no se
+   tocan aquí.
+   LA FRONTERA, porque se puso a prueba en el primer consumidor: el ACENTO es identidad de
+   superficie y por eso es declarativo (un nombre en el atributo, el tono en la hoja). El color
+   de un DATO de serie es otra cosa — qué categoría de gasto es cada arco del anillo — y ése
+   viene del motor y se encoda en el elemento, igual que el `stroke` de su `<circle>`. Intenté
+   pasar también ese color por la API y sólo consiguió un `--ws-a` inline: la misma cosa que la
+   regla prohíbe, disfrazada. No son el mismo problema y no comparten mecanismo.
+   DOS FAMILIAS a propósito:
+   · de CAPACIDAD — identidad de una herramienta o plantilla (teal, green, blue, violet, plum);
+   · SEMÁNTICA — significado de una cifra (`in` entra, `out` sale, `info` queda). El Presupuesto
+     necesitaba la segunda y no la primera: sus tres KPI no son tres capacidades, son tres
+     magnitudes. Meterlas en la misma tabla evita que mañana existan dos APIs de color. */
+[data-ws-accent] { --ws-a: 74,130,240; --ws-b: 120,170,255; }
+[data-ws-accent="blue"]   { --ws-a: 74,130,240;  --ws-b: 120,170,255; }
+[data-ws-accent="teal"]   { --ws-a: 45,190,180;  --ws-b: 255,138,112; }
+[data-ws-accent="green"]  { --ws-a: 64,190,120;  --ws-b: 235,180,72;  }
+[data-ws-accent="violet"] { --ws-a: 150,120,245; --ws-b: 96,150,255;  }
+/* Objetivos: familia violeta desplazada al magenta para no confundirse con el inmobiliario.
+   Dos superficies con el mismo acento son dos superficies sin identidad. */
+[data-ws-accent="plum"]   { --ws-a: 198,112,214; --ws-b: 132,124,250; }
+/* Semánticos: lo que ENTRA, lo que SALE y lo que QUEDA. */
+[data-ws-accent="in"]     { --ws-a: 55,199,184;  --ws-b: 95,216,203;  }
+[data-ws-accent="out"]    { --ws-a: 224,122,159; --ws-b: 240,160,184; }
+[data-ws-accent="info"]   { --ws-a: 74,130,240;  --ws-b: 120,170,255; }
+
 /* §16/§17 — SE DIFERENCIAN DE LAS TARJETAS PATRIMONIALES. Aquélla es sobria porque publica un
    hecho del patrimonio; ésta es trabajo personal, así que lleva el acento de su capacidad en
    el filete superior y en el pozo del icono. El acento es un TONO, no un relleno: el fondo
@@ -27621,28 +27665,18 @@ button.intv14-cmp-clear {
   padding: 14px; border-radius: 16px;
   border: 1px solid rgba(74,130,240,0.16);
   background: var(--elev-1);
-  --wspl-a: 74,130,240;          /* azul Aurix por defecto */
-  --wspl-b: 120,170,255;
 }
-.wspl-card.is-teal   { --wspl-a: 45,190,180;  --wspl-b: 255,138,112; }
-.wspl-card.is-green  { --wspl-a: 64,190,120;  --wspl-b: 235,180,72;  }
-.wspl-card.is-blue   { --wspl-a: 74,130,240;  --wspl-b: 120,170,255; }
-.wspl-card.is-violet { --wspl-a: 150,120,245; --wspl-b: 96,150,255;  }
-/* §25 — Objetivos entran con acento propio. Se queda en la familia violeta que el SPEC sugiere
-   para objetivos, pero desplazado hacia el magenta para que NO se confunda con el inmobiliario:
-   dos tarjetas con el mismo acento serían dos tarjetas sin identidad. */
-.wspl-card.is-plum   { --wspl-a: 198,112,214; --wspl-b: 132,124,250; }
 .wspl-card::before {
   content: ''; position: absolute; inset: 0 0 auto; height: 2px;
-  background: linear-gradient(90deg, rgba(var(--wspl-a),0.85), rgba(var(--wspl-b),0.35) 70%, transparent);
+  background: linear-gradient(90deg, rgba(var(--ws-a),0.85), rgba(var(--ws-b),0.35) 70%, transparent);
 }
-.wspl-card { border-color: rgba(var(--wspl-a), 0.22); }
+.wspl-card { border-color: rgba(var(--ws-a), 0.22); }
 .wspl-card-id { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .wspl-ico {
   flex: 0 0 auto; display: grid; place-items: center;
   width: 34px; height: 34px; border-radius: 10px;
-  color: rgb(var(--wspl-a));
-  background: rgba(var(--wspl-a), 0.12); border: 1px solid rgba(var(--wspl-a), 0.24);
+  color: rgb(var(--ws-a));
+  background: rgba(var(--ws-a), 0.12); border: 1px solid rgba(var(--ws-a), 0.24);
 }
 .wspl-ico .wsfc-cap-svg { width: 20px; height: 20px; }
 .wspl-card-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -27667,17 +27701,17 @@ button.intv14-cmp-clear {
   transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
 }
 .wspl-menu::after { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
-.wspl-menu:hover { color: var(--text-bright, #fff); background: rgba(var(--wspl-a), 0.14); border-color: rgba(var(--wspl-a), 0.26); }
+.wspl-menu:hover { color: var(--text-bright, #fff); background: rgba(var(--ws-a), 0.14); border-color: rgba(var(--ws-a), 0.26); }
 .wspl-menu:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
 /* §11/§17 — LA PROPORCIÓN, cuando se puede medir. Dos cajas, sin librería y sin canvas. La
    anchura viene del motor; aquí no se decide ningún número. Si no hubiera dato, este nodo no
    se pinta: preferimos una tarjeta sin barra a una barra sin verdad. */
 .wspl-share {
   display: flex; width: 100%; height: 6px; border-radius: 999px; overflow: hidden;
-  background: rgba(var(--wspl-b), 0.16);
+  background: rgba(var(--ws-b), 0.16);
 }
-.wspl-share-a { display: block; height: 100%; background: rgba(var(--wspl-a), 0.85); transition: width 260ms ease; }
-.wspl-share-b { display: block; height: 100%; flex: 1 1 auto; background: rgba(var(--wspl-b), 0.55); }
+.wspl-share-a { display: block; height: 100%; background: rgba(var(--ws-a), 0.85); transition: width 260ms ease; }
+.wspl-share-b { display: block; height: 100%; flex: 1 1 auto; background: rgba(var(--ws-b), 0.55); }
 @media (prefers-reduced-motion: reduce) {
   .wspl-share-a { transition: none; }
   .wspl-menu { transition: none; }

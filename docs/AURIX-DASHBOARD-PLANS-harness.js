@@ -337,10 +337,22 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
   ok('6.6 …y no son todos el mismo (si lo fueran, no habría identidad)',
     new Set(accents).size >= 3, String(new Set(accents).size) + ' distintos');
   const h = R(ctx({ docs: DOCS }), '_renderDashboardPlans()');
-  ok('6.7 la tarjeta publica su acento como clase, no como color en el HTML',
-    /class="wspl-card is-[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h));
-  accents.forEach(a => ok('6.7.' + a + ' el acento ' + a + ' tiene tono propio en la hoja',
-    new RegExp('\\.wspl-card\\.is-' + a + '\\s*\\{[^}]*--wspl-a:').test(block)));
+  // FASE 2 — EL MECANISMO CAMBIA, EL INVARIANTE NO. El acento dejó de ser una clase del
+  // namespace `wspl` y pasó a la API compartida `data-ws-accent`, porque el Presupuesto tenía la
+  // MISMA idea escrita a mano en un segundo sitio. Lo que estos asserts protegen sigue siendo lo
+  // de siempre: que la identidad se DECLARE y no se pinte inline, y que cada acento tenga tono
+  // propio. Se mide el contrato nuevo, no se relaja el viejo.
+  ok('6.7 la tarjeta declara su acento por la API compartida, no como color en el HTML',
+    /class="wspl-card" [^>]*data-ws-accent="[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h),
+    (h.match(/data-ws-accent="[a-z]+"/) || [])[0]);
+  // Se ancla en el marcador ÚNICO del bloque: `indexOf('[data-ws-accent]')` caía en la regla del
+  // Presupuesto, que va antes en el fichero, y la rebanada no contenía la tabla.
+  const apiAt = css.indexOf('FASE 2 · API DE ACENTO');
+  const api = css.slice(apiAt, apiAt + 3400);   // el comentario del contrato ocupa ~2,2 KB: la tabla empieza después
+  accents.forEach(a => ok('6.7.' + a + ' el acento ' + a + ' tiene tono propio en la API',
+    new RegExp('\\[data-ws-accent="' + a + '"\\]\\s*\\{[^}]*--ws-a:').test(api)));
+  ok('6.7b la API es el ÚNICO owner del tono: la tarjeta ya no declara canales propios',
+    !/--wspl-[ab]/.test(css), 'quedan canales del namespace viejo');
 
   // §21 — el menú existe, tiene nombre accesible y área táctil.
   ok('6.8 cada tarjeta ofrece su menú de instancia',
@@ -437,9 +449,9 @@ console.log('\n7 · Objetivos, en el sistema común:');
 
   const h = R(c, '_renderDashboardPlans()');
   ok('7.4 la tarjeta del objetivo declara su kind y su acento propio',
-    /data-wspl-kind="goal"/.test(h) && /class="wspl-card is-plum"/.test(h));
+    /data-wspl-kind="goal"/.test(h) && /data-ws-accent="plum"/.test(h));
   ok('7.5 …y el acento no es el de ninguna otra capacidad (si lo fuera, no habría identidad)',
-    /\.wspl-card\.is-plum\s*\{[^}]*--wspl-a: *198,112,214/.test(fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8')));
+    /\[data-ws-accent="plum"\]\s*\{[^}]*--ws-a: *198,112,214/.test(fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8')));
   ok('7.6 publica lo DECLARADO: meta y acumulado', /Meta/.test(h) && /Acumulado/.test(h));
 
   // §44 + WS.11A — la cifra sale del documento, NUNCA del patrimonio.

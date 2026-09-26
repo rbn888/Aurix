@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '723'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '724'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -23336,7 +23336,7 @@ function _renderDashboardPlans() {
     const nm = goal ? (p.name || t('wsg_title')) : _wsLabel('workspace', p);
     const sub = goal ? t('wsg_type_' + (p.type || 'wealth')) : t(spec.nameKey);
     return `
-      <article class="wspl-card is-${esc(spec.accent || 'blue')}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-wspl-accent="${esc(spec.accent || 'blue')}">
+      <article class="wspl-card" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-ws-accent="${esc(spec.accent || 'blue')}">
         <div class="wspl-card-id">
           <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
           <span class="wspl-card-txt">
@@ -26867,9 +26867,9 @@ function _wsBudgetTopHtml(inp) {
             ingresos y gastos eran dos celdas idénticas y había que leerlas para saber cuál era
             cuál. El acento es un TONO en el filete y la cifra, no un relleno de color. */''}
       <div class="wsbud-kpis">
-        <span class="wsbud-kpi is-in"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
-        <span class="wsbud-kpi is-out"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
-        <span class="wsbud-kpi is-main is-free"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b></span>
+        <span class="wsbud-kpi" data-ws-accent="in"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
+        <span class="wsbud-kpi" data-ws-accent="out"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
+        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b></span>
       </div>
       ${res.deficit ? `<p class="wsb-note is-warn">${esc(String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free))))}</p>` : ''}
     </div>`;
