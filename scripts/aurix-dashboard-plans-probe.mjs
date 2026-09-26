@@ -472,6 +472,94 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${ENG}.v2.sin datos · tarjeta sí, barra NO, cifras NO`,
       bare.n === 1 && bare.share === 0 && bare.metrics === 0, JSON.stringify(bare));
 
+    // ══════════════════════════════════════════════════════════════════════
+    // §25 · OBJETIVOS — EL CICLO DE VIDA COMPLETO, EN NAVEGADOR
+    // ══════════════════════════════════════════════════════════════════════
+    // El «bug declarado» del SPEC (crear no deja un objetivo visible) NO se reproduce: persiste y
+    // se pinta en el acto. Lo que sí faltaba era llegar al Dashboard, y eso es lo que se ejercita.
+    // ACOMODACIÓN DECLARADA: sin sesión OTP el guard de auth programa un rebote a login.html, que
+    // es comportamiento CORRECTO del producto y no tiene nada que ver con objetivos. Se cancela
+    // por su propio owner para poder llegar al acto de crear. No se toca producto.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.evaluate(`(function(){ try { _aurixCancelLoginRedirect('probe'); _aurixMarkSessionConfirmed(); } catch (_) {}
+      localStorage.removeItem('aurix_ws_goals_v1'); switchTab('workspace'); _wsOpenSurface('goals'); return true; })()`);
+    await page.waitForTimeout(500);
+    const gForm = await page.evaluate(`(function(){ return !!document.querySelector('.wsh-wsg [data-wsg-create]'); })()`);
+    ok(`${ENG}.g25 la superficie de Objetivos abre con su acción de crear`, gForm === true);
+    await page.evaluate(`(function(){
+      var r = document.querySelector('.wsh-wsg');
+      r.querySelector('[data-wsg-form="name"]').value = 'Libertad financiera';
+      var tg = r.querySelector('[data-wsg-form="target"]'); tg.value = '250000'; tg.dispatchEvent(new Event('input', { bubbles: true }));
+      var cu = r.querySelector('[data-wsg-form="current"]'); if (cu) { cu.value = '40000'; cu.dispatchEvent(new Event('input', { bubbles: true })); }
+      document.querySelector('[data-wsg-create]').click(); return true; })()`);
+    await page.waitForTimeout(400);
+    const gAfter = await page.evaluate(`(function(){
+      var raw = JSON.parse(localStorage.getItem('aurix_ws_goals_v1') || '[]');
+      return JSON.stringify({ stored: raw.length, name: raw[0] && raw[0].name, target: raw[0] && raw[0].target,
+        pinned: !!(raw[0] && raw[0].dashPinned),
+        cards: document.querySelectorAll('.wsg-card').length,
+        ask: !!document.querySelector('[data-wsg-dash]'),
+        askTap: (function(){ var b = document.querySelector('[data-wsg-dash]'); if (!b) return 0;
+          var r = b.getBoundingClientRect(); return Math.round(r.height); })(),
+        url: location.pathname });})()`).then(JSON.parse);
+    ok(`${ENG}.g25 crear PERSISTE y se ve en el acto (el bug declarado no se reproduce)`,
+      gAfter.stored === 1 && gAfter.cards === 1 && gAfter.name === 'Libertad financiera' && gAfter.target === 250000,
+      JSON.stringify(gAfter));
+    ok(`${ENG}.g25 …y no está en el Dashboard todavía (opt-in)`, gAfter.pinned === false);
+    ok(`${ENG}.g25 §23 pregunta por el Dashboard con una tira, no con un modal`,
+      gAfter.ask === true && gAfter.askTap >= 44, JSON.stringify({ ask: gAfter.ask, tap: gAfter.askTap }));
+
+    // «Ahora no» ⇒ sigue guardado y fuera del Resumen.
+    await page.evaluate(`(function(){ document.querySelector('[data-wsg-dashno]').click(); return true; })()`);
+    await page.waitForTimeout(300);
+    const gNo = await page.evaluate(`(function(){
+      var raw = JSON.parse(localStorage.getItem('aurix_ws_goals_v1') || '[]');
+      switchTab('dashboard'); try { updateDashboardPlans(); } catch (_) {}
+      var sec = document.getElementById('wsPlansSection');
+      return JSON.stringify({ stored: raw.length, pinned: !!(raw[0] && raw[0].dashPinned),
+        onDash: /Libertad financiera/.test(sec ? sec.innerHTML : ''),
+        ask: !!document.querySelector('[data-wsg-dash]') });})()`).then(JSON.parse);
+    ok(`${ENG}.g25 «Ahora no»: guardado sí, Dashboard no, y la pregunta no vuelve`,
+      gNo.stored === 1 && gNo.pinned === false && gNo.onDash === false && gNo.ask === false, JSON.stringify(gNo));
+
+    // Añadirlo por su owner ⇒ aparece con su acento y sus cifras DECLARADAS.
+    await page.evaluate(`(function(){ var id = JSON.parse(localStorage.getItem('aurix_ws_goals_v1'))[0].id;
+      _wsPlanDashSet(id, false, 'goal'); switchTab('dashboard'); try { updateDashboardPlans(); } catch (_) {} return true; })()`);
+    await page.waitForTimeout(350);
+    const gYes = await page.evaluate(`(function(){
+      var sec = document.getElementById('wsPlansSection');
+      var card = sec.querySelector('.wspl-card[data-wspl-kind="goal"]');
+      return JSON.stringify({ card: !!card,
+        accent: card ? card.getAttribute('data-wspl-accent') : null,
+        name: card ? (card.querySelector('.wspl-name') || {}).textContent : null,
+        metrics: card ? [].slice.call(card.querySelectorAll('.wspl-m b')).map(function(b){ return b.textContent.trim(); }) : [],
+        share: card ? !!card.querySelector('.wspl-share') : false,
+        sharePct: card ? (card.querySelector('.wspl-share-a') || {}).style.width : null,
+        menu: card ? !!card.querySelector('[data-wspl-menu]') : false,
+        spill: card ? [].slice.call(card.querySelectorAll('*')).some(function(e){ var b = e.getBoundingClientRect(), cb = card.getBoundingClientRect();
+          return b.width && (b.right > cb.right + 1 || b.left < cb.left - 1); }) : true });})()`).then(JSON.parse);
+    ok(`${ENG}.g25 añadido: la tarjeta aparece con su acento propio`,
+      gYes.card === true && gYes.accent === 'plum' && /Libertad financiera/.test(gYes.name || ''), JSON.stringify(gYes));
+    ok(`${ENG}.g25 …con las cifras DECLARADAS y la proporción 16 %`,
+      gYes.metrics.length === 2 && gYes.share === true && /^16(\.|%)/.test(String(gYes.sharePct)),
+      JSON.stringify({ m: gYes.metrics, pct: gYes.sharePct }));
+    ok(`${ENG}.g25 …su menú ⋯ y nada fuera de la caja`, gYes.menu === true && gYes.spill === false);
+
+    // El ⋯ del objetivo opera sobre SU almacén: quitar no borra.
+    await page.click('#wsPlansSection .wspl-card[data-wspl-kind="goal"] .wspl-menu');
+    await page.waitForTimeout(150);
+    await page.click('#wsPlansMenu [data-wsplmenu-act="unpin"]');
+    await page.waitForTimeout(300);
+    const gUn = await page.evaluate(`(function(){
+      var raw = JSON.parse(localStorage.getItem('aurix_ws_goals_v1') || '[]');
+      var sec = document.getElementById('wsPlansSection');
+      return JSON.stringify({ stored: raw.length, pinned: !!(raw[0] && raw[0].dashPinned),
+        deleted: !!(raw[0] && raw[0].deletedAt), target: raw[0] && raw[0].target,
+        onDash: !!sec.querySelector('.wspl-card[data-wspl-kind="goal"]') });})()`).then(JSON.parse);
+    ok(`${ENG}.g25 quitar del Dashboard NO borra el objetivo`,
+      gUn.stored === 1 && gUn.pinned === false && gUn.deleted === false && gUn.target === 250000 && gUn.onDash === false,
+      JSON.stringify(gUn));
+
     await page.screenshot({ path: join(OUT, `v2-${ENG}-1440.png`) }).catch(() => {});
     await ctx2.close();
   }

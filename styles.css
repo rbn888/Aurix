@@ -27543,6 +27543,10 @@ button.intv14-cmp-clear {
 .wspl-card.is-green  { --wspl-a: 64,190,120;  --wspl-b: 235,180,72;  }
 .wspl-card.is-blue   { --wspl-a: 74,130,240;  --wspl-b: 120,170,255; }
 .wspl-card.is-violet { --wspl-a: 150,120,245; --wspl-b: 96,150,255;  }
+/* §25 — Objetivos entran con acento propio. Se queda en la familia violeta que el SPEC sugiere
+   para objetivos, pero desplazado hacia el magenta para que NO se confunda con el inmobiliario:
+   dos tarjetas con el mismo acento serían dos tarjetas sin identidad. */
+.wspl-card.is-plum   { --wspl-a: 198,112,214; --wspl-b: 132,124,250; }
 .wspl-card::before {
   content: ''; position: absolute; inset: 0 0 auto; height: 2px;
   background: linear-gradient(90deg, rgba(var(--wspl-a),0.85), rgba(var(--wspl-b),0.35) 70%, transparent);
@@ -27593,6 +27597,28 @@ button.intv14-cmp-clear {
   .wspl-share-a { transition: none; }
   .wspl-menu { transition: none; }
 }
+/* §23 — LA PREGUNTA DISCRETA. Una tira dentro de la tarjeta, no un modal: la acción que ofrece es
+   reversible y vive en el ⋯ para siempre, así que no merece interrumpir. Alturas de toque de 44 px
+   porque es un control real, y se envuelve en móvil en vez de comprimir el texto. */
+.wsg-dashq {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  margin: 10px 0 0; padding: 10px 12px; border-radius: 12px;
+  background: rgba(74,130,240,0.08); border: 1px solid rgba(74,130,240,0.20);
+}
+.wsg-dashq-t { flex: 1 1 auto; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--text-bright, #fff); }
+.wsg-dashq-y, .wsg-dashq-n {
+  flex: 0 0 auto; font: inherit; cursor: pointer;
+  min-height: 44px; padding: 0 14px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600;
+  display: inline-flex; align-items: center;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.wsg-dashq-y { color: #aecbff; background: rgba(74,130,240,0.14); border: 1px solid rgba(74,130,240,0.34); }
+.wsg-dashq-y:hover { background: rgba(74,130,240,0.24); color: #cfe0ff; }
+.wsg-dashq-n { color: var(--text-muted, #8aa0c4); background: transparent; border: 1px solid transparent; }
+.wsg-dashq-n:hover { color: var(--text-bright, #fff); }
+.wsg-dashq-y:focus-visible, .wsg-dashq-n:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .wsg-dashq-y, .wsg-dashq-n { transition: none; } }
 .wspl-metrics { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .wspl-m { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .wspl-m i { font-style: normal; font-size: 12px; color: var(--text-muted); }

@@ -44,7 +44,7 @@ function ctx(opts) {
   vm.runInContext('var __GRANT = ' + JSON.stringify(opts.grant === undefined ? true : opts.grant) + '; function hasFeature(){ return __GRANT; } function hasAurixPremiumAccess(){ return __GRANT; } function _aurixEntIsCatalogPreview(){ return false; }', sb);
   vm.runInContext('var __UP = []; function openUpgradeIntent(o){ __UP.push(o); return false; }', sb);
   vm.runInContext('var _wsToolActive=null, _wsToolInputs=null, _wsToolEditId=null, _wsToolDirty=false, _wsReturnTab="tools", _wshView="home";', sb);
-  ['_WSH_PROJECTS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES',
+  ['_WSH_PROJECTS_KEY','_WSH_GOALS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES','_WSPL_GOAL',
    '_WSBUD_INCOME','_WSBUD_EXPENSES'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
@@ -55,9 +55,12 @@ function ctx(opts) {
    // menú, así que sus owners entran al sandbox: si faltaran, el render lanzaría y este
    // harness sería el primero en decirlo (es lo que pasó al añadirlos).
    '_wsPlanShare','_wsPlanShareHtml',
+   // §25 — Objetivos entran a la vista por su propio almacén: sus owners al sandbox.
+   '_wsgGoalsRaw','_wsgGoals','_wsPlansGoals','_wsPlansAll','_wsGoalShare','_wsGoalMetrics',
    '_renderDashboardPlans']
     .forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
   if (opts.docs) vm.runInContext('localStorage.setItem(_WSH_PROJECTS_KEY, ' + JSON.stringify(JSON.stringify(opts.docs)) + ');', sb);
+  if (opts.goals) vm.runInContext('localStorage.setItem(_WSH_GOALS_KEY, ' + JSON.stringify(JSON.stringify(opts.goals)) + ');', sb);
   return sb;
 }
 const R = (c, e) => vm.runInContext(e, c);
@@ -310,7 +313,7 @@ console.log('\n5 · Una simulación nunca es patrimonio:');
 console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
 {
   const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
-  const block = css.slice(css.indexOf('.wspl-sec'), css.indexOf('.wspl-sec') + 6000);
+  const block = css.slice(css.indexOf('.wspl-sec'), css.indexOf('.wspl-sec') + 12000);
 
   // §16 — mayúsculas VISUALES. El texto del DOM sigue siendo una frase, que es lo que lee un
   // lector de pantalla; gritar en el árbol de accesibilidad no es «premium».
@@ -405,6 +408,83 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
   // §12/§38 — movimiento sólo donde aporta, y respetando la preferencia del sistema.
   ok('6.25 la animación de la barra se desactiva con prefers-reduced-motion',
     /prefers-reduced-motion: reduce\)\s*\{[^}]*\.wspl-share-a\s*\{\s*transition: *none/.test(block));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 7 · §25 OBJETIVOS — ENTRAN AL SISTEMA COMÚN, SIN ALMACÉN NUEVO
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n7 · Objetivos, en el sistema común:');
+{
+  const G = [
+    { id: 'g1', name: 'Libertad financiera', type: 'wealth', target: 250000, current: 40000, dashPinned: true, updatedAt: 900, revision: 1 },
+    { id: 'g2', name: 'Sin publicar',        type: 'wealth', target: 100000, current: 0,     updatedAt: 800, revision: 1 },
+    { id: 'g3', name: 'Borrado',             type: 'wealth', target: 50000,  current: 1000,  dashPinned: true, deletedAt: 5, updatedAt: 700, revision: 1 },
+    { id: 'g4', name: 'Sin meta',            type: 'wealth', target: 0,      current: 0,     dashPinned: true, updatedAt: 600, revision: 1 },
+  ];
+  const c = ctx({ docs: DOCS, goals: G });
+
+  // §22 — OPT-IN para objetivos: la ausencia de marca NO los publica. Es lo que impide meter en
+  // el Dashboard de todo el mundo objetivos que nadie pidió (nunca habían podido llegar).
+  const ids = R(c, '_wsPlansGoals().map(g => g.id)');
+  ok('7.1 sólo se publica el objetivo que el usuario AÑADIÓ (opt-in)',
+    ids.indexOf('g1') >= 0 && ids.indexOf('g2') < 0, JSON.stringify(ids));
+  ok('7.2 un objetivo con tombstone no resucita en esta vista', ids.indexOf('g3') < 0, JSON.stringify(ids));
+
+  // La lista es UNA, ordenada por última edición, mezclando los dos almacenes.
+  const all = R(c, '_wsPlansAll().map(x => x.kind + ":" + x.id)');
+  ok('7.3 las dos clases de documento conviven en UNA lista ordenada por edición',
+    all[0] === 'goal:g1' && all.some(x => x.indexOf('workspace:') === 0), JSON.stringify(all));
+
+  const h = R(c, '_renderDashboardPlans()');
+  ok('7.4 la tarjeta del objetivo declara su kind y su acento propio',
+    /data-wspl-kind="goal"/.test(h) && /class="wspl-card is-plum"/.test(h));
+  ok('7.5 …y el acento no es el de ninguna otra capacidad (si lo fuera, no habría identidad)',
+    /\.wspl-card\.is-plum\s*\{[^}]*--wspl-a: *198,112,214/.test(fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8')));
+  ok('7.6 publica lo DECLARADO: meta y acumulado', /Meta/.test(h) && /Acumulado/.test(h));
+
+  // §44 + WS.11A — la cifra sale del documento, NUNCA del patrimonio.
+  const gm = R(c, '(function(){ var g = _wsPlansGoals()[0]; return [_wsGoalMetrics(g).length, _wsGoalShare(g).a, _wsGoalShare(g).b]; })()');
+  ok('7.7 la proporción es acumulado contra lo que falta, con las cifras del documento',
+    gm[0] === 2 && gm[1] === 40000 && gm[2] === 210000, JSON.stringify(gm));
+  const noTgt = R(c, '_wsGoalShare({ id:"x", target:0, current:0 })');
+  ok('7.8 sin meta positiva NO se pinta proporción', noTgt === null, JSON.stringify(noTgt));
+  const goalPath = fnSrc('_wsPlansGoals') + fnSrc('_wsGoalShare') + fnSrc('_wsGoalMetrics');
+  ok('7.9 el camino del objetivo NO lee patrimonio (WS.11A sigue intacto)',
+    !/assets|holdings|portfolio(Total|Value)|totalValueUSD|_ws4Real|calculateGoalProgress/.test(goalPath));
+
+  // §22 — el derecho se pregunta también para objetivos.
+  const denied = R(ctx({ docs: [], goals: G, grant: false }), '_wsPlansGoals().length');
+  ok('7.10 sin derecho efectivo no se publica ni un objetivo', denied === 0, String(denied));
+
+  // §21 — el menú es el MISMO componente, parametrizado por kind, sin segundo patrón.
+  const menu = fnSrc('_wsPlansMenu');
+  ok('7.11 el menú distingue la clase de documento y usa el owner de cada almacén',
+    /kind === 'goal'/.test(menu) && /_wsgDuplicate\(/.test(menu) && /_wsgTombstone\(/.test(menu) &&
+    /_ws4Tombstone\(/.test(menu), 'un solo menú para las dos clases');
+  const setter = fnSrc('_wsPlanDashSet');
+  ok('7.12 el interruptor escribe por `_wsgPersist`, sin almacén paralelo',
+    /_wsgPersist\(/.test(setter) && /_ws4Persist\(/.test(setter) &&
+    !/setItem|_wshWriteStore|\.upsert\(/.test(setter));
+  ok('7.13 …y limpia también la copia de trabajo, o el siguiente Guardar desharía la elección',
+    /_wsgWorking\[id\]/.test(setter));
+
+  // §23 — la pregunta es LIGERA, vive un repintado y no se persiste.
+  const ask = fnSrc('_wsgAskDashHtml') + fnSrc('_wsgCreate');
+  ok('7.14 tras crear se PREGUNTA por el Dashboard, sin modal',
+    /_wsgAskDash = g\.id/.test(ask) && /wsg_dash_q/.test(ask) && !/_wsModal2|_wsConfirm/.test(fnSrc('_wsgAskDashHtml')));
+  ok('7.15 …y esa pregunta no se persiste en ningún almacén',
+    !/setItem|_wsgPersist|_wshWriteStore/.test(fnSrc('_wsgAskDashHtml')));
+  ok('7.16 «Ahora no» deja el objetivo GUARDADO y fuera del Dashboard',
+    /data-wsg-dashno/.test(app) && /_wsgAskDash = null/.test(app));
+
+  // §45 — la asimetría está declarada y es la que preserva lo que cada usuario ya veía.
+  ok('7.17 plantillas opt-OUT y objetivos opt-IN, cada una preservando su estado previo',
+    /dashHidden !== true/.test(fnSrc('_wsPlansDocs')) && /dashPinned === true/.test(fnSrc('_wsPlansGoals')));
+
+  // El vacío sigue siendo honesto cuando no hay NI plantillas NI objetivos.
+  const empty = R(ctx({ docs: [], goals: [] }), '_renderDashboardPlans()');
+  ok('7.18 sin nada de lo uno ni de lo otro, el estado vacío es el de siempre',
+    /wspl-note/.test(empty) && !/wspl-card/.test(empty));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
