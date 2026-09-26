@@ -22406,6 +22406,80 @@ body.gs-open { overflow: hidden; }
 .wsbud-leg i.is-free { background: #2fd98e; }
 .wsbud-leg b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; }
 .wsbud-reading { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-bright); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(120,160,255,0.14); background: rgba(74,130,240,0.07); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   §26/§27 · PRESUPUESTO — REFERENCE IMPLEMENTATION DEL ESTÁNDAR WORKSPACE
+   ══════════════════════════════════════════════════════════════════════════════════════════
+   Lo que había: una columna de cinco tarjetas apiladas, todas sobre el mismo azul oscuro, con
+   el gráfico al final. Lo que cambia es la ESTRUCTURA (dos columnas, respuesta a la derecha) y
+   la ESCALERA DE SUPERFICIES (§2): la edición se levanta y la visualización se HUNDE, así que
+   hay profundidad en vez de un plano uniforme. Ningún tono nuevo inventado: se usan los
+   `--elev-*` que ya existen y el acento de cada categoría que ya declaraba el motor. Sin alfa
+   BLANCA, que sobre el lienzo oscuro se lee como gris neutro y rompe la escalera (GLOBAL POLISH). */
+.wsbud-body { display: flex; flex-direction: column; gap: 12px; }
+/* MÓVIL: EDICIÓN PRIMERO, y es una decisión medida, no la de por defecto. Probé la respuesta
+   delante y dejaba el primer campo en 1028 px: para cambiar un gasto había que cruzar el anillo
+   entero. Y no hacía falta, porque la RESPUESTA YA ESTÁ ARRIBA — el resumen compacto (periodo,
+   ingresos, gastos, disponible) vive fuera de esta rejilla y se ve sin scroll. El anillo es la
+   lectura PROFUNDA («en qué se va»), no la respuesta inmediata, así que va después de la
+   edición, que además coincide con el orden de lectura del escritorio (izquierda → derecha).
+   Los DOS hijos declaran `order` a propósito: si sólo lo hiciera uno, el otro se pintaría antes
+   por su valor inicial 0 — la lección de las cards de Intelligence. */
+.wsbud-col-edit { order: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.wsbud-col-view { order: 2; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@media (min-width: 1024px) {
+  /* `minmax(0, …)` en las dos pistas: con `1fr` (= `minmax(auto,1fr)`) una cifra larga se niega
+     a encoger y la columna se sale de la rejilla. El `min-width: 0` de cada columna es la otra
+     mitad de la misma condición. */
+  .wsbud-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 14px; align-items: start; }
+  .wsbud-col-view { position: sticky; top: 12px; }
+}
+/* LA VISUALIZACIÓN SE HUNDE: más oscura que la tarjeta de edición, para que la respuesta se lea
+   como un panel y no como otro formulario. Es el mismo recurso que la portada Free usó para que
+   ocho celdas dejaran de parecer ocho botones. */
+.wsbud-out-card { background: var(--elev-0, #0b1120); border-color: rgba(120,160,255,0.20); }
+.wsbud-out-card .wstool-res-main { background: rgba(74,130,240,0.08); border-radius: 14px; }
+/* §7 — menos gigantismo: 46 px era un titular, no un dato. */
+.wsbud-result .wstool-res-final { font-size: 34px; }
+@media (max-width: 767px) { .wsbud-result .wstool-res-final { font-size: 30px; } }
+
+/* ── EL ANILLO ─────────────────────────────────────────────────────────────────────────────── */
+.wsbud-donut { position: relative; display: grid; place-items: center; width: 100%; max-width: 208px; margin: 2px auto 4px; }
+.wsbud-donut svg { display: block; width: 100%; height: auto; }
+.wsbud-arc { transition: stroke-dasharray 260ms ease, stroke-dashoffset 260ms ease; }
+.wsbud-donut-c {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; text-align: center;
+  padding: 0 22px; pointer-events: none;
+}
+.wsbud-donut-c i {
+  font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: rgba(159,194,255,0.9);
+}
+/* La cifra del centro tiene que CABER: `anywhere` no vale aquí porque partiría un importe a
+   mitad de dígito, así que se ajusta el tamaño y se permite el salto por el espacio que ya hay. */
+.wsbud-donut-c b {
+  font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--text-bright);
+  font-variant-numeric: tabular-nums; max-width: 100%;
+}
+.wsbud-donut-c b.is-pos { color: #57e6a6; }
+.wsbud-donut-c b.is-neg, .wsbud-dn-neg { color: #ff8a70; }
+/* El centro publica la MAYOR PARTIDA, no un KPI repetido: nombre en su propio color, su peso, y
+   una línea que dice qué es esa cifra — un porcentaje suelto no se sabe de qué es. */
+.wsbud-donut-c b { font-size: 24px; }
+.wsbud-donut-c em { font-style: normal; font-size: 10.5px; color: var(--text-muted); line-height: 1.2; }
+
+/* §27 — IDENTIDAD DE LAS CUATRO MAGNITUDES. Un filete de 2 px y el tono de la cifra: entra
+   (turquesa), sale (coral), queda (azul Aurix). Nada de rellenos de color, que compiten con el
+   dato; y el contraste del texto no baja, que es lo que el §38 protege. */
+.wsbud-kpi { position: relative; overflow: hidden; }
+.wsbud-kpi::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 2px; background: transparent; }
+.wsbud-kpi.is-in::before   { background: rgba(55,199,184,0.85); }
+.wsbud-kpi.is-out::before  { background: rgba(224,122,159,0.85); }
+.wsbud-kpi.is-free::before { background: rgba(74,130,240,0.9); }
+.wsbud-kpi.is-in b  { color: #5fd8cb; }
+.wsbud-kpi.is-out b { color: #f0a0b8; }
+@media (prefers-reduced-motion: reduce) { .wsbud-arc { transition: none; } }
 @media (max-width: 720px) {
   .wsbud-result .wstool-res-final { font-size: 38px; }
   .wsbud-split { grid-template-columns: 1fr; }

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '721'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '722'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6242,6 +6242,7 @@ const T = {
     wspl_a_dup:           'Duplicar',
     wspl_a_unpin:         'Quitar del Dashboard',
     wspl_a_del:           'Eliminar',
+    wsbud_dn_top:         'la mayor partida',
     wspl_m_target:        'Meta',
     wspl_m_saved:         'Acumulado',
     wspl_share_saved:     'acumulado',
@@ -9073,6 +9074,7 @@ const T = {
     wspl_a_dup:           'Duplicate',
     wspl_a_unpin:         'Remove from Dashboard',
     wspl_a_del:           'Delete',
+    wsbud_dn_top:         'largest category',
     wspl_m_target:        'Target',
     wspl_m_saved:         'Saved',
     wspl_share_saved:     'saved',
@@ -26744,6 +26746,48 @@ function _wsBudgetDefaults() {
   return { salary: 2500, extra: 0, otherinc: 0, housing: 700, food: 350, transport: 120, utilities: 110, leisure: 150, education: 50, otherexp: 100 };
 }
 
+// ── §26/§11 · EL REPARTO, EN DONUT ────────────────────────────────────────────────────────────
+// SVG puro con `stroke-dasharray`: ninguna librería, ningún canvas, y el color de cada categoría
+// es el que YA declara `_WSBUD_EXPENSES` — no se inventa una paleta nueva para este gráfico.
+// Sin gastos NO se dibuja: un donut de una sola porción gris no informa de nada y un anillo
+// vacío parece un cero medido (§44). El centro publica el DISPONIBLE, que es la cifra por la que
+// el usuario abre esta plantilla.
+// Accesible: el anillo es `role="img"` con la reparto en palabras, porque un gráfico sin texto no
+// es un dato para quien usa lector de pantalla (§38).
+const _WSBUD_DONUT_R = 52, _WSBUD_DONUT_C = 2 * Math.PI * _WSBUD_DONUT_R;
+function _wsBudgetDonutHtml(res) {
+  const esc = _intccEsc;
+  const items = res.items.filter(it => it.value > 0);
+  if (!(res.expenses > 0) || !items.length) return '';
+  let off = 0;
+  const arcs = items.map(it => {
+    const frac = it.value / res.expenses;
+    const len = frac * _WSBUD_DONUT_C;
+    const seg = '<circle class="wsbud-arc" cx="60" cy="60" r="' + _WSBUD_DONUT_R + '" fill="none"'
+      + ' stroke="' + esc(it.color) + '" stroke-width="14" stroke-linecap="butt"'
+      + ' stroke-dasharray="' + len.toFixed(3) + ' ' + (_WSBUD_DONUT_C - len).toFixed(3) + '"'
+      + ' stroke-dashoffset="' + (-off).toFixed(3) + '"></circle>';
+    off += len;
+    return seg;
+  }).join('');
+  const words = items.map(it => Math.round(it.value / res.expenses * 100) + '% ' + t(it.label)).join(' · ');
+  // EL CENTRO NO REPITE UN KPI. «Disponible» ya está en el resumen de arriba, y decirlo otra vez
+  // aquí es el MISMO defecto de duplicación que este bloque cerró en su día con la tasa de ahorro.
+  // Lo que el anillo no puede decir con precisión es CUÁL manda y cuánto: eso va al centro.
+  const top = items.slice().sort((a, b) => b.value - a.value)[0];
+  const topPct = Math.round(top.value / res.expenses * 100);
+  return '<div class="wsbud-donut">'
+    + '<svg viewBox="0 0 120 120" role="img" aria-label="' + esc(t('wstool_bud_chart_title') + ': ' + words) + '">'
+    + '<circle cx="60" cy="60" r="' + _WSBUD_DONUT_R + '" fill="none" stroke="rgba(120,160,255,0.14)" stroke-width="14"></circle>'
+    + '<g transform="rotate(-90 60 60)">' + arcs + '</g>'
+    + '</svg>'
+    + '<span class="wsbud-donut-c">'
+    +   '<i style="color:' + esc(top.color) + '">' + esc(t(top.label)) + '</i>'
+    +   '<b>' + topPct + '%</b>'
+    +   '<em>' + esc(t('wsbud_dn_top')) + '</em>'
+    + '</span>'
+    + '</div>';
+}
 function _wsBudgetChartHtml(res) {
   const esc = _intccEsc;
   const denom = Math.max(res.income, res.expenses, 1);
@@ -26818,10 +26862,14 @@ function _wsBudgetTopHtml(inp) {
           ${opts.map(k => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(_wsPeriodLabel(k))}</option>`).join('')}
         </select>
       </label>
+      ${/* §27 — LAS CUATRO MAGNITUDES SE DISTINGUEN SIN LEER. Ingresos, gastos y disponible
+            llevan acento propio (entra, sale, queda) y no dependen sólo del rótulo: hasta ahora
+            ingresos y gastos eran dos celdas idénticas y había que leerlas para saber cuál era
+            cuál. El acento es un TONO en el filete y la cifra, no un relleno de color. */''}
       <div class="wsbud-kpis">
-        <span class="wsbud-kpi"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
-        <span class="wsbud-kpi"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
-        <span class="wsbud-kpi is-main"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b></span>
+        <span class="wsbud-kpi is-in"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
+        <span class="wsbud-kpi is-out"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
+        <span class="wsbud-kpi is-main is-free"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b></span>
       </div>
       ${res.deficit ? `<p class="wsb-note is-warn">${esc(String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free))))}</p>` : ''}
     </div>`;
@@ -26856,6 +26904,11 @@ function _wsBudgetOutHtml(inp) {
     </div>
     <div class="wstool-chart wsbud-chartbox">
       <span class="wsbud-chart-title">${esc(t('wstool_bud_chart_title'))}</span>
+      ${/* DOS lecturas del MISMO cálculo, no dos cálculos: el anillo responde «en qué se va» y la
+            barra «cuánto queda». No hay selector de vista porque no hay nada que elegir — las dos
+            caben y responden preguntas distintas, y un selector añadiría estado y una preferencia
+            que guardar para no enseñar la mitad de la respuesta. */''}
+      ${_wsBudgetDonutHtml(res)}
       ${_wsBudgetChartHtml(res)}
     </div>
     ${reading ? `<p class="wsbud-reading">${esc(reading)}</p>` : ''}
@@ -26895,17 +26948,36 @@ function _renderBudgetTool() {
             a esa cifra. Se repinta con cada tecla por su propio contenedor, así
             que no hay un segundo camino de cálculo. */''}
       <section class="wsh-card wsbud-top-card" data-wsbud-top>${_wsBudgetTopHtml(inp)}</section>
-      <section class="wsh-card wstool-inputs-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
-        <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>
-      </section>
-      <section class="wsh-card wstool-inputs-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3></header>
-        <div class="wstool-fields">${_WSBUD_EXPENSES.map(f => field(f.k, t(f.label))).join('')}</div>
-      </section>
-      <section class="wsh-card wstool-out-card">
-        <div class="wstool-out" data-wstool-out>${_wsBudgetOutHtml(inp)}</div>
-      </section>
+      ${/* ── §26 · DOS COLUMNAS EN ESCRITORIO ────────────────────────────────────────────────
+            Lo que había era UNA columna de cinco tarjetas apiladas: el usuario abría la
+            plantilla para saber cuánto le queda y tenía que bajar por diez campos para
+            encontrar el gráfico. Ahora la edición vive a la IZQUIERDA y la respuesta a la
+            DERECHA, así que las dos caben en el primer viewport y editar un campo mueve el
+            anillo sin scroll.
+            LOS OWNERS DE REPINTADO NO CAMBIAN: `data-wsbud-top` y `data-wstool-out` siguen
+            siendo los mismos dos contenedores que se reescriben con cada tecla, así que esto
+            es una reordenación de la caja y no un segundo camino de cálculo.
+            EN MÓVIL el orden es OTRO, no esta rejilla aplastada: el panel de respuesta se
+            declara `order:1` y la edición `order:2`, para que el resultado se vea pronto
+            (§33). Los dos hijos declaran `order` — si sólo lo hiciera uno, el otro se
+            pintaría antes por el valor inicial 0, que es la lección de Intelligence. */''}
+      <div class="wsbud-body">
+        <div class="wsbud-col-edit">
+          <section class="wsh-card wstool-inputs-card">
+            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
+            <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>
+          </section>
+          <section class="wsh-card wstool-inputs-card">
+            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3></header>
+            <div class="wstool-fields">${_WSBUD_EXPENSES.map(f => field(f.k, t(f.label))).join('')}</div>
+          </section>
+        </div>
+        <div class="wsbud-col-view">
+          <section class="wsh-card wstool-out-card wsbud-out-card">
+            <div class="wstool-out" data-wstool-out>${_wsBudgetOutHtml(inp)}</div>
+          </section>
+        </div>
+      </div>
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>

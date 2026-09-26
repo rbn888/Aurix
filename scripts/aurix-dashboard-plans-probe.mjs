@@ -39,7 +39,18 @@ const server = createServer(async (req, res) => {
   } catch (_) { res.writeHead(404).end('nf'); }
 });
 await new Promise(r => server.listen(0, '127.0.0.1', r));
-const ORIGIN = `http://127.0.0.1:${server.address().port}`;
+// CONTRA LO PÚBLICO CUANDO SE PIDE. Mismo idioma que `aurix-ws-firstscreen-probe`, para no
+// inventar un segundo mecanismo: AURIX_WS_URL apunta a los bytes DESPLEGADOS y AURIX_WS_RESOLVE
+// suple que el sandbox no resuelve el dominio. El ÚNICO parche es la navegación de auth —sin
+// sesión OTP el guard rebota a login.html, que es comportamiento correcto y ajeno a lo que se
+// mide— y se aplica interceptando la respuesta del CDN, no editando producto. WebKit no admite
+// regla de resolución, así que contra lo público corre sólo Chromium, y se dice.
+const PUBLIC_URL = String(process.env.AURIX_WS_URL || '').replace(/\/$/, '');
+const RESOLVE = String(process.env.AURIX_WS_RESOLVE || '');
+const ORIGIN = PUBLIC_URL || `http://127.0.0.1:${server.address().port}`;
+const AUTH_PATCH = x => String(x)
+  .replace('function safeRedirect(path, source) {', 'function safeRedirect(path, source) { return false;')
+  .replace(/location\.replace\(base \+ 'login\.html'\)/g, 'void 0');
 
 const PW = process.env.AURIX_PW || '/tmp/aurix-pw/node_modules/playwright/index.mjs';
 let chromium, webkit;
@@ -54,7 +65,7 @@ let pass = 0; const fails = [];
 const ok = (n, c, info) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fails.push(n + (info ? '  [' + info + ']' : '')); console.log('  ✗ ' + n + (info ? '  [' + info + ']' : '')); } };
 
 console.log('AURIX · «TUS PLANES» — Chromium + WebKit');
-console.log('origen: ' + ORIGIN + '  (copia de trabajo)\n');
+console.log('origen: ' + ORIGIN + (PUBLIC_URL ? '  (BYTES DESPLEGADOS)' : '  (copia de trabajo)') + '\n');
 mkdirSync(OUT, { recursive: true });
 
 // Documentos de PRUEBA, nunca reales: dos presupuestos distintos, un nombre
@@ -108,10 +119,19 @@ const read = page => page.evaluate(`(function(){
       return b?Math.round(Math.min(b.width,b.height)):0; }),
   });})()`).then(JSON.parse);
 
+async function newCtx(browser, opts) {
+  const ctx = await browser.newContext(opts);
+  if (PUBLIC_URL) await ctx.route('**/app.js*', async route => {
+    const r = await route.fetch();
+    await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
+  });
+  return ctx;
+}
 for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
-  const browser = await launcher.launch();
+  if (ENG === 'WK' && PUBLIC_URL && RESOLVE) { console.log('  (WebKit omitido contra lo público: no admite regla de resolución)'); continue; }
+  const browser = await launcher.launch({ args: (ENG === 'CR' && RESOLVE) ? ['--host-resolver-rules=MAP ' + RESOLVE.split('=')[0] + ' ' + RESOLVE.split('=')[1]] : [] });
   for (const [w, h] of [[390, 844], [1440, 900]]) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
+    const ctx = await newCtx(browser, { viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     await mount(page);
     const tag = `${ENG}.${w}×${h}`;
@@ -353,7 +373,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   // hoja de estilos: hay que MEDIR columnas en cada ancho y EJERCITAR el menú con teclado.
   // Los seis anchos son los del §47, incluidos 360 y 375, que es donde rompen las cosas.
   {
-    const ctx2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    const ctx2 = await newCtx(browser, { viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
     const page = await ctx2.newPage();
     await mount(page);
     await seed(page, DOCS); await persona(page, true); await paint(page);
