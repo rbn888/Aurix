@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '724'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '725'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -21164,7 +21164,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21278,6 +21278,10 @@ function _wshWireOnce() {
     if (ws4mode) { _ws4SetMode(ws4mode); return; }
     const wsgMode = t.getAttribute('data-wsg-mode');
     if (wsgMode) { _wsgSetMode(t.getAttribute('data-wsg-id'), wsgMode); return; }
+    // §23 del SPEC — el ⋯ de una instancia guardada. Vive DENTRO del `<summary>`, así que hay que
+    // impedir el plegado por defecto: sin esto, abrir el menú cerraría la instancia.
+    const siMenu = t.getAttribute('data-wssi-menu');
+    if (siMenu) { e.preventDefault(); e.stopPropagation(); _wsSavedMenuOpen(t, siMenu); return; }
     if (t.hasAttribute('data-wsg-create')) { _wsgCreate(); return; }
     const dq = t.getAttribute('data-wsg-dash');
     if (dq) { _wsgAskDash = null; _wsPlanDashSet(dq, false, 'goal');
@@ -21977,15 +21981,9 @@ function _wsSpaceMenu(ref, anchor) {
   if (dashDoc) items.push({ k: 'dash', label: t(dashDoc.on ? 'wsmse_dash_remove' : 'wsmse_dash_add') });
   items.push({ k: 'remove', label: t('wspin_remove'), cls: '' });
   if (!isPinned) items.push({ k: 'delete', label: t('wsmse_del_ok'), cls: 'is-danger' });
-  const menu = document.createElement('div');
-  menu.id = 'wsSpaceMenu'; menu.className = 'wsmse-menu';
-  menu.innerHTML = items.map(it => `<button type="button" class="wsmse-menu-item ${it.cls || ''}" data-wsmenu-act="${it.k}">${esc(it.label)}</button>`).join('');
-  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey); document.removeEventListener('click', onDoc, true); };
-  const onKey = e => { if (e.key === 'Escape') close(); };
-  const onDoc = e => { if (!menu.contains(e.target)) close(); };
-  menu.addEventListener('click', e => {
-    const b = e.target.closest ? e.target.closest('[data-wsmenu-act]') : null; if (!b) return;
-    const act = b.getAttribute('data-wsmenu-act'); close();
+  // La mecánica del popover es la compartida (`_wsPopoverMenu`): aquí se queda SÓLO la lista de
+  // acciones y su despacho, que es lo único propio de Mi espacio.
+  _wsPopoverMenu(anchor, 'wsSpaceMenu', items, act => {
     if (act === 'open') { isPinned ? _wsPinOpen(ref) : _wsxOpen(ref); }
     else if (act === 'top') { _wsSpaceToggleTop(ref); reb(); }
     else if (act === 'dash') { if (dashDoc) { _wsPlanDashSet(dashDoc.id, dashDoc.on, dashDoc.kind); reb(); } }
@@ -21993,16 +21991,6 @@ function _wsSpaceMenu(ref, anchor) {
     else if (act === 'remove') { if (isPinned) { _wsTogglePin(ref); reb(); } else { _wsModal2({ title: t('wsmse_remove_title'), text: t('wsmse_remove_text'), okLabel: t('wsmse_remove_ok'), danger: false, onOk: () => { _wsSpaceHide(ref); reb(); } }); } }
     else if (act === 'delete') { _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true, onOk: () => { _wsxAct('del', ref); } }); }
   });
-  document.body.appendChild(menu);
-  try {
-    const r = anchor.getBoundingClientRect();
-    const mw = menu.offsetWidth || 180, mh = menu.offsetHeight || 200;
-    let left = r.right - mw; if (left < 8) left = 8;
-    let top = r.bottom + 6; if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
-    menu.style.left = left + 'px'; menu.style.top = top + 'px';
-  } catch (_) {}
-  setTimeout(() => document.addEventListener('click', onDoc, true), 0);
-  document.addEventListener('keydown', onKey);
 }
 
 // WS.5B P6 — always-translated display label. Workspace names defaulted to the
@@ -23224,56 +23212,45 @@ function _wsPlanShareHtml(sh) {
     + '<span class="wspl-share-a" style="width:' + pa.toFixed(2) + '%"></span>'
     + '<span class="wspl-share-b"></span></span>';
 }
-// §21 — EL MENÚ DE UNA INSTANCIA GUARDADA. Reutiliza el componente que ya existe en Mi espacio
-// (`.wsmse-menu`: Escape, clic fuera, reposicionamiento si no cabe abajo) en vez de traer un
-// segundo patrón de menú al producto. Las acciones son las que EXISTEN como owners: abrir por
-// el mismo gate que revalida el derecho, renombrar por `_wsRename`, duplicar y eliminar por
-// `_wsxAct`. «Quitar del Dashboard» NO borra nada: apaga la visibilidad en esta sección y el
-// documento sigue en su almacén, accesible desde su capacidad y desde Mi espacio, que es donde
-// se vuelve a encender.
-function _wsPlansMenu(anchor, id, kind) {
-  kind = (kind === 'goal') ? 'goal' : 'workspace';
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// FASE 2 · MECÁNICA DE MENÚ EMERGENTE  —  `_wsPopoverMenu`
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// TRES CONSUMIDORES YA, que es lo que autoriza extraerlo (§5 de la dirección): el menú de Mi
+// espacio, el de las tarjetas de TUS PLANES y ahora el de la instancia guardada. Los dos primeros
+// ya duplicaban ENTERA la mecánica del popover —crear el nodo, colocarlo, cerrarlo con Escape,
+// cerrarlo al clicar fuera— y un tercero la habría triplicado.
+// SE EXTRAE LA MECÁNICA, NO LAS ACCIONES: la lista de elementos y lo que hace cada uno se queda
+// en cada llamador, porque ahí sí son decisiones distintas. Lo compartido es el comportamiento,
+// que es justo lo que no debería divergir.
+// Devuelve el foco al ancla al cerrar (§45): un menú que se abre con teclado y suelta el foco al
+// body deja al usuario perdido.
+function _wsPopoverMenu(anchor, id, items, onPick) {
   const esc = _intccEsc;
-  const prev = document.getElementById('wsPlansMenu');
+  const prev = document.getElementById(id);
   if (prev) prev.remove();
-  const items = [
-    { k: 'open',   label: t('wspl_a_open') },
-    { k: 'rename', label: t('wspl_a_rename') },
-    { k: 'dup',    label: t('wspl_a_dup') },
-    { k: 'unpin',  label: t('wspl_a_unpin') },
-    { k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' },
-  ];
   const menu = document.createElement('div');
-  menu.id = 'wsPlansMenu'; menu.className = 'wsmse-menu';
+  menu.id = id; menu.className = 'wsmse-menu';
   menu.setAttribute('role', 'menu');
-  menu.innerHTML = items.map(it => '<button type="button" role="menuitem" class="wsmse-menu-item ' + (it.cls || '')
-    + '" data-wsplmenu-act="' + it.k + '">' + esc(it.label) + '</button>').join('');
-  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey); document.removeEventListener('click', onDoc, true); };
-  const onKey = e => { if (e.key === 'Escape') { close(); try { anchor.focus(); } catch (_) {} } };
-  const onDoc = e => { if (!menu.contains(e.target)) close(); };
+  menu.innerHTML = items.map(it => '<button type="button" role="menuitem" class="wsmse-menu-item '
+    + (it.cls || '') + '" data-wsmenu-act="' + esc(it.k) + '">' + esc(it.label) + '</button>').join('');
+  const close = back => {
+    menu.remove();
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('click', onDoc, true);
+    if (back) { try { anchor.focus(); } catch (_) {} }
+  };
+  const onKey = e => { if (e.key === 'Escape') close(true); };
+  const onDoc = e => { if (!menu.contains(e.target)) close(false); };
   menu.addEventListener('click', e => {
-    const b = e.target.closest ? e.target.closest('[data-wsplmenu-act]') : null; if (!b) return;
-    const act = b.getAttribute('data-wsplmenu-act'); close();
-    const ref = kind + ':' + id;
-    if (act === 'open') { _wsPlansOpen(id, kind); return; }
-    if (act === 'rename') {
-      let cur = '';
-      try {
-        if (kind === 'goal') { const g = _wsgGoals().find(x => x && x.id === id); cur = (g && g.name) || ''; }
-        else { const d = _ws4Projects().find(x => x && x.id === id); cur = (d && d.customName) || ''; }
-      } catch (_) {}
-      _wsPrompt({ title: t('wsmse_rename_title'), current: cur, okLabel: t('wsmse_rename_save'),
-        onOk: v => { _wsRename(ref, v); _wsPlansRepaint(); } });
-      return;
-    }
-    if (act === 'dup')   { try { if (kind === 'goal') _wsgDuplicate(id); else _wsxAct('dup', ref); } catch (_) {} _wsPlansRepaint(); return; }
-    if (act === 'unpin') { _wsPlanDashSet(id, true, kind); return; }
-    if (act === 'del')   {
-      _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true,
-        onOk: () => { try { if (kind === 'goal') _wsgTombstone(id); else _ws4Tombstone(id); } catch (_) {} _wsPlansRepaint(); } });
-    }
+    const b = e.target.closest ? e.target.closest('[data-wsmenu-act]') : null;
+    if (!b) return;
+    const act = b.getAttribute('data-wsmenu-act');
+    close(false);
+    try { onPick(act); } catch (_) {}
   });
   document.body.appendChild(menu);
+  // Colocación: pegado al ancla por la derecha, y si no cabe abajo se va arriba. Nunca fuera de
+  // la ventana, que es la única forma de que un menú sea inalcanzable.
   try {
     const r = anchor.getBoundingClientRect();
     const mw = menu.offsetWidth || 190, mh = menu.offsetHeight || 210;
@@ -23284,6 +23261,128 @@ function _wsPlansMenu(anchor, id, kind) {
   setTimeout(() => document.addEventListener('click', onDoc, true), 0);
   document.addEventListener('keydown', onKey);
   try { const f = menu.querySelector('.wsmse-menu-item'); if (f) f.focus(); } catch (_) {}
+  return menu;
+}
+// El ⋯ de una instancia guardada. VIVE AQUÍ Y NO EN EL MANEJADOR DELEGADO, y no es una cuestión
+// de orden: dentro de ese manejador `t` es el NODO del evento (`const t = e.target.closest(…)`),
+// así que la función de i18n queda sombreada y `t('wspl_a_rename')` lanza «t is not a function».
+// Lo cazó la sonda al abrir el menú; leyendo el diff no se ve.
+// Sin «Abrir» en la lista: la instancia ya está delante y su propio `<summary>` la despliega —
+// ofrecerlo sería una acción que no hace nada distinto de lo que el usuario acaba de hacer.
+function _wsSavedMenuOpen(anchor, ref) {
+  const i = ref.indexOf(':'), kind = ref.slice(0, i), id = ref.slice(i + 1);
+  let pinned = false;
+  try {
+    pinned = (kind === 'goal')
+      ? (_wsgGoals().find(x => x && x.id === id) || {}).dashPinned === true
+      : (_ws4Projects().find(x => x && x.id === id) || {}).dashHidden !== true;
+  } catch (_) {}
+  const items = [
+    { k: 'rename', label: t('wspl_a_rename') },
+    { k: 'dup',    label: t('wspl_a_dup') },
+    { k: pinned ? 'unpin' : 'pin', label: t(pinned ? 'wsmse_dash_remove' : 'wsmse_dash_add') },
+    { k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' },
+  ];
+  _wsPopoverMenu(anchor, 'wsSavedMenu', items, act => _wsSavedAct(act, ref, { onDone: () => {
+    // Repinta la superficie que contiene la instancia. Objetivos es el primer consumidor; cuando
+    // se migren las demás, cada una pasará su propio repintado por `onDone`.
+    const c = document.getElementById('aurixWorkspace');
+    if (c && _wshView === 'goals') { c.innerHTML = _renderGoals(); _wshReveal(c); }
+  } }));
+}
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// FASE 2 · INSTANCIA GUARDADA, PLEGADA  —  `_wsSavedItemHtml`
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// §22 pide el MISMO patrón para los guardados de toda capacidad: plegados por defecto, con su
+// nombre, sus métricas esenciales y su menú. Hasta ahora cada capacidad lo resolvía a su manera —
+// Objetivos con tres botones sueltos y todo desplegado a la vez.
+//
+// ES UN `<details>` NATIVO, y eso es la decisión importante: el plegado, el foco, la tecla Enter,
+// el anuncio de estado al lector de pantalla y el `open` como atributo consultable vienen del
+// navegador. Cero manejadores nuevos, cero `aria-expanded` que mantener a mano. Es el mismo
+// camino que la cabecera compartida eligió en v740 para sus supuestos, por las mismas razones.
+//
+// NO CREA ALMACENAMIENTO. No sabe de objetivos, ni de plantillas, ni de sincronización: recibe un
+// `ref` («kind:id», la identidad que Workspace ya usa en todas partes), unos textos y un cuerpo
+// ya renderizado. Quién persiste y dónde sigue siendo del owner de cada almacén.
+//
+// El ⋯ vive DENTRO del `<summary>` para quedar en su línea, así que su manejador tiene que
+// impedir el plegado por defecto del summary — si no, abrir el menú cerraría la instancia.
+//   o = { ref, accent, icon, name, meta, kpis:[{k,v}], body, open }
+function _wsSavedItemHtml(o) {
+  const esc = _intccEsc;
+  o = o || {};
+  const kpis = Array.isArray(o.kpis) ? o.kpis.filter(x => x && x.v != null && x.v !== '') : [];
+  return '<details class="wssi' + (o.cls ? ' ' + o.cls : '') + '"'
+    + (o.open ? ' open' : '')
+    + ' data-wssi-ref="' + esc(o.ref) + '"'
+    + (o.attrs || '')
+    + (o.accent ? ' data-ws-accent="' + esc(o.accent) + '"' : '')
+    + '>'
+    + '<summary class="wssi-sum">'
+    +   (o.icon ? '<span class="wssi-ico" aria-hidden="true">' + o.icon + '</span>' : '')
+    +   '<span class="wssi-txt">'
+    +     '<b class="wssi-name">' + esc(o.name || '') + '</b>'
+    +     (o.meta ? '<i class="wssi-meta">' + esc(o.meta) + '</i>' : '')
+    +   '</span>'
+    +   (kpis.length ? '<span class="wssi-kpis">' + kpis.map(x =>
+          '<span class="wssi-kpi"><i>' + esc(x.k) + '</i><b>' + esc(x.v) + '</b></span>').join('') + '</span>' : '')
+    +   '<span class="wssi-menuwrap">'
+    +     '<button type="button" class="wssi-menu" data-wssi-menu="' + esc(o.ref) + '"'
+    +       ' aria-haspopup="true" title="' + esc(t('wspl_menu')) + '"'
+    +       ' aria-label="' + esc(t('wspl_menu') + ' — ' + (o.name || '')) + '">'
+    +       '<span aria-hidden="true">&#8943;</span></button>'
+    +   '</span>'
+    +   '<span class="wssi-chev" aria-hidden="true"></span>'
+    + '</summary>'
+    + '<div class="wssi-body">' + (o.body || '') + '</div>'
+    + '</details>';
+}
+// §21 — EL MENÚ DE UNA INSTANCIA GUARDADA. Reutiliza el componente que ya existe en Mi espacio
+// (`.wsmse-menu`: Escape, clic fuera, reposicionamiento si no cabe abajo) en vez de traer un
+// segundo patrón de menú al producto. Las acciones son las que EXISTEN como owners: abrir por
+// el mismo gate que revalida el derecho, renombrar por `_wsRename`, duplicar y eliminar por
+// `_wsxAct`. «Quitar del Dashboard» NO borra nada: apaga la visibilidad en esta sección y el
+// documento sigue en su almacén, accesible desde su capacidad y desde Mi espacio, que es donde
+// se vuelve a encender.
+function _wsPlansMenu(anchor, id, kind) {
+  kind = (kind === 'goal') ? 'goal' : 'workspace';
+  const items = [
+    { k: 'open',   label: t('wspl_a_open') },
+    { k: 'rename', label: t('wspl_a_rename') },
+    { k: 'dup',    label: t('wspl_a_dup') },
+    { k: 'unpin',  label: t('wspl_a_unpin') },
+    { k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' },
+  ];
+  _wsPopoverMenu(anchor, 'wsPlansMenu', items, act => _wsSavedAct(act, kind + ':' + id, { onDone: _wsPlansRepaint }));
+}
+// ── LAS ACCIONES DE UNA INSTANCIA, EN UN SOLO SITIO ───────────────────────────────────────────
+// El menú del Resumen y el de la instancia guardada ofrecen las MISMAS acciones sobre los MISMOS
+// almacenes. Tenerlas dos veces era garantizar que un día «Duplicar» hiciera cosas distintas
+// según desde dónde se abriera. Cada acción delega en el owner de su almacén: aquí no se persiste
+// ni se borra nada por cuenta propia.
+function _wsSavedAct(act, ref, opts) {
+  opts = opts || {};
+  const i = ref.indexOf(':'), kind = ref.slice(0, i), id = ref.slice(i + 1);
+  const done = () => { try { if (opts.onDone) opts.onDone(); } catch (_) {} };
+  if (act === 'open') { if (opts.onOpen) { try { opts.onOpen(); } catch (_) {} } else _wsPlansOpen(id, kind); return; }
+  if (act === 'rename') {
+    let cur = '';
+    try {
+      if (kind === 'goal') { const g = _wsgGoals().find(x => x && x.id === id); cur = (g && g.name) || ''; }
+      else { const d = _ws4Projects().find(x => x && x.id === id); cur = (d && d.customName) || ''; }
+    } catch (_) {}
+    _wsPrompt({ title: t('wsmse_rename_title'), current: cur, okLabel: t('wsmse_rename_save'),
+      onOk: v => { _wsRename(ref, v); done(); } });
+    return;
+  }
+  if (act === 'dup') { try { if (kind === 'goal') _wsgDuplicate(id); else _wsxAct('dup', ref); } catch (_) {} done(); return; }
+  if (act === 'pin')   { _wsPlanDashSet(id, false, kind); done(); return; }
+  if (act === 'unpin') { _wsPlanDashSet(id, true, kind); done(); return; }
+  if (act === 'del') {
+    _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true,
+      onOk: () => { try { if (kind === 'goal') _wsgTombstone(id); else _ws4Tombstone(id); } catch (_) {} done(); } });
+  }
 }
 // La visibilidad en el Dashboard se escribe EN EL DOCUMENTO, por su propio owner de
 // persistencia, así que sube con el mismo push y llega al otro dispositivo como cualquier otro
@@ -25720,10 +25819,20 @@ function _renderGoals() {
     const g = _wsgWorking[stored.id] || stored;
     const prog = calculateGoalProgress(g, real.wealth);
     const isSync = AURIX_WS_USE_REAL_DATA && g.mode === 'sync';  // WS.11A — manual unless real-data toggle is on
-    return `
-      <div class="wsg-card" data-wsg-cardid="${esc(g.id)}">
+    // ── §22 · LA INSTANCIA GUARDADA, PLEGADA POR LA PRIMITIVA COMÚN ──────────────────────────
+    // Antes las tarjetas se pintaban TODAS desplegadas a la vez, con tres botones sueltos al pie:
+    // con cuatro objetivos la pantalla era un muro. Ahora el envoltorio es `_wsSavedItemHtml` —el
+    // mismo `<details>` nativo que usará el resto de Workspace— y el contenido de la tarjeta pasa
+    // a ser su CUERPO, sin tocar una línea de su cálculo ni de sus inputs.
+    // `wsg-card` SIGUE SIENDO la clase del elemento que contiene los inputs, porque `_wsgOnInput`
+    // resuelve su contenedor con `closest('.wsg-card')` y repinta `[data-wsg-out]` y
+    // `[data-wsg-savebar]` dentro de él. Mover esa clase habría roto la edición en vivo sin que
+    // ningún assert de cálculo se enterara.
+    // ABIERTA la que se acaba de crear —para que su pregunta de Dashboard se vea— y la que tiene
+    // cambios sin guardar, porque plegar trabajo a medias lo esconde.
+    const kpis = [{ k: t('wspl_m_target'), v: Number.isFinite(Number(g.target)) && Number(g.target) > 0 ? formatBase(g.target) : '' }];
+    const inner = `
         <div class="wsg-card-head">
-          <div class="wsg-card-id"><span class="wsg-glyph is-${esc(g.type)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(g.type))}</svg></span><div class="wsg-card-idtxt"><span class="wsb-pill is-dynamic">${esc(t('wsg_type_' + g.type))}</span><p class="wsg-card-name">${esc(g.name)}</p></div></div>
           ${AURIX_WS_USE_REAL_DATA ? `<div class="ws4-modes wsg-modes">
             <button type="button" class="ws4-mode${!isSync ? ' is-active' : ''}" data-wsg-mode="manual" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_manual'))}</button>
             <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-wsg-mode="sync" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_sync'))}</button>
@@ -25740,13 +25849,26 @@ function _renderGoals() {
         ${_wsgAskDashHtml(g.id)}
         <div class="wsg-card-foot">
           <div class="wsg-savebar" data-wsg-savebar>${_wsgSaveBarHtml(g.id)}</div>
-          <div class="wsg-actions">
-            <button type="button" class="wsg-act" data-wsg-act="rename" data-wsg-id="${esc(g.id)}" title="${esc(t('wsg_act_rename'))}">${esc(t('wsg_act_rename'))}</button>
-            <button type="button" class="wsg-act" data-wsg-act="dup" data-wsg-id="${esc(g.id)}" title="${esc(t('wsg_act_dup'))}">${esc(t('wsg_act_dup'))}</button>
-            <button type="button" class="wsg-act is-danger" data-wsg-act="del" data-wsg-id="${esc(g.id)}" title="${esc(t('wsg_act_del'))}">${esc(t('wsg_act_del'))}</button>
-          </div>
-        </div>
-      </div>`;
+          ${/* §23 — LAS ACCIONES VIVEN EN EL ⋯, Y SÓLO AHÍ. Estos tres botones («Renombrar»,
+                «Duplicar», «Eliminar») quedaban al pie de cada instancia repitiendo lo que el
+                menú de la fila ya ofrece, y encima por otro camino: el de aquí abría un
+                `prompt()` nativo y el del ⋯ abre el modal del producto. Dos formas de renombrar
+                lo mismo es la divergencia que esta fase existe para cerrar. Se retiran; el
+                despachador `data-wsg-act` se conserva porque `_wsgDelete`/`_wsgDuplicate` siguen
+                siendo los owners a los que el ⋯ delega. */''}
+        </div>`;
+    return _wsSavedItemHtml({
+      ref: 'goal:' + g.id,
+      accent: 'plum',
+      attrs: ' data-wsg-cardid="' + esc(g.id) + '"',
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(g.type))}</svg>`,
+      name: g.name,
+      meta: t('wsg_type_' + g.type),
+      kpis: kpis,
+      open: (_wsgAskDash === g.id) || !!_wsgDirty[g.id],
+      cls: 'wsg-card',
+      body: inner,
+    });
   }).join('') : `<p class="wsh-empty">${esc(t('wsg_empty'))}</p>`;
 
   // ── LO QUE YA EXISTE VA PRIMERO ───────────────────────────────────────────
@@ -25759,7 +25881,10 @@ function _renderGoals() {
   const listCard = goals.length ? `
       <section class="wsh-card wsg-list-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsg_list_title'))}</h3></header>
-        <div class="wsg-grid">${listInner}</div>
+        ${/* PILA, no rejilla. Con la primitiva plegada las instancias son FILAS, y en una rejilla
+              de tres columnas las plegadas se estiraban a la altura de la abierta: una fila de
+              56 px quedaba como una caja de 750 px vacía. Lo destapó la captura. */''}
+        <div class="wsg-stack">${listInner}</div>
       </section>` : '';
   return `
     <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">

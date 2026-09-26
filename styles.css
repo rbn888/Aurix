@@ -22463,8 +22463,11 @@ body.gs-open { overflow: hidden; }
   align-items: center; justify-content: center; gap: 2px; text-align: center;
   padding: 0 22px; pointer-events: none;
 }
+/* 12 px Y NO 11: el suelo tipográfico de Workspace son 12 px para información necesaria, y lo
+   certificó v740 dentro de `.aurix-wsh`. Puse 11 px y 10,5 px aquí y la sonda de primera
+   pantalla lo cazó en los dos motores — es un suelo de legibilidad, no una preferencia. */
 .wsbud-donut-c i {
-  font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
   text-transform: uppercase; color: rgba(159,194,255,0.9);
 }
 /* La cifra del centro tiene que CABER: `anywhere` no vale aquí porque partiría un importe a
@@ -22478,7 +22481,7 @@ body.gs-open { overflow: hidden; }
 /* El centro publica la MAYOR PARTIDA, no un KPI repetido: nombre en su propio color, su peso, y
    una línea que dice qué es esa cifra — un porcentaje suelto no se sabe de qué es. */
 .wsbud-donut-c b { font-size: 24px; }
-.wsbud-donut-c em { font-style: normal; font-size: 10.5px; color: var(--text-muted); line-height: 1.2; }
+.wsbud-donut-c em { font-style: normal; font-size: 12px; color: var(--text-muted); line-height: 1.2; }
 
 /* §27 — IDENTIDAD DE LAS CUATRO MAGNITUDES. Un filete de 2 px y el tono de la cifra: entra
    (turquesa), sale (coral), queda (azul Aurix). Nada de rellenos de color, que compiten con el
@@ -27612,6 +27615,87 @@ button.intv14-cmp-clear {
 .wspl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: stretch; }
 @media (min-width: 640px)  { .wspl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
 @media (min-width: 1024px) { .wspl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } }
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   FASE 2 · INSTANCIA GUARDADA, PLEGADA  —  `.wssi`
+   ══════════════════════════════════════════════════════════════════════════════════════════
+   El patrón común de §22 para los guardados de toda capacidad. Es un `<details>` NATIVO: el
+   plegado, el foco, Enter/Espacio y el anuncio de estado los da el navegador, así que aquí sólo
+   hay presentación. El marcador propio sustituye al triángulo del navegador, que no se puede
+   estilar de forma consistente entre motores.
+   Consume la API de acento: el filete y el pozo del icono salen de `--ws-a`, así que una
+   capacidad declara su identidad UNA vez en el `<details>` y todo lo de dentro la hereda. */
+.wssi {
+  position: relative; overflow: hidden;
+  border-radius: 14px; border: 1px solid rgba(var(--ws-a, 74,130,240), 0.20);
+  background: var(--elev-1);
+}
+.wssi + .wssi { margin-top: 10px; }
+/* La lista de instancias es una PILA. Heredaba `.wsg-grid` (tres columnas) y las filas plegadas
+   se estiraban a la altura de la hermana abierta — una fila de 56 px como una caja vacía de 750.
+   Una instancia plegada es una FILA, no una tarjeta, y su contenedor tiene que decirlo. */
+.wsg-stack { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.wsg-stack > .wssi + .wssi { margin-top: 0; }
+.wssi::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 2px;
+  background: rgba(var(--ws-a, 74,130,240), 0.75);
+}
+/* El `summary` es la fila plegada: nombre, metadatos, métricas, ⋯ y marcador. Se le quita el
+   triángulo nativo en los dos motores y se le da área táctil de sobra (§43). */
+.wssi-sum {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 12px 12px 14px; min-height: 56px;
+  cursor: pointer; list-style: none; min-width: 0;
+}
+.wssi-sum::-webkit-details-marker { display: none; }
+.wssi-sum::marker { content: ''; }
+.wssi-sum:hover { background: rgba(var(--ws-a, 74,130,240), 0.06); }
+.wssi-sum:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: -2px; }
+.wssi-ico {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 9px;
+  color: rgb(var(--ws-a, 74,130,240));
+  background: rgba(var(--ws-a, 74,130,240), 0.12);
+  border: 1px solid rgba(var(--ws-a, 74,130,240), 0.24);
+}
+.wssi-ico svg { width: 18px; height: 18px; }
+/* `min-width: 0` para que un nombre largo pueda encoger en vez de empujar al ⋯ fuera de la fila. */
+.wssi-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.wssi-name { font-size: 14.5px; font-weight: 700; color: var(--text-bright); overflow-wrap: anywhere; }
+.wssi-meta { font-style: normal; font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
+.wssi-kpis { display: none; }
+@media (min-width: 640px) { .wssi-kpis { display: flex; flex: 0 0 auto; gap: 16px; } }
+.wssi-kpi { display: flex; flex-direction: column; gap: 1px; text-align: right; }
+.wssi-kpi i { font-style: normal; font-size: 11px; color: var(--text-muted); }
+.wssi-kpi b { font-size: 13.5px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wssi-menuwrap { flex: 0 0 auto; display: flex; align-items: center; }
+.wssi-menu {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border-radius: 8px;
+  font: inherit; font-size: 17px; line-height: 1; cursor: pointer;
+  color: var(--text-muted); background: transparent; border: 1px solid transparent;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+.wssi-menu::after { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+.wssi-menu:hover { color: var(--text-bright); background: rgba(var(--ws-a, 74,130,240), 0.14); border-color: rgba(var(--ws-a, 74,130,240), 0.26); }
+.wssi-menu:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+/* El marcador: un chevron que gira al abrir. Es la única señal de estado que el usuario ve, así
+   que no depende del movimiento — gira, pero su posición final ya distingue abierto de cerrado. */
+.wssi-chev {
+  flex: 0 0 auto; width: 16px; height: 16px; margin-left: 2px;
+  border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+  color: var(--text-muted); transform: rotate(45deg); transform-origin: 60% 60%;
+  transition: transform 180ms ease;
+}
+.wssi[open] > .wssi-sum .wssi-chev { transform: rotate(-135deg); }
+.wssi-body { padding: 0 12px 12px 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .wssi-chev, .wssi-menu { transition: none; }
+}
+/* Objetivos usa la primitiva como envoltorio, así que su tarjeta ya no pinta su propio marco ni
+   su propia cabecera de identidad: las pone la fila plegada. */
+.wssi.wsg-card { display: block; }
+.wssi.wsg-card > .wssi-body > .wsg-card-head:empty { display: none; }
+
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    FASE 2 · API DE ACENTO POR CAPACIDAD  —  `data-ws-accent`
    ══════════════════════════════════════════════════════════════════════════════════════════

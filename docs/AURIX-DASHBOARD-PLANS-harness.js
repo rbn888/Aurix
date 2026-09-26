@@ -313,7 +313,11 @@ console.log('\n5 · Una simulación nunca es patrimonio:');
 console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
 {
   const css = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
-  const block = css.slice(css.indexOf('.wspl-sec'), css.indexOf('.wspl-sec') + 12000);
+  // SE BUSCA EN TODA LA HOJA, sin ventana. Una rebanada de N caracteres desde `.wspl-sec` se
+  // rompió DOS veces al insertar CSS delante de estas reglas —y las dos veces el rojo fue del
+  // assert, no del producto—. El namespace `.wspl-` es único en el proyecto, así que la ventana
+  // no protegía de nada y sólo añadía una forma de fallar.
+  const block = css;
 
   // §16 — mayúsculas VISUALES. El texto del DOM sigue siendo una frase, que es lo que lee un
   // lector de pantalla; gritar en el árbol de accesibilidad no es «premium».
@@ -362,14 +366,23 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
     /aria-label="Más opciones — /.test(h));
   ok('6.10 …y su área táctil llega a 44 px sin crecer visualmente',
     /\.wspl-menu::after\s*\{[^}]*width: *44px;\s*height: *44px/.test(block));
-  const menu = fnSrc('_wsPlansMenu');
-  ok('6.11 reutiliza el componente de menú que YA existe, no trae un segundo patrón',
-    /wsmse-menu/.test(menu) && !/class="wspl-menu-pop/.test(menu));
-  ok('6.12 cierra con Escape y con clic fuera, y devuelve el foco',
-    /Escape/.test(menu) && /removeEventListener\('click'/.test(menu) && /anchor\.focus\(\)/.test(menu));
+  // FASE 2 — LOS OWNERS SE MOVIERON, EL INVARIANTE NO. La mecánica del popover salió a
+  // `_wsPopoverMenu` (tres consumidores) y las acciones a `_wsSavedAct` (el menú del Resumen y el
+  // de la instancia guardada ofrecían las MISMAS sobre los MISMOS almacenes). Estos asserts
+  // pasan a preguntar a los owners nuevos, y se añade el que antes no se podía escribir: que haya
+  // UNA sola mecánica de menú en todo Workspace.
+  const menu = fnSrc('_wsPlansMenu'), pop = fnSrc('_wsPopoverMenu'), acts = fnSrc('_wsSavedAct');
+  ok('6.11 reutiliza la mecánica compartida, no trae un segundo patrón',
+    /_wsPopoverMenu\(/.test(menu) && /wsmse-menu/.test(pop) && !/document\.createElement\('div'\)/.test(menu));
+  ok('6.11b …y esa mecánica es la ÚNICA de Workspace (Mi espacio también la usa)',
+    /_wsPopoverMenu\(/.test(fnSrc('_wsSpaceMenu')) &&
+    (app.match(/menu\.className = 'wsmse-menu'/g) || []).length === 1,
+    (app.match(/menu\.className = 'wsmse-menu'/g) || []).length + ' implementaciones');
+  ok('6.12 cierra con Escape y con clic fuera, y devuelve el foco al ancla',
+    /Escape/.test(pop) && /removeEventListener\('click'/.test(pop) && /anchor\.focus\(\)/.test(pop));
   ok('6.13 las acciones delegan en los owners existentes, sin segunda matemática',
-    /_wsPlansOpen\(/.test(menu) && /_wsRename\(/.test(menu) && /_wsxAct\('dup'/.test(menu) && /_ws4Tombstone\(/.test(menu));
-  ok('6.14 eliminar sigue pidiendo confirmación', /_wsModal2\(/.test(menu) && /danger: true/.test(menu));
+    /_wsPlansOpen\(/.test(acts) && /_wsRename\(/.test(acts) && /_wsxAct\('dup'/.test(acts) && /_ws4Tombstone\(/.test(acts));
+  ok('6.14 eliminar sigue pidiendo confirmación', /_wsModal2\(/.test(acts) && /danger: true/.test(acts));
 
   // §22 — guardar ≠ estar en el Dashboard, y la ausencia del campo es VISIBLE.
   const one = DOCS.find(d => d.type === 'monthly_budget' && !d.deletedAt);
@@ -469,10 +482,10 @@ console.log('\n7 · Objetivos, en el sistema común:');
   ok('7.10 sin derecho efectivo no se publica ni un objetivo', denied === 0, String(denied));
 
   // §21 — el menú es el MISMO componente, parametrizado por kind, sin segundo patrón.
-  const menu = fnSrc('_wsPlansMenu');
-  ok('7.11 el menú distingue la clase de documento y usa el owner de cada almacén',
-    /kind === 'goal'/.test(menu) && /_wsgDuplicate\(/.test(menu) && /_wsgTombstone\(/.test(menu) &&
-    /_ws4Tombstone\(/.test(menu), 'un solo menú para las dos clases');
+  const acts7 = fnSrc('_wsSavedAct');
+  ok('7.11 las acciones distinguen la clase de documento y usan el owner de cada almacén',
+    /kind === 'goal'/.test(acts7) && /_wsgDuplicate\(/.test(acts7) && /_wsgTombstone\(/.test(acts7) &&
+    /_ws4Tombstone\(/.test(acts7), 'un solo despachador para las dos clases');
   const setter = fnSrc('_wsPlanDashSet');
   ok('7.12 el interruptor escribe por `_wsgPersist`, sin almacén paralelo',
     /_wsgPersist\(/.test(setter) && /_ws4Persist\(/.test(setter) &&
