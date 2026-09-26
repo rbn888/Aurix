@@ -224,7 +224,13 @@ console.log('\nD · no regresión de v705 / v707');
     try { base = require('child_process').execSync('git show 8f581e9:app.js', { cwd: root, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8'); } catch (e) { return true; }   // clon shallow ⇒ no bloquea
     const bodyOf = (src, n) => { const i = src.indexOf('function ' + n + '('); if (i < 0) return null;
       let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } return null; };
-    return ['_aurixRejectStalePriceSpikes', '_aurixHistorySourceForDisplay', '_aurixResolveFinalRenderSeriesContract']
+    // SPRINT P0 CHART TRUTH — `_aurixResolveFinalRenderSeriesContract` SALE de la terna con causa: este
+    // sprint edita su proyección de cobertura para que TOTAL deje de afirmar historia completa sobre una
+    // lectura truncada. Lo que D2 protege de verdad —que no vuelva a colarse el filtro de la familia de
+    // display que la revisión adversarial tumbó— lo siguen afirmando los DOS owners que quedan fijados
+    // byte a byte y, sobre todo, D2b. El orden y la forma del FRC los fija ahora
+    // AURIX-CHART-TRUTH-CONTINUITY (sección FRC).
+    return ['_aurixRejectStalePriceSpikes', '_aurixHistorySourceForDisplay']
       .every(n => { const a = bodyOf(base, n), b = bodyOf(app, n); return !!a && !!b && a === b; });
   })());
   ok('D2b …y no queda rastro del filtro de la familia de display que se revirtió',

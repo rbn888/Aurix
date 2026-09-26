@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '718'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '719'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -38911,6 +38911,9 @@ function _aurixReturnPendingHTML() {
 // Decision comes from the SPEC.19 final contract's historyPresentationState (single source, computed after
 // return eligibility). No %, no 0%, no colour, no geometry — reuses the existing static wsc-metric-val markup
 // (no CSS/layout change). Genuine loading/unresolved and unit contexts without the FRC keep "Calculando…".
+// SPEC P0-CHART-TRUTH — TOTAL no puede declarar «toda la historia» si la lectura de snapshots se truncó
+// (ver la proyección `historyCoverage` del FRC). OFF ⇒ proyección previa byte a byte.
+const _AURIX_ALL_TRUNCATED_COVERAGE_HONESTY = true;
 const _AURIX_HIST_PARTIAL_TEXT = 'Historial parcial';
 const _AURIX_HIST_AVAILABLE_TEXT = 'Historial disponible';
 // ════════════════════════════════════════════════════════════════════════════
@@ -39473,6 +39476,32 @@ const _AURIX_CHART_SEGMENT_SOURCE_AUTHORITY = true;
 const _AURIX_CHART_24H_COVERAGE_AWARE_AUTHORITY = true;
 const _AURIX_24H_COVERAGE_THR = 0.8;          // rolling-24H SPAN coverage needed for a source to be authoritative (aligns with the downstream partial gate coverageRatio<0.8)
 const _AURIX_24H_MIN_BACKEND_POINTS = 8;      // backend maturity floor before backend can own 24H (no 2-point full-window claim)
+// ── SPEC P0-CHART-TRUTH · PENDIENTE DECLARADO, NO IMPLEMENTADO ────────────────────────────────
+// DEFECTO DEMOSTRADO (replay del pipeline real, no hipótesis): cuando la familia autoritativa deja de
+// escribir —el cron */15 se cae— su cobertura del rolling-24H sigue ≥0,8 porque MIDE EL PASADO, así que
+// conserva la autoridad y `_aurix24hStripNonAuthoritativePreservingHoles` descarta las ÚNICAS
+// observaciones reales del tramo más reciente. Medido: servidor hasta 09:39, 5 observaciones válidas de
+// frontend entre 10:15 y 12:15 borradas, endpoint del gráfico retrocediendo ~3 h y nowRef con él,
+// mientras la cabecera publica el valor vivo de las 12:24 (≈2.000 US$ de divergencia con el dato YA
+// presente en la sesión). El rescate interior no puede verlo: a 24H el suelo de hueco real son 8 h.
+//
+// POR QUÉ NO SE ARREGLA AQUÍ. Se implementó y la revisión financiera adversarial lo tumbó con tres
+// escenarios reproducidos, todos de la MISMA clase: rescatar la cola mueve el ENDPOINT y por tanto el
+// `current` del retorno 24H publicado.
+//   1. Bajo la RULE 1 (frontend autoritativo, app cerrada 3 h, cron escribiendo) el punto rescatado es de
+//      BACKEND y el baseline de FRONTEND ⇒ se publica un % que cruza dos regímenes de valoración —
+//      exactamente lo que SPEC.11 y SPEC.38 cerraron— y encima con `sameSourceFamily` cableado a `true`,
+//      así que el guard `cross_source_family` queda inerte justo cuando tendría razón para disparar.
+//   2. El umbral se vuelve un acantilado: 90 min de rancio publica +0,78 % y 91 min publica −0,38 %.
+//      Cambia el SIGNO sin hecho de mercado, y cada dispositivo cae a un lado según lo fresca que tenga
+//      su copia canónica ⇒ dos dispositivos de la misma cuenta con signos distintos.
+//   3. Convierte el gate `endpoint_fresh` en su propio bypass: publica justo donde ese gate refusaba.
+//
+// Es decir: la corrección correcta exige decidir qué hacer con un endpoint de otra familia de valoración
+// y con la neutralización de flujos en la ventana rescatada. Eso es verdad financiera publicada y, por el
+// §6 del SPEC, no se toca por iniciativa propia. QUEDA PENDIENTE DE AUTORIZACIÓN DEL FUNDADOR.
+// Mientras tanto el comportamiento es el certificado: se conserva el último punto histórico VERDADERO
+// (nunca se inyecta el valor de cabecera) y el retorno 24H falla cerrado por STALE_ENDPOINT.
 function _aurixApplyRangeSourceAuthority(src, range) {
   try {
     const r = String(range || '').toLowerCase();
@@ -41466,13 +41495,56 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     // Presentation-only; no eligibility/points/return change. No-op outside a real authed session
     // (harness sandbox / anonymous / settled).
     if ((typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) return 'CALCULATING';
-    if (r !== 'all' && out.historyCoverage === 'PARTIAL_AVAILABLE_HISTORY') return 'PARTIAL_HISTORY';
+    // SPEC P0-CHART-TRUTH — TOTAL también puede ser PARCIAL, y entonces hay que decirlo. La restricción
+    // `r !== 'all'` dejaba a TOTAL sin la única etiqueta honesta que existe para una historia incompleta,
+    // así que un TOTAL truncado caía en el `return 'CALCULATING'` terminal o afirmaba «Historial
+    // disponible». Se reutiliza el estado que YA existe; no se crea vocabulario nuevo.
+    if (out.historyCoverage === 'PARTIAL_AVAILABLE_HISTORY') return 'PARTIAL_HISTORY';
     if (r === 'all' && out.historyCoverage === 'ALL_AVAILABLE_HISTORY') return 'AVAILABLE_HISTORY';
     return 'CALCULATING';
   };
   out.historyCoverage = (function () {
     try {
-      if (r === 'all') return srcPts.length ? 'ALL_AVAILABLE_HISTORY' : 'UNKNOWN';
+      // SPEC P0-CHART-TRUTH — «Historial disponible» AFIRMA que esto es toda la historia que hay. Para
+      // `all` la proyección devolvía ALL_AVAILABLE_HISTORY con que hubiera UN punto, sin mirar si la
+      // lectura paginada de snapshots se quedó corta. Y el propio `_aurixSourceSetComplete` justifica NO
+      // bloquear el retorno por truncado escribiendo que «Aurix ya lo representa con honestidad vía
+      // PARTIAL_HISTORY» — un control compensatorio que para TOTAL no existía. Un truncado pierde
+      // exactamente la cola ANTIGUA (la lectura es descendente), que es el INICIO del historial: o sea,
+      // justo lo que TOTAL dice representar. Owner único del hecho: `_aurixBackendSnapshotsTruncated`
+      // (no se recuenta ni se re-deriva). Ausente el flag ⇒ nada que objetar ⇒ comportamiento anterior.
+      // Reversible: _AURIX_ALL_TRUNCATED_COVERAGE_HONESTY=false ⇒ proyección previa byte a byte.
+      if (r === 'all') {
+        if (!srcPts.length) return 'UNKNOWN';
+        let truncated = false;
+        try {
+          truncated = ((typeof _AURIX_ALL_TRUNCATED_COVERAGE_HONESTY === 'undefined') || _AURIX_ALL_TRUNCATED_COVERAGE_HONESTY)
+            && (typeof _aurixBackendSnapshotsTruncated !== 'undefined') && _aurixBackendSnapshotsTruncated === true
+            // …Y que esa lectura esté de verdad EN JUEGO EN ESTE BUILD. `_aurixBackendSnapshotsTruncated`
+            // es un GLOBAL sin ciclo de vida: no se reinicia al cambiar de cuenta ni cuando una lectura
+            // posterior falla. Sin esta segunda condición, la bandera levantada por una cuenta con
+            // historia enorme podía rotular «Historial parcial» el TOTAL de la siguiente cuenta, o
+            // contradecir un frame dibujado íntegro desde el canónico al que el backend no aportó nada.
+            // `emg.backendLoaded` lo cuenta EN EL BUILD (no es un global rancio) y lo escribe el MISMO
+            // cargador que levanta la bandera, así que los dos hechos siempre hablan de la misma lectura.
+            // LÍMITE DECLARADO: esto demuestra que la lectura truncada está cargada, no que cada uno de
+            // sus puntos sobreviva hasta la línea. Es cota superior, y falla hacia NO degradar.
+            //
+            // CONSECUENCIA QUE EL FUNDADOR DEBE DECIDIR A SABIENDAS, no descubrir: `_truncated` no marca
+            // una anomalía, marca el estado ESTACIONARIO de toda cuenta madura. El presupuesto son 12
+            // páginas × 1000 filas = 12.000, y a cadencia */15 eso son ~125 días de snapshots. Con la
+            // captura de servidor activa desde 2026-08-17, alrededor de 2026-12-20 TODA cuenta con el
+            // cron vivo tendrá `truncated = true` de forma permanente ⇒ TOTAL rotulará «Historial
+            // parcial» para todo el mundo, incluso cuando el historial canónico cubra el inicio y la
+            // línea dibujada esté completa. La dirección es la correcta (falla CERRADO: afirma de menos,
+            // nunca de más) pero la alternativa —comprobar si el canónico cubre el inicio antes de
+            // degradar— es una decisión de producto, no una corrección. Mismo patrón de bomba con fecha
+            // que el `limit(5000)`. Sub-caso menor: si el servidor no devuelve `count` en la página 0,
+            // exactamente 12.000 filas dan `truncated = true` siendo la lectura completa.
+            && Number(emg && emg.backendLoaded) > 0;
+        } catch (_) { truncated = false; }
+        return truncated ? 'PARTIAL_AVAILABLE_HISTORY' : 'ALL_AVAILABLE_HISTORY';
+      }
       const drs = emg && emg.displayedRangeState;
       if (drs === 'partial_history') return 'PARTIAL_AVAILABLE_HISTORY';
       if (drs === 'full') return 'FULL_REQUESTED_WINDOW';
@@ -41525,6 +41597,33 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     let contract = null;
     try { if (typeof _aurixResolveChartReturnContract === 'function') contract = _aurixResolveChartReturnContract(vs, r, { chart: emg }); } catch (_) {}
     diagnostics.returnContract = contract ? { state: contract.state, reason: contract.reason, returnPct: contract.returnPct } : null;
+    // ── SPEC P0-CHART-TRUTH · PENDIENTE DECLARADO, NO IMPLEMENTADO ──────────────────────────────
+    // DEFECTO DEMOSTRADO: un % PUBLICADO puede medirse sobre un punto que NO se dibuja. Con 10.442
+    // puntos reales en 1A el badge publica +32,55 % con baseline 67.861,34 del 06-06 mientras la línea
+    // arranca en 76.457,88 del 25-06: la geometría sube ~17 % y el badge afirma +32 %.
+    // DOS OWNERS, los dos reproducidos: (1) el paso 5 `_aurixStableDisplayAnchor` declara «badge OK ⇒
+    // passthrough» pero recibe el veredicto ANTERIOR a la promoción del paso 9.5, así que oculta el
+    // prefijo y después el 9.5 promueve el retorno que se mide sobre él (`hiddenPrefixPts: 1864`);
+    // (2) el paso 4 `_aurixShortHistoryDisplay` tira el fragmento inicial por su cuenta
+    // (`short_history_leading_fragments_dropped`, 100 pts) y llega al mismo sitio por otra puerta.
+    //
+    // POR QUÉ NO SE ARREGLA AQUÍ. La corrección evidente —consultar la promoción antes y no ocultar el
+    // prefijo— se implementó dos veces y la revisión adversarial la tumbó las dos, con contraejemplos
+    // ejecutados sobre este mismo pipeline. La razón de fondo es estructural: los pasos 6, 6.5, 6.6 y
+    // 6.7 RE-DERIVAN sus decisiones del conjunto de puntos, y varios de sus umbrales son RELATIVOS a N.
+    //   · Devolver el prefijo cambia la segmentación: el selector de run dominante (6.7) puede elegir
+    //     EL PREFIJO y publicar una línea que termina dos meses atrás en 20.026 con badge +152 % y
+    //     `state: ready` — el VALOR ACTUAL desaparece del gráfico. Se cambia un baseline oculto por un
+    //     ENDPOINT oculto, que es peor.
+    //   · `fragMax = max(3, 0.15·N)` del visual trust gate SUBE al crecer N, así que clusters de
+    //     historia real que antes se dibujaban pasan a borrarse como «islas»: la línea publica MENOS
+    //     verdad que antes de la corrección (medido: 46 pts sobre 22 días ⇒ 6 pts sobre 20 minutos).
+    //   · Y emitir el diagnóstico en el paso 5 AFIRMA un resultado que los pasos posteriores todavía
+    //     pueden deshacer, así que la auditoría quedaría verde sobre un frame que incumple el
+    //     invariante que dice haber restaurado.
+    // Una corrección correcta tiene que decidirse sobre el resultado FINAL de la cadena (¿quedan dentro
+    // el baseline Y el endpoint, y no se pierde historia real?), no a mitad de ella, y eso es un cambio
+    // del contrato de render, no un parche. QUEDA PENDIENTE DE AUTORIZACIÓN DEL FUNDADOR.
     const badgeCalculando = !(contract && contract.state === 'ok');   // parity with v500 (emg.returnState !== 'ok')
 
     // Rule 1 — not ready / not enough points ⇒ building (some data) or empty (no data at all).

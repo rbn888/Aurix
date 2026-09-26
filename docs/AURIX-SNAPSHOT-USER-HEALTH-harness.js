@@ -545,7 +545,16 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
     // exactly what UNKNOWN QUANTITY INTEGRITY does — and an assertion that cannot survive
     // a legitimate edit elsewhere stops being evidence. This form keeps the teeth: touch
     // Chart, Performance, Reader or Preview and it goes red.
-    const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
+    // SPRINT P0 CHART TRUTH — `_aurixResolveFinalRenderSeriesContract` SALE de esta lista con causa,
+    // igual que salieron `_aurixCatHistWindow` y `_aurixIntelligencePreviewHTML`: este sprint lo edita
+    // legítimamente en UN punto, y no toca cálculo financiero. La proyección `historyCoverage` afirmaba
+    // ALL_AVAILABLE_HISTORY en TOTAL con que hubiera un punto, ignorando que la lectura paginada de
+    // snapshots se hubiera truncado — y un truncado pierde la cola ANTIGUA, o sea el INICIO del
+    // historial, que es justo lo que TOTAL dice representar. Los otros owners siguen fijados byte a
+    // byte. Los dientes que aquí se pierden se reponen en AURIX-CHART-TRUTH-CONTINUITY (sección FRC),
+    // que fija el ORDEN de las sub-puertas y la ausencia de fabricación: se cambia una afirmación
+    // histórica sobre bytes por la que de verdad protege este owner.
+    const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries',
       'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
       '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
       '_aurixIntelligencePreviewFacts'];
