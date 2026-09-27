@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '730'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '731'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -24415,7 +24415,7 @@ function _wsbTwoWayInnerHtml() {
     <label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="${esc(key)}" value="${esc(_wsFormatInputNumber(val))}">
-        <span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span>
+        ${_wsFieldUnitHtml(unit)}
       </span></label>`;
   const head = `<header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb2_title'))}</h3></header>`;
   // El CAPITAL de partida y el HORIZONTE son comunes y viven en la tarjeta de
@@ -24702,9 +24702,9 @@ function _renderScenarioBuilder() {
     <section class="wsh-card wsb-params">
       <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_params_title'))}</h3></header>
       <div class="wsb-params-grid">
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_base'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="baseManual" value="${esc(_wsFormatInputNumber(params.baseManual))}"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_years'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="years" value="${esc(_wsFormatInputNumber(params.years))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(t('wstool_unit_years')))}</span></span></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_ret'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="ret" value="${esc(_wsFormatInputNumber(params.ret))}"><span class="ws4-field-unit">${esc(_wsFieldUnit('%'))}</span></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_base'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="baseManual" value="${esc(_wsFormatInputNumber(params.baseManual))}">${_wsFieldUnitHtml('€')}</span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_years'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="years" value="${esc(_wsFormatInputNumber(params.years))}">${_wsFieldUnitHtml(t('wstool_unit_years'))}</span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsb_p_ret'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsb-param="ret" value="${esc(_wsFormatInputNumber(params.ret))}">${_wsFieldUnitHtml('%')}</span></label>
       </div>
       ${/* El aviso se repinta con los parámetros: sin su propio hueco en el DOM,
             declarar la base NO lo hacía desaparecer hasta un re-render completo de
@@ -25210,7 +25210,7 @@ function _renderWorkspaceDetail() {
       <span class="ws4-field-name">${esc(f.label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-ws4-input="${esc(f.k)}" value="${esc(_wsFormatInputNumber(p.inputs[f.k]))}">
-        <span class="ws4-field-unit">${esc(_wsFieldUnit(f.unit))}</span>
+        ${_wsFieldUnitHtml(f.unit)}
       </span>
     </label>`).join('');
 
@@ -25790,7 +25790,7 @@ function _wsFundModal(goalId) {
         <button type="button" class="wsfund-type is-active" data-wsfund-type="add">${esc(t('wsfund_add'))}</button>
         <button type="button" class="wsfund-type" data-wsfund-type="remove">${esc(t('wsfund_remove'))}</button>
       </div>
-      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value=""><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value="">${_wsFieldUnitHtml('€')}</span></label>
       <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_note'))}</span><input class="wsg-text" type="text" id="wsFundNote" placeholder="${esc(t('wsfund_note_ph'))}"></label>
       <p class="wsfund-disclaimer">${esc(t('wsfund_disclaimer'))}</p>
       <div class="ws-modal-actions">
@@ -25833,9 +25833,9 @@ function _renderGoals() {
         <div class="wsg-form">
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="${esc(_wsFormatInputNumber(100000))}" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="${esc(_wsFormatInputNumber(0))}" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="${esc(_wsFormatInputNumber(300))}" min="0" step="50"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="${esc(_wsFormatInputNumber(100000))}" min="0" step="1000">${_wsFieldUnitHtml('€')}</span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="${esc(_wsFormatInputNumber(0))}" min="0" step="1000">${_wsFieldUnitHtml('€')}</span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="${esc(_wsFormatInputNumber(300))}" min="0" step="50">${_wsFieldUnitHtml('€')}</span></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
         </div>
         <aside class="wsg-form-preview">
@@ -25873,8 +25873,8 @@ function _renderGoals() {
         <div class="wsg-card-edit">
           ${isSync
             ? `<div class="wsg-sync-note">${esc(real.hasReal ? t('wsg_sync_on')(formatBase(real.wealth)) : t('ws4_sync_none'))}</div>`
-            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>`}
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50"><span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span></span></label>
+            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000">${_wsFieldUnitHtml('€')}</span></label>`}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50">${_wsFieldUnitHtml('€')}</span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
         ${_wsFundBlockHtml(g)}
@@ -26101,6 +26101,22 @@ function _wsFieldUnit(u) {
   const raw = (u == null) ? '' : String(u);
   if (raw === '€') { try { return _wsToolCcy(); } catch (_) { return raw; } }
   return raw;
+}
+// ── §27 · EL SUFIJO DE UN CAMPO TIENE UN OWNER ────────────────────────────
+// Estaba escrito a mano en DIECINUEVE sitios, siempre igual, y la hoja reservaba para él
+// 34 px FIJOS en `.ws4-num` — un número mágico dimensionado para el sufijo más ancho y
+// aplicado a todos. Medido en las ocho capacidades a 360 y 390: 80 campos reservan 34 px
+// para algo que ocupa 8 («$») o 13 («%»), y VEINTE no tienen sufijo ninguno y reservan
+// igual. Además la reserva se queda CORTA para el más ancho: «años» mide 29 px y con su
+// `right:12px` llega hasta 41, o sea que sus 7 px de la izquierda caen dentro del área de
+// contenido que los 34 px declaran libre.
+// Aquí el sufijo DECLARA su tamaño y la hoja reserva lo que de verdad hace falta. Un sufijo
+// vacío no pinta span: así el campo sin unidad recupera sus 22 px en vez de guardarlos para
+// nada.
+function _wsFieldUnitHtml(u) {
+  const s = _wsFieldUnit(u);
+  if (s == null || s === '') return '';
+  return '<span class="ws4-field-unit" data-ws-unit="' + (String(s).length > 1 ? 'lg' : 'sm') + '">' + _intccEsc(s) + '</span>';
 }
 function _wsToolCcy() {
   try {
@@ -26974,7 +26990,7 @@ function _renderCompoundTool() {
       <span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k]))}">
-        <span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span>
+        ${_wsFieldUnitHtml(unit)}
       </span>
     </label>`;
   return `
@@ -27279,7 +27295,7 @@ function _renderBudgetTool() {
       <span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
         <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : 0))}">
-        <span class="ws4-field-unit">${esc(_wsFieldUnit('€'))}</span>
+        ${_wsFieldUnitHtml('€')}
       </span>
     </label>`;
   return `
@@ -27597,7 +27613,7 @@ function _wsJrnFormHtml() {
   const d = _wsJrnDraft || _wsJrnNewDraft();
   const editing = !!_wsJrnEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   const sel = (k, label, opts) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsjrn-input="${k}">${opts.map(o => `<option value="${esc(o.v)}"${d[k] === o.v ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></span></label>`;
   const types = [['stock', 'wsjrn_type_stock'], ['etf', 'wsjrn_type_etf'], ['crypto', 'wsjrn_type_crypto'], ['other', 'wsjrn_type_other']].map(([v, lk]) => ({ v, l: t(lk) }));
   const ccys = ['EUR', 'USD', 'GBP'].map(c => ({ v: c, l: c }));
@@ -28065,7 +28081,7 @@ function _wsReFormHtml() {
   const d = _wsReDraft || _wsReNewDraft();
   const editing = !!_wsReEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsre-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsre-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsre-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   const typeOpts = _WSRE_TYPES.map(ty => `<option value="${ty}"${d.ptype === ty ? ' selected' : ''}>${esc(t('wsre_t_' + ty))}</option>`).join('');
   return `
     <section class="wsh-card wsre-form-card">
@@ -28364,7 +28380,7 @@ function _wsRecvFormHtml() {
   const d = _wsRecvDraft || _wsRecvNewDraft();
   const editing = !!_wsRecvEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsrecv-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   return `
     <section class="wsh-card wsrecv-form-card">
       <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsrecv_add'))}</h3></header>
@@ -28625,7 +28641,7 @@ function _wsLoanCmpOutHtml(inp) {
 function _wsLoanCmpInner(inp) {
   const esc = _intccEsc;
   if (!inp.cmpOpen) return `<button type="button" class="wsh-cta wsloan-cmp-btn" data-wsloan-cmp>${esc(t('wsloan_cmp_btn'))}</button>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsloan-cmp-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsloan-cmp-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   return `
     <div class="wsloan-cmp-head"><h3 class="wsh-title">${esc(t('wsloan_cmp_title'))}</h3><button type="button" class="wsre-mini" data-wsloan-cmp aria-label="${esc(t('wsjrn_cancel'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
     <div class="wsloan-cmp-grid">${num('bPrincipal', t('wsloan_in_amount'), '€')}${num('bRate', t('wsloan_in_rate'), '%')}${num('bYears', t('wsloan_in_years'), t('wstool_unit_years'))}</div>
@@ -28674,7 +28690,7 @@ function _renderLoanTool() {
   // `<input>` recortado no mueve `scrollWidth`, así que ninguna sonda de desbordamiento
   // podía verlo: lo destapó la captura. Marcarlo aquí y no ensanchar la caja de todos
   // mantiene las dos filas de campos que la densidad del §26 ya había ganado.
-  const field = (k, label, unit, wide) => `<label class="ws4-field"${wide ? ' data-ws-field="wide"' : ''}><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  const field = (k, label, unit, wide) => `<label class="ws4-field"${wide ? ' data-ws-field="wide"' : ''}><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool" data-ws-accent="blue">
       ${_wsSurfaceHeadHtml({ title: t('wsloan_n'), doc: _wsToolDocName(), help: [t('wsloan_sub')] })}
@@ -28895,7 +28911,7 @@ function _wsApFormHtml() {
   const d = _wsApDraft || _wsApNewDraft();
   const editing = !!_wsApEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsap-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsap-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsap-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   const typeOpts = _WSAP_TYPES.map(ty => `<option value="${ty}"${d.assetType === ty ? ' selected' : ''}>${esc(t('wsap_t_' + ty))}</option>`).join('');
   const ccyOpts = ['EUR', 'USD', 'GBP'].map(c => `<option value="${c}"${d.currency === c ? ' selected' : ''}>${c}</option>`).join('');
   return `

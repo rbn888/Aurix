@@ -22120,6 +22120,20 @@ body.gs-open { overflow: hidden; }
 .ws4-num:focus { border-color: rgba(77,141,255,0.55); box-shadow: 0 0 0 3px rgba(77,141,255,0.15); }
 .ws4-num::-webkit-outer-spin-button, .ws4-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .ws4-field-unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12.5px; font-weight: 600; color: rgba(159,194,255,0.7); pointer-events: none; }
+/* ── §27 · LA RESERVA SIGUE AL SUFIJO, NO A UNA CONSTANTE ──────────────────
+   `.ws4-num` reserva 34 px a la derecha. Es un número mágico dimensionado para el sufijo más
+   ancho y aplicado a los cien campos de Workspace. Medido a 360 y 390 en las ocho capacidades:
+     · 80 campos reservan 34 px para un sufijo que ocupa 8 («$») o 13 («%»)
+     · 20 NO tienen sufijo y reservan igual — 22 px guardados para nada
+     · y para el más ancho la reserva se queda CORTA: «años» mide 29 px y con `right:12px`
+       llega hasta 41, así que sus 7 px izquierdos caen dentro del área que los 34 declaran
+       libre. Una colisión latente, no un desperdicio.
+   Ahora el sufijo declara su tamaño (`data-ws-unit`, un solo owner en `_wsFieldUnitHtml`) y la
+   reserva sale de él. `:has()` lo resuelve sin tocar los 19 sitios que pintan un campo, y donde
+   no esté soportado se queda el comportamiento de hoy: degrada a los 34 px de siempre. */
+.ws4-field-input:not(:has(.ws4-field-unit)) .ws4-num { padding-right: 12px; }
+.ws4-field-input:has(.ws4-field-unit[data-ws-unit="sm"]) .ws4-num { padding-right: 32px; }
+.ws4-field-input:has(.ws4-field-unit[data-ws-unit="lg"]) .ws4-num { padding-right: 49px; }
 .ws4-autosave { font-size: 10.5px; font-weight: 600; color: rgba(143,230,182,0.8); letter-spacing: 0.02em; }
 
 /* Output rows (light table) + reading */

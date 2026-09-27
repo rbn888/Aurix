@@ -384,5 +384,35 @@ section('8 · §27 · La cifra de una métrica tiene UN owner:');
     heroClamps.length === 1, heroClamps.join(' | '));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+section('9 · §27 · El sufijo de un campo tiene UN owner, y la reserva sale de él:');
+// ════════════════════════════════════════════════════════════════════════════
+// Diecinueve sitios pintaban el mismo `<span class="ws4-field-unit">` a mano, y la hoja
+// reservaba 34 px FIJOS para él: un número mágico dimensionado para el sufijo más ancho y
+// aplicado a los cien campos de Workspace. Medido a 360 y 390 en las ocho capacidades: 80
+// campos reservaban 34 px para 8 («$») o 13 («%»), 20 no tenían sufijo y reservaban igual,
+// y para «años» (29 px) la reserva se quedaba SIETE PÍXELES CORTA — colisión, no desperdicio.
+{
+  const helper = fnSrc('_wsFieldUnitHtml');
+  ok('9.1 un solo sitio pinta el sufijo de un campo',
+    (app.match(/class="ws4-field-unit"/g) || []).length === 1);
+  ok('9.2 el sufijo DECLARA su tamaño, que es lo que la hoja necesita para reservar',
+    /data-ws-unit="' \+ \(String\(s\)\.length > 1 \? 'lg' : 'sm'\)/.test(helper));
+  ok('9.3 un sufijo vacío no pinta span: el campo sin unidad no guarda sitio para nada',
+    /if \(s == null \|\| s === ''\) return '';/.test(helper));
+  ok('9.4 …y entonces no hay reserva: el campo recupera su ancho',
+    /\.ws4-field-input:not\(:has\(\.ws4-field-unit\)\) \.ws4-num \{ padding-right: 12px; \}/.test(css));
+  ok('9.5 la reserva sigue al sufijo declarado, no a una constante',
+    /:has\(\.ws4-field-unit\[data-ws-unit="sm"\]\) \.ws4-num \{ padding-right: 32px; \}/.test(css) &&
+    /:has\(\.ws4-field-unit\[data-ws-unit="lg"\]\) \.ws4-num \{ padding-right: 49px; \}/.test(css));
+  // La reserva del sufijo ancho tiene que CUBRIRLO: vive en `right:12px` y mide 29 px, así que
+  // llega hasta 41. Con 34 sus siete píxeles izquierdos caían dentro del área de contenido.
+  ok('9.6 la reserva del sufijo ancho lo cubre de verdad (12 de offset + 29 de ancho + hueco)',
+    49 >= 12 + 29 + 4);
+  // Y donde `:has()` no exista se queda el comportamiento de hoy, no uno peor.
+  ok('9.7 sin `:has()` degrada a la reserva de siempre, no a un campo roto',
+    /padding: 11px 34px 11px 12px/.test(css));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

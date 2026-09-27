@@ -235,11 +235,18 @@ console.log('\n6 · Moneda coherente entre el campo y el resultado:');
   ok('6.4 ningún render de unidad de campo conserva un «€» hardcodeado',
     !/ws4-field-unit">€</.test(app),
     (app.match(/ws4-field-unit">[^$][^<]{0,4}</g) || []).slice(0, 4).join(' '));
+  // Este assert contaba una FORMA LITERAL: `ws4-field-unit">${esc(_wsFieldUnit(…` repetido en
+  // los diecinueve sitios que pintaban un campo. La §27 le dio un owner a ese span, así que la
+  // forma desapareció y el invariante se volvió MÁS fuerte: hay un solo span en todo el fichero
+  // y vive dentro del helper que resuelve el texto por `_wsFieldUnit`. Se comprueba eso, que es
+  // lo que la regla quería decir. No se relaja: antes podían ser diecinueve y ahora es uno.
+  const unitHelper = fnSrc('_wsFieldUnitHtml');
   ok('6.5 y todos pasan por el owner único',
-    (app.match(/ws4-field-unit">\$\{esc\(_wsFieldUnit\(/g) || []).length
-      === (app.match(/class="ws4-field-unit"/g) || []).length,
-    JSON.stringify({ through: (app.match(/ws4-field-unit">\$\{esc\(_wsFieldUnit\(/g) || []).length,
-                     total: (app.match(/class="ws4-field-unit"/g) || []).length }));
+    (app.match(/class="ws4-field-unit"/g) || []).length === 1 &&
+    /class="ws4-field-unit"/.test(unitHelper) && /_wsFieldUnit\(u\)/.test(unitHelper),
+    JSON.stringify({ spans: (app.match(/class="ws4-field-unit"/g) || []).length,
+                     enElOwner: /class="ws4-field-unit"/.test(unitHelper),
+                     resuelvePorElOwner: /_wsFieldUnit\(u\)/.test(unitHelper) }));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
