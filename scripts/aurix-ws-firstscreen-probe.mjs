@@ -207,6 +207,22 @@ const MEASURE = `(function(SPEC){
     if (!e.textContent || !e.textContent.trim()) return;
     if (e.querySelector('*')) return;                 // sólo hojas de texto
     var card = e.closest('.wsh-card'); if (!card) return;
+    // LO QUE VIVE EN UNA REGION DESPLAZABLE NO DESBORDA: SE DESPLAZA. Esta medida existe para
+    // cazar al que se pinta fuera EN SILENCIO porque su overflow es visible; una celda de tabla
+    // dentro de un contenedor con overflow:auto esta gestionada —se recorta y se puede
+    // desplazar— y contarla es un falso positivo. Lo destapo anadir 1024 px a la matriz: la
+    // tabla de amortizacion de Prestamos aparecia como desborde en espanol, y la medida directa
+    // demostro que su contenedor esta DENTRO de la tarjeta (987 <= 1008) y que desplaza de
+    // verdad (scrollWidth 444 > clientWidth 422). Se comprueba la propiedad, no se afloja el
+    // umbral. (Sin comillas invertidas: este comentario vive dentro de un template literal.)
+    // SOLO auto|scroll, NUNCA hidden: mi primera version incluia hidden y saltaba 1.897 de
+    // 2.217 hojas —el 86 %—, porque muchas celdas usan overflow:hidden para su filete. Eso no
+    // es afinar una medida, es cegarla. Lo que se salta es lo NAVEGABLE; lo recortado por
+    // hidden lo sigue cazando la medida de recorte, que pregunta scrollWidth > clientWidth.
+    for (var sc = e.parentElement; sc && sc !== card; sc = sc.parentElement) {
+      var so = getComputedStyle(sc);
+      if (/(auto|scroll)/.test(so.overflowX) || /(auto|scroll)/.test(so.overflow)) return;
+    }
     var cb = card.getBoundingClientRect();
     if (b.right > cb.right - 1 || b.left < cb.left + 1) spill.push((e.className||e.tagName).toString().split(' ')[0]);
   });
@@ -299,7 +315,11 @@ const MEASURE = `(function(SPEC){
 // Móvil, móvil ESTRECHO, tablet y escritorio. 360×740 entra por la misma razón
 // por la que entró en la frontera Free: es donde una rejilla que «cabe» deja de
 // caber, y ninguna prueba de «¿cabe?» lo ve si no se mide esa anchura.
-const VIEWPORTS = [[360, 740], [390, 844], [768, 1024], [1440, 900]];
+// §38 — LOS SEIS ANCHOS QUE EL CIERRE NOMBRA, no cuatro. Faltaban 375 y 1024, y no son
+// redundantes: 375 es el iPhone más extendido y 1024 es la frontera donde varias capacidades
+// cambian de reparto (el armazón pasa a dos columnas ahí mismo), o sea justo el ancho donde una
+// regla mal puesta se nota y ninguno de los otros cuatro lo veía.
+const VIEWPORTS = [[360, 740], [375, 812], [390, 844], [768, 1024], [1024, 768], [1440, 900]];
 
 async function mount(page) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
