@@ -27697,6 +27697,14 @@ button.intv14-cmp-clear {
   background: rgba(6,10,20,0.55);
   border: 1px solid rgba(90,140,255,0.16);
 }
+/* §6/§36 — CADA CELDA LLEVA EL ACENTO DE SU CAPACIDAD, por la API compartida: el tono lo pone
+   `data-ws-accent` y aquí sólo se consume. Nueve celdas del mismo azul no dicen que sean nueve
+   cosas distintas. El azul sigue siendo el defecto para lo que no declare acento. */
+.wsfc-cap[data-ws-accent] .wsfc-cap-ico {
+  color: rgb(var(--ws-a));
+  background: rgba(var(--ws-a), 0.13);
+  border-color: rgba(var(--ws-a), 0.22);
+}
 .wsfc-cap-ico {
   flex: 0 0 auto; display: grid; place-items: center;
   width: 28px; height: 28px; border-radius: 9px;
@@ -29446,6 +29454,37 @@ body.ws-cover .aurix-wsh { max-width: none; }
 .wsh-toolcard:has(.wsh-toolcover) .wsh-tool-name { padding: 0 4px; }
 .wsh-toolcard:has(.wsh-toolcover) .wsh-toolcard-foot { padding: 0 4px; }
 @media (prefers-reduced-motion: reduce) { .wsh-toolcover { transition: none; } }
+
+/* ── §9 · LA PORTADA ENTRA, UNA VEZ Y RÁPIDO ───────────────────────────────
+   Las cuatro portadas del catálogo eran estáticas. Entran al pintarse: el área se funde, la
+   línea sube un par de píxeles, las barras crecen desde su base con 40 ms de diferencia y el
+   punto final aparece al terminar. Nada se repite, nada dura más de 420 ms y no hay bucle.
+   DOS DECISIONES QUE IMPORTAN:
+   · Se animan las propiedades COMPUESTAS (opacidad y transformación), no la geometría del
+     trazo: un `stroke-dashoffset` sin `pathLength` declarado depende del largo real de cada
+     curva, y si la cuenta falla la línea se queda INVISIBLE. Aquí el peor caso es que no se
+     mueva.
+   · `backwards` y no `both`: la animación va DESDE un estado modificado HACIA el natural, así
+     que el estado final es el que la hoja ya declara. Si la animación no corre —movimiento
+     reducido, motor viejo, pintura interrumpida— la portada se ve entera igualmente. Es el
+     mismo patrón que este repositorio ya usa en la capa de movimiento del gráfico.
+   Y todo vive bajo `no-preference`: quien pide menos movimiento no recibe NINGUNO (§9/§42). */
+@media (prefers-reduced-motion: no-preference) {
+  .wsh-toolcover .wsc-area { animation: wscoverArea 320ms var(--ease-out, ease) 60ms backwards; }
+  .wsh-toolcover .wsc-line { animation: wscoverLine 380ms var(--ease-out, ease) backwards; }
+  .wsh-toolcover .wsc-dot  { animation: wscoverDot 240ms var(--ease-out, ease) 300ms backwards; }
+  .wsh-toolcover .wsc-bars rect { animation: wscoverBar 300ms var(--ease-out, ease) backwards; transform-origin: 50% 100%; }
+  .wsh-toolcover .wsc-bars rect:nth-child(1) { animation-delay: 40ms; }
+  .wsh-toolcover .wsc-bars rect:nth-child(2) { animation-delay: 80ms; }
+  .wsh-toolcover .wsc-bars rect:nth-child(3) { animation-delay: 120ms; }
+  .wsh-toolcover .wsc-bars rect:nth-child(4) { animation-delay: 160ms; }
+  .wsh-toolcover .wsc-bars rect:nth-child(5) { animation-delay: 200ms; }
+  .wsh-toolcover .wsc-bars rect:nth-child(6) { animation-delay: 240ms; }
+}
+@keyframes wscoverArea { from { opacity: 0; } }
+@keyframes wscoverLine { from { opacity: 0; transform: translateY(3px); } }
+@keyframes wscoverDot  { from { opacity: 0; transform: scale(0.4); transform-box: fill-box; transform-origin: 50% 50%; } }
+@keyframes wscoverBar  { from { opacity: 0; transform: scaleY(0.25); } }
 
 /* ── UN AVISO QUE OFRECE SALIDA ────────────────────────────────────────────
    El toast de «tu pago se está confirmando» no puede desvanecerse: el usuario

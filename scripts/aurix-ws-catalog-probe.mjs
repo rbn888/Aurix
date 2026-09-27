@@ -239,6 +239,39 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       caja.esperando && caja.esperando === caja.cargada && caja.cargada === caja.fallida,
       JSON.stringify(caja));
   }
+  // ── §9/§42 · LA ANIMACIÓN ENTRA UNA VEZ Y TERMINA VISIBLE ────────────────
+  // El riesgo de animar una portada no es que se vea fea: es que se quede a medias. Se
+  // comprueban las dos mitades que importan. Con movimiento REDUCIDO no debe haber ninguna
+  // animación —quien lo pide no recibe ni una—. Y con movimiento, DESPUÉS de que acaben, la
+  // portada tiene que estar entera: opacidad 1 y sin transformación residual. Por eso la
+  // animación va hacia el estado natural con `backwards` y no al contrario.
+  for (const [modo, rm] of [['reducido', 'reduce'], ['con movimiento', 'no-preference']]) {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: rm });
+    await ctx.route('**/app.js*', async route => {
+      const r = await route.fetch(); await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
+    });
+    const page = await ctx.newPage();
+    await mount(page); await asPremium(page, 'es');
+    await page.evaluate(`(function(){ _wshView='home'; _wsTab='tools'; _wshRepaintHome(); return true; })()`);
+    await page.waitForTimeout(1400);   // más que la animación más larga (380 ms + 300 de retardo)
+    const g = await page.evaluate(`(function(){
+      var els = [].slice.call(document.querySelectorAll('.wsh-toolcover .wsc-line, .wsh-toolcover .wsc-area, .wsh-toolcover .wsc-bars rect, .wsh-toolcover .wsc-dot'));
+      return els.map(function(e){ var cs = getComputedStyle(e);
+        return { cls: (typeof e.className === 'string' ? e.className : (e.getAttribute('class') || '')).split(' ')[0],
+          anim: cs.animationName, op: Number(cs.opacity), tf: cs.transform }; }); })()`);
+    const tag = `CR.1440 movimiento ${modo}`;
+    ok(`${tag} hay portadas que medir`, g.length > 0, String(g.length));
+    if (rm === 'reduce') {
+      ok(`${tag} NO se declara ninguna animación`, g.every(x => x.anim === 'none'),
+        JSON.stringify(g.filter(x => x.anim !== 'none').map(x => x.cls + ':' + x.anim)));
+    } else {
+      ok(`${tag} la animación existe de verdad`, g.some(x => x.anim !== 'none'), JSON.stringify(g.map(x => x.anim).slice(0, 4)));
+      ok(`${tag} …y al terminar la portada está ENTERA: opacidad 1 y sin transformación`,
+        g.every(x => x.op > 0.95) && g.every(x => x.tf === 'none' || x.tf === 'matrix(1, 0, 0, 1, 0, 0)'),
+        JSON.stringify(g.filter(x => !(x.op > 0.95) || !(x.tf === 'none' || x.tf === 'matrix(1, 0, 0, 1, 0, 0)'))));
+    }
+    await ctx.close();
+  }
   await browser.close();
 }
 if (server) server.close();

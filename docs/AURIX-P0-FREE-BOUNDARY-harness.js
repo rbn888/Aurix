@@ -120,6 +120,11 @@ function ctx(persona, langCode) {
    // absorbe y el gate se pone verde ejercitando el FALLBACK — un verde falso. Se carga para
    // que este harness recorra el camino real, que es para lo que existe.
    '_WS_TOOL_COVER',
+   // Y el acento de cada capacidad, que la portada Free consume para que sus nueve celdas no
+   // sean nueve azules. Aquí NO hay `try` que lo absorba, y es deliberado: la portada Free es
+   // la ÚNICA vista que alcanza un usuario Free, así que degradarla en silencio sería peor que
+   // romperse. Lo que tiene que estar declarado es la dependencia, en el producto y en el gate.
+   '_WS_TOOL_ACCENT',
    '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA'].forEach(n => vm.runInContext(konstSrc(n), sb));
   vm.runInContext('var _aurixEnt = { loaded:false, loading:false, error:null, plan:"free", status:"none", source:"default", validUntil:null, features:Object.create(null), sources:Object.create(null), fetchedAt:0 };', sb);
   ['hasFeature','_aurixEntLoaded','hasAurixPremiumAccess','_aurixEntIsCatalogPreview',

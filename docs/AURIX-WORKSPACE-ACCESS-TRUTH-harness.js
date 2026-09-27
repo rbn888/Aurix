@@ -112,7 +112,11 @@ function ctx(persona, langCode) {
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
    '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
-   '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA','_WS_TOOL_COVER',
+   // `_WS_TOOL_ACCENT` lo consume la portada Free para que sus nueve celdas no sean nueve
+   // azules. Este harness ejercita ese render en un sandbox, así que la dependencia se declara
+   // aquí también: es la SEGUNDA vez en la sesión que un gate caza una dependencia nueva de una
+   // ruta de render, y es exactamente para lo que sirve.
+   '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA','_WS_TOOL_COVER','_WS_TOOL_ACCENT',
    '_WSH_SCENARIOS_KEY','_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL',
    '_WS_FOUNDER_VIEW_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsCatalogEntry','_wsSurfaceEntry','_wsToolFeatureKey','_wsCatalogVisible','_wsCatalogFor',

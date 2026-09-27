@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '738'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '739'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26322,7 +26322,7 @@ function _renderWorkspaceFreeCover() {
           <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
           <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
           <ul class="wsfc-caps" data-wsfc-caps="${caps.length}">
-            ${caps.map(c => `<li class="wsfc-cap">
+            ${caps.map(c => `<li class="wsfc-cap" data-ws-accent="${esc(_WS_TOOL_ACCENT[c.k] || 'blue')}">
               <span class="wsfc-cap-ico">${_wsCapIconHtml(c.icon)}</span>
               <span class="wsfc-cap-name">${esc(tx(c.nameKey, ''))}</span>
             </li>`).join('')}
@@ -26698,9 +26698,21 @@ function _wsToolSavedListHtml() {
 }
 // El acento de cada capacidad, en un solo sitio. Consume la API de `data-ws-accent`, así que
 // aquí sólo vive el NOMBRE — el tono está en la hoja de estilos.
+// §6/§36 — UN SOLO OWNER DEL ACENTO DE UNA CAPACIDAD, y ahora cubre las nueve publicadas.
+// Faltaban `scenario` y `goals`, que se pintaban con otro mapa (`_WS_APP_IDENTITY`): dos fuentes
+// para la misma idea, que es el modo de fallo que esta sesión lleva cerrando.
+// CONVIENE DEJAR LAS DOS RAZONES ESCRITAS, porque aquí hay un choque. Una decisión anterior
+// unificó los acentos AL AZUL con un argumento bueno: «tres iconos de tres familias cromáticas
+// sólo comunican desorden». El cierre pide lo contrario —identidad por capacidad, más color— y
+// gana por dos motivos: primero, porque es la instrucción vigente; y segundo, porque esa
+// unificación ya la superó el propio producto: las vistas de herramienta llevan acento por
+// capacidad desde que existe esta API, está desplegado y certificado. Lo que queda no es una
+// paleta nueva, es extender la que ya manda. Cinco tonos para nueve capacidades, agrupando las
+// parientes: eso es sistema, no desorden.
 const _WS_TOOL_ACCENT = Object.freeze({
   compound: 'teal', loan: 'blue', budget: 'teal', receivables: 'green',
   journal: 'violet', realestate: 'violet', assets: 'blue', comparator: 'blue',
+  scenario: 'plum', goals: 'plum',
 });
 function _wsToolOpenSaved() {
   const type = _wsToolStateType(_wsToolActive);
