@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '725'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '726'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6242,6 +6242,11 @@ const T = {
     wspl_a_dup:           'Duplicar',
     wspl_a_unpin:         'Quitar del Dashboard',
     wspl_a_del:           'Eliminar',
+    wsdoc_title:          'MIS DOCUMENTOS',
+    wsdoc_open_now:       'abierto ahora',
+    wsdoc_s_none:         'Este documento no guardó cifras.',
+    wsdoc_s_value:        'Valor',
+    wsdoc_s_net:          'Resultado',
     wsbud_dn_top:         'la mayor partida',
     wspl_m_target:        'Meta',
     wspl_m_saved:         'Acumulado',
@@ -9074,6 +9079,11 @@ const T = {
     wspl_a_dup:           'Duplicate',
     wspl_a_unpin:         'Remove from Dashboard',
     wspl_a_del:           'Delete',
+    wsdoc_title:          'MY DOCUMENTS',
+    wsdoc_open_now:       'open now',
+    wsdoc_s_none:         'This document saved no figures.',
+    wsdoc_s_value:        'Value',
+    wsdoc_s_net:          'Result',
     wsbud_dn_top:         'largest category',
     wspl_m_target:        'Target',
     wspl_m_saved:         'Saved',
@@ -21164,7 +21174,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21281,7 +21291,19 @@ function _wshWireOnce() {
     // §23 del SPEC — el ⋯ de una instancia guardada. Vive DENTRO del `<summary>`, así que hay que
     // impedir el plegado por defecto: sin esto, abrir el menú cerraría la instancia.
     const siMenu = t.getAttribute('data-wssi-menu');
-    if (siMenu) { e.preventDefault(); e.stopPropagation(); _wsSavedMenuOpen(t, siMenu); return; }
+    if (siMenu) {
+      e.preventDefault(); e.stopPropagation();
+      // Cada superficie declara qué acciones tienen sentido en ella y cómo repintarse.
+      const inTool = _wshView === 'tool';
+      _wsSavedMenuOpen(t, siMenu, inTool ? {
+        canOpen: true,
+        onOpen: () => { try { _wsOpenTool(_wsToolActive, siMenu.slice(siMenu.indexOf(':') + 1)); } catch (_) {} },
+        onDone: () => { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); } },
+      } : { canOpen: false });
+      return;
+    }
+    const docOpen = t.getAttribute('data-wsdoc-open');
+    if (docOpen) { _wsOpenTool(_wsToolActive, docOpen); return; }
     if (t.hasAttribute('data-wsg-create')) { _wsgCreate(); return; }
     const dq = t.getAttribute('data-wsg-dash');
     if (dq) { _wsgAskDash = null; _wsPlanDashSet(dq, false, 'goal');
@@ -23269,7 +23291,8 @@ function _wsPopoverMenu(anchor, id, items, onPick) {
 // Lo cazó la sonda al abrir el menú; leyendo el diff no se ve.
 // Sin «Abrir» en la lista: la instancia ya está delante y su propio `<summary>` la despliega —
 // ofrecerlo sería una acción que no hace nada distinto de lo que el usuario acaba de hacer.
-function _wsSavedMenuOpen(anchor, ref) {
+function _wsSavedMenuOpen(anchor, ref, opts) {
+  opts = opts || {};
   const i = ref.indexOf(':'), kind = ref.slice(0, i), id = ref.slice(i + 1);
   let pinned = false;
   try {
@@ -23277,18 +23300,23 @@ function _wsSavedMenuOpen(anchor, ref) {
       ? (_wsgGoals().find(x => x && x.id === id) || {}).dashPinned === true
       : (_ws4Projects().find(x => x && x.id === id) || {}).dashHidden !== true;
   } catch (_) {}
-  const items = [
-    { k: 'rename', label: t('wspl_a_rename') },
-    { k: 'dup',    label: t('wspl_a_dup') },
-    { k: pinned ? 'unpin' : 'pin', label: t(pinned ? 'wsmse_dash_remove' : 'wsmse_dash_add') },
-    { k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' },
-  ];
-  _wsPopoverMenu(anchor, 'wsSavedMenu', items, act => _wsSavedAct(act, ref, { onDone: () => {
-    // Repinta la superficie que contiene la instancia. Objetivos es el primer consumidor; cuando
-    // se migren las demás, cada una pasará su propio repintado por `onDone`.
-    const c = document.getElementById('aurixWorkspace');
-    if (c && _wshView === 'goals') { c.innerHTML = _renderGoals(); _wshReveal(c); }
-  } }));
+  const items = [];
+  // «ABRIR» APLICA O NO SEGÚN LA FORMA DE LA CAPACIDAD, y eso lo decide el llamador. En Objetivos
+  // la instancia ya está delante y su `<summary>` la despliega, así que ofrecerlo no haría nada
+  // distinto. En una herramienta abrir ES la acción: carga el documento en el único editor. Lo
+  // descubrió el segundo consumidor — antes esta función lo decidía por su cuenta.
+  if (opts.canOpen) items.push({ k: 'open', label: t('wspl_a_open') });
+  items.push({ k: 'rename', label: t('wspl_a_rename') });
+  items.push({ k: 'dup',    label: t('wspl_a_dup') });
+  if (opts.canDash !== false) items.push({ k: pinned ? 'unpin' : 'pin', label: t(pinned ? 'wsmse_dash_remove' : 'wsmse_dash_add') });
+  items.push({ k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' });
+  _wsPopoverMenu(anchor, 'wsSavedMenu', items, act => _wsSavedAct(act, ref, {
+    onOpen: opts.onOpen,
+    onDone: opts.onDone || (() => {
+      const c = document.getElementById('aurixWorkspace');
+      if (c && _wshView === 'goals') { c.innerHTML = _renderGoals(); _wshReveal(c); }
+    }),
+  }));
 }
 // ════════════════════════════════════════════════════════════════════════════════════════════
 // FASE 2 · INSTANCIA GUARDADA, PLEGADA  —  `_wsSavedItemHtml`
@@ -26289,7 +26317,32 @@ function _wsOpenTool(toolKey, projectId) {
     // ponerle el mes de hoy sería deshacer su decisión en cada apertura.
     if (key === 'budget' && _wsToolInputs.periodKey === undefined) _wsToolInputs.periodKey = _wsBudgetCurrentPeriod();
   }
-  _wshView = 'tool'; renderWorkspaceHome();
+  // ── DEFECTO PREEXISTENTE, DEMOSTRADO Y CORREGIDO AQUÍ ─────────────────────────────────────
+  // `renderWorkspaceHome` tiene un guard de idempotencia (`if (shown === 'tool') return`) que
+  // existe para no repintar al volver a la pestaña. Pero `_wsOpenTool` se llama TAMBIÉN desde
+  // DENTRO de la herramienta —el modal «Abrir guardado» y ahora la lista de documentos— y ahí el
+  // guard era el fallo: el estado cambiaba (`_wsToolEditId`, `_wsToolInputs`) y la PANTALLA no.
+  // Medido en HEAD limpio: tras abrir un documento con `initial: 44444`, el campo seguía
+  // mostrando `1.000` y el nombre del documento seguía vacío.
+  // NO ERA COSMÉTICO: el estado interno ya decía que se estaba editando ESE documento, así que el
+  // siguiente «Guardar» lo habría sobrescrito con los valores viejos que seguían en pantalla.
+  // El guard NO se toca —protege a todos los demás llamadores—: quien sabe que la identidad del
+  // documento acaba de cambiar es este owner, así que es él quien repinta su propia superficie.
+  _wshView = 'tool';
+  // Guard de DOM, y no es paranoia: `_wsOpenTool` se ejecuta también en sandbox sin `document`
+  // —AURIX-WORKSPACE-ACCESS-TRUTH lo usa para certificar la decisión de ACCESO, que no necesita
+  // pantalla—, y tocar `document` sin preguntar rompió ese gate. El resto del fichero guarda el
+  // acceso al DOM por la misma razón.
+  let _mounted = null;
+  try {
+    if (typeof document !== 'undefined') {
+      const _host = document.getElementById('aurixWorkspace');
+      if (_host && _host.querySelector('.aurix-wsh[data-wsh-view="tool"]')) {
+        _host.innerHTML = _wsRenderTool(); _wshReveal(_host); _mounted = true;
+      }
+    }
+  } catch (_) { _mounted = null; }
+  if (!_mounted) renderWorkspaceHome();
 }
 
 function _wsToolOnInput(el) {
@@ -26458,6 +26511,113 @@ function _wsToolSave() {
 // llegar a él. Así que la puerta se construye ANTES de cerrar las otras.
 // Reutiliza el selector que ya existe para elegir destino de un reemplazo: mismo
 // componente, mismo teclado, misma lista ordenada por última edición.
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// FASE 2 paso 4 · «MIS DOCUMENTOS» — LA PRIMITIVA, SEGUNDO CONSUMIDOR
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// §22 pide que los guardados de una capacidad APAREZCAN en ella, plegados, con su menú. Hasta
+// ahora los documentos de una herramienta sólo existían detrás de un modal («Abrir guardado»):
+// el usuario tenía que saber que estaban ahí y salir del trabajo para verlos.
+//
+// ES EL SEGUNDO CONSUMIDOR de `_wsSavedItemHtml`, y por eso importa: Objetivos tiene un editor
+// POR instancia, así que su cuerpo plegado eran sus propios campos. Una herramienta tiene UN
+// editor y N documentos, así que el cuerpo no puede ser un editor — es el resumen GUARDADO del
+// documento. Dos formas muy distintas sobre la misma primitiva, que es exactamente la prueba de
+// si la abstracción era correcta o estaba moldeada al primer caso.
+//
+// LO QUE LA SEGUNDA INTEGRACIÓN OBLIGÓ A CAMBIAR (y se anota porque es el valor del ejercicio):
+// el menú de una instancia necesitaba «Abrir». En Objetivos se omitía a propósito —la instancia
+// ya está delante y su `<summary>` la despliega—, pero aquí abrir es LA acción: carga el
+// documento en el editor. Así que `_wsSavedMenuOpen` pasa a recibir qué acciones aplican en vez
+// de decidirlo por su cuenta.
+//
+// NO SE RECALCULA NADA. Las cifras del cuerpo son las que el documento GUARDÓ (`p.results`), no
+// una re-ejecución del motor: enseñar un número recalculado bajo un nombre guardado afirmaría
+// que el documento dice algo que no dice. Si un documento no tiene resultados guardados, no se
+// publica ninguna cifra (§52).
+function _wsToolDocSummary(p) {
+  const r = (p && p.results) || null;
+  if (!r) return [];
+  const m = (k, v) => ({ k: t(k), v: v });
+  const money = v => (Number.isFinite(Number(v)) ? formatBase(Number(v)) : null);
+  const out = [];
+  const push = (key, val) => { if (val != null && val !== '') out.push(m(key, val)); };
+  try {
+    if (p.type === 'compound_growth') {
+      // CLAVES REALES, no inventadas. La primera versión usaba `wstool_r_final` y
+      // `wsloan_r_monthly`, que no existen: `t()` devolvía `undefined` y la métrica salía SIN
+      // etiqueta —una cifra sin decir de qué es—. Lo destapó la captura, no el assert.
+      push('wspl_m_final', money(r.final));
+      push('wstool_res_contrib', money(r.contributed));
+    } else if (p.type === 'loan_simulation') {
+      push('wsloan_kpi_monthly', money(r.monthlyPayment));
+      push('wsloan_kpi_interest', money(r.totalInterest));
+    } else if (p.type === 'monthly_budget') {
+      push('wspl_m_income', money(r.income));
+      push('wspl_m_expenses', money(r.expenses));
+    } else if (p.type === 'receivables_app') {
+      push('wspl_m_pending', money(r.totalPendiente));
+      push('wspl_m_collected', money(r.totalCobrado));
+    } else if (p.type === 'real_estate_portfolio') {
+      push('wspl_m_units', Number.isFinite(Number(r.count)) ? String(r.count) : null);
+      // El VALOR sólo si está declarado: un «0 €» diría que la cartera no vale nada.
+      push('wsdoc_s_value', Number(r.valueTotal) > 0 ? money(r.valueTotal) : null);
+    } else if (p.type === 'trade_journal') {
+      // Con divisas mezcladas la rentabilidad media no es publicable: sólo el recuento.
+      push('wspl_m_rows', Number.isFinite(Number(r.closedCount)) ? String(r.closedCount) : null);
+      push('wsdoc_s_net', money(r.netProfit));
+    } else if (p.type === 'asset_prices') {
+      push('wspl_m_rows', Number.isFinite(Number(r.count)) ? String(r.count) : null);
+      push('wsdoc_s_net', r.currencyMixed ? null : money(r.netProfitLoss));
+    }
+  } catch (_) { return []; }
+  return out;
+}
+// La lista de documentos de la capacidad ABIERTA. Se pinta DEBAJO del trabajo (bloque 5 de la
+// jerarquía del §6), así que no desplaza ni un píxel el primer control útil que v740 certificó.
+// Sin documentos no se pinta: una tarjeta vacía que dice «no tienes nada» repite con otras
+// palabras lo que la pantalla ya está diciendo.
+function _wsToolSavedListHtml() {
+  const esc = _intccEsc;
+  const type = _wsToolStateType(_wsToolActive);
+  let docs = [];
+  try { docs = _wsSaveCandidates(type, null); } catch (_) { return ''; }
+  if (!docs.length) return '';
+  let raw = [];
+  try { raw = _ws4Projects(); } catch (_) { raw = []; }
+  const accent = _WS_TOOL_ACCENT[_wsToolActive] || 'blue';
+  const rows = docs.map(d => {
+    const p = raw.find(x => x && x.id === d.id) || {};
+    const kpis = _wsToolDocSummary(p);
+    const isOpen = _wsToolEditId === d.id;
+    return _wsSavedItemHtml({
+      ref: 'workspace:' + d.id,
+      accent: accent,
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + _wsGlyph('log') + '</svg>',
+      name: d.name,
+      meta: isOpen ? t('wsdoc_open_now') : d.meta,
+      kpis: kpis,
+      cls: isOpen ? 'is-current' : '',
+      body: '<div class="wssi-doc">'
+        + (kpis.length ? '<div class="wssi-doc-kpis">' + kpis.map(x =>
+            '<span class="wssi-doc-kpi"><i>' + esc(x.k) + '</i><b>' + esc(x.v) + '</b></span>').join('') + '</div>'
+          : '<p class="wssi-doc-none">' + esc(t('wsdoc_s_none')) + '</p>')
+        + (isOpen ? '' : '<button type="button" class="wsh-cta wssi-doc-open" data-wsdoc-open="' + esc(d.id) + '">'
+            + esc(t('wstool_open_saved')) + '</button>')
+        + '</div>',
+    });
+  }).join('');
+  return `
+      <section class="wsh-card wsdoc-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsdoc_title'))}</h3></header>
+        <div class="wsg-stack">${rows}</div>
+      </section>`;
+}
+// El acento de cada capacidad, en un solo sitio. Consume la API de `data-ws-accent`, así que
+// aquí sólo vive el NOMBRE — el tono está en la hoja de estilos.
+const _WS_TOOL_ACCENT = Object.freeze({
+  compound: 'teal', loan: 'blue', budget: 'teal', receivables: 'green',
+  journal: 'violet', realestate: 'violet', assets: 'blue', comparator: 'blue',
+});
 function _wsToolOpenSaved() {
   const type = _wsToolStateType(_wsToolActive);
   const docs = _wsSaveCandidates(type, null);
@@ -26819,6 +26979,10 @@ function _renderCompoundTool() {
       <section class="wsh-card wstool-out-card">
         <div class="wstool-out" data-wstool-out>${_wsToolOutHtml(inp)}</div>
       </section>
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
@@ -27103,6 +27267,10 @@ function _renderBudgetTool() {
           </section>
         </div>
       </div>
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
@@ -27457,6 +27625,10 @@ function _renderJournalTool() {
       </section>` : ''}
       ${_wsJrnFormHtml()}
       ${_wsJrnListHtml(res)}
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
@@ -27947,6 +28119,10 @@ function _renderRealEstateTool() {
         ${gridOrEmpty}
       </section>
       ${_wsReFormHtml()}
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
@@ -28177,6 +28353,10 @@ function _renderReceivablesTool() {
         <div data-wsrecv-list>${_wsRecvListHtml(r)}</div>
       </section>
       ${_wsRecvFormHtml()}
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
@@ -28437,6 +28617,10 @@ function _renderLoanTool() {
         <div class="wsloan-out" data-wstool-out>${_wsLoanOutHtml(inp)}</div>
       </section>
       <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
@@ -28670,6 +28854,10 @@ function _renderAssetPricesTool() {
         ${_wsApRowsHtml(r)}
       </section>
       ${_wsApFormHtml()}
+      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
+            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
+            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
+      ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>

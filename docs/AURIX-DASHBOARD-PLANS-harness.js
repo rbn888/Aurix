@@ -512,5 +512,55 @@ console.log('\n7 · Objetivos, en el sistema común:');
     /wspl-note/.test(empty) && !/wspl-card/.test(empty));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 8 · FASE 2 · EL SISTEMA COMÚN — PRIMITIVA, MENÚ Y «MIS DOCUMENTOS»
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n8 · El sistema común de instancias guardadas:');
+{
+  const prim = fnSrc('_wsSavedItemHtml');
+  ok('8.1 la primitiva es un `<details>` NATIVO (plegado, foco y teclado los da el navegador)',
+    /<details class="wssi/.test(prim) && /<summary class="wssi-sum"/.test(prim) &&
+    !/aria-expanded/.test(prim) && !/addEventListener/.test(prim));
+  ok('8.2 …y no sabe de ninguna capacidad concreta: recibe `ref`, textos y un cuerpo ya hecho',
+    !/goal|wsg|compound|budget|_ws4Projects|_wsgGoals/.test(prim), 'la primitiva conoce una capacidad');
+  ok('8.3 …y no persiste nada', !/setItem|_ws4Persist|_wsgPersist|_wshWriteStore/.test(prim));
+
+  // DOS CONSUMIDORES REALES, que es lo que autorizaba extraerla (§5 de la dirección).
+  ok('8.4 tiene DOS consumidores con formas distintas de cuerpo',
+    /_wsSavedItemHtml\(/.test(fnSrc('_renderGoals')) && /_wsSavedItemHtml\(/.test(fnSrc('_wsToolSavedListHtml')));
+  // …y cada uno declara qué acciones aplican, en vez de que el menú lo decida por su cuenta.
+  const mo = fnSrc('_wsSavedMenuOpen');
+  ok('8.5 «Abrir» lo decide el LLAMADOR, no el menú (lo obligó el segundo consumidor)',
+    /opts\.canOpen/.test(mo) && !/_wshView === 'tool'/.test(mo));
+
+  // «MIS DOCUMENTOS»: sólo los de la capacidad abierta, y sólo lo que el documento GUARDÓ.
+  const list = fnSrc('_wsToolSavedListHtml'), sum = fnSrc('_wsToolDocSummary');
+  ok('8.6 la lista filtra por el tipo de la capacidad abierta',
+    /_wsToolStateType\(_wsToolActive\)/.test(list) && /_wsSaveCandidates\(/.test(list));
+  ok('8.7 sin documentos no se pinta la tarjeta (nada de «no tienes nada»)',
+    /if \(!docs\.length\) return '';/.test(list));
+  ok('8.8 las cifras salen de lo GUARDADO (`p.results`), no de una re-ejecución del motor',
+    /p\.results/.test(sum) && !/calculate[A-Z]/.test(sum), 'recalcula en vez de leer lo guardado');
+  ok('8.9 sin resultados guardados no se publica ninguna cifra (§52)',
+    /if \(!r\) return \[\];/.test(sum));
+  ok('8.10 va DEBAJO del trabajo en las siete herramientas, sin mover el primer control',
+    (app.match(/\$\{_wsToolSavedListHtml\(\)\}/g) || []).length === 7,
+    (app.match(/\$\{_wsToolSavedListHtml\(\)\}/g) || []).length + ' inserciones');
+
+  // UNA CIFRA SIN ETIQUETA ES UNA CIFRA QUE NO DICE DE QUÉ ES. La primera versión usaba dos
+  // claves de i18n inventadas (`wstool_r_final`, `wsloan_r_monthly`): `t()` devolvía `undefined`
+  // y la métrica salía sin rótulo. Lo destapó la CAPTURA, y ningún assert lo veía — ahora sí.
+  const used = [...new Set([...sum.matchAll(/push\('([a-z0-9_]+)'/g)].map(m => m[1]))];
+  const esAt = app.indexOf('const T = {'), enAt = app.indexOf('  en: {', esAt);
+  const missing = used.filter(k => !(new RegExp('\\n\\s+' + k + ':').test(app.slice(esAt, enAt))
+                                  && new RegExp('\\n\\s+' + k + ':').test(app.slice(enAt))));
+  ok('8.11 toda etiqueta del resumen existe en ES y en EN (nunca una cifra sin rótulo)',
+    used.length > 0 && missing.length === 0, missing.join(' '));
+
+  // El documento ABIERTO no se ofrece abrir otra vez.
+  ok('8.12 el documento abierto se distingue y no ofrece «abrir»',
+    /_wsToolEditId === d\.id/.test(list) && /isOpen \? '' :/.test(list));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
