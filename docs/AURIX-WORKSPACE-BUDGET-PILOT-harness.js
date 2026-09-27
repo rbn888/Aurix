@@ -482,5 +482,41 @@ section('11 · Ninguna clave de Workspace se usa sin estar definida:');
     used.length > 600, String(used.length));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+section('12 · Cierre V2 · el título identifica y el Diario entra en el armazón:');
+// ════════════════════════════════════════════════════════════════════════════
+{
+  const cssNoC = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const jrn = fnSrc('_renderJournalTool');
+  // El título baja de 21/26 a 18/22: identifica, no domina. La accesibilidad no se toca — el
+  // alto mínimo de la barra y el objetivo táctil del retorno siguen siendo sus propios asserts.
+  ok('12.1 el título de una capacidad identifica y no domina',
+    /\.aurix-wsh \.wsh-bar-title \{[^}]*font-size: 18px/.test(cssNoC) &&
+    /\.aurix-wsh \.wsh-bar-title \{ font-size: 22px; \}/.test(cssNoC) &&
+    /\.aurix-wsh \.wsh-bar \{[\s\S]{0,120}min-height: 44px/.test(cssNoC));
+  // Cuarto consumidor del armazón. Y la condición: sin resumen NO se usa, porque una rejilla de
+  // dos columnas con una vacía es un hueco.
+  ok('12.2 el Diario usa el armazón compartido cuando hay algo que resumir',
+    /res\.list\.length \? `<div class="ws2col">/.test(jrn) &&
+    /ws2col-edit">\$\{_wsJrnFormHtml\(\)\}/.test(jrn) && /ws2col-view/.test(jrn));
+  ok('12.3 …y sin resumen no lo usa: el formulario va a ancho completo',
+    /` : _wsJrnFormHtml\(\)\}/.test(jrn));
+  ok('12.4 su acento sale del mapa, no escrito a mano en la vista',
+    /data-ws-accent="\$\{esc\(_WS_TOOL_ACCENT\.journal\)\}"/.test(jrn));
+  // `auto-fill` conserva pistas vacías; `auto-fit` las colapsa. Medido a 1440: cinco pistas para
+  // tres operaciones dejaban 560 px de negro. El tope por tarjeta es la otra mitad: sin él una
+  // sola operación se estiraría a 1.356 px.
+  ok('12.5 la lista de operaciones llena su ancho, y una sola no se estira',
+    /\.wsjrn-list \{ display: grid; grid-template-columns: repeat\(auto-fit, minmax\(232px, 1fr\)\)/.test(cssNoC) &&
+    /\.wsjrn-card \{ max-width: 480px; \}/.test(cssNoC));
+  // Inmobiliario NO se reabre: su apilado en móvil es una decisión MEDIDA del repositorio —dos
+  // columnas exigirían 9,2 px de cifra a 390, por debajo del suelo de 12— y se vuelve a
+  // comprobar aquí para que nadie la deshaga por «densidad».
+  ok('12.6 el apilado del resumen inmobiliario en móvil sigue siendo una columna, por medida',
+    /\.wsre-kpis \{ grid-template-columns: 1fr; \}/.test(cssNoC) ||
+    /\.wsre-kpis \{[^}]*grid-template-columns: 1fr/.test(cssNoC),
+    (cssNoC.match(/\.wsre-kpis \{[^}]*\}/g) || []).join(' | ').slice(0, 200));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

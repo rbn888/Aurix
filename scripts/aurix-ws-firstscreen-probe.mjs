@@ -357,8 +357,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         ok(`${tag} el retorno nombra su destino y es táctil`,
           g.backTap >= 44 && /(volver|back)/i.test(g.backAria),
           JSON.stringify({ tap: g.backTap, aria: g.backAria }));
-        ok(`${tag} el título está en la banda de §3 (20–24 móvil / 24–28 escritorio)`,
-          w < 1024 ? (g.titleFont >= 20 && g.titleFont <= 24) : (g.titleFont >= 24 && g.titleFont <= 28),
+        // LA BANDA SE RE-DECIDE, no se relaja. Era 20–24 / 24–28, de cuando el §3 fijó un suelo
+        // para que el título no fuese ilegible. El SPEC de cierre re-decide el TECHO: el título
+        // identifica y no domina, porque el usuario entra a trabajar. Sigue habiendo suelo —17 px
+        // en móvil— y la accesibilidad no se toca: la barra conserva sus 44 px y su retorno
+        // táctil, que son los asserts de al lado. Medido: a 360 dos títulos plegaban a dos líneas
+        // y la barra pasaba de 46 a 52 px.
+        ok(`${tag} el título está en la banda re-decidida (17–20 móvil / 21–24 escritorio)`,
+          w < 1024 ? (g.titleFont >= 17 && g.titleFont <= 20) : (g.titleFont >= 21 && g.titleFont <= 24),
           'px=' + g.titleFont);
         ok(`${tag} la ayuda desplegable conserva subtítulo y supuestos`,
           g.hasHelp === true, 'sin <details> de ayuda');

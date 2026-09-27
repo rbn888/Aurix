@@ -21794,8 +21794,13 @@ body.gs-open { overflow: hidden; }
 .aurix-wsh .wsh-bar-chev { font-size: 17px; line-height: 1; margin-top: -2px; }
 .aurix-wsh .wsh-bar-backtxt { white-space: nowrap; }
 .aurix-wsh .wsh-bar-id { flex: 1 1 auto; min-width: 0; }
+/* EL TÍTULO IDENTIFICA, NO DOMINA. Baja de 21 a 18 px en móvil y de 26 a 22 en escritorio:
+   el usuario entra a TRABAJAR, y el nombre de la herramienta no tiene que competir con ella.
+   No cuesta accesibilidad —la barra conserva sus 44 px de alto mínimo y su retorno táctil— y a
+   360 gana altura de verdad: «Simulador de préstamos» y «Simulador de escenarios» plegaban a
+   dos líneas y engordaban la barra a 52 px. El resto era peso visual sin función. */
 .aurix-wsh .wsh-bar-title {
-  margin: 0; font-size: 21px; font-weight: 700; line-height: 1.2;
+  margin: 0; font-size: 18px; font-weight: 700; line-height: 1.2;
   letter-spacing: -0.01em; color: var(--text-bright, #fff);
   overflow-wrap: anywhere;
 }
@@ -21851,7 +21856,7 @@ body.gs-open { overflow: hidden; }
 .aurix-wsh .wsh-bar-helpbody p:last-child { margin-bottom: 0; }
 @media (min-width: 1024px) {
   .aurix-wsh .wsh-bar { gap: 14px; padding-top: 4px; }
-  .aurix-wsh .wsh-bar-title { font-size: 26px; }
+  .aurix-wsh .wsh-bar-title { font-size: 22px; }
   .aurix-wsh .wsh-bar-doc { font-size: 13.5px; }
   .aurix-wsh .wsh-bar-helpbody { left: auto; width: min(520px, 100%); }
 }
@@ -22322,7 +22327,7 @@ body.gs-open { overflow: hidden; }
    El oro se RESERVA a la frontera comercial (`.wsh-tier.is-premium`) y el favorito
    pasa al azul de marca, que es el color de lo que el usuario controla. Sin alfa
    blanco: la base es la escalera `--elev-*`. */
-.wsh-pin { position: absolute; top: 10px; right: 10px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 8px; cursor: pointer; color: rgba(159,194,255,0.55); background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.14); transition: color 150ms ease, background 150ms ease, border-color 150ms ease; }
+.wsh-pin { z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 8px; cursor: pointer; color: rgba(159,194,255,0.55); background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.14); transition: color 150ms ease, background 150ms ease, border-color 150ms ease; }
 .wsh-pin svg { width: 15px; height: 15px; fill: none; }
 .wsh-pin:hover { color: #aecbff; background: rgba(var(--aurix-blue-rgb), 0.16); }
 .wsh-pin.is-on { color: var(--aurix-blue); border-color: rgba(var(--aurix-blue-rgb), 0.46); background: rgba(var(--aurix-blue-rgb), 0.14); }
@@ -22678,7 +22683,13 @@ body.gs-open { overflow: hidden; }
 .wsjrn-preview.is-loss { color: #f0897f; }
 .wsjrn-preview.is-open { color: rgba(159,194,255,0.85); }
 /* trade list */
-.wsjrn-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; }
+/* `auto-fit` Y NO `auto-fill`, que es la diferencia entre llenar y dejar huecos: medido a 1440,
+   la rejilla creaba CINCO pistas de 232 px para TRES operaciones y las dos vacías dejaban 560 px
+   de negro a la derecha. `auto-fill` conserva las pistas vacías; `auto-fit` las colapsa y las
+   tarjetas reparten el ancho. El tope por tarjeta es la otra mitad del arreglo: sin él, una
+   sola operación se estiraría a 1.356 px, que es el hueco al revés. */
+.wsjrn-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 12px; }
+.wsjrn-card { max-width: 480px; }
 .wsjrn-card { position: relative; display: flex; flex-direction: column; gap: 9px; padding: 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); border-left-width: 3px; }
 .wsjrn-card.is-win { border-left-color: #2fd98e; }
 .wsjrn-card.is-loss { border-left-color: #f0897f; }
@@ -22782,7 +22793,6 @@ body.gs-open { overflow: hidden; }
 
 /* ════════ WS.10 — Visual Identity System (preview-dominant cards) ════════════ */
 .wsh-cardv { padding: 0; gap: 0; overflow: hidden; }
-.wsh-cardv .wsh-pin { top: 8px; right: 8px; z-index: 3; }
 .wsh-pv-wrap { height: 108px; display: flex; }
 .wsh-pv-wrap > .wspv { flex: 1 1 auto; }
 .wsh-cardv-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-top: 1px solid rgba(120,160,255,0.10); }
@@ -29038,8 +29048,12 @@ input.ws4-num.is-invalid {
       no es «no pasa nada», es «pasa otra cosa». El botón pasa a 44×44 y su CHROMA
       visible (el cuadrado de 28 px) se dibuja en un pseudo-elemento: la zona
       pulsable crece, el aspecto no cambia ni un píxel. */
+/* §7 — Y YA NO FLOTA SOBRE LA PREVIEW: vive en la fila de acciones. `position: relative` y no
+   `static`, porque su cuadro visible de 28 px se dibuja en un `::before` posicionado y necesita
+   que el botón siga siendo su contexto. Los 44 px de zona pulsable no se tocan. */
 .wsh-pin {
-  width: 44px; height: 44px; top: 2px; right: 2px;
+  position: relative; top: auto; right: auto; flex: 0 0 auto; margin: -8px -8px -8px 0;
+  width: 44px; height: 44px;
   background: transparent; border: 0; border-radius: 12px;
 }
 .wsh-pin::before {
@@ -29054,7 +29068,6 @@ input.ws4-num.is-invalid {
 .wsh-pin:hover::before { background: rgba(var(--aurix-blue-rgb), 0.16); }
 .wsh-pin.is-on { background: transparent; border: 0; }
 .wsh-pin.is-on::before { border-color: rgba(var(--aurix-blue-rgb), 0.46); background: rgba(var(--aurix-blue-rgb), 0.14); }
-.wsh-cardv .wsh-pin { top: 0; right: 0; }
 
 /* 2 · EL CTA DEL ESTADO VACÍO DESBORDABA SU COLUMNA por 5 px: `inline-block` con
       padding fijo dentro de una columna de 150 px. Ocupa el ancho de su columna,
@@ -29337,7 +29350,12 @@ body.ws-cover .aurix-wsh { max-width: none; }
    área táctil se extiende con un pseudoelemento centrado, que es el patrón que
    este repo ya usa para los controles pequeños: crece lo que se toca, no lo que
    se ve. Sin `::after` no había forma de acertar con el pulgar. */
-.wsh-pin { position: absolute; }
+/* La COLOCACIÓN de la estrella ya no se declara aquí: este `position: absolute` se escribió
+   cuando flotaba sobre la tarjeta, y el §7 la ha bajado a la fila de acciones. Su owner único
+   está arriba, con `position: relative` —que el `::after` necesita igual para centrarse—. Eran
+   TRES reglas declarando lo mismo (la base, `.wsh-cardv .wsh-pin` y esta), y las dos últimas
+   ganaban por orden de fuente: mover el marcado no bastaba, y la medida lo delató enseñando la
+   estrella en y=200 cuando su fila está en y=390. */
 .wsh-pin::after {
   content: ''; position: absolute; left: 50%; top: 50%;
   width: 44px; height: 44px; transform: translate(-50%, -50%);

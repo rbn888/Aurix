@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '734'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '735'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -22788,6 +22788,17 @@ const _WS_TOOL_COVER = Object.freeze({
   scenario: '<path class="wsc-line" d="M6 44 C 34 42, 56 36, 76 24 S 106 8, 118 6"/>'
     + '<path class="wsc-line is-alt" d="M6 44 C 34 45, 58 46, 80 44 S 108 40, 118 38"/>'
     + '<circle class="wsc-dot" cx="6" cy="44" r="3"/>',
+  // §8 — Comparador: la ÚNICA tarjeta del catálogo que no tenía portada y caía al glifo, así
+  // que era la única que no se reconocía sin leer su nombre. Lo que hace esta capacidad es
+  // medir TU rentabilidad contra una REFERENCIA, y eso se dibuja con una barra y una línea de
+  // referencia cruzándola — no con dos curvas, que es el lenguaje de Escenarios, ni con barras
+  // decrecientes, que es el de Préstamos. Reutiliza las clases que ya visten las otras tres
+  // portadas (§44: primero reutilizar): azul lo tuyo, dorado discontinuo la referencia.
+  comparator: '<g class="wsc-bars">'
+    + '<rect x="26" y="12" width="24" height="40" rx="4"/>'
+    + '<rect class="wsc-bar-last" x="70" y="26" width="24" height="26" rx="4"/></g>'
+    + '<path class="wsc-line is-alt" d="M14 26 H106"/>'
+    + '<circle class="wsc-dot" cx="38" cy="12" r="3.2"/>',
 });
 function _wsToolCoverHtml(key) {
   const body = _WS_TOOL_COVER[String(key || '')];
@@ -23927,17 +23938,22 @@ function _renderWorkspaceHome(metrics) {
     const items = _wsCatalogFor(kind).map(e => _wsCardModel(e, map[e.id] || {}));
     const tplCard = m => `
       <div class="wsh-tpl wsh-cardv is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
-        ${m.pinRef ? pinBtn(m.pinRef) : ''}
         <div class="wsh-pv-wrap">${_wsCatPreviewHtml(m.cat)}</div>
         <div class="wsh-cardv-foot">
           <p class="wsh-tpl-name">${esc(m.name)}</p>
           ${_wsCardFoot(m)}
+          ${m.pinRef ? pinBtn(m.pinRef) : ''}
         </div>
       </div>`;
     const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
     const toolCard = m => `
+      ${/* §7 — EL FAVORITO SALE DE ENCIMA DE LA PREVIEW. Estaba posicionado en absoluto sobre
+            la esquina de la tarjeta, o sea sobre el gráfico: medido, su caja INTERSECTA la de la
+            preview en las plantillas. Una animación premium con un botón encima deja de ser
+            premium, y el favorito deja de tener sitio propio. Pasa a la fila de acciones, al
+            lado de «Abrir», donde ya hay un `space-between` que lo coloca a la derecha sin
+            inventar nada. Conserva sus 44 px de zona pulsable y su cuadro visible de 28. */''}
       <div class="wsh-tool wsh-toolcard ${accent(m.id)} is-${m.state}"${_wsCardAttrs(m)}${_wsAria(m)}>
-        ${m.pinRef ? pinBtn(m.pinRef) : ''}
         ${/* §8 — HERRAMIENTAS: iconos coherentes, no una mezcla. Aquí convivían
               una fotografía minúscula superpuesta (`_wsAssetImg`) y un glifo de
               64×40 con áreas rellenas (`_wsTplViz`), así que la rejilla tenía dos
@@ -23946,7 +23962,7 @@ function _renderWorkspaceHome(metrics) {
               identidad y §8 pide preservarlas. */''}
         ${_wsToolCoverHtml(m.cat) || `<div class="wsh-toolcard-ic is-glyph">${_wsCapIconHtml(_wsSurfaceIcon(m.cat))}</div>`}
         <p class="wsh-tool-name">${esc(m.name)}</p>
-        <div class="wsh-toolcard-foot">${_wsCardFoot(m)}</div>
+        <div class="wsh-toolcard-foot">${_wsCardFoot(m)}${m.pinRef ? pinBtn(m.pinRef) : ''}</div>
       </div>`;
     // La rejilla declara CUÁNTAS tarjetas lleva, y el CSS decide columnas con eso:
     // una rejilla de tres columnas fijas con cinco tarjetas deja una fila a medias y
@@ -27695,7 +27711,7 @@ function _renderJournalTool() {
   if (!_wsJrnDraft) _wsJrnDraft = _wsJrnNewDraft();
   const res = calculateTradeJournal(_wsToolInputs.trades);
   return `
-    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="${esc(_WS_TOOL_ACCENT.journal)}">
       ${_wsSurfaceHeadHtml({ title: t('wstool_journal_n'), doc: _wsToolDocName(), help: [t('wstool_journal_d')] })}
       ${/* ── UN RESUMEN DE NADA NO ES UN RESUMEN ──────────────────────────────
             Con el diario vacío esta tarjeta publicaba cuatro guiones y empujaba
@@ -27703,12 +27719,26 @@ function _renderJournalTool() {
             el vacío de lo que todavía no ha hecho. Sin operaciones no se pinta
             —no se inventa un cero, simplemente no hay nada que resumir— y el
             registro queda arriba. Con operaciones vuelve, porque entonces SÍ
-            resume algo. */''}
-      ${res.list.length ? `<section class="wsh-card wstool-out-card">
-        ${_wsJrnSummaryHtml(res)}
-        ${res.closedCount ? `<div class="wstool-chart wsjrn-chartbox"><span class="wsbud-chart-title">${esc(t('wsjrn_chart_title'))}</span>${_wsJrnChartHtml(res)}</div>` : ''}
-      </section>` : ''}
-      ${_wsJrnFormHtml()}
+            resume algo.
+            ── Y CUANDO SÍ HAY RESUMEN, VA AL LADO, NO ENCIMA ────────────────
+            Cuarto consumidor del armazón compartido. Medido a 1440: el resumen ocupaba 470 px de
+            alto con su gráfico usando 500 px de un ancho de 1.350 —dos tercios de la tarjeta en
+            negro— y el primer campo del registro caía en 711. Con el armazón, el formulario está
+            arriba a la izquierda y el resumen ocupa su columna, así que el gráfico llena su caja
+            y se empieza a trabajar sin bajar. En móvil el orden del armazón ya pone la edición
+            primero, que es exactamente lo que este bloque decidió cuando el diario está vacío:
+            ahora vale igual cuando está lleno.
+            SIN RESUMEN NO SE USA EL ARMAZÓN: una rejilla de dos columnas con una vacía es un
+            hueco, y el formulario a ancho completo es mejor que media tarjeta al aire. */''}
+      ${res.list.length ? `<div class="ws2col">
+        <div class="ws2col-edit">${_wsJrnFormHtml()}</div>
+        <div class="ws2col-view">
+          <section class="wsh-card wstool-out-card">
+            ${_wsJrnSummaryHtml(res)}
+            ${res.closedCount ? `<div class="wstool-chart wsjrn-chartbox"><span class="wsbud-chart-title">${esc(t('wsjrn_chart_title'))}</span>${_wsJrnChartHtml(res)}</div>` : ''}
+          </section>
+        </div>
+      </div>` : _wsJrnFormHtml()}
       ${_wsJrnListHtml(res)}
       ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que

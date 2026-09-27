@@ -259,9 +259,15 @@ console.log('\n6 · El suelo de §3, declarado en la hoja:');
       .filter(l => l.indexOf('.aurix-wsh') === -1);
     ok('6.1 el CSS de la barra está ACOTADO a Workspace', loose.length === 0, JSON.stringify(loose));
   }
-  ok('6.2 el título vive en la banda de §3 (21 móvil / 26 escritorio)',
-    /\.aurix-wsh \.wsh-bar-title \{[\s\S]{0,200}font-size: 21px/.test(css)
-    && /\.aurix-wsh \.wsh-bar-title \{ font-size: 26px; \}/.test(css));
+  // RE-DECIDIDO, no relajado. Eran 21/26, de cuando el §3 fijó que el título fuese legible. El
+  // SPEC de cierre baja el TECHO con una razón distinta: el usuario entra a TRABAJAR y el nombre
+  // de la herramienta no tiene que competir con ella. Sigue siendo un rango cerrado —no «lo que
+  // salga»— y lo de al lado no se toca: la barra conserva sus 44 px de alto y el retorno su
+  // objetivo táctil, que son los asserts 6.3 y 6.4. Medido: a 360 dos títulos plegaban a dos
+  // líneas y la barra pasaba de 46 a 52 px, así que el techo alto también costaba altura.
+  ok('6.2 el título vive en la banda re-decidida (18 móvil / 22 escritorio)',
+    /\.aurix-wsh \.wsh-bar-title \{[\s\S]{0,200}font-size: 18px/.test(css)
+    && /\.aurix-wsh \.wsh-bar-title \{ font-size: 22px; \}/.test(css));
   ok('6.3 el retorno conserva 44 px reales aunque se lea discreto',
     /\.aurix-wsh \.wsh-bar-back \{[\s\S]{0,400}min-height: 44px/.test(css));
   ok('6.4 la acción primaria de Workspace es un objetivo táctil',
