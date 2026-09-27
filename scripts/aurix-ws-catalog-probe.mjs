@@ -186,6 +186,59 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       await ctx.close();
     }
   }
+  // ── §29/§31 · NI UN ICONO ANTIGUO ANTES DE LA IMAGEN DEFINITIVA ──────────
+  // Tres estados, y los tres se ejercitan de verdad interceptando la red: la escena de CSS es
+  // el fallback de ERROR, no el relleno de espera. Lo que se exige es que ESPERANDO no se vea
+  // el dibujo viejo, que CARGADA se vea la fotografía, que FALLIDA vuelva el dibujo —el
+  // fallback no se pierde, se condiciona— y que la CAJA mida lo mismo en los tres, porque un
+  // placeholder que cambia de tamaño es el salto de layout que el §32 prohíbe.
+  {
+    const escenas = [
+      ['esperando', async ctx => ctx.route('**/*.webp', async r => { await new Promise(s => setTimeout(s, 4000)); r.abort(); })],
+      ['cargada',   async ctx => {}],
+      ['fallida',   async ctx => ctx.route('**/*.webp', r => r.abort())],
+    ];
+    const caja = {};
+    for (const [nombre, prep] of escenas) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+      await ctx.route('**/app.js*', async route => {
+        const r = await route.fetch(); await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
+      });
+      await prep(ctx);
+      const page = await ctx.newPage();
+      await mount(page); await asPremium(page, 'es');
+      await page.evaluate(`(function(){ _wshView='home'; _wsTab='templates'; _wshRepaintHome(); return true; })()`);
+      await page.waitForTimeout(nombre === 'esperando' ? 700 : 1500);
+      const g = await page.evaluate(`(function(){
+        var hosts = [].slice.call(document.querySelectorAll('.wsh-pv-wrap .wspv-asset-host'));
+        return hosts.map(function(h){
+          var base = h.querySelector('.wspv');
+          var img = h.querySelector('.ws-asset-img');
+          var hb = h.getBoundingClientRect();
+          return { caja: Math.round(hb.width) + 'x' + Math.round(hb.height),
+            baseVisible: base ? Number(getComputedStyle(base).opacity) > 0.02 : null,
+            fotoVisible: img ? (Number(getComputedStyle(img).opacity) > 0.9 && img.classList.contains('is-loaded')) : false,
+            marcadoFallo: h.classList.contains('is-asset-failed') };
+        }); })()`);
+      const tag = `CR.1440 imagen ${nombre}`;
+      ok(`${tag} hay portadas que medir`, Array.isArray(g) && g.length > 0, JSON.stringify(g && g.length));
+      caja[nombre] = (g[0] || {}).caja;
+      if (nombre === 'esperando') {
+        ok(`${tag} NO se ve el dibujo viejo mientras llega la imagen`,
+          g.every(x => x.baseVisible === false), JSON.stringify(g));
+      } else if (nombre === 'cargada') {
+        ok(`${tag} la fotografía definitiva se ve`, g.some(x => x.fotoVisible === true), JSON.stringify(g));
+        ok(`${tag} …y el dibujo viejo no asoma debajo`, g.every(x => x.baseVisible === false), JSON.stringify(g));
+      } else {
+        ok(`${tag} si la imagen falla, el dibujo vuelve: el fallback no se pierde`,
+          g.every(x => x.marcadoFallo === true) && g.every(x => x.baseVisible === true), JSON.stringify(g));
+      }
+      await ctx.close();
+    }
+    ok('CR.1440 la caja de la portada mide lo mismo esperando, cargada y fallida (§32)',
+      caja.esperando && caja.esperando === caja.cargada && caja.cargada === caja.fallida,
+      JSON.stringify(caja));
+  }
   await browser.close();
 }
 if (server) server.close();

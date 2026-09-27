@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '736'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '737'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -22077,9 +22077,19 @@ const _WS_TOOL_ASSET = {
 };
 // Self-removing overlay <img>: covers its (position:relative, overflow:hidden)
 // host when the WebP loads, removes itself on error so the CSS scene/glyph shows.
+// ── §29/§31 · NUNCA UN ICONO ANTIGUO ANTES DE LA IMAGEN DEFINITIVA ────────
+// LO QUE HABÍA: la escena de CSS se pintaba de inmediato y la WebP se le fundía
+// ENCIMA en 360 ms. O sea que el usuario veía primero el dibujo viejo —un donut,
+// un degradado, un glifo— y después la fotografía apareciendo sobre él. Es el
+// flash que el SPEC manda eliminar, y no era un fallo de carga: era el diseño.
+// AHORA la escena empieza OCULTA y sólo se revela si la imagen FALLA de verdad.
+// Mientras llega, el hueco es una superficie neutra con la MISMA geometría, así
+// que no hay salto de caja (§32) ni contenido viejo (§29). El fallback no se
+// pierde: se condiciona. Por eso la imagen, al fallar, marca su anfitrión ANTES
+// de retirarse — si sólo se retirase, nadie podría saber que falló.
 function _wsAssetImg(name, alt) {
   if (!name) return '';
-  return `<img class="ws-asset-img" src="${_WS_ASSET_BASE}${name}.webp" alt="${_intccEsc(alt || '')}" loading="lazy" decoding="async" onload="this.classList.add('is-loaded')" onerror="this.remove()">`;
+  return `<img class="ws-asset-img" src="${_WS_ASSET_BASE}${name}.webp" alt="${_intccEsc(alt || '')}" loading="lazy" decoding="async" onload="this.classList.add('is-loaded')" onerror="try{var h=this.parentNode; if(h&&h.classList) h.classList.add('is-asset-failed');}catch(_){} this.remove()">`;
 }
 
 function _wsTplViz(k) {

@@ -23284,6 +23284,16 @@ body.gs-open { overflow: hidden; }
 /* Template-card cover host: positioned slot so the overlay fills the preview. */
 .wspv-asset-host { position: relative; display: flex; width: 100%; height: 100%; overflow: hidden; }
 .wspv-asset-host > .wspv { flex: 1 1 auto; }
+/* §29/§31 — LA SUPERFICIE NEUTRA MIENTRAS LLEGA LA IMAGEN, y NUNCA el dibujo viejo. La escena
+   de CSS es el fallback de ERROR, no el relleno de espera: se pintaba de inmediato y la
+   fotografía se le fundía encima en 360 ms, que es el flash que había que quitar. Ahora la
+   escena espera oculta y sólo aparece si la imagen declara que ha fallado. La caja la reserva
+   el anfitrión, así que la geometría es la misma en los tres estados —esperando, cargada y
+   fallida— y no hay salto (§32). Sin animación: un brillo recorriendo cuatro portadas es
+   movimiento gratuito, y el §9 lo prohíbe. */
+.wspv-asset-host { background: linear-gradient(168deg, rgba(120,160,255,0.09), rgba(255,255,255,0.018)); }
+.wspv-asset-host > .wspv { opacity: 0; transition: opacity 180ms ease; }
+.wspv-asset-host.is-asset-failed > .wspv { opacity: 1; }
 .wsh-pv-wrap > .wspv-asset-host, .wsh-dcard-pv > .wspv-asset-host { flex: 1 1 auto; }
 /* Tool-card icon tile: compact premium cover fills the tile (icon is the fallback). */
 .wsh-toolcard-ic { position: relative; overflow: hidden; }
