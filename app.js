@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '740'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '741'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -56995,19 +56995,188 @@ function animateCardValues() {
   });
 }
 
-// ── Market status ──────────────────────────────────────────
-function getMarketStatus(type) {
-  const now = new Date();
-  const currentTime = now.getHours() * 60 + now.getMinutes();
-  // NYSE hours in Spain time: 15:30 – 22:00
-  const open  = 15 * 60 + 30;
-  const close = 22 * 60;
+// ════════════════════════════════════════════════════════════════════════════
+// ESTADO DE MERCADO · P0 DE HONESTIDAD
+// ════════════════════════════════════════════════════════════════════════════
+// LO QUE HABÍA, y era una MENTIRA reproducible:
+//
+//   const currentTime = now.getHours() * 60 + now.getMinutes();
+//   const open = 15*60+30, close = 22*60;            // «NYSE en hora de España»
+//   return (currentTime >= open && currentTime < close) ? 'open' : 'closed';
+//
+// Tres defectos a la vez:
+//   1. NO MIRABA EL DÍA. Un domingo a las 21:01 en España caía dentro de la
+//      ventana y el Dashboard decía «Mercado abierto» para ACCIONES y para
+//      FONDOS/ETF. Es exactamente la incidencia reportada, y era reproducible
+//      con el reloj del sistema.
+//   2. USABA EL RELOJ DEL USUARIO. La ventana estaba cableada a la hora de
+//      España, así que el mismo instante daba estados distintos según dónde
+//      estuviera el usuario. Un usuario en Nueva York veía «abierto» de 15:30 a
+//      22:00 de SU hora, o sea con el mercado ya cerrado.
+//   3. AFIRMABA NYSE PARA CUALQUIER ACCIÓN O ETF. El catálogo resuelve tickers
+//      con sufijo de mercado (IWDA.L, EUNL.DE), así que una posición puede ser
+//      una cotización europea y aun así se le aplicaba la sesión de Nueva York.
+//
+// Y hay precedente: MK.F8 ya RETIRÓ este indicador de Market «porque no era
+// fiable y causaba confusión». Lo que no se hizo entonces fue retirarlo del
+// Dashboard, que es donde se le vio mentir.
+//
+// AHORA se separan dos preguntas que antes estaban mezcladas:
+//   · ¿QUÉ MERCADO es este activo?   → `_aurixAssetMarketKind`
+//   · ¿ESTÁ ABIERTA SU SESIÓN?       → `_aurixUsMarketSession`, sólo para EE. UU.
+// Si la primera no se puede contestar, NO SE PUBLICA ESTADO. Preferimos no decir
+// nada a decir algo que no podemos sostener.
 
-  if (type === 'crypto') return '24/7';
-  if (type === 'stock' || type === 'etf') {
-    return (currentTime >= open && currentTime < close) ? 'open' : 'closed';
-  }
+// Reloj de pared de un huso, sin cuentas de desplazamiento a mano: `Intl` ya
+// conoce el horario de verano y sus cambios de fecha. Devolver los componentes
+// como números hace que todo lo de abajo sea una función PURA de ellos.
+function _aurixExchangeWallClock(when, tz) {
+  const d = (when instanceof Date) ? when : new Date(when);
+  const f = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', weekday: 'short',
+  });
+  const p = Object.create(null);
+  f.formatToParts(d).forEach(x => { p[x.type] = x.value; });
+  const WD = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    y: Number(p.year), m: Number(p.month), d: Number(p.day),
+    // `hour` puede venir como «24» a medianoche en algunos entornos.
+    hh: Number(p.hour) % 24, mm: Number(p.minute),
+    wd: WD[p.weekday],
+  };
+}
+// Pascua gregoriana (Meeus/Butcher). Se necesita para UN festivo —Viernes Santo—
+// y es enteramente computable, así que el calendario no depende de ninguna lista
+// que envejezca en silencio: eso sería una mentira con fecha de caducidad.
+function _aurixEasterMonthDay(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100;
+  const dd = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - dd - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return { m: month, d: day };
+}
+// Día de la semana de una fecha civil, sin zona: sólo aritmética de calendario.
+function _aurixCivilWeekday(y, m, d) { return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); }
+function _aurixNthWeekdayOfMonth(y, m, weekday, nth) {
+  const first = _aurixCivilWeekday(y, m, 1);
+  return 1 + ((weekday - first + 7) % 7) + (nth - 1) * 7;
+}
+function _aurixLastWeekdayOfMonth(y, m, weekday) {
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const last = _aurixCivilWeekday(y, m, days);
+  return days - ((last - weekday + 7) % 7);
+}
+// Regla de observancia del NYSE para los festivos de fecha fija: si cae sábado
+// se observa el viernes anterior; si cae domingo, el lunes siguiente.
+function _aurixObservedFixed(y, m, d) {
+  const wd = _aurixCivilWeekday(y, m, d);
+  if (wd === 6) return { m: m, d: d - 1 };
+  if (wd === 0) return { m: m, d: d + 1 };
+  return { m: m, d: d };
+}
+// Festivos del NYSE, todos computables. Devuelve 'full' (cerrado) o 'half'
+// (media sesión, cierre a las 13:00) o null.
+function _aurixUsMarketHolidayKind(y, m, d) {
+  const eq = (o) => o.m === m && o.d === d;
+  const easter = _aurixEasterMonthDay(y);
+  // Viernes Santo: dos días antes de Pascua, en calendario civil.
+  const gf = new Date(Date.UTC(y, easter.m - 1, easter.d - 2));
+  const FULL = [
+    _aurixObservedFixed(y, 1, 1),                                        // Año Nuevo
+    { m: 1, d: _aurixNthWeekdayOfMonth(y, 1, 1, 3) },                    // MLK
+    { m: 2, d: _aurixNthWeekdayOfMonth(y, 2, 1, 3) },                    // Washington
+    { m: gf.getUTCMonth() + 1, d: gf.getUTCDate() },                     // Viernes Santo
+    { m: 5, d: _aurixLastWeekdayOfMonth(y, 5, 1) },                      // Memorial
+    _aurixObservedFixed(y, 6, 19),                                       // Juneteenth
+    _aurixObservedFixed(y, 7, 4),                                        // Independencia
+    { m: 9, d: _aurixNthWeekdayOfMonth(y, 9, 1, 1) },                    // Trabajo
+    { m: 11, d: _aurixNthWeekdayOfMonth(y, 11, 4, 4) },                  // Acción de Gracias
+    _aurixObservedFixed(y, 12, 25),                                      // Navidad
+  ];
+  if (FULL.some(eq)) return 'full';
+  // Medias sesiones: víspera de Independencia y de Navidad cuando son laborables,
+  // y el día siguiente a Acción de Gracias.
+  const tg = _aurixNthWeekdayOfMonth(y, 11, 4, 4);
+  const HALF = [
+    { m: 11, d: tg + 1 },
+    { m: 7, d: 3 },
+    { m: 12, d: 24 },
+  ].filter(o => { const w = _aurixCivilWeekday(y, o.m, o.d); return w !== 0 && w !== 6; });
+  if (HALF.some(eq)) return 'half';
   return null;
+}
+// LA SESIÓN REGULAR DEL MERCADO ESTADOUNIDENSE. Pura respecto del instante que
+// se le pasa: la prueba puede fijar cualquier fecha sin tocar el reloj.
+const _AURIX_US_MARKET_TZ = 'America/New_York';
+function _aurixUsMarketSession(when) {
+  let c;
+  try { c = _aurixExchangeWallClock(when, _AURIX_US_MARKET_TZ); } catch (_) { return null; }
+  if (!Number.isFinite(c.y) || !Number.isFinite(c.hh) || !Number.isFinite(c.wd)) return null;
+  if (c.wd === 0 || c.wd === 6) return 'closed';
+  const hol = _aurixUsMarketHolidayKind(c.y, c.m, c.d);
+  if (hol === 'full') return 'closed';
+  const mins = c.hh * 60 + c.mm;
+  const open = 9 * 60 + 30;
+  const close = (hol === 'half') ? (13 * 60) : (16 * 60);
+  return (mins >= open && mins < close) ? 'open' : 'closed';
+}
+// ¿DE QUÉ MERCADO ES ESTE ACTIVO? Se contesta con lo que el activo declara, y
+// cuando no alcanza se contesta `null` — que es una respuesta, no un fallo.
+// Los sufijos son los que el propio catálogo usa para resolver cotizaciones
+// alternativas; una acción de clase (BRK.B) NO es un sufijo de mercado.
+const _AURIX_NON_US_SUFFIX = Object.freeze(['L','AS','DE','PA','MI','MC','SW','TO','V','HK','T','AX','SA','ST','HE','OL','CO','BR','VI','LS','IR','WA','PR','NZ','SI','KS','TW','JO','MX','BA','IS']);
+function _aurixAssetMarketKind(asset) {
+  if (!asset) return null;
+  const type = String(asset.type || '');
+  if (type === 'crypto') return 'crypto';
+  if (type !== 'stock' && type !== 'etf') return null;
+  const sym = String(asset.marketSymbol || asset.ticker || '').trim().toUpperCase();
+  if (!sym) return null;
+  const dot = sym.lastIndexOf('.');
+  if (dot < 0) return 'us';
+  const suf = sym.slice(dot + 1);
+  if (_AURIX_NON_US_SUFFIX.indexOf(suf) !== -1) return 'other';
+  // Un sufijo que no reconocemos no se adivina: sin mercado atribuido no hay estado.
+  return (suf.length <= 2 && /^[A-Z]+$/.test(suf)) ? 'us' : null;
+}
+// EL ESTADO DE UNA CATEGORÍA NO ES EL DE UN ACTIVO CUALQUIERA SUYO. «ACCIONES»
+// puede contener una cotización de Nueva York y otra de Londres, y entonces no
+// hay ningún estado que sea cierto para las dos. La regla es la del SPEC: si la
+// categoría no es homogénea, NO SE AFIRMA NADA. Una categoría vacía tampoco
+// afirma: no hay nada de lo que hablar.
+function _aurixCategoryMarketStatus(type, list) {
+  if (type === 'crypto') return '24/7';
+  if (type !== 'stock' && type !== 'etf') return null;
+  let items = Array.isArray(list) ? list : null;
+  if (!items) { try { items = (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []; } catch (_) { items = []; } }
+  const mine = items.filter(a => a && a.type === type);
+  if (!mine.length) return null;
+  let kind = null;
+  for (let i = 0; i < mine.length; i++) {
+    const k = _aurixAssetMarketKind(mine[i]);
+    if (k === null) return null;            // uno sin atribuir basta para callarse
+    if (kind === null) kind = k;
+    else if (kind !== k) return null;       // mezcla de mercados: sin estado
+  }
+  if (kind !== 'us') return null;
+  return _aurixUsMarketSession(new Date());
+}
+// ── Market status ──────────────────────────────────────────
+// Sigue recibiendo un TIPO para no romper a sus llamadores, pero ya no afirma
+// una sesión que no puede sostener: para acciones y ETF hace falta el ACTIVO,
+// porque el tipo no dice de qué mercado es. Sin activo, sin estado.
+function getMarketStatus(type, asset) {
+  if (type === 'crypto') return '24/7';
+  if (type !== 'stock' && type !== 'etf') return null;
+  const kind = _aurixAssetMarketKind(asset || { type: type, marketSymbol: '' });
+  if (kind !== 'us') return null;
+  return _aurixUsMarketSession(new Date());
 }
 
 function getMarketLabel(status) {
@@ -57020,7 +57189,7 @@ function getMarketLabel(status) {
 function getStatusHtml(asset) {
   if (asset.type === 'cash' || asset.type === 'metal' || asset.type === 'real_estate') return '';
 
-  const status = getMarketStatus(asset.type);
+  const status = getMarketStatus(asset.type, asset);
   if (!status) return '';
 
   const cls   = status === '24/7' ? 'crypto' : status;  // '24/7' → 'crypto'
@@ -57637,7 +57806,13 @@ function updateCategoryCards() {
         }
       }
       const stEl = card.querySelector('.market-status');
-      const st   = getMarketStatus(type);
+      const st   = _aurixCategoryMarketStatus(type);
+      // SI DEJA DE SER AFIRMABLE, EL BADGE SE VA. Este refresco sólo actualizaba
+      // cuando había estado, así que un «Mercado abierto» pintado antes sobrevivía
+      // al cierre de la sesión —o a que el usuario añadiera una cotización de otro
+      // mercado— hasta el siguiente repintado completo. Un estado viejo es una
+      // mentira igual que un estado inventado.
+      if (stEl && !st) stEl.remove();
       if (stEl && st) {
         stEl.className = `market-status ${st === '24/7' ? 'crypto' : st}`;
         stEl.innerHTML = `<span class="dot"></span>${getMarketLabel(st)}`;
@@ -57695,7 +57870,7 @@ function updateCategoryCards() {
       }
     }
 
-    const catStatus = getMarketStatus(type);
+    const catStatus = _aurixCategoryMarketStatus(type);
     const catStatusHtml = catStatus
       ? `<span class="market-status ${catStatus === '24/7' ? 'crypto' : catStatus}"><span class="dot"></span>${getMarketLabel(catStatus)}</span>`
       : '';
@@ -69593,10 +69768,12 @@ function render(animate = false) {
              <span class="price">${formatDisplay(asset.price, assetCurr)}${t('perUnit')}${origHtml ? ` · ${origHtml}` : ''}</span>
              ${changeHtml}`;
 
-    const _mStatus = getMarketStatus(asset.type);
+    const _mStatus = getMarketStatus(asset.type, asset);
     let statusHtml = '';
-    if (_mStatus === 'open')   statusHtml = '<div class="market-status open">🟢 Open</div>';
-    else if (_mStatus === 'closed') statusHtml = '<div class="market-status closed">🔴 Closed</div>';
+    // Y con su rótulo traducido: aquí había «Open» y «Closed» en inglés fijo, así
+    // que la misma superficie hablaba dos idiomas a la vez (§39).
+    if (_mStatus === 'open')   statusHtml = '<div class="market-status open">🟢 ' + _intccEsc(t('statusOpen')) + '</div>';
+    else if (_mStatus === 'closed') statusHtml = '<div class="market-status closed">🔴 ' + _intccEsc(t('statusClosed')) + '</div>';
     else if (_mStatus === '24/7')   statusHtml = '<div class="market-status crypto">🟣 24/7</div>';
 
     // Per-asset P&L
