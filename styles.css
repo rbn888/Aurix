@@ -24507,11 +24507,18 @@ body.aurix-skeleton #totalValue::after {
   display:block; margin-top:3px;
   font-size:12px; color:var(--text-dim,#8a96aa); letter-spacing:.1px;
 }
-.wsh-mse2-list{ display:flex; flex-direction:column; gap:8px; }
+/* §12 — LA REJILLA SE ADAPTA AL CONTENIDO. Era una columna de filas, así que dos favoritos
+   dejaban media caja al aire en escritorio y la única forma de «llenar» habría sido estirar la
+   fila. `auto-fit` reparte lo que haya y colapsa lo que no: con uno hay una tarjeta de su
+   tamaño, no una caja enorme medio vacía. El tope evita el hueco al revés. */
+.wsh-mse2-list{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; align-items:start; }
+/* Sin tope de ancho: con UN favorito el tope dejaba una tarjeta de 260 px en una columna de
+   511 y media caja al aire, que es justo lo que el §12 prohíbe. Con `auto-fit` la tarjeta ocupa
+   su pista —una sola llena la columna, varias reparten— y la altura la pone el contenido. */
 
 .wsh-mse2-card{
-  display:flex; align-items:center; gap:12px;
-  padding:10px 12px;
+  display:flex; flex-direction:column; align-items:stretch; gap:9px;
+  padding:9px 9px 11px;
   border:1px solid var(--border,rgba(255,255,255,.08));
   border-radius:12px;
   background:rgba(255,255,255,.02);
@@ -24526,8 +24533,10 @@ body.aurix-skeleton #totalValue::after {
   box-shadow:0 10px 26px -14px rgba(0,0,0,.55), 0 0 22px rgba(77,141,255,.14);
 }
 .wsh-mse2-pv{
-  flex:0 0 auto; width:52px; height:52px;
-  border-radius:9px; overflow:hidden;
+  /* §11 — la portada manda: ancho completo de la tarjeta y una altura declarada, para que la
+     caja esté RESERVADA antes de que la imagen llegue y la tarjeta no salte (§32). */
+  flex:0 0 auto; width:100%; height:74px;
+  border-radius:9px; overflow:hidden; position:relative;
   display:flex; align-items:center; justify-content:center;
   background:rgba(255,255,255,.03);
 }
@@ -28221,13 +28230,26 @@ button.intv14-cmp-clear {
    distinción entre documento y favorito no la hace el icono —no puede, son la
    misma capacidad— sino el filete de color y el metadato. */
 .wsh-mse2-pv {
-  /* Ni foto ni recorte: un tile de icono. Sin `overflow:hidden` recortando
-     contenido, porque ya no hay contenido que recortar. */
-  flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
-  display: grid; place-items: center;
+  /* RE-DECIDIDO POR EL SPEC DE CIERRE (§11). Aquí decía «ni foto ni recorte: un tile de icono»,
+     y su razón era buena para lo que entonces se pedía: la distinción entre documento y
+     favorito no la hace el icono, la hace el filete y el metadato. Pero el cierre pide otra
+     cosa —que Mi espacio deje de parecer una lista administrativa y REUTILICE las previews del
+     catálogo—, y con un tile de 44 px la misma capacidad tenía dos caras según por dónde la
+     mirases. Así que la caja pasa a ser una PORTADA: ancho completo y altura declarada, para
+     que esté reservada antes de que la imagen llegue y la tarjeta no salte.
+     `display:block` y no `grid`+`place-items:center`: centrando, el contenedor de la
+     fotografía resolvía a CERO de ancho —medido— y no se veía nada. Y vuelve `overflow:hidden`,
+     porque ahora sí hay contenido que recortar.
+     EN MÓVIL ESTRECHO NO CAMBIA NADA: el bloque de ≤560 mantiene el tile pequeño, y su razón
+     sigue en pie y está medida —«la miniatura compite con el nombre, que es lo que hay que
+     leer»—. Lo que gana ahí es que el tile ya lleva la portada REAL, no un glifo genérico. */
+  flex: 0 0 auto; width: 100%; height: 74px; border-radius: 10px;
+  display: block; position: relative; overflow: hidden;
   background: rgba(74,130,240,0.10);
   border: 1px solid rgba(74,130,240,0.20);
 }
+.wsh-mse2-pv > * { width: 100%; height: 100%; display: block; }
+.wsh-mse2-pv > .wsh-mse2-ic2 { display: grid; place-items: center; }
 .wsh-mse2-ic2 { display: grid; place-items: center; width: 24px; height: 24px; color: var(--aurix-blue, #4A82F0); }
 .wsh-mse2-ic2 svg { width: 22px; height: 22px; display: block; }
 /* El nombre de un documento es lo único que lo distingue de otro del mismo
@@ -28971,7 +28993,7 @@ input.ws4-num.is-invalid {
     flex-direction: row; align-items: center; gap: 9px;
     padding: 9px 10px; min-height: 44px;
   }
-  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-pv { width: 34px; height: 34px; }
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-pv { width: 34px; height: 34px; border-radius: 9px; }
   .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-name { font-size: 12.5px; white-space: normal;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-meta { font-size: 11px; }

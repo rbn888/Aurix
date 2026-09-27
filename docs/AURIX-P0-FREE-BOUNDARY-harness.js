@@ -116,6 +116,10 @@ function ctx(persona, langCode) {
    '_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL','_WS_FOUNDER_VIEW_KEY','_AURIX_ENT_CANON_EXTRA',
    '_AURIX_ENT_CANON','_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_TOOL_REQUIRED','_WS_PROJ_CONV',
    '_WSH_SPACE_HIDDEN_KEY','_WSH_SPACE_TOP_KEY',
+   // Sin este mapa, `_wsToolCoverHtml` revienta en el sandbox, el `try` de `mseCover` lo
+   // absorbe y el gate se pone verde ejercitando el FALLBACK — un verde falso. Se carga para
+   // que este harness recorra el camino real, que es para lo que existe.
+   '_WS_TOOL_COVER',
    '_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA'].forEach(n => vm.runInContext(konstSrc(n), sb));
   vm.runInContext('var _aurixEnt = { loaded:false, loading:false, error:null, plan:"free", status:"none", source:"default", validUntil:null, features:Object.create(null), sources:Object.create(null), fetchedAt:0 };', sb);
   ['hasFeature','_aurixEntLoaded','hasAurixPremiumAccess','_aurixEntIsCatalogPreview',
@@ -129,6 +133,9 @@ function ctx(persona, langCode) {
    '_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml','_wsLabel','_wsTypeLabel',
    '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsCanPersist','_wsPersistUpsell','_wshReveal',
    '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon',
+   // §11 — Mi espacio reutiliza la portada del catálogo, así que su render depende de este
+   // owner. Sin cargarlo aquí el sandbox ejercitaba el FALLBACK y no el camino real.
+   '_wsToolCoverHtml',
    '_wshMetrics','_wshRefreshMetrics','_wsTogglePin','_wsTouch','_wsSpaceHidden','_wsSpaceTop','_wsSpaceTopRank',
    '_ws4ProjectsRaw','_ws4Projects','_ws4SaveAll','_wsDocStamp','_ws4Persist','_ws4Tombstone',
    '_wsgGoalsRaw','_wsgGoals','_wsgSaveAll','_wsgTombstone','_wsgPersist','_wsgGet','_wsgStored',

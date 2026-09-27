@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '735'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '736'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -23892,13 +23892,33 @@ function _renderWorkspaceHome(metrics) {
     // pertenecen. La distinción entre documento guardado y capacidad favorita no
     // la hace la miniatura —no puede, son la misma capacidad— sino el filete de
     // color de la tarjeta y su metadato, que es donde se lee.
-    const mseIcon = it => `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(it.cat))}</span>`;
+    // ── §11/§13 · LA PREVIEW ES LA DEL CATÁLOGO, NO UN GLIFO DE 24 px ────────
+    // Mi espacio pintaba una fila de 66 px con un icono genérico de 24 en una caja de 52: una
+    // LISTA ADMINISTRATIVA, no una biblioteca. Y la misma capacidad tenía dos caras según por
+    // dónde la mirases. Aquí no se crea ningún asset: se llama a los DOS owners que ya visten
+    // el catálogo, y de ahí sale gratis la personalidad que el §13 pide —fotografía para las
+    // plantillas, que son organización y documento; trazo para las herramientas, que son
+    // cálculo— con una sola arquitectura. El glifo se queda como último recurso, para una
+    // capacidad sin portada declarada: la caja es la misma, así que no hay salto.
+    // El `try` no es decorativo: esta función pasó de depender de un glifo a depender de los dos
+    // owners de portada del catálogo, y eso amplía la superficie de fallo de una ruta de render
+    // de una superficie PAGADA. Una portada es cosmética; Mi espacio no. Si algo faltara, se
+    // cae al glifo y la lista sigue en pie. Lo destapó un gate P0 que ejercita este render en un
+    // sandbox: allí las dependencias nuevas no estaban cargadas y el render entero reventaba.
+    const mseCover = it => {
+      try {
+        const cover = _wsToolCoverHtml(it.cat);
+        if (cover) return cover;
+        if (_WS_TPL_ASSET[it.cat]) return _wsCatPreviewHtml(it.cat);
+      } catch (_) {}
+      return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(it.cat))}</span>`;
+    };
     // `aria-hidden` en la miniatura: es una ILUSTRACIÓN de 34 px en móvil, con
     // etiquetas de 7,5 px que nadie lee y que un lector de pantalla no debe
     // dictar. El nombre accesible de la tarjeta es el del documento, que ya está.
     const card = it => `
       <div class="wsh-mse2-card is-${it.mtype}" data-wsmse-type="${it.mtype}"${openAttrs(it)} aria-label="${esc(it.name)}">
-        <div class="wsh-mse2-pv" aria-hidden="true">${mseIcon(it)}</div>
+        <div class="wsh-mse2-pv" aria-hidden="true">${mseCover(it)}</div>
         <div class="wsh-mse2-body">
           <p class="wsh-mse2-name">${esc(it.name)}</p>
           <span class="wsh-mse2-meta">${esc(mseMeta(it))}</span>

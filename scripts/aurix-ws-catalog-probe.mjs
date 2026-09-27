@@ -103,6 +103,32 @@ async function asPremium(page, L) {
   await page.waitForTimeout(400);
 }
 
+// MI ESPACIO — §11: cada favorito enseña la portada DE SU CAPACIDAD, no un glifo genérico, y
+// es la MISMA que el catálogo (se reutiliza el owner, no se duplica el asset). A ≤560 la
+// portada se pinta pequeña a propósito: esa decisión está medida y escrita en la hoja —«la
+// miniatura compite con el nombre, que es lo que hay que leer»— y lo que se exige ahí es que
+// sea la portada REAL, no que sea grande.
+const MEASURE_SPACE = `(function(){
+  var wsh = document.querySelector('#aurixWorkspace .aurix-wsh');
+  if (!wsh) return { mounted: false };
+  var cards = [].slice.call(wsh.querySelectorAll('.wsh-mse2-card'));
+  var sinPortada = [], soloGlifo = [], sinNombre = [], pvCero = [];
+  cards.forEach(function(c, i){
+    var pv = c.querySelector('.wsh-mse2-pv');
+    if (!pv) { sinPortada.push(String(i)); return; }
+    var b = pv.getBoundingClientRect();
+    if (b.width < 8 || b.height < 8) pvCero.push(i + ':' + Math.round(b.width) + 'x' + Math.round(b.height));
+    var real = pv.querySelector('.wsh-toolcover, .wspv-asset-host, .ws-asset-img, .wspv');
+    if (!real) soloGlifo.push(String(i));
+    else { var rb = real.getBoundingClientRect(); if (rb.width < 8 || rb.height < 8) pvCero.push(i + ':hijo ' + Math.round(rb.width) + 'x' + Math.round(rb.height)); }
+    var nm = c.querySelector('.wsh-mse2-name');
+    if (!nm || !(nm.textContent || '').trim()) sinNombre.push(String(i));
+  });
+  return { mounted: true, n: cards.length, sinPortada: sinPortada, soloGlifo: soloGlifo,
+    sinNombre: sinNombre, pvCero: pvCero,
+    cols: wsh.querySelectorAll('.wsh-mse2-col').length };
+})`;
+
 console.log('AURIX · CATÁLOGO DE WORKSPACE — favorito, preview y acción');
 console.log('origen: ' + ORIGIN + (PUBLIC_URL ? '  (PÚBLICO · bytes desplegados)' : '  (copia de trabajo)') + '\n');
 
@@ -135,6 +161,27 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
           g.sinPreview.length === 0 && g.sinNombre.length === 0 && g.sinAccion.length === 0,
           JSON.stringify({ sinPreview: g.sinPreview, sinNombre: g.sinNombre, sinAccion: g.sinAccion }));
         ok(`${tag} sin desbordamiento horizontal del documento`, g.docX === false);
+      }
+      // MI ESPACIO — se llena marcando favoritos POR SU OWNER: pulsando la estrella del
+      // catálogo, no escribiendo el almacén. Si la estrella no funcionase, esto se quedaría
+      // vacío y el assert lo diría.
+      for (const tab of ['tools', 'templates']) {
+        await page.evaluate(`(function(){ _wshView='home'; _wsTab=${JSON.stringify(tab)}; _wshRepaintHome(); return true; })()`);
+        await page.waitForTimeout(380);
+        await page.evaluate(`(function(){ var p=document.querySelector('.wsh-pin'); if(p) p.click(); return true; })()`);
+        await page.waitForTimeout(260);
+      }
+      await page.evaluate(`(function(){ _wshView='home'; _wsTab='space'; _wshRepaintHome(); return true; })()`);
+      await page.waitForTimeout(460);
+      {
+        const g = await page.evaluate(`(${MEASURE_SPACE})()`);
+        const tag = `${ENG}.${w}×${h} ${L.toUpperCase()} espacio`;
+        ok(`${tag} marcar un favorito lo publica en Mi espacio`, g.mounted === true && g.n >= 1 && g.cols === 2, JSON.stringify({ n: g.n, cols: g.cols }));
+        ok(`${tag} cada favorito enseña la portada de su capacidad, no un glifo`,
+          g.soloGlifo.length === 0 && g.sinPortada.length === 0,
+          JSON.stringify({ soloGlifo: g.soloGlifo, sinPortada: g.sinPortada }));
+        ok(`${tag} …y esa portada tiene caja de verdad, no cero`, g.pvCero.length === 0, JSON.stringify(g.pvCero));
+        ok(`${tag} y cada favorito dice su nombre`, g.sinNombre.length === 0, JSON.stringify(g.sinNombre));
       }
       await ctx.close();
     }
