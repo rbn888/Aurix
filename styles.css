@@ -29368,13 +29368,38 @@ input.ws4-num.is-invalid {
 
 /* El halo de Intelligence: gradiente, no imagen ni animación permanente. Está
    para situar el producto, no para competir con las cifras de arriba. */
+/* §17 — EL ORBE CON SU HALO, y con SITIO para el halo. Este repositorio ya tiene escrito el
+   gotcha: «el orbe NO acaba en su caja: su halo exige ~19 px extra». Así que el anillo se dibuja
+   en un pseudoelemento CENTRADO y la banda visual reserva altura para él — si se añadiera sólo
+   una sombra más grande, el halo se recortaría contra la tarjeta. La señal es un anillo
+   estático: sin bucle, porque una promo que late permanentemente compite con las cifras del
+   patrimonio que hay justo encima (§6). */
 .wsdisc-orb {
-  width: 40px; height: 40px; border-radius: 50%;
+  position: relative;
+  width: 44px; height: 44px; border-radius: 50%;
   background:
     radial-gradient(circle at 32% 30%, rgba(190,215,255,0.95), rgba(90,150,255,0.55) 38%, rgba(40,80,190,0.30) 62%, transparent 72%),
     radial-gradient(circle at 50% 50%, rgba(74,130,240,0.30), transparent 70%);
-  box-shadow: 0 0 18px rgba(74,130,240,0.28);
+  box-shadow: 0 0 22px rgba(74,130,240,0.30);
 }
+.wsdisc-orb::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 76px; height: 76px; transform: translate(-50%, -50%);
+  border-radius: 50%; pointer-events: none;
+  border: 1px solid rgba(120,170,255,0.20);
+  background: radial-gradient(circle, rgba(74,130,240,0.10), transparent 68%);
+}
+/* La banda reserva el alto del halo: 76 px de anillo sobre 44 de orbe. */
+.wsdisc-card.is-int .wsdisc-viz { min-height: 80px; align-items: center; padding-left: 18px; }
+.wsdisc-card.is-int .wsdisc-orb { margin: 0; }
+/* §18/§19 — y la de Workspace consume el acento de cada capacidad por la API compartida: tres
+   azules idénticos hacían que la promo operativa se leyera igual de monocroma que la analítica. */
+.wsdisc-ic[data-ws-accent] {
+  color: rgb(var(--ws-a));
+  background: rgba(var(--ws-a), 0.12);
+  border-color: rgba(var(--ws-a), 0.24);
+}
+.wsdisc-card.is-ws .wsdisc-viz { min-height: 80px; align-items: center; }
 /* Los iconos de Workspace: tres de su propia familia, no el catálogo entero. */
 .wsdisc-icons { display: inline-flex; gap: 8px; }
 .wsdisc-ic {

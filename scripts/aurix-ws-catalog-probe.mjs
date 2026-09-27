@@ -60,7 +60,7 @@ const MEASURE = `(function(){
   var R = function(e){ var b = e.getBoundingClientRect(); return { t:b.top, b:b.bottom, l:b.left, r:b.right, w:b.width, h:b.height }; };
   var inter = function(a, c){ return !(a.r <= c.l + 0.5 || c.r <= a.l + 0.5 || a.b <= c.t + 0.5 || c.b <= a.t + 0.5); };
   var cards = [].slice.call(wsh.querySelectorAll('.wsh-tpl, .wsh-toolcard'));
-  var solape = [], sinAccion = [], toqueCorto = [], sinPreview = [], sinNombre = [], fueraDeCaja = [];
+  var solape = [], sinAccion = [], toqueCorto = [], sinPreview = [], sinNombre = [], fueraDeCaja = [], soloGlifo = [];
   cards.forEach(function(card, i){
     var cb = R(card);
     var pin = card.querySelector('.wsh-pin');
@@ -75,12 +75,19 @@ const MEASURE = `(function(){
       if (pb.l < cb.l - 0.5 || pb.r > cb.r + 0.5 || pb.t < cb.t - 0.5 || pb.b > cb.b + 0.5) fueraDeCaja.push('pin' + i);
     }
     if (!pvs.filter(function(e){ var b = R(e); return b.w > 20 && b.h > 20; }).length) sinPreview.push(String(i));
+    // §5 — NINGUNA ENTRADA SE QUEDA EN UN ICONO. Una tarjeta de herramienta tiene portada
+    // funcional (curva, barras, caminos, barra contra referencia) y una de plantilla tiene su
+    // fotografía; el glifo existe SÓLO como último recurso y que se use significa que a una
+    // capacidad le falta portada. Lo que NO se exige es que la portada lea el documento del
+    // usuario: esa vía ya se probó en este repositorio y se retiró porque una tarjeta acabó
+    // mostrando las cifras de otro documento.
+    if (card.querySelector('.wsh-toolcard-ic.is-glyph') && !card.querySelector('.wsh-toolcover')) soloGlifo.push(String(i));
     if (!card.querySelector('.wsh-tool-go, .wsh-pill, .wsh-tier')) sinAccion.push(String(i));
     var nm = card.querySelector('.wsh-tpl-name, .wsh-tool-name');
     if (!nm || !(nm.textContent || '').trim()) sinNombre.push(String(i));
   });
   return { mounted: true, n: cards.length, solape: solape, sinAccion: sinAccion, toqueCorto: toqueCorto,
-    sinPreview: sinPreview, sinNombre: sinNombre, fueraDeCaja: fueraDeCaja,
+    sinPreview: sinPreview, sinNombre: sinNombre, fueraDeCaja: fueraDeCaja, soloGlifo: soloGlifo,
     docX: document.documentElement.scrollWidth > window.innerWidth + 1 };
 })`;
 
@@ -157,6 +164,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         ok(`${tag} …y conserva 44 px de zona pulsable`, g.toqueCorto.length === 0, JSON.stringify(g.toqueCorto));
         ok(`${tag} …y no se sale de su tarjeta`, g.fueraDeCaja.length === 0, JSON.stringify(g.fueraDeCaja));
         // Se reconoce sin leer: cada entrada tiene preview, nombre y una acción.
+        ok(`${tag} ninguna entrada se queda en un icono: todas tienen portada`,
+          g.soloGlifo.length === 0, JSON.stringify(g.soloGlifo));
         ok(`${tag} cada entrada tiene preview, nombre y una acción`,
           g.sinPreview.length === 0 && g.sinNombre.length === 0 && g.sinAccion.length === 0,
           JSON.stringify({ sinPreview: g.sinPreview, sinNombre: g.sinNombre, sinAccion: g.sinAccion }));
@@ -270,6 +279,59 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         g.every(x => x.op > 0.95) && g.every(x => x.tf === 'none' || x.tf === 'matrix(1, 0, 0, 1, 0, 0)'),
         JSON.stringify(g.filter(x => !(x.op > 0.95) || !(x.tf === 'none' || x.tf === 'matrix(1, 0, 0, 1, 0, 0)'))));
     }
+    await ctx.close();
+  }
+  // ── §16–§19 · LAS DOS PROMOS FREE: HERMANAS, NO GEMELAS ──────────────────
+  // Misma caja y misma jerarquía —eso es lo que las hace un par— y personalidad distinta: la
+  // analítica trae su orbe con halo, la operativa trae tres capacidades con SU acento. Y el
+  // halo tiene que CABER: este repositorio ya tiene escrito que «el orbe no acaba en su caja,
+  // su halo exige ~19 px extra», así que se mide su caja real contra la tarjeta.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+    await ctx.route('**/app.js*', async route => {
+      const r = await route.fetch(); await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
+    });
+    const page = await ctx.newPage();
+    await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(`typeof updateDashboardDiscover === 'function'`, null, { timeout: 60000 });
+    await page.waitForTimeout(800);
+    await page.evaluate(`(function(){ var bl=document.getElementById('bootLoader'); if(bl) bl.remove();
+      var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1'; return true; })()`);
+    // FREE de verdad: es quien ve estas promos.
+    await page.evaluate(`(function(){ lang='es';
+      _aurixEnt={loaded:true,loading:false,error:null,plan:'free',status:'none',source:'default',validUntil:null,features:Object.create(null),sources:Object.create(null),fetchedAt:Date.now()};
+      switchTab('dashboard'); updateDashboardDiscover(); return true; })()`);
+    await page.waitForTimeout(700);
+    const g = await page.evaluate(`(function(){
+      var cards=[].slice.call(document.querySelectorAll('.wsdisc-card'));
+      if (cards.length < 2) return { n: cards.length };
+      var R=function(e){ var b=e.getBoundingClientRect(); return { w:Math.round(b.width), h:Math.round(b.height), l:b.left, r:b.right, t:b.top, b:b.bottom }; };
+      var a=R(cards[0]), b2=R(cards[1]);
+      var orb=document.querySelector('.wsdisc-orb');
+      var halo=orb ? (parseFloat(getComputedStyle(orb,'::after').width)||0) : 0;
+      var ob=orb ? orb.getBoundingClientRect() : null;
+      var card=orb ? orb.closest('.wsdisc-card').getBoundingClientRect() : null;
+      var dentro=null, margen=null;
+      if (ob && card && halo) {
+        var cx=ob.left+ob.width/2, cy=ob.top+ob.height/2;
+        dentro = (cx-halo/2 >= card.left-0.5) && (cx+halo/2 <= card.right+0.5) && (cy-halo/2 >= card.top-0.5) && (cy+halo/2 <= card.bottom+0.5);
+        margen = Math.round(cx-halo/2-card.left);
+      }
+      var ics=[].slice.call(document.querySelectorAll('.wsdisc-ic')).map(function(e){ return getComputedStyle(e).color; });
+      var ctas=cards.map(function(c){ return !!c.querySelector('.wsdisc-cta'); });
+      return { n: cards.length, a: a, b: b2, halo: halo, haloDentro: dentro, margen: margen,
+        iconos: ics.length, distintos: new Set(ics).size, ctas: ctas,
+        anims: (orb ? getComputedStyle(orb).animationName : 'none') }; })()`);
+    ok('CR.1440 promos · las dos existen para un usuario Free', g.n === 2, JSON.stringify(g.n));
+    ok('CR.1440 promos · misma caja: son un par, no dos piezas sueltas',
+      g.a && g.b && g.a.w === g.b.w && Math.abs(g.a.h - g.b.h) <= 1, JSON.stringify([g.a, g.b]));
+    ok('CR.1440 promos · las dos ofrecen su acción', Array.isArray(g.ctas) && g.ctas.every(Boolean), JSON.stringify(g.ctas));
+    ok('CR.1440 promos · el halo del orbe CABE en su tarjeta',
+      g.haloDentro === true && g.margen >= 8, JSON.stringify([g.halo, g.haloDentro, g.margen]));
+    ok('CR.1440 promos · la operativa trae tres capacidades con acento DISTINTO',
+      g.iconos === 3 && g.distintos === 3, JSON.stringify([g.iconos, g.distintos]));
+    // Sin bucle: una promo que late permanentemente compite con las cifras del patrimonio.
+    ok('CR.1440 promos · el orbe no late en bucle', g.anims === 'none', String(g.anims));
     await ctx.close();
   }
   await browser.close();

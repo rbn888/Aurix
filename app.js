@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '742'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '743'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6485,7 +6485,11 @@ const T = {
     wsrecv_sub:         'Controla el dinero que te deben.',
     wsrecv_save:        'Guardar control de cobros',
     wsrecv_kpi_total:   'Total',
-    wsrecv_search:      'Buscar persona, empresa o concepto…',
+    // §30 — LA GUÍA NO PUEDE SALIR CORTADA. «Buscar persona, empresa o concepto…» pedía 304 px
+    // en los 280 útiles de un campo a 360 px, y 295 a 375: se leía «…concepto…» con el final
+    // comido. Era el último pendiente declarado de la sonda. Corto y completo dice lo mismo: el
+    // campo busca dentro de los cobros, y por quién o por qué concepto ya se ve al escribir.
+    wsrecv_search:      'Buscar cobro…',
     wsrecv_no_results:  'Sin resultados.',
     wsrecv_overdue_badge: n => `${n} vencidos`,
     wsrecv_unit:        'registros',
@@ -9317,7 +9321,7 @@ const T = {
     wsrecv_sub:         'Track the money owed to you.',
     wsrecv_save:        'Save payment control',
     wsrecv_kpi_total:   'Total',
-    wsrecv_search:      'Search person, company or concept…',
+    wsrecv_search:      'Search receivable…',
     wsrecv_no_results:  'No results.',
     wsrecv_overdue_badge: n => `${n} overdue`,
     wsrecv_unit:        'records',
@@ -23591,9 +23595,13 @@ function _renderDashboardDiscover() {
   // Intelligence: un halo, no un dato. Es CSS puro (sin imagen, sin animación
   // permanente) para no competir con las cifras del patrimonio que hay arriba.
   const orb = `<span class="wsdisc-orb"></span>`;
-  // Workspace: TRES iconos de su propia familia, no el catálogo entero.
-  const tools = `<span class="wsdisc-icons">${['split', 'calc', 'paths']
-    .map(g => `<span class="wsdisc-ic">${_wsCapIconHtml(g)}</span>`).join('')}</span>`;
+  // §18 — Workspace: TRES iconos de su propia familia, no el catálogo entero, y CADA UNO CON EL
+  // ACENTO DE SU CAPACIDAD. Eran tres azules idénticos, así que la promo de la superficie
+  // «operativa» se leía igual de monocroma que la analítica — justo lo que el §19 pide evitar.
+  // El acento sale del mapa compartido, no de una paleta nueva: presupuesto, préstamos y
+  // escenarios, que son las tres que el texto nombra.
+  const tools = `<span class="wsdisc-icons">${[['split', 'budget'], ['calc', 'loan'], ['paths', 'scenario']]
+    .map(([g, k]) => `<span class="wsdisc-ic" data-ws-accent="${esc(_WS_TOOL_ACCENT[k] || 'blue')}">${_wsCapIconHtml(g)}</span>`).join('')}</span>`;
   return `
     <div class="wsdisc-grid">
       ${card('int', orb,   t('dsc_int_t'), t('dsc_int_b'), t('dsc_int_cta'), 'intelligence')}
