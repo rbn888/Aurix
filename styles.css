@@ -23071,6 +23071,11 @@ body.gs-open { overflow: hidden; }
 
 /* ════════ WS.13 — Receivables Pro (bordeaux CRM identity) ═══════════════════ */
 .wsrecv-summary { display: flex; flex-direction: column; gap: 14px; }
+/* Y AQUÍ `1fr` SE QUEDA, aunque la regla general del repo prefiera `minmax(0,·)`. Lo cambié
+   para igualar las tres columnas —a 641 el TOTAL medía 212 px y sus vecinas 190 sólo porque su
+   cifra es más larga— y la medida me corrigió: con el mínimo a 0 la columna encoge a 185 y el
+   total pide 174 en una caja de 147. El mínimo automático de `1fr` no era un descuido, estaba
+   PROTEGIENDO la cifra más larga. La asimetría es el precio de que quepa. */
 .wsrecv-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .wsrecv-kpi { display: flex; flex-direction: column; gap: 3px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(255,255,255,0.025); }
 .wsrecv-kpi.is-pending { border-color: rgba(199,91,122,0.34); background: radial-gradient(130% 150% at 85% 0%, rgba(199,91,122,0.16), transparent 60%), rgba(255,255,255,0.022); }
@@ -23126,7 +23131,19 @@ body.gs-open { overflow: hidden; }
 .wspv-recvw-foot .is-overdue { color: #f0897f; font-weight: 700; }
 @media (max-width: 920px) { .wsrecv-form-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) {
-  .wsrecv-kpis { grid-template-columns: 1fr; }
+  /* §26 — TOTAL ARRIBA, Y COBRADO CONTRA PENDIENTE EN PARALELO. Apiladas, las tres cifras del
+     resumen ocupaban 600 px a 390 en una tarjeta que sólo dice tres números — el mayor coste de
+     altura de todo Workspace. Y son lo mismo que en Presupuesto: un total y su reparto, que se
+     lee comparando. El total conserva el ancho completo porque es el ancla; las otras dos se
+     enfrentan, que es cómo se miran.
+     La cifra tiene que ESCALAR: a media columna son 113 px útiles a 360 y 24 px fijos pedían
+     130. La primitiva de métrica prohíbe romperla, así que el sitio se consigue con tamaño. */
+  .wsrecv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wsrecv-kpis > .wsrecv-kpi.is-total { grid-column: 1 / -1; }
+  /* El TAMAÑO de esta cifra en móvil lo fija el bloque de densidad de más abajo, que es su
+     owner y ganaba por orden de fuente: poner aquí un `clamp` era dejar dos reglas compitiendo
+     —justo lo que la primitiva de métrica vino a cerrar—, y la medida lo delató enseñando 20 px
+     donde mi regla pedía 18. */
   .wsrecv-grid { grid-template-columns: 1fr; }
   .wsrecv-form-grid { grid-template-columns: 1fr 1fr; }
 }
@@ -23356,7 +23373,11 @@ body.gs-open { overflow: hidden; }
   .wsrecv-who { font-size: 14px; }
   .wsrecv-kpis { gap: 8px; }
   .wsrecv-kpi { padding: 12px 13px; }
-  .wsrecv-kpi-v { font-size: 20px; }
+  /* Y la cifra ESCALA, porque desde que el resumen reparte en dos columnas su caja es la mitad:
+     a 360 son 121 px útiles y 20 px fijos pedían 127. El total conserva sus 24, que para eso
+     tiene el ancho entero. */
+  .wsrecv-kpi-v { font-size: clamp(15px, 5vw, 20px); }
+  .wsrecv-kpis > .wsrecv-kpi.is-total .wsrecv-kpi-v { font-size: 24px; }
   /* asset cards tighter */
   .wsap-card { padding: 11px 12px; gap: 7px; }
   /* RE summary + cards tighter */

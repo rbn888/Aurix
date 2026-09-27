@@ -414,5 +414,40 @@ section('9 · §27 · El sufijo de un campo tiene UN owner, y la reserva sale de
     /padding: 11px 34px 11px 12px/.test(css));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+section('10 · §26 · Cobros y Escenarios: un total y su reparto se comparan:');
+// ════════════════════════════════════════════════════════════════════════════
+// Lo geométrico ya lo mide la sonda en los dos motores; aquí se fija la DECISIÓN, que es lo
+// que una hoja de 29.000 líneas pierde en silencio.
+{
+  const cssNoC = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Cobros: tres cifras apiladas eran 600 px a 390, el mayor coste de altura de Workspace.
+  ok('10.1 el resumen de Cobros reparte en dos columnas y el total ancla el ancho entero',
+    /\.wsrecv-kpis \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}/.test(cssNoC) &&
+    /\.wsrecv-kpis > \.wsrecv-kpi\.is-total \{ grid-column: 1 \/ -1; \}/.test(cssNoC));
+  // Y como la caja es la mitad, la cifra escala: la primitiva prohíbe romperla.
+  // Lo que importa no es que haya UNA declaración de tamaño en toda la hoja —un tamaño base de
+  // escritorio con un override en móvil es el patrón normal— sino que el ESCALADO tenga un solo
+  // owner. La primera versión de este assert contaba declaraciones y se puso roja por el tamaño
+  // base, que es legítimo: no es el caso de la cuota de Préstamos, donde había dos `clamp`
+  // compitiendo para el mismo elemento y uno era inerte.
+  ok('10.2 …y su cifra escala, con un solo owner del escalado',
+    /\.wsrecv-kpi-v \{ font-size: clamp\(15px, 5vw, 20px\); \}/.test(cssNoC) &&
+    (cssNoC.match(/\.wsrecv-kpi-v \{ font-size: clamp/g) || []).length === 1);
+  // En escritorio `1fr` SE QUEDA: su mínimo automático protege a la cifra más larga. Lo cambié
+  // a `minmax(0,·)` para igualar columnas y la medida me corrigió — a 641 el total pedía 174 px
+  // en una caja de 147. El assert existe para que nadie repita mi error.
+  ok('10.3 en escritorio las tres columnas siguen con `1fr`, que es lo que protege al total',
+    /\.wsrecv-kpis \{ display: grid; grid-template-columns: repeat\(3, 1fr\); gap: 12px; \}/.test(cssNoC));
+  // Escenarios: dos supuestos son una comparación, y una comparación se mira en paralelo.
+  ok('10.4 los dos supuestos de Escenarios van en paralelo, también en móvil',
+    /\.wsb2-cols \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/.test(cssNoC) &&
+    !/@media \(min-width: 700px\) \{\s*\.wsb2-cols/.test(cssNoC));
+  // Y una fila de campos alinea sus entradas aunque los rótulos no midan lo mismo. Sin número
+  // mágico: la celda ya se estira a la altura de su fila.
+  ok('10.5 una fila de campos alinea sus entradas, y sin número mágico',
+    /\.ws4-field > \.ws4-field-input \{ margin-top: auto; \}/.test(cssNoC));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
