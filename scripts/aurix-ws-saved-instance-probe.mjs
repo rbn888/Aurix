@@ -86,7 +86,14 @@ for (const [ENG,launcher] of [['CR',chromium],['WK',webkit]]) {
   ok(`${ENG}.si el menú ofrece quitar del Dashboard (g1 ya estaba)`, menu.items.indexOf('unpin')>=0, JSON.stringify(menu.items));
   // quitar del Dashboard: no borra
   await pg.evaluate(`(function(){ document.querySelector('#wsSavedMenu [data-wsmenu-act="unpin"]').click(); return true; })()`);
-  await pg.waitForTimeout(400);
+  // SE ESPERA LA CONDICIÓN, NO UN RELOJ. Con un `waitForTimeout(400)` fijo esta comprobación
+  // era INTERMITENTE: un intento veía las dos instancias y el siguiente cero, porque quitar del
+  // Dashboard repinta la superficie de forma asíncrona y el sondeo llegaba a veces en medio del
+  // repintado. Los invariantes de DATOS —existe, no borrado, objetivo intacto, ya no fijado—
+  // se cumplían en los dos casos, así que el defecto era de la medida. No se relaja nada: se
+  // espera a que la lista vuelva a estar pintada, con tope, y si no vuelve el assert falla igual.
+  try { await pg.waitForFunction(`document.querySelectorAll('.wssi').length === 2`, null, { timeout: 4000 }); }
+  catch (_) { /* si no llega, el assert de abajo lo dirá con su medida */ }
   const un=await pg.evaluate(`(function(){ const raw=JSON.parse(localStorage.getItem('aurix_ws_goals_v1')||'[]');
     const g=raw.find(x=>x.id==='g1');
     return JSON.stringify({ exists:!!g, pinned:!!(g&&g.dashPinned), deleted:!!(g&&g.deletedAt), target:g&&g.target, items:document.querySelectorAll('.wssi').length });})()`).then(JSON.parse);
