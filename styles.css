@@ -22643,6 +22643,14 @@ body.gs-open { overflow: hidden; }
    176 px deja aire al lado y, sobre todo, aparece antes. */
 .wsbud-donut { position: relative; display: grid; place-items: center; width: 100%; max-width: 176px; margin: 0 auto 2px; }
 @media (min-width: 1024px) { .wsbud-donut { max-width: 208px; } }
+/* §11 · INTENTO REVERTIDO, y queda escrito para que nadie lo repita. Puse el anillo y su leyenda
+   en paralelo a ≥1024 —el anillo mide 208 px centrado en una tarjeta de ~600, así que deja aire
+   a los lados mientras la leyenda se apila debajo— esperando acortar la columna de
+   visualización. LA MEDIDA DIJO LO CONTRARIO: la columna pasó de 465 a 551 px y el desfase con
+   la de edición de 103 a 189. Así que el aire lateral del anillo no es altura recuperable: la
+   fila de la rejilla la fija el propio anillo y la leyenda deja de aportar su compresión.
+   El desfase de 103 px se queda, declarado: es cosmético, no bloquea el cierre, y forzarlo con
+   relleno es exactamente lo que el §11 prohíbe. */
 .wsbud-donut svg { display: block; width: 100%; height: auto; }
 .wsbud-arc { transition: stroke-dasharray 260ms ease, stroke-dashoffset 260ms ease; }
 .wsbud-donut-c {

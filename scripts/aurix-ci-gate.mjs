@@ -54,7 +54,12 @@ console.log(JSON.stringify({
 if (failures.length) {
   console.error('\nFAILED HARNESSES:');
   for (const x of failures) console.error(`  ✗ ${x.f} (exit ${x.status})\n    ${x.tail.replace(/\n/g, '\n    ')}`);
+  // EL NOMBRE VA DESPUÉS DEL VEREDICTO, Y EN UNA LÍNEA. Los nombres ya se imprimían, pero
+  // ARRIBA y con el volcado completo de cada fallo: quien lee el final del log —lo normal en
+  // CI y lo que yo mismo hice— se queda con «NO-GO» y sin saber qué falló. Una intermitencia
+  // sin nombre no se puede perseguir, así que el veredicto se autoexplica.
   console.error(`\nGATE RESULT: NO-GO — ${failures.length}/${total} harnesses failed. Deploy blocked.`);
+  console.error(`FALLARON: ${failures.map(x => x.f).join(' · ')}`);
   process.exit(1);
 }
 console.log(`\nGATE RESULT: GO — ${passed}/${total} harnesses passed in ${dur}s. Deploy allowed.`);
