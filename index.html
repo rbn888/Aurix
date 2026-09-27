@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v781-market-status-truth';
-      var APPJS_V = '741';
+      var BUILD = 'v782-tx-money';
+      var APPJS_V = '742';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -480,7 +480,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=741">
+  <link rel="stylesheet" href="styles.css?v=742">
 </head>
 <body style="background:#040507">
 
@@ -1513,6 +1513,12 @@
         </div>
 
         <div class="reduce-preview" id="reducePreview">
+          <!-- P0 §25 — EL VALOR DE LA OPERACIÓN, no sólo el de lo que queda. El usuario
+               teclea unidades y necesita saber cuánto dinero mueve eso. -->
+          <div class="reduce-preview-row is-op" id="previewOpRow" hidden>
+            <span id="previewOpLabel">Valor de la operación</span>
+            <strong id="previewOpValue">—</strong>
+          </div>
           <div class="reduce-preview-row">
             <span data-i18n="qtyRemaining">Cantidad restante</span>
             <strong id="previewQtyLeft">—</strong>
@@ -1636,6 +1642,23 @@
           <label for="txPrice" data-i18n="txPriceLabel">Precio por unidad</label>
           <input type="text" inputmode="decimal" id="txPrice" placeholder="0,00" autocomplete="off">
         </div>
+        <!-- P0 §25 — LO QUE CUESTA O LO QUE SE COBRA, en vivo. Aquí sólo había unidades y
+             precio por unidad: el usuario tenía que multiplicar de cabeza para saber cuánto
+             dinero movía una compra o una venta. -->
+        <div class="reduce-preview" id="txPreview" hidden>
+          <div class="reduce-preview-row is-op">
+            <span id="txOpLabel">Valor de la operación</span>
+            <strong id="txOpValue">—</strong>
+          </div>
+          <div class="reduce-preview-row">
+            <span id="txAfterQtyLabel">Cantidad resultante</span>
+            <strong id="txAfterQty">—</strong>
+          </div>
+          <div class="reduce-preview-row" id="txAfterValRow">
+            <span id="txAfterValLabel">Valor de la posición</span>
+            <strong id="txAfterVal">—</strong>
+          </div>
+        </div>
         <div class="reduce-error" id="txError"></div>
         <button type="submit" class="btn-submit btn-submit--green" data-i18n="txSubmit">Añadir transacción</button>
       </form>
@@ -1737,7 +1760,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=741"
+  <script src="app.js?v=742"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

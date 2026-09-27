@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '741'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '742'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5161,6 +5161,13 @@ const T = {
     txTypeBuy:         'Compra',
     txTypeSell:        'Venta',
     txPriceLabel:      'Precio por unidad',
+    // P0 §25 — unidades Y dinero en todo flujo de compra/venta.
+    txOpCost:          'Coste de la operación',
+    txOpProceeds:      'Valor de la venta',
+    txQtyAfter:        'Cantidad resultante',
+    txValueAfter:      'Valor de la posición',
+    txValueAfterEst:   'Valor de la posición (estimado)',
+    reduceOpValue:     'Valor estimado de la venta',
     txSubmit:          'Añadir transacción',
     // Asset detail modal
     adValueLabel:      'Valor total',
@@ -8266,6 +8273,12 @@ const T = {
     txTypeBuy:         'Buy',
     txTypeSell:        'Sell',
     txPriceLabel:      'Price per unit',
+    txOpCost:          'Operation cost',
+    txOpProceeds:      'Sale value',
+    txQtyAfter:        'Resulting quantity',
+    txValueAfter:      'Position value',
+    txValueAfterEst:   'Position value (estimated)',
+    reduceOpValue:     'Estimated sale value',
     txSubmit:          'Add transaction',
     // Asset detail modal
     adValueLabel:      'Total value',
@@ -73158,10 +73171,31 @@ function updateReducePreview() {
     reduceError.textContent = t('cantExceed')(maxLabel);
     previewQtyLeft.textContent   = '—';
     previewValueLeft.textContent = '—';
+    { const r = document.getElementById('previewOpRow'); if (r) r.hidden = true; }
     reduceWarning.classList.remove('visible');
     return;
   }
 
+  // P0 §25 — EL VALOR DE LO QUE SE QUITA. Se publica sólo si hay un precio con el que
+  // calcularlo: sin precio fiable no se inventa un cero, se deja la fila fuera —que es la
+  // misma regla que ya gobierna el resto de Aurix (§38).
+  {
+    const opRow = document.getElementById('previewOpRow');
+    const opLbl = document.getElementById('previewOpLabel');
+    const opVal = document.getElementById('previewOpValue');
+    if (opRow && opVal) {
+      const px = Number(asset.price);
+      const canValue = asset.type !== 'cash' && Number.isFinite(px) && px > 0 && amount > 0;
+      if (canValue) {
+        if (opLbl) opLbl.textContent = t('reduceOpValue');
+        opVal.textContent = formatDisplay(assetNativeValue({ ...asset, qty: amount }), cur);
+        opRow.hidden = false;
+      } else {
+        opRow.hidden = true;
+        opVal.textContent = '—';
+      }
+    }
+  }
   const remaining      = asset.qty - amount;
   const remainingAsset = { ...asset, qty: remaining };
   previewQtyLeft.textContent   = asset.type === 'cash'
@@ -73951,6 +73985,7 @@ function openTxModal(assetId) {
   if (asset && asset.price && !isNaN(asset.price)) {
     txPriceInput.value = asset.price;
   }
+  { const b = document.getElementById('txPreview'); if (b) b.hidden = true; }
   txOverlay.classList.add('open');
   document.body.classList.add('modal-open');
   setTimeout(() => txQtyInput.focus(), 50);
@@ -73966,11 +74001,54 @@ function closeTxModal() {
 document.getElementById('txClose').addEventListener('click', closeTxModal);
 txOverlay.addEventListener('click', e => { if (e.target === txOverlay) closeTxModal(); });
 
+// ── P0 §25 · LO QUE CUESTA O LO QUE SE COBRA, EN VIVO ─────────────────────
+// Esta hoja sólo pedía unidades y precio por unidad, así que el usuario tenía que
+// multiplicar de cabeza para saber cuánto dinero movía una compra o una venta.
+// Ahora se publica mientras teclea, y con dos naturalezas DISTINTAS que no se
+// mezclan:
+//   · el VALOR DE LA OPERACIÓN es exacto — cantidad y precio los declara él;
+//   · el VALOR DE LA POSICIÓN resultante es ESTIMADO, porque usa el precio de
+//     mercado del activo, que él no ha declarado. Se rotula como estimado.
+// Y si no hay precio de mercado con el que valorar la posición, esa fila NO se
+// publica: un cero ahí diría que la posición no vale nada (§38).
+// Todo en la divisa del ACTIVO, que es la del precio por unidad: no se mezcla.
+function _aurixTxUpdatePreview() {
+  const box = document.getElementById('txPreview');
+  if (!box) return;
+  const asset = assets.find(a => a.id === _txAssetId);
+  const qty   = parseLocalFloat(txQtyInput.value);
+  const price = normalizePriceInput(txPriceInput.value);
+  const okQty = Number.isFinite(qty) && qty > 0;
+  const okPx  = Number.isFinite(price) && price > 0;
+  if (!asset || !okQty || !okPx) { box.hidden = true; return; }
+  const isSell = txTypeHidden.value === 'sell';
+  const cur    = (asset.assetCurrency || 'USD').toUpperCase();
+  const held   = Number(asset.qty) || 0;
+  const after  = isSell ? (held - qty) : (held + qty);
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('txOpLabel', t(isSell ? 'txOpProceeds' : 'txOpCost'));
+  set('txOpValue', formatDisplay(qty * price, cur));
+  set('txAfterQtyLabel', t('txQtyAfter'));
+  set('txAfterQty', formatQty(Math.max(0, after)));
+  const mkt = Number(asset.price);
+  const row = document.getElementById('txAfterValRow');
+  if (Number.isFinite(mkt) && mkt > 0 && after > 0) {
+    set('txAfterValLabel', t('txValueAfterEst'));
+    set('txAfterVal', formatDisplay(assetNativeValue({ ...asset, qty: after }), cur));
+    if (row) row.hidden = false;
+  } else if (row) { row.hidden = true; }
+  box.hidden = false;
+}
+txQtyInput.addEventListener('input', _aurixTxUpdatePreview);
+txPriceInput.addEventListener('input', _aurixTxUpdatePreview);
+
 document.querySelectorAll('#txTypeToggle [data-txtype]').forEach(btn => {
   btn.addEventListener('click', () => {
     txTypeHidden.value = btn.dataset.txtype;
     document.querySelectorAll('#txTypeToggle [data-txtype]')
       .forEach(b => b.classList.toggle('active', b === btn));
+    // Cambiar de compra a venta cambia el signo de la operación y su rótulo.
+    _aurixTxUpdatePreview();
   });
 });
 

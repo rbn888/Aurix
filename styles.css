@@ -3128,6 +3128,12 @@ body.modal-open {
 }
 
 /* ── Reduce preview ────────────────────────────────────── */
+/* P0 §25 — LA FILA DE LA OPERACIÓN PESA MÁS QUE LAS DE RESULTADO. Es el dinero que el usuario
+   mueve AHORA; lo demás es consecuencia. Se distingue con un filete y con el peso de su cifra,
+   sin traer un componente nuevo: el bloque de previsualización ya existía para «reducir» y se
+   reutiliza tal cual en compra/venta (§35: reutilizar antes que crear). */
+.reduce-preview-row.is-op { padding-bottom: 7px; border-bottom: 1px solid var(--border); }
+.reduce-preview-row.is-op strong { font-size: 15.5px; font-weight: 800; color: var(--text-bright, #fff); }
 .reduce-preview {
   background: var(--bg-card-2);
   border: 1px solid var(--border);
