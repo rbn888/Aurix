@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '727'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '728'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26935,13 +26935,23 @@ function _wsToolOutHtml(inp) {
         <span class="wstool-res-final">${esc(formatBase(p.final))}</span>
         <span class="wstool-res-orient">${esc(t('wstool_orient'))}</span>
       </div>
+      ${/* §25 — LAS TRES COMPONENTES SE DISTINGUEN SIN LEER. Ya estaban separadas como cifras
+            (lo hizo §B en su día) pero eran tres celdas idénticas: había que leer el rótulo para
+            saber cuál era el dinero que pusiste, cuál el que fuiste poniendo y cuál el que
+            generó. Cada una declara su acento por la API compartida — lo que ENTRA de golpe
+            (info), lo que entra a plazos (in) y lo que produce el interés (green) — y el signo
+            del crecimiento sigue siendo el que manda su color cuando es negativo. */''}
       <div class="wstool-res-split is-quad">
-        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(p.initial))}</span><span class="wstool-res-k">${esc(t('wstool_res_initial'))}</span></div>
-        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(p.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
-        <div class="wstool-res-cell${p.growth < 0 ? ' is-loss' : ' is-gain'}"><span class="wstool-res-v">${p.growth < 0 ? '−' : '+'}${esc(formatBase(Math.abs(p.growth)))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
+        <div class="wstool-res-cell" data-ws-accent="info"><span class="wstool-res-v">${esc(formatBase(p.initial))}</span><span class="wstool-res-k">${esc(t('wstool_res_initial'))}</span></div>
+        <div class="wstool-res-cell" data-ws-accent="in"><span class="wstool-res-v">${esc(formatBase(p.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
+        <div class="wstool-res-cell${p.growth < 0 ? ' is-loss' : ' is-gain'}" data-ws-accent="${p.growth < 0 ? 'out' : 'up'}"><span class="wstool-res-v">${p.growth < 0 ? '−' : '+'}${esc(formatBase(Math.abs(p.growth)))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
       </div>
-      ${_wsAssumptionsHtml(p)}
     </div>
+    ${/* §25 — LA CURVA VA JUSTO DESPUÉS DE LAS CIFRAS. Los supuestos estaban DENTRO del bloque de
+          resultado, así que se colaban entre el capital final y la curva: había que cruzar un
+          desplegable para llegar al gráfico. `order` no los movía porque su padre era el bloque
+          de resultado, no el contenedor — el arreglo es de MARCADO, no de CSS. Bajan a
+          información secundaria, que es lo que son. */''}
     <div class="wstool-chart">
       ${_wsToolChartHtml(res, Math.max(1, Math.round(inp.years || 0)))}
       <div class="wsp-legend">
@@ -26949,6 +26959,7 @@ function _wsToolOutHtml(inp) {
         <span class="wsp-leg is-cons">${esc(t('wstool_legend_contrib'))}</span>
       </div>
     </div>
+    ${_wsAssumptionsHtml(p)}
     ${ms.length ? `<div class="wstool-ms"><span class="wstool-ms-title">${esc(t('wstool_ms_title'))}</span><ul class="wstool-ms-list">${ms.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}`;
 }
 
@@ -26965,22 +26976,32 @@ function _renderCompoundTool() {
       </span>
     </label>`;
   return `
-    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="teal">
       ${_wsSurfaceHeadHtml({ title: t('wstool_compound_n'), doc: _wsToolDocName(), help: [t('wstool_compound_d')] })}
       ${/* «DATOS DE ENTRADA» debajo de «Interés compuesto» no informaba de nada:
             los campos ya son visiblemente los datos de entrada. Se retira el
             título de sección, no los campos. */''}
-      <section class="wsh-card wstool-inputs-card">
-        <div class="wstool-fields">
-          ${field('initial', t('wstool_in_initial'), _wsToolCcy())}
-          ${field('monthly', t('wstool_in_monthly'), _wsToolCcy())}
-          ${field('ret',     t('wstool_in_return'),  '%')}
-          ${field('years',   t('wstool_in_years'),   t('wstool_unit_years'))}
+      ${/* §25 — SOBRE EL ARMAZÓN COMPARTIDO. Mismo reparto que el Presupuesto: en escritorio la
+            edición a la izquierda y la respuesta a la derecha (pegajosa), en móvil la edición
+            primero y la curva después. No es una pantalla nueva: es la MISMA decisión de caja,
+            que es justo lo que `.ws2col` existe para no volver a tomar. */''}
+      <div class="ws2col">
+        <div class="ws2col-edit">
+          <section class="wsh-card wstool-inputs-card">
+            <div class="wstool-fields">
+              ${field('initial', t('wstool_in_initial'), _wsToolCcy())}
+              ${field('monthly', t('wstool_in_monthly'), _wsToolCcy())}
+              ${field('ret',     t('wstool_in_return'),  '%')}
+              ${field('years',   t('wstool_in_years'),   t('wstool_unit_years'))}
+            </div>
+          </section>
         </div>
-      </section>
-      <section class="wsh-card wstool-out-card">
-        <div class="wstool-out" data-wstool-out>${_wsToolOutHtml(inp)}</div>
-      </section>
+        <div class="ws2col-view">
+          <section class="wsh-card wstool-out-card wscmp-out-card">
+            <div class="wstool-out" data-wstool-out>${_wsToolOutHtml(inp)}</div>
+          </section>
+        </div>
+      </div>
       ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
             usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
@@ -27283,8 +27304,8 @@ function _renderBudgetTool() {
             declara `order:1` y la edición `order:2`, para que el resultado se vea pronto
             (§33). Los dos hijos declaran `order` — si sólo lo hiciera uno, el otro se
             pintaría antes por el valor inicial 0, que es la lección de Intelligence. */''}
-      <div class="wsbud-body">
-        <div class="wsbud-col-edit">
+      <div class="ws2col wsbud-body">
+        <div class="ws2col-edit wsbud-col-edit">
           <section class="wsh-card wstool-inputs-card">
             <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
             <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>
@@ -27294,7 +27315,7 @@ function _renderBudgetTool() {
             <div class="wstool-fields">${_WSBUD_EXPENSES.map(f => field(f.k, t(f.label))).join('')}</div>
           </section>
         </div>
-        <div class="wsbud-col-view">
+        <div class="ws2col-view wsbud-col-view">
           <section class="wsh-card wstool-out-card wsbud-out-card">
             <div class="wstool-out" data-wstool-out>${_wsBudgetOutHtml(inp)}</div>
           </section>

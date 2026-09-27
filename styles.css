@@ -22433,26 +22433,80 @@ body.gs-open { overflow: hidden; }
    compartida de las demás capacidades desde aquí. El input CONSERVA sus 44 px de toque y sus
    16 px de texto —los dos son invariantes certificados—; lo que se recorta es todo lo que los
    rodeaba: el hueco entre etiqueta y campo, el hueco entre filas y el relleno de la tarjeta. */
-.wsbud-col-edit .wstool-inputs-card { padding: 11px 12px 12px; }
-.wsbud-col-edit .wsh-head { margin-bottom: 7px; }
-/* §13 — TRES COLUMNAS EN LOS CAMPOS, y no es lo mismo que el resumen. Lo que se salía a 360 en
-   el resumen era un importe FORMATEADO («2.500,00 US$», 96 px); un campo editable muestra el
-   número CRUDO («2.500») con su unidad en una caja de 44 px, y a 360 le quedan 105 px por
-   columna. La etiqueta más larga del presupuesto («Otros ingresos», 12 px) mide ~92. Cabe, y se
-   comprueba midiendo desbordamiento hijo-contra-tarjeta en la sonda, no de memoria.
-   El efecto es el que §13 pedía: Ingresos pasa de dos filas a UNA y Gastos de cuatro a TRES. */
-.wsbud-col-edit .wstool-fields { gap: 7px 7px; }
 /* ACOTADA A MÓVIL. La primera versión la aplicó en todos los anchos y EMPEORÓ 768, donde la
    rejilla compartida ya daba CUATRO columnas: forzar tres añadía filas. Tres breakpoints, tres
    decisiones distintas — que es lo que el §45 pide de cada ancho.
      <768   → 3 (el cuerpo es una columna y cuatro no caben)
      768-1023 → 4 (la que ya había: el cuerpo sigue en una columna pero es ancho)
      ≥1024  → 3 (el cuerpo son dos columnas y la de edición es más estrecha) */
-@media (max-width: 767px) {
-  .wsbud-col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   FASE 2 · ARMAZÓN DE DOS COLUMNAS  —  `.ws2col`
+   ══════════════════════════════════════════════════════════════════════════════════════════
+   SE EXTRAE CON DOS CONSUMIDORES: el Presupuesto lo demostró y el Interés compuesto lo necesita
+   igual. Escribirlo dos veces era garantizar que un día el móvil de una herramienta ordenara sus
+   bloques al revés que el de la otra.
+   LO COMPARTIDO es la DECISIÓN DE CAJA, no la apariencia: en móvil una columna con la edición
+   primero (la respuesta esencial ya está arriba en cada capacidad) y en escritorio dos columnas
+   con la edición a la izquierda y la respuesta pegajosa a la derecha. Cada herramienta pone
+   dentro lo suyo.
+   LOS DOS hijos declaran `order` a propósito: si sólo lo hiciera uno, el otro se pintaría antes
+   por su valor inicial 0 — la lección de las cards de Intelligence. */
+.ws2col { display: flex; flex-direction: column; gap: 10px; }
+.ws2col-edit { order: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ws2col-view { order: 2; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (min-width: 1024px) {
+  /* `minmax(0, …)` en las dos pistas: con `1fr` (= `minmax(auto,1fr)`) una cifra larga se niega
+     a encoger y la columna se sale de la rejilla. El `min-width: 0` de cada columna es la otra
+     mitad de la misma condición — hacen falta las dos. */
+  .ws2col { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 14px; align-items: start; }
+  .ws2col-view { position: sticky; top: 12px; }
+  /* §10 — LA EDICIÓN RESPIRA: en una columna de ~700 px, cuatro campos por fila dejan 131 px por
+     campo y un importe de seis dígitos con su unidad va justo. Tres por fila dan ~185. */
+  .ws2col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-.wsbud-col-edit .ws4-field { gap: 2px; }
-.wsbud-col-edit .ws4-field-name { font-size: 12px; line-height: 1.2; }
+/* §13/§14 · DENSIDAD DE LA EDICIÓN. El input CONSERVA sus 44 px de toque y sus 16 px de texto
+   —los dos son invariantes certificados—; lo que se recorta es lo que los rodeaba: el hueco
+   entre etiqueta y campo, el hueco entre filas y el relleno de la tarjeta. */
+.ws2col-edit .wstool-inputs-card { padding: 11px 12px 12px; }
+.ws2col-edit .wsh-head { margin-bottom: 7px; }
+.ws2col-edit .wstool-fields { gap: 7px 7px; }
+.ws2col-edit .ws4-field { gap: 2px; }
+.ws2col-edit .ws4-field-name { font-size: 12px; line-height: 1.2; }
+/* Por debajo de 768 el cuerpo es una columna y cuatro campos por fila no caben: tres. */
+@media (max-width: 767px) {
+  .ws2col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* LA RESPUESTA SE HUNDE respecto a la edición, así que hay escalera en vez de plano. Ningún tono
+   nuevo inventado y sin alfa BLANCA, que sobre el lienzo oscuro se lee como gris neutro. */
+.ws2col-view .wstool-out-card { background: var(--elev-0, #0b1120); border-color: rgba(120,160,255,0.20); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   §25 · INTERÉS COMPUESTO — LA CURVA MANDA
+   ══════════════════════════════════════════════════════════════════════════════════════════
+   §8/§25 — MENOS GIGANTISMO. El capital final ocupaba 46 px de titular; es el dato principal,
+   así que se queda arriba y con contraste, pero un dato no necesita el tamaño de una portada. */
+.wscmp-out-card .wstool-res-final { font-size: 32px; line-height: 1.04; }
+@media (max-width: 767px) { .wscmp-out-card .wstool-res-final { font-size: 28px; } }
+.wscmp-out-card .wstool-res-main { padding: 12px 14px; background: rgba(74,130,240,0.08); border-radius: 14px; }
+/* Las tres componentes: acento de la API en el filete y en la cifra. No hay relleno de color —
+   compite con el dato— y el contraste del texto no baja, que es lo que el §51 protege. */
+.wscmp-out-card .wstool-res-cell { position: relative; overflow: hidden; }
+.wscmp-out-card .wstool-res-cell[data-ws-accent]::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 2px;
+  background: rgba(var(--ws-a), 0.85);
+}
+/* La cifra toma el canal PRIMARIO del acento, que es su propio tono; el secundario existe para
+   el compañero de la pareja y usarlo aquí era lo que traía el ámbar. */
+.wscmp-out-card .wstool-res-cell[data-ws-accent="in"] .wstool-res-v,
+.wscmp-out-card .wstool-res-cell[data-ws-accent="up"] .wstool-res-v { color: rgb(var(--ws-a)); }
+/* §25 — LA CURVA ES LA PROTAGONISTA: sube justo debajo del resultado y gana altura en vez de
+   quedar detrás de los supuestos. El desplegable de supuestos baja a información secundaria. */
+.wscmp-out-card .wstool-chart { order: 2; }
+.wscmp-out-card .wstool-asm { order: 3; }
+.wscmp-out-card .wstool-ms { order: 4; }
+.wscmp-out-card .wstool-out { display: flex; flex-direction: column; gap: 10px; }
+.wscmp-out-card .wstool-result { display: flex; flex-direction: column; gap: 10px; order: 1; }
+
 .wsbud-body { display: flex; flex-direction: column; gap: 10px; }
 /* MÓVIL: EDICIÓN PRIMERO, y es una decisión medida, no la de por defecto. Probé la respuesta
    delante y dejaba el primer campo en 1028 px: para cambiar un gasto había que cruzar el anillo
@@ -27796,6 +27850,10 @@ button.intv14-cmp-clear {
 [data-ws-accent="in"]     { --ws-a: 55,199,184;  --ws-b: 95,216,203;  }
 [data-ws-accent="out"]    { --ws-a: 224,122,159; --ws-b: 240,160,184; }
 [data-ws-accent="info"]   { --ws-a: 74,130,240;  --ws-b: 120,170,255; }
+/* `up` existe porque `green` NO servía: su canal secundario es ÁMBAR —se diseñó para el «parcial»
+   de Cobros— y al usarlo para el crecimiento del interés compuesto pintaba una ganancia en
+   ámbar. Un acento semántico tiene que ser coherente en sus DOS canales. */
+[data-ws-accent="up"]     { --ws-a: 64,190,120;  --ws-b: 87,230,166;  }
 
 /* §16/§17 — SE DIFERENCIAN DE LAS TARJETAS PATRIMONIALES. Aquélla es sobria porque publica un
    hecho del patrimonio; ésta es trabajo personal, así que lleva el acento de su capacidad en

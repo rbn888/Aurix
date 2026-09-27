@@ -194,5 +194,48 @@ section('5 · §2/§7 — profundidad y densidad, sin inventar tonos:');
     !/from ['"]chart|d3|recharts|plotly/i.test(app.slice(app.indexOf('_wsBudgetDonutHtml') - 400, app.indexOf('_wsBudgetDonutHtml') + 2000)));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+section('6 · §25 · Interés compuesto sobre el armazón compartido:');
+// ════════════════════════════════════════════════════════════════════════════
+// El armazón `.ws2col` se extrajo con DOS consumidores: el Presupuesto lo demostró y el Interés
+// compuesto lo reutiliza. Lo que se fija aquí es que sea el MISMO —una sola fuente para la
+// decisión de caja— y que la personalidad del compuesto venga del acento y de la curva, no de
+// una estructura propia.
+{
+  const cmp = fnSrc('_renderCompoundTool'), bud = fnSrc('_renderBudgetTool');
+  ok('6.1 las dos herramientas usan el MISMO armazón de dos columnas',
+    /class="ws2col"/.test(cmp) && /ws2col-edit/.test(cmp) && /ws2col-view/.test(cmp) &&
+    /ws2col wsbud-body/.test(bud) && /ws2col-edit/.test(bud));
+  ok('6.2 …y la decisión de caja vive en UN solo sitio de la hoja',
+    (css.match(/\.ws2col \{ display: flex/g) || []).length === 1 &&
+    (css.match(/\.ws2col-edit \{ order: 1/g) || []).length === 1);
+  ok('6.3 el compuesto declara su acento por la API compartida, no con color en el HTML',
+    /data-ws-accent="teal"/.test(cmp) && !/style="[^"]*color:/.test(cmp));
+  // §25 — las tres componentes se distinguen sin leer el rótulo.
+  const out = fnSrc('_wsToolOutHtml');
+  ok('6.4 las tres componentes declaran acento propio (entra de golpe / a plazos / lo que genera)',
+    /data-ws-accent="info"/.test(out) && /data-ws-accent="in"/.test(out) && /'up'/.test(out));
+  ok('6.5 un crecimiento NEGATIVO cambia de acento, no sólo de signo',
+    /p\.growth < 0 \? 'out' : 'up'/.test(out));
+  // `up` existe porque `green` emparejaba verde con ÁMBAR (su secundario es el «parcial» de
+  // Cobros) y pintaba una ganancia en ámbar. Un acento semántico tiene que ser coherente en sus
+  // DOS canales — lo cazó la medida del color computado en el navegador.
+  ok('6.6 el acento `up` es coherente en sus dos canales (verde con verde)',
+    /\[data-ws-accent="up"\]\s*\{[^}]*--ws-a: *64,190,120;\s*--ws-b: *87,230,166/.test(css));
+  ok('6.7 la cifra toma el canal PRIMARIO del acento, que es su propio tono',
+    /wstool-res-cell\[data-ws-accent="up"\] \.wstool-res-v \{ color: rgb\(var\(--ws-a\)\)/.test(css));
+  // §25 — LA CURVA MANDA: los supuestos ya no se cuelan entre las cifras y el gráfico.
+  ok('6.8 la curva va justo después de las cifras y los supuestos detrás',
+    out.indexOf('wstool-chart') < out.indexOf('_wsAssumptionsHtml'),
+    'grafico@' + out.indexOf('wstool-chart') + ' supuestos@' + out.indexOf('_wsAssumptionsHtml'));
+  ok('6.9 …y fue un arreglo de MARCADO: los supuestos ya no viven dentro del bloque de resultado',
+    out.indexOf('_wsAssumptionsHtml') > out.indexOf('</div>'));
+  ok('6.10 §8 la cifra grande del compuesto baja de 46 px',
+    /\.wscmp-out-card \.wstool-res-final \{ font-size: 32px/.test(css));
+  // El motor no se toca (§55).
+  ok('6.11 el motor del compuesto sigue intacto: la salida no recalcula por su cuenta',
+    /_wsCompoundProjection\(inp\)/.test(out) && !/Math\.pow\(/.test(out));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
