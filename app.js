@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '733'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '734'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6122,6 +6122,11 @@ const T = {
     wsg_type_home: 'Vivienda', wsg_type_fire: 'FIRE', wsg_type_free: 'Objetivo libre',
     wsg_r_target: 'Cantidad objetivo', wsg_r_current: 'Cantidad actual', wsg_r_remaining: 'Distancia restante',
     wsg_r_eta: 'Fecha estimada', wsg_r_required: 'Ritmo necesario',
+    // `wsg_r_years` se USABA y no estaba DEFINIDA: `t()` devolvía `undefined` y el resultado
+    // publicaba «28 años» SIN ROTULO — una cifra sin decir de qué es, en una superficie Premium
+    // publicada. Lo destapó la captura, no un assert. Es el tercer caso de este linaje en la
+    // sesión, así que la comprobación de completitud pasa a cubrir TODAS las claves `wsg_r_*`.
+    wsg_r_years: 'Tiempo estimado',
     wsg_sync_on: w => `Cantidad actual sincronizada con tu patrimonio real (${w}).`,
     wsg_read_reached: 'Objetivo alcanzado.',
     wsg_read_nodata: 'Define una cantidad objetivo para medir tu progreso.',
@@ -8984,6 +8989,7 @@ const T = {
     wsg_type_home: 'Home', wsg_type_fire: 'FIRE', wsg_type_free: 'Custom goal',
     wsg_r_target: 'Target amount', wsg_r_current: 'Current amount', wsg_r_remaining: 'Remaining distance',
     wsg_r_eta: 'Estimated date', wsg_r_required: 'Required pace',
+    wsg_r_years: 'Estimated time',
     wsg_sync_on: w => `Current amount synced with your real wealth (${w}).`,
     wsg_read_reached: 'Goal reached.',
     wsg_read_nodata: 'Set a target amount to measure your progress.',

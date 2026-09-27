@@ -449,5 +449,38 @@ section('10 · §26 · Cobros y Escenarios: un total y su reparto se comparan:')
     /\.ws4-field > \.ws4-field-input \{ margin-top: auto; \}/.test(cssNoC));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+section('11 · Ninguna clave de Workspace se usa sin estar definida:');
+// ════════════════════════════════════════════════════════════════════════════
+// TERCERA vez en esta sesión que el mismo linaje muerde: una clave que se usa y no existe hace
+// que `t()` devuelva `undefined` y se publique una CIFRA SIN ROTULO. Las dos primeras las
+// inventé yo (`wstool_r_final`, `wsloan_r_monthly`); la tercera era del producto —`wsg_r_years`,
+// en Objetivos, publicando «28 años» sin decir de qué— y la destapó la CAPTURA, no un assert.
+// Así que la comprobación deja de ser por clave suelta y pasa a ser de COMPLETITUD, en los dos
+// idiomas: 635 claves `ws*` usadas contra los dos diccionarios.
+{
+  const tI = app.indexOf('const T = {');
+  const esI = app.indexOf('es: {', tI), enI = app.indexOf('en: {', tI);
+  let d = 0, end = -1;
+  for (let k = app.indexOf('{', tI); k < app.length; k++) {
+    if (app[k] === '{') d++; else if (app[k] === '}') { d--; if (!d) { end = k; break; } }
+  }
+  const ES = app.slice(esI, enI), EN = app.slice(enI, end);
+  const used = [...new Set([...app.matchAll(/t\('(ws[a-zA-Z_0-9]+)'\)/g)].map(m => m[1]))];
+  // Se busca `clave:` precedida de separador: las claves van VARIAS POR LÍNEA en estos
+  // diccionarios, así que un ancla de principio de línea sólo ve la primera. Mi primera versión
+  // de esta auditoría lo hacía y declaró 34 claves ausentes que estaban definidas — la pista fue
+  // que las listas de ES y EN salían IDÉNTICAS.
+  const has = (seg, k) => new RegExp('[{,\\s]' + k + '\\s*:').test(seg);
+  const sinES = used.filter(k => !has(ES, k)), sinEN = used.filter(k => !has(EN, k));
+  ok('11.1 las ' + used.length + ' claves `ws*` que se usan están definidas en español',
+    sinES.length === 0, sinES.join(', '));
+  ok('11.2 …y en inglés', sinEN.length === 0, sinEN.join(', '));
+  ok('11.3 y la que faltaba tiene rótulo en los dos idiomas',
+    has(ES, 'wsg_r_years') && has(EN, 'wsg_r_years'));
+  ok('11.4 la comprobación es real: mide bastantes claves para que signifique algo',
+    used.length > 600, String(used.length));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

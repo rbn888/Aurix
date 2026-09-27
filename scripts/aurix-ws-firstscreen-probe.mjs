@@ -218,17 +218,36 @@ const MEASURE = `(function(SPEC){
   // propio campo y compararlo con su ancho útil —descontando el padding, que aquí
   // reserva sitio fijo para el sufijo— y hacerlo en TODAS las capacidades, porque
   // el punto ciego era de la sonda, no de una herramienta.
-  var inClip = [];
+  var inClip = [], phClip = [];
   try {
     var _cx = document.createElement('canvas').getContext('2d');
-    [].slice.call(wsh.querySelectorAll('input.ws4-num, input[data-wstool-input], input[data-wsg-form], input[data-ws-num]')).forEach(function(inp){
+    // Y los select entran también: el tipo de objetivo salía «Patrimonio obje…» y esta medida
+    // no lo veía porque sólo miraba inputs. Un select recorta su opción igual de silenciosamente.
+    // (Sin comillas invertidas en este comentario: vive DENTRO de un template literal y una sola
+    //  lo parte en dos, que es primo del gotcha ya escrito sobre la barra-d en otra sonda.)
+    // Todos los select de la superficie, no sólo los que llevan la clase del campo numérico:
+    // el de Objetivos es .wsg-select y por eso la primera versión de esta medida no lo veía.
+    // Y el PLACEHOLDER cuenta: si el ejemplo que guía al usuario sale cortado, no guía.
+    [].slice.call(wsh.querySelectorAll('input.ws4-num, select, input[data-wstool-input], input[data-wsg-form], input[data-ws-num], input[placeholder]')).forEach(function(inp){
       var b = inp.getBoundingClientRect(); if (!b.width || !b.height) return;
-      var v = (inp.value || '').trim(); if (!v) return;
+      // DOS CONTRATOS QUE NO VALEN LO MISMO. Un VALOR —lo escrito, o la opción elegida de un
+      // select— es un dato que el usuario debe poder leer: si se recorta, es fallo. Un
+      // PLACEHOLDER es una GUÍA de campo vacío; su recorte se MIDE y se publica aparte, porque
+      // arreglarlo es acortar copy de producto y eso lo decide el fundador, no esta sonda.
+      var esPh = false;
+      var v = (inp.tagName === 'SELECT'
+        ? ((inp.options[inp.selectedIndex] || {}).textContent || '')
+        : (inp.value || '')).trim();
+      if (!v) { v = (inp.getAttribute('placeholder') || '').trim(); esPh = !!v; }
+      if (!v) return;
       var cs = getComputedStyle(inp); if (cs.visibility === 'hidden' || cs.display === 'none') return;
       _cx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
       var need = Math.ceil(_cx.measureText(v).width);
       var inner = Math.round(inp.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0));
-      if (inner > 0 && need > inner + 1) inClip.push((inp.getAttribute('data-wstool-input') || inp.getAttribute('data-wsg-form') || inp.className) + ':' + need + '>' + inner);
+      if (inner > 0 && need > inner + 1) {
+        var nm = (inp.getAttribute('data-wstool-input') || inp.getAttribute('data-wsg-form') || inp.className) + ':' + need + '>' + inner;
+        if (esPh) phClip.push(nm); else inClip.push(nm);
+      }
     });
   } catch (_) { inClip = ['no-medible']; }
   // ── Y UNA FILA DE CAMPOS ALINEA SUS ENTRADAS ─────────────────────────────
@@ -271,7 +290,7 @@ const MEASURE = `(function(SPEC){
     // §1: ningún chip Incluido/Premium dentro de la cabecera.
     barTier: !!bar && bar.querySelectorAll('.wsh-tier, .wsb-title-tier').length,
     legacyHeader: wsh.querySelectorAll('.wsb-header').length,
-    small: u(small), zoom: u(zoom), taps: u(taps), clipped: u(clipped), rowBad: u(rowBad), spill: u(spill), inClip: u(inClip), misalign: u(misalign),
+    small: u(small), zoom: u(zoom), taps: u(taps), clipped: u(clipped), rowBad: u(rowBad), spill: u(spill), inClip: u(inClip), phClip: u(phClip), misalign: u(misalign),
     docOverflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
     savebar: !!root.querySelector('[data-wstool-savebar], [data-wsg-savebar]'),
   };
@@ -367,6 +386,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
           JSON.stringify({ recortado: g.clipped, docX: g.docOverflowX }));
         ok(`${tag} ninguna cifra escrita se ve cortada dentro de su campo`,
           g.inClip.length === 0, JSON.stringify(g.inClip));
+        // Y los ejemplos de campo vacío se PUBLICAN, no se esconden: acortar copy de producto
+        // no es decisión de una sonda, pero tampoco se calla que están recortados.
+        if (g.phClip.length) pend.push(`${tag} guía de campo recortada: ${JSON.stringify(g.phClip)}`);
         ok(`${tag} una fila de campos alinea sus entradas, aunque los rótulos no midan igual`,
           g.misalign.length === 0, JSON.stringify(g.misalign));
         ok(`${tag} ninguna celda se sale de su fila ni pisa a su vecina`,

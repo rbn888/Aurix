@@ -22244,6 +22244,22 @@ body.gs-open { overflow: hidden; }
   /* WORKSPACE OPERATIVO §2 — seis campos apilados eran 433 px y dejaban la
      acción de crear en 791 px, fuera de pantalla. */
   .wsg-form { grid-template-columns: 1fr 1fr; }
+  /* §26/§27 — TIPO Y NOMBRE OCUPAN LA FILA, porque su contenido no cabe en media. Medido a 390:
+     el selector de tipo tiene 116 px útiles y «Patrimonio objetivo» pide 150 —salía «Patrimonio
+     obje…»—, y el nombre pide 169 para su ejemplo en 138. Es la misma regla que recuperó el
+     importe de Préstamos: el ancho de un campo sigue a lo que sostiene. Cuesta una fila y la
+     paga la tarjeta, que tenía sitio de sobra debajo; las dos parejas de cifras siguen
+     emparejadas, que es como se leen.
+     Un `<select>` recorta su opción SIN mover `scrollWidth`, igual que un `<input>`: para
+     cualquier medida de desbordamiento todo cabía. Lo vio la captura. */
+  /* Y EL NOMBRE SALE GRATIS, cosa que sólo se ve contando filas: con seis campos en dos
+     columnas la rejilla ocupa TRES filas; con el tipo a fila completa pasa a cuatro, y con el
+     nombre TAMBIÉN a fila completa sigue en cuatro —tipo, nombre, las dos parejas de cifras—.
+     Lo confirmó la medida: el botón quedaba en el mismo píxel con una variante y con la otra.
+     Un `<select>` recorta su opción SIN mover `scrollWidth`, igual que un `<input>`: para
+     cualquier medida de desbordamiento todo cabía. Lo vio la captura. */
+  .wsg-form > .ws4-field:has([data-wsg-form="type"]),
+  .wsg-form > .ws4-field:has([data-wsg-form="name"]) { grid-column: 1 / -1; }
   .wsg-grid { grid-template-columns: 1fr; }
   .wsg-create-body { grid-template-columns: 1fr; }
   .wsg-form-preview { position: static; }
@@ -23365,6 +23381,13 @@ body.gs-open { overflow: hidden; }
   /* tighter forms */
   .wsre-form-section { padding: 10px 0; }
   .wsre-form-grid, .wsrecv-form-grid, .wsap-form-grid, .wstool-fields, .wsloan-fields, .wsg-form { gap: 9px; }
+  /* §26 — Y LOS 18 px QUE FALTABAN EN OBJETIVOS SALEN DE DENSIDAD, NO DE CONTENIDO. Con el tipo
+     y el nombre a fila completa la tarjeta crece una fila y a 360 el botón «Crear objetivo»
+     acababa en 694 con el suelo seguro en 680. Medido pieza a pieza: el hueco del cuerpo (16→12,
+     4 px), su margen inferior (16→8, 8 px) y el relleno del bloque de resultado (16→13, 6 px)
+     dan 18. No se quita ni un dato ni un rótulo. */
+  .wsg-create-body { gap: 12px; margin-bottom: 8px; }
+  .wsg-form-preview { padding: 13px; }
   .ws4-num, .wsg-text, .wsg-select { padding-top: 9px; padding-bottom: 9px; }
   /* receivables compact rows (≤140px) */
   .wsrecv-card { gap: 7px; padding: 11px 12px; }
