@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '726'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '727'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6242,6 +6242,7 @@ const T = {
     wspl_a_dup:           'Duplicar',
     wspl_a_unpin:         'Quitar del Dashboard',
     wspl_a_del:           'Eliminar',
+    wsbud_kpi_save:       'ahorro',
     wsdoc_title:          'MIS DOCUMENTOS',
     wsdoc_open_now:       'abierto ahora',
     wsdoc_s_none:         'Este documento no guardó cifras.',
@@ -9079,6 +9080,7 @@ const T = {
     wspl_a_dup:           'Duplicate',
     wspl_a_unpin:         'Remove from Dashboard',
     wspl_a_del:           'Delete',
+    wsbud_kpi_save:       'saved',
     wsdoc_title:          'MY DOCUMENTS',
     wsdoc_open_now:       'open now',
     wsdoc_s_none:         'This document saved no figures.',
@@ -27081,15 +27083,17 @@ function _wsBudgetChartHtml(res) {
   const esc = _intccEsc;
   const denom = Math.max(res.income, res.expenses, 1);
   const pct = v => (v / denom * 100).toFixed(2);
-  const segs = res.items.filter(it => it.value > 0).map(it =>
-    `<span class="wsbud-seg" style="width:${pct(it.value)}%;background:${it.color}" title="${esc(t(it.label))}"></span>`).join('');
-  const freeSeg = res.free > 0 ? `<span class="wsbud-seg is-free" style="width:${pct(res.free)}%"></span>` : '';
   const legend = res.items.filter(it => it.value > 0).map(it =>
     `<span class="wsbud-leg"><i style="background:${it.color}"></i>${esc(t(it.label))} <b>${esc(formatBase(it.value))}</b></span>`).join('');
   const freeLeg = res.free > 0 ? `<span class="wsbud-leg"><i class="is-free"></i>${esc(t('wstool_bud_free'))} <b>${esc(formatBase(res.free))}</b></span>` : '';
   return `
     <div class="wsbud-chart-wrap">
-      <div class="wsbud-bar" role="img" aria-label="${esc(t('wstool_bud_chart_title'))}">${segs}${freeSeg}</div>
+      ${/* §18 — LA BARRA DE REPARTO SE RETIRA, y se auditó antes de decidirlo. Contaba lo MISMO
+            que el anillo (el reparto del gasto) más una cosa: el dinero libre como parte del
+            ingreso. Pero eso YA lo dicen el «Disponible» del resumen y su tasa de ahorro, que es
+            literalmente esa proporción. Dos visualizaciones de lo mismo no son el doble de
+            información: son el doble de altura. La LEYENDA se queda —lleva el importe por
+            categoría, que el anillo no sabe decir— y con ella «Dinero libre». */''}
       <div class="wsbud-legend">${legend}${freeLeg}</div>
     </div>`;
 }
@@ -27120,6 +27124,20 @@ function _wsPeriodLabel(key) {
       { month: 'long', year: 'numeric' }).format(new Date(y, mo - 1, 1));
   } catch (_) { return m[1] + '-' + m[2]; }
 }
+// §11 — LA FORMA CORTA, para el chip de la cabecera. «septiembre de 2026» mide 164 px y a 360
+// hacía SALTAR DE LÍNEA la barra entera: 128 px de cabecera en vez de 78. «sept 2026» cabe al
+// lado del título, que es justo el formato que el §11 pone como ejemplo. La forma larga se
+// conserva para el desplegable abierto, donde sí hay sitio y desambigua mejor.
+function _wsPeriodLabelShort(key) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
+  if (!m) return t('wsbud_period_none');
+  const y = Number(m[1]), mo = Number(m[2]);
+  if (!(mo >= 1 && mo <= 12)) return t('wsbud_period_none');
+  try {
+    return new Intl.DateTimeFormat((typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES',
+      { month: 'short', year: 'numeric' }).format(new Date(y, mo - 1, 1)).replace(/\./g, '');
+  } catch (_) { return m[1] + '-' + m[2]; }
+}
 // Las opciones: «Sin periodo», los doce meses anteriores, el actual, el
 // siguiente, y —si el documento trae uno fuera de ese rango— el suyo. Un
 // documento de 2019 no puede quedarse sin su propia opción en la lista.
@@ -27137,20 +27155,28 @@ function _wsPeriodOptions(current) {
 // El RESUMEN y el PERIODO, arriba del todo. Antes el usuario tenía que cruzar
 // diez campos para ver cuánto le queda, que es la única cifra por la que abre
 // esta plantilla.
+// §11 — EL PERIODO, COMPACTO Y EN LA CABECERA. No se elimina porque tiene función demostrada: no
+// entra en `calculateMonthlyBudget` (cero referencias) pero vive en `inputs`, así que viaja en el
+// payload del documento con la sincronización, y `_wsSaveCandidates` lo usa para DISTINGUIR un
+// documento de otro en el selector. Un control con función no se retira; un control secundario
+// tampoco se queda con una franja entera del móvil.
+function _wsBudgetPeriodHtml(inp) {
+  const esc = _intccEsc;
+  const cur = (inp && inp.periodKey) ? String(inp.periodKey) : '';
+  const opts = _wsPeriodOptions(cur);
+  return '<label class="wsbud-perchip">'
+    + '<span class="wsbud-perchip-lbl">' + esc(t('wsbud_period')) + '</span>'
+    + '<select class="wsbud-perchip-sel" data-wsbud-period aria-label="' + esc(t('wsbud_period')) + '">'
+    +   '<option value=""' + (cur ? '' : ' selected') + '>' + esc(t('wsbud_period_none')) + '</option>'
+    +   opts.map(k => '<option value="' + esc(k) + '"' + (k === cur ? ' selected' : '') + '>'
+          + esc(k === cur ? _wsPeriodLabelShort(k) : _wsPeriodLabel(k)) + '</option>').join('')
+    + '</select></label>';
+}
 function _wsBudgetTopHtml(inp) {
   const esc = _intccEsc;
   const res = calculateMonthlyBudget(inp);
-  const cur = (inp && inp.periodKey) ? String(inp.periodKey) : '';
-  const opts = _wsPeriodOptions(cur);
   return `
     <div class="wsbud-top">
-      <label class="wsbud-period">
-        <span class="wsbud-period-lbl">${esc(t('wsbud_period'))}</span>
-        <select class="wsg-select wsbud-period-sel" data-wsbud-period>
-          <option value=""${cur ? '' : ' selected'}>${esc(t('wsbud_period_none'))}</option>
-          ${opts.map(k => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(_wsPeriodLabel(k))}</option>`).join('')}
-        </select>
-      </label>
       ${/* §27 — LAS CUATRO MAGNITUDES SE DISTINGUEN SIN LEER. Ingresos, gastos y disponible
             llevan acento propio (entra, sale, queda) y no dependen sólo del rótulo: hasta ahora
             ingresos y gastos eran dos celdas idénticas y había que leerlas para saber cuál era
@@ -27158,7 +27184,19 @@ function _wsBudgetTopHtml(inp) {
       <div class="wsbud-kpis">
         <span class="wsbud-kpi" data-ws-accent="in"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
         <span class="wsbud-kpi" data-ws-accent="out"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
-        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b></span>
+        ${/* §15 — LA TASA DE AHORRO ACOMPAÑA, NO REINA. Tenía una tarjeta propia de 123 px de alto
+              para una cifra secundaria. Aquí va pegada al disponible, que es su denominador
+              natural, y se dice sobre qué se calcula. Cuando no hay ingresos no se publica un
+              0 %: el motor devuelve `null` y aquí no se pinta el sufijo. */''}
+        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b>${
+          res.saveRate == null ? '' : `<em class="wsbud-kpi-sub">${esc(Math.round(res.saveRate) + '% ' + t('wsbud_kpi_save'))}</em>`}</span>
+        ${/* §11 — EL PERIODO, CUARTA CELDA DEL RESUMEN. Estuvo en la línea del título y la CAPTURA
+              lo tumbó: a 360 el chip dejaba «Presupuesto mensual» en una columna de 30 px —una
+              letra por línea, 254 px de cabecera— y encima el mes salía truncado («sept …»), que
+              es peor que no ponerlo: un periodo ilegible no identifica nada. Aquí comparte fila
+              con las cifras que CALIFICA, así que no cuesta un píxel de altura, se lee entero y la
+              cabecera vuelve a ser la de v740. */''}
+        ${_wsBudgetPeriodHtml(inp)}
       </div>
       ${res.deficit ? `<p class="wsb-note is-warn">${esc(String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free))))}</p>` : ''}
     </div>`;
@@ -27180,17 +27218,11 @@ function _wsBudgetOutHtml(inp) {
     : res.deficit ? String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free)))
     : String(t('wstool_bud_read_neutral') || '').replace('{r}', String(rate));
   return `
-    <div class="wstool-result wsbud-result">
-      ${/* §10 — la TASA se decía DOS veces en esta misma tarjeta (bajo la cifra
-            grande y otra vez como celda) y los tres totales se repetían con el
-            resumen de arriba. Aquí queda una sola vez, y los totales viven en la
-            cabecera operativa, que es donde el usuario los busca. */''}
-      <div class="wstool-res-main">
-        <span class="wstool-res-label">${esc(t('wstool_bud_saverate'))}</span>
-        <span class="wstool-res-final ${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(rateTxt)}</span>
-        <span class="wstool-res-orient">${esc(t('wstool_bud_rate_basis'))}</span>
-      </div>
-    </div>
+    ${/* §15 — LA TARJETA DE LA TASA SE RETIRA. Ocupaba 123 px de alto en móvil para una cifra
+          secundaria que además ya se dice en el resumen de arriba, junto a su denominador. Su
+          texto de base («sobre los ingresos del plan») se conserva donde se explica todo lo
+          demás: el desplegable «Cómo se lee este presupuesto». No se pierde ninguna afirmación,
+          se deja de decir dos veces. */''}
     <div class="wstool-chart wsbud-chartbox">
       <span class="wsbud-chart-title">${esc(t('wstool_bud_chart_title'))}</span>
       ${/* DOS lecturas del MISMO cálculo, no dos cálculos: el anillo responde «en qué se va» y la
@@ -27209,6 +27241,7 @@ function _wsBudgetOutHtml(inp) {
       <ul class="wstool-asm-list">
         <li>${esc(t('wstool_bud_basis_plan'))}</li>
         <li>${esc(t('wstool_bud_basis_denom'))}</li>
+        <li>${esc(t('wstool_bud_saverate') + ': ' + rateTxt + ' — ' + t('wstool_bud_rate_basis'))}</li>
         <li>${esc(t('wstool_bud_basis_notcat'))}</li>
       </ul>
     </details>`;

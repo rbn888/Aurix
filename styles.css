@@ -22400,12 +22400,25 @@ body.gs-open { overflow: hidden; }
 .wsbud-bar { display: flex; width: 100%; height: 20px; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(120,160,255,0.14); }
 .wsbud-seg { height: 100%; transition: width 220ms ease; }
 .wsbud-seg.is-free { background: linear-gradient(90deg, #2fd98e, #57e6a6); box-shadow: inset 0 0 8px rgba(47,217,142,0.4); }
-.wsbud-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.wsbud-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+/* §17 — la leyenda es la única que lleva el importe por categoría, así que se queda; pero en dos
+   columnas fijas en móvil lee mejor y ocupa menos que envolviendo a lo que salga. */
+.wsbud-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+@media (min-width: 1024px) { .wsbud-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; } }
+/* ENVUELVE SÓLO DONDE HACE FALTA. En dos columnas a 360 cada celda mide ~150 px y
+   «Alimentación 350,00 US$» pedía 155: el importe se salía 5 px de la tarjeta (medido, no
+   supuesto). Con `wrap` el elemento parte en dos líneas únicamente en los anchos donde no cabe,
+   así que 390 y arriba siguen en una sola línea y no se paga altura donde no hay problema.
+   No se recorta el importe ni se abrevia la moneda: una cifra a medias no es una cifra. */
+.wsbud-leg { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; font-size: 12px; color: var(--text-muted); }
 .wsbud-leg i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 .wsbud-leg i.is-free { background: #2fd98e; }
 .wsbud-leg b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; }
-.wsbud-reading { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-bright); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(120,160,255,0.14); background: rgba(74,130,240,0.07); }
+/* §19 — la lectura aporta interpretación, así que se queda; en bloque compacto, no en tarjeta. */
+.wsbud-reading { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--text-bright); padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(120,160,255,0.14); background: rgba(74,130,240,0.07); }
+/* §20 — la ayuda es información secundaria: no compite con la herramienta. */
+.wsbud-chartbox .wsbud-basis > .wstool-asm-sum { padding: 8px 11px; font-size: 12.5px; }
+/* §21 — guardar es una BARRA DE ACCIÓN, no una tarjeta de 86 px. */
+.wsbud-chartbox { gap: 10px; }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    §26/§27 · PRESUPUESTO — REFERENCE IMPLEMENTATION DEL ESTÁNDAR WORKSPACE
@@ -22416,7 +22429,31 @@ body.gs-open { overflow: hidden; }
    hay profundidad en vez de un plano uniforme. Ningún tono nuevo inventado: se usan los
    `--elev-*` que ya existen y el acento de cada categoría que ya declaraba el motor. Sin alfa
    BLANCA, que sobre el lienzo oscuro se lee como gris neutro y rompe la escalera (GLOBAL POLISH). */
-.wsbud-body { display: flex; flex-direction: column; gap: 12px; }
+/* §13/§14 · LA EDICIÓN, DENSA. Acotado al cuerpo del Presupuesto: no se toca la rejilla
+   compartida de las demás capacidades desde aquí. El input CONSERVA sus 44 px de toque y sus
+   16 px de texto —los dos son invariantes certificados—; lo que se recorta es todo lo que los
+   rodeaba: el hueco entre etiqueta y campo, el hueco entre filas y el relleno de la tarjeta. */
+.wsbud-col-edit .wstool-inputs-card { padding: 11px 12px 12px; }
+.wsbud-col-edit .wsh-head { margin-bottom: 7px; }
+/* §13 — TRES COLUMNAS EN LOS CAMPOS, y no es lo mismo que el resumen. Lo que se salía a 360 en
+   el resumen era un importe FORMATEADO («2.500,00 US$», 96 px); un campo editable muestra el
+   número CRUDO («2.500») con su unidad en una caja de 44 px, y a 360 le quedan 105 px por
+   columna. La etiqueta más larga del presupuesto («Otros ingresos», 12 px) mide ~92. Cabe, y se
+   comprueba midiendo desbordamiento hijo-contra-tarjeta en la sonda, no de memoria.
+   El efecto es el que §13 pedía: Ingresos pasa de dos filas a UNA y Gastos de cuatro a TRES. */
+.wsbud-col-edit .wstool-fields { gap: 7px 7px; }
+/* ACOTADA A MÓVIL. La primera versión la aplicó en todos los anchos y EMPEORÓ 768, donde la
+   rejilla compartida ya daba CUATRO columnas: forzar tres añadía filas. Tres breakpoints, tres
+   decisiones distintas — que es lo que el §45 pide de cada ancho.
+     <768   → 3 (el cuerpo es una columna y cuatro no caben)
+     768-1023 → 4 (la que ya había: el cuerpo sigue en una columna pero es ancho)
+     ≥1024  → 3 (el cuerpo son dos columnas y la de edición es más estrecha) */
+@media (max-width: 767px) {
+  .wsbud-col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.wsbud-col-edit .ws4-field { gap: 2px; }
+.wsbud-col-edit .ws4-field-name { font-size: 12px; line-height: 1.2; }
+.wsbud-body { display: flex; flex-direction: column; gap: 10px; }
 /* MÓVIL: EDICIÓN PRIMERO, y es una decisión medida, no la de por defecto. Probé la respuesta
    delante y dejaba el primer campo en 1028 px: para cambiar un gasto había que cruzar el anillo
    entero. Y no hacía falta, porque la RESPUESTA YA ESTÁ ARRIBA — el resumen compacto (periodo,
@@ -22455,7 +22492,10 @@ body.gs-open { overflow: hidden; }
 @media (max-width: 767px) { .wsbud-result .wstool-res-final { font-size: 30px; } }
 
 /* ── EL ANILLO ─────────────────────────────────────────────────────────────────────────────── */
-.wsbud-donut { position: relative; display: grid; place-items: center; width: 100%; max-width: 208px; margin: 2px auto 4px; }
+/* §16 — el anillo es PROTAGONISTA, no gigantesco: 208 px sobre 360 se comía el 58 % del ancho.
+   176 px deja aire al lado y, sobre todo, aparece antes. */
+.wsbud-donut { position: relative; display: grid; place-items: center; width: 100%; max-width: 176px; margin: 0 auto 2px; }
+@media (min-width: 1024px) { .wsbud-donut { max-width: 208px; } }
 .wsbud-donut svg { display: block; width: 100%; height: auto; }
 .wsbud-arc { transition: stroke-dasharray 260ms ease, stroke-dashoffset 260ms ease; }
 .wsbud-donut-c {
@@ -28053,22 +28093,63 @@ button.intv14-cmp-clear {
    El usuario abre esta plantilla para ver cuánto le queda. Antes esa cifra
    estaba enterrada detrás de diez campos. */
 .wsbud-top { display: flex; flex-direction: column; gap: 12px; }
-.wsbud-period { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.wsbud-period-lbl { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
-.wsbud-period-sel { flex: 1 1 180px; min-width: 0; max-width: 260px; }
+/* §11 — EL PERIODO VIVE EN LA LÍNEA DEL TÍTULO. Antes era una franja propia dentro del resumen:
+   etiqueta en mayúsculas + selector de 260 px para un control secundario. Se conserva porque
+   TIENE función (identifica documentos y viaja en el payload), pero como chip.
+   PUEDE ENCOGER: con ancho fijo y sin `flex-shrink`, a 360 mantenía 164 px y empujaba la barra a
+   dos líneas — 128 px de cabecera en vez de 78. Medido. */
+.wsbud-perchip { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.wsbud-perchip-lbl {
+  font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); white-space: nowrap;
+}
+@media (max-width: 519px) { .wsbud-perchip-lbl { display: none; } }
+/* 16 px Y 44 px, NO 12,5 Y 34. Los puse pequeños por densidad y la sonda de primera pantalla lo
+   cazó en los dos motores: 16 px es el owner que evita el zoom de iOS al enfocar un control de
+   formulario, y 44 px el suelo de toque que v740 certificó para Workspace. Un `<select>` es un
+   control interactivo real, no un adorno. La densidad se cobra en el ANCHO —forma corta del mes y
+   etiqueta oculta— no en la accesibilidad. */
+.wsbud-perchip-sel {
+  font: inherit; font-size: 16px; font-weight: 600; color: var(--text-bright);
+  min-height: 44px; padding: 0 26px 0 10px; border-radius: 10px;
+  min-width: 0; flex: 1 1 auto; max-width: 100%; text-overflow: ellipsis;
+  cursor: pointer; appearance: none; -webkit-appearance: none;
+  background: rgba(74,130,240,0.10) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%239fc2ff' stroke-width='1.6'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E") no-repeat right 8px center/11px;
+  border: 1px solid rgba(74,130,240,0.26);
+}
+.wsbud-perchip-sel:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+/* §21 — GUARDAR ES UNA BARRA DE ACCIÓN. Envolvía en dos líneas a 360 porque el rótulo de estado
+   pedía su ancho entero; ahora encoge con elipsis y la acción primaria conserva sus 44 px. */
+.wsh-tool-view .wsg-foot-card { padding: 10px 12px; }
+.wsh-tool-view .wsg-savebar { flex-wrap: nowrap; gap: 8px; min-width: 0; }
+.wsh-tool-view .wsg-savebar > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* DOS columnas en móvil y el disponible en su propia fila. Con tres, cada celda
    quedaba en 83 px para un importe de 96 («2.500,00 US$») y se salía. La
    densidad no se cobra en legibilidad: se cobra en filas. */
-.wsbud-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.wsbud-kpi.is-main { grid-column: 1 / -1; }
-@media (min-width: 560px) {
-  .wsbud-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .wsbud-kpi.is-main { grid-column: auto; }
+/* §12 — SE MANTIENE 2 + 1 POR DEBAJO DE 560 px, y es una decisión heredada, no una omisión: un
+   bloque anterior ya probó tres columnas a 360 y el importe se salía («quedaba en 83 px para un
+   importe de 96»). La altura no se recorta metiendo tres cifras donde no caben — se recorta
+   quitando la franja del periodo (que se ha ido a la cabecera) y apretando relleno y huecos. */
+/* Cuatro celdas: las tres magnitudes y el periodo. Por debajo de 560 son 2×2, así que el
+   periodo NO añade una fila — comparte la segunda con el disponible. Por encima, los tres KPI
+   van en fila y el periodo se ajusta a su contenido al final. */
+.wsbud-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+/* El salto a TRES columnas está en 900 px, no en 560, y es una decisión heredada y medida (ver la
+   regla de 560-899 más abajo: «116 px de cifra en una celda de 109»). El periodo entra como
+   CUARTA celda ahí, y por debajo comparte la segunda fila con el disponible — que es lo que hace
+   que no cueste altura en ningún ancho. */
+@media (min-width: 900px) {
+  .wsbud-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
 }
 .wsbud-kpi {
-  display: flex; flex-direction: column; gap: 2px; min-width: 0;
-  padding: 10px 11px; border-radius: 12px;
+  display: flex; flex-direction: column; gap: 1px; min-width: 0;
+  padding: 7px 10px; border-radius: 11px;
   background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.14);
+}
+/* §15 — la tasa de ahorro, pegada a su denominador y en su sitio: un sufijo, no una tarjeta. */
+.wsbud-kpi-sub {
+  font-style: normal; font-size: 12px; font-weight: 600; line-height: 1.2;
+  color: rgba(159,194,255,0.85); white-space: nowrap;
 }
 .wsbud-kpi i { font-style: normal; font-size: 12px; color: var(--text-muted); }
 .wsbud-kpi b {
@@ -28085,7 +28166,7 @@ button.intv14-cmp-clear {
 .wsbud-kpi b.is-neg { color: rgba(240,170,110,0.98); }
 @media (min-width: 768px) {
   .wsbud-top { flex-direction: row; align-items: center; gap: 18px; }
-  .wsbud-period { flex: 0 0 auto; }
+
   .wsbud-kpis { flex: 1 1 auto; }
 }
 
@@ -28843,7 +28924,9 @@ input.ws4-num.is-invalid {
    Se retrasa el salto a tres columnas hasta donde la cifra cabe de verdad. */
 @media (min-width: 560px) and (max-width: 899px) {
   .wsbud-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .wsbud-kpi.is-main { grid-column: 1 / -1; }
+  /* `is-main` DEJA DE ocupar la fila entera: su hueco lo llena ahora el periodo, así que la
+     segunda fila lleva disponible + periodo en vez de disponible solo. El motivo por el que esta
+     regla existe —que el importe no cabe en tres columnas por debajo de 900— no cambia. */
 }
 
 /* Diario · el resumen. En 360 la celda deja 69 px útiles y «Rentabilidad» es UNA
