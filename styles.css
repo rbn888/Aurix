@@ -9082,6 +9082,16 @@ main { padding-bottom: 72px; }
   max-height: 70vh;
   overflow-y: auto;
 }
+/* §26 — EL MISMO INDICIO EN ESCRITORIO. La lista se corta a 70vh y no lo decía: «parece
+   cortada abajo y apenas se entiende que puede hacerse scroll» es la incidencia literal. El
+   desvanecido aparece SÓLO con `data-scroll="more"` —cuando de verdad queda contenido— y
+   desaparece al llegar al final, así que nunca insinúa un scroll inexistente. `mask` y no un
+   pseudoelemento: se aplica a la CAJA del scroller, así que el borde se queda quieto mientras
+   las filas pasan por debajo. */
+.market-section[data-scroll="more"] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 38px), rgba(0,0,0,0.22) 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 38px), rgba(0,0,0,0.22) 100%);
+}
 
 /* ── MC-9A: Funds / ETFs discovery view ─────────────────────────────────
    Horizontal category chips + responsive card grid. Lives inside
@@ -13062,6 +13072,17 @@ body.workspace-active:not(.ws-cover) .header {
     padding: 0 0 calc(10px + env(safe-area-inset-bottom, 0px));
   }
   #marketList.market-section::-webkit-scrollbar { display: none; }
+  /* §26 — Y CUANDO HAY MÁS ABAJO, SE VE QUE LO HAY. La última fila se desvanece contra el
+     borde de la card: en menos de un segundo se entiende que la lista sigue. El degradado
+     SÓLO existe con `data-scroll="more"`, o sea cuando de verdad queda contenido — uno
+     permanente atenuaría la última fila con la lista entera a la vista, que es insinuar un
+     scroll que no existe. Se usa `mask`, que se aplica a la CAJA del scroller y no a su
+     contenido, así que el desvanecido se queda pegado al borde inferior mientras el usuario
+     desplaza, en vez de viajar con las filas. */
+  #marketList.market-section[data-scroll="more"] {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), rgba(0,0,0,0.25) 100%);
+            mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), rgba(0,0,0,0.25) 100%);
+  }
   /* Dentro de la card las filas no dibujan su propia caja redondeada: si no, cada
      fila se leería como una tarjeta suelta, que es justo lo que NO se quiere. */
   #marketList.market-section .market-row { border-radius: 0; }

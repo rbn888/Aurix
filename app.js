@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '743'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '744'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -60646,6 +60646,41 @@ function renderCurrentMarketView() {
   renderFeaturedBlock(data);
   renderMarketTickerStrip(data);
   requestAnimationFrame(() => renderMarketInsights(data));
+  try { _aurixMarketScrollHint(el); } catch (_) {}
+}
+
+// ── §26 · QUE SE ENTIENDA QUE HAY MÁS ABAJO ───────────────────────────────
+// INCIDENCIA: la lista de Market «parece cortada abajo y apenas se entiende que
+// puede hacerse scroll». Y es verdad: el contenedor desplaza (`overflow-y:auto`)
+// pero no lo DICE. En móvil, además, la barra está oculta a propósito —decisión
+// anterior y documentada— así que el indicio no puede ser la barra.
+// Lo que se publica es un ESTADO, y sólo cuando es cierto:
+//   'more' → hay contenido por debajo;  'end' → se llegó al final;
+//   sin atributo → no hay nada que desplazar, así que no se insinúa que lo haya.
+// El desvanecido lo pinta el CSS a partir de ese estado. Un degradado permanente
+// habría atenuado la última fila incluso con la lista completa a la vista, que es
+// insinuar un scroll inexistente.
+function _aurixMarketScrollHint(el) {
+  const list = el || document.getElementById('marketList');
+  if (!list) return;
+  const over = list.scrollHeight - list.clientHeight;
+  if (over <= 2) { list.removeAttribute('data-scroll'); }
+  else {
+    const left = over - list.scrollTop;
+    list.setAttribute('data-scroll', left > 2 ? 'more' : 'end');
+  }
+  // Un solo listener por elemento: el render repinta las filas, no el contenedor.
+  if (!list._aurixScrollHintWired) {
+    list._aurixScrollHintWired = true;
+    list.addEventListener('scroll', () => { try { _aurixMarketScrollHint(list); } catch (_) {} }, { passive: true });
+    try {
+      if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(() => { try { _aurixMarketScrollHint(list); } catch (_) {} }).observe(list);
+      } else if (typeof window !== 'undefined') {
+        window.addEventListener('resize', () => { try { _aurixMarketScrollHint(list); } catch (_) {} }, { passive: true });
+      }
+    } catch (_) {}
+  }
 }
 
 function initMarketSearch() {
