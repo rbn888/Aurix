@@ -210,6 +210,27 @@ const MEASURE = `(function(SPEC){
     var cb = card.getBoundingClientRect();
     if (b.right > cb.right - 1 || b.left < cb.left + 1) spill.push((e.className||e.tagName).toString().split(' ')[0]);
   });
+  // ── Y UN <input> CORTADO, QUE NINGUNA DE LAS TRES MEDIDAS ANTERIORES VE ──
+  // Lo destapó la captura de Préstamos: «180.00…». Un <input> con texto más largo
+  // que su caja lo DESPLAZA, no lo desborda, así que 'scrollWidth === clientWidth'
+  // y la contención está intacta: para las tres medidas de arriba todo cabe. La
+  // única forma honesta de verlo es MEDIR EL TEXTO con la tipografía computada del
+  // propio campo y compararlo con su ancho útil —descontando el padding, que aquí
+  // reserva sitio fijo para el sufijo— y hacerlo en TODAS las capacidades, porque
+  // el punto ciego era de la sonda, no de una herramienta.
+  var inClip = [];
+  try {
+    var _cx = document.createElement('canvas').getContext('2d');
+    [].slice.call(wsh.querySelectorAll('input.ws4-num, input[data-wstool-input], input[data-wsg-form], input[data-ws-num]')).forEach(function(inp){
+      var b = inp.getBoundingClientRect(); if (!b.width || !b.height) return;
+      var v = (inp.value || '').trim(); if (!v) return;
+      var cs = getComputedStyle(inp); if (cs.visibility === 'hidden' || cs.display === 'none') return;
+      _cx.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      var need = Math.ceil(_cx.measureText(v).width);
+      var inner = Math.round(inp.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0));
+      if (inner > 0 && need > inner + 1) inClip.push((inp.getAttribute('data-wstool-input') || inp.getAttribute('data-wsg-form') || inp.className) + ':' + need + '>' + inner);
+    });
+  } catch (_) { inClip = ['no-medible']; }
   var u = function(a){ return Array.from(new Set(a)); };
   return {
     mounted: true, whole: whole, starts: starts,
@@ -224,7 +245,7 @@ const MEASURE = `(function(SPEC){
     // §1: ningún chip Incluido/Premium dentro de la cabecera.
     barTier: !!bar && bar.querySelectorAll('.wsh-tier, .wsb-title-tier').length,
     legacyHeader: wsh.querySelectorAll('.wsb-header').length,
-    small: u(small), zoom: u(zoom), taps: u(taps), clipped: u(clipped), rowBad: u(rowBad), spill: u(spill),
+    small: u(small), zoom: u(zoom), taps: u(taps), clipped: u(clipped), rowBad: u(rowBad), spill: u(spill), inClip: u(inClip),
     docOverflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
     savebar: !!root.querySelector('[data-wstool-savebar], [data-wsg-savebar]'),
   };
@@ -318,6 +339,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         ok(`${tag} sin recortes de texto ni desbordamiento horizontal`,
           g.clipped.length === 0 && g.docOverflowX === false,
           JSON.stringify({ recortado: g.clipped, docX: g.docOverflowX }));
+        ok(`${tag} ninguna cifra escrita se ve cortada dentro de su campo`,
+          g.inClip.length === 0, JSON.stringify(g.inClip));
         ok(`${tag} ninguna celda se sale de su fila ni pisa a su vecina`,
           g.rowBad.length === 0, JSON.stringify(g.rowBad));
         ok(`${tag} ningún texto se pinta fuera de su tarjeta`,

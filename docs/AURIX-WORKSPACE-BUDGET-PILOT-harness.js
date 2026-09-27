@@ -60,7 +60,7 @@ function ctx() {
   vm.runInContext('function formatBase(v){ return String(Math.round(Number(v) || 0)) + " €"; }', sb);
   vm.runInContext('function _wsNum(v){ if (v == null || v === "") return 0; var n = Number(String(v).replace(/\\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0; }', sb);
   ['_WSBUD_INCOME', '_WSBUD_EXPENSES', '_WSBUD_DONUT_R'].forEach(n => vm.runInContext(constSrc(n), sb));
-  ['calculateMonthlyBudget', '_wsBudgetDonutHtml', '_wsBudgetChartHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
+  ['calculateMonthlyBudget', '_wsBudgetDonutHtml', '_wsBudgetChartHtml', 'calculateLoan', '_wsLoanDonutHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
 const C = ctx();
@@ -235,6 +235,87 @@ section('6 · §25 · Interés compuesto sobre el armazón compartido:');
   // El motor no se toca (§55).
   ok('6.11 el motor del compuesto sigue intacto: la salida no recalcula por su cuenta',
     /_wsCompoundProjection\(inp\)/.test(out) && !/Math\.pow\(/.test(out));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+section('7 · §26 · Préstamos sobre el armazón compartido (tercer consumidor):');
+// ════════════════════════════════════════════════════════════════════════════
+// Con Préstamos el armazón `.ws2col` tiene TRES consumidores reales, que es la condición que
+// esta sesión se puso para extraer. Lo que se fija aquí es que la herramienta con mejor
+// legibilidad de Workspace no la perdió al mudarse, y que su personalidad sale del acento y
+// del anillo — no de una estructura propia ni de color escrito en el HTML.
+{
+  const loan = fnSrc('_renderLoanTool'), out = fnSrc('_wsLoanOutHtml'), dn = fnSrc('_wsLoanDonutHtml');
+  ok('7.1 Préstamos usa el MISMO armazón de dos columnas que Presupuesto y Compuesto',
+    /class="ws2col"/.test(loan) && /ws2col-edit/.test(loan) && /ws2col-view/.test(loan));
+  ok('7.2 declara su acento por la API compartida y sin color en el marcado',
+    /data-ws-accent="blue"/.test(loan) && !/style="[^"]*color:/.test(loan));
+  // §6/§26 — azul lo que recibes, coral lo que cuesta pedirlo, y por acento semántico.
+  ok('7.3 capital e intereses se distinguen por acento, no por dos grises casi iguales',
+    /wsloan-leg is-cap" data-ws-accent="info"/.test(out) && /wsloan-leg is-int" data-ws-accent="out"/.test(out) &&
+    /wsloan-kpi" data-ws-accent="out"/.test(out));
+
+  // ── EL MOTOR NO SE TOCA (§55) Y EL ANILLO MIDE (§11) ──────────────────────
+  // Se EJECUTA, no se lee: el anillo se dibuja desde el reparto que publica el motor y sus
+  // dos arcos tienen que sumar la circunferencia; si el centro derivase su propio porcentaje
+  // podría contradecir a la leyenda que tiene al lado.
+  const r = R('calculateLoan({ principal: "180.000", rate: "3,25", years: "30", fees: "0", insurance: "0" })');
+  ok('7.4 el motor sigue intacto y con el parseo tolerante (una cuota real, no la rama sin interés)',
+    Math.round(r.monthlyPayment) === 783 && Math.round(r.totalInterest) === 102014, JSON.stringify([r.monthlyPayment, r.totalInterest]));
+  ok('7.5 la salida no recalcula por su cuenta: pide el resultado al motor',
+    /calculateLoan\(inp\)/.test(out) && !/Math\.pow\(/.test(out));
+  const C0 = 2 * Math.PI * 52;
+  const svg = R('_wsLoanDonutHtml(calculateLoan({ principal: "180.000", rate: "3,25", years: "30" }))');
+  const da = /stroke-dasharray="([\d.]+) ([\d.]+)"/.exec(svg);
+  ok('7.6 los dos arcos del anillo suman la circunferencia (mide, no ilustra)',
+    !!da && Math.abs((parseFloat(da[1]) + parseFloat(da[2])) - C0) < 0.2, da && da[0]);
+  ok('7.7 …y el arco es PROPORCIONAL al reparto que publica el motor',
+    !!da && Math.abs(parseFloat(da[1]) - (r.principalShare / 100) * C0) < 0.2);
+  ok('7.8 el centro publica el reparto DEL MOTOR, no una segunda derivación',
+    /Math\.round\(res\.interestShare\)/.test(dn) && new RegExp('>' + Math.round(r.interestShare) + '%<').test(svg));
+
+  // ── LO QUE COSTÓ CAZAR, FIJADO ───────────────────────────────────────────
+  // `formatBase()` une importe y moneda con un espacio de NO ruptura: no hay punto de corte
+  // legítimo, así que cualquier `overflow-wrap` acaba partiendo dentro de «US$». La cifra
+  // ESCALA y nunca se rompe. Esta regla ya existía y una segunda la anulaba por venir después.
+  ok('7.9 las cifras de Préstamos no se rompen nunca: escalan',
+    /\.wstool-res-v, \.wsloan-kpi-v \{[^}]*white-space: nowrap/.test(css) &&
+    /\.wsloan-hero-v \{[^}]*white-space: nowrap/.test(css));
+  // Se miran las REGLAS, no los comentarios: la primera versión de este assert se puso roja
+  // casando con el propio comentario que CITA la regla retirada — el mismo error que el 1.5
+  // documenta. Y lo que importa no es que la palabra `break-word` no aparezca en la hoja (hay
+  // una regla compartida legítima que la usa para otros selectores y que el contrato de abajo
+  // sobrescribe), sino que nadie les devuelva el `white-space: normal` que la habilita.
+  const cssNoC = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('7.10 …y ninguna regla les devuelve el `white-space: normal` que habilita el corte',
+    !/\.wsloan-(hero|kpi)-v(,[^{}]*)?\s*\{[^}]*white-space: normal/.test(cssNoC),
+    (cssNoC.match(/\.wsloan-(hero|kpi)-v[^{}]*\{[^}]*white-space: normal[^}]*\}/g) || []).join(' | '));
+  // El techo de tamaño sale de LA CAJA, no del viewport: la rejilla da dos columnas en móvil
+  // y cuatro a 768, así que una ventana más ancha producía una caja igual de estrecha con el
+  // `vw` ya en su techo. Medido: a 768 la cifra pedía 168 px en una caja de 134.
+  ok('7.11 el tamaño del KPI tiene techo mientras la caja es estrecha, y recupera a 1024',
+    /\.wsloan-kpi-v \{ font-size: clamp\(13px, 4vw, 16px\); \}/.test(css) &&
+    /@media \(min-width: 1024px\) \{ \.wsloan-kpi-v \{ font-size: 21px; \} \}/.test(css));
+  // El ancho de un campo sigue a la magnitud que sostiene. Un `<input>` recortado no mueve
+  // `scrollWidth`: lo destapó la captura y ahora lo mide la sonda con la tipografía del campo.
+  ok('7.12 el campo del importe pide el ancho de su cifra, y sólo donde hacía falta',
+    /const field = \(k, label, unit, wide\)/.test(loan) && /data-ws-field="wide"/.test(loan) &&
+    /\.wsloan-fields > \[data-ws-field="wide"\] \{ grid-column: span 2; \}/.test(css));
+  ok('7.13 el anillo y su leyenda no se apilan en móvil (eran 64 px de caja vacía)',
+    /\.wsloan-split \{ flex-direction: row; align-items: flex-start; gap: 14px; \}/.test(css) &&
+    /\.wsloan-leg \{ flex-wrap: wrap/.test(css));
+  // El comparador tiene sus propios inputs y vive FUERA del contenedor que se repinta con cada
+  // tecla. Meterlo en la rejilla le haría perder el foco al escribir: se fija para que nadie lo
+  // «ordene» dentro.
+  ok('7.14 el comparador se queda fuera del contenedor que se repinta con cada tecla',
+    !/wsloan-cmp/.test(out) && /data-wstool-out>\$\{_wsLoanOutHtml\(inp\)\}/.test(loan) &&
+    loan.indexOf('wsloan-cmp-card') > loan.indexOf('data-wstool-out'),
+    JSON.stringify({ enLaSalida: /wsloan-cmp/.test(out), cmp: loan.indexOf('wsloan-cmp-card'), out: loan.indexOf('data-wstool-out') }));
+  // Una clave inventada devuelve `undefined` y deja una cifra sin rótulo: ya pasó dos veces.
+  ['wsloan_dn_lbl', 'wsloan_in_amount', 'wsloan_kpi_interest', 'wsloan_capital'].forEach(k => {
+    const es = R('T.es[' + JSON.stringify(k) + ']'), en = R('T.en[' + JSON.stringify(k) + ']');
+    ok('7.15 la clave `' + k + '` existe en ES y EN', !!es && !!en, JSON.stringify([es, en]));
+  });
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

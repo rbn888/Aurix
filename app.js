@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '728'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '729'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6242,6 +6242,7 @@ const T = {
     wspl_a_dup:           'Duplicar',
     wspl_a_unpin:         'Quitar del Dashboard',
     wspl_a_del:           'Eliminar',
+    wsloan_dn_lbl:        'intereses',
     wsbud_kpi_save:       'ahorro',
     wsdoc_title:          'MIS DOCUMENTOS',
     wsdoc_open_now:       'abierto ahora',
@@ -9080,6 +9081,7 @@ const T = {
     wspl_a_dup:           'Duplicate',
     wspl_a_unpin:         'Remove from Dashboard',
     wspl_a_del:           'Delete',
+    wsloan_dn_lbl:        'interest',
     wsbud_kpi_save:       'saved',
     wsdoc_title:          'MY DOCUMENTS',
     wsdoc_open_now:       'open now',
@@ -28471,7 +28473,7 @@ function _wsLoanDonutHtml(res) {
     <circle class="wsloan-donut-int" cx="70" cy="70" r="52" transform="rotate(-90 70 70)"></circle>
     <circle class="wsloan-donut-cap" cx="70" cy="70" r="52" transform="rotate(-90 70 70)" stroke-dasharray="${capLen.toFixed(1)} ${(C - capLen).toFixed(1)}"></circle>
     <text class="wsloan-donut-c" x="70" y="66" text-anchor="middle">${Math.round(res.interestShare)}%</text>
-    <text class="wsloan-donut-l" x="70" y="84" text-anchor="middle">${esc(t('wsloan_kpi_interest'))}</text>
+    <text class="wsloan-donut-l" x="70" y="84" text-anchor="middle">${esc(t('wsloan_dn_lbl'))}</text>
   </svg>`;
 }
 function _wsLoanInsights(res) {
@@ -28523,16 +28525,20 @@ function _wsLoanOutHtml(inp) {
       <span class="wsloan-hero-v">${esc(formatBase(res.monthlyPayment))}${esc(t('wsre_permonth'))}</span>
     </div>
     <div class="wsloan-kpis">
-      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(formatBase(res.totalInterest))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_interest'))}</span></div>
+      <div class="wsloan-kpi" data-ws-accent="out"><span class="wsloan-kpi-v">${esc(formatBase(res.totalInterest))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_interest'))}</span></div>
       <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(formatBase(res.totalPaid))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_total'))}</span></div>
       <div class="wsloan-kpi"><span class="wsloan-kpi-v">${_wsLoanPct(res.annual)}%</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_rate'))}</span></div>
       <div class="wsloan-kpi"><span class="wsloan-kpi-v">${res.years}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_years'))}</span></div>
     </div>
     <div class="wsloan-split">
       ${_wsLoanDonutHtml(res)}
+      ${/* §6/§26 — CAPITAL E INTERESES SE DISTINGUEN POR ACENTO. Eran dos grises azulados casi
+            iguales (#9fb3d0 y #c08a9a): había que leer el rótulo para saber cuál era el dinero
+            que pides y cuál el que cuesta pedirlo. Azul lo que recibes, coral lo que pagas — el
+            mismo par que el §6 propone para préstamos, y por la API compartida. */''}
       <div class="wsloan-legend">
-        <span class="wsloan-leg is-cap"><i></i>${esc(t('wsloan_capital'))} <b>${esc(formatBase(res.principal))}</b></span>
-        <span class="wsloan-leg is-int"><i></i>${esc(t('wsloan_kpi_interest'))} <b>${esc(formatBase(res.totalInterest))}</b></span>
+        <span class="wsloan-leg is-cap" data-ws-accent="info"><i></i>${esc(t('wsloan_capital'))} <b>${esc(formatBase(res.principal))}</b></span>
+        <span class="wsloan-leg is-int" data-ws-accent="out"><i></i>${esc(t('wsloan_kpi_interest'))} <b>${esc(formatBase(res.totalInterest))}</b></span>
       </div>
     </div>
     ${insights.length ? `<div class="wsloan-insights"><span class="wsloan-insights-t">${esc(t('wsloan_insights_title'))}</span><ul>${insights.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
@@ -28654,22 +28660,41 @@ function _renderLoanTool() {
   const esc = _intccEsc;
   if (!_wsToolInputs) _wsToolInputs = _wsLoanDefaults();
   const inp = _wsToolInputs;
-  const field = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
+  // El ancho de un campo sigue a la MAGNITUD que sostiene. El importe solicitado es la
+  // cifra más larga de la herramienta y a 360/390 salía RECORTADA («180.00…»): la caja
+  // reserva 34 px fijos a la derecha para el sufijo más ancho («años»), y al importe
+  // —cuyo sufijo mide 8 px— le quedaban 49 px útiles para una cifra que pide 65. Un
+  // `<input>` recortado no mueve `scrollWidth`, así que ninguna sonda de desbordamiento
+  // podía verlo: lo destapó la captura. Marcarlo aquí y no ensanchar la caja de todos
+  // mantiene las dos filas de campos que la densidad del §26 ya había ganado.
+  const field = (k, label, unit, wide) => `<label class="ws4-field"${wide ? ' data-ws-field="wide"' : ''}><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(_wsFieldUnit(unit))}</span></span></label>`;
   return `
-    <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
+    <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool" data-ws-accent="blue">
       ${_wsSurfaceHeadHtml({ title: t('wsloan_n'), doc: _wsToolDocName(), help: [t('wsloan_sub')] })}
-      <section class="wsh-card wsloan-inputs-card">
-        <div class="wsloan-fields">
-          ${field('principal', t('wsloan_in_amount'), _wsToolCcy())}
-          ${field('rate', t('wsloan_in_rate'), '%')}
-          ${field('years', t('wsloan_in_years'), t('wstool_unit_years'))}
-          ${field('fees', t('wsloan_in_fees'), _wsToolCcy())}
-          ${field('insurance', t('wsloan_in_insurance'), _wsToolCcy())}
+      ${/* §26 — SOBRE EL ARMAZÓN COMPARTIDO, tercer consumidor. La legibilidad de esta
+            herramienta ya era la mejor de Workspace y NO se toca: lo que cambia es el reparto de
+            la caja (edición a la izquierda, respuesta a la derecha) y la densidad, que es lo que
+            el §26 pedía. El comparador se queda FUERA de la rejilla a propósito: tiene sus
+            propios inputs y vive en su tarjeta para no entrar en el contenedor que se repinta
+            con cada tecla — mover eso le haría perder el foco al escribir. */''}
+      <div class="ws2col">
+        <div class="ws2col-edit">
+          <section class="wsh-card wsloan-inputs-card">
+            <div class="wsloan-fields">
+              ${field('principal', t('wsloan_in_amount'), _wsToolCcy(), true)}
+              ${field('rate', t('wsloan_in_rate'), '%')}
+              ${field('years', t('wsloan_in_years'), t('wstool_unit_years'))}
+              ${field('fees', t('wsloan_in_fees'), _wsToolCcy())}
+              ${field('insurance', t('wsloan_in_insurance'), _wsToolCcy())}
+            </div>
+          </section>
         </div>
-      </section>
-      <section class="wsh-card wsloan-out-card">
-        <div class="wsloan-out" data-wstool-out>${_wsLoanOutHtml(inp)}</div>
-      </section>
+        <div class="ws2col-view">
+          <section class="wsh-card wsloan-out-card">
+            <div class="wsloan-out" data-wstool-out>${_wsLoanOutHtml(inp)}</div>
+          </section>
+        </div>
+      </div>
       <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
       ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que

@@ -22462,19 +22462,22 @@ body.gs-open { overflow: hidden; }
   .ws2col-view { position: sticky; top: 12px; }
   /* §10 — LA EDICIÓN RESPIRA: en una columna de ~700 px, cuatro campos por fila dejan 131 px por
      campo y un importe de seis dígitos con su unidad va justo. Tres por fila dan ~185. */
-  .ws2col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ws2col-edit .wstool-fields,
+  .ws2col-edit .wsloan-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 /* §13/§14 · DENSIDAD DE LA EDICIÓN. El input CONSERVA sus 44 px de toque y sus 16 px de texto
    —los dos son invariantes certificados—; lo que se recorta es lo que los rodeaba: el hueco
    entre etiqueta y campo, el hueco entre filas y el relleno de la tarjeta. */
 .ws2col-edit .wstool-inputs-card { padding: 11px 12px 12px; }
 .ws2col-edit .wsh-head { margin-bottom: 7px; }
-.ws2col-edit .wstool-fields { gap: 7px 7px; }
+.ws2col-edit .wstool-fields,
+.ws2col-edit .wsloan-fields { gap: 7px 7px; }
 .ws2col-edit .ws4-field { gap: 2px; }
 .ws2col-edit .ws4-field-name { font-size: 12px; line-height: 1.2; }
 /* Por debajo de 768 el cuerpo es una columna y cuatro campos por fila no caben: tres. */
 @media (max-width: 767px) {
-  .ws2col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ws2col-edit .wstool-fields,
+  .ws2col-edit .wsloan-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 /* LA RESPUESTA SE HUNDE respecto a la edición, así que hay escalera en vez de plano. Ningún tono
    nuevo inventado y sin alfa BLANCA, que sobre el lienzo oscuro se lee como gris neutro. */
@@ -22506,6 +22509,27 @@ body.gs-open { overflow: hidden; }
 .wscmp-out-card .wstool-ms { order: 4; }
 .wscmp-out-card .wstool-out { display: flex; flex-direction: column; gap: 10px; }
 .wscmp-out-card .wstool-result { display: flex; flex-direction: column; gap: 10px; order: 1; }
+
+/* §26 · PRÉSTAMOS — capital e intereses, por acento. Eran dos grises azulados casi iguales y
+   había que leer el rótulo para distinguirlos. El swatch y la cifra toman el canal primario de
+   su acento: azul lo que recibes, coral lo que pagas. */
+.wsloan-leg[data-ws-accent] i { background: rgb(var(--ws-a)); }
+.wsloan-leg[data-ws-accent="out"] b { color: rgb(var(--ws-b)); }
+.wsloan-kpi[data-ws-accent] { position: relative; overflow: hidden; }
+.wsloan-kpi[data-ws-accent]::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 2px;
+  background: rgba(var(--ws-a), 0.85);
+}
+.wsloan-kpi[data-ws-accent="out"] .wsloan-kpi-v { color: rgb(var(--ws-b)); }
+/* Dentro de la columna de respuesta los cuatro KPI se quedan en ~150 px y un importe de seis
+   cifras no cabe: DOS columnas. La densidad no se cobra partiendo números. */
+@media (min-width: 1024px) {
+  .ws2col-view .wsloan-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* El rótulo del centro del donut se salía del HUECO del anillo («TOTAL INTERESE» cortado). NO se
+   baja su tamaño: un bloque anterior lo subió a 11 px por legibilidad y esa decisión sigue en
+   pie. Lo que sobra es el TEXTO — el % ya dice qué se está midiendo y la leyenda de al lado lo
+   escribe entero—, así que el centro usa una forma corta. */
 
 .wsbud-body { display: flex; flex-direction: column; gap: 10px; }
 /* MÓVIL: EDICIÓN PRIMERO, y es una decisión medida, no la de por defecto. Probé la respuesta
@@ -23148,7 +23172,17 @@ body.gs-open { overflow: hidden; }
 @media (max-width: 920px) { .wsloan-fields { grid-template-columns: repeat(2, 1fr); } .wsloan-kpis { grid-template-columns: repeat(2, 1fr); } .wsloan-cmp-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 640px) {
   .wsloan-hero-v { font-size: 38px; }
-  .wsloan-split { flex-direction: column; align-items: flex-start; }
+  /* §26 — EL DONUT NO SE APILA: ERA MEDIA CAJA VACÍA. Apilado, el bloque medía 196 px
+     (132 de donut + 22 de hueco + 42 de leyenda) y dejaba ~170 px muertos a la derecha del
+     anillo, que es lo que empujaba la lectura rápida fuera de pantalla. En fila mide 132 —
+     los 64 px que sobran no se recuperan de ningún otro sitio— y la leyenda cabe porque se
+     le deja plegar el importe bajo su rótulo, igual que en Presupuesto: dos ítems de dos
+     líneas son 74 px, menos que la altura del propio anillo, así que la fila no cuesta nada.
+     A 360 la leyenda recibe 160 px y el rótulo más largo («Total intereses») pide 113. */
+  .wsloan-split { flex-direction: row; align-items: flex-start; gap: 14px; }
+  .wsloan-legend { flex: 1 1 auto; min-width: 0; gap: 12px; padding-top: 8px; }
+  .wsloan-leg { flex-wrap: wrap; row-gap: 1px; }
+  .wsloan-leg b { flex: 0 0 100%; padding-left: 21px; }
   .wsloan-amort-tablewrap { display: none; }
   .wsloan-amort-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 360px; overflow: auto; }
   .wsloan-amort-card { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 12px; border-radius: 10px; background: rgba(165,196,255,0.03); font-size: 12px; }
@@ -28656,10 +28690,51 @@ input.ws4-num.is-invalid {
   white-space: normal; overflow-wrap: break-word;
   font-size: clamp(14px, 4.2vw, 19px);
 }
-/* Y la misma excepción en Préstamos, por la misma razón: la cuota y los KPI
-   llevan cifra + unidad («1.122,61 US$») y en 390 px se salían 10 px de su caja
-   con `nowrap`. Parten por el espacio, nunca dentro del número. */
-.wsloan-hero-v, .wsloan-kpi-v { white-space: normal; overflow-wrap: break-word; }
+/* Y la misma excepción en Préstamos, por la misma razón: la cuota y los KPI llevan cifra +
+   unidad («1.122,61 US$») y en 390 px se salían de su caja con `nowrap`.
+   CORREGIDO: la regla decía `break-word`, que es precisamente lo que permite partir DENTRO del
+   número — su propio comentario prometía «por el espacio, nunca dentro del número» y hacía lo
+   contrario. Lo destapó la captura a 1440: «102.013,6 / 9 US$». Con `normal` el salto sólo puede
+   caer en el espacio que ya hay entre la cifra y su moneda; el sitio para que quepa se consigue
+   dando menos columnas a los KPI, no rompiendo la cifra. */
+/* REGLA RETIRADA, y conviene dejar escrito por qué. Aquí había
+     `.wsloan-hero-v, .wsloan-kpi-v { white-space: normal; overflow-wrap: break-word; }`
+   que venía DESPUÉS del contrato de «la cifra no se rompe, se escala» y lo anulaba. Con la
+   herramienta en una columna estrecha el resultado fue visible en la captura: «102.013,6 / 9
+   US$», la cifra partida a mitad de dígito.
+   El contrato de arriba ya resuelve esto y su razón sigue siendo válida: `formatBase()` une
+   cifra y moneda con un ESPACIO DE NO RUPTURA, así que no hay punto de corte legítimo y
+   cualquier `overflow-wrap` acaba cortando dentro de «US$». La cifra ESCALA y nunca se rompe;
+   el `nowrap` explícito hace que un desbordamiento se VEA y lo cace la sonda, en vez de
+   esconderse en un corte silencioso. Intenté sustituirlo por `normal` + un `clamp` propio y la
+   sonda me corrigió dos veces: primero el corte, después el desbordamiento.
+   La cuota grande conserva su escalado propio, con `nowrap`. */
+.wsloan-hero-v { font-size: clamp(24px, 7.4vw, 46px); white-space: nowrap; overflow-wrap: normal; }
+
+/* Y EL TAMAÑO DE LOS CUATRO KPIs SALE DE SU CAJA, NO DEL VIEWPORT — que es justo el
+   error que la sonda cazó dos veces. El contrato compartido de arriba usa
+   `clamp(15px, 4.6vw, 21px)`, y `vw` sólo vale cuando la caja crece con la ventana.
+   Aquí no lo hace: medido, la rejilla da DOS columnas en móvil y CUATRO a 768, así que
+   una ventana más ancha produce una caja igual de estrecha mientras el `4.6vw` ya ha
+   tocado su techo. Las medidas:
+     360 → caja 119, la cifra pedía 133 a 16,56px
+     390 → caja 134, pedía 144 a 17,94px
+     768 → caja 134, pedía 168 a 21px      ← cuatro columnas, el peor caso
+    1024 → caja 171 y 1440 → caja 267: a 21px caben de sobra
+   De ahí el techo de 16px mientras la caja sigue siendo de 134, y los 21px devueltos
+   desde 1024, donde la caja ya los sostiene. La cifra nunca se rompe (`nowrap` del
+   contrato compartido: `formatBase()` une importe y moneda con un espacio de NO ruptura
+   y cualquier `overflow-wrap` acabaría cortando dentro de «US$»). */
+.wsloan-kpi-v { font-size: clamp(13px, 4vw, 16px); }
+@media (min-width: 1024px) { .wsloan-kpi-v { font-size: 21px; } }
+
+/* …y el campo del importe ocupa el ancho que su cifra pide. A 360 y 390 la rejilla de
+   campos da TRES columnas de 97/107 px; el importe pide 65 px de texto y sólo tenía 49/59
+   útiles, así que se veía «180.00…». Con doble columna sigue habiendo DOS filas de campos
+   (2+3 en vez de 3+2), o sea que la legibilidad no cuesta altura. */
+@media (max-width: 767px) {
+  .wsloan-fields > [data-ws-field="wide"] { grid-column: span 2; }
+}
 /* La cifra grande de un resultado tiene su propio tamaño y su propia caja: se
    escala igual, con su rango. */
 .wstool-res-final {
