@@ -278,9 +278,13 @@ section('7 · §26 · Préstamos sobre el armazón compartido (tercer consumidor
   // `formatBase()` une importe y moneda con un espacio de NO ruptura: no hay punto de corte
   // legítimo, así que cualquier `overflow-wrap` acaba partiendo dentro de «US$». La cifra
   // ESCALA y nunca se rompe. Esta regla ya existía y una segunda la anulaba por venir después.
-  ok('7.9 las cifras de Préstamos no se rompen nunca: escalan',
-    /\.wstool-res-v, \.wsloan-kpi-v \{[^}]*white-space: nowrap/.test(css) &&
-    /\.wsloan-hero-v \{[^}]*white-space: nowrap/.test(css));
+  // Este assert fijaba el `nowrap` dentro de la regla de Préstamos. La §8 extrajo ese contrato
+  // a un owner único, así que lo que aquí se comprueba es que Préstamos SIGUE cubierto por él —
+  // no que lo declare por su cuenta, que es justo lo que la extracción vino a eliminar. Es un
+  // contrato antiguo, no un defecto: el invariante no se relaja, cambia de dueño.
+  ok('7.9 las cifras de Préstamos no se rompen nunca: las cubre el owner de la §8',
+    /\.aurix-wsh \.wsloan-kpi-v, \.aurix-wsh \.wsloan-hero-v/.test(css) &&
+    /\[data-ws-metric\][\s\S]{0,600}white-space: nowrap/.test(css));
   // Se miran las REGLAS, no los comentarios: la primera versión de este assert se puso roja
   // casando con el propio comentario que CITA la regla retirada — el mismo error que el 1.5
   // documenta. Y lo que importa no es que la palabra `break-word` no aparezca en la hoja (hay
@@ -316,6 +320,68 @@ section('7 · §26 · Préstamos sobre el armazón compartido (tercer consumidor
     const es = R('T.es[' + JSON.stringify(k) + ']'), en = R('T.en[' + JSON.stringify(k) + ']');
     ok('7.15 la clave `' + k + '` existe en ES y EN', !!es && !!en, JSON.stringify([es, en]));
   });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+section('8 · §27 · La cifra de una métrica tiene UN owner:');
+// ════════════════════════════════════════════════════════════════════════════
+// No se extrajo por anticipación: la MISMA conclusión estaba re-derivada en ocho bloques de la
+// hoja y siete capacidades la implementaban por separado. Tres generaciones vivas a la vez
+// (`anywhere` → `break-word` → `nowrap`+escalar), y la correcta extendida A MANO, capacidad a
+// capacidad: Cobros se había quedado en la primera y el Diario en la segunda. Medido en vivo
+// antes de tocar nada, y verificado después: ninguna cifra cambió de tamaño.
+{
+  const cssNoC = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const METRICAS = ['wstool-res-v', 'wstool-res-final', 'wsloan-kpi-v', 'wsloan-hero-v',
+                    'wsre-kpi-v', 'wsrecv-kpi-v', 'wsbud-kpi b', 'wsb-row b', 'wsre-layer b', 'wsb-impact-val'];
+  // El owner es UNO: un solo sitio declara que una cifra no se rompe.
+  const nowrapRules = (cssNoC.match(/[^{}]*\{[^{}]*white-space: *nowrap[^{}]*\}/g) || [])
+    .filter(r => METRICAS.some(m => r.split('{')[0].indexOf(m) !== -1));
+  ok('8.1 una sola regla declara el contrato tipográfico de una cifra de métrica',
+    nowrapRules.length === 1, nowrapRules.length + ' reglas');
+  ok('8.2 …y nombra a los diez consumidores que ya lo compartían a mano',
+    METRICAS.every(m => nowrapRules[0] && nowrapRules[0].split('{')[0].indexOf(m) !== -1),
+    METRICAS.filter(m => !(nowrapRules[0] || '').split('{')[0].includes(m)).join(', '));
+  // Una capacidad nueva entra DECLARANDO, no añadiéndose a una lista: así es como esta hoja
+  // acabó con tres generaciones vivas y con dos capacidades olvidadas en las dos malas.
+  ok('8.3 una capacidad nueva entra declarando `data-ws-metric`, sin editar la lista',
+    /\[data-ws-metric\]/.test(nowrapRules[0] || ''));
+  // Las dos generaciones descartadas no sobreviven en ninguna cifra. `break-word` no era «menos
+  // agresivo» que `anywhere`: AÑADE puntos de corte donde no hay ninguno, y entre un importe y
+  // su moneda no hay ninguno porque los une un espacio de NO ruptura.
+  const malas = (cssNoC.match(/[^{}]*\{[^{}]*overflow-wrap: *(anywhere|break-word)[^{}]*\}/g) || [])
+    .filter(r => METRICAS.some(m => r.split('{')[0].indexOf(m) !== -1));
+  ok('8.4 ninguna cifra sigue en las dos estrategias que este repositorio ya descartó',
+    malas.length === 0, malas.map(r => r.split('{')[0].trim()).join(' | '));
+  // Lo que NO es una cifra se queda fuera, y eso también es el contrato: la lista de la gen 2
+  // arrastró una FRASE («la mejor combinación… del horizonte») y un `nowrap` la desbordaría.
+  ok('8.5 un texto NO entra en la primitiva: el pie de impacto conserva su corte por palabra',
+    !/\[data-ws-metric\][^{}]*wsb-impact-cap|wsb-impact-cap[^{}]*\[data-ws-metric\]/.test(nowrapRules[0] || '') &&
+    /\.wsb-impact-cap \{ overflow-wrap: break-word; \}/.test(cssNoC));
+  ok('8.6 …ni los rótulos, que sí pueden plegarse',
+    !/wsbud-kpi i|wsre-layer i/.test((nowrapRules[0] || '').split('{')[0]));
+  // Y un VALOR COMPUESTO sí parte, pero sólo donde ya hay un espacio de verdad. «NVDA +31,9%»
+  // es un ticker MÁS un porcentaje: ahí el punto de corte existe. Se declara, y la excepción
+  // vive DETRÁS de la primitiva — escrita antes, con la misma especificidad, no se aplicaba.
+  ok('8.7 el valor compuesto del Diario se declara como tal',
+    /class="wstool-res-v wsjrn-sum-best"/.test(fnSrc('_wsJrnSummaryHtml') || app));
+  ok('8.8 …y su excepción va DESPUÉS del owner, o el `nowrap` la gana por orden de fuente',
+    cssNoC.lastIndexOf('.wsjrn-sum-best') > cssNoC.indexOf('[data-ws-metric]'),
+    'excepcion@' + cssNoC.lastIndexOf('.wsjrn-sum-best') + ' owner@' + cssNoC.indexOf('[data-ws-metric]'));
+  ok('8.9 y parte con `normal`, que se limita a los cortes que YA existen',
+    /\.wsjrn-sum-best \{ white-space: normal; \}/.test(cssNoC));
+  // El TAMAÑO sigue siendo de cada capacidad: es identidad, no contrato (§27). Se comprueba que
+  // la extracción no se llevó por delante ninguna de las decisiones de tamaño.
+  ok('8.10 el tamaño sigue siendo de cada capacidad, no del owner',
+    !/font-size/.test(nowrapRules[0] || '') &&
+    /\.wsloan-kpi-v \{ font-size: clamp\(13px, 4vw, 16px\)/.test(cssNoC) &&
+    /\.wsbud-kpi b \{[^}]*font-size: clamp\(13px, 3\.8vw, 18px\)/.test(cssNoC) &&
+    /\.wsjrn-sum-grid \.wstool-res-v \{ font-size: clamp\(14px, 4\.2vw, 19px\); \}/.test(cssNoC));
+  // Y ninguna capacidad vuelve a declarar dos `clamp` para la misma cifra, que era la trampa
+  // real: ganaba el de abajo por orden de fuente y nada lo decía.
+  const heroClamps = (cssNoC.match(/\.wsloan-hero-v[^{}]*\{[^}]*font-size[^}]*\}/g) || []);
+  ok('8.11 una cifra tiene UN tamaño declarado, no dos compitiendo',
+    heroClamps.length === 1, heroClamps.join(' | '));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

@@ -21951,7 +21951,6 @@ body.gs-open { overflow: hidden; }
 /* Y el mismo `minmax(0,·)` en las otras rejillas que este bloque puso en fila. */
 .aurix-wsh .wsjrn-sum-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .aurix-wsh .wsjrn-sum-grid > * { min-width: 0; }
-.aurix-wsh .wstool-res-v, .aurix-wsh .wsre-kpi-v, .aurix-wsh .wsrecv-kpi-v { overflow-wrap: anywhere; }
 
 /* ── WS.2 — Scenario Builder (inside Workspace, wsb-* namespace) ── */
 .wsb-header { position: relative; }
@@ -23118,7 +23117,7 @@ body.gs-open { overflow: hidden; }
 /* dominant hero */
 .wsloan-hero { display: flex; flex-direction: column; gap: 3px; padding: 22px 24px; border-radius: 16px; border: 1px solid rgba(184,198,221,0.30); background: radial-gradient(130% 150% at 82% 0%, rgba(160,179,208,0.20), transparent 60%), linear-gradient(165deg, rgba(40,52,76,0.6), rgba(14,20,34,0.65)); }
 .wsloan-hero-lbl { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(200,214,237,0.85); font-weight: 600; }
-.wsloan-hero-v { font-size: 46px; font-weight: 800; letter-spacing: -0.02em; color: #fff; font-variant-numeric: tabular-nums; }
+.wsloan-hero-v { font-weight: 800; letter-spacing: -0.02em; color: #fff; }
 .wsloan-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .wsloan-kpi { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(184,198,221,0.16); background: rgba(165,196,255,0.025); }
 .wsloan-kpi-v { font-size: 19px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
@@ -23171,7 +23170,6 @@ body.gs-open { overflow: hidden; }
 .wspv-loan-foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 920px) { .wsloan-fields { grid-template-columns: repeat(2, 1fr); } .wsloan-kpis { grid-template-columns: repeat(2, 1fr); } .wsloan-cmp-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 640px) {
-  .wsloan-hero-v { font-size: 38px; }
   /* §26 — EL DONUT NO SE APILA: ERA MEDIA CAJA VACÍA. Apilado, el bloque medía 196 px
      (132 de donut + 22 de hueco + 42 de leyenda) y dejaba ~170 px muertos a la derecha del
      anillo, que es lo que empujaba la lectura rápida fuera de pantalla. En fila mide 132 —
@@ -28249,7 +28247,6 @@ button.intv14-cmp-clear {
      unidad («920,00 U / S$»). El salto tiene que caer en el espacio que ya hay
      entre la cifra y su moneda. */
   font-size: clamp(13px, 3.8vw, 18px); font-weight: 800; color: var(--text-bright);
-  font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal;
 }
 .wsbud-kpi i { overflow-wrap: normal; }
 /* El disponible es la cifra por la que se abre la plantilla: pesa más. */
@@ -28430,7 +28427,8 @@ input.ws4-num.is-invalid {
   .wsre-layer.is-total { grid-column: 1 / -1; }
 }
 .wsre-layer { min-width: 0; }
-.wsre-layer i, .wsre-layer b { min-width: 0; overflow-wrap: anywhere; }
+.wsre-layer i { min-width: 0; overflow-wrap: anywhere; }
+.wsre-layer b { min-width: 0; }
 
 /* ════════════════════════════════════════════════════════════════════════════
    WORKSPACE COMPLETION · SUPUESTOS, PARÁMETROS Y ESTADO DE GUARDADO
@@ -28587,7 +28585,7 @@ input.ws4-num.is-invalid {
   min-width: 0;
 }
 .wstool-res-v, .wsloan-kpi-v, .wsb-row b, .wsre-layer b {
-  min-width: 0; overflow-wrap: anywhere;
+  min-width: 0;
 }
 /* Interés compuesto · las tres celdas. En 360 y en 768 la tercera no cabía a un
    tercio (137px de desbordamiento a 768, el mayor de la matriz), así que la
@@ -28605,7 +28603,6 @@ input.ws4-num.is-invalid {
    del horizonte») no cabía en una línea a 360px y sangraba 29px. */
 .wsb-impact-row { min-width: 0; flex-wrap: wrap; }
 .wsb-impact-col { min-width: 0; }
-.wsb-impact-val { overflow-wrap: anywhere; }
 .wsb-impact-uplift { flex-wrap: wrap; min-width: 0; }
 .wsb-impact-cap { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
 /* Y el contenedor de la vista, que es quien propaga el desbordamiento. */
@@ -28628,19 +28625,18 @@ input.ws4-num.is-invalid {
    y en pantallas anchas sigue midiendo los 46px de siempre. Una cifra monetaria
    grande no debe romperse en dos líneas. */
 .wsloan-hero { min-width: 0; }
-.wsloan-hero-v {
-  font-size: clamp(30px, 9.4vw, 46px);
-  min-width: 0; white-space: nowrap;
-}
+/* El `clamp` de esta cifra se re-decidió más abajo (24px de suelo en vez de 30) al mudarse la
+   herramienta a la columna estrecha del armazón común, y su `nowrap` y su `min-width` los pone
+   ahora la primitiva de métrica. Dejar aquí una segunda declaración de lo mismo era la trampa
+   que esta extracción viene a cerrar: dos `clamp` para el mismo elemento, ganando el de abajo
+   por orden de fuente y sin que nada lo dijera. */
 
 /* ── 2 · EL CORTE DENTRO DE «US$» ──────────────────────────────────────────
    `overflow-wrap:anywhere` contenía el desbordamiento pero partía la unidad
    monetaria por la mitad («1000,00 US» / «$»). `break-word` rompe primero en los
    límites de palabra, así que parte por el espacio que ya hay entre la cifra y su
    unidad y la unidad queda entera. Contiene igual y se lee bien. */
-.wstool-res-v, .wsloan-kpi-v, .wsb-row b, .wsre-layer b, .wsb-impact-val, .wsb-impact-cap {
-  overflow-wrap: break-word;
-}
+.wsb-impact-cap { overflow-wrap: break-word; }
 
 /* ── 3 · EL SUELO DE 11px EN LAS SUPERFICIES PUBLICADAS ────────────────────
    La sonda las midió en vivo y confirmó que las cuatro aparecen en superficies
@@ -28672,10 +28668,7 @@ input.ws4-num.is-invalid {
    caber y no se rompe nunca. `white-space:nowrap` lo hace explícito, así que si
    algún día una cifra no cupiera se vería desbordar y la sonda lo cazaría, en vez
    de esconderse en un corte silencioso a mitad de la moneda. */
-.wstool-res-v, .wsloan-kpi-v {
-  font-size: clamp(15px, 4.6vw, 21px);
-  white-space: nowrap; overflow-wrap: normal;
-}
+.wstool-res-v, .wsloan-kpi-v { font-size: clamp(15px, 4.6vw, 21px); }
 .wsbud-split .wstool-res-v, .wstool-res-split.is-quad .wstool-res-v {
   font-size: clamp(14px, 4.2vw, 19px);
 }
@@ -28686,10 +28679,13 @@ input.ws4-num.is-invalid {
    rentabilidad— y en una columna de 106 px se salía de la tarjeta. Se permite el
    salto POR EL ESPACIO que ya existe entre ellos (`break-word`), no dentro del
    número: la razón de la regla se conserva, su literalidad no. */
-.wsjrn-sum-grid .wstool-res-v {
-  white-space: normal; overflow-wrap: break-word;
-  font-size: clamp(14px, 4.2vw, 19px);
-}
+/* LA EXCEPCIÓN DEL DIARIO SE RETIRA, y su razón la refutó este mismo repositorio DESPUÉS de
+   escribirla: decía «se permite el salto POR EL ESPACIO que ya existe» entre la cifra y su
+   unidad, y resulta que ese espacio es un NBSP — no hay salto posible ahí, así que lo único
+   que habilitaba era partir DENTRO de «US$». Medido en vivo: el Diario computaba
+   `normal`/`break-word`. Lo que necesitaba —caber en una columna de 106 px— ya lo da su
+   `clamp`, que se conserva. */
+.wsjrn-sum-grid .wstool-res-v { font-size: clamp(14px, 4.2vw, 19px); }
 /* Y la misma excepción en Préstamos, por la misma razón: la cuota y los KPI llevan cifra +
    unidad («1.122,61 US$») y en 390 px se salían de su caja con `nowrap`.
    CORREGIDO: la regla decía `break-word`, que es precisamente lo que permite partir DENTRO del
@@ -28709,7 +28705,7 @@ input.ws4-num.is-invalid {
    esconderse en un corte silencioso. Intenté sustituirlo por `normal` + un `clamp` propio y la
    sonda me corrigió dos veces: primero el corte, después el desbordamiento.
    La cuota grande conserva su escalado propio, con `nowrap`. */
-.wsloan-hero-v { font-size: clamp(24px, 7.4vw, 46px); white-space: nowrap; overflow-wrap: normal; }
+.wsloan-hero-v { font-size: clamp(24px, 7.4vw, 46px); }
 
 /* Y EL TAMAÑO DE LOS CUATRO KPIs SALE DE SU CAJA, NO DEL VIEWPORT — que es justo el
    error que la sonda cazó dos veces. El contrato compartido de arriba usa
@@ -28737,13 +28733,7 @@ input.ws4-num.is-invalid {
 }
 /* La cifra grande de un resultado tiene su propio tamaño y su propia caja: se
    escala igual, con su rango. */
-.wstool-res-final {
-  font-size: clamp(26px, 8.4vw, 38px);
-  white-space: nowrap; overflow-wrap: normal;
-}
-.wsb-impact-val, .wsb-row b, .wsre-layer b {
-  white-space: nowrap; overflow-wrap: normal;
-}
+.wstool-res-final { font-size: clamp(26px, 8.4vw, 38px); }
 .wsb-impact-val { font-size: clamp(16px, 4.8vw, 22px); }
 
 /* ── EL SUELO DE 11px · LOS TRES QUE MI LISTA NO ALCANZÓ ───────────────────
@@ -29139,10 +29129,7 @@ input.ws4-num.is-invalid {
    mismo que ya se aplicó a `.wstool-res-v` y `.wsloan-kpi-v`, y que a estos tres
    KPI no se les había extendido: no se parte nunca y el tamaño se adapta.
    Lo encontró la INSPECCIÓN DE LA CAPTURA, no un assert geométrico. */
-.aurix-wsh .wsre-kpi-v {
-  white-space: nowrap; overflow-wrap: normal; word-break: normal;
-  font-size: clamp(15px, 5.2vw, 24px);
-}
+.aurix-wsh .wsre-kpi-v { font-size: clamp(15px, 5.2vw, 24px); }
 @media (min-width: 560px) { .aurix-wsh .wsre-kpi-v { font-size: clamp(17px, 2.4vw, 24px); } }
 /* Y en el móvil estrecho, UNA columna. Con dos, la celda queda en 119 px para un
    importe de 147 y la única salida sería bajar la cifra a ~12 px, que es el
@@ -29339,3 +29326,50 @@ body.ws-cover .aurix-wsh { max-width: none; }
   color: rgba(214,226,255,0.8); font-size: 13px; line-height: 1;
 }
 .aurix-toast-x:hover { background: rgba(165,196,255,0.10); }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   §27 · PRIMITIVA: LA CIFRA DE UNA MÉTRICA — UN SOLO OWNER
+   ════════════════════════════════════════════════════════════════════════════
+   Esto no se extrae por anticipación: se extrae porque la MISMA conclusión estaba
+   re-derivada en OCHO bloques de esta hoja y siete capacidades la implementaban por
+   separado. El linaje, medido antes de tocar nada:
+     gen 1  `overflow-wrap: anywhere`   → partía dentro de «US$»
+     gen 2  `overflow-wrap: break-word` → tampoco: el punto de corte que buscaba NO EXISTE
+     gen 3  `white-space: nowrap` + escalar  → la correcta… extendida a mano, capacidad a
+            capacidad, y por eso incompleta: Cobros seguía en la gen 1 y el Diario en la gen 2.
+   La causa, ya escrita en este repositorio y ahora en un solo sitio: `Intl.NumberFormat` une
+   importe y moneda con un ESPACIO DE NO RUPTURA (U+00A0). No hay ningún punto de ruptura
+   legítimo entre una cifra y su unidad — «1000,00 US» no es nada—, así que la cifra NO SE
+   ROMPE: se ESCALA para caber. El `nowrap` es explícito a propósito: si algún día no cupiera,
+   se vería desbordar y la sonda lo cazaría, en vez de esconderse en un corte silencioso.
+   Una capacidad nueva entra DECLARANDO `data-ws-metric`, no añadiéndose a una lista — que es
+   como esta hoja acabó con tres generaciones vivas a la vez. El TAMAÑO sigue siendo de cada
+   capacidad: es identidad, y el §27 dice que lo compartido es el sistema, no el carácter.
+   NO entra `.wsb-impact-cap`: es una FRASE, no una cifra. La lista de la gen 2 lo metió por
+   arrastre y un `nowrap` la habría desbordado — conserva su `break-word`, que para texto es
+   lo correcto. Tampoco `.wsbud-kpi i` ni `.wsre-layer i`, que son rótulos. */
+.aurix-wsh [data-ws-metric],
+.aurix-wsh .wstool-res-v, .aurix-wsh .wstool-res-final,
+.aurix-wsh .wsloan-kpi-v, .aurix-wsh .wsloan-hero-v,
+.aurix-wsh .wsre-kpi-v, .aurix-wsh .wsrecv-kpi-v,
+.aurix-wsh .wsbud-kpi b, .aurix-wsh .wsb-row b, .aurix-wsh .wsre-layer b,
+.aurix-wsh .wsb-impact-val {
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* ── LA EXCEPCIÓN DECLARADA, Y VIVE DETRÁS DE LA PRIMITIVA ─────────────────
+   Un VALOR COMPUESTO sí puede partir, pero sólo donde ya hay un espacio de verdad.
+   `white-space: normal` con el `overflow-wrap: normal` de arriba parte ÚNICAMENTE en
+   oportunidades legítimas: nunca dentro de «US$» ni a mitad de un número, que es lo que la
+   gen 2 (`break-word`) sí hacía. La diferencia no es de grado: `break-word` AÑADE puntos de
+   corte donde no hay ninguno; `normal` se limita a los que ya existen.
+   Y ESTA REGLA TIENE QUE IR DESPUÉS DE LA PRIMITIVA, no antes: la escribí junto al bloque del
+   Diario —600 líneas más arriba, misma especificidad— y el `nowrap` del owner la ganaba por
+   orden de fuente. La sonda se quedó roja con los MISMOS números, que es la pista: la regla no
+   estaba perdiendo una discusión de especificidad, no estaba aplicándose en absoluto. */
+.aurix-wsh .wsjrn-sum-best { white-space: normal; }

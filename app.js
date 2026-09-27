@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '729'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '730'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -27580,7 +27580,14 @@ function _wsJrnSummaryHtml(res) {
       <div class="wsjrn-sum-grid">
         <div class="wstool-res-cell"><span class="wstool-res-v ${res.avgReturn == null ? '' : (res.avgReturn >= 0 ? 'is-up' : 'is-down')}">${esc(hasClosed ? _wsJrnPct(res.avgReturn) : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_avg'))}</span></div>
         <div class="wstool-res-cell"><span class="wstool-res-v">${esc(hasClosed ? Math.round(res.winRate) + '%' : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_winrate'))}</span></div>
-        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(best)}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_best'))}</span></div>
+        ${/* §27 — «Mejor operación» NO es una cifra: es un TICKER más un porcentaje, dos cosas
+              con un espacio de verdad entre ellas. La primitiva de métrica prohíbe romper una
+              cifra porque entre un importe y su moneda no hay punto de corte legítimo; aquí sí
+              lo hay, así que esta celda se declara valor COMPUESTO y parte por ese espacio —
+              nunca dentro del número. Lo destapó la extracción: con el contrato único puesto,
+              «NVDA +31,9%» pedía 109 px en una caja de 75 y se vio, en vez de esconderse en un
+              corte a mitad de dato. */''}
+        <div class="wstool-res-cell"><span class="wstool-res-v wsjrn-sum-best">${esc(best)}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_best'))}</span></div>
       </div>
     </div>`;
 }
