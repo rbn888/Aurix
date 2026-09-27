@@ -231,6 +231,32 @@ const MEASURE = `(function(SPEC){
       if (inner > 0 && need > inner + 1) inClip.push((inp.getAttribute('data-wstool-input') || inp.getAttribute('data-wsg-form') || inp.className) + ':' + need + '>' + inner);
     });
   } catch (_) { inClip = ['no-medible']; }
+  // ── Y UNA FILA DE CAMPOS ALINEA SUS ENTRADAS ─────────────────────────────
+  // Lo vio la captura: en Interés compuesto «Aportación mensual» ocupa dos líneas y hundía su
+  // campo 15 px por debajo de sus vecinos de fila. Ninguna de las medidas anteriores pregunta
+  // por eso — cada celda cabe en su caja, no hay recorte y nada se sale—, así que la fila se
+  // lee torcida y todos los gates están verdes. Se agrupa por posición vertical de la CELDA y
+  // se exige que las entradas de una misma fila empiecen a la misma altura.
+  var misalign = [];
+  ['.wstool-fields', '.wsloan-fields', '.wsb-params-grid', '.wsjrn-form-grid',
+   '.wsre-form-grid', '.wsrecv-form-grid', '.wsg-form'].forEach(function(sel){
+    [].slice.call(wsh.querySelectorAll(sel)).forEach(function(g){
+      var rows = {};
+      [].slice.call(g.children).forEach(function(f){
+        if (!f.classList || !f.classList.contains('ws4-field')) return;
+        var inp = f.querySelector('.ws4-field-input'); if (!inp) return;
+        var fb = f.getBoundingClientRect(), ib = inp.getBoundingClientRect();
+        if (!fb.width || !ib.width) return;
+        var key = Math.round(fb.top / 6);
+        (rows[key] = rows[key] || []).push(Math.round(ib.top));
+      });
+      Object.keys(rows).forEach(function(k){
+        var v = rows[k]; if (v.length < 2) return;
+        var d = Math.max.apply(null, v) - Math.min.apply(null, v);
+        if (d > 2) misalign.push(sel + ':' + d + 'px');
+      });
+    });
+  });
   var u = function(a){ return Array.from(new Set(a)); };
   return {
     mounted: true, whole: whole, starts: starts,
@@ -245,7 +271,7 @@ const MEASURE = `(function(SPEC){
     // §1: ningún chip Incluido/Premium dentro de la cabecera.
     barTier: !!bar && bar.querySelectorAll('.wsh-tier, .wsb-title-tier').length,
     legacyHeader: wsh.querySelectorAll('.wsb-header').length,
-    small: u(small), zoom: u(zoom), taps: u(taps), clipped: u(clipped), rowBad: u(rowBad), spill: u(spill), inClip: u(inClip),
+    small: u(small), zoom: u(zoom), taps: u(taps), clipped: u(clipped), rowBad: u(rowBad), spill: u(spill), inClip: u(inClip), misalign: u(misalign),
     docOverflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
     savebar: !!root.querySelector('[data-wstool-savebar], [data-wsg-savebar]'),
   };
@@ -341,6 +367,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
           JSON.stringify({ recortado: g.clipped, docX: g.docOverflowX }));
         ok(`${tag} ninguna cifra escrita se ve cortada dentro de su campo`,
           g.inClip.length === 0, JSON.stringify(g.inClip));
+        ok(`${tag} una fila de campos alinea sus entradas, aunque los rótulos no midan igual`,
+          g.misalign.length === 0, JSON.stringify(g.misalign));
         ok(`${tag} ninguna celda se sale de su fila ni pisa a su vecina`,
           g.rowBad.length === 0, JSON.stringify(g.rowBad));
         ok(`${tag} ningún texto se pinta fuera de su tarjeta`,

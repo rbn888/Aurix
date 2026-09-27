@@ -22098,6 +22098,14 @@ body.gs-open { overflow: hidden; }
 .ws4-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .ws4-fields { display: flex; flex-direction: column; gap: 14px; }
 .ws4-field { display: flex; flex-direction: column; gap: 7px; }
+/* §27 — Y EL CAMPO SE PEGA AL PIE DE SU CELDA, para que una fila de campos alinee sus
+   entradas aunque los rótulos no midan lo mismo. Medido en las ocho capacidades a 360, 390 y
+   768: sólo Interés compuesto lo delataba —«Aportación mensual» ocupa dos líneas y hundía su
+   campo 15 px por debajo de sus vecinos—, pero la causa es del campo COMPARTIDO y volvería a
+   aparecer en cuanto otra capacidad usara un rótulo largo. Sin número mágico: la celda de una
+   rejilla ya se estira a la altura de su fila, así que basta con que la entrada busque el pie.
+   Lo vio la captura; ningún assert geométrico preguntaba por la alineación de una fila. */
+.ws4-field > .ws4-field-input { margin-top: auto; }
 .ws4-field-name { font-size: 12px; color: var(--text-muted); }
 .ws4-field-input { position: relative; display: block; }
 .ws4-num {
@@ -28279,7 +28287,13 @@ button.intv14-cmp-clear {
    Dos supuestos comparables sobre el mismo capital y el mismo horizonte. Las
    series se distinguen por COLOR Y POR ETIQUETA —§11 prohíbe que el color sea
    la única señal— y el gráfico lleva su alternativa textual. */
-.wsb2-cols { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 10px; }
+/* §26 — LOS DOS SUPUESTOS VAN EN PARALELO, TAMBIÉN EN MÓVIL. Son una COMPARACIÓN: apilados
+   se leen como dos formularios seguidos y hay que recordar el primero para entender el
+   segundo. Medido a 390: dos bloques de 142 px apilados con su hueco son 296, y en fila son
+   142 — 154 px que no se recuperan de ningún otro sitio, en una superficie que mide 2.514.
+   El suelo de 700 px que tenía esta regla no venía de que no cupiera: cada bloque es un
+   rótulo, un campo y una nota, y a 360 la columna mide 147 px con el campo en 103 útiles. */
+.wsb2-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 10px; }
 .wsb2-col {
   display: flex; flex-direction: column; gap: 10px; min-width: 0;
   padding: 12px; border-radius: 14px;
@@ -28340,9 +28354,6 @@ button.intv14-cmp-clear {
 }
 .wsb2-savebar .wsg-savestate { flex: 1 1 auto; min-width: 0; }
 .wsb2-savebar .wsg-savebtn { flex: 0 0 auto; }
-@media (min-width: 700px) {
-  .wsb2-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 /* Escritorio: supuestos a la izquierda, resultado y gráfico a la derecha. */
 @media (min-width: 1024px) {
   .wsb2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; align-items: start; }
