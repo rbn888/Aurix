@@ -27833,7 +27833,12 @@ button.intv14-cmp-clear {
    debajo de su contenido, porque `1fr` es `minmax(auto, 1fr)` y con un nombre largo la
    columna se niega a ceder y la tarjeta se sale de la rejilla. El `min-width: 0` de la
    tarjeta es la otra mitad de la misma condición — hacen falta las dos. */
-.wspl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: stretch; }
+/* §12/§15 — CADA TARJETA MIDE LO QUE TIENE. Con `stretch`, las que no publican proporción
+   —el Diario, que declara por escrito que su rentabilidad con divisas mezcladas NO es
+   publicable, y una cartera sin valoraciones— se estiraban a la altura de la más alta y
+   enseñaban el hueco. Y el cierre prohíbe las dos salidas fáciles: crecer dejando vacío, y
+   rellenar con una cifra inventada. Queda la tercera: que la altura la ponga el contenido. */
+.wspl-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; align-items: start; }
 @media (min-width: 640px)  { .wspl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
 @media (min-width: 1024px) { .wspl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; } }
 /* ══════════════════════════════════════════════════════════════════════════════════════════
@@ -27901,6 +27906,15 @@ button.intv14-cmp-clear {
 .wssi-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
 .wssi-name { font-size: 14.5px; font-weight: 700; color: var(--text-bright); overflow-wrap: anywhere; }
 .wssi-meta { font-style: normal; font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
+/* §25 — Y EN MÓVIL LAS MÉTRICAS SE QUEDAN FUERA, que es una decisión con evidencia y no un
+   olvido. Intenté publicar la primera cifra bajo el nombre, porque el cierre pide métricas en la
+   fila plegada y con dos presupuestos guardados la fecha no distingue uno de otro. La sonda de
+   la primitiva me paró con dos cosas: un assert que ya declaraba «las métricas de la fila se
+   retiran en móvil (EL NOMBRE MANDA)», y —más concreto— que para que la cifra caiga a su línea
+   hace falta `flex-wrap` en la fila, y con eso un nombre largo empuja el ⋯ y lo SOLAPA: medido,
+   la fila pasaba de 59 a 172 px a 360 y el objetivo táctil se pisaba. El nombre es lo que
+   identifica un documento y puede ser largo; la cifra se ve al desplegar, que está a un toque.
+   En ancho sí caben las dos, a la derecha, y ahí es donde el §25 se cumple. */
 .wssi-kpis { display: none; }
 @media (min-width: 640px) { .wssi-kpis { display: flex; flex: 0 0 auto; gap: 16px; } }
 .wssi-kpi { display: flex; flex-direction: column; gap: 1px; text-align: right; }
@@ -28033,10 +28047,19 @@ button.intv14-cmp-clear {
 /* §11/§17 — LA PROPORCIÓN, cuando se puede medir. Dos cajas, sin librería y sin canvas. La
    anchura viene del motor; aquí no se decide ningún número. Si no hubiera dato, este nodo no
    se pinta: preferimos una tarjeta sin barra a una barra sin verdad. */
+/* §15/§19 — EL MINI VISUAL DE LA TARJETA. La barra sube de 6 a 9 px y gana un rótulo con su
+   proporción, que es el dato que su `aria-label` ya publicaba y que quien mira no tenía. Los dos
+   juntos son el «preview» que el cierre pide sin inventar ninguna cifra: sale del documento. */
+.wspl-viz { display: flex; flex-direction: column; gap: 5px; }
 .wspl-share {
-  display: flex; width: 100%; height: 6px; border-radius: 999px; overflow: hidden;
+  display: flex; width: 100%; height: 9px; border-radius: 999px; overflow: hidden;
   background: rgba(var(--ws-b), 0.16);
 }
+.wspl-share-t {
+  font-size: 11.5px; letter-spacing: .01em; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wspl-share-t b { color: rgb(var(--ws-a)); font-weight: 800; }
 .wspl-share-a { display: block; height: 100%; background: rgba(var(--ws-a), 0.85); transition: width 260ms ease; }
 .wspl-share-b { display: block; height: 100%; flex: 1 1 auto; background: rgba(var(--ws-b), 0.55); }
 @media (prefers-reduced-motion: reduce) {

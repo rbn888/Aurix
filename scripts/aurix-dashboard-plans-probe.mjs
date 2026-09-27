@@ -429,13 +429,19 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       new Set(acc.map(a => a[1])).size >= 3, JSON.stringify(acc.map(a => a[1])));
 
     // §21 — el menú se abre, se cierra con Escape y devuelve el foco.
+    // ATRIBUTO ACTUALIZADO, no assert relajado: esta sonda buscaba `data-wsmenu-act`, que era
+    // el nombre de cuando TUS PLANES tenía su propia mecánica de menú. Al extraerse
+    // `_wsPopoverMenu` —un solo owner para el menú de las tres superficies que lo usan— las
+    // acciones pasaron a declararse con `data-wsmenu-act`, y la sonda se quedó mirando un nombre
+    // que ya no existe. Se comprobó antes de tocarla: el menú se abre y trae sus CINCO acciones
+    // en el mismo orden (open, rename, dup, unpin, del). Lo que estaba roto era la pregunta.
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.waitForTimeout(90);
     await page.click('#wsPlansSection .wspl-card[data-wspl-id="d1"] .wspl-menu');
     await page.waitForTimeout(120);
     const opened = await page.evaluate(`(function(){
       var m=document.getElementById('wsPlansMenu');
-      return JSON.stringify({ open:!!m, items: m ? [].slice.call(m.querySelectorAll('[data-wsplmenu-act]')).map(function(b){return b.getAttribute('data-wsplmenu-act');}) : [],
+      return JSON.stringify({ open:!!m, items: m ? [].slice.call(m.querySelectorAll('[data-wsmenu-act]')).map(function(b){return b.getAttribute('data-wsmenu-act');}) : [],
         inView: m ? (m.getBoundingClientRect().right <= innerWidth + 1 && m.getBoundingClientRect().bottom <= innerHeight + 1) : false });})()`).then(JSON.parse);
     ok(`${ENG}.v2.menú · se abre con las cinco acciones`,
       opened.open && opened.items.join(',') === 'open,rename,dup,unpin,del', JSON.stringify(opened.items));
@@ -451,7 +457,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // §22 — «Quitar del Dashboard» OCULTA y NO BORRA, y el viaje de vuelta existe.
     await page.click('#wsPlansSection .wspl-card[data-wspl-id="d1"] .wspl-menu');
     await page.waitForTimeout(120);
-    await page.click('#wsPlansMenu [data-wsplmenu-act="unpin"]');
+    await page.click('#wsPlansMenu [data-wsmenu-act="unpin"]');
     await page.waitForTimeout(200);
     const after = await page.evaluate(`(function(){
       var ids=[].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){return c.getAttribute('data-wspl-id');});
@@ -568,7 +574,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // El ⋯ del objetivo opera sobre SU almacén: quitar no borra.
     await page.click('#wsPlansSection .wspl-card[data-wspl-kind="goal"] .wspl-menu');
     await page.waitForTimeout(150);
-    await page.click('#wsPlansMenu [data-wsplmenu-act="unpin"]');
+    await page.click('#wsPlansMenu [data-wsmenu-act="unpin"]');
     await page.waitForTimeout(300);
     const gUn = await page.evaluate(`(function(){
       var raw = JSON.parse(localStorage.getItem('aurix_ws_goals_v1') || '[]');

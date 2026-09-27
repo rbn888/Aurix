@@ -562,5 +562,30 @@ console.log('\n8 · El sistema común de instancias guardadas:');
     /_wsToolEditId === d\.id/.test(list) && /isOpen \? '' :/.test(list));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n9 · Cierre V2 · la tarjeta de un plan enseña su proporción:');
+// ════════════════════════════════════════════════════════════════════════════
+{
+  const cssNoC = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const sh = fnSrc('_wsPlanShareHtml');
+  // §15/§19 — el mini visual. Y NO es un dato nuevo: es el mismo número que el `aria-label` ya
+  // publicaba, que hasta ahora sólo existía para quien usa lector de pantalla.
+  ok('9.1 la proporción se PINTA, además de anunciarse',
+    /class="wspl-share-t"/.test(sh) && /aria-hidden="true"/.test(sh) && /Math\.round\(pa\)/.test(sh));
+  ok('9.2 el rótulo va FUERA del `role="img"`, o el lector no lo leería',
+    sh.indexOf('role="img"') < sh.indexOf('wspl-share-t') &&
+    /<\/span>'\s*\+\s*'<span class="wspl-share-t"/.test(sh));
+  ok('9.3 sigue saliendo del PROPIO documento, no del borrador de la herramienta',
+    /_wsPlanShare\(p\)/.test(fnSrc('_renderDashboardPlans')) && !/_wsToolStateGet/.test(sh));
+  // §12/§15 — la altura la pone el contenido: ni hueco ni cifra inventada.
+  ok('9.4 las tarjetas miden lo que tienen, no lo que mide la más alta',
+    /\.wspl-grid \{ display: grid;[^}]*align-items: start; \}/.test(cssNoC));
+  // Y el Diario sigue publicando SÓLO su recuento: su propia nota dice que la rentabilidad con
+  // divisas mezcladas no es publicable, y esta fase es visual — no cambia qué se publica.
+  ok('9.5 el Diario sigue publicando sólo su recuento, sin proporción inventada',
+    /SÓLO EL RECUENTO/.test(fnSrc('_wsPlanMetrics')) &&
+    !/trade_journal:[^}]*share:/.test(app.slice(app.indexOf('_WSPL_TYPES'), app.indexOf('_WSPL_TYPES') + 900)));
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

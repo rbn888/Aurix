@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '737'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '738'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -23261,9 +23261,21 @@ function _wsPlanShareHtml(sh) {
   const tot = sh.a + sh.b;
   const pa = Math.max(0, Math.min(100, (sh.a / tot) * 100));
   const lbl = Math.round(pa) + '% ' + t(sh.ka) + ' · ' + (100 - Math.round(pa)) + '% ' + t(sh.kb);
-  return '<span class="wspl-share" role="img" aria-label="' + esc(lbl) + '">'
+  // §15/§19 — LA PROPORCIÓN SE VE, no sólo se anuncia. Era una barra de 6 px sin texto: para
+  // quien usa lector de pantalla el dato estaba (en el `aria-label`) y para quien mira no. Es el
+  // «mini visual» que el cierre pide, y NO es un dato nuevo: es exactamente el mismo número que
+  // el `aria-label` ya publicaba. El visual de una tarjeta de TUS PLANES tiene que salir del
+  // PROPIO documento —`_wsPlanShare` lee sus `inputs` por los motores reales— y no del borrador
+  // local de la herramienta: eso último fue un defecto real de este repositorio, con una tarjeta
+  // mostrando las cifras de otro documento, y por eso se retiró `_wsProjPreviewHtml`.
+  // El rótulo va FUERA del `role="img"`: dentro, un lector de pantalla no lo leería y el
+  // `aria-label` lo sustituiría.
+  return '<span class="wspl-viz">'
+    + '<span class="wspl-share" role="img" aria-label="' + esc(lbl) + '">'
     + '<span class="wspl-share-a" style="width:' + pa.toFixed(2) + '%"></span>'
-    + '<span class="wspl-share-b"></span></span>';
+    + '<span class="wspl-share-b"></span></span>'
+    + '<span class="wspl-share-t" aria-hidden="true"><b>' + Math.round(pa) + '%</b> ' + esc(t(sh.ka)) + '</span>'
+    + '</span>';
 }
 // ════════════════════════════════════════════════════════════════════════════════════════════
 // FASE 2 · MECÁNICA DE MENÚ EMERGENTE  —  `_wsPopoverMenu`
