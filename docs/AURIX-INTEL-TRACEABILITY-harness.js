@@ -172,7 +172,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -958,22 +958,32 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
     && !/intcc-radar-edge\.is-unknown/.test(css)
     && !/intcc-radar-label\.is-unavailable/.test(css)
     && !/intcc-radar-val\.is-unavailable/.test(css));
-  ok('10.22 la descripción accesible enumera los CINCO, y nombra la ausencia sólo ahí',
+  // REMATE §4 — el canal accesible deja de ser un `aria-label` sintético y pasa
+  // a ser TEXTO REAL: la leyenda HTML. Es el mismo contenido para quien ve y para
+  // quien escucha, así que no pueden divergir.
+  ok('10.22 la leyenda enumera los CINCO y nombra la ausencia sólo donde toca',
     (() => { const m = Number(svg(/data-svg-measured="(\d+)"/));
-      const al = (rr.match(/<svg class="intcc-radar-svg[^>]*aria-label="([^"]+)"/) || [, ''])[1];
       const notMeasured = DICT.es.intv16_axis_not_measured;
-      return svg(/data-svg-a11y-axes="(\d+)"/) === '5'
-        && !/sin datos/.test(al)
-        // …y sin dos puntos colgando: una afirmación vacía es peor que el nombre solo.
-        && !/: \./.test(al) && !/: $/.test(al)
-        && (al.match(new RegExp(notMeasured, 'g')) || []).length === 5 - m; })(),
-    (rr.match(/<svg class="intcc-radar-svg[^>]*aria-label="([^"]+)"/) || [, '?'])[1]);
+      const items = rr.match(/class="intcc-radar-leg-item"[\s\S]*?<\/li>/g) || [];
+      return items.length === 5
+        && /data-legend-axes="5"/.test(rr)
+        && count(rr, /class="intcc-radar-label"/g) === 5
+        && count(rr, /class="intcc-radar-val"/g) === m
+        && count(rr, new RegExp(notMeasured, 'g')) === 5 - m
+        && !/sin datos/.test(rr)
+        // el SVG ya no habla: su contenido está descrito al lado
+        && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(rr)
+        && !/<svg class="intcc-radar-svg[^>]*aria-label=/.test(rr); })(),
+    (rr.match(/class="intcc-radar-legend"[\s\S]{0,200}/) || [, '?'])[0]);
   ok('10.23 CRECIMIENTO sigue sin owner: conserva su eje y su nombre, y no publica cifra',
     (() => { const dims = run('JSON.stringify(_INTV7_RADAR_DIMS)', makeCtx(APPLE));
       const g = JSON.parse(dims).find(d => d.key === 'growth');
+      const row = (rr.match(/class="intcc-radar-leg-item" data-axis="growth"[\s\S]*?<\/li>/) || [''])[0];
       return !!g && g.owner === null && g.pending === 'no_certifiable_scale'
         && rr.indexOf(DICT.es.intcc_dim_growth) !== -1
-        && !/data-axis="growth"/.test(rr)
+        // su fila existe, lleva nombre y NO lleva cifra; y no tiene marcador
+        && /data-measured="0"/.test(row) && !/intcc-radar-val/.test(row)
+        && !/data-axis="growth" data-availability/.test(rr)
         && /growth:no_certifiable_scale/.test(num(rr, /data-pending="([^"]*)"/) || ''); })());
   ok('10.24 la transición del radar respeta `prefers-reduced-motion`',
     /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,200}\.intcc-radar-dot[^}]*transition: none/.test(css));

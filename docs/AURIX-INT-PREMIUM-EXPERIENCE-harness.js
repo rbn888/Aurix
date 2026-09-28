@@ -166,7 +166,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];

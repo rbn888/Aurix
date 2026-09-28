@@ -228,7 +228,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -1244,17 +1244,18 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     && count(hUnk, /data-availability="measured"/g) === 3,
     JSON.stringify({ dots: count(hUnk, /class="intcc-radar-dot"/g),
       axes: count(hUnk, /class="intcc-radar-axis[" ]/g) }));
-  ok('11.8b la descripción accesible enumera los CINCO; la ausencia sólo se nombra ahí',
-    (() => { const m = hUnk.match(/aria-label="([^"]+)"/);
-      if (!m) return false;
-      const a = m[1];
-      return /data-svg-a11y-axes="5"/.test(hUnk)
-        && (a.match(/sin datos/g) || []).length === 0
-        // sin dos puntos colgando: una afirmación vacía es peor que el nombre solo
-        && !/: \./.test(a) && !/: "/.test(a)
-        && a.indexOf('diversification: 40%') !== -1
-        && a.indexOf('concentration: 60%') !== -1; })(),
-    JSON.stringify((hUnk.match(/aria-label="([^"]+)"/) || [])[1] || null));
+  // REMATE §4 — el canal accesible es la LEYENDA HTML, no un `aria-label`: mismo
+  // texto para quien ve y para quien escucha, imposible que diverjan.
+  ok('11.8b la leyenda enumera los CINCO con su valor; la ausencia sólo donde toca',
+    (() => { const items = hUnk.match(/class="intcc-radar-leg-item"[\s\S]*?<\/li>/g) || [];
+      return items.length === 5
+        && count(hUnk, /class="intcc-radar-label"/g) === 5
+        && count(hUnk, /class="intcc-radar-val"/g) === 3
+        && !/sin datos/.test(hUnk)
+        && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(hUnk)
+        && !/<text/.test(hUnk)
+        && hUnk.indexOf('>40%<') !== -1 && hUnk.indexOf('>60%<') !== -1; })(),
+    JSON.stringify((hUnk.match(/class="intcc-radar-legend"[\s\S]{0,160}/) || [])[0] || null));
   ok('11.9 la trayectoria se INTERRUMPE en cada hueco: un segmento, nunca un triángulo',
     /data-svg-edges="1"/.test(hUnk) && /data-svg-gaps="4"/.test(hUnk)
     && count(hUnk, /class="intcc-radar-edge"/g) === 1
@@ -1284,7 +1285,7 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
       const zero = /data-axis="liquidity" data-availability="measured"/.test(h);
       const small = /data-axis="diversification" data-availability="measured"/.test(h);
       return zero && small && />0%</.test(h) && !/sin datos/.test(h)
-        && !/data-axis="growth"/.test(h)
+        && !/data-axis="growth" data-availability/.test(h)
         && count(h, /class="intcc-radar-label"/g) === 5
         && count(h, /class="intcc-radar-dot"/g) === 4
         && !/is-unknown/.test(h); })(),
@@ -1319,7 +1320,9 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     (() => { const s0 = hUnk;
       const i1 = s0.indexOf('intcc-radar-grid');
       const i3 = s0.indexOf('<g class="intcc-radar-edges">'), i5 = s0.indexOf('intcc-radar-halos');
-      const i4 = s0.indexOf('intcc-radar-dots'), i6 = s0.indexOf('intcc-radar-labels');
+      const i4 = s0.indexOf('intcc-radar-dots'), i6 = s0.indexOf('intcc-radar-legend');
+      // §4 — «etiquetas» ya no es una capa del SVG: es la leyenda, que va después
+      // de la figura entera. El orden de pintado de la figura no cambia.
       return i1 < i3 && i3 < i5 && i5 < i4 && i4 < i6; })(),
     JSON.stringify({ grid: hUnk.indexOf('intcc-radar-grid'), edges: hUnk.indexOf('<g class="intcc-radar-edges">'),
       halos: hUnk.indexOf('intcc-radar-halos'), dots: hUnk.indexOf('intcc-radar-dots') }));
@@ -1435,7 +1438,11 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
       const xsFrame = [];
       for (let i = 0; i < n; i++) xsFrame.push(cx + Math.cos((-90 + i * (360 / n)) * Math.PI / 180) * R);
       const frac = (Math.max.apply(null, xsFrame) - Math.min.apply(null, xsFrame)) / Number(vb[3]);
-      return frac >= 0.50 && frac <= 0.62; })(),
+      // REMATE §4 — con las etiquetas fuera, el viewBox ya no reserva 144 unidades
+      // para texto: se ciñe a la figura. El marco pasa de ocupar ~55 % del ancho a
+      // ocuparlo casi entero, que es justo lo que hace el radar más grande y
+      // legible en el mismo espacio de tarjeta. El suelo sube en consecuencia.
+      return frac >= 0.85 && frac <= 1.0; })(),
     JSON.stringify({ viewBox: (ACC.match(/viewBox="[^"]*"/) || [''])[0],
       frac: +((2 * R * Math.sin(72 * Math.PI / 180)) / Number((ACC.match(/viewBox="[^ ]+ [^ ]+ ([\d.]+)/) || [, 1])[1])).toFixed(3) }));
   ok('11.26b …y en móvil el SVG ya no está capado por debajo de su card',
@@ -2518,9 +2525,9 @@ console.log('\nSC · RESIDUALES · un rendimiento sin periodo, y un drawdown sin
       run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
         + ' startsAfterRecord: true, spanMs: ' + (90 * DAY) + ' })', c);
       const h = run('_intv7RadarHtml(s => s)', c);
-      const a = /intcc-radar-svg/.test(h)
-        ? (h.match(/aria-label="([^"]+)"/) || [, ''])[1]
-        : (h.match(/class="intv15-obs-val">([^<]+)</g) || []).join(' ');
+      // REMATE §4 — el canal legible es la LEYENDA: misma cadena para el ojo y
+      // para el lector de pantalla.
+      const a = (h.match(/class="intcc-radar-val">([^<]+)</g) || []).join(' ');
       return !!h && /90/.test(a) && /82/.test(a); })(),
     run('_intv7RadarHtml(s => s)', (() => { const c = makeCtx({});
       run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'

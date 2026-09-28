@@ -356,15 +356,18 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     && svg.indexOf(T.intcc_dim_growth) !== -1
     && !/is-unavailable/.test(svg),
     'axes=' + (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length);
+  // REMATE §4 — las etiquetas son HTML, así que «no publica cifra» se mide en la
+  // LEYENDA: la fila del eje ausente lleva nombre y razón, nunca `.intcc-radar-val`.
   ok('3.7 la dimensión ausente conserva su NOMBRE y no publica cifra, «sin datos» ni marcador',
     svg.indexOf(T.intcc_dim_growth) !== -1
     && svg.indexOf(T.intv7_axis_unavailable) === -1
-    && (svg.match(/class="intcc-radar-val[^"]*"/g) || []).length === 4
-    && (svg.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || [])
+    && (svg.match(/class="intcc-radar-val"/g) || []).length === 4
+    && (svg.match(/class="intcc-radar-val">([^<]*)</g) || [])
          .every(m => /\d/.test(m))
     && (svg.match(/class="intcc-radar-dot"/g) || []).length === 4
-    && !/data-axis="growth"/.test(svg),
-    JSON.stringify((svg.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || [])));
+    && !/data-axis="growth" data-measured="1"/.test(svg)
+    && /data-axis="growth" data-measured="0"/.test(svg),
+    JSON.stringify((svg.match(/class="intcc-radar-val">([^<]*)</g) || [])));
   // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ────────────────────────
   // La versión anterior de 3.8 exigía `class="intcc-radar-area"` con 4 vértices,
   // es decir un POLÍGONO CERRADO sobre los ejes medidos. Con un eje sin datos, los
@@ -554,10 +557,28 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     if (!coords.length) return false;
     return coords.every(([x, y]) => x >= minX - 1 && x <= minX + w + 1 && y >= minY + 4 && y <= minY + hgt - 1);
   };
-  ok('3.13 every label of the 4-axis radar stays inside the fixed viewBox (no clipping)',
-    fitsViewBox(svg), svg.match(/viewBox="[^"]+"/)?.[0]);
-  ok('3.14 the 5-axis geometry still fits (kept intact for the future series)',
-    fitsViewBox(run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })')));
+  // ── REMATE §4 · YA NO HAY TEXTO QUE RECORTAR DENTRO DEL SVG ─────────────
+  // `fitsViewBox` medía la contención de los `<text>`. Con las etiquetas fuera,
+  // lo que hay que demostrar es lo contrario y es más fuerte: el SVG no contiene
+  // texto EN ABSOLUTO, así que ningún rótulo puede escalarse por debajo de su
+  // tamaño declarado ni salirse del marco. Y la FIGURA sí tiene que caber.
+  ok('3.13 el SVG ya no contiene texto: nada que escalar y nada que recortar',
+    !/<text/.test(svg) && /aria-hidden="true"/.test(svg)
+    && (svg.match(/class="intcc-radar-leg-item"/g) || []).length === 5,
+    svg.match(/viewBox="[^"]+"/)?.[0]);
+  ok('3.14 el marco se ciñe a la figura y la contiene entera, con cualquier serie',
+    (() => { const check = (x) => {
+        const vb = (x.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/) || []).slice(1).map(Number);
+        if (vb.length !== 4) return false;
+        const pts = [];
+        x.replace(/points="([^"]+)"/g, (_, p) => { p.trim().split(/\s+/).forEach(q => {
+          const [a, b] = q.split(',').map(Number); pts.push([a, b]); }); return ''; });
+        x.replace(/c[xy]="(-?[\d.]+)" cy="(-?[\d.]+)"/g, (_, a, b) => { pts.push([+a, +b]); return ''; });
+        return pts.length > 0 && pts.every(([px, py]) =>
+          px >= vb[0] && px <= vb[0] + vb[2] && py >= vb[1] && py <= vb[1] + vb[3]); };
+      return check(svg)
+        && check(run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })'))
+        && check(run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0, growth: 0 })')); })());
 }
 
 // ════════════════════════════════════════════════════════════════════════════

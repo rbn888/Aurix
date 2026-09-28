@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '747'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '748'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5459,6 +5459,9 @@ const T = {
     // ── CIERRE CORRECTIVO §4 · EL ALCANCE DE LA CIFRA ───────────────────────
     // Lo que el anillo mide y lo que NO: no es una nota a las decisiones, no es
     // riesgo y no es volatilidad. Va en el nombre accesible del anillo.
+    // REMATE §3 — la etiqueta VISIBLE junto al anillo. Nombra la magnitud real y
+    // nada más: es un indicador de reparto, no un diagnóstico integral.
+    intv17_health_metric: 'Reparto del peso entre posiciones',
     intv16_health_scope: 'mide cómo se reparte el peso entre tus posiciones; no es una nota a tus decisiones ni una medida de riesgo',
     intv16_health_aria: (v, scope) => `Salud ${v} %. Esta cifra ${scope}.`,
     intcc_health_suffix:  '/ 100',
@@ -5931,7 +5934,9 @@ const T = {
     // como efectivo» no es lo mismo que «disponible sin restricciones». No
     // califica suficiente ni insuficiente — eso necesitaría necesidades y
     // horizonte, y sin ellos sería una recomendación.
-    intv16_ans_liq_lead: (cash, rest) => `El ${cash} de tu cartera financiera está registrado como efectivo: es la parte cuyo valor no depende del precio de ningún activo. El ${rest} restante son posiciones que se mueven con el mercado.`,
+    intv16_ans_liq_lead: (cash) => `El ${cash} de tu cartera financiera está registrado como efectivo: es la parte cuyo valor no depende del precio de ningún activo.`,
+    intv16_ans_liq_scope: 'Ese porcentaje se mide sobre tus inversiones. Tu patrimonio inmobiliario no entra en el cálculo, así que no es el peso de tu efectivo sobre todo lo que tienes.',
+    intv16_ans_liq_coverage: (n) => `El cálculo cubre las posiciones que Aurix puede valorar; ${n === 1 ? 'una queda' : n + ' quedan'} fuera, así que el porcentaje describe la parte valorada y no el total registrado.`,
     intv16_ans_liq_limit: 'Aurix cuenta aquí lo que has registrado como efectivo. No puede saber si ese saldo está inmovilizado, comprometido o sujeto a alguna restricción, así que no equivale automáticamente a dinero disponible hoy.',
     // TOP-3. Nombres y peso CONJUNTO, agregado sin redondear. La consecuencia se
     // limita a lo demostrable: el peso dice de qué depende el VALOR, no qué
@@ -5999,11 +6004,15 @@ const T = {
     // titular fechaba la quietud con la EDAD DE LA CUENTA. Las que las sustituyen
     // nombran la comparación: cuánto se ha medido, sobre cuántos días y contra qué
     // umbral. Si esa comparación no existe, no hay frase que publicar.
-    intv16_stable_head: (d) => `Tu estructura se mantiene: en los últimos ${d} ${d === 1 ? 'día' : 'días'} Aurix ha comparado tu cartera con su pasado y no ha encontrado ningún cambio relevante.`,
-    intv16_stable_liq: (pct, thr, d) => `Tu liquidez está en el ${pct} y se ha movido menos de ${thr} puntos porcentuales en ${d} ${d === 1 ? 'día' : 'días'}.`,
-    intv16_stable_mix: (thr, d) => `El reparto entre clases de activo no se ha movido más de ${thr} puntos porcentuales en ${d} ${d === 1 ? 'día' : 'días'}.`,
+    // ── REMATE §2 · LA AFIRMACIÓN VA DE FECHA A FECHA ──────────────────────
+    // Se comparan los dos EXTREMOS de la ventana, no el camino entre ellos, así
+    // que la copy dice exactamente eso. «Se ha movido menos de 3 pp en 30 días»
+    // afirmaba una trayectoria que nadie ha medido.
+    intv16_stable_head: (a, b) => `Entre el ${a} y el ${b} tu cartera terminó donde estaba: Aurix compara los dos extremos del periodo y el cambio neto no llega a su umbral de materialidad.`,
+    intv16_stable_liq: (pct, a, b, thr) => `Tu liquidez está hoy en el ${pct}. Entre el ${a} y el ${b} su peso cambió menos de ${thr} puntos porcentuales.`,
+    intv16_stable_mix: (a, b, thr) => `Entre el ${a} y el ${b}, el reparto entre clases de activo cambió menos de ${thr} puntos porcentuales.`,
     intv16_stable_flows: 'No has registrado aportaciones ni retiradas en este periodo, así que lo que ves no viene de dinero nuevo.',
-    intv16_stable_limit_position: 'Aurix compara el reparto por clase de activo con su pasado, pero todavía no el peso de cada posición: esa parte es una lectura de hoy, no una evolución.',
+    intv16_stable_limit: 'Aurix compara los extremos del periodo, no el camino entre ellos —un movimiento que fuese y volviese no aparecería aquí—, y todavía no compara el peso de cada posición: esa parte es una lectura de hoy.',
     // El estado que faltaba: hay historial y aun así no hay NADA que comparar.
     // Dice los días —que es lo que gobierna qué comparaciones serán posibles— y
     // por qué eso todavía no basta, en una línea.
@@ -8601,6 +8610,7 @@ const T = {
     intcc_mhint_div:   'Your portfolio keeps a reasonable spread across several categories.',
     intcc_mhint_watch: 'Aurix will keep watching liquidity, concentration and diversification.',
     intcc_health_title:   'Health',
+    intv17_health_metric: 'Weight spread across positions',
     intv16_health_scope: 'measures how weight is spread across your positions; it is not a grade on your decisions nor a measure of risk',
     intv16_health_aria: (v, scope) => `Health ${v}%. This figure ${scope}.`,
     intcc_health_suffix:  '/ 100',
@@ -8892,7 +8902,9 @@ const T = {
     intv15_qc_liq_level: (pct) => `What does holding ${pct} of my wealth in cash mean?`,
     intv15_qc_changed: (d) => `What changed most in my wealth over the last ${d} days?`,
     intv15_qc_flows_vs_market: 'How much of my evolution comes from my contributions and how much from the market?',
-    intv16_ans_liq_lead: (cash, rest) => `${cash} of your financial portfolio is recorded as cash: the part whose value does not depend on any asset price. The remaining ${rest} are positions that move with the market.`,
+    intv16_ans_liq_lead: (cash) => `${cash} of your financial portfolio is recorded as cash: the part whose value does not depend on any asset price.`,
+    intv16_ans_liq_scope: 'That percentage is measured over your investments. Your property wealth is not part of the calculation, so it is not the weight of your cash over everything you own.',
+    intv16_ans_liq_coverage: (n) => `The calculation covers the positions Aurix can value; ${n === 1 ? 'one is' : n + ' are'} outside it, so the percentage describes the valued part and not the full record.`,
     intv16_ans_liq_limit: 'Aurix counts here what you have recorded as cash. It cannot know whether that balance is locked, committed or otherwise restricted, so it does not automatically mean money available today.',
     intv16_ans_top3_lead: (n, names, pct) => `Your ${n} largest positions are ${names}, and together they hold ${pct} of your financial portfolio.`,
     intv16_ans_top3_mean: 'That means your portfolio value moves mainly with them. It is a statement about WEIGHT, not about return: Aurix cannot split your result across positions, so this does not say how much each one contributed.',
@@ -8922,11 +8934,11 @@ const T = {
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
     intv4_memory_coverage: (d) => `Aurix has ${d} ${d === 1 ? 'day' : 'days'} of certified history. Longer-horizon comparisons will appear as your history grows.`,
-    intv16_stable_head: (d) => `Your structure is holding: over the last ${d} ${d === 1 ? 'day' : 'days'} Aurix compared your portfolio with its own past and found no relevant change.`,
-    intv16_stable_liq: (pct, thr, d) => `Your cash is at ${pct} and has moved less than ${thr} percentage points in ${d} ${d === 1 ? 'day' : 'days'}.`,
-    intv16_stable_mix: (thr, d) => `The split across asset classes has not moved more than ${thr} percentage points in ${d} ${d === 1 ? 'day' : 'days'}.`,
+    intv16_stable_head: (a, b) => `Between ${a} and ${b} your portfolio ended where it started: Aurix compares the two ends of the period and the net change does not reach its materiality threshold.`,
+    intv16_stable_liq: (pct, a, b, thr) => `Your cash is at ${pct} today. Between ${a} and ${b} its weight changed by less than ${thr} percentage points.`,
+    intv16_stable_mix: (a, b, thr) => `Between ${a} and ${b}, the split across asset classes changed by less than ${thr} percentage points.`,
     intv16_stable_flows: 'You have recorded no contributions or withdrawals in this period, so what you see does not come from new money.',
-    intv16_stable_limit_position: 'Aurix compares the split across asset classes with its past, but not yet the weight of each position: that part is a reading of today, not an evolution.',
+    intv16_stable_limit: 'Aurix compares the ends of the period, not the path between them —a move that went and came back would not show here— and it does not yet compare the weight of each position: that part is a reading of today.',
     intv16_no_comparison: (d) => `Aurix has been observing your portfolio for ${d} ${d === 1 ? 'day' : 'days'}, but it cannot yet compare any of its dimensions with its own past: what you see elsewhere on this screen is a reading of today, not an evolution.`,
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
@@ -64837,76 +64849,30 @@ function _intccRadarSvg(radar, dimsOverride) {
           +  ` x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}"/>`;
     edgeCount++;
   }
-  let labels = '', dots = '', halos = '';
-  // ── §6 · LA GEOMETRÍA DE LAS ETIQUETAS SE RESUELVE ANTES DE PINTAR ───────
-  // Con un radar ADAPTATIVO el número de ejes deja de ser 5, y con él se mueven
-  // los extremos de las etiquetas: cuatro ejes ponen un vértice EXACTAMENTE
-  // ABAJO (sin 90° = 1) y su cifra caía 14 unidades por debajo del viewBox fijo,
-  // o sea recortada. Lo destapó el gate de contención, no la vista.
-  // Se calcula primero la posición de cada rótulo y de ahí sale el marco, así que
-  // la contención es estructural para CUALQUIER número de ejes.
-  const labelGeom = dims.map((d, i) => {
-    // INT.2Y — the apex (top) label sits directly above the highest data point;
-    // when that axis maxes out (e.g. Diversificación 100) the numeric value used
-    // to collide with the dot. Push the apex label/value slightly higher (extra
-    // radial offset); the viewBox top padding below absorbs it. Math untouched.
-    const isApex = (i === 0);
-    const [lx, ly] = pt(i, R + (isApex ? 26 : 15));
-    const anchor = Math.abs(lx - cx) < 8 ? 'middle' : (lx > cx ? 'start' : 'end');
-    return { lx, ly, anchor };
-  });
+  // ── REMATE §4 · LAS ETIQUETAS SALEN DEL SVG ──────────────────────────────
+  // Dentro del viewBox el texto NO se pinta al tamaño que declara: se escala con
+  // la figura. Medido, 9,5 px declarados salían a 7–9,7 px reales en un teléfono
+  // —por debajo del suelo de legibilidad de 11— y no había forma de arreglarlo
+  // desde dentro: subir el tipo ensancha el texto, el texto ensancha el marco, el
+  // marco encoge la escala y el tamaño pintado se queda donde estaba. Es un punto
+  // fijo, no un ajuste pendiente. Y agrandar el SVG no es una salida: su ancho lo
+  // manda la tarjeta.
+  //
+  // Así que el texto deja de ser geometría y pasa a ser TEXTO: una leyenda HTML
+  // bajo la figura, con los cinco ejes y el valor de los certificados. Se pinta al
+  // tamaño que declara la hoja de estilos, escala con la preferencia de tipo del
+  // usuario, es seleccionable y la lee un lector de pantalla sin `aria-label`
+  // sintético. El SVG queda para lo que sabe hacer —retícula, radiales, serie— y
+  // se marca `aria-hidden`, porque su contenido ya está descrito al lado.
+  //
+  // LO QUE NO CAMBIA: cinco ejes fijos, un valor sólo donde hay evidencia, y las
+  // clases `intcc-radar-label` / `intcc-radar-val`, que siguen significando lo
+  // mismo — la etiqueta de un eje y su cifra— sólo que ahora en HTML.
+  let dots = '', halos = '';
   dims.forEach((d, i) => {
-    const { lx, ly, anchor } = labelGeom[i];
-    // §2 — EL NOMBRE SIEMPRE; LA CIFRA, SÓLO SI ESTÁ CERTIFICADA. Un eje
-    // desconocido conserva su rótulo y su radial y NO emite el segundo `<text>`:
-    // ni cifra, ni porcentaje, ni la palabra «sin datos», ni un cero. Lo que se
-    // ve es el marco con un nombre, que es exactamente lo que el dato es.
     const isMeasured = isM(i);
-    labels += `<text class="intcc-radar-label" x="${lx.toFixed(1)}" y="${(ly + 1).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
-    // `display` permite que un eje publique algo que NO es un porcentaje (la
-    // amplitud de categorías se publica como CONTEO con su taxonomía: «1,2 de 7»).
-    // El radio sigue siendo geometría normalizada; el TEXTO es el dato.
-    if (isMeasured) {
-      labels += `<text class="intcc-radar-val" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${
-        _intccEsc(d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))}</text>`;
-    }
-    // ── CINCO DIMENSIONES RECONOCIBLES, TRES VALORES ───────────────────────
-    // «Sin vértice» dejaba dos ejes sin NADA que mirar: la QA del founder no podía
-    // distinguir «Aurix no lo mide» de «aquí no hay nada». Un eje no certificado
-    // recibe ahora un marcador HUECO en el EXTREMO de su eje —lo más lejos posible
-    // de la serie, para que no pueda leerse como un valor bajo ni como un cero— y
-    // su radial va discontinua. Sigue sin entrar en el polígono, que es el
-    // invariante financiero: no participa, no puntúa y no se interpola.
-    // ── §11 · UN MARCADOR POR EJE, Y TRES ESTADOS DISTINGUIBLES ───────────
-    // Un 0 % REAL es un marcador SÓLIDO en el límite interior con su «0%» impreso.
-    // Un valor pequeño es un marcador SÓLIDO proporcional con su cifra real. Un
-    // eje SIN DATOS es un marcador HUECO en ese mismo límite interior, con sus dos
-    // segmentos discontinuos y la palabra «sin datos» debajo de su etiqueta. La
-    // posición no distingue los dos primeros del tercero —§11 fija el límite
-    // interior para ambos— y no tiene por qué: lo distinguen el relleno, el trazo
-    // y el texto, que son tres señales independientes y no una coordenada
-    // ambigua. Las radiales al centro se RETIRAN: con cinco segmentos siempre
-    // dibujados ningún marcador queda sin anclar, y una línea que sale del centro
-    // volvería a sugerir que el centro es un valor.
-    // §7 — MISMO DIÁMETRO EXTERIOR y misma alineación para los cinco. Un hueco más
-    // grande que un sólido rompía la retícula de lectura: lo que distingue al
-    // desconocido es el RELLENO (ninguno) y el contorno, no el tamaño. El halo es
-    // idéntico para ambos, así que ninguna línea atraviesa el centro de un marcador.
-    // ── SUPREME CLOSURE · §5 — UN SOLO MARCADOR, CINCO VECES ───────────────
-    // El marcador HUECO del eje sin datos era, literalmente, lo que el §5 prohíbe
-    // por su nombre: «ninguna muesca, hueco o centro negro» y «cinco puntos
-    // visualmente idénticos … misma forma, diámetro, relleno, borde, color,
-    // brillo y opacidad». Se retira el estado visual; NO se retira la verdad: el
-    // eje sigue rotulado «sin datos», sigue enumerado como tal en la descripción
-    // accesible, sigue sin puntuar y sigue sin rellenar el área. Lo que cambia es
-    // que la figura deja de ser el sitio donde se declara la limitación.
-    // `data-availability` se conserva: es el discriminador del gate y el que
-    // alimenta la descripción accesible, y no pinta nada.
     // §2 — SIN MARCADOR CUANTITATIVO PARA LO DESCONOCIDO. No hay punto, no hay
-    // halo y no hay coordenada: el eje existe, su medición no. Ésta es la
-    // diferencia con la versión que rotulaba «sin datos» (dibujaba un marcador y
-    // le ponía una palabra al lado) y con la que retiraba el eje (borraba también
-    // la estructura). El nombre se queda; el dato no se finge.
+    // halo y no hay coordenada: el eje existe, su medición no.
     if (!isMeasured) return;
     const [dx, dy] = posOf(i);
     halos += `<circle class="intcc-radar-halo"`
@@ -64916,33 +64882,14 @@ function _intccRadarSvg(radar, dimsOverride) {
          +  ` data-axis="${_intccEsc(d.key)}"`
          +  ` data-availability="measured"/>`;
   });
-  // ── §6 · EL VIEWBOX SE DERIVA DE LAS ETIQUETAS, NO DE UNA CONSTANTE ──────
-  // Era `-76 -32 362 252`, ajustado a mano a los extremos del pentágono. Correcto
-  // mientras el radar tuvo siempre cinco ejes; con el radar adaptativo el marco
-  // deja de ser una constante del producto y pasa a ser una FUNCIÓN del número de
-  // ejes. Con cuatro, el rótulo inferior cae en y = 106 + 115 = 221 y su cifra en
-  // 233: catorce unidades fuera de un marco que terminaba en 220.
-  //
-  // Las holguras son las MISMAS que el marco ajustado a mano usaba con cinco ejes
-  // (77 a la izquierda del ancla, 67 a la derecha, 12 arriba y 9 bajo la cifra),
-  // así que el encuadre aprobado se conserva y sólo se recalcula su origen. 60 a
-  // cada lado para el rótulo centrado del ápice, que es el más largo de los dos
-  // idiomas («Amplitud de categorías» / «Category breadth»).
-  // El MARCO conceptual (el polígono en R) entra también en el cálculo: con pocos
-  // ejes las etiquetas pueden quedar por dentro de él y el recorte lo sufriría la
-  // figura en vez del texto.
-  const LB_L = 77, LB_R = 67, LB_T = 12, LB_B = 9, LB_MID = 60;
-  const xs = [cx - R - 2, cx + R + 2], ys = [cy - R - 2, cy + R + 2];
-  labelGeom.forEach((g) => {
-    xs.push(g.anchor === 'end' ? g.lx - LB_L : g.anchor === 'middle' ? g.lx - LB_MID : g.lx - 4);
-    xs.push(g.anchor === 'start' ? g.lx + LB_R : g.anchor === 'middle' ? g.lx + LB_MID : g.lx + 4);
-    ys.push(g.ly - LB_T);
-    ys.push(g.ly + 12 + LB_B);                   // 12 = desplazamiento de la cifra
-  });
-  const vbX = Math.floor(Math.min.apply(null, xs));
-  const vbY = Math.floor(Math.min.apply(null, ys));
-  const vbW = Math.ceil(Math.max.apply(null, xs)) - vbX;
-  const vbH = Math.ceil(Math.max.apply(null, ys)) - vbY;
+  // ── EL VIEWBOX SE CIÑE A LA FIGURA ───────────────────────────────────────
+  // Sin texto dentro, el marco es exactamente el polígono conceptual más un
+  // margen para el trazo. Deja de depender de la copy y del idioma, que es lo que
+  // obligaba a derivarlo, y el radar ocupa TODO el ancho que la tarjeta le da en
+  // vez de reservar 144 unidades para rótulos que ya no están.
+  const PAD = 4;
+  const vbX = Math.round(cx - R - PAD), vbY = Math.round(cy - R - PAD);
+  const vbW = Math.round(2 * (R + PAD)), vbH = vbW;
   // ── §2 · LA DESCRIPCIÓN ACCESIBLE ES EL ÚNICO SITIO DONDE SE NOMBRA LA
   //         AUSENCIA, y el §2 lo autoriza expresamente («explicación accesible
   //         breve FUERA de las etiquetas») ────────────────────────────────────
@@ -64957,25 +64904,35 @@ function _intccRadarSvg(radar, dimsOverride) {
   // colgando —una afirmación vacía que un lector de pantalla pronuncia— sino el
   // NOMBRE solo, que es verdad y completo.
   const _notMeasured = _intv4T('intv16_axis_not_measured');
-  const a11y = dims.map((d) => {
-    if (measured.indexOf(d) !== -1) {
-      return d.label + ': '
-        + (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')));
-    }
-    return _notMeasured ? (d.label + ': ' + _notMeasured) : d.label;
-  }).join('. ');
+  // LA LEYENDA ES EL CANAL ACCESIBLE. Un eje certificado publica su cifra; uno
+  // sin evidencia publica su NOMBRE y, si la copy existe, por qué no hay número.
+  // No hay `aria-label` sintético que mantener en paralelo con lo que se ve: es
+  // el mismo texto para todo el mundo.
+  const legend = dims.map((d) => {
+    const isMeasured = measured.indexOf(d) !== -1;
+    const val = isMeasured
+      ? (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
+      : '';
+    return `<li class="intcc-radar-leg-item" data-axis="${_intccEsc(d.key)}"`
+      + ` data-measured="${isMeasured ? '1' : '0'}">`
+      + `<span class="intcc-radar-label">${_intccEsc(d.label)}</span>`
+      + (isMeasured
+          ? `<span class="intcc-radar-val">${_intccEsc(val)}</span>`
+          : (_notMeasured ? `<span class="intcc-radar-pending">${_intccEsc(_notMeasured)}</span>` : ''))
+      + '</li>';
+  }).join('');
   return `
-    <svg class="intcc-radar-svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" role="img" aria-label="${_intccEsc(t('intcc_radar_title') + '. ' + a11y + '.')}"
+    <svg class="intcc-radar-svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" aria-hidden="true"
          data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
          data-svg-unknown="${dims.length - measured.length}"
          data-svg-open="${closeArea ? '0' : '1'}" data-svg-edges="${edgeCount}"
          data-svg-gaps="${gapCount}" data-svg-dots="${measured.length}"
          data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}"
          data-svg-a11y-axes="${dims.length}">
-      ${/* ORDEN DE CAPAS (§7): retícula → relleno → los cinco segmentos → marcador
-            CON SU HALO → etiquetas. El halo es un disco opaco del color del lienzo
-            inmediatamente bajo el marcador: corta las conexiones justo en su borde,
-            así que ninguna línea atraviesa el centro de un marcador. */''}
+      ${/* ORDEN DE CAPAS (§7): retícula → relleno → los segmentos → marcador CON
+            SU HALO. El halo es un disco opaco del color del lienzo inmediatamente
+            bajo el marcador: corta las conexiones justo en su borde, así que
+            ninguna línea atraviesa el centro de un marcador. */''}
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
       ${/* UN SOLO GRUPO: todos los segmentos son idénticos, así que separar en dos
@@ -64983,8 +64940,9 @@ function _intccRadarSvg(radar, dimsOverride) {
       <g class="intcc-radar-edges">${edges}</g>
       <g class="intcc-radar-halos">${halos}</g>
       <g class="intcc-radar-dots">${dots}</g>
-      <g class="intcc-radar-labels">${labels}</g>
-    </svg>`;
+    </svg>
+    <ul class="intcc-radar-legend" data-legend-axes="${dims.length}"
+        data-legend-measured="${measured.length}">${legend}</ul>`;
 }
 
 // ── Main renderer ───────────────────────────────────────────────────────────
@@ -66102,8 +66060,28 @@ function _intv16AnswerLead(q, core, intel) {
     if (q.id === 'q_liquidity') {
       const l = m.liquidity;
       if (!l || l.availability !== AV || !Number.isFinite(l.cashPct)) return out;
-      out.push(_intv4T('intv16_ans_liq_lead', _aurixPctLabel(l.cashPct),
-        _aurixPctLabel(Math.max(0, 100 - l.cashPct))));
+      // ── REMATE §1 · SE DICE QUÉ ES EL 4 %, NO QUÉ ES EL 96 % ──────────────
+      // La primera versión cerraba con «el 96 % restante son posiciones que se
+      // mueven con el mercado». Tener un 4 % de efectivo no demuestra NADA sobre
+      // la naturaleza del resto: ahí puede haber un fondo sin cotización diaria,
+      // una posición que Aurix no puede valorar, o —si el perímetro fuese otro—
+      // un inmueble. Caracterizar el complemento es afirmar por diferencia, que
+      // es exactamente la clase de inferencia que este producto no hace.
+      // Se publica lo que SÍ está certificado: qué es ese saldo, sobre qué
+      // DENOMINADOR se mide, qué queda fuera de la cobertura y qué no puede
+      // afirmarse de él.
+      out.push(_intv4T('intv16_ans_liq_lead', _aurixPctLabel(l.cashPct)));
+      let snap = null;
+      try { snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null; }
+      catch (_) { snap = null; }
+      // EL DENOMINADOR, dicho sólo cuando hay algo que quede fuera de él: con
+      // patrimonio inmobiliario registrado, «tu cartera financiera» no es «todo
+      // tu patrimonio» y callarlo deja el porcentaje sin perímetro.
+      if (snap && Number(snap.realEstatePct) > 0) out.push(_intv4T('intv16_ans_liq_scope'));
+      // LA COBERTURA. Si hay posiciones que Aurix no puede valorar, el
+      // porcentaje describe la parte valorada y no el total registrado.
+      const unc = snap ? Number(snap.uncertifiablePositions || 0) : 0;
+      if (unc > 0) out.push(_intv4T('intv16_ans_liq_coverage', unc));
       out.push(_intv4T('intv16_ans_liq_limit'));
       return out.filter(Boolean);
     }
@@ -66464,6 +66442,19 @@ function _intv16StabilityByRoot(core) {
   });
   return out;
 }
+// ── REMATE §2 · DOS EXTREMOS ACREDITAN UN CAMBIO NETO, NO UN INTERVALO ─────
+// `_aurixCatExposureDelta` compara el punto de INICIO con el de FIN de la
+// ventana: `baseline`/`comparison`, dos observaciones. Eso demuestra que el peso
+// está donde estaba, NO que no se haya movido por el camino — un desplazamiento
+// que fuese y volviese dentro del intervalo daría exactamente el mismo delta.
+// Decir «se ha movido menos de 3 pp en 30 días» afirma la trayectoria; decir
+// «entre el 29 ago y el 28 sep cambió menos de 3 pp» afirma lo que se ha medido.
+// La diferencia no es de matiz: es la única forma de que el enunciado siga siendo
+// verdad si mañana se certifica la trayectoria y resulta que hubo un pico.
+function _intv16EvDates(e) {
+  if (!e || !Number.isFinite(e.startAt) || !Number.isFinite(e.endAt)) return null;
+  try { return { a: _intccDate(e.startAt), b: _intccDate(e.endAt) }; } catch (_) { return null; }
+}
 function _intv15StableRows(core, intel) {
   const out = [];
   const m = (intel && intel.model) || {};
@@ -66473,18 +66464,24 @@ function _intv15StableRows(core, intel) {
   // Nivel actual del owner canónico + la prueba de que NO se ha movido. Las dos
   // mitades son obligatorias: el nivel sin la prueba es una foto, y la prueba sin
   // el nivel no dice de qué estamos hablando.
+  // FAIL CLOSED SOBRE LAS FECHAS: sin los dos extremos no se puede acotar la
+  // afirmación, y sin acotarla no se publica. Es preferible perder la fila.
   const liqEv = byRoot[_AURIX_CAUSAL_ROOT.CASH_WEIGHT];
   const l = m.liquidity;
-  if (liqEv && l && l.availability === AV && Number.isFinite(l.cashPct)) {
+  const liqD = liqEv ? _intv16EvDates(liqEv.e) : null;
+  if (liqEv && liqD && l && l.availability === AV && Number.isFinite(l.cashPct)) {
     out.push({ code: 'liquidity', days: liqEv.days,
-      txt: _intv4T('intv16_stable_liq', _aurixPctLabel(l.cashPct),
-        _intv4Num(liqEv.e.thresholdPp, 0), liqEv.days) });
+      startAt: liqEv.e.startAt, endAt: liqEv.e.endAt,
+      txt: _intv4T('intv16_stable_liq', _aurixPctLabel(l.cashPct), liqD.a, liqD.b,
+        _intv4Num(liqEv.e.thresholdPp, 0)) });
   }
   // ── REPARTO POR CLASE DE ACTIVO ───────────────────────────────────────────
   const mixEv = byRoot[_AURIX_CAUSAL_ROOT.CATEGORY_MIX];
-  if (mixEv) {
+  const mixD = mixEv ? _intv16EvDates(mixEv.e) : null;
+  if (mixEv && mixD) {
     out.push({ code: 'category_mix', days: mixEv.days,
-      txt: _intv4T('intv16_stable_mix', _intv4Num(mixEv.e.thresholdPp, 0), mixEv.days) });
+      startAt: mixEv.e.startAt, endAt: mixEv.e.endAt,
+      txt: _intv4T('intv16_stable_mix', mixD.a, mixD.b, _intv4Num(mixEv.e.thresholdPp, 0)) });
   }
   // ── APORTACIONES ──────────────────────────────────────────────────────────
   // «No hay flujos en la ventana» es una afirmación CERTIFICADA del ledger: se ha
@@ -66496,6 +66493,20 @@ function _intv15StableRows(core, intel) {
   if (noFlows) out.push({ code: 'flows', days: null, txt: _intv4T('intv16_stable_flows') });
   return out.filter(x => !!x.txt);
 }
+// La ventana que ACOTA el titular: la de la comparación más corta, que es la que
+// limita lo que se puede afirmar del conjunto. Devuelve sus dos extremos, no una
+// duración: la afirmación va de fecha a fecha.
+function _intv16StableWindow(rows) {
+  let best = null;
+  (rows || []).forEach((r) => {
+    if (!Number.isFinite(r.days) || r.days < 1) return;
+    if (!Number.isFinite(r.startAt) || !Number.isFinite(r.endAt)) return;
+    if (!best || r.days < best.days) best = r;
+  });
+  if (!best) return null;
+  try { return { days: best.days, a: _intccDate(best.startAt), b: _intccDate(best.endAt) }; }
+  catch (_) { return null; }
+}
 // Lo que NO se ha podido comparar, dicho una vez y compacto (§5). Hoy es siempre
 // el peso por POSICIÓN: existe lector histórico por categoría, no por posición.
 function _intv16StableLimit(core, intel) {
@@ -66503,7 +66514,9 @@ function _intv16StableLimit(core, intel) {
   const AV = (typeof _AURIX_AI_AVAIL !== 'undefined') ? _AURIX_AI_AVAIL.AVAILABLE : 'available';
   const c = m.concentration;
   if (!c || c.availability !== AV || !Number.isFinite(c.topWeightPct)) return '';
-  return _intv4T('intv16_stable_limit_position') || '';
+  // Dos límites, UNA línea. Son los dos que acotan esta card y separarlos en dos
+  // párrafos convertiría la lectura en una lista de descargos.
+  return _intv4T('intv16_stable_limit') || '';
 }
 // ── LA PUERTA DEL TITULAR ───────────────────────────────────────────────────
 // TRES condiciones, y las tres son necesarias:
@@ -66523,6 +66536,8 @@ function _intv15MemoryIsStable(core) {
 // La ventana que el titular puede afirmar: el MÍNIMO de las coberturas
 // publicadas. Afirmar el máximo diría que todo se comparó durante ese plazo, y no
 // es cierto — cada dimensión tiene la suya.
+// SE CONSERVA como owner del recuento (lo consume `data-stable-days` y el gate);
+// la copy usa `_intv16StableWindow`, que además devuelve los dos extremos.
 function _intv16StableDays(rows) {
   const ds = (rows || []).map(r => r.days).filter(d => Number.isFinite(d) && d >= 1);
   return ds.length ? Math.min.apply(null, ds) : null;
@@ -66568,9 +66583,10 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
       // `days` (la edad del historial) se sigue publicando como cobertura al pie,
       // porque es lo que gobierna qué comparaciones son posibles; pero lo que el
       // titular AFIRMA se acota a `stableDays`, que es lo que se ha comparado.
-      const stableDays = _intv16StableDays(st);
+      const stableWin = _intv16StableWindow(st);
       const limitLn = _intv16StableLimit(core, intel);
-      if (st.length && stableDays) {
+      if (st.length && stableWin) {
+        const stableDays = stableWin.days;
         return `
         <section class="intcc-card intcc-timeline intv4-memory is-stable"
                  data-coverage-days="${esc(String(days))}" data-obs="${esc(String(nObs))}"
@@ -66578,7 +66594,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
                  data-stable-days="${esc(String(stableDays))}"
                  data-stable-codes="${esc(st.map(x => x.code).join(','))}">
           <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-          <p class="intv15-stable-head">${esc(_intv4T('intv16_stable_head', stableDays))}</p>
+          <p class="intv15-stable-head">${esc(_intv4T('intv16_stable_head', stableWin.a, stableWin.b))}</p>
           <ul class="intv15-stable-list">
             ${st.map(x => `<li class="intv15-stable-row" data-stable-code="${esc(x.code)}">${
               esc(x.txt)}</li>`).join('')}
@@ -69331,6 +69347,16 @@ function _renderIntelligenceCommandCenter() {
              data-health-state="${esc(score.band || '')}" data-health-conf="${esc(score.confidence || '')}">
       <div class="intcc-hero-score">
         <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
+        ${/* ── REMATE §3 · QUÉ MIDE EL 26 %, JUNTO AL ANILLO Y EN CORTO ──────
+              El nombre accesible ya lo decía y eso no basta: quien mira la cifra
+              no la oye. El founder autoriza expresamente añadir una etiqueta
+              compacta conservando «SALUD» como título de sección, así que la
+              metodología se nombra aquí —bajo el título y encima del anillo—, en
+              una línea y sin abrir un hueco nuevo debajo del estado.
+              No repite el estado («Débil») ni la frase accesible: dice la
+              MAGNITUD, que es lo que faltaba. Y no cambia la fórmula. */''}
+        ${_intv4T('intv17_health_metric') ? `<span class="intv17-health-metric">${
+          esc(_intv4T('intv17_health_metric'))}</span>` : ''}
         <div class="intcc-score-ring">
           ${_intccScoreRingHtml(score)}
           <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${score.score != null ? '%' : ''}</span></div>
@@ -69381,6 +69407,10 @@ function _renderIntelligenceCommandCenter() {
     <section class="intcc-card intcc-m-card intcc-m-health is-tone-${esc(score.tone)}"
              data-health-state="${esc(score.band || '')}">
       <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
+      ${/* §3 — la misma etiqueta en la card de móvil: una sola fuente de copy y
+            el mismo sitio relativo (bajo el título, sobre el anillo). */''}
+      ${_intv4T('intv17_health_metric') ? `<span class="intv17-health-metric">${
+        esc(_intv4T('intv17_health_metric'))}</span>` : ''}
       <div class="intcc-m-health-body">
         <div class="intcc-m-health-score">
           <div class="intcc-score-ring">

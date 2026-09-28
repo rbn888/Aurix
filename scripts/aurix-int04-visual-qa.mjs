@@ -92,7 +92,7 @@ function dict(langIdx){
     // superficie con esos textos VACÍOS y acusaba un defecto que no existe (o,
     // peor, dejaba de ver los que sí existen).
     'intv16_axis_not_measured','intv16_radar_no_evidence',
-    'intv16_health_scope','intv16_health_aria',
+    'intv16_health_scope','intv16_health_aria','intv17_health_metric',
     'intv15_drv_dependency','intv15_drv_category']
     // Se retira además el comentario de cola: `clave: 'valor',   // nota` unido
     // con `,\n` mete la coma DENTRO del comentario y parte el literal.
@@ -128,7 +128,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // CIERRE CORRECTIVO §3/§5/§6 — los owners nuevos de Explora, «Tu evolución» y «Hoy».
   '_intv15ExploreLabel','_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_intv15StableRows','_intv15MemoryIsStable','_intv16EvidenceDays','_intv16StabilityByRoot',
-  '_intv16StableLimit','_intv16StableDays',
+  '_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   '_aurixTodayEventAt','_aurixTodayIsRecentClaim',
   '_aurixIntelCtxReadPolicy',
   '_intv4ReadShown','_intv4RecordShown',

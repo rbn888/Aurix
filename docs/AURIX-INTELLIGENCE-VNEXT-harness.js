@@ -58,12 +58,14 @@ function dictOf(langIdx) {
     'intv7_pending_obs','intv7_pending_scale',
     'intv4_memory_title','intv4_memory_empty','intv4_memory_coverage',
     'intv16_stable_head','intv16_stable_liq','intv16_stable_mix','intv16_stable_flows',
-    'intv16_stable_limit_position','intv16_no_comparison',
+    'intv16_stable_limit','intv16_no_comparison',
     'intv15_qc_concentration','intv15_qc_top3','intv15_qc_liq_dir','intv15_qc_liq_level',
     'intv15_qc_changed','intv15_qc_flows_vs_market',
-    'intv16_ans_liq_lead','intv16_ans_liq_limit','intv16_ans_top3_lead','intv16_ans_top3_mean',
+    'intv16_ans_liq_lead','intv16_ans_liq_scope','intv16_ans_liq_coverage','intv16_ans_liq_limit',
+    'intv16_ans_top3_lead','intv16_ans_top3_mean',
     'intv16_ans_conc_lead','intv16_ans_conc_mean','intv16_list_and',
-    'intv16_health_scope','intv16_health_aria','intcc_chip_limit_spread','intcc_chip_ctx_intent',
+    'intv16_health_scope','intv16_health_aria','intv17_health_metric',
+    'intcc_chip_limit_spread','intcc_chip_ctx_intent',
     'intv4_q_q_concentration','intv4_q_q_liquidity','intv4_q_q_diversification',
     'intv4_q_q_what_changed','intv4_q_q_performance','intv4_q_q_current_value',
     'intv4_w_eff','intv4_w_capital','intv4_w_liqconc','intv4_discovery_title',
@@ -117,7 +119,7 @@ function makeCtx(lang) {
   ['_intccClamp','_intccEsc','_aurixPctNum','_aurixPctLabel','_intv4Num','_intv4Money',
    '_intccRadarSvg','_intv7PendingReasonKey','_intv7RadarAxes','_intv7RadarHtml',
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
-   '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
+   '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
    '_intv4MemoryHtml','_intv4WowText','_intv4DiscoveryHtml','_aurixIntelQuestions',
    '_intccIsMonetary','_intccPctLabel','_intv5DriversHtml','_intv5MattersHtml','_intv5Chips',
@@ -143,7 +145,9 @@ function makeCtx(lang) {
   sb._intv5MattersStories = () => sb.__matters;
   sb._intv4FindingRows = () => [];
   sb._intv4StoryHtml = () => '<div class="intv4-story"></div>';
-  sb._intccDate = () => '1 ene';
+  // Fecha DEPENDIENTE del instante: con un stub constante los dos extremos de la
+  // ventana salían iguales y los asserts de «de fecha a fecha» no medían nada.
+  sb._intccDate = (ts) => 'D' + Math.round(Number(ts) / 864e5);
   sb._intv4RangeLabel = () => '30 d';
   sb._aurixFactPeriodNamedAs = () => '30d';
   sb._aurixFactPeriodDegraded = () => false;
@@ -222,14 +226,32 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
           && count(h, /class="intcc-radar-edge"/g) === e; })(),
       JSON.stringify({ edges: (h.match(/data-svg-edges="[^"]*"/) || [''])[0],
         gaps: (h.match(/data-svg-gaps="[^"]*"/) || [''])[0] }));
-    ok('2.5/' + c.m + ' …y el marco no se recorta: las etiquetas caben en el viewBox',
+    // ── REMATE §4 · EL TEXTO SALE DEL SVG ────────────────────────────────
+    // Dentro del viewBox el texto se escala con la figura: 9,5 px declarados se
+    // pintaban a 7–9,7 px en un teléfono, por debajo del suelo de 11. No era un
+    // ajuste pendiente sino un punto fijo —subir el tipo ensancha el texto,
+    // ensancha el marco, encoge la escala—, así que los rótulos pasan a ser una
+    // LEYENDA HTML. Lo que se mide aquí ya no es contención de `<text>`: es que
+    // no quede texto dentro y que la leyenda enumere los cinco.
+    ok('2.5/' + c.m + ' los rótulos son HTML, no texto escalado dentro del SVG',
+      !/<text/.test(h)
+      && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(h)
+      && count(h, /class="intcc-radar-leg-item"/g) === 5
+      && count(h, /class="intcc-radar-label"/g) === 5
+      && count(h, /class="intcc-radar-val"/g) === c.m
+      && new RegExp('data-legend-measured="' + c.m + '"').test(h)
+      && ORDER.every(k => new RegExp('data-axis="' + k + '" data-measured="'
+          + (c.unav.indexOf(k) === -1 ? '1' : '0') + '"').test(h)),
+      (h.match(/class="intcc-radar-legend"[^>]*/) || [''])[0]);
+    ok('2.5b/' + c.m + ' …y la FIGURA cabe entera en su marco, que se ciñe a ella',
       (() => { const vb = (h.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/) || []).slice(1).map(Number);
         if (vb.length !== 4) return false;
         const pts = [];
-        h.replace(/<text[^>]*x="(-?[\d.]+)"[^>]*y="(-?[\d.]+)"/g, (_, x, y) => { pts.push([+x, +y]); return ''; });
-        return pts.length === 5 + c.m
-          && pts.every(([x, y]) => x >= vb[0] - 1 && x <= vb[0] + vb[2] + 1
-                                && y >= vb[1] + 4 && y <= vb[1] + vb[3] - 1); })(),
+        h.replace(/points="([^"]+)"/g, (_, p) => { p.trim().split(/\s+/).forEach(q => {
+          const [a, b] = q.split(',').map(Number); pts.push([a, b]); }); return ''; });
+        h.replace(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g, (_, a, b) => { pts.push([+a, +b]); return ''; });
+        return pts.length > 0 && pts.every(([x, y]) =>
+          x >= vb[0] && x <= vb[0] + vb[2] && y >= vb[1] && y <= vb[1] + vb[3]); })(),
       (h.match(/viewBox="[^"]+"/) || [''])[0]);
   });
   // ── EL CASO QUE MOTIVA LA REGLA DE ADYACENCIA ────────────────────────────
@@ -463,12 +485,17 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
     /class="intcc-card intcc-timeline intv4-memory is-stable"/.test(stable)
     && /data-stable="1"/.test(stable) && /class="intv15-stable-head"/.test(stable),
     stable.slice(0, 180));
-  ok('5.2 el titular dice que ha COMPARADO, y acota la ventana a lo comparado',
-    /Aurix ha comparado tu cartera con su pasado/.test(stable)
-    && /en los últimos 30 días/.test(stable)
-    && /data-stable-days="30"/.test(stable)
-    // …y NO a la edad de la cuenta, que son 41
-    && !/41 días/.test((stable.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1]),
+  // REMATE §2 — el titular va DE FECHA A FECHA y afirma el cambio NETO entre los
+  // dos extremos, no la quietud del intervalo.
+  ok('5.2 el titular acota la afirmación a los DOS EXTREMOS medidos, no al calendario',
+    (() => { const h = (stable.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1];
+      const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
+      return h.indexOf('Entre el ' + a + ' y el ' + b) === 0
+        && /compara los dos extremos del periodo/.test(h)
+        && /cambio neto/.test(h)
+        // …no afirma continuidad ni usa la edad de la cuenta (41)
+        && !/se mantiene|se ha movido|últimos \d+ días/.test(h) && !/41/.test(h)
+        && /data-stable-days="30"/.test(stable); })(),
     (stable.match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
   // ── EL DEFECTO EXACTO DE LA CAPTURA ──────────────────────────────────────
   ok('5.3 SIN comparación no se afirma estabilidad, por mucho historial que haya',
@@ -489,24 +516,53 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
         causalRoot: 'wealth_level', window: { range: '30d', endAt: T0 } }] }), INTEL({}));
       return !/is-stable/.test(h); })());
   // ── LA VENTANA NO SE INFLA ───────────────────────────────────────────────
-  ok('5.7 la ventana afirmada es el MÍNIMO de las comparaciones, no el máximo',
+  ok('5.7 la ventana afirmada es la de la comparación MÁS CORTA, no la más larga',
     (() => { const h = MEM(CORE({ ev: [EV('cash_weight', 7), EV('category_mix', 90)] }), INTEL({}));
-      return /en los últimos 7 días/.test(h) && /data-stable-days="7"/.test(h)
-        && !/en los últimos 90 días/.test(h); })(),
+      const head = (h.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1];
+      const a7 = 'D' + Math.round((NOWT - 7 * DAY) / 864e5);
+      const a90 = 'D' + Math.round((NOWT - 90 * DAY) / 864e5);
+      return head.indexOf(a7) !== -1 && head.indexOf(a90) === -1
+        && /data-stable-days="7"/.test(h); })(),
     (MEM(CORE({ ev: [EV('cash_weight', 7), EV('category_mix', 90)] }), INTEL({}))
       .match(/data-stable-days="[^"]*"/) || [''])[0]);
-  ok('5.8 el span sale de los DOS EXTREMOS, no del nombre de la ventana (cobertura parcial)',
+  ok('5.8 las fechas salen de los DOS EXTREMOS, no del nombre de la ventana (cobertura parcial)',
     (() => { const trimmed = { root: 'cash_weight', category: 'liquidity', range: '30d',
         startAt: NOWT - 9 * DAY, endAt: NOWT, deltaPp: 0.5, thresholdPp: 3 };
       const h = MEM(CORE({ ev: [trimmed] }), INTEL({}));
-      return /en los últimos 9 días/.test(h) && !/en los últimos 30 días/.test(h); })());
+      return h.indexOf('D' + Math.round((NOWT - 9 * DAY) / 864e5)) !== -1
+        && h.indexOf('D' + Math.round((NOWT - 30 * DAY) / 864e5)) === -1
+        && /data-stable-days="9"/.test(h); })());
   // ── LAS FILAS NOMBRAN LA MEDICIÓN, NO UNA CONTINUIDAD SUPUESTA ───────────
-  ok('5.9 cada fila dice CUÁNTO se ha movido y contra qué umbral',
-    /Tu liquidez está en el 7% y se ha movido menos de 3 puntos porcentuales en 30 días/.test(stable)
-    && /El reparto entre clases de activo no se ha movido más de 3 puntos porcentuales en 30 días/.test(stable),
+  ok('5.9 cada fila dice ENTRE QUÉ FECHAS cambió y contra qué umbral',
+    (() => { const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
+      return new RegExp('Tu liquidez está hoy en el 7%\\. Entre el ' + a + ' y el ' + b
+          + ' su peso cambió menos de 3 puntos porcentuales').test(stable)
+        && new RegExp('Entre el ' + a + ' y el ' + b
+          + ', el reparto entre clases de activo cambió menos de 3 puntos porcentuales').test(stable); })(),
     JSON.stringify((stable.match(/class="intv15-stable-row"[^>]*>([^<]*)</g) || []).map(x => x.slice(-60))));
-  ok('5.10 ninguna fila afirma continuidad leyendo sólo el presente',
-    !/sigue siendo|sigue concentrando|se mantiene en el/.test(stable));
+  ok('5.10 ninguna fila afirma continuidad ni trayectoria: sólo el cambio entre extremos',
+    !/sigue siendo|sigue concentrando|se mantiene|se ha movido|no se ha movido/.test(stable));
+  // ── EL CASO QUE EL §2 PIDE POR SU NOMBRE ─────────────────────────────────
+  // Dos extremos IGUALES con una desviación material por el medio producen el
+  // MISMO delta que una serie plana: el lector de derivas no puede distinguirlos.
+  // Lo que el gate exige no es detectarlo —no se puede con dos puntos— sino que
+  // la copy NO afirme lo que no ha medido.
+  ok('5.10b dos extremos iguales con un pico intermedio: la copy no afirma quietud',
+    (() => { const flat = { root: 'cash_weight', category: 'liquidity', range: '30d',
+        startAt: NOWT - 30 * DAY, endAt: NOWT, deltaPp: 0, thresholdPp: 3, endPct: 7 };
+      const h = MEM(CORE({ ev: [flat] }), INTEL({}));
+      const head = (h.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1];
+      const row = (h.match(/class="intv15-stable-row"[^>]*>([^<]*)</) || [, ''])[1];
+      return /is-stable/.test(h)
+        // ni titular ni fila dicen que NO se haya movido durante el intervalo
+        && !/se mantiene|estable|no se ha movido|se ha movido/.test(head + ' ' + row)
+        && /Entre el /.test(head) && /Entre el /.test(row)
+        // …y la limitación de trayectoria está publicada
+        && /no el camino entre ellos/.test(h)
+        && /fuese y volviese no aparecería aquí/.test(h); })(),
+    (MEM(CORE({ ev: [{ root: 'cash_weight', category: 'liquidity', range: '30d',
+      startAt: NOWT - 30 * DAY, endAt: NOWT, deltaPp: 0, thresholdPp: 3, endPct: 7 }] }), INTEL({}))
+      .match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
   ok('5.11 una dimensión sin comparación NO produce fila, aunque su nivel se conozca',
     (() => { const rows = ROWS(CORE({ ev: [EV('category_mix', 30)] }), INTEL({}));
       return rows.every(r => r.code !== 'liquidity')
@@ -516,9 +572,9 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
     (() => { const rows = ROWS(CORE({}), INTEL({ liq: null }));
       return rows.every(r => r.code !== 'liquidity'); })());
   // ── LO QUE NO SE PUEDE COMPARAR SE DICE, UNA VEZ Y COMPACTO ──────────────
-  ok('5.13 el peso por POSICIÓN se declara como límite, no como estabilidad',
-    /todavía no el peso de cada posición/.test(stable)
-    && /una lectura de hoy, no una evolución/.test(stable)
+  ok('5.13 los DOS límites —trayectoria y peso por posición— en UNA sola línea',
+    /no el camino entre ellos/.test(stable)
+    && /todavía no compara el peso de cada posición/.test(stable)
     && (stable.match(/intcc-surface-limit/g) || []).length === 1,
     (stable.match(/class="intcc-surface-limit">([^<]*)</) || [, '?'])[1]);
   ok('5.14 «no hay aportaciones» sale de un hueco CERTIFICADO, no de su ausencia',
@@ -554,10 +610,14 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
   // §37 — ES + EN.
   ok('5.20 la misma lectura existe en EN, con las MISMAS cifras',
     (() => { const en = MEM(CORE({}), INTEL({}), 'en');
+      const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
       return /is-stable/.test(en)
-        && /over the last 30 days Aurix compared your portfolio with its own past/.test(en)
-        && /Your cash is at 7% and has moved less than 3 percentage points in 30 days/.test(en)
-        && /not yet the weight of each position/.test(en); })(),
+        && new RegExp('Between ' + a + ' and ' + b + ' your portfolio ended where it started').test(en)
+        && new RegExp('Your cash is at 7% today\\. Between ' + a + ' and ' + b
+          + ' its weight changed by less than 3 percentage points').test(en)
+        && /not the path between them/.test(en)
+        && /not yet compare the weight of each position/.test(en)
+        && !/has moved|is holding|held steady/.test(en); })(),
     (MEM(CORE({}), INTEL({}), 'en').match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
   ok('5.21 …y el estado sin comparación también',
     /cannot yet compare any of its dimensions with its own past/.test(
@@ -664,7 +724,8 @@ console.log('\n§3 · Explora: cada par pregunta/respuesta es una unidad:');
   const ANS = (id, o) => { const c = makeCtx((o && o.lang) || 'es');
     c.__drivers = { items: (o && o.items !== undefined) ? o.items : TOP3, pct: 77 };
     c.buildPortfolioDrivers = () => c.__drivers;
-    c.__snap = { assetCount: 4, totUSD: 100000 };
+    c.__snap = (o && o.snap !== undefined) ? o.snap
+      : { assetCount: 4, totUSD: 100000, realEstatePct: 0, uncertifiablePositions: 0 };
     c._intv4FactText = () => (o && o.factText !== undefined) ? o.factText : 'Hecho certificado del ledger.';
     const q = { id, family: (o && o.family) || 'structure', answer: { factKeys: ['f1'] } };
     return vm.runInContext('_intv4AnswerHtml(' + JSON.stringify(q) + ', ' + JSON.stringify(CORE)
@@ -680,8 +741,35 @@ console.log('\n§3 · Explora: cada par pregunta/respuesta es una unidad:');
   const liq = ANS('q_liquidity');
   ok('3.1 liquidez: la primera frase EXPLICA el saldo, no repite la cifra del título',
     /El 4% de tu cartera financiera está registrado como efectivo/.test(liq)
-    && /El 96% restante son posiciones que se mueven con el mercado/.test(liq),
+    && /cuyo valor no depende del precio de ningún activo/.test(liq),
     (liq.match(/<p>([^<]*)</) || [, '?'])[1]);
+  // ── REMATE §1 · NO SE CARACTERIZA EL COMPLEMENTO ─────────────────────────
+  // Tener un 4 % de efectivo no demuestra la naturaleza, la negociabilidad ni la
+  // valoración del 96 % restante. Afirmarlo era una deducción por diferencia.
+  ok('3.1b …y NO dice nada del 96 % restante: eso no se deduce del 4 %',
+    !/96%/.test(liq)
+    && !/se mueven con el mercado|move with the market/.test(liq)
+    && !/restante/.test(liq),
+    liq.replace(/<[^>]*>/g, ' ').slice(0, 150));
+  ok('3.1c con inmueble registrado, el DENOMINADOR se declara',
+    (() => { const h = ANS('q_liquidity', { snap: { assetCount: 5, totUSD: 100000,
+        realEstatePct: 38, uncertifiablePositions: 0 } });
+      return /Ese porcentaje se mide sobre tus inversiones/.test(h)
+        && /Tu patrimonio inmobiliario no entra en el cálculo/.test(h); })(),
+    ANS('q_liquidity', { snap: { assetCount: 5, totUSD: 100000, realEstatePct: 38,
+      uncertifiablePositions: 0 } }).replace(/<[^>]*>/g, ' ').slice(0, 220));
+  ok('3.1d sin inmueble no se publica esa línea (§12 · anti-ruido)',
+    !/patrimonio inmobiliario/.test(liq));
+  ok('3.1e con una posición SIN VALORAR, la cobertura se declara y el % se acota',
+    (() => { const h = ANS('q_liquidity', { snap: { assetCount: 5, totUSD: 100000,
+        realEstatePct: 0, uncertifiablePositions: 2 } });
+      return /El cálculo cubre las posiciones que Aurix puede valorar/.test(h)
+        && /2 quedan fuera/.test(h)
+        && /describe la parte valorada y no el total registrado/.test(h); })(),
+    ANS('q_liquidity', { snap: { assetCount: 5, totUSD: 100000, realEstatePct: 0,
+      uncertifiablePositions: 2 } }).replace(/<[^>]*>/g, ' ').slice(0, 240));
+  ok('3.1f con cobertura completa no se publica esa línea',
+    !/El cálculo cubre las posiciones/.test(liq));
   ok('3.2 …y declara el límite: registrado como efectivo ≠ disponible hoy',
     /no equivale automáticamente a dinero disponible hoy/.test(liq)
     && /inmovilizado, comprometido o sujeto a alguna restricción/.test(liq));
@@ -798,7 +886,7 @@ console.log('\n§3 · Explora: cada par pregunta/respuesta es una unidad:');
       const t = ANS('q_diversification', { lang: 'en' });
       const c2 = ANS('q_concentration', { lang: 'en' });
       return /4% of your financial portfolio is recorded as cash/.test(l)
-        && /remaining 96%/.test(l)
+        && !/remaining 96%|move with the market/.test(l)
         && /Your 3 largest positions are Microsoft, Bitcoin and Apple/.test(t)
         && /together they hold 77%/.test(t)
         && /Microsoft holds 31% of your financial portfolio/.test(c2)
@@ -1075,6 +1163,12 @@ console.log('\n§4 · Salud y avisos: una característica aceptada no es una inc
       vm.runInContext('__T.intv16_health_scope = undefined;', c);
       const h = vm.runInContext('_intccScoreRingHtml({ score: 47 })', c);
       return /aria-hidden="true"/.test(h) && !/aria-label/.test(h); })());
+  ok('4.8b la etiqueta VISIBLE nombra la magnitud y no repite el estado ni el título',
+    (() => { const es = VAL_ES.intv17_health_metric;
+      return typeof es === 'string' && es.length > 0 && es.length <= 40
+        && /reparto|peso/i.test(es)
+        && !/salud|débil|a vigilar|estable/i.test(es); })(),
+    String(VAL_ES.intv17_health_metric));
   ok('4.9 el alcance existe en los dos idiomas (§37)',
     (() => { const en = vm.runInContext('_intccScoreRingHtml({ score: 47 })', makeCtx('en'));
       return /measures how weight is spread across your positions/.test(en)
@@ -1214,11 +1308,25 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   // viewBox lo contenga. Con el marco fijo de cinco eso vuelve a ser una
   // constante, pero la DERIVACIÓN se conserva: es lo que lo demuestra en vez de
   // confiarlo a un número escrito a mano.
-  ok('25.4 el viewBox se DERIVA de los rótulos, no es una constante escrita a mano',
-    (() => { const src = fnSrc('_intccRadarSvg');
-      return /const vbX = Math\.floor\(Math\.min\.apply\(null, xs\)\);/.test(src)
-        && /viewBox="\$\{vbX\} \$\{vbY\} \$\{vbW\} \$\{vbH\}"/.test(src)
-        && !/viewBox="-76 -32 362 252"/.test(src); })());
+  // REMATE §4 — la contención del texto deja de ser un problema de geometría:
+  // la leyenda es HTML y se pinta al tamaño que declara. Lo que se exige ahora es
+  // que ese tamaño esté POR ENCIMA del suelo de legibilidad, que es lo que el
+  // texto dentro del SVG no podía garantizar.
+  ok('25.4 los rótulos del radar se declaran por encima del suelo de 11 px',
+    (() => { const lab = css.indexOf('.intcc-radar-legend .intcc-radar-label {');
+      const val = css.indexOf('.intcc-radar-legend .intcc-radar-val {');
+      const pen = css.indexOf('.intcc-radar-pending {');
+      if (lab < 0 || val < 0 || pen < 0) return false;
+      const fs = (i) => Number((css.slice(i, css.indexOf('}', i)).match(/font-size:\s*([\d.]+)px/) || [, 0])[1]);
+      return fs(lab) >= 11 && fs(val) >= 11 && fs(pen) >= 11; })(),
+    JSON.stringify(['label', 'val', 'pending'].map((k, n) => {
+      const i = css.indexOf(n === 0 ? '.intcc-radar-legend .intcc-radar-label {'
+        : n === 1 ? '.intcc-radar-legend .intcc-radar-val {' : '.intcc-radar-pending {');
+      return k + ':' + (css.slice(i, css.indexOf('}', i)).match(/font-size:\s*[\d.]+px/) || [''])[0]; })));
+  ok('25.4b …y el SVG no conserva ningún texto que pudiera escalarse por debajo',
+    !/<text/.test(fnSrc('_intccRadarSvg'))
+    && !/intcc-radar-labels/.test(fnSrc('_intccRadarSvg'))
+    && /aria-hidden="true"/.test(fnSrc('_intccRadarSvg')));
   // ── §8 · CONTRASTE Y PROFUNDIDAD, MEDIDOS EN LA HOJA ────────────────────
   // «Menos azul oscuro sobre azul oscuro»: la lectura de estabilidad es un
   // RESULTADO y se apoya en una superficie más profunda que el panel, no en otro
@@ -1260,7 +1368,7 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   ok('25.6 el SVG escala por viewBox, así que la contención es independiente del ancho',
     /\.intcc-radar-svg \{ width: 100%; max-width: 380px; height: auto; \}/.test(css)
     && /\.intcc-radar-svg \{ max-width: 100%; \}/.test(css));
-  ok('25.7 …y con 3, 4 y 5 ejes el marco se deriva de los rótulos, en los DOS idiomas',
+  ok('25.7 …y la leyenda publica los mismos ejes en los DOS idiomas',
     (() => {
       const V = { diversification: 30, stability: 80, liquidity: 7, growth: 40, concentration: 31 };
       const cases = [[], ['growth'], ['stability', 'growth']];
@@ -1271,15 +1379,29 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
           const vals = {}; Object.keys(V).forEach(k => { if (unav.indexOf(k) === -1) vals[k] = V[k]; });
           const h = vm.runInContext('_intccRadarSvg(' + JSON.stringify(vals) + ', '
             + JSON.stringify(dims) + ')', c);
-          const vb = (h.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/) || []).slice(1).map(Number);
-          if (vb.length !== 4) return false;
-          const pts = [];
-          h.replace(/<text[^>]*x="(-?[\d.]+)"[^>]*y="(-?[\d.]+)"/g, (_, x, y) => { pts.push([+x, +y]); return ''; });
-          // El MARCO conceptual (polígono en R) tiene que caber además del texto.
-          const frame = [[10, 6], [210, 206]];
-          return pts.length > 0
-            && pts.every(([x, y]) => x >= vb[0] && x <= vb[0] + vb[2] && y >= vb[1] + 4 && y <= vb[1] + vb[3] - 1)
-            && frame.every(([x, y]) => x >= vb[0] && x <= vb[0] + vb[2] && y >= vb[1] && y <= vb[1] + vb[3]); }); }); })());
+          return count(h, /class="intcc-radar-leg-item"/g) === 5
+            && count(h, /class="intcc-radar-val"/g) === 5 - unav.length
+            && !/<text/.test(h); }); }); })());
+  ok('25.8 la leyenda cae a UNA columna en los anchos de teléfono',
+    /@media \(max-width: 420px\)[\s\S]{0,200}\.intcc-radar-legend \{ grid-template-columns: minmax\(0, 1fr\)/
+      .test(css.replace(/\s+/g, ' ')));
+  // §3 — la etiqueta de métrica es VISIBLE, compacta y no duplica el estado.
+  // Se mide la EMISIÓN, no la presencia de la cadena: con `class="…"` dentro de
+  // una rama muerta el grep seguía verde. La condición tiene que ser la copy.
+  ok('25.9 «Salud» declara su métrica junto al anillo, en una línea y sin card nueva',
+    (() => { const src = fnSrc('_renderIntelligenceCommandCenter');
+      const emits = (src.match(/_intv4T\('intv17_health_metric'\) \? `<span class="intv17-health-metric">/g) || []).length;
+      const i = css.indexOf('.intv17-health-metric {');
+      if (i < 0) return false;
+      const blk = css.slice(i, css.indexOf('}', i));
+      // DOS emisiones: el hero de escritorio y la card de móvil, que son
+      // mutuamente excluyentes por CSS y comparten la misma clave de copy.
+      return emits === 2 && /display: block/.test(blk)
+        && !/(^|[^-])height:\s*\d/.test(blk)
+        // …y va DENTRO del bloque de la cifra, no en una card nueva
+        && /intcc-hero-health-label[\s\S]{0,900}intv17-health-metric/.test(src); })(),
+    String((fnSrc('_renderIntelligenceCommandCenter')
+      .match(/_intv4T\('intv17_health_metric'\) \? `<span class="intv17-health-metric">/g) || []).length));
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -29757,3 +29757,87 @@ body.ws-cover .aurix-wsh { max-width: none; }
    siguen poniendo el peso y el color, no el tamaño. Se sube el suelo en la regla
    BASE; la de móvil deja de ser la única que lo garantiza. */
 .intcc-drv-kind { font-size: 11px; letter-spacing: 0.04em; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REMATE v787 · §3 ETIQUETA DE MÉTRICA · §4 LEYENDA DEL RADAR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* §3 · QUÉ MIDE EL ANILLO, junto a él y en una línea. Va bajo el título y sobre
+   el anillo, que es el único hueco libre de la composición aprobada: el que hay
+   debajo del estado sigue cerrado. Tipo pequeño y apagado —es una aclaración de
+   magnitud, no una conclusión— y `balance` para que si envuelve lo haga en dos
+   líneas parejas en vez de dejar una palabra suelta. */
+.intv17-health-metric {
+  display: block;
+  margin: -2px 0 8px;
+  /* 11 px es el suelo de legibilidad medido de esta pantalla, y la sonda lo
+     pilló a 10,5: un texto que explica QUÉ mide la cifra principal no puede ser
+     el más pequeño de la card. La jerarquía la pone el color, no el tamaño. */
+  font-size: 11px; line-height: 1.35; letter-spacing: 0.01em;
+  text-wrap: balance;
+  color: rgba(214,226,255,0.52);
+}
+.intcc-m-health .intv17-health-metric { margin: 2px 0 10px; }
+
+/* §4 · LA LEYENDA DEL RADAR.
+   El texto sale del SVG porque dentro se escalaba con la figura y se pintaba a
+   7–9,7 px. Aquí se pinta al tamaño que declara, respeta la preferencia de tipo
+   del usuario y es seleccionable. Dos columnas: cinco ejes caben en tres filas
+   sin estirar la tarjeta, y a 360 px siguen siendo dos columnas legibles porque
+   las etiquetas son cortas y pueden envolver. */
+/* LA FIGURA PUEDE SER MÁS PEQUEÑA AHORA QUE NO LLEVA TEXTO. Con los rótulos
+   dentro, el SVG tenía que ser grande para que la letra escalada fuese legible;
+   fuera, es geometría pura y 248 px bastan. Importa porque el marco pasó a ser
+   CUADRADO (antes reservaba 144 unidades de ancho para texto) y a todo el ancho
+   de la tarjeta la card crecía casi 100 px sin añadir información. */
+.intv7-radar .intcc-radar-svg { max-width: 248px; }
+.intcc-radar-legend {
+  /* El envoltorio del radar centra sus hijos (`place-items: center`), y eso
+     dejaba la leyenda encogida a su ancho de contenido con un margen izquierdo
+     enorme. Es una LISTA, no una figura: ocupa el ancho de la tarjeta. */
+  width: 100%; justify-self: stretch;
+  list-style: none; margin: 10px 0 0; padding: 9px 0 0;
+  border-top: 1px solid rgba(120,150,220,0.10);
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+}
+.intcc-radar-leg-item {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  min-width: 0;
+}
+/* La etiqueta cede y la cifra no: es la lección del `nowrap` que pinta fuera de
+   su caja. `min-width: 0` permite que baje de su mínimo automático. */
+.intcc-radar-legend .intcc-radar-label {
+  flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere;
+  font-size: 11.5px; line-height: 1.3; font-weight: 600;
+  color: rgba(214,226,255,0.74);
+}
+.intcc-radar-legend .intcc-radar-val {
+  flex: 0 0 auto; white-space: nowrap;
+  font-size: 12.5px; line-height: 1.3; font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: rgba(226,236,255,0.96);
+}
+/* Un eje sin evidencia: su nombre en el mismo tono y, en vez de cifra, la razón
+   —en tipo legible, no en letra pequeña de descargo—. Nunca «0», nunca «—».
+   LA RAZÓN NO VA `nowrap` Y NO VA AL LADO. Puesta como la cifra, «Aurix todavía
+   no puede medirla» se salía 92 px de su celda en escritorio: es una frase, no
+   un dato tabular, y en una rejilla de dos columnas no cabe en línea. La fila
+   del eje sin medir pasa a apilarse —nombre arriba, razón debajo— y la razón
+   envuelve. Lo detectó la sonda, no la vista: un `nowrap` pinta fuera de su caja
+   con el rectángulo intacto, que es la lección que este proyecto ya pagó. */
+.intcc-radar-leg-item[data-measured="0"] {
+  flex-direction: column; align-items: flex-start; gap: 1px;
+}
+.intcc-radar-pending {
+  flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere;
+  font-size: 11px; line-height: 1.3; font-weight: 500;
+  color: rgba(150,180,240,0.50);
+}
+.intcc-radar-leg-item[data-measured="0"] .intcc-radar-label { color: rgba(214,226,255,0.56); }
+/* En una columna por debajo de 420 px: con dos, «Aurix todavía no puede medirla»
+   junto a su etiqueta no cabe sin envolver tres veces. */
+@media (max-width: 420px) {
+  .intcc-radar-legend { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
