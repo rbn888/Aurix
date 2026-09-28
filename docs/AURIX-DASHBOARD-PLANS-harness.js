@@ -48,6 +48,11 @@ function ctx(opts) {
    '_WSBUD_INCOME','_WSBUD_EXPENSES'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
+   // §3 del cierre v789 — la tarjeta CALLA el subtítulo cuando repetiría el título
+   // (el primer guardado sugiere el nombre de la capacidad, así que es el caso por
+   // defecto, no uno raro). Su owner al sandbox: sin él el render lanza, y este
+   // harness volvió a ser el primero en decirlo.
+   '_wsSubIfDistinct',
    'calculateMonthlyBudget','calculateReceivables','calculateRealEstatePortfolio','_wsRecvStatus',
    '_wsPlanMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState',

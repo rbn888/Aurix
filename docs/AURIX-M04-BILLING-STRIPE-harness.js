@@ -862,28 +862,40 @@ console.log('\nF · precios canónicos y paywall');
   ok('F.8 el CTA del paywall abre el checkout real (ya no "te avisaremos pronto")',
     /data-premium-buy=/.test(app) && /_aurixBillingCheckout\(iv/.test(app) &&
     !/Te avisaremos pronto|We'll notify you soon/.test(app));
-  ok('F.9 el paywall promete SÓLO lo que Premium concede hoy',
-    (() => { const keys = ['pw_b_intel', 'pw_b_workspace', 'pw_b_plan', 'pw_b_future'];
-      const block = app.slice(app.indexOf("const PREM_B ="), app.indexOf("const FREE_B ="));
-      return keys.every(k => block.includes(k))
-        && !/ap_p_reports|ap_p_goals|ap_p_timeline|ap_p_risk/.test(block); })());
-  // ── Y LA OTRA MITAD, QUE NADIE MIRABA ───────────────────────────────────
-  // DEFECTO REAL (2026-09-24): la lista «Ya incluido en Free» prometía la
-  // calculadora de interés compuesto y la plantilla de portfolio inmobiliario.
-  // Las dos son Premium desde v739 y `plan_features` las declara `false` para
-  // Free, así que la pantalla de venta invitaba a usar lo que el gate deniega.
-  // El assert no repite una lista escrita a mano: CONTRASTA con `_WS_CATALOG`,
-  // que es la fuente única de qué se publica y con qué derecho.
-  ok('F.9b lo que se anuncia como GRATIS no puede ser una capacidad Premium del catálogo',
-    (() => {
-      const free = app.slice(app.indexOf("const FREE_B ="), app.indexOf("const FREE_B =") + 240);
-      // Las capacidades de Workspace publicadas, todas con featureKey ⇒ ninguna
-      // puede aparecer en la lista de Free. Se detecta por su raíz semántica.
-      const forbidden = ['compound', 'realestate', 'budget', 'journal', 'receivables',
-                         'goals', 'scenario', 'loan'];
-      return !forbidden.some(w => new RegExp('pw_fb_[a-z_]*' + w).test(free));
-    })(),
-    app.slice(app.indexOf("const FREE_B ="), app.indexOf("const FREE_B =") + 140));
+  // ── QUÉ SE COMPRA, Y QUE NADIE LO ESCRIBA A MANO ────────────────────────
+  // CONTRATO SUSTITUIDO, y por qué. F.9 exigía que las cuatro claves de la lista
+  // Premium estuvieran presentes; F.9b, que la lista Free no anunciara una
+  // capacidad de pago. Las dos protegían una COMPARATIVA de dos columnas que ya
+  // no se pinta: se retiró entera porque gastaba media pantalla —en el punto de
+  // máxima intención de compra— enumerando lo que el usuario YA tiene, y porque
+  // dos de sus frases eran falsas por construcción («las ocho capacidades» con
+  // nueve publicadas, y una promesa abierta sobre producto futuro). El contrato
+  // nuevo es más fuerte: el recuento y los NOMBRES no pueden estar escritos en
+  // el paywall, tienen que salir del catálogo.
+  ok('F.9 el recuento y los nombres de las capacidades salen del CATÁLOGO, no del paywall',
+    (() => { const b = fnSrc(app, '_valueBlocks');
+      return /_capsPub\(\)/.test(b) && /t\('pw_v2_b'\)\(caps\.length\)/.test(b)
+        // Ni una cifra ni un nombre de capacidad escritos a mano en el bloque.
+        && !/\b(ocho|nueve|diez|eight|nine|ten)\b/i.test(b)
+        && !/Presupuesto|Interés compuesto|Préstamo|Budget|Compound/i.test(b)
+        // Y sin catálogo NO se afirma un número: el bloque entero se omite.
+        && /caps\.length \? item\('pw_v2_t'/.test(b); })(),
+    'el bloque de valor tiene que derivar de _wsfcPublishedCaps()');
+  ok('F.9b la comparativa «Ya incluido en Free» se retira ENTERA: marcado, claves y estilos',
+    // Se buscan DEFINICIONES y USOS, no prosa: el comentario que explica por qué
+    // se retiró nombra las claves, y eso no es un resto.
+    !/class="aurix-premium-comparison|class="aurix-premium-compare-col|const FREE_B|const PREM_B/.test(app) &&
+    !/^\s+(pw_free_tier|pw_prem_tier|pw_fb_[a-z]+|pw_b_[a-z]+):/m.test(app) &&
+    !/t\('(pw_free_tier|pw_prem_tier|pw_fb_[a-z]+|pw_b_[a-z]+)'\)/.test(app) &&
+    !/^\s*\.aurix-premium-(comparison|compare-col|compare-tier|list)\b/m.test(css),
+    'quedan restos de la comparativa');
+  ok('F.9d y ninguna promesa abierta sobre producto futuro, en ninguno de los dos idiomas',
+    (() => { const i = app.indexOf('    pw_v_lead:'), j = app.indexOf('    pw_trust:', i);
+      const k = app.indexOf('    pw_v_lead:', j), l = app.indexOf('    pw_trust:', k);
+      const blocks = app.slice(i, j) + app.slice(k, l);
+      return i > -1 && k > i &&
+        !/a partir de ahora|pr[óo]ximamente|from now on|coming soon|whatever Aurix/i.test(blocks); })(),
+    'promesa de producto futuro en el bloque de valor');
   ok('F.9c …y el catálogo confirma que NINGUNA capacidad de Workspace es gratuita',
     (() => {
       // El catálogo lleva comentarios largos entre entradas, así que se recorta
@@ -897,7 +909,8 @@ console.log('\nF · precios canónicos y paywall');
     })(), 'publicadas que no son premium');
   ok('F.10 y las claves nuevas existen en ES y EN',
     ['pw_title', 'pw_cta', 'pw_annual', 'pw_monthly', 'pw_manage', 'pw_unavailable',
-     'pw_b_intel', 'pw_trust', 'pw_active', 'pw_pending', 'pw_cancelled']
+     'pw_v_lead', 'pw_v1_t', 'pw_v2_t', 'pw_v3_t', 'pw_v1_eg', 'pw_v2_eg', 'pw_v3_eg',
+     'pw_trust', 'pw_active', 'pw_pending', 'pw_cancelled']
       .every(k => (app.match(new RegExp('\\n\\s+' + k + ':', 'g')) || []).length === 2));
   // ── EL CLIENTE TIENE QUE SABER DISTINGUIR DOS 409 ──────────────────────
   // DEFECTO REAL (2026-09-24): el servidor devuelve 409 para «ya tienes una
@@ -960,9 +973,28 @@ console.log('\nF2 · el paywall renderizado (cinco estados)');
   // Diccionario ES REAL, recortado del bundle (no una copia escrita a mano).
   const dStart = app.indexOf('    pw_eyebrow:');
   const dEnd   = app.indexOf('    ap_eyebrow:', dStart);
+  // LAS NUEVE CAPACIDADES, DEL CATÁLOGO DEL PROPIO BUNDLE. El bloque de valor
+  // del paywall las nombra a través de `_wsfcPublishedCaps()`, así que el
+  // sandbox tiene que darle la MISMA lista que le daría el producto: ids
+  // publicados del catálogo, su `nameKey` de los mapas de render, y el nombre
+  // ES que esas claves resuelven. Nada escrito a mano.
+  const CAT0 = app.indexOf('const _WS_CATALOG');
+  const CATB = app.slice(CAT0, app.indexOf(']);', CAT0));
+  const PUBIDS = [...CATB.matchAll(/\{ id: '([a-z_]+)',[^}]*published: true,/g)].map(m => m[1]);
+  const NAMEKEY = {};
+  for (const m of ['_WS_TOOL_RENDER', '_WS_TPL_RENDER']) {
+    const i = app.indexOf('const ' + m); const blk = app.slice(i, app.indexOf('});', i));
+    for (const e of blk.matchAll(/([a-z_]+):\s*\{[^}]*nameKey:\s*'([a-z_0-9]+)'/g)) {
+      if (!NAMEKEY[e[1]]) NAMEKEY[e[1]] = e[2];
+    }
+  }
+  const CAPS = PUBIDS.map(id => ({ k: id, nameKey: NAMEKEY[id] })).filter(c => c.nameKey);
+  // Las líneas del diccionario ES de esas claves, recortadas del bundle.
+  const NAMELINES = [...new Set(CAPS.map(c => c.nameKey))]
+    .map(k => (app.match(new RegExp('\\n\\s+' + k + ":\\s*'[^']*',")) || [''])[0]).join('');
   const sb = { console: { log() {}, warn() {} }, Intl, Math, Number, JSON, Object, Array, String, Boolean, isFinite };
   vm.createContext(sb);
-  vm.runInContext('const DICT = ({' + app.slice(dStart, dEnd) + " ap_close:'Cerrar'});", sb);
+  vm.runInContext('const DICT = ({' + app.slice(dStart, dEnd) + NAMELINES + " ap_close:'Cerrar'});", sb);
   vm.runInContext(`
     let lang = 'es';
     const t = (k) => DICT[k];
@@ -976,10 +1008,11 @@ console.log('\nF2 · el paywall renderizado (cinco estados)');
     ${fnSrc(app, '_aurixBillingIsCustomer')}
     let __feat = {};
     function hasFeature(k) { return __feat[k] === true; }
-    const PREM_B = ['pw_b_intel', 'pw_b_loan', 'pw_b_plan', 'pw_b_future'];
-    const FREE_B = ['pw_fb_dash', 'pw_fb_market', 'pw_fb_compound', 'pw_fb_re', 'pw_fb_preview'];
-    const li = (keys, cls) => keys.map(k => '<li class="' + cls + '">' + esc(t(k)) + '</li>').join('');
+    const _wsfcPublishedCaps = () => (${JSON.stringify(CAPS)});
+    const _capsPub = () => { try { return _wsfcPublishedCaps(); } catch (_) { return []; } };
+    const _capName = c => { try { const v = t(c.nameKey); return (typeof v === 'string' && v) ? v : ''; } catch (_) { return ''; } };
     ${inner('_planCard')}
+    ${inner('_valueBlocks')}
     ${inner('_buildHtml')}
   `, sb);
   const run = (e) => vm.runInContext(e, sb);
@@ -1030,9 +1063,22 @@ console.log('\nF2 · el paywall renderizado (cinco estados)');
     /No hemos podido cobrar tu [úu]ltimo pago/.test(pastDue));
   ok('F2.9 ninguna de las cinco renderizaciones contiene `undefined` (claves i18n completas)',
     [empty, full, managed, pastDue].every(h => !/undefined/.test(h)));
-  ok('F2.10 y ninguna promete producto interno ni escasez',
+  // CONTRATO SUSTITUIDO. Antes prohibía las palabras «Informes» y «Objetivos»
+  // porque en su día eran inventario interno. Objetivos se PUBLICA desde el
+  // cierre de Workspace y es una de las nueve capacidades que el paywall ahora
+  // nombra desde el catálogo: la lista escrita a mano había fosilizado un
+  // momento del producto. La prohibición pasa a DERIVARSE — lo que no se publica
+  // no se puede nombrar— y así persigue al catálogo en vez de al revés.
+  const UNPUB_NAMES = [...new Set(Object.keys(NAMEKEY)
+    .filter(id => !PUBIDS.includes(id)).map(id => NAMEKEY[id])
+    .filter(k => !CAPS.some(c => c.nameKey === k)))]
+    .map(k => (app.match(new RegExp('\\n\\s+' + k + ":\\s*'([^']*)',")) || [])[1])
+    .filter(Boolean);
+  ok('F2.10 ninguna renderización promete escasez ni capacidad SIN PUBLICAR',
     [full, managed, pastDue].every(h =>
-      !/plaza|slot|quedan|remaining|Founder|Informes|Objetivos/i.test(h)));
+      !/plaza|slot|quedan|remaining|Founder/i.test(h) &&
+      !UNPUB_NAMES.some(n => h.includes(n))),
+    JSON.stringify(UNPUB_NAMES));
 }
 
 // ══ G · CONVERGENCIA Y SEPARACIÓN ═════════════════════════════════════════

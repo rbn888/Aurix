@@ -144,8 +144,15 @@ section('C — paywall: un solo sitio con precios, y ninguno inventado:');
      !/upgradeFounderBtn/.test(idx));
   ok('C.8 el CTA se deshabilita mientras viaja al proveedor (sin doble sesión de checkout)',
      /function _ctaBusy/.test(app) && /pw_opening/.test(app));
+  // CONTRATO SUSTITUIDO (cierre v789). `pw_free_tier` y `pw_prem_tier` eran los
+  // rótulos de la comparativa «Ya incluido en Free», retirada entera: gastaba
+  // media pantalla —en el punto de máxima intención de compra— enumerando lo que
+  // el usuario YA tiene. La pregunta sigue siendo la misma —«¿está la copy
+  // crítica en los DOS idiomas?»— y ahora apunta a lo que ocupa ese espacio: los
+  // tres bloques de valor con su ejemplo de uso.
   ok('C.9 copy crítica del paywall en los DOS idiomas',
-     ['pw_title', 'pw_sub', 'pw_cta', 'pw_manage', 'pw_unavailable', 'pw_free_tier', 'pw_prem_tier']
+     ['pw_title', 'pw_sub', 'pw_cta', 'pw_manage', 'pw_unavailable',
+      'pw_v_lead', 'pw_v1_t', 'pw_v2_t', 'pw_v3_t', 'pw_v1_eg', 'pw_v2_eg', 'pw_v3_eg']
        .every(k => (app.match(new RegExp('\\b' + k + ':\\s*', 'g')) || []).length === 2));
 }
 

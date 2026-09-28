@@ -77,6 +77,11 @@ const DOCS = [
   { id: 'd4', type: 'real_estate_portfolio', customName: 'Cartera Madrid', updatedAt: 200, revision: 1, inputs: { properties: [{ id: 'p1', name: 'Piso Centro', ptype: 'flat', buy: 200000, value: 250000 }] } },
   { id: 'd5', type: 'trade_journal',   customName: 'Diario cripto', updatedAt: 100, revision: 1, inputs: { currency: 'EUR', trades: [{ id: 't1', asset: 'BTC', atype: 'crypto', buy: 1, qty: 1, currency: 'EUR' }] } },
 ];
+// EL CASO POR DEFECTO, no uno raro: el primer guardado SUGIERE el nombre de la
+// capacidad, así que la tarjeta más probable del producto es justo la que decía
+// «Presupuesto mensual / Presupuesto mensual». Va aparte del fixture compartido
+// porque sólo responde a esa pregunta y los recorridos cuentan documentos.
+const DOC_SAME_NAME = { id: 'd6', type: 'monthly_budget', customName: 'Presupuesto mensual', updatedAt: 90, revision: 1, inputs: { salary: 1800, housing: 600 } };
 
 async function mount(page) {
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
@@ -168,6 +173,18 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       g.cols === (w >= 1024 ? 3 : 1), 'columnas=' + g.cols);
     ok(`${tag} nada se pinta fuera de su card y «Continuar» es táctil`,
       g.spill === false && g.taps.every(x => x >= 44), JSON.stringify({ spill: g.spill, taps: g.taps }));
+    // ── §3 · TÍTULO Y SUBTÍTULO NO PUEDEN DECIR LO MISMO ────────────────────
+    // La tarjeta publica el nombre del usuario y CALLA el subtítulo cuando
+    // repetiría; las demás, que sí aportan información, lo conservan. El nombre
+    // guardado NO se toca: lo único que se decide es si se pinta el subtítulo.
+    await seed(page, DOCS.concat([DOC_SAME_NAME])); await paint(page);
+    const gd = await read(page);
+    ok(`${tag} un nombre igual a su capacidad no se pinta dos veces`,
+      gd.n === 6 && gd.names[5] === 'Presupuesto mensual' && gd.types[5] === '' &&
+      gd.types[0] === 'Presupuesto mensual' && gd.names[0] !== gd.types[0],
+      JSON.stringify({ n: gd.n, n5: [gd.names[5], gd.types[5]], n0: [gd.names[0], gd.types[0]] }));
+    await seed(page, DOCS); await paint(page);
+    g = await read(page);
     // Se captura la SECCIÓN, no el pliegue del Dashboard: «Tus planes» vive
     // debajo de las categorías y una captura del viewport superior no la enseña.
     await page.evaluate(`document.getElementById('wsPlansSection').scrollIntoView({block:'center'})`);

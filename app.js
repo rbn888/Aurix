@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '748'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '749'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -7361,7 +7361,7 @@ const T = {
     pw_open:           'Ver Aurix Premium',
     pw_eyebrow:        'AURIX PREMIUM',
     pw_title:          'Toda la inteligencia de tu patrimonio',
-    pw_sub:            'Claridad total sobre tu patrimonio.',
+    pw_sub:            'Intelligence y Workspace completos, y tus planes guardados donde los dejaste.',
     pw_annual:         'Anual',
     pw_monthly:        'Mensual',
     pw_per_year:       'al año',
@@ -7378,15 +7378,24 @@ const T = {
     pw_past_due_note:  'No hemos podido cobrar tu último pago. Actualiza tu método de pago o cancela desde el portal.',
     pw_canceled_note:  'Tu suscripción está cancelada. Puedes revisarla o reactivarla desde el portal.',
     pw_err_already:    'Ya tienes una suscripción activa. Gestiónala desde tu plan.',
-    pw_prem_tier:      'Con Premium',
-    pw_free_tier:      'Ya incluido en Free',
-    pw_b_intel:        'Intelligence completa: radar, memoria patrimonial y qué ha cambiado',
-    pw_b_workspace:    'Workspace completo: las ocho capacidades',
-    pw_b_plan:         'Gestión de tu plan y facturación',
-    pw_b_future:       'Y lo que Aurix publique en Premium a partir de ahora',
-    pw_fb_dash:        'Dashboard y evolución de tu patrimonio',
-    pw_fb_market:      'Market con seguimiento y búsqueda',
-    pw_fb_preview:     'Vista previa de Intelligence',
+    // ── QUÉ OBTIENE EL USUARIO AL SUSCRIBIRSE ──────────────────────────────
+    // Se retiran las nueve claves de la comparativa (`pw_prem_tier`,
+    // `pw_free_tier`, `pw_b_*` y `pw_fb_*`): media pantalla gastada en explicar
+    // lo que el usuario YA tiene, y dos frases que no eran ciertas —«las ocho
+    // capacidades» cuando el catálogo publica nueve, y una promesa abierta sobre
+    // lo que Aurix publique «a partir de ahora»—. El recuento y los nombres
+    // ahora los pone el CATÁLOGO, así que ninguna frase puede volver a
+    // desincronizarse.
+    pw_v_lead:         'Qué incluye Premium',
+    pw_v1_t:           'Intelligence completa',
+    pw_v1_b:           'La lectura entera de tu patrimonio: cómo está construido, dónde se concentra y qué ha cambiado desde la última vez que miraste.',
+    pw_v1_eg:          'Por ejemplo: ver que un solo activo pesa más de la mitad de tu cartera — y desde cuándo.',
+    pw_v2_t:           'Workspace completo',
+    pw_v2_b:           (n) => `Las ${n} capacidades publicadas, para calcular, comparar y organizar:`,
+    pw_v2_eg:          'Por ejemplo: calcular la cuota de una hipoteca y ver cuánto acabas pagando en intereses.',
+    pw_v3_t:           'Tus planes y documentos',
+    pw_v3_b:           'Guarda lo que calculas con el nombre que elijas, retómalo en cualquier dispositivo y tenlo a mano en el Resumen.',
+    pw_v3_eg:          'Por ejemplo: abrir el presupuesto del mes pasado y actualizar sólo lo que ha cambiado.',
     pw_trust:          'Pago gestionado por Stripe. Aurix no almacena tu tarjeta.',
     pw_micro:          'Tu plan se activa cuando el pago se confirma, no antes.',
     pw_confirming:     'Confirmando tu pago…',
@@ -10167,7 +10176,7 @@ const T = {
     pw_open:           'See Aurix Premium',
     pw_eyebrow:        'AURIX PREMIUM',
     pw_title:          'All the intelligence of your wealth',
-    pw_sub:            'Complete clarity on your wealth.',
+    pw_sub:            'Full Intelligence and Workspace, and your saved plans right where you left them.',
     pw_annual:         'Annual',
     pw_monthly:        'Monthly',
     pw_per_year:       'per year',
@@ -10184,15 +10193,16 @@ const T = {
     pw_past_due_note:  "We couldn't take your last payment. Update your payment method or cancel from the portal.",
     pw_canceled_note:  'Your subscription is cancelled. You can review or restart it from the portal.',
     pw_err_already:    'You already have an active subscription. Manage it from your plan.',
-    pw_prem_tier:      'With Premium',
-    pw_free_tier:      'Already in Free',
-    pw_b_intel:        'Full Intelligence: radar, wealth memory and what changed',
-    pw_b_workspace:    'The whole Workspace: all eight capabilities',
-    pw_b_plan:         'Plan and billing management',
-    pw_b_future:       'And whatever Aurix ships in Premium from now on',
-    pw_fb_dash:        'Dashboard and your wealth evolution',
-    pw_fb_market:      'Market with tracking and search',
-    pw_fb_preview:     'Intelligence preview',
+    pw_v_lead:         'What Premium includes',
+    pw_v1_t:           'Full Intelligence',
+    pw_v1_b:           'The whole reading of your wealth: how it is built, where it concentrates, and what has changed since you last looked.',
+    pw_v1_eg:          'For example: seeing that a single asset is more than half your portfolio — and since when.',
+    pw_v2_t:           'The whole Workspace',
+    pw_v2_b:           (n) => `The ${n} published capabilities, to calculate, compare and organise:`,
+    pw_v2_eg:          'For example: working out a mortgage payment and how much interest you end up paying.',
+    pw_v3_t:           'Your plans and documents',
+    pw_v3_b:           'Save what you calculate under the name you choose, pick it up on any device, and keep it at hand on the Dashboard.',
+    pw_v3_eg:          'For example: opening last month’s budget and updating only what changed.',
     pw_trust:          'Payments handled by Stripe. Aurix never stores your card.',
     pw_micro:          'Your plan activates when the payment is confirmed, not before.',
     pw_confirming:     'Confirming your payment…',
@@ -23533,6 +23543,22 @@ function _wsSavedMenuOpen(anchor, ref, opts) {
 // `ref` («kind:id», la identidad que Workspace ya usa en todas partes), unos textos y un cuerpo
 // ya renderizado. Quién persiste y dónde sigue siendo del owner de cada almacén.
 //
+// ── SI EL TÍTULO Y EL SUBTÍTULO DICEN LO MISMO, EL SUBTÍTULO SOBRA ────────
+// No es un caso raro: el primer guardado SUGIERE el nombre de la capacidad, así
+// que quien acepta la sugerencia —el camino por defecto— acaba con una tarjeta
+// que dice «Presupuesto mensual / Presupuesto mensual». Se compara sin acentos,
+// sin mayúsculas y sin espacios de más, porque «Objetivos Financieros» y
+// «Objetivos financieros» son la misma repetición.
+// Lo que esto NO hace: tocar el nombre guardado. El usuario puso el que quiso y
+// nadie lo renombra por él; lo único que se decide aquí es si se PINTA el
+// subtítulo.
+function _wsSubIfDistinct(name, sub) {
+  const norm = x => String(x == null ? '' : x)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim();
+  const n = norm(name), b = norm(sub);
+  return (!b || n === b) ? '' : sub;
+}
 // El ⋯ vive DENTRO del `<summary>` para quedar en su línea, así que su manejador tiene que
 // impedir el plegado por defecto del summary — si no, abrir el menú cerraría la instancia.
 //   o = { ref, accent, icon, name, meta, kpis:[{k,v}], body, open }
@@ -23660,14 +23686,14 @@ function _renderDashboardPlans() {
     const mets = goal ? _wsGoalMetrics(p) : _wsPlanMetrics(p);
     const share = _wsPlanShareHtml(goal ? _wsGoalShare(p) : _wsPlanShare(p));
     const nm = goal ? (p.name || t('wsg_title')) : _wsLabel('workspace', p);
-    const sub = goal ? t('wsg_type_' + (p.type || 'wealth')) : t(spec.nameKey);
+    const sub = _wsSubIfDistinct(nm, goal ? t('wsg_type_' + (p.type || 'wealth')) : t(spec.nameKey));
     return `
       <article class="wspl-card" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-ws-accent="${esc(spec.accent || 'blue')}">
         <div class="wspl-card-id">
           <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
           <span class="wspl-card-txt">
             <span class="wspl-name">${esc(nm)}</span>
-            <span class="wspl-type">${esc(sub)}</span>
+            ${sub ? `<span class="wspl-type">${esc(sub)}</span>` : ''}
           </span>
           <button type="button" class="wspl-menu" data-wspl-menu="${esc(p.id)}" data-wspl-mkind="${esc(it.kind)}"
             aria-haspopup="true" aria-expanded="false"
@@ -26119,7 +26145,7 @@ function _renderGoals() {
       attrs: ' data-wsg-cardid="' + esc(g.id) + '"',
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(g.type))}</svg>`,
       name: g.name,
-      meta: t('wsg_type_' + g.type),
+      meta: _wsSubIfDistinct(g.name, t('wsg_type_' + g.type)),
       kpis: kpis,
       open: (_wsgAskDash === g.id) || !!_wsgDirty[g.id],
       cls: 'wsg-card',
@@ -63578,7 +63604,7 @@ function _aurixIntelligencePreviewHTML() {
 
     // Neutralize the Intelligence host (#tabPlaceholder) exactly like the shared
     // premium preview does, so the card sits on one clean field.
-    + '.tab-placeholder:has(.intprev-stage){background:transparent!important;padding:0!important;margin:0!important;border:none!important;box-shadow:none!important;min-height:calc(100dvh - 116px)!important;display:flex!important;align-items:stretch!important;justify-content:center!important;}'
+    + '.tab-placeholder:has(.intprev-stage){background:transparent!important;padding:0!important;margin:0!important;border:none!important;box-shadow:none!important;min-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))))!important;display:flex!important;align-items:stretch!important;justify-content:center!important;}'
     // ── §2 · CABE SIN SCROLL EN MÓVIL VERTICAL ──────────────────────────────
     // La sonda multi-viewport lo midió en vivo, en el peor caso legítimo del motor
     // (tres hechos): en 360×740 el CTA caía 111 px POR DEBAJO del pliegue, tapado
@@ -63596,7 +63622,7 @@ function _aurixIntelligencePreviewHTML() {
     // Y va en la BASE, no detrás de un `max-width`: esta superficie es mobile-first
     // por contrato —su gate lo exige y tiene razón— así que el móvil es el punto de
     // partida y el escritorio RELAJA la restricción en su `min-width:768px`.
-    + '.intprev-card{position:relative;display:flex;flex-direction:column;width:100%;max-width:620px;max-height:calc(100dvh - 116px);border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:20px 18px 18px;animation:intprevIn .22s ease-out both;}'
+    + '.intprev-card{position:relative;display:flex;flex-direction:column;width:100%;max-width:620px;max-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))));border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:20px 18px 18px;animation:intprevIn .22s ease-out both;}'
     + '.intprev-badge{display:inline-block;align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
     + '.intprev-title{flex:0 0 auto;font-size:18px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 14px;letter-spacing:-.01em;line-height:1.25;}'
     + '.intprev-facts{list-style:none;padding:0;margin:0 0 14px;display:grid;grid-auto-rows:1fr;align-content:start;gap:9px;flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
@@ -63636,7 +63662,7 @@ function _aurixIntelligencePreviewHTML() {
     + '@media (min-width:768px){.intprev-redact i{height:9px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}}'
     + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
-    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - 116px);}.intprev-cta{width:auto;min-width:240px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:clamp(32px,4vh,48px) 24px 40px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:26px;margin:0 0 12px;}.intprev-sub{font-size:15px;margin:0 0 22px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:16px 18px;min-height:74px;}.intprev-sep{margin:0 0 18px;}.intprev-bridge{font-size:11.5px;margin:0 0 8px;}.intprev-bridge-b{font-size:16px;margin:0 0 20px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}@media (min-width:1024px){.intprev-stage{min-height:auto;padding-top:clamp(32px,4vh,48px);}.intprev-card{max-width:860px;padding:44px 44px 34px;}.intprev-title{font-size:32px;}.intprev-sub{font-size:16px;max-width:74ch;}.intprev-fact-text{font-size:15.5px;}.intprev-bridge-b{font-size:17px;}.intprev-cta{min-height:54px;font-size:15.5px;}}'
+    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))));}.intprev-cta{width:auto;min-width:240px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:clamp(32px,4vh,48px) 24px 40px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:26px;margin:0 0 12px;}.intprev-sub{font-size:15px;margin:0 0 22px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:16px 18px;min-height:74px;}.intprev-sep{margin:0 0 18px;}.intprev-bridge{font-size:11.5px;margin:0 0 8px;}.intprev-bridge-b{font-size:16px;margin:0 0 20px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}@media (min-width:1024px){.intprev-stage{min-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))));padding-top:clamp(32px,4vh,48px);}.intprev-card{max-width:860px;padding:44px 44px 34px;}.intprev-title{font-size:32px;}.intprev-sub{font-size:16px;max-width:74ch;}.intprev-fact-text{font-size:15.5px;}.intprev-bridge-b{font-size:17px;}.intprev-cta{min-height:54px;font-size:15.5px;}}'
     + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 
@@ -83022,17 +83048,53 @@ try {
   // Free» listaba «Calculadora de interés compuesto» y «Plantilla de portfolio
   // inmobiliario». Las dos dejaron de ser gratuitas en el CIERRE WORKSPACE
   // PREMIUM (v739): hoy declaran `workspace.compound` y `workspace.realestate`
-  // y el plan Free NO las concede — está en `plan_features`, con `false`
-  // explícito. Es decir, la pantalla de venta invitaba a un usuario Free a usar
-  // dos capacidades que el gate le va a denegar: la misma mentira que el
-  // catálogo cerró, sólo que al revés y en el punto de máxima intención.
-  // Y por el otro lado se quedaba corta: Premium anunciaba UNA capacidad de
-  // Workspace («simulador de préstamos») cuando concede las OCHO.
-  // La comprobación no puede ser una lista escrita a mano dos veces, así que el
-  // gate de billing contrasta estas claves contra `_WS_CATALOG` (F.9b).
-  const PREM_B = ['pw_b_intel', 'pw_b_workspace', 'pw_b_plan', 'pw_b_future'];
-  const FREE_B = ['pw_fb_dash', 'pw_fb_market', 'pw_fb_preview'];
-  const li = (keys, cls) => keys.map(k => `<li class="${cls}">${esc(t(k))}</li>`).join('');
+  // y el plan Free NO las concede. La pantalla de venta invitaba a un usuario
+  // Free a usar dos capacidades que el gate le va a denegar.
+  //
+  // ── Y AHORA LA COMPARATIVA ENTERA SE RETIRA ─────────────────────────────
+  // El parche anterior corrigió las dos frases falsas pero dejó en pie la
+  // estructura que las produjo: media pantalla, en el punto de máxima intención
+  // de compra, gastada en enumerar lo que el usuario YA TIENE. Y en la columna
+  // de al lado quedaban otras dos que tampoco se sostenían: «las ocho
+  // capacidades» cuando el catálogo publica NUEVE, y «lo que Aurix publique en
+  // Premium a partir de ahora», que es una promesa abierta sobre producto que no
+  // existe. Las dos son del mismo linaje: una lista escrita a mano al lado de un
+  // catálogo que se mueve.
+  //
+  // Lo que ocupa ese espacio es QUÉ SE COMPRA, con un ejemplo de uso por bloque.
+  // El recuento y los NOMBRES de las capacidades salen de `_wsfcPublishedCaps()`
+  // —la misma fuente que la portada Free de Workspace, que a su vez lee el
+  // catálogo—, así que publicar una décima capacidad actualiza esta pantalla sin
+  // que nadie la toque. No hay ninguna cifra ni nombre escrito aquí.
+  const _capsPub = () => { try { return _wsfcPublishedCaps(); } catch (_) { return []; } };
+  const _capName = c => { try { const v = t(c.nameKey); return (typeof v === 'string' && v) ? v : ''; } catch (_) { return ''; } };
+  // Si el catálogo no se puede leer, el bloque de Workspace NO se pinta: mejor no
+  // decir nada que decir «las 0 capacidades» o un número adivinado.
+  function _valueBlocks() {
+    const caps = _capsPub().map(_capName).filter(Boolean);
+    // `body` ya viene RESUELTO, no es una clave: el bloque de Workspace necesita
+    // pasar por `t('pw_v2_b')(n)` antes de llegar aquí, y un parámetro que a
+    // veces es clave y a veces texto acaba llamando `t()` sobre una frase.
+    const item = (tk, body, egk, extra) => `
+      <article class="aurix-premium-value-item">
+        <h3 class="aurix-premium-value-t">${esc(t(tk))}</h3>
+        <p class="aurix-premium-value-b">${esc(body)}</p>
+        ${extra || ''}
+        <p class="aurix-premium-value-eg">${esc(t(egk))}</p>
+      </article>`;
+    const chips = caps.length
+      ? `<ul class="aurix-premium-caps">${caps.map(n => `<li class="aurix-premium-ind">${esc(n)}</li>`).join('')}</ul>`
+      : '';
+    return `
+      <section class="aurix-premium-value" aria-label="${esc(t('pw_v_lead'))}">
+        <h3 class="aurix-premium-value-lead">${esc(t('pw_v_lead'))}</h3>
+        <div class="aurix-premium-value-grid">
+          ${item('pw_v1_t', t('pw_v1_b'), 'pw_v1_eg')}
+          ${caps.length ? item('pw_v2_t', t('pw_v2_b')(caps.length), 'pw_v2_eg', chips) : ''}
+          ${item('pw_v3_t', t('pw_v3_b'), 'pw_v3_eg')}
+        </div>
+      </section>`;
+  }
 
   // ANUAL PRIMERO: es la decisión de producto, así que es la tarjeta destacada y
   // la primera del DOM (también en lectores de pantalla y en móvil, donde el
@@ -83105,16 +83167,7 @@ try {
 
         ${plans}
 
-        <div class="aurix-premium-comparison">
-          <div class="aurix-premium-compare-col is-premium">
-            <span class="aurix-premium-compare-tier">${esc(t('pw_prem_tier'))}</span>
-            <ul class="aurix-premium-list">${li(PREM_B, 'is-prem')}</ul>
-          </div>
-          <div class="aurix-premium-compare-col is-free">
-            <span class="aurix-premium-compare-tier">${esc(t('pw_free_tier'))}</span>
-            <ul class="aurix-premium-list">${li(FREE_B, 'is-free')}</ul>
-          </div>
-        </div>
+        ${managed ? '' : _valueBlocks()}
 
         <footer class="aurix-premium-footer">
           <p class="aurix-premium-trust-1">${esc(t('pw_trust'))}</p>
@@ -83198,17 +83251,30 @@ try {
     // M.04 — los precios son del servidor, así que la primera apertura puede
     // pintar el estado "todavía no disponible" y repintarse al llegar el
     // catálogo. Nunca al revés: no hay importe por defecto en el bundle.
+    const _focusClose = () => {
+      const b = _el && _el.querySelector('.aurix-premium-close');
+      if (b) { try { b.focus(); } catch (_) {} }
+    };
     try {
       if (typeof _aurixBillingPricesLoad === 'function') {
-        _aurixBillingPricesLoad().then(() => { if (_open && _el) _el.innerHTML = _buildHtml(); });
+        _aurixBillingPricesLoad().then(() => {
+          if (!_open || !_el) return;
+          // Sólo se devuelve el foco si estaba DENTRO del diálogo (o lo acaba de
+          // perder al destruirse su nodo): si el usuario ya se había movido a
+          // otro sitio, robárselo sería peor que el defecto.
+          const inside = _el.contains(document.activeElement) ||
+                         document.activeElement === document.body ||
+                         document.activeElement === null;
+          _el.innerHTML = _buildHtml();
+          if (inside) _focusClose();
+        });
       }
     } catch (_) {}
     _el.style.display = 'flex';
     requestAnimationFrame(() => _el.classList.add('is-open'));
     document.body.classList.add('aurix-premium-lock');
     _open = true;
-    const closeBtn = _el.querySelector('.aurix-premium-close');
-    if (closeBtn) closeBtn.focus();
+    _focusClose();
   }
 
   function closeAurixPremiumModal() {

@@ -299,7 +299,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   // antes del arreglo: inicio del contenido 46 vs 58 px (390), margen lateral
   // 32 vs 12 (768) y 112 vs 170 (1440), ancho 1216 vs 1100.
   // Se compara coordenada a coordenada, en las dos pestañas, mismo viewport.
-  for (const [w, h] of [[360, 740], [390, 844], [768, 1024], [1440, 900]]) {
+  // LOS SEIS ANCHOS ACORDADOS, no cuatro. Faltaban 375 —el iPhone más vendido— y
+  // 1024, que es justo donde `.intprev-card` y `.wsfc-panel` cambian de columna:
+  // el punto donde una diferencia de geometría es MÁS probable, y el único que no
+  // se estaba mirando.
+  for (const [w, h] of [[360, 740], [375, 812], [390, 844], [768, 1024], [1024, 768], [1440, 900]]) {
     const ctx = await newCtx(browser, { viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce' });
     const page = await ctx.newPage();
     await mount(page, 'es');
@@ -313,13 +317,19 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         // comparar el contenedor de una con la tarjeta de la otra daba números
         // que no se parecían a lo que se ve.
         var host = document.querySelector('#aurixWorkspace .wsfc-panel, #tabPlaceholder .intprev-card');
+        // EL CONTENEDOR EXTERIOR, que es el que el encargo manda igualar en ancho
+        // Y EN ALTURA. El panel de dentro lo dimensiona su contenido —igualarlo
+        // exigiría un hueco artificial, que está prohibido—, pero el escenario que
+        // lo aloja es la misma pieza en las dos portadas y sí tiene que medir lo
+        // mismo: es lo que hace que al cambiar de pestaña nada salte.
+        var stage = document.querySelector('#aurixWorkspace .wsfc-stage, #tabPlaceholder .intprev-stage');
         var cta  = document.querySelector('#aurixWorkspace .wsfc-cta, #tabPlaceholder .intprev-cta');
         // NINGUNA de las dos puede nombrar el plan: el precio y el plan viven en
         // el paywall. Se busca el nombre, no una clase concreta.
         var surf = document.querySelector('#aurixWorkspace .wsfc-panel, #tabPlaceholder .intprev-card');
         var names = surf ? /premium|incluido|included/i.test(surf.textContent || '') : false;
         var ctaCs = cta ? getComputedStyle(cta) : null;
-        return JSON.stringify({ menu: R(document.getElementById('menuToggle')), host: R(host),
+        return JSON.stringify({ menu: R(document.getElementById('menuToggle')), host: R(host), stage: R(stage),
           radius: ctaCs ? ctaCs.borderRadius : null, minH: ctaCs ? ctaCs.minHeight : null,
           bg: ctaCs ? ctaCs.backgroundImage.slice(0, 60) : null,
           names: names, docH: document.documentElement.scrollHeight, vh: window.innerHeight });})()`).then(JSON.parse);
@@ -340,6 +350,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} · mismos márgenes laterales y mismo ancho de columna`,
       Math.abs(I.host.l - W.host.l) <= 1 && Math.abs(I.host.w - W.host.w) <= 1,
       JSON.stringify({ int: [I.host.l, I.host.w], ws: [W.host.l, W.host.w] }));
+    ok(`${tag} · el CONTENEDOR EXTERIOR mide lo mismo: ancho, alto y origen`,
+      I.stage && W.stage &&
+      Math.abs(I.stage.w - W.stage.w) <= 1 && Math.abs(I.stage.h - W.stage.h) <= 1 &&
+      Math.abs(I.stage.l - W.stage.l) <= 1 && Math.abs(I.stage.t - W.stage.t) <= 1,
+      JSON.stringify({ int: I.stage, ws: W.stage }));
     ok(`${tag} · el CTA es el MISMO componente (radio, alto y familia de color)`,
       I.radius === W.radius && I.minH === W.minH &&
       /gradient/.test(String(I.bg)) && I.bg === W.bg,

@@ -24717,19 +24717,49 @@ body.aurix-skeleton #totalValue::after {
 .aurix-premium-tagline{ margin:0 0 8px; font-size:24px; font-weight:800; line-height:1.2; color:#fff; }
 .aurix-premium-lede{ margin:0; font-size:13.5px; line-height:1.55; color:#9aa7bd; }
 
-.aurix-premium-comparison{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:22px; }
-.aurix-premium-compare-col{
-  border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:16px 16px 14px;
-  background:rgba(255,255,255,.02);
+/* ── QUÉ INCLUYE PREMIUM ────────────────────────────────────────────────────
+   Sustituye a la comparativa de dos columnas (`.aurix-premium-comparison` y su
+   familia `.aurix-premium-compare-*` / `.aurix-premium-list`, retiradas enteras).
+   Aquella gastaba media pantalla en enumerar lo que el usuario YA tiene, justo
+   donde está decidiendo pagar. Aquí van TRES bloques de valor, cada uno con su
+   ejemplo de uso, y el de Workspace con los nombres reales de las capacidades
+   que publica el catálogo.
+
+   Celdas MÁS OSCURAS que el modal, no más claras: es la misma regla que cerró la
+   portada Free de Workspace —una celda que se levanta sobre su panel se lee como
+   un botón—, y aquí el único elemento accionable tiene que seguir siendo el CTA
+   de compra, que está justo encima. Nada de alfa BLANCO (DASHBOARD EXCELLENCE):
+   el relieve lo pone el azul de acento. */
+.aurix-premium-value{ margin-bottom:20px; }
+.aurix-premium-value-lead{
+  margin:0 0 10px; font-size:11.5px; font-weight:900; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--accent,#4d8dff);
 }
-.aurix-premium-compare-col.is-premium{ border-color:rgba(77,141,255,.34); background:rgba(77,141,255,.05); }
-.aurix-premium-compare-tier{ display:block; font-size:12px; font-weight:800; letter-spacing:.06em; color:#cdd6e6; }
-.aurix-premium-compare-q{ display:block; margin:2px 0 12px; font-size:13.5px; font-weight:700; color:#fff; }
-.aurix-premium-compare-col.is-premium .aurix-premium-compare-q{ color:var(--accent,#4d8dff); }
-.aurix-premium-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
-.aurix-premium-list li{ position:relative; padding-left:20px; font-size:12.5px; color:#aeb9cc; line-height:1.35; }
-.aurix-premium-list li::before{ content:"✓"; position:absolute; left:0; top:0; font-weight:800; color:#5f7088; }
-.aurix-premium-list li.is-prem::before{ color:var(--accent,#4d8dff); }
+/* LA COLUMNA DEL MEDIO ES MÁS ANCHA PORQUE TIENE MÁS QUE DECIR, y `align-items`
+   NO estira: con tres columnas iguales y estiradas, los nueve nombres de
+   Workspace caían de uno en uno y las otras dos tarjetas se quedaban con ~250 px
+   de vacío al pie. Eso es exactamente lo que el encargo prohíbe —igualar
+   columnas y dejar altura muerta—, así que la rejilla se reparte por CONTENIDO y
+   cada tarjeta mide lo que ocupa. */
+.aurix-premium-value-grid{ display:grid; grid-template-columns:1fr 1.45fr 1fr; gap:12px; align-items:start; }
+.aurix-premium-value-item{
+  display:flex; flex-direction:column; min-width:0;
+  border:1px solid rgba(77,141,255,.22); border-radius:14px; padding:14px 15px 13px;
+  background:linear-gradient(165deg, rgba(77,141,255,.055), rgba(6,10,20,.34));
+}
+.aurix-premium-value-t{ margin:0 0 6px; font-size:14px; font-weight:800; color:#fff; line-height:1.25; }
+.aurix-premium-value-b{ margin:0 0 9px; font-size:12.5px; line-height:1.45; color:#c2ccdd; }
+/* El ejemplo se separa con una regla tenue porque es OTRA VOZ —«así se usa»— y no
+   la continuación del párrafo. `margin:auto 0 0` sólo actúa si la tarjeta llegara
+   a estirarse; con `align-items:start` cada una mide su contenido y no hay hueco
+   que empujar, que es justamente lo que se buscaba. */
+.aurix-premium-value-eg{
+  margin:auto 0 0; padding-top:9px; border-top:1px solid rgba(77,141,255,.16);
+  font-size:11.5px; line-height:1.45; color:#9fadc4;
+}
+/* Los NOMBRES de las capacidades, con la píldora que este modal ya usaba. */
+.aurix-premium-caps{ list-style:none; margin:0 0 10px; padding:0; display:flex; flex-wrap:wrap; gap:5px; }
+.aurix-premium-caps .aurix-premium-ind{ font-size:10px; padding:3px 8px; letter-spacing:.02em; }
 
 .aurix-premium-plans{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .aurix-premium-plan{ border:1px solid rgba(255,255,255,.1); border-radius:16px; padding:18px; display:flex; flex-direction:column; }
@@ -24767,7 +24797,7 @@ body.aurix-skeleton #totalValue::after {
 
 .aurix-premium-footer{ margin-top:18px; text-align:center; }
 .aurix-premium-footer p{ margin:0; font-size:12px; color:#8a96aa; line-height:1.5; }
-.aurix-premium-microcopy{ margin-top:4px !important; font-size:11px !important; color:#6b7689 !important; }
+.aurix-premium-microcopy{ margin-top:4px !important; font-size:11px !important; color:#78839a !important; }
 
 body.aurix-premium-lock{ overflow:hidden; }
 
@@ -24775,7 +24805,7 @@ body.aurix-premium-lock{ overflow:hidden; }
 @media (max-width:720px){
   .aurix-premium-overlay{ padding:0; align-items:stretch; }
   .aurix-premium-modal{ width:100%; max-height:100vh; border-radius:0; padding:54px 18px 24px; }
-  .aurix-premium-comparison{ grid-template-columns:1fr; gap:10px; }
+  .aurix-premium-value-grid{ grid-template-columns:1fr; gap:10px; }
   .aurix-premium-plans{ grid-template-columns:1fr; }
   .aurix-premium-tagline{ font-size:21px; }
   .aurix-premium-close{ top:12px; right:12px; }
@@ -24791,18 +24821,6 @@ body.aurix-premium-lock{ overflow:hidden; }
    Hierarchy: Premium > Founder > Free. Later rules override the base block. */
 .aurix-premium-tagline{ font-size:28px; line-height:1.15; letter-spacing:-.01em; }
 .aurix-premium-sub{ margin:0 0 8px; font-size:15px; font-weight:700; color:var(--accent,#4d8dff); }
-
-/* Two-column feature lists (less empty space, more institutional). */
-.aurix-premium-list.is-2col{ display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; }
-
-/* Free de-emphasized; Premium comparison card dominant. */
-.aurix-premium-compare-col.is-free{ opacity:.9; background:rgba(255,255,255,.015); }
-.aurix-premium-compare-col.is-free .aurix-premium-compare-tier{ color:#9aa7bd; }
-.aurix-premium-compare-col.is-premium{
-  border-color:rgba(77,141,255,.42);
-  background:linear-gradient(165deg, rgba(77,141,255,.09), rgba(77,141,255,.03));
-  box-shadow:0 0 34px rgba(77,141,255,.1), inset 0 1px 0 rgba(255,255,255,.05);
-}
 
 /* Premium intelligence positioning band (above the Premium list). */
 .aurix-premium-pos{ margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid rgba(77,141,255,.18); }
@@ -24860,7 +24878,6 @@ body.aurix-premium-lock{ overflow:hidden; }
 .aurix-premium-cta[disabled]{ opacity:.62; cursor:default; }
 
 @media (max-width:720px){
-  .aurix-premium-list.is-2col{ grid-template-columns:1fr; }
   .aurix-premium-tagline{ font-size:23px; }
 }
 
@@ -24871,7 +24888,7 @@ body.aurix-premium-lock{ overflow:hidden; }
 /* PART 9 — tighter density (less dead space, less scroll). */
 .aurix-premium-modal{ padding:22px 26px 20px; }
 .aurix-premium-header{ margin-bottom:16px; }
-.aurix-premium-comparison{ margin-bottom:14px; }
+.aurix-premium-value{ margin-bottom:14px; }
 .aurix-premium-plans{ gap:12px; }
 .aurix-premium-footer{ margin-top:14px; }
 
@@ -24899,38 +24916,20 @@ body.aurix-premium-lock{ overflow:hidden; }
   color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d);
 }
 
-/* PART 4 — de-emphasize Free so the two blue Premium blocks read as one family. */
-.aurix-premium-compare-col.is-free{ opacity:.82; }
-
 /* ══════════════════════════════════════════════════════════════
    WN.P2 — Premium modal layout lock (titles, Free polish, compact)
    Comparison titles top-aligned & equally deliberate; Free reads premium;
    Premium positioning moved to card bottom; Founder seat compact; tighter
    density. Hierarchy Premium > Founder > Free preserved. Later rules win.
 ══════════════════════════════════════════════════════════════ */
-/* PART 2 — comparison card titles: top, aligned, premium, breathing room. */
-.aurix-premium-compare-col{ padding:16px 16px 14px; }
-.aurix-premium-compare-tier{ display:block; font-size:15px; font-weight:800; letter-spacing:.01em; color:#e7ecf5; }
-.aurix-premium-card-desc{ margin:5px 0 15px; font-size:12px; line-height:1.4; color:#9fb4d8; }
-
-/* PART 3 — Aurix Free looks premium (silver-blue), not crippled. */
-.aurix-premium-compare-col.is-free{ opacity:1; background:rgba(255,255,255,.025); }
-.aurix-premium-compare-col.is-free .aurix-premium-compare-tier{ color:#cdd9ec; }
-.aurix-premium-compare-col.is-free .aurix-premium-card-desc{ color:#93a2bb; }
-/* Premium card title/descriptor (blue family). */
-.aurix-premium-compare-col.is-premium .aurix-premium-compare-tier{ color:#fff; }
-.aurix-premium-compare-col.is-premium .aurix-premium-card-desc{ color:#bcd0ff; }
-
-/* PART 4 — positioning copy at the BOTTOM of the Premium card, muted/small. */
-.aurix-premium-pos-foot{ margin:13px 0 0; padding-top:10px; border-top:1px solid rgba(77,141,255,.16); font-size:11px; line-height:1.45; color:#8a96aa; }
-
-/* PART 5 — balanced two-column lists, tighter rhythm, -1px feature size. */
-.aurix-premium-list.is-2col{ gap:6px 14px; }
-.aurix-premium-list li{ font-size:11.5px; line-height:1.3; }
+/* PARTES 2–5 · RETIRADAS CON SU ESTRUCTURA. Vestían la comparativa de dos
+   columnas (`.aurix-premium-compare-*`, `.aurix-premium-card-desc`,
+   `.aurix-premium-list`, `.aurix-premium-pos-foot`). Ese bloque ya no se pinta:
+   su espacio lo ocupa `.aurix-premium-value`, arriba en esta misma hoja. */
 
 /* PART 6 — compact modal (less hero padding, smaller gaps, card padding). */
 .aurix-premium-header{ margin-bottom:12px; }
-.aurix-premium-comparison{ margin-bottom:11px; }
+.aurix-premium-value{ margin-bottom:11px; }
 .aurix-premium-plans{ gap:11px; }
 .aurix-premium-plan{ padding:16px; }
 .aurix-premium-standard{ padding:18px; }
@@ -27675,12 +27674,24 @@ button.intv14-cmp-clear {
    Lo que aquí NO se usa, y está prohibido: `overflow:hidden` para esconder lo que
    no cabe, rejillas encogibles, `transform:scale`, tipografías diminutas y un CTA
    superpuesto a las capacidades. */
+/* ── EL CROMO DE LAS DOS PORTADAS FREE, UN SOLO OWNER ──────────────────────
+   DEFECTO MEDIDO (§6, seis viewports, los dos motores): el contenedor exterior
+   de las dos portadas NO medía lo mismo. Intelligence descontaba 116 px y
+   Workspace 118 px + área segura, así que el escenario difería en 2 px en todo
+   el rango móvil y tablet; y en ≥1024 Workspace descontaba 68 px mientras
+   Intelligence se quedaba con los 116, o sea 48 px de diferencia — la portada de
+   pago saltaba medio dedo al cambiar de pestaña.
+   Tres números mágicos para UNA misma cosa. Ahora es una sola declaración, y las
+   reglas de `.intprev-*` —que viven en la hoja inyectada por app.js— la consumen
+   por variable, que es cómo se comparte armazón entre dos hojas sin duplicarlo. */
+:root { --aurix-cover-chrome: calc(118px + env(safe-area-inset-bottom, 0px)); }
 .wsfc { display: block; }
 .wsfc-stage {
   /* `--aurix-ws-chrome` declara lo que ocupan cabecera + navegación inferior +
      áreas seguras. Un número mágico repetido en tres sitios fue antes la causa de
-     que el CTA quedara tapado en un solo viewport. */
-  --aurix-ws-chrome: calc(118px + env(safe-area-inset-bottom, 0px));
+     que el CTA quedara tapado en un solo viewport. Hoy ese owner es compartido
+     con la portada de Intelligence (`--aurix-cover-chrome`). */
+  --aurix-ws-chrome: var(--aurix-cover-chrome);
   min-height: calc(100dvh - var(--aurix-ws-chrome));
   max-height: calc(100dvh - var(--aurix-ws-chrome));
   overflow: auto;                      /* zoom / texto ampliado: scroll accesible */
@@ -27848,7 +27859,9 @@ button.intv14-cmp-clear {
    centra, que es lo que evita el panel diminuto flotando en un vacío negro. */
 @media (min-width: 1024px) {
   .wsfc-stage {
-    min-height: calc(100dvh - 68px); max-height: none; overflow: visible;
+    /* 68 px era un CUARTO número para el mismo cromo, y el que producía los 48 px
+       de diferencia contra Intelligence en ≥1024. Se unifica. */
+    min-height: calc(100dvh - var(--aurix-cover-chrome)); max-height: none; overflow: visible;
     padding: clamp(24px, 4vh, 40px) 24px;
   }
   /* 860 px, el MISMO ancho que `.intprev-card`, que es la referencia declarada

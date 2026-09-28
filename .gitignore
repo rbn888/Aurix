@@ -23,6 +23,9 @@ docs/wsfc-premium-cover/
 docs/ws-firstscreen/
 # Y las de «Tus planes» en el Dashboard.
 docs/ws-dashboard-plans/
+# Y las del paywall (`scripts/aurix-paywall-probe.mjs`): 6 anchos × 2 idiomas ×
+# 2 motores, antes y después. La evidencia que se commitea es el checklist.
+docs/paywall/
 # Y las de la mudanza del comparador a Workspace.
 docs/comparator-move/
 # Y las del onboarding en el móvil (4 pasos × 2 viewports × 2 motores).
