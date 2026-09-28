@@ -78,6 +78,9 @@ function extractDict(langIdx) {
     // enlace VACÍO, que es peor que no tenerlo.
     'intel_see_changes','intel_now_novelty','intel_sub_review','intel_now_reviewed','intel_sub_reviewed','intel_now_no_news','intel_sub_no_news','intel_ack_done','intel_ack','intel_ack_aria',
     'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
+    // CIERRE CORRECTIVO §2 — la única cadena que nombra la ausencia, y vive en la
+    // descripción accesible, nunca en una etiqueta de la figura.
+    'intv16_axis_not_measured','intv16_radar_no_evidence',
     // M.03 C — el disclosure del radar es POR EJE y con su causa, así que el gate
     // necesita las cuatro cadenas reales: sin ellas el renderer produce texto vacío
     // y 13B.9 dejaría de ver los nombres.
@@ -135,8 +138,8 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -168,6 +171,10 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
+  // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
+  // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
+  '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -464,16 +471,20 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
       // el texto sale de `display` o de `radar[key]+suffix`, nunca de `rOf`
       return /d\.display != null \? String\(d\.display\) : \(radar\[d\.key\] \+ \(d\.suffix \|\| ''\)\)/.test(src)
         && !/rOf\([^)]*\)[^;]*radar-val/.test(src); })());
-  // VNEXT §6 — se dibujan LAS CERTIFICADAS, ni una más ni una menos, y el conteo
-  // sale del mismo `data-measured` que publica el motor: radar y contrato no
-  // pueden desmentirse.
-  ok('5.4 se dibuja un eje y una etiqueta por dimensión CERTIFICADA',
+  // CIERRE CORRECTIVO §2 — el MARCO es fijo (cinco ejes, cinco nombres) y los
+  // MARCADORES son los certificados. Las dos cosas se miden por separado porque
+  // son cosas distintas: confundirlas es lo que hizo fallar las dos versiones
+  // anteriores, en direcciones opuestas.
+  ok('5.4 cinco ejes y cinco nombres SIEMPRE, y un marcador por dimensión certificada',
     (() => { const m = Number(num(h, /data-measured="(\d+)"/));
-      return m >= 3
-        && count(h, /class="intcc-radar-axis[" ]/g) === m
-        && count(h, /class="intcc-radar-label[" ]/g) === m; })(),
+      return m >= 1
+        && count(h, /class="intcc-radar-axis[" ]/g) === 5
+        && count(h, /class="intcc-radar-label[" ]/g) === 5
+        && count(h, /class="intcc-radar-dot"/g) === m
+        && count(h, /class="intcc-radar-val[" ]/g) === m; })(),
     JSON.stringify({ measured: num(h, /data-measured="(\d+)"/),
-      axes: count(h, /class="intcc-radar-axis[" ]/g), labels: count(h, /class="intcc-radar-label[" ]/g) }));
+      axes: count(h, /class="intcc-radar-axis[" ]/g), labels: count(h, /class="intcc-radar-label[" ]/g),
+      dots: count(h, /class="intcc-radar-dot"/g) }));
   ok('5.5 y la disponibilidad de ejes sale de UNA sola autoridad (misma para escritorio y móvil)',
     // Se cuentan LLAMADAS, no la declaración: dos autoridades de disponibilidad
     // serían dos radares que pueden desmentirse entre breakpoints.
@@ -910,56 +921,59 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   // ── RADAR · CINCO MARCADORES, TRES VALORES ──────────────────────────────
   const rr = render(APPLE).html;
   const svg = (re) => (rr.match(re) || [, null])[1];
-  // ── VNEXT §6 · EL RADAR ADAPTATIVO, MEDIDO SOBRE LA PINTURA REAL ─────────
-  // 10.19–10.23 exigían «cinco ejes, cinco etiquetas, dos desconocidos y la
-  // palabra sin datos dos veces en el aria-label». Era el contrato del pentágono
-  // permanente, y el §6 lo re-decide: el radar dibuja lo que puede certificar.
-  // Lo que se conserva —y es lo que de verdad protegía este bloque— es que el
-  // motor y la figura publiquen el MISMO recuento, y que lo no medible siga
-  // declarado en el nodo para la trazabilidad del §3.
-  ok('10.19 la figura y el contrato publican el MISMO número de ejes',
+  // ── CIERRE CORRECTIVO §2 · MARCO FIJO, EVIDENCIA VARIABLE ───────────────
+  // Tercera redacción de este bloque. Deja de medir «cuántos ejes hay» —que es
+  // una CONSTANTE del producto y por tanto no es lo que puede romperse— y mide
+  // las dos propiedades que sí dependen del código: que la evidencia dibujada
+  // coincida exactamente con la certificada, y que un hueco INTERRUMPA la
+  // trayectoria en vez de saltársela.
+  ok('10.19 el marco publica sus cinco ejes y la serie sólo lo certificado',
     (() => { const m = Number(svg(/data-svg-measured="(\d+)"/));
-      return svg(/data-svg-axes="(\d+)"/) === String(m)
+      return svg(/data-svg-axes="(\d+)"/) === '5'
         && Number(num(rr, /data-measured="(\d+)"/)) === m
-        && count(rr, /class="intcc-radar-label[ "]/g) === m
+        && count(rr, /class="intcc-radar-label[ "]/g) === 5
         && count(rr, /class="intcc-radar-dot"/g) === m
-        && m >= 3; })(),
+        && m >= 1 && m <= 5; })(),
     JSON.stringify({ axes: svg(/data-svg-axes="(\d+)"/),
       labels: count(rr, /class="intcc-radar-label[ "]/g),
       dots: count(rr, /class="intcc-radar-dot"/g) }));
-  ok('10.20 cero desconocidos en la serie, y el área CIERRA sobre los certificados',
+  ok('10.20 los segmentos unen sólo vecinos certificados y el área exige los cinco',
     (() => { const measured = Number(svg(/data-svg-measured="(\d+)"/));
-      const unknown = Number(svg(/data-svg-unknown="(\d+)"/));
-      const pts = (rr.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim();
-      return measured >= 3 && unknown === 0
-        && svg(/data-svg-open="(\d)"/) === '0'
-        && !!pts && pts.split(/\s+/).length === measured
+      const edges = Number(svg(/data-svg-edges="(\d+)"/));
+      const gaps  = Number(svg(/data-svg-gaps="(\d+)"/));
+      const closed = svg(/data-svg-open="(\d)"/) === '0';
+      return edges + gaps === 5 && closed === (measured === 5)
+        && (measured === 5 ? /intcc-radar-area/.test(rr) : !/intcc-radar-area/.test(rr))
         && count(rr, /data-availability="measured"/g) === measured
         && count(rr, /data-availability="unknown"/g) === 0; })(),
-    JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
+    JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), edges: svg(/data-svg-edges="(\d+)"/),
+      gaps: svg(/data-svg-gaps="(\d+)"/) }));
   ok('10.21 la figura no conserva NINGUNA vía de reintroducir el estado «sin datos»',
     !/data-availability="unknown"/.test(rr)
     && !/is-unknown/.test(rr)
     && !/is-unavailable/.test(rr)
     && !/intcc-radar-spoke/.test(rr)
     && !/stroke-dasharray/.test((rr.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0])
-    // …y el CSS tampoco: ni el marcador hueco ni el rótulo atenuado.
     && !/intcc-radar-dot\.is-unknown/.test(css)
     && !/intcc-radar-edge\.is-unknown/.test(css)
     && !/intcc-radar-label\.is-unavailable/.test(css)
     && !/intcc-radar-val\.is-unavailable/.test(css));
-  ok('10.22 la descripción accesible enumera los ejes DIBUJADOS con su valor, sin «sin datos»',
+  ok('10.22 la descripción accesible enumera los CINCO, y nombra la ausencia sólo ahí',
     (() => { const m = Number(svg(/data-svg-measured="(\d+)"/));
       const al = (rr.match(/<svg class="intcc-radar-svg[^>]*aria-label="([^"]+)"/) || [, ''])[1];
-      return svg(/data-svg-a11y-axes="(\d+)"/) === String(m)
+      const notMeasured = DICT.es.intv16_axis_not_measured;
+      return svg(/data-svg-a11y-axes="(\d+)"/) === '5'
         && !/sin datos/.test(al)
-        && al.split('. ').length >= m; })(),
+        // …y sin dos puntos colgando: una afirmación vacía es peor que el nombre solo.
+        && !/: \./.test(al) && !/: $/.test(al)
+        && (al.match(new RegExp(notMeasured, 'g')) || []).length === 5 - m; })(),
     (rr.match(/<svg class="intcc-radar-svg[^>]*aria-label="([^"]+)"/) || [, '?'])[1]);
-  ok('10.23 CRECIMIENTO sigue siendo no computable, y ahora simplemente no se dibuja',
+  ok('10.23 CRECIMIENTO sigue sin owner: conserva su eje y su nombre, y no publica cifra',
     (() => { const dims = run('JSON.stringify(_INTV7_RADAR_DIMS)', makeCtx(APPLE));
       const g = JSON.parse(dims).find(d => d.key === 'growth');
       return !!g && g.owner === null && g.pending === 'no_certifiable_scale'
-        && /data-svg-unknown="0"/.test(rr)
+        && rr.indexOf(DICT.es.intcc_dim_growth) !== -1
+        && !/data-axis="growth"/.test(rr)
         && /growth:no_certifiable_scale/.test(num(rr, /data-pending="([^"]*)"/) || ''); })());
   ok('10.24 la transición del radar respeta `prefers-reduced-motion`',
     /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,200}\.intcc-radar-dot[^}]*transition: none/.test(css));

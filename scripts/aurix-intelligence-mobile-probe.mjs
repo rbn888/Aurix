@@ -183,9 +183,32 @@ const MEASURE = `(function(){
     var decorative = e.getAttribute('aria-hidden') === 'true' || /glow|ring|halo|orb-/.test((e.getAttribute('class')||''));
     if (!decorative && (r.right > wr.right + 1 || r.left < wr.left - 1))
       over.push({ cls: (e.getAttribute('class')||'').slice(0, 40), out: Math.round(Math.max(r.right - wr.right, wr.left - r.left)) });
+    // ── scrollWidth MIENTE CON PADDING ASIMETRICO ──────────────────────────
+    // Al extender la sonda a 768/1024/1440 aparecio un recorte de 11 px en
+    // .intcc-hero-body, que tiene padding-left 22px y un padding-right calculado
+    // a partir del solape del orbe. scrollWidth incluye el padding de INICIO y no
+    // el de FIN cuando hay desbordamiento, asi que un contenedor con padding
+    // desigual acusa un recorte que no existe — y nada salia del lienzo (over
+    // estaba vacio), que es la senal de que era un artefacto.
+    // El criterio pasa a ser el REAL: hay algun descendiente cuyo borde se salga
+    // de la CAJA DE CONTENIDO de este nodo? Eso es un recorte, y ademas dice
+    // QUIEN lo provoca en vez de dejarlo a la deduccion.
     if (cs.display !== 'inline' && cs.overflow === 'visible' && cs.textOverflow !== 'ellipsis'
-        && e.scrollWidth - Math.round(r.width) > 1 && (e.innerText || '').trim())
-      clip.push({ t: (e.innerText || '').trim().slice(0, 24), sw: e.scrollWidth, w: Math.round(r.width) });
+        && e.scrollWidth - Math.round(r.width) > 1 && (e.innerText || '').trim()) {
+      var padL = parseFloat(cs.paddingLeft) || 0, padR = parseFloat(cs.paddingRight) || 0;
+      var cl = r.left + padL, cr = r.right - padR;
+      var culprit = null, worst = 0;
+      [].slice.call(e.querySelectorAll('*')).forEach(function (k) {
+        if (!vis(k)) return;
+        var kc = k.getAttribute('class') || '';
+        if (k.getAttribute('aria-hidden') === 'true' || /glow|ring|halo|orb-/.test(kc)) return;
+        var kr = k.getBoundingClientRect();
+        var outBy = Math.max(kr.right - cr, cl - kr.left);
+        if (outBy > 1 && outBy > worst) { worst = outBy; culprit = kc.slice(0, 40); }
+      });
+      if (culprit) clip.push({ t: (e.innerText || '').trim().slice(0, 24),
+        sw: e.scrollWidth, w: Math.round(r.width), by: Math.round(worst), culprit: culprit });
+    }
   });
   var cards = [].slice.call(wrap.children).filter(vis).map(function (e) {
     var r = e.getBoundingClientRect();
@@ -204,7 +227,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   const browser = await launcher.launch();
   for (const lang of ['es', 'en']) {
     const HTML = readFileSync(join(MARKUP_DIR, `markup-${lang}.html`), 'utf8');
-    for (const [w, h] of [[390, 844], [360, 740]]) {
+    // ── CIERRE CORRECTIVO §8 · LOS SEIS ANCHOS DEL SPEC ────────────────────
+    // La sonda nació para el móvil y medía dos. El §8 pide 360/375/390/768/1024
+    // /1440, y la mitad de las reglas de esta pantalla cambian en `≤1023px` y en
+    // `≥1024px`: medir sólo teléfonos dejaba sin comprobar justo los dos
+    // breakpoints donde la rejilla recompone. Los contratos son los mismos en
+    // todos —nada se sale, nada se recorta, 44 px de impacto, 11 px de letra—,
+    // así que no hace falta una sonda nueva: hace falta la lista completa.
+    for (const [w, h] of [[390, 844], [375, 812], [360, 740], [768, 1024], [1024, 768], [1440, 900]]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
       const page = await ctx.newPage();
       const tag = `${ENG}.${lang}.${w}×${h}`;

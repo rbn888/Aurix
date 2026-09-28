@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '746'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '747'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5456,6 +5456,11 @@ const T = {
     intcc_mhint_div:   'Tu cartera mantiene una diversificación razonable entre varias categorías.',
     intcc_mhint_watch: 'Aurix seguirá vigilando liquidez, concentración y diversificación.',
     intcc_health_title:   'Salud',
+    // ── CIERRE CORRECTIVO §4 · EL ALCANCE DE LA CIFRA ───────────────────────
+    // Lo que el anillo mide y lo que NO: no es una nota a las decisiones, no es
+    // riesgo y no es volatilidad. Va en el nombre accesible del anillo.
+    intv16_health_scope: 'mide cómo se reparte el peso entre tus posiciones; no es una nota a tus decisiones ni una medida de riesgo',
+    intv16_health_aria: (v, scope) => `Salud ${v} %. Esta cifra ${scope}.`,
     intcc_health_suffix:  '/ 100',
     intcc_band_excellent: 'Excelente',
     intcc_band_good:      'Buena',
@@ -5497,7 +5502,17 @@ const T = {
     // El título de la alternativa compacta cuando Aurix certifica menos de tres
     // dimensiones y por tanto no hay radar que dibujar. Dice exactamente lo que
     // la card contiene: los factores que SÍ son observables, con su cifra.
-    intv7_observable_title: 'Factores observables',
+    // ── CIERRE CORRECTIVO §2 · EL MARCO VUELVE A SER FIJO ──────────────────
+    // `intv7_observable_title` QUEDA RETIRADA con su superficie: el §2 prohíbe
+    // convertir el radar en lista. Las dos claves nuevas son el único sitio donde
+    // se nombra la ausencia, y ninguna vive DENTRO de la figura: una es la
+    // descripción accesible por eje y la otra la línea que acompaña a la malla
+    // cuando todavía no hay ninguna medición.
+    // No dicen «sin datos» —jerga retirada del lenguaje de producto— ni prometen
+    // que esperar lo resuelva: Crecimiento no espera datos, espera una referencia
+    // que el producto ha decidido no tener.
+    intv16_axis_not_measured: 'Aurix todavía no puede medirla',
+    intv16_radar_no_evidence: 'Estas son las cinco dimensiones sobre las que Aurix razona. Todavía no puede medir ninguna con tus datos, así que el mapa se muestra sin valores.',
     // `intv7_axis_unavailable` QUEDA RETIRADA de la superficie por el §6: el radar
     // ya no puede rotular un eje «sin datos» porque un eje sin datos no se dibuja.
     // La clave SE CONSERVA porque la consumen los gates de i18n y la trazabilidad
@@ -5511,7 +5526,15 @@ const T = {
     intv7_radar_legend: 'Las cinco dimensiones de tu estructura. Cada eje es un porcentaje de su propia magnitud, y Aurix sólo dibuja los que puede certificar.',
     intv7_radar_pending: (d) => `Todavía sin datos: ${d}. Aparecerán cuando Aurix pueda medirlas con rigor.`,
     // M.03 C — el disclosure nombra la evidencia que falta, eje por eje.
-    intv7_pending_obs:     (d) => `${d}: hay historial, pero todavía no suficientes observaciones para medirla sin exagerar la calma. Aparece sola en cuanto lo haya.`,
+    // ── CIERRE CORRECTIVO §2 · NO SE PROMETE QUE ESPERAR LO RESUELVA ───────
+    // Decía «Aparece sola en cuanto lo haya», y eso convertía una condición en un
+    // calendario. La elegibilidad de Estabilidad NO depende del número de
+    // snapshots: cuelga de la CONFIANZA del motor de rentabilidad flow-neutral
+    // (`_aurixPeakRetention` exige `confidence === 'high'`), que además de
+    // historia necesita que los flujos estén reconciliados. Puede resolverse con
+    // el tiempo, o no resolverse nunca si falta la conciliación — y afirmar lo
+    // primero es una promesa que el producto no controla.
+    intv7_pending_obs:     (d) => `${d}: hay historial, pero el motor de rentabilidad todavía no lo respalda con confianza suficiente para medirla sin exagerar la calma.`,
     intv7_pending_scale:   (d) => `${d}: el dato existe y Aurix lo publica como porcentaje de rentabilidad; lo que falta es una referencia con la que convertirlo en una escala de 0 a 100 sin inventarla.`,
     intv7_pending_generic: (d) => `${d}: todavía sin datos que Aurix pueda certificar.`,
     intv7_stab_meaning: 'Estabilidad = porcentaje del máximo que tu cartera conservó en su peor momento, con las aportaciones y retiradas neutralizadas.',
@@ -5524,7 +5547,13 @@ const T = {
     // ── VNEXT §8 · LOS DOS FACTORES QUE LA LISTA NO DICE ────────────────────
     // `n` es el número REAL de posiciones listadas, nunca la constante tres: la
     // cuota conjunta cubre exactamente las que se están viendo.
-    intv15_drv_dependency: (n, pct) => `Tus ${n} mayores posiciones concentran el ${pct} de tu cartera financiera: es de ellas de quien depende tu evolución.`,
+    // ── CIERRE CORRECTIVO §6 · SIN AFIRMACIÓN CAUSAL ───────────────────────
+    // Decía «es de ellas de quien depende tu evolución». Eso es una ATRIBUCIÓN
+    // DE RENDIMIENTO deducida de unos pesos, y los pesos no la sostienen: una
+    // posición del 5 % puede explicar más resultado que una del 40 %. Lo que el
+    // peso SÍ demuestra —aritmética pura— es cuánto mueve cada posición el VALOR
+    // del conjunto. Se dice eso y se para ahí.
+    intv15_drv_dependency: (n, pct) => `Tus ${n} mayores posiciones concentran el ${pct} de tu cartera financiera: el valor del conjunto se mueve sobre todo con ellas.`,
     intv15_drv_category: (label, pct) => `Por clase de activo, tu mayor exposición es ${label}, con el ${pct} de tu cartera financiera.`,
     intcc_explore_title: 'Explora tu patrimonio',
     intcc_explore_hint:  'Toca una pregunta para ver la respuesta.',
@@ -5885,12 +5914,34 @@ const T = {
     // Sustituyen al genérico SÓLO cuando la cifra que llevan está certificada. Son
     // la misma pregunta con el contexto de la cuenta dentro, no una pregunta nueva:
     // la respuesta que se despliega es exactamente la que ya había.
-    intv15_qc_concentration: (name, pct) => `¿Qué está causando que ${name} pese el ${pct} de mi patrimonio?`,
+    // ── CIERRE CORRECTIVO §3 · EL ENUNCIADO PROMETE LO QUE LA RESPUESTA DA ──
+    // «¿Qué está causando que X pese el 31 %?» prometía una ATRIBUCIÓN que Aurix
+    // no puede certificar —qué decisiones o qué mercado llevaron ahí— y la
+    // respuesta hablaba de otra cosa. Se pregunta por lo que sí se puede
+    // contestar: qué IMPLICA ese peso. El §3 lo pide por su nombre.
+    intv15_qc_concentration: (name, pct) => `${name} pesa el ${pct} de mi cartera: ¿qué implica esa concentración?`,
     intv15_qc_top3:   (pct) => `¿Cuánto de mi patrimonio depende de mis tres mayores posiciones (${pct})?`,
     intv15_qc_liq_dir:   (pct) => `Mi liquidez es el ${pct}: ¿está aumentando o reduciéndose?`,
     intv15_qc_liq_level: (pct) => `¿Qué significa tener el ${pct} de mi patrimonio en liquidez?`,
     intv15_qc_changed: (d) => `¿Qué ha cambiado más en mi patrimonio en los últimos ${d} días?`,
     intv15_qc_flows_vs_market: '¿Qué parte de mi evolución viene de mis aportaciones y qué parte del mercado?',
+    // ── §3 · LOS LEADS: LA PRIMERA FRASE CONTESTA LA INTENCIÓN ──────────────
+    // LIQUIDEZ. Dice QUÉ es ese saldo dentro del conjunto analizado y qué queda
+    // fuera de él, y a continuación declara el límite que el §3 exige: «registrado
+    // como efectivo» no es lo mismo que «disponible sin restricciones». No
+    // califica suficiente ni insuficiente — eso necesitaría necesidades y
+    // horizonte, y sin ellos sería una recomendación.
+    intv16_ans_liq_lead: (cash, rest) => `El ${cash} de tu cartera financiera está registrado como efectivo: es la parte cuyo valor no depende del precio de ningún activo. El ${rest} restante son posiciones que se mueven con el mercado.`,
+    intv16_ans_liq_limit: 'Aurix cuenta aquí lo que has registrado como efectivo. No puede saber si ese saldo está inmovilizado, comprometido o sujeto a alguna restricción, así que no equivale automáticamente a dinero disponible hoy.',
+    // TOP-3. Nombres y peso CONJUNTO, agregado sin redondear. La consecuencia se
+    // limita a lo demostrable: el peso dice de qué depende el VALOR, no qué
+    // explicó el rendimiento ni cuánto riesgo aporta cada una.
+    intv16_ans_top3_lead: (n, names, pct) => `Tus ${n} mayores posiciones son ${names}, y juntas concentran el ${pct} de tu cartera financiera.`,
+    intv16_ans_top3_mean: 'Eso significa que el valor de tu cartera se mueve sobre todo con ellas. Es una afirmación sobre el PESO, no sobre el rendimiento: Aurix no puede repartir tu resultado entre posiciones, así que esto no dice cuánto aportó cada una.',
+    // CONCENTRACIÓN. Misma disciplina: qué implica el peso, sin fingir atribución.
+    intv16_ans_conc_lead: (name, pct) => `${name} concentra el ${pct} de tu cartera financiera, y es tu mayor posición individual.`,
+    intv16_ans_conc_mean: 'A ese peso, lo que le pase a esa posición se nota en el conjunto más que cualquier otra cosa que tengas. Es una lectura de exposición: no dice si la decisión es buena ni cuánto riesgo asumes.',
+    intv16_list_and: 'y',
     // ── CHECKPOINT E · «¿QUÉ PUEDE SABER AURIX DE MÍ?» ERA DEMASIADO VAGA ──
     // No decía sobre qué: se leía como una pregunta sobre privacidad. Y su
     // respuesta era sólo la lista de lo que Aurix NO puede hacer, o sea una
@@ -5942,12 +5993,21 @@ const T = {
     // HECHO → CONTEXTO → SIGNIFICADO (§24): cada línea publica una cifra que el
     // motor certifica y dice qué significa que no se haya movido. Ninguna afirma
     // una dirección que no esté medida.
-    intv15_stable_head: (d) => `Tu estructura se mantiene estable desde hace ${d} ${d === 1 ? 'día' : 'días'}: en ese periodo no ha cambiado nada que merezca tu atención.`,
-    intv15_stable_conc_named: (name, pct) => `Tu mayor posición sigue siendo ${name}, con el ${pct} de tu cartera financiera.`,
-    intv15_stable_conc: (pct) => `Tu mayor posición sigue concentrando el ${pct} de tu cartera financiera.`,
-    intv15_stable_liq:      (pct) => `Tu liquidez registrada es el ${pct} de tu cartera financiera.`,
-    intv15_stable_liq_flat: (pct) => `Tu liquidez se mantiene en el ${pct} de tu cartera financiera, sin variación relevante.`,
-    intv15_stable_flows: 'No has registrado aportaciones ni retiradas en este periodo, así que lo que ves no viene de dinero nuevo.',
+    // ── CIERRE CORRECTIVO §5 · LO QUE «SE MANTIENE» HAY QUE HABERLO COMPARADO ─
+    // Las claves `intv15_stable_*` quedan retiradas: afirmaban continuidad
+    // («sigue siendo», «sin variación relevante») leyendo sólo el presente, y el
+    // titular fechaba la quietud con la EDAD DE LA CUENTA. Las que las sustituyen
+    // nombran la comparación: cuánto se ha medido, sobre cuántos días y contra qué
+    // umbral. Si esa comparación no existe, no hay frase que publicar.
+    intv16_stable_head: (d) => `Tu estructura se mantiene: en los últimos ${d} ${d === 1 ? 'día' : 'días'} Aurix ha comparado tu cartera con su pasado y no ha encontrado ningún cambio relevante.`,
+    intv16_stable_liq: (pct, thr, d) => `Tu liquidez está en el ${pct} y se ha movido menos de ${thr} puntos porcentuales en ${d} ${d === 1 ? 'día' : 'días'}.`,
+    intv16_stable_mix: (thr, d) => `El reparto entre clases de activo no se ha movido más de ${thr} puntos porcentuales en ${d} ${d === 1 ? 'día' : 'días'}.`,
+    intv16_stable_flows: 'No has registrado aportaciones ni retiradas en este periodo, así que lo que ves no viene de dinero nuevo.',
+    intv16_stable_limit_position: 'Aurix compara el reparto por clase de activo con su pasado, pero todavía no el peso de cada posición: esa parte es una lectura de hoy, no una evolución.',
+    // El estado que faltaba: hay historial y aun así no hay NADA que comparar.
+    // Dice los días —que es lo que gobierna qué comparaciones serán posibles— y
+    // por qué eso todavía no basta, en una línea.
+    intv16_no_comparison: (d) => `Aurix lleva ${d} ${d === 1 ? 'día' : 'días'} observando tu cartera, pero todavía no puede comparar ninguna de sus dimensiones con su propio pasado: lo que ves en el resto de la pantalla es una lectura de hoy, no una evolución.`,
     intv6_memory_accruing_sub: 'Todavía no hay suficientes eventos registrados para construir tu memoria. Cada observación que Aurix guarda la hace más profunda.',
     intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
     intv5_cat_crypto: 'Cripto', intv5_cat_metal: 'Metales', intv5_cat_liquidity: 'Liquidez',
@@ -8541,6 +8601,8 @@ const T = {
     intcc_mhint_div:   'Your portfolio keeps a reasonable spread across several categories.',
     intcc_mhint_watch: 'Aurix will keep watching liquidity, concentration and diversification.',
     intcc_health_title:   'Health',
+    intv16_health_scope: 'measures how weight is spread across your positions; it is not a grade on your decisions nor a measure of risk',
+    intv16_health_aria: (v, scope) => `Health ${v}%. This figure ${scope}.`,
     intcc_health_suffix:  '/ 100',
     intcc_band_excellent: 'Excellent',
     intcc_band_good:      'Good',
@@ -8575,12 +8637,13 @@ const T = {
     intcc_dim_conc:   'Concentration',
     intcc_dim_stab:   'Stability',
     intcc_dim_growth: 'Growth',        // INT.07 — the founder's five conceptual dimensions
-    intv7_observable_title: 'Observable factors',
+    intv16_axis_not_measured: 'Aurix cannot measure it yet',
+    intv16_radar_no_evidence: 'These are the five dimensions Aurix reasons about. It cannot measure any of them with your data yet, so the map is shown without values.',
     intv7_axis_unavailable: 'no data',
     intv7_axis_span_days: (n) => `${n}d measured`,
     intv7_radar_legend: 'The five dimensions of your structure. Each axis is a percentage of its own magnitude, and Aurix only draws the ones it can certify.',
     intv7_radar_pending: (d) => `No data yet: ${d}. They will appear once Aurix can measure them rigorously.`,
-    intv7_pending_obs:     (d) => `${d}: there is history, but not yet enough observations to measure it without overstating the calm. It appears on its own once there is.`,
+    intv7_pending_obs:     (d) => `${d}: there is history, but the return engine does not yet back it with enough confidence to measure it without overstating the calm.`,
     intv7_pending_scale:   (d) => `${d}: the figure exists and Aurix publishes it as a return percentage; what is missing is a reference to turn it into a 0–100 scale without inventing one.`,
     intv7_pending_generic: (d) => `${d}: no data Aurix can certify yet.`,
     intv7_stab_meaning: 'Stability = the percentage of its peak your portfolio kept at its worst moment, with contributions and withdrawals neutralised.',
@@ -8590,7 +8653,7 @@ const T = {
     intcc_drv_kind_eng:  'Exposure',
     intcc_drv_kind_liq:  'Liquidity',
     intcc_drv_none:      'Not enough positions yet to identify your key drivers.',
-    intv15_drv_dependency: (n, pct) => `Your ${n} largest positions hold ${pct} of your financial portfolio: they are what your evolution depends on.`,
+    intv15_drv_dependency: (n, pct) => `Your ${n} largest positions hold ${pct} of your financial portfolio: the value of the whole moves mainly with them.`,
     intv15_drv_category: (label, pct) => `By asset class, your largest exposure is ${label}, at ${pct} of your financial portfolio.`,
     intcc_explore_title: 'Explore your wealth',
     intcc_explore_hint:  'Tap a question to see the answer.',
@@ -8823,12 +8886,19 @@ const T = {
     intv4_q_q_structure: 'How is my wealth split today?',
     intv4_q_q_historical: 'Where is my wealth against its own history?',
     intv4_q_q_current_value: 'How much is my financial portfolio worth right now?',
-    intv15_qc_concentration: (name, pct) => `What is driving ${name} to ${pct} of my wealth?`,
+    intv15_qc_concentration: (name, pct) => `${name} is ${pct} of my portfolio: what does that concentration mean?`,
     intv15_qc_top3:   (pct) => `How much of my wealth depends on my three largest positions (${pct})?`,
     intv15_qc_liq_dir:   (pct) => `My cash is ${pct}: is it rising or falling?`,
     intv15_qc_liq_level: (pct) => `What does holding ${pct} of my wealth in cash mean?`,
     intv15_qc_changed: (d) => `What changed most in my wealth over the last ${d} days?`,
     intv15_qc_flows_vs_market: 'How much of my evolution comes from my contributions and how much from the market?',
+    intv16_ans_liq_lead: (cash, rest) => `${cash} of your financial portfolio is recorded as cash: the part whose value does not depend on any asset price. The remaining ${rest} are positions that move with the market.`,
+    intv16_ans_liq_limit: 'Aurix counts here what you have recorded as cash. It cannot know whether that balance is locked, committed or otherwise restricted, so it does not automatically mean money available today.',
+    intv16_ans_top3_lead: (n, names, pct) => `Your ${n} largest positions are ${names}, and together they hold ${pct} of your financial portfolio.`,
+    intv16_ans_top3_mean: 'That means your portfolio value moves mainly with them. It is a statement about WEIGHT, not about return: Aurix cannot split your result across positions, so this does not say how much each one contributed.',
+    intv16_ans_conc_lead: (name, pct) => `${name} holds ${pct} of your financial portfolio, and it is your largest single position.`,
+    intv16_ans_conc_mean: 'At that weight, whatever happens to that position shows in the whole more than anything else you hold. This is a reading of exposure: it does not say whether the decision is good or how much risk you are taking.',
+    intv16_list_and: 'and',
     intv4_q_q_data_quality: 'How much of my wealth can Aurix analyse with the current data?',
     intv4_dq_cover_full: 'Aurix analyses every position you have recorded.',
     intv4_dq_cover_partial: (n) => `${n} ${n === 1 ? 'position cannot be valued' : 'positions cannot be valued'}, so the analysis covers the rest.`,
@@ -8852,12 +8922,12 @@ const T = {
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
     intv4_memory_coverage: (d) => `Aurix has ${d} ${d === 1 ? 'day' : 'days'} of certified history. Longer-horizon comparisons will appear as your history grows.`,
-    intv15_stable_head: (d) => `Your structure has held steady for ${d} ${d === 1 ? 'day' : 'days'}: over that period nothing changed enough to be worth your attention.`,
-    intv15_stable_conc_named: (name, pct) => `Your largest position is still ${name}, at ${pct} of your financial portfolio.`,
-    intv15_stable_conc: (pct) => `Your largest position still holds ${pct} of your financial portfolio.`,
-    intv15_stable_liq:      (pct) => `Your recorded cash is ${pct} of your financial portfolio.`,
-    intv15_stable_liq_flat: (pct) => `Your cash is holding at ${pct} of your financial portfolio, with no meaningful move.`,
-    intv15_stable_flows: 'You have recorded no contributions or withdrawals in this period, so what you see does not come from new money.',
+    intv16_stable_head: (d) => `Your structure is holding: over the last ${d} ${d === 1 ? 'day' : 'days'} Aurix compared your portfolio with its own past and found no relevant change.`,
+    intv16_stable_liq: (pct, thr, d) => `Your cash is at ${pct} and has moved less than ${thr} percentage points in ${d} ${d === 1 ? 'day' : 'days'}.`,
+    intv16_stable_mix: (thr, d) => `The split across asset classes has not moved more than ${thr} percentage points in ${d} ${d === 1 ? 'day' : 'days'}.`,
+    intv16_stable_flows: 'You have recorded no contributions or withdrawals in this period, so what you see does not come from new money.',
+    intv16_stable_limit_position: 'Aurix compares the split across asset classes with its past, but not yet the weight of each position: that part is a reading of today, not an evolution.',
+    intv16_no_comparison: (d) => `Aurix has been observing your portfolio for ${d} ${d === 1 ? 'day' : 'days'}, but it cannot yet compare any of its dimensions with its own past: what you see elsewhere on this screen is a reading of today, not an evolution.`,
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
     intv5_cat_crypto: 'Crypto', intv5_cat_metal: 'Metals', intv5_cat_liquidity: 'Cash',
@@ -35077,7 +35147,7 @@ if (typeof window !== 'undefined') {
 // frase que la publicaba queda retirada.
 function _aurixCashLedgerAuthority(t0, t1) {
   const out = { status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE, reason: 'no_window',
-    gaps: [], events: 0, inUSD: null, outUSD: null, netUSD: null,
+    gaps: [], events: 0, inUSD: null, outUSD: null, netUSD: null, lastFlowAt: null,
     intentKnown: 0, externalCertified: false, amountPublishable: false,
     observationClass: _AURIX_OBS_CLASS.DERIVED };
   try {
@@ -35117,6 +35187,14 @@ function _aurixCashLedgerAuthority(t0, t1) {
       if (amt >= 0) sIn += amt; else sOut += amt;
     }
     out.inUSD = +sIn.toFixed(2); out.outUSD = +sOut.toFixed(2); out.netUSD = +(sIn + sOut).toFixed(2);
+    // ── CIERRE CORRECTIVO §6 · EL INSTANTE DEL ÚLTIMO MOVIMIENTO ───────────
+    // Sin él, un acumulado no tiene más fecha que el final de la serie de
+    // observaciones —que es HOY siempre— y por eso «Lo que importa hoy»
+    // publicaba las entradas y salidas de agosto como si acabaran de ocurrir.
+    // Es un timestamp REAL del ledger, no del render: registrar un depósito hoy
+    // lo hace reciente, y no registrar nada no lo rejuvenece. Se calcula sobre
+    // los movimientos que de verdad se han sumado (`cash`), no sobre la ventana.
+    out.lastFlowAt = cash.reduce((mx, f) => (Number.isFinite(f.ts) && f.ts > mx) ? f.ts : mx, 0) || null;
     out.intentKnown = cash.filter(f => _AURIX_FLOW_INTENT_EXTERNAL.indexOf(_aurixFlowIntentOf(f)) !== -1).length;
     // La afirmación EXTERNA exige intención declarada en TODOS los eventos de la
     // ventana. Hoy no se captura, así que esto es falso por diseño y el hueco lo
@@ -35348,6 +35426,8 @@ function _aurixFactLedger(opts) {
   // hidratación pendiente, FX caído, esquema ausente, cambio de cuenta o la
   // propia puerta de evidencia suprimiéndolo, y todo eso es DESCONOCIDO.
   const resolvedCandidates = [];
+  // §5 — PRUEBAS DE COMPARACIÓN SIN CAMBIO. Ver el bloque de drift más abajo.
+  const stabilityEvidence = [];
   const resolveCandidate = (conceptId, reason) => {
     if (!conceptId) return;
     resolvedCandidates.push({ conceptId: String(conceptId), reason: String(reason || '') });
@@ -35749,6 +35829,11 @@ function _aurixFactLedger(opts) {
         value: +net.toFixed(2), unit: 'base_currency',
         values: { net: +net.toFixed(2), events: cashAuth.events,
                   inUSD: cashAuth.inUSD, outUSD: cashAuth.outUSD,
+                  // §6 — el instante del ÚLTIMO movimiento sumado. Es lo que
+                  // permite que la actualidad se juzgue por el evento y no por el
+                  // final de la serie, y lo que hace que un depósito de hoy SÍ
+                  // entre en «Lo que importa hoy».
+                  lastActionAt: cashAuth.lastFlowAt,
                   amountPublishable: cashAuth.amountPublishable,
                   externalCertified: cashAuth.externalCertified,
                   intentKnown: cashAuth.intentKnown,
@@ -36112,6 +36197,20 @@ function _aurixFactLedger(opts) {
         try {
           if (driftEvidence(cat, d, range).ev.ok) {
             resolveCandidate('drift:' + rootKey + ':' + cat, 'drift_below_materiality');
+            // ── CIERRE CORRECTIVO §5 · LA ESTABILIDAD TAMBIÉN ES UN HECHO ────
+            // Hasta aquí, «medido y por debajo del umbral» sólo servía para
+            // RESOLVER una alarma previa; la evidencia positiva se tiraba. Y es
+            // justo la que «Tu evolución» necesitaba: sin ella, la card derivaba
+            // «tu estructura se mantiene estable» de la EDAD DE LA CUENTA y de la
+            // ausencia de hallazgos, que es lo que el §5 prohíbe por su nombre.
+            // Esto NO es un hecho publicable —no es una noticia, y por eso no
+            // entra en `facts`—: es la prueba de que la comparación SE HA HECHO,
+            // con sus dos extremos certificados, su ventana y su umbral. Quien
+            // quiera afirmar estabilidad tiene que apoyarse aquí.
+            stabilityEvidence.push({ root: rootKey, category: cat, range: range,
+              startAt: d.startAt, endAt: d.endAt,
+              deltaPp: +Number(d.deltaPp).toFixed(2), thresholdPp: thr,
+              endPct: Number.isFinite(d.endPct) ? +Number(d.endPct).toFixed(2) : null });
           }
         } catch (_) {}
         continue;                                          // measured, but not material — no story
@@ -36772,7 +36871,7 @@ function _aurixFactLedger(opts) {
     _seenResolved.add(r.conceptId);
     return true;
   });
-  return { facts, gaps, observation, resolvedConcepts, generatedAt: nowTs };
+  return { facts, gaps, observation, resolvedConcepts, stabilityEvidence, generatedAt: nowTs };
 }
 
 // ── RELATION / DEDUPLICATION — ONE ROOT → ONE PRIMARY STORY ────────────────
@@ -37383,6 +37482,9 @@ function _aurixIntelligenceCore(opts) {
     // §3 — los conceptos que una MEDICIÓN demuestra terminados. Es lo único que
     // puede resolver un acuse: la ausencia de un hecho no entra en esta lista.
     resolvedConcepts: ledger.resolvedConcepts || [],
+    // §5 — viaja al Core para que la superficie temporal pueda EXIGIRLA antes de
+    // afirmar que algo «se mantiene».
+    stabilityEvidence: ledger.stabilityEvidence || [],
     // §8 — el conjunto COMPLETO, acuses incluidos. Es la prueba de que dar por
     // visto un hallazgo no destruye el hecho: sigue aquí, certificado, y sólo ha
     // dejado de ocupar superficie.
@@ -38261,6 +38363,16 @@ function _aurixIntelContext(env) {
       };
     });
   }
+  // ── CIERRE CORRECTIVO §7 · EL RETORNO TEMPRANO SE LLEVABA EL SILENCIO ────
+  // Mismo defecto que el §8 ya corrigió para los acuses, en la línea de al lado y
+  // sin corregir: `asked`, `declined` y `pausedAt` se leían DESPUÉS de este
+  // `return`. Un usuario que sólo ha pulsado «Prefiero no responder» —o «no más
+  // preguntas por ahora»— no tiene NINGÚN campo respondido, así que el registro
+  // no lleva `fields` y la lectura se iba por aquí: su rechazo y su pausa se
+  // perdían en cada carga y la pregunta volvía. Es exactamente el síntoma que el
+  // §7 manda verificar, en el estado más común de quien no quiere responder.
+  // Se sanean ANTES del retorno, con las mismas reglas de siempre.
+  _aurixIntelCtxReadPolicy(rec, out);
   if (!rec || !rec.fields || typeof rec.fields !== 'object') return out;
   Object.keys(_AURIX_INTEL_FIELDS).forEach(k => {
     const spec = _AURIX_INTEL_FIELDS[k], v = rec.fields[k];
@@ -38314,8 +38426,16 @@ function _aurixIntelContext(env) {
   });
   out.answered = Object.keys(out.fields).length;
   out.source = out.answered ? 'stored' : 'none';
-  // Historial de preguntas: se sanea igual que los campos — sólo ids y timestamps.
+  out.updatedAt = Number.isFinite(rec.updatedAt) ? rec.updatedAt : null;
+  return out;
+}
+// Historial de preguntas: se sanea igual que los campos — sólo ids y timestamps.
+// Vive en su propia función porque lo leen DOS caminos (con campos y sin ellos) y
+// duplicar el saneado es cómo uno de los dos se queda atrás.
+function _aurixIntelCtxReadPolicy(rec, out) {
   out.asked = {}; out.declined = {};
+  out.pausedAt = null;
+  if (!rec || typeof rec !== 'object') return out;
   if (rec.asked && typeof rec.asked === 'object') {
     Object.keys(rec.asked).forEach(k => {
       const v = rec.asked[k];
@@ -38328,7 +38448,7 @@ function _aurixIntelContext(env) {
     });
   }
   out.pausedAt = Number.isFinite(rec.pausedAt) ? rec.pausedAt : null;
-  out.updatedAt = Number.isFinite(rec.updatedAt) ? rec.updatedAt : null;
+  if (Number.isFinite(rec.updatedAt)) out.updatedAt = rec.updatedAt;
   return out;
 }
 // Las tres mutaciones del ciclo de vida. Todas ADITIVAS sobre el mismo registro:
@@ -64518,12 +64638,45 @@ function _intccIdentityIcon(key) {
 }
 
 // Health score ring (SVG arc + big number rendered by the caller alongside).
+// ── CIERRE CORRECTIVO §4 · EL ANILLO DECLARA QUÉ MIDE ──────────────────────
+// El §4 lo pide por su nombre: «si el score solo mide dispersión, explicitar ese
+// alcance; no presentarlo como salud financiera integral». Y sólo mide eso: el
+// anillo es `(effectiveN−1)/(N−1)`, la dispersión de pesos reescalada, UN eje y
+// una sola fuente.
+//
+// DÓNDE SE DICE, y por qué aquí. La superficie VISIBLE de esta card está fijada
+// por dos decisiones anteriores del founder que este cierre no puede revocar por
+// su cuenta: la card se llama SALUD en los dos idiomas (certificado en A0.4) y
+// bajo el estado no va NADA (§6 del cierre del hero, que retiró dos textos de ese
+// mismo hueco). El canal que queda —y que es un canal real, no un comentario— es
+// el NOMBRE ACCESIBLE del anillo, que hasta ahora era `aria-hidden` y no decía
+// nada en absoluto. Ahí se declara la cifra Y su alcance, y `data-health-scope`
+// lo publica para la trazabilidad del §3.
+// Queda DECLARADO como pendiente de producto que la frase no es visible: mover el
+// título o reabrir el hueco bajo el estado es una decisión del founder.
 function _intccScoreRingHtml(score) {
   const r = 52, c = 2 * Math.PI * r;
   const pct = (score.score || 0) / 100;
   const off = c * (1 - _intccClamp(pct, 0, 1));
+  // FAIL CLOSED SOBRE LA COPY: sin la frase de alcance, el anillo vuelve a ser
+  // decorativo (`aria-hidden`) en vez de anunciar una cifra pelada sin decir de
+  // qué es. Una cifra sin su magnitud es justo lo que el §4 viene a corregir.
+  const scope = _intv4T('intv16_health_scope');
+  const a11y = (scope && score && score.score != null)
+    ? _intv4T('intv16_health_aria', String(score.score), scope) : '';
+  if (a11y) {
+    return `
+    <svg class="intcc-score-svg" viewBox="0 0 130 130" role="img"
+         data-health-scope="weight_dispersion" aria-label="${_intccEsc(a11y)}">
+      <circle class="intcc-score-track" cx="65" cy="65" r="${r}"/>
+      <circle class="intcc-score-arc" cx="65" cy="65" r="${r}"
+        stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"
+        transform="rotate(-90 65 65)"/>
+    </svg>`;
+  }
   return `
-    <svg class="intcc-score-svg" viewBox="0 0 130 130" aria-hidden="true">
+    <svg class="intcc-score-svg" viewBox="0 0 130 130" aria-hidden="true"
+         data-health-scope="weight_dispersion">
       <circle class="intcc-score-track" cx="65" cy="65" r="${r}"/>
       <circle class="intcc-score-arc" cx="65" cy="65" r="${r}"
         stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"
@@ -64579,16 +64732,29 @@ function _intccRadarSvg(radar, dimsOverride) {
     { key: 'stability',       label: t('intcc_dim_stab') },
     { key: 'growth',          label: t('intcc_dim_growth') },
   ];
-  // §6 — EL MARCO ES LA MEDICIÓN. Un eje entra en la figura si y sólo si su valor
-  // está certificado; el resto no recibe vértice, ni radial, ni etiqueta, ni
-  // coordenada. `measured` se conserva como nombre porque lo consumen el resto de
-  // la función y los gates, pero ya es el MISMO conjunto que `dims`: por
-  // construcción no puede haber un eje dibujado sin dato.
-  const dims = ALL_DIMS.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
-  const measured = dims;
-  // Menos de tres ejes no son un radar: son un segmento o un punto, y forzarlos a
-  // polígono sería inventar una figura. El owner de la card publica en su lugar la
-  // alternativa compacta del §6.B.
+  // ── §2 · ESTRUCTURA Y EVIDENCIA SON COSAS DISTINTAS ─────────────────────
+  // El MARCO son las cinco dimensiones sobre las que Intelligence razona, y es
+  // fijo: misma malla, mismos ángulos, mismos nombres, pase lo que pase con los
+  // datos. La EVIDENCIA es qué puede certificar Aurix hoy, y decide únicamente
+  // qué se dibuja ENCIMA del marco. Confundirlas es lo que ha fallado dos veces
+  // en direcciones opuestas: primero rotulando «sin datos» dentro de la figura
+  // (la limitación ascendida a diseño), después retirando el eje entero (la
+  // estructura convertida en una función de los datos, con un triángulo de tres
+  // vértices que se leía como el patrimonio completo).
+  //
+  // LAS REGLAS, tal como las fija el §2:
+  //   · los `n` ejes declarados SIEMPRE se dibujan, con su nombre;
+  //   · certificado ⇒ marcador y su cifra con unidad;
+  //   · desconocido ⇒ nombre y eje, y NADA más: ni marcador, ni cifra, ni
+  //     porcentaje, ni «sin datos», ni un cero fingido;
+  //   · un CERO CERTIFICADO no es un desconocido y sí se representa;
+  //   · los segmentos unen SÓLO ejes VECINOS certificados: la trayectoria se
+  //     interrumpe en cada hueco en vez de saltárselo, que es lo que impide que
+  //     tres valores se lean como un triángulo cerrado;
+  //   · el relleno exige los `n`: una figura cerrada afirma que el contorno
+  //     describe el conjunto, y con un hueco eso es falso.
+  const dims = ALL_DIMS;
+  const measured = dims.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
   if (dims.length < 3) return '';
   const cx = 110, cy = 106, R = 100, n = dims.length;
   const RADAR_DOT_R = 4;                        // §7 — el mismo para los cinco
@@ -64640,25 +64806,30 @@ function _intccRadarSvg(radar, dimsOverride) {
   // ejes: la figura es una sub-figura honesta del pentágono, nunca un polígono
   // reescalado sobre menos ejes.
   //
-  // §6 VNEXT — YA NO HAY DOS CLASES DE VÉRTICE, así que desaparece toda la
-  // maquinaria que existía para distinguirlas: `isM`, la coordenada de reserva
-  // `R_UNK` para el desconocido, el segmento «neutral» y el recuento de tramos que
-  // tocaban un eje sin dato. Cada vértice es un dato certificado, el relleno se
-  // cierra SIEMPRE y la trayectoria recorre los `n` ejes sin excepciones.
-  // `R_UNK` se conserva como límite interior de la RETÍCULA (el anillo del cero,
-  // de donde arrancan las radiales): eso es geometría de escala, no una posición
-  // de reserva para un valor que no existe.
+  // §2 — UN EJE DESCONOCIDO NO TIENE COORDENADA. Ni la del dato (no lo hay) ni
+  // una de reserva: `R_UNK` vuelve a ser sólo el límite interior de la RETÍCULA
+  // —el anillo del cero, de donde arrancan las radiales—, que es geometría de
+  // escala y no la posición de nada.
   const rOf = key => rBand(radar[key] / 100);
-  const closeArea = true;
+  const isM = i => measured.indexOf(dims[i]) !== -1;
+  // El relleno exige los `n` certificados. Con un hueco, el contorno no describe
+  // el conjunto y cerrarlo sería afirmar que sí.
+  const closeArea = measured.length === n;
   const posOf = i => pt(i, rOf(dims[i].key));
-  const dp = dims.map((d, i) => pt(i, rOf(d.key)).map(v => v.toFixed(1)).join(',')).join(' ');
-  // n SEGMENTOS IDÉNTICOS y la figura CIERRA: mismo grosor y terminaciones en
-  // todas las líneas, sin una segunda capa de tratamiento que pueda reintroducir
-  // una diferencia de pintado.
-  let edges = '', edgeCount = 0;
-  const neutralCount = 0;                         // §6 — no puede haber tramo no medido
+  const dp = closeArea
+    ? dims.map((d, i) => pt(i, rOf(d.key)).map(v => v.toFixed(1)).join(',')).join(' ')
+    : '';
+  // ── §2 · LA TRAYECTORIA SE INTERRUMPE, NO SE SALTA EL HUECO ──────────────
+  // Un segmento sólo existe entre dos ejes VECINOS del marco y sólo si los dos
+  // están certificados. Con tres valores en ejes no contiguos eso da CERO
+  // segmentos —y es lo correcto—: unirlos dibujaría un triángulo que el ojo lee
+  // como «ésta es tu estructura completa», que es exactamente la afirmación que
+  // no se puede hacer. `gapCount` cuenta los tramos que NO se dibujan por un
+  // hueco: es el discriminador del gate y no pinta nada.
+  let edges = '', edgeCount = 0, gapCount = 0;
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
+    if (!(isM(i) && isM(j))) { gapCount++; continue; }
     const [ax, ay] = posOf(i);
     const [bx, by] = posOf(j);
     edges += `<line class="intcc-radar-edge"`
@@ -64686,16 +64857,19 @@ function _intccRadarSvg(radar, dimsOverride) {
   });
   dims.forEach((d, i) => {
     const { lx, ly, anchor } = labelGeom[i];
-    // Label + a dimmer numeric value stacked underneath → values legible
-    // without turning the radar into a table.
-    // §6 — los cinco (o cuatro, o tres) ejes dibujados están TODOS certificados,
-    // así que no hay clase de estado que aplicar ni texto alternativo que imprimir.
+    // §2 — EL NOMBRE SIEMPRE; LA CIFRA, SÓLO SI ESTÁ CERTIFICADA. Un eje
+    // desconocido conserva su rótulo y su radial y NO emite el segundo `<text>`:
+    // ni cifra, ni porcentaje, ni la palabra «sin datos», ni un cero. Lo que se
+    // ve es el marco con un nombre, que es exactamente lo que el dato es.
+    const isMeasured = isM(i);
     labels += `<text class="intcc-radar-label" x="${lx.toFixed(1)}" y="${(ly + 1).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
     // `display` permite que un eje publique algo que NO es un porcentaje (la
     // amplitud de categorías se publica como CONTEO con su taxonomía: «1,2 de 7»).
     // El radio sigue siendo geometría normalizada; el TEXTO es el dato.
-    labels += `<text class="intcc-radar-val" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${
-      _intccEsc(d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))}</text>`;
+    if (isMeasured) {
+      labels += `<text class="intcc-radar-val" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${
+        _intccEsc(d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))}</text>`;
+    }
     // ── CINCO DIMENSIONES RECONOCIBLES, TRES VALORES ───────────────────────
     // «Sin vértice» dejaba dos ejes sin NADA que mirar: la QA del founder no podía
     // distinguir «Aurix no lo mide» de «aquí no hay nada». Un eje no certificado
@@ -64728,6 +64902,12 @@ function _intccRadarSvg(radar, dimsOverride) {
     // que la figura deja de ser el sitio donde se declara la limitación.
     // `data-availability` se conserva: es el discriminador del gate y el que
     // alimenta la descripción accesible, y no pinta nada.
+    // §2 — SIN MARCADOR CUANTITATIVO PARA LO DESCONOCIDO. No hay punto, no hay
+    // halo y no hay coordenada: el eje existe, su medición no. Ésta es la
+    // diferencia con la versión que rotulaba «sin datos» (dibujaba un marcador y
+    // le ponía una palabra al lado) y con la que retiraba el eje (borraba también
+    // la estructura). El nombre se queda; el dato no se finge.
+    if (!isMeasured) return;
     const [dx, dy] = posOf(i);
     halos += `<circle class="intcc-radar-halo"`
           +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${(RADAR_DOT_R + 2.2).toFixed(1)}"/>`;
@@ -64763,24 +64943,34 @@ function _intccRadarSvg(radar, dimsOverride) {
   const vbY = Math.floor(Math.min.apply(null, ys));
   const vbW = Math.ceil(Math.max.apply(null, xs)) - vbX;
   const vbH = Math.ceil(Math.max.apply(null, ys)) - vbY;
-  // ── SUPREME CLOSURE · §5 — DESCRIPCIÓN ACCESIBLE DE LOS CINCO EJES ───────
-  // «No depender solo del color» deja de ser una aspiración cuando la figura es
-  // deliberadamente uniforme: si los cinco marcadores son idénticos, el ÚNICO
-  // canal que distingue medido de no medido para quien no ve la etiqueta es
-  // éste. Se enumeran los cinco por su nombre con su valor publicado o con la
-  // misma palabra que imprime la etiqueta («sin datos») — nunca un 0 ni un
-  // porcentaje inventado. Se compone de la copy que ya existe, en el idioma
-  // activo, y no añade ningún nodo enfocable.
-  // §6 — la enumeración accesible publica el valor de cada eje dibujado. No puede
-  // decir «sin datos» porque un eje sin datos no llega hasta aquí.
-  const a11y = dims.map(d => d.label + ': '
-    + (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))).join('. ');
+  // ── §2 · LA DESCRIPCIÓN ACCESIBLE ES EL ÚNICO SITIO DONDE SE NOMBRA LA
+  //         AUSENCIA, y el §2 lo autoriza expresamente («explicación accesible
+  //         breve FUERA de las etiquetas») ────────────────────────────────────
+  // Para quien no ve la figura, un eje sin marcador es indistinguible de un eje
+  // que no se ha pintado: hay que decirlo con palabras en alguna parte. Lo que
+  // el §2 prohíbe es rotularlo DENTRO del gráfico, no que exista el dato de
+  // disponibilidad. Y no se dice «sin datos» —jerga que el lenguaje de producto
+  // ya había retirado— sino que Aurix todavía no puede medirlo, que es la
+  // afirmación cierta: la ausencia es de MEDICIÓN, no del dato del usuario.
+  // FAIL CLOSED SOBRE LA COPY, y ya nos costó una vez con la cobertura del eje:
+  // sin la cadena, la alternativa NO es «Estabilidad: » con los dos puntos
+  // colgando —una afirmación vacía que un lector de pantalla pronuncia— sino el
+  // NOMBRE solo, que es verdad y completo.
+  const _notMeasured = _intv4T('intv16_axis_not_measured');
+  const a11y = dims.map((d) => {
+    if (measured.indexOf(d) !== -1) {
+      return d.label + ': '
+        + (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')));
+    }
+    return _notMeasured ? (d.label + ': ' + _notMeasured) : d.label;
+  }).join('. ');
   return `
     <svg class="intcc-radar-svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" role="img" aria-label="${_intccEsc(t('intcc_radar_title') + '. ' + a11y + '.')}"
          data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
          data-svg-unknown="${dims.length - measured.length}"
          data-svg-open="${closeArea ? '0' : '1'}" data-svg-edges="${edgeCount}"
-         data-svg-neutral="${neutralCount}" data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}"
+         data-svg-gaps="${gapCount}" data-svg-dots="${measured.length}"
+         data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}"
          data-svg-a11y-axes="${dims.length}">
       ${/* ORDEN DE CAPAS (§7): retícula → relleno → los cinco segmentos → marcador
             CON SU HALO → etiquetas. El halo es un disco opaco del color del lienzo
@@ -64788,8 +64978,8 @@ function _intccRadarSvg(radar, dimsOverride) {
             así que ninguna línea atraviesa el centro de un marcador. */''}
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
-      ${/* UN SOLO GRUPO: con los cinco segmentos idénticos, separar en dos capas
-            sólo podía reintroducir una diferencia de pintado. */''}
+      ${/* UN SOLO GRUPO: todos los segmentos son idénticos, así que separar en dos
+            capas sólo podía reintroducir una diferencia de pintado. */''}
       <g class="intcc-radar-edges">${edges}</g>
       <g class="intcc-radar-halos">${halos}</g>
       <g class="intcc-radar-dots">${dots}</g>
@@ -64883,12 +65073,63 @@ const _AURIX_TODAY_STALE_MS = 72 * 3600 * 1000;
 // El instante FECHABLE de un hecho. `endAt` es el cierre de su ventana —lo
 // último que el hecho afirma—, y sin ventana se admite la marca del evento.
 // Devuelve null cuando no hay ninguna: eso es un estado, no un hecho viejo.
+// ════════════════════════════════════════════════════════════════════════════
+// CIERRE CORRECTIVO §6 · UN AGREGADO HISTÓRICO NO ES UN EVENTO RECIENTE
+// ════════════════════════════════════════════════════════════════════════════
+// EL DEFECTO, con la captura del founder: «Lo que importa hoy» publicaba las
+// entradas y salidas de liquidez ACUMULADAS DESDE AGOSTO. Y el mecanismo es
+// exacto: `recorded_capital_net` mide sobre la ventana `all`, cuyo `endAt` es el
+// final de la serie de observaciones, o sea HOY. La puerta de actualidad leía ese
+// `endAt` y concluía «esto es de hoy». La frase del §6 lo resume: la fecha final
+// actual no convierte un agregado histórico en evento reciente.
+//
+// DOS CORRECCIONES, y ninguna toca la ventana financiera del hecho:
+//   1 · si el hecho lleva un INSTANTE DE EVENTO real del ledger, la actualidad se
+//       mide contra ÉL y no contra el final de una serie. Es lo que el §6 pide
+//       con esas palabras: «usar timestamps reales de eventos».
+//   2 · un hecho que ACUMULA EVENTOS sobre una ventana histórica por definición
+//       —`all`, `observed`, `inception`: el registro entero, no un periodo
+//       reciente nombrado— sólo puede entrar en «Hoy» si trae ese instante de
+//       evento. Sin él es historia, y su sitio son «Tu evolución» y «Qué ha
+//       cambiado», donde sigue publicándose: esto no lo silencia, lo manda a su
+//       superficie.
+//
+// POR QUÉ «ACUMULA EVENTOS» Y NO SIMPLEMENTE «VENTANA LARGA», que fue mi primer
+// intento y vació la card entera en el gate. Un NIVEL o una RENTABILIDAD sobre
+// `all` son mediciones AS OF el final de la ventana: su fecha SÍ es `endAt` y son
+// afirmaciones sobre el presente. Un acumulado de movimientos no: es la suma de
+// cosas que pasaron en instantes distintos, y su fecha es la del último, que el
+// hecho no lleva. La diferencia se detecta sin heurística —la familia declarada
+// es `capital_flow`, o el propio hecho publica el CONTADOR de eventos que ha
+// sumado (`values.events`)— así que no hace falta adivinar.
+//
+// Lo que NO se toca, y es deliberado: las ventanas NOMBRADAS (24h, 7d, 30d, 90d)
+// son afirmaciones de recencia por construcción y siguen entrando. Una deriva de
+// liquidez de 30 días que termina hoy ES un cambio reciente; un acumulado desde
+// el primer día del registro no lo es.
+const _AURIX_TODAY_HISTORICAL_RANGES = Object.freeze(['all', 'observed', 'inception']);
+function _aurixTodayEventAt(st) {
+  const v = (st && st.values) || {};
+  const KEYS = ['lastActionAt', 'recordedAt', 'effectiveAt', 'at'];
+  for (const k of KEYS) if (Number.isFinite(v[k])) return v[k];
+  return Number.isFinite(st && st.at) ? st.at : null;
+}
+function _aurixTodayIsRecentClaim(st) {
+  const range = String((st && st.window && st.window.range) || '').toLowerCase();
+  if (_AURIX_TODAY_HISTORICAL_RANGES.indexOf(range) === -1) return true;
+  const v = (st && st.values) || {};
+  const aggregatesEvents = (st && st.family === _AURIX_FACT_FAMILY.CAPITAL_FLOW)
+    || Number.isFinite(v.events);
+  if (!aggregatesEvents) return true;
+  return _aurixTodayEventAt(st) !== null;
+}
 function _aurixTodayDatedAt(st) {
+  // §6 — EL EVENTO MANDA SOBRE LA SERIE. Antes se leía primero `window.endAt`, y
+  // por eso un agregado de tres meses se fechaba hoy.
+  const ev = _aurixTodayEventAt(st);
+  if (ev !== null) return ev;
   const w = st && st.window;
   if (w && Number.isFinite(w.endAt)) return w.endAt;
-  const v = (st && st.values) || {};
-  if (Number.isFinite(v.at)) return v.at;
-  if (Number.isFinite(st && st.at)) return st.at;
   return null;
 }
 // ¿Es este hecho ACTUAL? Contra el presente, siempre. La ventana de medición
@@ -65767,8 +66008,11 @@ function _intv15ExploreLabel(q, core, intel) {
 function _intv4ExploreHtml(core, esc, intel) {
   const hot = new Set(_aurixIntelRootsOf(intel));
   const all = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
+    // §3 — LABEL Y RESPUESTA SE RESUELVEN EN LA MISMA PASADA Y DESDE EL MISMO
+    // `q`, así que no pueden cruzarse: un reordenamiento del catálogo mueve el
+    // par entero, nunca media pareja.
     .map(q => ({ q, label: _intv15ExploreLabel(q, core, intel),
-                 answer: _intv4AnswerHtml(q, core, esc) }))
+                 answer: _intv4AnswerHtml(q, core, esc, intel) }))
     .filter(x => !!x.label && !!x.answer);
   // La rotación elige QUÉ cuatro; la relevancia del modelo sólo ordena las
   // elegidas, y es una derivación de datos certificados, así que es igual en
@@ -65819,7 +66063,87 @@ const _AURIX_ROOT_READABLE = Object.freeze({
   investable_return: 'intcc_dim_growth',
   wealth_level:      'intcc_dim_stab',
 });
-function _intv4AnswerHtml(q, core, esc) {
+// ════════════════════════════════════════════════════════════════════════════
+// CIERRE CORRECTIVO §3 · LA RESPUESTA CONTESTA LA PREGUNTA
+// ════════════════════════════════════════════════════════════════════════════
+// LOS DOS DEFECTOS, con las capturas del founder:
+//   A · «¿Qué significa tener el 4 % … en liquidez?» → «Tu liquidez es el 4 %…».
+//       La respuesta REPITE el enunciado. Preguntar «qué significa» y devolver la
+//       misma cifra no es una respuesta corta: es ninguna.
+//   B · la pregunta por las TRES MAYORES POSICIONES se contestaba con «3,3
+//       posiciones equiponderadas». Son conceptos emparentados —los dos salen del
+//       vector de pesos— pero la dispersión equivalente no dice quiénes son ni
+//       cuánto suman, que es exactamente lo que se ha preguntado.
+//
+// LA REGLA QUE LO CIERRA: cada par pregunta/respuesta es UNA UNIDAD. La primera
+// frase contesta la intención; lo que venga después es contexto y consecuencia, y
+// sólo hasta donde la evidencia llegue. El resto del cuerpo de la respuesta —los
+// hechos del Core— no se toca: sigue siendo la evidencia, ahora detrás de su
+// conclusión en vez de en lugar de ella.
+//
+// DE DÓNDE SALE CADA LEAD, y ninguno inventa una cifra:
+//   · liquidez      → `intel.model.liquidity.cashPct`, el owner canónico. Dice qué
+//     es ese saldo frente al conjunto analizado y qué NO puede afirmar de él
+//     (§3: «no equiparar liquidez registrada con dinero inmediatamente
+//     disponible»). No califica suficiente/insuficiente: eso exigiría necesidades
+//     y horizonte, y sin ellos sería una recomendación disfrazada.
+//   · top-3         → `buildPortfolioDrivers`, el mismo owner que pinta Factores,
+//     así que la card y la respuesta no pueden publicar pesos distintos. El peso
+//     conjunto se agrega sobre `pctRaw` SIN REDONDEAR y se redondea UNA vez
+//     (§3), que es la diferencia entre 77 % y «31+25+21».
+//   · concentración → el peso de la mayor posición y lo que implica
+//     ESTRUCTURALMENTE. Nunca atribución de rendimiento ni de riesgo: el peso
+//     dice de qué depende el VALOR, no qué explicó el resultado.
+function _intv16AnswerLead(q, core, intel) {
+  const m = (intel && intel.model) || {};
+  const AV = (typeof _AURIX_AI_AVAIL !== 'undefined') ? _AURIX_AI_AVAIL.AVAILABLE : 'available';
+  const out = [];
+  try {
+    if (q.id === 'q_liquidity') {
+      const l = m.liquidity;
+      if (!l || l.availability !== AV || !Number.isFinite(l.cashPct)) return out;
+      out.push(_intv4T('intv16_ans_liq_lead', _aurixPctLabel(l.cashPct),
+        _aurixPctLabel(Math.max(0, 100 - l.cashPct))));
+      out.push(_intv4T('intv16_ans_liq_limit'));
+      return out.filter(Boolean);
+    }
+    if (q.id === 'q_diversification') {
+      let drv = null;
+      const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+      try { drv = (snap && typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : null; }
+      catch (_) { drv = null; }
+      const items = (drv && Array.isArray(drv.items)) ? drv.items.filter(x => Number.isFinite(x.pctRaw)) : [];
+      if (items.length < 2) return out;
+      // §3 — SE AGREGA SIN REDONDEAR Y SE REDONDEA UNA VEZ. Sumar los enteros ya
+      // redondeados de cada fila produce un total que no es el total.
+      const joint = items.reduce((a, x) => a + x.pctRaw, 0);
+      out.push(_intv4T('intv16_ans_top3_lead', items.length,
+        _aurixListJoin(items.map(x => x.name)), _aurixPctLabel(joint)));
+      out.push(_intv4T('intv16_ans_top3_mean'));
+      return out.filter(Boolean);
+    }
+    if (q.id === 'q_concentration') {
+      const c = m.concentration;
+      if (!c || c.availability !== AV || !Number.isFinite(c.topWeightPct)) return out;
+      const name = (c.topContributor && c.topContributor.name) ? String(c.topContributor.name) : null;
+      if (!name) return out;
+      out.push(_intv4T('intv16_ans_conc_lead', name, _aurixPctLabel(c.topWeightPct)));
+      out.push(_intv4T('intv16_ans_conc_mean'));
+      return out.filter(Boolean);
+    }
+  } catch (_) { return []; }
+  return out;
+}
+// Enumeración en lenguaje natural, en el idioma activo. No es un formateador
+// financiero: no toca ninguna cifra.
+function _aurixListJoin(names) {
+  const xs = (names || []).map(x => String(x == null ? '' : x)).filter(Boolean);
+  if (!xs.length) return '';
+  if (xs.length === 1) return xs[0];
+  const and = _intv4T('intv16_list_and') || 'y';
+  return xs.slice(0, -1).join(', ') + ' ' + and + ' ' + xs[xs.length - 1];
+}
+function _intv4AnswerHtml(q, core, esc, intel) {
   const avail = (core && core.dataAvailability) || {};
   const obs = avail.observation || {};
   if (q.family === 'data_quality') {
@@ -65887,7 +66211,35 @@ function _intv4AnswerHtml(q, core, esc) {
     if (!Number.isFinite(obs.endAt)) return '';
     lines.push(_intv4T('intv4_cv_asof', _intccDate(obs.endAt)));
   }
-  return lines.slice(0, 4).map(l => `<p>${esc(l)}</p>`).join('');
+  // §3 — EL LEAD VA DELANTE, y los hechos del Core pasan a ser su evidencia. Si
+  // no hay lead para esta pregunta, la respuesta es la de siempre: este cierre
+  // añade conclusión donde faltaba, no reemplaza la evidencia.
+  const lead = _intv16AnswerLead(q, core, intel);
+  const body = lead.concat(lines);
+  // ── §3 · UNA RESPUESTA QUE REPITE EL ENUNCIADO NO SE PUBLICA ────────────
+  // El caso A del founder en su forma general: si TODO lo que la respuesta dice
+  // ya está contenido en el título de la pregunta, el candidato se retira y su
+  // sitio NO se rellena —el §3 lo dice con esas palabras—. Se compara
+  // normalizado (sin acentos, signos ni espacios) porque lo que se mide es si
+  // aporta información, no si la redacción coincide.
+  const qLabel = _intv15ExploreLabel(q, core, intel);
+  if (_intv16AnswerIsTautology(body, qLabel)) return '';
+  return body.slice(0, 5).map(l => `<p>${esc(l)}</p>`).join('');
+}
+// Normalización compartida por la puerta anti-tautología. Sin acentos y sin nada
+// que no sea alfanumérico: «el 4 %» y «el 4%» son la misma afirmación.
+function _intv16NormTxt(t0) {
+  return String(t0 || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+function _intv16AnswerIsTautology(lines, label) {
+  const q = _intv16NormTxt(label);
+  if (!q) return false;
+  const body = (lines || []).map(_intv16NormTxt).filter(Boolean);
+  if (!body.length) return true;                 // sin texto no hay respuesta
+  // Basta con que UNA línea aporte algo que el enunciado no contenga.
+  return body.every(l => q.indexOf(l) !== -1 || l.indexOf(q) !== -1);
 }
 
 // FINANCIAL MEMORY — WHAT / WHEN / MAGNITUDE / WHY IT MATTERS, and nothing that
@@ -66054,65 +66406,126 @@ function _intv4MemoryRows(core, alreadyPublished, intel, excludeFields) {
     .sort((a, b) => (b.at - a.at) || (a.key < b.key ? -1 : 1)), _INTV4_MEMORY_MAX);
 }
 // ════════════════════════════════════════════════════════════════════════════
-// VNEXT §14–§16 · «TU EVOLUCIÓN» DEJA DE SER UNA CARD MUERTA
+// §14–§16 + CIERRE CORRECTIVO §5 · «TU EVOLUCIÓN» ES EVOLUCIÓN, NO UNA FOTO
 // ════════════════════════════════════════════════════════════════════════════
-// EL DEFECTO, con la frase exacta que el founder leyó durante días: «Aurix dispone
-// de 40 días de historial certificado. Las comparaciones de mayor plazo aparecerán
-// a medida que crezca tu historial.» Es verdad, es honesta y es INÚTIL: describe la
-// herramienta, no el patrimonio, y no cambia mientras no cambie el calendario. El
-// §14 la llama «muerta» y el §16 dice qué poner en su lugar cuando de verdad no ha
-// cambiado nada: que la ESTRUCTURA se mantiene, desde cuándo, y por qué se puede
-// afirmar — «solo si puede certificarse».
+// PRIMER DEFECTO (VNext lo corrigió): la card repetía durante días «Aurix dispone
+// de 40 días de historial certificado». Describía la herramienta, no el
+// patrimonio, y no cambiaba mientras no cambiara el calendario.
 //
-// DE DÓNDE SALE CADA LÍNEA, y ninguna se calcula aquí:
-//   · concentración → `intel.model.concentration` (owner: diversificación efectiva,
-//     con `snapshot_fallback` declarado). Publica el PESO de la mayor posición.
-//   · liquidez      → `intel.model.liquidity` (owner: el snapshot canónico).
-//     Publica el NIVEL. Sólo añade dirección cuando la deriva está MEDIDA; con
-//     `no_measured_drift` la cobertura es parcial y decir «estable» sería afirmar
-//     una ausencia que nadie ha medido.
-//   · aportaciones  → el hueco `recorded_capital_net · no_flows_in_window` que el
-//     Core ya declara. «No hay flujos en la ventana» es una afirmación CERTIFICADA
-//     del ledger, no la ausencia de un dato.
+// SEGUNDO DEFECTO, el que cierra este bloque, y lo destapó la captura del
+// founder: «Tu estructura se mantiene estable desde hace 41 días; no ha cambiado
+// nada que merezca tu atención.» La frase era UNA INFERENCIA, no una medición.
+// Salía de dos cosas que no demuestran estabilidad:
+//   · la EDAD DE LA CUENTA (`observation.spanMs`), que sólo dice cuánto hace que
+//     Aurix mira, y
+//   · la AUSENCIA DE HALLAZGOS, que puede significar «nada se ha movido» o
+//     «todavía no puedo comparar». Son dos estados opuestos con la misma huella.
+// Y las filas lo agravaban: «tu mayor posición SIGUE SIENDO Microsoft» afirma una
+// continuidad sobre el pasado leyendo únicamente el presente. Una foto no es una
+// evolución.
 //
-// Y LA CONDICIÓN QUE HACE PUBLICABLE EL TITULAR, que es lo delicado: «no ha
-// cambiado nada material» sólo se puede decir si el Core NO ha producido NINGÚN
-// hallazgo ni evento — no si los ha producido y otra card se los ha llevado. Se
-// consulta el pool COMPLETO (`_intv4MemoryEvents(core, [])`, sin exclusiones) y la
-// lista canónica de hallazgos. Con cambios publicados en otra superficie, esta card
-// cae al estado de cobertura anterior, que no afirma estabilidad. Fail closed.
+// LA REGLA, tal como la fija el §5: afirmar que algo se mantiene exige una
+// COMPARACIÓN DEMOSTRABLE de esa dimensión. El Core publica ahora
+// `stabilityEvidence`: por cada deriva MEDIDA sobre dos extremos certificados y
+// por debajo de su propio umbral de materialidad, una entrada con su raíz, su
+// ventana y su delta. Sin una entrada, la dimensión NO puede decir «se mantiene»,
+// por muchos días de historial que haya.
+//
+// Y LA VENTANA NO SE INFLA: el titular se acota al SOLAPE de las comparaciones
+// publicadas (el mínimo de sus spans), no a la edad de la cuenta. Con dos extremos
+// conocidos y nada en medio, la afirmación cubre lo que la comparación cubre.
+//
+// LO QUE NO SE PUEDE COMPARAR SE DICE, compacto y una sola vez: el peso de cada
+// POSICIÓN no tiene lector histórico (la historia por categorías sí, la de
+// posiciones no), así que la concentración individual NO produce fila de
+// estabilidad y sí produce una línea de límite.
+const _INTV16_STABLE_ROOT_LABEL = Object.freeze({
+  cash_weight:  'intcc_dim_liq',
+  category_mix: 'intcc_dim_breadth',
+});
+// Span efectivo de una prueba, en días. Sale de sus DOS EXTREMOS certificados,
+// nunca del nombre de la ventana: una `30d` recortada cubre menos de 30 días y
+// decir «30» sería la cobertura inflada que el §5 prohíbe.
+function _intv16EvidenceDays(e) {
+  if (!e || !Number.isFinite(e.startAt) || !Number.isFinite(e.endAt)) return null;
+  const d = Math.round((e.endAt - e.startAt) / 864e5);
+  return d >= 1 ? d : null;
+}
+// La mejor prueba POR RAÍZ: la de mayor cobertura, porque es la que sostiene la
+// afirmación más ancha que se puede hacer sin exagerar.
+function _intv16StabilityByRoot(core) {
+  const out = {};
+  ((core && core.stabilityEvidence) || []).forEach((e) => {
+    if (!e || !e.root) return;
+    const days = _intv16EvidenceDays(e);
+    if (days === null) return;
+    const prev = out[e.root];
+    if (!prev || days > prev.days) out[e.root] = { e, days };
+  });
+  return out;
+}
 function _intv15StableRows(core, intel) {
   const out = [];
   const m = (intel && intel.model) || {};
   const AV = (typeof _AURIX_AI_AVAIL !== 'undefined') ? _AURIX_AI_AVAIL.AVAILABLE : 'available';
-  const c = m.concentration, l = m.liquidity;
-  if (c && c.availability === AV && Number.isFinite(c.topWeightPct)) {
-    const pct = _aurixPctLabel(c.topWeightPct);
-    const name = (c.topContributor && c.topContributor.name) ? String(c.topContributor.name) : null;
-    out.push({ code: 'concentration',
-      txt: name ? _intv4T('intv15_stable_conc_named', name, pct) : _intv4T('intv15_stable_conc', pct) });
+  const byRoot = _intv16StabilityByRoot(core);
+  // ── LIQUIDEZ ──────────────────────────────────────────────────────────────
+  // Nivel actual del owner canónico + la prueba de que NO se ha movido. Las dos
+  // mitades son obligatorias: el nivel sin la prueba es una foto, y la prueba sin
+  // el nivel no dice de qué estamos hablando.
+  const liqEv = byRoot[_AURIX_CAUSAL_ROOT.CASH_WEIGHT];
+  const l = m.liquidity;
+  if (liqEv && l && l.availability === AV && Number.isFinite(l.cashPct)) {
+    out.push({ code: 'liquidity', days: liqEv.days,
+      txt: _intv4T('intv16_stable_liq', _aurixPctLabel(l.cashPct),
+        _intv4Num(liqEv.e.thresholdPp, 0), liqEv.days) });
   }
-  if (l && l.availability === AV && Number.isFinite(l.cashPct)) {
-    // Con deriva MEDIDA y por debajo del umbral de materialidad se puede decir que
-    // no se ha movido; sin deriva medida se publica sólo el nivel.
-    const measuredFlat = Number.isFinite(l.changePp)
-      && Math.abs(l.changePp) < _AURIX_FACT_MATERIAL.cashDeltaPp;
-    out.push({ code: 'liquidity',
-      txt: _intv4T(measuredFlat ? 'intv15_stable_liq_flat' : 'intv15_stable_liq',
-        _aurixPctLabel(l.cashPct)) });
+  // ── REPARTO POR CLASE DE ACTIVO ───────────────────────────────────────────
+  const mixEv = byRoot[_AURIX_CAUSAL_ROOT.CATEGORY_MIX];
+  if (mixEv) {
+    out.push({ code: 'category_mix', days: mixEv.days,
+      txt: _intv4T('intv16_stable_mix', _intv4Num(mixEv.e.thresholdPp, 0), mixEv.days) });
   }
+  // ── APORTACIONES ──────────────────────────────────────────────────────────
+  // «No hay flujos en la ventana» es una afirmación CERTIFICADA del ledger: se ha
+  // mirado y no había. No es la ausencia de un dato.
   const noFlows = ((core && core.dataAvailability && core.dataAvailability.gaps) || [])
     .some(g => g && g.semanticKey === 'recorded_capital_net'
             && g.reason === 'no_flows_in_window'
             && g.status === _AURIX_FACT_STATUS.AVAILABLE);
-  if (noFlows) out.push({ code: 'flows', txt: _intv4T('intv15_stable_flows') });
+  if (noFlows) out.push({ code: 'flows', days: null, txt: _intv4T('intv16_stable_flows') });
   return out.filter(x => !!x.txt);
 }
+// Lo que NO se ha podido comparar, dicho una vez y compacto (§5). Hoy es siempre
+// el peso por POSICIÓN: existe lector histórico por categoría, no por posición.
+function _intv16StableLimit(core, intel) {
+  const m = (intel && intel.model) || {};
+  const AV = (typeof _AURIX_AI_AVAIL !== 'undefined') ? _AURIX_AI_AVAIL.AVAILABLE : 'available';
+  const c = m.concentration;
+  if (!c || c.availability !== AV || !Number.isFinite(c.topWeightPct)) return '';
+  return _intv4T('intv16_stable_limit_position') || '';
+}
+// ── LA PUERTA DEL TITULAR ───────────────────────────────────────────────────
+// TRES condiciones, y las tres son necesarias:
+//   1 · el Core no ha producido NINGÚN hallazgo ni evento material — si los
+//       produjo y otra card se los llevó, aquí no se puede afirmar quietud;
+//   2 · existe al menos UNA comparación demostrable (`stabilityEvidence`), que es
+//       lo que convierte «no he visto nada» en «he mirado y no se ha movido»;
+//   3 · esa comparación cubre al menos un día.
+// Fail closed en las tres.
 function _intv15MemoryIsStable(core) {
   const findings = (core && Array.isArray(core.findings)) ? core.findings : [];
   if (findings.length) return false;
   try { if (_intv4MemoryEvents(core, []).length) return false; } catch (_) { return false; }
-  return true;
+  const byRoot = _intv16StabilityByRoot(core);
+  return Object.keys(byRoot).length > 0;
+}
+// La ventana que el titular puede afirmar: el MÍNIMO de las coberturas
+// publicadas. Afirmar el máximo diría que todo se comparó durante ese plazo, y no
+// es cierto — cada dimensión tiene la suya.
+function _intv16StableDays(rows) {
+  const ds = (rows || []).map(r => r.days).filter(d => Number.isFinite(d) && d >= 1);
+  return ds.length ? Math.min.apply(null, ds) : null;
 }
 function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, limitLine) {
   const declared = _intv4MemoryDeclared(intel, excludeFields);
@@ -66151,32 +66564,49 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
     // a secas sería la misma no-noticia con otras palabras.
     if (nObs >= 3 && days && _intv15MemoryIsStable(core)) {
       const st = _intv15StableRows(core, intel);
-      if (st.length) {
+      // §5 — LA VENTANA DEL TITULAR SALE DE LAS COMPARACIONES, NO DEL CALENDARIO.
+      // `days` (la edad del historial) se sigue publicando como cobertura al pie,
+      // porque es lo que gobierna qué comparaciones son posibles; pero lo que el
+      // titular AFIRMA se acota a `stableDays`, que es lo que se ha comparado.
+      const stableDays = _intv16StableDays(st);
+      const limitLn = _intv16StableLimit(core, intel);
+      if (st.length && stableDays) {
         return `
         <section class="intcc-card intcc-timeline intv4-memory is-stable"
                  data-coverage-days="${esc(String(days))}" data-obs="${esc(String(nObs))}"
                  data-stable="1" data-stable-rows="${st.length}"
+                 data-stable-days="${esc(String(stableDays))}"
                  data-stable-codes="${esc(st.map(x => x.code).join(','))}">
           <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-          <p class="intv15-stable-head">${esc(_intv4T('intv15_stable_head', days))}</p>
+          <p class="intv15-stable-head">${esc(_intv4T('intv16_stable_head', stableDays))}</p>
           <ul class="intv15-stable-list">
             ${st.map(x => `<li class="intv15-stable-row" data-stable-code="${esc(x.code)}">${
               esc(x.txt)}</li>`).join('')}
           </ul>
-          ${/* La cobertura sigue declarándose —es lo que gobierna qué comparaciones
-                son posibles—, pero como PIE de una lectura, no como su contenido. */''}
+          ${/* §5 — lo que NO se ha podido comparar, una vez y compacto. */''}
+          ${limitLn ? `<p class="intcc-surface-limit">${esc(limitLn)}</p>` : ''}
           <p class="intv4-mem-coverage">${esc(_intv4T('intv4_memory_coverage', days))}</p>
         </section>`;
       }
     }
+    // ── §5 · SIN COMPARACIÓN CERTIFICABLE, LA LIMITACIÓN CONCRETA ───────────
+    // Éste es el estado que faltaba y el que la captura convirtió en una
+    // afirmación falsa. Hay historial —puede que mucho— y aun así Aurix no ha
+    // podido comparar ninguna dimensión con su pasado. Lo honesto es decir eso,
+    // en una línea, en vez de publicar métricas de hoy bajo un título temporal o
+    // repetir el párrafo de cobertura como si fuera análisis.
     if (nObs >= 3 && days) {
       return `
         <section class="intcc-card intcc-timeline intv4-memory is-coverage"
-                 data-coverage-days="${esc(String(days))}">
+                 data-coverage-days="${esc(String(days))}" data-stable="0"
+                 data-no-comparison="1">
           <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-          <p class="intv4-mem-coverage">${esc(_intv4T('intv4_memory_coverage', days))}</p>
+          <p class="intv4-mem-coverage">${esc(_intv4T('intv16_no_comparison', days))}</p>
         </section>`;
     }
+    // La rama de cobertura A SECAS se retira: decir «Aurix dispone de N días de
+    // historial» y nada más es describir la herramienta. Su caso lo cubre ahora
+    // `intv16_no_comparison`, que dice lo MISMO y además por qué importa.
     // ── SUPREME CLOSURE · §4.5 · EL ESTADO VACÍO ES COMPACTO ──────────────
     // Era una línea de tiempo animada con cinco nodos y DOS párrafos: media card
     // premium dedicada a decir que todavía no hay nada. El §4.5 pide exactamente
@@ -66556,9 +66986,39 @@ function _intv5Chips(core, score, intel) {
   // Va DELANTE de los elogios a propósito: si sólo hay sitio para tres filas,
   // la que explica el número no puede ser la que se cae. Viene del owner de
   // Salud (`score.limiters`), no de una segunda derivación.
-  ((score && score.limiters) || []).forEach(l => { if (l && l.label) out.push(l); });
-  const eff = by('effective_holdings'), cash = by('cash_weight'), top1 = by('top_position_weight');
+  // ── CIERRE CORRECTIVO §4 · UNA CARACTERÍSTICA ACEPTADA NO ES UNA INCIDENCIA ─
+  // El §4 lo separa en cuatro cosas distintas: característica estructural,
+  // cambio nuevo que merece revisión, limitación de evidencia y decisión
+  // declarada. El limitador de reparto las mezclaba: llevaba SIEMPRE tono de
+  // aviso («!» en la lista de móvil) aunque el usuario hubiese declarado su
+  // concentración deliberada y aunque no hubiese cambiado nada desde entonces.
+  // Una exclamación permanente sobre algo conocido y aceptado deja de informar y
+  // empieza a regañar.
+  //
+  // LO QUE CAMBIA ES EL TONO, Y NADA MÁS. La cifra no se toca, el limitador no
+  // desaparece, el anillo no sube y la concentración no se oculta — el §4 lo
+  // prohíbe expresamente («no ocultar concentración ni mejorar el score porque el
+  // usuario se declare experto»). Sólo deja de presentarse como una incidencia.
+  //
+  // Y VUELVE A MERECER ATENCIÓN cuando hay un CAMBIO MATERIAL POSTERIOR: si la
+  // lista canónica de hallazgos tiene un hallazgo vivo de la raíz de concentración,
+  // el aviso se restaura. La declaración cubre lo que el usuario aceptó, no lo que
+  // ocurra después.
   const cf = (intel && intel.context && intel.context.fields) || {};
+  const _intentDeliberate = !!(cf.concentration_intent
+    && cf.concentration_intent.value === 'deliberate'
+    && cf.concentration_intent.superseded !== true);
+  const _concChangeLive = ((core && core.findings) || [])
+    .some(f => f && (f.rootCause === _AURIX_CAUSAL_ROOT.TOP_POSITION
+                  || f.causalRoot === _AURIX_CAUSAL_ROOT.TOP_POSITION));
+  const _neutraliseSpread = _intentDeliberate && !_concChangeLive;
+  ((score && score.limiters) || []).forEach(l => {
+    if (!l || !l.label) return;
+    out.push((_neutraliseSpread && l.key === 'spread')
+      ? Object.assign({}, l, { tone: 'context', neutralised: 'declared_intent' })
+      : l);
+  });
+  const eff = by('effective_holdings'), cash = by('cash_weight'), top1 = by('top_position_weight');
   const liqNeed = (cf.liquidity_need && cf.liquidity_need.value) || null;
   const unregLiq = (cf.unregistered_liquidity && cf.unregistered_liquidity.value) || null;
   // ── §8 · CON UNA POSICIÓN NO HAY REPARTO QUE ELOGIAR ─────────────────────
@@ -66848,55 +67308,51 @@ function _intv7PendingReasonKey(reason) {
   return 'intv7_pending_generic';
 }
 
-// ── §6 · LA CARD SE ADAPTA A LO QUE AURIX PUEDE CERTIFICAR ─────────────────
-// TRES ESTADOS, y ninguno de ellos afirma nada que no esté medido:
-//   >= 3 certificadas → RADAR ADAPTATIVO de exactamente esas dimensiones.
-//    1–2 certificadas → FACTORES OBSERVABLES: una lista compacta, etiqueta y
-//                       cifra real. No se dibuja un polígono de dos puntos, que
-//                       es una figura inventada.
-//      0 certificadas → NADA. Una card vacía que dice «no puedo medir tu
-//                       estructura» ocupa el sitio de la que sí tiene contenido.
-//                       Fail closed en la dirección de no publicar.
+// ════════════════════════════════════════════════════════════════════════════
+// §2 · LA CARD DEL RADAR ES UNA SOLA, Y SIEMPRE ES UN RADAR
+// ════════════════════════════════════════════════════════════════════════════
+// SE RETIRA «FACTORES OBSERVABLES». Fue la respuesta de VNext a «menos de tres
+// dimensiones no son un radar», y el §2 la prohíbe por su nombre: «nunca …
+// eliminar ejes o convertir el radar en lista». El razonamiento del founder es
+// el correcto y es el mismo que rescata el marco fijo: la malla pentagonal es la
+// ESTRUCTURA sobre la que Intelligence razona y no puede desaparecer porque hoy
+// falte evidencia — si desaparece, el usuario pierde la referencia de qué se
+// está midiendo y cada visita le enseña una figura distinta.
 //
-// El orden de dibujo del catálogo `_INTV7_RADAR_DIMS` se CONSERVA: al filtrar se
-// mantiene su secuencia relativa, así que cuando un eje pendiente adquiere owner
-// la figura crece sin reordenar los que ya estaban. Eso era el objetivo del orden
-// intercalado y sigue cumpliéndose — lo que se retira es el vértice fantasma.
+// Queda UN estado con tres grados de relleno, y ninguno miente:
+//   5 certificadas → polígono cerrado.
+//   1–4            → marcadores en sus ejes y segmentos SÓLO entre vecinos
+//                    certificados; la trayectoria se interrumpe en los huecos.
+//   0              → malla y nombres, y una línea breve que explica que Aurix
+//                    todavía no puede medir ninguna. Es la «explicación
+//                    accesible breve fuera de las etiquetas» que el §2 autoriza,
+//                    y es lo único que impide que la card parezca rota.
 //
-// `data-unavailable`, `data-quality` y `data-pending` SE CONSERVAN en el nodo: son
-// el discriminador de los gates y la trazabilidad del §3 (qué dato, qué owner, qué
-// confianza, por qué no se afirma). Declarar internamente lo que no se mide es
-// obligatorio; PINTARLO como un eje del radar es lo que el §6 prohíbe.
+// `data-unavailable`, `data-pending` y `data-quality` SE CONSERVAN: son la
+// trazabilidad del §3 y el discriminador de los gates. Declarar internamente lo
+// que no se mide es obligatorio; pintarlo como una cifra es lo que está vetado.
 function _intv7RadarHtml(esc) {
   const r = _intv7RadarAxes();
   const svg = _intccRadarSvg(r.values, r.dims);
-  const meta = `data-axes="${r.measured}" data-declared="${r.dims.length}"`
+  const meta = `data-axes="${r.dims.length}" data-declared="${r.dims.length}"`
     + ` data-measured="${r.measured}"`
     + ` data-unavailable="${esc(r.unavailable.join(','))}"`
     + ` data-pending="${esc(Object.keys(r.pending).map(k => k + ':' + r.pending[k]).join(','))}"`
     + ` data-quality="${esc(Object.keys(r.quality).map(k => k + ':' + r.quality[k]).join(','))}"`;
-  if (svg) {
-    return `
-    <section class="intcc-card intcc-radar intv6-radar intv7-radar" ${meta} data-state="radar">
+  // Sin SVG no hay card: eso sólo puede pasar si el catálogo declarase menos de
+  // tres dimensiones, que no ocurre, y publicar un contenedor vacío sería peor
+  // que el hueco. Fail closed.
+  if (!svg) return '';
+  return `
+    <section class="intcc-card intcc-radar intv6-radar intv7-radar" ${meta}
+             data-state="radar" data-evidence="${r.measured ? 'partial' : 'none'}">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
       <div class="intcc-radar-wrap">${svg}</div>
-    </section>`;
-  }
-  // §6.B — la alternativa compacta. Cada fila es un eje CERTIFICADO con el mismo
-  // `display` que habría impreso el radar, así que la card y la figura no pueden
-  // publicar dos textos del mismo dato: es el mismo owner y el mismo formateador.
-  const rows = r.dims.filter(d => !d.unavailable);
-  if (!rows.length) return '';
-  return `
-    <section class="intcc-card intcc-radar intv7-radar is-observable" ${meta} data-state="observable">
-      <h3 class="intcc-card-title">${esc(_intv4T('intv7_observable_title'))}</h3>
-      <ul class="intv15-obs-list">
-        ${rows.map(d => `<li class="intv15-obs-row" data-axis="${esc(d.key)}">
-          <span class="intv15-obs-label">${esc(d.label)}</span>
-          <span class="intv15-obs-val">${esc(d.display != null ? String(d.display)
-            : (r.values[d.key] + (d.suffix || '')))}</span>
-        </li>`).join('')}
-      </ul>
+      ${/* FAIL CLOSED SOBRE LA COPY: sin la cadena la alternativa NO es un
+            párrafo vacío bajo la malla —que es un hueco con borde— sino no
+            emitir el nodo. La malla con sus cinco nombres ya se sostiene sola. */''}
+      ${(r.measured === 0 && _intv4T('intv16_radar_no_evidence')) ? `<p class="intv16-radar-none">${
+        esc(_intv4T('intv16_radar_no_evidence'))}</p>` : ''}
     </section>`;
 }
 
@@ -67150,6 +67606,8 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
     // propósito: ordenar lo viejo al final no impide que salga cuando hay
     // hueco, y el §F prohíbe usar hechos antiguos para completar la card.
     .filter(st => _aurixTodayFresh(st, _nowAt))
+    // §6 — y la ventana histórica no se cuela por tener el final de hoy.
+    .filter(st => _aurixTodayIsRecentClaim(st))
     .filter(st => !skip.has(st.causalRoot))
     // ── SE RE-ELIGE, NO SE DESCARTA ────────────────────────────────────────
     // Filtrar la historia acusada reintroducía en la capa de HISTORIAS el mismo
@@ -67248,6 +67706,31 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
   const publishedRoots = new Set(((typeof _intv4FindingRows === 'function')
     ? _intv4FindingRows(core) : [])
     .map(x => x && x.fd && (x.fd.rootCause || x.fd.causalRoot)).filter(Boolean));
+  // ── CIERRE CORRECTIVO §6 · EL MISMO ACONTECIMIENTO, UNA SOLA VEZ ─────────
+  // EL DEFECTO, con la cifra del founder: el −1,93 % salía en «Lo que importa
+  // hoy» Y en «Qué ha cambiado», como si fueran dos novedades. Y el hueco era
+  // exacto: la exclusión de arriba se mide contra la lista ACTIVA, mientras la
+  // otra card RENDERIZA EL HISTORIAL COMPLETO desde que acusar deja la fila en su
+  // sitio. Un hallazgo ya revisado desaparecía de la lista activa —y por tanto de
+  // la exclusión— pero seguía visible abajo con su cifra.
+  //
+  // NO SE VUELVE A LA EXCLUSIÓN POR RAÍZ SOBRE EL HISTORIAL COMPLETO, que es lo
+  // que una decisión anterior retiró con razón: vetaba una raíz PARA SIEMPRE y un
+  // acontecimiento nuevo y material de esa misma familia no podía volver a
+  // titular. La exclusión es por IDENTIDAD DE EVENTO, que es más fina: el
+  // acontecimiento concreto que ya está publicado abajo no se repite arriba, y
+  // uno NUEVO de la misma raíz sí puede — que es literalmente lo que el §6 pide
+  // en sus dos frases seguidas.
+  // LA IDENTIDAD ES EL EVENTO, NUNCA LA CLAVE SEMÁNTICA. Caer a `semanticKey`
+  // como respaldo parecía inofensivo y reintroducía el veto por familia por la
+  // puerta de atrás: dos operaciones registradas en días distintos comparten
+  // clave y sólo se distinguen por su evento. Si un lado no tiene identidad de
+  // evento, NO se excluye — el filtro por raíz activa ya cubre el caso normal, y
+  // enterrar un acontecimiento nuevo es peor que repetir uno.
+  const _evId = (x) => String((x && (x.eventId || x.conceptId)) || '');
+  const publishedEvents = new Set(((typeof _intv4FindingRows === 'function')
+    ? _intv4FindingRows(core, { all: true }) : [])
+    .map(x => x && x.fd && _evId(x.fd)).filter(Boolean));
   const cards = sel.stories
     // ── CHECKPOINT H · UN HECHO, UNA UBICACIÓN ─────────────────────────────
     // La regla anterior dejaba pasar el hecho si esta card podía añadirle un
@@ -67261,6 +67744,8 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
     // ya vive en «Qué ha cambiado» no vuelve a salir aquí — su significado
     // sigue publicado allí, en su fila.
     .filter(st => !publishedRoots.has(st.causalRoot))
+    // §6 — y el acontecimiento CONCRETO que ya está publicado abajo tampoco sube.
+    .filter(st => { const id = _evId(st); return !id || !publishedEvents.has(id); })
     .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
     .filter(Boolean);
   // EL CONTROL «ENTENDIDO» VIVE EN UN SOLO SITIO. Aquí se construía una segunda

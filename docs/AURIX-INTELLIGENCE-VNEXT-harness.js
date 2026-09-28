@@ -53,13 +53,17 @@ function dictOf(langIdx) {
   // indentación. Se toma la ocurrencia por índice de idioma, que es la técnica que
   // ya usan los gates de Intelligence: anclar por vecino encontraba el idioma
   // equivocado en silencio.
-  const KEYS = ['intv7_observable_title','intv7_axis_unavailable','intcc_radar_title',
+  const KEYS = ['intv16_axis_not_measured','intv16_radar_no_evidence','intv7_axis_unavailable','intcc_radar_title',
     'intcc_dim_breadth','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
+    'intv7_pending_obs','intv7_pending_scale',
     'intv4_memory_title','intv4_memory_empty','intv4_memory_coverage',
-    'intv15_stable_head','intv15_stable_conc_named','intv15_stable_conc',
-    'intv15_stable_liq','intv15_stable_liq_flat','intv15_stable_flows',
+    'intv16_stable_head','intv16_stable_liq','intv16_stable_mix','intv16_stable_flows',
+    'intv16_stable_limit_position','intv16_no_comparison',
     'intv15_qc_concentration','intv15_qc_top3','intv15_qc_liq_dir','intv15_qc_liq_level',
     'intv15_qc_changed','intv15_qc_flows_vs_market',
+    'intv16_ans_liq_lead','intv16_ans_liq_limit','intv16_ans_top3_lead','intv16_ans_top3_mean',
+    'intv16_ans_conc_lead','intv16_ans_conc_mean','intv16_list_and',
+    'intv16_health_scope','intv16_health_aria','intcc_chip_limit_spread','intcc_chip_ctx_intent',
     'intv4_q_q_concentration','intv4_q_q_liquidity','intv4_q_q_diversification',
     'intv4_q_q_what_changed','intv4_q_q_performance','intv4_q_q_current_value',
     'intv4_w_eff','intv4_w_capital','intv4_w_liqconc','intv4_discovery_title',
@@ -103,7 +107,8 @@ function makeCtx(lang) {
   vm.runInContext('function _intv4T(k){ const v = __T[k];'
     + ' return (typeof v === "function") ? v.apply(null, [].slice.call(arguments, 1)) : v; }', sb);
   sb.lang = lang || 'es';
-  ['_AURIX_FACT_STATUS','_AURIX_FACT_MATERIAL','_AURIX_AI_AVAIL','_AURIX_AI_DIM',
+  ['_AURIX_CAUSAL_ROOT','_AURIX_FACT_FAMILY','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS',
+   '_AURIX_FACT_STATUS','_AURIX_FACT_MATERIAL','_AURIX_AI_AVAIL','_AURIX_AI_DIM',
    '_AURIX_AI_LABEL','_AURIX_INTEL_FIELDS','_AURIX_INTEL_PROVENANCE',
    '_AURIX_INTEL_QUESTION_LIMIT','_AURIX_INTEL_Q_AFTER_ANSWER_MS','_AURIX_INTEL_Q_COOLDOWN_MS',
    '_AURIX_INTEL_Q_DECLINED_MS','_AURIX_INTEL_PAUSE_MS','_INTV4_MEMORY_MAX',
@@ -112,9 +117,17 @@ function makeCtx(lang) {
   ['_intccClamp','_intccEsc','_aurixPctNum','_aurixPctLabel','_intv4Num','_intv4Money',
    '_intccRadarSvg','_intv7PendingReasonKey','_intv7RadarAxes','_intv7RadarHtml',
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
+   '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
    '_intv4MemoryHtml','_intv4WowText','_intv4DiscoveryHtml','_aurixIntelQuestions',
-   '_intccIsMonetary','_intccPctLabel','_intv5DriversHtml','_intv5MattersHtml']
+   '_intccIsMonetary','_intccPctLabel','_intv5DriversHtml','_intv5MattersHtml','_intv5Chips',
+   '_intccScoreRingHtml','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore',
+   '_aurixIntelOwner','_aurixIntelCtxMerge','_aurixIntelContext','_aurixIntelRecordAnswer',
+   '_aurixIntelPauseQuestions',
+   '_aurixIntelDecline','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord',
+   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
+   '_intv4AnswerHtml','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt',
+   '_aurixTodayFresh']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   // La COPY de los hechos es otra capa y tiene su propio gate: aquí sólo hace
   // falta que un evento temporal produzca texto para que el pool no esté vacío.
@@ -157,92 +170,135 @@ const DIMS = (unavailable, display) => ORDER.map(k => ({ key: k, label: LABELS[k
 const RADAR = (values, unavailable, display) =>
   run('_intccRadarSvg(' + JSON.stringify(values) + ', ' + JSON.stringify(DIMS(unavailable, display)) + ')');
 
-console.log('AURIX-INTELLIGENCE-VNEXT — SPEC «INTELLIGENCE VNEXT»\n');
+console.log('AURIX-INTELLIGENCE-VNEXT — SPEC «INTELLIGENCE VNEXT» + CIERRE CORRECTIVO\n');
 
 // ════════════════════════════════════════════════════════════════════════════
-// §6 · RADAR ADAPTATIVO — la matriz completa de §34
+// §2 (CIERRE CORRECTIVO) · RADAR: CINCO EJES PERMANENTES
 // ════════════════════════════════════════════════════════════════════════════
-console.log('§6 · Radar adaptativo (5 · 4 · 3 · <3 factores medibles):');
+// SUSTITUYE al radar adaptativo de VNext, por decisión expresa del founder. La
+// regla que gobierna todo el bloque: ESTRUCTURA ≠ EVIDENCIA. El marco (cinco
+// ejes, sus ángulos, sus nombres) es una CONSTANTE del producto; la evidencia
+// decide únicamente qué se dibuja encima.
+console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
 {
   const CASES = [
-    { n: 5, values: { diversification: 30, stability: 80, liquidity: 7, growth: 40, concentration: 31 }, unav: [] },
-    { n: 4, values: { diversification: 30, stability: 80, liquidity: 7, concentration: 31 }, unav: ['growth'] },
-    { n: 3, values: { diversification: 30, liquidity: 7, concentration: 31 }, unav: ['stability', 'growth'] },
+    { m: 5, values: { diversification: 30, stability: 80, liquidity: 7, growth: 40, concentration: 31 }, unav: [] },
+    { m: 4, values: { diversification: 30, stability: 80, liquidity: 7, concentration: 31 }, unav: ['growth'] },
+    { m: 3, values: { diversification: 30, liquidity: 7, concentration: 31 }, unav: ['stability', 'growth'] },
+    { m: 2, values: { diversification: 30, liquidity: 7 }, unav: ['stability', 'growth', 'concentration'] },
+    { m: 1, values: { liquidity: 7 }, unav: ['diversification', 'stability', 'growth', 'concentration'] },
+    { m: 0, values: {}, unav: ORDER.slice() },
   ];
   CASES.forEach((c) => {
     const h = RADAR(c.values, c.unav);
-    ok('6.1/' + c.n + ' con ' + c.n + ' dimensiones medibles se dibuja un radar de ' + c.n + ' ejes',
-      count(h, /class="intcc-radar-axis[" ]/g) === c.n
-      && count(h, /class="intcc-radar-label"/g) === c.n
-      && count(h, /class="intcc-radar-dot"/g) === c.n
-      && count(h, /class="intcc-radar-edge"/g) === c.n
-      && new RegExp('data-svg-axes="' + c.n + '"').test(h)
-      && new RegExp('data-svg-measured="' + c.n + '"').test(h),
+    ok('2.1/' + c.m + ' con ' + c.m + ' métricas el MARCO sigue siendo cinco ejes y cinco nombres',
+      h !== ''
+      && count(h, /class="intcc-radar-axis[" ]/g) === 5
+      && count(h, /class="intcc-radar-label"/g) === 5
+      && /data-svg-axes="5"/.test(h) && /data-svg-a11y-axes="5"/.test(h)
+      && ORDER.every(k => h.indexOf(LABELS[k]) !== -1),
       JSON.stringify({ axes: count(h, /class="intcc-radar-axis[" ]/g),
-        dots: count(h, /class="intcc-radar-dot"/g) }));
-    ok('6.2/' + c.n + ' …y la figura CIERRA con un vértice por eje, todos certificados',
-      /data-svg-open="0"/.test(h) && /data-svg-unknown="0"/.test(h)
-      && (h.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === c.n);
-    ok('6.3/' + c.n + ' …y NUNCA aparece «sin datos», ni 0 falso, ni eje atenuado',
-      !/is-unavailable/.test(h) && h.indexOf(SRC_ES.intv7_axis_unavailable.replace(/'/g, '')) === -1
-      && !/data-availability="unknown"/.test(h)
-      // Toda cifra publicada corresponde a un valor de entrada: ninguna inventada.
-      && (h.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || [])
-           .every(m => /\d/.test(m)));
-    ok('6.4/' + c.n + ' …y ninguna etiqueta se sale del viewBox (el marco se deriva)',
+        labels: count(h, /class="intcc-radar-label"/g) }));
+    ok('2.2/' + c.m + ' …y sólo lo certificado recibe marcador y cifra',
+      count(h, /class="intcc-radar-dot"/g) === c.m
+      && count(h, /class="intcc-radar-halo"/g) === c.m
+      && count(h, /class="intcc-radar-val"/g) === c.m
+      && new RegExp('data-svg-measured="' + c.m + '"').test(h)
+      && new RegExp('data-svg-unknown="' + (5 - c.m) + '"').test(h)
+      && count(h, /data-availability="unknown"/g) === 0,
+      JSON.stringify({ dots: count(h, /class="intcc-radar-dot"/g),
+        vals: count(h, /class="intcc-radar-val"/g) }));
+    ok('2.3/' + c.m + ' …sin «sin datos», sin cero fingido y sin eje atenuado',
+      !/is-unavailable/.test(h) && !/is-unknown/.test(h)
+      && h.indexOf(VAL_ES.intv7_axis_unavailable) === -1
+      // toda cifra publicada corresponde a un valor de entrada
+      && (h.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || []).every(x => /\d/.test(x)));
+    ok('2.4/' + c.m + ' …el área exige los cinco, y los tramos sólo unen vecinos certificados',
+      (() => { const e = Number((h.match(/data-svg-edges="(\d+)"/) || [, 0])[1]);
+        const g = Number((h.match(/data-svg-gaps="(\d+)"/) || [, 0])[1]);
+        const closed = /data-svg-open="0"/.test(h);
+        return e + g === 5 && closed === (c.m === 5)
+          && (c.m === 5 ? /intcc-radar-area/.test(h) : !/intcc-radar-area/.test(h))
+          && count(h, /class="intcc-radar-edge"/g) === e; })(),
+      JSON.stringify({ edges: (h.match(/data-svg-edges="[^"]*"/) || [''])[0],
+        gaps: (h.match(/data-svg-gaps="[^"]*"/) || [''])[0] }));
+    ok('2.5/' + c.m + ' …y el marco no se recorta: las etiquetas caben en el viewBox',
       (() => { const vb = (h.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/) || []).slice(1).map(Number);
         if (vb.length !== 4) return false;
         const pts = [];
         h.replace(/<text[^>]*x="(-?[\d.]+)"[^>]*y="(-?[\d.]+)"/g, (_, x, y) => { pts.push([+x, +y]); return ''; });
-        return pts.length === c.n * 2
+        return pts.length === 5 + c.m
           && pts.every(([x, y]) => x >= vb[0] - 1 && x <= vb[0] + vb[2] + 1
                                 && y >= vb[1] + 4 && y <= vb[1] + vb[3] - 1); })(),
       (h.match(/viewBox="[^"]+"/) || [''])[0]);
   });
-  // ── §6.B · MENOS DE TRES ⇒ NO HAY RADAR ───────────────────────────────────
-  ok('6.5 dos dimensiones medibles ⇒ el radar NO se dibuja (no se inventa figura)',
-    RADAR({ diversification: 30, liquidity: 7 }, ['stability', 'growth', 'concentration']) === '');
-  ok('6.6 una dimensión medible ⇒ tampoco',
-    RADAR({ liquidity: 7 }, ['diversification', 'stability', 'growth', 'concentration']) === '');
-  ok('6.7 ninguna dimensión medible ⇒ tampoco',
-    RADAR({}, ORDER) === '');
-  // Un valor NO FINITO es indistinguible de «no medido»: la barrera es doble, así
-  // que un `null` que se colase en `values` no puede dibujar un eje.
-  ok('6.8 un valor no finito no dibuja eje aunque la dimensión no esté marcada',
-    (() => { const h = RADAR({ diversification: 30, stability: null, liquidity: 7,
-        growth: undefined, concentration: 31 }, []);
-      return /data-svg-axes="3"/.test(h) && count(h, /class="intcc-radar-dot"/g) === 3; })(),
-    (RADAR({ diversification: 30, stability: null, liquidity: 7, growth: undefined, concentration: 31 }, [])
-      .match(/data-svg-axes="[^"]*"/) || [''])[0]);
-  ok('6.9 un CERO REAL sigue siendo una medición: se dibuja y se rotula «0%»',
-    (() => { const h = RADAR({ diversification: 0, liquidity: 0, concentration: 0 },
-        ['stability', 'growth']);
-      return /data-svg-axes="3"/.test(h) && count(h, />0%</g) === 3
-        && count(h, /class="intcc-radar-dot"/g) === 3; })());
-  ok('6.10 el ORDEN RELATIVO del catálogo congelado se conserva al filtrar',
+  // ── EL CASO QUE MOTIVA LA REGLA DE ADYACENCIA ────────────────────────────
+  ok('2.6 tres métricas en ejes ALTERNOS dan UN segmento, jamás un triángulo',
     (() => { const h = RADAR({ diversification: 30, liquidity: 7, concentration: 31 },
         ['stability', 'growth']);
-      const drawn = (h.match(/class="intcc-radar-label"[^>]*>([^<]+)</g) || [])
-        .map(m => m.replace(/^.*?>/, '').replace(/<$/, ''));
-      const idx = drawn.map(l => Object.keys(LABELS).map(k => LABELS[k]).indexOf(l));
-      return JSON.stringify(drawn) === JSON.stringify(['Amplitud de categorías', 'Liquidez', 'Concentración'])
-        && idx.every((v, i) => i === 0 || v > idx[i - 1]); })());
-  ok('6.11 el owner del SVG no conserva NINGÚN camino al estado «sin datos»',
+      return /data-svg-edges="1"/.test(h) && /data-svg-gaps="4"/.test(h)
+        && count(h, /class="intcc-radar-edge"/g) === 1
+        && !/intcc-radar-area/.test(h); })(),
+    (RADAR({ diversification: 30, liquidity: 7, concentration: 31 }, ['stability', 'growth'])
+      .match(/data-svg-(edges|gaps)="[^"]*"/g) || []).join(' '));
+  ok('2.7 dos métricas VECINAS sí se unen: la interrupción es por hueco, no por número',
+    (() => { const h = RADAR({ diversification: 30, stability: 80 }, ['liquidity', 'growth', 'concentration']);
+      return /data-svg-edges="1"/.test(h) && /data-svg-gaps="4"/.test(h); })());
+  ok('2.8 dos métricas NO vecinas no se unen con nada',
+    (() => { const h = RADAR({ diversification: 30, liquidity: 7 }, ['stability', 'growth', 'concentration']);
+      return /data-svg-edges="0"/.test(h) && /data-svg-gaps="5"/.test(h); })());
+  ok('2.9 un CERO CERTIFICADO no es un desconocido: se dibuja y se rotula «0%»',
+    (() => { const h = RADAR({ diversification: 0, liquidity: 0, concentration: 0 },
+        ['stability', 'growth']);
+      return count(h, />0%</g) === 3 && count(h, /class="intcc-radar-dot"/g) === 3
+        && /data-svg-measured="3"/.test(h); })());
+  ok('2.10 un valor no finito es indistinguible de la ausencia: no dibuja nada',
+    (() => { const h = RADAR({ diversification: 30, stability: null, liquidity: 7,
+        growth: undefined, concentration: 31 }, []);
+      return /data-svg-measured="3"/.test(h) && count(h, /class="intcc-radar-dot"/g) === 3
+        && count(h, /class="intcc-radar-label"/g) === 5; })());
+  ok('2.11 los nombres y los ángulos NO dependen de los datos: misma malla siempre',
+    (() => { const grid = (x) => (x.match(/<g class="intcc-radar-grid">[\s\S]*?<\/g>/) || [''])[0];
+      const a = RADAR({ diversification: 30, stability: 80, liquidity: 7, growth: 40, concentration: 31 }, []);
+      const b = RADAR({}, ORDER.slice());
+      return grid(a) === grid(b) && grid(a).length > 100; })());
+  ok('2.12 el owner no conserva NINGÚN camino a «sin datos» ni al marcador fantasma',
     (() => { const src = fnSrc('_intccRadarSvg');
       return !/intv7_axis_unavailable/.test(src) && !/is-unavailable/.test(src)
         && !/is-unknown/.test(src) && !/availability="unknown"/.test(src)
-        && /ALL_DIMS\.filter\(d => !d\.unavailable/.test(src); })());
-  ok('6.12 …y el CSS tampoco: sin sujeto, la regla se retira en vez de quedarse',
+        && /if \(!isMeasured\) return;/.test(src)
+        && /const dims = ALL_DIMS;/.test(src); })());
+  // ── §2 · AUDITORÍA DE ELEGIBILIDAD DE LOS DOS EJES SIN OWNER ────────────
+  // El §2 lo pide por su nombre: «no hacer Estabilidad disponible por tener
+  // muchos snapshots» y «no prometer que simplemente esperar resolverá la
+  // ausencia». Las dos cosas se comprueban en el código, no en la intención.
+  ok('2.14 Estabilidad cuelga de la CONFIANZA del motor de retorno, no del nº de snapshots',
+    (() => { const src = fnSrc('_aurixPeakRetention');
+      return /perf\.confidence !== 'high'/.test(src)
+        && /perf\.index\.basis !== 'flow_neutral_index'/.test(src)
+        && /perf\.coversNominal === false/.test(src)
+        // no hay ninguna vía que la habilite contando observaciones
+        && !/observations\s*>=?\s*\d/.test(src)
+        && !/vals\.length\s*>=?\s*\d/.test(src); })());
+  ok('2.15 la causa de Crecimiento es la ESCALA, no la espera, y no tiene owner',
+    (() => { const ks = konstSrc('_INTV7_RADAR_DIMS');
+      return /key: 'growth',[\s\S]{0,80}owner: null/.test(ks)
+        && /pending: 'no_certifiable_scale'/.test(ks); })());
+  ok('2.16 ninguna causa publicada promete que esperar la resuelva',
+    (() => { const es = VAL_ES.intv7_pending_obs;
+      const txt = (typeof es === 'function') ? es('Estabilidad') : String(es);
+      return !/aparece sola|en cuanto|appears on its own|once there is/i.test(txt)
+        && /confianza/i.test(txt); })(),
+    (typeof VAL_ES.intv7_pending_obs === 'function') ? VAL_ES.intv7_pending_obs('Estabilidad') : '?');
+  ok('2.13 …y el CSS tampoco',
     !/intcc-radar-label\.is-unavailable/.test(css)
     && !/intcc-radar-val\.is-unavailable/.test(css)
     && !/intcc-radar-dot\.is-unknown/.test(css)
     && !/intcc-radar-edge\.is-unknown/.test(css));
 }
 
-console.log('\n§6.B · «Factores observables», la alternativa compacta:');
+console.log('\n§2 · La card: siempre un radar, nunca una lista:');
 {
-  // La card completa, con sus owners dobles: se ejercita el DESPACHADOR de los
-  // tres estados (radar / observables / nada).
   const cardWith = (o) => { const c = makeCtx('es');
     c.__snap = o.snap === undefined ? { assetCount: 4, totUSD: 100000, cashPct: 7,
       topInvestedAsset: { pctTotal: 31, name: 'MSFT' } } : o.snap;
@@ -252,43 +308,51 @@ console.log('\n§6.B · «Factores observables», la alternativa compacta:');
     return vm.runInContext('_intv7RadarHtml(s => String(s == null ? "" : s))', c); };
 
   const three = cardWith({});
-  ok('6.B1 con tres certificadas la card publica el RADAR',
+  ok('2.C1 con tres certificadas la card es un RADAR de cinco ejes',
     /data-state="radar"/.test(three) && /intcc-radar-svg/.test(three)
-    && /data-axes="3"/.test(three) && /data-measured="3"/.test(three)
-    && /data-declared="5"/.test(three));
-  ok('6.B2 …y declara lo que NO puede medir, con su causa (§3 · trazabilidad)',
+    && /data-axes="5"/.test(three) && /data-measured="3"/.test(three)
+    && /data-declared="5"/.test(three)
+    && !/intv15-obs-row/.test(three) && !/data-state="observable"/.test(three));
+  ok('2.C2 …y declara lo que NO puede medir, con su causa (§3 · trazabilidad)',
     /data-unavailable="stability,growth"/.test(three)
     && /data-pending="[^"]*growth:no_certifiable_scale/.test(three),
     (three.match(/data-pending="[^"]*"/) || [''])[0]);
-  // Sin snapshot no hay liquidez ni concentración: sólo la amplitud de categorías.
   const one = cardWith({ snap: null });
-  ok('6.B3 con UNA certificada se publica «Factores observables», no un radar',
-    /data-state="observable"/.test(one) && !/intcc-radar-svg/.test(one)
-    && count(one, /class="intv15-obs-row"/g) === 1
-    && /data-measured="1"/.test(one) && /data-declared="5"/.test(one),
-    one.slice(0, 260));
-  ok('6.B4 …y cada fila lleva etiqueta y CIFRA REAL, nunca una palabra de ausencia',
-    /class="intv15-obs-label">Amplitud de categorías</.test(one)
-    && /class="intv15-obs-val">2,2 \/ 7</.test(one)
-    && !/is-unavailable/.test(one) && one.indexOf('sin datos') === -1,
-    (one.match(/class="intv15-obs-val">[^<]*</) || [''])[0]);
-  ok('6.B5 el título de la alternativa es el declarado, no una frase inventada',
-    /<h3 class="intcc-card-title">Factores observables<\/h3>/.test(one));
-  ok('6.B6 con CERO certificadas no se publica card alguna (fail closed)',
-    cardWith({ snap: null, breadth: null }) === '');
-  ok('6.B7 la misma cifra la publican radar y lista: un solo formateador',
-    (() => { const t3 = (three.match(/class="intcc-radar-val"[^>]*>([^<]+)</) || [, ''])[1];
-      const o1 = (one.match(/class="intv15-obs-val">([^<]+)</) || [, ''])[1];
-      return t3 === '2,2 / 7' && o1 === '2,2 / 7'; })());
-  ok('6.B8 …y el estado sube a RADAR en cuanto un cuarto eje adquiere owner',
+  ok('2.C3 con UNA certificada sigue siendo el MISMO radar, con un solo marcador',
+    /data-state="radar"/.test(one) && /intcc-radar-svg/.test(one)
+    && count(one, /class="intcc-radar-label"/g) === 5
+    && count(one, /class="intcc-radar-dot"/g) === 1
+    && /data-measured="1"/.test(one)
+    && !/intv15-obs-row/.test(one) && !/Factores observables/.test(one),
+    one.slice(0, 240));
+  const none = cardWith({ snap: null, breadth: null });
+  ok('2.C4 con CERO certificadas: malla, nombres y una explicación breve fuera de las etiquetas',
+    /data-state="radar"/.test(none) && /data-measured="0"/.test(none)
+    && /data-evidence="none"/.test(none)
+    && count(none, /class="intcc-radar-label"/g) === 5
+    && !/class="intcc-radar-val"/.test(none) && !/class="intcc-radar-dot"/.test(none)
+    && /class="intv16-radar-none"/.test(none)
+    && /cinco dimensiones sobre las que Aurix razona/.test(none)
+    && !/sin datos/.test(none),
+    none.slice(0, 240));
+  ok('2.C5 la explicación SÓLO aparece sin evidencia: con una métrica ya no hace falta',
+    !/intv16-radar-none/.test(one) && !/intv16-radar-none/.test(three));
+  ok('2.C6 el estado sube de grado sin cambiar de figura al aparecer un cuarto owner',
     (() => { const h = cardWith({ peak: { status: 'available', retentionPct: 80,
         quality: 'measured', startsAfterRecord: false } });
       return /data-state="radar"/.test(h) && /data-measured="4"/.test(h)
-        && /data-svg-axes="4"/.test(h) && !/sin datos/.test(h); })());
-  ok('6.B9 la lista tiene estilo propio y el alto lo pone el contenido',
-    /\.intv7-radar\.is-observable \.intv15-obs-list/.test(css)
-    && /\.intv15-obs-row \{/.test(css) && /\.intv15-obs-val \{/.test(css)
-    && !/\.intv15-obs-list[^}]*height:\s*\d/.test(css));
+        && /data-svg-axes="5"/.test(h) && !/sin datos/.test(h)
+        && /data-svg-edges="3"/.test(h) && /data-svg-gaps="2"/.test(h); })(),
+    (cardWith({ peak: { status: 'available', retentionPct: 80, quality: 'measured',
+      startsAfterRecord: false } }).match(/data-svg-(edges|gaps|measured)="[^"]*"/g) || []).join(' '));
+  ok('2.C7 «Factores observables» queda retirada del código y de la hoja de estilos',
+    !/intv7_observable_title/.test(fnSrc('_intv7RadarHtml'))
+    && !/intv15-obs-list|intv15-obs-row|intv15-obs-val/.test(css)
+    && !/is-observable/.test(fnSrc('_intv7RadarHtml')));
+  ok('2.C8 la línea sin evidencia tiene estilo propio y densidad de nota',
+    /\.intv16-radar-none \{/.test(css)
+    && /font-size: 12px/.test(css.slice(css.indexOf('.intv16-radar-none {'),
+                                        css.indexOf('.intv16-radar-none {') + 220)));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -362,105 +426,142 @@ console.log('\n§10 · Question engine: responder no abre otra pregunta:');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// §14–§16 · «TU EVOLUCIÓN» VIVA
+// §14–§16 + §5 (CIERRE CORRECTIVO) · «TU EVOLUCIÓN» ES EVOLUCIÓN
 // ════════════════════════════════════════════════════════════════════════════
-console.log('\n§14–§16 · «Tu evolución»: de card muerta a lectura de estabilidad:');
+// La regla del §5: afirmar que algo «se mantiene» exige una COMPARACIÓN
+// DEMOSTRABLE de esa dimensión. Ni la edad de la cuenta ni la ausencia de
+// hallazgos la sustituyen — son exactamente las dos cosas de las que la frase de
+// la captura se derivaba.
+console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con comparación demostrable:');
 {
   const AV = 'available';
+  const NOWT = T0 + 60 * DAY;
   const INTEL = (o) => ({ model: {
     concentration: (o && o.conc === null) ? { availability: 'unavailable' }
       : { availability: AV, topWeightPct: 31, top3Pct: 77,
           topContributor: { name: 'Microsoft', pct: 31 } },
     liquidity: (o && o.liq === null) ? { availability: 'unavailable' }
-      : { availability: AV, cashPct: 7, changePp: (o && o.drift !== undefined) ? o.drift : null },
+      : { availability: AV, cashPct: 7, changePp: null },
   }, context: { fields: {} } });
+  const EV = (root, days) => ({ root, category: root === 'cash_weight' ? 'liquidity' : 'stock',
+    range: days + 'd', startAt: NOWT - days * DAY, endAt: NOWT,
+    deltaPp: 0.8, thresholdPp: 3, endPct: 7 });
   const CORE = (o) => ({ findings: (o && o.findings) || [], temporalEvents: (o && o.events) || [],
+    stabilityEvidence: (o && o.ev !== undefined) ? o.ev : [EV('cash_weight', 30), EV('category_mix', 30)],
     dataAvailability: { observation: { observations: (o && o.obs != null) ? o.obs : 12,
-        spanMs: (o && o.spanMs !== undefined) ? o.spanMs : 40 * DAY },
+        spanMs: (o && o.spanMs !== undefined) ? o.spanMs : 41 * DAY },
       gaps: (o && o.noFlows === false) ? [] : [{ family: 'capital_flow',
         semanticKey: 'recorded_capital_net', status: 'available', reason: 'no_flows_in_window' }] } });
   const MEM = (core, intel, lang) => { const c = (lang === 'en') ? makeCtx('en') : sb;
     return vm.runInContext('_intv4MemoryHtml(' + JSON.stringify(core) + ', s => String(s == null ? "" : s), [], '
       + JSON.stringify(intel) + ', [], "")', c); };
+  const ROWS = (core, intel) => run('_intv15StableRows(' + JSON.stringify(core) + ', '
+    + JSON.stringify(intel) + ')');
 
   const stable = MEM(CORE({}), INTEL({}));
-  ok('14.1 sin cambios materiales la card publica una LECTURA, no la cobertura sola',
+  ok('5.1 con comparación demostrable la card publica una LECTURA de evolución',
     /class="intcc-card intcc-timeline intv4-memory is-stable"/.test(stable)
-    && /data-stable="1"/.test(stable) && !/is-coverage/.test(stable)
-    && /class="intv15-stable-head"/.test(stable),
-    stable.slice(0, 200));
-  ok('14.2 el titular dice DESDE CUÁNDO y que no hubo cambio material',
-    /Tu estructura se mantiene estable desde hace 40 días/.test(stable)
-    && /no ha cambiado nada que merezca tu atención/.test(stable),
+    && /data-stable="1"/.test(stable) && /class="intv15-stable-head"/.test(stable),
+    stable.slice(0, 180));
+  ok('5.2 el titular dice que ha COMPARADO, y acota la ventana a lo comparado',
+    /Aurix ha comparado tu cartera con su pasado/.test(stable)
+    && /en los últimos 30 días/.test(stable)
+    && /data-stable-days="30"/.test(stable)
+    // …y NO a la edad de la cuenta, que son 41
+    && !/41 días/.test((stable.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1]),
     (stable.match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
-  ok('14.3 …y trae explicación REAL: concentración, liquidez y aportaciones',
-    /data-stable-codes="concentration,liquidity,flows"/.test(stable)
-    && count(stable, /class="intv15-stable-row"/g) === 3
-    && /Microsoft/.test(stable) && /31%/.test(stable) && /7%/.test(stable),
-    (stable.match(/data-stable-codes="[^"]*"/) || [''])[0]);
-  ok('14.4 la cobertura NO se pierde: pasa a pie de la lectura',
-    /class="intv4-mem-coverage">Aurix dispone de 40 días/.test(stable));
-  // ── FAIL CLOSED · §2 ──────────────────────────────────────────────────────
-  // «Nada ha cambiado» sólo se puede decir si el Core no produjo NADA material.
-  // Si lo produjo y otra card se lo llevó, esta NO puede afirmar estabilidad.
-  ok('14.5 con un hallazgo material NO se afirma estabilidad, aunque esta card no lo muestre',
+  // ── EL DEFECTO EXACTO DE LA CAPTURA ──────────────────────────────────────
+  ok('5.3 SIN comparación no se afirma estabilidad, por mucho historial que haya',
+    (() => { const h = MEM(CORE({ ev: [] }), INTEL({}));
+      return !/is-stable/.test(h) && !/se mantiene/.test(h)
+        && /data-no-comparison="1"/.test(h)
+        && /Aurix lleva 41 días observando/.test(h)
+        && /una lectura de hoy, no una evolución/.test(h); })(),
+    MEM(CORE({ ev: [] }), INTEL({})).slice(0, 260));
+  ok('5.4 …ni siquiera con 41 días y cero hallazgos pendientes (edad ≠ estabilidad)',
+    (() => { const h = MEM(CORE({ ev: [], findings: [], events: [], spanMs: 41 * DAY }), INTEL({}));
+      return !/is-stable/.test(h) && !/merezca tu atención/.test(h); })());
+  ok('5.5 con un hallazgo material tampoco, aunque haya comparación',
     (() => { const h = MEM(CORE({ findings: [{ semanticKey: 'cash_drift_30d', priority: 0.8 }] }), INTEL({}));
-      return /is-coverage/.test(h) && !/is-stable/.test(h)
-        && !/se mantiene estable/.test(h); })(),
-    MEM(CORE({ findings: [{ semanticKey: 'cash_drift_30d', priority: 0.8 }] }), INTEL({})).slice(0, 180));
-  ok('14.6 …y con un evento temporal en el pool, tampoco',
+      return !/is-stable/.test(h) && /data-no-comparison="1"/.test(h); })());
+  ok('5.6 …y con un evento temporal en el pool, tampoco',
     (() => { const h = MEM(CORE({ events: [{ semanticKey: 'wealth_level_peak', priority: 0.7,
         causalRoot: 'wealth_level', window: { range: '30d', endAt: T0 } }] }), INTEL({}));
       return !/is-stable/.test(h); })());
-  ok('14.7 sin NINGUNA explicación certificable no se publica el titular (§16)',
-    (() => { const h = MEM(CORE({ noFlows: false }), INTEL({ conc: null, liq: null }));
-      return /is-coverage/.test(h) && !/is-stable/.test(h); })());
-  ok('14.8 sin historial suficiente sigue el estado compacto de siempre',
+  // ── LA VENTANA NO SE INFLA ───────────────────────────────────────────────
+  ok('5.7 la ventana afirmada es el MÍNIMO de las comparaciones, no el máximo',
+    (() => { const h = MEM(CORE({ ev: [EV('cash_weight', 7), EV('category_mix', 90)] }), INTEL({}));
+      return /en los últimos 7 días/.test(h) && /data-stable-days="7"/.test(h)
+        && !/en los últimos 90 días/.test(h); })(),
+    (MEM(CORE({ ev: [EV('cash_weight', 7), EV('category_mix', 90)] }), INTEL({}))
+      .match(/data-stable-days="[^"]*"/) || [''])[0]);
+  ok('5.8 el span sale de los DOS EXTREMOS, no del nombre de la ventana (cobertura parcial)',
+    (() => { const trimmed = { root: 'cash_weight', category: 'liquidity', range: '30d',
+        startAt: NOWT - 9 * DAY, endAt: NOWT, deltaPp: 0.5, thresholdPp: 3 };
+      const h = MEM(CORE({ ev: [trimmed] }), INTEL({}));
+      return /en los últimos 9 días/.test(h) && !/en los últimos 30 días/.test(h); })());
+  // ── LAS FILAS NOMBRAN LA MEDICIÓN, NO UNA CONTINUIDAD SUPUESTA ───────────
+  ok('5.9 cada fila dice CUÁNTO se ha movido y contra qué umbral',
+    /Tu liquidez está en el 7% y se ha movido menos de 3 puntos porcentuales en 30 días/.test(stable)
+    && /El reparto entre clases de activo no se ha movido más de 3 puntos porcentuales en 30 días/.test(stable),
+    JSON.stringify((stable.match(/class="intv15-stable-row"[^>]*>([^<]*)</g) || []).map(x => x.slice(-60))));
+  ok('5.10 ninguna fila afirma continuidad leyendo sólo el presente',
+    !/sigue siendo|sigue concentrando|se mantiene en el/.test(stable));
+  ok('5.11 una dimensión sin comparación NO produce fila, aunque su nivel se conozca',
+    (() => { const rows = ROWS(CORE({ ev: [EV('category_mix', 30)] }), INTEL({}));
+      return rows.every(r => r.code !== 'liquidity')
+        && rows.some(r => r.code === 'category_mix'); })(),
+    JSON.stringify(ROWS(CORE({ ev: [EV('category_mix', 30)] }), INTEL({})).map(r => r.code)));
+  ok('5.12 …y sin el NIVEL del owner tampoco, aunque haya comparación',
+    (() => { const rows = ROWS(CORE({}), INTEL({ liq: null }));
+      return rows.every(r => r.code !== 'liquidity'); })());
+  // ── LO QUE NO SE PUEDE COMPARAR SE DICE, UNA VEZ Y COMPACTO ──────────────
+  ok('5.13 el peso por POSICIÓN se declara como límite, no como estabilidad',
+    /todavía no el peso de cada posición/.test(stable)
+    && /una lectura de hoy, no una evolución/.test(stable)
+    && (stable.match(/intcc-surface-limit/g) || []).length === 1,
+    (stable.match(/class="intcc-surface-limit">([^<]*)</) || [, '?'])[1]);
+  ok('5.14 «no hay aportaciones» sale de un hueco CERTIFICADO, no de su ausencia',
+    (() => { const withFlows = ROWS(CORE({ noFlows: false }), INTEL({}));
+      return withFlows.every(r => r.code !== 'flows')
+        && ROWS(CORE({}), INTEL({})).some(r => r.code === 'flows')
+        && /no_flows_in_window/.test(fnSrc('_intv15StableRows')); })());
+  ok('5.15 sin historial suficiente sigue el estado compacto de siempre',
     (() => { const h = MEM(CORE({ obs: 1, spanMs: DAY }), INTEL({}));
       return /is-accruing/.test(h) && /data-compact="1"/.test(h) && !/is-stable/.test(h); })());
-  ok('14.9 sin `spanMs` no se declara cobertura ni estabilidad (fail closed)',
+  ok('5.16 sin `spanMs` no se declara ni cobertura ni estabilidad (fail closed)',
     (() => { const h = MEM(CORE({ spanMs: null }), INTEL({}));
-      return /is-accruing/.test(h) && !/is-stable/.test(h) && !/is-coverage/.test(h); })());
-  // ── §2 · NINGUNA LÍNEA AFIRMA UNA DIRECCIÓN QUE NO ESTÉ MEDIDA ────────────
-  ok('14.10 sin deriva MEDIDA la liquidez publica su NIVEL, nunca «estable»',
-    (() => { const rows = run('_intv15StableRows(' + JSON.stringify(CORE({})) + ', '
-        + JSON.stringify(INTEL({})) + ')');
-      const liq = rows.find(r => r.code === 'liquidity');
-      return !!liq && /Tu liquidez registrada es el 7% de tu cartera financiera/.test(liq.txt)
-        && !/sin variación/.test(liq.txt); })(),
-    JSON.stringify(run('_intv15StableRows(' + JSON.stringify(CORE({})) + ', ' + JSON.stringify(INTEL({})) + ')')));
-  ok('14.11 con deriva medida y por debajo del umbral SÍ se puede decir que no se movió',
-    (() => { const rows = run('_intv15StableRows(' + JSON.stringify(CORE({})) + ', '
-        + JSON.stringify(INTEL({ drift: 0.4 })) + ')');
-      const liq = rows.find(r => r.code === 'liquidity');
-      return !!liq && /sin variación relevante/.test(liq.txt); })());
-  ok('14.12 con deriva medida MATERIAL no se afirma quietud (vuelve al nivel)',
-    (() => { const rows = run('_intv15StableRows(' + JSON.stringify(CORE({})) + ', '
-        + JSON.stringify(INTEL({ drift: 5 })) + ')');
-      const liq = rows.find(r => r.code === 'liquidity');
-      return !!liq && !/sin variación/.test(liq.txt); })());
-  ok('14.13 «no hay aportaciones» sale de un hueco CERTIFICADO del ledger, no de su ausencia',
-    (() => { const withFlows = run('_intv15StableRows(' + JSON.stringify(CORE({ noFlows: false })) + ', '
-        + JSON.stringify(INTEL({})) + ')');
-      return withFlows.every(r => r.code !== 'flows')
-        && /no_flows_in_window/.test(fnSrc('_intv15StableRows')); })());
-  ok('14.14 una dimensión no disponible no produce línea (nunca un cero)',
-    (() => { const rows = run('_intv15StableRows(' + JSON.stringify(CORE({})) + ', '
-        + JSON.stringify(INTEL({ conc: null })) + ')');
-      return rows.length === 2 && rows.every(r => r.code !== 'concentration')
-        && rows.every(r => !/0%/.test(r.txt)); })());
-  ok('14.15 la card es una LECTURA, no un panel: sin animación ni alto fijo',
-    /\.intv4-memory\.is-stable \.intv15-stable-head/.test(css)
-    && /\.intv15-stable-list \{/.test(css)
-    && !/\.intv15-stable-list[^}]*(animation|height:\s*\d)/.test(css));
+      return /is-accruing/.test(h) && !/is-stable/.test(h) && !/data-no-comparison/.test(h); })());
+  // ── LA PRUEBA SALE DEL LEDGER, NO DE LA SUPERFICIE ───────────────────────
+  ok('5.17 la evidencia la emite el ledger cuando la deriva está MEDIDA y bajo umbral',
+    (() => { const src = fnSrc('_aurixIntelligenceCore');
+      return /stabilityEvidence: ledger\.stabilityEvidence \|\| \[\]/.test(src)
+        && /stabilityEvidence\.push\(\{ root: rootKey/.test(app)
+        && /driftEvidence\(cat, d, range\)\.ev\.ok/.test(app); })());
+  ok('5.17b la puerta devuelve FALSE sin evidencia y TRUE con ella (unidad)',
+    (() => { const no = run('_intv15MemoryIsStable(' + JSON.stringify(CORE({ ev: [] })) + ')');
+      const si = run('_intv15MemoryIsStable(' + JSON.stringify(CORE({})) + ')');
+      return no === false && si === true; })(),
+    JSON.stringify({ sinEv: run('_intv15MemoryIsStable(' + JSON.stringify(CORE({ ev: [] })) + ')'),
+      conEv: run('_intv15MemoryIsStable(' + JSON.stringify(CORE({})) + ')') }));
+  ok('5.18 …y la puerta del titular EXIGE esa evidencia, no la ausencia de hallazgos',
+    (() => { const src = fnSrc('_intv15MemoryIsStable');
+      return /_intv16StabilityByRoot\(core\)/.test(src)
+        && /Object\.keys\(byRoot\)\.length > 0/.test(src)
+        && !/spanMs|observations/.test(src); })());
+  ok('5.19 la cobertura del historial sigue publicada, pero como PIE, no como análisis',
+    /class="intv4-mem-coverage">Aurix dispone de 41 días/.test(stable));
   // §37 — ES + EN.
-  ok('14.16 la misma lectura existe en EN, con las MISMAS cifras',
+  ok('5.20 la misma lectura existe en EN, con las MISMAS cifras',
     (() => { const en = MEM(CORE({}), INTEL({}), 'en');
-      return /is-stable/.test(en) && /Your structure has held steady for 40 days/.test(en)
-        && /nothing changed enough to be worth your attention/.test(en)
-        && /Microsoft/.test(en) && /31%/.test(en) && /7%/.test(en)
-        && /data-stable-codes="concentration,liquidity,flows"/.test(en); })(),
+      return /is-stable/.test(en)
+        && /over the last 30 days Aurix compared your portfolio with its own past/.test(en)
+        && /Your cash is at 7% and has moved less than 3 percentage points in 30 days/.test(en)
+        && /not yet the weight of each position/.test(en); })(),
     (MEM(CORE({}), INTEL({}), 'en').match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
+  ok('5.21 …y el estado sin comparación también',
+    /cannot yet compare any of its dimensions with its own past/.test(
+      MEM(CORE({ ev: [] }), INTEL({}), 'en')));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -480,8 +581,11 @@ console.log('\n§9 · Explora: preguntas con el contexto de la cuenta:');
     return vm.runInContext('_intv15ExploreLabel(' + JSON.stringify({ id }) + ', '
       + JSON.stringify(core || CORE(40 * DAY)) + ', ' + JSON.stringify(intel) + ')', c); };
 
-  ok('9.1 concentración: la pregunta nombra la posición y su peso REAL',
-    L('q_concentration', INTEL({})) === '¿Qué está causando que Microsoft pese el 31% de mi patrimonio?',
+  // §3 — el enunciado promete SÓLO lo que la respuesta puede dar: qué IMPLICA el
+  // peso, no qué lo causó (eso sería una atribución que Aurix no certifica).
+  ok('9.1 concentración: la pregunta nombra la posición, su peso REAL y pregunta por su implicación',
+    L('q_concentration', INTEL({})) === 'Microsoft pesa el 31% de mi cartera: ¿qué implica esa concentración?'
+    && !/causando|qué lo provoca/i.test(L('q_concentration', INTEL({}))),
     L('q_concentration', INTEL({})));
   ok('9.2 …y sin NOMBRE certificado cae al rótulo genérico, nunca a un hueco',
     (() => { const g = L('q_concentration', INTEL({ conc: { topContributor: null } }));
@@ -532,12 +636,239 @@ console.log('\n§9 · Explora: preguntas con el contexto de la cuenta:');
   ok('9.14 las variantes contextuales existen en EN con las MISMAS cifras',
     (() => { const en = ['q_concentration', 'q_diversification', 'q_liquidity', 'q_what_changed']
         .map(id => L(id, INTEL({}), CORE(40 * DAY), 'en'));
-      return en[0] === 'What is driving Microsoft to 31% of my wealth?'
+      return en[0] === 'Microsoft is 31% of my portfolio: what does that concentration mean?'
         && /three largest positions \(77%\)/.test(en[1])
         && /7% of my wealth in cash/.test(en[2])
         && /last 40 days/.test(en[3]); })(),
     JSON.stringify(['q_concentration', 'q_diversification', 'q_liquidity', 'q_what_changed']
       .map(id => L(id, INTEL({}), CORE(40 * DAY), 'en'))));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// §3 (CIERRE CORRECTIVO) · LA RESPUESTA CONTESTA LA PREGUNTA
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n§3 · Explora: cada par pregunta/respuesta es una unidad:');
+{
+  const AV = 'available';
+  const INTEL = (o) => ({ model: {
+    concentration: Object.assign({ availability: AV, topWeightPct: 31, top3Pct: 77,
+      topContributor: { name: 'Microsoft' } }, (o && o.conc) || {}),
+    liquidity: Object.assign({ availability: AV, cashPct: 4, changePp: null }, (o && o.liq) || {}),
+    evolution: { availability: 'unavailable' },
+  } });
+  const TOP3 = [{ name: 'Microsoft', type: 'stock', pct: 31, pctRaw: 31.4, pctLabel: '31%' },
+                { name: 'Bitcoin', type: 'crypto', pct: 25, pctRaw: 25.4, pctLabel: '25%' },
+                { name: 'Apple', type: 'stock', pct: 21, pctRaw: 20.6, pctLabel: '21%' }];
+  const CORE = { ledger: { facts: [{ semanticKey: 'f1' }] },
+    dataAvailability: { observation: { spanMs: 40 * DAY } } };
+  const ANS = (id, o) => { const c = makeCtx((o && o.lang) || 'es');
+    c.__drivers = { items: (o && o.items !== undefined) ? o.items : TOP3, pct: 77 };
+    c.buildPortfolioDrivers = () => c.__drivers;
+    c.__snap = { assetCount: 4, totUSD: 100000 };
+    c._intv4FactText = () => (o && o.factText !== undefined) ? o.factText : 'Hecho certificado del ledger.';
+    const q = { id, family: (o && o.family) || 'structure', answer: { factKeys: ['f1'] } };
+    return vm.runInContext('_intv4AnswerHtml(' + JSON.stringify(q) + ', ' + JSON.stringify(CORE)
+      + ', s => String(s == null ? "" : s), ' + JSON.stringify((o && o.intel) || INTEL({})) + ')', c); };
+  const LEAD = (id, o) => { const c = makeCtx((o && o.lang) || 'es');
+    c.__drivers = { items: (o && o.items !== undefined) ? o.items : TOP3, pct: 77 };
+    c.buildPortfolioDrivers = () => c.__drivers;
+    c.__snap = { assetCount: 4, totUSD: 100000 };
+    return vm.runInContext('_intv16AnswerLead(' + JSON.stringify({ id }) + ', ' + JSON.stringify(CORE)
+      + ', ' + JSON.stringify((o && o.intel) || INTEL({})) + ')', c); };
+
+  // ── DEFECTO A · LA LIQUIDEZ TAUTOLÓGICA ──────────────────────────────────
+  const liq = ANS('q_liquidity');
+  ok('3.1 liquidez: la primera frase EXPLICA el saldo, no repite la cifra del título',
+    /El 4% de tu cartera financiera está registrado como efectivo/.test(liq)
+    && /El 96% restante son posiciones que se mueven con el mercado/.test(liq),
+    (liq.match(/<p>([^<]*)</) || [, '?'])[1]);
+  ok('3.2 …y declara el límite: registrado como efectivo ≠ disponible hoy',
+    /no equivale automáticamente a dinero disponible hoy/.test(liq)
+    && /inmovilizado, comprometido o sujeto a alguna restricción/.test(liq));
+  ok('3.3 …y NO califica suficiente ni insuficiente, ni infiere meses de gasto',
+    !/suficiente|insuficiente|meses de gasto|colchón/i.test(liq));
+  ok('3.4 sin liquidez certificada no hay lead inventado: la respuesta cae a la evidencia',
+    (() => { const h = ANS('q_liquidity', { intel: INTEL({ liq: { availability: 'unavailable' } }) });
+      return !/registrado como efectivo/.test(h) && /Hecho certificado del ledger/.test(h); })());
+
+  // ── DEFECTO B · EL TOP-3 CONTESTADO CON LA DISPERSIÓN ────────────────────
+  const top3 = ANS('q_diversification');
+  ok('3.5 top-3: la respuesta nombra las posiciones y su peso CONJUNTO',
+    /Tus 3 mayores posiciones son Microsoft, Bitcoin y Apple/.test(top3)
+    && /juntas concentran el 77% de tu cartera financiera/.test(top3),
+    (top3.match(/<p>([^<]*)</) || [, '?'])[1]);
+  ok('3.6 …agregando SIN REDONDEAR y redondeando una sola vez (31,4+25,4+20,6 = 77, no 77,4)',
+    (() => { const rows = LEAD('q_diversification');
+      // Sumar los enteros ya redondeados daría 31+25+21 = 77 por casualidad; el
+      // caso que lo distingue es 31,4+25,4+20,6 = 77,4 → 77, frente a 31+25+21=77.
+      // Se prueba con un reparto donde las dos vías divergen: 31,6+25,6+20,6 = 77,8
+      // → 78, mientras los redondeados darían 32+26+21 = 79.
+      const alt = LEAD('q_diversification', { items: [
+        { name: 'A', pct: 32, pctRaw: 31.6 }, { name: 'B', pct: 26, pctRaw: 25.6 },
+        { name: 'C', pct: 21, pctRaw: 20.6 }] });
+      return /77%/.test(rows[0]) && /78%/.test(alt[0]) && !/79%/.test(alt[0]); })(),
+    JSON.stringify(LEAD('q_diversification', { items: [
+      { name: 'A', pct: 32, pctRaw: 31.6 }, { name: 'B', pct: 26, pctRaw: 25.6 },
+      { name: 'C', pct: 21, pctRaw: 20.6 }] })));
+  ok('3.7 …y la consecuencia se limita al PESO: no atribuye rendimiento ni riesgo',
+    /Es una afirmación sobre el PESO/.test(top3)
+    && /no puede repartir tu resultado entre posiciones/.test(top3)
+    && !/explica el mismo|del riesgo|diversificación completa/i.test(top3));
+  ok('3.8 …y la dispersión del ledger queda DETRÁS, como evidencia, no como respuesta',
+    (() => { const ps = top3.match(/<p>([^<]*)</g) || [];
+      return ps.length >= 3
+        && /mayores posiciones son/.test(ps[0])
+        && /Hecho certificado del ledger/.test(ps[ps.length - 1]); })(),
+    JSON.stringify((top3.match(/<p>([^<]*)</g) || []).map(x => x.slice(3, 45))));
+  ok('3.9 con menos de dos posiciones no se inventa un conjunto',
+    LEAD('q_diversification', { items: [TOP3[0]] }).length === 0
+    && LEAD('q_diversification', { items: [] }).length === 0);
+
+  // ── CONCENTRACIÓN ────────────────────────────────────────────────────────
+  const conc = ANS('q_concentration');
+  ok('3.10 concentración: nombra la posición, su peso y qué IMPLICA, sin atribuir resultado',
+    /Microsoft concentra el 31% de tu cartera financiera/.test(conc)
+    && /Es una lectura de exposición/.test(conc)
+    && !/explic|atribu/i.test(conc),
+    (conc.match(/<p>([^<]*)</) || [, '?'])[1]);
+
+  // ── LA PUERTA ANTI-TAUTOLOGÍA ────────────────────────────────────────────
+  ok('3.11 una respuesta contenida ENTERA en el enunciado no se publica',
+    (() => { const c = makeCtx('es');
+      return vm.runInContext('_intv16AnswerIsTautology(["Tu liquidez es el 4%"],'
+        + ' "¿Qué significa tener el 4% de mi patrimonio en liquidez? Tu liquidez es el 4%")', c) === true; })());
+  ok('3.12 …y basta con que UNA línea aporte algo para que sí se publique',
+    (() => { const c = makeCtx('es');
+      return vm.runInContext('_intv16AnswerIsTautology(["Tu liquidez es el 4%",'
+        + ' "No puede saberse si está inmovilizada"], "Tu liquidez es el 4%")', c) === false; })());
+  ok('3.13 la comparación ignora acentos, signos y espacios (mide información, no redacción)',
+    (() => { const c = makeCtx('es');
+      return vm.runInContext('_intv16NormTxt("El 4 % de tu Cartera…")', c)
+          === vm.runInContext('_intv16NormTxt("el4%detucartera")', c); })());
+  ok('3.14 sin ninguna línea la respuesta se considera vacía y el candidato se retira',
+    (() => { const c = makeCtx('es');
+      return vm.runInContext('_intv16AnswerIsTautology([], "lo que sea")', c) === true; })());
+  ok('3.15 una pregunta sin hechos y sin lead no publica nada (no se rellena el cupo)',
+    ANS('q_current_value', { factText: '' }) === '');
+  // ── LA PUERTA, CABLEADA · el defecto A de extremo a extremo ──────────────
+  // Una pregunta cuya ÚNICA línea de respuesta repite su enunciado no llega a la
+  // pantalla. Se ejercita sobre `_intv4AnswerHtml` —no sobre el predicado— para
+  // que retirar la llamada rompa el gate: probar sólo el predicado dejaba el
+  // cableado sin cubrir, y una puerta que nadie invoca es una puerta abierta.
+  ok('3.15b una respuesta que SÓLO repite el enunciado no se publica (cableado)',
+    (() => { const c = makeCtx('es');
+      c.__snap = { assetCount: 4, totUSD: 100000 };
+      c.buildPortfolioDrivers = () => ({ items: [], pct: 0 });
+      // `q_current_value` no tiene lead, así que su respuesta es sólo el hecho:
+      // si ese hecho es el propio enunciado, no queda nada que aportar.
+      const label = '¿Cuánto vale actualmente mi cartera financiera?';
+      c._intv4FactText = () => label;
+      const q = { id: 'q_current_value', family: 'structure', answer: { factKeys: ['f1'] } };
+      const core = { ledger: { facts: [{ semanticKey: 'f1' }] },
+        dataAvailability: { observation: { spanMs: 40 * DAY } } };
+      const h = vm.runInContext('_intv4AnswerHtml(' + JSON.stringify(q) + ', ' + JSON.stringify(core)
+        + ', s => String(s == null ? "" : s), ' + JSON.stringify(INTEL({})) + ')', c);
+      return h === ''; })());
+  ok('3.15c …y con UNA línea que sí aporta, la misma pregunta sí se publica',
+    (() => { const c = makeCtx('es');
+      c.__snap = { assetCount: 4, totUSD: 100000 };
+      c.buildPortfolioDrivers = () => ({ items: [], pct: 0 });
+      c._intv4FactText = () => 'Tus inversiones suman 118.400 US$ a 27 de septiembre.';
+      const q = { id: 'q_current_value', family: 'structure', answer: { factKeys: ['f1'] } };
+      const core = { ledger: { facts: [{ semanticKey: 'f1' }] },
+        dataAvailability: { observation: { spanMs: 40 * DAY } } };
+      const h = vm.runInContext('_intv4AnswerHtml(' + JSON.stringify(q) + ', ' + JSON.stringify(core)
+        + ', s => String(s == null ? "" : s), ' + JSON.stringify(INTEL({})) + ')', c);
+      return /118\.400/.test(h); })());
+
+  // ── §3 · IDENTIDAD ESTABLE: EL PAR NO SE CRUZA ───────────────────────────
+  ok('3.16 enunciado y respuesta se resuelven del MISMO `q` en la misma pasada',
+    (() => { const src = fnSrc('_intv4ExploreHtml');
+      return /_intv15ExploreLabel\(q, core, intel\)/.test(src)
+        && /_intv4AnswerHtml\(q, core, esc, intel\)/.test(src)
+        // …y la puerta anti-tautología compara la respuesta con SU propio enunciado
+        && /_intv15ExploreLabel\(q, core, intel\)/.test(fnSrc('_intv4AnswerHtml')); })());
+  ok('3.17 dos pasadas con la misma entrada dan exactamente el mismo par',
+    ANS('q_liquidity') === ANS('q_liquidity')
+    && ANS('q_diversification') === ANS('q_diversification'));
+
+  // ── §37 · ES + EN ────────────────────────────────────────────────────────
+  ok('3.18 los tres leads existen en EN con las MISMAS cifras',
+    (() => { const l = ANS('q_liquidity', { lang: 'en' });
+      const t = ANS('q_diversification', { lang: 'en' });
+      const c2 = ANS('q_concentration', { lang: 'en' });
+      return /4% of your financial portfolio is recorded as cash/.test(l)
+        && /remaining 96%/.test(l)
+        && /Your 3 largest positions are Microsoft, Bitcoin and Apple/.test(t)
+        && /together they hold 77%/.test(t)
+        && /Microsoft holds 31% of your financial portfolio/.test(c2)
+        && !/explained|attribut/i.test(t + c2); })(),
+    JSON.stringify([ANS('q_liquidity', { lang: 'en' }).slice(0, 80),
+      ANS('q_diversification', { lang: 'en' }).slice(0, 80)]));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// §6 (CIERRE CORRECTIVO) · «HOY» NO PUBLICA UN AGREGADO HISTÓRICO
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n§6 · Hoy: la fecha final de la serie no hace reciente a un acumulado:');
+{
+  const NOWT = T0 + 100 * DAY;
+  const F = (o) => Object.assign({ semanticKey: 'recorded_capital_net',
+    family: 'capital_flow', window: { range: 'all', startAt: T0, endAt: NOWT },
+    values: { net: 5000, events: 4 } }, o || {});
+  const R = (expr, f) => { const c = makeCtx('es');
+    return vm.runInContext(expr + '(' + JSON.stringify(f) + (expr === '_aurixTodayEventAt' ? '' : '')
+      + ')', c); };
+  const fresh = (f) => { const c = makeCtx('es');
+    return vm.runInContext('_aurixTodayFresh(' + JSON.stringify(f) + ', ' + NOWT + ')', c); };
+  const recent = (f) => { const c = makeCtx('es');
+    return vm.runInContext('_aurixTodayIsRecentClaim(' + JSON.stringify(f) + ')', c); };
+  const dated = (f) => { const c = makeCtx('es');
+    return vm.runInContext('_aurixTodayDatedAt(' + JSON.stringify(f) + ')', c); };
+
+  // EL DEFECTO EXACTO DE LA CAPTURA: acumulado desde el primer día del registro,
+  // ventana terminada hoy, sin instante de evento.
+  ok('6.1 un acumulado de flujos sobre TODO el registro no es elegible para «Hoy»',
+    recent(F()) === false,
+    JSON.stringify({ recent: recent(F()), dated: dated(F()) }));
+  ok('6.2 …aunque su ventana termine EXACTAMENTE ahora (que es lo que lo colaba)',
+    dated(F()) === NOWT && fresh(F()) === true && recent(F()) === false);
+  // LA DIRECCIÓN POSITIVA: un movimiento registrado hoy SÍ es noticia de hoy.
+  ok('6.3 con el instante del ÚLTIMO movimiento dentro del horizonte, SÍ entra',
+    (() => { const f = F({ values: { net: 5000, events: 4, lastActionAt: NOWT - 3600e3 } });
+      return recent(f) === true && dated(f) === NOWT - 3600e3 && fresh(f) === true; })());
+  ok('6.4 …y con ese instante FUERA del horizonte, la fecha del evento lo excluye',
+    (() => { const f = F({ values: { net: 5000, events: 4, lastActionAt: T0 + DAY } });
+      return recent(f) === true && dated(f) === T0 + DAY && fresh(f) === false; })(),
+    JSON.stringify({ dated: dated(F({ values: { net: 5000, events: 4, lastActionAt: T0 + DAY } })) }));
+  // LO QUE NO SE TOCA: una ventana NOMBRADA es una afirmación de recencia.
+  ok('6.5 una deriva de 30 días que termina hoy SIGUE siendo un cambio reciente',
+    (() => { const f = { semanticKey: 'cash_drift_30d', family: 'liquidity',
+        window: { range: '30d', startAt: NOWT - 30 * DAY, endAt: NOWT }, values: {} };
+      return recent(f) === true && fresh(f) === true; })());
+  // …y una medición AS OF sobre `all` (un nivel, una rentabilidad) tampoco se
+  // ve afectada: su fecha SÍ es el final de la ventana.
+  ok('6.6 un NIVEL sobre todo el registro conserva su elegibilidad: no acumula eventos',
+    (() => { const f = { semanticKey: 'investable_level', family: 'wealth_level',
+        window: { range: 'all', startAt: T0, endAt: NOWT }, values: {} };
+      return recent(f) === true; })());
+  ok('6.7 el discriminador es declarado, no heurístico: familia o contador de eventos',
+    (() => { const src = fnSrc('_aurixTodayIsRecentClaim');
+      return /_AURIX_FACT_FAMILY\.CAPITAL_FLOW/.test(src)
+        && /Number\.isFinite\(v\.events\)/.test(src)
+        && /_AURIX_TODAY_HISTORICAL_RANGES/.test(src); })());
+  ok('6.8 la actualidad se mide con el EVENTO por delante de la serie',
+    (() => { const src = fnSrc('_aurixTodayDatedAt');
+      const i = src.indexOf('const ev = _aurixTodayEventAt');
+      const j = src.indexOf('Number.isFinite(w.endAt)');
+      return i > 0 && j > i; })());
+  ok('6.9 el instante sale del LEDGER, nunca del reloj del render',
+    (() => { const src = fnSrc('_aurixCashLedgerAuthority');
+      return /out\.lastFlowAt = cash\.reduce/.test(src) && !/Date\.now\(\)/.test(src); })());
+  ok('6.10 …y viaja en el hecho para que la superficie no tenga que re-derivarlo',
+    /lastActionAt: cashAuth\.lastFlowAt/.test(app));
+  ok('6.11 el filtro se aplica en la selección de «Lo que importa hoy»',
+    /\.filter\(st => _aurixTodayIsRecentClaim\(st\)\)/.test(fnSrc('_intv5MattersStories')));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -592,6 +923,10 @@ console.log('\n§8 · Factores: dependencia y clase de activo, que la lista no d
   ok('8.1 con tres posiciones se publica la DEPENDENCIA conjunta, con su cifra real',
     /data-factor="dependency"/.test(three)
     && /Tus 3 mayores posiciones concentran el 77% de tu cartera financiera/.test(three)
+    // §6 — sin afirmación causal: describe concentración del VALOR, no atribuye
+    // el rendimiento a esas posiciones.
+    && !/depende tu evolución|explican|atribu/i.test(three)
+    && /el valor del conjunto se mueve sobre todo con ellas/.test(three)
     && /data-drv-dep="77"/.test(three),
     (three.match(/data-factor="dependency">([^<]*)</) || [, '?'])[1]);
   ok('8.2 …y el recuento es el REAL, nunca la constante tres',
@@ -631,6 +966,8 @@ console.log('\n§8 · Factores: dependencia y clase de activo, que la lista no d
   ok('8.12 ES + EN (§37), con las MISMAS cifras',
     (() => { const en = DRV({ items: P3, pct: 77, lang: 'en' });
       return /Your 3 largest positions hold 77% of your financial portfolio/.test(en)
+        && /the value of the whole moves mainly with them/.test(en)
+        && !/depends on|explained|attribut/i.test(en)
         && /By asset class, your largest exposure is Cripto, at 62% of your financial portfolio/.test(en)
         && !/\bmaterial\b/i.test(en); })(),
     (DRV({ items: P3, pct: 77, lang: 'en' }).match(/data-factor="dependency">([^<]*)</) || [, '?'])[1]);
@@ -680,6 +1017,169 @@ console.log('\n§12 · «Lo que importa hoy»: el vacío dice qué pasa, no que 
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// §4 (CIERRE CORRECTIVO) · DESCRIBIR SIN REGAÑAR
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n§4 · Salud y avisos: una característica aceptada no es una incidencia:');
+{
+  const SCORE = { score: 47, tone: 'watch', band: 'weight_in_few',
+    limiters: [{ tone: 'limit', key: 'spread', label: 'equivale a 2,1 posiciones de 4' }] };
+  const CORE = (findings) => ({ findings: findings || [],
+    ledger: { facts: [{ semanticKey: 'top_position_weight', value: 31,
+      values: { pct: 31, name: 'Microsoft' } }] } });
+  const INTEL = (intent) => ({ context: { fields: intent
+    ? { concentration_intent: { value: intent, provenance: 'user_answer', answeredAt: T0 } } : {} } });
+  const CH = (core, intel) => run('_intv5Chips(' + JSON.stringify(core) + ', '
+    + JSON.stringify(SCORE) + ', ' + JSON.stringify(intel) + ')');
+
+  ok('4.1 sin declarar nada, el limitador de reparto conserva su tono de aviso',
+    (() => { const c = CH(CORE(), INTEL(null));
+      const l = c.find(x => x.key === 'spread');
+      return !!l && l.tone === 'limit' && !l.neutralised; })(),
+    JSON.stringify(CH(CORE(), INTEL(null))));
+  ok('4.2 declarada DELIBERADA y sin cambio vivo, el mismo limitador pasa a NEUTRO',
+    (() => { const c = CH(CORE(), INTEL('deliberate'));
+      const l = c.find(x => x.key === 'spread');
+      return !!l && l.tone === 'context' && l.neutralised === 'declared_intent'; })(),
+    JSON.stringify(CH(CORE(), INTEL('deliberate'))));
+  ok('4.3 …y la CIFRA no se toca: el limitador sigue publicándose con su etiqueta',
+    (() => { const a = CH(CORE(), INTEL(null)).find(x => x.key === 'spread');
+      const b = CH(CORE(), INTEL('deliberate')).find(x => x.key === 'spread');
+      return a.label === b.label && b.label.indexOf('2,1') !== -1; })());
+  ok('4.4 un CAMBIO MATERIAL posterior de esa raíz restaura el aviso',
+    (() => { const c = CH(CORE([{ rootCause: 'top_position', semanticKey: 'top_position_weight' }]),
+        INTEL('deliberate'));
+      const l = c.find(x => x.key === 'spread');
+      return !!l && l.tone === 'limit'; })(),
+    JSON.stringify(CH(CORE([{ rootCause: 'top_position' }]), INTEL('deliberate')).map(x => x.tone)));
+  ok('4.5 declararse experto NO oculta la concentración ni sube el anillo',
+    (() => { const src = fnSrc('_intv5Chips');
+      // el tono es lo ÚNICO que cambia: no se filtra el limitador ni se toca `score`
+      return /Object\.assign\(\{\}, l, \{ tone: 'context'/.test(src)
+        && !/score\.score\s*[+*]/.test(src)
+        && !/limiters[^\n]*filter\(/.test(src); })());
+  ok('4.6 una respuesta SUPERADA no neutraliza nada (§4.1 sigue mandando)',
+    (() => { const intel = { context: { fields: { concentration_intent: { value: 'deliberate',
+        provenance: 'user_answer', answeredAt: T0, superseded: true } } } };
+      const l = CH(CORE(), intel).find(x => x.key === 'spread');
+      return !!l && l.tone === 'limit'; })());
+  // ── EL ALCANCE DEL SCORE ─────────────────────────────────────────────────
+  ok('4.7 el anillo DECLARA qué mide y qué no, en un canal real',
+    (() => { const h = run('_intccScoreRingHtml({ score: 47 })');
+      return /role="img"/.test(h) && !/aria-hidden/.test(h)
+        && /data-health-scope="weight_dispersion"/.test(h)
+        && /cómo se reparte el peso entre tus posiciones/.test(h)
+        && /no es una nota a tus decisiones ni una medida de riesgo/.test(h); })(),
+    (run('_intccScoreRingHtml({ score: 47 })').match(/aria-label="([^"]*)"/) || [, '?'])[1]);
+  ok('4.8 …y sin la copy vuelve a ser decorativo en vez de anunciar una cifra pelada',
+    (() => { const c = makeCtx('es');
+      vm.runInContext('__T.intv16_health_scope = undefined;', c);
+      const h = vm.runInContext('_intccScoreRingHtml({ score: 47 })', c);
+      return /aria-hidden="true"/.test(h) && !/aria-label/.test(h); })());
+  ok('4.9 el alcance existe en los dos idiomas (§37)',
+    (() => { const en = vm.runInContext('_intccScoreRingHtml({ score: 47 })', makeCtx('en'));
+      return /measures how weight is spread across your positions/.test(en)
+        && /not a grade on your decisions nor a measure of risk/.test(en); })());
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// §6 (CIERRE CORRECTIVO) · ANTI-REPETICIÓN ENTRE HOY Y CAMBIOS
+// ════════════════════════════════════════════════════════════════════════════
+console.log('\n§6 · el mismo acontecimiento no se publica dos veces como novedad:');
+{
+  ok('6.12 la exclusión se mide contra lo que «Qué ha cambiado» RENDERIZA, no sólo lo activo',
+    (() => { const src = fnSrc('_intv5MattersHtml');
+      return /_intv4FindingRows\(core, \{ all: true \}\)/.test(src)
+        && /publishedEvents\.has\(id\)/.test(src); })());
+  ok('6.13 …y la identidad es el EVENTO, nunca la clave semántica (sin veto por familia)',
+    (() => { const src = fnSrc('_intv5MattersHtml');
+      return /const _evId = \(x\) => String\(\(x && \(x\.eventId \|\| x\.conceptId\)\) \|\| ''\);/.test(src)
+        && !/publishedEvents[^\n]*semanticKey/.test(src); })());
+  ok('6.14 sin identidad de evento NO se excluye: enterrar lo nuevo es peor que repetir',
+    /return !id \|\| !publishedEvents\.has\(id\)/.test(fnSrc('_intv5MattersHtml')));
+  ok('6.15 el historial revisado sigue rotulado como tal en su destino',
+    /is-reviewed/.test(app) && /data-reviewed="\$\{x\.reviewed \? '1' : '0'\}"/.test(app));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// §7 (CIERRE CORRECTIVO) · PREGUNTAS: VERIFICAR EL ARREGLO EXISTENTE
+// ════════════════════════════════════════════════════════════════════════════
+// El §7 pide VERIFICAR, no rediagnosticar: la respuesta sí persistía y lo que
+// aparecía era otra pregunta del catálogo (ya cerrado en §10). Aquí se ejercitan
+// las condiciones que el §7 enumera y que no tenían assert propio.
+console.log('\n§7 · persistencia, aislamiento y orden de respuestas:');
+{
+  // Se ejercita en el sandbox, con el store y el dueño inyectados por `env`.
+  const c = makeCtx('es');
+  vm.runInContext('const _AURIX_INTEL_CTX_KEY = "aurix_intel_ctx_v1";'
+    + 'const _AURIX_INTEL_CTX_KEY_LEGACY = "aurix_auri_ctx_v1";', c);
+  vm.runInContext('globalThis.__mk = function(){ var m = {}; return {'
+    + ' getItem: function(k){ return (k in m) ? m[k] : null; },'
+    + ' setItem: function(k,v){ m[k] = String(v); },'
+    + ' removeItem: function(k){ delete m[k]; }, __m: m }; };', c);
+
+  ok('7.1 el contexto lleva SELLO DE DUEÑO: otro usuario no lo lee',
+    vm.runInContext('(function(){ var s = __mk();'
+      + ' _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, { fields: { horizon: { value: "long" } } },'
+      + '   { owner: "u1", store: s });'
+      + ' var mine = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, { owner: "u1", store: s });'
+      + ' var other = _aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, { owner: "u2", store: s });'
+      + ' return !!mine && other === null; })()', c) === true);
+  ok('7.2 sin dueño resuelto la escritura FALLA CERRADA (no se finge guardado)',
+    vm.runInContext('(function(){ var s = __mk();'
+      + ' return _aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, { fields: {} }, { owner: null, store: s })'
+      + '   === false; })()', c) === true);
+  ok('7.3 responder PERSISTE la respuesta con su instante y su procedencia',
+    vm.runInContext('(function(){ var s = __mk();'
+      + ' var ok0 = _aurixIntelRecordAnswer("horizon", "long", { owner: "u1", store: s, now: 100 });'
+      + ' var ctx = _aurixIntelContext({ owner: "u1", store: s });'
+      + ' return ok0 === true && ctx.fields.horizon.value === "long"'
+      + '   && ctx.fields.horizon.answeredAt === 100'
+      + '   && ctx.fields.horizon.provenance === "user_answer"; })()', c) === true);
+  ok('7.4 «prefiero no responder» se guarda y sobrevive a una nueva lectura',
+    vm.runInContext('(function(){ var s = __mk();'
+      + ' _aurixIntelDecline("horizon", { owner: "u1", store: s, now: 200 });'
+      + ' var ctx = _aurixIntelContext({ owner: "u1", store: s });'
+      + ' return ctx.declined.horizon === 200; })()', c) === true);
+  // §7 — «una respuesta antigua/tardía no sobrescribe un contexto más reciente».
+  // ── DEFECTO ENCONTRADO AL VERIFICAR (§7) ────────────────────────────────
+  // El lector saneaba `asked`/`declined`/`pausedAt` DESPUÉS del retorno temprano
+  // por «no hay campos». Quien sólo había declinado —o pausado— no tiene ningún
+  // campo respondido, así que su rechazo se perdía en cada carga y la pregunta
+  // volvía. Es el síntoma que el §7 manda verificar, en el estado más común de
+  // quien no quiere responder.
+  ok('7.4b REGRESIÓN · declinar SIN ninguna respuesta previa sobrevive a la recarga',
+    vm.runInContext('(function(){ var s = __mk();'
+      + ' _aurixIntelDecline("horizon", { owner: "u9", store: s, now: 700 });'
+      + ' var ctx = _aurixIntelContext({ owner: "u9", store: s });'
+      + ' return ctx.declined && ctx.declined.horizon === 700'
+      + '   && ctx.answered === 0; })()', c) === true);
+  ok('7.4c …y pausar sin haber respondido nada, también',
+    vm.runInContext('(function(){ var s = __mk();'
+      + ' _aurixIntelPauseQuestions({ owner: "u9", store: s, now: 800 });'
+      + ' return _aurixIntelContext({ owner: "u9", store: s }).pausedAt === 800; })()', c) === true);
+  ok('7.5 una respuesta TARDÍA pero más ANTIGUA no pisa a la más reciente',
+    vm.runInContext('(function(){'
+      + ' var nuevo = { fields: { horizon: { value: "long", answeredAt: 500 } } };'
+      + ' var viejo = { fields: { horizon: { value: "short", answeredAt: 100 } } };'
+      + ' var a = _aurixIntelCtxMerge(nuevo, viejo), b = _aurixIntelCtxMerge(viejo, nuevo);'
+      + ' return a.fields.horizon.value === "long" && b.fields.horizon.value === "long"; })()', c) === true);
+  ok('7.6 …y el merge es CONMUTATIVO, así que dos dispositivos no oscilan',
+    vm.runInContext('(function(){'
+      + ' var A = { fields: { horizon: { value: "long", answeredAt: 500 } }, asked: { q1: { at: 3, count: 1 } } };'
+      + ' var B = { fields: { horizon: { value: "short", answeredAt: 100 } }, asked: { q1: { at: 9, count: 2 } } };'
+      + ' return JSON.stringify(_aurixIntelCtxMerge(A, B)) === JSON.stringify(_aurixIntelCtxMerge(B, A)); })()', c) === true);
+  ok('7.7 el silencio se deriva del MÁXIMO answeredAt del PROPIO dueño, no de un global',
+    /provenance !== 'user_answer'/.test(fnSrc('_aurixIntelQuestions'))
+    && /owner !== owner/.test(fnSrc('_aurixIntelReadOwned').replace('obj.owner !== owner', 'owner !== owner')));
+  ok('7.8 …y un cambio material sigue pudiendo reabrir la necesidad de contexto',
+    /if \(lastAnswerAt > 0 && now - lastAnswerAt < _AURIX_INTEL_Q_AFTER_ANSWER_MS\) return \[\];/
+      .test(fnSrc('_aurixIntelQuestions'))
+    && /now > 0 && !pol\.materialReopen/.test(fnSrc('_aurixIntelQuestions')));
+  ok('7.9 no se ha creado estado ni tabla nueva para esto',
+    !/_AURIX_INTEL_Q_STATE_KEY|intelligence_questions|aurix_intel_q_/.test(app));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // §25 / §36 · PRESENTACIÓN Y RESPONSIVE
 // ════════════════════════════════════════════════════════════════════════════
 console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se sale de su caja:');
@@ -690,12 +1190,11 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   // crear superficie: es lo que hace que la invariante ya esté cumplida, y este
   // assert lo demuestra en vez de darlo por hecho.
   ok('25.1 los estados nuevos viven en cards YA pineadas: cero superficie nueva',
-    /class="intcc-card intcc-radar intv7-radar is-observable"/.test(app)
+    /class="intcc-card intcc-radar intv6-radar intv7-radar"/.test(app)
     && /class="intcc-card intcc-timeline intv4-memory is-stable"/.test(app)
     // …y ninguna de las clases nuevas recibe una posición de rejilla propia, que
     // es cómo aparecería una card sin `order` delante del hero.
-    && !/\.intv15-[a-z-]+\s*\{[^}]*grid-(column|row)/.test(css)
-    && !/\.is-observable\s*\{[^}]*grid-(column|row)/.test(css)
+    && !/\.intv1[56]-[a-z-]+\s*\{[^}]*grid-(column|row)/.test(css)
     && !/\.is-stable\s*\{[^}]*grid-(column|row)/.test(css));
   ok('25.2 `.intcc-radar` y `.intcc-timeline` declaran su `order` bajo 1024px',
     /\.intcc-radar\s+\{ order: \d+; \}/.test(css)
@@ -703,28 +1202,56 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
     JSON.stringify([(css.match(/\.intcc-radar\s+\{ order: \d+; \}/) || [''])[0],
                     (css.match(/\.intcc-timeline\s+\{ order: \d+; \}/) || [''])[0]]));
   ok('25.3 ninguna superficie nueva fija alto ni anima: el contenido pone la altura',
-    ['intv15-obs-list', 'intv15-obs-row', 'intv15-stable-list', 'intv15-stable-row',
+    ['intv16-radar-none', 'intv15-stable-list', 'intv15-stable-row',
      'intv15-drv-factors', 'intv15-drv-factor'].every((cls) => {
       const i = css.indexOf('.' + cls + ' {');
       if (i < 0) return false;
       const block = css.slice(i, css.indexOf('}', i));
       return !/(^|[^-])height:\s*\d/.test(block) && !/animation/.test(block); }));
   // ── LA LECCIÓN DEL `nowrap` QUE PINTA FUERA DE SU CAJA ────────────────────
-  // Costó un P0 visual en Workspace: un `<span>` con `white-space: nowrap` se sale
-  // de su tarjeta sin recortarse y con el rectángulo intacto, así que ninguna
-  // prueba de «¿cabe?» lo ve. La cifra de «Factores observables» lleva `nowrap` a
-  // propósito, así que la etiqueta tiene que poder ceder: sin `min-width: 0` su
-  // mínimo automático la haría empujar.
-  ok('25.4 la cifra va `nowrap` y la ETIQUETA puede ceder (min-width:0 + overflow-wrap)',
-    (() => { const i = css.indexOf('.intv15-obs-label {');
-      const lbl = css.slice(i, css.indexOf('}', i));
-      const j = css.indexOf('.intv15-obs-val {');
-      const val = css.slice(j, css.indexOf('}', j));
-      return /min-width:\s*0/.test(lbl) && /overflow-wrap:\s*anywhere/.test(lbl)
-        && /flex:\s*1 1 auto/.test(lbl)
-        && /white-space:\s*nowrap/.test(val) && /flex:\s*0 0 auto/.test(val); })());
-  ok('25.5 en escritorio la lista compacta se centra en su celda estirada',
-    /\.aurix-intv6 \.intcc-radar\.is-observable \.intv15-obs-list/.test(css));
+  // Costó un P0 visual en Workspace y el §2 manda preservar la contención: un
+  // `<text>` de SVG no se recorta solo, así que la única garantía es que el
+  // viewBox lo contenga. Con el marco fijo de cinco eso vuelve a ser una
+  // constante, pero la DERIVACIÓN se conserva: es lo que lo demuestra en vez de
+  // confiarlo a un número escrito a mano.
+  ok('25.4 el viewBox se DERIVA de los rótulos, no es una constante escrita a mano',
+    (() => { const src = fnSrc('_intccRadarSvg');
+      return /const vbX = Math\.floor\(Math\.min\.apply\(null, xs\)\);/.test(src)
+        && /viewBox="\$\{vbX\} \$\{vbY\} \$\{vbW\} \$\{vbH\}"/.test(src)
+        && !/viewBox="-76 -32 362 252"/.test(src); })());
+  // ── §8 · CONTRASTE Y PROFUNDIDAD, MEDIDOS EN LA HOJA ────────────────────
+  // «Menos azul oscuro sobre azul oscuro»: la lectura de estabilidad es un
+  // RESULTADO y se apoya en una superficie más profunda que el panel, no en otro
+  // azul. Se comprueba el canal AZUL del fondo, que es lo que distingue el negro
+  // profundo del azul de tarjeta — no un juicio sobre una captura.
+  ok('25.4b la lectura de estabilidad usa negro profundo, no otro azul de panel',
+    (() => { const i = css.indexOf('.intv4-memory.is-stable .intv15-stable-list {');
+      if (i < 0) return false;
+      const blk = css.slice(i, css.indexOf('}', i));
+      const m = blk.match(/background:\s*rgba\((\d+),(\d+),(\d+)/);
+      if (!m) return false;
+      const [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])];
+      // profundo: los tres canales bajos, y el azul sin dominar la mezcla
+      return r <= 12 && g <= 14 && b <= 24 && (b - r) <= 14; })(),
+    (css.slice(css.indexOf('.intv4-memory.is-stable .intv15-stable-list {')).match(/background:[^;]+;/) || [''])[0]);
+  ok('25.4c el titular y las cifras quedan CLAROS sobre esa superficie',
+    (() => { const head = css.indexOf('.intv4-memory.is-stable .intv15-stable-head {');
+      const row = css.indexOf('.intv4-memory.is-stable .intv15-stable-row {');
+      if (head < 0 || row < 0) return false;
+      const a = (css.slice(head, css.indexOf('}', head)).match(/rgba\([^)]*,\s*([\d.]+)\)/) || [, 0])[1];
+      const b = (css.slice(row, css.indexOf('}', row)).match(/rgba\([^)]*,\s*([\d.]+)\)/) || [, 0])[1];
+      return Number(a) >= 0.9 && Number(b) >= 0.75 && Number(a) > Number(b); })());
+  ok('25.4d …y la cobertura sigue siendo un PIE en el estado estable, y CONTENIDO sin comparación',
+    (() => { const base = css.indexOf('.intv4-memory .intv4-mem-coverage {');
+      const noc = css.indexOf('.intv4-memory.is-coverage[data-no-comparison="1"] .intv4-mem-coverage {');
+      if (base < 0 || noc < 0) return false;
+      const fa = (css.slice(base, css.indexOf('}', base)).match(/font-size:\s*([\d.]+)px/) || [, 0])[1];
+      const fb = (css.slice(noc, css.indexOf('}', noc)).match(/font-size:\s*([\d.]+)px/) || [, 0])[1];
+      return Number(fb) > Number(fa); })());
+  ok('25.5 la línea sin evidencia no reserva alto ni deja fila vacía cuando no se pinta',
+    (() => { const i = css.indexOf('.intv16-radar-none {');
+      const blk = css.slice(i, css.indexOf('}', i));
+      return i > 0 && !/(^|[^-])height:\s*\d/.test(blk) && !/min-height/.test(blk); })());
   // ── §36 · EL RADAR ADAPTATIVO NO SE RECORTA EN NINGÚN TAMAÑO ──────────────
   // El SVG escala por su viewBox (`width:100%; height:auto`), así que demostrar la
   // contención en unidades de viewBox la demuestra en los seis anchos del §36 a la

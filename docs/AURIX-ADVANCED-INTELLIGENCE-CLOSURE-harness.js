@@ -192,8 +192,8 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_INTCC_HEALTH_DIM_LABEL','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT',
-  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -227,6 +227,10 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
+  // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays',
+  // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
+  '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -1177,10 +1181,10 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   const h5 = RADAR(FIVE, DIMS([]));
   ok('11.1 cinco valores ⇒ cinco marcadores, cinco segmentos y figura CERRADA con relleno',
     count(h5, /class="intcc-radar-dot"/g) === 5
-    && /data-svg-edges="5"/.test(h5) && /data-svg-neutral="0"/.test(h5)
+    && /data-svg-edges="5"/.test(h5) && /data-svg-gaps="0"/.test(h5)
     && /intcc-radar-area/.test(h5) && !/stroke-dasharray/.test(h5),
     JSON.stringify({ dots: count(h5, /class="intcc-radar-dot"/g),
-      edges: num(h5, /data-svg-edges="(\d+)"/), neutral: num(h5, /data-svg-neutral="(\d+)"/) }));
+      edges: num(h5, /data-svg-edges="(\d+)"/), gaps: num(h5, /data-svg-gaps="(\d+)"/) }));
   ok('11.2 exactamente UN marcador por eje, en los cinco',
     (() => { const axes = attrs(h5, 'class="intcc-radar-dot" cx="[^"]*" cy="[^"]*" r="[^"]*" data-axis="([^"]+)"');
       return new Set(axes).size === 5 && axes.length === 5; })(),
@@ -1219,58 +1223,61 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
         return !new RegExp('cx="' + cx + '" cy="' + cy + '"').test(h)
           && !/cx="110.0" cy="106.0"/.test(h); }));
 
-  // ── VNEXT §6 · DATOS DESCONOCIDOS: YA NO LLEGAN A LA FIGURA ──────────────
-  // Este bloque entero (11.8–11.15) certificaba CÓMO se pintaba un eje sin datos:
-  // marcador idéntico, coordenada en el límite interior, segmento neutral, rótulo
-  // «sin datos» y su enumeración accesible. Es, otra vez, un gate que convirtió en
-  // contrato una limitación — y es la UNDÉCIMA vez que este proyecto lo descubre.
-  // El §6 del SPEC VNEXT ordena el radar ADAPTATIVO y prohíbe «sin datos» por su
-  // nombre, así que lo que aquí se mide cambia de sujeto: no cómo se dibuja lo
-  // desconocido, sino que NO SE DIBUJA, en ninguna de sus formas, y que la figura
-  // resultante es honesta por construcción.
+  // ── CIERRE CORRECTIVO §2 · ESTRUCTURA FIJA, EVIDENCIA VARIABLE ───────────
+  // TERCERA redacción de este bloque, y la última que cambia de sujeto. INT.07
+  // certificaba CÓMO se pintaba un eje sin datos (marcador, coordenada de
+  // reserva, rótulo «sin datos»): eso ascendió la limitación a diseño. VNext
+  // certificaba que el eje NO EXISTÍA: eso borró la estructura y convirtió tres
+  // valores en un triángulo que se leía como el patrimonio entero.
+  // El §2 separa las dos cosas y es lo que estos asserts miden ahora: el MARCO es
+  // una constante (cinco ejes, cinco nombres) y la EVIDENCIA decide sólo qué se
+  // dibuja encima — marcador y cifra si está certificada, NADA si no.
   const hUnk = RADAR({ diversification: 40, liquidity: 30, concentration: 60 }, DIMS(['stability', 'growth']));
-  ok('11.8 dos ejes sin datos ⇒ TRES marcadores, ninguno de disponibilidad desconocida',
-    count(hUnk, /class="intcc-radar-dot"/g) === 3
+  ok('11.8 dos ejes sin datos ⇒ marco de CINCO y sólo TRES marcadores',
+    count(hUnk, /class="intcc-radar-axis[" ]/g) === 5
+    && count(hUnk, /class="intcc-radar-label"/g) === 5
+    && count(hUnk, /class="intcc-radar-dot"/g) === 3
+    && count(hUnk, /class="intcc-radar-val"/g) === 3
     && !/is-unknown/.test(hUnk)
-    && /data-svg-unknown="0"/.test(hUnk) && /data-svg-axes="3"/.test(hUnk)
+    && /data-svg-unknown="2"/.test(hUnk) && /data-svg-axes="5"/.test(hUnk)
     && count(hUnk, /data-availability="unknown"/g) === 0
     && count(hUnk, /data-availability="measured"/g) === 3,
     JSON.stringify({ dots: count(hUnk, /class="intcc-radar-dot"/g),
-      unknown: count(hUnk, /data-availability="unknown"/g) }));
-  ok('11.8b …y la descripción accesible enumera los TRES con su valor, sin «sin datos»',
+      axes: count(hUnk, /class="intcc-radar-axis[" ]/g) }));
+  ok('11.8b la descripción accesible enumera los CINCO; la ausencia sólo se nombra ahí',
     (() => { const m = hUnk.match(/aria-label="([^"]+)"/);
       if (!m) return false;
       const a = m[1];
-      return /data-svg-a11y-axes="3"/.test(hUnk)
-        && (a.match(/:/g) || []).length >= 3
-        && (a.match(/sin datos/g) || []).length === 0; })(),
+      return /data-svg-a11y-axes="5"/.test(hUnk)
+        && (a.match(/sin datos/g) || []).length === 0
+        // sin dos puntos colgando: una afirmación vacía es peor que el nombre solo
+        && !/: \./.test(a) && !/: "/.test(a)
+        && a.indexOf('diversification: 40%') !== -1
+        && a.indexOf('concentration: 60%') !== -1; })(),
     JSON.stringify((hUnk.match(/aria-label="([^"]+)"/) || [])[1] || null));
-  ok('11.9 la figura se recorre completa: TRES segmentos idénticos y ninguno neutral',
-    /data-svg-edges="3"/.test(hUnk) && /data-svg-neutral="0"/.test(hUnk)
-    && count(hUnk, /class="intcc-radar-edge"/g) === 3
+  ok('11.9 la trayectoria se INTERRUMPE en cada hueco: un segmento, nunca un triángulo',
+    /data-svg-edges="1"/.test(hUnk) && /data-svg-gaps="4"/.test(hUnk)
+    && count(hUnk, /class="intcc-radar-edge"/g) === 1
     && !/intcc-radar-edge is-unknown/.test(hUnk)
     && !/stroke-dasharray/.test(hUnk)
     && count(hUnk, /<g class="intcc-radar-edges">/g) === 1,
-    JSON.stringify({ edges: num(hUnk, /data-svg-edges="(\d+)"/), neutral: num(hUnk, /data-svg-neutral="(\d+)"/),
+    JSON.stringify({ edges: num(hUnk, /data-svg-edges="(\d+)"/), gaps: num(hUnk, /data-svg-gaps="(\d+)"/),
       drawn: count(hUnk, /class="intcc-radar-edge"/g) }));
-  ok('11.10 el último eje cierra con el primero (la trayectoria es un ciclo)',
+  ok('11.10 el último eje cierra con el primero cuando los dos están certificados',
     (() => { const src0 = fnSrc('_intccRadarSvg');
-      return /const j = \(i \+ 1\) % n;/.test(src0) && /for \(let i = 0; i < n; i\+\+\)/.test(src0); })());
-  ok('11.11 ningún eje recibe una coordenada de reserva: la figura no tiene vértices prestados',
+      return /const j = \(i \+ 1\) % n;/.test(src0) && /for \(let i = 0; i < n; i\+\+\)/.test(src0)
+        && /if \(!\(isM\(i\) && isM\(j\)\)\) \{ gapCount\+\+; continue; \}/.test(src0); })());
+  ok('11.11 un eje desconocido no recibe NINGUNA coordenada, ni siquiera de reserva',
     (() => { const src0 = fnSrc('_intccRadarSvg');
       return radiusOf(hUnk, 'stability') === null && radiusOf(hUnk, 'growth') === null
-        // `R_UNK` sobrevive SÓLO como límite interior de la retícula, nunca como
-        // posición de un valor: no puede aparecer en `posOf`.
         && /const posOf = i => pt\(i, rOf\(dims\[i\]\.key\)\);/.test(src0)
-        && !/posOf[^\n]*R_UNK/.test(src0); })(),
+        && !/posOf[^\n]*R_UNK/.test(src0)
+        && /if \(!isMeasured\) return;/.test(src0); })(),
     JSON.stringify({ stability: radiusOf(hUnk, 'stability'), growth: radiusOf(hUnk, 'growth') }));
-  ok('11.12 el área SÍ se rellena, y sólo sobre los ejes certificados',
-    /intcc-radar-area/.test(hUnk) && /data-svg-open="0"/.test(hUnk)
-    && (hUnk.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 3);
+  ok('11.12 el área exige los CINCO: con un hueco no se rellena ni se cierra',
+    !/intcc-radar-area/.test(hUnk) && /data-svg-open="1"/.test(hUnk));
   ok('11.13 la palabra «sin datos» no aparece en el radar en ninguna forma',
     count(hUnk, /is-unavailable/g) === 0 && !/sin datos/.test(hUnk));
-  // Quedan DOS estados en la figura, y los dos son mediciones: un cero REAL y un
-  // valor pequeño. El tercero ya no compite por el mismo espacio.
   ok('11.14 un 0 REAL y un valor pequeño siguen distinguiéndose, y ambos son mediciones',
     (() => { const h = RADAR({ diversification: 14, stability: 70, liquidity: 0, concentration: 60 },
         DIMS(['growth']));
@@ -1278,16 +1285,24 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
       const small = /data-axis="diversification" data-availability="measured"/.test(h);
       return zero && small && />0%</.test(h) && !/sin datos/.test(h)
         && !/data-axis="growth"/.test(h)
+        && count(h, /class="intcc-radar-label"/g) === 5
         && count(h, /class="intcc-radar-dot"/g) === 4
         && !/is-unknown/.test(h); })(),
     RADAR({ diversification: 14, stability: 70, liquidity: 0, concentration: 60 }, DIMS(['growth'])).slice(0, 200));
-  // §6.B — CON TODO SIN DATOS NO HAY FIGURA. Antes se dibujaba el pentágono
-  // completo con cinco rótulos «sin datos»: una pantalla premium cuyo único
-  // contenido era declarar que no podía medir nada.
-  ok('11.15 todos los ejes sin datos ⇒ NO se dibuja radar (cadena vacía)',
+  // §2 — CON TODO SIN DATOS, LA MALLA Y LOS NOMBRES. Ni se borra la figura (VNext)
+  // ni se rellena de rótulos «sin datos» (INT.07): se ve el mapa de lo que Aurix
+  // razona, vacío, que es exactamente la verdad.
+  ok('11.15 todos los ejes sin datos ⇒ malla y nombres, sin un solo valor',
     (() => { const h = RADAR({}, DIMS(['diversification', 'stability', 'liquidity', 'growth', 'concentration']));
-      return h === ''; })(),
-    JSON.stringify(RADAR({}, DIMS(['diversification', 'stability', 'liquidity', 'growth', 'concentration']))));
+      return h !== ''
+        && count(h, /class="intcc-radar-axis[" ]/g) === 5
+        && count(h, /class="intcc-radar-label"/g) === 5
+        && count(h, /class="intcc-radar-val"/g) === 0
+        && count(h, /class="intcc-radar-dot"/g) === 0
+        && !/intcc-radar-area/.test(h)
+        && /data-svg-edges="0"/.test(h) && /data-svg-gaps="5"/.test(h)
+        && !/sin datos/.test(h) && !/>0%</.test(h); })(),
+    JSON.stringify(RADAR({}, DIMS(['diversification', 'stability', 'liquidity', 'growth', 'concentration'])).slice(0, 160)));
   ok('11.16 la zona central excluida NO forma parte de la retícula medible',
     (() => { const src0 = fnSrc('_intccRadarSvg');
       // Los anillos se mapean por la MISMA transformación de la serie y los ejes
@@ -1332,15 +1347,20 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     && !/intcc-radar-edge\.is-unknown/.test(css)
     && !/intcc-radar-halo\.is-unknown/.test(css)
     && !/intcc-radar-axis\.is-unavailable/.test(css));
-  // VNEXT §6 — «sus cinco ejes» pasa a ser «los que puede certificar», y el
-  // invariante fuerte es la COHERENCIA: el contrato de la card, la figura y el
-  // número de marcadores tienen que decir lo mismo, siempre.
-  ok('11.23 en las DOS cuentas de referencia la figura y el contrato coinciden',
+  // CIERRE CORRECTIVO §2 — el marco es CINCO en las dos cuentas; lo que varía es
+  // cuánto se dibuja encima. El invariante fuerte es la COHERENCIA entre contrato
+  // y figura: `data-measured` tiene que ser exactamente el número de marcadores y
+  // de cifras, y `edges + gaps` tiene que cerrar el ciclo de cinco.
+  ok('11.23 en las DOS cuentas de referencia el marco es cinco y la serie es la certificada',
     [CUENTA_A, CUENTA_B].every(f => { const h = render(f).html;
       const m = Number(num(h, /data-measured="(\d+)"/));
-      return m >= 3 && num(h, /data-axes="(\d+)"/) === String(m)
+      const e = Number(num(h, /data-svg-edges="(\d+)"/));
+      const g = Number(num(h, /data-svg-gaps="(\d+)"/));
+      return m >= 1 && num(h, /data-axes="(\d+)"/) === '5'
+        && count(h, /class="intcc-radar-label"/g) === 5
         && count(h, /class="intcc-radar-dot[" ]/g) === m
-        && num(h, /data-svg-edges="(\d+)"/) === String(m)
+        && count(h, /class="intcc-radar-val"/g) === m
+        && e + g === 5
         && !/sin datos/.test(h); }),
     JSON.stringify([CUENTA_A, CUENTA_B].map(f => { const h = render(f).html;
       return { axes: num(h, /data-axes="(\d+)"/), dots: count(h, /class="intcc-radar-dot[" ]/g),
@@ -1369,19 +1389,25 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   // cambio: 2,2/7 · 31 % · 7 % con Estabilidad y Crecimiento sin datos. Antes
   // producía un pentágono con dos rótulos «sin datos»; ahora produce un TRIÁNGULO
   // cerrado de tres mediciones reales.
-  ok('11.25 CASO DE ACEPTACIÓN · tres coordenadas, tres marcadores y tres segmentos',
+  // CIERRE CORRECTIVO §2 — el caso de la captura autenticada: marco de cinco con
+  // sus cinco nombres, tres marcadores con su cifra y UN solo segmento (los tres
+  // certificados ocupan vértices alternos). Tres segmentos serían el triángulo
+  // que el §2 prohíbe.
+  ok('11.25 CASO DE ACEPTACIÓN · marco de cinco, tres marcadores y UN segmento',
     count(ACC, /class="intcc-radar-dot[" ]/g) === 3
     && count(ACC, /class="intcc-radar-halo[" ]/g) === 3
-    && /data-svg-edges="3"/.test(ACC) && /data-svg-axes="3"/.test(ACC),
+    && count(ACC, /class="intcc-radar-label"/g) === 5
+    && /data-svg-edges="1"/.test(ACC) && /data-svg-axes="5"/.test(ACC),
     JSON.stringify({ dots: count(ACC, /class="intcc-radar-dot[" ]/g),
       edges: num(ACC, /data-svg-edges="(\d+)"/) }));
-  ok('11.25b …los tres medidos y CERO desconocidos, con el área cerrada',
+  ok('11.25b …y sin los cinco no hay relleno ni marcador desconocido',
     count(ACC, /class="intcc-radar-dot"/g) === 3
     && count(ACC, /data-availability="measured"/g) === 3
     && count(ACC, /data-availability="unknown"/g) === 0
-    && count(ACC, /class="intcc-radar-edge"/g) === 3
+    && count(ACC, /class="intcc-radar-edge"/g) === 1
     && !/is-unknown/.test(ACC) && !/is-unavailable/.test(ACC)
-    && /data-svg-neutral="0"/.test(ACC) && /data-svg-open="0"/.test(ACC)
+    && /data-svg-gaps="4"/.test(ACC) && /data-svg-open="1"/.test(ACC)
+    && !/intcc-radar-area/.test(ACC)
     && ((((ACC.match(/aria-label="([^"]+)"/) || [])[1]) || '').match(/sin datos/g) || []).length === 0,
     JSON.stringify({ dots: count(ACC, /class="intcc-radar-dot"/g),
       unknown: count(ACC, /data-availability="unknown"/g),
@@ -3958,10 +3984,13 @@ console.log('\nDC · C y D · el radar y los factores, preservados y verificados
   // VNEXT §6 — un marcador y un segmento POR DIMENSIÓN CERTIFICADA, y el número
   // lo dice el propio contrato de la card: así el assert no vuelve a fijar el
   // recuento de un estado de datos concreto como si fuera el contrato.
-  ok('C.2 un marcador y un segmento por dimensión certificada, en las DOS cuentas',
+  ok('C.2 un marcador por dimensión certificada, y el ciclo de cinco cerrado entre tramos y huecos',
     [hA, hB].every((h) => { const m = Number((h.match(/data-measured="(\d+)"/) || [, 0])[1]);
-      return m >= 3 && (h.match(/class="intcc-radar-dot"/g) || []).length === m
-        && (h.match(/data-svg-edges="(\d+)"/) || [, ''])[1] === String(m); }),
+      const e = Number((h.match(/data-svg-edges="(\d+)"/) || [, 0])[1]);
+      const g = Number((h.match(/data-svg-gaps="(\d+)"/) || [, 0])[1]);
+      return m >= 1 && (h.match(/class="intcc-radar-dot"/g) || []).length === m
+        && (h.match(/class="intcc-radar-label"/g) || []).length === 5
+        && e + g === 5; }),
     JSON.stringify([hA, hB].map((h) => ({
       dots: (h.match(/class="intcc-radar-dot"/g) || []).length,
       edges: (h.match(/data-svg-edges="(\d+)"/) || [, '?'])[1] }))));

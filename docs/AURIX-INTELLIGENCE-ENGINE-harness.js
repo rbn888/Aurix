@@ -646,7 +646,12 @@ ok('M.8c …y conserva el mapeo de causas, que Advanced Intelligence necesitará
   /function _intv7PendingReasonKey\(reason\)/.test(src));
 ok('M.9 …y lo no medible sigue DECLARADO en la card, con su causa (§3)',
   /data-unavailable=/.test(radarFn) && /data-pending=/.test(radarFn)
-  && /intv7_observable_title/.test(radarFn));
+  // CIERRE CORRECTIVO §2 — la alternativa en lista se retira («nunca convertir el
+  // radar en lista»), así que el marco se pinta SIEMPRE y la única frase que
+  // nombra la ausencia es la que acompaña a la malla cuando no hay ni una medición.
+  && !/intv7_observable_title/.test(radarFn)
+  && /intv16_radar_no_evidence/.test(radarFn)
+  && /r\.measured === 0/.test(radarFn));
 ok('M.10 la pregunta se pinta con la primitiva de chip existente, sin slot nuevo',
   /intv8-intel-q/.test(src) && /class="intcc-chip intv8-intel-opt"/.test(src));
 ok('M.11 responder tiene efecto inmediato: se guarda y se repinta',

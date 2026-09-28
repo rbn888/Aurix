@@ -21017,45 +21017,19 @@ body.gs-open { overflow: hidden; }
    trazabilidad, no pintura— y, cuando quedan menos de tres dimensiones, en la
    lista compacta de «Factores observables» de aquí abajo. */
 
-/* ── VNEXT §6.B · FACTORES OBSERVABLES ──────────────────────────────────────
-   La alternativa al radar cuando hay 1 o 2 dimensiones certificadas. Densidad de
-   card, no de panel: etiqueta a la izquierda, cifra tabular a la derecha, y el
-   alto lo pone el contenido. Reutiliza los tokens de superficie ya validados. */
-.intv7-radar.is-observable .intv15-obs-list {
-  list-style: none; margin: 10px 0 0; padding: 0;
-  display: flex; flex-direction: column; gap: 2px;
+/* ── CIERRE CORRECTIVO §2 · LA MALLA SIN EVIDENCIA ─────────────────────────
+   «Factores observables» se retira con su superficie (el §2 prohíbe convertir el
+   radar en lista), y con ella sus reglas: dejarlas sería conservar la
+   instrucción de pintar algo que ya no existe.
+   Lo que queda es la línea que acompaña a la malla cuando no hay ninguna
+   medición. Densidad de nota, no de párrafo: dice por qué el mapa está vacío sin
+   ocupar el sitio de un contenido que no hay. */
+.intv16-radar-none {
+  margin: 10px 0 0; padding: 0 2px;
+  font-size: 12px; line-height: 1.45; text-align: center;
+  color: rgba(214,226,255,0.56);
 }
-.intv15-obs-row {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  padding: 9px 11px; border-radius: 10px;
-  background: var(--elev-1, rgba(12,16,28,0.55));
-  border: 1px solid rgba(120,150,220,0.10);
-}
-/* LA CIFRA VA `nowrap` PORQUE PARTIRLA LA HACE ILEGIBLE, y la lección que eso ya
-   costó en Workspace es que un `nowrap` pinta FUERA de su caja sin recortar y con
-   el rectángulo intacto — invisible para cualquier sonda de «¿cabe?». Así que la
-   cifra no se encoge y la ETIQUETA es la que cede: `min-width:0` le permite
-   reducirse por debajo de su mínimo automático y `overflow-wrap` la rompe antes de
-   empujar a la cifra fuera de la tarjeta. A 360 px la fila más larga de los dos
-   idiomas («Amplitud de categorías» + «80% · 8 d medidos») cabe con holgura. */
-.intv15-obs-label {
-  flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere;
-  font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em;
-  color: rgba(214,226,255,0.78);
-}
-.intv15-obs-val {
-  flex: 0 0 auto;
-  font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
-  color: rgba(226,236,255,0.96); white-space: nowrap;
-}
-/* ESCRITORIO · la celda de la rejilla estira la card, así que la lista se centra
-   igual que el polígono del radar hace en su `wrap`. Sin esto, dos filas quedaban
-   arriba de una tarjeta alta — el «panel enorme con una frase» que el §25 prohíbe. */
-@media (min-width: 1024px) {
-  .aurix-intv6 .intcc-radar.is-observable .intv15-obs-list {
-    flex: 1 1 auto; justify-content: center; gap: 8px;
-  }
-}
+
 /* ── SUPREME CLOSURE §5 · CINCO MARCADORES, UNO SOLO ───────────────────────
    El marcador HUECO del eje sin datos era exactamente lo que el §5 prohíbe por
    su nombre —«ninguna muesca, hueco o centro negro»— y rompía «cinco puntos
@@ -29702,3 +29676,84 @@ body.ws-cover .aurix-wsh { max-width: none; }
   width: 4px; height: 4px; border-radius: 50%;
   background: rgba(120,150,220,0.55);
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CIERRE CORRECTIVO §8 · PRESENTACIÓN DE LAS SUPERFICIES TOCADAS
+   ══════════════════════════════════════════════════════════════════════════
+   Sólo las de Intelligence y sólo las que este cierre cambia. Tres cosas:
+   negro profundo SELECTIVO donde hay resultado (no azul oscuro sobre azul
+   oscuro), cifras y títulos claros, y cards proporcionadas al contenido — sin
+   alto reservado cuando un bloque no se pinta. */
+
+/* La cobertura del historial es un PIE en los dos estados de «Tu evolución»,
+   no su contenido. Antes sólo estaba tipada en el estado estable, así que en el
+   estado sin comparación heredaba el cuerpo y competía con la lectura. */
+.intv4-memory .intv4-mem-coverage {
+  margin: 10px 0 0; font-size: 11.5px; line-height: 1.5;
+  color: rgba(214,226,255,0.46);
+}
+/* El estado SIN COMPARACIÓN no es un pie: es la única frase de la card y tiene
+   que leerse como contenido. Es el caso que antes decía «Aurix dispone de N
+   días» en letra de nota y parecía un descargo. */
+.intv4-memory.is-coverage[data-no-comparison="1"] .intv4-mem-coverage {
+  margin-top: 8px; font-size: 12.5px; line-height: 1.5;
+  color: rgba(214,226,255,0.72);
+}
+
+/* NEGRO PROFUNDO SELECTIVO. La lectura de estabilidad es un RESULTADO —lo que
+   Aurix ha comparado y no se ha movido—, así que sus filas se apoyan sobre una
+   superficie más profunda que el panel en vez de sobre otro azul. Es el mismo
+   criterio ya validado en Workspace: se oscurece donde hay dato, no la interfaz
+   entera. La cifra hereda el color claro del cuerpo. */
+.intv4-memory.is-stable .intv15-stable-list {
+  padding: 10px 12px; border-radius: 12px;
+  background: rgba(6,9,17,0.55);
+  border: 1px solid rgba(120,150,220,0.09);
+}
+.intv4-memory.is-stable .intv15-stable-row { color: rgba(214,226,255,0.80); }
+.intv4-memory.is-stable .intv15-stable-row::before { background: rgba(122,162,255,0.62); }
+/* El titular es la conclusión: se lee primero y sin competir con el título. */
+.intv4-memory.is-stable .intv15-stable-head { color: rgba(232,240,255,0.96); }
+
+/* CARDS PROPORCIONADAS. Ninguno de los bloques condicionales reserva alto: si no
+   se pinta, no deja fila. Se declara para que una regla futura de rejilla no lo
+   reintroduzca por descuido. */
+.intv7-radar .intv16-radar-none:empty,
+.intv4-memory .intv15-stable-list:empty,
+.intcc-drivers .intv15-drv-factors:empty { display: none; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CIERRE CORRECTIVO §8 · DOS DEFECTOS QUE SÓLO SE VEÍAN AL MEDIR ANCHOS GRANDES
+   ══════════════════════════════════════════════════════════════════════════
+   La sonda de Intelligence medía 360 y 390. El §8 pide además 768, 1024 y 1440,
+   y al añadirlos aparecieron dos incumplimientos de contrato que llevaban ahí
+   desde siempre: los dos viven por ENCIMA de 640 px, que es justo donde acaban
+   las reglas que ya los corregían en el teléfono. Es el mismo patrón de tantas
+   veces: la garantía existía, pero sólo donde se estaba mirando. */
+
+/* 1 · «ENTENDIDO» MEDÍA 23 px DE IMPACTO fuera del móvil.
+   El `min-height: 44px` estaba dentro de `max-width: 640px`. Subirlo a todos los
+   anchos engordaría la fila —que es lo que esa regla evitaba a propósito—, así
+   que se hace como ya se hizo con «Ver cambios ↓»: la píldora conserva su tamaño
+   y el ÁREA DE IMPACTO se extiende con un pseudo-elemento. Se mide por impacto
+   (`elementFromPoint` en los dos extremos de la banda), no por la altura. */
+/* SE INTENTÓ PRIMERO CON UN PSEUDO-ELEMENTO, como en «Ver cambios ↓», y la
+   medida lo rechazó: `top: true, bot: false` en los seis anchos y en los dos
+   motores. La mitad inferior de la banda cae en el hueco entre filas y no la
+   gana el área ampliada. Se podría seguir persiguiendo el apilado, pero el
+   control REAL sigue midiendo 23 px y el contrato es que se pueda pulsar: la
+   respuesta correcta es que mida 44, no que finja medirlos.
+   `align-items: flex-start` mantiene el texto arriba, así que la fila sólo crece
+   donde era más baja que el dedo. Es exactamente la regla que el móvil ya
+   usaba y que allí pasa desde siempre; deja de estar limitada a 640 px. */
+.intv12-ack {
+  min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px;
+}
+/* 2 · «EXPOSICIÓN» / «LIQUIDEZ» de Factores se pintaba a 8,5 px fuera del móvil.
+   El suelo de legibilidad es 11 px y ya se aplicaba… sólo en teléfono. Un texto
+   que no se puede leer no está de-enfatizado, está de adorno, y la jerarquía la
+   siguen poniendo el peso y el color, no el tamaño. Se sube el suelo en la regla
+   BASE; la de móvil deja de ser la única que lo garantiza. */
+.intcc-drv-kind { font-size: 11px; letter-spacing: 0.04em; }
