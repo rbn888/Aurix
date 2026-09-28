@@ -166,6 +166,8 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixPctNum','_aurixPctLabel',
   
   '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
+  '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -415,14 +417,25 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
   // idénticos; lo que no puede pasar es que un eje sin dato PUNTÚE. Se mide eso
   // directamente: `data-availability` por eje, y el recuento de desconocidos
   // cuadra con `data-unavailable`.
-  ok('5.1 un eje sin dato NO puntúa (desconocido no puede parecer cero)',
+  // ── VNEXT §6 · «BAJO NO ES DESCONOCIDO» SE RESUELVE POR CONSTRUCCIÓN ─────
+  // El assert vigilaba que un eje sin dato no puntuara mientras SEGUÍA dibujado.
+  // El §6 retira el eje, así que la confusión que este bloque protegía ya no tiene
+  // soporte físico: no hay marcador que pueda parecer un cero. Lo que se mide
+  // ahora es que la card declara internamente lo que no puede medir —§3, la
+  // trazabilidad es obligatoria— sin pintarlo.
+  ok('5.1 lo no medido se DECLARA (trazabilidad) y no se DIBUJA (§6)',
     (() => { const unavail = (num(h, /data-unavailable="([^"]*)"/) || '').split(',').filter(Boolean);
       const dots = count(h, /class="intcc-radar-dot"/g);
       const measured = Number(num(h, /data-measured="(\d+)"/));
-      return dots === 5 && count(h, /data-availability="measured"/g) === measured
-        && count(h, /data-availability="unknown"/g) === unavail.length
-        && unavail.length === 5 - measured; })(),
-    JSON.stringify({ measured: num(h, /data-measured="(\d+)"/), dots: count(h, /class="intcc-radar-dot"/g) }));
+      const declared = Number(num(h, /data-declared="(\d+)"/));
+      return dots === measured && declared === 5
+        && unavail.length === declared - measured
+        && count(h, /data-availability="measured"/g) === measured
+        && count(h, /data-availability="unknown"/g) === 0
+        // …y cada dimensión no medida lleva su CAUSA, que es lo que §3 exige.
+        && unavail.every(k => new RegExp(k + ':[a-z_]+').test(num(h, /data-pending="([^"]*)"/) || '')); })(),
+    JSON.stringify({ measured: num(h, /data-measured="(\d+)"/), dots: count(h, /class="intcc-radar-dot"/g),
+      pending: num(h, /data-pending="([^"]*)"/) }));
   // RE-DECIDIDO (§8): el margen ya no es sólo inferior. La banda de la serie tiene
   // margen a los DOS extremos —antes un 100 certificado caía exactamente en el
   // vértice, el mismo píxel del marcador de «sin datos»— y el marcador de
@@ -451,11 +464,16 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
       // el texto sale de `display` o de `radar[key]+suffix`, nunca de `rOf`
       return /d\.display != null \? String\(d\.display\) : \(radar\[d\.key\] \+ \(d\.suffix \|\| ''\)\)/.test(src)
         && !/rOf\([^)]*\)[^;]*radar-val/.test(src); })());
-  ok('5.4 los cinco ejes se dibujan siempre, cualquiera que sea la cartera',
-    // El grupo contenedor `intcc-radar-labels` también empieza por ese prefijo, así
-    // que el corte tiene que cerrar la clase para contar sólo las etiquetas.
-    count(h, /class="intcc-radar-axis[" ]/g) === 5 && count(h, /class="intcc-radar-label[" ]/g) === 5,
-    JSON.stringify({ axes: count(h, /class="intcc-radar-axis[" ]/g), labels: count(h, /class="intcc-radar-label[" ]/g) }));
+  // VNEXT §6 — se dibujan LAS CERTIFICADAS, ni una más ni una menos, y el conteo
+  // sale del mismo `data-measured` que publica el motor: radar y contrato no
+  // pueden desmentirse.
+  ok('5.4 se dibuja un eje y una etiqueta por dimensión CERTIFICADA',
+    (() => { const m = Number(num(h, /data-measured="(\d+)"/));
+      return m >= 3
+        && count(h, /class="intcc-radar-axis[" ]/g) === m
+        && count(h, /class="intcc-radar-label[" ]/g) === m; })(),
+    JSON.stringify({ measured: num(h, /data-measured="(\d+)"/),
+      axes: count(h, /class="intcc-radar-axis[" ]/g), labels: count(h, /class="intcc-radar-label[" ]/g) }));
   ok('5.5 y la disponibilidad de ejes sale de UNA sola autoridad (misma para escritorio y móvil)',
     // Se cuentan LLAMADAS, no la declaración: dos autoridades de disponibilidad
     // serían dos radares que pueden desmentirse entre breakpoints.
@@ -892,59 +910,57 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   // ── RADAR · CINCO MARCADORES, TRES VALORES ──────────────────────────────
   const rr = render(APPLE).html;
   const svg = (re) => (rr.match(re) || [, null])[1];
-  ok('10.19 cinco ejes, cinco etiquetas y cinco marcadores de disponibilidad',
-    svg(/data-svg-axes="(\d+)"/) === '5'
-    && count(rr, /class="intcc-radar-label[ "]/g) === 5
-    && count(rr, /class="intcc-radar-dot"/g) === 5,
+  // ── VNEXT §6 · EL RADAR ADAPTATIVO, MEDIDO SOBRE LA PINTURA REAL ─────────
+  // 10.19–10.23 exigían «cinco ejes, cinco etiquetas, dos desconocidos y la
+  // palabra sin datos dos veces en el aria-label». Era el contrato del pentágono
+  // permanente, y el §6 lo re-decide: el radar dibuja lo que puede certificar.
+  // Lo que se conserva —y es lo que de verdad protegía este bloque— es que el
+  // motor y la figura publiquen el MISMO recuento, y que lo no medible siga
+  // declarado en el nodo para la trazabilidad del §3.
+  ok('10.19 la figura y el contrato publican el MISMO número de ejes',
+    (() => { const m = Number(svg(/data-svg-measured="(\d+)"/));
+      return svg(/data-svg-axes="(\d+)"/) === String(m)
+        && Number(num(rr, /data-measured="(\d+)"/)) === m
+        && count(rr, /class="intcc-radar-label[ "]/g) === m
+        && count(rr, /class="intcc-radar-dot"/g) === m
+        && m >= 3; })(),
     JSON.stringify({ axes: svg(/data-svg-axes="(\d+)"/),
       labels: count(rr, /class="intcc-radar-label[ "]/g),
       dots: count(rr, /class="intcc-radar-dot"/g) }));
-  // RE-DECIDIDO (§8): «no entran en el polígono» se medía contra un polígono
-  // CERRADO que §8 prohíbe cuando hay huecos. El invariante financiero es el
-  // mismo y se mide sobre el trazo abierto: los desconocidos no participan, no
-  // puntúan y no se interpolan.
-  ok('10.20 tres certificados y dos DESCONOCIDOS, y los desconocidos no entran en la serie',
+  ok('10.20 cero desconocidos en la serie, y el área CIERRA sobre los certificados',
     (() => { const measured = Number(svg(/data-svg-measured="(\d+)"/));
       const unknown = Number(svg(/data-svg-unknown="(\d+)"/));
-      // §5: los desconocidos SÍ reciben coordenada (la posición interior neutral
-      // que cierra la figura) y siguen sin puntuar y sin rellenar. Lo que se
-      // verifica es el invariante financiero, no la ausencia de un píxel: no hay
-      // ÁREA, la figura está declarada abierta, y el conteo de medidos es el que
-      // el motor certificó — nunca cinco.
-      return measured === 3 && unknown === 2
-        && !/intcc-radar-area/.test(rr) && svg(/data-svg-open="(\d)"/) === '1'
-        && count(rr, /class="intcc-radar-dot"/g) === 5
-        && count(rr, /data-availability="measured"/g) === 3
-        && count(rr, /data-availability="unknown"/g) === 2; })(),
+      const pts = (rr.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim();
+      return measured >= 3 && unknown === 0
+        && svg(/data-svg-open="(\d)"/) === '0'
+        && !!pts && pts.split(/\s+/).length === measured
+        && count(rr, /data-availability="measured"/g) === measured
+        && count(rr, /data-availability="unknown"/g) === 0; })(),
     JSON.stringify({ measured: svg(/data-svg-measured="(\d+)"/), unknown: svg(/data-svg-unknown="(\d+)"/) }));
-  // Las tres señales que distinguen «no medido» de «medido en cero», y ninguna es
-  // la coordenada: marcador HUECO (`fill: none`), su tramo de trayectoria en tono
-  // NEUTRAL —sólido, no partido: el SPEC de cierre re-decidió la discontinua
-  // porque hacía parecer roto el gráfico entero— y la palabra «sin datos» bajo la
-  // etiqueta (10.22). La radial al centro se retiró: el centro no es un dato.
-  ok('10.21 un eje DESCONOCIDO se distingue por TEXTO, nunca por la figura',
-    /data-availability="unknown"/.test(rr)
+  ok('10.21 la figura no conserva NINGUNA vía de reintroducir el estado «sin datos»',
+    !/data-availability="unknown"/.test(rr)
     && !/is-unknown/.test(rr)
+    && !/is-unavailable/.test(rr)
     && !/intcc-radar-spoke/.test(rr)
-    // El ámbito es el SVG DEL RADAR: `rr` es la pintura completa y el anillo de
-    // Salud emite su propio `stroke-dasharray` como atributo.
     && !/stroke-dasharray/.test((rr.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0])
-    // El CSS no puede conservar NINGUNA vía de reintroducir el hueco.
+    // …y el CSS tampoco: ni el marcador hueco ni el rótulo atenuado.
     && !/intcc-radar-dot\.is-unknown/.test(css)
     && !/intcc-radar-edge\.is-unknown/.test(css)
-    // …y el canal que sustituye al relleno existe y enumera los cinco.
-    && /data-svg-a11y-axes="5"/.test(rr)
-    && (((rr.match(/aria-label="([^"]+)"/g) || []).join(' ').match(/sin datos/g) || []).length === 2),
-    JSON.stringify((rr.match(/aria-label="[^"]*sin datos[^"]*"/g) || []).slice(0, 1)));
-  ok('10.22 …dice «sin datos» y su etiqueta está atenuada',
-    count(rr, /class="intcc-radar-val is-unavailable"/g) === 2
-    && count(rr, /class="intcc-radar-label is-unavailable"/g) === 2
-    && /sin datos/.test(rr));
-  ok('10.23 CRECIMIENTO sigue siendo no computable: ningún owner puede puntuarlo',
+    && !/intcc-radar-label\.is-unavailable/.test(css)
+    && !/intcc-radar-val\.is-unavailable/.test(css));
+  ok('10.22 la descripción accesible enumera los ejes DIBUJADOS con su valor, sin «sin datos»',
+    (() => { const m = Number(svg(/data-svg-measured="(\d+)"/));
+      const al = (rr.match(/<svg class="intcc-radar-svg[^>]*aria-label="([^"]+)"/) || [, ''])[1];
+      return svg(/data-svg-a11y-axes="(\d+)"/) === String(m)
+        && !/sin datos/.test(al)
+        && al.split('. ').length >= m; })(),
+    (rr.match(/<svg class="intcc-radar-svg[^>]*aria-label="([^"]+)"/) || [, '?'])[1]);
+  ok('10.23 CRECIMIENTO sigue siendo no computable, y ahora simplemente no se dibuja',
     (() => { const dims = run('JSON.stringify(_INTV7_RADAR_DIMS)', makeCtx(APPLE));
       const g = JSON.parse(dims).find(d => d.key === 'growth');
       return !!g && g.owner === null && g.pending === 'no_certifiable_scale'
-        && /data-svg-unknown="2"/.test(rr); })());
+        && /data-svg-unknown="0"/.test(rr)
+        && /growth:no_certifiable_scale/.test(num(rr, /data-pending="([^"]*)"/) || ''); })());
   ok('10.24 la transición del radar respeta `prefers-reduced-motion`',
     /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,200}\.intcc-radar-dot[^}]*transition: none/.test(css));
 

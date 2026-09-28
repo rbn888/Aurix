@@ -162,6 +162,8 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixPctNum','_aurixPctLabel',
   
   '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
+  '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -393,19 +395,27 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   // exigir `intcc-radar-area` era exigir el triángulo engañoso. Lo que esta
   // aserción protege —que el radar se pinte con su marco y su serie— se comprueba
   // sobre el trazo abierto, que es la forma correcta en este estado de datos.
-  ok('3.5 the radar renders with its frame and its (open) series',
+  // VNEXT §6 — el radar es ADAPTATIVO: dibuja sólo lo certificado y, por eso, su
+  // figura CIERRA. Exigir `data-svg-open="1"` era exigir la figura abierta que el
+  // pentágono permanente imponía; ahora el relleno no afirma nada que no esté
+  // medido, porque todos sus vértices lo están.
+  ok('3.5 the radar renders with its adaptive frame and a CLOSED series',
     /intcc-radar-svg/.test(html) && /intcc-radar-axis/.test(html)
     && /intcc-radar-label/.test(html) && /class="intcc-radar-dot"/.test(html)
-    && /data-svg-open="1"/.test(html) && !/intcc-radar-area/.test(html),
-    (html.match(/data-svg-(open|edges)="[^"]*"/g) || []).join(' '));
-  ok('3.5b the five axes are the founder\'s five SEMANTIC dimensions, in the FIXED drawing order',
-    JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<'))
-      // A1/A2 — el primer eje DEJA DE LLAMARSE «Diversificación». Publicaba
-      // `effectiveN/positions*100`, la MISMA magnitud que el anillo de Salud con
-      // otra normalización (83 % vs 75 % en una pantalla), y además no medía
-      // diversificación sino reparto entre POSICIONES. Ahora mide amplitud de
-      // categorías REGISTRADAS y lo dice. El pentágono sigue siendo de cinco.
-      === JSON.stringify(['Amplitud de categorías','Estabilidad','Liquidez','Crecimiento','Concentración']),
+    && /data-svg-open="0"/.test(html) && /intcc-radar-area/.test(html)
+    && /data-svg-unknown="0"/.test(html),
+    (html.match(/data-svg-(open|edges|unknown)="[^"]*"/g) || []).join(' '));
+  // VNEXT §6 — los ejes DIBUJADOS son los certificados, y conservan el ORDEN
+  // RELATIVO del catálogo congelado: al filtrar no se reordena nada, así que
+  // cuando un eje pendiente adquiera owner ocupará su sitio sin mover a los
+  // demás. Eso era el objetivo del orden intercalado y sigue vigente; lo que
+  // desaparece es el vértice fantasma.
+  ok('3.5b the drawn axes are the CERTIFIED ones, in the frozen relative order',
+    (() => { const ORDER = ['Amplitud de categorías','Estabilidad','Liquidez','Crecimiento','Concentración'];
+      const drawn = attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<');
+      const idx = drawn.map(l => ORDER.indexOf(l));
+      return drawn.length >= 3 && idx.every(i => i >= 0)
+        && idx.every((v, i) => i === 0 || v > idx[i - 1]); })(),
     JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<')));
   ok('3.5b2 the radar is NOT a map of asset classes any more',
     (() => { const labels = attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<').map(x => x.trim());
@@ -450,18 +460,21 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   // («2,1 / 7») porque la revisión financiera descartó todo 0-100 para esa
   // magnitud. Lo que el contrato exige es que un eje certificado lleve una CIFRA
   // CON SU UNIDAD y uno sin certificar lleve una PALABRA.
-  ok('3.5g a certified axis carries its unit; an uncertified one carries a WORD, not a figure',
+  // VNEXT §6 — TODOS los ejes dibujados llevan cifra con su unidad. Ya no hay un
+  // eje que lleve una palabra, porque un eje sin dato no se dibuja.
+  ok('3.5g every drawn axis carries a FIGURE with its unit, and never a word',
     (() => { const vals = attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
       // RESIDUAL B — un eje medido sobre una serie RECORTADA publica además su
       // cobertura («82 % · 90 d medidos»), que sigue siendo una cifra con su
       // unidad y no un porcentaje pelado. Es una declaración MÁS, no menos.
       const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v)
         || /^\d+%\s·\s.+$/.test(v));
-      const pending  = vals.filter(v => v === 'sin datos');
-      return vals.length === 5 && measured.length === 3 && pending.length === 2; })(),
+      return vals.length >= 3 && measured.length === vals.length
+        && vals.indexOf('sin datos') === -1; })(),
     JSON.stringify(attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
-  ok('3.5h "sin datos" is never rendered as a number and never as zero',
-    !/class="intcc-radar-val is-unavailable"[^>]*>\s*0/.test(html));
+  ok('3.5h la palabra «sin datos» no puede aparecer en el radar, ni como texto ni como clase',
+    !/is-unavailable/.test(html)
+    && !/class="intcc-radar-val"[^>]*>\s*sin datos\s*</.test(html));
   ok('3.6 the drivers and watch slots are restored, fed by certified owners',
     /intcc-drivers/.test(html) && /intcc-watch/.test(html)
     // the old heuristic watch LIST is not back — the slot holds Core stories
@@ -850,8 +863,17 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   const founder = st(['crypto', 'crypto', 'cash']);   // BTC + ETH + EUR
   const one = st(['crypto']);
 
-  ok('13B.1 the pentagon ALWAYS has its five fixed axes, whatever the portfolio',
-    [five, founder, one].every(x => x.axes === 5 && x.labels.length === 5),
+  // ── VNEXT §6 · EL PENTÁGONO PERMANENTE SE RETIRA ─────────────────────────
+  // «Cinco ejes siempre» fue la respuesta correcta a un problema real (no inventar
+  // un 0 para lo que no se mide) y se convirtió en el problema: la pantalla premium
+  // rotulaba «sin datos» dos veces de cinco. El §6 del SPEC VNEXT ordena el radar
+  // ADAPTATIVO. Lo que estas aserciones protegían —que la figura sea ESTABLE entre
+  // carteras y no se derive de los datos— sigue protegido: el catálogo de
+  // dimensiones sigue congelado (13B.2, 13B.7b, 13B.7c) y lo que varía es
+  // únicamente cuántas de ellas Aurix puede certificar.
+  ok('13B.1 el radar dibuja las dimensiones CERTIFICADAS, iguales en toda cartera',
+    [five, founder, one].every(x => x.axes >= 3 && x.labels.length === x.axes
+      && String(x.axes) === x.measured),
     JSON.stringify([five.axes, founder.axes, one.axes]));
   ok('13B.2 the five dimensions are the SAME five every time (fixed, not data-derived)',
     JSON.stringify(five.labels) === JSON.stringify(founder.labels)
@@ -862,9 +884,12 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   ok('13B.4 exactly the three certifiable dimensions carry a value today',
     [five, founder, one].every(x => x.measured === '3' && x.figures.length === 3),
     JSON.stringify([five.measured, founder.measured, one.measured]));
-  ok('13B.5 Estabilidad and Crecimiento are reported as unavailable, not as 0',
+  // VNEXT §6 — se siguen DECLARANDO como no disponibles (trazabilidad del §3), y
+  // ahora no se PINTAN: cero rótulos «sin datos» en la figura.
+  ok('13B.5 Estabilidad y Crecimiento se DECLARAN no disponibles y no se dibujan',
     [five, founder, one].every(x => x.pending === 'stability,growth'
-      && x.vals.filter(v => v === 'sin datos').length === 2),
+      && x.vals.filter(v => v === 'sin datos').length === 0
+      && !/is-unavailable/.test(x.html)),
     JSON.stringify(founder.vals));
   // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ────────────────────────
   // Estas aserciones exigían un POLÍGONO CERRADO (`intcc-radar-area`) sobre los
@@ -882,14 +907,16 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   // puntos idénticos y la QA real leyó el hueco como un defecto de pintado.
   // El discriminador pasa a ser `data-availability`, que es texto para el gate y
   // para el lector de pantalla, y cero píxeles para el ojo.
-  ok('13B.6 un eje sin certificar NO entra en el área ni se arrastra al centro',
-    founder.dots === 5 && founder.pts.length === 0
-    && founder.unknownDots === 2
+  ok('13B.6 un eje sin certificar no recibe marcador, ni coordenada, ni vértice',
+    founder.dots === 3 && founder.pts.length === 3
+    && founder.unknownDots === 0
     && !/cx="110.0" cy="106.0"/.test(founder.html),
     JSON.stringify({ pts: founder.pts, dots: founder.dots, unknown: founder.unknownDots }));
-  ok('13B.7 exactamente las dimensiones certificadas puntúan, y la figura NO se rellena',
-    [five, founder, one].every(x => x.dots === 5 && x.unknownDots === 2 && x.pts.length === 0
-      && /data-svg-open="1"/.test(x.html) && /data-svg-measured="3"/.test(x.html)));
+  // Y el área SÍ se rellena, porque ya no queda nada sobre lo que pueda mentir:
+  // los tres vértices que la forman están los tres certificados.
+  ok('13B.7 sólo lo certificado puntúa, y el área cierra sobre exactamente eso',
+    [five, founder, one].every(x => x.dots === 3 && x.unknownDots === 0 && x.pts.length === 3
+      && /data-svg-open="0"/.test(x.html) && /data-svg-measured="3"/.test(x.html)));
   // ── RE-DECIDIDO POR §11, Y LA GARANTÍA SE MANTIENE POR OTRA VÍA ──────────
   // Este assert fosilizaba «un solo segmento» como contrato, y era la causa
   // visual del defecto que el founder reportó: con dos ejes sin datos el radar
@@ -905,17 +932,15 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   // Pasa a sólido NEUTRAL (grupo propio `is-neutral`, color apagado, sin glow), así
   // que la trayectoria de los cinco ejes se sigue de un vistazo y sigue sin poder
   // leerse como una medición certificada. El relleno sigue exigiendo los cinco.
-  ok('13B.7c la figura recorre los CINCO ejes con CINCO segmentos idénticos',
-    [five, founder, one].every(x => /data-svg-edges="5"/.test(x.html))
-    // Tres medidos intercalados ⇒ los cuatro tramos que tocan `stability` o
-    // `growth` son neutrales, y el par adyacente 4↔0 es el único medido.
-    && [five, founder, one].every(x => /data-svg-neutral="4"/.test(x.html))
+  ok('13B.7c la figura se recorre completa: un segmento por eje, y CERO neutrales',
+    [five, founder, one].every(x => /data-svg-edges="3"/.test(x.html))
+    && [five, founder, one].every(x => /data-svg-neutral="0"/.test(x.html))
     && [five, founder, one].every(x =>
-         (x.html.match(/class="intcc-radar-edge"/g) || []).length === 5)
+         (x.html.match(/class="intcc-radar-edge"/g) || []).length === 3)
     && [five, founder, one].every(x => !/is-unknown/.test(x.html))
     && [five, founder, one].every(x =>
          !/stroke-dasharray/.test((x.html.match(/<svg class="intcc-radar-svg[\s\S]*?<\/svg>/) || [''])[0]))
-    && [five, founder, one].every(x => !/intcc-radar-area/.test(x.html)),
+    && [five, founder, one].every(x => /intcc-radar-area/.test(x.html)),
     JSON.stringify([five, founder, one].map(x => [
       (x.html.match(/data-svg-edges="[^"]*"/) || [, '?'])[0],
       (x.html.match(/data-svg-neutral="[^"]*"/) || [, '?'])[0]])));
@@ -933,19 +958,24 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
   // §5 — LA ATENUACIÓN SE QUEDA EN LA ETIQUETA, NO EN LA FIGURA. La radial y el
   // marcador son idénticos para los cinco; lo que distingue al eje sin datos es
   // su rótulo y la enumeración accesible.
-  ok('13B.8 los ejes sin certificar se atenúan SÓLO en su etiqueta, y sólo esos dos',
-    [five, founder, one].every(x => x.dimAxes === 2
-      && (x.html.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 2
-      && (x.html.match(/class="intcc-radar-axis"/g) || []).length === 5
-      && !/intcc-radar-axis is-unavailable/.test(x.html)));
+  ok('13B.8 no queda NINGUNA atenuación de estado en la figura, ni en etiqueta ni en radial',
+    [five, founder, one].every(x => x.dimAxes === 0
+      && (x.html.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 0
+      && (x.html.match(/class="intcc-radar-axis"/g) || []).length === 3
+      && !/is-unavailable/.test(x.html)));
   // RE-DECIDIDO · HERO FINALIZATION: el founder retiró «Qué mide cada eje». Lo que
   // esta aserción protege —que un eje pendiente NO se quede en silencio— sigue
   // siendo cierto y de forma más directa: su nombre y la marca «sin datos» están
   // en el propio SVG, donde el usuario está mirando, sin abrir nada.
-  ok('13B.9 the pending dimensions are NAMED in words, not left silent',
-    /Estabilidad/.test(founder.html) && /Crecimiento/.test(founder.html)
-    && /intcc-radar-val is-unavailable/.test(founder.html)
-    && /sin datos/.test(founder.html));
+  // VNEXT §6 — la dimensión pendiente deja de NOMBRARSE en la figura (era la
+  // limitación pintada) y se declara en el contrato de la card, con su causa. Eso
+  // es lo que el §3 exige: la trazabilidad debe EXISTIR en el pipeline, no
+  // necesariamente enseñarse al usuario.
+  ok('13B.9 las dimensiones pendientes se declaran con su causa, fuera de la figura',
+    !/Estabilidad/.test(founder.html) && !/Crecimiento/.test(founder.html)
+    && !/sin datos/.test(founder.html)
+    && /data-unavailable="stability,growth"/.test(founder.html)
+    && /stability:[a-z_]+/.test(founder.html) && /growth:no_certifiable_scale/.test(founder.html));
   // With NO valuation the whole surface is the pre-existing honest empty state —
   // there is no cockpit to put a radar in, and that is correct. So the radar's own
   // "one certified axis" path is exercised at the MODULE level, where it lives.
@@ -953,26 +983,30 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
     (() => { const h = render(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null })).html;
       return /aurix-intcc is-empty/.test(h) && !/intcc-radar-svg/.test(h)
         && !/class="intcc-radar-val/.test(h); })());
-  ok('13B.10b one certified axis ⇒ five axes still drawn, measured length along the axis',
+  // ── VNEXT §6.B · UNA SOLA DIMENSIÓN CERTIFICADA NO ES UN RADAR ───────────
+  // Antes se dibujaba el pentágono con UN vértice medido y CUATRO rótulos «sin
+  // datos»: una figura cuya única información era su propia incapacidad. El §6.B
+  // ordena sustituirla por un componente compacto de «Factores observables», que
+  // publica etiqueta y cifra REAL de lo que sí se mide — y nada de lo que no.
+  ok('13B.10b una sola dimensión certificada ⇒ «Factores observables», no un radar',
     (() => { const c = makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }));
       const h = run('_intv7RadarHtml(s => s)', c);
-      const vals = attrs(h, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<');
-      // A single vertex cannot close an area, and the centre is not a data point,
-      // so no polygon is emitted — the axis itself carries the measurement.
-      // §11 RE-DECIDE la forma: las radiales al centro se retiran (el centro no es
-      // un dato y una línea que sale de él lo sugería) y cada eje recibe UN
-      // marcador, así que con un solo eje certificado hay 1 marcador sólido y 4
-      // huecos. Lo que se conserva es lo esencial: cinco ejes, cuatro «sin datos»
-      // y NINGÚN área rellena, porque un relleno exigiría los cinco certificados.
-      return /intcc-radar-svg/.test(h)
-        && (h.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
-        && vals.length === 5 && vals.filter(v => v.trim() === 'sin datos').length === 4
-        && !/intcc-radar-area/.test(h)
-        && !/intcc-radar-spoke/.test(h)
-        && (h.match(/class="intcc-radar-dot"[^>]*/g) || []).length === 5
-        && (h.match(/data-availability="measured"/g) || []).length === 1
-        && (h.match(/data-availability="unknown"/g) || []).length === 4; })(),
+      const rows = (h.match(/class="intv15-obs-row"/g) || []).length;
+      const measured = Number((h.match(/data-measured="(\d+)"/) || [, 0])[1]);
+      return !/intcc-radar-svg/.test(h)
+        && /data-state="observable"/.test(h)
+        && measured >= 1 && measured <= 2 && rows === measured
+        && !/sin datos/.test(h) && !/is-unavailable/.test(h)
+        // …y sigue declarando lo que no puede medir, con su causa.
+        && /data-declared="5"/.test(h) && /data-unavailable="/.test(h)
+        // cada fila lleva una CIFRA, nunca una palabra de ausencia
+        && (h.match(/class="intv15-obs-val">([^<]+)</g) || []).every(m => /\d/.test(m)); })(),
     run('_intv7RadarHtml(s => s)', makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }))));
+  ok('13B.10c cero dimensiones certificadas ⇒ no se publica card alguna',
+    (() => { const h = run('_intv7RadarHtml(s => s)',
+      makeCtx(Object.assign(shape([]), { snap: null })));
+      return h === ''; })(),
+    JSON.stringify(run('_intv7RadarHtml(s => s)', makeCtx(Object.assign(shape([]), { snap: null })))));
   // A1/A2 · RE-DECIDIDO. El eje ya NO lee `_aurixEffectiveDiversification`: leerlo
   // era publicar la MISMA magnitud que el anillo de Salud con otra normalización
   // (83 % en el radar, 75 % en Salud) y además llamar «diversificación» a un
@@ -1023,9 +1057,12 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
       return JSON.stringify(en.nums) === JSON.stringify(founder.nums)
         && en.figures.length === founder.figures.length
         && en.pending === founder.pending
-        && en.vals.filter(v => v === 'no data').length === 2
+        // VNEXT §6 — ninguno de los dos idiomas puede imprimir la palabra de
+        // ausencia, y los dos dibujan EXACTAMENTE los mismos ejes.
+        && en.vals.filter(v => v === 'no data').length === 0
+        && en.labels.length === founder.labels.length
         && JSON.stringify(en.labels)
-             === JSON.stringify(['Category breadth','Stability','Liquidity','Growth','Concentration']); })(),
+             === JSON.stringify(['Category breadth','Liquidity','Concentration']); })(),
     JSON.stringify(st(['crypto', 'crypto', 'cash'], 'en').vals));
   ok('13B.15 no renderer arithmetic beyond the declared share transform',
     (() => { const src = fnSrc('_intv7RadarAxes');
@@ -1165,21 +1202,21 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
     (() => { const a = axesOf(DIPPED);
       return a.pending.growth === 'no_certifiable_scale'
         && /owner: null/.test(konstSrc('_INTV7_RADAR_DIMS')); })());
-  // RE-DECIDIDO · la CAUSA por eje deja de publicarse en la card (era el contenido
-  // del disclosure retirado). El mapeo de causas SE CONSERVA porque Advanced
-  // Intelligence lo necesita, y el eje sigue rotulado y atenuado en el radar.
-  ok('15.5 cada eje pendiente sigue nombrado y atenuado, y su causa sigue mapeada',
+  // VNEXT §6 — el eje pendiente deja de estar «nombrado y atenuado» en la figura:
+  // el §6 lo prohíbe. Su CAUSA sigue existiendo y ahora se publica donde debe,
+  // en el contrato de la card, y el mapeo de causas sigue en el código.
+  ok('15.5 cada eje pendiente declara su causa en el contrato, y nunca en la figura',
     (() => { const a = section(render(SHORT).html, 'intcc-radar');
-      return /is-unavailable/.test(a) && /sin datos/.test(a)
+      return !/is-unavailable/.test(a) && !/sin datos/.test(a)
+        && /data-unavailable="stability,growth"/.test(a)
+        && /stability:awaiting_observations/.test(a)
+        && /growth:no_certifiable_scale/.test(a)
         && !/intv7-radar-pending/.test(a)
         && /function _intv7PendingReasonKey\(reason\)/.test(app); })(),
     section(render(SHORT).html, 'intcc-radar').slice(0, 400));
-  // RE-DECIDIDO · el párrafo permanente que explicaba la unidad de Estabilidad se
-  // retiró con el disclosure. Un eje MEDIDO sigue publicando su cifra, que es la
-  // forma en que el radar dice qué mide sin un párrafo debajo.
-  ok('15.6 un eje medido publica su cifra, y uno sin medir su marca de ausencia',
+  ok('15.6 todo eje dibujado publica su cifra, y ninguno una marca de ausencia',
     /intcc-radar-val/.test(dipped.html) && !/intv7-radar-mean/.test(dipped.html)
-    && /sin datos/.test(render(SHORT).html));
+    && !/sin datos/.test(render(SHORT).html));
   ok('15.7 el eje nuevo respeta el contrato: porcentaje en rango y SIN PUNTUAR si no está medido',
     (() => { const vals = attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
       // Un eje certificado lleva CIFRA CON SU UNIDAD: porcentaje, o conteo con su
@@ -1189,10 +1226,10 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
       // una declaración MÁS, no menos.
       const measured = vals.filter(v => /^\d+%$/.test(v) || /^\d+(?:[.,]\d+)?\s*\/\s*\d+$/.test(v)
         || /^\d+%\s·\s.+$/.test(v));
-      return vals.length === 5 && measured.length === 4
-        && vals.filter(v => v === 'sin datos').length === 1
-        && (dipped.html.match(/class="intcc-radar-dot"/g) || []).length === 5
-        && (dipped.html.match(/data-availability="unknown"/g) || []).length === 1; })(),
+      return vals.length === 4 && measured.length === 4
+        && vals.filter(v => v === 'sin datos').length === 0
+        && (dipped.html.match(/class="intcc-radar-dot"/g) || []).length === 4
+        && (dipped.html.match(/data-availability="unknown"/g) || []).length === 0; })(),
     JSON.stringify(attrs(dipped.html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
 
   // ── D · MEMORIA PATRIMONIAL ──────────────────────────────────────────────

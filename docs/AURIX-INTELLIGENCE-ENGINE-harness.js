@@ -628,15 +628,25 @@ const radarFn = bare(fnSrc('_intv7RadarHtml'));
 ok('M.7 el radar ya no tiene disclosure ni control alguno al pie',
   !/<details/.test(radarFn) && !/<summary/.test(radarFn)
   && !/intv7-radar-pending|intv6-radar-legend|intv7-radar-mean/.test(radarFn));
-ok('M.8 …y la limitación sigue VISIBLE sin abrir nada: eje atenuado y «sin datos»',
-  /is-unavailable/.test(bare(fnSrc('_intccRadarSvg')))
-  && /intv7_axis_unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
+// ── VNEXT §6 · LA LIMITACIÓN DEJA DE SER UN ELEMENTO DE LA FIGURA ──────────
+// M.8/M.9 exigían que `_intccRadarSvg` conservara el rótulo «sin datos» y la
+// clase atenuada: era la forma de demostrar que la limitación se veía sin abrir
+// un disclosure. El §6 del SPEC VNEXT prohíbe ese rótulo por su nombre, así que
+// la aserción se invierte y se mide donde la verdad vive ahora: el SVG no puede
+// contener NI la clase NI la clave, y la dimensión no medible se declara en los
+// `data-*` de la card (trazabilidad) y, si quedan menos de tres, en la lista de
+// «Factores observables» (contenido real, no una etiqueta de ausencia).
+ok('M.8 el SVG del radar no puede rotular un eje «sin datos» ni atenuarlo',
+  !/is-unavailable/.test(bare(fnSrc('_intccRadarSvg')))
+  && !/intv7_axis_unavailable/.test(bare(fnSrc('_intccRadarSvg')))
+  && /d => !d\.unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
 ok('M.8b el radar no deja CSS huérfano de la superficie retirada',
   !/intv8-radar-|intv7-radar-pending|intv6-radar-legend|intv7-radar-mean/.test(css));
 ok('M.8c …y conserva el mapeo de causas, que Advanced Intelligence necesitará',
   /function _intv7PendingReasonKey\(reason\)/.test(src));
-ok('M.9 …y la limitación se sigue VIENDO sin abrir nada (ejes atenuados en el SVG)',
-  /is-unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
+ok('M.9 …y lo no medible sigue DECLARADO en la card, con su causa (§3)',
+  /data-unavailable=/.test(radarFn) && /data-pending=/.test(radarFn)
+  && /intv7_observable_title/.test(radarFn));
 ok('M.10 la pregunta se pinta con la primitiva de chip existente, sin slot nuevo',
   /intv8-intel-q/.test(src) && /class="intcc-chip intv8-intel-opt"/.test(src));
 ok('M.11 responder tiene efecto inmediato: se guarda y se repinta',

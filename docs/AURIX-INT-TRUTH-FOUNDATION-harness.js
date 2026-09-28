@@ -338,17 +338,27 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // SUPREME CLOSURE §5 — «mismo grosor y terminaciones en todas las líneas»: la
   // radial deja de llevar estado. La atenuación del eje ausente vive en su
   // ETIQUETA, que es texto y se lee, no en la geometría.
-  ok('3.6 the frame keeps its five conceptual axes; the absent one is attenuated IN ITS LABEL',
-    (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
-    && !/intcc-radar-axis is-unavailable/.test(svg)
-    && (svg.match(/class="intcc-radar-label is-unavailable"/g) || []).length === 1
-    && (svg.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 1,
+  // ── VNEXT §6 · SE RE-DECIDE INT.07, Y ES LA UNDÉCIMA VEZ ─────────────────
+  // Estos asserts exigían el pentágono completo con el eje ausente ROTULADO «sin
+  // datos». Nació como la alternativa honesta a un 0 inventado, y acabó siendo la
+  // limitación ASCENDIDA A DISEÑO: dos ejes de cinco diciendo «sin datos» en la
+  // pantalla premium del producto. El §6 del SPEC VNEXT lo prohíbe por su nombre
+  // —«el Radar NUNCA debe mostrar sin datos»— y ordena el radar ADAPTATIVO.
+  // Lo que INT.01 protegía de verdad sigue protegido, y de forma más fuerte: un
+  // eje sin evidencia no puede publicar un valor porque NO SE DIBUJA. El invariante
+  // pasa de convencional («lo rotulamos distinto») a estructural («no existe»).
+  ok('3.6 el marco dibuja EXACTAMENTE las dimensiones certificadas, y ninguna más',
+    (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 4
+    && (svg.match(/class="intcc-radar-label"/g) || []).length === 4
+    && !/is-unavailable/.test(svg),
     'axes=' + (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length);
-  ok('3.7 the absent dimension publishes its NAME but never a figure',
-    svg.indexOf(T.intcc_dim_growth) !== -1
-    && (svg.match(/class="intcc-radar-val[^"]*"/g) || []).length === 5
-    && /class="intcc-radar-val is-unavailable"[^>]*>[^<0-9]+</.test(svg),
-    (svg.match(/class="intcc-radar-val is-unavailable"[^>]*>([^<]*)</) || [, '?'])[1]);
+  ok('3.7 la dimensión ausente no publica NI su nombre NI una cifra NI «sin datos»',
+    svg.indexOf(T.intcc_dim_growth) === -1
+    && svg.indexOf(T.intv7_axis_unavailable) === -1
+    && (svg.match(/class="intcc-radar-val[^"]*"/g) || []).length === 4
+    && (svg.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || [])
+         .every(m => /\d/.test(m)),
+    JSON.stringify((svg.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || [])));
   // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ────────────────────────
   // La versión anterior de 3.8 exigía `class="intcc-radar-area"` con 4 vértices,
   // es decir un POLÍGONO CERRADO sobre los ejes medidos. Con un eje sin datos, los
@@ -364,13 +374,17 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // un gate fosilizó una limitación: «no recibe vértice» describía cómo se
   // dibujaba el hueco de entonces, no el invariante. El invariante es que el eje
   // ausente no PUNTÚA y no RELLENA, y eso es lo que se mide.
-  ok('3.8 el eje ausente no puntúa y la figura NO se rellena',
-    (svg.match(/class="intcc-radar-dot"/g) || []).length === 5
+  // VNEXT §6 — Y AHORA LA FIGURA SÍ SE RELLENA, que es lo que la vuelve legible:
+  // puede hacerlo sin mentir precisamente porque TODOS sus vértices están
+  // certificados. El relleno dejó de ser una afirmación sobre lo desconocido el
+  // día en que lo desconocido dejó de tener coordenada.
+  ok('3.8 un marcador por eje certificado, ninguno «unknown», y el área cierra',
+    (svg.match(/class="intcc-radar-dot"/g) || []).length === 4
     && (svg.match(/data-availability="measured"/g) || []).length === 4
-    && (svg.match(/data-availability="unknown"/g) || []).length === 1
-    && /data-svg-measured="4"/.test(svg)
-    && !/intcc-radar-area/.test(svg)
-    && /data-svg-open="1"/.test(svg),
+    && !/data-availability="unknown"/.test(svg)
+    && /data-svg-measured="4"/.test(svg) && /data-svg-unknown="0"/.test(svg)
+    && (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 4
+    && /data-svg-open="0"/.test(svg),
     (svg.match(/data-svg-open="[^"]*"/) || [, '?'])[0]);
   // ── RE-DECIDIDO POR §11 DEL CIERRE, Y LA GARANTÍA SE REFUERZA ────────────
   // «Sólo los adyacentes medidos» fosilizaba una figura ABIERTA, y era la causa
@@ -385,13 +399,12 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // evidencia era DISCONTINUO y hacía parecer roto el gráfico entero. Pasa a
   // sólido NEUTRAL, en su propio grupo, con color y opacidad distintos — sigue sin
   // poder leerse como una medición y ahora la trayectoria se sigue de un vistazo.
-  ok('3.8b con un hueco la figura se recorre completa con CINCO segmentos idénticos',
-    (svg.match(/class="intcc-radar-edge"/g) || []).length === 5
+  ok('3.8b la figura se recorre completa con UN segmento por eje, todos idénticos',
+    (svg.match(/class="intcc-radar-edge"/g) || []).length === 4
     && !/is-unknown/.test(svg)
-    && /data-svg-edges="5"/.test(svg) && /data-svg-neutral="2"/.test(svg)
+    && /data-svg-edges="4"/.test(svg) && /data-svg-neutral="0"/.test(svg)
     && (svg.match(/<g class="intcc-radar-edges">/g) || []).length === 1
-    && !/stroke-dasharray/.test(svg)
-    && !/intcc-radar-area/.test(svg),
+    && !/stroke-dasharray/.test(svg),
     JSON.stringify([(svg.match(/data-svg-edges="[^"]*"/) || [, '?'])[0],
                     (svg.match(/data-svg-neutral="[^"]*"/) || [, '?'])[0]]));
   ok('3.8c con los cinco ejes certificados el pentágono SÍ se cierra y se rellena',
@@ -425,42 +438,39 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
       (zero.match(/class="intcc-radar-val"[^>]*>0</g) || []).length === 5,
       (zero.match(/class="intcc-radar-val"[^>]*>([^<]*)</) || [, '?'])[1]);
   }
-  // UNKNOWN ocupa una posición de DISPONIBILIDAD, fuera de la banda de la serie:
-  // no puede confundirse con un valor alto ni con un cero.
+  // ── VNEXT §6 · YA NO HAY «POSICIÓN DE DISPONIBILIDAD» QUE CERTIFICAR ─────
+  // 3.9f–3.9i medían dónde se colocaba el marcador del eje sin datos, cuánto se
+  // alejaba del vértice y cómo se rotulaba. Toda esa familia de asserts existía
+  // para vigilar un compromiso —dibujar lo que no se mide sin que parezca medido—
+  // que el §6 elimina de raíz: lo que no se mide no se dibuja. Se sustituyen por
+  // el invariante que sí sobrevive, y es más fuerte porque no admite grados:
+  // NINGUNA coordenada, NINGÚN marcador y NINGÚN texto pertenece a un eje sin
+  // evidencia, en ninguna cartera.
   {
-    // SUPREME CLOSURE §5 — el marcador ya no lleva clase de estado; el eje sin
-    // dato se localiza por `data-availability`, que es el discriminador que
-    // sobrevive a la uniformidad visual y es además el que lee el aria-label.
-    const unkR = ((svg.match(/class="intcc-radar-dot" cx="(-?[\d.]+)" cy="(-?[\d.]+)"[^>]*data-availability="unknown"/) || [])
-      .slice(1).map(Number));
-    const rUnk = unkR.length === 2 ? radiusOf(unkR) : null;
-    const fullMax = Math.max.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 100, liquidity: 100, concentration: 100, stability: 100, growth: 100 })')).map(radiusOf));
-    // §11 RE-DECIDE DÓNDE VIVE, y conviene dejar escrito por qué. A2 lo puso FUERA
-    // de la banda y por encima de ella para que no pudiera confundirse con un
-    // valor; en la pantalla real eso lo pegaba al marco —donde el ojo lee
-    // «máximo»— mientras los ejes certificados se apelotonaban en el centro. §11
-    // lo baja al límite INTERIOR de referencia. SUPREME CLOSURE §5 retira las dos
-    // señales GRÁFICAS que lo acompañaban (hueco y segmento discontinuo) porque
-    // la QA real las leyó como un defecto de pintado, y deja la distinción en el
-    // TEXTO: «sin datos» bajo la etiqueta y la enumeración accesible de los cinco
-    // ejes. Lo que este assert protege ahora: sigue DENTRO del marco, no toca el
-    // centro, y no puede leerse como un valor alto.
-    const bandMin = Math.min.apply(null, dotsOf(run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0, growth: 0 })')).map(radiusOf));
-    ok('3.9f el marcador «sin datos» no puede leerse como un valor ALTO',
-      rUnk != null && rUnk < fullMax - 20 && Math.abs(rUnk - bandMin) < 0.5,
-      JSON.stringify({ rUnk, fullMax, bandMin }));
-    ok('3.9g …y no toca ni el centro ni el vértice',
-      rUnk != null && rUnk > 6 && rUnk < R_OUT - 0.5, String(rUnk));
-    ok('3.9h está rotulado como disponibilidad, no como puntuación',
-      /data-availability="unknown"/.test(svg) && /data-axis="growth"/.test(svg));
-    // §5 — «no participa» se mide donde el invariante financiero vive: el eje sin
-    // dato no puntúa y no rellena. Su coordenada SÍ entra en la trayectoria (es
-    // la posición interior neutral que cierra la figura, autorizada por el §5),
-    // así que exigir que no aparezca en ningún segmento sería fosilizar otra vez
-    // la limitación que el §5 acaba de retirar.
-    ok('3.9i y NO puntúa ni rellena',
-      /data-svg-measured="4"/.test(svg) && /data-svg-open="1"/.test(svg)
-      && !/intcc-radar-area/.test(svg));
+    const unknowns = ['{ diversification: 40, liquidity: 30, concentration: 60, stability: null, growth: null }',
+                      '{ diversification: 40, liquidity: 30, concentration: 60, stability: 55, growth: null }',
+                      '{ diversification: 40, liquidity: 30, concentration: 60, stability: 55, growth: 20 }'];
+    const svgs = unknowns.map(r => run('_intccRadarSvg(' + r + ')'));
+    ok('3.9f ninguna cartera produce un marcador de disponibilidad desconocida',
+      svgs.every(x => !/data-availability="unknown"/.test(x) && /data-svg-unknown="0"/.test(x)),
+      JSON.stringify(svgs.map(x => (x.match(/data-svg-unknown="[^"]*"/) || [, '?'])[0])));
+    ok('3.9g el número de marcadores, ejes y segmentos es SIEMPRE el de certificados',
+      svgs.every((x) => {
+        const m = Number((x.match(/data-svg-measured="(\d+)"/) || [, 0])[1]);
+        return (x.match(/class="intcc-radar-dot"/g) || []).length === m
+            && (x.match(/class="intcc-radar-axis[^"]*"/g) || []).length === m
+            && (x.match(/class="intcc-radar-edge"/g) || []).length === m
+            && (x.match(/class="intcc-radar-label"/g) || []).length === m; }),
+      JSON.stringify(svgs.map(x => (x.match(/data-svg-measured="[^"]*"/) || [, '?'])[0])));
+    ok('3.9h la palabra «sin datos» no aparece en NINGUNA de las figuras',
+      svgs.every(x => x.indexOf(T.intv7_axis_unavailable) === -1 && !/is-unavailable/.test(x)));
+    // El relleno es ahora la norma, no la excepción: con todos los vértices
+    // certificados no queda nada sobre lo que el área pueda mentir.
+    ok('3.9i el área cierra SIEMPRE y con exactamente un vértice por eje medido',
+      svgs.every((x) => {
+        const m = Number((x.match(/data-svg-measured="(\d+)"/) || [, 0])[1]);
+        const pts = (x.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim();
+        return /data-svg-open="0"/.test(x) && pts && pts.split(/\s+/).length === m; }));
   }
   ok('3.10 the wealth-identity cascade cannot read a fabricated return',
     /Number\.isFinite\(radar\.growth\)/.test(fnSrc('_intccIdentity')));
@@ -469,13 +479,17 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // RE-CERTIFIED (INT.07): the frame no longer disappears — the founder requires
   // it always visible. What must never happen is a VALUE without evidence, so the
   // assertion moves from "no radar" to "no certified value but one".
-  ok('3.12 one certified dimension ⇒ frame intact, no area, exactly one MEASURED axis',
-    (() => { const one = run('_intccRadarSvg({ diversification: 50, liquidity: null, concentration: null, stability: null, growth: null })');
-      return one !== '' && (one.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
-        && !/intcc-radar-area/.test(one)
-        && (one.match(/class="intcc-radar-dot"/g) || []).length === 5
-        && (one.match(/data-availability="measured"/g) || []).length === 1
-        && (one.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 4; })());
+  // VNEXT §6.B — MENOS DE TRES CERTIFICADAS NO SON UN RADAR. Antes se seguía
+  // dibujando el pentágono con UN vértice medido y cuatro rótulos «sin datos»:
+  // una figura que informaba de su propia incapacidad. Ahora el SVG no existe y
+  // el owner de la card publica «Factores observables», que es texto y cifra real.
+  ok('3.12 una o dos dimensiones certificadas ⇒ NO se dibuja radar',
+    (() => {
+      const one = run('_intccRadarSvg({ diversification: 50, liquidity: null, concentration: null, stability: null, growth: null })');
+      const two = run('_intccRadarSvg({ diversification: 50, liquidity: 7, concentration: null, stability: null, growth: null })');
+      const three = run('_intccRadarSvg({ diversification: 50, liquidity: 7, concentration: 31, stability: null, growth: null })');
+      return one === '' && two === ''
+        && three !== '' && /data-svg-axes="3"/.test(three) && /data-svg-measured="3"/.test(three); })());
 
   // Dropping an axis re-lays out every label. The viewBox is FIXED, so the only
   // real visual risk is a clipped label — and because the viewBox scales, proving

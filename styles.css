@@ -21007,16 +21007,54 @@ body.gs-open { overflow: hidden; }
   .aurix-intv6 .intv5-structure .intv6-struct-dep { margin-top: auto; }
 }
 
-/* ── INT.07 · UNAVAILABLE AXES — attenuated, never zero ──────────────────────
-   The frame is the product: five axes always. An axis Aurix cannot certify is
-   rendered in a distinct, deliberately quiet state — dashed, dimmed, labelled
-   "sin datos" and WITHOUT a vertex — so the eye reads "not measured yet" instead
-   of "measured at zero". Those are different claims and must never look alike. */
-.intcc-radar-label.is-unavailable { fill: rgba(214,226,255,0.40); font-weight: 600; }
-.intcc-radar-val.is-unavailable {
-  fill: rgba(150,180,240,0.36);
-  font-size: 7.5px; font-weight: 600; letter-spacing: 0.03em;
-  font-variant-numeric: normal;      /* it is a word, not a figure */
+/* ── VNEXT §6 · EL ESTADO «SIN DATOS» DEL RADAR SE RETIRA ENTERO ────────────
+   Las reglas `.is-unavailable` existían para pintar en voz baja un eje que Aurix
+   no puede certificar. El §6 prohíbe que ese eje llegue a dibujarse, así que su
+   estilo no es que deje de aplicarse: no tiene sujeto. Mantenerlo sería dejar en
+   la hoja la INSTRUCCIÓN de cómo pintar lo que el producto ya no pinta, y es así
+   como una limitación vuelve por la puerta de atrás.
+   Lo que no se mide se declara en `data-unavailable`/`data-pending` del nodo —
+   trazabilidad, no pintura— y, cuando quedan menos de tres dimensiones, en la
+   lista compacta de «Factores observables» de aquí abajo. */
+
+/* ── VNEXT §6.B · FACTORES OBSERVABLES ──────────────────────────────────────
+   La alternativa al radar cuando hay 1 o 2 dimensiones certificadas. Densidad de
+   card, no de panel: etiqueta a la izquierda, cifra tabular a la derecha, y el
+   alto lo pone el contenido. Reutiliza los tokens de superficie ya validados. */
+.intv7-radar.is-observable .intv15-obs-list {
+  list-style: none; margin: 10px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.intv15-obs-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 11px; border-radius: 10px;
+  background: var(--elev-1, rgba(12,16,28,0.55));
+  border: 1px solid rgba(120,150,220,0.10);
+}
+/* LA CIFRA VA `nowrap` PORQUE PARTIRLA LA HACE ILEGIBLE, y la lección que eso ya
+   costó en Workspace es que un `nowrap` pinta FUERA de su caja sin recortar y con
+   el rectángulo intacto — invisible para cualquier sonda de «¿cabe?». Así que la
+   cifra no se encoge y la ETIQUETA es la que cede: `min-width:0` le permite
+   reducirse por debajo de su mínimo automático y `overflow-wrap` la rompe antes de
+   empujar a la cifra fuera de la tarjeta. A 360 px la fila más larga de los dos
+   idiomas («Amplitud de categorías» + «80% · 8 d medidos») cabe con holgura. */
+.intv15-obs-label {
+  flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere;
+  font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em;
+  color: rgba(214,226,255,0.78);
+}
+.intv15-obs-val {
+  flex: 0 0 auto;
+  font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums;
+  color: rgba(226,236,255,0.96); white-space: nowrap;
+}
+/* ESCRITORIO · la celda de la rejilla estira la card, así que la lista se centra
+   igual que el polígono del radar hace en su `wrap`. Sin esto, dos filas quedaban
+   arriba de una tarjeta alta — el «panel enorme con una frase» que el §25 prohíbe. */
+@media (min-width: 1024px) {
+  .aurix-intv6 .intcc-radar.is-observable .intv15-obs-list {
+    flex: 1 1 auto; justify-content: center; gap: 8px;
+  }
 }
 /* ── SUPREME CLOSURE §5 · CINCO MARCADORES, UNO SOLO ───────────────────────
    El marcador HUECO del eje sin datos era exactamente lo que el §5 prohíbe por
@@ -29614,3 +29652,53 @@ body.ws-cover .aurix-wsh { max-width: none; }
    orden de fuente. La sonda se quedó roja con los MISMOS números, que es la pista: la regla no
    estaba perdiendo una discusión de especificidad, no estaba aplicándose en absoluto. */
 .aurix-wsh .wsjrn-sum-best { white-space: normal; }
+
+
+/* ── VNEXT §16 · «TU EVOLUCIÓN» · LECTURA DE ESTABILIDAD ────────────────────
+   El estado anterior era una sola frase sobre el historial en una card de alto
+   completo: la ausencia de historia parecía contenido. Ahora hay un titular y de
+   una a tres líneas de explicación real, y el alto lo pone el contenido. Se
+   reutilizan los tokens de superficie ya validados; cero lenguaje visual nuevo. */
+.intv4-memory.is-stable .intv15-stable-head {
+  margin: 8px 0 0; font-size: 13.5px; font-weight: 650; line-height: 1.42;
+  letter-spacing: -0.01em; color: rgba(226,236,255,0.94);
+}
+.intv15-stable-list {
+  list-style: none; margin: 10px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.intv15-stable-row {
+  position: relative; padding-left: 13px;
+  font-size: 12.5px; line-height: 1.45; color: rgba(214,226,255,0.74);
+}
+.intv15-stable-row::before {
+  content: ''; position: absolute; left: 0; top: 7px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(120,150,220,0.55);
+}
+/* La cobertura pasa a PIE de la lectura: sigue declarada, deja de ser el
+   contenido de la card. */
+.intv4-memory.is-stable .intv4-mem-coverage {
+  margin-top: 11px; font-size: 11.5px; color: rgba(214,226,255,0.46);
+}
+
+
+/* ── VNEXT §8 · FACTORES · LOS DOS FACTORES INTERPRETATIVOS ─────────────────
+   Van bajo la lista porque son su lectura, no su encabezado: densidad de nota,
+   no de fila, para que no compitan con el ranking ni parezcan una cuarta
+   posición. Mismo raíl visual que la lectura de estabilidad de «Tu evolución»,
+   que es el mismo tipo de contenido (una explicación, no un dato tabulado). */
+.intv15-drv-factors {
+  list-style: none; margin: 11px 0 0; padding: 10px 0 0;
+  border-top: 1px solid rgba(120,150,220,0.10);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.intv15-drv-factor {
+  position: relative; padding-left: 13px;
+  font-size: 12.5px; line-height: 1.45; color: rgba(214,226,255,0.74);
+}
+.intv15-drv-factor::before {
+  content: ''; position: absolute; left: 0; top: 7px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: rgba(120,150,220,0.55);
+}
