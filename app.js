@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '749'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '750'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -14771,9 +14771,32 @@ function _aurixLocalPortfolioEpoch() {
     return 0;
   }
 }
+// ── P0 · EL EPOCH TENÍA QUE PODER LEERSE ANTES DE EXISTIR ─────────────────
+// DEFECTO MEDIDO, y costaba el historial entero. `let portfolioHistory =
+// loadHistory();` y `let categoryHistory = loadCategoryHistory();` se ejecutan
+// MUCHO ANTES (líneas ~11676/11683) que `let _aurixRemotePortfolioEpochMs = 0;`
+// (aquí arriba). Las dos cargas terminan en `_aurixFilterAfterEpoch` → esta
+// función → lectura de una `let` en su ZONA MUERTA TEMPORAL ⇒ ReferenceError.
+// Y cada cargador tiene su propio `catch { return []; }` —puesto ahí para un
+// JSON corrupto—, así que el error se TRAGABA y ambas series arrancaban VACÍAS
+// en cada arranque, con el disco intacto y nadie avisando.
+//
+// No era cosmético. `recordSnapshot()` compone `[...portfolioHistory, punto]` y
+// después `saveHistory()`: con la serie viva vacía, el primer refresco de precios
+// PERSISTÍA un único punto encima de la historia local. Medido en sandbox con 43
+// puntos sembrados: 43 en disco → arranque → un snapshot → 1 en disco.
+//
+// La corrección es la mínima que existe y NO cambia ninguna semántica: en la zona
+// muerta el valor que se leería es justo el inicial (0), así que se devuelve 0 en
+// vez de explotar. Después del arranque el comportamiento es byte a byte el de
+// antes. No se toca el orden de declaraciones —mover una `let` a través de 3.000
+// líneas de este fichero es mucho más arriesgado que aislar la lectura.
+function _aurixRemoteEpochMsSafe() {
+  try { return Number(_aurixRemotePortfolioEpochMs) || 0; } catch (_) { return 0; }
+}
 function _aurixPortfolioEpoch() {
   const local  = _aurixLocalPortfolioEpoch();
-  const remote = Number(_aurixRemotePortfolioEpochMs) || 0;
+  const remote = _aurixRemoteEpochMsSafe();
   return Math.max(local > 0 ? local : 0, remote > 0 ? remote : 0);
 }
 // Read-only diagnosis of WHICH side is in force. The A0 probe and the evidence
@@ -14781,7 +14804,7 @@ function _aurixPortfolioEpoch() {
 // hides history" — they are different facts and only one is cross-device.
 function _aurixEpochAuthority() {
   const local  = _aurixLocalPortfolioEpoch();
-  const remote = Number(_aurixRemotePortfolioEpochMs) || 0;
+  const remote = _aurixRemoteEpochMsSafe();
   return {
     effective: Math.max(local > 0 ? local : 0, remote > 0 ? remote : 0),
     local: local, remote: remote,

@@ -145,7 +145,7 @@ console.log('\nH) history validation (trust floor + sanitation + honest suppress
   // remota el valor es 0, que es exactamente el comportamiento de hoy: el módulo
   // lo declara como `let`, así que hay que publicarlo en el contexto.
   vm.runInContext('var _aurixRemotePortfolioEpochMs = 0;', hCtx);
-  ['_aurixInvestableChartEpoch', '_aurixLocalPortfolioEpoch', '_aurixPortfolioEpoch', '_aurixTrustedChartSource', '_aurixSourceFamily',
+  ['_aurixInvestableChartEpoch', '_aurixLocalPortfolioEpoch', '_aurixRemoteEpochMsSafe', '_aurixPortfolioEpoch', '_aurixTrustedChartSource', '_aurixSourceFamily',
    '_aurixApplyRangeSourceAuthority', '_aurix24hSourceCoverage', '_aurixHpqIso', '_aurixHpqDiag', '_aurixHpqRawStages',
    '_aurixHpqQuarantineSpikes', '_aurixHpqTrimConstruction', '_aurixProdPlateauFilter',
    '_aurixHpqFirstInvalidStage', '_aurixHpqRangesContaining', 'buildValidatedHistoricalSeries',
