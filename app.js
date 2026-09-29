@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '751'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '752'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5925,7 +5925,7 @@ const T = {
     // respuesta hablaba de otra cosa. Se pregunta por lo que sí se puede
     // contestar: qué IMPLICA ese peso. El §3 lo pide por su nombre.
     intv15_qc_concentration: (name, pct) => `${name} pesa el ${pct} de mi cartera: ¿qué implica esa concentración?`,
-    intv15_qc_top3:   (pct) => `¿Cuánto de mi patrimonio depende de mis tres mayores posiciones (${pct})?`,
+    intv15_qc_top3:   () => '¿Cuánto de mi patrimonio depende de mis tres mayores posiciones?',
     intv15_qc_liq_dir:   (pct) => `Mi liquidez es el ${pct}: ¿está aumentando o reduciéndose?`,
     intv15_qc_liq_level: (pct) => `¿Qué significa tener el ${pct} de mi patrimonio en liquidez?`,
     intv15_qc_changed: (d) => `¿Qué ha cambiado más en mi patrimonio en los últimos ${d} días?`,
@@ -6010,7 +6010,7 @@ const T = {
     // Se comparan los dos EXTREMOS de la ventana, no el camino entre ellos, así
     // que la copy dice exactamente eso. «Se ha movido menos de 3 pp en 30 días»
     // afirmaba una trayectoria que nadie ha medido.
-    intv16_stable_head: (a, b) => `Entre el ${a} y el ${b} tu cartera terminó donde estaba: Aurix compara los dos extremos del periodo y el cambio neto no llega a su umbral de materialidad.`,
+    intv16_stable_head: (a, b) => `Entre el ${a} y el ${b} el reparto de tu cartera apenas cambió: Aurix compara los dos extremos del periodo. Es una afirmación sobre pesos, no sobre tu rentabilidad.`,
     intv16_stable_liq: (pct, a, b, thr) => `Tu liquidez está hoy en el ${pct}. Entre el ${a} y el ${b} su peso cambió menos de ${thr} puntos porcentuales.`,
     intv16_stable_mix: (a, b, thr) => `Entre el ${a} y el ${b}, el reparto entre clases de activo cambió menos de ${thr} puntos porcentuales.`,
     intv16_stable_flows: 'No has registrado aportaciones ni retiradas en este periodo, así que lo que ves no viene de dinero nuevo.',
@@ -8909,7 +8909,7 @@ const T = {
     intv4_q_q_historical: 'Where is my wealth against its own history?',
     intv4_q_q_current_value: 'How much is my financial portfolio worth right now?',
     intv15_qc_concentration: (name, pct) => `${name} is ${pct} of my portfolio: what does that concentration mean?`,
-    intv15_qc_top3:   (pct) => `How much of my wealth depends on my three largest positions (${pct})?`,
+    intv15_qc_top3:   () => 'How much of my wealth depends on my three largest positions?',
     intv15_qc_liq_dir:   (pct) => `My cash is ${pct}: is it rising or falling?`,
     intv15_qc_liq_level: (pct) => `What does holding ${pct} of my wealth in cash mean?`,
     intv15_qc_changed: (d) => `What changed most in my wealth over the last ${d} days?`,
@@ -8946,7 +8946,7 @@ const T = {
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
     intv4_memory_coverage: (d) => `Aurix has ${d} ${d === 1 ? 'day' : 'days'} of certified history. Longer-horizon comparisons will appear as your history grows.`,
-    intv16_stable_head: (a, b) => `Between ${a} and ${b} your portfolio ended where it started: Aurix compares the two ends of the period and the net change does not reach its materiality threshold.`,
+    intv16_stable_head: (a, b) => `Between ${a} and ${b} your portfolio mix barely changed: Aurix compares the two ends of the period. This is a statement about weights, not about your return.`,
     intv16_stable_liq: (pct, a, b, thr) => `Your cash is at ${pct} today. Between ${a} and ${b} its weight changed by less than ${thr} percentage points.`,
     intv16_stable_mix: (a, b, thr) => `Between ${a} and ${b}, the split across asset classes changed by less than ${thr} percentage points.`,
     intv16_stable_flows: 'You have recorded no contributions or withdrawals in this period, so what you see does not come from new money.',
@@ -66023,9 +66023,17 @@ function _intv15ExploreLabel(q, core, intel) {
       // Sin el NOMBRE la pregunta pierde su gracia y el genérico ya la cubre.
       if (name) return _intv4T('intv15_qc_concentration', name, pct(c.topWeightPct)) || fallback;
     }
+    // ── LA PREGUNTA NO PUEDE CONTESTARSE A SÍ MISMA ────────────────────────
+    // Decía «¿Cuánto de mi patrimonio depende de mis tres mayores posiciones
+    // (79 %)?»: pregunta CUÁNTO y contesta 79 % en el mismo renglón, así que
+    // desplegarla no aporta nada y el enunciado se lee como un dato suelto.
+    // La cifra pertenece a la respuesta, donde ya vive —`intv16_ans_top3_lead`
+    // publica el peso conjunto agregado sin redondear y redondeado UNA vez—.
+    // Se conserva la CONDICIÓN (`top3Pct` certificado): sin ese dato la pregunta
+    // no se ofrece, porque su respuesta no podría sostenerse.
     if (q.id === 'q_diversification' && c && c.availability === AV
         && Number.isFinite(c.top3Pct) && c.top3Pct > 0) {
-      return _intv4T('intv15_qc_top3', pct(c.top3Pct)) || fallback;
+      return _intv4T('intv15_qc_top3') || fallback;
     }
     if (q.id === 'q_liquidity' && l && l.availability === AV && Number.isFinite(l.cashPct)) {
       // La DIRECCIÓN sólo se pregunta si hay deriva medida: preguntar «¿sube o
@@ -66083,13 +66091,24 @@ function _intv4ExploreHtml(core, esc, intel) {
       <div class="intcc-explore-list">
         ${qs.map(x => `
           <div class="intcc-x-item" data-root="${esc(x.q.causalRoot)}">
-            <button type="button" class="intcc-x-q" data-intcc-q="${esc(x.q.id)}" aria-expanded="false">
+            <button type="button" class="intcc-x-q" id="intcc-xq-${esc(x.q.id)}"
+                    data-intcc-q="${esc(x.q.id)}" aria-expanded="false"
+                    aria-controls="intcc-x-${esc(x.q.id)}">
               <span class="intcc-x-label">${esc(x.label)}</span>
               <span class="intcc-x-caret" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
               </span>
             </button>
-            <div class="intcc-x-answer" id="intcc-x-${esc(x.q.id)}">${x.answer}</div>
+            ${/* EL ENVOLTORIO INTERIOR ES LO QUE PERMITE ANIMAR SIN NÚMERO MÁGICO.
+                   El desplegable en flujo se hace con `grid-template-rows: 0fr → 1fr`,
+                   y esa técnica necesita UN hijo al que colapsar. Con los párrafos
+                   sueltos sólo colapsaría el primero. La alternativa —`max-height`
+                   con un tope inventado— recorta en cuanto la respuesta crece, que
+                   es justo lo que el encargo prohíbe. */''}
+            <div class="intcc-x-answer" id="intcc-x-${esc(x.q.id)}" role="region"
+                 aria-labelledby="intcc-xq-${esc(x.q.id)}">
+              <div class="intcc-x-answer-in">${x.answer}</div>
+            </div>
           </div>`).join('')}
       </div>
     </section>`;
@@ -66305,7 +66324,23 @@ function _intv4AnswerHtml(q, core, esc, intel) {
   // no hay lead para esta pregunta, la respuesta es la de siempre: este cierre
   // añade conclusión donde faltaba, no reemplaza la evidencia.
   const lead = _intv16AnswerLead(q, core, intel);
-  const body = lead.concat(lines);
+  // ── Y TAMPOCO SE REPITE A SÍ MISMA ──────────────────────────────────────
+  // La puerta de abajo compara la respuesta con EL ENUNCIADO. Faltaba la otra
+  // mitad: el lead y un hecho del Core pueden decir exactamente lo mismo, y se
+  // veía —«Bitcoin concentra el 47 % de tu cartera financiera, y es tu mayor
+  // posición individual» seguido, tres párrafos después, de «Bitcoin concentra
+  // el 47 % de tu cartera financiera»—. Son dos owners distintos diciendo la
+  // misma frase, que es el modo de fallo que este cierre lleva persiguiendo.
+  // Se retira la línea ya CONTENIDA en otra anterior (normalizada, sin acentos
+  // ni signos): contención completa, no parecido — dos frases que comparten
+  // sujeto siguen siendo dos afirmaciones distintas y las dos se publican.
+  const body = lead.concat(lines).reduce((acc, ln) => {
+    const n = _intv16NormTxt(ln);
+    if (!n) return acc;
+    if (acc.some(prev => { const p = _intv16NormTxt(prev);
+      return p === n || p.indexOf(n) !== -1; })) return acc;
+    return acc.concat([ln]);
+  }, []);
   // ── §3 · UNA RESPUESTA QUE REPITE EL ENUNCIADO NO SE PUBLICA ────────────
   // El caso A del founder en su forma general: si TODO lo que la respuesta dice
   // ya está contenido en el título de la pregunta, el candidato se retira y su

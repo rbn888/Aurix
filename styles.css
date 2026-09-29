@@ -20773,24 +20773,45 @@ body.gs-open { overflow: hidden; }
 .intcc-x-q:hover .intcc-x-caret { background: rgba(74,130,240,0.2); color: #cfe0ff; }
 .intcc-x-q.is-active .intcc-x-caret { transform: rotate(180deg); background: rgba(74,130,240,0.24); color: #cfe0ff; }
 .intcc-x-item.is-active { border-color: rgba(74,130,240,0.4); background: rgba(74,130,240,0.05); }
-/* INT.2V Bloque 7 — premium internal popover: absolute, z-index, never grows the
-   card nor pushes content below; soft opacity + translateY transition. */
+/* ════════════════════════════════════════════════════════════════════════
+   LA RESPUESTA DE EXPLORA, EN FLUJO
+   ════════════════════════════════════════════════════════════════════════
+   QUÉ SE RETIRA Y POR QUÉ. Esto era un POPOVER: `position:absolute`,
+   `z-index:60` y, escrito en su propio comentario, «never grows the card nor
+   pushes content below». Medido con la sonda de interacción a 1440 px: la
+   respuesta de liquidez terminaba en y=1015 dentro de una tarjeta que acaba en
+   y=918 — 97 px FUERA, flotando encima del radar y de lo que hubiera debajo,
+   con el contenido de esas tarjetas visible por detrás. Es exactamente el
+   defecto de las capturas del encargo.
+
+   AHORA ES UN DESPLEGABLE: crece su tarjeta y empuja lo de abajo. Sin
+   `position`, sin `z-index` y sin sombra de flotante.
+
+   LA ANIMACIÓN, SIN NÚMERO MÁGICO. `grid-template-rows: 0fr → 1fr` mide el
+   contenido real, así que no hay `max-height` inventado que recorte cuando la
+   respuesta crece — y una respuesta recortada es justo lo que esto no puede
+   hacer. Necesita un hijo único al que colapsar: por eso el marcado envuelve la
+   respuesta en `.intcc-x-answer-in`. */
 .intcc-x-answer {
-  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
-  border-radius: 12px; border: 1px solid rgba(74,130,240,0.40);
-  background: linear-gradient(165deg, rgba(34,48,80,0.99), rgba(28,36,58,0.99));
-  box-shadow: 0 16px 42px rgba(0,0,0,0.52), 0 0 0 1px rgba(74,130,240,0.12);
-  opacity: 0; transform: translateY(-4px); pointer-events: none;
-  transition: opacity 200ms ease, transform 200ms ease;
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms var(--ease-out, ease), opacity 160ms ease;
+  opacity: 0;
 }
-.intcc-x-answer.is-open { opacity: 1; transform: translateY(0); pointer-events: auto; }
-/* INT.2Z — an open answer must always stack above the cards below it. Raise the
-   whole Explore card (and the active item) into a high stacking context so the
-   popover can never be painted under the next card's own context. */
-.intcc-explore { position: relative; }
-.intcc-explore:has(.intcc-x-answer.is-open) { z-index: 60; }
-.intcc-x-item.is-active { position: relative; z-index: 60; }
+.intcc-x-answer > .intcc-x-answer-in { overflow: hidden; min-height: 0; }
+.intcc-x-answer.is-open { grid-template-rows: 1fr; opacity: 1; }
+/* Cerrada NO es navegable: sin esto el tabulador entra en una respuesta de
+   altura cero y el foco desaparece de la pantalla. */
+.intcc-x-answer:not(.is-open) > .intcc-x-answer-in { visibility: hidden; }
+.intcc-x-answer.is-open > .intcc-x-answer-in { visibility: visible; }
+/* El separador es del ITEM, no de un panel flotante: la respuesta forma parte
+   de la misma tarjeta que su pregunta y así se lee. */
+.intcc-x-item.is-active { border-color: rgba(74,130,240,0.40); }
+.intcc-x-answer.is-open > .intcc-x-answer-in { border-top: 1px solid rgba(74,130,240,0.22); }
 .intcc-x-answer p { margin: 0; padding: 12px 14px; font-size: 13px; line-height: 1.55; color: var(--text-bright); }
+.intcc-x-answer p + p { padding-top: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .intcc-x-answer { transition: none; }
+}
 
 /* "+N más" footer for scalable Desde-última-visita / Línea temporal */
 .intcc-more-note { margin: 12px 0 0; font-size: 11.5px; font-weight: 600; color: rgba(150,180,240,0.7); letter-spacing: 0.02em; }

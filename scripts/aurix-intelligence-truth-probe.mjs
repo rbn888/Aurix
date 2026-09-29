@@ -201,6 +201,41 @@ const claims = page => page.evaluate(`(function(){
     hscroll: hscroll,
     today: fill('.intv5-matters, .intv4-brief'), evolution: fill('.intv4-memory, .intv15-evolution'),
     pendingLine: (document.querySelector('.intv7-radar-pending')||{}).textContent || null,
+    // ── TU EVOLUCIÓN: qué afirma, sobre qué ventana y con qué dimensión ─────
+    evo: (function(){ var c=document.querySelector('.intv4-memory, .intv15-evolution');
+      if(!c) return null;
+      var t=(c.textContent||'').replace(/\\s+/g,' ').trim();
+      return { text:t.slice(0,600),
+        stable: c.getAttribute('data-stable'),
+        stableDays: c.getAttribute('data-stable-days'),
+        coverage: c.getAttribute('data-coverage-days'),
+        head:((c.querySelector('.intv15-stable-head')||{}).textContent||'').trim(),
+        limits: [].slice.call(c.querySelectorAll('.intcc-surface-limit, .intv4-mem-coverage')).length,
+        // ¿Hay fechas? Se busca un día de mes seguido de un mes abreviado, o ISO.
+        // Los DOS órdenes de fecha: «29 sept 2026» (es) y «Sep 29, 2026» (en).
+        hasDates: /\\b\\d{1,2}\\s+[a-zé]{3,10}\\.?\\s+\\d{4}\\b|\\b[a-zé]{3,10}\\.?\\s+\\d{1,2},?\\s+\\d{4}\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b|\\bD\\d{5}\\b/i.test(t),
+      };})(),
+    // Y lo que el resto de la pantalla afirma sobre RENDIMIENTO, para poder
+    // comprobar que Evolución no lo contradice.
+    // ── COMPARADOR · SÓLO EN SU UBICACIÓN VIGENTE ──────────────────────────
+    // Vive en Workspace como capacidad Premium. Aquí se comprueba que NO está
+    // duplicado en Intelligence, que es la forma en que una mudanza se deshace
+    // sola: alguien repone la card «porque falta» y quedan dos.
+    cmpInIntel: !!document.querySelector('.aurix-intelligence-screen .intv14-cmp, .aurix-intcc .intv14-cmp'),
+    // ── SALUD · COMPACTA Y CON SU EXPLICACIÓN DENTRO ───────────────────────
+    health: (function(){ var h=document.querySelector('.intcc-m-health, .intv17-health');
+      if(!h) return null; var hb=h.getBoundingClientRect();
+      var kids=[].slice.call(h.children);
+      if(!kids.length) return null;
+      var top=Math.min.apply(null,kids.map(function(k){return k.getBoundingClientRect().top;}));
+      var bot=Math.max.apply(null,kids.map(function(k){return k.getBoundingClientRect().bottom;}));
+      return { h:Math.round(hb.height), content:Math.round(bot-top),
+        dead:Math.round(hb.height-(bot-top)),
+        ring: !!h.querySelector('svg, canvas, .intv17-health-ring, .intcc-ring'),
+        explain: !!h.querySelector('.intv17-health-metric, .intcc-m-health-sub, .intcc-health-sub, p') };})(),
+    returnClaims: [].slice.call(document.querySelectorAll('.intv4-changed, .intv5-drivers, .intcc-drivers'))
+      .map(function(e){ return (e.textContent||'').replace(/\\s+/g,' '); }).join(' ')
+      .match(/[-−+]?\\d+[.,]\\d+\\s*%/g) || [],
     heroSub: (document.querySelector('.intcc-hero-sub, .intv4-hero-sub, .intcc-m-hero-sub')||{}).textContent || '',
     todayEmpty: (document.querySelector('.intv5-matters .intcc-empty-body, .intv4-brief .intcc-empty-body')||{}).textContent || '',
     todayEmptyKey: (document.querySelector('.intv5-matters, .intv4-brief')||{}).getAttribute
@@ -300,6 +335,28 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         JSON.stringify({ hero: (c.heroSub || '').trim().slice(0, 80),
                          hoy: (c.todayEmpty || '').trim().slice(0, 80), key: c.todayEmptyKey }));
     }
+    // ── §EVOLUCIÓN · DIMENSIÓN, VENTANA Y MAGNITUD ─────────────────────────
+    if (c.evo) {
+      ok(`${tag} Evolución acota su afirmación con fechas`, c.evo.hasDates === true,
+        JSON.stringify({ text: (c.evo.text || '').slice(0, 220), stable: c.evo.stable }));
+      // LA FRASE FALSA: «tu cartera terminó donde estaba» se lee como valor o
+      // rentabilidad, y lo que se mide son PESOS. Con un rendimiento publicado
+      // en otra card, decir eso es contradecirse.
+      ok(`${tag} Evolución no afirma que la cartera «terminó donde estaba»`,
+        !/termin[óo] donde estaba|ended where it started/i.test(c.evo.text || ''),
+        (c.evo.head || '').slice(0, 140));
+      if (c.evo.stable === '1') {
+        ok(`${tag} …y cuando habla de estabilidad DICE que son pesos, no rentabilidad`,
+          /reparto de tu cartera|portfolio mix/i.test(c.evo.head || '')
+          && /no sobre tu rentabilidad|not about your return/i.test(c.evo.head || ''),
+          (c.evo.head || '').slice(0, 180));
+        ok(`${tag} …y declara la ventana comparada`,
+          !!c.evo.stableDays && Number(c.evo.stableDays) > 0, String(c.evo.stableDays));
+      }
+      // NI UNA TARJETA LLENA DE ADVERTENCIAS: como mucho dos líneas de límite.
+      ok(`${tag} Evolución no se llena de advertencias`, (c.evo.limits || 0) <= 2,
+        String(c.evo.limits));
+    }
     // ── §DISEÑO · ORDEN Y DESBORDE ─────────────────────────────────────────
     ok(`${tag} sin desborde horizontal de página`, c.hscroll === false);
     // El orden que el encargo fija para móvil. En escritorio la rejilla reordena
@@ -327,6 +384,33 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       }
       ok(`${tag} orden: ${want.join(' → ')}`, bad.length === 0,
         JSON.stringify({ bad, got: (c.order || []) }));
+    }
+    // ── §5 · EL COMPARADOR, SÓLO DONDE VIVE ────────────────────────────────
+    ok(`${tag} el comparador NO está duplicado en Intelligence`, c.cmpInIntel === false);
+    // ── §6 · SALUD COMPACTA, CON SU EXPLICACIÓN Y SIN HUECO ────────────────
+    if (c.health) {
+      ok(`${tag} Salud lleva su anillo y su explicación dentro`,
+        c.health.ring === true && c.health.explain === true, JSON.stringify(c.health));
+      ok(`${tag} Salud no reserva hueco vacío`, c.health.dead <= 56, JSON.stringify(c.health));
+    }
+    // ── §6 · LA COMPOSICIÓN DE ESCRITORIO, POR FILAS ───────────────────────
+    if (VP[0] >= 1024) {
+      const B = {}; (c.orderBoxes || []).forEach(o => { B[o.k] = o.box; });
+      const row = (a, b) => (a && b) &&
+        Math.min(a.b, b.b) - Math.max(a.t, b.t) > 0.5 * Math.min(a.h, b.h);
+      ok(`${tag} escritorio · Salud e Inteligencia comparten la primera fila`,
+        row(B.health, B.hero) || !B.health,
+        JSON.stringify({ health: B.health, hero: B.hero }));
+      ok(`${tag} escritorio · Radar · Factores · Explora en una fila`,
+        row(B.radar, B.drivers) && row(B.drivers, B.explore),
+        JSON.stringify({ radar: B.radar, drivers: B.drivers, explore: B.explore }));
+      ok(`${tag} escritorio · Hoy y Evolución en una fila, y DEBAJO de esa`,
+        row(B.today, B.evolution) && B.today && B.radar && B.today.t > B.radar.t,
+        JSON.stringify({ today: B.today, evolution: B.evolution }));
+      ok(`${tag} escritorio · «Qué ha cambiado» a ancho completo y debajo`,
+        B.changed && B.today && B.changed.t >= B.today.t
+        && B.radar && B.explore && B.changed.w >= (B.explore.r - B.radar.l) - 2,
+        JSON.stringify({ changed: B.changed, span: B.explore && B.radar ? B.explore.r - B.radar.l : null }));
     }
     // ── §DISEÑO · ALTURA SEGÚN CONTENIDO ───────────────────────────────────
     // «Hoy» no puede ser una card alta medio vacía. Se mide el hueco muerto: la

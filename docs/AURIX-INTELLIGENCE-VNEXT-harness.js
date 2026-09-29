@@ -492,7 +492,11 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
       const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
       return h.indexOf('Entre el ' + a + ' y el ' + b) === 0
         && /compara los dos extremos del periodo/.test(h)
-        && /cambio neto/.test(h)
+        // LA DIMENSIÓN, que antes faltaba: «tu cartera terminó donde estaba» se
+        // lee como valor o rentabilidad, y lo medido son PESOS. Con un
+        // rendimiento publicado al lado eso era una contradicción en pantalla.
+        && /reparto de tu cartera/.test(h)
+        && /no sobre tu rentabilidad/.test(h)
         // …no afirma continuidad ni usa la edad de la cuenta (41)
         && !/se mantiene|se ha movido|últimos \d+ días/.test(h) && !/41/.test(h)
         && /data-stable-days="30"/.test(stable); })(),
@@ -612,7 +616,11 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
     (() => { const en = MEM(CORE({}), INTEL({}), 'en');
       const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
       return /is-stable/.test(en)
-        && new RegExp('Between ' + a + ' and ' + b + ' your portfolio ended where it started').test(en)
+        // La frase decía «your portfolio ended where it started», que se lee como
+        // VALOR o RENTABILIDAD; lo medido son PESOS, así que con un rendimiento
+        // publicado al lado la pantalla se contradecía. Se nombra la dimensión.
+        && new RegExp('Between ' + a + ' and ' + b + ' your portfolio mix barely changed').test(en)
+        && /not about your return/.test(en)
         && new RegExp('Your cash is at 7% today\\. Between ' + a + ' and ' + b
           + ' its weight changed by less than 3 percentage points').test(en)
         && /not the path between them/.test(en)
@@ -654,9 +662,14 @@ console.log('\n§9 · Explora: preguntas con el contexto de la cuenta:');
   ok('9.3 …y con la dimensión no disponible, también',
     L('q_concentration', INTEL({ conc: { availability: 'unavailable' } }))
       === '¿De qué posición depende más mi patrimonio?');
-  ok('9.4 tres mayores posiciones: la pregunta que el SPEC pide, con su cifra',
+  // CONTRATO SUSTITUIDO: la cifra sale del ENUNCIADO. «¿Cuánto … (77%)?» pregunta
+  // cuánto y contesta 77% en el mismo renglón, así que desplegarla no aportaba
+  // nada. El dato vive en la respuesta (`intv16_ans_top3_lead`), y la CONDICIÓN
+  // se conserva: sin `top3Pct` certificado la pregunta no se ofrece.
+  ok('9.4 tres mayores posiciones: la pregunta NO se contesta a sí misma',
     L('q_diversification', INTEL({}))
-      === '¿Cuánto de mi patrimonio depende de mis tres mayores posiciones (77%)?',
+      === '¿Cuánto de mi patrimonio depende de mis tres mayores posiciones?'
+    && L('q_diversification', INTEL({ conc: { top3Pct: null } })) !== null,
     L('q_diversification', INTEL({})));
   ok('9.5 liquidez SIN deriva medida: se pregunta el significado, no la dirección',
     L('q_liquidity', INTEL({})) === '¿Qué significa tener el 7% de mi patrimonio en liquidez?',
@@ -697,7 +710,7 @@ console.log('\n§9 · Explora: preguntas con el contexto de la cuenta:');
     (() => { const en = ['q_concentration', 'q_diversification', 'q_liquidity', 'q_what_changed']
         .map(id => L(id, INTEL({}), CORE(40 * DAY), 'en'));
       return en[0] === 'Microsoft is 31% of my portfolio: what does that concentration mean?'
-        && /three largest positions \(77%\)/.test(en[1])
+        && en[1] === 'How much of my wealth depends on my three largest positions?'
         && /7% of my wealth in cash/.test(en[2])
         && /last 40 days/.test(en[3]); })(),
     JSON.stringify(['q_concentration', 'q_diversification', 'q_liquidity', 'q_what_changed']

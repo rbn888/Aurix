@@ -248,10 +248,19 @@ const run = (e, c) => vm.runInContext(e, c);
 const render = (o) => { const c = makeCtx(o); return { html: run('_renderIntelligenceCommandCenter()', c), ctx: c }; };
 const coreOf = (o) => { const c = makeCtx(o); return run('_aurixIntelligenceCore({ presentationHistory: _intv4ReadShown() })', c); };
 const attrs = (html, re) => { const out = []; let m; const r = new RegExp(re, 'g'); while ((m = r.exec(html))) out.push(m[1]); return out; };
+// HASTA EL CIERRE REAL, NO HASTA UN NÚMERO. Cortaba a 4.000 caracteres fijos, y
+// eso convierte cualquier marcado que crezca en un falso negativo: al envolver la
+// respuesta de Explora para poder desplegarla en flujo, la CUARTA pregunta quedó
+// fuera de la ventana y el harness dijo que le faltaba el panel. El panel estaba.
+// Se corta donde termina la sección; el tope sigue como red por si no hubiera.
 const section = (html, cls) => {
   const i = html.indexOf('class="intcc-card ' + cls);
-  if (i < 0) { const j = html.indexOf(cls); return j < 0 ? '' : html.slice(j, j + 2600); }
-  return html.slice(i, i + 4000);
+  const cut = (from, cap) => {
+    const end = html.indexOf('</section>', from);
+    return (end > -1) ? html.slice(from, end + 10) : html.slice(from, from + cap);
+  };
+  if (i < 0) { const j = html.indexOf(cls); return j < 0 ? '' : cut(j, 2600); }
+  return cut(i, 4000);
 };
 
 // ── fixtures ────────────────────────────────────────────────────────────────
@@ -654,13 +663,21 @@ console.log('\n8 · Explore is contextual, not a fixed list:');
   ok('8.6 every question comes from the Core catalogue',
     (() => { const sel = coreOf(MATURE).contextualQuestions.selected.map(q => q.id);
       return qids.every(id => sel.indexOf(id) >= 0); })());
-  ok('8.7 every rendered question has a real answer', (sec.match(/intcc-x-answer/g) || []).length === qids.length
-    && !/<div class="intcc-x-answer" id="[^"]*"><\/div>/.test(sec));
+  // `intcc-x-answer` casa también con `intcc-x-answer-in`, el envoltorio que el
+  // desplegable en flujo necesita para animar sin `max-height` inventado. Se
+  // cuenta la clase EXACTA.
+  ok('8.7 every rendered question has a real answer',
+    (sec.match(/class="intcc-x-answer"/g) || []).length === qids.length
+    && !/<div class="intcc-x-answer"[^>]*>\s*<div class="intcc-x-answer-in">\s*<\/div>/.test(sec),
+    JSON.stringify({ qids: qids.length,
+      answers: (sec.match(/class="intcc-x-answer"/g) || []).length }));
   ok('8.8 an ineligible question never appears',
     (() => { const y = render(YOUNG).html;
       return !/data-intcc-q="q_performance"/.test(y) && !/data-intcc-q="q_capital_flows"/.test(y); })());
   ok('8.9 the existing delegation contract is preserved (data-intcc-q + #intcc-x-<id>)',
-    qids.every(id => sec.indexOf('id="intcc-x-' + id + '"') >= 0));
+    qids.every(id => sec.indexOf('id="intcc-x-' + id + '"') >= 0),
+    JSON.stringify({ qids, missing: qids.filter(id => sec.indexOf('id="intcc-x-' + id + '"') < 0),
+      sample: sec.slice(0, 300) }));
   ok('8.10 a DATA_QUALITY question can be premium content',
     (() => { const y = render(YOUNG).html; return /data-intcc-q="q_data_quality"/.test(y); })());
 }
