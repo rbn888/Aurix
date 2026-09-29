@@ -51,7 +51,7 @@ const AUTH_PATCH = t => String(t)
 let pass = 0; const fails = [];
 const ok = (n, c, info) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fails.push(n); console.log('  ✗ ' + n + (info ? '  [' + info + ']' : '')); } };
 
-const VIEWPORTS = [[360, 740], [390, 844], [768, 1024], [1440, 900]];
+const VIEWPORTS = [[360, 740], [375, 812], [390, 844], [768, 1024], [1024, 768], [1440, 900]];
 
 // Lo que se mide de cada tarjeta del catálogo, DENTRO de ella misma.
 const MEASURE = `(function(){
@@ -286,8 +286,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   // analítica trae su orbe con halo, la operativa trae tres capacidades con SU acento. Y el
   // halo tiene que CABER: este repositorio ya tiene escrito que «el orbe no acaba en su caja,
   // su halo exige ~19 px extra», así que se mide su caja real contra la tarjeta.
-  {
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
+  // ── LOS SEIS ANCHOS ACORDADOS ───────────────────────────────────────────
+  // La paridad se medía SÓLO a 1440. Dos tarjetas pueden ser gemelas en
+  // escritorio y dejar de serlo en cuanto una envuelve su texto antes que la
+  // otra, que es donde un par se rompe de verdad.
+  for (const [PW_, PH_] of [[360, 740], [375, 812], [390, 844], [768, 1024], [1024, 768], [1440, 900]]) {
+    const PTAG = ENG + '.' + PW_;
+    const ctx = await browser.newContext({ viewport: { width: PW_, height: PH_ },
+      deviceScaleFactor: PW_ < 700 ? 2 : 1, reducedMotion: 'reduce' });
     await ctx.route('**/app.js*', async route => {
       const r = await route.fetch(); await route.fulfill({ response: r, body: AUTH_PATCH(await r.text()) });
     });
@@ -319,19 +325,57 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       }
       var ics=[].slice.call(document.querySelectorAll('.wsdisc-ic')).map(function(e){ return getComputedStyle(e).color; });
       var ctas=cards.map(function(c){ return !!c.querySelector('.wsdisc-cta'); });
+      // ── PARIDAD COMPLETA, NO SÓLO LA CAJA ──────────────────────────────
+      // El encargo enumera qué tiene que coincidir: anchura y altura, padding,
+      // radio y borde, posición de título/texto/CTA y alineación vertical. Se
+      // miden los SEIS, porque igualar sólo la caja permite dos tarjetas que
+      // miden lo mismo y se leen distinto por dentro.
+      var boxOf=function(c){ var cs=getComputedStyle(c); var cb=c.getBoundingClientRect();
+        var q=function(sel){ var e=c.querySelector(sel); if(!e) return null;
+          var r=e.getBoundingClientRect();
+          return { dx:Math.round(r.left-cb.left), dy:Math.round(r.top-cb.top),
+                   w:Math.round(r.width), h:Math.round(r.height) }; };
+        return { w:Math.round(cb.width), h:Math.round(cb.height),
+          pad: cs.padding, radius: cs.borderRadius, border: cs.borderWidth+' '+cs.borderStyle,
+          title: q('.wsdisc-t'), body: q('.wsdisc-b'), cta: q('.wsdisc-cta'),
+          // El CTA medido desde ABAJO: es lo que hace que los dos botones se
+          // lean a la misma altura aunque el texto de encima mida distinto.
+          ctaFromBottom: (function(){ var e=c.querySelector('.wsdisc-cta'); if(!e) return null;
+            return Math.round(cb.bottom - e.getBoundingClientRect().bottom); })() }; };
       return { n: cards.length, a: a, b: b2, halo: halo, haloDentro: dentro, margen: margen,
         iconos: ics.length, distintos: new Set(ics).size, ctas: ctas,
+        boxA: boxOf(cards[0]), boxB: boxOf(cards[1]),
         anims: (orb ? getComputedStyle(orb).animationName : 'none') }; })()`);
-    ok('CR.1440 promos · las dos existen para un usuario Free', g.n === 2, JSON.stringify(g.n));
-    ok('CR.1440 promos · misma caja: son un par, no dos piezas sueltas',
+    ok(PTAG + ' promos · las dos existen para un usuario Free', g.n === 2, JSON.stringify(g.n));
+    ok(PTAG + ' promos · misma caja: son un par, no dos piezas sueltas',
       g.a && g.b && g.a.w === g.b.w && Math.abs(g.a.h - g.b.h) <= 1, JSON.stringify([g.a, g.b]));
-    ok('CR.1440 promos · las dos ofrecen su acción', Array.isArray(g.ctas) && g.ctas.every(Boolean), JSON.stringify(g.ctas));
-    ok('CR.1440 promos · el halo del orbe CABE en su tarjeta',
+    ok(PTAG + ' promos · mismo padding, radio y borde',
+      g.boxA && g.boxB && g.boxA.pad === g.boxB.pad
+      && g.boxA.radius === g.boxB.radius && g.boxA.border === g.boxB.border,
+      JSON.stringify([g.boxA, g.boxB]));
+    // EL CTA SE COMPARA POR POSICIÓN Y ALTURA, NO POR ANCHO: los dos botones se
+    // ajustan a su texto («Explorar Intelligence» mide 3 px más que «Explorar
+    // Workspace») e igualar el ancho sería rellenar un botón para imitar a otra
+    // palabra — justo el «no igualarlas con … una altura vacía» del encargo.
+    // Lo que sí tiene que coincidir es dónde arrancan y dónde acaban respecto a
+    // su tarjeta, que es lo que hace que se lean a la misma altura.
+    ok(PTAG + ' promos · título, texto y CTA en la misma posición relativa',
+      (() => { const A = g.boxA, B = g.boxB; if (!A || !B) return false;
+        const block = (x, y) => !!x && !!y && Math.abs(x.dx - y.dx) <= 1
+          && Math.abs(x.w - y.w) <= 1 && x.dy === y.dy;
+        return block(A.title, B.title) && block(A.body, B.body)
+          && Math.abs(A.cta.dx - B.cta.dx) <= 1
+          && Math.abs(A.cta.dy - B.cta.dy) <= 1
+          && Math.abs(A.cta.h - B.cta.h) <= 1
+          && Math.abs(A.ctaFromBottom - B.ctaFromBottom) <= 1; })(),
+      JSON.stringify([g.boxA, g.boxB]));
+    ok(PTAG + ' promos · las dos ofrecen su acción', Array.isArray(g.ctas) && g.ctas.every(Boolean), JSON.stringify(g.ctas));
+    ok(PTAG + ' promos · el halo del orbe CABE en su tarjeta',
       g.haloDentro === true && g.margen >= 8, JSON.stringify([g.halo, g.haloDentro, g.margen]));
-    ok('CR.1440 promos · la operativa trae tres capacidades con acento DISTINTO',
+    ok(PTAG + ' promos · la operativa trae tres capacidades con acento DISTINTO',
       g.iconos === 3 && g.distintos === 3, JSON.stringify([g.iconos, g.distintos]));
     // Sin bucle: una promo que late permanentemente compite con las cifras del patrimonio.
-    ok('CR.1440 promos · el orbe no late en bucle', g.anims === 'none', String(g.anims));
+    ok(PTAG + ' promos · el orbe no late en bucle', g.anims === 'none', String(g.anims));
     await ctx.close();
   }
   await browser.close();

@@ -21424,7 +21424,26 @@ body.gs-open { overflow: hidden; }
 
   /* Card 2 — Salud: score ring + badge on the left, sober conclusion rows on
      the right (distinct from the solid Excelente badge). */
-  .intcc-m-health-body { display: flex; align-items: center; gap: 16px; }
+  /* ── SALUD MÓVIL · ANILLO A LA IZQUIERDA, EXPLICACIÓN A LA DERECHA ──────
+     La mitad derecha estaba vacía: su único inquilino eran los tres veredictos
+     retirados. Ahora la ocupa la explicación, que es contenido real y de paso
+     devuelve a la card la composición de dos columnas que el encargo pide.
+     `align-items: flex-start` para que el texto empiece arriba junto al anillo
+     y no flote centrado dejando aire arriba y abajo. */
+  .intcc-m-health-body { display: flex; align-items: flex-start; gap: 16px; }
+  .intcc-m-health-explain { flex: 1 1 auto; min-width: 0; }
+  .intcc-m-health-explain p {
+    margin: 0 0 6px; font-size: 12.5px; line-height: 1.45;
+    color: rgba(206,220,246,0.82);
+    overflow-wrap: normal; word-break: normal;
+  }
+  .intcc-m-health-explain p:last-child { margin-bottom: 0; color: rgba(206,220,246,0.66); }
+  /* En los teléfonos más estrechos se apila, pero NUNCA deja un panel vacío:
+     la explicación pasa debajo del anillo, a todo el ancho. */
+  @media (max-width: 359px) {
+    .intcc-m-health-body { flex-direction: column; align-items: stretch; gap: 12px; }
+    .intcc-m-health-score { align-self: flex-start; flex-direction: row; align-items: center; gap: 12px; }
+  }
   .intcc-m-health-score { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .intcc-m-health .intcc-score-ring, .intcc-m-health .intcc-score-svg { width: 78px; height: 78px; }
   .intcc-m-health .intcc-score-val { font-size: 24px; }
@@ -29443,7 +29462,16 @@ input.ws4-num.is-invalid {
    alturas que romperían una traducción larga o el zoom). Densidad controlada:
    sin banner, sin paywall y sin copiar las portadas. */
 .wsdisc-sec { margin-top: var(--space-3, 16px); }
-.wsdisc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3, 16px); }
+/* ── LAS DOS PROMOS SON UN PAR, TAMBIÉN APILADAS ─────────────────────────
+   En dos columnas la rejilla ya las igualaba por fila. Apiladas (≤ 640 px) cada
+   una caía en su propia fila y medían distinto: 269 px frente a 249 px a 360,
+   porque el texto de Intelligence envuelve una línea más que el de Workspace.
+   Un par que deja de ser par se nota más que cualquier adorno.
+   `grid-auto-rows: 1fr` las iguala por ESTRUCTURA, no con relleno: los 20 px
+   caen entre el texto y el CTA, que ya está anclado abajo en las dos, así que
+   los dos botones siguen leyéndose a la misma altura desde el borde. */
+.wsdisc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr; gap: var(--space-3, 16px); }
 .wsdisc-card {
   display: flex; flex-direction: column; gap: 12px; min-width: 0;
   padding: 18px 20px; border-radius: 16px;
@@ -29894,7 +29922,7 @@ body.ws-cover .aurix-wsh { max-width: none; }
    veces alrededor de ella—. Se atenúa para que la ausencia se vea sin leerla. */
 .intcc-radar-vlabel[data-measured="0"] .intcc-radar-label { color: rgba(214,226,255,0.46); }
 /* El bloqueo concreto, al pie de la figura: tono secundario, una sola vez. */
-.intv7-radar-pending {
+.intv7-radar-evidence {
   margin: 10px 0 0; padding-top: 9px;
   border-top: 1px solid rgba(120,150,220,0.10);
   font-size: 11.5px; line-height: 1.45; font-weight: 500;

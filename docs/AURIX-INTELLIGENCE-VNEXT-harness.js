@@ -53,7 +53,7 @@ function dictOf(langIdx) {
   // indentación. Se toma la ocurrencia por índice de idioma, que es la técnica que
   // ya usan los gates de Intelligence: anclar por vecino encontraba el idioma
   // equivocado en silencio.
-  const KEYS = ['intv16_axis_not_measured','intv16_radar_no_evidence','intv7_axis_unavailable','intcc_radar_title',
+  const KEYS = ['intv16_axis_not_measured','intv16_radar_no_evidence','intv17_radar_evidence','intv18_health_measures','intv18_health_cause','intv18_health_cause_declared','intv7_axis_unavailable','intcc_radar_title',
     'intcc_dim_breadth','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
     'intv7_pending_obs','intv7_pending_scale',
     'intv4_memory_title','intv4_memory_empty','intv4_memory_coverage',
@@ -117,7 +117,7 @@ function makeCtx(lang) {
    '_INTV4_MEMORY_WINDOW_ORDER','_INTV7_RADAR_DIMS','_AURIX_INTEL_EXCLUSIVE_CLAIMS']
     .forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_intccClamp','_intccEsc','_aurixPctNum','_aurixPctLabel','_intv4Num','_intv4Money',
-   '_intccRadarSvg','_intv7PendingReasonKey','_intv7RadarPendingHtml','_intv7RadarAxes','_intv7RadarHtml',
+   '_intccRadarSvg','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarEvidenceHtml','_intv7RadarAxes','_intv7RadarHtml',
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
    '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
@@ -203,13 +203,18 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
       && ORDER.every(k => h.indexOf(LABELS[k]) !== -1),
       JSON.stringify({ axes: count(h, /class="intcc-radar-axis[" ]/g),
         labels: count(h, /class="intcc-radar-label"/g) }));
-    ok('2.2/' + c.m + ' …y sólo lo certificado recibe marcador y cifra',
-      count(h, /class="intcc-radar-dot"/g) === c.m
-      && count(h, /class="intcc-radar-halo"/g) === c.m
-      && count(h, /class="intcc-radar-val"/g) === c.m
-      && new RegExp('data-svg-measured="' + c.m + '"').test(h)
-      && new RegExp('data-svg-unknown="' + (5 - c.m) + '"').test(h)
-      && count(h, /data-availability="unknown"/g) === 0,
+    // CONTRATO SUSTITUIDO · LA FIGURA ES TODO O NADA. Marcador por eje
+    // certificado producía, con tres de cinco, TRES PUNTOS Y UN SEGMENTO
+    // SUELTO: el gráfico roto de las capturas de producción. Ahora el dibujo
+    // exige los cinco; las CIFRAS certificadas se siguen publicando, porque son
+    // hechos y esconderlas sería peor que no dibujar el polígono.
+    ok('2.2/' + c.m + ' …la cifra es de lo certificado; el marcador, sólo con los cinco',
+      (() => { const drawn = (c.m === 5) ? 5 : 0;
+        return count(h, /class="intcc-radar-dot"/g) === drawn
+          && count(h, /class="intcc-radar-halo"/g) === drawn
+          && count(h, /class="intcc-radar-val"/g) === c.m
+          && new RegExp('data-svg-measured="' + drawn + '"').test(h)
+          && count(h, /data-availability="unknown"/g) === 0; })(),
       JSON.stringify({ dots: count(h, /class="intcc-radar-dot"/g),
         vals: count(h, /class="intcc-radar-val"/g) }));
     ok('2.3/' + c.m + ' …sin «sin datos», sin cero fingido y sin eje atenuado',
@@ -255,29 +260,32 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
       (h.match(/viewBox="[^"]+"/) || [''])[0]);
   });
   // ── EL CASO QUE MOTIVA LA REGLA DE ADYACENCIA ────────────────────────────
-  ok('2.6 tres métricas en ejes ALTERNOS dan UN segmento, jamás un triángulo',
+  ok('2.6 tres métricas en ejes ALTERNOS no dibujan nada (ni un segmento suelto)',
     (() => { const h = RADAR({ diversification: 30, liquidity: 7, concentration: 31 },
         ['stability', 'growth']);
-      return /data-svg-edges="1"/.test(h) && /data-svg-gaps="4"/.test(h)
-        && count(h, /class="intcc-radar-edge"/g) === 1
+      return /data-svg-edges="0"/.test(h)
+        && count(h, /class="intcc-radar-edge"/g) === 0
         && !/intcc-radar-area/.test(h); })(),
     (RADAR({ diversification: 30, liquidity: 7, concentration: 31 }, ['stability', 'growth'])
       .match(/data-svg-(edges|gaps)="[^"]*"/g) || []).join(' '));
-  ok('2.7 dos métricas VECINAS sí se unen: la interrupción es por hueco, no por número',
+  ok('2.7 dos métricas vecinas tampoco se unen: la figura exige los cinco',
     (() => { const h = RADAR({ diversification: 30, stability: 80 }, ['liquidity', 'growth', 'concentration']);
-      return /data-svg-edges="1"/.test(h) && /data-svg-gaps="4"/.test(h); })());
+      return /data-svg-edges="0"/.test(h); })());
   ok('2.8 dos métricas NO vecinas no se unen con nada',
     (() => { const h = RADAR({ diversification: 30, liquidity: 7 }, ['stability', 'growth', 'concentration']);
       return /data-svg-edges="0"/.test(h) && /data-svg-gaps="5"/.test(h); })());
   ok('2.9 un CERO CERTIFICADO no es un desconocido: se dibuja y se rotula «0%»',
     (() => { const h = RADAR({ diversification: 0, liquidity: 0, concentration: 0 },
         ['stability', 'growth']);
-      return count(h, />0%</g) === 3 && count(h, /class="intcc-radar-dot"/g) === 3
-        && /data-svg-measured="3"/.test(h); })());
+      // El cero certificado SIGUE siendo una medición y publica su «0%»; lo
+      // que no hace, sin los cinco, es dibujar un punto.
+      return count(h, />0%</g) === 3 && count(h, /class="intcc-radar-dot"/g) === 0
+        && /data-svg-measured="0"/.test(h); })());
   ok('2.10 un valor no finito es indistinguible de la ausencia: no dibuja nada',
     (() => { const h = RADAR({ diversification: 30, stability: null, liquidity: 7,
         growth: undefined, concentration: 31 }, []);
-      return /data-svg-measured="3"/.test(h) && count(h, /class="intcc-radar-dot"/g) === 3
+      return /data-svg-measured="0"/.test(h) && count(h, /class="intcc-radar-dot"/g) === 0
+        && count(h, /class="intcc-radar-val"/g) === 3
         && count(h, /class="intcc-radar-label"/g) === 5; })());
   ok('2.11 los nombres y los ángulos NO dependen de los datos: misma malla siempre',
     (() => { const grid = (x) => (x.match(/<g class="intcc-radar-grid">[\s\S]*?<\/g>/) || [''])[0];
@@ -302,10 +310,17 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
         // no hay ninguna vía que la habilite contando observaciones
         && !/observations\s*>=?\s*\d/.test(src)
         && !/vals\.length\s*>=?\s*\d/.test(src); })());
-  ok('2.15 la causa de Crecimiento es la ESCALA, no la espera, y no tiene owner',
+  // CONTRATO SUSTITUIDO · CRECIMIENTO YA TIENE OWNER. «No hay escala 0-100 sin
+  // benchmark» sigue siendo cierto para una NOTA, y por eso no se publica
+  // ninguna: lo que se afirma es la rentabilidad flow-neutral certificada y lo
+  // que se dibuja es su posición, por una transformación declarada y monótona.
+  ok('2.15 Crecimiento tiene owner y su cifra es la rentabilidad, no una nota',
     (() => { const ks = konstSrc('_INTV7_RADAR_DIMS');
-      return /key: 'growth',[\s\S]{0,80}owner: null/.test(ks)
-        && /pending: 'no_certifiable_scale'/.test(ks); })());
+      const src0 = fnSrc('_aurixGrowthAxis');
+      return /key: 'growth',[\s\S]{0,90}owner: 'aurixGrowthAxis'/.test(ks)
+        && !/pending: 'no_certifiable_scale'/.test(ks)
+        && /Math\.tanh/.test(src0) && /_AURIX_GROWTH_SCALE_PP/.test(src0)
+        && /perf\.confidence !== 'high'/.test(src0); })());
   ok('2.16 ninguna causa publicada promete que esperar la resuelva',
     (() => { const es = VAL_ES.intv7_pending_obs;
       const txt = (typeof es === 'function') ? es('Estabilidad') : String(es);
@@ -337,14 +352,17 @@ console.log('\n§2 · La card: siempre un radar, nunca una lista:');
     && !/intv15-obs-row/.test(three) && !/data-state="observable"/.test(three));
   ok('2.C2 …y declara lo que NO puede medir, con su causa (§3 · trazabilidad)',
     /data-unavailable="stability,growth"/.test(three)
-    && /data-pending="[^"]*growth:no_certifiable_scale/.test(three),
+    // La causa de Crecimiento ya no es «no hay escala»: hereda la del retorno.
+    && /data-pending="[^"]*growth:[a-z_]+/.test(three),
     (three.match(/data-pending="[^"]*"/) || [''])[0]);
   const one = cardWith({ snap: null });
-  ok('2.C3 con UNA certificada sigue siendo el MISMO radar, con un solo marcador',
+  ok('2.C3 con UNA certificada sigue siendo el MISMO radar, y sin figura',
     /data-state="radar"/.test(one) && /intcc-radar-svg/.test(one)
     && count(one, /class="intcc-radar-label"/g) === 5
-    && count(one, /class="intcc-radar-dot"/g) === 1
-    && /data-measured="1"/.test(one)
+    // Con UNA certificada ya no se dibuja un punto suelto sobre la malla: la
+    // figura es todo o nada. El marco, en cambio, es idéntico.
+    && count(one, /class="intcc-radar-dot"/g) === 0
+    && /data-certified="1"/.test(one) && /data-measured="0"/.test(one)
     && !/intv15-obs-row/.test(one) && !/Factores observables/.test(one),
     one.slice(0, 240));
   const none = cardWith({ snap: null, breadth: null });
@@ -359,12 +377,15 @@ console.log('\n§2 · La card: siempre un radar, nunca una lista:');
     none.slice(0, 240));
   ok('2.C5 la explicación SÓLO aparece sin evidencia: con una métrica ya no hace falta',
     !/intv16-radar-none/.test(one) && !/intv16-radar-none/.test(three));
-  ok('2.C6 el estado sube de grado sin cambiar de figura al aparecer un cuarto owner',
+  ok('2.C6 un cuarto owner sube la certificación sin estrenar una figura abierta',
     (() => { const h = cardWith({ peak: { status: 'available', retentionPct: 80,
         quality: 'measured', startsAfterRecord: false } });
-      return /data-state="radar"/.test(h) && /data-measured="4"/.test(h)
+      // «Sube de grado» se mide en la CERTIFICACIÓN, no en el dibujo: con
+      // cuatro de cinco sigue sin haber figura, que es justamente lo que evita
+      // el polígono abierto de las capturas.
+      return /data-state="radar"/.test(h) && /data-certified="4"/.test(h)
         && /data-svg-axes="5"/.test(h) && !/sin datos/.test(h)
-        && /data-svg-edges="3"/.test(h) && /data-svg-gaps="2"/.test(h); })(),
+        && /data-svg-edges="0"/.test(h); })(),
     (cardWith({ peak: { status: 'available', retentionPct: 80, quality: 'measured',
       startsAfterRecord: false } }).match(/data-svg-(edges|gaps|measured)="[^"]*"/g) || []).join(' '));
   ok('2.C7 «Factores observables» queda retirada del código y de la hoja de estilos',

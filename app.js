@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '752'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '753'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5515,6 +5515,10 @@ const T = {
     // que esperar lo resuelva: Crecimiento no espera datos, espera una referencia
     // que el producto ha decidido no tener.
     intv16_axis_not_measured: 'Aurix todavía no puede medirla',
+    intv18_health_measures: 'El porcentaje mide cómo se reparte el peso entre tus posiciones.',
+    intv18_health_cause: (name, pct) => `Hoy lo estrecha ${name}, con el ${pct} de tu cartera financiera.`,
+    intv18_health_cause_declared: (name, pct) => `Lo estrecha ${name}, con el ${pct}, y nos indicaste que esa concentración es una decisión tuya.`,
+    intv17_radar_evidence: (n, t) => `Aurix puede medir ${n} de las ${t} dimensiones con tu historial certificado. El pentágono dibuja su marco de referencia; la figura aparece cuando estén las cinco.`,
     intv16_radar_no_evidence: 'Estas son las cinco dimensiones sobre las que Aurix razona. Todavía no puede medir ninguna con tus datos, así que el mapa se muestra sin valores.',
     // `intv7_axis_unavailable` QUEDA RETIRADA de la superficie por el §6: el radar
     // ya no puede rotular un eje «sin datos» porque un eje sin datos no se dibuja.
@@ -8659,6 +8663,10 @@ const T = {
     intcc_dim_stab:   'Stability',
     intcc_dim_growth: 'Growth',        // INT.07 — the founder's five conceptual dimensions
     intv16_axis_not_measured: 'Aurix cannot measure it yet',
+    intv18_health_measures: 'The percentage measures how weight is spread across your positions.',
+    intv18_health_cause: (name, pct) => `Today it is narrowed by ${name}, at ${pct} of your financial portfolio.`,
+    intv18_health_cause_declared: (name, pct) => `It is narrowed by ${name}, at ${pct}, and you told us that concentration is your own decision.`,
+    intv17_radar_evidence: (n, t) => `Aurix can measure ${n} of the ${t} dimensions with your certified history. The pentagon draws its frame of reference; the shape appears once all five are there.`,
     intv16_radar_no_evidence: 'These are the five dimensions Aurix reasons about. It cannot measure any of them with your data yet, so the map is shown without values.',
     intv7_axis_unavailable: 'no data',
     intv7_axis_span_days: (n) => `${n}d measured`,
@@ -34732,6 +34740,87 @@ function _aurixPeakRetention(range) {
 }
 if (typeof window !== 'undefined') {
   window.debugAurixPeakRetention = (range) => _aurixPeakRetention(range || 'all');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CRECIMIENTO · OWNER ÚNICO SOBRE LA RENTABILIDAD FLOW-NEUTRAL
+// ════════════════════════════════════════════════════════════════════════════
+// POR QUÉ EXISTE AHORA, Y POR QUÉ NO EXISTÍA ANTES. La decisión anterior fue
+// dejar este eje sin owner, y su razonamiento está escrito arriba: las tres
+// escalas «naturales» que se evaluaron —frecuencia de intervalos positivos,
+// percentil contra la propia historia, posición en el rango observado— medían
+// la CADENCIA DE MUESTREO o eran degeneradas, y un 0-100 relativo a un índice
+// exigiría un benchmark que INT.01 prohíbe. Ese razonamiento sigue siendo
+// correcto PARA AQUELLAS TRES.
+//
+// Lo que faltaba no era un benchmark: era aceptar que el RADIO de un eje es
+// GEOMETRÍA, no una afirmación financiera. Los otros cuatro ejes ya funcionan
+// así —la amplitud publica «2,3 / 7» y su radio es otra cosa; la estabilidad
+// publica su cuota y su radio es esa cuota—. Crecimiento puede hacer lo mismo:
+//
+//   · LO QUE SE AFIRMA es la rentabilidad flow-neutral certificada, con su
+//     signo y su ventana. Es el MISMO número que `_aurixInvestablePerformance`
+//     publica en el resto de la superficie, del MISMO owner: no hay una segunda
+//     cifra que pueda contradecir a la primera, que era el otro miedo.
+//   · LO QUE SE DIBUJA es una posición en el pentágono, obtenida con una
+//     transformación DECLARADA, ESTABLE y MONÓTONA. No es una nota ni una
+//     puntuación: es dónde cae ese retorno en un eje acotado.
+//
+// LA TRANSFORMACIÓN, y por qué ésta. `50 + 50·tanh(r / K)` con K = 20 pp:
+//   · MONÓTONA ESTRICTA: más rentabilidad ⇒ más radio, siempre. Nunca empata
+//     dos retornos distintos ni invierte el orden.
+//   · ACOTADA en (0, 100) sin recortar: un +300 % no satura en un plano ni
+//     desplaza al resto de la figura.
+//   · SIMÉTRICA: −r y +r caen a la misma distancia del centro del eje, así que
+//     el signo no se pierde en la geometría.
+//   · ESTABLE: K es una constante declarada, no depende de la cuenta, del
+//     muestreo ni del histórico. La misma rentabilidad da el mismo punto hoy y
+//     dentro de un año, y en cualquier dispositivo.
+//   · Y NO ES UNA RECOMENDACIÓN: no dice qué rentabilidad es buena; dice dónde
+//     cae la que hay. El 50 sólo se alcanza con un retorno de EXACTAMENTE 0,00 %
+//     certificado — nunca por ausencia de dato, que es lo que se prohíbe.
+//
+// HEREDA LAS BARRERAS DEL OWNER, sin añadir ninguna nueva: misma validez, misma
+// cobertura nominal y la MISMA barra de confianza que Estabilidad. Si el retorno
+// no es publicable, este eje tampoco lo es — y entonces no hay punto, no hay
+// radio y no hay cero fingido.
+const _AURIX_GROWTH_SCALE_PP = 20;   // pp de rentabilidad por unidad de tanh — CONSTANTE DECLARADA
+function _aurixGrowthAxis(range) {
+  const out = { range: range || 'all', status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE,
+    reason: 'owner_unavailable', returnPct: null, radial: null, quality: null,
+    observations: 0, startsAfterRecord: false, spanMs: null,
+    scalePp: _AURIX_GROWTH_SCALE_PP, transform: 'tanh' };
+  try {
+    if (typeof _aurixInvestablePerformance !== 'function') return out;
+    const perf = _aurixInvestablePerformance(out.range);
+    if (!perf || perf.valid !== true || !Number.isFinite(perf.returnPct)) {
+      out.status = _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY;
+      out.reason = (perf && perf.fallbackReason) || 'return_not_publishable';
+      return out;
+    }
+    if (perf.coversNominal === false) {
+      out.status = _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY; out.reason = 'window_not_covered'; return out;
+    }
+    if (perf.confidence !== 'high') {
+      out.status = _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY;
+      out.reason = 'awaiting_observations'; out.quality = 'immature'; return out;
+    }
+    const r = perf.returnPct;
+    const radial = 50 + 50 * Math.tanh(r / _AURIX_GROWTH_SCALE_PP);
+    if (!Number.isFinite(radial)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'not_finite'; return out; }
+    out.returnPct = r;
+    // Se acota a (0,100) SIN recortar información: `tanh` ya es asintótico, el
+    // clamp sólo protege de un redondeo en los extremos.
+    out.radial = Math.max(0, Math.min(100, +radial.toFixed(2)));
+    out.observations = (perf.index && perf.index.values) ? perf.index.values.length : 0;
+    out.startsAfterRecord = perf.startsAfterRecord === true;
+    out.spanMs = Number.isFinite(perf.spanMs) ? perf.spanMs : null;
+    out.status = _AURIX_FACT_STATUS.AVAILABLE; out.reason = ''; out.quality = 'measured';
+    return out;
+  } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixGrowthAxis = (range) => _aurixGrowthAxis(range || 'all');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -64815,7 +64904,23 @@ function _intccRadarSvg(radar, dimsOverride) {
   //   · el relleno exige los `n`: una figura cerrada afirma que el contorno
   //     describe el conjunto, y con un hueco eso es falso.
   const dims = ALL_DIMS;
-  const measured = dims.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
+  const measuredAll = dims.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
+  // ── O LA FIGURA ESTÁ COMPLETA, O NO HAY FIGURA ──────────────────────────
+  // DEFECTO DE PRODUCCIÓN, reproducido con las dos cuentas reales: con tres
+  // ejes certificados se pintaban TRES PUNTOS Y UN SEGMENTO suelto sobre una
+  // malla de cinco. No es «evidencia parcial honesta»: se lee como un gráfico
+  // roto, y el encargo lo prohíbe por su nombre.
+  //
+  // La regla pasa a ser binaria y la razón es de lectura, no de datos: una
+  // silueta sólo significa algo cuando recorre TODOS los ejes. Con cuatro de
+  // cinco, el vértice que falta no se lee como «esto no se sabe» sino como
+  // «esto vale cero», que es exactamente la confusión que el contrato del radar
+  // lleva prohibiendo desde el principio.
+  //
+  // Lo que NO cambia: la malla pentagonal se dibuja SIEMPRE y los cinco nombres
+  // siguen ahí. La estructura es el marco de razonamiento y no depende de los
+  // datos; lo que depende de los datos es si hay algo que dibujar ENCIMA.
+  const measured = (measuredAll.length === dims.length) ? measuredAll : [];
   if (dims.length < 3) return '';
   const cx = 110, cy = 106, R = 100, n = dims.length;
   const RADAR_DOT_R = 4;                        // §7 — el mismo para los cinco
@@ -64982,7 +65087,13 @@ function _intccRadarSvg(radar, dimsOverride) {
     return c > 0 ? 'right' : 'left';
   };
   const vlabels = dims.map((d, i) => {
-    const isMeasured = measured.indexOf(d) !== -1;
+    // LA CIFRA SE PUBLICA SI ESTÁ CERTIFICADA, aunque la FIGURA no se dibuje.
+    // Son dos decisiones distintas y confundirlas fue un error de la primera
+    // versión de este bloque: retirar el polígono parcial es una decisión de
+    // LECTURA —una silueta a medias miente—, pero un porcentaje medido es un
+    // hecho, y ocultarlo porque a otro eje le falta historia sería esconder
+    // evidencia que el usuario ya tiene. `measuredAll` es la certificación real.
+    const isMeasured = measuredAll.indexOf(d) !== -1;
     const val = isMeasured
       ? (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
       : '';
@@ -67192,31 +67303,34 @@ function _intv5Chips(core, score, intel) {
   // que repartir—, que es la misma degeneración que PC.01 ya había declarado para
   // su dimensión de diversificación. Un elogio derivado de una división
   // degenerada es la forma más caro de perder credibilidad: exige DOS posiciones.
-  const effPos = eff ? Number(eff.values && eff.values.positions) : NaN;
-  const effN = eff ? Number(eff.values && eff.values.effectiveN) : NaN;
-  const effScaled = (Number.isFinite(effPos) && effPos >= 2 && Number.isFinite(effN))
-    ? (effN - 1) / (effPos - 1) : null;
-  if (effScaled != null && effPos >= 3
-      && effScaled >= _AURIX_FACT_MATERIAL.effectiveNRatio)
-    out.push({ tone: 'good', label: _intv4T('intcc_chip_div') });
-  // ── §8 · «LIQUIDEZ SUFICIENTE» ES UN JUICIO, Y UN JUICIO TIENE CONTEXTO ──
-  // El nivel de liquidez es el mismo dato siempre; llamarlo SUFICIENTE es una
-  // conclusión, y hay dos declaraciones del usuario que la desmienten sin mover
-  // ni un decimal: una necesidad INMINENTE (para la que un 6 % no es suficiente)
-  // y liquidez que existe FUERA de Aurix (con lo que el porcentaje medido no
-  // describe su liquidez real). En los dos casos el HECHO se sigue publicando
-  // donde le toca; lo que se retira es el elogio.
-  if (cash && Number.isFinite(cash.value) && cash.value >= 5 && cash.value <= 60
-      && liqNeed !== 'imminent' && unregLiq !== 'yes')
-    out.push({ tone: 'good', label: _intv4T('intcc_chip_liq') });
-  // ── §8 · SIN HECHO NO HAY ELOGIO ─────────────────────────────────────────
-  // `!top1` publicaba «Concentración controlada» cuando el hecho de concentración
-  // NO EXISTÍA —ledger sin cobertura, una posición sin valorar, cartera vacía—, o
-  // sea derivaba una condición POSITIVA de la AUSENCIA de evidencia. Es
-  // exactamente el defecto que el score viejo tenía dentro («desconocer el riesgo
-  // sube la nota») reaparecido en una etiqueta verde.
-  if (top1 && Number.isFinite(top1.value) && top1.value < 45)
-    out.push({ tone: 'good', label: _intv4T('intcc_chip_conc') });
+  // ════════════════════════════════════════════════════════════════════════
+  // LOS TRES VEREDICTOS SE RETIRAN: UN UMBRAL NO ES UNA VERDAD FINANCIERA
+  // ════════════════════════════════════════════════════════════════════════
+  // «Diversificación adecuada», «Liquidez suficiente» y «Concentración
+  // controlada» salían de tres umbrales universales —un ratio de reparto, una
+  // banda del 5–60 % y un tope del 45 %— presentados como conclusiones sobre el
+  // patrimonio de UNA persona. Cada iteración les fue añadiendo guardias
+  // (dos posiciones mínimo, sin necesidad inminente, sin liquidez fuera de
+  // Aurix, hecho de concentración presente) y todos eran correctos, pero
+  // ninguno arregla el problema de fondo: seguían siendo la AUSENCIA de un
+  // desmentido, no la PRESENCIA de una razón.
+  //
+  //   · «suficiente» exige saber PARA QUÉ. Un 7 % es holgado para quien no
+  //     espera ningún gasto y escaso para quien tiene una entrada firmada el
+  //     mes que viene. Aurix no lo sabe, así que no puede calificarlo.
+  //   · «controlada» exige saber que alguien la controla. Un 31 % en la mayor
+  //     posición no acredita control; acredita 31 %.
+  //   · «adecuada» exige un criterio de adecuación que este producto ha decidido
+  //     no tener (INT.01 prohíbe el benchmark).
+  //
+  // NO SE PIERDE NI UN DATO: el porcentaje de liquidez, el peso de la mayor
+  // posición y la amplitud de categorías se siguen publicando —con su cifra— en
+  // el radar y en Salud, que es donde son una MEDIDA y no un elogio. Lo que
+  // desaparece es la capa que los convertía en nota.
+  //
+  // Y NO SE SUSTITUYEN por la declaración del usuario: eso sería reintroducir
+  // por otro nombre la píldora que el cierre anterior retiró. Las decisiones
+  // declaradas siguen vivas en memoria y en la supresión de preguntas.
   // ── §6/§8 · LA DECLARACIÓN DEL USUARIO, COMO CONTEXTO NEUTRAL ────────────
   // Vivía debajo del estado de Salud, donde se leía como parte del juicio
   // estructural —y §6 retira toda explicación de esa card—. Aquí es una etiqueta
@@ -67373,7 +67487,7 @@ const _INTV7_RADAR_DIMS = Object.freeze([
   Object.freeze({ key: 'diversification', labelKey: 'intcc_dim_breadth', owner: 'aurixRegisteredCategoryBreadth' }),
   Object.freeze({ key: 'stability',       labelKey: 'intcc_dim_stab',   owner: 'aurixPeakRetention' }),
   Object.freeze({ key: 'liquidity',       labelKey: 'intcc_dim_liq',    owner: 'aurixHealthSnapshot' }),
-  Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: null, pending: 'no_certifiable_scale' }),
+  Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: 'aurixGrowthAxis' }),
   Object.freeze({ key: 'concentration',   labelKey: 'intcc_dim_conc',   owner: 'aurixHealthSnapshot' }),
 ]);
 
@@ -67440,6 +67554,20 @@ function _intv7RadarAxes() {
   } else if (ret) {
     out.quality.stability = ret.quality || 'unavailable';
   }
+  // ── CRECIMIENTO · EL RADIO ES GEOMETRÍA, LA CIFRA ES EL RETORNO ──────────
+  // `display` lleva la rentabilidad flow-neutral REAL con su signo —el mismo
+  // número que publica el resto de la superficie, del mismo owner— y el radio
+  // lleva la transformación declarada. En pantalla no aparece ni un 0-100.
+  let grw = null;
+  try { grw = (typeof _aurixGrowthAxis === 'function') ? _aurixGrowthAxis('all') : null; } catch (_) { grw = null; }
+  if (grw && grw.status === 'available' && Number.isFinite(grw.radial)) {
+    certified.growth = grw.radial;
+    out.quality.growth = grw.quality || 'measured';
+    out.display = out.display || {};
+    out.display.growth = _aurixSignedPctLabel(grw.returnPct);
+  } else if (grw) {
+    out.quality.growth = grw.quality || 'unavailable';
+  }
 
   for (const d of _INTV7_RADAR_DIMS) {
     const v = Object.prototype.hasOwnProperty.call(certified, d.key) ? certified[d.key] : null;
@@ -67450,6 +67578,7 @@ function _intv7RadarAxes() {
     else {
       out.unavailable.push(d.key);
       out.pending[d.key] = (d.key === 'stability' && ret && ret.reason) ? ret.reason
+                         : (d.key === 'growth' && grw && grw.reason) ? grw.reason
                          : (d.key === 'diversification' && breadth && breadth.reason) ? breadth.reason
                          : (d.pending || 'owner_unavailable');
     }
@@ -67495,26 +67624,66 @@ function _intv7PendingReasonKey(reason) {
 // `data-unavailable`, `data-pending` y `data-quality` SE CONSERVAN: son la
 // trazabilidad del §3 y el discriminador de los gates. Declarar internamente lo
 // que no se mide es obligatorio; pintarlo como una cifra es lo que está vetado.
-// Una línea por eje sin medir, con su causa. Con el radar completo no emite nada.
-function _intv7RadarPendingHtml(r, esc) {
-  const lines = (r.unavailable || []).map((k) => {
-    const dim = (r.dims || []).find(d => d.key === k);
-    if (!dim || !dim.label) return '';
-    // `_intv4T` YA invoca la copy cuando es una función y le pasa los args: la
-    // primera versión la llamaba sin argumentos y comprobaba `typeof === 'function'`
-    // sobre el resultado, así que nunca emitía nada — y de haberlo emitido habría
-    // publicado «undefined: el dato existe…». Lo cazó el gate, no la vista.
-    return _intv4T(_intv7PendingReasonKey(r.pending ? r.pending[k] : null), dim.label);
-  }).filter(Boolean);
+// ── EL ESTADO SIN EVIDENCIA: COMPACTO Y HONESTO ───────────────────────────
+// Sustituye al párrafo por eje con su causa. Aquello era TEXTO INTERNO DE
+// IMPLEMENTACIÓN puesto en la interfaz —«el dato existe y Aurix lo publica como
+// porcentaje de rentabilidad; lo que falta es una referencia con la que
+// convertirlo en una escala de 0 a 100»— y el encargo lo retira por su nombre.
+// Lo que el usuario necesita saber es UNA cosa: cuántas dimensiones puede medir
+// Aurix todavía y que la malla es el marco, no un resultado. Una línea.
+// Con el radar completo no emite nada.
+// ── QUÉ MIDE EL ANILLO Y QUÉ LO ESTRECHA HOY ──────────────────────────────
+// Dos frases, las dos derivadas de `_aurixHealthSnapshot`, que es el owner del
+// propio anillo: no hay una segunda fuente que pueda contradecirlo.
+//   1 · QUÉ MIDE — la magnitud, dicha en lenguaje de usuario.
+//   2 · QUÉ LO CAUSA — la posición que más estrecha el reparto, con su peso.
+// Si el usuario declaró que esa concentración es deliberada, la segunda frase
+// pasa a TONO DESCRIPTIVO: consta su decisión y no se le repite una alarma. Un
+// cambio material posterior vuelve a abrir la atención por la vía de las
+// preguntas, no convirtiendo su preferencia en una penalización permanente.
+// FAIL CLOSED: sin snapshot o sin posición dominante certificada no se inventa
+// una causa — se publica sólo lo que mide, y si tampoco eso, no se emite nada.
+function _intccHealthExplainHtml(snap, core, esc) {
+  const e = esc || _intccEsc;
+  const lines = [];
+  const what = _intv4T('intv18_health_measures');
+  if (what) lines.push(what);
+  try {
+    const top = snap && snap.topInvestedAsset;
+    if (top && top.name && Number.isFinite(top.pctTotal)) {
+      let deliberate = false;
+      try {
+        const cf = (core && core.context && core.context.fields) || {};
+        const it = cf.concentration_intent;
+        deliberate = !!(it && it.value === 'deliberate');
+      } catch (_) { deliberate = false; }
+      const key = deliberate ? 'intv18_health_cause_declared' : 'intv18_health_cause';
+      const ln = _intv4T(key, String(top.name), _aurixPctLabel(top.pctTotal));
+      if (ln) lines.push(ln);
+    }
+  } catch (_) {}
   if (!lines.length) return '';
-  return `<p class="intv7-radar-pending" data-pending-axes="${lines.length}">`
-    + lines.map(l => esc(l)).join(' ') + '</p>';
+  return '<div class="intcc-m-health-explain">'
+    + lines.map(l => '<p>' + e(l) + '</p>').join('') + '</div>';
+}
+function _intv7RadarEvidenceHtml(r, esc) {
+  const total = (r.dims || []).length;
+  const n = Number(r.measured) || 0;
+  if (!total || n >= total) return '';
+  const line = _intv4T('intv17_radar_evidence', n, total);
+  if (!line) return '';
+  return `<p class="intv7-radar-evidence" data-measured="${n}" data-of="${total}">${esc(line)}</p>`;
 }
 function _intv7RadarHtml(esc) {
   const r = _intv7RadarAxes();
   const svg = _intccRadarSvg(r.values, r.dims);
   const meta = `data-axes="${r.dims.length}" data-declared="${r.dims.length}"`
-    + ` data-measured="${r.measured}"`
+    // DOS CUENTAS DISTINTAS, Y CONFUNDIRLAS ES LO QUE ROMPÍA LA LECTURA:
+    //   `data-certified` — cuántos ejes tienen evidencia (y publican su cifra);
+    //   `data-measured`  — cuántos se DIBUJAN, que es 0 salvo con los cinco.
+    // La trazabilidad necesita la primera; la figura, la segunda.
+    + ` data-certified="${r.measured}"`
+    + ` data-measured="${r.measured === (r.dims || []).length ? r.measured : 0}"`
     + ` data-unavailable="${esc(r.unavailable.join(','))}"`
     + ` data-pending="${esc(Object.keys(r.pending).map(k => k + ':' + r.pending[k]).join(','))}"`
     + ` data-quality="${esc(Object.keys(r.quality).map(k => k + ':' + r.quality[k]).join(','))}"`;
@@ -67541,7 +67710,7 @@ function _intv7RadarHtml(esc) {
             producto ha decidido no tener—. El mapa de causas ya existía
             (`_intv7PendingReasonKey`); lo que faltaba era quien lo publicara.
             FAIL CLOSED sobre la copy: sin cadena no se emite el nodo. */''}
-      ${_intv7RadarPendingHtml(r, esc)}
+      ${_intv7RadarEvidenceHtml(r, esc)}
     </section>`;
 }
 
@@ -69624,6 +69793,19 @@ function _renderIntelligenceCommandCenter() {
           </div>
           <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
         </div>
+        ${/* ── LA EXPLICACIÓN VA AQUÍ, Y ES LO QUE LLENA LA TARJETA ──────────
+              DEFECTO DE PRODUCCIÓN: la mitad derecha estaba VACÍA. Vivía de
+              `goodChips`, o sea de los tres veredictos («Diversificación
+              adecuada», «Liquidez suficiente», «Concentración controlada»)
+              que este mismo cierre retira por no sostenerse. Sin ellos la
+              composición se quedaba en un anillo solo y media superficie en
+              negro — y con ellos era peor, porque llenaba el hueco con una
+              nota inventada.
+              Lo que va aquí es lo que el encargo pide y la card no decía
+              NUNCA: qué mide ese porcentaje y qué lo estrecha hoy. Las dos
+              frases salen de dato certificado (`_aurixHealthSnapshot`), no de
+              un umbral. */''}
+        ${_intccHealthExplainHtml(snap, core, esc)}
         ${goodChips.length ? `<ul class="intcc-m-concl">
           ${/* CHECKPOINT B · EL «✓» ES UNA CONFIRMACIÓN, ASÍ QUE SÓLO PUEDE
                 ACOMPAÑAR A UNA. Un limitador con marca de verificación decía
@@ -84156,6 +84338,18 @@ function _aurixPctNum(raw) {
 function _aurixPctLabel(raw) {
   const nPart = _aurixPctNum(raw);
   return (nPart === null) ? '—' : nPart + '%';
+}
+// EL SIGNO ES PARTE DEL DATO. Una rentabilidad publicada sin él deja «4,8 %» y
+// «−4,8 %» con la misma cara, y el eje de Crecimiento necesita justamente esa
+// distinción. Un cero certificado se publica como «0 %», sin signo inventado.
+function _aurixSignedPctLabel(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return '—';
+  const body = _aurixPctLabel(Math.abs(n));
+  if (body === '—') return '—';
+  if (n > 0) return '+' + body;
+  if (n < 0) return '−' + body;
+  return body;
 }
 function _aurixHealthSnapshot() {
   const out = {

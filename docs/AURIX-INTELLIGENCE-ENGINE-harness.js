@@ -646,9 +646,15 @@ ok('M.8 el SVG del radar no puede rotular un eje «sin datos» ni atenuarlo',
 // card publica una línea al pie con el eje y su causa. Lo huérfano sigue estando
 // prohibido; esta clase ya no lo es, y la leyenda retirada sí se añade a la lista.
 ok('M.8b el radar no deja CSS huérfano de la superficie retirada',
-  !/intv8-radar-|intv6-radar-legend|intv7-radar-mean|intcc-radar-leg-item/.test(css));
-ok('M.8b2 …y la clase que SÍ se pinta tiene su regla (el bloqueo concreto, al pie)',
-  /\.intv7-radar-pending \{/.test(css) && /intv7-radar-pending/.test(src));
+  !/intv8-radar-|intv6-radar-legend|intv7-radar-mean|intcc-radar-leg-item|intv7-radar-pending/.test(css));
+// La línea al pie deja de enumerar la causa POR EJE —eso era texto interno de
+// implementación en la interfaz, y el encargo lo retira— y pasa a decir, una
+// sola vez, cuántas dimensiones puede medir Aurix. Otra clase, mismo contrato:
+// lo que se pinta tiene su regla.
+ok('M.8b2 …y la clase que SÍ se pinta tiene su regla (el estado de evidencia, al pie)',
+  /\.intv7-radar-evidence \{/.test(css) && /intv7-radar-evidence/.test(src)
+  && !/intv7_pending_scale|referencia con la que convertirlo/.test(
+       (src.match(/function _intv7RadarEvidenceHtml[\s\S]{0,900}/) || [''])[0]));
 ok('M.8c …y conserva el mapeo de causas, que Advanced Intelligence necesitará',
   /function _intv7PendingReasonKey\(reason\)/.test(src));
 ok('M.9 …y lo no medible sigue DECLARADO en la card, con su causa (§3)',

@@ -77,7 +77,7 @@ function extractDict(langIdx) {
     // A2 — el enlace de trazabilidad del hero. Sin la clave el renderer emite un
     // enlace VACÍO, que es peor que no tenerlo.
     'intel_see_changes','intel_now_novelty','intel_sub_review','intel_now_reviewed','intel_sub_reviewed','intel_now_no_news','intel_sub_no_news','intel_ack_done','intel_ack','intel_ack_aria',
-    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
+    'intv17_radar_evidence','intv18_health_measures','intv18_health_cause','intv18_health_cause_declared','intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
     // CIERRE CORRECTIVO §2 — la única cadena que nombra la ausencia, y vive en la
     // descripción accesible, nunca en una etiqueta de la figura.
     'intv16_axis_not_measured','intv16_radar_no_evidence',
@@ -168,7 +168,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarPendingHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarEvidenceHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
@@ -435,9 +435,15 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
       const dots = count(h, /class="intcc-radar-dot"/g);
       const measured = Number(num(h, /data-measured="(\d+)"/));
       const declared = Number(num(h, /data-declared="(\d+)"/));
+      // La trazabilidad no cambia: `data-unavailable` y `data-pending` siguen
+      // declarando qué falta y por qué. Lo que cambia es el DIBUJO: con menos
+      // de cinco certificadas no hay marcadores, así que `data-measured` (lo
+      // que se pinta) es 0 y la cuenta de no-medidas se hace sobre `certified`.
+      const certified = Number(num(h, /data-certified="(\d+)"/));
       return dots === measured && declared === 5
-        && unavail.length === declared - measured
+        && unavail.length === declared - certified
         && count(h, /data-availability="measured"/g) === measured
+        && (certified === declared ? measured === declared : measured === 0)
         && count(h, /data-availability="unknown"/g) === 0
         // …y cada dimensión no medida lleva su CAUSA, que es lo que §3 exige.
         && unavail.every(k => new RegExp(k + ':[a-z_]+').test(num(h, /data-pending="([^"]*)"/) || '')); })(),
@@ -477,11 +483,14 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
   // anteriores, en direcciones opuestas.
   ok('5.4 cinco ejes y cinco nombres SIEMPRE, y un marcador por dimensión certificada',
     (() => { const m = Number(num(h, /data-measured="(\d+)"/));
-      return m >= 1
+      const certified = Number(num(h, /data-certified="(\d+)"/));
+      return certified >= 1
         && count(h, /class="intcc-radar-axis[" ]/g) === 5
         && count(h, /class="intcc-radar-label[" ]/g) === 5
+        // Un marcador por eje DIBUJADO (0 salvo con los cinco); una cifra por
+        // eje CERTIFICADO, que es un hecho y se publica igualmente.
         && count(h, /class="intcc-radar-dot"/g) === m
-        && count(h, /class="intcc-radar-val[" ]/g) === m; })(),
+        && count(h, /class="intcc-radar-val[" ]/g) === certified; })(),
     JSON.stringify({ measured: num(h, /data-measured="(\d+)"/),
       axes: count(h, /class="intcc-radar-axis[" ]/g), labels: count(h, /class="intcc-radar-label[" ]/g),
       dots: count(h, /class="intcc-radar-dot"/g) }));
@@ -943,7 +952,7 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
         && Number(num(rr, /data-measured="(\d+)"/)) === m
         && count(rr, /class="intcc-radar-label[ "]/g) === 5
         && count(rr, /class="intcc-radar-dot"/g) === m
-        && m >= 1 && m <= 5; })(),
+        && m >= 0 && m <= 5; })(),
     JSON.stringify({ axes: svg(/data-svg-axes="(\d+)"/),
       labels: count(rr, /class="intcc-radar-label[ "]/g),
       dots: count(rr, /class="intcc-radar-dot"/g) }));
@@ -981,9 +990,12 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
       return count(rr, /class="intcc-radar-vlabel"/g) === 5
         && !/intcc-radar-legend|intcc-radar-leg-item/.test(rr)
         && count(rr, /class="intcc-radar-label"/g) === 5
-        && count(rr, /class="intcc-radar-val"/g) === m
+        && count(rr, /class="intcc-radar-val"/g) === Number(num(rr, /data-certified="(\d+)"/))
         && count(rr, new RegExp(DICT.es.intv16_axis_not_measured, 'g')) === 0
-        && (m === 5 || /class="intv7-radar-pending"/.test(rr))
+        // La ausencia se dice UNA vez, y ya no enumera la causa por eje: eso
+        // era texto interno de implementación y el encargo lo retira.
+        && (Number(num(rr, /data-certified="(\d+)"/)) === 5 || /class="intv7-radar-evidence"/.test(rr))
+        && !/escala de 0 a 100|referencia con la que convertirlo/.test(rr)
         && !/sin datos/.test(rr)
         && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(rr)
         && !/<svg class="intcc-radar-svg[^>]*aria-label=/.test(rr); })(),
@@ -993,18 +1005,30 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
       label: count(rr, /class="intcc-radar-label"/g),
       val: count(rr, /class="intcc-radar-val"/g),
       notMeasured: count(rr, new RegExp(DICT.es.intv16_axis_not_measured, 'g')),
-      pending: /class="intv7-radar-pending"/.test(rr) }),
+      pending: /class="intv7-radar-evidence"/.test(rr),
+      certified: num(rr, /data-certified="(\d+)"/) }),
     (rr.match(/class="intcc-radar-legend"[\s\S]{0,200}/) || [, '?'])[0]);
-  ok('10.23 CRECIMIENTO sigue sin owner: conserva su eje y su nombre, y no publica cifra',
+  // CONTRATO SUSTITUIDO · CRECIMIENTO YA TIENE OWNER. La decisión anterior
+  // —dejarlo sin owner— se apoyaba en que no hay escala 0-100 sin un benchmark,
+  // y eso sigue siendo cierto PARA UNA NOTA. Lo que faltaba era separar las dos
+  // cosas: lo que se AFIRMA es la rentabilidad flow-neutral certificada (con su
+  // signo, del mismo owner que el resto de la superficie) y lo que se DIBUJA es
+  // una posición obtenida con una transformación declarada y monótona. El radio
+  // es geometría; la cifra es el dato. Ningún número inventado llega a pantalla.
+  ok('10.23 CRECIMIENTO tiene owner y publica su rentabilidad real, no una nota',
     (() => { const dims = run('JSON.stringify(_INTV7_RADAR_DIMS)', makeCtx(APPLE));
       const g = JSON.parse(dims).find(d => d.key === 'growth');
-      const row = (rr.match(/class="intcc-radar-vlabel" data-axis="growth"[\s\S]*?<\/span>/) || [''])[0];
-      return !!g && g.owner === null && g.pending === 'no_certifiable_scale'
+      const src0 = fnSrc('_aurixGrowthAxis');
+      return !!g && g.owner === 'aurixGrowthAxis' && !g.pending
         && rr.indexOf(DICT.es.intcc_dim_growth) !== -1
-        // su fila existe, lleva nombre y NO lleva cifra; y no tiene marcador
-        && /data-measured="0"/.test(row) && !/intcc-radar-val/.test(row)
-        && !/data-axis="growth" data-availability/.test(rr)
-        && /growth:no_certifiable_scale/.test(num(rr, /data-pending="([^"]*)"/) || ''); })());
+        // hereda las barreras del retorno y no añade ninguna propia
+        && /_aurixInvestablePerformance\(out\.range\)/.test(src0)
+        && /perf\.confidence !== 'high'/.test(src0)
+        && /coversNominal === false/.test(src0)
+        // transformación declarada, monótona y acotada
+        && /Math\.tanh\(r \/ _AURIX_GROWTH_SCALE_PP\)/.test(src0)
+        // y lo que se PUBLICA es el retorno, no el radio
+        && /_aurixSignedPctLabel\(grw\.returnPct\)/.test(fnSrc('_intv7RadarAxes')); })());
   ok('10.24 la transición del radar respeta `prefers-reduced-motion`',
     /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,200}\.intcc-radar-dot[^}]*transition: none/.test(css));
 
