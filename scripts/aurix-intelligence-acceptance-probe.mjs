@@ -157,6 +157,26 @@ const read = page => page.evaluate(`(function(){
     axes: { measured: axes.measured, unavailable: axes.unavailable, values: axes.values,
             display: axes.display, error: axes.error||null },
     svgDots: svg?svg.querySelectorAll('.intcc-radar-dot').length:null,
+    svgVerts: svg?(function(){ var a=svg.querySelector('.intcc-radar-area');
+      if(!a) return 0; var p=(a.getAttribute('points')||'').trim();
+      return p?p.split(/\\s+/).filter(Boolean).length:0; })():null,
+    svgFill: svg?(function(){ var a=svg.querySelector('.intcc-radar-area');
+      return a?getComputedStyle(a).fill:null; })():null,
+    // Los cinco rótulos: mismo color y mismo peso, sin cifras, sin partir.
+    labelStyle: (function(){
+      var ls=[].slice.call(document.querySelectorAll('.intcc-radar-vlabel .intcc-radar-label'));
+      return ls.map(function(e){ var cs=getComputedStyle(e); var b=e.getBoundingClientRect();
+        var lh=parseFloat(cs.lineHeight)||parseFloat(cs.fontSize)*1.25;
+        return { txt:(e.textContent||'').trim(), color:cs.color, weight:cs.fontWeight,
+                 size:cs.fontSize, wrap:cs.overflowWrap, brk:cs.wordBreak,
+                 lines:Math.max(1,Math.round(b.height/lh)),
+                 over:e.scrollWidth>e.clientWidth+1,
+                 w:Math.round(b.width), l:Math.round(b.left), r:Math.round(b.right),
+                 t:Math.round(b.top), b:Math.round(b.bottom) }; });
+    })(),
+    // ¿Sobra algo bajo la figura? Sólo puede haber título y envoltorio.
+    radarKids: (function(){ var c=pick('.intv7-radar'); if(!c) return null;
+      return [].slice.call(c.children).map(function(e){ return e.className||e.tagName; }); })(),
     svgEdges: svg?Number(svg.getAttribute('data-svg-edges')):null,
     svgArea: svg?!!svg.querySelector('.intcc-radar-area'):null,
     vlabels: document.querySelectorAll('.intcc-radar-vlabel').length,
@@ -200,8 +220,36 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
              && Math.abs(parseFloat(String(r.axes.display.diversification).replace(',', '.')) - P.breadth) <= 0.15),
           JSON.stringify(r.axes.display));
 
-        // ── EL RADAR ─────────────────────────────────────────────────────
-        ok(`${tag} el pentágono declara sus cinco ejes con nombre`, r.vlabels === 5, String(r.vlabels));
+        // ══ GATES QUIRÚRGICOS DEL RADAR ══════════════════════════════════
+        // El contrato es el MISMO en los cuatro casos: con evidencia o sin ella,
+        // la figura está completa. Lo que cambia es de dónde salen los radios.
+        ok(`${tag} exactamente CINCO categorías`, r.vlabels === 5, String(r.vlabels));
+        ok(`${tag} exactamente CINCO puntos`, r.svgDots === 5, String(r.svgDots));
+        ok(`${tag} el trazado contiene los CINCO vértices`, r.svgVerts === 5, String(r.svgVerts));
+        ok(`${tag} el polígono CIERRA (cinco aristas)`, r.svgEdges === 5, String(r.svgEdges));
+        ok(`${tag} hay relleno interior`,
+          r.svgArea === true && !!r.svgFill && r.svgFill !== 'none',
+          JSON.stringify({ area: r.svgArea, fill: r.svgFill }));
+        ok(`${tag} NINGUNA cifra ni porcentaje junto a una categoría`,
+          (r.labelStyle || []).length === 5
+          && (r.labelStyle || []).every(x => !/\d/.test(x.txt))
+          // …y tampoco en el marcado: la clase de la cifra no puede reaparecer.
+          && r.valuesShown === 0,
+          JSON.stringify((r.labelStyle || []).map(x => x.txt)));
+        ok(`${tag} las cinco categorías comparten color, peso y tamaño`,
+          (() => { const L = r.labelStyle || []; if (L.length !== 5) return false;
+            return new Set(L.map(x => x.color)).size === 1
+              && new Set(L.map(x => x.weight)).size === 1
+              && new Set(L.map(x => x.size)).size === 1; })(),
+          JSON.stringify((r.labelStyle || []).map(x => [x.color, x.weight, x.size])));
+        ok(`${tag} ninguna palabra se parte ni desborda`,
+          (r.labelStyle || []).every(x => x.wrap !== 'anywhere' && x.wrap !== 'break-word'
+            && x.brk !== 'break-all' && !x.over && x.lines <= 3),
+          JSON.stringify((r.labelStyle || []).filter(x => x.over || x.lines > 3)));
+        ok(`${tag} bajo la figura NO hay nada más que el título y el envoltorio`,
+          (() => { const k = r.radarKids || []; return k.length === 2
+            && /intcc-card-title/.test(String(k[0])) && /intcc-radar-wrap/.test(String(k[1])); })(),
+          JSON.stringify(r.radarKids));
         ok(`${tag} ninguna explicación técnica bajo la figura`,
           !r.pendingLine && !/escala de 0 a 100|scale of 0 to 100|referencia con la que/i.test(r.radarText || ''),
           (r.pendingLine || r.radarText || '').slice(0, 140));
@@ -210,24 +258,19 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
           (r.radarText || '').slice(0, 120));
 
         if (kind === 'dense') {
-          // CON EVIDENCIA SUFICIENTE: cinco medidos y UNA línea cerrada.
-          ok(`${tag} CINCO ejes medidos`, r.axes.measured === 5,
+          // Con evidencia, los cinco radios son medidos: el auxiliar no se usa.
+          ok(`${tag} con evidencia, los CINCO ejes están certificados`,
+            r.axes.measured === 5,
             JSON.stringify({ measured: r.axes.measured, unavailable: r.axes.unavailable }));
-          ok(`${tag} cinco marcadores reales`, r.svgDots === 5, String(r.svgDots));
-          ok(`${tag} una sola línea CERRADA (cinco aristas y relleno)`,
-            r.svgEdges === 5 && r.svgArea === true,
-            JSON.stringify({ edges: r.svgEdges, area: r.svgArea }));
         } else {
-          // SIN EVIDENCIA: malla como estructura, NUNCA una figura parcial.
-          ok(`${tag} sin evidencia NO se dibuja una figura cuantitativa parcial`,
-            r.svgDots === 0 && r.svgEdges === 0 && r.svgArea === false,
-            JSON.stringify({ dots: r.svgDots, edges: r.svgEdges, area: r.svgArea }));
-          // …PERO LO MEDIDO SIGUE PUBLICÁNDOSE. Retirar el polígono es una
-          // decisión de lectura; ocultar un porcentaje certificado sería
-          // esconder evidencia que el usuario ya tiene.
-          ok(`${tag} los ejes certificados conservan su cifra`,
-            (r.axes.measured || 0) >= 3 && r.valuesShown >= (r.axes.measured || 0),
-            JSON.stringify({ measured: r.axes.measured, cifras: r.valuesShown }));
+          // Sin evidencia la figura es idéntica, y el auxiliar NO SALE del SVG:
+          // `_intv7RadarAxes()` sigue publicando sólo lo certificado, que es de
+          // donde beben Explora, Salud y el resto.
+          ok(`${tag} el auxiliar visual NO contamina el owner certificado`,
+            (r.axes.measured || 0) < 5
+            && (r.axes.unavailable || []).length === 5 - (r.axes.measured || 0)
+            && Object.keys(r.axes.values || {}).length === (r.axes.measured || 0),
+            JSON.stringify({ measured: r.axes.measured, values: r.axes.values }));
         }
 
         // ── SALUD ────────────────────────────────────────────────────────
@@ -258,6 +301,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
           JSON.stringify(r.heroChips));
 
         await page.screenshot({ path: join(OUT, `acc-${who}-${kind}-${lng}-${VP[0]}x${VP[1]}-${ENG}.png`), fullPage: true });
+        // LA CAPTURA QUE DE VERDAD SE REVISA. La de página completa mide 780×4866
+        // en teléfono: a esa escala el radar es un sello y la revisión visual se
+        // vuelve una formalidad —que es exactamente cómo se aprobaron las dos
+        // versiones anteriores de esta figura—. Se añade el RECORTE de la card,
+        // que es lo que el SPEC pide mirar.
+        try {
+          const card = await page.$('.intv7-radar');
+          if (card) await card.screenshot({ path: join(OUT, `radar-${who}-${kind}-${lng}-${VP[0]}x${VP[1]}-${ENG}.png`) });
+        } catch (_) { /* el recorte es evidencia adicional, nunca un gate */ }
         await ctx.close();
       }
     }

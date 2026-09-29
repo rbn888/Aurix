@@ -374,17 +374,26 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // La regla nueva es binaria: con los cinco ejes certificados se dibuja la
   // figura CERRADA; con menos, no se dibuja NINGUNA — malla, nombres y las
   // cifras que sí están certificadas, que siguen siendo hechos y se publican.
-  ok('3.7 la dimensión ausente conserva su NOMBRE y no publica cifra ni marcador',
+  // ══════════════════════════════════════════════════════════════════════
+  // CONTRATO SUSTITUIDO (3ª y definitiva) · EL RADAR ES UNA SÍNTESIS
+  // ══════════════════════════════════════════════════════════════════════
+  // Las dos versiones anteriores optimizaban la MISMA cosa —no afirmar lo que no
+  // se sabe— y las dos produjeron una card que el usuario lee como rota: primero
+  // «sin datos» rotulado, después tres puntos y un segmento suelto. La tercera
+  // separa qué se AFIRMA de qué se DIBUJA: la figura se cierra siempre con un
+  // valor visual auxiliar (neutro, determinista, confinado al SVG) y el eje NO
+  // PUBLICA CIFRA, así que no hay nada que leer como medición. Lo certificado
+  // sigue viviendo en `_intv7RadarAxes()`, que es de donde beben las demás
+  // superficies — el auxiliar no sale del componente gráfico.
+  ok('3.7 la dimensión ausente conserva su NOMBRE y NINGÚN eje publica cifra',
     svg.indexOf(T.intcc_dim_growth) !== -1
     && svg.indexOf(T.intv7_axis_unavailable) === -1
-    // Las CUATRO certificadas publican su cifra: retirar el polígono es una
-    // decisión de lectura, esconder una medición sería esconder evidencia.
-    && (svg.match(/class="intcc-radar-val"/g) || []).length === 4
-    && (svg.match(/class="intcc-radar-val">([^<]*)</g) || [])
-         .every(m => /\d/.test(m))
-    // …y sin los cinco, ni un marcador.
-    && (svg.match(/class="intcc-radar-dot"/g) || []).length === 0
+    // Ni un número junto a una categoría: el radar dejó de ser una tabla.
+    && (svg.match(/class="intcc-radar-val"/g) || []).length === 0
+    // …y la figura está completa, con su quinto vértice.
+    && (svg.match(/class="intcc-radar-dot"/g) || []).length === 5
     && !/data-axis="growth" data-measured="1"/.test(svg)
+    // La trazabilidad por eje se conserva en el marcado, y no pinta nada.
     && /data-axis="growth" data-measured="0"/.test(svg),
     JSON.stringify((svg.match(/class="intcc-radar-val">([^<]*)</g) || [])));
   // ── RE-DECIDIDO · SPEC ADVANCED INTELLIGENCE · §8 ────────────────────────
@@ -405,11 +414,11 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // §2 — EL RELLENO EXIGE LOS CINCO. Con un hueco, un contorno cerrado afirmaría
   // que describe el conjunto, y es falso. Lo que sí hay es un marcador por eje
   // certificado, y ninguno para el que no lo está.
-  ok('3.8 sin los cinco NO hay marcadores, ni área, ni figura',
-    (svg.match(/class="intcc-radar-dot"/g) || []).length === 0
+  ok('3.8 CINCO marcadores, área cerrada y ninguna marca de ausencia',
+    (svg.match(/class="intcc-radar-dot"/g) || []).length === 5
     && !/data-availability="unknown"/.test(svg)
-    && /data-svg-measured="0"/.test(svg)
-    && !/intcc-radar-area/.test(svg),
+    && /intcc-radar-area/.test(svg)
+    && /data-svg-open="0"/.test(svg),
     (svg.match(/data-svg-measured="[^"]*"/) || [, '?'])[0]);
   // ── RE-DECIDIDO POR §11 DEL CIERRE, Y LA GARANTÍA SE REFUERZA ────────────
   // «Sólo los adyacentes medidos» fosilizaba una figura ABIERTA, y era la causa
@@ -427,10 +436,10 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   // §2 — LOS SEGMENTOS UNEN SÓLO VECINOS CERTIFICADOS. Con `growth` ausente en el
   // vértice 4 de cinco, los tramos 3→4 y 4→0 no existen: quedan 3 de 5, y el
   // hueco se VE como hueco en vez de saltarse.
-  ok('3.8b sin los cinco no se traza ni un segmento (ni suelto, ni punteado)',
-    (svg.match(/class="intcc-radar-edge"/g) || []).length === 0
+  ok('3.8b el ciclo se recorre entero: cinco aristas, ninguna punteada',
+    (svg.match(/class="intcc-radar-edge"/g) || []).length === 5
     && !/is-unknown/.test(svg)
-    && /data-svg-edges="0"/.test(svg)
+    && /data-svg-edges="5"/.test(svg) && /data-svg-gaps="0"/.test(svg)
     && !/stroke-dasharray/.test(svg),
     JSON.stringify([(svg.match(/data-svg-edges="[^"]*"/) || [, '?'])[0]]));
   ok('3.8c con los cinco ejes certificados el pentágono SÍ se cierra y se rellena',
@@ -460,9 +469,17 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
       rf.length === 5 && rf.every(r => r < R_OUT - 4), JSON.stringify(rf.map(r => +r.toFixed(1))));
     ok('3.9d el margen es UNIFORME: los cinco ejes comparten radio con el mismo valor',
       new Set(rz.map(r => r.toFixed(1))).size === 1 && new Set(rf.map(r => r.toFixed(1))).size === 1);
-    ok('3.9e y la etiqueta sigue imprimiendo el dato real, incluido el 0',
-      (zero.match(/class="intcc-radar-val"[^>]*>0</g) || []).length === 5,
-      (zero.match(/class="intcc-radar-val"[^>]*>([^<]*)</) || [, '?'])[1]);
+    // Ya no hay cifra que leer, así que la distinción entre «cero medido» y
+    // «sin evidencia» tiene que sobrevivir en la GEOMETRÍA o se pierde: el
+    // auxiliar visual es neutro (media banda), nunca el mínimo, de modo que una
+    // ausencia jamás se dibuja como el peor resultado posible.
+    const absent = run('_intccRadarSvg({ diversification: 0, liquidity: 0, concentration: 0, stability: 0 })');
+    const ra = dotsOf(absent).map(radiusOf);
+    ok('3.9e un 0 REAL y una ausencia NO dibujan el mismo punto, y ninguno publica cifra',
+      ra.length === 5 && ra.filter((r, i) => Math.abs(r - rz[i]) > 10).length === 1
+      && ra.filter((r, i) => r > rz[i] + 10).length === 1
+      && !/intcc-radar-val/.test(absent) && !/intcc-radar-val/.test(zero),
+      JSON.stringify(ra.map(r => +r.toFixed(1))) + ' vs ' + JSON.stringify(rz.map(r => +r.toFixed(1))));
   }
   // ── CIERRE CORRECTIVO §2 · LO DESCONOCIDO NO PRODUCE NADA CUANTITATIVO ───
   // Ni marcador, ni coordenada, ni cifra, ni segmento que lo cruce. Es el
@@ -482,12 +499,10 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
       JSON.stringify(svgs.map(x => (x.match(/data-svg-axes="[^"]*"/) || [, '?'])[0])));
     ok('3.9g los MARCADORES son exactamente los certificados, y ninguno más',
       svgs.every((x) => {
-        const m = Number((x.match(/data-svg-measured="(\d+)"/) || [, 0])[1]);
-        // `data-svg-measured` publica lo que se DIBUJA (0 salvo con los cinco);
-        // las cifras siguen las CERTIFICADAS, que es otra cuenta.
-        return (x.match(/class="intcc-radar-dot"/g) || []).length === m
-            && (x.match(/class="intcc-radar-halo"/g) || []).length === m
-            && (x.match(/class="intcc-radar-val"/g) || []).length >= m
+        // Cinco marcadores SIEMPRE; cero cifras SIEMPRE.
+        return (x.match(/class="intcc-radar-dot"/g) || []).length === 5
+            && (x.match(/class="intcc-radar-halo"/g) || []).length === 5
+            && (x.match(/class="intcc-radar-val"/g) || []).length === 0
             && !/data-availability="unknown"/.test(x); }),
       JSON.stringify(svgs.map(x => (x.match(/data-svg-measured="[^"]*"/) || [, '?'])[0])));
     ok('3.9h la palabra «sin datos» no aparece en NINGUNA de las figuras',
@@ -510,29 +525,27 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     // liquidez, concentración) ocupan los vértices 0, 2 y 4: sólo 4→0 son vecinos,
     // así que sale UN segmento y cuatro huecos. Tres segmentos serían el TRIÁNGULO
     // que el §2 prohíbe, y ése es el número que este assert existe para descartar.
-    ok('3.9j tres certificados en ejes alternos NO dibujan nada (ni un segmento suelto)',
+    ok('3.9j tres certificados en ejes alternos siguen dando un pentágono cerrado',
       (() => { const dims = [{ key: 'diversification', label: 'A' }, { key: 'stability', label: 'B' },
                       { key: 'liquidity', label: 'C' }, { key: 'growth', label: 'D' },
                       { key: 'concentration', label: 'E' }];
         const x = run('_intccRadarSvg({ diversification: 40, liquidity: 30, concentration: 60 }, '
           + JSON.stringify(dims) + ')');
-        return /data-svg-measured="0"/.test(x)
-          && /data-svg-edges="0"/.test(x)
-          && (x.match(/class="intcc-radar-edge"/g) || []).length === 0
-          && (x.match(/class="intcc-radar-dot"/g) || []).length === 0
-          && !/intcc-radar-area/.test(x); })(),
+        return /data-svg-edges="5"/.test(x)
+          && (x.match(/class="intcc-radar-edge"/g) || []).length === 5
+          && (x.match(/class="intcc-radar-dot"/g) || []).length === 5
+          && /intcc-radar-area/.test(x); })(),
       (() => { const dims = [{ key: 'diversification', label: 'A' }, { key: 'stability', label: 'B' },
                       { key: 'liquidity', label: 'C' }, { key: 'growth', label: 'D' },
                       { key: 'concentration', label: 'E' }];
         return run('_intccRadarSvg({ diversification: 40, liquidity: 30, concentration: 60 }, '
           + JSON.stringify(dims) + ')').match(/data-svg-(edges|gaps)="[^"]*"/g).join(' '); })());
-    ok('3.9k dos vecinos certificados tampoco: la figura es todo o nada',
+    ok('3.9k dos vecinos certificados: misma figura completa',
       (() => { const dims = [{ key: 'diversification', label: 'A' }, { key: 'stability', label: 'B' },
                       { key: 'liquidity', label: 'C' }, { key: 'growth', label: 'D' },
                       { key: 'concentration', label: 'E' }];
         const x = run('_intccRadarSvg({ diversification: 40, stability: 55 }, ' + JSON.stringify(dims) + ')');
-        return /data-svg-measured="0"/.test(x) && /data-svg-edges="0"/.test(x)
-          && !/intcc-radar-area/.test(x); })());
+        return /data-svg-edges="5"/.test(x) && /intcc-radar-area/.test(x); })());
   }
   ok('3.10 the wealth-identity cascade cannot read a fabricated return',
     /Number\.isFinite\(radar\.growth\)/.test(fnSrc('_intccIdentity')));
@@ -556,13 +569,12 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
       const dotsOf = x => (x.match(/class="intcc-radar-dot"/g) || []).length;
       return [one, zero, five].every(x => x !== '' && axesOf(x) === 5
                                        && (x.match(/class="intcc-radar-label"/g) || []).length === 5)
-        // El MARCO es idéntico en los tres, que es lo que este assert protege.
-        // Lo que cambia es si hay figura: con una certificada ya no se dibuja
-        // un punto suelto sobre la malla — la figura es todo o nada.
-        && dotsOf(one) === 0 && dotsOf(zero) === 0 && dotsOf(five) === 5
+        // El MARCO es idéntico en los tres, y la FIGURA también: cinco puntos
+        // siempre. Lo que cambia es de dónde sale cada radio.
+        && dotsOf(one) === 5 && dotsOf(zero) === 5 && dotsOf(five) === 5
         // cero certificadas: malla y nombres, y NINGÚN valor inventado
-        && !/intcc-radar-val/.test(zero) && !/intcc-radar-area/.test(zero)
-        && /data-svg-edges="0"/.test(zero)
+        && !/intcc-radar-val/.test(zero) && /intcc-radar-area/.test(zero)
+        && /data-svg-edges="5"/.test(zero)
         && /data-svg-open="0"/.test(five); })());
 
   // Dropping an axis re-lays out every label. The viewBox is FIXED, so the only

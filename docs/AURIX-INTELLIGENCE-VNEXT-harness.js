@@ -53,7 +53,7 @@ function dictOf(langIdx) {
   // indentación. Se toma la ocurrencia por índice de idioma, que es la técnica que
   // ya usan los gates de Intelligence: anclar por vecino encontraba el idioma
   // equivocado en silencio.
-  const KEYS = ['intv16_axis_not_measured','intv16_radar_no_evidence','intv17_radar_evidence','intv18_health_measures','intv18_health_cause','intv18_health_cause_declared','intv7_axis_unavailable','intcc_radar_title',
+  const KEYS = ['intv16_axis_not_measured','intv18_health_measures','intv18_health_cause','intv18_health_cause_declared','intv7_axis_unavailable','intcc_radar_title',
     'intcc_dim_breadth','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
     'intv7_pending_obs','intv7_pending_scale',
     'intv4_memory_title','intv4_memory_empty','intv4_memory_coverage',
@@ -117,7 +117,7 @@ function makeCtx(lang) {
    '_INTV4_MEMORY_WINDOW_ORDER','_INTV7_RADAR_DIMS','_AURIX_INTEL_EXCLUSIVE_CLAIMS']
     .forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_intccClamp','_intccEsc','_aurixPctNum','_aurixPctLabel','_intv4Num','_intv4Money',
-   '_intccRadarSvg','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarEvidenceHtml','_intv7RadarAxes','_intv7RadarHtml',
+   '_intccRadarSvg','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarAxes','_intv7RadarHtml',
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
    '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
@@ -203,32 +203,35 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
       && ORDER.every(k => h.indexOf(LABELS[k]) !== -1),
       JSON.stringify({ axes: count(h, /class="intcc-radar-axis[" ]/g),
         labels: count(h, /class="intcc-radar-label"/g) }));
-    // CONTRATO SUSTITUIDO · LA FIGURA ES TODO O NADA. Marcador por eje
-    // certificado producía, con tres de cinco, TRES PUNTOS Y UN SEGMENTO
-    // SUELTO: el gráfico roto de las capturas de producción. Ahora el dibujo
-    // exige los cinco; las CIFRAS certificadas se siguen publicando, porque son
-    // hechos y esconderlas sería peor que no dibujar el polígono.
-    ok('2.2/' + c.m + ' …la cifra es de lo certificado; el marcador, sólo con los cinco',
-      (() => { const drawn = (c.m === 5) ? 5 : 0;
-        return count(h, /class="intcc-radar-dot"/g) === drawn
-          && count(h, /class="intcc-radar-halo"/g) === drawn
-          && count(h, /class="intcc-radar-val"/g) === c.m
-          && new RegExp('data-svg-measured="' + drawn + '"').test(h)
-          && count(h, /data-availability="unknown"/g) === 0; })(),
+    // CONTRATO SUSTITUIDO (2 veces) · EL RADAR ES UNA SÍNTESIS, NO UNA TABLA.
+    // (1) Marcador por eje certificado daba, con tres de cinco, TRES PUNTOS Y UN
+    // SEGMENTO SUELTO: el gráfico roto de las capturas de producción. (2) «La
+    // figura es todo o nada» lo arregló dejando la card VACÍA, que se lee igual
+    // de rota. (3) Definitivo: la figura se cierra SIEMPRE sobre los cinco con
+    // un valor visual auxiliar —neutro, determinista y confinado al SVG— y
+    // NINGÚN eje publica cifra, así que no hay nada que leer como medición.
+    // Lo certificado se sigue contando, y se audita en `data-svg-certified`.
+    ok('2.2/' + c.m + ' …cinco marcadores SIEMPRE, cero cifras SIEMPRE',
+      (() => count(h, /class="intcc-radar-dot"/g) === 5
+          && count(h, /class="intcc-radar-halo"/g) === 5
+          && count(h, /class="intcc-radar-val"/g) === 0
+          && /data-svg-measured="5"/.test(h)
+          && new RegExp('data-svg-certified="' + c.m + '"').test(h)
+          && count(h, /data-availability="unknown"/g) === 0)(),
       JSON.stringify({ dots: count(h, /class="intcc-radar-dot"/g),
-        vals: count(h, /class="intcc-radar-val"/g) }));
+        vals: count(h, /class="intcc-radar-val"/g),
+        cert: (h.match(/data-svg-certified="[^"]*"/) || [''])[0] }));
     ok('2.3/' + c.m + ' …sin «sin datos», sin cero fingido y sin eje atenuado',
       !/is-unavailable/.test(h) && !/is-unknown/.test(h)
       && h.indexOf(VAL_ES.intv7_axis_unavailable) === -1
       // toda cifra publicada corresponde a un valor de entrada
       && (h.match(/class="intcc-radar-val"[^>]*>([^<]*)</g) || []).every(x => /\d/.test(x)));
-    ok('2.4/' + c.m + ' …el área exige los cinco, y los tramos sólo unen vecinos certificados',
+    ok('2.4/' + c.m + ' …el ciclo se cierra: cinco aristas, cero huecos, relleno presente',
       (() => { const e = Number((h.match(/data-svg-edges="(\d+)"/) || [, 0])[1]);
         const g = Number((h.match(/data-svg-gaps="(\d+)"/) || [, 0])[1]);
-        const closed = /data-svg-open="0"/.test(h);
-        return e + g === 5 && closed === (c.m === 5)
-          && (c.m === 5 ? /intcc-radar-area/.test(h) : !/intcc-radar-area/.test(h))
-          && count(h, /class="intcc-radar-edge"/g) === e; })(),
+        return e === 5 && g === 0 && /data-svg-open="0"/.test(h)
+          && /intcc-radar-area/.test(h)
+          && count(h, /class="intcc-radar-edge"/g) === 5; })(),
       JSON.stringify({ edges: (h.match(/data-svg-edges="[^"]*"/) || [''])[0],
         gaps: (h.match(/data-svg-gaps="[^"]*"/) || [''])[0] }));
     // ── REMATE §4 · EL TEXTO SALE DEL SVG ────────────────────────────────
@@ -243,7 +246,7 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
       && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(h)
       && count(h, /class="intcc-radar-vlabel"/g) === 5
       && count(h, /class="intcc-radar-label"/g) === 5
-      && count(h, /class="intcc-radar-val"/g) === c.m
+      && count(h, /class="intcc-radar-val"/g) === 0
       && !/intcc-radar-legend|intcc-radar-leg-item/.test(h)
       && ORDER.every(k => new RegExp('data-axis="' + k + '" data-measured="'
           + (c.unav.indexOf(k) === -1 ? '1' : '0') + '"').test(h)),
@@ -260,32 +263,44 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
       (h.match(/viewBox="[^"]+"/) || [''])[0]);
   });
   // ── EL CASO QUE MOTIVA LA REGLA DE ADYACENCIA ────────────────────────────
-  ok('2.6 tres métricas en ejes ALTERNOS no dibujan nada (ni un segmento suelto)',
+  ok('2.6 tres métricas en ejes ALTERNOS dan el MISMO pentágono cerrado',
     (() => { const h = RADAR({ diversification: 30, liquidity: 7, concentration: 31 },
         ['stability', 'growth']);
-      return /data-svg-edges="0"/.test(h)
-        && count(h, /class="intcc-radar-edge"/g) === 0
-        && !/intcc-radar-area/.test(h); })(),
+      return /data-svg-edges="5"/.test(h)
+        && count(h, /class="intcc-radar-edge"/g) === 5
+        && /intcc-radar-area/.test(h); })(),
     (RADAR({ diversification: 30, liquidity: 7, concentration: 31 }, ['stability', 'growth'])
       .match(/data-svg-(edges|gaps)="[^"]*"/g) || []).join(' '));
-  ok('2.7 dos métricas vecinas tampoco se unen: la figura exige los cinco',
+  ok('2.7 dos métricas vecinas: misma figura, y la evidencia sigue contada aparte',
     (() => { const h = RADAR({ diversification: 30, stability: 80 }, ['liquidity', 'growth', 'concentration']);
-      return /data-svg-edges="0"/.test(h); })());
-  ok('2.8 dos métricas NO vecinas no se unen con nada',
+      return /data-svg-edges="5"/.test(h) && /data-svg-certified="2"/.test(h); })());
+  ok('2.8 dos métricas NO vecinas: ni un hueco en el ciclo',
     (() => { const h = RADAR({ diversification: 30, liquidity: 7 }, ['stability', 'growth', 'concentration']);
-      return /data-svg-edges="0"/.test(h) && /data-svg-gaps="5"/.test(h); })());
-  ok('2.9 un CERO CERTIFICADO no es un desconocido: se dibuja y se rotula «0%»',
+      return /data-svg-edges="5"/.test(h) && /data-svg-gaps="0"/.test(h); })());
+  // Ya no queda cifra que rotular, así que la diferencia entre «cero medido» y
+  // «sin evidencia» sólo puede sobrevivir en la GEOMETRÍA: el auxiliar es
+  // neutro (media banda) y jamás el mínimo, de modo que una ausencia no se
+  // dibuja nunca como el peor resultado posible.
+  const radii = (h) => (h.match(/class="intcc-radar-dot" cx="(-?[\d.]+)" cy="(-?[\d.]+)"/g) || [])
+    .map(m => { const n = m.match(/cx="(-?[\d.]+)" cy="(-?[\d.]+)"/);
+      return Math.sqrt((+n[1] - 110) ** 2 + (+n[2] - 106) ** 2); });
+  ok('2.9 un CERO CERTIFICADO se dibuja MÁS ADENTRO que una ausencia, y sin cifra',
     (() => { const h = RADAR({ diversification: 0, liquidity: 0, concentration: 0 },
         ['stability', 'growth']);
-      // El cero certificado SIGUE siendo una medición y publica su «0%»; lo
-      // que no hace, sin los cinco, es dibujar un punto.
-      return count(h, />0%</g) === 3 && count(h, /class="intcc-radar-dot"/g) === 0
-        && /data-svg-measured="0"/.test(h); })());
-  ok('2.10 un valor no finito es indistinguible de la ausencia: no dibuja nada',
+      const r = radii(h);
+      return count(h, />0%</g) === 0 && count(h, /class="intcc-radar-val"/g) === 0
+        && r.length === 5 && r.filter(x => x < 40).length === 3
+        && r.filter(x => x > 50).length === 2
+        && /data-svg-certified="3"/.test(h); })());
+  ok('2.10 un valor no finito es indistinguible de la ausencia: mismo radio neutro',
     (() => { const h = RADAR({ diversification: 30, stability: null, liquidity: 7,
         growth: undefined, concentration: 31 }, []);
-      return /data-svg-measured="0"/.test(h) && count(h, /class="intcc-radar-dot"/g) === 0
-        && count(h, /class="intcc-radar-val"/g) === 3
+      const r = radii(h);
+      const ref = radii(RADAR({ diversification: 30, liquidity: 7, concentration: 31 },
+        ['stability', 'growth']));
+      return /data-svg-measured="5"/.test(h) && r.length === 5
+        && r.every((x, i) => Math.abs(x - ref[i]) < 0.01)
+        && count(h, /class="intcc-radar-val"/g) === 0
         && count(h, /class="intcc-radar-label"/g) === 5; })());
   ok('2.11 los nombres y los ángulos NO dependen de los datos: misma malla siempre',
     (() => { const grid = (x) => (x.match(/<g class="intcc-radar-grid">[\s\S]*?<\/g>/) || [''])[0];
@@ -296,7 +311,10 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
     (() => { const src = fnSrc('_intccRadarSvg');
       return !/intv7_axis_unavailable/.test(src) && !/is-unavailable/.test(src)
         && !/is-unknown/.test(src) && !/availability="unknown"/.test(src)
-        && /if \(!isMeasured\) return;/.test(src)
+        // …y el auxiliar visual no tiene ningún camino de salida del SVG: se
+        // consume en el radio y no se escribe en ningún atributo publicado.
+        && /const NEUTRAL_VISUAL = 50;/.test(src)
+        && (src.match(/NEUTRAL_VISUAL/g) || []).length === 2
         && /const dims = ALL_DIMS;/.test(src); })());
   // ── §2 · AUDITORÍA DE ELEGIBILIDAD DE LOS DOS EJES SIN OWNER ────────────
   // El §2 lo pide por su nombre: «no hacer Estabilidad disponible por tener
@@ -347,7 +365,8 @@ console.log('\n§2 · La card: siempre un radar, nunca una lista:');
   const three = cardWith({});
   ok('2.C1 con tres certificadas la card es un RADAR de cinco ejes',
     /data-state="radar"/.test(three) && /intcc-radar-svg/.test(three)
-    && /data-axes="5"/.test(three) && /data-measured="3"/.test(three)
+    && /data-axes="5"/.test(three) && /data-measured="5"/.test(three)
+    && /data-certified="3"/.test(three)
     && /data-declared="5"/.test(three)
     && !/intv15-obs-row/.test(three) && !/data-state="observable"/.test(three));
   ok('2.C2 …y declara lo que NO puede medir, con su causa (§3 · trazabilidad)',
@@ -356,46 +375,54 @@ console.log('\n§2 · La card: siempre un radar, nunca una lista:');
     && /data-pending="[^"]*growth:[a-z_]+/.test(three),
     (three.match(/data-pending="[^"]*"/) || [''])[0]);
   const one = cardWith({ snap: null });
-  ok('2.C3 con UNA certificada sigue siendo el MISMO radar, y sin figura',
+  ok('2.C3 con UNA certificada sigue siendo el MISMO radar, con su figura entera',
     /data-state="radar"/.test(one) && /intcc-radar-svg/.test(one)
     && count(one, /class="intcc-radar-label"/g) === 5
-    // Con UNA certificada ya no se dibuja un punto suelto sobre la malla: la
-    // figura es todo o nada. El marco, en cambio, es idéntico.
-    && count(one, /class="intcc-radar-dot"/g) === 0
-    && /data-certified="1"/.test(one) && /data-measured="0"/.test(one)
+    // Con UNA certificada la figura es la MISMA —cinco puntos y el ciclo
+    // cerrado—; lo que cambia es de dónde sale cada radio, y eso no se publica.
+    && count(one, /class="intcc-radar-dot"/g) === 5
+    && /data-certified="1"/.test(one) && /data-measured="5"/.test(one)
     && !/intv15-obs-row/.test(one) && !/Factores observables/.test(one),
     one.slice(0, 240));
   const none = cardWith({ snap: null, breadth: null });
-  ok('2.C4 con CERO certificadas: malla, nombres y una explicación breve fuera de las etiquetas',
-    /data-state="radar"/.test(none) && /data-measured="0"/.test(none)
-    && /data-evidence="none"/.test(none)
+  // CONTRATO SUSTITUIDO · la nota «estas son las cinco dimensiones…» existía
+  // para explicar una malla vacía. Ya no hay malla vacía, y el SPEC prohíbe
+  // por su nombre el contenido explicativo bajo el radar: la card es el título
+  // y la figura, nada más. La nota se retira del código y de la hoja.
+  ok('2.C4 con CERO certificadas: la MISMA figura, y ninguna explicación bajo ella',
+    /data-state="radar"/.test(none) && /data-measured="5"/.test(none)
+    && /data-evidence="none"/.test(none) && /data-certified="0"/.test(none)
     && count(none, /class="intcc-radar-label"/g) === 5
-    && !/class="intcc-radar-val"/.test(none) && !/class="intcc-radar-dot"/.test(none)
-    && /class="intv16-radar-none"/.test(none)
-    && /cinco dimensiones sobre las que Aurix razona/.test(none)
+    && !/class="intcc-radar-val"/.test(none)
+    && count(none, /class="intcc-radar-dot"/g) === 5
+    && !/intv16-radar-none/.test(none)
     && !/sin datos/.test(none),
     none.slice(0, 240));
-  ok('2.C5 la explicación SÓLO aparece sin evidencia: con una métrica ya no hace falta',
-    !/intv16-radar-none/.test(one) && !/intv16-radar-none/.test(three));
+  ok('2.C5 la nota explicativa no vuelve por ninguna combinación de evidencia',
+    !/intv16-radar-none/.test(one) && !/intv16-radar-none/.test(three)
+    && !/intv16-radar-none/.test(css)
+    && !/intv16-radar-none/.test(fnSrc('_intv7RadarHtml')));
   ok('2.C6 un cuarto owner sube la certificación sin estrenar una figura abierta',
     (() => { const h = cardWith({ peak: { status: 'available', retentionPct: 80,
         quality: 'measured', startsAfterRecord: false } });
-      // «Sube de grado» se mide en la CERTIFICACIÓN, no en el dibujo: con
-      // cuatro de cinco sigue sin haber figura, que es justamente lo que evita
-      // el polígono abierto de las capturas.
+      // «Sube de grado» se mide en la CERTIFICACIÓN, no en el dibujo: la
+      // figura ya era un pentágono cerrado con tres, y lo sigue siendo con
+      // cuatro. Lo que NUNCA puede aparecer es un polígono abierto.
       return /data-state="radar"/.test(h) && /data-certified="4"/.test(h)
         && /data-svg-axes="5"/.test(h) && !/sin datos/.test(h)
-        && /data-svg-edges="0"/.test(h); })(),
+        && /data-svg-edges="5"/.test(h) && /data-svg-open="0"/.test(h); })(),
     (cardWith({ peak: { status: 'available', retentionPct: 80, quality: 'measured',
       startsAfterRecord: false } }).match(/data-svg-(edges|gaps|measured)="[^"]*"/g) || []).join(' '));
   ok('2.C7 «Factores observables» queda retirada del código y de la hoja de estilos',
     !/intv7_observable_title/.test(fnSrc('_intv7RadarHtml'))
     && !/intv15-obs-list|intv15-obs-row|intv15-obs-val/.test(css)
     && !/is-observable/.test(fnSrc('_intv7RadarHtml')));
-  ok('2.C8 la línea sin evidencia tiene estilo propio y densidad de nota',
-    /\.intv16-radar-none \{/.test(css)
-    && /font-size: 12px/.test(css.slice(css.indexOf('.intv16-radar-none {'),
-                                        css.indexOf('.intv16-radar-none {') + 220)));
+  ok('2.C8 bajo la figura no queda NADA: la card es título y radar',
+    (() => { const src = fnSrc('_intv7RadarHtml');
+      return !/intv16-radar-none/.test(src) && !/intcc-radar-note|intcc-radar-foot/.test(src)
+        // La MENCIÓN en un comentario documenta la retirada; lo que no puede
+        // existir es la REGLA, que es lo que volvería a pintar la lista.
+        && !/\.intcc-radar-(legend|leg-item)[^;{]*\{/.test(css); })());
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1339,7 +1366,7 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
     JSON.stringify([(css.match(/\.intcc-radar\s+\{ order: \d+; \}/) || [''])[0],
                     (css.match(/\.intcc-timeline\s+\{ order: \d+; \}/) || [''])[0]]));
   ok('25.3 ninguna superficie nueva fija alto ni anima: el contenido pone la altura',
-    ['intv16-radar-none', 'intv15-stable-list', 'intv15-stable-row',
+    ['intv15-stable-list', 'intv15-stable-row',
      'intv15-drv-factors', 'intv15-drv-factor'].every((cls) => {
       const i = css.indexOf('.' + cls + ' {');
       if (i < 0) return false;
@@ -1360,19 +1387,21 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   // sacarlos del SVG— y ahora se mide en sus selectores nuevos, incluido el
   // tamaño que declaran en el breakpoint de teléfono.
   ok('25.4 los rótulos del radar se declaran por encima del suelo de 11 px',
+    // `.intcc-radar-val` desaparece con la cifra, así que el suelo se mide en
+    // los selectores que QUEDAN: el rótulo base y el que redeclara el teléfono.
     (() => { const idxs = [];
-      const re = /\.intcc-radar-(label|val) \{|\.intv7-radar-pending \{/g;
+      const re = /\.intcc-radar-label \{/g;
       let m; while ((m = re.exec(css))) idxs.push(m.index);
       // …y también los que el breakpoint de móvil vuelve a declarar.
       const mob = css.indexOf('@media (max-width: 480px)');
       if (mob >= 0) { const blk = css.slice(mob, css.indexOf('\n}', mob));
-        const re2 = /\.intcc-radar-(label|val) \{[^}]*\}/g; let m2;
+        const re2 = /\.intcc-radar-label \{[^}]*\}/g; let m2;
         while ((m2 = re2.exec(blk))) idxs.push(mob + m2.index); }
-      if (idxs.length < 3) return false;
+      if (idxs.length < 2) return false;
       return idxs.every((i) => {
         const fs = Number((css.slice(i, css.indexOf('}', i)).match(/font-size:\s*([\d.]+)px/) || [, 99])[1]);
         return fs >= 11; }); })(),
-    JSON.stringify((css.match(/\.intcc-radar-(label|val) \{[^}]*font-size:\s*[\d.]+px/g) || [])
+    JSON.stringify((css.match(/\.intcc-radar-label \{[^}]*font-size:\s*[\d.]+px/g) || [])
       .map(x => (x.match(/font-size:\s*[\d.]+px/) || [''])[0])));
   ok('25.4b …y el SVG no conserva ningún texto que pudiera escalarse por debajo',
     !/<text/.test(fnSrc('_intccRadarSvg'))
@@ -1410,10 +1439,11 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
       const fa = (css.slice(base, css.indexOf('}', base)).match(/font-size:\s*([\d.]+)px/) || [, 0])[1];
       const fb = (css.slice(noc, css.indexOf('}', noc)).match(/font-size:\s*([\d.]+)px/) || [, 0])[1];
       return Number(fb) > Number(fa); })());
-  ok('25.5 la línea sin evidencia no reserva alto ni deja fila vacía cuando no se pinta',
-    (() => { const i = css.indexOf('.intv16-radar-none {');
-      const blk = css.slice(i, css.indexOf('}', i));
-      return i > 0 && !/(^|[^-])height:\s*\d/.test(blk) && !/min-height/.test(blk); })());
+  // La regla `:empty { display:none }` protegía una fila que ya no existe: con
+  // la superficie retirada, lo que hay que sostener es que nadie la reintroduzca
+  // por la hoja de estilos.
+  ok('25.5 la fila sin evidencia no sobrevive en la hoja como estilo huérfano',
+    !/intv16-radar-none/.test(css));
   // ── §36 · EL RADAR ADAPTATIVO NO SE RECORTA EN NINGÚN TAMAÑO ──────────────
   // El SVG escala por su viewBox (`width:100%; height:auto`), así que demostrar la
   // contención en unidades de viewBox la demuestra en los seis anchos del §36 a la
@@ -1422,7 +1452,7 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   ok('25.6 el SVG escala por viewBox, así que la contención es independiente del ancho',
     /\.intcc-radar-svg \{ width: 100%; max-width: 380px; height: auto; \}/.test(css)
     && /\.intcc-radar-svg \{ max-width: 100%; \}/.test(css));
-  ok('25.7 …y la leyenda publica los mismos ejes en los DOS idiomas',
+  ok('25.7 …y los cinco rótulos salen en los DOS idiomas, sin una sola cifra',
     (() => {
       const V = { diversification: 30, stability: 80, liquidity: 7, growth: 40, concentration: 31 };
       const cases = [[], ['growth'], ['stability', 'growth']];
@@ -1434,7 +1464,8 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
           const h = vm.runInContext('_intccRadarSvg(' + JSON.stringify(vals) + ', '
             + JSON.stringify(dims) + ')', c);
           return count(h, /class="intcc-radar-vlabel"/g) === 5
-            && count(h, /class="intcc-radar-val"/g) === 5 - unav.length
+            && count(h, /class="intcc-radar-val"/g) === 0
+            && count(h, /class="intcc-radar-label"/g) === 5
             && !/<text/.test(h); }); }); })());
   // CONTRATO SUSTITUIDO con la estructura: no hay columnas que colapsar porque
   // no hay lista. Lo que el teléfono necesita ahora es que el rótulo tenga ancho

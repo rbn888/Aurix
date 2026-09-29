@@ -86,12 +86,12 @@ function dict(langIdx){
     'intel_now_novelty','intel_sub_review','intel_now_reviewed','intel_sub_reviewed',
     'intel_now_no_news','intel_sub_no_news','intel_ack_done','intel_ack','intel_ack_aria',
     'intel_see_changes','intel_now_material','intel_now_discovery','intel_now_changed',
-    'intv17_radar_evidence','intv18_health_measures','intv18_health_cause','intv18_health_cause_declared','intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
+    'intv18_health_measures','intv18_health_cause','intv18_health_cause_declared','intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending',
     // CIERRE CORRECTIVO — las claves nuevas viven FUERA del corte
     // `intv4_brief_title`…`intv5_cat_other`, así que sin esto la sonda medía la
     // superficie con esos textos VACÍOS y acusaba un defecto que no existe (o,
     // peor, dejaba de ver los que sí existen).
-    'intv16_axis_not_measured','intv16_radar_no_evidence',
+    'intv16_axis_not_measured',
     'intv16_health_scope','intv16_health_aria','intv17_health_metric',
     'intv15_drv_dependency','intv15_drv_category']
     // Se retira además el comentario de cola: `clave: 'valor',   // nota` unido

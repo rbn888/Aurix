@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '753'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '754'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5518,8 +5518,6 @@ const T = {
     intv18_health_measures: 'El porcentaje mide cómo se reparte el peso entre tus posiciones.',
     intv18_health_cause: (name, pct) => `Hoy lo estrecha ${name}, con el ${pct} de tu cartera financiera.`,
     intv18_health_cause_declared: (name, pct) => `Lo estrecha ${name}, con el ${pct}, y nos indicaste que esa concentración es una decisión tuya.`,
-    intv17_radar_evidence: (n, t) => `Aurix puede medir ${n} de las ${t} dimensiones con tu historial certificado. El pentágono dibuja su marco de referencia; la figura aparece cuando estén las cinco.`,
-    intv16_radar_no_evidence: 'Estas son las cinco dimensiones sobre las que Aurix razona. Todavía no puede medir ninguna con tus datos, así que el mapa se muestra sin valores.',
     // `intv7_axis_unavailable` QUEDA RETIRADA de la superficie por el §6: el radar
     // ya no puede rotular un eje «sin datos» porque un eje sin datos no se dibuja.
     // La clave SE CONSERVA porque la consumen los gates de i18n y la trazabilidad
@@ -8666,8 +8664,6 @@ const T = {
     intv18_health_measures: 'The percentage measures how weight is spread across your positions.',
     intv18_health_cause: (name, pct) => `Today it is narrowed by ${name}, at ${pct} of your financial portfolio.`,
     intv18_health_cause_declared: (name, pct) => `It is narrowed by ${name}, at ${pct}, and you told us that concentration is your own decision.`,
-    intv17_radar_evidence: (n, t) => `Aurix can measure ${n} of the ${t} dimensions with your certified history. The pentagon draws its frame of reference; the shape appears once all five are there.`,
-    intv16_radar_no_evidence: 'These are the five dimensions Aurix reasons about. It cannot measure any of them with your data yet, so the map is shown without values.',
     intv7_axis_unavailable: 'no data',
     intv7_axis_span_days: (n) => `${n}d measured`,
     intv7_radar_legend: 'The five dimensions of your structure. Each axis is a percentage of its own magnitude, and Aurix only draws the ones it can certify.',
@@ -64905,6 +64901,36 @@ function _intccRadarSvg(radar, dimsOverride) {
   //     describe el conjunto, y con un hueco eso es falso.
   const dims = ALL_DIMS;
   const measuredAll = dims.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
+  // ══════════════════════════════════════════════════════════════════════════
+  // EL RADAR ES UNA SÍNTESIS VISUAL, NO UNA TABLA DE AUDITORÍA
+  // ══════════════════════════════════════════════════════════════════════════
+  // TERCERA DECISIÓN SOBRE EL MISMO PUNTO, y conviene dejar las tres escritas.
+  //   1 · Se rotulaba «sin datos» en el eje sin evidencia → mentía por defecto.
+  //   2 · Se dibujaba sólo lo certificado → con tres de cinco salía un segmento
+  //       suelto sobre una malla de cinco, que se lee como un gráfico roto.
+  //   3 · Ahora la figura se dibuja SIEMPRE completa, y el eje sin evidencia usa
+  //       un VALOR VISUAL AUXILIAR: neutro, determinista y del componente.
+  //
+  // POR QUÉ ESTO NO ES «INVENTAR UN DATO», que es la objeción obvia y la razón
+  // por la que las dos versiones anteriores existieron:
+  //   · el auxiliar NO SALE DE AQUÍ. Vive en el SVG y muere en el SVG: no se
+  //     escribe en memoria, ni en el ledger, ni en el Core, ni en Explora, ni en
+  //     Salud, ni en un evento, ni en una respuesta. `_intv7RadarAxes()` sigue
+  //     publicando EXACTAMENTE lo certificado, y es de ahí de donde beben las
+  //     demás superficies — por eso «Aurix ya puede leer» no puede contradecirlo.
+  //   · el eje NO PUBLICA CIFRA. Junto a la categoría no hay número, ni
+  //     porcentaje, ni ratio: sólo el nombre. Nadie puede leer el auxiliar como
+  //     una medición porque no hay nada que leer.
+  //   · es DETERMINISTA: el mismo punto medio de la banda, siempre, en cualquier
+  //     dispositivo y en cualquier idioma. No depende de la cuenta ni del azar.
+  //   · y se SUSTITUYE SOLO en cuanto aparece evidencia real.
+  // La figura dice «éstas son las cinco dimensiones sobre las que Aurix razona»;
+  // las cifras, cuando importan, las publican las superficies que sí las afirman.
+  const NEUTRAL_VISUAL = 50;
+  const radialOf = (d) => {
+    const v = radar ? radar[d.key] : null;
+    return (!d.unavailable && Number.isFinite(v)) ? Math.max(0, Math.min(100, v)) : NEUTRAL_VISUAL;
+  };
   // ── O LA FIGURA ESTÁ COMPLETA, O NO HAY FIGURA ──────────────────────────
   // DEFECTO DE PRODUCCIÓN, reproducido con las dos cuentas reales: con tres
   // ejes certificados se pintaban TRES PUNTOS Y UN SEGMENTO suelto sobre una
@@ -64920,7 +64946,7 @@ function _intccRadarSvg(radar, dimsOverride) {
   // Lo que NO cambia: la malla pentagonal se dibuja SIEMPRE y los cinco nombres
   // siguen ahí. La estructura es el marco de razonamiento y no depende de los
   // datos; lo que depende de los datos es si hay algo que dibujar ENCIMA.
-  const measured = (measuredAll.length === dims.length) ? measuredAll : [];
+  const measured = dims;                 // la figura recorre SIEMPRE los cinco
   if (dims.length < 3) return '';
   const cx = 110, cy = 106, R = 100, n = dims.length;
   const RADAR_DOT_R = 4;                        // §7 — el mismo para los cinco
@@ -64976,26 +65002,28 @@ function _intccRadarSvg(radar, dimsOverride) {
   // una de reserva: `R_UNK` vuelve a ser sólo el límite interior de la RETÍCULA
   // —el anillo del cero, de donde arrancan las radiales—, que es geometría de
   // escala y no la posición de nada.
-  const rOf = key => rBand(radar[key] / 100);
+  // El radio de un eje: su valor certificado, o el auxiliar visual. La banda
+  // [30 %, 90 %] del radio es la MISMA para los dos, así que el auxiliar cae
+  // dentro de la figura como cualquier otro vértice y no la deforma.
+  const rOf = key => {
+    const d = dims.find(x => x.key === key) || { key: key };
+    return rBand(radialOf(d) / 100);
+  };
   const isM = i => measured.indexOf(dims[i]) !== -1;
   // El relleno exige los `n` certificados. Con un hueco, el contorno no describe
   // el conjunto y cerrarlo sería afirmar que sí.
-  const closeArea = measured.length === n;
+  const closeArea = true;                // la figura SIEMPRE cierra sobre los cinco
   const posOf = i => pt(i, rOf(dims[i].key));
   const dp = closeArea
     ? dims.map((d, i) => pt(i, rOf(d.key)).map(v => v.toFixed(1)).join(',')).join(' ')
     : '';
-  // ── §2 · LA TRAYECTORIA SE INTERRUMPE, NO SE SALTA EL HUECO ──────────────
-  // Un segmento sólo existe entre dos ejes VECINOS del marco y sólo si los dos
-  // están certificados. Con tres valores en ejes no contiguos eso da CERO
-  // segmentos —y es lo correcto—: unirlos dibujaría un triángulo que el ojo lee
-  // como «ésta es tu estructura completa», que es exactamente la afirmación que
-  // no se puede hacer. `gapCount` cuenta los tramos que NO se dibujan por un
-  // hueco: es el discriminador del gate y no pinta nada.
+  // ── EL CICLO SE RECORRE ENTERO: 1→2→3→4→5→1 ─────────────────────────────
+  // Aquí vivía la interrupción por hueco. Con el auxiliar visual ya no hay
+  // huecos que saltar: las cinco aristas existen siempre y la última cierra con
+  // la primera, que es lo que convierte cinco puntos en una figura.
   let edges = '', edgeCount = 0, gapCount = 0;
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
-    if (!(isM(i) && isM(j))) { gapCount++; continue; }
     const [ax, ay] = posOf(i);
     const [bx, by] = posOf(j);
     edges += `<line class="intcc-radar-edge"`
@@ -65019,31 +65047,44 @@ function _intccRadarSvg(radar, dimsOverride) {
   // sintético. El SVG queda para lo que sabe hacer —retícula, radiales, serie— y
   // se marca `aria-hidden`, porque su contenido ya está descrito al lado.
   //
-  // LO QUE NO CAMBIA: cinco ejes fijos, un valor sólo donde hay evidencia, y las
-  // clases `intcc-radar-label` / `intcc-radar-val`, que siguen significando lo
-  // mismo — la etiqueta de un eje y su cifra— sólo que ahora en HTML.
+  // LO QUE NO CAMBIA: cinco ejes fijos y la clase `intcc-radar-label`, que sigue
+  // significando lo mismo —el nombre de un eje— sólo que ahora en HTML. Lo que
+  // SÍ cambia con el radar quirúrgico: la cifra por eje desaparece entera, así
+  // que el rótulo es el nombre y nada más.
   let dots = '', halos = '';
   dims.forEach((d, i) => {
-    const isMeasured = isM(i);
-    // §2 — SIN MARCADOR CUANTITATIVO PARA LO DESCONOCIDO. No hay punto, no hay
-    // halo y no hay coordenada: el eje existe, su medición no.
-    if (!isMeasured) return;
+    // CINCO MARCADORES, SIEMPRE. El que no tiene evidencia usa el auxiliar
+    // visual, que no publica cifra en ninguna parte: un punto sin número no
+    // afirma nada, y su ausencia sí dejaba la figura rota.
     const [dx, dy] = posOf(i);
     halos += `<circle class="intcc-radar-halo"`
           +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${(RADAR_DOT_R + 2.2).toFixed(1)}"/>`;
+    // `data-availability` se retira del marcador: el punto ya no representa una
+    // medición, así que declararla sería la misma mentira que rotularla. La
+    // certificación por eje vive en su rótulo (`data-measured`) y el recuento
+    // en `data-svg-certified`, que son los canales que audita la trazabilidad.
     dots += `<circle class="intcc-radar-dot"`
          +  ` cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="${RADAR_DOT_R}"`
-         +  ` data-axis="${_intccEsc(d.key)}"`
-         +  ` data-availability="measured"/>`;
+         +  ` data-axis="${_intccEsc(d.key)}"/>`;
   });
   // ── EL VIEWBOX SE CIÑE A LA FIGURA ───────────────────────────────────────
   // Sin texto dentro, el marco es exactamente el polígono conceptual más un
   // margen para el trazo. Deja de depender de la copy y del idioma, que es lo que
   // obligaba a derivarlo, y el radar ocupa TODO el ancho que la tarjeta le da en
   // vez de reservar 144 unidades para rótulos que ya no están.
+  // Y SE CIÑE A LA FIGURA REAL, NO A SU CIRCUNFERENCIA. Un pentágono no llena
+  // su círculo: por los lados llega a R·sen72° y por abajo a R·cos36°, así que
+  // un marco cuadrado de 2R reservaba ~10 unidades de aire a cada lado y ~19
+  // abajo. En la rejilla de tres columnas eso es lo que hacía que la figura se
+  // viera pequeña con la card medio vacía. El marco pasa a ser el rectángulo
+  // que la envuelve, derivado de la misma geometría —si cambian los ángulos,
+  // cambia solo— y el dibujo crece sin tocar una sola coordenada.
   const PAD = 4;
-  const vbX = Math.round(cx - R - PAD), vbY = Math.round(cy - R - PAD);
-  const vbW = Math.round(2 * (R + PAD)), vbH = vbW;
+  const halfW = R * Math.sin((72 * Math.PI) / 180);        // vértices laterales
+  const lowY  = R * Math.cos((36 * Math.PI) / 180);        // vértices inferiores
+  const vbX = Math.round(cx - halfW - PAD), vbY = Math.round(cy - R - PAD);
+  const vbW = Math.round(2 * (halfW + PAD));
+  const vbH = Math.round(R + lowY + 2 * PAD);
   // ── §2 · LA DESCRIPCIÓN ACCESIBLE ES EL ÚNICO SITIO DONDE SE NOMBRA LA
   //         AUSENCIA, y el §2 lo autoriza expresamente («explicación accesible
   //         breve FUERA de las etiquetas») ────────────────────────────────────
@@ -65086,17 +65127,16 @@ function _intccRadarSvg(radar, dimsOverride) {
     if (Math.abs(c) < 0.2) return 'top';
     return c > 0 ? 'right' : 'left';
   };
+  // ── LAS CINCO CATEGORÍAS: SÓLO EL NOMBRE ────────────────────────────────
+  // Se retira la cifra de junto a la categoría. No es que estorbe: es que el
+  // radar deja de ser una tabla de auditoría y pasa a ser una síntesis, y una
+  // cifra pegada al vértice invita a leer la FIGURA como una medición exacta —
+  // justo lo que el auxiliar visual impide afirmar. Los números que importan los
+  // publican las superficies que sí los sostienen (Salud, Factores, Explora).
+  // Los cinco rótulos comparten color, peso y jerarquía: ninguna categoría se
+  // presenta como más importante que otra, porque el marco no las ordena.
   const vlabels = dims.map((d, i) => {
-    // LA CIFRA SE PUBLICA SI ESTÁ CERTIFICADA, aunque la FIGURA no se dibuje.
-    // Son dos decisiones distintas y confundirlas fue un error de la primera
-    // versión de este bloque: retirar el polígono parcial es una decisión de
-    // LECTURA —una silueta a medias miente—, pero un porcentaje medido es un
-    // hecho, y ocultarlo porque a otro eje le falta historia sería esconder
-    // evidencia que el usuario ya tiene. `measuredAll` es la certificación real.
     const isMeasured = measuredAll.indexOf(d) !== -1;
-    const val = isMeasured
-      ? (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
-      : '';
     const [vx, vy] = pt(i, R);
     // LA VERTICAL SALE DE LA GEOMETRÍA; LA HORIZONTAL, DEL LADO. Anclar también
     // la X al vértice parecía más fiel y se salía de la tarjeta: a 1024 px la
@@ -65113,10 +65153,6 @@ function _intccRadarSvg(radar, dimsOverride) {
       + ` data-measured="${isMeasured ? '1' : '0'}" data-anchor="${an}"`
       + ` style="${pos}">`
       + `<b class="intcc-radar-label">${_intccEsc(d.label)}</b>`
-      // §2 — desconocido ⇒ NOMBRE y nada más. Ni cifra, ni cero fingido, ni la
-      // frase «Aurix todavía no puede medirla», que el encargo retira: el
-      // bloqueo concreto se informa UNA vez bajo la figura, no cinco veces.
-      + (isMeasured ? `<i class="intcc-radar-val">${_intccEsc(val)}</i>` : '')
       + '</span>';
   }).join('');
   return `
@@ -65125,12 +65161,27 @@ function _intccRadarSvg(radar, dimsOverride) {
          data-svg-unknown="${dims.length - measured.length}"
          data-svg-open="${closeArea ? '0' : '1'}" data-svg-edges="${edgeCount}"
          data-svg-gaps="${gapCount}" data-svg-dots="${measured.length}"
+         ${/* La trazabilidad de la EVIDENCIA sobrevive al cambio de contrato: el
+              dibujo es siempre cinco, pero `data-svg-certified` sigue contando
+              los ejes con owner que los certifica, que es lo que auditan los
+              gates y lo único que pueden leer las demás superficies. */''}
+         data-svg-certified="${measuredAll.length}"
          data-svg-rmin="${RMIN}" data-svg-rmax="${RMAX}"
          data-svg-a11y-axes="${dims.length}">
       ${/* ORDEN DE CAPAS (§7): retícula → relleno → los segmentos → marcador CON
             SU HALO. El halo es un disco opaco del color del lienzo inmediatamente
             bajo el marcador: corta las conexiones justo en su borde, así que
             ninguna línea atraviesa el centro de un marcador. */''}
+      ${/* El degradado del relleno vive en el SVG porque es geometría de
+            pintado, no tema: así escala con la figura y no depende de una
+            variable de hoja que pueda cambiar bajo él. Vertical y corto —más
+            presencia arriba, más aire abajo— para dar profundidad sin saturar. */''}
+      <defs>
+        <linearGradient id="aurixRadarFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="rgba(110,170,255,0.30)"/>
+          <stop offset="100%" stop-color="rgba(74,130,240,0.10)"/>
+        </linearGradient>
+      </defs>
       <g class="intcc-radar-grid">${rings}${axes}</g>
       ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
       ${/* UN SOLO GRUPO: todos los segmentos son idénticos, así que separar en dos
@@ -67624,23 +67675,13 @@ function _intv7PendingReasonKey(reason) {
 // `data-unavailable`, `data-pending` y `data-quality` SE CONSERVAN: son la
 // trazabilidad del §3 y el discriminador de los gates. Declarar internamente lo
 // que no se mide es obligatorio; pintarlo como una cifra es lo que está vetado.
-// ── EL ESTADO SIN EVIDENCIA: COMPACTO Y HONESTO ───────────────────────────
-// Sustituye al párrafo por eje con su causa. Aquello era TEXTO INTERNO DE
-// IMPLEMENTACIÓN puesto en la interfaz —«el dato existe y Aurix lo publica como
-// porcentaje de rentabilidad; lo que falta es una referencia con la que
-// convertirlo en una escala de 0 a 100»— y el encargo lo retira por su nombre.
-// Lo que el usuario necesita saber es UNA cosa: cuántas dimensiones puede medir
-// Aurix todavía y que la malla es el marco, no un resultado. Una línea.
-// Con el radar completo no emite nada.
 // ── QUÉ MIDE EL ANILLO Y QUÉ LO ESTRECHA HOY ──────────────────────────────
 // Dos frases, las dos derivadas de `_aurixHealthSnapshot`, que es el owner del
 // propio anillo: no hay una segunda fuente que pueda contradecirlo.
 //   1 · QUÉ MIDE — la magnitud, dicha en lenguaje de usuario.
 //   2 · QUÉ LO CAUSA — la posición que más estrecha el reparto, con su peso.
 // Si el usuario declaró que esa concentración es deliberada, la segunda frase
-// pasa a TONO DESCRIPTIVO: consta su decisión y no se le repite una alarma. Un
-// cambio material posterior vuelve a abrir la atención por la vía de las
-// preguntas, no convirtiendo su preferencia en una penalización permanente.
+// pasa a TONO DESCRIPTIVO: consta su decisión y no se le repite una alarma.
 // FAIL CLOSED: sin snapshot o sin posición dominante certificada no se inventa
 // una causa — se publica sólo lo que mide, y si tampoco eso, no se emite nada.
 function _intccHealthExplainHtml(snap, core, esc) {
@@ -67666,24 +67707,22 @@ function _intccHealthExplainHtml(snap, core, esc) {
   return '<div class="intcc-m-health-explain">'
     + lines.map(l => '<p>' + e(l) + '</p>').join('') + '</div>';
 }
-function _intv7RadarEvidenceHtml(r, esc) {
-  const total = (r.dims || []).length;
-  const n = Number(r.measured) || 0;
-  if (!total || n >= total) return '';
-  const line = _intv4T('intv17_radar_evidence', n, total);
-  if (!line) return '';
-  return `<p class="intv7-radar-evidence" data-measured="${n}" data-of="${total}">${esc(line)}</p>`;
-}
+// El estado de evidencia bajo la figura se retira con todo lo demás: la figura
+// ya no está incompleta, así que no hay nada que explicar debajo. Se conserva
+// `_intv7PendingReasonKey`, que mapea causas y sigue siendo lo que Advanced
+// Intelligence necesita para razonar sobre disponibilidad — conocimiento, no UI.
 function _intv7RadarHtml(esc) {
   const r = _intv7RadarAxes();
   const svg = _intccRadarSvg(r.values, r.dims);
   const meta = `data-axes="${r.dims.length}" data-declared="${r.dims.length}"`
     // DOS CUENTAS DISTINTAS, Y CONFUNDIRLAS ES LO QUE ROMPÍA LA LECTURA:
-    //   `data-certified` — cuántos ejes tienen evidencia (y publican su cifra);
-    //   `data-measured`  — cuántos se DIBUJAN, que es 0 salvo con los cinco.
-    // La trazabilidad necesita la primera; la figura, la segunda.
+    //   `data-certified` — cuántos ejes tienen evidencia de un owner real;
+    //   `data-measured`  — cuántos se DIBUJAN, que ahora son SIEMPRE los cinco.
+    // La trazabilidad necesita la primera; la figura, la segunda. Que la
+    // segunda sea constante es justamente el contrato nuevo: la síntesis se
+    // dibuja entera, y la evidencia se sigue auditando por la primera.
     + ` data-certified="${r.measured}"`
-    + ` data-measured="${r.measured === (r.dims || []).length ? r.measured : 0}"`
+    + ` data-measured="${(r.dims || []).length}"`
     + ` data-unavailable="${esc(r.unavailable.join(','))}"`
     + ` data-pending="${esc(Object.keys(r.pending).map(k => k + ':' + r.pending[k]).join(','))}"`
     + ` data-quality="${esc(Object.keys(r.quality).map(k => k + ':' + r.quality[k]).join(','))}"`;
@@ -67699,8 +67738,12 @@ function _intv7RadarHtml(esc) {
       ${/* FAIL CLOSED SOBRE LA COPY: sin la cadena la alternativa NO es un
             párrafo vacío bajo la malla —que es un hueco con borde— sino no
             emitir el nodo. La malla con sus cinco nombres ya se sostiene sola. */''}
-      ${(r.measured === 0 && _intv4T('intv16_radar_no_evidence')) ? `<p class="intv16-radar-none">${
-        esc(_intv4T('intv16_radar_no_evidence'))}</p>` : ''}
+      ${/* NADA BAJO LA FIGURA. Aquí vivieron, por orden: la etiqueta «sin datos»
+            por eje, la leyenda en lista, la causa por eje y el estado de
+            evidencia. Las cuatro eran la misma cosa —una nota al pie
+            explicando por qué el gráfico no está completo— y la figura ya no
+            está incompleta, así que no hay nada que excusar. El espacio
+            recuperado se lo queda el pentágono. */''}
       ${/* ── EL BLOQUEO CONCRETO, UNA VEZ Y CON SU CAUSA ────────────────────
             El encargo retira la frase «Aurix todavía no puede medirla» de cada
             eje, pero exige lo contrario de callar: «informa el bloqueo concreto
@@ -67710,7 +67753,6 @@ function _intv7RadarHtml(esc) {
             producto ha decidido no tener—. El mapa de causas ya existía
             (`_intv7PendingReasonKey`); lo que faltaba era quien lo publicara.
             FAIL CLOSED sobre la copy: sin cadena no se emite el nodo. */''}
-      ${_intv7RadarEvidenceHtml(r, esc)}
     </section>`;
 }
 

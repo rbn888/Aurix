@@ -20563,18 +20563,25 @@ body.gs-open { overflow: hidden; }
 /* ── Bloque 4 — Radar ── */
 .intcc-radar-wrap { display: grid; place-items: center; }
 .intcc-radar-svg { width: 100%; max-width: 380px; height: auto; }
-.intcc-radar-ring { fill: none; stroke: rgba(150,180,240,0.10); stroke-width: 0.8; }
+/* La malla es SECUNDARIA: baja de 0,10 a 0,07 para que el polígono mande. */
+.intcc-radar-ring { fill: none; stroke: rgba(150,180,240,0.07); stroke-width: 0.7; }
 /* SPEC §11 — EL MARCO NO ES UN NIVEL. Los anillos interiores SÍ son niveles de la
    banda medible [22 %, 88 %] y el exterior es la estructura conceptual del
    pentágono, así que se atenúa un punto para que el ojo no lo lea como «máximo».
    La zona por debajo del anillo interior queda deliberadamente VACÍA: es la zona
    de exclusión visual, y no tener retícula es lo que impide leerla como escala. */
 .intcc-radar-ring.is-frame { stroke: rgba(150,180,240,0.07); }
-.intcc-radar-axis { stroke: rgba(150,180,240,0.10); stroke-width: 0.8; }
+.intcc-radar-axis { stroke: rgba(150,180,240,0.075); stroke-width: 0.7; }
+/* ── EL POLÍGONO PRINCIPAL · LUMINOSO, NÍTIDO Y CON PROFUNDIDAD ───────────
+   El relleno plano de un solo alfa se leía apagado sobre el lienzo. Un degradado
+   vertical muy corto da profundidad sin saturar: más presencia arriba, donde
+   nace la figura, y más aire abajo. El trazo se afina (1,6 → 1,4) porque una
+   línea fina y limpia se lee más premium que una gruesa con halo, y el glow
+   baja de 5 a 3,5 px para que no ensucie los rótulos que ahora están cerca. */
 .intcc-radar-area {
-  fill: rgba(92,156,255,0.20);
-  stroke: #6aa0ff; stroke-width: 1.6; stroke-linejoin: round;
-  filter: drop-shadow(0 0 5px rgba(92,156,255,0.55));
+  fill: url(#aurixRadarFill);
+  stroke: #7db4ff; stroke-width: 1.4; stroke-linejoin: round;
+  filter: drop-shadow(0 0 3.5px rgba(110,170,255,0.5));
   transform-origin: 110px 106px;
   animation: intccRadarIn 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -20583,10 +20590,17 @@ body.gs-open { overflow: hidden; }
    otro elemento, pero SIN relleno: la figura está interrumpida y rellenarla
    inventaría superficie entre dos puntos que no se tocan. */
 .intcc-radar-edge {
-  stroke: #6aa0ff; stroke-width: 1.6; stroke-linecap: round; fill: none;
-  filter: drop-shadow(0 0 5px rgba(92,156,255,0.55));
+  stroke: #7db4ff; stroke-width: 1.4; stroke-linecap: round; fill: none;
+  filter: drop-shadow(0 0 3.5px rgba(110,170,255,0.5));
 }
-.intcc-radar-dot { fill: #cfe0ff; filter: drop-shadow(0 0 3px rgba(92,156,255,0.9)); }
+/* ── LOS MARCADORES SON EL ELEMENTO DOMINANTE ────────────────────────────
+   Núcleo claro, borde azul y halo CONTENIDO: el `drop-shadow` de 3 px sobre un
+   relleno liso daba un punto difuso de videojuego. Un borde real define el
+   círculo, y el brillo se reduce a un resplandor corto que no invade la línea. */
+.intcc-radar-dot {
+  fill: #eaf2ff; stroke: #5c9cff; stroke-width: 1.2;
+  filter: drop-shadow(0 0 2.5px rgba(125,180,255,0.75));
+}
 /* SUPREME CLOSURE §5 — LA TRAYECTORIA ES CONTINUA Y TIENE UN SOLO TRATAMIENTO.
    El tramo «neutral» que tocaba un eje sin datos se retira: el §5 exige cinco
    segmentos visualmente idénticos, mismo grosor y mismas terminaciones. Lo que
@@ -21005,7 +21019,8 @@ body.gs-open { overflow: hidden; }
 .intv6-radar .intcc-radar-wrap { margin-top: 2px; }
 /* The radar is a map of structure, not a verdict: the fill stays calm and the
    accent is reserved for real signals elsewhere. A bigger polygon is not "better". */
-.intv6-radar .intcc-radar-area { fill: rgba(74,130,240,0.20); stroke: rgba(122,162,255,0.85); }
+/* El degradado lo declara el SVG; aquí sólo se refuerza el borde del polígono. */
+.intv6-radar .intcc-radar-area { stroke: rgba(140,185,255,0.92); }
 
 /* ── INT.07 · INTERIOR DISTRIBUTION over the full row height ─────────────────
    Now that a card stretches to its row, its CONTENT must be distributed rather
@@ -21045,14 +21060,11 @@ body.gs-open { overflow: hidden; }
    «Factores observables» se retira con su superficie (el §2 prohíbe convertir el
    radar en lista), y con ella sus reglas: dejarlas sería conservar la
    instrucción de pintar algo que ya no existe.
-   Lo que queda es la línea que acompaña a la malla cuando no hay ninguna
-   medición. Densidad de nota, no de párrafo: dice por qué el mapa está vacío sin
-   ocupar el sitio de un contenido que no hay. */
-.intv16-radar-none {
-  margin: 10px 0 0; padding: 0 2px;
-  font-size: 12px; line-height: 1.45; text-align: center;
-  color: rgba(214,226,255,0.56);
-}
+   Con el RADAR QUIRÚRGICO desaparece también la línea que acompañaba a la malla
+   sin mediciones: la figura ya se cierra siempre, así que no hay vacío que
+   explicar, y el §2 prohíbe contenido explicativo bajo el radar. Se retira la
+   regla con la superficie, por la misma razón que la anterior — conservar un
+   estilo huérfano es conservar la instrucción de volver a pintarlo. */
 
 /* ── SUPREME CLOSURE §5 · CINCO MARCADORES, UNO SOLO ───────────────────────
    El marcador HUECO del eje sin datos era exactamente lo que el §5 prohíbe por
@@ -29805,7 +29817,6 @@ body.ws-cover .aurix-wsh { max-width: none; }
 /* CARDS PROPORCIONADAS. Ninguno de los bloques condicionales reserva alto: si no
    se pinta, no deja fila. Se declara para que una regla futura de rejilla no lo
    reintroduzca por descuido. */
-.intv7-radar .intv16-radar-none:empty,
 .intv4-memory .intv15-stable-list:empty,
 .intcc-drivers .intv15-drv-factors:empty { display: none; }
 
@@ -29890,18 +29901,34 @@ body.ws-cover .aurix-wsh { max-width: none; }
   /* El SVG ocupa el rectángulo INTERIOR: el margen que deja alrededor es donde
      viven los rótulos, y son las mismas fracciones que usa el owner (0,18 / 0,10)
      para proyectar cada vértice. Un solo par de números, dos consumidores. */
-  display: block; width: 46%; margin: 0 auto; max-width: 300px;
+  display: block; width: 70%; margin: 0 auto; max-width: 460px;
   padding: 0; /* el hueco lo pone el `width`, no un padding que falsearía el % */
 }
-.intv7-radar .intcc-radar-wrap { padding: 4px 0 2px; }
+/* ── EL PENTÁGONO SE QUEDA CON TODA LA SUPERFICIE ÚTIL ───────────────────
+   Al retirar la leyenda, la causa por eje y el estado de evidencia, la card se
+   quedó con la figura arriba y un tercio de aire abajo — la tarjeta la estira
+   su fila, y antes ese hueco lo llenaba el texto. En vez de encoger la card
+   (perdería el paralelismo con Factores y Explora, que es deliberado), el
+   envoltorio CRECE y centra: el espacio recuperado se lo queda el radar, que es
+   lo que el encargo pide. */
+.intv7-radar .intcc-radar-wrap {
+  flex: 1 1 auto; display: grid; place-items: center;
+  padding: 6px 0 4px; min-height: 0;
+}
 .intcc-radar-vlabel {
   position: absolute; z-index: 2;
   display: flex; flex-direction: column; gap: 1px;
-  max-width: 26%; min-width: 0; pointer-events: none;
+  max-width: 19%; min-width: 0; pointer-events: none;
 }
 /* El anclaje sale del ÁNGULO del eje, no de una tabla: arriba el de la punta,
    y a un lado u otro según el signo del coseno. */
-.intcc-radar-vlabel[data-anchor="top"]   { transform: translate(-50%, -104%); align-items: center; text-align: center; }
+/* El rótulo de ARRIBA no compite con nadie: tiene el ancho entero de la card
+   por encima del vértice, así que no hay razón para estrecharlo al ancho de los
+   laterales. Con 18 % «Amplitud de categorías» caía en tres líneas. */
+.intcc-radar-vlabel[data-anchor="top"] {
+  transform: translate(-50%, -104%); align-items: center; text-align: center;
+  max-width: 52%;
+}
 /* Los laterales se anclan al BORDE de la tarjeta y sólo toman del vértice su
    altura: así no pueden salirse por estrecha que sea la columna. */
 .intcc-radar-vlabel[data-anchor="right"] { transform: translateY(-50%); align-items: flex-end;   text-align: right; }
@@ -29911,35 +29938,35 @@ body.ws-cover .aurix-wsh { max-width: none; }
   color: rgba(214,226,255,0.74);
   overflow-wrap: normal; word-break: normal; hyphens: none;
 }
-.intcc-radar-val {
-  font-style: normal;
-  font-size: 13px; line-height: 1.2; font-weight: 750;
-  font-variant-numeric: tabular-nums; white-space: nowrap;
-  color: rgba(226,236,255,0.96);
-}
-/* Un eje sin evidencia publica su NOMBRE y nada más: ni cifra, ni cero fingido,
-   ni la frase de descargo —que ahora se dice UNA vez bajo la figura, no cinco
-   veces alrededor de ella—. Se atenúa para que la ausencia se vea sin leerla. */
-.intcc-radar-vlabel[data-measured="0"] .intcc-radar-label { color: rgba(214,226,255,0.46); }
-/* El bloqueo concreto, al pie de la figura: tono secundario, una sola vez. */
-.intv7-radar-evidence {
-  margin: 10px 0 0; padding-top: 9px;
-  border-top: 1px solid rgba(120,150,220,0.10);
-  font-size: 11.5px; line-height: 1.45; font-weight: 500;
-  color: rgba(150,180,240,0.58);
-  overflow-wrap: normal; word-break: normal;
-}
+/* RADAR QUIRÚRGICO · `.intcc-radar-val` se retira con la cifra. El SPEC prohíbe
+   por su nombre cualquier número junto a una categoría, así que la regla se va
+   con la superficie: conservarla sería conservar la instrucción de pintarla. */
+/* LOS CINCO NOMBRES SON EL MISMO NOMBRE. El atenuado del eje sin evidencia se
+   retira: era la última señal de estado sobre la tipografía, y convertía la
+   ausencia en una jerarquía visual —dos categorías se leían «apagadas» frente a
+   tres «encendidas»— sobre una figura que ya no distingue entre ellas. El marco
+   no ordena las dimensiones, así que sus rótulos tampoco. `data-measured` se
+   CONSERVA en el marcado: es trazabilidad, y no pinta nada. */
+/* El estado de evidencia al pie se retira con el mismo argumento: la figura ya
+   no está incompleta, así que no hay bloqueo que informar bajo ella, y el SPEC
+   prohíbe el separador con párrafo explicativo. */
 /* Móvil: la figura puede crecer porque los rótulos laterales son cortos, pero se
    les deja algo más de ancho para que ningún nombre baje de dos líneas. */
 @media (max-width: 480px) {
-  .intv7-radar .intcc-radar-svg { width: 48%; }
-  .intcc-radar-vlabel { max-width: 25%; }
+  /* 66 % y no 68 %: a 360 px el marcador de Estabilidad quedaba a 13 px de su
+     nombre y el halo llegaba a tocarlo. La holgura la paga la figura, no el
+     rótulo — partir una palabra es peor que un pentágono un punto más chico. */
+  .intv7-radar .intcc-radar-svg { width: 66%; }
+  .intcc-radar-vlabel { max-width: 18%; }
   .intcc-radar-label { font-size: 11px; }
-  .intcc-radar-val { font-size: 12.5px; }
 }
 /* Escritorio: en la rejilla de tres columnas la tarjeta es estrecha, así que la
    figura cede ancho a los rótulos en vez de partirlos. */
 @media (min-width: 1024px) {
-  .intv7-radar .intcc-radar-svg { width: 44%; }
-  .intcc-radar-vlabel { max-width: 27%; }
+  /* En la rejilla de tres columnas la card es estrecha y los rótulos laterales
+     necesitan su 19 % cada uno: 64 % + 2·19 % = 102 %, un solapamiento de 1 %
+     por lado que cae sobre el aire del `PAD` del viewBox y no sobre la malla.
+     Con 68 % el nombre se apoyaba en el anillo exterior. */
+  .intv7-radar .intcc-radar-svg { width: 64%; }
+  .intcc-radar-vlabel { max-width: 19%; }
 }

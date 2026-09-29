@@ -647,24 +647,29 @@ ok('M.8 el SVG del radar no puede rotular un eje «sin datos» ni atenuarlo',
 // prohibido; esta clase ya no lo es, y la leyenda retirada sí se añade a la lista.
 ok('M.8b el radar no deja CSS huérfano de la superficie retirada',
   !/intv8-radar-|intv6-radar-legend|intv7-radar-mean|intcc-radar-leg-item|intv7-radar-pending/.test(css));
-// La línea al pie deja de enumerar la causa POR EJE —eso era texto interno de
-// implementación en la interfaz, y el encargo lo retira— y pasa a decir, una
-// sola vez, cuántas dimensiones puede medir Aurix. Otra clase, mismo contrato:
-// lo que se pinta tiene su regla.
-ok('M.8b2 …y la clase que SÍ se pinta tiene su regla (el estado de evidencia, al pie)',
-  /\.intv7-radar-evidence \{/.test(css) && /intv7-radar-evidence/.test(src)
-  && !/intv7_pending_scale|referencia con la que convertirlo/.test(
-       (src.match(/function _intv7RadarEvidenceHtml[\s\S]{0,900}/) || [''])[0]));
+// RADAR QUIRÚRGICO · la línea al pie se retira ENTERA, y con ella su clase. El
+// SPEC prohíbe por su nombre el separador con párrafo explicativo bajo el
+// Radar, y la figura ya no está incompleta: no hay bloqueo que informar. El
+// invariante de M.8b se aplica ahora también a ella — nada huérfano.
+ok('M.8b2 …y la superficie retirada no deja NI clase NI regla NI cadena',
+  // Se mide la REGLA y la EMISIÓN, no la mención: un comentario que documenta
+  // la retirada es lo contrario de un huérfano.
+  !/\.intv7-radar-evidence\s*\{/.test(css) && !/class="intv7-radar-evidence"/.test(src)
+  && !/intv16_radar_no_evidence/.test(src)
+  && !/\.intcc-radar-val\s*\{/.test(css) && !/class="intcc-radar-val"/.test(src));
 ok('M.8c …y conserva el mapeo de causas, que Advanced Intelligence necesitará',
   /function _intv7PendingReasonKey\(reason\)/.test(src));
-ok('M.9 …y lo no medible sigue DECLARADO en la card, con su causa (§3)',
+ok('M.9 …y lo no medible sigue DECLARADO en la card, con su causa (§3), y sin pintarse',
   /data-unavailable=/.test(radarFn) && /data-pending=/.test(radarFn)
-  // CIERRE CORRECTIVO §2 — la alternativa en lista se retira («nunca convertir el
-  // radar en lista»), así que el marco se pinta SIEMPRE y la única frase que
-  // nombra la ausencia es la que acompaña a la malla cuando no hay ni una medición.
+  // TERCERA REDACCIÓN. La lista se retiró («nunca convertir el radar en
+  // lista»), después la frase que acompañaba a la malla vacía, y ahora el
+  // estado de evidencia al pie. Lo no medible sigue DECLARADO —en los
+  // atributos de la card, que es trazabilidad— y ya no se pinta en ninguna
+  // forma, porque la figura completa no deja nada que explicar.
   && !/intv7_observable_title/.test(radarFn)
-  && /intv16_radar_no_evidence/.test(radarFn)
-  && /r\.measured === 0/.test(radarFn));
+  && !/intv16_radar_no_evidence/.test(radarFn)
+  && !/intv7-radar-evidence/.test(radarFn)
+  && /data-certified=/.test(radarFn));
 ok('M.10 la pregunta se pinta con la primitiva de chip existente, sin slot nuevo',
   /intv8-intel-q/.test(src) && /class="intcc-chip intv8-intel-opt"/.test(src));
 ok('M.11 responder tiene efecto inmediato: se guarda y se repinta',
