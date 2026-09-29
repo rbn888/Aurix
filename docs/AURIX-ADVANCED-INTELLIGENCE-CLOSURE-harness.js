@@ -192,7 +192,7 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_INTCC_HEALTH_DIM_LABEL','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT',
-  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+  '_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -204,7 +204,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixHealthScore','_intccScoreTone','_intccHealthLimiters','_intccHealthScore','_intccClamp','_intccEsc','_intccDate','_intccDateTime',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv16ReadableDims','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
@@ -224,7 +224,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarPendingHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
@@ -913,14 +913,27 @@ console.log('\n§8 · etiquetas con evidencia');
       topInvestedAsset: { name: 'Bitcoin', ticker: 'BTC', type: 'crypto', pctTotal: 100 },
       topCategory: { type: 'crypto', label: 'Cripto', pctTotal: 100 } }, rows: [], serverRows: [],
       flows: [] }).html, 'class="intcc-chip is-([a-z]+)"')));
-  ok('8.7 una concentración declarada intencionada es CONTEXTO NEUTRAL, no aprobación',
+  // ── CONTRATO SUSTITUIDO · LA DECLARACIÓN SALE DEL HERO Y SIGUE EN LA CUENTA ─
+  // 8.7/8.7b/8.7b2/8.7d protegían la píldora «Concentración declarada como
+  // decisión propia». El encargo la retira y dice dónde vive: «esa decisión
+  // permanece en el contexto de la cuenta». Y es lo correcto de producto:
+  // repetir cada visita que el usuario ya decidió algo convierte su decisión en
+  // un asunto abierto. Lo que hay que demostrar ahora son las DOS mitades —que
+  // la píldora no se publica Y que el dato no se ha perdido—, porque retirar la
+  // etiqueta borrando el conocimiento sería un defecto peor que el original.
+  ok('8.7 la declaración del usuario ya NO se publica como píldora del Hero',
     (() => { const ch = CHIPS([F('top_position_weight', 80)], { band: 'weight_in_few' },
         { context: { fields: { concentration_intent: { value: 'deliberate', provenance: 'user_answer' } } } });
-      const ctx = ch.find(x => x.tone === 'context');
-      return !!ctx && !/deliberada/i.test(ctx.label)
-        && !ch.some(x => x.tone === 'good' && x.label === DICT.es.intcc_chip_conc); })(),
+      return !ch.some(x => x.tone === 'context')
+        && !ch.some(x => x.label === DICT.es.intcc_chip_ctx_intent); })(),
     JSON.stringify(CHIPS([F('top_position_weight', 80)], { band: 'weight_in_few' },
       { context: { fields: { concentration_intent: { value: 'deliberate', provenance: 'user_answer' } } } })));
+  ok('8.7a …pero SIGUE en el contexto de la cuenta: memoria y supresión de la pregunta',
+    (() => { const src0 = app;
+      return /concentration_intent: 'intv9_mem_intent'/.test(src0)
+        && /!known\.concentration_intent/.test(src0)
+        && /intv9_mem_intent_deliberate/.test(src0); })(),
+    'la declaración tiene que sobrevivir a la retirada de la píldora');
   ok('8.8 …y la etiqueta de contexto NO lleva marca de verificación',
     /\.intcc-chip\.is-context::before \{ content: none; \}/.test(css)
     && /\.intcc-chip\.is-context \{[^}]*box-shadow: none/.test(css));
@@ -947,18 +960,18 @@ console.log('\n§8 · etiquetas con evidencia');
         purpose: 'interpretation_of_concentration', changes: 'interpretation' } },
       asked: {}, declined: {}, ack: {} })), c);
     return run('_renderIntelligenceCommandCenter()', c); };
-  ok('8.7b el contexto declarado LLEGA a la superficie (no-vacuidad del caso móvil)',
+  ok('8.7b el contexto declarado NO llega a ninguna superficie como píldora',
     (() => { const h = ctxRender();
-      return h.indexOf(DICT.es.intcc_chip_ctx_intent) >= 0
-        && (h.match(/intcc-chip is-context/g) || []).length >= 1; })(),
+      return h.indexOf(DICT.es.intcc_chip_ctx_intent) === -1
+        && (h.match(/intcc-chip is-context/g) || []).length === 0; })(),
     JSON.stringify((ctxRender().match(/intcc-chip is-[a-z]+/g) || [])));
-  ok('8.7b2 …y en MÓVIL NO entra en la lista de Salud, que imprime un ✓ por fila',
+  ok('8.7b2 …tampoco en MÓVIL, ni en el Hero ni en la lista de Salud',
     (() => { const h = ctxRender();
       const i = h.indexOf('intcc-m-health');
-      const mHealth = h.slice(i, h.indexOf('</section>', i));
+      const mHealth = i >= 0 ? h.slice(i, h.indexOf('</section>', i)) : '';
       return mHealth.indexOf(DICT.es.intcc_chip_ctx_intent) === -1
         && !/intcc-m-concl-row is-context/.test(h)
-        && /intcc-m-hero[\s\S]{0,1200}intcc-chip is-context/.test(h); })(),
+        && !/intcc-chip is-context/.test(h); })(),
     JSON.stringify((ctxRender().match(/intcc-m-concl-row is-[a-z]+/g) || [])));
   // La reverificación señaló el segundo orden: el chip se gateaba SÓLO por la banda,
   // así que quien declaró deliberada su concentración con BTC al 91 % seguía
@@ -970,7 +983,9 @@ console.log('\n§8 · etiquetas con evidencia');
       const withConc = CHIPS([F('top_position_weight', 80)], { band: 'weight_in_few' }, ctxIntent);
       const rebalanced = CHIPS([], { band: 'weight_in_few' }, ctxIntent);
       const tiny = CHIPS([F('top_position_weight', 12)], { band: 'weight_in_few' }, ctxIntent);
-      return withConc.some(c => c.tone === 'context')
+      // Ya no se publica en NINGÚN caso: la premisa rancia deja de ser posible
+      // porque la superficie que la exponía no existe.
+      return !withConc.some(c => c.tone === 'context')
         && !rebalanced.some(c => c.tone === 'context')
         && !tiny.some(c => c.tone === 'context'); })(),
     JSON.stringify(CHIPS([], { band: 'weight_in_few' }, { context: { fields: {
@@ -992,11 +1007,12 @@ console.log('\n§8 · etiquetas con evidencia');
     JSON.stringify((render(CUENTA_B).html.match(/intcc-m-concl-row is-[a-z]+/g) || [])));
   // NO-VACUIDAD. Sin esto, 8.7f pasa con la lista vacía y con el limitador
   // nunca emitido — que es exactamente el defecto que el checkpoint B cierra.
-  ok('8.7g el limitador SE EMITE de verdad: Salud publica por qué no es mayor',
+  // CONTRATO SUSTITUIDO con la píldora: el limitador de dispersión se retira, así
+  // que lo que se exige es que Salud no vuelva a publicar esa segunda voz.
+  ok('8.7g Salud ya NO publica la dispersión como limitador (el anillo ya la dice)',
     (() => { const h = render(CUENTA_B).html;
-      return /class="intcc-chip is-limit"/.test(h)
-        && /equivale a/.test(h) && /con el mismo peso/.test(h)
-        && /registradas/.test(h); })(),
+      return !/class="intcc-chip is-limit"/.test(h)
+        && !/con el mismo peso/.test(h) && !/equally weighted/.test(h); })(),
     JSON.stringify(attrs(render(CUENTA_B).html, 'class="intcc-chip is-([a-z]+)"')));
   ok('8.7g2 la frase del limitador es LENGUAJE DE USUARIO, no la fórmula leída',
     (() => { const es = DICT.es.intcc_chip_limit_spread('2,5', 4);
@@ -1010,8 +1026,14 @@ console.log('\n§8 · etiquetas con evidencia');
   ok('8.7h el limitador sale del MISMO owner que la cifra, no de una derivación',
     /limiters:\s*_intccHealthLimiters\(h\)/.test(fnSrc('_intccHealthScore'))
     && /\(\(score && score\.limiters\) \|\| \[\]\)/.test(fnSrc('_intv5Chips')));
-  ok('8.7i con el anillo NO publicable no se añade una segunda frase encima del estado',
-    /h\.ringPublishable && Number\.isFinite\(h\.ring\) && h\.ring < 100/.test(fnSrc('_intccHealthLimiters')));
+  // CONTRATO SUSTITUIDO. Este assert protegía la CONDICIÓN de la píldora de
+  // dispersión («equivale a 3,1 posiciones con el mismo peso»). El encargo la
+  // retira del Hero por su nombre: decía con otras palabras lo que el anillo de
+  // Salud ya dice con una cifra, en el sitio de máxima jerarquía. Lo que queda
+  // por proteger es que NO VUELVA, que es más fuerte que su condición.
+  ok('8.7i la píldora de dispersión NO se publica (decía dos veces la misma magnitud)',
+    (() => { const src0 = fnSrc('_intccHealthLimiters');
+      return !/intcc_chip_limit_spread/.test(src0) && !/key: 'spread'/.test(src0); })());
   ok('8.7j una dimensión no medible se DECLARA, nunca se penaliza',
     (() => { const src0 = fnSrc('_intccHealthLimiters');
       return /!== _AURIX_AI_AVAIL\.AVAILABLE/.test(src0)
@@ -1246,16 +1268,22 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
       axes: count(hUnk, /class="intcc-radar-axis[" ]/g) }));
   // REMATE §4 — el canal accesible es la LEYENDA HTML, no un `aria-label`: mismo
   // texto para quien ve y para quien escucha, imposible que diverjan.
-  ok('11.8b la leyenda enumera los CINCO con su valor; la ausencia sólo donde toca',
-    (() => { const items = hUnk.match(/class="intcc-radar-leg-item"[\s\S]*?<\/li>/g) || [];
-      return items.length === 5
+  // CONTRATO SUSTITUIDO: la LISTA bajo la figura pasa a ser CINCO RÓTULOS JUNTO A
+  // SUS VÉRTICES. La pregunta no cambia —los cinco nombres en texto real, cifra
+  // sólo donde hay evidencia, y ni una letra dentro del SVG— y se añade la que el
+  // encargo introduce: cada rótulo lleva su posición, derivada de la geometría.
+  ok('11.8b los CINCO ejes se nombran junto a su vértice; la cifra sólo donde toca',
+    (() => { const items = hUnk.match(/class="intcc-radar-vlabel"[\s\S]*?<\/span>\s*<\/span>|class="intcc-radar-vlabel"[\s\S]*?<\/b><\/span>/g) || [];
+      return count(hUnk, /class="intcc-radar-vlabel"/g) === 5
         && count(hUnk, /class="intcc-radar-label"/g) === 5
         && count(hUnk, /class="intcc-radar-val"/g) === 3
         && !/sin datos/.test(hUnk)
+        && !/intcc-radar-legend|intcc-radar-leg-item/.test(hUnk)
         && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(hUnk)
         && !/<text/.test(hUnk)
+        && count(hUnk, /style="(?:left:50%|left:0|right:0);top:[\d.]+%"/g) === 5
         && hUnk.indexOf('>40%<') !== -1 && hUnk.indexOf('>60%<') !== -1; })(),
-    JSON.stringify((hUnk.match(/class="intcc-radar-legend"[\s\S]{0,160}/) || [])[0] || null));
+    JSON.stringify((hUnk.match(/class="intcc-radar-vlabel"[\s\S]{0,160}/) || [])[0] || null));
   ok('11.9 la trayectoria se INTERRUMPE en cada hueco: un segmento, nunca un triángulo',
     /data-svg-edges="1"/.test(hUnk) && /data-svg-gaps="4"/.test(hUnk)
     && count(hUnk, /class="intcc-radar-edge"/g) === 1
@@ -1320,9 +1348,9 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     (() => { const s0 = hUnk;
       const i1 = s0.indexOf('intcc-radar-grid');
       const i3 = s0.indexOf('<g class="intcc-radar-edges">'), i5 = s0.indexOf('intcc-radar-halos');
-      const i4 = s0.indexOf('intcc-radar-dots'), i6 = s0.indexOf('intcc-radar-legend');
-      // §4 — «etiquetas» ya no es una capa del SVG: es la leyenda, que va después
-      // de la figura entera. El orden de pintado de la figura no cambia.
+      const i4 = s0.indexOf('intcc-radar-dots'), i6 = s0.indexOf('intcc-radar-vlabel');
+      // «Etiquetas» sigue sin ser una capa del SVG: son los rótulos posicionados,
+      // que van DESPUÉS de la figura entera. El orden de pintado no cambia.
       return i1 < i3 && i3 < i5 && i5 < i4 && i4 < i6; })(),
     JSON.stringify({ grid: hUnk.indexOf('intcc-radar-grid'), edges: hUnk.indexOf('<g class="intcc-radar-edges">'),
       halos: hUnk.indexOf('intcc-radar-halos'), dots: hUnk.indexOf('intcc-radar-dots') }));
@@ -3489,12 +3517,14 @@ console.log('\nSC · §6 · comparador de rentabilidad');
         return b.symbol === 'BTC-USD' && b.range === 'all'; })(),
       'última selección');
   // ── REVISIÓN FINANCIERA · LOS CUATRO P1, REPRODUCIDOS ────────────────
-  ok('RF.1 el limitador de Salud CONSERVA el decimal (no dice «2 de 2»)',
-    (() => { const es = DICT.es.intcc_chip_limit_spread('1,98', 2);
-      return /_intv4Num\(h\.effectiveN, 1\)/.test(fnSrc('_intccHealthLimiters'))
-        && !/_aurixPctNum\(h\.effectiveN/.test(fnSrc('_intccHealthLimiters'))
-        && /1,98/.test(es); })(),
-    'antes `_aurixPctNum` ignoraba el 2º argumento y redondeaba a entero');
+  // CONTRATO SUSTITUIDO con la píldora que lo motivaba. El defecto original era
+  // que `_aurixPctNum` ignoraba su 2º argumento y «1,98 posiciones» se publicaba
+  // como «2 de 2» — un reparto perfecto descrito como la causa de que el anillo
+  // no suba. La píldora ya no existe, así que lo que se conserva es la lección
+  // del formateador: quien necesite un decimal usa `_intv4Num`, no `_aurixPctNum`.
+  ok('RF.1 nadie vuelve a pedirle decimales a `_aurixPctNum` (ignora el 2º argumento)',
+    !/_aurixPctNum\([^)]*,\s*\d/.test(app),
+    'un `_aurixPctNum(x, n)` redondea a entero y pierde el decimal en silencio');
   ok('RF.2 la cobertura NO se afirma desde un campo inexistente',
     // SOBRE CÓDIGO, NO SOBRE PROSA: el comentario que explica el defecto cita
     // los nombres antiguos a propósito, y medir el fichero entero los
@@ -3713,6 +3743,16 @@ console.log('\nDC · E · Explora pregunta lo que Aurix puede contestar');
       + (uncert || 0) + ' }; }', c);
     return run('_intv4AnswerHtml(' + JSON.stringify(q) + ', '
       + JSON.stringify(core0) + ', _intccEsc)', c); };
+  // La tercera parte de la respuesta sale del RADAR, así que la expectativa se
+  // le pregunta al MISMO owner en el MISMO contexto: si se escribiera a mano,
+  // este assert volvería a ser una lista paralela — justo lo que causó el P0.
+  // MISMO contexto y MISMO stub que la respuesta: el radar lee
+  // `_aurixHealthSnapshot`, así que preguntarle en un contexto sin ese stub
+  // daría otra lista y el assert compararía dos mundos distintos.
+  const readableOf = (uncert) => { const c = makeCtx(CUENTA_B);
+    run('_aurixHealthSnapshot = function () { return { uncertifiablePositions: '
+      + (uncert || 0) + ' }; }', c);
+    return run('_intv16ReadableDims().join(", ")', c); };
   const DQ = { id: 'q_data_quality', family: 'data_quality', answer: { factKeys: [] } };
 
   ok('E.1 la pregunta de calidad ya no es «¿qué puede saber Aurix de mí?»',
@@ -3729,7 +3769,7 @@ console.log('\nDC · E · Explora pregunta lo que Aurix puede contestar');
         gaps: [{ semanticKey: 'per_asset_attribution' }] } });
       return h.indexOf(DICT.es.intv4_dq_cover_full) !== -1
         && h.indexOf(DICT.es.intv4_dq_history(33)) !== -1
-        && h.indexOf(DICT.es.intv4_dq_can(DICT.es.intcc_dim_conc + ', ' + DICT.es.intcc_dim_liq)) !== -1
+        && h.indexOf(DICT.es.intv4_dq_can(readableOf())) !== -1
         && h.indexOf(DICT.es.intv4_dq_cannot_intro) !== -1
         && h.indexOf(DICT.es.intv4_gap_per_asset_attribution) !== -1; })(),
     ansOf(DQ, { dataAvailability: {
@@ -3744,10 +3784,21 @@ console.log('\nDC · E · Explora pregunta lo que Aurix puede contestar');
     (() => { const h = ansOf(DQ, { dataAvailability: {
         observation: {}, roots: [], gaps: [] } });
       return h.indexOf(DICT.es.intv4_dq_history_none) !== -1; })());
-  ok('E.5 las dimensiones legibles salen de las RAÍCES del ledger, no de un catálogo aspiracional',
-    (() => { const src0 = fnSrc('_intv4AnswerHtml');
-      return /avail\.roots \|\| \[\]/.test(src0)
-        && /_AURIX_ROOT_READABLE\[r\]/.test(src0); })());
+  // CONTRATO SUSTITUIDO, y el nuevo es más fuerte. E.5 exigía que las dimensiones
+  // legibles saliesen de las RAÍCES del ledger. Eso evitaba un catálogo
+  // aspiracional pero permitía —y producía— una CONTRADICCIÓN: el mapa de raíces
+  // traducía `investable_return → Crecimiento` y `wealth_level → Estabilidad`,
+  // así que un solo hecho de rendimiento hacía decir «Aurix ya puede leer:
+  // Crecimiento» mientras el radar, en la MISMA pantalla, declaraba ese eje sin
+  // medir — y `growth` tiene `owner: null`, o sea que NUNCA se mide. Ahora la
+  // lista se deriva del RADAR, que es quien certifica: sigue sin ser aspiracional
+  // y además no puede contradecir a la figura que tiene al lado.
+  ok('E.5 las dimensiones legibles salen del RADAR certificado, no de un mapa paralelo',
+    (() => { const src0 = fnSrc('_intv4AnswerHtml') + fnSrc('_intv16ReadableDims');
+      return /_intv16ReadableDims\(\)/.test(src0)
+        && /_intv7RadarAxes\(\)/.test(src0)
+        && /!d\.unavailable/.test(src0)
+        && !/_AURIX_ROOT_READABLE/.test(src0); })());
 
   // ── «¿CUÁNTO VALE?» — UNA CIFRA REPETIDA NO ES UNA RESPUESTA ─────────
   const CV = { id: 'q_current_value', family: 'wealth_level',

@@ -138,7 +138,7 @@ const CONSTS = ['_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -150,7 +150,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv16ReadableDims','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
@@ -168,7 +168,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarPendingHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
@@ -485,11 +485,21 @@ console.log('\n5 · Radar: BAJO no es DESCONOCIDO:');
     JSON.stringify({ measured: num(h, /data-measured="(\d+)"/),
       axes: count(h, /class="intcc-radar-axis[" ]/g), labels: count(h, /class="intcc-radar-label[" ]/g),
       dots: count(h, /class="intcc-radar-dot"/g) }));
-  ok('5.5 y la disponibilidad de ejes sale de UNA sola autoridad (misma para escritorio y móvil)',
-    // Se cuentan LLAMADAS, no la declaración: dos autoridades de disponibilidad
-    // serían dos radares que pueden desmentirse entre breakpoints.
-    (app.match(/(?<!function )_intv7RadarAxes\(\)/g) || []).length === 1,
-    String((app.match(/(?<!function )_intv7RadarAxes\(\)/g) || []).length));
+  // CONTRATO AMPLIADO, no relajado. Antes se exigía UNA llamada porque dos
+  // autoridades serían dos radares capaces de desmentirse. El P0 de esta entrega
+  // demostró la otra mitad del mismo problema: Explora tenía su PROPIO mapa
+  // (`_AURIX_ROOT_READABLE`) y por eso afirmaba «Aurix ya puede leer:
+  // Crecimiento» con ese eje sin medir. La cura fue hacerla llamar al MISMO
+  // owner, así que ahora hay más llamadas y ESO ES LO CORRECTO. Lo que se exige
+  // es que no exista una segunda autoridad, no que haya un solo consumidor.
+  ok('5.5 la disponibilidad de ejes sale de UNA sola autoridad, y todos la consultan',
+    (() => { const calls = (app.match(/(?<!function )_intv7RadarAxes\(\)/g) || []).length;
+      return calls >= 1
+        // Ni un mapa paralelo que traduzca otra cosa a nombres de ejes.
+        && !/_AURIX_ROOT_READABLE\s*=/.test(app)
+        // Y quien responde «qué puede leer Aurix» lo deriva de ese owner.
+        && /_intv7RadarAxes\(\)/.test(fnSrc('_intv16ReadableDims')); })(),
+    String((app.match(/(?<!function )_intv7RadarAxes\(\)/g) || []).length) + ' llamadas');
 }
 
 console.log('\n6 · ES y EN publican la misma verdad:');
@@ -961,24 +971,34 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   // REMATE §4 — el canal accesible deja de ser un `aria-label` sintético y pasa
   // a ser TEXTO REAL: la leyenda HTML. Es el mismo contenido para quien ve y para
   // quien escucha, así que no pueden divergir.
-  ok('10.22 la leyenda enumera los CINCO y nombra la ausencia sólo donde toca',
+  // CONTRATO SUSTITUIDO: la LISTA pasa a CINCO RÓTULOS junto a sus vértices, y la
+  // frase «Aurix todavía no puede medirla» deja de repetirse por eje —el encargo
+  // la retira— para decirse UNA vez al pie, con su causa. Lo que se conserva:
+  // los cinco nombres en texto real, cifra sólo donde hay evidencia, nada dentro
+  // del SVG, y la ausencia dicha en alguna parte (ahora en un solo sitio).
+  ok('10.22 los CINCO se nombran junto a su vértice y la ausencia se dice UNA vez',
     (() => { const m = Number(svg(/data-svg-measured="(\d+)"/));
-      const notMeasured = DICT.es.intv16_axis_not_measured;
-      const items = rr.match(/class="intcc-radar-leg-item"[\s\S]*?<\/li>/g) || [];
-      return items.length === 5
-        && /data-legend-axes="5"/.test(rr)
+      return count(rr, /class="intcc-radar-vlabel"/g) === 5
+        && !/intcc-radar-legend|intcc-radar-leg-item/.test(rr)
         && count(rr, /class="intcc-radar-label"/g) === 5
         && count(rr, /class="intcc-radar-val"/g) === m
-        && count(rr, new RegExp(notMeasured, 'g')) === 5 - m
+        && count(rr, new RegExp(DICT.es.intv16_axis_not_measured, 'g')) === 0
+        && (m === 5 || /class="intv7-radar-pending"/.test(rr))
         && !/sin datos/.test(rr)
-        // el SVG ya no habla: su contenido está descrito al lado
         && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(rr)
         && !/<svg class="intcc-radar-svg[^>]*aria-label=/.test(rr); })(),
+    JSON.stringify({ m: Number(svg(/data-svg-measured="(\d+)"/)),
+      vlabel: count(rr, /class="intcc-radar-vlabel"/g),
+      legacy: /intcc-radar-legend|intcc-radar-leg-item/.test(rr),
+      label: count(rr, /class="intcc-radar-label"/g),
+      val: count(rr, /class="intcc-radar-val"/g),
+      notMeasured: count(rr, new RegExp(DICT.es.intv16_axis_not_measured, 'g')),
+      pending: /class="intv7-radar-pending"/.test(rr) }),
     (rr.match(/class="intcc-radar-legend"[\s\S]{0,200}/) || [, '?'])[0]);
   ok('10.23 CRECIMIENTO sigue sin owner: conserva su eje y su nombre, y no publica cifra',
     (() => { const dims = run('JSON.stringify(_INTV7_RADAR_DIMS)', makeCtx(APPLE));
       const g = JSON.parse(dims).find(d => d.key === 'growth');
-      const row = (rr.match(/class="intcc-radar-leg-item" data-axis="growth"[\s\S]*?<\/li>/) || [''])[0];
+      const row = (rr.match(/class="intcc-radar-vlabel" data-axis="growth"[\s\S]*?<\/span>/) || [''])[0];
       return !!g && g.owner === null && g.pending === 'no_certifiable_scale'
         && rr.indexOf(DICT.es.intcc_dim_growth) !== -1
         // su fila existe, lleva nombre y NO lleva cifra; y no tiene marcador

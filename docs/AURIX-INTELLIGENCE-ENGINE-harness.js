@@ -640,8 +640,15 @@ ok('M.8 el SVG del radar no puede rotular un eje «sin datos» ni atenuarlo',
   !/is-unavailable/.test(bare(fnSrc('_intccRadarSvg')))
   && !/intv7_axis_unavailable/.test(bare(fnSrc('_intccRadarSvg')))
   && /d => !d\.unavailable/.test(bare(fnSrc('_intccRadarSvg'))));
+// CONTRATO ACTUALIZADO: `intv7-radar-pending` deja de ser CSS huérfano porque su
+// superficie VUELVE. El encargo lo pide por su nombre —«informa el bloqueo
+// concreto y no declares cumplido el radar de cinco medidas»—, así que ahora la
+// card publica una línea al pie con el eje y su causa. Lo huérfano sigue estando
+// prohibido; esta clase ya no lo es, y la leyenda retirada sí se añade a la lista.
 ok('M.8b el radar no deja CSS huérfano de la superficie retirada',
-  !/intv8-radar-|intv7-radar-pending|intv6-radar-legend|intv7-radar-mean/.test(css));
+  !/intv8-radar-|intv6-radar-legend|intv7-radar-mean|intcc-radar-leg-item/.test(css));
+ok('M.8b2 …y la clase que SÍ se pinta tiene su regla (el bloqueo concreto, al pie)',
+  /\.intv7-radar-pending \{/.test(css) && /intv7-radar-pending/.test(src));
 ok('M.8c …y conserva el mapeo de causas, que Advanced Intelligence necesitará',
   /function _intv7PendingReasonKey\(reason\)/.test(src));
 ok('M.9 …y lo no medible sigue DECLARADO en la card, con su causa (§3)',

@@ -117,7 +117,7 @@ function makeCtx(lang) {
    '_INTV4_MEMORY_WINDOW_ORDER','_INTV7_RADAR_DIMS','_AURIX_INTEL_EXCLUSIVE_CLAIMS']
     .forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_intccClamp','_intccEsc','_aurixPctNum','_aurixPctLabel','_intv4Num','_intv4Money',
-   '_intccRadarSvg','_intv7PendingReasonKey','_intv7RadarAxes','_intv7RadarHtml',
+   '_intccRadarSvg','_intv7PendingReasonKey','_intv7RadarPendingHtml','_intv7RadarAxes','_intv7RadarHtml',
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
    '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
@@ -128,7 +128,7 @@ function makeCtx(lang) {
    '_aurixIntelPauseQuestions',
    '_aurixIntelDecline','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord',
    '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
-   '_intv4AnswerHtml','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt',
+   '_intv16ReadableDims','_intv4AnswerHtml','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt',
    '_aurixTodayFresh']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   // La COPY de los hechos es otra capa y tiene su propio gate: aquí sólo hace
@@ -236,13 +236,13 @@ console.log('§2 · Radar: cinco ejes permanentes, evidencia variable:');
     ok('2.5/' + c.m + ' los rótulos son HTML, no texto escalado dentro del SVG',
       !/<text/.test(h)
       && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(h)
-      && count(h, /class="intcc-radar-leg-item"/g) === 5
+      && count(h, /class="intcc-radar-vlabel"/g) === 5
       && count(h, /class="intcc-radar-label"/g) === 5
       && count(h, /class="intcc-radar-val"/g) === c.m
-      && new RegExp('data-legend-measured="' + c.m + '"').test(h)
+      && !/intcc-radar-legend|intcc-radar-leg-item/.test(h)
       && ORDER.every(k => new RegExp('data-axis="' + k + '" data-measured="'
           + (c.unav.indexOf(k) === -1 ? '1' : '0') + '"').test(h)),
-      (h.match(/class="intcc-radar-legend"[^>]*/) || [''])[0]);
+      (h.match(/class="intcc-radar-vlabel"[^>]*/) || [''])[0]);
     ok('2.5b/' + c.m + ' …y la FIGURA cabe entera en su marco, que se ciñe a ella',
       (() => { const vb = (h.match(/viewBox="(-?[\d.]+) (-?[\d.]+) ([\d.]+) ([\d.]+)"/) || []).slice(1).map(Number);
         if (vb.length !== 4) return false;
@@ -1188,8 +1188,17 @@ console.log('\n§6 · el mismo acontecimiento no se publica dos veces como noved
     (() => { const src = fnSrc('_intv5MattersHtml');
       return /const _evId = \(x\) => String\(\(x && \(x\.eventId \|\| x\.conceptId\)\) \|\| ''\);/.test(src)
         && !/publishedEvents[^\n]*semanticKey/.test(src); })());
+  // La REGLA es la misma; cambió su forma porque ahora el filtro también CUENTA
+  // cuántas historias cedieron su sitio a «Qué ha cambiado» —lo que permite que
+  // el estado vacío diga la verdad en vez de negar lo que el Hero afirma—.
   ok('6.14 sin identidad de evento NO se excluye: enterrar lo nuevo es peor que repetir',
-    /return !id \|\| !publishedEvents\.has\(id\)/.test(fnSrc('_intv5MattersHtml')));
+    /const keep = !id \|\| !publishedEvents\.has\(id\)/.test(fnSrc('_intv5MattersHtml')));
+  ok('6.14b …y cuando TODO lo de hoy ya está abajo, la card lo dice en vez de negarlo',
+    (() => { const src0 = fnSrc('_intv5MattersHtml');
+      return /_cededToChanged/.test(src0)
+        && /intv16_brief_in_changed/.test(src0)
+        // y la frase existe en los DOS idiomas
+        && (app.match(/\n\s+intv16_brief_in_changed:/g) || []).length === 2; })());
   ok('6.15 el historial revisado sigue rotulado como tal en su destino',
     /is-reviewed/.test(app) && /data-reviewed="\$\{x\.reviewed \? '1' : '0'\}"/.test(app));
 }
@@ -1312,21 +1321,32 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   // la leyenda es HTML y se pinta al tamaño que declara. Lo que se exige ahora es
   // que ese tamaño esté POR ENCIMA del suelo de legibilidad, que es lo que el
   // texto dentro del SVG no podía garantizar.
+  // Los rótulos pasan de una LISTA bajo la figura a CINCO RÓTULOS junto a sus
+  // vértices. El suelo de 11 px sigue siendo el contrato —es lo que motivó
+  // sacarlos del SVG— y ahora se mide en sus selectores nuevos, incluido el
+  // tamaño que declaran en el breakpoint de teléfono.
   ok('25.4 los rótulos del radar se declaran por encima del suelo de 11 px',
-    (() => { const lab = css.indexOf('.intcc-radar-legend .intcc-radar-label {');
-      const val = css.indexOf('.intcc-radar-legend .intcc-radar-val {');
-      const pen = css.indexOf('.intcc-radar-pending {');
-      if (lab < 0 || val < 0 || pen < 0) return false;
-      const fs = (i) => Number((css.slice(i, css.indexOf('}', i)).match(/font-size:\s*([\d.]+)px/) || [, 0])[1]);
-      return fs(lab) >= 11 && fs(val) >= 11 && fs(pen) >= 11; })(),
-    JSON.stringify(['label', 'val', 'pending'].map((k, n) => {
-      const i = css.indexOf(n === 0 ? '.intcc-radar-legend .intcc-radar-label {'
-        : n === 1 ? '.intcc-radar-legend .intcc-radar-val {' : '.intcc-radar-pending {');
-      return k + ':' + (css.slice(i, css.indexOf('}', i)).match(/font-size:\s*[\d.]+px/) || [''])[0]; })));
+    (() => { const idxs = [];
+      const re = /\.intcc-radar-(label|val) \{|\.intv7-radar-pending \{/g;
+      let m; while ((m = re.exec(css))) idxs.push(m.index);
+      // …y también los que el breakpoint de móvil vuelve a declarar.
+      const mob = css.indexOf('@media (max-width: 480px)');
+      if (mob >= 0) { const blk = css.slice(mob, css.indexOf('\n}', mob));
+        const re2 = /\.intcc-radar-(label|val) \{[^}]*\}/g; let m2;
+        while ((m2 = re2.exec(blk))) idxs.push(mob + m2.index); }
+      if (idxs.length < 3) return false;
+      return idxs.every((i) => {
+        const fs = Number((css.slice(i, css.indexOf('}', i)).match(/font-size:\s*([\d.]+)px/) || [, 99])[1]);
+        return fs >= 11; }); })(),
+    JSON.stringify((css.match(/\.intcc-radar-(label|val) \{[^}]*font-size:\s*[\d.]+px/g) || [])
+      .map(x => (x.match(/font-size:\s*[\d.]+px/) || [''])[0])));
   ok('25.4b …y el SVG no conserva ningún texto que pudiera escalarse por debajo',
     !/<text/.test(fnSrc('_intccRadarSvg'))
     && !/intcc-radar-labels/.test(fnSrc('_intccRadarSvg'))
-    && /aria-hidden="true"/.test(fnSrc('_intccRadarSvg')));
+    && /aria-hidden="true"/.test(fnSrc('_intccRadarSvg'))
+    // Y la posición de cada rótulo se DERIVA de la geometría del pentágono
+    // (`pt(i, R)`), no de una tabla escrita a mano que se desincronizaría.
+    && /pt\(i, R\)/.test(fnSrc('_intccRadarSvg')));
   // ── §8 · CONTRASTE Y PROFUNDIDAD, MEDIDOS EN LA HOJA ────────────────────
   // «Menos azul oscuro sobre azul oscuro»: la lectura de estabilidad es un
   // RESULTADO y se apoya en una superficie más profunda que el panel, no en otro
@@ -1379,12 +1399,19 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
           const vals = {}; Object.keys(V).forEach(k => { if (unav.indexOf(k) === -1) vals[k] = V[k]; });
           const h = vm.runInContext('_intccRadarSvg(' + JSON.stringify(vals) + ', '
             + JSON.stringify(dims) + ')', c);
-          return count(h, /class="intcc-radar-leg-item"/g) === 5
+          return count(h, /class="intcc-radar-vlabel"/g) === 5
             && count(h, /class="intcc-radar-val"/g) === 5 - unav.length
             && !/<text/.test(h); }); }); })());
-  ok('25.8 la leyenda cae a UNA columna en los anchos de teléfono',
-    /@media \(max-width: 420px\)[\s\S]{0,200}\.intcc-radar-legend \{ grid-template-columns: minmax\(0, 1fr\)/
-      .test(css.replace(/\s+/g, ' ')));
+  // CONTRATO SUSTITUIDO con la estructura: no hay columnas que colapsar porque
+  // no hay lista. Lo que el teléfono necesita ahora es que el rótulo tenga ancho
+  // suficiente para no partir una palabra — que es el defecto que trajo la
+  // leyenda estrecha («Ampl / itud / de / cate / goría / s»).
+  ok('25.8 en teléfono el rótulo tiene ancho propio y NUNCA parte una palabra',
+    (() => { const flat = css.replace(/\s+/g, ' ');
+      return /@media \(max-width: 480px\)[\s\S]{0,400}\.intcc-radar-vlabel \{ max-width: \d\d%/.test(flat)
+        && /\.intcc-radar-label \{[^}]*overflow-wrap: normal/.test(flat)
+        && !/\.intcc-radar-label \{[^}]*overflow-wrap: anywhere/.test(flat); })(),
+    'el rótulo del radar no puede usar `overflow-wrap: anywhere`');
   // §3 — la etiqueta de métrica es VISIBLE, compacta y no duplica el estado.
   // Se mide la EMISIÓN, no la presencia de la cadena: con `class="…"` dentro de
   // una rama muerta el grep seguía verde. La condición tiene que ser la copy.

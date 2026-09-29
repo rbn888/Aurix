@@ -132,7 +132,7 @@ const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY',
   '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_FACT_CONTRACT_VERSION','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
-  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE','_AURIX_ROOT_READABLE'];
+  '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE'];
 const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
@@ -144,7 +144,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
   '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
-  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml',
+  '_intv4ChangedRef','_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv16ReadableDims','_intv4AnswerHtml',
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
@@ -162,7 +162,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intv7RadarPendingHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
@@ -564,8 +564,16 @@ console.log('\n5 · A young account is not padded with invented content:');
   ok('5.2 it publishes no return figure',
     !core.ledger.facts.some(f => f.family === 'performance'), JSON.stringify(core.ledger.facts.map(f => f.semanticKey)));
   ok('5.3 no 30D/90D window is published', !/30 d[ií]as|90 d[ií]as|last 30 days|last 90 days/.test(html));
+  // SOBRE EL TEXTO, NO SOBRE EL MARCADO. El patrón `0%` casaba con el `50.00%`
+  // de un `style` inline —la posición de un rótulo del radar—, que no es un
+  // placeholder ni lo lee nadie. El contrato es «nada que PAREZCA análisis en
+  // pantalla», así que se mide lo que se pinta: se retiran las etiquetas y se
+  // examina el texto resultante.
   ok('5.4 no placeholder that looks like analysis',
-    !/45\/100|0%|--%|—%|N\/A|estimad|approx/i.test(html));
+    (() => { const txt = html.replace(/<[^>]*>/g, ' ');
+      return !/45\/100|0%|--%|—%|N\/A|estimad|approx/i.test(txt); })(),
+    JSON.stringify((html.replace(/<[^>]*>/g, ' ')
+      .match(/.{40}(45\/100|0%|--%|—%|N\/A|estimad|approx).{40}/i) || [])[0] || null));
   ok('5.5 the empty Brief says so honestly instead of inventing',
     /intv4-brief/.test(html));
   ok('5.6 a mature account DOES get more depth than the young one (progressive)',
@@ -1245,7 +1253,13 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
         && /data-unavailable="stability,growth"/.test(a)
         && /stability:awaiting_observations/.test(a)
         && /growth:no_certifiable_scale/.test(a)
-        && !/intv7-radar-pending/.test(a)
+        // CONTRATO SUSTITUIDO: antes se exigía que la causa NO se publicara —el
+        // disclosure estaba retirado—. El encargo lo revierte por su nombre:
+        // «informa el bloqueo concreto y no declares cumplido el radar de cinco
+        // medidas». Así que ahora tiene que estar, UNA vez y al pie, y seguir
+        // sin aparecer como etiqueta dentro de la figura.
+        && /intv7-radar-pending/.test(a)
+        && !/intcc-radar-vlabel[^>]*>[\s\S]{0,120}no_certifiable_scale/.test(a)
         && /function _intv7PendingReasonKey\(reason\)/.test(app); })(),
     section(render(SHORT).html, 'intcc-radar').slice(0, 400));
   ok('15.6 todo eje dibujado publica su cifra, y ninguno una marca de ausencia',

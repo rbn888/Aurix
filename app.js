@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '750'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '751'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5539,7 +5539,7 @@ const T = {
     // primero es una promesa que el producto no controla.
     intv7_pending_obs:     (d) => `${d}: hay historial, pero el motor de rentabilidad todavía no lo respalda con confianza suficiente para medirla sin exagerar la calma.`,
     intv7_pending_scale:   (d) => `${d}: el dato existe y Aurix lo publica como porcentaje de rentabilidad; lo que falta es una referencia con la que convertirlo en una escala de 0 a 100 sin inventarla.`,
-    intv7_pending_generic: (d) => `${d}: todavía sin datos que Aurix pueda certificar.`,
+    intv7_pending_generic: (d) => `${d}: Aurix todavía no tiene evidencia que pueda certificar.`,
     intv7_stab_meaning: 'Estabilidad = porcentaje del máximo que tu cartera conservó en su peor momento, con las aportaciones y retiradas neutralizadas.',
     intcc_drivers_title: 'Factores principales',
     intcc_drv_explain_asset: name => `${name} representa actualmente la mayor exposición individual de tu patrimonio.`,
@@ -5635,6 +5635,8 @@ const T = {
     // «material»: §20 del cierre anterior retiró esa palabra de la superficie
     // visible por jerga, y el vocabulario de producto para lo mismo es «atención».
     intv15_brief_settled: 'Ahora mismo no hay ningún cambio en tu patrimonio que merezca tu atención.',
+    // El vacío que NO es ausencia: lo de hoy ya tiene su sitio, y está abajo.
+    intv16_brief_in_changed: 'Lo relevante de hoy ya está recogido en «Qué ha cambiado», con su fecha.',
     intv4_changed_title: 'Qué ha cambiado',
     intv4_changed_ref_since: (d) => `Sobre lo registrado desde el ${d}.`,
     intv4_changed_ref_24h:   'Durante las últimas 24 horas.',
@@ -8664,7 +8666,7 @@ const T = {
     intv7_radar_pending: (d) => `No data yet: ${d}. They will appear once Aurix can measure them rigorously.`,
     intv7_pending_obs:     (d) => `${d}: there is history, but the return engine does not yet back it with enough confidence to measure it without overstating the calm.`,
     intv7_pending_scale:   (d) => `${d}: the figure exists and Aurix publishes it as a return percentage; what is missing is a reference to turn it into a 0–100 scale without inventing one.`,
-    intv7_pending_generic: (d) => `${d}: no data Aurix can certify yet.`,
+    intv7_pending_generic: (d) => `${d}: Aurix has no certifiable evidence for it yet.`,
     intv7_stab_meaning: 'Stability = the percentage of its peak your portfolio kept at its worst moment, with contributions and withdrawals neutralised.',
     intcc_drivers_title: 'Key drivers',
     intcc_drv_explain_asset: name => `${name} is currently the single largest exposure in your wealth.`,
@@ -8740,6 +8742,7 @@ const T = {
     intv4_brief_stale: 'Aurix does not have recent enough data to say what matters today. It will speak again as soon as your portfolio updates.',
     intv4_brief_empty: 'Aurix is reading your wealth. As soon as there is a fact it can prove, it will appear here.',
     intv15_brief_settled: 'Right now there is nothing in your wealth worth your attention.',
+    intv16_brief_in_changed: 'What matters today is already recorded under “What changed”, with its date.',
     intv4_changed_title: 'What changed',
     intv4_changed_ref_since: (d) => `Against what is recorded since ${d}.`,
     intv4_changed_ref_24h:   'Over the last 24 hours.',
@@ -64257,17 +64260,14 @@ function _intccHealthLimiters(h) {
   // 1 · LA CAUSA PRINCIPAL. Sólo si el anillo es publicable y no está al máximo:
   // con el anillo no publicable el estado YA dice «datos insuficientes», y
   // repetirlo sería la tercera frase compitiendo con el donut que §6 retiró.
-  if (h.ringPublishable && Number.isFinite(h.ring) && h.ring < 100
-      && Number.isFinite(h.effectiveN) && Number.isFinite(h.positions) && h.positions >= 2) {
-    out.push({ tone: 'limit', key: 'spread',
-      // `_aurixPctNum` acepta UN argumento y termina en `Math.round`: el `1`
-      // se ignoraba y el decimal desaparecía. Con 2 posiciones 55/45,
-      // `effectiveN = 1,98` se publicaba como «equivale a 2 posiciones con el
-      // mismo peso, de las 2 registradas» — o sea, la causa que impide subir
-      // el anillo describía un reparto PERFECTO. `_intv4Num` sí respeta los
-      // decimales y el separador del locale.
-      label: t('intcc_chip_limit_spread')(_intv4Num(h.effectiveN, 1), h.positions) });
-  }
+  // ── LA PÍLDORA DE DIVERSIFICACIÓN TRUNCADA SE RETIRA ────────────────────
+  // «La distribución de tu cartera equivale a 3,1 posiciones con el mismo peso,
+  // de las 5 registradas» era una tecnicidad —dispersión equivalente— colocada
+  // en el sitio de máxima jerarquía de la pantalla, y decía con otras palabras
+  // lo que el anillo de Salud ya dice con una cifra: la MISMA magnitud publicada
+  // dos veces en la misma tarjeta. El encargo la elimina por su nombre.
+  // NO se retira el conocimiento: `effectiveN` sigue calculándose y sigue siendo
+  // la causa que el anillo refleja. Lo que se retira es esta SEGUNDA voz.
   // 2 · LAS DIMENSIONES NO MEDIBLES. Se declaran; no puntúan en ninguna
   // dirección. Se ordenan por el catálogo para que la salida sea determinista.
   Object.keys(_INTCC_HEALTH_DIM_LABEL).forEach((id) => {
@@ -64952,23 +64952,61 @@ function _intccRadarSvg(radar, dimsOverride) {
   // sin la cadena, la alternativa NO es «Estabilidad: » con los dos puntos
   // colgando —una afirmación vacía que un lector de pantalla pronuncia— sino el
   // NOMBRE solo, que es verdad y completo.
-  const _notMeasured = _intv4T('intv16_axis_not_measured');
-  // LA LEYENDA ES EL CANAL ACCESIBLE. Un eje certificado publica su cifra; uno
-  // sin evidencia publica su NOMBRE y, si la copy existe, por qué no hay número.
-  // No hay `aria-label` sintético que mantener en paralelo con lo que se ve: es
-  // el mismo texto para todo el mundo.
-  const legend = dims.map((d) => {
+  // ── LOS NOMBRES VUELVEN JUNTO A SUS VÉRTICES ─────────────────────────────
+  // La versión anterior los bajó a una LISTA HTML bajo la figura, y el argumento
+  // era bueno: rotular dentro del SVG crea un punto fijo —subir el tipo ensancha
+  // el texto, el texto ensancha el marco, el marco encoge la escala—. Pero la
+  // lista trajo dos defectos peores, medidos en la captura de escritorio: en la
+  // rejilla de tres columnas la leyenda cae en una columna de ~60 px y «Amplitud
+  // de categorías» se parte LETRA A LETRA («Ampl / itud / de / cate / goría / s»),
+  // y la propia lista es lo que el encargo manda retirar.
+  //
+  // La salida no es devolver el texto al SVG: es TEXTO HTML SOBRE LA FIGURA.
+  // Conserva todo lo que se ganó —escala con la preferencia de tipo del usuario,
+  // es seleccionable, lo lee un lector de pantalla sin `aria-label` sintético— y
+  // recupera lo que se había perdido: el nombre al lado de su vértice.
+  //
+  // LA POSICIÓN SALE DE LA MISMA GEOMETRÍA QUE EL PENTÁGONO, no de una tabla
+  // escrita a mano: se proyecta el vértice real del eje al sistema del contenedor.
+  // Si mañana cambian los ángulos o el radio, los rótulos se mueven solos. El SVG
+  // se inserta con margen (`--rl-mx` / `--rl-my` en la hoja) para que los rótulos
+  // vivan FUERA de la malla y no la tapen.
+  const MY = 0.10;                               // margen vertical de los rótulos
+  const fy = y => ((MY + ((y - vbY) / vbH) * (1 - 2 * MY)) * 100).toFixed(2);
+  // A qué lado del vértice se ancla cada rótulo. Se deriva del ÁNGULO, así que
+  // tampoco es una tabla: arriba el de la punta, y a izquierda/derecha según el
+  // signo del coseno. Es la única decisión tipográfica que la geometría no da.
+  const anchorOf = (i) => {
+    const a = ang(i), c = Math.cos(a);
+    if (Math.abs(c) < 0.2) return 'top';
+    return c > 0 ? 'right' : 'left';
+  };
+  const vlabels = dims.map((d, i) => {
     const isMeasured = measured.indexOf(d) !== -1;
     const val = isMeasured
       ? (d.display != null ? String(d.display) : (radar[d.key] + (d.suffix || '')))
       : '';
-    return `<li class="intcc-radar-leg-item" data-axis="${_intccEsc(d.key)}"`
-      + ` data-measured="${isMeasured ? '1' : '0'}">`
-      + `<span class="intcc-radar-label">${_intccEsc(d.label)}</span>`
-      + (isMeasured
-          ? `<span class="intcc-radar-val">${_intccEsc(val)}</span>`
-          : (_notMeasured ? `<span class="intcc-radar-pending">${_intccEsc(_notMeasured)}</span>` : ''))
-      + '</li>';
+    const [vx, vy] = pt(i, R);
+    // LA VERTICAL SALE DE LA GEOMETRÍA; LA HORIZONTAL, DEL LADO. Anclar también
+    // la X al vértice parecía más fiel y se salía de la tarjeta: a 1024 px la
+    // card del radar mide 289 px, el vértice izquierdo cae en el 20,8 % (60 px)
+    // y un rótulo de hasta 32 % (92 px) creciendo hacia la izquierda terminaba
+    // 32 px FUERA. Anclado al borde de la tarjeta no puede salirse por
+    // construcción, y sigue leyéndose a la altura de su vértice — que es lo que
+    // «nombres cerca de sus vértices» significa.
+    const an = anchorOf(i);
+    const pos = an === 'top' ? `left:50%;top:${fy(vy)}%`
+              : an === 'right' ? `right:0;top:${fy(vy)}%`
+              : `left:0;top:${fy(vy)}%`;
+    return `<span class="intcc-radar-vlabel" data-axis="${_intccEsc(d.key)}"`
+      + ` data-measured="${isMeasured ? '1' : '0'}" data-anchor="${an}"`
+      + ` style="${pos}">`
+      + `<b class="intcc-radar-label">${_intccEsc(d.label)}</b>`
+      // §2 — desconocido ⇒ NOMBRE y nada más. Ni cifra, ni cero fingido, ni la
+      // frase «Aurix todavía no puede medirla», que el encargo retira: el
+      // bloqueo concreto se informa UNA vez bajo la figura, no cinco veces.
+      + (isMeasured ? `<i class="intcc-radar-val">${_intccEsc(val)}</i>` : '')
+      + '</span>';
   }).join('');
   return `
     <svg class="intcc-radar-svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" aria-hidden="true"
@@ -64990,8 +65028,7 @@ function _intccRadarSvg(radar, dimsOverride) {
       <g class="intcc-radar-halos">${halos}</g>
       <g class="intcc-radar-dots">${dots}</g>
     </svg>
-    <ul class="intcc-radar-legend" data-legend-axes="${dims.length}"
-        data-legend-measured="${measured.length}">${legend}</ul>`;
+    ${vlabels}`;
 }
 
 // ── Main renderer ───────────────────────────────────────────────────────────
@@ -66060,16 +66097,43 @@ function _intv4ExploreHtml(core, esc, intel) {
 // An answer is the rendered fact(s) the Core attached to the question — never a
 // re-derivation. A DATA_QUALITY question answers with the honest limit, which is
 // premium content in its own right (SPEC §6/§14).
-// CHECKPOINT E — qué dimensiones sabe leer Aurix HOY, dichas con el nombre que
-// ya usa el radar. No es un catálogo nuevo: es la traducción de las raíces
-// causales que el ledger ha producido de verdad en esta pasada.
-const _AURIX_ROOT_READABLE = Object.freeze({
-  top_position:      'intcc_dim_conc',
-  category_mix:      'intcc_dim_breadth',
-  cash_weight:       'intcc_dim_liq',
-  investable_return: 'intcc_dim_growth',
-  wealth_level:      'intcc_dim_stab',
-});
+// ════════════════════════════════════════════════════════════════════════════
+// P0 · UNA SOLA VERDAD PARA TODA LA PANTALLA
+// ════════════════════════════════════════════════════════════════════════════
+// AQUÍ ESTABA LA CONTRADICCIÓN, y era estructural, no una frase mal escrita.
+// `_AURIX_ROOT_READABLE` traducía RAÍCES CAUSALES DE HECHOS a NOMBRES DE EJES
+// DEL RADAR, con dos equivalencias que no se sostienen:
+//
+//   · `investable_return → Crecimiento`. El rendimiento flow-neutral de una
+//     ventana NO es el eje Crecimiento: ese eje no tiene owner y su bloqueo está
+//     documentado —falta un índice de referencia, y INT.01 prohíbe el benchmark—.
+//     Con esta línea, un solo hecho de rendimiento hacía que Explora dijera
+//     «Aurix ya puede leer: … Crecimiento» mientras el radar, en la MISMA
+//     pantalla, declaraba ese eje sin medir. Contradicción garantizada, no
+//     probable: `growth` tiene `owner: null` y por tanto NUNCA se mide.
+//   · `wealth_level → Estabilidad`. El nivel de patrimonio bruto no es la
+//     Estabilidad del radar, que es RETENCIÓN DE MÁXIMO sobre el índice
+//     flow-neutral. Y «stability derived from gross wealth» está en la lista de
+//     PROHIBIDO del propio radar: este mapa hacía exactamente lo que ese bloque
+//     prohíbe, sólo que desde otra superficie.
+//
+// LA REGLA NUEVA: si una superficie habla con el VOCABULARIO DEL RADAR, su
+// fuente TIENE QUE SER EL RADAR. No se cruzan owners y no se reconcilian dos
+// listas: se lee `_intv7RadarAxes()`, que es quien certifica. Así la
+// contradicción deja de ser un defecto que corregir y pasa a ser imposible de
+// escribir: lo que el radar no mide, nadie puede decir que se lee.
+//
+// NO SE PIERDE INFORMACIÓN. Las raíces sin eje (`external_capital`,
+// `position_result`, `recorded_operation`…) ya se descartaban en el `.filter`,
+// así que este bloque no publicaba nada sobre ellas ni antes ni ahora.
+function _intv16ReadableDims() {
+  let axes = null;
+  try { axes = (typeof _intv7RadarAxes === 'function') ? _intv7RadarAxes() : null; }
+  catch (_) { axes = null; }
+  if (!axes || !Array.isArray(axes.dims)) return [];
+  // FAIL CLOSED: sin radar no se afirma que se lea nada.
+  return axes.dims.filter(d => d && !d.unavailable && d.label).map(d => d.label);
+}
 // ════════════════════════════════════════════════════════════════════════════
 // CIERRE CORRECTIVO §3 · LA RESPUESTA CONTESTA LA PREGUNTA
 // ════════════════════════════════════════════════════════════════════════════
@@ -66198,11 +66262,10 @@ function _intv4AnswerHtml(q, core, esc, intel) {
     // 2 · HISTORIAL CERTIFICADO
     const days = Number.isFinite(obs.spanMs) ? Math.max(1, Math.round(obs.spanMs / 864e5)) : null;
     out.push(days ? _intv4T('intv4_dq_history', days) : _intv4T('intv4_dq_history_none'));
-    // 3 · QUÉ PUEDE CALCULAR — las raíces que el ledger ha producido, no una
-    // lista de aspiraciones.
-    const readable = Array.from(new Set((avail.roots || [])
-      .map(r => _AURIX_ROOT_READABLE[r]).filter(Boolean)))
-      .map(k => _intv4T(k)).filter(Boolean);
+    // 3 · QUÉ PUEDE CALCULAR — lo que el RADAR certifica, que es el único owner
+    // de esta pregunta. Si mañana Crecimiento adquiere escala, esta frase lo
+    // nombra sola; y mientras no la tenga, no puede nombrarlo por error.
+    const readable = _intv16ReadableDims();
     if (readable.length) out.push(_intv4T('intv4_dq_can', readable.join(', ')));
     // 4 · QUÉ TODAVÍA NO PUEDE AFIRMAR
     const gapLines = Array.from(new Set(((avail.gaps) || [])
@@ -67124,13 +67187,14 @@ function _intv5Chips(core, score, intel) {
   // estructural —y §6 retira toda explicación de esa card—. Aquí es una etiqueta
   // NEUTRAL, sin marca de verificación: no sube el anillo, no baja la
   // concentración y no la oculta. Sólo consta que el usuario lo dijo.
-  const intent = cf.concentration_intent;
-  const NON_POSITIVE_CONC = ['weight_in_few', 'single_position', 'two_positions'];
-  const concMaterial = !!(top1 && Number.isFinite(top1.value)
-    && top1.value >= _AURIX_FACT_MATERIAL.concentrationPct);
-  if (intent && intent.value === 'deliberate' && concMaterial && score
-      && NON_POSITIVE_CONC.indexOf(String(score.band || '')) !== -1)
-    out.push({ tone: 'context', label: _intv4T('intcc_chip_ctx_intent') });
+  // ── «CONCENTRACIÓN DECLARADA COMO DECISIÓN PROPIA» TAMPOCO VA AQUÍ ──────
+  // El encargo la retira del Hero y dice dónde vive: «esa decisión permanece en
+  // el contexto de la cuenta». Y tiene razón de producto: repetir cada visita
+  // que el usuario ya decidió algo convierte su decisión en un asunto abierto.
+  // El dato NO se borra —`concentration_intent` se sigue guardando y leyendo, y
+  // sigue modulando qué se pregunta y con qué prioridad—: lo que desaparece es
+  // la etiqueta que lo reabría en pantalla. Un cambio material posterior sí
+  // puede volver a plantearlo, por la vía de las preguntas, no por una píldora.
   // El chip «A vigilar» salía de `score < 60`, o sea del score retirado. Los chips
   // pasan a ser EXCLUSIVAMENTE derivados de hechos del Core y de contexto
   // DECLARADO: una confirmación que no se puede sostener con un hecho no se
@@ -67396,6 +67460,21 @@ function _intv7PendingReasonKey(reason) {
 // `data-unavailable`, `data-pending` y `data-quality` SE CONSERVAN: son la
 // trazabilidad del §3 y el discriminador de los gates. Declarar internamente lo
 // que no se mide es obligatorio; pintarlo como una cifra es lo que está vetado.
+// Una línea por eje sin medir, con su causa. Con el radar completo no emite nada.
+function _intv7RadarPendingHtml(r, esc) {
+  const lines = (r.unavailable || []).map((k) => {
+    const dim = (r.dims || []).find(d => d.key === k);
+    if (!dim || !dim.label) return '';
+    // `_intv4T` YA invoca la copy cuando es una función y le pasa los args: la
+    // primera versión la llamaba sin argumentos y comprobaba `typeof === 'function'`
+    // sobre el resultado, así que nunca emitía nada — y de haberlo emitido habría
+    // publicado «undefined: el dato existe…». Lo cazó el gate, no la vista.
+    return _intv4T(_intv7PendingReasonKey(r.pending ? r.pending[k] : null), dim.label);
+  }).filter(Boolean);
+  if (!lines.length) return '';
+  return `<p class="intv7-radar-pending" data-pending-axes="${lines.length}">`
+    + lines.map(l => esc(l)).join(' ') + '</p>';
+}
 function _intv7RadarHtml(esc) {
   const r = _intv7RadarAxes();
   const svg = _intccRadarSvg(r.values, r.dims);
@@ -67418,6 +67497,16 @@ function _intv7RadarHtml(esc) {
             emitir el nodo. La malla con sus cinco nombres ya se sostiene sola. */''}
       ${(r.measured === 0 && _intv4T('intv16_radar_no_evidence')) ? `<p class="intv16-radar-none">${
         esc(_intv4T('intv16_radar_no_evidence'))}</p>` : ''}
+      ${/* ── EL BLOQUEO CONCRETO, UNA VEZ Y CON SU CAUSA ────────────────────
+            El encargo retira la frase «Aurix todavía no puede medirla» de cada
+            eje, pero exige lo contrario de callar: «informa el bloqueo concreto
+            y no declares cumplido el radar de cinco medidas». Así que la
+            ausencia se dice UNA vez, al pie, nombrando el eje y POR QUÉ —que no
+            es lo mismo esperar historia que esperar una referencia que el
+            producto ha decidido no tener—. El mapa de causas ya existía
+            (`_intv7PendingReasonKey`); lo que faltaba era quien lo publicara.
+            FAIL CLOSED sobre la copy: sin cadena no se emite el nodo. */''}
+      ${_intv7RadarPendingHtml(r, esc)}
     </section>`;
 }
 
@@ -67796,6 +67885,15 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
   const publishedEvents = new Set(((typeof _intv4FindingRows === 'function')
     ? _intv4FindingRows(core, { all: true }) : [])
     .map(x => x && x.fd && _evId(x.fd)).filter(Boolean));
+  // ── CUÁNTAS HISTORIAS CEDIERON SU SITIO, Y POR QUÉ IMPORTA ──────────────
+  // El filtro de abajo es correcto —un hecho, una ubicación— pero deja a esta
+  // card VACÍA por una razón muy distinta a «no pasa nada»: lo que importaba hoy
+  // está publicado justo debajo. Y la copy del estado vacío no distinguía los dos
+  // casos, así que la pantalla decía a la vez «1 cambio merece revisión» (Hero,
+  // sobre la lista canónica) y «Ahora mismo no hay ningún cambio en tu patrimonio
+  // que merezca tu atención» (aquí). Las dos frases son del MISMO estado y se
+  // contradicen. Se cuenta cuántas cedieron para poder decir la verdad.
+  let _cededToChanged = 0;
   const cards = sel.stories
     // ── CHECKPOINT H · UN HECHO, UNA UBICACIÓN ─────────────────────────────
     // La regla anterior dejaba pasar el hecho si esta card podía añadirle un
@@ -67808,9 +67906,12 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
     // rompería la promesa numérica, que está certificada. Así que el hecho que
     // ya vive en «Qué ha cambiado» no vuelve a salir aquí — su significado
     // sigue publicado allí, en su fila.
-    .filter(st => !publishedRoots.has(st.causalRoot))
+    .filter(st => { const keep = !publishedRoots.has(st.causalRoot);
+                    if (!keep) _cededToChanged++; return keep; })
     // §6 — y el acontecimiento CONCRETO que ya está publicado abajo tampoco sube.
-    .filter(st => { const id = _evId(st); return !id || !publishedEvents.has(id); })
+    .filter(st => { const id = _evId(st);
+                    const keep = !id || !publishedEvents.has(id);
+                    if (!keep) _cededToChanged++; return keep; })
     .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
     .filter(Boolean);
   // EL CONTROL «ENTENDIDO» VIVE EN UN SOLO SITIO. Aquí se construía una segunda
@@ -67834,8 +67935,28 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
   // direcciones posibles), así que la frase no afirma un punto de partida.
   const hasRead = !!(core && core.ledger && Array.isArray(core.ledger.facts)
                      && core.ledger.facts.length);
+  // ── TRES RAZONES DE VACÍO, NO DOS ───────────────────────────────────────
+  // LA CONTRADICCIÓN, medida en la captura: el hero decía «1 cambio merece
+  // revisión» y esta card, en la misma pantalla, «Ahora mismo no hay ningún
+  // cambio en tu patrimonio que merezca tu atención». Las dos hablan del MISMO
+  // estado y se desmienten.
+  //
+  // Y el vacío tenía DOS causas distintas que la copy trataba igual: que una
+  // historia cediera su sitio a «Qué ha cambiado» (el filtro de arriba), o que
+  // ninguna alcanzara materialidad AUNQUE existan hallazgos vigentes. En los dos
+  // casos la verdad es la misma —lo relevante está publicado abajo, con su
+  // fecha— y en ninguno es «no hay nada».
+  //
+  // EL DISCRIMINADOR ES EL MISMO OWNER QUE CUENTA EL HERO: `_intv4FindingRows`
+  // sin `all` son los hallazgos VIGENTES Y NO ACUSADOS, que es exactamente lo
+  // que el hero anuncia. Así la pantalla no puede volver a contradecirse: si el
+  // hero cuenta uno, esta card no puede decir que no hay ninguno.
+  let _activeFindings = 0;
+  try { _activeFindings = ((typeof _intv4FindingRows === 'function')
+    ? _intv4FindingRows(core) : []).length; } catch (_) { _activeFindings = 0; }
   const emptyKey = sel.stale ? 'intv4_brief_stale'
-    : (hasRead ? 'intv15_brief_settled' : 'intv4_brief_empty');
+    : ((_cededToChanged > 0 || _activeFindings > 0) ? 'intv16_brief_in_changed'
+    : (hasRead ? 'intv15_brief_settled' : 'intv4_brief_empty'));
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
              data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}"
