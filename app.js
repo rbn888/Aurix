@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '754'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '755'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -64982,10 +64982,16 @@ function _intccRadarSvg(radar, dimsOverride) {
   // Marco + CUATRO niveles de la banda = cinco anillos, el máximo que §8 permite.
   // Todos comparten centro y geometría, y el interior (f = 0) ES la línea del cero.
   const poly = r => dims.map((_, i) => pt(i, r).map(v => v.toFixed(1)).join(',')).join(' ');
-  rings += `<polygon class="intcc-radar-ring is-frame" points="${poly(R)}"/>`;
-  [0, 1 / 3, 2 / 3, 1].forEach(f => {
-    rings += `<polygon class="intcc-radar-ring" points="${poly(rBand(f))}"/>`;
-  });
+  // MALLA EQUIDISTANTE. Los niveles de la banda (30·50·70·90) dejaban el último
+  // tramo, 90→100, a la MITAD que los demás, y se leía como un anillo estrecho.
+  // La malla es retícula visual, no escala impresa: se reparte a paso constante
+  // entre la línea del cero (R·RMIN) y el marco (R). La serie no cambia: sigue
+  // mapeada por `rBand`.
+  const RING_STEPS = 4;
+  for (let k = 0; k <= RING_STEPS; k++) {
+    const rr = R * (RMIN + (1 - RMIN) * k / RING_STEPS);
+    rings += `<polygon class="intcc-radar-ring${k === RING_STEPS ? ' is-frame' : ''}" points="${poly(rr)}"/>`;
+  }
   let axes = '';
   // ── SUPREME CLOSURE · §5 — LAS CINCO RADIALES SON LA MISMA LÍNEA ──────────
   // Atenuar la radial de un eje sin datos era una tercera señal de estado sobre
@@ -65117,8 +65123,11 @@ function _intccRadarSvg(radar, dimsOverride) {
   // Si mañana cambian los ángulos o el radio, los rótulos se mueven solos. El SVG
   // se inserta con margen (`--rl-mx` / `--rl-my` en la hoja) para que los rótulos
   // vivan FUERA de la malla y no la tapen.
-  const MY = 0.10;                               // margen vertical de los rótulos
-  const fy = y => ((MY + ((y - vbY) / vbH) * (1 - 2 * MY)) * 100).toFixed(2);
+  // Los rótulos viven en `.intcc-radar-stage`, que mide EXACTAMENTE lo que el
+  // SVG: el vértice se proyecta a porcentaje de ese rectángulo sin supuestos
+  // sobre márgenes del contenedor.
+  const fx = x => (((x - vbX) / vbW) * 100).toFixed(2);
+  const fy = y => (((y - vbY) / vbH) * 100).toFixed(2);
   // A qué lado del vértice se ancla cada rótulo. Se deriva del ÁNGULO, así que
   // tampoco es una tabla: arriba el de la punta, y a izquierda/derecha según el
   // signo del coseno. Es la única decisión tipográfica que la geometría no da.
@@ -65145,17 +65154,27 @@ function _intccRadarSvg(radar, dimsOverride) {
     // 32 px FUERA. Anclado al borde de la tarjeta no puede salirse por
     // construcción, y sigue leyéndose a la altura de su vértice — que es lo que
     // «nombres cerca de sus vértices» significa.
+    // ANCLADO AL VÉRTICE, con UN margen común (`--rl-gap` en la hoja). En los
+    // vértices inferiores la arista exterior sube hacia el rótulo con ángulo θ,
+    // así que la holgura real sería gap·senθ − (media línea)·cosθ; `--rl-k` y
+    // `--rl-c` salen de esa misma geometría para que la holgura PERPENDICULAR a
+    // la malla sea el mismo `gap` en los cinco. No es una tabla por texto.
     const an = anchorOf(i);
-    const pos = an === 'top' ? `left:50%;top:${fy(vy)}%`
-              : an === 'right' ? `right:0;top:${fy(vy)}%`
-              : `left:0;top:${fy(vy)}%`;
+    let k = 1, c = 0;
+    if (an !== 'top' && Math.sin(ang(i)) > 0.2) {
+      const [ux, uy] = pt((i + (an === 'right' ? n - 1 : 1)) % n, R);
+      const th = Math.atan2(Math.abs(uy - vy), Math.abs(ux - vx));
+      k = 1 / Math.sin(th); c = Math.cos(th) / Math.sin(th);
+    }
+    const pos = `left:${fx(vx)}%;top:${fy(vy)}%`
+      + (an === 'top' ? '' : `;--rl-k:${k.toFixed(3)};--rl-c:${c.toFixed(3)}`);
     return `<span class="intcc-radar-vlabel" data-axis="${_intccEsc(d.key)}"`
       + ` data-measured="${isMeasured ? '1' : '0'}" data-anchor="${an}"`
       + ` style="${pos}">`
       + `<b class="intcc-radar-label">${_intccEsc(d.label)}</b>`
       + '</span>';
   }).join('');
-  return `
+  return `<div class="intcc-radar-stage">
     <svg class="intcc-radar-svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" aria-hidden="true"
          data-svg-axes="${dims.length}" data-svg-measured="${measured.length}"
          data-svg-unknown="${dims.length - measured.length}"
@@ -65190,7 +65209,7 @@ function _intccRadarSvg(radar, dimsOverride) {
       <g class="intcc-radar-halos">${halos}</g>
       <g class="intcc-radar-dots">${dots}</g>
     </svg>
-    ${vlabels}`;
+    ${vlabels}</div>`;
 }
 
 // ── Main renderer ───────────────────────────────────────────────────────────
@@ -67538,8 +67557,11 @@ const _INTV7_RADAR_DIMS = Object.freeze([
   Object.freeze({ key: 'diversification', labelKey: 'intcc_dim_breadth', owner: 'aurixRegisteredCategoryBreadth' }),
   Object.freeze({ key: 'stability',       labelKey: 'intcc_dim_stab',   owner: 'aurixPeakRetention' }),
   Object.freeze({ key: 'liquidity',       labelKey: 'intcc_dim_liq',    owner: 'aurixHealthSnapshot' }),
-  Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: 'aurixGrowthAxis' }),
+  // Orden VISUAL en sentido horario desde la punta. Concentración (inferior
+  // izquierda) y Crecimiento (superior izquierda): cada eje lleva su clave y su
+  // owner, así que mover la posición no mueve ningún valor.
   Object.freeze({ key: 'concentration',   labelKey: 'intcc_dim_conc',   owner: 'aurixHealthSnapshot' }),
+  Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: 'aurixGrowthAxis' }),
 ]);
 
 function _intv7RadarAxes() {

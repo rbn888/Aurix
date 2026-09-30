@@ -20564,14 +20564,14 @@ body.gs-open { overflow: hidden; }
 .intcc-radar-wrap { display: grid; place-items: center; }
 .intcc-radar-svg { width: 100%; max-width: 380px; height: auto; }
 /* La malla es SECUNDARIA: baja de 0,10 a 0,07 para que el polígono mande. */
-.intcc-radar-ring { fill: none; stroke: rgba(150,180,240,0.07); stroke-width: 0.7; }
+.intcc-radar-ring { fill: none; stroke: rgba(150,180,240,0.095); stroke-width: 0.7; }
 /* SPEC §11 — EL MARCO NO ES UN NIVEL. Los anillos interiores SÍ son niveles de la
    banda medible [22 %, 88 %] y el exterior es la estructura conceptual del
    pentágono, así que se atenúa un punto para que el ojo no lo lea como «máximo».
    La zona por debajo del anillo interior queda deliberadamente VACÍA: es la zona
    de exclusión visual, y no tener retícula es lo que impide leerla como escala. */
-.intcc-radar-ring.is-frame { stroke: rgba(150,180,240,0.07); }
-.intcc-radar-axis { stroke: rgba(150,180,240,0.075); stroke-width: 0.7; }
+.intcc-radar-ring.is-frame { stroke: rgba(150,180,240,0.095); }
+.intcc-radar-axis { stroke: rgba(150,180,240,0.095); stroke-width: 0.7; }
 /* ── EL POLÍGONO PRINCIPAL · LUMINOSO, NÍTIDO Y CON PROFUNDIDAD ───────────
    El relleno plano de un solo alfa se leía apagado sobre el lienzo. Un degradado
    vertical muy corto da profundidad sin saturar: más presencia arriba, donde
@@ -21590,7 +21590,7 @@ body.gs-open { overflow: hidden; }
 
   /* ── 5. Radar — better read, no added noise.
      Dimmer secondary mesh, brighter main polygon, +10% active dots. */
-  .intcc-radar-ring, .intcc-radar-axis { stroke: rgba(150,180,240,0.07); }
+  .intcc-radar-ring, .intcc-radar-axis { stroke: rgba(150,180,240,0.095); }
   .intcc-radar-area, .intcc-radar-edge {
     fill: rgba(92,156,255,0.27);
     stroke: #8ab6ff;
@@ -29897,12 +29897,17 @@ body.ws-cover .aurix-wsh { max-width: none; }
    `overflow-wrap: normal` A PROPÓSITO, y es la corrección medida: una palabra
    partida a mitad es peor que dos líneas. Misma lección que la portada Free. */
 .intv7-radar .intcc-radar-wrap { position: relative; }
-.intv7-radar .intcc-radar-svg {
-  /* El SVG ocupa el rectángulo INTERIOR: el margen que deja alrededor es donde
-     viven los rótulos, y son las mismas fracciones que usa el owner (0,18 / 0,10)
-     para proyectar cada vértice. Un solo par de números, dos consumidores. */
-  display: block; width: 70%; margin: 0 auto; max-width: 460px;
-  padding: 0; /* el hueco lo pone el `width`, no un padding que falsearía el % */
+.intv7-radar .intcc-radar-svg { display: block; width: 100%; max-width: none; padding: 0; }
+/* EL ESCENARIO MIDE LO MISMO QUE EL SVG: el owner proyecta cada vértice a % de
+   este rectángulo y el rótulo se separa de él un único `--rl-gap`. El ancho
+   reserva a cada lado el margen más el rótulo lateral más largo (`--rl-side`),
+   entre dos topes; el margen superior es el hueco del rótulo de la punta. */
+.intcc-radar-stage {
+  --rl-fs: 11.5px; --rl-gap: 12px; --rl-side: 68px;
+  --rl-half: calc(var(--rl-fs) * 0.625);          /* media línea (lh 1,25) */
+  position: relative; max-width: 460px;
+  width: clamp(52%, calc((100% - 2 * (var(--rl-gap) + var(--rl-side))) / 0.961), 70%);
+  margin: calc(var(--rl-gap) + 2 * var(--rl-half)) auto 2px;
 }
 /* ── EL PENTÁGONO SE QUEDA CON TODA LA SUPERFICIE ÚTIL ───────────────────
    Al retirar la leyenda, la causa por eje y el estado de evidencia, la card se
@@ -29917,8 +29922,8 @@ body.ws-cover .aurix-wsh { max-width: none; }
 }
 .intcc-radar-vlabel {
   position: absolute; z-index: 2;
-  display: flex; flex-direction: column; gap: 1px;
-  max-width: 19%; min-width: 0; pointer-events: none;
+  display: flex; flex-direction: column;
+  white-space: nowrap; pointer-events: none;
 }
 /* El anclaje sale del ÁNGULO del eje, no de una tabla: arriba el de la punta,
    y a un lado u otro según el signo del coseno. */
@@ -29926,15 +29931,20 @@ body.ws-cover .aurix-wsh { max-width: none; }
    por encima del vértice, así que no hay razón para estrecharlo al ancho de los
    laterales. Con 18 % «Amplitud de categorías» caía en tres líneas. */
 .intcc-radar-vlabel[data-anchor="top"] {
-  transform: translate(-50%, -104%); align-items: center; text-align: center;
-  max-width: 52%;
+  transform: translate(-50%, calc(-100% - var(--rl-gap))); text-align: center;
 }
-/* Los laterales se anclan al BORDE de la tarjeta y sólo toman del vértice su
-   altura: así no pueden salirse por estrecha que sea la columna. */
-.intcc-radar-vlabel[data-anchor="right"] { transform: translateY(-50%); align-items: flex-end;   text-align: right; }
-.intcc-radar-vlabel[data-anchor="left"]  { transform: translateY(-50%); align-items: flex-start; text-align: left; }
+/* Los laterales parten del vértice hacia fuera; `--rl-k`/`--rl-c` los fija el
+   owner desde el ángulo de la arista para que la holgura perpendicular sea la
+   misma en los cinco. */
+.intcc-radar-vlabel[data-anchor="right"] {
+  transform: translate(calc(var(--rl-k, 1) * var(--rl-gap) + var(--rl-c, 0) * var(--rl-half)), -50%);
+}
+.intcc-radar-vlabel[data-anchor="left"] {
+  transform: translate(calc(-100% - var(--rl-k, 1) * var(--rl-gap) - var(--rl-c, 0) * var(--rl-half)), -50%);
+}
+/* LA ÚNICA REGLA TIPOGRÁFICA de las cinco categorías. */
 .intcc-radar-label {
-  font-size: 11.5px; line-height: 1.25; font-weight: 600;
+  font-size: var(--rl-fs); line-height: 1.25; font-weight: 600;
   color: rgba(214,226,255,0.74);
   overflow-wrap: normal; word-break: normal; hyphens: none;
 }
@@ -29950,23 +29960,8 @@ body.ws-cover .aurix-wsh { max-width: none; }
 /* El estado de evidencia al pie se retira con el mismo argumento: la figura ya
    no está incompleta, así que no hay bloqueo que informar bajo ella, y el SPEC
    prohíbe el separador con párrafo explicativo. */
-/* Móvil: la figura puede crecer porque los rótulos laterales son cortos, pero se
-   les deja algo más de ancho para que ningún nombre baje de dos líneas. */
+/* Móvil: un punto menos de tipo para las cinco y un margen algo mayor. El
+   margen inferior devuelve a la card la altura que tenía antes del pulido. */
 @media (max-width: 480px) {
-  /* 66 % y no 68 %: a 360 px el marcador de Estabilidad quedaba a 13 px de su
-     nombre y el halo llegaba a tocarlo. La holgura la paga la figura, no el
-     rótulo — partir una palabra es peor que un pentágono un punto más chico. */
-  .intv7-radar .intcc-radar-svg { width: 66%; }
-  .intcc-radar-vlabel { max-width: 18%; }
-  .intcc-radar-label { font-size: 11px; }
-}
-/* Escritorio: en la rejilla de tres columnas la tarjeta es estrecha, así que la
-   figura cede ancho a los rótulos en vez de partirlos. */
-@media (min-width: 1024px) {
-  /* En la rejilla de tres columnas la card es estrecha y los rótulos laterales
-     necesitan su 19 % cada uno: 64 % + 2·19 % = 102 %, un solapamiento de 1 %
-     por lado que cae sobre el aire del `PAD` del viewBox y no sobre la malla.
-     Con 68 % el nombre se apoyaba en el anillo exterior. */
-  .intv7-radar .intcc-radar-svg { width: 64%; }
-  .intcc-radar-vlabel { max-width: 19%; }
+  .intcc-radar-stage { --rl-fs: 11px; --rl-gap: 13px; --rl-side: 66px; margin-bottom: 5px; }
 }

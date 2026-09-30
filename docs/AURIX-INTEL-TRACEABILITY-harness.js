@@ -1350,7 +1350,9 @@ console.log('\nRQ · Gates quirúrgicos del Radar: la figura es una constante:')
       return labels.length === 5 && labels.every(x => x === labels[0])
         && !/intcc-radar-label[^"]*is-/.test(r.card)
         && styles.length === 5
-        && styles.every(x => /^(?:left:50%|left:0|right:0);top:[\d.]+%$/.test(x)); })
+        // Pulido geométrico: posición = vértice proyectado (+ factores de
+        // holgura del lateral inferior). Sigue siendo SÓLO posición.
+        && styles.every(x => /^left:[\d.]+%;top:[\d.]+%(?:;--rl-k:[\d.]+;--rl-c:[\d.]+)?$/.test(x)); })
     // …y la hoja tampoco distingue por estado de evidencia.
     && !/\[data-measured="0"\][^{]*\{/.test(css.replace(/\s+/g, ' '))
     && !/\.intcc-radar-label\.is-/.test(css),
@@ -1379,7 +1381,7 @@ console.log('\nRQ · Gates quirúrgicos del Radar: la figura es una constante:')
   // (sonda de aceptación, seis anchos y dos motores); esto impide el retroceso
   // que la haría imposible: un rótulo posicionado fuera del 0–100 %.
   ok('RQ.13 los rótulos se anclan DENTRO de la card, sin posiciones fuera de rango',
-    every(r => { const tops = [...r.card.matchAll(/style="(?:left:50%|left:0|right:0);top:([\d.]+)%"/g)]
+    every(r => { const tops = [...r.card.matchAll(/style="left:[\d.]+%;top:([\d.]+)%(?:;--rl-k:[\d.]+;--rl-c:[\d.]+)?"/g)]
         .map(m => Number(m[1]));
       return tops.length === 5 && tops.every(t => t >= 0 && t <= 100); }),
     JSON.stringify([...rendered[0].card.matchAll(/style="[^"]*top:([\d.]+)%"/g)].map(m => m[1])));

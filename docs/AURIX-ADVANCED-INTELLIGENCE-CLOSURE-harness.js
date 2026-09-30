@@ -1308,7 +1308,7 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
         && !/intcc-radar-legend|intcc-radar-leg-item/.test(hUnk)
         && /<svg class="intcc-radar-svg[^>]*aria-hidden="true"/.test(hUnk)
         && !/<text/.test(hUnk)
-        && count(hUnk, /style="(?:left:50%|left:0|right:0);top:[\d.]+%"/g) === 5
+        && count(hUnk, /style="left:[\d.]+%;top:[\d.]+%(?:;--rl-k:[\d.]+;--rl-c:[\d.]+)?"/g) === 5
         && hUnk.indexOf('>40%<') === -1 && hUnk.indexOf('>60%<') === -1; })(),
     JSON.stringify((hUnk.match(/class="intcc-radar-vlabel"[\s\S]{0,160}/) || [])[0] || null));
   ok('11.9 el ciclo se traza entero: cinco segmentos, ninguno punteado',
@@ -1384,7 +1384,9 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
     (() => { const src0 = fnSrc('_intccRadarSvg');
       // Los anillos se mapean por la MISMA transformación de la serie y los ejes
       // arrancan del anillo interior, no del centro.
-      return /rings \+= `<polygon class="intcc-radar-ring" points="\$\{poly\(rBand\(f\)\)\}"\/>`/.test(src0)
+      // Pulido geométrico: la malla va a paso constante desde la línea del cero
+      // (R·RMIN) hasta el marco, y ya no se mapea por `rBand`.
+      return /const rr = R \* \(RMIN \+ \(1 - RMIN\) \* k \/ RING_STEPS\)/.test(src0)
         && /x1="\$\{ix\.toFixed\(1\)\}" y1="\$\{iy\.toFixed\(1\)\}"/.test(src0)
         && !/x1="\$\{cx\}" y1="\$\{cy\}"/.test(src0); })());
   // §7 — el halo pasa a ser un DISCO opaco del color del lienzo INMEDIATAMENTE
@@ -2638,7 +2640,7 @@ console.log('\nSC · RESIDUALES · un rendimiento sin periodo, y un drawdown sin
       const h = run('_intv7RadarHtml(s => s)', c);
       return !!h && typeof r.display.stability === 'string'
         && /90/.test(r.display.stability) && /82/.test(r.display.stability)
-        && !/82/.test(h) && !/class="intcc-radar-val"/.test(h); })(),
+        && !/82/.test(h.replace(/<[^>]*>/g, ' ')) && !/class="intcc-radar-val"/.test(h); })(),
     run('_intv7RadarHtml(s => s)', (() => { const c = makeCtx({});
       run('_aurixPeakRetention = () => ({ status: "available", retentionPct: 82, quality: "measured",'
         + ' startsAfterRecord: true, spanMs: ' + (90 * DAY) + ' })', c); return c; })()).slice(0, 400));

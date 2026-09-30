@@ -1389,7 +1389,12 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   ok('25.4 los rótulos del radar se declaran por encima del suelo de 11 px',
     // `.intcc-radar-val` desaparece con la cifra, así que el suelo se mide en
     // los selectores que QUEDAN: el rótulo base y el que redeclara el teléfono.
-    (() => { const idxs = [];
+    // Pulido geométrico: el tamaño es UNA variable (`--rl-fs`) que consume la
+    // única regla del rótulo; se exige el suelo en cada declaración de ella.
+    (() => { const fsd = [...css.matchAll(/--rl-fs:\s*([\d.]+)px/g)].map(m => Number(m[1]));
+      if (/\.intcc-radar-label \{[^}]*font-size:\s*var\(--rl-fs\)/.test(css.replace(/\s+/g, ' ')))
+        return fsd.length >= 2 && fsd.every(v => v >= 11);
+      const idxs = [];
       const re = /\.intcc-radar-label \{/g;
       let m; while ((m = re.exec(css))) idxs.push(m.index);
       // …y también los que el breakpoint de móvil vuelve a declarar.
@@ -1473,7 +1478,7 @@ console.log('\n§25/§36 · presentación: el alto sigue al contenido y nada se 
   // leyenda estrecha («Ampl / itud / de / cate / goría / s»).
   ok('25.8 en teléfono el rótulo tiene ancho propio y NUNCA parte una palabra',
     (() => { const flat = css.replace(/\s+/g, ' ');
-      return /@media \(max-width: 480px\)[\s\S]{0,400}\.intcc-radar-vlabel \{ max-width: \d\d%/.test(flat)
+      return /\.intcc-radar-vlabel \{[^}]*white-space: nowrap/.test(flat)
         && /\.intcc-radar-label \{[^}]*overflow-wrap: normal/.test(flat)
         && !/\.intcc-radar-label \{[^}]*overflow-wrap: anywhere/.test(flat); })(),
     'el rótulo del radar no puede usar `overflow-wrap: anywhere`');

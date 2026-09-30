@@ -600,7 +600,7 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   ok('3.13 el SVG ya no contiene texto: nada que escalar y nada que recortar',
     !/<text/.test(svg) && /aria-hidden="true"/.test(svg)
     && (svg.match(/class="intcc-radar-vlabel"/g) || []).length === 5
-    && (svg.match(/style="(?:left:50%|left:0|right:0);top:[\d.]+%"/g) || []).length === 5
+    && (svg.match(/style="left:[\d.]+%;top:[\d.]+%(?:;--rl-k:[\d.]+;--rl-c:[\d.]+)?"/g) || []).length === 5
     && !/intcc-radar-leg-item/.test(svg),
     svg.match(/viewBox="[^"]+"/)?.[0]);
   ok('3.14 el marco se ciñe a la figura y la contiene entera, con cualquier serie',

@@ -440,7 +440,7 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   // demás. Eso era el objetivo del orden intercalado y sigue vigente; lo que
   // desaparece es el vértice fantasma.
   ok('3.5b the drawn axes are the CERTIFIED ones, in the frozen relative order',
-    (() => { const ORDER = ['Amplitud de categorías','Estabilidad','Liquidez','Crecimiento','Concentración'];
+    (() => { const ORDER = ['Amplitud de categorías','Estabilidad','Liquidez','Concentración','Crecimiento'];
       const drawn = attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<');
       const idx = drawn.map(l => ORDER.indexOf(l));
       return drawn.length >= 3 && idx.every(i => i >= 0)
@@ -1150,7 +1150,7 @@ console.log('\n13B · Five conceptual axes always; values only where certified:'
         && en.vals.filter(v => v === 'no data').length === 0
         && en.labels.length === 5 && founder.labels.length === 5
         && JSON.stringify(en.labels)
-             === JSON.stringify(['Category breadth','Stability','Liquidity','Growth','Concentration']); })(),
+             === JSON.stringify(['Category breadth','Stability','Liquidity','Concentration','Growth']); })(),
     JSON.stringify(st(['crypto', 'crypto', 'cash'], 'en').vals));
   ok('13B.15 no renderer arithmetic beyond the declared share transform',
     (() => { const src = fnSrc('_intv7RadarAxes');
