@@ -166,7 +166,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -706,8 +706,10 @@ console.log('\n9 · Wealth memory uses only publishable events:');
       return keys.every(k => core.temporalEvents.some(f => f.semanticKey === k)); })());
   ok('9.4 no event repeats the same fact', (() => { const keys = attrs(sec, 'data-fact="([^"]+)"');
     return new Set(keys).size === keys.length; })());
-  ok('9.5 an event states WHAT and WHY IT MATTERS, and WHEN when known',
-    /intv4-mem-what/.test(sec) && /intv4-mem-why/.test(sec));
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  // «Tu evolución» publica el hecho y su fecha; el «por qué» metodológico se retira.
+  ok('9.5 an event states WHAT, and WHEN when known — without methodological caveats',
+    /intv4-mem-what/.test(sec) && !/intv4-mem-why/.test(sec));
   ok('9.6 no field is padded when absent',
     !/intv4-mem-why"><\/span>|intcc-tl-date"><\/span>/.test(sec));
   ok('9.7 no retroactive causality is invented', !/despu[eé]s de esto|after that, because/i.test(html));
@@ -762,22 +764,22 @@ console.log('\n11 · A limit is explained, never turned into a figure:');
   // limit is now a quiet line beside the disclaimer, and Explore still offers it
   // as a full question when it is genuinely relevant.
   const sec = (html.match(/<p class="intcc-(?:drv|surface)-limit">([\s\S]*?)<\/p>/) || [, ''])[1];
-  ok('11.1 the honest limit is an inline line inside the analysis it limits, not a giant card',
-    !!sec && !/intv4-quality/.test(html)
-    // …y ya no cuelga del disclaimer global, que vuelve a decir una sola cosa.
-    && !/intv5-honesty/.test(html)
-    // CHECKPOINT J — la de atribución vive en «Lo que importa hoy» o en «Tu
-    // evolución», nunca en Factores: el ranking de exposición es exacto y no
-    // tiene por qué pedir perdón por algo que hace bien.
-    && (/intv5-matters[\s\S]*intcc-surface-limit/.test(html)
-        || /intv4-memory[\s\S]*intcc-surface-limit/.test(html))
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  // Las limitaciones del motor ya no se publican en Hoy ni en Tu evolución (son
+  // explicaciones internas); siguen sin card propia y sin colgar de Factores.
+  ok('11.1 no engine-limit line in Hoy or Evolution, no giant card, none in Factores',
+    !/intv4-quality/.test(html) && !/intv5-honesty/.test(html)
+    && !/intv5-matters[^]*?intcc-surface-limit[^]*?<\/section>/.test(section(html, 'intv5-matters'))
+    && !/intcc-surface-limit/.test(section(html, 'intv5-matters'))
+    && !/intcc-surface-limit/.test(section(html, 'intv4-memory'))
     && !/intcc-drivers[\s\S]*?intcc-drv-limit/.test(html));
   ok('11.2 it contains no percentage and no currency figure',
     !/\d+([.,]\d+)?\s*%/.test(sec) && !/[€$]\s?\d/.test(sec), sec.slice(0, 240));
   ok('11.3 a raw status token never leaks to the UI',
     !/insufficient_history|low_confidence|unavailable_source|not_yet_supported/.test(html));
-  ok('11.4 attribution is explained as a limit, not attempted',
-    /por posici[oó]n|per-position/i.test(sec) && /no puede|cannot/i.test(sec), sec.slice(0, 240));
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  ok('11.4 attribution is never attempted (no asset is named as the cause of the return)',
+    !/(explic[oó]|explained) tu rendimiento|drove your return|gracias a (Bitcoin|Ethereum|Apple)/i.test(html), sec.slice(0, 240));
   ok('11.5 no status is rendered as 0 / neutral', !/>0<|>neutral</i.test(html));
 }
 
@@ -1355,7 +1357,7 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
   ok('15.10 un usuario NUEVO conserva el estado honesto, ahora compacto y en una frase',
     /intv4-memory is-accruing/.test(young.html)
     && /data-compact="1"/.test(young.html)
-    && /Aún no hay historial suficiente para mostrar tu evolución/.test(young.html)
+    && /Aurix está creando tu primera referencia histórica/.test(young.html)
     && !/intv6-accrue-node/.test(young.html));
   // ── CHECKPOINT G · «ESTABLE» ERA UN VEREDICTO QUE NADIE HABÍA MEDIDO ───
   // Este assert exigía literalmente «se mantiene estable desde el …» y
@@ -1369,18 +1371,17 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
   // que dice los mismos días Y por qué todavía no bastan. Lo que este assert
   // protege es lo importante y no se mueve: sin comparación demostrable NO se
   // afirma estabilidad.
-  ok('15.11 historia SÍ pero sin comparación ⇒ se declara el LÍMITE, nunca estabilidad',
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  // Historia plana CON dos extremos certificados ES una comparación: se publica
+  // la lectura fechada, y nunca «no puede comparar» ni un número de días.
+  ok('15.11 historia plana comparable ⇒ lectura fechada; nunca «no puede comparar» ni días observados',
     (() => { const flat = render(Object.assign({}, MATURE, {
         rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] }));
       const m = section(flat.html, 'intcc-timeline');
-      return /intv4-memory is-coverage/.test(m) && !/is-accruing/.test(m)
-        && /data-no-comparison="1"/.test(m) && /data-stable="0"/.test(m)
-        && /todavía no puede comparar/.test(m)
-        && /una lectura de hoy, no una evolución/.test(m)
-        && /data-coverage-days="\d+"/.test(m)
-        // …y NI UN contador interno ni la palabra retirada.
-        && !/observacion/i.test(m) && !/memoria/i.test(m)
-        && !/se mantiene/.test(m); })(),
+      return /intv4-memory is-stable/.test(m) && /data-stable="1"/.test(m)
+        && /Entre el .+ y el .+/.test(m)
+        && !/no puede comparar|días observando|data-coverage-days/.test(m)
+        && !/observacion/i.test(m) && !/memoria/i.test(m); })(),
     section(render(Object.assign({}, MATURE, { rows: inv([10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000]), flows: [] })).html, 'intcc-timeline').slice(0, 400));
 
   // ── E · QUÉ HA CAMBIADO ──────────────────────────────────────────────────
@@ -1433,6 +1434,9 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
           f.semanticKey !== 'investable_level_change' && f.semanticKey !== 'investable_prior_high'),
         dataAvailability: Object.assign({}, core0.dataAvailability,
           { observation: { observations: 0, startAt: null, endAt: null, spanMs: null } }),
+        // Sin comparaciones certificadas tampoco (la evidencia de estabilidad ES
+        // una comparación desde el SPEC «Evolución real»).
+        stabilityEvidence: [],
       });
       c.__stripped = stripped;
       const html = run('_intv4MemoryHtml(__stripped, _intccEsc, [])', c);
@@ -1548,7 +1552,8 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
     // §4.6 — la firma vuelve a sus cuatro argumentos: la marca de visita se
     // retiró como referencia (es un timestamp de presentación, no un extremo de
     // medición), así que la card no necesita nada del almacenamiento.
-    /_intv4ChangedHtml\(core, esc, publishedKeys, memoryClaims\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
+    // + la selección de Hoy (`_hoyEv`): «Qué ha cambiado» no repite lo que Hoy titula.
+    /_intv4ChangedHtml\(core, esc, publishedKeys, memoryClaims, _hoyEv\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
   // Cada superficie conserva su propósito: la Memoria sigue fechando, y Qué ha
   // cambiado sigue siendo una lista de novedades con dirección.
   ok('16.11 cada superficie conserva su propósito (Memoria: hito CON fecha; cambios: dirección)',

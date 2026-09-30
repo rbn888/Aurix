@@ -20406,7 +20406,7 @@ body.gs-open { overflow: hidden; }
 .intcc-hero .intcc-score-ring { position: relative; width: 116px; height: 116px; display: grid; place-items: center; }
 .intcc-hero .intcc-score-svg  { width: 116px; height: 116px; }
 .intcc-hero-score .intcc-health-badge { margin: 2px 0 0; }
-.intcc-hero-health-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; color: rgba(159,194,255,0.95); text-transform: uppercase; }
+.intcc-hero-health-label { font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; color: rgba(159,194,255,0.95); text-transform: uppercase; }
 /* INT.2ZC — desktop/tablet hero: the Inteligencia module groups body + orb as one
    block (sibling to the Salud module). Hidden hero (≤640) is unaffected; mobile
    uses the dedicated .intcc-m-* cards. */
@@ -21009,7 +21009,6 @@ body.gs-open { overflow: hidden; }
 .aurix-intv6 .intcc-hero-intel { align-items: flex-start; padding-top: 14px; }
 .aurix-intv6 .intcc-hero-orb-wrap { align-self: center; }
 .aurix-intv6 .intcc-hero-body { padding-top: 0; }
-.aurix-intv6 .intcc-hero-health-label,
 .aurix-intv6 .intcc-hero-body .intcc-eyebrow {
   display: block;
   margin: 0 0 10px;
@@ -21443,6 +21442,9 @@ body.gs-open { overflow: hidden; }
      `align-items: flex-start` para que el texto empiece arriba junto al anillo
      y no flote centrado dejando aire arriba y abajo. */
   .intcc-m-health-body { display: flex; align-items: flex-start; gap: 16px; }
+  /* SALUD = título, anillo y estado: sin explicación al lado, el anillo se centra
+     en la card en vez de dejar media superficie vacía. */
+  .intcc-m-health-body:not(:has(.intcc-m-health-explain)) { justify-content: center; }
   .intcc-m-health-explain { flex: 1 1 auto; min-width: 0; }
   .intcc-m-health-explain p {
     margin: 0 0 6px; font-size: 12.5px; line-height: 1.45;

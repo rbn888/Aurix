@@ -389,8 +389,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} el comparador NO está duplicado en Intelligence`, c.cmpInIntel === false);
     // ── §6 · SALUD COMPACTA, CON SU EXPLICACIÓN Y SIN HUECO ────────────────
     if (c.health) {
-      ok(`${tag} Salud lleva su anillo y su explicación dentro`,
-        c.health.ring === true && c.health.explain === true, JSON.stringify(c.health));
+      // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30):
+      // Salud es título, anillo y estado; la explicación se retira de la card.
+      ok(`${tag} Salud lleva su anillo y NINGUNA explicación (título, anillo y estado)`,
+        c.health.ring === true && c.health.explain === false, JSON.stringify(c.health));
       ok(`${tag} Salud no reserva hueco vacío`, c.health.dead <= 56, JSON.stringify(c.health));
     }
     // ── §6 · LA COMPOSICIÓN DE ESCRITORIO, POR FILAS ───────────────────────

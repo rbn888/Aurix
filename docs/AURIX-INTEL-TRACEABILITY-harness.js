@@ -172,7 +172,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -843,7 +843,13 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   // El acuse se guarda por PROPIETARIO (`_aurixIntelWriteOwned` se niega sin uno,
   // que es el fail-closed correcto), así que el caso se ejercita con una cuenta
   // real igual que en producción.
-  const c1 = makeCtx(APPLE);
+  // SPEC «cero repetición»: «Lo que importa hoy» titula primero y «Qué ha
+  // cambiado» no repite lo que Hoy ya publica. Este bloque certifica la MECÁNICA
+  // del acuse sobre las filas PROPIAS de «Qué ha cambiado», así que sus contextos
+  // se aíslan con Hoy vacío (el supuesto con el que se escribió): los owners del
+  // acuse, del recuento y de la persistencia son los reales.
+  const isolateAck = (c) => { run('_intv5MattersStories = function(){ return { stories: [], stale: false, rankedBy: "isolated" }; };', c); return c; };
+  const c1 = isolateAck(makeCtx(APPLE));
   c1._aurixActiveUserId = 'founder-qa';
   const h1 = run('_renderIntelligenceCommandCenter()', c1);
   const id1 = ackOf(h1), sg1 = sigOf(h1);
@@ -873,7 +879,7 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
     JSON.stringify({ mem_before: count(h1, /class="intcc-tl-item/g),
       mem_after: count(h2, /class="intcc-tl-item/g) }));
   ok('10.12 PERSISTE tras refrescar: un contexto nuevo con el mismo almacenamiento lo lee revisado',
-    (() => { const c2 = makeCtx(APPLE);
+    (() => { const c2 = isolateAck(makeCtx(APPLE));
       c2._aurixActiveUserId = 'founder-qa';
       c2.__store = JSON.parse(JSON.stringify(c1.__store));
       const h3 = run('_renderIntelligenceCommandCenter()', c2);
@@ -888,7 +894,7 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
         && Number(heroPending(h4)) === Number(heroPending(h2)); })());
   ok('10.14 CROSS-DEVICE: el acuse viaja por el merge y el otro dispositivo lo lee revisado',
     (() => { const mine = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c1);
-      const other = makeCtx(APPLE);
+      const other = isolateAck(makeCtx(APPLE));
       other._aurixActiveUserId = 'founder-qa';
       const merged = run('_aurixIntelCtxMerge(' + JSON.stringify(mine) + ', null)', other);
       run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify(merged) + ', {})', other);
@@ -902,7 +908,7 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   ok('10.15 SÓLO evidencia nueva reabre, y una sola vez (firma distinta ⇒ episodio nuevo)',
     (() => { const signed = h1.match(/data-intel-ack="([^"]+)"\s*\n\s*data-intel-sig="([^"]+)"/);
       if (!signed) return false;
-      const c3 = makeCtx(APPLE);
+      const c3 = isolateAck(makeCtx(APPLE));
       c3._aurixActiveUserId = 'founder-qa';
       const base = Number(heroPending(run('_renderIntelligenceCommandCenter()', c3)));
       run('_aurixIntelAcknowledge(' + JSON.stringify(signed[1]) + ', { signature: '
@@ -1193,11 +1199,13 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
   // «hoy» obligaba a mover las cuatro cosas con él —se probó, y rompía nueve
   // aserciones de acuse e idempotencia— para ganar una posición de titular.
   // El hecho NO se pierde: sigue publicado, con su cifra y su control.
-  ok('ADV.2 la operación registrada se publica en UNA sola superficie',
+  // CONTRATO RE-DECIDIDO (SPEC «cero repetición», prioridad Hoy > Evolución >
+  // Qué ha cambiado): la unicidad se mantiene y el destino pasa a ser Hoy.
+  ok('ADV.2 la operación registrada se publica en UNA sola superficie (Hoy)',
     (() => { const inBrief = /data-fact="operation_registered_a2"/.test(brief);
       const chg = section(h, 'intv4-changed');
       const inChanged = /operation_registered_a2/.test(chg);
-      return inChanged && !inBrief; })(),
+      return inBrief && !inChanged; })(),
     JSON.stringify({ brief: /operation_registered_a2/.test(brief),
       changed: /operation_registered_a2/.test(section(h, 'intv4-changed')) }));
   // §14/§20 — «Es un registro tuyo, no un resultado» se RETIRA del inicio: era una
@@ -1222,9 +1230,9 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
       // O publica hechos propios, o declara honestamente que no tiene ninguno.
       return Number(items) > 0 || /intcc-empty-body/.test(brief); })(),
     (brief.match(/data-items="\d+"/) || [''])[0]);
-  ok('ADV.3b y el importe del registro vive en «Qué ha cambiado», no duplicado arriba',
-    /Hoy has (registrado|comprado)/.test(section(h, 'intv4-changed'))
-    && !/Hoy has (registrado|comprado)/.test(brief),
+  ok('ADV.3b y el importe del registro vive en Hoy, sin duplicarse en «Qué ha cambiado»',
+    !/Hoy has (registrado|comprado)/.test(section(h, 'intv4-changed'))
+    && /Hoy has (registrado|comprado)/.test(brief),
     (section(h, 'intv4-changed').match(/Hoy has [^<]{0,60}/) || [, ''])[0]);
   ok('ADV.4 el hero cuenta el registro como algo pendiente de revisar',
     Number(num(h, /class="intcc-hero[^"]*"[^>]*data-review-pending="(\d+)"/)) > 0,

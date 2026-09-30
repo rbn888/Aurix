@@ -228,7 +228,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv16StableLimit','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -740,7 +740,7 @@ console.log('\n§6 · Salud visible desde el primer activo');
   // La CARD, ejecutada.
   const rA = render(CUENTA_A);
   ok('6.6 CUENTA A publica la card de Salud con anillo, % y UN estado',
-    /class="intcc-hero-health-label"/.test(rA.html)
+    /class="intcc-card-title intcc-hero-health-label"/.test(rA.html)
     && /class="intcc-health-badge/.test(rA.html)
     && /class="intcc-score-val">\d+<\/span><span class="intcc-score-suffix">%/.test(rA.html),
     (rA.html.match(/intcc-score-val">[^<]*/) || [''])[0]);
@@ -848,7 +848,7 @@ console.log('\n§7 · hero · titular, revisiones y orden');
   // anunciar «1 cambio ya revisado · Ver el historial» para algo que ni está
   // revisado ni el destino puede pintar. Ahora sale de la MISMA lista.
   ok('7.4b el número del historial sale de la lista que el destino RENDERIZA',
-    /_intv4FindingRows\(core, \{ all: true \}\)\.filter\(x => x\.reviewed\)\.length/.test(src0)
+    /_intv4FindingRows\(core, \{ all: true, hoy: _hoyEv \}\)\.filter\(x => x\.reviewed\)\.length/.test(src0)
     && !/reading\.allCount \|\| 0\) - findingCount/.test(src0));
   ok('7.7 el hero no publica dos estados contradictorios a la vez',
     /activeReviewCount > 0\) \{\s*\n\s*nowState = 'review_pending';/.test(fnSrc('_intv5Reading')));
@@ -1010,10 +1010,13 @@ console.log('\n§8 · etiquetas con evidencia');
   // confirmaciones»— es justo lo que el checkpoint B corrige: la lista tiene
   // que poder decir qué limita la cifra. Lo que NO puede cambiar es que el
   // «✓» signifique confirmado.
-  ok('8.7c el «✓» de la lista de Salud sólo acompaña a una CONFIRMACIÓN',
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  // Salud ya no pinta lista de conclusiones (título, anillo y estado). Si algún
+  // día vuelve, el «✓» sigue reservado a una confirmación.
+  ok('8.7c el «✓» de la lista de Salud sólo acompaña a una CONFIRMACIÓN (o no hay lista)',
     (() => { const src0 = fnSrc('_renderIntelligenceCommandCenter');
       const m = src0.match(/intcc-m-concl-check"[^>]*>\$\{([^}]*)\}/);
-      return !!m && /c\.tone === 'good' \? '✓'/.test(m[1]); })());
+      return !m ? !/intcc-m-concl-row/.test(render(CUENTA_B).html) : /c\.tone === 'good' \? '✓'/.test(m[1]); })());
   ok('8.7f …y ninguna fila NO verificada lo lleva, medido sobre el HTML pintado',
     (() => { const h = render(CUENTA_B).html;
       const rows = h.match(/<li class="intcc-m-concl-row is-([a-z]+)"><span class="intcc-m-concl-check"[^>]*>([^<]*)</g) || [];
@@ -1199,7 +1202,7 @@ console.log('\n§10 · acuse de recibo');
   // reclamó, que no borra nada: mueve el hecho de superficie.
   ok('10.7 el acuse NO borra la fila del historial: cambia de estado',
     /rows\.map\(x => `/.test(fnSrc('_intv4ChangedHtml'))
-    && /_intv4FindingRows\(core, \{ all: true \}\)/.test(fnSrc('_intv4ChangedHtml'))
+    && /_intv4FindingRows\(core, \{ all: true, hoy: hoy \}\)/.test(fnSrc('_intv4ChangedHtml'))
     && /reviewed: all \? !active\.has\(id\) : false/.test(fnSrc('_intv4FindingRows')));
 }
 
@@ -2233,7 +2236,7 @@ console.log('\nSC · §4.5 · «Tu evolución» publica hechos, no respuestas');
   ok('SC.5.7 el estado vacío es COMPACTO y dice una sola frase',
     (() => { const h = render(YOUNG).html;
       return /data-compact="1"/.test(h) && !/intv6-accrue-node/.test(h)
-        && h.indexOf(DICT.es.intv4_memory_empty) !== -1; })(),
+        && h.indexOf(DICT.es.intv17_first_ref) !== -1; })(),
     section(render(YOUNG).html, 'intcc-timeline').slice(0, 260));
   ok('SC.5.8 …y esa frase es la que el §4.5 dicta, en los dos idiomas',
     /^Aún no hay historial suficiente/.test(DICT.es.intv4_memory_empty)
@@ -4036,10 +4039,12 @@ console.log('\nDC · L · coherencia entre dispositivos');
     /_aurixIntelReadOwned/.test(fnSrc('_intv14CmpState'))
     && /_aurixIntelReadOwned/.test(fnSrc('_aurixCmpRecent')));
   ok('L.7 el muestreo interno NUNCA se expone: cero contadores de observación en copy',
-    (() => { const leak = ['intv4_memory_coverage', 'intv4_brief_stale', 'intel_sub_no_news']
+    // `intv4_memory_coverage` se retiró (SPEC «Evolución real»); se vigilan las que
+    // la sustituyen en «Tu evolución».
+    (() => { const leak = ['intv17_first_ref', 'intv17_longer', 'intv4_brief_stale', 'intel_sub_no_news']
         .map(k => String(typeof DICT.es[k] === 'function' ? DICT.es[k](33) : DICT.es[k]));
       return !leak.some(t => /observacion|snapshot|bucket|muestreo/i.test(t)); })(),
-    JSON.stringify(['intv4_memory_coverage'].map(k => DICT.es[k](33))));
+    DICT.es.intv17_first_ref);
   // El aislamiento del comparador entre cuentas ya se ejecuta en §6 (6.9,
   // «el comparador de A no aparece en B»); aquí se mide lo que aquel no
   // cubre: que el sello por cuenta esté en el OWNER y no en el llamador.
@@ -4051,7 +4056,7 @@ console.log('\nDC · L · coherencia entre dispositivos');
 console.log('\nDC · M · idiomas y accesibilidad');
 {
   ok('M.1 TODA clave nueva de este cierre existe en los DOS idiomas',
-    (() => { const keys = ['intcc_chip_limit_spread', 'intcc_chip_nodata', 'intv4_memory_coverage',
+    (() => { const keys = ['intcc_chip_limit_spread', 'intcc_chip_nodata', 'intv17_first_ref',
         'intv4_brief_stale', 'intv4_brief_stale_note', 'intv4_dq_cover_full', 'intv4_dq_cover_partial',
         'intv4_dq_history', 'intv4_dq_history_none', 'intv4_dq_can', 'intv4_dq_cannot_intro',
         'intv4_cv_asof', 'cmp_diff_more', 'cmp_diff_less', 'cmp_diff_flat',
@@ -4242,7 +4247,8 @@ console.log('\nDC · J · cada limitación, junto a la afirmación que limita');
         && !/retained peak/i.test(DICT.en.intv4_gap_position_drawdown_from_peak); })(),
     DICT.es.intv4_gap_position_drawdown_from_peak);
   // NO-VACUIDAD · que el enrutado llegue de verdad al DOM de cada card.
-  ok('J.10 la limitación de HOY se pinta dentro de la card de Hoy, no en otra',
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  ok('J.10 «Lo que importa hoy» publica el titular sin la limitación del motor',
     (() => { const c = makeCtx(CUENTA_B);
       const now = 1760000000000;
       run('_aurixNow = function () { return ' + now + '; };', c);
@@ -4258,8 +4264,9 @@ console.log('\nDC · J · cada limitación, junto a la afirmación que limita');
         dataAvailability: { observation: { endAt: now - 3600e3 } } };
       const h = run('_intv5MattersHtml(' + JSON.stringify(core0)
         + ', _intccEsc, "standard", [], null, {}, ' + JSON.stringify('LIMITE-HOY') + ')', c);
+      // «Lo que importa hoy» publica sólo el titular: la limitación ya no se pinta.
       return /data-items="[1-9]/.test(h)
-        && /intcc-surface-limit/.test(h) && h.indexOf('LIMITE-HOY') !== -1; })(),
+        && !/intcc-surface-limit/.test(h) && h.indexOf('LIMITE-HOY') === -1; })(),
     'la limitación de Hoy');
   ok('J.11 …y sin contenido que acotar, la limitación NO se pinta sola',
     (() => { const c = makeCtx(CUENTA_B);
@@ -4302,8 +4309,11 @@ console.log('\nDC · R2/R3 · residuales del cierre');
   });
   const cardR = (activos) => run('_intv5MattersHtml(' + JSON.stringify(coreR(activos))
     + ', _intccEsc, "standard", [], null, {}, "")', ctxR());
-  ok('R2.1 con el acontecimiento NUEVO activo, «hoy» cede la raíz al destino',
-    /data-items="0"/.test(cardR([NUEVO])),
+  // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  // Hoy ya no cede por raíz: titula el hecho actual, y es «Qué ha cambiado»
+  // quien no lo repite.
+  ok('R2.1 con el acontecimiento NUEVO activo, «hoy» TITULA (ya no cede la raíz)',
+    /data-items="1"/.test(cardR([NUEVO])),
     (cardR([NUEVO]).match(/data-items="\d+"/) || [''])[0]);
   ok('R2.2 REGRESIÓN · acusado el VIEJO, el NUEVO vuelve a poder publicarse',
     (() => { const h = cardR([]);          // nada activo: sólo queda historial
