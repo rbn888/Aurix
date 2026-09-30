@@ -45,7 +45,7 @@ function ctx(opts) {
   vm.runInContext('var __UP = []; function openUpgradeIntent(o){ __UP.push(o); return false; }', sb);
   vm.runInContext('var _wsToolActive=null, _wsToolInputs=null, _wsToolEditId=null, _wsToolDirty=false, _wsReturnTab="tools", _wshView="home";', sb);
   ['_WSH_PROJECTS_KEY','_WSH_GOALS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES','_WSPL_GOAL',
-   '_WSBUD_INCOME','_WSBUD_EXPENSES'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    // §3 del cierre v789 — la tarjeta CALLA el subtítulo cuando repetiría el título
@@ -53,6 +53,7 @@ function ctx(opts) {
    // defecto, no uno raro). Su owner al sandbox: sin él el render lanza, y este
    // harness volvió a ser el primero en decirlo.
    '_wsSubIfDistinct',
+   '_wsBudgetColorFor','_wsBudgetLegacyRows','_wsBudgetRows','_wsBudgetRowName',
    'calculateMonthlyBudget','calculateReceivables','calculateRealEstatePortfolio','_wsRecvStatus',
    '_wsPlanMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState',

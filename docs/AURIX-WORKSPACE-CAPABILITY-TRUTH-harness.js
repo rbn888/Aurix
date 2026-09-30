@@ -40,8 +40,9 @@ function ctx(lang) {
                console: { warn(){}, log(){} } };
   vm.createContext(sb);
   sb.lang = lang || 'es';
-  ['_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_NON_NUMERIC_INPUT_KEYS'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
-  ['_wsNum','_wsCanonicalNumStr','_wsNumInLang','_wsCanonicalizeInputs','_wsNumOrNull','_wsJrnPct','calculateLoan',
+  ['_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WS_NON_NUMERIC_INPUT_KEYS'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
+  try { vm.runInContext('t', sb); } catch (_) { vm.runInContext('function t(k){ return k; }', sb); }
+  ['_wsBudgetColorFor','_wsBudgetLegacyRows','_wsBudgetRows','_wsBudgetRowName','_wsNum','_wsCanonicalNumStr','_wsNumInLang','_wsCanonicalizeInputs','_wsNumOrNull','_wsJrnPct','calculateLoan',
    'calculateRealEstatePortfolio','calculateMonthlyBudget','calculateAssetPrices','calculateTradeJournal']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
@@ -163,7 +164,8 @@ console.log('\n4 · Presupuesto · la razón sin denominador no existe:');
       return d.deficit === true && d.free === -500 && d.saveRate < 0; })(),
     JSON.stringify(BUD({ salary: '1000', housing: '1500' }).free));
   ok('4.5 la superficie escribe «no aplicable» en vez de un 0 %',
-    /res\.saveRate == null \? t\('wstool_bud_na'\)/.test(fnSrc('_wsBudgetOutHtml')));
+    // «Cómo se lee» (donde vive la tasa) pasó a su propio contenedor, `_wsBudgetHelpHtml`.
+    /res\.saveRate == null \? t\('wstool_bud_na'\)/.test(fnSrc('_wsBudgetHelpHtml')));
   // LOS VEREDICTOS SIN CRITERIO, RETIRADOS.
   ok('4.6 los umbrales de «margen sólido» / «buen camino» ya no deciden la lectura',
     !/rate >= 30 \? t\('wstool_bud_read_high'\)/.test(app)

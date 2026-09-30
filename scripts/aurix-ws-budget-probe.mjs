@@ -87,7 +87,7 @@ async function open(page) {
 const geom = page => page.evaluate(`(function(){
   const q = s => document.querySelector(s);
   const body = q('.wsbud-body'), ed = q('.wsbud-col-edit'), vw = q('.wsbud-col-view');
-  const top = q('.wsbud-top-card'), dn = q('.wsbud-donut'), f0 = q('.wsbud-col-edit .ws4-num');
+  const top = q('.wsbud-top-card'), dn = q('.wsbud-donut'), f0 = q('.wsbud-col-edit [data-wsbud-amt]');
   const rect = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { t: Math.round(r.top), l: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) }; };
   const spill = [];
   document.querySelectorAll('.wsh-tool-view .wsh-card').forEach(card => {
@@ -122,8 +122,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await open(page);
     const g = await geom(page);
     ok(`${ENG}.1440 el cuerpo son DOS columnas medidas, no una apilada`, g.tracks === 2, 'pistas=' + g.tracks);
-    ok(`${ENG}.1440 edición a la IZQUIERDA y respuesta a la DERECHA, a la misma altura`,
-      g.sideBySide === true && g.edit.l < g.view.l, JSON.stringify({ e: g.edit, v: g.view }));
+    // RE-DECIDIDO (SPEC «visualización primero»): el panel visual va a la IZQUIERDA.
+    ok(`${ENG}.1440 respuesta a la IZQUIERDA y edición a la DERECHA, a la misma altura`,
+      g.sideBySide === true && g.view.l < g.edit.l, JSON.stringify({ e: g.edit, v: g.view }));
     ok(`${ENG}.1440 las columnas no se solapan`, g.overlap === false);
     ok(`${ENG}.1440 el resumen va ENCIMA del cuerpo`, g.top.t < g.edit.t, JSON.stringify([g.top.t, g.edit.t]));
     // §8 — el primer viewport tiene que contener la experiencia útil: campos Y respuesta.
@@ -146,7 +147,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // Se escribe en un GASTO (`housing`), no en el primer campo del panel: el primer campo es
     // «Nómina» y mover ingresos no cambia el KPI de gastos ni el arco de vivienda. La primera
     // versión de esta sonda medía eso y se puso roja con razón — el defecto era la prueba.
-    const fld = await page.$('[data-wstool-input="housing"]');
+    const fld = await page.$('[data-wsbud-amt="housing"]');
     await fld.click({ clickCount: 3 });
     await page.keyboard.type('1400', { delay: 18 });
     await page.keyboard.press('Tab');
@@ -165,7 +166,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // …y se LEE el mismo campo que se vació. La versión anterior leía el primer input del panel
     // (Nómina) y reportaba «2.500» como si el borrado no hubiera funcionado.
     const cleared = await page.evaluate(`(function(){ return JSON.stringify({
-      val: document.querySelector('[data-wstool-input="housing"]').value,
+      val: document.querySelector('[data-wsbud-amt="housing"]').value,
       kpi: document.querySelectorAll('.wsbud-kpi b')[1].textContent.trim() });})()`).then(JSON.parse);
     ok(`${ENG}.edit §9 el campo se puede vaciar y el total no publica NaN`,
       cleared.val === '' && !/NaN/.test(cleared.kpi), JSON.stringify(cleared));
@@ -181,9 +182,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await open(page);
     const g = await geom(page);
     ok(`${ENG}.${w} una sola columna`, g.sideBySide === false, JSON.stringify({ e: g.edit.l, v: g.view.l }));
-    // El orden DISEÑADO: el resumen responde arriba y la EDICIÓN va antes que la lectura profunda.
-    ok(`${ENG}.${w} resumen primero, luego edición, luego el anillo`,
-      g.top.t < g.edit.t && g.edit.t < g.view.t, JSON.stringify([g.top.t, g.edit.t, g.view.t]));
+    // RE-DECIDIDO: primero entender (resumen → anillo), después editar.
+    ok(`${ENG}.${w} resumen primero, luego el anillo, luego la edición`,
+      g.top.t < g.view.t && g.view.t < g.edit.t, JSON.stringify([g.top.t, g.view.t, g.edit.t]));
     // §33 — editar no puede exigir cruzar el gráfico entero.
     ok(`${ENG}.${w} el primer campo está al alcance (< 1,5 pantallas)`,
       g.field.t < h * 1.5, 'campo@' + g.field.t + ' de ' + h);

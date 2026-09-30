@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '755'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '756'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6376,6 +6376,22 @@ const T = {
     wsdoc_s_value:        'Valor',
     wsdoc_s_net:          'Resultado',
     wsbud_dn_top:         'la mayor partida',
+    // Presupuesto · categorías del usuario
+    wsbud_new_income:     'Nuevo ingreso',
+    wsbud_new_expense:    'Nuevo gasto',
+    wsbud_add_income:     'Añadir ingreso',
+    wsbud_add_expense:    'Añadir gasto',
+    wsbud_name_aria:      '{n}. Editar nombre',
+    wsbud_name_field:     'Nombre de la categoría',
+    wsbud_amt_aria:       'Importe de {n}',
+    wsbud_del_aria:       'Eliminar {n}',
+    wsbud_del_title:      'Eliminar categoría',
+    wsbud_del_text:       '«{n}» tiene {a}. Si la eliminas, deja de contar en este presupuesto.',
+    wsbud_limit:          'Has llegado al máximo de {m} categorías en este bloque.',
+    wsbud_legend_label:   'Categorías de gasto',
+    wsbud_empty:          'Añade tus gastos para ver el reparto',
+    wsbud_empty_cta:      'Ir a gastos',
+    wsbud_read_zero:      'Según tu presupuesto, tus gastos igualan tus ingresos: no queda dinero libre ni hay déficit.',
     wspl_m_target:        'Meta',
     wspl_m_saved:         'Acumulado',
     wspl_share_saved:     'acumulado',
@@ -6834,6 +6850,7 @@ const T = {
     wssave_confirm_title: 'Reemplazar documento',
     wssave_confirm_text:  'Vas a sustituir el contenido de «{n}». Esta acción no se puede deshacer.',
     wssave_target_gone:   'Ese documento ya no existe. No se ha guardado nada.',
+    wssave_failed:        'No se ha podido guardar en este dispositivo. Tus cambios siguen en pantalla.',
     wsname_ok:          'Guardar',
     wsname_required:    'Escribe un nombre para guardarlo.',
     wstool_saveas:      'Guardar como…',
@@ -9267,6 +9284,22 @@ const T = {
     wsdoc_s_value:        'Value',
     wsdoc_s_net:          'Result',
     wsbud_dn_top:         'largest category',
+    // Budget · user categories
+    wsbud_new_income:     'New income',
+    wsbud_new_expense:    'New expense',
+    wsbud_add_income:     'Add income',
+    wsbud_add_expense:    'Add expense',
+    wsbud_name_aria:      '{n}. Edit name',
+    wsbud_name_field:     'Category name',
+    wsbud_amt_aria:       'Amount for {n}',
+    wsbud_del_aria:       'Delete {n}',
+    wsbud_del_title:      'Delete category',
+    wsbud_del_text:       '“{n}” holds {a}. If you delete it, it no longer counts in this budget.',
+    wsbud_limit:          'You have reached the maximum of {m} categories in this block.',
+    wsbud_legend_label:   'Expense categories',
+    wsbud_empty:          'Add your expenses to see the breakdown',
+    wsbud_empty_cta:      'Go to expenses',
+    wsbud_read_zero:      'On your budget, your expenses match your income: no free money and no deficit.',
     wspl_m_target:        'Target',
     wspl_m_saved:         'Saved',
     wspl_share_saved:     'saved',
@@ -9687,6 +9720,7 @@ const T = {
     wssave_confirm_title: 'Replace document',
     wssave_confirm_text:  'You are about to replace the content of “{n}”. This cannot be undone.',
     wssave_target_gone:   'That document no longer exists. Nothing was saved.',
+    wssave_failed:        'Could not save on this device. Your changes are still on screen.',
     wsname_ok:          'Save',
     wsname_required:    'Type a name to save it.',
     wstool_saveas:      'Save as…',
@@ -21621,6 +21655,7 @@ function _wshWireOnce() {
     }
     el.value = _wsFormatInputNumber(raw);
   });
+  _wsBudgetWire();
 }
 
 function _wshRefreshMetrics(root, metrics) {
@@ -25350,7 +25385,7 @@ function _ws4Templates() {
 // borraría del almacén y devolvería la resurrección por la puerta de atrás.
 function _ws4ProjectsRaw() { return _wshReadStore(_WSH_PROJECTS_KEY); }
 function _ws4Projects() { return _ws4ProjectsRaw().filter(p => p && !p.deletedAt); }
-function _ws4SaveAll(list) { _wshWriteStore(_WSH_PROJECTS_KEY, list); }
+function _ws4SaveAll(list) { return _wshWriteStore(_WSH_PROJECTS_KEY, list); }
 function _ws4Get() { return _ws4Draft; }   // P5 — live working copy (may be unsaved)
 // Sella la revisión SIGUIENTE y el instante. Monótona por documento: es lo que
 // permite que la fusión por revisión distinga «más nuevo» de «igual».
@@ -25360,7 +25395,7 @@ function _wsDocStamp(doc) {
   doc.updatedAt = Date.now();
   return doc;
 }
-function _ws4Persist(p) { _wsDocStamp(p); const list = _ws4ProjectsRaw(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); _ws4SaveAll(list); }
+function _ws4Persist(p) { _wsDocStamp(p); const list = _ws4ProjectsRaw(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); return _ws4SaveAll(list); }
 // El borrado SEGURO: marca, no recorta. El documento sigue en el almacén con su
 // `deletedAt` para que el push suba el tombstone; todos los lectores lo ocultan.
 function _ws4Tombstone(id) {
@@ -27074,7 +27109,9 @@ function _wsToolCommit(name, forceNew, targetId) {
     createdAt: existing ? (existing.createdAt || now) : now,
     updatedAt: now,
   };
-  _ws4Persist(proj);
+  // Si el almacén rechaza la escritura (cuota, modo privado), NO se finge: el
+  // borrador sigue sucio en pantalla y el motivo se dice junto al botón.
+  if (_ws4Persist(proj) === false) { try { _wsToolSaveError(t('wssave_failed')); } catch (_) {} return; }
   _wsToolEditId = proj.id; _wsToolDirty = false;
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); }
   // §5 — el Dashboard es una VISTA del mismo guardado, así que se repinta aquí
@@ -27341,11 +27378,81 @@ const _WSBUD_EXPENSES = [
   { k: 'otherexp',  label: 'wstool_bud_other',     color: '#7c89a3' },
 ];
 
+// ════════════════════════════════════════════════════════════════════════════
+// LAS CATEGORÍAS SON DEL USUARIO: FILAS CON IDENTIDAD, NO CLAVES FIJAS
+// ════════════════════════════════════════════════════════════════════════════
+// Hasta aquí el documento guardaba diez claves planas (`salary`, `housing`…) y
+// el nombre de cada una salía de i18n: no había forma de llamar «Baile» a
+// «Formación» ni de tener un segundo ingreso. Ahora `inputs.rows` es la fuente
+// de verdad —`{ id, type, labelKey, label, amount, color, order }`— y vive en el
+// MISMO documento, así que guarda, abre, duplica y sincroniza por los caminos que
+// ya existían (el cuerpo viaja entero en `_wsDocRows`).
+//   · IDENTIDAD = `id`. El texto visible no identifica nada: dos gastos llamados
+//     igual son dos gastos, y el donut enlaza por `id`.
+//   · `label` es el nombre que escribió el usuario; `null` significa «el nombre
+//     sugerido», que se lee de `labelKey` en el idioma activo. Así una categoría
+//     sin tocar sigue diciendo «Housing» en inglés.
+//   · COLOR estable por identidad: se fija al crear la fila y se guarda.
+// COMPATIBILIDAD: un documento sin `rows` se LEE como las diez filas de siempre,
+// con sus importes exactos y los ids iguales a las claves antiguas. No se migra
+// nada en el almacén: la forma nueva se escribe sólo cuando el usuario guarda. Y
+// las claves planas se siguen escribiendo como ESPEJO de las filas que conservan
+// su id, para que un cliente con el bundle anterior no lea importes inventados.
+const _WSBUD_PALETTE = Object.freeze(['#4D8DFF', '#37c7b8', '#8a7dff', '#e0b15c', '#e07a9f', '#6fcf97', '#7c89a3',
+  '#5cc8ff', '#f2956b', '#b58cff', '#a3d65c', '#ff7fb5', '#46b0a0', '#d9a441']);
+// Límite TÉCNICO, no de producto: ningún presupuesto razonable llega a 40 partidas
+// por bloque, y sin tope un documento podría crecer sin medida en cada sync.
+const _WSBUD_ROW_MAX = 40;
+const _WSBUD_LABEL_MAX = 60;
+const _WSBUD_LEGACY_KEYS = Object.freeze(_WSBUD_INCOME.concat(_WSBUD_EXPENSES).map(f => f.k));
+function _wsBudgetColorFor(id) {
+  let h = 0; const s = String(id || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return _WSBUD_PALETTE[h % _WSBUD_PALETTE.length];
+}
+function _wsBudgetLegacyRows(inp) {
+  const src = inp || {};
+  let order = 0;
+  const mk = (f, type) => ({ id: f.k, type: type, labelKey: f.label, label: null,
+    amount: src[f.k] != null ? src[f.k] : 0, color: type === 'expense' ? (f.color || _wsBudgetColorFor(f.k)) : null, order: order++ });
+  return _WSBUD_INCOME.map(f => mk(f, 'income')).concat(_WSBUD_EXPENSES.map(f => mk(f, 'expense')));
+}
+// Lee las filas de cualquier documento, nuevo o antiguo, y devuelve COPIAS: quien
+// las modifique no puede tocar el objeto del que salieron.
+function _wsBudgetRows(inp) {
+  if (!inp || !Array.isArray(inp.rows)) return _wsBudgetLegacyRows(inp);
+  const seen = new Set(), out = [];
+  inp.rows.forEach((r, i) => {
+    if (!r || typeof r !== 'object') return;
+    const id = (typeof r.id === 'string' && r.id) ? r.id : null;
+    if (!id || seen.has(id) || (r.type !== 'income' && r.type !== 'expense')) return;
+    seen.add(id);
+    out.push({ id: id, type: r.type,
+      labelKey: typeof r.labelKey === 'string' ? r.labelKey : null,
+      label: typeof r.label === 'string' ? r.label : null,
+      amount: r.amount == null ? 0 : r.amount,
+      color: r.type === 'expense' ? ((typeof r.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(r.color)) ? r.color : _wsBudgetColorFor(id)) : null,
+      order: Number.isFinite(Number(r.order)) ? Number(r.order) : i });
+  });
+  return out.map((r, i) => [r, i]).sort((a, b) => (a[0].order - b[0].order) || (a[1] - b[1])).map(x => x[0]);
+}
+// El nombre que se ENSEÑA: el del usuario si lo escribió, si no el sugerido.
+// Nunca devuelve vacío mientras exista una sugerencia.
+function _wsBudgetRowName(r) {
+  if (r && typeof r.label === 'string' && r.label.trim()) return r.label.trim();
+  const d = (r && r.labelKey) ? t(r.labelKey) : '';
+  return (typeof d === 'string' && d) ? d : (r && r.type === 'income' ? t('wsbud_new_income') : t('wsbud_new_expense'));
+}
+
 function calculateMonthlyBudget(inp) {
   inp = inp || {};
-  const num = k => Math.max(0, _wsNum(inp[k]));  // WS.15A tolerant parse
-  const income = _WSBUD_INCOME.reduce((s, f) => s + num(f.k), 0);
-  const items = _WSBUD_EXPENSES.map(f => ({ k: f.k, label: f.label, color: f.color, value: num(f.k) }));
+  const num = v => Math.max(0, _wsNum(v));  // WS.15A tolerant parse
+  // MISMA ARITMÉTICA sobre las filas: Σ ingresos − Σ gastos. Un documento antiguo
+  // se lee como sus diez filas de siempre y da exactamente el mismo resultado.
+  const rows = _wsBudgetRows(inp);
+  const income = rows.filter(r => r.type === 'income').reduce((s, r) => s + num(r.amount), 0);
+  const items = rows.filter(r => r.type === 'expense').map(r => ({ k: r.id, id: r.id, label: r.labelKey,
+    name: _wsBudgetRowName(r), color: r.color, value: num(r.amount) }));
   const expenses = items.reduce((s, it) => s + it.value, 0);
   const free = income - expenses;
   // ── §F · CON INGRESOS CERO LA TASA DE AHORRO NO EXISTE ────────────────────
@@ -27377,46 +27484,63 @@ function _wsBudgetDefaults() {
 // Accesible: el anillo es `role="img"` con la reparto en palabras, porque un gráfico sin texto no
 // es un dato para quien usa lector de pantalla (§38).
 const _WSBUD_DONUT_R = 52, _WSBUD_DONUT_C = 2 * Math.PI * _WSBUD_DONUT_R;
-function _wsBudgetDonutHtml(res) {
+// ── EL ANILLO ES INTERACTIVO, Y LA SELECCIÓN NO TOCA NINGUNA CIFRA ─────────────
+// `sel` es el `id` de una categoría (o nada). Seleccionar sólo cambia QUÉ se lee:
+// el segmento se resalta, el resto se atenúa sin volverse ilegible y el centro
+// dice nombre, importe y porcentaje de esa categoría. El reparto es el mismo.
+var _wsBudSel = null;
+function _wsBudgetDonutHtml(res, sel) {
   const esc = _intccEsc;
   const items = res.items.filter(it => it.value > 0);
   if (!(res.expenses > 0) || !items.length) return '';
+  const pick = sel ? items.find(it => it.id === sel) : null;
   let off = 0;
   const arcs = items.map(it => {
     const frac = it.value / res.expenses;
     const len = frac * _WSBUD_DONUT_C;
-    const seg = '<circle class="wsbud-arc" cx="60" cy="60" r="' + _WSBUD_DONUT_R + '" fill="none"'
+    const st = pick ? (it === pick ? ' is-sel' : ' is-dim') : '';
+    const seg = '<circle class="wsbud-arc' + st + '" data-wsbud-seg="' + esc(it.id) + '" cx="60" cy="60" r="' + _WSBUD_DONUT_R + '" fill="none"'
       + ' stroke="' + esc(it.color) + '" stroke-width="14" stroke-linecap="butt"'
       + ' stroke-dasharray="' + len.toFixed(3) + ' ' + (_WSBUD_DONUT_C - len).toFixed(3) + '"'
       + ' stroke-dashoffset="' + (-off).toFixed(3) + '"></circle>';
     off += len;
     return seg;
   }).join('');
-  const words = items.map(it => Math.round(it.value / res.expenses * 100) + '% ' + t(it.label)).join(' · ');
+  const words = items.map(it => Math.round(it.value / res.expenses * 100) + '% ' + it.name).join(' · ');
   // EL CENTRO NO REPITE UN KPI. «Disponible» ya está en el resumen de arriba, y decirlo otra vez
   // aquí es el MISMO defecto de duplicación que este bloque cerró en su día con la tasa de ahorro.
   // Lo que el anillo no puede decir con precisión es CUÁL manda y cuánto: eso va al centro.
   const top = items.slice().sort((a, b) => b.value - a.value)[0];
   const topPct = Math.round(top.value / res.expenses * 100);
-  return '<div class="wsbud-donut">'
+  const centre = pick
+    ? '<i style="color:' + esc(pick.color) + '">' + esc(pick.name) + '</i>'
+      + '<b>' + Math.round(pick.value / res.expenses * 100) + '%</b>'
+      + '<em>' + esc(formatBase(pick.value)) + '</em>'
+    : '<i style="color:' + esc(top.color) + '">' + esc(top.name) + '</i>'
+      + '<b>' + topPct + '%</b>'
+      + '<em>' + esc(t('wsbud_dn_top')) + '</em>';
+  return '<div class="wsbud-donut' + (pick ? ' has-sel' : '') + '">'
     + '<svg viewBox="0 0 120 120" role="img" aria-label="' + esc(t('wstool_bud_chart_title') + ': ' + words) + '">'
     + '<circle cx="60" cy="60" r="' + _WSBUD_DONUT_R + '" fill="none" stroke="rgba(120,160,255,0.14)" stroke-width="14"></circle>'
     + '<g transform="rotate(-90 60 60)">' + arcs + '</g>'
     + '</svg>'
-    + '<span class="wsbud-donut-c">'
-    +   '<i style="color:' + esc(top.color) + '">' + esc(t(top.label)) + '</i>'
-    +   '<b>' + topPct + '%</b>'
-    +   '<em>' + esc(t('wsbud_dn_top')) + '</em>'
-    + '</span>'
+    + '<span class="wsbud-donut-c" aria-live="polite">' + centre + '</span>'
     + '</div>';
 }
-function _wsBudgetChartHtml(res) {
+// LEYENDA = el control accesible del anillo. Cada categoría es un botón con
+// `aria-pressed`: ratón, toque y teclado pasan por el MISMO sitio. Ordenada por
+// PESO, que es cómo se lee un reparto; el orden del formulario no cambia.
+function _wsBudgetChartHtml(res, sel) {
   const esc = _intccEsc;
-  const denom = Math.max(res.income, res.expenses, 1);
-  const pct = v => (v / denom * 100).toFixed(2);
-  const legend = res.items.filter(it => it.value > 0).map(it =>
-    `<span class="wsbud-leg"><i style="background:${it.color}"></i>${esc(t(it.label))} <b>${esc(formatBase(it.value))}</b></span>`).join('');
-  const freeLeg = res.free > 0 ? `<span class="wsbud-leg"><i class="is-free"></i>${esc(t('wstool_bud_free'))} <b>${esc(formatBase(res.free))}</b></span>` : '';
+  const items = res.items.filter(it => it.value > 0).slice().sort((a, b) => b.value - a.value);
+  const pct = v => (res.expenses > 0 ? Math.round(v / res.expenses * 100) : 0) + '%';
+  const legend = items.map(it => {
+    const on = sel === it.id;
+    return `<li><button type="button" class="wsbud-leg${on ? ' is-sel' : ''}" data-wsbud-sel="${esc(it.id)}" aria-pressed="${on ? 'true' : 'false'}">`
+      + `<i style="background:${esc(it.color)}"></i><span class="wsbud-leg-n">${esc(it.name)}</span>`
+      + `<b>${esc(formatBase(it.value))}</b><em>${pct(it.value)}</em></button></li>`;
+  }).join('');
+  const freeLeg = res.free > 0 ? `<li><span class="wsbud-leg is-static"><i class="is-free"></i><span class="wsbud-leg-n">${esc(t('wstool_bud_free'))}</span><b>${esc(formatBase(res.free))}</b><em></em></span></li>` : '';
   return `
     <div class="wsbud-chart-wrap">
       ${/* §18 — LA BARRA DE REPARTO SE RETIRA, y se auditó antes de decidirlo. Contaba lo MISMO
@@ -27425,8 +27549,18 @@ function _wsBudgetChartHtml(res) {
             literalmente esa proporción. Dos visualizaciones de lo mismo no son el doble de
             información: son el doble de altura. La LEYENDA se queda —lleva el importe por
             categoría, que el anillo no sabe decir— y con ella «Dinero libre». */''}
-      <div class="wsbud-legend">${legend}${freeLeg}</div>
+      <ul class="wsbud-legend" aria-label="${esc(t('wsbud_legend_label'))}">${legend}${freeLeg}</ul>
     </div>`;
+}
+// Sin gastos no hay reparto que dibujar, y un anillo de un color sería un reparto
+// inventado. Se dice qué falta y se lleva al sitio donde se arregla.
+function _wsBudgetEmptyHtml() {
+  const esc = _intccEsc;
+  return '<div class="wsbud-empty">'
+    + '<svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="' + _WSBUD_DONUT_R + '" fill="none" stroke="rgba(120,160,255,0.14)" stroke-width="14"></circle></svg>'
+    + '<p class="wsbud-empty-t">' + esc(t('wsbud_empty')) + '</p>'
+    + '<button type="button" class="wsbud-empty-cta" data-wsbud-goto="expense">' + esc(t('wsbud_empty_cta')) + '</button>'
+    + '</div>';
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -27520,7 +27654,7 @@ function _wsBudgetTopHtml(inp) {
               natural, y se dice sobre qué se calcula. Cuando no hay ingresos no se publica un
               0 %: el motor devuelve `null` y aquí no se pinta el sufijo. */''}
         <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b>${
-          res.saveRate == null ? '' : `<em class="wsbud-kpi-sub">${esc(Math.round(res.saveRate) + '% ' + t('wsbud_kpi_save'))}</em>`}</span>
+          (res.saveRate == null || res.saveRate < 0) ? '' : `<em class="wsbud-kpi-sub">${esc(Math.round(res.saveRate) + '% ' + t('wsbud_kpi_save'))}</em>`}</span>
         ${/* §11 — EL PERIODO, CUARTA CELDA DEL RESUMEN. Estuvo en la línea del título y la CAPTURA
               lo tumbó: a 360 el chip dejaba «Presupuesto mensual» en una columna de 30 px —una
               letra por línea, 254 px de cabecera— y encima el mes salía truncado («sept …»), que
@@ -27529,44 +27663,43 @@ function _wsBudgetTopHtml(inp) {
               cabecera vuelve a ser la de v740. */''}
         ${_wsBudgetPeriodHtml(inp)}
       </div>
-      ${res.deficit ? `<p class="wsb-note is-warn">${esc(String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free))))}</p>` : ''}
+      ${/* UNA SOLA LECTURA. Aquí se repetía el déficit que la lectura junto al gráfico ya dice
+            con las mismas palabras; se queda allí, que es donde se entiende. */''}
     </div>`;
+}
+// ── UNA SOLA LECTURA FINANCIERA ────────────────────────────────────────────────
+// El déficit va PRIMERO porque es un hecho aritmético aunque no haya ingresos
+// (gastar 100 sin ingresar nada es superar los ingresos en 100). Disponible cero
+// tiene su propia frase, exacta y neutra. Sin ingresos ni gastos, la frase dice
+// lo único cierto: que la proporción no se puede calcular. Nada de consejos.
+function _wsBudgetReading(res) {
+  if (res.deficit) return String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free)));
+  if (!res.applicable) return t('wstool_bud_read_noincome');
+  if (res.free === 0) return t('wsbud_read_zero');
+  return String(t('wstool_bud_read_neutral') || '').replace('{r}', String(Math.round(res.saveRate)));
 }
 function _wsBudgetOutHtml(inp) {
   const esc = _intccEsc;
   const res = calculateMonthlyBudget(inp);
-  // §F — «no aplicable» cuando no hay denominador, nunca un 0 %.
-  const rateTxt = res.saveRate == null ? t('wstool_bud_na') : Math.round(res.saveRate) + '%';
-  const rate = res.saveRate == null ? null : Math.round(res.saveRate);
-  // ── LA LECTURA NO DA VEREDICTOS SIN CRITERIO (§F) ─────────────────────────
-  // Había una escalera de umbrales —30 % «margen sólido», 10 % «buen camino»— que
-  // no está documentada en ningún sitio: es una opinión sobre las finanzas del
-  // usuario presentada como una medición. §F lo permite SÓLO con criterio
-  // documentado, y no lo hay, así que la lectura es NEUTRAL: dice la proporción y
-  // su denominador, que es verdad, y no dictamina si está bien.
-  // El DÉFICIT sí se nombra, porque es un hecho aritmético y no un juicio.
-  const reading = !res.applicable ? t('wstool_bud_read_noincome')
-    : res.deficit ? String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free)))
-    : String(t('wstool_bud_read_neutral') || '').replace('{r}', String(rate));
+  // La selección sólo sobrevive si su categoría sigue en el reparto.
+  if (_wsBudSel && !res.items.some(it => it.id === _wsBudSel && it.value > 0)) _wsBudSel = null;
+  const reading = _wsBudgetReading(res);
+  const donut = _wsBudgetDonutHtml(res, _wsBudSel);
   return `
-    ${/* §15 — LA TARJETA DE LA TASA SE RETIRA. Ocupaba 123 px de alto en móvil para una cifra
-          secundaria que además ya se dice en el resumen de arriba, junto a su denominador. Su
-          texto de base («sobre los ingresos del plan») se conserva donde se explica todo lo
-          demás: el desplegable «Cómo se lee este presupuesto». No se pierde ninguna afirmación,
-          se deja de decir dos veces. */''}
     <div class="wstool-chart wsbud-chartbox">
       <span class="wsbud-chart-title">${esc(t('wstool_bud_chart_title'))}</span>
-      ${/* DOS lecturas del MISMO cálculo, no dos cálculos: el anillo responde «en qué se va» y la
-            barra «cuánto queda». No hay selector de vista porque no hay nada que elegir — las dos
-            caben y responden preguntas distintas, y un selector añadiría estado y una preferencia
-            que guardar para no enseñar la mitad de la respuesta. */''}
-      ${_wsBudgetDonutHtml(res)}
-      ${_wsBudgetChartHtml(res)}
+      <div class="wsbud-viz">${donut ? donut + _wsBudgetChartHtml(res, _wsBudSel) : _wsBudgetEmptyHtml()}</div>
     </div>
-    ${reading ? `<p class="wsbud-reading">${esc(reading)}</p>` : ''}
-    ${/* §F — el DENOMINADOR de la tasa y la naturaleza de la cifra, dichos. El
-          «disponible» es lo que queda SEGÚN EL PRESUPUESTO, no un saldo bancario, y
-          no es una categoría de gasto: por eso no aparece en el reparto. */''}
+    ${reading ? `<p class="wsbud-reading">${esc(reading)}</p>` : ''}`;
+}
+// §F — el DENOMINADOR de la tasa y la naturaleza de la cifra, dichos. Plegado:
+// ayuda, no protagonista. Tiene su propio contenedor de repintado porque cita la
+// tasa, que cambia con cada tecla.
+function _wsBudgetHelpHtml(inp) {
+  const esc = _intccEsc;
+  const res = calculateMonthlyBudget(inp);
+  const rateTxt = res.saveRate == null ? t('wstool_bud_na') : Math.round(res.saveRate) + '%';
+  return `
     <details class="wstool-asm wsbud-basis">
       <summary class="wstool-asm-sum">${esc(t('wstool_bud_basis_title'))}</summary>
       <ul class="wstool-asm-list">
@@ -27578,62 +27711,260 @@ function _wsBudgetOutHtml(inp) {
     </details>`;
 }
 
+// ── EL EDITOR: NOMBRE ENCIMA, IMPORTE DEBAJO ───────────────────────────────────
+// El nombre se lee como TEXTO (un botón sin caja) y al pulsarlo pasa a campo con el
+// contenido seleccionado. Así no hay veinte cajas pesadas en pantalla y un nombre
+// largo se parte por palabras en vez de recortarse dentro de un `<input>`.
+function _wsBudgetRowHtml(r) {
+  const esc = _intccEsc;
+  const name = _wsBudgetRowName(r);
+  return `
+    <div class="wsbud-row${_wsBudSel === r.id ? ' is-sel' : ''}" data-wsbud-row="${esc(r.id)}">
+      <div class="wsbud-row-head">
+        <button type="button" class="wsbud-name" data-wsbud-rename="${esc(r.id)}" aria-label="${esc(String(t('wsbud_name_aria')).replace('{n}', name))}">${esc(name)}</button>
+        <button type="button" class="wsbud-del" data-wsbud-del="${esc(r.id)}" aria-label="${esc(String(t('wsbud_del_aria')).replace('{n}', name))}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+      </div>
+      <span class="ws4-field-input">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsbud-amt="${esc(r.id)}" aria-label="${esc(String(t('wsbud_amt_aria')).replace('{n}', name))}" value="${esc(_wsFormatInputNumber(r.amount != null ? r.amount : 0))}">
+        ${_wsFieldUnitHtml('€')}
+      </span>
+    </div>`;
+}
+function _wsBudgetListHtml(inp, type) {
+  const esc = _intccEsc;
+  const rows = _wsBudgetRows(inp).filter(r => r.type === type);
+  const full = rows.length >= _WSBUD_ROW_MAX;
+  return `<div class="wsbud-rows">${rows.map(_wsBudgetRowHtml).join('')}</div>
+    <button type="button" class="wsbud-add" data-wsbud-add="${type}"${full ? ' disabled aria-describedby="wsbudLim-' + type + '"' : ''}>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>${esc(t(type === 'income' ? 'wsbud_add_income' : 'wsbud_add_expense'))}</button>
+    ${full ? `<p class="wsbud-limit" id="wsbudLim-${type}">${esc(String(t('wsbud_limit')).replace('{m}', String(_WSBUD_ROW_MAX)))}</p>` : ''}`;
+}
+// Un borrador sin filas (documento antiguo o recién creado) las ADOPTA al pintarse,
+// con los mismos importes: no cambia ninguna cifra, así que no se marca como sucio.
+function _wsBudgetAdopt(inp) {
+  if (inp && !Array.isArray(inp.rows)) inp.rows = _wsBudgetRows(inp);
+  return inp;
+}
+// Todo cambio de filas pasa por aquí: filas NUEVAS (nunca se muta el array de
+// origen), orden reescrito, espejo de las claves antiguas, borrador sucio y estado
+// de acceso rápido al día.
+function _wsBudgetSetRows(rows, quiet) {
+  const inp = _wsToolInputs; if (!inp) return;
+  inp.rows = rows.map((r, i) => Object.assign({}, r, { order: i }));
+  _WSBUD_LEGACY_KEYS.forEach(k => { const r = inp.rows.find(x => x.id === k); inp[k] = r ? r.amount : 0; });
+  if (!quiet) _wsToolDirty = true;
+  try { _wsToolStateSet(_wsToolActive, inp); } catch (_) {}
+}
+function _wsBudgetRoot() { try { return document.querySelector('.wsh-tool-view[data-wsbud-view]'); } catch (_) { return null; } }
+// Repinta las LECTURAS (resumen, gráfico, ayuda, barra), nunca el campo enfocado.
+function _wsBudgetRepaint() {
+  const root = _wsBudgetRoot(); if (!root || !_wsToolInputs) return;
+  const set = (sel, html) => { const el = root.querySelector(sel); if (el) el.innerHTML = html; };
+  const focusSel = (document.activeElement && document.activeElement.getAttribute) ? document.activeElement.getAttribute('data-wsbud-sel') : null;
+  set('[data-wsbud-top]', _wsBudgetTopHtml(_wsToolInputs));
+  set('[data-wstool-out]', _wsBudgetOutHtml(_wsToolInputs));
+  const help = root.querySelector('[data-wsbud-help]');
+  if (help) { const open = !!(help.querySelector('details') || {}).open; help.innerHTML = _wsBudgetHelpHtml(_wsToolInputs); if (open) { const d = help.querySelector('details'); if (d) d.open = true; } }
+  set('[data-wstool-savebar]', _wsToolSaveBarHtml());
+  root.querySelectorAll('.wsbud-row').forEach(el => el.classList.toggle('is-sel', el.getAttribute('data-wsbud-row') === _wsBudSel));
+  if (focusSel) { const b = root.querySelector('[data-wsbud-sel="' + focusSel + '"]'); if (b) b.focus(); }
+}
+function _wsBudgetRepaintList(type) {
+  const root = _wsBudgetRoot(); if (!root) return;
+  const host = root.querySelector('[data-wsbud-list="' + type + '"]');
+  if (host) host.innerHTML = _wsBudgetListHtml(_wsToolInputs, type);
+}
+function _wsBudgetOnAmount(el) {
+  const id = el.getAttribute('data-wsbud-amt');
+  const rows = _wsBudgetRows(_wsToolInputs);
+  const i = rows.findIndex(r => r.id === id); if (i < 0) return;
+  const prev = rows[i].amount, next = el.value;
+  // EL MISMO NÚMERO NO ES UNA EDICIÓN. Al salir del campo el formateador reemite su forma
+  // canónica («1.400» → «1400»): se guarda esa forma, pero sin ensuciar el borrador y sin
+  // repintar. Repintar ahí sustituía el anillo BAJO EL DEDO (el primer toque sobre un segmento
+  // con un campo enfocado no llegaba) y, al guardar con un campo enfocado, el documento recién
+  // guardado volvía a figurar como pendiente.
+  const same = String(prev) === String(next)
+    || (String(prev).trim() !== '' && String(next).trim() !== '' && _wsNum(prev) === _wsNum(next));
+  rows[i] = Object.assign({}, rows[i], { amount: next });   // WS.15A: crudo durante la edición
+  _wsBudgetSetRows(rows, same);
+  if (!same) _wsBudgetRepaint();
+}
+function _wsBudgetSelect(id) {
+  _wsBudSel = (id && _wsBudSel !== id) ? id : null;
+  _wsBudgetRepaint();
+}
+function _wsBudgetAdd(type) {
+  const rows = _wsBudgetRows(_wsToolInputs);
+  if (rows.filter(r => r.type === type).length >= _WSBUD_ROW_MAX) return;
+  const used = new Set(rows.filter(r => r.type === 'expense').map(r => String(r.color).toLowerCase()));
+  const free = _WSBUD_PALETTE.find(c => !used.has(c.toLowerCase()));
+  const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const row = { id: id, type: type, labelKey: type === 'income' ? 'wsbud_new_income' : 'wsbud_new_expense', label: null, amount: '',
+    color: type === 'expense' ? (free || _wsBudgetColorFor(id)) : null };
+  // La fila nueva va al FINAL de su bloque, sin mover las del otro.
+  let at = -1; rows.forEach((r, k) => { if (r.type === type) at = k; });
+  rows.splice(at + 1, 0, row);
+  _wsBudgetSetRows(rows);
+  _wsBudgetRepaintList(type);
+  _wsBudgetRepaint();
+  _wsBudgetRenameStart(id);
+}
+function _wsBudgetDelete(id) {
+  const rows = _wsBudgetRows(_wsToolInputs);
+  const r = rows.find(x => x.id === id); if (!r) return;
+  const go = () => {
+    const next = _wsBudgetRows(_wsToolInputs).filter(x => x.id !== id);
+    if (_wsBudSel === id) _wsBudSel = null;
+    _wsBudgetSetRows(next);
+    _wsBudgetRepaintList(r.type);
+    _wsBudgetRepaint();
+    const root = _wsBudgetRoot(); const add = root && root.querySelector('[data-wsbud-add="' + r.type + '"]');
+    if (add) add.focus();
+  };
+  // Sólo se pregunta cuando se pierde un dato: una fila vacía o a cero se va sin más.
+  if (_wsNum(r.amount) === 0) { go(); return; }
+  _wsModal2({ title: t('wsbud_del_title'),
+    text: String(t('wsbud_del_text')).replace('{n}', _wsBudgetRowName(r)).replace('{a}', formatBase(_wsNum(r.amount))),
+    okLabel: t('wsmodal_delete'), danger: true, onOk: go });
+}
+// ── RENOMBRAR ──────────────────────────────────────────────────────────────────
+// Enter o tocar fuera confirman; Escape restaura; vacío restaura el último nombre
+// válido. La edición en vivo mueve leyenda y centro sin esperar a confirmar.
+var _wsBudRename = null;   // { id, prev } — `prev` es el `label` guardado al empezar
+function _wsBudgetRenameStart(id) {
+  const root = _wsBudgetRoot(); if (!root) return;
+  const btn = root.querySelector('[data-wsbud-rename="' + id + '"]'); if (!btn) return;
+  const r = _wsBudgetRows(_wsToolInputs).find(x => x.id === id); if (!r) return;
+  _wsBudRename = { id: id, prev: r.label };
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'wsbud-name-in'; inp.setAttribute('data-wsbud-name-in', id);
+  inp.setAttribute('maxlength', String(_WSBUD_LABEL_MAX)); inp.setAttribute('autocomplete', 'off');
+  inp.setAttribute('enterkeyhint', 'done'); inp.setAttribute('spellcheck', 'false');
+  inp.setAttribute('aria-label', t('wsbud_name_field'));
+  inp.value = _wsBudgetRowName(r);
+  btn.replaceWith(inp);
+  inp.focus(); try { inp.select(); } catch (_) {}
+}
+function _wsBudgetOnNameInput(el) {
+  const id = el.getAttribute('data-wsbud-name-in');
+  const v = String(el.value || '');
+  if (!v.trim()) return;                         // vacío: se espera, no se guarda un nombre vacío
+  const rows = _wsBudgetRows(_wsToolInputs);
+  const i = rows.findIndex(r => r.id === id); if (i < 0) return;
+  rows[i] = Object.assign({}, rows[i], { label: v.slice(0, _WSBUD_LABEL_MAX) });
+  _wsBudgetSetRows(rows);
+  _wsBudgetRepaint();
+}
+var _wsBudRenameBusy = false;
+function _wsBudgetRenameEnd(el, mode) {
+  // Sustituir el campo enfocado dispara su `focusout` DENTRO de esta misma llamada: sin el
+  // cerrojo, esa segunda pasada rehacía la cabecera y el foco se perdía.
+  if (!el || !el.isConnected || _wsBudRenameBusy) return;
+  _wsBudRenameBusy = true;
+  try { _wsBudgetRenameEndInner(el, mode); } finally { _wsBudRenameBusy = false; }
+}
+function _wsBudgetRenameEndInner(el, mode) {
+  const id = el.getAttribute('data-wsbud-name-in');
+  const st = _wsBudRename && _wsBudRename.id === id ? _wsBudRename : null;
+  _wsBudRename = null;
+  const rows = _wsBudgetRows(_wsToolInputs);
+  const i = rows.findIndex(r => r.id === id);
+  if (i >= 0 && st && (mode === 'cancel' || !String(el.value || '').trim()) && rows[i].label !== st.prev) {
+    rows[i] = Object.assign({}, rows[i], { label: st.prev });
+    _wsBudgetSetRows(rows);
+  }
+  const row = i >= 0 ? _wsBudgetRows(_wsToolInputs).find(r => r.id === id) : null;
+  if (row) {
+    const tmp = document.createElement('div'); tmp.innerHTML = _wsBudgetRowHtml(row);
+    const head = el.closest('.wsbud-row');
+    const fresh = tmp.firstElementChild;
+    if (head && fresh) {
+      head.querySelector('.wsbud-row-head').replaceWith(fresh.querySelector('.wsbud-row-head'));
+      const amt = head.querySelector('[data-wsbud-amt]'); if (amt) amt.setAttribute('aria-label', String(t('wsbud_amt_aria')).replace('{n}', _wsBudgetRowName(row)));
+    }
+  }
+  _wsBudgetRepaint();
+  if (mode !== 'blur') {
+    const root = _wsBudgetRoot(); const b = root && root.querySelector('[data-wsbud-rename="' + id + '"]');
+    if (b) b.focus();
+  }
+}
+var _wsBudWired = false;
+function _wsBudgetWire() {
+  if (_wsBudWired || typeof document === 'undefined' || !document.addEventListener) return;
+  _wsBudWired = true;
+  document.addEventListener('input', e => {
+    const el = e.target; if (!el || !el.getAttribute || !_wsBudgetRoot()) return;
+    if (el.hasAttribute('data-wsbud-amt')) _wsBudgetOnAmount(el);
+    else if (el.hasAttribute('data-wsbud-name-in')) _wsBudgetOnNameInput(el);
+  });
+  document.addEventListener('click', e => {
+    const root = _wsBudgetRoot(); if (!root || !e.target || !e.target.closest) return;
+    const q = s => e.target.closest(s);
+    let b;
+    if ((b = q('[data-wsbud-sel]'))) { _wsBudgetSelect(b.getAttribute('data-wsbud-sel')); return; }
+    if ((b = q('[data-wsbud-seg]'))) { _wsBudgetSelect(b.getAttribute('data-wsbud-seg')); return; }
+    if ((b = q('[data-wsbud-rename]'))) { _wsBudgetRenameStart(b.getAttribute('data-wsbud-rename')); return; }
+    if ((b = q('[data-wsbud-del]'))) { _wsBudgetDelete(b.getAttribute('data-wsbud-del')); return; }
+    if ((b = q('[data-wsbud-add]'))) { _wsBudgetAdd(b.getAttribute('data-wsbud-add')); return; }
+    if ((b = q('[data-wsbud-goto]'))) {
+      const f = root.querySelector('[data-wsbud-list="expense"] [data-wsbud-amt]') || root.querySelector('[data-wsbud-add="expense"]');
+      if (f) { try { f.scrollIntoView({ block: 'center' }); } catch (_) {} f.focus(); }
+      return;
+    }
+    // Pulsar FUERA del gráfico devuelve el estado general.
+    if (_wsBudSel && !q('.wsbud-donut') && !q('.wsbud-legend')) _wsBudgetSelect(null);
+  });
+  document.addEventListener('keydown', e => {
+    const el = e.target;
+    if (el && el.hasAttribute && el.hasAttribute('data-wsbud-name-in')) {
+      if (e.key === 'Enter') { e.preventDefault(); _wsBudgetRenameEnd(el, 'enter'); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _wsBudgetRenameEnd(el, 'cancel'); }
+      return;
+    }
+    if (e.key === 'Escape' && _wsBudSel && _wsBudgetRoot() && !document.getElementById('wsConfirmModal')) _wsBudgetSelect(null);
+  });
+  document.addEventListener('focusout', e => {
+    const el = e.target;
+    if (el && el.hasAttribute && el.hasAttribute('data-wsbud-name-in')) _wsBudgetRenameEnd(el, 'blur');
+  });
+}
+
 function _renderBudgetTool() {
   const esc = _intccEsc;
   if (!_wsToolInputs) _wsToolInputs = _wsBudgetDefaults();
-  const inp = _wsToolInputs;
-  const field = (k, label) => `
-    <label class="ws4-field">
-      <span class="ws4-field-name">${esc(label)}</span>
-      <span class="ws4-field-input">
-        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : 0))}">
-        ${_wsFieldUnitHtml('€')}
-      </span>
-    </label>`;
+  const inp = _wsBudgetAdopt(_wsToolInputs);
+  _wsBudSel = null;   // un repintado completo (abrir, guardar) vuelve al estado general
   return `
-    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
-      ${/* Aquí los DOS títulos de sección sí informan —Ingresos y Gastos son dos
-            bloques distintos— así que se conservan. Lo que se retira es la
-            tarjeta de presentación de encima. */''}
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-wsbud-view>
       ${_wsSurfaceHeadHtml({ title: t('wstool_budget_n'), doc: _wsToolDocName(), help: [t('wstool_budget_d')] })}
-      ${/* §10 — periodo y resumen ARRIBA. El usuario abre esta plantilla para
-            ver cuánto le queda; antes tenía que cruzar diez campos para llegar
-            a esa cifra. Se repinta con cada tecla por su propio contenedor, así
-            que no hay un segundo camino de cálculo. */''}
       <section class="wsh-card wsbud-top-card" data-wsbud-top>${_wsBudgetTopHtml(inp)}</section>
-      ${/* ── §26 · DOS COLUMNAS EN ESCRITORIO ────────────────────────────────────────────────
-            Lo que había era UNA columna de cinco tarjetas apiladas: el usuario abría la
-            plantilla para saber cuánto le queda y tenía que bajar por diez campos para
-            encontrar el gráfico. Ahora la edición vive a la IZQUIERDA y la respuesta a la
-            DERECHA, así que las dos caben en el primer viewport y editar un campo mueve el
-            anillo sin scroll.
-            LOS OWNERS DE REPINTADO NO CAMBIAN: `data-wsbud-top` y `data-wstool-out` siguen
-            siendo los mismos dos contenedores que se reescriben con cada tecla, así que esto
-            es una reordenación de la caja y no un segundo camino de cálculo.
-            EN MÓVIL el orden es OTRO, no esta rejilla aplastada: el panel de respuesta se
-            declara `order:1` y la edición `order:2`, para que el resultado se vea pronto
-            (§33). Los dos hijos declaran `order` — si sólo lo hiciera uno, el otro se
-            pintaría antes por el valor inicial 0, que es la lección de Intelligence. */''}
-      <div class="ws2col wsbud-body">
-        <div class="ws2col-edit wsbud-col-edit">
-          <section class="wsh-card wstool-inputs-card">
-            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
-            <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>
-          </section>
-          <section class="wsh-card wstool-inputs-card">
-            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3></header>
-            <div class="wstool-fields">${_WSBUD_EXPENSES.map(f => field(f.k, t(f.label))).join('')}</div>
-          </section>
-        </div>
-        <div class="ws2col-view wsbud-col-view">
+      ${/* ── PRIMERO ENTENDER, DESPUÉS EDITAR ──────────────────────────────────────────────
+            El orden del DOM ES el de lectura: resumen → reparto → edición → ayuda. En móvil se
+            apila tal cual, sin `order`, así que teclado y lector de pantalla recorren lo mismo
+            que se ve y el anillo aparece antes que los campos. En escritorio la misma caja se
+            compone en dos columnas (≈56/44) con áreas de rejilla: reparto y ayuda a la
+            izquierda, edición a la derecha. Los contenedores de repintado siguen siendo
+            `data-wsbud-top` y `data-wstool-out`: un solo camino de cálculo. */''}
+      <div class="wsbud-body">
+        <div class="wsbud-col-view">
           <section class="wsh-card wstool-out-card wsbud-out-card">
             <div class="wstool-out" data-wstool-out>${_wsBudgetOutHtml(inp)}</div>
           </section>
         </div>
+        <div class="wsbud-col-edit">
+          <section class="wsh-card wstool-inputs-card" data-wsbud-block="income">
+            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
+            <div class="wsbud-list" data-wsbud-list="income">${_wsBudgetListHtml(inp, 'income')}</div>
+          </section>
+          <section class="wsh-card wstool-inputs-card" data-wsbud-block="expense">
+            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3></header>
+            <div class="wsbud-list" data-wsbud-list="expense">${_wsBudgetListHtml(inp, 'expense')}</div>
+          </section>
+        </div>
+        <div class="wsbud-col-help" data-wsbud-help>${_wsBudgetHelpHtml(inp)}</div>
       </div>
-      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
-            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
-            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
       ${_wsToolSavedListHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>

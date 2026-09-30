@@ -59,8 +59,11 @@ function ctx() {
   vm.runInContext('function _intccEsc(x){ return String(x == null ? "" : x).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c])); }', sb);
   vm.runInContext('function formatBase(v){ return String(Math.round(Number(v) || 0)) + " €"; }', sb);
   vm.runInContext('function _wsNum(v){ if (v == null || v === "") return 0; var n = Number(String(v).replace(/\\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0; }', sb);
-  ['_WSBUD_INCOME', '_WSBUD_EXPENSES', '_WSBUD_DONUT_R'].forEach(n => vm.runInContext(constSrc(n), sb));
-  ['calculateMonthlyBudget', '_wsBudgetDonutHtml', '_wsBudgetChartHtml', 'calculateLoan', '_wsLoanDonutHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
+  // Presupuesto con categorías del usuario: el motor lee FILAS, así que sus helpers
+  // de lectura entran al sandbox (no cambian ninguna aritmética).
+  ['_WSBUD_INCOME', '_WSBUD_EXPENSES', '_WSBUD_DONUT_R', '_WSBUD_PALETTE', '_WSBUD_LEGACY_KEYS'].forEach(n => vm.runInContext(constSrc(n), sb));
+  vm.runInContext('var _wsBudSel = null;', sb);
+  ['_wsBudgetColorFor', '_wsBudgetLegacyRows', '_wsBudgetRows', '_wsBudgetRowName', 'calculateMonthlyBudget', '_wsBudgetDonutHtml', '_wsBudgetChartHtml', 'calculateLoan', '_wsLoanDonutHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
 const C = ctx();
@@ -134,15 +137,17 @@ section('3 · UN solo camino de cálculo (§26: reordenar la caja, no duplicar e
   ok('3.2 el cuerpo declara sus dos columnas', /wsbud-col-edit/.test(render) && /wsbud-col-view/.test(render));
   ok('3.3 el resumen vive FUERA del cuerpo, así que se ve sin scroll en cualquier ancho',
     render.indexOf('wsbud-top-card') < render.indexOf('wsbud-body'));
-  ok('3.4 la edición se declara antes que la vista en el DOM (y el orden lo decide el CSS)',
-    render.indexOf('wsbud-col-edit') < render.indexOf('wsbud-col-view'));
+  // CONTRATO RE-DECIDIDO (SPEC «Visualización primero»): el DOM va en orden de LECTURA
+  // —reparto, edición, ayuda— y ya no es el CSS quien reordena. Antes: edición primero + `order`.
+  ok('3.4 la VISTA se declara antes que la edición, y la ayuda después (orden del DOM = orden de lectura)',
+    render.indexOf('wsbud-col-view') < render.indexOf('wsbud-col-edit') && render.indexOf('wsbud-col-edit') < render.indexOf('wsbud-col-help'));
   // Ni el pintor del resumen ni el de la salida recalculan por su cuenta: los dos llaman al motor.
   const top = fnSrc('_wsBudgetTopHtml'), out = fnSrc('_wsBudgetOutHtml');
   ok('3.5 resumen y salida llaman al MISMO motor, sin aritmética propia',
     /calculateMonthlyBudget\(/.test(top) && /calculateMonthlyBudget\(/.test(out) &&
     !/\bincome\s*=\s*[^;]*\+/.test(top) && !/\bexpenses\s*=\s*[^;]*\+/.test(out));
   ok('3.6 el anillo recibe el resultado ya calculado, no los inputs',
-    /_wsBudgetDonutHtml\(res\)/.test(out));
+    /_wsBudgetDonutHtml\(res[,)]/.test(out));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -182,12 +187,17 @@ section('5 · §2/§7 — profundidad y densidad, sin inventar tonos:');
   ok('5.2 sin alfa BLANCA en las superficies nuevas (se leería como gris y rompe la escalera)',
     !/background:\s*rgba\(255,\s*255,\s*255/.test(bl));
   ok('5.3 §7 la cifra grande baja de 46 px', /\.wsbud-result \.wstool-res-final \{ font-size: 34px/.test(css));
-  ok('5.4 las dos pistas pueden encoger (`minmax(0,…)`, no `1fr`)',
-    /grid-template-columns: minmax\(0, 1\.05fr\) minmax\(0, 0\.95fr\)/.test(bl));
+  // Proporción RE-DECIDIDA: ≈56/44 con el panel visual a la izquierda (antes 1,05/0,95 con la
+  // edición a la izquierda). Sigue exigiendo `minmax(0,…)` en las dos pistas.
+  ok('5.4 las dos pistas pueden encoger (`minmax(0,…)`, no `1fr`) en la proporción ≈56/44',
+    /grid-template-columns: minmax\(0, 1\.27fr\) minmax\(0, 1fr\)/.test(bl));
   ok('5.5 y sus columnas declaran `min-width: 0`, que es la otra mitad de la condición',
     (bl.match(/\.wsbud-col-(edit|view) \{[^}]*min-width: 0/g) || []).length === 2);
-  ok('5.6 LOS DOS hijos declaran `order` (si sólo lo hiciera uno, el otro se pinta antes)',
-    /\.wsbud-col-edit \{ order: 1/.test(bl) && /\.wsbud-col-view \{ order: 2/.test(bl));
+  // CONTRATO RE-DECIDIDO: el SPEC prohíbe un `order` que contradiga el DOM. Ninguna columna
+  // lo declara; el escritorio compone con ÁREAS de rejilla y el móvil apila el DOM tal cual.
+  ok('5.6 ninguna columna declara `order`: el escritorio compone con áreas de rejilla',
+    !/\.wsbud-col-(edit|view|help) \{[^}]*order:/.test(bl)
+    && /grid-template-areas: "view edit" "help edit"/.test(bl));
   ok('5.7 la animación del anillo respeta prefers-reduced-motion (§12/§38)',
     /prefers-reduced-motion: reduce\)\s*\{\s*\.wsbud-arc\s*\{\s*transition: none/.test(css));
   ok('5.8 el anillo es SVG/CSS: ninguna librería nueva (§39)',
@@ -203,9 +213,12 @@ section('6 · §25 · Interés compuesto sobre el armazón compartido:');
 // una estructura propia.
 {
   const cmp = fnSrc('_renderCompoundTool'), bud = fnSrc('_renderBudgetTool');
-  ok('6.1 las dos herramientas usan el MISMO armazón de dos columnas',
+  // CONTRATO RE-DECIDIDO: `.ws2col` impone edición-primero (`order` 1/2) y 1,05/0,95, que es
+  // justo lo que el SPEC del Presupuesto sustituye. El Presupuesto sale del armazón y compone lo
+  // suyo; Interés compuesto (y Préstamos, §7) lo conservan INTACTO.
+  ok('6.1 el compuesto sigue en el armazón compartido y el Presupuesto compone su propia caja',
     /class="ws2col"/.test(cmp) && /ws2col-edit/.test(cmp) && /ws2col-view/.test(cmp) &&
-    /ws2col wsbud-body/.test(bud) && /ws2col-edit/.test(bud));
+    /class="wsbud-body"/.test(bud) && !/ws2col/.test(bud));
   ok('6.2 …y la decisión de caja vive en UN solo sitio de la hoja',
     (css.match(/\.ws2col \{ display: flex/g) || []).length === 1 &&
     (css.match(/\.ws2col-edit \{ order: 1/g) || []).length === 1);
@@ -516,6 +529,60 @@ section('12 · Cierre V2 · el título identifica y el Diario entra en el armaz�
     /\.wsre-kpis \{ grid-template-columns: 1fr; \}/.test(cssNoC) ||
     /\.wsre-kpis \{[^}]*grid-template-columns: 1fr/.test(cssNoC),
     (cssNoC.match(/\.wsre-kpis \{[^}]*\}/g) || []).join(' | ').slice(0, 200));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+section('13 · Categorías del usuario: filas con identidad, compatibles con lo guardado:');
+// ════════════════════════════════════════════════════════════════════════════
+{
+  const LEG = '{ salary: 2500, extra: 0, otherinc: 0, housing: 700, food: 350, transport: 120, utilities: 110, leisure: 150, education: 50, otherexp: 100 }';
+  const rows = R('_wsBudgetRows(' + LEG + ')');
+  ok('13.1 un documento ANTIGUO se lee como sus diez filas, ids = claves antiguas, importes exactos',
+    rows.length === 10 && rows[0].id === 'salary' && rows[0].type === 'income' && rows.find(r => r.id === 'housing').amount === 700
+    && rows.every(r => r.label === null && typeof r.labelKey === 'string'), JSON.stringify(rows.slice(0, 2)));
+  const a = R('calculateMonthlyBudget(' + LEG + ')'), b = R('calculateMonthlyBudget({ rows: _wsBudgetRows(' + LEG + ') })');
+  ok('13.2 misma aritmética en la forma antigua y en la nueva', a.income === b.income && a.expenses === b.expenses && a.free === b.free && a.saveRate === b.saveRate,
+    JSON.stringify([a.free, b.free]));
+  const dup = R(`calculateMonthlyBudget({ rows: [
+    { id: 'i1', type: 'income', label: 'Autónomo', amount: 1000 },
+    { id: 'g1', type: 'expense', label: 'Gimnasio', amount: 30, color: '#4D8DFF' },
+    { id: 'g2', type: 'expense', label: 'Gimnasio', amount: 70, color: '#37c7b8' },
+    { id: 'g2', type: 'expense', label: 'Duplicado de id', amount: 999 } ] })`);
+  ok('13.3 dos categorías con el MISMO nombre coexisten; un id repetido NO se cuenta dos veces',
+    dup.items.length === 2 && dup.items[0].id !== dup.items[1].id && dup.expenses === 100 && dup.income === 1000, JSON.stringify(dup.items.map(i => [i.id, i.name, i.value])));
+  C.__d = dup;
+  const h = R('_wsBudgetDonutHtml(__d)');
+  ok('13.4 el anillo enlaza cada segmento por id, no por el texto',
+    /data-wsbud-seg="g1"/.test(h) && /data-wsbud-seg="g2"/.test(h));
+  const hs = R('_wsBudgetDonutHtml(__d, "g2")');
+  const lens = x => (x.match(/stroke-dasharray="([0-9.]+) /g) || []).join();
+  ok('13.5 seleccionar cambia QUÉ se lee (nombre, importe, %) pero NINGUNA cifra del reparto',
+    lens(h) === lens(hs) && /is-sel/.test(hs) && /is-dim/.test(hs) && /<b>70%<\/b>/.test(hs) && /70 €/.test(hs) && /Gimnasio/.test(hs));
+  ok('13.6 la leyenda es un botón por categoría con aria-pressed, ordenada por peso',
+    (() => { const l = R('_wsBudgetChartHtml(__d, "g2")'); const ids = [...l.matchAll(/data-wsbud-sel="([^"]+)"/g)].map(m => m[1]);
+      return ids.join() === 'g2,g1' && /data-wsbud-sel="g2" aria-pressed="true"/.test(l) && /data-wsbud-sel="g1" aria-pressed="false"/.test(l); })());
+  ok('13.7 un nombre vacío NUNCA se publica: cae al sugerido',
+    R(`_wsBudgetRowName({ id: 'x', type: 'expense', labelKey: 'wstool_bud_leisure', label: '   ' })`) === 'Ocio'
+    && R(`_wsBudgetRowName({ id: 'y', type: 'expense', labelKey: null, label: '' })`) === R(`t('wsbud_new_expense')`));
+  ok('13.8 una fila sin color válido recibe uno ESTABLE por su id (mismo id, mismo color)',
+    R(`_wsBudgetRows({ rows: [{ id: 'zz', type: 'expense', label: 'a', amount: 1, color: 'red' }] })[0].color`) === R(`_wsBudgetColorFor('zz')`));
+  ok('13.9 leer filas devuelve COPIAS: modificar el resultado no toca el documento de origen',
+    R(`(function(){ var d = { rows: [{ id: 'a', type: 'income', label: 'x', amount: 5 }] }; var r = _wsBudgetRows(d); r[0].label = 'mutado'; return d.rows[0].label; })()`) === 'x');
+  // La lectura: una sola, y exacta en los cuatro casos.
+  const read = fnSrc('_wsBudgetReading');
+  ok('13.10 la lectura cubre déficit (primero), sin ingresos, disponible cero y positivo, sin consejos',
+    /res\.deficit/.test(read) && /wsbud_read_zero/.test(read) && /wstool_bud_read_noincome/.test(read) && /wstool_bud_read_neutral/.test(read)
+    && !/revisa|recomend|deberías|should/i.test(read));
+  ok('13.11 el resumen ya no repite el déficit: una sola lectura, junto al gráfico',
+    !/wstool_bud_read_deficit/.test(fnSrc('_wsBudgetTopHtml').replace(/\/\/[^\n]*/g, '')));
+  ok('13.12 sin gastos no hay segmentos: estado neutro con acceso al editor',
+    /wsbud_empty/.test(fnSrc('_wsBudgetEmptyHtml')) && /data-wsbud-goto="expense"/.test(fnSrc('_wsBudgetEmptyHtml')) && !/wsbud-arc/.test(fnSrc('_wsBudgetEmptyHtml')));
+  ok('13.13 las claves nuevas existen en ES y EN',
+    ['wsbud_add_income', 'wsbud_add_expense', 'wsbud_new_income', 'wsbud_new_expense', 'wsbud_name_aria', 'wsbud_name_field', 'wsbud_amt_aria',
+     'wsbud_del_aria', 'wsbud_del_title', 'wsbud_del_text', 'wsbud_limit', 'wsbud_legend_label', 'wsbud_empty', 'wsbud_empty_cta', 'wsbud_read_zero', 'wssave_failed']
+      .every(k => R('typeof T.es.' + k) === 'string' && R('typeof T.en.' + k) === 'string'));
+  ok('13.14 guardar no finge éxito si el almacén rechaza la escritura',
+    /_ws4Persist\(proj\) === false/.test(fnSrc('_wsToolCommit')) && /return _ws4SaveAll\(list\)/.test(fnSrc('_ws4Persist')));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

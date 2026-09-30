@@ -22557,19 +22557,26 @@ body.gs-open { overflow: hidden; }
 .wsbud-bar { display: flex; width: 100%; height: 20px; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(120,160,255,0.14); }
 .wsbud-seg { height: 100%; transition: width 220ms ease; }
 .wsbud-seg.is-free { background: linear-gradient(90deg, #2fd98e, #57e6a6); box-shadow: inset 0 0 8px rgba(47,217,142,0.4); }
-/* §17 — la leyenda es la única que lleva el importe por categoría, así que se queda; pero en dos
-   columnas fijas en móvil lee mejor y ocupa menos que envolviendo a lo que salga. */
-.wsbud-legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
-@media (min-width: 1024px) { .wsbud-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; } }
-/* ENVUELVE SÓLO DONDE HACE FALTA. En dos columnas a 360 cada celda mide ~150 px y
-   «Alimentación 350,00 US$» pedía 155: el importe se salía 5 px de la tarjeta (medido, no
-   supuesto). Con `wrap` el elemento parte en dos líneas únicamente en los anchos donde no cabe,
-   así que 390 y arriba siguen en una sola línea y no se paga altura donde no hay problema.
-   No se recorta el importe ni se abrevia la moneda: una cifra a medias no es una cifra. */
-.wsbud-leg { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; font-size: 12px; color: var(--text-muted); }
-.wsbud-leg i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+/* LA LEYENDA ES EL CONTROL DEL ANILLO: una fila por categoría, ordenada por peso, con
+   nombre (que puede ser largo y se parte por palabras), importe y porcentaje. Cada fila es un
+   botón de 44 px, así que ratón, toque y teclado seleccionan por el mismo sitio. */
+.wsbud-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; }
+.wsbud-leg {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 3.1em; align-items: center; gap: 4px 10px;
+  width: 100%; min-height: 44px; padding: 6px 10px; margin: 0; box-sizing: border-box;
+  border: 1px solid transparent; border-radius: 10px; background: transparent;
+  font: inherit; font-size: 13px; line-height: 1.3; color: var(--text-bright); text-align: left; cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.wsbud-leg:hover { background: rgba(77,141,255,0.07); }
+.wsbud-leg:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 1px; }
+.wsbud-leg.is-sel { border-color: rgba(92,150,255,0.5); background: rgba(77,141,255,0.12); }
+.wsbud-leg.is-static { cursor: default; background: transparent; }
+.wsbud-leg i { width: 10px; height: 10px; border-radius: 3px; }
 .wsbud-leg i.is-free { background: #2fd98e; }
-.wsbud-leg b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; }
+.wsbud-leg-n { min-width: 0; overflow-wrap: break-word; color: rgba(214,226,255,0.86); }
+.wsbud-leg b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.wsbud-leg em { font-style: normal; text-align: right; color: rgba(190,206,240,0.72); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* §19 — la lectura aporta interpretación, así que se queda; en bloque compacto, no en tarjeta. */
 .wsbud-reading { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--text-bright); padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(120,160,255,0.14); background: rgba(74,130,240,0.07); }
 /* §20 — la ayuda es información secundaria: no compite con la herramienta. */
@@ -22689,82 +22696,126 @@ body.gs-open { overflow: hidden; }
    escribe entero—, así que el centro usa una forma corta. */
 
 .wsbud-body { display: flex; flex-direction: column; gap: 10px; }
-/* MÓVIL: EDICIÓN PRIMERO, y es una decisión medida, no la de por defecto. Probé la respuesta
-   delante y dejaba el primer campo en 1028 px: para cambiar un gasto había que cruzar el anillo
-   entero. Y no hacía falta, porque la RESPUESTA YA ESTÁ ARRIBA — el resumen compacto (periodo,
-   ingresos, gastos, disponible) vive fuera de esta rejilla y se ve sin scroll. El anillo es la
-   lectura PROFUNDA («en qué se va»), no la respuesta inmediata, así que va después de la
-   edición, que además coincide con el orden de lectura del escritorio (izquierda → derecha).
-   Los DOS hijos declaran `order` a propósito: si sólo lo hiciera uno, el otro se pintaría antes
-   por su valor inicial 0 — la lección de las cards de Intelligence. */
-.wsbud-col-edit { order: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.wsbud-col-view { order: 2; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* PRIMERO ENTENDER, DESPUÉS EDITAR. El DOM ya va en el orden de lectura —reparto, edición,
+   ayuda—, así que en móvil se apila tal cual y SIN `order`: lo que ve el ojo es lo que recorren
+   el teclado y el lector de pantalla. (Hasta ahora la edición iba primero y el anillo quedaba
+   bajo diez campos, fuera de la primera pantalla.) */
+.wsbud-col-view { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.wsbud-col-edit { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.wsbud-col-help { min-width: 0; }
 @media (min-width: 1024px) {
-  /* `minmax(0, …)` en las dos pistas: con `1fr` (= `minmax(auto,1fr)`) una cifra larga se niega
-     a encoger y la columna se sale de la rejilla. El `min-width: 0` de cada columna es la otra
-     mitad de la misma condición. */
-  /* PROPORCIÓN MEDIDA, no elegida. Probé 0,88 / 1,12 para que la columna de edición se alargara y
-     cerrara el hueco que deja debajo: a 1440 el hueco bajaba de 289 a 266 px —nada— y a 1024 el
-     campo numérico caía a 86 px, demasiado estrecho para «2.500» con su unidad. Se vuelve a
-     1,05 / 0,95, y el hueco se ataca donde de verdad ayuda: el ANCHO DE LOS CAMPOS (abajo).
-     Que dos columnas tengan distinta altura no es un defecto — forzarlo sería decoración. */
-  .wsbud-body { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 14px; align-items: start; }
-  /* §10 — LA EDICIÓN RESPIRA: en una columna de ~700 px, cuatro campos por fila dejan 131 px por
-     campo, y un importe de seis dígitos con su unidad va justo. Tres por fila dan ~185 px, que es
-     el mismo ancho cómodo que ya tienen a pantalla completa, y de paso la columna se alarga y el
-     vacío de debajo se reduce. Acotado a Presupuesto dentro de su cuerpo: no se toca la rejilla
-     compartida de las demás capacidades desde aquí. */
-  .wsbud-col-edit .wstool-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .wsbud-col-view { position: sticky; top: 12px; }
+  /* ≈56/44 con el panel visual a la izquierda. `minmax(0, …)` en las dos pistas: con `1fr` una
+     cifra larga se niega a encoger. La ayuda ocupa la celda bajo el reparto; la edición baja por
+     la derecha a lo largo de las dos filas. Áreas de rejilla, no `order`: el orden del DOM no
+     cambia. */
+  .wsbud-body {
+    display: grid; grid-template-columns: minmax(0, 1.27fr) minmax(0, 1fr);
+    grid-template-areas: "view edit" "help edit"; grid-template-rows: auto 1fr;
+    gap: 14px; align-items: start;
+  }
+  .wsbud-col-view { grid-area: view; }
+  .wsbud-col-edit { grid-area: edit; }
+  .wsbud-col-help { grid-area: help; }
 }
-/* LA VISUALIZACIÓN SE HUNDE: más oscura que la tarjeta de edición, para que la respuesta se lea
-   como un panel y no como otro formulario. Es el mismo recurso que la portada Free usó para que
-   ocho celdas dejaran de parecer ocho botones. */
-.wsbud-out-card { background: var(--elev-0, #0b1120); border-color: rgba(120,160,255,0.20); }
+/* EL PANEL VISUAL: negro profundo con un difuminado azul contenido arriba y un filete
+   eléctrico. Se hunde respecto a la edición, así que se lee como respuesta y no como otro
+   formulario. Ninguna alfa blanca: se leería como gris lavado. */
+.wsbud-out-card {
+  background: var(--elev-0, #0b1120);
+  background-image: radial-gradient(120% 80% at 30% 0%, rgba(46,96,214,0.17), rgba(46,96,214,0) 62%);
+  border-color: rgba(92,150,255,0.30);
+  box-shadow: 0 0 0 1px rgba(77,141,255,0.05) inset, 0 22px 44px -30px rgba(40,90,220,0.55);
+}
 .wsbud-out-card .wstool-res-main { background: rgba(74,130,240,0.08); border-radius: 14px; }
 /* §7 — menos gigantismo: 46 px era un titular, no un dato. */
 .wsbud-result .wstool-res-final { font-size: 34px; }
 @media (max-width: 767px) { .wsbud-result .wstool-res-final { font-size: 30px; } }
+/* Anillo y leyenda: apilados, y en paralelo sólo cuando el panel mide lo bastante para que la
+   leyenda no se estreche (≥1200). */
+.wsbud-viz { display: grid; gap: 14px; justify-items: center; min-width: 0; }
+.wsbud-viz > .wsbud-chart-wrap { justify-self: stretch; width: 100%; min-width: 0; }
+@media (min-width: 1200px) {
+  .wsbud-viz { grid-template-columns: minmax(0, 300px) minmax(0, 1fr); align-items: center; gap: 22px; }
+}
 
 /* ── EL ANILLO ─────────────────────────────────────────────────────────────────────────────── */
-/* §16 — el anillo es PROTAGONISTA, no gigantesco: 208 px sobre 360 se comía el 58 % del ancho.
-   176 px deja aire al lado y, sobre todo, aparece antes. */
-.wsbud-donut { position: relative; display: grid; place-items: center; width: 100%; max-width: 176px; margin: 0 auto 2px; }
-@media (min-width: 1024px) { .wsbud-donut { max-width: 208px; } }
-/* §11 · INTENTO REVERTIDO, y queda escrito para que nadie lo repita. Puse el anillo y su leyenda
-   en paralelo a ≥1024 —el anillo mide 208 px centrado en una tarjeta de ~600, así que deja aire
-   a los lados mientras la leyenda se apila debajo— esperando acortar la columna de
-   visualización. LA MEDIDA DIJO LO CONTRARIO: la columna pasó de 465 a 551 px y el desfase con
-   la de edición de 103 a 189. Así que el aire lateral del anillo no es altura recuperable: la
-   fila de la rejilla la fija el propio anillo y la leyenda deja de aportar su compresión.
-   El desfase de 103 px se queda, declarado: es cosmético, no bloquea el cierre, y forzarlo con
-   relleno es exactamente lo que el §11 prohíbe. */
-.wsbud-donut svg { display: block; width: 100%; height: auto; }
-.wsbud-arc { transition: stroke-dasharray 260ms ease, stroke-dashoffset 260ms ease; }
+/* PROTAGONISTA: 240 px en móvil (cabe entero hasta 360), 260 en escritorio apilado y 300 cuando
+   comparte fila con la leyenda. */
+.wsbud-donut { position: relative; display: grid; place-items: center; width: 100%; max-width: 240px; margin: 0 auto 2px; }
+@media (min-width: 1024px) { .wsbud-donut { max-width: 260px; } }
+@media (min-width: 1200px) { .wsbud-donut { max-width: 300px; } }
+.wsbud-donut svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 0 14px rgba(60,120,255,0.16)); }
+.wsbud-arc { cursor: pointer; transition: stroke-dasharray 260ms ease, stroke-dashoffset 260ms ease, stroke-width 180ms ease, opacity 180ms ease; }
+.wsbud-arc.is-dim { opacity: 0.34; }
+.wsbud-arc.is-sel { stroke-width: 18; }
 .wsbud-donut-c {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 2px; text-align: center;
-  padding: 0 22px; pointer-events: none;
+  padding: 0 24%; pointer-events: none;
 }
-/* 12 px Y NO 11: el suelo tipográfico de Workspace son 12 px para información necesaria, y lo
-   certificó v740 dentro de `.aurix-wsh`. Puse 11 px y 10,5 px aquí y la sonda de primera
-   pantalla lo cazó en los dos motores — es un suelo de legibilidad, no una preferencia. */
+/* 12 px Y NO 11: el suelo tipográfico de Workspace son 12 px para información necesaria. */
 .wsbud-donut-c i {
-  font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: rgba(159,194,255,0.9);
+  font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; line-height: 1.2;
+  text-transform: uppercase; color: rgba(159,194,255,0.9); max-width: 100%;
+  overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-/* La cifra del centro tiene que CABER: `anywhere` no vale aquí porque partiría un importe a
-   mitad de dígito, así que se ajusta el tamaño y se permite el salto por el espacio que ya hay. */
 .wsbud-donut-c b {
-  font-size: 17px; font-weight: 700; line-height: 1.15; color: var(--text-bright);
+  font-size: 28px; font-weight: 700; line-height: 1.1; color: #f4f7ff;
   font-variant-numeric: tabular-nums; max-width: 100%;
 }
+@media (min-width: 1200px) { .wsbud-donut-c b { font-size: 32px; } }
 .wsbud-donut-c b.is-pos { color: #57e6a6; }
 .wsbud-donut-c b.is-neg, .wsbud-dn-neg { color: #ff8a70; }
-/* El centro publica la MAYOR PARTIDA, no un KPI repetido: nombre en su propio color, su peso, y
-   una línea que dice qué es esa cifra — un porcentaje suelto no se sabe de qué es. */
-.wsbud-donut-c b { font-size: 24px; }
-.wsbud-donut-c em { font-style: normal; font-size: 12px; color: var(--text-muted); line-height: 1.2; }
+.wsbud-donut-c em { font-style: normal; font-size: 12px; color: rgba(200,214,245,0.8); line-height: 1.2; font-variant-numeric: tabular-nums; }
+/* Sin gastos: el anillo vacío, la frase y el atajo al editor. Ningún segmento. */
+.wsbud-empty { position: relative; display: grid; place-items: center; width: 100%; max-width: 240px; margin: 0 auto; }
+.wsbud-empty svg { display: block; width: 100%; height: auto; grid-area: 1 / 1; }
+.wsbud-empty-t { grid-area: 1 / 1; margin: 0 24% 34px; text-align: center; font-size: 13px; line-height: 1.35; color: rgba(214,226,255,0.86); }
+.wsbud-empty-cta { grid-area: 1 / 1; align-self: end; margin-bottom: 30%; min-height: 44px; padding: 0 14px; border-radius: 22px;
+  border: 1px solid rgba(92,150,255,0.45); background: rgba(77,141,255,0.10); color: #cfe0ff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.wsbud-empty-cta:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+
+/* ── EL EDITOR · nombre encima, importe debajo ────────────────────────────────────────────── */
+/* Hasta dos columnas, y una sola cuando no caben dos de 150 px: el ancho REAL decide. */
+.wsbud-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(150px, calc(50% - 6px)), 1fr)); gap: 8px 12px; }
+.wsbud-row { display: flex; flex-direction: column; gap: 2px; min-width: 0; border-radius: 12px; transition: box-shadow 160ms ease; }
+.wsbud-row.is-sel { box-shadow: 0 0 0 1px rgba(92,150,255,0.55), 0 0 0 5px rgba(77,141,255,0.10); }
+.wsbud-row-head { display: flex; align-items: center; gap: 2px; min-width: 0; }
+/* El nombre se lee como TEXTO. El affordance es discreto —cursor y un subrayado suave al pasar
+   o enfocar— y no una caja por cada nombre. 44 px de alto: es un objetivo táctil. */
+.wsbud-name {
+  flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 4px 2px; margin: 0; border: 0; background: transparent;
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1.25; color: rgba(214,226,255,0.9);
+  text-align: left; overflow-wrap: break-word; cursor: text;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 4px; text-decoration-thickness: 1px;
+  transition: text-decoration-color 160ms ease;
+}
+.wsbud-name:hover, .wsbud-name:focus-visible { text-decoration-color: rgba(140,180,255,0.7); }
+.wsbud-name:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 1px; border-radius: 6px; }
+.wsbud-name-in {
+  flex: 1 1 auto; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 8px; margin: 0;
+  border: 1px solid rgba(92,150,255,0.6); border-radius: 8px; background: rgba(8,14,30,0.9);
+  font: inherit; font-size: 16px; font-weight: 600; color: #f4f7ff;
+}
+.wsbud-name-in:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 1px; }
+.wsbud-del {
+  flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: 0 -10px 0 0; padding: 0;
+  border: 0; border-radius: 10px; background: transparent; color: rgba(190,206,240,0.55); cursor: pointer;
+}
+.wsbud-del svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; fill: none; }
+.wsbud-del:hover { color: #ff9a8a; background: rgba(255,120,110,0.08); }
+.wsbud-del:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: -2px; color: #ff9a8a; }
+.wsbud-add {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 8px; padding: 0 14px;
+  border: 1px dashed rgba(92,150,255,0.45); border-radius: 12px; background: transparent;
+  font: inherit; font-size: 13px; font-weight: 600; color: #cfe0ff; cursor: pointer;
+}
+.wsbud-add svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+.wsbud-add:hover { background: rgba(77,141,255,0.08); border-style: solid; }
+.wsbud-add:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+.wsbud-add[disabled] { opacity: 0.5; cursor: not-allowed; }
+.wsbud-limit { margin: 6px 0 0; font-size: 12px; color: rgba(214,226,255,0.8); }
+.wsbud-col-help .wsbud-basis > .wstool-asm-sum { padding: 8px 11px; font-size: 12.5px; }
 
 /* §27 — IDENTIDAD DE LAS CUATRO MAGNITUDES. Un filete de 2 px y el tono de la cifra: entra
    (turquesa), sale (coral), queda (azul Aurix). Nada de rellenos de color, que compiten con el
@@ -22777,7 +22828,7 @@ body.gs-open { overflow: hidden; }
 .wsbud-kpi[data-ws-accent]::before { background: rgba(var(--ws-a), 0.85); }
 .wsbud-kpi[data-ws-accent="in"] b,
 .wsbud-kpi[data-ws-accent="out"] b { color: rgb(var(--ws-b)); }
-@media (prefers-reduced-motion: reduce) { .wsbud-arc { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .wsbud-arc { transition: none; } .wsbud-leg, .wsbud-row, .wsbud-name { transition: none; } }
 @media (max-width: 720px) {
   .wsbud-result .wstool-res-final { font-size: 38px; }
   .wsbud-split { grid-template-columns: 1fr; }
@@ -28526,6 +28577,12 @@ button.intv14-cmp-clear {
 .wsbud-kpi i { overflow-wrap: normal; }
 /* El disponible es la cifra por la que se abre la plantilla: pesa más. */
 .wsbud-kpi.is-main { border-color: rgba(var(--aurix-blue-rgb), 0.34); background: var(--elev-2); }
+/* SUPERFICIES PROFUNDAS EN EL RESUMEN. Las celdas en `--elev-1/2` sobre la tarjeta se leían
+   como gris azulado lavado: pasan a negro profundo con un filete eléctrico, y la cifra —blanca
+   o del tono de su magnitud— es lo que destaca. «Disponible» conserva su borde más vivo. */
+.wsbud-top-card { background: var(--elev-1, #0f1628); background-image: linear-gradient(180deg, rgba(46,96,214,0.07), rgba(46,96,214,0)); }
+.wsbud-top-card .wsbud-kpi { background: var(--elev-0, #0b1120); border-color: rgba(92,150,255,0.22); }
+.wsbud-top-card .wsbud-kpi.is-main { background: var(--elev-0, #0b1120); background-image: radial-gradient(120% 140% at 0% 0%, rgba(46,96,214,0.16), rgba(46,96,214,0) 70%); border-color: rgba(92,150,255,0.42); }
 .wsbud-kpi b.is-pos { color: rgba(120,215,170,0.98); }
 .wsbud-kpi b.is-neg { color: rgba(240,170,110,0.98); }
 @media (min-width: 768px) {
