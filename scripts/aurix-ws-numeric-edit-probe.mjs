@@ -60,7 +60,8 @@ const ok = (n, c, info) => { if (c) { pass++; console.log('  ✓ ' + n); } else 
 const CAPS = [
   { id: 'compound',    open: `_wsOpenTool('compound')`,       sel: '.wstool-inputs-card .ws4-num' },
   { id: 'loan',        open: `_wsOpenTool('loan')`,           sel: '.wsloan-fields .ws4-num' },
-  { id: 'budget',      open: `_wsOpenTool('budget')`,         sel: '.wstool-fields .ws4-num' },
+  // Presupuesto con FILAS (cb0776a): el importe de cada categoría es `[data-wsbud-amt]`.
+  { id: 'budget',      open: `_wsOpenTool('budget')`,         sel: '.wsbud-col-edit [data-wsbud-amt]' },
   { id: 'journal',     open: `_wsOpenTool('journal')`,        sel: '[data-wsjrn-input="buy"]' },
   { id: 'realestate',  open: `_wsOpenTool('realestate')`,     sel: '[data-wsre-input="buy"]' },
   { id: 'receivables', open: `_wsOpenTool('receivables')`,    sel: '[data-wsrecv-input="unitPrice"]' },

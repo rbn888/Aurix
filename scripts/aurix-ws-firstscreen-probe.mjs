@@ -94,8 +94,12 @@ const SURFACES = [
     whole: ['.wstool-inputs-card .ws4-num'], starts: ['[data-wstool-out]'] },
   { id: 'loan',        open: `_wsOpenTool('loan')`,
     whole: ['.wsloan-fields .ws4-num'],      starts: ['[data-wstool-out]'] },
+  // RE-DECIDIDO tras cb0776a (Presupuesto con FILAS): la superficie se lee resumen → reparto →
+  // edición, a propósito, así que «empezar a trabajar» es ver el resumen ENTERO y que el
+  // reparto (o su estado vacío) EMPIECE en pantalla. La edición va debajo y se mide aparte en
+  // aurix-ws-budget-custom-probe. `.wstool-fields` ya no existe en esta superficie.
   { id: 'budget',      open: `_wsOpenTool('budget')`,
-    whole: ['.wstool-fields .ws4-num'],      starts: ['.wstool-inputs-card'] },
+    whole: ['.wsbud-top .wsbud-kpis'],       starts: ['.wsbud-donut, .wsbud-empty'] },
   { id: 'journal',     open: `_wsOpenTool('journal')`,
     whole: ['[data-wsjrn-input]'],           starts: ['.wsjrn-form-card'] },
   // ── LA EXENCIÓN SE RETIRA: EL HUECO ESTÁ CERRADO ────────────────────────
@@ -182,7 +186,8 @@ const MEASURE = `(function(SPEC){
   // tocar a su vecina?
   var ROWS = ['.wsre-kpis', '.wsre-subkpis', '.wsre-layers', '.wsjrn-sum-grid',
               '.wsb-params-grid', '.wstool-fields', '.wsloan-fields', '.wsg-form',
-              '.wsjrn-form-grid', '.wsre-form-grid', '.wsrecv-form-grid', '.wsrecv-kpis'];
+              '.wsjrn-form-grid', '.wsre-form-grid', '.wsrecv-form-grid', '.wsrecv-kpis',
+              '.wsbud-kpis', '.wsbud-rows'];
   var rowBad = [];
   ROWS.forEach(function(sel){
     [].slice.call(wsh.querySelectorAll(sel)).forEach(function(g){
@@ -274,11 +279,12 @@ const MEASURE = `(function(SPEC){
   // se exige que las entradas de una misma fila empiecen a la misma altura.
   var misalign = [];
   ['.wstool-fields', '.wsloan-fields', '.wsb-params-grid', '.wsjrn-form-grid',
-   '.wsre-form-grid', '.wsrecv-form-grid', '.wsg-form'].forEach(function(sel){
+   '.wsre-form-grid', '.wsrecv-form-grid', '.wsg-form', '.wsbud-rows'].forEach(function(sel){
     [].slice.call(wsh.querySelectorAll(sel)).forEach(function(g){
       var rows = {};
       [].slice.call(g.children).forEach(function(f){
-        if (!f.classList || !f.classList.contains('ws4-field')) return;
+        // .wsbud-row es la celda de campo del Presupuesto con filas (nombre encima, importe debajo).
+        if (!f.classList || !(f.classList.contains('ws4-field') || f.classList.contains('wsbud-row'))) return;
         var inp = f.querySelector('.ws4-field-input'); if (!inp) return;
         var fb = f.getBoundingClientRect(), ib = inp.getBoundingClientRect();
         if (!fb.width || !ib.width) return;
