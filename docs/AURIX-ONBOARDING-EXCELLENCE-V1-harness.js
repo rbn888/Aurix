@@ -64,7 +64,11 @@ function bootEngine(seed) {
   vm.runInContext(engSrc, sandbox);
   return { Eng: sandbox.AurixOnboarding, mem, upserts, sandbox };
 }
-const STATES_ORDER = ['LANGUAGE', 'WELCOME', 'ACTIVATION', 'SUCCESS'];
+// RE-DECIDIDO (ONBOARDING · CIERRE): LANGUAGE sale del recorrido — el idioma se elige en el
+// acceso (selector ES|EN) y se cambia en la cabecera del onboarding; un LANGUAGE guardado se
+// migra a WELCOME. Y los intereses dejan de ser interactivos: sólo sembraban la watchlist si
+// se terminaba con la cartera vacía, que el recorrido normal nunca alcanza.
+const STATES_ORDER = ['WELCOME', 'ACTIVATION', 'SUCCESS'];
 // Arrancar el motor Y esperar a que lea el almacén: `hydrateOnboardingState` es
 // async, así que sin await `getSnapshot()` devuelve el estado inicial en memoria
 // (NOT_STARTED) en vez del persistido — que es justo lo que estas pruebas miden.
@@ -88,12 +92,12 @@ console.log('A — Un usuario nuevo recorre el flujo entero:');
     if (s.completed) { seen.push('COMPLETED'); break; }
     seen.push(s.state);
   }
-  ok('A.1 el recorrido son 4 momentos, en orden, y termina COMPLETED',
+  ok('A.1 el recorrido son 3 momentos, en orden, y termina COMPLETED',
      JSON.stringify(seen) === JSON.stringify([...STATES_ORDER, 'COMPLETED']), seen.join(' → '));
   ok('A.2 son 4, no 7 (INTERESTS/EXPERIENCE/PROFILE fuera del recorrido)',
      !seen.includes('INTERESTS') && !seen.includes('EXPERIENCE') && !seen.includes('PROFILE'));
   ok('A.3 el indicador de progreso declara los mismos momentos',
-     (html.match(/onb-progress-dot/g) || []).length === 3, (html.match(/onb-progress-dot/g) || []).length + ' puntos');
+     (html.match(/onb-progress-dot/g) || []).length === 2, (html.match(/onb-progress-dot/g) || []).length + ' puntos');
 }
 
 // ── B · IDIOMA ──────────────────────────────────────────────────────────────
@@ -103,9 +107,9 @@ console.log('\nB — Idioma:');
   Eng.startOnboarding(); Eng.setLanguage('en');
   ok('B.1 el idioma persiste en el snapshot', Eng.getSnapshot().language === 'en');
   ok('B.2 y en el almacén local', /"language":"en"/.test(mem['aurix_onboarding_preferences'] || ''));
-  ok('B.3 LANGUAGE sigue siendo el primer momento y conserva su UI bilingüe',
-     /Selecciona tu idioma/.test(html) && /Choose your language/.test(html)
-     && /data-onb-lang="es"/.test(html) && /data-onb-lang="en"/.test(html));
+  ok('B.3 el idioma ya no es un paso: se cambia con el selector ES|EN de la cabecera',
+     !/data-onb-step="LANGUAGE"/.test(html) && /data-onb-langswitch="es"/.test(html) && /data-onb-langswitch="en"/.test(html)
+     && /data-onb-langswitch[\s\S]{0,400}switchLang\(to\)/.test(app));
   ok('B.4 y se sincroniza con el backend', upserts.some(u => u.preferred_language === 'en'));
 }
 
@@ -120,8 +124,8 @@ console.log('\nC — Intereses:');
   ok('C.3 su consumidor real sigue en pie (watchlist inicial)',
      /function _aurixBuildStarterWatchlist\(interests\)/.test(app));
   const w = stepHtml('WELCOME');
-  ok('C.4 el grid vive AHORA dentro de la bienvenida, con su id y sus hooks intactos',
-     /id="onbInterestsGrid"/.test(w) && (w.match(/data-onb-interest=/g) || []).length === 6,
+  ok('C.4 las categorías son EJEMPLOS no interactivos en la bienvenida (sin selección que simular)',
+     !/data-onb-interest=/.test(w) && /class="onb-cat-examples"/.test(w) && (w.match(/<li /g) || []).length === 6,
      'chips en WELCOME: ' + (w.match(/data-onb-interest=/g) || []).length);
   ok('C.5 y ya no existe un paso INTERESTS separado',
      !/data-onb-step="INTERESTS"/.test(html));
@@ -131,7 +135,7 @@ console.log('\nC — Intereses:');
 console.log('\nD/E — Experiencia y perfil fuera del flujo, sin romper sus datos:');
 {
   const { Eng } = bootEngine();
-  Eng.startOnboarding(); Eng.nextStep();                      // → WELCOME
+  Eng.startOnboarding();                                      // → WELCOME
   ok('D.1 tras la bienvenida se va directo a la activación',
      Eng.nextStep().state === 'ACTIVATION');
   ok('D.2 no queda ningún paso EXPERIENCE en el recorrido', !/data-onb-step="EXPERIENCE"[\s\S]{0,200}onb-cta/.test('') && true);
@@ -169,7 +173,7 @@ console.log('\nF/G — Add Asset real y reintentos:');
 console.log('\nH/I/J — Primer activo, éxito y recompensa:');
 {
   const { Eng, sandbox } = bootEngine();
-  Eng.startOnboarding(); Eng.nextStep(); Eng.nextStep();      // → ACTIVATION
+  Eng.startOnboarding(); Eng.nextStep();                      // → ACTIVATION
   sandbox._aurixOnboardingInProgress = true;
   ok('H.1 se está en ACTIVATION antes del primer activo', Eng.getSnapshot().state === 'ACTIVATION');
   // El motor escucha el evento REAL que emite el alta de activos.
@@ -194,7 +198,7 @@ console.log('\nH/I/J — Primer activo, éxito y recompensa:');
 console.log('\nK — Diferir no es completar:');
 {
   const { Eng, mem } = bootEngine();
-  Eng.startOnboarding(); Eng.nextStep();                      // en WELCOME
+  Eng.startOnboarding();                                      // en WELCOME
   const before = Eng.getSnapshot().state;
   const after = Eng.deferOnboarding();
   ok('K.1 [P1 cerrado] diferir NO marca completado',
@@ -216,7 +220,7 @@ console.log('\nK — Diferir no es completar:');
 console.log('\nL/M — Reentrada y refresh reanudan:');
 {
   const { Eng, mem } = bootEngine();
-  Eng.startOnboarding(); Eng.nextStep(); Eng.deferOnboarding();
+  Eng.startOnboarding(); Eng.deferOnboarding();
   // "Refresh": un motor nuevo sobre el MISMO almacén, hidratado como en el arranque real.
   const { Eng: E2 } = await bootHydrated(mem);
   ok('L.1 al reentrar se reanuda en el mismo paso', E2.getSnapshot().state === 'WELCOME', E2.getSnapshot().state);
@@ -227,7 +231,7 @@ console.log('\nL/M — Reentrada y refresh reanudan:');
      'antes setStep sólo hacía _writeLocal ⇒ onboarding_step remoto quedaba desfasado');
   const { Eng: E3, upserts } = bootEngine();
   E3.startOnboarding(); E3.nextStep();
-  ok('M.4 el upsert lleva el paso actual', upserts.some(u => u.onboarding_step === 'WELCOME'),
+  ok('M.4 el upsert lleva el paso actual', upserts.some(u => u.onboarding_step === 'ACTIVATION'),
      JSON.stringify(upserts.map(u => u.onboarding_step)));
 }
 
@@ -241,7 +245,7 @@ console.log('\nN — Nadie queda atrapado en un paso que ya no existe:');
   ok('N.1 quien estaba en INTERESTS entra en WELCOME (allí están los intereses)', mInt === 'WELCOME', mInt);
   ok('N.2 quien estaba en EXPERIENCE continúa en ACTIVATION', mExp === 'ACTIVATION', mExp);
   ok('N.3 quien estaba en PROFILE continúa en ACTIVATION', mProf === 'ACTIVATION', mProf);
-  ok('N.4 un paso vigente no se toca', mAct === 'ACTIVATION' && mLang === 'LANGUAGE', mAct + '/' + mLang);
+  ok('N.4 un paso vigente no se toca, y el LANGUAGE retirado continúa en WELCOME', mAct === 'ACTIVATION' && mLang === 'WELCOME', mAct + '/' + mLang);
   const { Eng: EN5 } = await bootHydrated({ 'aurix_onboarding_step': 'PROFILE' });
   ok('N.5 el estado migrado es NAVEGABLE (no queda fuera de ORDER)',
      EN5.nextStep().state === 'SUCCESS');
@@ -272,8 +276,8 @@ console.log('\nQ — Copy completo en los dos idiomas:');
   ok('Q.1 todas las claves del flujo existen en ES y EN', missing.length === 0, 'faltan: ' + missing.join(','));
   ok('Q.2 sin jerga, promesas de IA ni marketing largo en el copy del flujo',
      !/onb[A-Za-z]*:\s*'[^']{130,}'/.test(app) && !/onb[A-Za-z]*:\s*'[^']*\b(IA|AI|inteligencia artificial)\b/i.test(app));
-  ok('Q.3 el nuevo lead de intereses está cableado en el markup',
-     /data-i18n="onbInterestsLead"/.test(stepHtml('WELCOME')));
+  ok('Q.3 la bienvenida ya no pregunta «¿Qué quieres controlar?» ni promete personalización',
+     !/data-i18n="onbInterestsLead"/.test(stepHtml('WELCOME')) && !/personaliz/i.test(stepHtml('WELCOME')));
 }
 
 // ── R/S/T/U · MÓVIL, ESCRITORIO Y GEOMETRÍA ─────────────────────────────────

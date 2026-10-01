@@ -94,40 +94,48 @@ function landingCtx(init) {
 }
 
 // ── 2 · APP (index.html): precedencia determinista ─────────────────────────
-console.log('\n2 · APP — precedencia `?lang=` > persistido > `?langhint=` > es:');
+// RE-DECIDIDO (ONBOARDING · CIERRE, idioma desde el acceso). La precedencia es
+//   elección explícita (`?lang=` / selector del acceso) > `portfolio_lang` > `?langhint=` > navegador
+// y ni index.html ni login.html ESCRIBEN ya `portfolio_lang`: escribirla antes de leer la
+// cuenta hacía pasar por «más recientes» todas las preferencias locales (también la moneda
+// base por defecto) y en un navegador nuevo pisaba la de una cuenta existente. La elección
+// viaja en `sessionStorage.aurix_lang_choice` y la ADOPTA app.js tras leer la cuenta
+// (`_aurixAdoptSessionLangChoice`, por `_touchPrefs`); la pista va a `aurix_lang_hint`.
+// El caso del SPEC M.03 (elegí español, vuelvo por la landing en inglés ⇒ sigo en español)
+// se mantiene, y la elección sigue sobreviviendo a la sesión: la persiste la app.
+console.log('\n2 · APP — precedencia elección > persistido > `?langhint=` > navegador:');
 const IDX_SRC = between(idx, 'var _qs = new URLSearchParams(location.search);',
-                             "var lang = localStorage.getItem('portfolio_lang') || 'es';", 'index resolver');
-function resolveIdx(search, init) {
-  const st = store(init);
-  const sb = { localStorage: st, location: { search }, URLSearchParams,
-    document: { documentElement: {} } };
+                             'document.documentElement.lang = lang;', 'index resolver');
+function resolveIdx(search, init, nav, sess) {
+  const st = store(init), ss = store(sess || {});
+  const sb = { localStorage: st, sessionStorage: ss, location: { search }, URLSearchParams,
+    navigator: { language: nav || 'es-ES' }, document: { documentElement: {} } };
   vm.createContext(sb);
   vm.runInContext(IDX_SRC, sb);
-  return { lang: vm.runInContext('lang', sb), stored: st.getItem('portfolio_lang') };
+  return { lang: vm.runInContext('lang', sb), stored: st.getItem('portfolio_lang'), choice: ss.getItem('aurix_lang_choice'), hint: ss.getItem('aurix_lang_hint') };
 }
 {
-  ok('2.1 sin nada: español (el fallback existente, intacto)',
-    resolveIdx('', {}).lang === 'es');
-  ok('2.2 `?lang=` es una ELECCIÓN y gana a la preferencia persistida',
+  ok('2.1 sin nada: el idioma del navegador (es-* ⇒ español, otro ⇒ inglés)',
+    resolveIdx('', {}, 'es-MX').lang === 'es' && resolveIdx('', {}, 'de-DE').lang === 'en');
+  ok('2.2 `?lang=` es una ELECCIÓN y gana a la preferencia persistida (sin escribirla)',
     (() => { const r = resolveIdx('?lang=en', { portfolio_lang: 'es' });
-      return r.lang === 'en' && r.stored === 'en'; })());
-  // ── EL CASO DEL SPEC ──────────────────────────────────────────────────────
-  ok('2.3 EL CASO DEL SPEC: elegí español en Aurix, vuelvo por la landing en inglés ⇒ SIGO en español',
+      return r.lang === 'en' && r.stored === 'es' && r.choice === 'en'; })());
+  ok('2.3 EL CASO DEL SPEC M.03: elegí español en Aurix, vuelvo por la landing en inglés ⇒ SIGO en español',
     (() => { const r = resolveIdx('?langhint=en', { portfolio_lang: 'es' });
       return r.lang === 'es' && r.stored === 'es'; })(),
     JSON.stringify(resolveIdx('?langhint=en', { portfolio_lang: 'es' })));
   ok('2.3b y el simétrico: elegí inglés en Aurix y la landing sugiere español',
     (() => { const r = resolveIdx('?langhint=es', { portfolio_lang: 'en' });
       return r.lang === 'en' && r.stored === 'en'; })());
-  ok('2.4 sin preferencia previa, el hint SÍ se aplica (el visitante nuevo no aterriza en otro idioma)',
-    (() => { const r = resolveIdx('?langhint=en', {});
-      return r.lang === 'en' && r.stored === 'en'; })());
-  ok('2.5 un valor basura no concede nada',
-    resolveIdx('?lang=fr&langhint=de', {}).lang === 'es' &&
-    resolveIdx('?lang=fr', { portfolio_lang: 'en' }).lang === 'en');
-  ok('2.6 la elección se PERSISTE, así que sobrevive al rebote por login y a la sesión siguiente',
-    resolveIdx('?lang=en', {}).stored === 'en');
-  // La pantalla de recuperación pre-bootstrap usa la MISMA precedencia.
+  ok('2.4 sin preferencia previa, el hint SÍ se aplica — en sesión, sin persistir',
+    (() => { const r = resolveIdx('?langhint=en', {}, 'es-ES');
+      return r.lang === 'en' && r.stored === null && r.hint === 'en'; })());
+  ok('2.5 un valor basura no concede nada y se normaliza es-ES ⇒ es',
+    resolveIdx('?lang=fr&langhint=de', {}, 'es-ES').lang === 'es' &&
+    resolveIdx('?lang=fr', { portfolio_lang: 'en' }).lang === 'en' &&
+    resolveIdx('?lang=ES-es', {}, 'en-US').lang === 'es');
+  ok('2.6 la elección de la sesión gana a la persistida en las recargas de la misma sesión',
+    resolveIdx('', { portfolio_lang: 'es' }, 'es-ES', { aurix_lang_choice: 'en' }).lang === 'en');
   ok('2.7 el resolutor pre-bootstrap del diagnóstico usa la misma precedencia',
     (() => { const b = fnSrc(idx, 'bootLang');
       return b.indexOf('lang=(es|en)') < b.indexOf("getItem('portfolio_lang')")
@@ -135,26 +143,30 @@ function resolveIdx(search, init) {
 }
 
 // ── 3 · LOGIN: el mismo criterio en la ruta de acceso ──────────────────────
-console.log('\n3 · LOGIN — mismo criterio, misma clave:');
-const LOGIN_SRC = between(login, 'const LOGIN_LANG = (function () {', "return 'es';\n    })();", 'login resolver');
-function resolveLogin(search, init) {
-  const st = store(init);
-  const sb = { localStorage: st, location: { search }, URLSearchParams };
+console.log('\n3 · LOGIN — mismo criterio y selector ES|EN:');
+const LOGIN_SRC = between(login, "const _LG_CHOICE_KEY = 'aurix_lang_choice'", "return 'es';\n    })();", 'login resolver');
+function resolveLogin(search, init, nav, sess) {
+  const st = store(init), ss = store(sess || {});
+  const sb = { localStorage: st, sessionStorage: ss, location: { search }, URLSearchParams, navigator: { language: nav || 'es-ES' } };
   vm.createContext(sb);
   vm.runInContext(LOGIN_SRC, sb);
-  return { lang: vm.runInContext('LOGIN_LANG', sb), stored: st.getItem('portfolio_lang') };
+  return { lang: vm.runInContext('LOGIN_LANG', sb), stored: st.getItem('portfolio_lang'), choice: ss.getItem('aurix_lang_choice') };
 }
 {
-  ok('3.1 `?lang=` gana y se persiste', (() => { const r = resolveLogin('?lang=en', { portfolio_lang: 'es' });
-    return r.lang === 'en' && r.stored === 'en'; })());
+  ok('3.1 `?lang=` gana como elección de sesión, sin escribir `portfolio_lang`', (() => { const r = resolveLogin('?lang=en', { portfolio_lang: 'es' });
+    return r.lang === 'en' && r.stored === 'es' && r.choice === 'en'; })());
   ok('3.2 la preferencia persistida gana al hint',
     resolveLogin('?langhint=en', { portfolio_lang: 'es' }).lang === 'es');
-  ok('3.3 sin preferencia, el hint se aplica y se persiste (index.html hereda el idioma)',
-    (() => { const r = resolveLogin('?langhint=en', {});
-      return r.lang === 'en' && r.stored === 'en'; })());
-  ok('3.4 sin nada, español', resolveLogin('', {}).lang === 'es');
+  ok('3.3 sin preferencia, el hint se aplica sin persistir',
+    (() => { const r = resolveLogin('?langhint=en', {}, 'es-ES');
+      return r.lang === 'en' && r.stored === null; })());
+  ok('3.4 sin nada, el navegador decide: es-* ⇒ español, otro ⇒ inglés',
+    resolveLogin('', {}, 'es-AR').lang === 'es' && resolveLogin('', {}, 'fr-FR').lang === 'en');
   ok('3.5 el rebote a index lleva el idioma YA RESUELTO como elección',
     /lang=' \+ \(LOGIN_LANG === 'en' \? 'en' : 'es'\)/.test(login));
+  ok('3.6 el selector ES|EN cambia el idioma sin recargar y sin tocar campos ni envíos',
+    /function setLoginLang\(next, explicit\)/.test(login) && !/location\.reload/.test(fnSrc(login, 'setLoginLang'))
+    && /applyLoginI18n\(\)/.test(fnSrc(login, 'setLoginLang')) && /data-lg-lang="es"/.test(login) && /data-lg-lang="en"/.test(login));
 }
 
 // ── 4 · LA AUTORIDAD SIGUE SIENDO UNA ──────────────────────────────────────
@@ -164,7 +176,9 @@ console.log('\n4 · Una sola autoridad, y sobrevive a la sesión:');
     /function switchLang\(newLang\)/.test(app) &&
     /localStorage\.setItem\(LANG_KEY, lang\);/.test(fnSrc(app, 'switchLang')) &&
     /const LANG_KEY = 'portfolio_lang';/.test(app) &&
-    /let lang = localStorage\.getItem\(LANG_KEY\) \|\| 'es';/.test(app));
+    // RE-DECIDIDO: el arranque lee primero la elección de la sesión y cae al navegador.
+    /aurix_lang_choice/.test(between(app, 'let lang = (function () {', '})();', 'app lang init')) &&
+    /localStorage\.getItem\(LANG_KEY\)/.test(between(app, 'let lang = (function () {', '})();', 'app lang init')));
   ok('4.2 una elección explícita se SELLA para ganar al estado remoto (LWW)',
     /_touchPrefs\(\)/.test(fnSrc(app, 'switchLang')));
   ok('4.3 el idioma NO se borra al cerrar sesión (no está en PORTFOLIO_KEYS)',
@@ -173,7 +187,7 @@ console.log('\n4 · Una sola autoridad, y sobrevive a la sesión:');
   ok('4.4 no se ha creado una segunda autoridad de idioma en la app',
     (() => { const w = (app.match(/setItem\(LANG_KEY/g) || []).length
                      + (app.match(/setItem\('portfolio_lang'/g) || []).length;
-      return w === 2; })(),   // switchLang + _applyRemotePrefs (la rama LWW remota)
+      return w === 3; })(),   // switchLang + _applyRemotePrefs (rama LWW remota) + _aurixAdoptSessionLangChoice (elección del acceso)
     'escrituras=' + ((app.match(/setItem\(LANG_KEY/g) || []).length
       + (app.match(/setItem\('portfolio_lang'/g) || []).length));
   ok('4.5 el idioma se propaga al motor de onboarding en UN solo sentido',
