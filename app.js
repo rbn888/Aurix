@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '758'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '759'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6503,7 +6503,7 @@ const T = {
     wspl_a_unpin:         'Quitar del Dashboard',
     wspl_a_del:           'Eliminar',
     wsloan_dn_lbl:        'intereses',
-    wsbud_kpi_save:       'ahorro',
+    wsbud_kpi_save:       'de tus ingresos',
     wsdoc_title:          'MIS DOCUMENTOS',
     wsdoc_open_now:       'abierto ahora',
     wsdoc_s_none:         'Este documento no guardó cifras.',
@@ -6523,6 +6523,9 @@ const T = {
     wsbud_del_text:       '«{n}» tiene {a}. Si la eliminas, deja de contar en este presupuesto.',
     wsbud_limit:          'Has llegado al máximo de {m} categorías en este bloque.',
     wsbud_legend_label:   'Categorías de gasto',
+    wsbud_leg_basis:      '% sobre el total de gastos',
+    wsbud_free_note:      '{a} sin asignar · {r}% de tus ingresos. No forma parte del reparto de gastos.',
+    wsbud_free_note_nr:   '{a} sin asignar. No forma parte del reparto de gastos.',
     wsbud_empty:          'Añade tus gastos para ver el reparto',
     wsbud_empty_cta:      'Ir a gastos',
     wsbud_read_zero:      'Según tu presupuesto, tus gastos igualan tus ingresos: no queda dinero libre ni hay déficit.',
@@ -6544,6 +6547,10 @@ const T = {
     wspl_loading:         'Comprobando tus planes guardados…',
     wspl_error:           'No se han podido cargar tus planes guardados.',
     wspl_m_income:        'Ingresos',
+    wspl_m_avail:         'Disponible',
+    wspl_m_deficit:       'Déficit',
+    wspl_share_done_of:   'cobrado del total',
+    wspl_share_goal:      'acumulado de la meta',
     wspl_m_expenses:      'Gastos',
     wspl_m_pending:       'Pendiente',
     wspl_m_collected:     'Cobrado',
@@ -6760,7 +6767,7 @@ const T = {
     wsrecv_kpi_pending: 'Pendiente total',
     wsrecv_kpi_collected:'Cobrado',
     wsrecv_kpi_overdue: 'Vencido',
-    wsrecv_list_title:  'Pendientes',
+    wsrecv_list_title:  'Tus cobros',
     wsjrn_list_title:   'Operaciones',
     wsrecv_total:       'Total',
     wsrecv_paid:        'Pagado',
@@ -6769,17 +6776,46 @@ const T = {
     wsrecv_st_parcial:  'Parcial',
     wsrecv_st_vencido:  'Vencido',
     wsrecv_st_cobrado:  'Cobrado',
-    wsrecv_add:         'Nuevo pendiente',
-    wsrecv_add_btn:     'Añadir pendiente',
+    wsrecv_add:         'Nuevo cobro',
+    wsrecv_add_btn:     'Añadir cobro',
     wsrecv_mark_paid:   'Marcar como cobrado',
-    wsrecv_empty:       'Añade tu primer pendiente.',
+    wsrecv_empty:       'Añade tu primer cobro.',
     wsrecv_f_who:       'Persona / empresa',
     wsrecv_f_concept:   'Concepto',
     wsrecv_f_units:     'Unidades',
     wsrecv_f_unitprice: 'Precio unidad',
-    wsrecv_f_paid:      'Importe pagado',
+    wsrecv_f_paid:      'Ya cobrado (opcional)',
     wsrecv_f_due:       'Fecha vencimiento',
     wsrecv_f_notes:     'Notas',
+    wsrecv_manual_note: 'Registro manual: no crea cargos ni cobra a nadie.',
+    wsrecv_f_all:       'Todos',
+    wsrecv_f_open:      'Por cobrar',
+    wsrecv_f_done:      'Cobrados',
+    wsrecv_filter_aria: 'Filtrar registros',
+    wsrecv_none_open:   'No queda nada por cobrar.',
+    wsrecv_none_done:   'Todavía no hay registros cobrados.',
+    wsrecv_pay_btn:     'Registrar cobro',
+    wsrecv_pay_title:   'Nuevo cobro',
+    wsrecv_pay_amount:  'Importe recibido',
+    wsrecv_pay_date:    'Fecha del cobro',
+    wsrecv_pay_full:    'Saldo completo · {a}',
+    wsrecv_pay_save:    'Guardar cobro',
+    wsrecv_hist_title:  'Cobros registrados',
+    wsrecv_hist_nodate: 'Sin fecha',
+    wsrecv_hist_del:    'Eliminar el cobro de {a}',
+    wsrecv_hist_del_t:  'Eliminar este cobro',
+    wsrecv_edit:        'Editar registro',
+    wsrecv_edit_title:  'Editar registro',
+    wsrecv_edit_note:   'Los cobros ya registrados se conservan. Para corregir uno, elimínalo en su tarjeta y regístralo de nuevo.',
+    wsrecv_dup:         'Duplicar sin cobros',
+    wsrecv_due_short:   'Vence',
+    wsrecv_date_ph:     'dd/mm/aaaa',
+    wsrecv_err_amount:  'Escribe un importe mayor que cero.',
+    wsrecv_err_neg:     'El importe no puede ser negativo.',
+    wsrecv_err_over:    'El importe supera lo pendiente ({p}).',
+    wsrecv_err_date:    'Escribe una fecha válida (dd/mm/aaaa).',
+    wsrecv_err_future:  'La fecha del cobro no puede ser posterior a hoy.',
+    wsrecv_err_total_below: 'El total no puede ser menor que lo ya cobrado ({p}).',
     // WS.14 — Loan Simulator Pro (Préstamos Pro)
     wsloan_n:           'Simulador de préstamos',
     wsloan_sub:         'Simula cualquier financiación y entiende su coste real.',
@@ -9429,7 +9465,7 @@ const T = {
     wspl_a_unpin:         'Remove from Dashboard',
     wspl_a_del:           'Delete',
     wsloan_dn_lbl:        'interest',
-    wsbud_kpi_save:       'saved',
+    wsbud_kpi_save:       'of your income',
     wsdoc_title:          'MY DOCUMENTS',
     wsdoc_open_now:       'open now',
     wsdoc_s_none:         'This document saved no figures.',
@@ -9449,6 +9485,9 @@ const T = {
     wsbud_del_text:       '“{n}” holds {a}. If you delete it, it no longer counts in this budget.',
     wsbud_limit:          'You have reached the maximum of {m} categories in this block.',
     wsbud_legend_label:   'Expense categories',
+    wsbud_leg_basis:      '% of total expenses',
+    wsbud_free_note:      '{a} unallocated · {r}% of your income. It is not part of the expense breakdown.',
+    wsbud_free_note_nr:   '{a} unallocated. It is not part of the expense breakdown.',
     wsbud_empty:          'Add your expenses to see the breakdown',
     wsbud_empty_cta:      'Go to expenses',
     wsbud_read_zero:      'On your budget, your expenses match your income: no free money and no deficit.',
@@ -9470,6 +9509,10 @@ const T = {
     wspl_loading:         'Checking your saved plans…',
     wspl_error:           'Your saved plans could not be loaded.',
     wspl_m_income:        'Income',
+    wspl_m_avail:         'Available',
+    wspl_m_deficit:       'Deficit',
+    wspl_share_done_of:   'collected of the total',
+    wspl_share_goal:      'saved of the goal',
     wspl_m_expenses:      'Expenses',
     wspl_m_pending:       'Pending',
     wspl_m_collected:     'Collected',
@@ -9668,7 +9711,7 @@ const T = {
     wsrecv_kpi_pending: 'Total pending',
     wsrecv_kpi_collected:'Collected',
     wsrecv_kpi_overdue: 'Overdue',
-    wsrecv_list_title:  'Receivables',
+    wsrecv_list_title:  'Your receivables',
     wsjrn_list_title:   'Trades',
     wsrecv_total:       'Total',
     wsrecv_paid:        'Paid',
@@ -9685,9 +9728,38 @@ const T = {
     wsrecv_f_concept:   'Concept',
     wsrecv_f_units:     'Units',
     wsrecv_f_unitprice: 'Unit price',
-    wsrecv_f_paid:      'Amount paid',
+    wsrecv_f_paid:      'Already collected (optional)',
     wsrecv_f_due:       'Due date',
     wsrecv_f_notes:     'Notes',
+    wsrecv_manual_note: 'Manual record: it never creates charges or bills anyone.',
+    wsrecv_f_all:       'All',
+    wsrecv_f_open:      'Outstanding',
+    wsrecv_f_done:      'Collected',
+    wsrecv_filter_aria: 'Filter records',
+    wsrecv_none_open:   'Nothing left to collect.',
+    wsrecv_none_done:   'No collected records yet.',
+    wsrecv_pay_btn:     'Record payment',
+    wsrecv_pay_title:   'New payment',
+    wsrecv_pay_amount:  'Amount received',
+    wsrecv_pay_date:    'Payment date',
+    wsrecv_pay_full:    'Full balance · {a}',
+    wsrecv_pay_save:    'Save payment',
+    wsrecv_hist_title:  'Recorded payments',
+    wsrecv_hist_nodate: 'No date',
+    wsrecv_hist_del:    'Delete the {a} payment',
+    wsrecv_hist_del_t:  'Delete this payment',
+    wsrecv_edit:        'Edit record',
+    wsrecv_edit_title:  'Edit record',
+    wsrecv_edit_note:   'Recorded payments are kept. To correct one, delete it on its card and record it again.',
+    wsrecv_dup:         'Duplicate without payments',
+    wsrecv_due_short:   'Due',
+    wsrecv_date_ph:     'dd/mm/yyyy',
+    wsrecv_err_amount:  'Enter an amount greater than zero.',
+    wsrecv_err_neg:     'The amount cannot be negative.',
+    wsrecv_err_over:    'The amount exceeds what is outstanding ({p}).',
+    wsrecv_err_date:    'Enter a valid date (dd/mm/yyyy).',
+    wsrecv_err_future:  'The payment date cannot be later than today.',
+    wsrecv_err_total_below: 'The total cannot be lower than what is already collected ({p}).',
     // WS.14 — Loan Simulator Pro
     wsloan_n:           'Loan simulator',
     wsloan_sub:         'Simulate any financing and understand its real cost.',
@@ -21564,9 +21636,10 @@ function _wshRepaintHome() {
 function _wshWireOnce() {
   if (_wshWired) return;
   _wshWired = true;
+  try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21668,6 +21741,11 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsrecv-add')) { _wsRecvAdd(); return; }
     const recvAct = t.getAttribute('data-wsrecv-act'); if (recvAct) { _wsRecvAct(recvAct, t.getAttribute('data-wsrecv-id')); return; }
     if (t.hasAttribute('data-wsrecv-cancel')) { _wsRecvCancel(); return; }
+    if (t.hasAttribute('data-wsrecv-pay-save')) { _wsRecvPaySave(); return; }
+    if (t.hasAttribute('data-wsrecv-pay-cancel')) { _wsRecvPayClose(); return; }
+    if (t.hasAttribute('data-wsrecv-pay-full')) { const f = t.closest('.wsrecv-pay'); const a = f && f.querySelector('[data-wsrecv-pay-amt]'); if (a) { a.value = _wsFormatInputNumber(t.getAttribute('data-wsrecv-pay-full')); a.removeAttribute('aria-invalid'); a.classList.remove('is-invalid'); try { a.focus(); } catch (_) {} } return; }
+    const payDel = t.getAttribute('data-wsrecv-paydel'); if (payDel) { _wsRecvPayDelete(t.getAttribute('data-wsrecv-id'), payDel); return; }
+    const rcvF = t.getAttribute('data-wsrecv-filter'); if (rcvF) { _wsRecvSetFilter(rcvF); return; }
     // WS.14 — Loan comparator toggle.
     if (t.hasAttribute('data-wsloan-cmp')) { _wsLoanCmpToggle(); return; }
     // WS.15 — Asset Prices: add/save, per-row act, cancel.
@@ -23510,12 +23588,19 @@ function _wsPlanMetrics(p) {
     if (p.type === 'monthly_budget') {
       const r = calculateMonthlyBudget(inp);
       if (!(r.income > 0) && !(r.expenses > 0)) return [];
-      return [m('wspl_m_income', formatBase(r.income)), m('wspl_m_expenses', formatBase(r.expenses))];
+      // LA CIFRA QUE IMPORTA VA PRIMERO y es la del documento: lo que queda (o falta)
+      // = ingresos − gastos, del mismo motor. Es lo que se lee al abrir la plantilla.
+      const fr = Number(r.income) - Number(r.expenses);
+      const head = fr < 0 ? m('wspl_m_deficit', '−' + formatBase(Math.abs(fr))) : m('wspl_m_avail', formatBase(fr));
+      head.tone = fr < 0 ? 'neg' : 'pos';
+      return [head, m('wspl_m_income', formatBase(r.income)), m('wspl_m_expenses', formatBase(r.expenses))];
     }
     if (p.type === 'receivables_app') {
       const r = calculateReceivables(inp.items);
       if (!r.count) return [];
-      return [m('wspl_m_pending', formatBase(r.totalPendiente)), m('wspl_m_collected', formatBase(r.totalCobrado))];
+      // Cobrado primero: es la magnitud que rellena la barra de progreso de debajo, así que
+      // la cifra grande y el tramo coloreado hablan de lo mismo; lo pendiente va al lado.
+      return [m('wspl_m_collected', formatBase(r.totalCobrado)), m('wspl_m_pending', formatBase(r.totalPendiente))];
     }
     if (p.type === 'real_estate_portfolio') {
       const r = calculateRealEstatePortfolio(inp.properties);
@@ -23523,7 +23608,7 @@ function _wsPlanMetrics(p) {
       // El VALOR sólo si alguien lo ha declarado: sin valoraciones, `valueTotal`
       // es cero y publicar «0» diría que la cartera no vale nada.
       const out = [m('wspl_m_units', String(r.count))];
-      if (r.valueTotal > 0) out.push(m('wspl_m_value', formatBase(r.valueTotal)));
+      if (r.valueTotal > 0) out.unshift(m('wspl_m_value', formatBase(r.valueTotal)));
       return out;
     }
     if (p.type === 'trade_journal') {
@@ -23601,13 +23686,13 @@ function _wsGoalShare(g) {
   if (!Number.isFinite(tgt) || !(tgt > 0)) return null;
   const acc = Number.isFinite(cur) ? Math.max(0, Math.min(cur, tgt)) : 0;
   if (!Number.isFinite(cur)) return null;
-  return { a: acc, b: Math.max(0, tgt - acc), ka: 'wspl_share_saved', kb: 'wspl_share_left' };
+  return { a: acc, b: Math.max(0, tgt - acc), ka: 'wspl_share_goal', kb: 'wspl_share_left' };
 }
 function _wsGoalMetrics(g) {
   const out = [];
   const tgt = Number(g && g.target), cur = Number(g && g.current);
-  if (Number.isFinite(tgt) && tgt > 0) out.push({ k: t('wspl_m_target'), v: formatBase(tgt) });
   if (Number.isFinite(cur)) out.push({ k: t('wspl_m_saved'), v: formatBase(cur) });
+  if (Number.isFinite(tgt) && tgt > 0) out.push({ k: t('wspl_m_target'), v: formatBase(tgt) });
   return out;
 }
 function _wsPlanShare(p) {
@@ -23615,12 +23700,11 @@ function _wsPlanShare(p) {
   if (!spec || !spec.share) return null;
   const inp = (p && p.inputs) || {};
   try {
-    if (spec.share === 'budget') {
-      const r = calculateMonthlyBudget(inp);
-      const a = Number(r.income), b = Number(r.expenses);
-      if (!Number.isFinite(a) || !Number.isFinite(b) || !((a + b) > 0)) return null;
-      return { a: a, b: b, ka: 'wspl_share_in', kb: 'wspl_share_out' };
-    }
+    // PRESUPUESTO · SIN BARRA. Dibujaba ingresos / (ingresos + gastos) con el rótulo
+    // «55 % ingresos»: una proporción que no responde a ninguna pregunta del usuario
+    // (no es ahorro, ni gasto sobre ingreso). Se retira; la tarjeta abre con el
+    // disponible, que es la cifra real del documento.
+    if (spec.share === 'budget') return null;
     if (spec.share === 'recv') {
       const r = calculateReceivables(inp.items);
       if (!r || !r.count) return null;
@@ -23628,9 +23712,10 @@ function _wsPlanShare(p) {
       // empezaba por «cobrado» y la primera métrica debajo era «pendiente», así que el
       // tramo de la izquierda y el número de la izquierda hablaban de cosas distintas.
       // `_wsPlanMetrics` publica pendiente y luego cobrado; la barra hace lo mismo.
-      const a = Number(r.totalPendiente), b = Number(r.totalCobrado);
+      // PROGRESO DE COBRO: lo cobrado sobre el total registrado, con el rótulo que lo dice.
+      const a = Number(r.totalCobrado), b = Number(r.totalPendiente);
       if (!Number.isFinite(a) || !Number.isFinite(b) || !((a + b) > 0)) return null;
-      return { a: a, b: b, ka: 'wspl_share_due', kb: 'wspl_share_done' };
+      return { a: a, b: b, ka: 'wspl_share_done_of', kb: 'wspl_share_due' };
     }
   } catch (_) { return null; }
   return null;
@@ -23885,6 +23970,7 @@ function _wsPlansRepaint() {
 }
 function _renderDashboardPlans() {
   const esc = _intccEsc;
+  const _wsplSigs = (_renderDashboardPlans._sigs = _renderDashboardPlans._sigs || Object.create(null));
   const docs = _wsPlansAll();
   if (!docs.length) {
     const st = _wsPlansEmptyState();
@@ -23904,8 +23990,13 @@ function _renderDashboardPlans() {
     const share = _wsPlanShareHtml(goal ? _wsGoalShare(p) : _wsPlanShare(p));
     const nm = goal ? (p.name || t('wsg_title')) : _wsLabel('workspace', p);
     const sub = _wsSubIfDistinct(nm, goal ? t('wsg_type_' + (p.type || 'wealth')) : t(spec.nameKey));
+    // ENTRADA SÓLO SI ALGO CAMBIÓ. Esta sección se repinta con cada refresco del
+    // Dashboard; animar cada repintado sería un bucle. Se anima la tarjeta nueva o la
+    // que cambió de contenido, una vez.
+    const sig = nm + '|' + mets.map(x => x.v).join('|') + '|' + share;
+    const enter = _wsplSigs[it.kind + ':' + p.id] !== sig; _wsplSigs[it.kind + ':' + p.id] = sig;
     return `
-      <article class="wspl-card" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-ws-accent="${esc(spec.accent || 'blue')}">
+      <article class="wspl-card${enter ? ' is-enter' : ''}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-ws-accent="${esc(spec.accent || 'blue')}">
         <div class="wspl-card-id">
           <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
           <span class="wspl-card-txt">
@@ -23918,11 +24009,12 @@ function _renderDashboardPlans() {
             <span aria-hidden="true">&#8943;</span>
           </button>
         </div>
+        ${mets.length ? `<span class="wspl-hero${mets[0].tone ? ' is-' + mets[0].tone : ''}"><i>${esc(mets[0].k)}</i><b>${esc(mets[0].v)}</b></span>` : ''}
         ${share}
-        ${mets.length ? `<div class="wspl-metrics">${mets.map(x =>
+        ${mets.length > 1 ? `<div class="wspl-metrics">${mets.slice(1).map(x =>
           `<span class="wspl-m"><i>${esc(x.k)}</i><b>${esc(x.v)}</b></span>`).join('')}</div>` : ''}
         ${spec.sim ? `<span class="wspl-sim">${esc(t('wspl_sim'))}</span>` : ''}
-        <button type="button" class="wspl-go" data-wspl-open="${esc(p.id)}" data-wspl-okind="${esc(it.kind)}">${esc(t('wspl_continue'))}</button>
+        <button type="button" class="wspl-go" data-wspl-open="${esc(p.id)}" data-wspl-okind="${esc(it.kind)}" aria-label="${esc(t('wspl_continue') + ' — ' + nm)}">${esc(t('wspl_continue'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
       </article>`;
   }).join('');
   return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>
@@ -26062,7 +26154,26 @@ function _wsgOnInput(el) {
   g[k] = el.value; _wsgDirty[id] = true;  // WS.15A raw value during edit
   const card = el.closest('.wsg-card'); if (!card) return;
   const out = card.querySelector('[data-wsg-out]');
-  if (out) out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
+  if (out) {
+    // EL CAMBIO SE VE, Y SÓLO CUANDO HAY CAMBIO. Repintar sustituía la barra por una
+    // nueva con su ancho final: el progreso saltaba sin que se notara qué se había
+    // movido. Se recuerda lo que había, y sólo si una cifra REAL cambió se anima la
+    // barra desde su ancho anterior y se marca la cifra (una vez, sin bucle). Con
+    // reduced motion no se anima nada.
+    const prevFill = out.querySelector('.wsg-bar-fill');
+    const prevW = prevFill ? prevFill.style.width : '';
+    const prevVals = [].slice.call(out.querySelectorAll('.ws4-row-val, .wsg-pct')).map(b => b.textContent);
+    out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
+    let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    if (!reduce) {
+      const fill = out.querySelector('.wsg-bar-fill');
+      if (fill && prevW && fill.style.width !== prevW) {
+        const to = fill.style.width; fill.style.width = prevW; void fill.offsetWidth;
+        fill.classList.add('is-anim'); fill.style.width = to;
+      }
+      [].slice.call(out.querySelectorAll('.ws4-row-val, .wsg-pct')).forEach((b, i) => { if (prevVals[i] != null && prevVals[i] !== b.textContent) b.classList.add('is-upd'); });
+    }
+  }
   const bar = card.querySelector('[data-wsg-savebar]');
   if (bar) bar.innerHTML = _wsgSaveBarHtml(id);
 }
@@ -26870,6 +26981,46 @@ function _wsBudgetPeriodChange(el) {
 // pulsaba «Añadir», no pasaba nada, y nada en la pantalla decía por qué. Es el
 // mismo defecto que el guardado sin nombre, en cuatro sitios.
 // Un solo owner de mensaje para los cuatro, con los campos marcados.
+// ── EDITAR TIENE QUE VERSE ────────────────────────────────────────────────
+// Los lápices de Inmobiliario, Cobros y Diario cargaban el registro en un
+// formulario que vive AL FINAL de la superficie y no movían ni la vista ni el
+// foco: en móvil el formulario quedaba 800 px más abajo y el toque parecía no
+// hacer nada. Tras repintar, se lleva la vista al bloque y el foco al primer
+// campo (o al bloque, si no hay campo). Sin animación con reduced motion.
+function _wsFocusInView(blockSel, focusSel) {
+  try {
+    const root = document.querySelector('.wsh-tool-view');
+    const box = root && root.querySelector(blockSel);
+    if (!box) return false;
+    let reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    try { box.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' }); } catch (_) { try { box.scrollIntoView(true); } catch (__) {} }
+    const f = focusSel ? box.querySelector(focusSel) : null;
+    if (f) { try { f.focus({ preventScroll: true }); } catch (_) { try { f.focus(); } catch (__) {} } }
+    else { if (!box.hasAttribute('tabindex')) box.setAttribute('tabindex', '-1'); try { box.focus({ preventScroll: true }); } catch (_) {} }
+    return true;
+  } catch (_) { return false; }
+}
+let _wsEditKeysWired = false;
+function _wsEditKeysWireOnce() {
+  if (_wsEditKeysWired) return; _wsEditKeysWired = true;
+  document.addEventListener('keydown', e => {
+    const el = e.target; if (!el || !el.closest) return;
+    if (el.closest('.wsrecv-pay') && (el.hasAttribute('data-wsrecv-pay-amt') || el.hasAttribute('data-wsrecv-pay-date'))) {
+      if (e.key === 'Enter') { e.preventDefault(); _wsRecvPaySave(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _wsRecvPayClose(); }
+      return;
+    }
+    // La tarjeta de inmueble es role=button: Enter y Espacio la abren como un botón.
+    if (el.classList && el.classList.contains('wsre-card') && el.getAttribute('data-wsre-act') === 'detail' && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault(); _wsReAct('detail', el.getAttribute('data-wsre-id'));
+    }
+  });
+  document.addEventListener('input', e => {
+    const el = e.target;
+    if (el && el.hasAttribute && el.hasAttribute('data-wsrecv-pay-date')) el.value = _wsDateAutoFormat(el.value);
+    if (el && el.hasAttribute && (el.hasAttribute('data-wsrecv-pay-date') || el.hasAttribute('data-wsrecv-pay-amt'))) { el.removeAttribute('aria-invalid'); el.classList.remove('is-invalid'); }
+  });
+}
 function _wsDraftRequired(attr, missing) {
   return _wsDraftRequiredIn(document.querySelector('.wsh-tool-view'), attr, missing);
 }
@@ -27692,7 +27843,13 @@ function _wsBudgetChartHtml(res, sel) {
       + `<i style="background:${esc(it.color)}"></i><span class="wsbud-leg-n">${esc(it.name)}</span>`
       + `<b>${esc(formatBase(it.value))}</b><em>${pct(it.value)}</em></button></li>`;
   }).join('');
-  const freeLeg = res.free > 0 ? `<li><span class="wsbud-leg is-static"><i class="is-free"></i><span class="wsbud-leg-n">${esc(t('wstool_bud_free'))}</span><b>${esc(formatBase(res.free))}</b><em></em></span></li>` : '';
+  // «DINERO LIBRE» NO ES UNA PORCIÓN DEL ANILLO. Estaba en la misma lista que las
+  // categorías, con su punto de color y sin porcentaje, y el anillo (que reparte sólo
+  // el GASTO) no tiene ningún segmento suyo: se leía como una categoría más. Sale de
+  // la lista y se dice qué es: lo no asignado, su proporción sobre INGRESOS y que no
+  // entra en el reparto. No se interpreta como «ahorro»: el usuario puede tener sus
+  // propias categorías de ahorro dentro de los gastos.
+  const freeLeg = res.free > 0 ? `<p class="wsbud-free-note"><b>${esc(t('wstool_bud_free'))}</b> ${esc(String(t(res.saveRate == null ? 'wsbud_free_note_nr' : 'wsbud_free_note')).replace('{a}', formatBase(res.free)).replace('{r}', String(Math.round(res.saveRate || 0))))}</p>` : '';
   return `
     <div class="wsbud-chart-wrap">
       ${/* §18 — LA BARRA DE REPARTO SE RETIRA, y se auditó antes de decidirlo. Contaba lo MISMO
@@ -27701,7 +27858,9 @@ function _wsBudgetChartHtml(res, sel) {
             literalmente esa proporción. Dos visualizaciones de lo mismo no son el doble de
             información: son el doble de altura. La LEYENDA se queda —lleva el importe por
             categoría, que el anillo no sabe decir— y con ella «Dinero libre». */''}
-      <ul class="wsbud-legend" aria-label="${esc(t('wsbud_legend_label'))}">${legend}${freeLeg}</ul>
+      ${legend ? `<p class="wsbud-leg-basis">${esc(t('wsbud_leg_basis'))}</p>` : ''}
+      <ul class="wsbud-legend" aria-label="${esc(t('wsbud_legend_label') + ' · ' + t('wsbud_leg_basis'))}">${legend}</ul>
+      ${freeLeg}
     </div>`;
 }
 // Sin gastos no hay reparto que dibujar, y un anillo de un color sería un reparto
@@ -28314,6 +28473,7 @@ function _wsJrnAct(act, id) {
     _wsJrnEditId = id;
     _wsJrnDraft = { asset: tr.asset, atype: tr.atype, buy: tr.buy, sell: tr.sell, qty: tr.qty, fee: tr.fee, currency: tr.currency, notes: tr.notes || '', buyDate: tr.buyDate || '', sellDate: tr.sellDate || '' };
     _wsJrnRerender();
+    _wsFocusInView('.wsjrn-form-card', '[data-wsjrn-input]');
   } else if (act === 'dup') {
     list.push(Object.assign({}, tr, { id: 'tr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) }));
     _wsToolDirty = true; _wsToolStateSet('journal', _wsToolInputs); _wsJrnRerender();
@@ -28734,8 +28894,10 @@ function _wsReAdd() {
   if (_wsReEditId) { const i = list.findIndex(x => x && x.id === _wsReEditId); if (i >= 0) prop.timeline = list[i].timeline || []; if (i >= 0) list[i] = prop; else list.push(prop); }
   else list.push(prop);
   _wsToolInputs.properties = list; _wsToolDirty = true; _wsToolStateSet('realestate', _wsToolInputs);
+  const wasEdit = !!_wsReEditId;
   _wsReDraft = _wsReNewDraft(); _wsReEditId = null;
   _wsReRerender();
+  if (wasEdit) _wsFocusInView('.wsre-card[data-wsre-id="' + prop.id + '"]', null);
 }
 function _wsReAct(act, id) {
   const list = _wsReProps();
@@ -28744,7 +28906,9 @@ function _wsReAct(act, id) {
   if (act === 'edit') {
     _wsReEditId = id; _wsReDetailId = null;
     _wsReDraft = Object.assign(_wsReNewDraft(), p, { buy: String(p.buy || ''), value: String(p.value || ''), rent: String(p.rent || ''), expenses: String(p.expenses || ''), mortgage: String(p.mortgage || ''), payment: String(p.payment || '') });
-    _wsReRerender(); return;
+    _wsReRerender();
+    _wsFocusInView('.wsre-form-card', '[data-wsre-input="name"]');
+    return;
   }
   if (act === 'dup') { list.push(Object.assign({}, p, { id: 'pr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), timeline: (p.timeline || []).slice() })); _wsToolDirty = true; _wsToolStateSet('realestate', _wsToolInputs); _wsReRerender(); return; }
   if (act === 'del') {
@@ -28756,7 +28920,7 @@ function _wsReAct(act, id) {
     });
   }
 }
-function _wsReCancel() { _wsReEditId = null; _wsReDraft = _wsReNewDraft(); _wsReRerender(); }
+function _wsReCancel() { const id = _wsReEditId; _wsReEditId = null; _wsReDraft = _wsReNewDraft(); _wsReRerender(); if (id) _wsFocusInView('.wsre-card[data-wsre-id="' + id + '"]', null); }
 function _wsReBack() { _wsReDetailId = null; _wsReRerender(); }
 function _wsReTimelineAdd() {
   if (_wsReDetailId == null) return;
@@ -28783,6 +28947,16 @@ function _wsReSummaryHtml(r) {
         <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
         <div class="wsre-kpi is-yield"><span class="wsre-kpi-v">${esc(_wsJrnPct(r.avgYield))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_yield'))}</span></div>
       </div>
+    </div>`;
+}
+// ── LA EXPLICACIÓN VA DESPUÉS DEL INVENTARIO ──────────────────────────────
+// El desglose y «Cómo se calculan» vivían dentro del resumen, entre las cifras y
+// la lista: en móvil empujaban los inmuebles al borde de la pantalla. Son lectura
+// secundaria; se conservan íntegros, en su propia tarjeta, DESPUÉS de la lista.
+function _wsReMoreHtml(r) {
+  const esc = _intccEsc;
+  const cfCls = r.cashflowMonthly >= 0 ? 'is-pos' : 'is-neg';
+  return `
       ${/* ── EL DESGLOSE, PLEGADO SÓLO DONDE ESTORBA ─────────────────────────
             MEDIDO en 360×740: el resumen ocupaba 552 px él solo y empujaba el
             inventario a 741 px, con el suelo en 680 — se entraba a la capacidad
@@ -28838,7 +29012,7 @@ function _wsReSummaryHtml(r) {
           ${r.yieldCoversAll ? '' : `<li>${esc(String(t('wsre_basis_yield_partial') || '').replace('{n}', String(r.yieldCoverage)).replace('{t}', String(r.count)))}</li>`}
         </ul>
       </details>
-    </div>`;
+`;
 }
 function _wsRePropCard(p) {
   const esc = _intccEsc;
@@ -28986,6 +29160,7 @@ function _renderRealEstateTool() {
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_grid_title'))}</h3></header>
         ${gridOrEmpty}
       </section>
+      ${r.count ? `<section class="wsh-card wsre-more-card"><header class="wsh-head wsre-more-head"><h3 class="wsh-title">${esc(t('wsre_more_title'))}</h3></header>${_wsReMoreHtml(r)}</section>` : ''}
       ${_wsReFormHtml()}
       ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
@@ -29008,11 +29183,48 @@ function _wsDateAutoFormat(v) {
   if (d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
   return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
 }
+// ── COBROS PARCIALES CON HISTORIAL ───────────────────────────────────────────
+// `paidAmount` era un CAMPO que se sobrescribía: registrar 100 € y después 150 €
+// exigía escribir «250» a mano, y «Marcar como cobrado» lo machacaba con el total
+// sin dejar rastro de cuándo ni cuánto se cobró. Ahora lo cobrado se DERIVA de
+// `payments: [{ id, amount, date, at }]` y `paidAmount` queda como ESPEJO de esa
+// suma, para que cualquier lector antiguo siga leyendo lo mismo.
+// COMPATIBILIDAD: un registro sin `payments` se LEE como un único cobro previo
+// por su `paidAmount`, SIN FECHA (`date: null`, `legacy: true`): no se inventa
+// cuándo ocurrió. Sólo se materializa en el almacén cuando el usuario registra o
+// borra un cobro de ese registro.
+const _WSRECV_EPS = 0.005;
+function _wsRecvParseDate(s) {
+  // Acepta la forma que escribe el formulario (dd/mm/aaaa) y la ISO de los
+  // documentos antiguos. Devuelve 'AAAA-MM-DD' o null; nunca una fecha corrida.
+  const v = String(s == null ? '' : s).trim();
+  let y, m, d, mm;
+  if ((mm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v))) { y = +mm[1]; m = +mm[2]; d = +mm[3]; }
+  else if ((mm = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(v))) { d = +mm[1]; m = +mm[2]; y = +mm[3]; }
+  else return null;
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return String(y) + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+function _wsRecvTodayIso() { const n = new Date(); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); }
+function _wsRecvDateText(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? (m[3] + '/' + m[2] + '/' + m[1]) : ''; }
+function _wsRecvPayments(it) {
+  if (it && Array.isArray(it.payments)) {
+    return it.payments.filter(p => p && Number.isFinite(Number(p.amount)) && Number(p.amount) > 0)
+      .map(p => ({ id: String(p.id || ''), amount: Number(p.amount), date: _wsRecvParseDate(p.date), at: Number(p.at) || 0, legacy: p.legacy === true }));
+  }
+  const legacy = Math.max(0, _wsNum(it && it.paidAmount));
+  return legacy > 0 ? [{ id: 'legacy', amount: legacy, date: null, at: 0, legacy: true }] : [];
+}
 function _wsRecvStatus(total, paid, dueDate) {
-  if (total > 0 && paid >= total) return 'cobrado';
+  if (total > 0 && paid >= total - _WSRECV_EPS) return 'cobrado';
   const pending = Math.max(0, total - paid);
-  if (dueDate) { const d = Date.parse(dueDate); if (!isNaN(d) && d < Date.now() && pending > 0) return 'vencido'; }
-  if (paid > 0) return 'parcial';
+  // Vencido cuando el día de vencimiento YA PASÓ entero. Antes `Date.parse`
+  // recibía «15/01/2024» —el formato que el propio formulario escribe—, daba NaN
+  // y ningún registro introducido por el usuario llegaba nunca a vencer.
+  const iso = _wsRecvParseDate(dueDate);
+  if (iso && pending > _WSRECV_EPS && iso < _wsRecvTodayIso()) return 'vencido';
+  if (paid > _WSRECV_EPS) return 'parcial';
   return 'pendiente';
 }
 function calculateReceivables(items) {
@@ -29022,21 +29234,22 @@ function calculateReceivables(items) {
     const units = Math.max(0, _wsNum(it.units));
     const unitPrice = Math.max(0, _wsNum(it.unitPrice));
     const totalAmount = units * unitPrice;
-    const paidAmount = Math.max(0, _wsNum(it.paidAmount));
+    const payments = _wsRecvPayments(it);
+    const paidAmount = payments.reduce((s, p) => s + p.amount, 0);
     const pendingAmount = Math.max(0, totalAmount - paidAmount);
     const status = _wsRecvStatus(totalAmount, paidAmount, it.dueDate);
-    return Object.assign({}, it, { units, unitPrice, totalAmount, paidAmount, pendingAmount, status });
+    return Object.assign({}, it, { units, unitPrice, totalAmount, paidAmount, pendingAmount, status, payments });
   });
-  let totalCobrado = 0, totalPendiente = 0, totalVencido = 0, grand = 0, numeroPendientes = 0, numeroVencidos = 0;
+  let totalCobrado = 0, totalPendiente = 0, totalVencido = 0, grand = 0, numeroPendientes = 0, numeroVencidos = 0, numeroCobrados = 0;
   for (const x of list) {
     grand += x.totalAmount;
     totalCobrado += Math.min(x.paidAmount, x.totalAmount);
-    if (x.status !== 'cobrado') { totalPendiente += x.pendingAmount; numeroPendientes++; }
+    if (x.status !== 'cobrado') { totalPendiente += x.pendingAmount; numeroPendientes++; } else numeroCobrados++;
     if (x.status === 'vencido') { totalVencido += x.pendingAmount; numeroVencidos++; }
   }
   return {
     list, count: list.length, grand, totalCobrado, totalPendiente, totalVencido,
-    numeroPendientes, numeroVencidos,
+    numeroPendientes, numeroVencidos, numeroCobrados,
     // §H — sin importe total no hay proporción que calcular: `null`, no un 0 % que
     // el usuario leería como «no has cobrado nada». Mismo criterio que la tasa de
     // ahorro del presupuesto y que las rentabilidades del inmobiliario.
@@ -29044,15 +29257,13 @@ function calculateReceivables(items) {
     // §H — el PERIODO del resumen, explícito. Estos totales son de TODO lo
     // registrado, no de un mes: decirlo evita que se lean como el cobro del mes.
     periodBasis: 'all_registered',
-    // Y el cobro parcial es de primera clase: lo pendiente sale del total menos lo
-    // cobrado, así que registrar un cobro dos veces con el mismo importe no
-    // duplica nada (es un CAMPO, no un registro que se acumula).
+    // El cobro parcial es de primera clase y ACUMULA: cada cobro es una entrada
+    // del historial con su importe y su fecha; lo cobrado es su suma.
     partialSupported: true,
   };
 }
 function _wsRecvNewDraft() { return { personOrCompany: '', concept: '', units: '', unitPrice: '', paidAmount: '', dueDate: '', notes: '' }; }
 function _wsRecvDemo() {
-  const yr = (typeof _intccDate === 'function') ? '' : '';
   return [
     { id: 'rc_d1', personOrCompany: 'Hamburguesas Celestiales', concept: 'Pedido palés', units: 1, unitPrice: 6000, paidAmount: 2000, dueDate: '', notes: '' },
     { id: 'rc_d2', personOrCompany: 'Cliente B', concept: 'Diseño web', units: 1, unitPrice: 2400, paidAmount: 0, dueDate: '', notes: '' },
@@ -29063,11 +29274,13 @@ function _wsRecvDemo() {
 function _wsReceivablesDefaults() { return { items: _wsRecvDemo() }; }
 function _wsRecvProps() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.items)) _wsToolInputs = _wsReceivablesDefaults(); return _wsToolInputs.items; }
 function _wsRecvRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderReceivablesTool(); _wshReveal(c); } }
+function _wsRecvCommit() { _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); }
 function _wsRecvOnInput(el) {
   if (!_wsRecvDraft) _wsRecvDraft = _wsRecvNewDraft();
   const key = el.getAttribute('data-wsrecv-input');
   if (key === 'dueDate') { el.value = _wsDateAutoFormat(el.value); }  // WS.16 dd/mm/aaaa
   _wsRecvDraft[key] = el.value;
+  el.removeAttribute('aria-invalid'); el.classList.remove('is-invalid');
   const root = document.querySelector('.wsh-tool-view');
   const pv = root && root.querySelector('[data-wsrecv-pv]');
   if (pv) pv.innerHTML = _wsRecvPreviewLine(_wsRecvDraft);
@@ -29076,10 +29289,24 @@ function _wsRecvPreviewLine(d) {
   const esc = _intccEsc;
   const total = (Number(_wsNum(d.units)) || 0) * (Number(_wsNum(d.unitPrice)) || 0);
   if (total <= 0) return '';
-  const paid = _wsNum(d.paidAmount);
+  // Editando, lo cobrado es el HISTORIAL del registro, no un campo del formulario.
+  const cur = _wsRecvEditId ? _wsRecvProps().find(x => x && x.id === _wsRecvEditId) : null;
+  const paid = cur ? _wsRecvPayments(cur).reduce((s, p) => s + p.amount, 0) : _wsNum(d.paidAmount);
   const pending = Math.max(0, total - paid);
   const st = _wsRecvStatus(total, paid, d.dueDate);
   return `<span class="wsrecv-prev"><b>${esc(formatBase(total))}</b> · ${esc(t('wsrecv_pending'))} ${esc(formatBase(pending))} · <em class="is-${st}">${esc(t('wsrecv_st_' + st))}</em></span>`;
+}
+// Un error de validación junto al formulario que lo provoca, por el canal común
+// (`.wsg-reqerr` con role=alert) y marcando el campo culpable.
+function _wsRecvFail(root, attrSel, msg) {
+  if (!root) return false;
+  root.querySelectorAll('.wsg-reqerr').forEach(n => n.remove());
+  const el = attrSel ? root.querySelector(attrSel) : null;
+  if (el) { el.setAttribute('aria-invalid', 'true'); el.classList.add('is-invalid'); }
+  const p = document.createElement('p'); p.className = 'wsg-reqerr'; p.setAttribute('role', 'alert'); p.textContent = msg;
+  root.appendChild(p);
+  if (el) { try { el.focus(); } catch (_) {} }
+  return false;
 }
 function _wsRecvAdd() {
   const d = _wsRecvDraft || _wsRecvNewDraft();
@@ -29089,41 +29316,121 @@ function _wsRecvAdd() {
     { k: 'unitPrice', label: 'wsrecv_f_unitprice', num: true },
   ]);
   if (missRc.length) return _wsDraftRequired('wsrecv-input', missRc);
-  const who = (d.personOrCompany || '').trim();
+  const form = document.querySelector('.wsh-tool-view .wsrecv-form-card');
+  const due = String(d.dueDate || '').trim();
+  if (due && !_wsRecvParseDate(due)) return _wsRecvFail(form, '[data-wsrecv-input="dueDate"]', t('wsrecv_err_date'));
+  const list = _wsRecvProps();
   const now = Date.now();
+  const units = _wsNum(d.units) || 1, unitPrice = _wsNum(d.unitPrice), total = units * unitPrice;
+  const prev = _wsRecvEditId ? list.find(x => x && x.id === _wsRecvEditId) : null;
+  let payments;
+  if (prev) {
+    // EDITAR NO TOCA EL HISTORIAL: los cobros ya registrados se conservan tal cual,
+    // y por eso el total nuevo no puede quedar por debajo de lo ya cobrado.
+    payments = _wsRecvPayments(prev);
+    const paid = payments.reduce((s, p) => s + p.amount, 0);
+    if (total < paid - _WSRECV_EPS) return _wsRecvFail(form, '[data-wsrecv-input="unitPrice"]', String(t('wsrecv_err_total_below')).replace('{p}', formatBase(paid)));
+  } else {
+    const opening = Math.max(0, _wsNum(d.paidAmount));
+    if (_wsNum(d.paidAmount) < 0) return _wsRecvFail(form, '[data-wsrecv-input="paidAmount"]', t('wsrecv_err_neg'));
+    if (opening > total + _WSRECV_EPS) return _wsRecvFail(form, '[data-wsrecv-input="paidAmount"]', String(t('wsrecv_err_over')).replace('{p}', formatBase(total)));
+    // Lo «ya cobrado» al dar de alta es un cobro ANTERIOR sin fecha conocida: no
+    // se le pone la de hoy, porque nadie ha dicho que se cobrara hoy.
+    payments = opening > 0 ? [{ id: 'pm_' + now + '_0', amount: opening, date: null, at: now, legacy: true }] : [];
+  }
+  const who = (d.personOrCompany || '').trim();
   const item = {
     id: _wsRecvEditId || ('rc_' + now + '_' + Math.random().toString(36).slice(2, 6)),
     personOrCompany: who || t('wsapp_receivables_n'), concept: (d.concept || '').trim(),
-    units: _wsNum(d.units) || 1, unitPrice: _wsNum(d.unitPrice), paidAmount: _wsNum(d.paidAmount),
-    dueDate: d.dueDate || '', notes: (d.notes || '').trim(),
-    createdAt: now, updatedAt: now,
+    units, unitPrice, payments, paidAmount: payments.reduce((s, p) => s + p.amount, 0),
+    dueDate: due ? _wsRecvParseDate(due) : '', notes: (d.notes || '').trim(),
+    createdAt: (prev && prev.createdAt) || now, updatedAt: now,
   };
-  const list = _wsRecvProps();
-  if (_wsRecvEditId) { const i = list.findIndex(x => x && x.id === _wsRecvEditId); if (i >= 0) { item.createdAt = list[i].createdAt || now; list[i] = item; } else list.push(item); }
-  else list.push(item);
-  _wsToolInputs.items = list; _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs);
+  const i = prev ? list.indexOf(prev) : -1;
+  const savedId = item.id;
+  if (i >= 0) list[i] = item; else list.push(item);
+  _wsToolInputs.items = list; _wsRecvCommit();
   _wsRecvDraft = _wsRecvNewDraft(); _wsRecvEditId = null;
   _wsRecvRerender();
+  _wsFocusInView('[data-wsrecv-card="' + savedId + '"]', null);
+}
+// ── REGISTRAR UN COBRO ───────────────────────────────────────────────────────
+// Un formulario en línea DENTRO de la tarjeta del registro, con un token propio
+// generado al abrirlo: la escritura comprueba que ese token no esté ya en el
+// historial, así que un doble toque o un reintento no pueden duplicar el cobro.
+let _wsRecvPayId = null, _wsRecvPayToken = null;
+function _wsRecvPayOpen(id) {
+  _wsRecvPayId = id; _wsRecvPayToken = 'pm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  _wsRecvRerender();
+  _wsFocusInView('[data-wsrecv-card="' + id + '"] .wsrecv-pay', '[data-wsrecv-pay-amt]');
+}
+function _wsRecvPayClose() { const id = _wsRecvPayId; _wsRecvPayId = null; _wsRecvPayToken = null; _wsRecvRerender(); if (id) _wsFocusInView('[data-wsrecv-card="' + id + '"]', '[data-wsrecv-act="pay"]'); }
+function _wsRecvPaySave() {
+  const id = _wsRecvPayId, token = _wsRecvPayToken;
+  const root = document.querySelector('.wsh-tool-view .wsrecv-pay');
+  if (!id || !token || !root) return false;
+  const list = _wsRecvProps();
+  const it = list.find(x => x && x.id === id); if (!it) { _wsRecvPayClose(); return false; }
+  const pays = _wsRecvPayments(it);
+  if (pays.some(p => p.id === token)) return false;           // ya escrito: reintento o doble toque
+  const amtEl = root.querySelector('[data-wsrecv-pay-amt]'), dateEl = root.querySelector('[data-wsrecv-pay-date]');
+  const raw = amtEl ? amtEl.value : '';
+  const amt = _wsNumOrNull(raw);
+  const total = Math.max(0, _wsNum(it.units)) * Math.max(0, _wsNum(it.unitPrice));
+  const pending = Math.max(0, total - pays.reduce((s, p) => s + p.amount, 0));
+  if (amt == null || String(raw).trim() === '') return _wsRecvFail(root, '[data-wsrecv-pay-amt]', t('wsrecv_err_amount'));
+  if (Number(amt) < 0 || /^\s*-/.test(String(raw))) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', t('wsrecv_err_neg'));
+  if (!(Number(amt) > 0)) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', t('wsrecv_err_amount'));
+  if (Number(amt) > pending + _WSRECV_EPS) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', String(t('wsrecv_err_over')).replace('{p}', formatBase(pending)));
+  const iso = _wsRecvParseDate(dateEl ? dateEl.value : '');
+  if (!iso) return _wsRecvFail(root, '[data-wsrecv-pay-date]', t('wsrecv_err_date'));
+  if (iso > _wsRecvTodayIso()) return _wsRecvFail(root, '[data-wsrecv-pay-date]', t('wsrecv_err_future'));
+  // Materializa el cobro antiguo (si lo había) ANTES de añadir el nuevo: así el
+  // historial guardado conserva lo ya cobrado y lo cobrado sigue siendo su suma.
+  const next = pays.concat([{ id: token, amount: Math.round(Number(amt) * 100) / 100, date: iso, at: Date.now() }]);
+  it.payments = next; it.paidAmount = next.reduce((s, p) => s + p.amount, 0); it.updatedAt = Date.now();
+  _wsRecvPayId = null; _wsRecvPayToken = null;
+  _wsRecvCommit(); _wsRecvRerender();
+  _wsFocusInView('[data-wsrecv-card="' + id + '"]', null);
+  return true;
+}
+function _wsRecvPayDelete(id, pid) {
+  const list = _wsRecvProps();
+  const it = list.find(x => x && x.id === id); if (!it) return;
+  _wsConfirm(() => {
+    const next = _wsRecvPayments(it).filter(p => p.id !== pid);
+    it.payments = next; it.paidAmount = next.reduce((s, p) => s + p.amount, 0); it.updatedAt = Date.now();
+    _wsRecvCommit(); _wsRecvRerender();
+  });
 }
 function _wsRecvAct(act, id) {
   const list = _wsRecvProps();
   const it = list.find(x => x && x.id === id); if (!it) return;
   if (act === 'edit') {
-    _wsRecvEditId = id;
-    _wsRecvDraft = { personOrCompany: it.personOrCompany, concept: it.concept, units: String(it.units || ''), unitPrice: String(it.unitPrice || ''), paidAmount: String(it.paidAmount || ''), dueDate: it.dueDate || '', notes: it.notes || '' };
-    _wsRecvRerender(); return;
+    _wsRecvEditId = id; _wsRecvPayId = null; _wsRecvPayToken = null;
+    _wsRecvDraft = { personOrCompany: it.personOrCompany, concept: it.concept, units: String(it.units || ''), unitPrice: String(it.unitPrice || ''), paidAmount: '', dueDate: _wsRecvDateText(_wsRecvParseDate(it.dueDate)) || it.dueDate || '', notes: it.notes || '' };
+    _wsRecvRerender();
+    _wsFocusInView('.wsrecv-form-card', '[data-wsrecv-input="personOrCompany"]');
+    return;
   }
-  if (act === 'dup') { list.push(Object.assign({}, it, { id: 'rc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) })); _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); _wsRecvRerender(); return; }
-  if (act === 'paid') { it.paidAmount = Math.max(0, (Number(it.units) || 0) * (Number(it.unitPrice) || 0)); it.updatedAt = Date.now(); _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); _wsRecvRerender(); return; }
+  // DUPLICAR crea un registro NUEVO con los mismos datos y SIN sus cobros: copiar
+  // el historial afirmaría que el mismo dinero se cobró dos veces.
+  if (act === 'dup') {
+    const now = Date.now();
+    list.push(Object.assign({}, it, { id: 'rc_' + now + '_' + Math.random().toString(36).slice(2, 6), payments: [], paidAmount: 0, createdAt: now, updatedAt: now }));
+    _wsRecvCommit(); _wsRecvRerender(); return;
+  }
+  if (act === 'pay') { _wsRecvPayOpen(id); return; }
   if (act === 'del') {
     _wsConfirm(() => {
       const i = list.findIndex(x => x && x.id === id); if (i >= 0) list.splice(i, 1);
       if (_wsRecvEditId === id) { _wsRecvEditId = null; _wsRecvDraft = _wsRecvNewDraft(); }
-      _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); _wsRecvRerender();
+      if (_wsRecvPayId === id) { _wsRecvPayId = null; _wsRecvPayToken = null; }
+      _wsRecvCommit(); _wsRecvRerender();
     });
   }
 }
-function _wsRecvCancel() { _wsRecvEditId = null; _wsRecvDraft = _wsRecvNewDraft(); _wsRecvRerender(); }
+function _wsRecvCancel() { const id = _wsRecvEditId; _wsRecvEditId = null; _wsRecvDraft = _wsRecvNewDraft(); _wsRecvRerender(); if (id) _wsFocusInView('[data-wsrecv-card="' + id + '"]', null); }
 
 function _wsRecvSummaryHtml(r) {
   const esc = _intccEsc;
@@ -29141,13 +29448,46 @@ function _wsRecvSummaryHtml(r) {
       <div class="wsrecv-sumbar-row"><span class="wsrecv-sumbar-lbl">${esc(r.porcentajeCobrado == null ? t('wstool_bud_na') : Math.round(r.porcentajeCobrado) + '%')} ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>${r.numeroVencidos ? `<span class="wsrecv-overdue-badge">${esc(t('wsrecv_overdue_badge')(r.numeroVencidos))}</span>` : ''}</div>
     </div>`;
 }
+const _WSRECV_ICON = {
+  edit: '<path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  pay:  '<path d="M12 5v14M5 12h14"/>',
+  dup:  '<rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+  del:  '<path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/>',
+};
+function _wsRecvPayFormHtml(it) {
+  const esc = _intccEsc;
+  return `
+      <div class="wsrecv-pay" role="group" aria-label="${esc(t('wsrecv_pay_title') + ' — ' + it.personOrCompany)}">
+        <p class="wsrecv-pay-t">${esc(t('wsrecv_pay_title'))}</p>
+        <div class="wsrecv-pay-grid">
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsrecv_pay_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-pay-amt value="" placeholder="${esc(_wsFormatInputNumber(String(Math.round(it.pendingAmount * 100) / 100)))}"></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsrecv_pay_date'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="numeric" autocomplete="off" data-wsrecv-pay-date value="${esc(_wsRecvDateText(_wsRecvTodayIso()))}" placeholder="${esc(t('wsrecv_date_ph'))}"></span></label>
+        </div>
+        <button type="button" class="wsrecv-pay-full" data-wsrecv-pay-full="${esc(String(Math.round(it.pendingAmount * 100) / 100))}">${esc(String(t('wsrecv_pay_full')).replace('{a}', formatBase(it.pendingAmount)))}</button>
+        <div class="wsrecv-pay-btns">
+          <button type="button" class="wsg-act" data-wsrecv-pay-cancel>${esc(t('wsjrn_cancel'))}</button>
+          <button type="button" class="wsh-cta is-primary" data-wsrecv-pay-save>${esc(t('wsrecv_pay_save'))}</button>
+        </div>
+      </div>`;
+}
+function _wsRecvHistHtml(it) {
+  const esc = _intccEsc;
+  if (!it.payments.length) return '';
+  const rows = it.payments.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || (a.at - b.at)).map(p => `
+          <li class="wsrecv-hist-row"><span class="wsrecv-hist-d">${esc(p.date ? _wsRecvDateText(p.date) : t('wsrecv_hist_nodate'))}</span><b>${esc(formatBase(p.amount))}</b>
+            <button type="button" class="wsrecv-hist-x" data-wsrecv-paydel="${esc(p.id)}" data-wsrecv-id="${esc(it.id)}" aria-label="${esc(String(t('wsrecv_hist_del')).replace('{a}', formatBase(p.amount)))}" title="${esc(t('wsrecv_hist_del_t'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></li>`).join('');
+  return `<div class="wsrecv-hist"><p class="wsrecv-hist-t">${esc(t('wsrecv_hist_title'))} · ${it.payments.length}</p><ul class="wsrecv-hist-list">${rows}</ul></div>`;
+}
 function _wsRecvCardHtml(it) {
   const esc = _intccEsc;
   const pct = it.totalAmount > 0 ? Math.round(Math.min(100, it.paidAmount / it.totalAmount * 100)) : 0;
+  const btn = (act, label, extra) => `<button type="button" class="wsre-mini${extra || ''}" data-wsrecv-act="${act}" data-wsrecv-id="${esc(it.id)}" title="${esc(label)}" aria-label="${esc(label + ' — ' + it.personOrCompany)}"><svg viewBox="0 0 24 24" aria-hidden="true">${_WSRECV_ICON[act]}</svg></button>`;
+  const paying = _wsRecvPayId === it.id && it.status !== 'cobrado';
+  const due = _wsRecvParseDate(it.dueDate);
   return `
-    <div class="wsrecv-card is-${esc(it.status)}">
+    <div class="wsrecv-card is-${esc(it.status)}" data-wsrecv-card="${esc(it.id)}">
       <div class="wsrecv-card-top">
-        <div class="wsrecv-card-id"><p class="wsrecv-who">${esc(it.personOrCompany)}</p>${it.concept ? `<span class="wsrecv-concept">${esc(it.concept)}</span>` : ''}</div>
+        <div class="wsrecv-card-id"><p class="wsrecv-who">${esc(it.personOrCompany)}</p>${it.concept ? `<span class="wsrecv-concept">${esc(it.concept)}</span>` : ''}${due ? `<span class="wsrecv-due">${esc(t('wsrecv_due_short'))} ${esc(_wsRecvDateText(due))}</span>` : ''}</div>
         <span class="wsrecv-status is-${esc(it.status)}">${esc(t('wsrecv_st_' + it.status))}</span>
       </div>
       <div class="wsrecv-amounts">
@@ -29155,12 +29495,16 @@ function _wsRecvCardHtml(it) {
         <span class="wsrecv-amt"><i>${esc(t('wsrecv_paid'))}</i><b>${esc(formatBase(it.paidAmount))}</b></span>
         <span class="wsrecv-amt is-pending"><i>${esc(t('wsrecv_pending'))}</i><b>${esc(formatBase(it.pendingAmount))}</b></span>
       </div>
-      <div class="wsrecv-bar"><span class="wsrecv-bar-fill is-${esc(it.status)}" style="width:${pct}%"></span></div>
+      <div class="wsrecv-bar" role="img" aria-label="${esc(pct + '% ' + t('wsrecv_kpi_collected').toLowerCase())}"><span class="wsrecv-bar-fill is-${esc(it.status)}" style="width:${pct}%"></span></div>
+      ${_wsRecvHistHtml(it)}
+      ${paying ? _wsRecvPayFormHtml(it) : ''}
       <div class="wsrecv-card-acts">
-        <button type="button" class="wsre-mini" data-wsrecv-act="edit" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button>
-        <button type="button" class="wsre-mini" data-wsrecv-act="paid" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsrecv_mark_paid'))}" aria-label="${esc(t('wsrecv_mark_paid'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></button>
-        <button type="button" class="wsre-mini" data-wsrecv-act="dup" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsg_act_dup'))}" aria-label="${esc(t('wsg_act_dup'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
-        <button type="button" class="wsre-mini is-danger" data-wsrecv-act="del" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button>
+        ${it.status !== 'cobrado' && !paying ? `<button type="button" class="wsrecv-paybtn" data-wsrecv-act="pay" data-wsrecv-id="${esc(it.id)}" aria-label="${esc(t('wsrecv_pay_btn') + ' — ' + it.personOrCompany)}"><svg viewBox="0 0 24 24" aria-hidden="true">${_WSRECV_ICON.pay}</svg>${esc(t('wsrecv_pay_btn'))}</button>` : ''}
+        <span class="wsrecv-acts-sec">
+          ${btn('edit', t('wsrecv_edit'))}
+          ${btn('dup', t('wsrecv_dup'))}
+          ${btn('del', t('wsg_act_del'), ' is-danger')}
+        </span>
       </div>
     </div>`;
 }
@@ -29168,20 +29512,21 @@ function _wsRecvFormHtml() {
   const esc = _intccEsc;
   const d = _wsRecvDraft || _wsRecvNewDraft();
   const editing = !!_wsRecvEditId;
-  const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsrecv-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
+  const txt = (k, label, ph) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsrecv-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"${ph ? ` placeholder="${esc(ph)}"` : ''}></span></label>`;
   const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   return `
     <section class="wsh-card wsrecv-form-card">
-      <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsrecv_add'))}</h3></header>
+      <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsrecv_edit_title') : t('wsrecv_add'))}</h3></header>
       <div class="wsrecv-form-grid">
         ${txt('personOrCompany', t('wsrecv_f_who'))}
         ${txt('concept', t('wsrecv_f_concept'))}
         ${num('units', t('wsrecv_f_units'), '')}
         ${num('unitPrice', t('wsrecv_f_unitprice'), '€')}
-        ${num('paidAmount', t('wsrecv_f_paid'), '€')}
-        ${txt('dueDate', t('wsrecv_f_due'))}
+        ${editing ? '' : num('paidAmount', t('wsrecv_f_paid'), '€')}
+        ${txt('dueDate', t('wsrecv_f_due'), t('wsrecv_date_ph'))}
         ${txt('notes', t('wsrecv_f_notes'))}
       </div>
+      ${editing ? `<p class="wsrecv-form-note">${esc(t('wsrecv_edit_note'))}</p>` : ''}
       <div class="wsrecv-form-foot">
         <span class="wsrecv-prev-wrap" data-wsrecv-pv>${_wsRecvPreviewLine(d)}</span>
         <div class="wsrecv-form-btns">
@@ -29191,13 +29536,25 @@ function _wsRecvFormHtml() {
       </div>
     </section>`;
 }
+// EL TÍTULO DICE LO QUE SE MUESTRA. La lista se titulaba «Pendientes» y enseñaba
+// también los cobrados; ahora se titula por lo que es y un filtro explícito
+// decide qué parte se ve. El filtro no se persiste: es una forma de mirar.
+let _wsRecvFilter = 'all';
+function _wsRecvFilterHtml(r) {
+  const esc = _intccEsc;
+  const opts = [['all', 'wsrecv_f_all', r.count], ['open', 'wsrecv_f_open', r.numeroPendientes], ['done', 'wsrecv_f_done', r.numeroCobrados]];
+  return `<div class="wsrecv-filter" role="group" aria-label="${esc(t('wsrecv_filter_aria'))}">${opts.map(([k, lk, n]) =>
+    `<button type="button" class="wsrecv-fchip${_wsRecvFilter === k ? ' is-on' : ''}" data-wsrecv-filter="${k}" aria-pressed="${_wsRecvFilter === k ? 'true' : 'false'}">${esc(t(lk))} <span>${n}</span></button>`).join('')}</div>`;
+}
 function _wsRecvListHtml(r) {
   const esc = _intccEsc;
   if (!r.list.length) return `<p class="wsh-empty">${esc(t('wsrecv_empty'))}</p>`;
   const q = (_wsRecvQuery || '').trim().toLowerCase();
   let list = r.list;
+  if (_wsRecvFilter === 'open') list = list.filter(it => it.status !== 'cobrado');
+  else if (_wsRecvFilter === 'done') list = list.filter(it => it.status === 'cobrado');
   if (q) list = list.filter(it => ((String(it.personOrCompany || '') + ' ' + String(it.concept || '') + ' ' + t('wsrecv_st_' + it.status)).toLowerCase().indexOf(q) >= 0));
-  if (!list.length) return `<p class="wsh-empty">${esc(t('wsrecv_no_results'))}</p>`;
+  if (!list.length) return `<p class="wsh-empty">${esc(q ? t('wsrecv_no_results') : t(_wsRecvFilter === 'done' ? 'wsrecv_none_done' : 'wsrecv_none_open'))}</p>`;
   return `<div class="wsrecv-grid">${list.map(_wsRecvCardHtml).join('')}</div>`;
 }
 function _wsRecvSearch(el) {
@@ -29206,6 +29563,15 @@ function _wsRecvSearch(el) {
   const box = root && root.querySelector('[data-wsrecv-list]');
   if (box) box.innerHTML = _wsRecvListHtml(calculateReceivables(_wsRecvProps()));
 }
+function _wsRecvSetFilter(k) {
+  _wsRecvFilter = (k === 'open' || k === 'done') ? k : 'all';
+  const root = document.querySelector('.wsh-tool-view');
+  const r = calculateReceivables(_wsRecvProps());
+  const box = root && root.querySelector('[data-wsrecv-list]');
+  const f = root && root.querySelector('.wsrecv-filter');
+  if (box) box.innerHTML = _wsRecvListHtml(r);
+  if (f) { f.outerHTML = _wsRecvFilterHtml(r); const on = root.querySelector('.wsrecv-fchip.is-on'); if (on) try { on.focus(); } catch (_) {} }
+}
 function _renderReceivablesTool() {
   const esc = _intccEsc;
   const items = _wsRecvProps();
@@ -29213,11 +29579,11 @@ function _renderReceivablesTool() {
   const r = calculateReceivables(items);
   return `
     <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
-      ${_wsSurfaceHeadHtml({ title: t('wsapp_receivables_n'), doc: _wsToolDocName(), help: [t('wsrecv_sub')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wsapp_receivables_n'), doc: _wsToolDocName(), help: [t('wsrecv_sub'), t('wsrecv_manual_note')] })}
       ${r.list.length ? `<section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>` : ''}
-      <section class="wsh-card">
+      <section class="wsh-card wsrecv-list-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
-        ${r.list.length ? `<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}">` : ''}
+        ${r.list.length ? `<div class="wsrecv-listbar">${_wsRecvFilterHtml(r)}<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search aria-label="${esc(t('wsrecv_search'))}" placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}"></div>` : ''}
         <div data-wsrecv-list>${_wsRecvListHtml(r)}</div>
       </section>
       ${_wsRecvFormHtml()}
@@ -29639,7 +30005,9 @@ function _wsApAct(act, id) {
   if (act === 'edit') {
     _wsApEditId = id;
     _wsApDraft = { assetName: rw.assetName, assetType: rw.assetType, ticker: rw.ticker, buyPrice: String(rw.buyPrice || ''), sellPrice: rw.sellPrice === '' ? '' : String(rw.sellPrice), quantity: String(rw.quantity || ''), fees: String(rw.fees || ''), currency: rw.currency || 'EUR', notes: rw.notes || '' };
-    _wsApRerender(); return;
+    _wsApRerender();
+    _wsFocusInView('.wsap-form-card', '[data-wsap-input]');
+    return;
   }
   if (act === 'dup') { list.push(Object.assign({}, rw, { id: 'ap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) })); _wsToolDirty = true; _wsToolStateSet('assets', _wsToolInputs); _wsApRerender(); return; }
   if (act === 'del') {

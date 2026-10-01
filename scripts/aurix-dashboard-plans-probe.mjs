@@ -111,7 +111,8 @@ const read = page => page.evaluate(`(function(){
     ids: cards.map(function(c){ return c.getAttribute('data-wspl-id'); }),
     names: cards.map(function(c){ return (c.querySelector('.wspl-name')||{}).textContent || ''; }),
     types: cards.map(function(c){ return (c.querySelector('.wspl-type')||{}).textContent || ''; }),
-    metrics: cards.map(function(c){ return [].slice.call(c.querySelectorAll('.wspl-m')).map(function(m){ return m.textContent.trim(); }); }),
+    // RE-DECIDIDO (cierre de usabilidad §8): la primera cifra de la tarjeta es su .wspl-hero
+    metrics: cards.map(function(c){ return [].slice.call(c.querySelectorAll('.wspl-hero, .wspl-m')).map(function(m){ return m.textContent.trim(); }); }),
     cols: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
     note: (sec.querySelector('.wspl-note')||{}).textContent || '',
     hasTemplatesLink: !!sec.querySelector('[data-wspl-templates]'),
@@ -166,8 +167,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${tag} dos presupuestos distintos: mismo tipo, nombres e identidades propias`,
       g.types[0] === g.types[1] && g.names[0] !== g.names[1] && g.ids[0] !== g.ids[1],
       JSON.stringify({ tipos: g.types.slice(0, 2), nombres: g.names.slice(0, 2) }));
-    ok(`${tag} hasta DOS métricas por plan, y el diario sólo su recuento`,
-      g.metrics.every(m => m.length <= 2) && g.metrics[4].length === 1,
+    // RE-DECIDIDO (§8): el presupuesto abre con su disponible y acompaña con ingresos y gastos.
+    ok(`${tag} hasta TRES métricas (sólo el presupuesto), DOS el resto, y el diario sólo su recuento`,
+      g.metrics.every(m => m.length <= 3) && g.metrics.slice(2).every(m => m.length <= 2) && g.metrics[4].length === 1
+      && /^Disponible/.test(g.metrics[0][0] || ''),
       JSON.stringify(g.metrics));
     ok(`${tag} rejilla ${w >= 1024 ? '3' : '1'} columna(s)`,
       g.cols === (w >= 1024 ? 3 : 1), 'columnas=' + g.cols);
@@ -217,13 +220,17 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
 
     // Editar, guardar y volver: el Dashboard enseña la cifra nueva.
     r = await page.evaluate(`(function(){
-      _wsToolInputs.salary = '3.000'; _wsToolDirty = true;
+      // El Presupuesto guarda FILAS desde cb0776a: editar la clave plana ya no movía el ingreso
+      // y este paso fallaba también en main. Se edita la fila de nómina (id = clave antigua).
+      var rw = Array.isArray(_wsToolInputs.rows) ? _wsToolInputs.rows.find(function(x){ return x.id === 'salary'; }) : null;
+      if (rw) rw.amount = '3.000'; else _wsToolInputs.salary = '3.000';
+      _wsToolDirty = true;
       _wsToolCommit(null, false);
       document.querySelector('#aurixWorkspace .wsh-bar-back').click();
       _wsPlansWireOnce(); updateDashboardPlans();
       var c = document.querySelector('#wsPlansSection [data-wspl-id="d1"]');
       return JSON.stringify({ tab: currentTab, n: _ws4Projects().length,
-        metric: c ? (c.querySelector('.wspl-m b')||{}).textContent : null,
+        metric: c ? (c.querySelector('.wspl-m b')||{}).textContent : null,   // ingresos: primera métrica tras el disponible
         first: document.querySelector('#wsPlansSection .wspl-card').getAttribute('data-wspl-id'),
         // Y lo PINTADO, no sólo la variable: ver abajo por qué.
         mainShown: (function(){ var m = document.querySelector('main');
@@ -575,7 +582,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       return JSON.stringify({ card: !!card,
         accent: card ? card.getAttribute('data-ws-accent') : null,
         name: card ? (card.querySelector('.wspl-name') || {}).textContent : null,
-        metrics: card ? [].slice.call(card.querySelectorAll('.wspl-m b')).map(function(b){ return b.textContent.trim(); }) : [],
+        metrics: card ? [].slice.call(card.querySelectorAll('.wspl-hero b, .wspl-m b')).map(function(b){ return b.textContent.trim(); }) : [],
         share: card ? !!card.querySelector('.wspl-share') : false,
         sharePct: card ? (card.querySelector('.wspl-share-a') || {}).style.width : null,
         menu: card ? !!card.querySelector('[data-wspl-menu]') : false,

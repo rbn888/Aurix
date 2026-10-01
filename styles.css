@@ -30038,3 +30038,139 @@ body.ws-cover .aurix-wsh { max-width: none; }
 @media (max-width: 480px) {
   .intcc-radar-stage { --rl-fs: 11px; --rl-gap: 13px; --rl-side: 66px; margin-bottom: 5px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   WORKSPACE · CIERRE QUIRÚRGICO DE USABILIDAD
+   ══════════════════════════════════════════════════════════════════════════ */
+/* ── §1 · COBROS: historial, cobro en línea y filtro ─────────────────────── */
+.wsrecv-listbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.wsrecv-listbar .wsrecv-search { flex: 1 1 200px; min-width: 0; margin: 0; }
+.wsrecv-filter { display: inline-flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(120,160,255,0.12); }
+.wsrecv-fchip { min-height: 38px; padding: 0 12px; border-radius: 9px; border: 0; background: transparent; color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; position: relative; }
+.wsrecv-fchip::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%); }
+.wsrecv-fchip span { font-variant-numeric: tabular-nums; opacity: .75; margin-left: 2px; }
+.wsrecv-fchip.is-on { background: rgba(74,130,240,0.20); color: #dbe7ff; }
+.wsrecv-fchip:focus-visible, .wsrecv-paybtn:focus-visible, .wsrecv-pay-full:focus-visible, .wsrecv-hist-x:focus-visible { outline: 2px solid #7fb0ff; outline-offset: 2px; }
+.wsrecv-due { display: block; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+.wsrecv-card.is-vencido .wsrecv-due { color: #f0a59d; }
+.wsrecv-card-acts { align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.wsrecv-acts-sec { display: inline-flex; gap: 7px; margin-left: auto; }
+.wsrecv-paybtn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 11px; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 700; color: #dbe7ff; background: rgba(74,130,240,0.16); border: 1px solid rgba(120,160,255,0.32); }
+.wsrecv-paybtn:hover { background: rgba(74,130,240,0.24); }
+.wsrecv-paybtn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.wsrecv-hist { border-top: 1px solid rgba(120,160,255,0.10); padding-top: 9px; }
+.wsrecv-hist-t { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: .02em; }
+.wsrecv-hist-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.wsrecv-hist-row { display: grid; grid-template-columns: minmax(0,1fr) auto 44px; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; color: var(--text-main, #cfd8e8); }
+.wsrecv-hist-row b { font-variant-numeric: tabular-nums; color: #9ff0c6; font-weight: 700; }
+.wsrecv-hist-d { font-variant-numeric: tabular-nums; }
+.wsrecv-hist-x { width: 44px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 8px; position: relative; }
+.wsrecv-hist-x::after { content: ''; position: absolute; inset: -4px 0; }
+.wsrecv-hist-x:hover { color: #f0897f; }
+.wsrecv-hist-x svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.wsrecv-pay { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 12px; background: rgba(74,130,240,0.07); border: 1px solid rgba(120,160,255,0.22); }
+.wsrecv-pay .wsg-reqerr { margin: 0; }
+.wsrecv-pay-t { margin: 0; font-size: 13px; font-weight: 800; color: var(--text-bright); }
+.wsrecv-pay-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.wsrecv-pay-full { align-self: flex-start; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px dashed rgba(120,160,255,0.34); background: transparent; color: #aecbff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.wsrecv-pay-btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.wsrecv-form-note { margin: 10px 0 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.45; }
+@media (max-width: 380px) { .wsrecv-pay-grid { grid-template-columns: 1fr; } }
+/* ── §3 · MI ESPACIO: LA PORTADA DE LAS HERRAMIENTAS SE VEÍA COMO UN CUADRO VACÍO ──
+   `.wsh-toolcover` declara `height: 76px` (es la portada del catálogo) y, por orden de
+   fuente, ganaba al `height: 100%` de `.wsh-mse2-pv > *`. En el tile de 34 px de
+   Mi espacio el SVG medía 30×74, su dibujo (meet, centrado) caía a ~37 px de altura
+   —fuera de la caja recortada— y sólo quedaba el fondo azul. La portada ocupa ahora
+   su caja; en el tile pequeño se muestra el centro de la ilustración a escala útil
+   (el SVG al doble de ancho, centrado), en vez de un dibujo de 16 px de alto. */
+.wsh-mse2-pv > .wsh-toolcover { height: 100%; border: 0; border-radius: 0; }
+@media (max-width: 560px) {
+  .wsh-mse2[data-wsmse-cols="2"] .wsh-mse2-pv > .wsh-toolcover svg { width: 200%; height: 100%; margin-left: -50%; }
+}
+/* ── §4 · PRESUPUESTO: leyenda que dice sobre qué es el %, dinero libre aparte ── */
+.wsbud-leg-basis { margin: 0 0 -4px; font-size: 12px; color: rgba(200,214,245,0.78); text-align: right; width: 100%; }
+.wsbud-free-note { margin: 0; font-size: 12.5px; line-height: 1.45; color: rgba(214,226,248,0.86);
+  padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(47,217,142,0.22); border-left: 3px solid #2fd98e; background: rgba(47,217,142,0.05); }
+.wsbud-free-note b { color: #7ef0b8; font-weight: 700; margin-right: 2px; }
+/* Densidad en móvil: el anillo y la edición llegan antes sin bajar del suelo de
+   12 px ni de los 44 px táctiles. */
+@media (max-width: 480px) {
+  .wsbud-donut { max-width: 208px; }
+  .wsbud-viz { gap: 10px; }
+  .wsbud-chart-wrap { gap: 8px; }
+  .wsbud-rows { gap: 4px 10px; }
+}
+/* ── §5 · INMOBILIARIO: resumen compacto, inventario antes ──────────────── */
+.wsre-more-card .wsre-more { margin-top: 0; }
+.wsre-more-card .wsre-basis { margin-top: 10px; }
+.wsh-re-view .wsre-summary { gap: 12px; }
+.wsh-re-view .wsre-sum-head { align-items: baseline; row-gap: 2px; }
+.wsh-re-view .wsre-sum-value { font-size: clamp(22px, 2.4vw, 28px); line-height: 1.15; }
+.wsh-re-view .wsre-sum-vlbl { order: 3; }
+@media (min-width: 561px) {
+  .wsh-re-view .wsre-kpi { padding: 12px 14px; }
+}
+/* Móvil: los tres KPI secundarios son FILAS rótulo–cifra (≈40 px cada una) en vez de
+   tres tarjetas de ancho completo de 80 px. El importe principal sigue arriba. */
+@media (max-width: 560px) {
+  .wsh-re-view .wsre-summary-card { padding: 14px; }
+  .wsh-re-view .wsre-sum-value { font-size: 24px; }
+  .aurix-wsh.wsh-re-view .wsre-kpis { grid-template-columns: 1fr; gap: 0; border: 1px solid rgba(120,160,255,0.14); border-radius: 12px; background: rgba(255,255,255,0.022); overflow: hidden; }
+  .aurix-wsh.wsh-re-view .wsre-kpi { flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 9px 12px; min-height: 40px; border: 0; border-radius: 0; background: none; }
+  .aurix-wsh.wsh-re-view .wsre-kpi + .wsre-kpi { border-top: 1px solid rgba(120,160,255,0.10); }
+  .aurix-wsh.wsh-re-view .wsre-kpi-v { font-size: 16px; }
+  .aurix-wsh.wsh-re-view .wsre-kpi-k { font-size: 12px; }
+}
+@media (max-width: 559px) { .wsre-more-card > .wsre-more-head { display: none; } }
+/* ── §7 · OBJETIVOS: la cifra y la barra acompañan al dato que cambia ─────── */
+.wsg-bar-fill.is-anim { transition: width 280ms cubic-bezier(.2,.7,.2,1); }
+.wsg-card .ws4-row-val.is-upd, .wsg-card .wsg-pct.is-upd { animation: wsgValUpd 520ms ease-out 1; }
+@keyframes wsgValUpd { 0% { color: #9fc2ff; } 100% { color: inherit; } }
+.wsg-card .wsg-pct { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .wsg-bar-fill.is-anim { transition: none; }
+  .wsg-card .ws4-row-val.is-upd, .wsg-card .wsg-pct.is-upd { animation: none; }
+}
+/* ── §8 · DASHBOARD «TUS PLANES»: tarjeta personal, cifra real primero ──────
+   Distinta de las cards de patrimonio: profundidad oscura con un halo del acento
+   de su capacidad en la esquina, filete superior y pozo de icono. Azul eléctrico
+   en la acción; ningún marco dorado. */
+.wspl-card {
+  background:
+    radial-gradient(120% 85% at 100% 0%, rgba(var(--ws-a), 0.11), transparent 58%),
+    linear-gradient(180deg, rgba(10,16,30,0.0), rgba(4,8,18,0.45)),
+    var(--elev-1);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 14px 30px -22px rgba(0,0,0,0.8);
+  gap: 12px;
+}
+.wspl-ico { width: 38px; height: 38px; border-radius: 11px;
+  background: radial-gradient(100% 100% at 30% 20%, rgba(var(--ws-a), 0.22), rgba(var(--ws-a), 0.06)); }
+.wspl-type { font-weight: 500; color: rgba(170,190,225,0.78); }
+.wspl-hero { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wspl-hero i { font-style: normal; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: rgba(190,206,235,0.82); }
+.wspl-hero b { font-size: 22px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; color: var(--text-bright, #fff);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wspl-hero.is-pos b { color: #7ef0b8; }
+.wspl-hero.is-neg b { color: #ff9a85; }
+.wspl-share { height: 6px; }
+.wspl-share-t { font-size: 12px; color: rgba(190,206,235,0.82); }
+.wspl-metrics { gap: 6px 22px; padding-top: 10px; border-top: 1px solid rgba(120,160,255,0.10); }
+.wspl-m b { font-size: 14px; }
+.wspl-go { gap: 6px; color: #e6efff; background: linear-gradient(180deg, rgba(74,130,240,0.30), rgba(74,130,240,0.18)); border-color: rgba(110,160,255,0.45); }
+.wspl-go:hover { background: linear-gradient(180deg, rgba(74,130,240,0.42), rgba(74,130,240,0.26)); color: #fff; }
+.wspl-go svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform 160ms ease; }
+.wspl-go:hover svg { transform: translateX(2px); }
+.wspl-card.is-enter { animation: wsplEnter 300ms cubic-bezier(.2,.7,.2,1) 1 both; }
+@keyframes wsplEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .wspl-card.is-enter { animation: none; }
+  .wspl-go svg { transition: none; }
+}
+/* Cobros a 360: los tres importes de una tarjeta no caben en una fila con su
+   moneda; la rejilla no encoge y la tarjeta se salía de su contenedor. */
+.wsrecv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wsrecv-card { min-width: 0; }
+.wsrecv-amounts { flex-wrap: wrap; gap: 6px 16px; }
+@media (max-width: 640px) { .wsrecv-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -45,7 +45,7 @@ function ctx(opts) {
   vm.runInContext('var __UP = []; function openUpgradeIntent(o){ __UP.push(o); return false; }', sb);
   vm.runInContext('var _wsToolActive=null, _wsToolInputs=null, _wsToolEditId=null, _wsToolDirty=false, _wsReturnTab="tools", _wshView="home";', sb);
   ['_WSH_PROJECTS_KEY','_WSH_GOALS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES','_WSPL_GOAL',
-   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    // §3 del cierre v789 — la tarjeta CALLA el subtítulo cuando repetiría el título
@@ -55,6 +55,8 @@ function ctx(opts) {
    '_wsSubIfDistinct',
    '_wsBudgetColorFor','_wsBudgetLegacyRows','_wsBudgetRows','_wsBudgetRowName',
    'calculateMonthlyBudget','calculateReceivables','calculateRealEstatePortfolio','_wsRecvStatus',
+   // Cobros parciales con historial: lo cobrado se deriva de `payments` (o del `paidAmount` antiguo).
+   '_wsRecvPayments','_wsRecvParseDate','_wsRecvTodayIso',
    '_wsPlanMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState',
    // SPRINT WORKSPACE PREMIUM V2 §17/§21 — la tarjeta publica ahora su proporción medida y su
@@ -167,15 +169,18 @@ console.log('\n2 · Hasta dos métricas, nunca inventadas:');
 {
   const c = ctx({ docs: DOCS });
   const met = id => JSON.parse(R(c, 'JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === ' + JSON.stringify(id) + ')))'));
-  ok('2.1 presupuesto → ingresos y gastos, del mismo motor que la plantilla',
-    (() => { const m = met('d1'); return m.length === 2 && m[0].k === 'Ingresos' && m[1].k === 'Gastos'
-      && m[0].v === R(c, 'formatBase(calculateMonthlyBudget({salary:2500,housing:700,food:300}).income)'); })(),
+  // RE-DECIDIDO (cierre de usabilidad §8): la tarjeta abre con el DISPONIBLE del documento
+  // (ingresos − gastos del mismo motor) y acompaña con ingresos y gastos.
+  ok('2.1 presupuesto → disponible, ingresos y gastos, del mismo motor que la plantilla',
+    (() => { const m = met('d1'); return m.length === 3 && m[0].k === 'Disponible' && m[1].k === 'Ingresos' && m[2].k === 'Gastos'
+      && m[0].v === R(c, '(function(){ var r = calculateMonthlyBudget({salary:2500,housing:700,food:300}); return formatBase(r.income - r.expenses); })()')
+      && m[1].v === R(c, 'formatBase(calculateMonthlyBudget({salary:2500,housing:700,food:300}).income)'); })(),
     JSON.stringify(met('d1')));
   ok('2.2 cobros → pendiente y cobrado, de sus estados reales',
-    (() => { const m = met('d3'); return m.length === 2 && m[0].k === 'Pendiente' && m[1].k === 'Cobrado'; })(),
+    (() => { const m = met('d3'); return m.length === 2 && m[0].k === 'Cobrado' && m[1].k === 'Pendiente'; })(),
     JSON.stringify(met('d3')));
-  ok('2.3 inmuebles → número y valor',
-    (() => { const m = met('d4'); return m.length === 2 && m[0].k === 'Inmuebles' && m[0].v === '1'; })(),
+  ok('2.3 inmuebles → valor (si está declarado) y número',
+    (() => { const m = met('d4'); return m.length === 2 && m[0].k === 'Valor' && m[1].k === 'Inmuebles' && m[1].v === '1'; })(),
     JSON.stringify(met('d4')));
   ok('2.4 diario → SÓLO el recuento: no se inventa una rentabilidad',
     (() => { const m = met('d5'); return m.length === 1 && m[0].k === 'Operaciones' && m[0].v === '2'; })(),
@@ -353,7 +358,7 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
   // de siempre: que la identidad se DECLARE y no se pinte inline, y que cada acento tenga tono
   // propio. Se mide el contrato nuevo, no se relaja el viejo.
   ok('6.7 la tarjeta declara su acento por la API compartida, no como color en el HTML',
-    /class="wspl-card" [^>]*data-ws-accent="[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h),
+    /class="wspl-card(?: is-enter)?" [^>]*data-ws-accent="[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h),
     (h.match(/data-ws-accent="[a-z]+"/) || [])[0]);
   // Se ancla en el marcador ÚNICO del bloque: `indexOf('[data-ws-accent]')` caía en la regla del
   // Presupuesto, que va antes en el fichero, y la rebanada no contenía la tabla.
@@ -420,9 +425,12 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
   ok('6.23 la proporción se anuncia en palabras para quien no ve la barra',
     /role="img" aria-label="[0-9]+% /.test(h));
   // …y coincide con el motor, no con una estimación aparte.
-  const cmp = R(ctx({ docs: DOCS }), '(function(){ var p = _wsPlansDocs().find(x => x.type === "monthly_budget");' +
-    ' var r = calculateMonthlyBudget(p.inputs); var sh = _wsPlanShare(p);' +
-    ' return [r.income, r.expenses, sh.a, sh.b]; })()');
+  // RE-DECIDIDO (§8): el Presupuesto ya no dibuja barra —«55 % ingresos» no respondía a nada—;
+  // la que queda es la de Cobros (cobrado sobre total) y se contrasta con SU motor.
+  ok('6.24b el presupuesto NO pinta barra', R(ctx({ docs: DOCS }), '(function(){ var p = _wsPlansDocs().find(x => x.type === "monthly_budget"); return _wsPlanShare(p); })()') === null);
+  const cmp = R(ctx({ docs: DOCS }), '(function(){ var p = _wsPlansDocs().find(x => x.type === "receivables_app");' +
+    ' var r = calculateReceivables(p.inputs.items); var sh = _wsPlanShare(p);' +
+    ' return [r.totalCobrado, r.totalPendiente, sh.a, sh.b]; })()');
   ok('6.24 la barra usa EXACTAMENTE las cifras del motor de la plantilla',
     cmp[0] === cmp[2] && cmp[1] === cmp[3], JSON.stringify(cmp));
 
@@ -433,7 +441,7 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
     '   var ms = _wsPlanMetrics(p); if (!ms.length) return;' +
     '   out.push([t(sh.ka), ms[0].k]); }); return out; })()');
   ok('6.26 el primer tramo de la barra y la primera cifra hablan de lo mismo',
-    ord.length > 0 && ord.every(x => String(x[1]).toLowerCase().indexOf(String(x[0]).toLowerCase()) >= 0),
+    ord.length > 0 && ord.every(x => String(x[0]).toLowerCase().indexOf(String(x[1]).toLowerCase()) === 0),
     JSON.stringify(ord));
 
   // §12/§38 — movimiento sólo donde aporta, y respetando la preferencia del sistema.

@@ -264,7 +264,10 @@ console.log('\n6 · Préstamos · qué préstamo es el que se está simulando:')
 // ════════════════════════════════════════════════════════════════════════════
 console.log('\n7 · Inmobiliario · el usuario ve la separación:');
 {
-  const src = fnSrc('_wsReSummaryHtml');
+  // RE-DECIDIDO (cierre de usabilidad §5): el desglose y «Cómo se calculan» salen del resumen
+  // a su propia tarjeta DESPUÉS del inventario (`_wsReMoreHtml`); el contrato —las tres capas
+  // publicadas y los denominadores explicados en la superficie— es el mismo.
+  const src = fnSrc('_wsReMoreHtml');
   ok('7.1 la vista publica operativo, deuda y flujo como tres filas',
     /wsre_l_noi/.test(src) && /wsre_l_debt/.test(src) && /wsre_l_cf/.test(src));
   ok('7.2 la apreciación se publica aparte y sólo si hay valor declarado',
