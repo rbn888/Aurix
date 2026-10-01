@@ -28,7 +28,10 @@ const out = (() => { const a = process.argv[2] || '/tmp/aurix-demo-site'; return
 const BASE = process.env.AURIX_DEMO_BASE || '/aurix-demo/';
 const API_HOST = 'demo-api.aurix.invalid';
 const ver = JSON.parse(readFileSync(join(root, 'version.json'), 'utf8'));
-const VERSION = String(ver.appjs), BUILD = String(ver.build);
+// AURIX_DEMO_LABEL: una propuesta que AÚN NO está en producción se declara en la versión
+// representada (p. ej. «propuesta onboarding premium 13cc3bc»), y la marca lleva «+».
+const LABEL = String(process.env.AURIX_DEMO_LABEL || '').trim();
+const VERSION = String(ver.appjs) + (LABEL ? '+' : ''), BUILD = String(ver.build) + (LABEL ? ' + ' + LABEL : '');
 
 // 1 · el ensamblado de producción, tal cual (allowlist + verificación de referencias)
 execFileSync('node', [join(root, 'scripts/aurix-build-site.mjs'), out], { stdio: 'inherit' });
