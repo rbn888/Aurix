@@ -151,7 +151,8 @@ console.log('\nF/G — Add Asset real y reintentos:');
 {
   const ui = app.slice(app.indexOf('(function _initOnboardingUI()'));
   ok('F.1 la activación abre el Add Asset REAL (openModal), sin sistema paralelo',
-     /#onbAddAssetBtn[\s\S]{0,900}openModal\(\)/.test(ui));
+     // ventana 900→1100: el handler ahora también fija el contexto visual del alta (ONBOARDING PREMIUM).
+     /#onbAddAssetBtn[\s\S]{0,1100}openModal\(\)/.test(ui));
   ok('F.2 no se ha creado picker/buscador/formulario propio del onboarding',
      !/onb-(picker|search|asset-form)/.test(html));
   ok('G.1 [P1 cerrado] CADA intento arma el retorno al onboarding',
@@ -178,8 +179,11 @@ console.log('\nH/I/J — Primer activo, éxito y recompensa:');
   ok('I.1 SUCCESS ofrece la recompensa: ver el patrimonio propio',
      /id="onbGoDashboardBtn"/.test(html) && /data-i18n="onbGoDashboard"/.test(html));
   ok('I.2 con copy de patrimonio, no de "configuración completada"',
-     /onbSuccessSub:\s*'Tu patrimonio ya está en Aurix\.'/.test(app)
-     && /onbSuccessSub:\s*'Your wealth is now in Aurix\.'/.test(app));
+     // RE-DECIDIDO (ONBOARDING PREMIUM): «Tu patrimonio ya está en Aurix» afirmaba que TODO el
+     // patrimonio estaba registrado tras una sola posición. El contrato pasa a ser el contrario.
+     /onbSuccessTitle:\s*'Tu primera posición, registrada'/.test(app)
+     && /onbSuccessTitle:\s*'Your first position, recorded'/.test(app)
+     && !/ya está en Aurix|is now in Aurix/.test(app));
   ok('J.1 y permite añadir otro activo sin salir del flujo',
      /id="onbAddAnotherBtn"/.test(html) && /onbAddAnotherBtn[\s\S]{0,400}openModal\(\)/.test(app));
   ok('J.2 SUCCESS es breve: sin celebración artificial ni temporizadores',
