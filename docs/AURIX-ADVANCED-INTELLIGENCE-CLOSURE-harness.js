@@ -224,11 +224,11 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intccHealthExplainHtml','_intccHealthReading','_intccHealthReadHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv19Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -1869,17 +1869,22 @@ console.log('\n§15 · memoria patrimonial');
     && css.split('\n').filter(l => /\.intv10-mem-scroll/.test(l) && /max-height/.test(l))
         .every(l => /data-scroll="1"/.test(l) || /max-height: none/.test(l)),
     JSON.stringify(css.split('\n').filter(l => /\.intv10-mem-scroll/.test(l) && /max-height/.test(l))));
-  ok('15.9 la card declara cuántos recuerdos hay y si va a recortar',
-    /data-rows="\$\{rows\.length\}"/.test(fnSrc('_intv4MemoryHtml'))
-    && /data-scroll="\$\{rows\.length > 4 \? '1' : '0'\}"/.test(fnSrc('_intv4MemoryHtml')));
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): la lista con scroll se sustituye por UN
+  // titular y como máximo TRES evidencias, así que ya no hay nada que recortar. Lo
+  // que la card declara ahora es qué familias publica.
+  ok('15.9 la card declara qué evidencias publica y nunca más de un titular + tres',
+    /data-evo-families="\$\{esc\(evo\.items\.map\(x => x\.family\)\.join\(','\)\)\}"/.test(fnSrc('_intv4MemoryHtml'))
+    && /evo\.items\.slice\(1, 4\)/.test(fnSrc('_intv4MemoryHtml'))
+    && /return \{ items: items\.slice\(0, 4\)/.test(fnSrc('_intv19Evolution')));
   // CHECKPOINT G — la fila publica ahora FECHA · PERIODO. El invariante no es
   // el literal de la plantilla: es que sin fecha no se estampa una, y que el
   // periodo sólo se imprime si el hecho lo nombra.
+  // RE-DECIDIDO: cada evidencia fecha con el INICIO de su propia ventana; nunca
+  // con el reloj.
   ok('15.10 no se estampa la fecha de hoy sobre historia antigua',
-    (() => { const src0 = fnSrc('_intv4MemoryHtml');
-      return /\(r\.at \|\| r\.period\) \? `<span class="intcc-tl-date">/.test(src0)
-        && /r\.at \? _intccDate\(r\.at\) : ''/.test(src0)
-        && /r\.period \? _intv4RangeLabel\(r\.period\) : ''/.test(src0); })());
+    (() => { const src0 = fnSrc('_intv19Evolution');
+      return /_intccDate\(f\.window\.startAt\)/.test(src0) && /_intccDate\(c\.startAt\)/.test(src0)
+        && !/_intccDate\((Date\.now|_aurixNow)/.test(src0 + fnSrc('_intv4MemoryHtml')); })());
   ok('15.11 el PERIODO es visible, no sólo un data-attribute',
     (() => { const h = render(CUENTA_B).html;
       const rows = h.match(/<li class="intcc-tl-item"[^>]*data-period="([^"]+)"[\s\S]*?<\/li>/g) || [];
@@ -2231,8 +2236,12 @@ console.log('\nSC · §4.5 · «Tu evolución» publica hechos, no respuestas');
   ok('SC.5.5 pero lo DECLARADO no se pierde: se conserva y se declara su recuento',
     /data-declared="\$\{declared\.length\}"/.test(fnSrc('_intv4MemoryHtml'))
     && typeof run('_intv4MemoryDeclared', makeCtx({})) === 'function');
-  ok('SC.5.6 cada fila declara su PERIODO y su COBERTURA',
-    /data-period="\$\{esc\(r\.period \|\| ''\)\}" data-coverage="\$\{esc\(r\.coverage \|\| ''\)\}"/.test(fnSrc('_intv4MemoryHtml')));
+  // RE-DECIDIDO: cada evidencia declara su PERIODO, y la cobertura se garantiza en
+  // la selección — una ventana que no cubre su nombre no se publica.
+  ok('SC.5.6 cada fila declara su PERIODO y sólo se publican ventanas con cobertura',
+    /data-period="\$\{esc\(x\.period \|\| ''\)\}"/.test(fnSrc('_intv4MemoryHtml'))
+    && /data-period="\$\{esc\(head\.period \|\| ''\)\}"/.test(fnSrc('_intv4MemoryHtml'))
+    && /!_aurixFactPeriodDegraded\(f\.window\)/.test(fnSrc('_intv19Evolution')));
   ok('SC.5.7 el estado vacío es COMPACTO y dice una sola frase',
     (() => { const h = render(YOUNG).html;
       return /data-compact="1"/.test(h) && !/intv6-accrue-node/.test(h)
@@ -4364,9 +4373,14 @@ console.log('\nDC · F · «hoy» tiene un borde, y el borde es el PRESENTE');
   // tiene `Date.now()`: no se añade ninguna variable ni puerta trasera.
   const ctxAt = (now) => { const c = makeCtx(CUENTA_B);
     run('_aurixNow = function () { return ' + now + '; };', c); return c; };
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §2): el hecho fechado de esta fixture era
+  // `recorded_capital_net`, que ya no entra en Hoy como acumulado (se sustituye por
+  // la ventana de 24 h; su prueba vive en la sonda de evolución). La puerta de
+  // ACTUALIDAD que se prueba aquí es genérica, así que se ejerce con una deriva
+  // fechada, que es un hecho de ventana nombrada.
   const coreOf = (obsAgeH, factAgeH) => ({
     topStories: [
-      { semanticKey: 'recorded_capital_net', causalRoot: 'capital_flow', priority: 9,
+      { semanticKey: 'exposure_drift_crypto_30D', causalRoot: 'category_mix', priority: 9,
         window: { range: '30D', endAt: PRESENTE - factAgeH * HOUR }, values: {} },
     ],
     ledger: { facts: [] },
@@ -4421,11 +4435,11 @@ console.log('\nDC · F · «hoy» tiene un borde, y el borde es el PRESENTE');
         + ', _intccEsc, "standard", [], null, {})', c);
       return /data-stale="1"/.test(h)
         && h.indexOf(DICT.es.intv4_brief_stale) !== -1
-        && !/recorded_capital_net/.test(h); })());
+        && !/exposure_drift_crypto_30D/.test(h); })());
   ok('F.8 NO-VACUIDAD · con datos frescos y hecho fresco, SÍ se publica',
     (() => { const r = sel(1, 2);
       return r.stale !== true && r.stories.length === 1
-        && r.stories[0].semanticKey === 'recorded_capital_net'; })(),
+        && r.stories[0].semanticKey === 'exposure_drift_crypto_30D'; })(),
     JSON.stringify(sel(1, 2).stories.map((x) => x.semanticKey)));
   ok('F.9 datos FRESCOS pero hecho VIEJO: la card vive, el hecho no entra',
     (() => { const r = sel(1, 24 * 40);

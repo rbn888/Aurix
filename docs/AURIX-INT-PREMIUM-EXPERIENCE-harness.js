@@ -123,7 +123,7 @@ function extractDict(langIdx) {
 }
 const DICT = { es: extractDict(0), en: extractDict(1) };
 
-const CONSTS = ['_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+const CONSTS = ['_AURIX_AI_LABEL','_AURIX_AI_AVAIL','_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
   '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR',
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
@@ -162,11 +162,11 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // Intelligence: el redondeo es de renderizado y hay UNA sola función.
   '_aurixPctNum','_aurixPctLabel',
   
-  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
+  '_intelCoherentState','_intv5MattersStories','_intv5Reading','_intv5Chips','_intv5StructureHtml','_aurixGapsBySurface','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7PendingReasonKey','_intccHealthExplainHtml','_intccHealthReading','_intccHealthReadHtml','_intv7RadarHtml','_intccRadarSvg','_aurixPeakRetention','getInvestableDistribution','_aurixDisplayCategory',
   // VNEXT §16 — los dos owners de la lectura de estabilidad de «Tu evolución».
   '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
   // CIERRE CORRECTIVO §5 — la evidencia de comparación y sus lectores.
-  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
+  '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv19Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
   // CIERRE CORRECTIVO §3 — el lead que contesta la pregunta y su puerta anti-tautología.
   '_aurixListJoin','_intv16AnswerLead','_intv16NormTxt','_intv16AnswerIsTautology',
   '_renderIntelligenceCommandCenter'];
@@ -1335,8 +1335,9 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
   // ── D · MEMORIA PATRIMONIAL ──────────────────────────────────────────────
   ok('15.8 con trayectoria observada la Memoria PUBLICA eventos (ya no "acumulando")',
     (() => { const m = section(dipped.html, 'intcc-timeline');
-      return !/is-accruing/.test(m) && /intcc-tl-item/.test(m)
-        && /data-fact="investable_/.test(m); })(),
+      // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): ya no es una línea de tiempo, es un
+      // titular + evidencias; lo que se exige es que publique hechos del ledger.
+      return !/is-accruing/.test(m) && /data-fact="investable_/.test(m); })(),
     section(dipped.html, 'intcc-timeline').slice(0, 300));
   // A2 · RE-DECIDIDO. El invariante es que la Memoria publica NIVEL en divisa y
   // NUNCA un porcentaje; qué hito concreto le queda depende de la cartera, y con
@@ -1344,11 +1345,14 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
   // mientras el MÁXIMO —que es el hito— sigue aquí. Fijar una frase concreta era
   // fijar la fixture, no el contrato.
   ok('15.9 y lo que publica es NIVEL con su fecha, nunca un porcentaje',
+    // RE-DECIDIDO: la evolución publica también la rentabilidad neutralizada (una
+    // familia nueva del SPEC, en %); el invariante se queda en el HITO de nivel,
+    // que sigue siendo divisa con su fecha y nunca un porcentaje.
     (() => { const m = section(dipped.html, 'intcc-timeline');
-      const i = m.indexOf('intcc-tl-item');
+      const i = m.indexOf('data-evo-family="level"');
       if (i < 0) return false;                                  // la Memoria no puede quedarse muda aquí
-      const item = m.slice(i, m.indexOf('</ul>'));
-      return /data-fact="investable_/.test(item) && !/%/.test(item); })(),
+      const item = m.slice(i, m.indexOf('</li>', i));
+      return /data-fact="investable_/.test(item) && !/%/.test(item) && /\d{4}/.test(item); })(),
     section(dipped.html, 'intcc-timeline').slice(0, 600));
   // SUPREME CLOSURE · §4.5 — el estado vacío pasa a ser COMPACTO y a decir una
   // sola frase. La línea de tiempo animada con cinco nodos y dos párrafos
@@ -1437,6 +1441,10 @@ console.log('\n15 · M.03 — estados progresivos (C/D/E):');
         // Sin comparaciones certificadas tampoco (la evidencia de estabilidad ES
         // una comparación desde el SPEC «Evolución real»).
         stabilityEvidence: [],
+        // …ni rentabilidades neutralizadas, que desde el SPEC «Memoria útil» también
+        // son comparaciones que Tu evolución publica.
+        ledger: Object.assign({}, core0.ledger, { facts: ((core0.ledger && core0.ledger.facts) || [])
+          .filter(f => !/^investable_return_/.test(String(f.semanticKey || ''))) }),
       });
       c.__stripped = stripped;
       const html = run('_intv4MemoryHtml(__stripped, _intccEsc, [])', c);
@@ -1556,10 +1564,13 @@ console.log('\n16 · M.04 dedupe Memoria / Qué ha cambiado:');
     /_intv4ChangedHtml\(core, esc, publishedKeys, memoryClaims, _hoyEv\)/.test(fnSrc('_renderIntelligenceCommandCenter')));
   // Cada superficie conserva su propósito: la Memoria sigue fechando, y Qué ha
   // cambiado sigue siendo una lista de novedades con dirección.
-  ok('16.11 cada superficie conserva su propósito (Memoria: hito CON fecha; cambios: dirección)',
-    /intcc-tl-item/.test(memHtml) && /intcc-tl-date/.test(memHtml)
+  // RE-DECIDIDO: la Memoria publica evidencias FECHADAS dentro de la frase (cada
+  // una con los extremos de su propia ventana), no filas de línea de tiempo.
+  ok('16.11 cada superficie conserva su propósito (Memoria: hecho CON fecha; cambios: dirección)',
+    /data-evo-family=/.test(memHtml)
+    && (memHtml.match(/<span class="intv4-mem-what">[^<]*<\/span>/g) || []).every(x => /\d{4}/.test(x))
     && /is-up|is-down|is-flat/.test(chgHtml),
-    JSON.stringify({ hasItem: /intcc-tl-item/.test(memHtml), hasDate: /intcc-tl-date/.test(memHtml) }));
+    JSON.stringify({ rows: (memHtml.match(/<span class="intv4-mem-what">[^<]*<\/span>/g) || []) }));
   ok('16.12 y ningún cálculo financiero se ha tocado en este arreglo',
     !/investableValue|assetValueUSD|_aurixTwrChain|returnPct \*/.test(fnSrc('_intv4ChangedHtml') + fnSrc('_intv4MemoryEvents') + fnSrc('_intv4MemoryClaims')));
 }

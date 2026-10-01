@@ -21442,9 +21442,23 @@ body.gs-open { overflow: hidden; }
      `align-items: flex-start` para que el texto empiece arriba junto al anillo
      y no flote centrado dejando aire arriba y abajo. */
   .intcc-m-health-body { display: flex; align-items: flex-start; gap: 16px; }
-  /* SALUD = título, anillo y estado: sin explicación al lado, el anillo se centra
-     en la card en vez de dejar media superficie vacía. */
-  .intcc-m-health-body:not(:has(.intcc-m-health-explain)) { justify-content: center; }
+  /* SALUD · el anillo y el estado se anclan SIEMPRE a la izquierda (nunca se
+     centran cuando falta contenido); a la derecha, la lectura y sus etiquetas,
+     centradas en vertical con el anillo para que la card no deje aire. */
+  .intcc-m-health .intcc-card-title { margin-bottom: 10px; }
+  .intcc-m-health-body { align-items: center; gap: 14px; }
+  .intcc-m-health-read { flex: 1 1 auto; min-width: 0; }
+  .intcc-m-health-read-txt {
+    margin: 0; font-size: 13px; line-height: 1.42; font-weight: 500;
+    color: rgba(226,235,252,0.90);
+    overflow-wrap: normal; word-break: normal;
+  }
+  .intcc-m-health-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .intcc-m-health-tag {
+    font-size: 11.5px; line-height: 1.2; padding: 4px 9px; border-radius: 999px;
+    color: rgba(214,226,255,0.86); background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(214,226,255,0.14); max-width: 100%;
+  }
   .intcc-m-health-explain { flex: 1 1 auto; min-width: 0; }
   .intcc-m-health-explain p {
     margin: 0 0 6px; font-size: 12.5px; line-height: 1.45;

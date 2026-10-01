@@ -1658,7 +1658,8 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
       return /_intv4ExploreHtml\(core, esc, intel\)/.test(r)
         // CHECKPOINT J — las dos reciben además la limitación que les toca.
         && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap, _gaps\.today\)/.test(r)
-        && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields, _gaps\.evolution\)/.test(r)
+        // + lo que titula Hoy (SPEC MEMORIA ÚTIL §5: Tu evolución no repite a Hoy).
+        && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields, _gaps\.evolution,\s*mattersSel\.map\(st => st\.semanticKey\)\)/.test(r)
         && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
 }
 
@@ -1774,20 +1775,22 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
   ok('V.16 …y sólo con hechos REALES: sin hechos no hay filas, responda lo que responda',
     (() => { const r = sb4.ROWS({ ev: [] }, [], ctx9);
       return r.length === 0; })());
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): titular + evidencias, en UNA sola lista.
   ok('V.17 UNA sola lista: la unión blanca del raíl se resuelve por estructura',
     (() => { const m = fnSrc('_intv4MemoryHtml');
-      return (m.match(/class="intcc-tl-list"/g) || []).length === 1
-        && !/intv9-mem-declared/.test(m); })());
+      return (m.match(/class="intv15-stable-list"/g) || []).length === 1
+        && !/class="intcc-tl-list"/.test(m) && !/intv9-mem-declared/.test(m); })());
   // §15 — EL SCROLL DEJA DE RESERVAR ALTURA. `max-height` incondicional montaba
   // un contenedor con barra propia incluso con tres recuerdos, y el resultado era
   // el scroll interior corto con espacio vacío debajo que §15 prohíbe. El techo
   // pasa a colgar del atributo que el renderer ya publica (`data-scroll`), que es
   // el mismo criterio que decide si hay algo que recortar. Lo que se conserva y se
   // comprueba: vertical acotado cuando hay desbordamiento, y NUNCA horizontal.
-  ok('V.18 scroll interno vertical y acotado SÓLO cuando desborda, sin barra horizontal',
+  // RE-DECIDIDO: con un titular y ≤3 evidencias no hay nada que recortar; la regla
+  // CSS queda inerte y la card no monta contenedor de scroll.
+  ok('V.18 sin scroll interno: la card está acotada por construcción, sin barra horizontal',
     /\.intv10-mem-scroll \{ overflow-x: hidden/.test(css)
-    && /\.intv4-memory\[data-scroll="1"\] \.intv10-mem-scroll \{ max-height: 268px; overflow-y: auto; \}/.test(css)
-    && /<div class="intv10-mem-scroll">/.test(src));
+    && !/intv10-mem-scroll/.test(fnSrc('_intv4MemoryHtml')) && /evo\.items\.slice\(1, 4\)/.test(fnSrc('_intv4MemoryHtml')));
   ok('V.19 la barra es discreta y aparece al interactuar; en táctil no hay barra',
     /\.intv10-mem-scroll:hover, \.intv10-mem-scroll:focus-within/.test(css)
     && /@media \(max-width: 1023px\)[\s\S]{0,400}\.intv10-mem-scroll::-webkit-scrollbar \{ width: 0; \}/.test(css));
@@ -1796,8 +1799,8 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
   ok('V.21 con pocos recuerdos NO se reserva hueco: es max-height, nunca height fija',
     /\.intv10-mem-scroll \{ max-height: 268px/.test(css)
     && !/\.intv10-mem-scroll \{[^}]*[^-]height: \d/.test(css));
-  ok('V.22 la card declara cuántos recuerdos hay y si va a hacer scroll',
-    /data-rows="\$\{rows\.length\}"/.test(src) && /data-scroll=/.test(src));
+  ok('V.22 la card declara qué evidencias publica',
+    /data-evo-families="\$\{esc\(evo\.items\.map\(x => x\.family\)\.join\(','\)\)\}"/.test(fnSrc('_intv4MemoryHtml')));
   // NAMING
   // Las ÚNICAS apariciones permitidas son los nombres ANTERIORES de las dos claves
   // de storage, que deben permanecer para purgarlas y adoptar el contexto que un

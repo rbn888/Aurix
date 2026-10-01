@@ -207,8 +207,20 @@ console.log('\n5/6 — Compatibilidad con lo que ya existe:');
   // de comentario, así que es imposible que oculte una lectura real: una línea que
   // arranca con `//` es comentario íntegro.
   const appCode = app.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
-  ok('6.1 ningún consumidor de producto lee asset_values (write-only)',
-     !/asset_values/.test(appCode), 'app.js no debe consumirlo todavía');
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §4 — la «SPEC futura» que este fichero
+  // anunciaba): la columna deja de ser write-only. Lo que se fija ahora es que el
+  // ÚNICO lector es `_aurixHydrateAssetMemory`, en solo lectura, acotado a filas
+  // completas (`schema_version >= 2`, no nulas) y de una en una (`limit(1)`).
+  const _amIdx = appCode.indexOf('async function _aurixHydrateAssetMemory(');
+  const _amSrc = _amIdx === -1 ? '' : appCode.slice(_amIdx, appCode.indexOf('\n}\n', _amIdx));
+  const _outside = appCode.slice(0, _amIdx === -1 ? appCode.length : _amIdx) + (_amIdx === -1 ? '' : appCode.slice(_amIdx + _amSrc.length));
+  const _readsOutside = (_outside.match(/\.select\(\s*['"`][^'"`]*\basset_values\b[^'"`]*['"`]/g) || []);
+  ok('6.1 un solo lector de asset_values, de solo lectura y acotado a filas completas',
+     !!_amSrc && /\.select\('ts,asset_values,real_estate,schema_version'\)/.test(_amSrc)
+       && /gte\('schema_version', 2\)/.test(_amSrc) && /not\('asset_values', 'is', null\)/.test(_amSrc)
+       && /limit\(1\)/.test(_amSrc) && !/\.(insert|update|upsert|delete)\(/.test(_amSrc)
+       && _readsOutside.length === 0,
+     'lector: ' + (!!_amSrc) + ' · lecturas fuera: ' + _readsOutside.join(' | '));
   // Se cuenta la ESCRITURA, no las menciones: el bloque que documenta la decisión
   // nombra la columna varias veces y eso no es un consumidor.
   ok('6.2 existe exactamente UNA escritura de la columna, en el insert del capturador',

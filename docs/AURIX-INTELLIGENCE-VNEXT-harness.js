@@ -119,9 +119,9 @@ function makeCtx(lang) {
    '_INTV4_MEMORY_WINDOW_ORDER','_INTV7_RADAR_DIMS','_AURIX_INTEL_EXCLUSIVE_CLAIMS']
     .forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_intccClamp','_intccEsc','_aurixPctNum','_aurixPctLabel','_intv4Num','_intv4Money',
-   '_intccRadarSvg','_intv7PendingReasonKey','_intccHealthExplainHtml','_intv7RadarAxes','_intv7RadarHtml',
+   '_intccRadarSvg','_intv7PendingReasonKey','_intccHealthExplainHtml','_intccHealthReading','_intccHealthReadHtml','_intv7RadarAxes','_intv7RadarHtml',
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
-   '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
+   '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv19Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
    '_intv4MemoryHtml','_intv4WowText','_intv4DiscoveryHtml','_aurixIntelQuestions',
    '_intccIsMonetary','_intccPctLabel','_intv5DriversHtml','_intv5MattersHtml','_intv5Chips',
@@ -539,13 +539,13 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
   // dos extremos, no la quietud del intervalo.
   // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
   ok('5.2 el titular va de FECHA A FECHA (cambio neto), sin descargos del motor ni días de calendario',
-    (() => { const h = (stable.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1];
+    (() => { const h = (stable.match(/class="intv15-stable-head"[^>]*>(?:<span[^>]*>)?([^<]*)</) || [, ''])[1];
       const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
       return h.indexOf('Entre el ' + a + ' y el ' + b) === 0 && /reparto de tu cartera/.test(h)
         && /apenas cambiaron/.test(h) && !/compara los dos extremos|no sobre tu rentabilidad/.test(h)
         && !/se mantiene|se ha movido|últimos \d+ días|estable/.test(h) && !/41/.test(h)
         && /data-stable-days="30"/.test(stable); })(),
-    (stable.match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
+    (stable.match(/class="intv15-stable-head"[^>]*>(?:<span[^>]*>)?([^<]*)</) || [, '?'])[1]);
   // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
   ok('5.3 SIN comparación no se afirma nada: primera referencia, sin días observados',
     (() => { const h = MEM(CORE({ ev: [] }), INTEL({}));
@@ -559,18 +559,22 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
   // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
   ok('5.5 una deriva MATERIAL de la liquidez bloquea SU afirmación, no la del reparto',
     (() => { const h = MEM(CORE({ findings: [{ semanticKey: 'cash_drift_liquidity_30d', priority: 0.8 }] }), INTEL({}));
-      return /is-stable/.test(h) && !/data-stable-code="liquidity"/.test(h) && /data-stable-code="category_mix"/.test(h); })());
-  ok('5.6 …y con un evento temporal en el pool, tampoco',
+      // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): una evidencia por familia; los códigos
+      // medidos se declaran en la card.
+      return /is-stable/.test(h) && /data-stable-codes="category_mix"/.test(h); })());
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): un hito de nivel ya no desplaza a la
+  // comparación estructural a otra plantilla — es OTRA familia de la misma card.
+  ok('5.6 …y con un evento temporal en el pool, el hito entra como su propia evidencia',
     (() => { const h = MEM(CORE({ events: [{ semanticKey: 'wealth_level_peak', priority: 0.7,
         causalRoot: 'wealth_level', window: { range: '30d', endAt: T0 } }] }), INTEL({}));
-      return !/is-stable/.test(h); })());
+      return /data-evo-families="[^"]*structure/.test(h) || /data-evo-families="[^"]*level/.test(h); })());
   // ── LA VENTANA NO SE INFLA ───────────────────────────────────────────────
   // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
   // Una sola ventana COMÚN (la más larga afirmable) y sólo las dimensiones medidas
   // en ella: nunca se mezclan extremos de comparaciones distintas.
   ok('5.7 la ventana afirmada es UNA y sólo lleva las dimensiones medidas en ELLA',
     (() => { const h = MEM(CORE({ ev: [EV('cash_weight', 7), EV('category_mix', 90)] }), INTEL({}));
-      const head = (h.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1];
+      const head = (h.match(/class="intv15-stable-head"[^>]*>(?:<span[^>]*>)?([^<]*)</) || [, ''])[1];
       const a90 = 'D' + Math.round((NOWT - 90 * DAY) / 864e5);
       return head.indexOf(a90) !== -1 && /data-stable-days="90"/.test(h)
         && /data-stable-codes="category_mix"/.test(h) && !/data-stable-code="liquidity"/.test(h); })(),
@@ -585,9 +589,10 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
         && /data-stable-days="9"/.test(h); })());
   // ── LAS FILAS NOMBRAN LA MEDICIÓN, NO UNA CONTINUIDAD SUPUESTA ───────────
   // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): el umbral viaja en la MISMA frase de la
+  // evidencia estructural, en vez de en dos filas que repetían el titular.
   ok('5.9 cada evidencia dice contra qué umbral se comparó, sin repetir la liquidez de hoy',
-    /El reparto entre clases de activo cambió menos de 3 puntos porcentuales\./.test(stable)
-    && /El peso de tu liquidez cambió menos de 3 puntos porcentuales\./.test(stable)
+    /apenas cambiaron \(menos de 3 puntos\)\./.test(stable)
     && !/Tu liquidez está hoy|7 ?%/.test(stable),
     JSON.stringify((stable.match(/class="intv15-stable-row"[^>]*>([^<]*)</g) || []).map(x => x.slice(-60))));
   ok('5.10 ninguna fila afirma continuidad ni trayectoria: sólo el cambio entre extremos',
@@ -602,14 +607,14 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
     (() => { const flat = { root: 'cash_weight', category: 'liquidity', range: '30d',
         startAt: NOWT - 30 * DAY, endAt: NOWT, deltaPp: 0, thresholdPp: 3, endPct: 7 };
       const h = MEM(CORE({ ev: [flat] }), INTEL({}));
-      const head = (h.match(/class="intv15-stable-head">([^<]*)</) || [, ''])[1];
+      const head = (h.match(/class="intv15-stable-head"[^>]*>(?:<span[^>]*>)?([^<]*)</) || [, ''])[1];
       const row = (h.match(/class="intv15-stable-row"[^>]*>([^<]*)</) || [, ''])[1];
       return /is-stable/.test(h) && /^Entre el /.test(head) && /apenas cambió/.test(head)
         && !/se mantiene|estable|no se ha movido|se ha movido/.test(head + ' ' + row)
         && !/camino entre ellos|fuese y volviese/.test(h); })(),
     (MEM(CORE({ ev: [{ root: 'cash_weight', category: 'liquidity', range: '30d',
       startAt: NOWT - 30 * DAY, endAt: NOWT, deltaPp: 0, thresholdPp: 3, endPct: 7 }] }), INTEL({}))
-      .match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
+      .match(/class="intv15-stable-head"[^>]*>(?:<span[^>]*>)?([^<]*)</) || [, '?'])[1]);
   ok('5.11 una dimensión sin comparación NO produce fila, aunque su nivel se conozca',
     (() => { const rows = ROWS(CORE({ ev: [EV('category_mix', 30)] }), INTEL({}));
       return rows.every(r => r.code !== 'liquidity')
@@ -659,10 +664,9 @@ console.log('\n§5/§14–16 · «Tu evolución»: estabilidad sólo con compara
       const a = 'D' + Math.round((NOWT - 30 * DAY) / 864e5), b = 'D' + Math.round(NOWT / 864e5);
       return /is-stable/.test(en)
         && new RegExp('Between ' + a + ' and ' + b + ', your portfolio mix and your cash weight barely changed').test(en)
-        && /Your cash weight moved by less than 3 percentage points/.test(en)
-        && /Your asset-class mix moved by less than 3 percentage points/.test(en)
+        && /barely changed \(less than 3 points\)\./.test(en)
         && !/not the path between them|is holding|held steady|Your cash is at/.test(en); })(),
-    (MEM(CORE({}), INTEL({}), 'en').match(/class="intv15-stable-head">([^<]*)</) || [, '?'])[1]);
+    (MEM(CORE({}), INTEL({}), 'en').match(/class="intv15-stable-head"[^>]*>(?:<span[^>]*>)?([^<]*)</) || [, '?'])[1]);
   // CONTRATO RE-DECIDIDO (SPEC «Evolución real y cero repetición», 2026-09-30).
   ok('5.21 …y el estado sin comparación también',
     /Aurix is building your first historical reference/.test(MEM(CORE({ ev: [] }), INTEL({}), 'en'))
@@ -1245,12 +1249,14 @@ console.log('\n§6 · el mismo acontecimiento no se publica dos veces como noved
   ok('6.14 la identidad es EVENTO + HECHO (nunca raíz): un evento de raíz no arrastra a otro hecho',
     (() => { const src = fnSrc('_intv17IsHoyEvent');
       return /hoy\.pairs\.has\(id \+ '\|' \+ sk\)/.test(src) && !/causalRoot|rootCause/.test(src); })());
-  ok('6.14b …y cuando TODO lo de hoy ya está abajo, la card lo dice en vez de negarlo',
+  // RE-DECIDIDO (SPEC MEMORIA ÚTIL §2): Hoy ya no remite a «Qué ha cambiado» con
+  // un subtítulo defensivo; dice lo único cierto sobre HOY sin negar al hero.
+  ok('6.14b …y cuando hay hallazgos de otras ventanas, la card no los niega ni remite a otra',
     (() => { const src0 = fnSrc('_intv5MattersHtml');
       return /_cededToChanged/.test(src0)
-        && /intv16_brief_in_changed/.test(src0)
+        && /intv19_brief_quiet/.test(src0) && !/intv16_brief_in_changed/.test(src0)
         // y la frase existe en los DOS idiomas
-        && (app.match(/\n\s+intv16_brief_in_changed:/g) || []).length === 2; })());
+        && (app.match(/\n\s+intv19_brief_quiet:/g) || []).length === 2; })());
   ok('6.15 el historial revisado sigue rotulado como tal en su destino',
     /is-reviewed/.test(app) && /data-reviewed="\$\{x\.reviewed \? '1' : '0'\}"/.test(app));
 }

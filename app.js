@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '757'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '758'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2308,12 +2308,121 @@ async function _aurixHydrateBackendSnapshots(reason) {
       // que esta rama tenía antes de existir el owner: el repintado ocurre siempre.
       try { _aurixNoteCanonicalOutcome({ force: true }); } catch (_) { try { _aurixForceMergedChartRepaint(); } catch (__) {} }
       try { console.log('[BACKEND-SNAPSHOTS] ready: ' + rows.length + ' snapshot(s) (' + (reason || '') + ')'); } catch (_) {}
+      // Memoria por posición: lectura aparte y acotada; su fallo no toca esta hidratación.
+      try { _aurixHydrateAssetMemory(); } catch (_) {}
     } else {                                               // null ⇒ transient failure → stay RETRYABLE (never falsely complete)
       _aurixSetBackendSnapshotsState('failed');
       _aurixBackendHydrateAttempts++;
       _aurixScheduleBackendHydrateRetry('fetch_failed');
     }
   } catch (_) { _aurixBackendHydrateInFlight = false; _aurixSetBackendSnapshotsState('failed'); _aurixBackendHydrateAttempts++; _aurixScheduleBackendHydrateRetry('exception'); }
+}
+// ── MEMORIA POR POSICIÓN · LECTURA ACOTADA DE `asset_values` ─────────────────
+// AUDITORÍA (SPEC MEMORIA ÚTIL §4): el snapshot canónico de servidor YA guarda por
+// fecha todo lo que la memoria necesita — total y `real_estate` (⇒ invertible),
+// `category_values` (clases y liquidez), `asset_values` por `asset_id` estable,
+// completo por construcción (LB-1) desde `schema_version` 2, divisa base USD y
+// `price_staleness`; los flujos clasificados viven en `capital_flows`. No falta
+// ninguna columna ni hace falta un almacén paralelo. Lo que faltaba era LEERLO:
+// el loader del gráfico no pide `asset_values` (y no debe: multiplicaría su carga).
+// Esto pide sólo CUATRO filas —la última, la primera de cada ventana (7D, 30D) y
+// la primera de toda la historia comparable—, en solo lectura, por cuenta (RLS +
+// `user_id`), con el suelo de reset y descartando la respuesta si cambió la cuenta
+// o hubo un reset en vuelo. Un fallo deja la memoria vacía: ninguna familia se
+// publica y nada más se entera. No toca Chart, TWR ni el historial.
+let _aurixAssetMemory = { userId: null, rows: [], state: 'idle', at: 0 };
+async function _aurixHydrateAssetMemory() {
+  try {
+    if (_aurixAssetMemory.state === 'loading' && Date.now() - _aurixAssetMemory.at < 60000) return;
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return;
+    const uid = currentUser.id;
+    const gen = (typeof _aurixResetGeneration !== 'undefined') ? _aurixResetGeneration : 0;
+    const now = Date.now();
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const floor = Math.max(now - _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS * 864e5, epoch);
+    const iso = (t) => new Date(Math.max(floor, t)).toISOString();
+    const q = (since, asc) => supabaseClient.from('portfolio_snapshots')
+      .select('ts,asset_values,real_estate,schema_version')
+      .eq('user_id', uid).gte('schema_version', 2).not('asset_values', 'is', null)
+      .gte('ts', iso(since)).order('ts', { ascending: asc }).limit(1);
+    _aurixAssetMemory = { userId: uid, rows: [], state: 'loading', at: now };
+    const res = await Promise.all([q(floor, false), q(now - 7 * 864e5, true), q(now - 30 * 864e5, true), q(floor, true)]
+      .map(p => Promise.resolve(p).then(r => r, () => ({ error: true }))));
+    if (typeof _aurixIsResetStale === 'function' && _aurixIsResetStale(gen)) { _aurixAssetMemory = { userId: null, rows: [], state: 'idle', at: 0 }; return; }
+    if (!currentUser || currentUser.id !== uid) { _aurixAssetMemory = { userId: null, rows: [], state: 'idle', at: 0 }; return; }
+    if (res.some(r => !r || r.error || !Array.isArray(r.data))) { _aurixAssetMemory = { userId: uid, rows: [], state: 'failed', at: now }; return; }
+    const seen = new Set(), rows = [];
+    res.forEach(r => (r.data || []).forEach(x => {
+      const ts = (typeof x.ts === 'number') ? x.ts : Date.parse(x.ts);
+      if (!Number.isFinite(ts) || seen.has(ts) || !x.asset_values || typeof x.asset_values !== 'object') return;
+      seen.add(ts); rows.push({ ts: ts, values: x.asset_values, re: Number(x.real_estate) || 0 });
+    }));
+    rows.sort((a, b) => a.ts - b.ts);
+    _aurixAssetMemory = { userId: uid, rows: rows, state: 'ready', at: now };
+  } catch (_) { _aurixAssetMemory = { userId: null, rows: [], state: 'failed', at: 0 }; }
+}
+// Peso de la mayor posición INVERTIBLE de una fila: mismo denominador que
+// `_aurixEffectiveDiversification` (posiciones positivas, inmueble fuera). El
+// inmueble se identifica por el tipo ACTUAL del activo, y la fila sólo vale si
+// esos activos explican EXACTAMENTE su columna `real_estate`; si un activo ya
+// vendido pudo ser inmueble, no se puede demostrar y la fila no se usa.
+function _aurixAssetMemoryRowTopWeight(row, reIds) {
+  let reKnown = 0, tot = 0, max = 0, n = 0;
+  for (const id of Object.keys(row.values || {})) {
+    const v = Number(row.values[id]);
+    if (!Number.isFinite(v)) return null;
+    if (reIds.has(String(id))) { reKnown += v; continue; }
+    if (v <= 0) continue;
+    tot += v; n++; if (v > max) max = v;
+  }
+  if (Math.abs(reKnown - (Number(row.re) || 0)) > 1) return null;
+  if (!(tot > 0) || n < 2) return null;
+  let top = null;
+  for (const id of Object.keys(row.values || {})) if (!reIds.has(String(id)) && Number(row.values[id]) === max) { top = String(id); break; }
+  return { pct: (max / tot) * 100, id: top };
+}
+// Cambio NETO del peso de la mayor posición en la ventana más larga cubierta:
+// toda la historia comparable (si supera un mes), 30D o 7D. La fila de inicio
+// tiene que caer dentro de la tolerancia de su ventana; si no, esa ventana no está
+// cubierta y se prueba la siguiente. Fail closed en todo lo demás.
+function _aurixAssetMemoryTopWeight(nowTs) {
+  try {
+    const m = _aurixAssetMemory;
+    if (!m || m.state !== 'ready' || !Array.isArray(m.rows) || m.rows.length < 2) return null;
+    const uid = (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null;
+    if (!uid || m.userId !== uid) return null;
+    const now = Number.isFinite(nowTs) ? nowTs : _aurixNow();
+    // Suelo de reset también aquí: una fila anterior al último reset no existe.
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const rows = m.rows.filter(r => r.ts >= epoch).sort((a, b) => a.ts - b.ts);
+    if (rows.length < 2) return null;
+    const end = rows[rows.length - 1];
+    if (!(now - end.ts <= 36 * 3600e3) || end.ts > now + 6e5) return null;
+    const reIds = new Set(((typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : [])
+      .filter(a => a && a.type === 'real_estate').map(a => String(a.id)));
+    const wEnd = _aurixAssetMemoryRowTopWeight(end, reIds);
+    if (!wEnd || !Number.isFinite(wEnd.pct)) return null;
+    const first = rows[0];
+    const W = [
+      { range: 'all', ok: (r) => r === first && (end.ts - r.ts) > 31 * 864e5 },
+      { range: '30D', ok: (r) => r.ts - (now - 30 * 864e5) <= 3 * 864e5 && r.ts >= now - 33 * 864e5 && (end.ts - r.ts) >= 27 * 864e5 },
+      { range: '7D',  ok: (r) => r.ts - (now - 7 * 864e5) <= 864e5 && r.ts >= now - 8 * 864e5 && (end.ts - r.ts) >= 6 * 864e5 },
+    ];
+    for (const w of W) {
+      const start = rows.slice(0, -1).find(r => w.ok(r));
+      if (!start) continue;
+      const wStart = _aurixAssetMemoryRowTopWeight(start, reIds);
+      if (!wStart || !Number.isFinite(wStart.pct)) continue;
+      // La frase habla de UNA posición: si la mayor ya no es la misma, comparar los
+      // dos máximos mezclaría dos activos. Esa ventana no se afirma.
+      if (!wStart.id || wStart.id !== wEnd.id) continue;
+      const d = wEnd.pct - wStart.pct;
+      return { range: w.range, startAt: start.ts, endAt: end.ts, deltaPp: +d.toFixed(2), assetId: wEnd.id,
+        material: Math.abs(d) >= _AURIX_FACT_MATERIAL.exposureDeltaPp, source: 'portfolio_snapshots.asset_values' };
+    }
+    return null;
+  } catch (_) { return null; }
 }
 try {
   if (typeof window !== 'undefined') {
@@ -5516,6 +5625,18 @@ const T = {
     // que el producto ha decidido no tener.
     intv16_axis_not_measured: 'Aurix todavía no puede medirla',
     intv18_health_measures: 'El porcentaje mide cómo se reparte el peso entre tus posiciones.',
+    // SALUD · lectura y etiquetas: salen del ESTADO de Salud y de la concentración
+    // que ya calcula su modelo. Sin activos, sin cifras, sin tecnicismos.
+    intv19_h_read_few:     'Gran parte del peso depende de pocas posiciones.',
+    intv19_h_read_uneven:  'El reparto todavía depende de algunas posiciones principales.',
+    intv19_h_read_spread:  'El peso está distribuido sin una dependencia dominante.',
+    intv19_h_read_single:  'Todo el peso depende de una sola posición.',
+    intv19_h_read_two:     'Todo el peso se reparte entre dos posiciones.',
+    intv19_h_read_none:    'Aurix necesita posiciones valoradas para evaluar el reparto.',
+    intv19_h_tag_conc:     'Concentración elevada',
+    intv19_h_tag_div:      'Diversificación limitada',
+    intv19_h_tag_improve:  'Reparto mejorable',
+    intv19_h_tag_balanced: 'Reparto equilibrado',
     intv18_health_cause: (name, pct) => `Hoy lo estrecha ${name}, con el ${pct} de tu cartera financiera.`,
     intv18_health_cause_declared: (name, pct) => `Lo estrecha ${name}, con el ${pct}, y nos indicaste que esa concentración es una decisión tuya.`,
     // `intv7_axis_unavailable` QUEDA RETIRADA de la superficie por el §6: el radar
@@ -5639,6 +5760,7 @@ const T = {
     intv15_brief_settled: 'Ahora mismo no hay ningún cambio en tu patrimonio que merezca tu atención.',
     // El vacío que NO es ausencia: lo de hoy ya tiene su sitio, y está abajo.
     intv16_brief_in_changed: 'Lo relevante de hoy ya está recogido en «Qué ha cambiado», con su fecha.',
+    intv19_brief_quiet: 'Hoy no hay movimientos nuevos en tu patrimonio.',
     intv4_changed_title: 'Qué ha cambiado',
     intv4_changed_ref_since: (d) => `Sobre lo registrado desde el ${d}.`,
     intv4_changed_ref_24h:   'Durante las últimas 24 horas.',
@@ -6018,12 +6140,16 @@ const T = {
     // hubiera ninguna dimensión comparada.
     intv17_first_ref:  'Aurix está creando tu primera referencia histórica.',
     // Cambio NETO entre dos fechas, no quietud del intervalo (REMATE §2 sigue en pie).
-    intv17_head_both:  (a, b) => `Entre el ${a} y el ${b}, el reparto de tu cartera y el peso de tu liquidez apenas cambiaron.`,
-    intv17_head_liq:   (a, b) => `Entre el ${a} y el ${b}, el peso de tu liquidez apenas cambió.`,
-    intv17_head_mix:   (a, b) => `Entre el ${a} y el ${b}, el reparto entre clases de activo apenas cambió.`,
+    intv17_head_both:  (a, b, thr) => `Entre el ${a} y el ${b}, el reparto de tu cartera y el peso de tu liquidez apenas cambiaron` + (thr ? ` (menos de ${thr} puntos).` : '.'),
+    intv17_head_liq:   (a, b, thr) => `Entre el ${a} y el ${b}, el peso de tu liquidez apenas cambió` + (thr ? ` (menos de ${thr} puntos).` : '.'),
+    intv17_head_mix:   (a, b, thr) => `Entre el ${a} y el ${b}, el reparto entre clases de activo apenas cambió` + (thr ? ` (menos de ${thr} puntos).` : '.'),
     intv17_ev_liq:     (thr) => `El peso de tu liquidez cambió menos de ${thr} puntos porcentuales.`,
     intv17_ev_mix:     (thr) => `El reparto entre clases de activo cambió menos de ${thr} puntos porcentuales.`,
     intv17_longer:     'Las comparaciones de mayor plazo aparecerán a medida que crezca tu historial.',
+    intv19_evo_ret:       (pct, a) => `Desde el ${a}, tus inversiones han rendido un ${pct}.`,
+    intv19_evo_conc_up:   (pp, a) => `Desde el ${a}, el peso de tu mayor posición ha subido ${pp} puntos.`,
+    intv19_evo_conc_down: (pp, a) => `Desde el ${a}, el peso de tu mayor posición ha bajado ${pp} puntos.`,
+    intv19_evo_conc_flat: (a) => `Desde el ${a}, el peso de tu mayor posición apenas ha cambiado.`,
     intv17_in_today:   'El cambio de tu estructura en este periodo ya aparece en «Lo que importa hoy».',
     intv16_stable_flows: 'No has registrado aportaciones ni retiradas en este periodo, así que lo que ves no viene de dinero nuevo.',
     // El estado que faltaba: hay historial y aun así no hay NADA que comparar.
@@ -8687,6 +8813,16 @@ const T = {
     intcc_dim_growth: 'Growth',        // INT.07 — the founder's five conceptual dimensions
     intv16_axis_not_measured: 'Aurix cannot measure it yet',
     intv18_health_measures: 'The percentage measures how weight is spread across your positions.',
+    intv19_h_read_few:     'Much of the weight depends on a few positions.',
+    intv19_h_read_uneven:  'The split still leans on a few main positions.',
+    intv19_h_read_spread:  'Weight is spread with no dominant dependency.',
+    intv19_h_read_single:  'All the weight depends on a single position.',
+    intv19_h_read_two:     'All the weight is split between two positions.',
+    intv19_h_read_none:    'Aurix needs valued positions to assess the split.',
+    intv19_h_tag_conc:     'High concentration',
+    intv19_h_tag_div:      'Limited diversification',
+    intv19_h_tag_improve:  'Split could improve',
+    intv19_h_tag_balanced: 'Balanced split',
     intv18_health_cause: (name, pct) => `Today it is narrowed by ${name}, at ${pct} of your financial portfolio.`,
     intv18_health_cause_declared: (name, pct) => `It is narrowed by ${name}, at ${pct}, and you told us that concentration is your own decision.`,
     intv7_axis_unavailable: 'no data',
@@ -8772,6 +8908,7 @@ const T = {
     intv4_brief_empty: 'Aurix is reading your wealth. As soon as there is a fact it can prove, it will appear here.',
     intv15_brief_settled: 'Right now there is nothing in your wealth worth your attention.',
     intv16_brief_in_changed: 'What matters today is already recorded under “What changed”, with its date.',
+    intv19_brief_quiet: 'There are no new movements in your wealth today.',
     intv4_changed_title: 'What changed',
     intv4_changed_ref_since: (d) => `Against what is recorded since ${d}.`,
     intv4_changed_ref_24h:   'Over the last 24 hours.',
@@ -8976,12 +9113,16 @@ const T = {
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
     // ── YOUR EVOLUTION · a real comparison or nothing ───────────────────────
     intv17_first_ref:  'Aurix is building your first historical reference.',
-    intv17_head_both:  (a, b) => `Between ${a} and ${b}, your portfolio mix and your cash weight barely changed.`,
-    intv17_head_liq:   (a, b) => `Between ${a} and ${b}, your cash weight barely changed.`,
-    intv17_head_mix:   (a, b) => `Between ${a} and ${b}, your asset-class mix barely changed.`,
+    intv17_head_both:  (a, b, thr) => `Between ${a} and ${b}, your portfolio mix and your cash weight barely changed` + (thr ? ` (less than ${thr} points).` : '.'),
+    intv17_head_liq:   (a, b, thr) => `Between ${a} and ${b}, your cash weight barely changed` + (thr ? ` (less than ${thr} points).` : '.'),
+    intv17_head_mix:   (a, b, thr) => `Between ${a} and ${b}, your asset-class mix barely changed` + (thr ? ` (less than ${thr} points).` : '.'),
     intv17_ev_liq:     (thr) => `Your cash weight moved by less than ${thr} percentage points.`,
     intv17_ev_mix:     (thr) => `Your asset-class mix moved by less than ${thr} percentage points.`,
     intv17_longer:     'Longer-range comparisons will appear as your history grows.',
+    intv19_evo_ret:       (pct, a) => `Since ${a}, your investments have returned ${pct}.`,
+    intv19_evo_conc_up:   (pp, a) => `Since ${a}, the weight of your largest position has risen ${pp} points.`,
+    intv19_evo_conc_down: (pp, a) => `Since ${a}, the weight of your largest position has fallen ${pp} points.`,
+    intv19_evo_conc_flat: (a) => `Since ${a}, the weight of your largest position has barely changed.`,
     intv17_in_today:   'The change in your structure over this period is already shown in “What matters today”.',
     intv16_stable_flows: 'You have recorded no contributions or withdrawals in this period, so what you see does not come from new money.',
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
@@ -65971,7 +66112,7 @@ function _intv4FactText(fact) {
   // remoto sin completitud demostrable, duplicados de identidad vivos o filas
   // heurísticas en la ventana— se publica el RECUENTO sin cifra. Nunca un importe
   // preciso con salvedad: una cifra equivocada con caveat sigue siendo equivocada.
-  if (k === 'recorded_capital_net') {
+  if (k === 'recorded_capital_net' || k === 'recorded_capital_24h') {
     const _cmWin = fact.window || null;
     const _cmWide = !!(_cmWin && Number.isFinite(_cmWin.startAt) && Number.isFinite(_cmWin.endAt)
                          && (_cmWin.endAt - _cmWin.startAt) > 864e5);
@@ -67214,7 +67355,11 @@ function _intv17Evolution(core) {
     const longer = _INTV17_RANGES.slice(0, k).some(L => gapIn(new RegExp('^(exposure|cash)_drift_.+_' + L + '$')));
     return { range: R, a: a, b: b, startAt: e0.startAt, endAt: e0.endAt,
       days: Math.max(1, Math.round((e0.endAt - e0.startAt) / 864e5)),
-      head: _intv4T(liq && mix ? 'intv17_head_both' : (liq ? 'intv17_head_liq' : 'intv17_head_mix'), a, b),
+      // El umbral de la comparación viaja en la MISMA frase: una sola evidencia por
+      // familia, y concreta. Si las dos dimensiones no comparten umbral, no se da.
+      head: _intv4T(liq && mix ? 'intv17_head_both' : (liq ? 'intv17_head_liq' : 'intv17_head_mix'), a, b,
+        (liq && mix) ? (Number(liq.thresholdPp) === Number(mix.thresholdPp) ? _intv4Num(liq.thresholdPp, 0) : '')
+                     : _intv4Num((liq || mix).thresholdPp, 0)),
       rows: rows.filter(x => !!x.txt).slice(0, 2), longer: longer };
   }
   return null;
@@ -67261,104 +67406,128 @@ function _intv16StableDays(rows) {
   const ds = (rows || []).map(r => r.days).filter(d => Number.isFinite(d) && d >= 1);
   return ds.length ? Math.min.apply(null, ds) : null;
 }
-function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, limitLine) {
+// ════════════════════════════════════════════════════════════════════════════
+// TU EVOLUCIÓN · UN TITULAR Y HASTA TRES EVIDENCIAS, UNA POR FAMILIA
+// ════════════════════════════════════════════════════════════════════════════
+// Cada familia usa la ventana MÁS LARGA que de verdad tiene cobertura, y una
+// familia inmadura no bloquea a otra. Nada se calcula aquí: cada fila es un hecho
+// que ya produjo su owner.
+//   · return    — rentabilidad neutralizada de flujos (`investable_return_*`, el
+//                 TWR compartido). `all` sólo cuando cubre más de un mes; si no,
+//                 la ventana nombrada más larga que cubra su nombre.
+//   · position  — cambio neto del peso de la mayor posición, desde la memoria por
+//                 posición (`_aurixAssetMemoryTopWeight`), sólo si existe.
+//   · level     — máximo / retroceso del nivel invertible (`temporalEvents`).
+//   · structure — cambio neto del reparto y de la liquidez (`_intv17Evolution`).
+// ANTIRREPETICIÓN: no entra un hecho que titule Hoy (y una rentabilidad sólo si su
+// ventana dobla la de Hoy, para no contar casi lo mismo), ni un hallazgo vigente
+// —es un evento pendiente y su sitio es «Qué ha cambiado»—, ni nada ya publicado.
+function _intv19Evolution(core, alreadyPublished, hoyKeys) {
+  const items = [];
+  const facts = (core && core.ledger && core.ledger.facts) || [];
+  const active = new Set(((core && core.findings) || []).map(f => f && f.semanticKey).filter(Boolean));
+  const hoy = new Set(hoyKeys || []);
+  const published = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
+  const span = (f) => (f && f.window && Number.isFinite(f.window.startAt) && Number.isFinite(f.window.endAt))
+    ? f.window.endAt - f.window.startAt : null;
+  const fact = (k) => facts.find(f => f && f.semanticKey === k) || null;
+  // 1 · RENTABILIDAD
+  try {
+    const hoySpans = Array.from(hoy).filter(k => /^investable_return_/.test(k)).map(k => span(fact(k))).filter(Number.isFinite);
+    const hoySpan = hoySpans.length ? Math.max.apply(null, hoySpans) : 0;
+    const ok = (f, minSpan) => f && Number.isFinite(Number(f.value)) && Number.isFinite(span(f))
+      && span(f) >= minSpan && !_aurixFactPeriodDegraded(f.window)
+      && !hoy.has(f.semanticKey) && !active.has(f.semanticKey) && !published.has(f.semanticKey)
+      // H3 · la frase se lee «hasta hoy»: la ventana tiene que acabar en el presente.
+      && Number.isFinite(_aurixNow()) && (_aurixNow() - f.window.endAt) <= _AURIX_TODAY_STALE_MS
+      && (!hoySpan || span(f) >= 2 * hoySpan);
+    const all = fact('investable_return_all');
+    const pick = [[all, 31 * 864e5], [fact('investable_return_30d'), 6 * 864e5],
+                  [fact('investable_return_7d'), 6 * 864e5], [all, 7 * 864e5]]
+      .find(([f, m]) => ok(f, m));
+    if (pick) {
+      const f = pick[0], v = Number(f.value);
+      const pct = (v > 0 ? '+' : '') + _intv4Num(v, 2) + '%';
+      const txt = _intv4T('intv19_evo_ret', pct, _intccDate(f.window.startAt));
+      if (txt) items.push({ family: 'return', key: f.semanticKey, period: String(f.window.range || ''), txt: txt });
+    }
+  } catch (_) {}
+  // 2 · PESO DE LA MAYOR POSICIÓN (memoria por posición)
+  try {
+    const c = (typeof _aurixAssetMemoryTopWeight === 'function') ? _aurixAssetMemoryTopWeight() : null;
+    if (c && Number.isFinite(c.deltaPp) && Number.isFinite(c.startAt)) {
+      const a = _intccDate(c.startAt), pp = _intv4Num(Math.abs(c.deltaPp), 1);
+      const txt = c.material ? _intv4T(c.deltaPp > 0 ? 'intv19_evo_conc_up' : 'intv19_evo_conc_down', pp, a)
+                             : _intv4T('intv19_evo_conc_flat', a);
+      if (txt) items.push({ family: 'position', key: 'top_position_weight_' + c.range, period: c.range, txt: txt });
+    }
+  } catch (_) {}
+  // 3 · MÁXIMO, RETROCESO Y RECUPERACIÓN
+  try {
+    const ev = _intv4MemoryEvents(core, Array.from(published).concat(Array.from(hoy)))
+      .filter(x => x.f && x.f.causalRoot === _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && !active.has(x.f.semanticKey))[0];
+    if (ev) {
+      // Un hito lleva su fecha: si la frase no la nombra (p. ej. «está en su
+      // máximo»), se añade la del propio hecho, nunca la del reloj.
+      const v = ev.f.values || {}, w = ev.f.window || {};
+      const at = Number.isFinite(v.at) ? v.at : (Number.isFinite(w.endAt) ? w.endAt : null);
+      const d = at != null ? _intccDate(at) : '';
+      const txt = (d && ev.txt.indexOf(d) === -1) ? ev.txt + ' · ' + d : ev.txt;
+      items.push({ family: 'level', key: ev.f.semanticKey, period: String(w.range || ''), txt: txt });
+    }
+  } catch (_) {}
+  // 4 · ESTRUCTURA (reparto y liquidez, cambio neto entre dos fechas)
+  let stab = null;
+  try { stab = _intv17Evolution(core); } catch (_) { stab = null; }
+  if (stab && stab.head) items.push({ family: 'structure', key: 'stability_' + stab.range, period: stab.range, txt: stab.head });
+  return { items: items.slice(0, 4), stab: stab };
+}
+function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, limitLine, hoyKeys) {
   const declared = _intv4MemoryDeclared(intel, excludeFields);
-  // Máximo DOS evidencias históricas (hechos); lo DECLARADO por el usuario es
-  // memoria, no evidencia, y se conserva entero.
-  let _nFacts = 0;
-  const rows = _intv4MemoryRows(core, alreadyPublished, intel, excludeFields)
-    .filter(r => r.kind === 'declared' || (_nFacts++ < 2));
-  // Anything the Brief already said above is NOT repeated here. Memory is the
-  // record of what is NOT in today's conclusion; showing the same sentence twice
-  // on one screen is the repetition this whole block exists to remove.
   const events = _intv4MemoryEvents(core, alreadyPublished);
-  // PREMIUM EMPTY STATE (SPEC §12). The honest semantics are "the history does not
-  // yet contain enough events" — NOT "Aurix is analysing". So the visual is a faint
-  // timeline with observation nodes that accumulate: a temporal signal, not a
-  // spinner, not a skeleton, and not a claim of intelligence. CSS-only, and the
-  // motion is disabled under prefers-reduced-motion.
-  // ── M.03 · D — EL ESTADO "ACUMULANDO" SE RESERVA A QUIEN NO TIENE HISTORIAL ─
-  // Era el estado permanente de cualquiera que no estuviese en máximos, porque la
-  // familia WEALTH_LEVEL sólo emitía un hecho fechado y ese hecho era el máximo. Ya
-  // no: el ledger emite trayectoria (cambio de nivel, máximo anterior). Y cuando
-  // esa trayectoria existe pero es ESTABLE, se dice — con su fecha de inicio y su
-  // número de observaciones —, que es una afirmación verdadera y distinta de "estoy
-  // acumulando tu historial".
   const obs = (core.dataAvailability && core.dataAvailability.observation) || {};
-  // Si Aurix RECUERDA algo que el usuario le dijo, la Memoria ya tiene contenido
-  // propio: el estado «acumulando historial» sería falso.
-  if (!rows.length) {
-    const nObs = Number(obs.observations) || 0;
-    // ── CHECKPOINT G · HISTORIA CORTA: COBERTURA, NO UN VEREDICTO ────────
-    // Con historial pero sin hechos materiales, lo honesto es decir CUÁNTA
-    // historia hay —que es lo que gobierna qué comparaciones son posibles— y
-    // no afirmar estabilidad, que es una conclusión que nadie ha medido.
-    // Se exige `spanMs`: sin él no hay cobertura que declarar y se cae al
-    // estado vacío, que no afirma nada.
-    // ── TU EVOLUCIÓN: COMPARACIÓN REAL, O LA PRIMERA REFERENCIA ──────────
-    // Ningún número de días sale de la serie de nivel ni de la edad de la cuenta:
-    // las fechas del titular son los dos extremos de la comparación publicada.
-    const evo = _intv17Evolution(core);
-    if (evo && evo.rows.length) {
-      return `
-        <section class="intcc-card intcc-timeline intv4-memory is-stable"
-                 data-obs="${esc(String(nObs))}" data-stable="1" data-stable-rows="${evo.rows.length}"
-                 data-stable-days="${esc(String(evo.days))}" data-stable-range="${esc(evo.range)}"
-                 data-stable-codes="${esc(evo.rows.map(x => x.code).join(','))}">
-          <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-          <p class="intv15-stable-head">${esc(evo.head)}</p>
-          <ul class="intv15-stable-list">
-            ${evo.rows.map(x => `<li class="intv15-stable-row" data-stable-code="${esc(x.code)}">${esc(x.txt)}</li>`).join('')}
-          </ul>
-          ${evo.longer && _intv4T('intv17_longer') ? `<p class="intv4-mem-coverage">${esc(_intv4T('intv17_longer'))}</p>` : ''}
-        </section>`;
-    }
-    // Hubo comparación estructural material, pero la titula «Lo que importa hoy»:
-    // aquí no se repite ni se niega. Se dice dónde está, en una línea.
-    const pub = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
-    if (Array.from(pub).some(k => /^(exposure|cash)_drift_/.test(String(k)))) {
-      return `
-        <section class="intcc-card intcc-timeline intv4-memory is-elsewhere" data-compact="1" data-stable="0">
-          <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-          <p class="intcc-empty-body">${esc(_intv4T('intv17_in_today'))}</p>
-        </section>`;
-    }
-    // Sin dos observaciones comparables de ninguna dimensión: un estado breve.
+  const nObs = Number(obs.observations) || 0;
+  // ── TU EVOLUCIÓN: UN TITULAR Y HASTA TRES EVIDENCIAS DE FAMILIAS DISTINTAS ──
+  // Ningún número de días sale de la serie de nivel ni de la edad de la cuenta:
+  // cada fila lleva sus propios extremos. Sin la frase permanente de «mayor plazo».
+  const evo = _intv19Evolution(core, alreadyPublished, hoyKeys);
+  if (evo.items.length) {
+    const head = evo.items[0], rest = evo.items.slice(1, 4);
+    const st = evo.stab && evo.items.some(x => x.family === 'structure') ? evo.stab : null;
+    // Las filas que SON un hecho del ledger declaran su clave como las demás
+    // superficies (`data-fact`): es la identidad que usa la antirrepetición.
+    const factAttr = (x) => (x.family === 'return' || x.family === 'level') ? ` data-fact="${esc(x.key)}"` : '';
     return `
-      <section class="intcc-card intcc-timeline intv4-memory is-accruing"
-               data-obs="${esc(String(nObs))}" data-compact="1" data-no-comparison="1">
+      <section class="intcc-card intcc-timeline intv4-memory is-stable"
+               data-obs="${esc(String(nObs))}" data-declared="${declared.length}" data-events="${events.length}"
+               data-evo-families="${esc(evo.items.map(x => x.family).join(','))}"
+               data-evo-keys="${esc(evo.items.map(x => x.key).join(','))}"
+               data-stable="${st ? '1' : '0'}"${st ? ` data-stable-rows="${st.rows.length}"
+               data-stable-days="${esc(String(st.days))}" data-stable-range="${esc(st.range)}"
+               data-stable-codes="${esc(st.rows.map(x => x.code).join(','))}"` : ''}>
         <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-        <p class="intcc-empty-body">${esc(_intv4T('intv17_first_ref'))}</p>
+        <p class="intv15-stable-head" data-evo-family="${esc(head.family)}" data-evo-key="${esc(head.key)}"${factAttr(head)} data-period="${esc(head.period || '')}"><span class="intv4-mem-what">${esc(head.txt)}</span></p>
+        ${rest.length ? `<ul class="intv15-stable-list">
+          ${rest.map(x => `<li class="intv15-stable-row" data-evo-family="${esc(x.family)}" data-evo-key="${esc(x.key)}"${factAttr(x)} data-period="${esc(x.period || '')}"><span class="intv4-mem-what">${esc(x.txt)}</span></li>`).join('')}
+        </ul>` : ''}
       </section>`;
   }
+  // Hubo comparación estructural material, pero la titula «Lo que importa hoy»:
+  // aquí no se repite ni se niega. Se dice dónde está, en una línea.
+  const pub = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
+  if (Array.from(pub).some(k => /^(exposure|cash)_drift_/.test(String(k)))) {
+    return `
+      <section class="intcc-card intcc-timeline intv4-memory is-elsewhere" data-compact="1" data-stable="0">
+        <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
+        <p class="intcc-empty-body">${esc(_intv4T('intv17_in_today'))}</p>
+      </section>`;
+  }
+  // Sin dos observaciones comparables de ninguna familia: un estado breve.
   return `
-    <section class="intcc-card intcc-timeline intv4-memory"
-             data-declared="${declared.length}" data-events="${events.length}"
-             data-rows="${rows.length}" data-scroll="${rows.length > 4 ? '1' : '0'}">
+    <section class="intcc-card intcc-timeline intv4-memory is-accruing"
+             data-obs="${esc(String(nObs))}" data-compact="1" data-no-comparison="1">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
-      ${rows.length ? `<div class="intv10-mem-scroll"><ul class="intcc-tl-list">${rows.map(r => `
-        <li class="intcc-tl-item${r.kind === 'declared' ? ' is-declared' : ''}"${
-          r.kind === 'declared' ? ` data-declared-field="${esc(r.field)}"`
-            : ` data-fact="${esc(r.key)}" data-period="${esc(r.period || '')}" data-coverage="${esc(r.coverage || '')}"`}>
-          <span class="intcc-tl-node" aria-hidden="true"></span>
-          <div class="intcc-tl-text">
-            <span class="intv4-mem-what">${esc(r.txt)}</span>
-            ${/* CHECKPOINT G — «cada hecho declara su periodo exacto». Estaba
-                  sólo en `data-period`, o sea visible para el gate y no para
-                  el usuario; la fecha de la fila es CUÁNDO, no SOBRE CUÁNTO.
-                  Se publica junto a la fecha, y sólo si el hecho lo nombra:
-                  un periodo degradado devuelve null y no se inventa. */''}
-            ${(r.at || r.period) ? `<span class="intcc-tl-date">${
-              esc([r.at ? _intccDate(r.at) : '', r.period ? _intv4RangeLabel(r.period) : '']
-                .filter(Boolean).join(' · '))}</span>` : ''}
-          </div></li>`).join('')}</ul></div>`
-      : `<p class="intcc-empty-body">${esc(_intv4T('intv4_memory_empty'))}</p>`}
-      ${/* CHECKPOINT J — la limitación HISTÓRICA (resultado desde la compra,
-            máximo por posición, divisa) se publica aquí, que es donde vive la
-            afirmación que acota. Sólo si hay filas: una limitación colgando de
-            un estado vacío no acota nada. */''}
-      ${/* Sin explicaciones del motor: ni el «por qué» metodológico de cada fila
-            ni la limitación («todavía no el de cada posición») se publican aquí. */''}
+      <p class="intcc-empty-body">${esc(_intv4T('intv17_first_ref'))}</p>
     </section>`;
 }
 
@@ -68072,6 +68241,41 @@ function _intv7PendingReasonKey(reason) {
 // pasa a TONO DESCRIPTIVO: consta su decisión y no se le repite una alarma.
 // FAIL CLOSED: sin snapshot o sin posición dominante certificada no se inventa
 // una causa — se publica sólo lo que mide, y si tampoco eso, no se emite nada.
+// ── SALUD · LECTURA Y ETIQUETAS A LA DERECHA DEL ANILLO ─────────────────────
+// Sin la explicación retirada, el anillo se quedaba centrado en una card vacía.
+// Lo que ocupa la mitad derecha sale de las DOS causas que Salud ya calcula —su
+// estado (`score.band`, la misma llamada que produce la cifra) y la concentración
+// de su modelo (`intel.model.concentration`, el componente `top_position`)— y de
+// nada más: cero umbrales nuevos, cero segunda fórmula, ni activos ni cifras (las
+// publica Factores). La concentración sólo etiqueta los estados que ya dicen que
+// el peso no está repartido, para que la etiqueta no pueda contradecir al estado.
+function _intccHealthReading(score, intel) {
+  const band = score && score.band;
+  const lbl = intel && intel.model && intel.model.concentration
+    && intel.model.concentration.availability === _AURIX_AI_AVAIL.AVAILABLE
+    ? intel.model.concentration.semanticLabel : null;
+  const concentrated = lbl === _AURIX_AI_LABEL.DOMINANT_POSITION || lbl === _AURIX_AI_LABEL.CONCENTRATED;
+  const MAP = {
+    weight_in_few:   { read: 'intv19_h_read_few',    tags: [concentrated ? 'intv19_h_tag_conc' : null, 'intv19_h_tag_div'] },
+    weight_uneven:   { read: 'intv19_h_read_uneven', tags: [concentrated ? 'intv19_h_tag_conc' : null, 'intv19_h_tag_improve'] },
+    weight_spread:   { read: 'intv19_h_read_spread', tags: ['intv19_h_tag_balanced'] },
+    single_position: { read: 'intv19_h_read_single', tags: ['intv19_h_tag_conc'] },
+    two_positions:   { read: 'intv19_h_read_two',    tags: ['intv19_h_tag_div'] },
+  };
+  const m = MAP[band] || { read: 'intv19_h_read_none', tags: [] };
+  const tags = m.tags.filter(Boolean).map(k => _intv4T(k)).filter(Boolean).slice(0, 2);
+  return { code: MAP[band] ? band : 'insufficient', read: _intv4T(m.read) || '', tags: tags };
+}
+function _intccHealthReadHtml(score, intel, esc) {
+  const e = esc || _intccEsc;
+  const r = _intccHealthReading(score, intel);
+  if (!r.read) return '';
+  return `<div class="intcc-m-health-read" data-health-read="${e(r.code)}">
+          <p class="intcc-m-health-read-txt">${e(r.read)}</p>
+          ${r.tags.length ? `<div class="intcc-m-health-tags">${r.tags.map(x =>
+            `<span class="intcc-m-health-tag">${e(x)}</span>`).join('')}</div>` : ''}
+        </div>`;
+}
 function _intccHealthExplainHtml(snap, core, esc) {
   const e = esc || _intccEsc;
   const lines = [];
@@ -68381,7 +68585,66 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
   // elegir el texto honesto cuando no queda nada que publicar.
   const _nowAt = _aurixNow();
   const _stale = _aurixTodayDataStale(core, _nowAt);
-  const stories = (core.topStories || [])
+  // ── HOY · LO ACTUAL DE CADA RAÍZ, NO SU TITULAR HISTÓRICO ──────────────────
+  // El Core elige una historia por raíz y la de rendimiento suele ser la de 30
+  // días, que Hoy no titula por no ser actual. Pero su `supporting` ya trae el
+  // 24h y el 7d: si uno de ellos es un hallazgo VIGENTE (material, certificado),
+  // es él quien representa a la raíz aquí. Sin hallazgo actual no se promueve
+  // nada: un rendimiento de hoy sin materialidad no es relevante.
+  const _activeKeys = new Set(((core && core.findings) || []).map(f => f && f.semanticKey).filter(Boolean));
+  const _promoteCurrent = (st) => {
+    if (!st || isCurrentWindow(st)) return st;
+    const alt = (st.supporting || [])
+      .filter(sp => sp && _activeKeys.has(sp.semanticKey) && isCurrentWindow(sp))
+      .sort((a, b) => CURRENT_WINDOWS.indexOf(String(a.window.range).toUpperCase())
+                    - CURRENT_WINDOWS.indexOf(String(b.window.range).toUpperCase()))[0];
+    if (!alt) return st;
+    const fd = ((core && core.findings) || []).find(f => f && f.semanticKey === alt.semanticKey) || {};
+    return Object.assign({}, st, alt, {
+      causalRoot: st.causalRoot, rootMateriality: st.rootMateriality,
+      eventId: fd.eventId || alt.eventId, conceptId: fd.conceptId || alt.conceptId,
+      // Sin hermanos: las otras ventanas de la misma raíz son historia y las publica
+      // Tu evolución; dejarlas aquí repetiría la misma cifra en dos superficies.
+      promotedFrom: st.semanticKey, supporting: [] });
+  };
+  // ── FLUJOS · EL IMPORTE DE LA VENTANA RECIENTE, NUNCA EL ACUMULADO ─────────
+  // `recorded_capital_net` suma TODO el registro: un depósito de hoy le da un
+  // `lastActionAt` reciente y el acumulado desde agosto pasaba la puerta de
+  // actualidad. En Hoy se sustituye por el MISMO owner (`_aurixCashLedgerAuthority`:
+  // sólo `deposit`/`withdrawal`, sin heurísticos, sin duplicados, ledger completo)
+  // sobre las últimas 24 h, con la misma materialidad. Transferencias,
+  // reclasificaciones y compras no son de esos `kind`, así que no entran nunca.
+  const _recentFlow = (st) => {
+    if (!st || st.semanticKey !== 'recorded_capital_net') return st;
+    const v = st.values || {};
+    const share = Number(v.shareOfValue), net = Number(v.net);
+    const endValue = (share > 0 && Number.isFinite(net)) ? Math.abs(net) / share : null;
+    if (!Number.isFinite(_nowAt) || !(endValue > 0)) return null;
+    const t0 = _nowAt - 864e5;
+    let a = null;
+    try { a = _aurixCashLedgerAuthority(t0, _nowAt); } catch (_) { a = null; }
+    if (!a || a.status !== _AURIX_FACT_STATUS.AVAILABLE || !a.events) return null;
+    const rnet = Number(a.netUSD);
+    if (!Number.isFinite(rnet) || Math.abs(rnet) < _AURIX_FACT_MATERIAL.flowShareOfValue * endValue) return null;
+    return Object.assign({}, st, {
+      semanticKey: 'recorded_capital_24h', value: +rnet.toFixed(2),
+      values: Object.assign({}, v, { net: +rnet.toFixed(2), events: a.events, inUSD: a.inUSD, outUSD: a.outUSD,
+        lastActionAt: a.lastFlowAt, amountPublishable: a.amountPublishable,
+        externalCertified: a.externalCertified, intentKnown: a.intentKnown }),
+      window: { range: '24H', startAt: t0, endAt: _nowAt },
+      eventId: 'flow24h:' + String(a.lastFlowAt || ''), supporting: [] });
+  };
+  // Si el flujo no encabeza su raíz (va de `supporting` o no tiene historia), el
+  // hecho del ledger es el candidato: la ventana reciente se mide igual.
+  const _top = (core.topStories || []).slice();
+  if (!_top.some(st => st && st.semanticKey === 'recorded_capital_net')) {
+    const _flowFact = ((core.ledger && core.ledger.facts) || []).find(f => f && f.semanticKey === 'recorded_capital_net');
+    if (_flowFact && !_top.some(st => st && st.causalRoot === _flowFact.causalRoot)) _top.push(_flowFact);
+  }
+  const stories = _top
+    .map(_promoteCurrent)
+    .map(_recentFlow)
+    .filter(Boolean)
     .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
     // EL DISCRIMINADOR ES LA RAÍZ, NO LA FAMILIA, y el gate lo demostró en el
     // acto: `position_below_cost_*` también es familia PERFORMANCE, y filtrar
@@ -68458,7 +68721,8 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
       // Sin señal del motor se conserva el orden certificado del Core.
       return (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1);
     })
-    .slice(0, _INTV4_BRIEF_MAX);
+    // «Lo que importa hoy»: de uno a cuatro hechos actuales, y menos si no los hay.
+    .slice(0, 4);
   return { stories, rankedBy: rank.size ? 'intelligence' : 'core', stale: _stale };
 }
 function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) {
@@ -68585,8 +68849,11 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
   let _activeFindings = 0;
   try { _activeFindings = ((typeof _intv4FindingRows === 'function')
     ? _intv4FindingRows(core, { hoy: _intv17HoyEvents(sel.stories) }) : []).length; } catch (_) { _activeFindings = 0; }
+  // Sin subtítulo defensivo: si hay hallazgos vigentes de otras ventanas, Hoy
+  // dice lo único cierto sobre HOY —que no hay movimientos nuevos— sin remitir a
+  // otra card ni negar lo que el hero cuenta.
   const emptyKey = sel.stale ? 'intv4_brief_stale'
-    : ((_cededToChanged > 0 || _activeFindings > 0) ? 'intv16_brief_in_changed'
+    : ((_cededToChanged > 0 || _activeFindings > 0) ? 'intv19_brief_quiet'
     : (hasRead ? 'intv15_brief_settled' : 'intv4_brief_empty'));
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
@@ -70238,8 +70505,9 @@ function _renderIntelligenceCommandCenter() {
               NUNCA: qué mide ese porcentaje y qué lo estrecha hoy. Las dos
               frases salen de dato certificado (`_aurixHealthSnapshot`), no de
               un umbral. */''}
-        ${/* SALUD = título, anillo y estado. La explicación y la lista de
-              conclusiones se retiran de la card (las cifras siguen en Factores). */''}
+        ${/* SALUD = título, anillo y estado a la izquierda; a la derecha UNA
+              lectura y hasta dos etiquetas derivadas de sus causas reales. */''}
+        ${_intccHealthReadHtml(score, intel, esc)}
         </div>
     </section>`;
 
@@ -70306,7 +70574,8 @@ function _renderIntelligenceCommandCenter() {
   const discFields = [];
   if (/declared_goal_distant_from_observed_structure/.test(discHtml)) discFields.push('primary_goal');
   if (/liquidity_fell_while_need_declared/.test(discHtml)) discFields.push('liquidity_need');
-  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys, intel, discFields, _gaps.evolution);
+  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys, intel, discFields, _gaps.evolution,
+    mattersSel.map(st => st.semanticKey));
   // M.04 · 0 — la Memoria se pinta antes, así que RECLAMA primero. Sus claves y
   // raíces viajan a Qué ha cambiado para que la misma verdad no ocupe las dos.
   const memoryClaims = _intv4MemoryClaims(core, publishedKeys);
