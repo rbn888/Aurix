@@ -182,10 +182,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // guardado NO se toca: lo único que se decide es si se pinta el subtítulo.
     await seed(page, DOCS.concat([DOC_SAME_NAME])); await paint(page);
     const gd = await read(page);
-    ok(`${tag} un nombre igual a su capacidad no se pinta dos veces`,
-      gd.n === 6 && gd.names[5] === 'Presupuesto mensual' && gd.types[5] === '' &&
-      gd.types[0] === 'Presupuesto mensual' && gd.names[0] !== gd.types[0],
-      JSON.stringify({ n: gd.n, n5: [gd.names[5], gd.types[5]], n0: [gd.names[0], gd.types[0]] }));
+    // RE-DECIDIDO (orden y Tus planes §2): la tarjeta publica SÓLO el nombre del usuario. El
+    // subtítulo de tipo se retira en TODAS —no sólo cuando repetía—, y el nombre guardado no se toca.
+    ok(`${tag} sólo el nombre del documento: ninguna tarjeta pinta subtítulo de tipo`,
+      gd.n === 6 && gd.names[5] === 'Presupuesto mensual' && gd.names[0] === 'Presupuesto de casa'
+      && gd.types.every(x => x === ''),
+      JSON.stringify({ n: gd.n, names: gd.names, types: gd.types }));
     await seed(page, DOCS); await paint(page);
     g = await read(page);
     // Se captura la SECCIÓN, no el pliegue del Dashboard: «Tus planes» vive

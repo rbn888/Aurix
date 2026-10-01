@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '759'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '760'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -1644,11 +1644,13 @@ function _touchUiState() {
 }
 // Snapshot the current UI state for the remote flush payload.
 function _collectUiState() {
-  let workspace = null, cardOrder = [], catOrder = [];
+  let workspace = null, cardOrder = [], catOrder = [], planOrder = [];
   try { const raw = localStorage.getItem('aurix.workspace.v1'); workspace = raw ? JSON.parse(raw) : null; } catch (_) {}
   try { cardOrder = JSON.parse(localStorage.getItem('portfolio_card_order') || 'null') || []; } catch (_) {}
   try { catOrder  = JSON.parse(localStorage.getItem('portfolio_cat_order')  || 'null') || []; } catch (_) {}
-  return { workspace, cardOrder, catOrder };
+  // Orden de «Tus planes» (identidades «kind:id»). Mismo raíl LWW que el de categorías.
+  try { planOrder = JSON.parse(localStorage.getItem('aurix_plan_order')  || 'null') || []; } catch (_) {}
+  return { workspace, cardOrder, catOrder, planOrder };
 }
 // Apply remote UI state into localStorage + the in-memory order vars. The boot
 // render reads _cardOrder/_catOrder and the workspace mounts from localStorage,
@@ -1666,12 +1668,25 @@ function _applyRemoteUiState(ui) {
       if (typeof _cardOrder !== 'undefined') _cardOrder = ui.cardOrder;
     }
   } catch (_) {}
+  let reorder = false;
   try {
     if (Array.isArray(ui.catOrder)) {
+      reorder = reorder || localStorage.getItem('portfolio_cat_order') !== JSON.stringify(ui.catOrder);
       localStorage.setItem('portfolio_cat_order', JSON.stringify(ui.catOrder));
       if (typeof _catOrder !== 'undefined') _catOrder = ui.catOrder;
     }
   } catch (_) {}
+  // Una fila remota ANTERIOR a este campo no trae `planOrder`: ausencia NO es «orden vacío»,
+  // así que no se borra el local.
+  try {
+    if (Array.isArray(ui.planOrder)) {
+      reorder = reorder || localStorage.getItem('aurix_plan_order') !== JSON.stringify(ui.planOrder);
+      localStorage.setItem('aurix_plan_order', JSON.stringify(ui.planOrder));
+    }
+  } catch (_) {}
+  // Si el orden llegó cuando el Dashboard ya estaba pintado, se repinta UNA vez con él. En el
+  // arranque normal la fila remota llega antes que las tarjetas y esto no cambia nada visible.
+  if (reorder) { try { if (typeof updateCategoryCards === 'function') updateCategoryCards(); } catch (_) {} }
 }
 
 // ── Subscription / plan sync (AURIX-MONETIZATION-1) ───────────────
@@ -3745,7 +3760,8 @@ function _mergeRemoteState(remoteRow) {
       try {
         return localStorage.getItem('aurix.workspace.v1') != null ||
                localStorage.getItem('portfolio_card_order') != null ||
-               localStorage.getItem('portfolio_cat_order')  != null;
+               localStorage.getItem('portfolio_cat_order')  != null ||
+               localStorage.getItem('aurix_plan_order')     != null;
       } catch (_) { return false; }
     })();
     if (localUiTs === 0 && hasLocalUi) {
@@ -3809,22 +3825,27 @@ function scheduleWatchlistFlush() {
   _watchlistFlushTimer = setTimeout(() => { _flushStatePersistence('watchlist'); }, 1500);
 }
 
+// Devuelve el resultado ('ok' | 'partial' | 'fail' | 'skipped' | 'blocked' | 'deferred') para
+// quien necesite saberlo —el orden del Dashboard informa de un fallo—; el resto lo ignora.
 async function _flushStatePersistence(reason) {
-  if (!supabaseClient || !currentUser) return;
-  if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
+  if (!supabaseClient || !currentUser) return 'skipped';
+  if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return 'skipped';
   // SPEC MULTI-DEVICE STATE HARDENING — reconciliation WRITE BARRIER. Never publish persistent state
   // (history / watchlist / prefs / assets) until the remote reconcile has settled safely. Blocks every
   // trigger equally: debounced, lifecycle (pagehide/visibilitychange) and watchlist. A blocked flush loses
   // nothing — localStorage already holds the state and it syncs on the next flush once reconcile succeeds.
-  if (!_aurixPersistenceReady()) { _persistDebug('[persist-save-backend] flush BLOCKED (reconcile not ready)', { reason, outcome: _aurixRemoteLoadOutcome }); return; }
+  if (!_aurixPersistenceReady()) { _persistDebug('[persist-save-backend] flush BLOCKED (reconcile not ready)', { reason, outcome: _aurixRemoteLoadOutcome }); return 'blocked'; }
   // Throttle to ≤1 write / 60s, except forced lifecycle flushes (pagehide /
   // visibilitychange) which must always persist before the app backgrounds.
   const now = Date.now();
-  if (reason !== 'lifecycle' && reason !== 'watchlist' && _lastStateFlushMs && now - _lastStateFlushMs < 60_000) {
+  // 'order' entra como 'watchlist': un gesto deliberado y de bajo volumen que debe llegar a la
+  // cuenta enseguida, no al cabo de un minuto.
+  if (reason !== 'lifecycle' && reason !== 'watchlist' && reason !== 'order' && _lastStateFlushMs && now - _lastStateFlushMs < 60_000) {
     scheduleStateFlush(); // ensure the latest state still lands after the window
-    return;
+    return 'deferred';
   }
   _lastStateFlushMs = now;
+  let _outcome = 'ok';
   try {
     const localTs      = _aurixWatchlistTs();
     const localPrefsTs = _aurixPrefsTs();
@@ -3918,6 +3939,7 @@ async function _flushStatePersistence(reason) {
               asset_classification_lineage, asset_classification_lineage_updated_at, ...core } = payload;
       const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
       if (retry.error) throw retry.error;
+      _outcome = 'partial';
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
     }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
@@ -3928,12 +3950,14 @@ async function _flushStatePersistence(reason) {
     // The just-flushed points become canonical when this device next reconciles them back FROM remote; until
     // then they are pending-local-only and the strict gate keeps the device in "Calculando…" (never divergent).
   } catch (e) {
+    _outcome = 'fail';
     if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
   }
   // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — write performance_state in its OWN decoupled update, AFTER (and
   // independent of) the main flush. So a stripped/failed main upsert (unmigrated ui_state/subscription) can
   // never drop it, and it persists even when the holdings merge decides apply:"local". Fire-and-forget.
   try { _aurixFlushPerformanceState(reason); } catch (_) {}
+  return _outcome;
 }
 
 // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — dedicated, decoupled writer for the canonical performance_state.
@@ -4189,6 +4213,7 @@ const PORTFOLIO_KEYS = [
   'category_history',          // CATEGORY_HISTORY snapshots
   'portfolio_card_order',      // dashboard card order
   'portfolio_cat_order',       // category drill-down order
+  'aurix_plan_order',          // «Tus planes» order (kind:id refs)
   'aurix_watchlist',           // watchlist symbols
   'aurix_watchlist_seeded',    // one-shot seed guard
   'aurix_watchlist_updated_at',// watchlist last-write-wins timestamp (remote sync)
@@ -6583,6 +6608,17 @@ const T = {
     wspl_m_interest:      'Intereses',
     wspl_m_rows:          'Registros',
     wspl_sim:             'Proyección',
+    wspl_m_overdue:       'Vencido',
+    wspl_spend:           'Reparto de gastos',
+    wspl_nodata:          'Sin datos todavía',
+    dash_grip:            'Reordenar',
+    dash_move_before:     'Mover antes',
+    dash_move_after:      'Mover después',
+    dash_moved_pos:       '{name}: posición {n} de {total}',
+    dash_reorder_hint:    'Alt y flechas para cambiar el orden',
+    dash_reorder_hint_plans: 'Flechas para cambiar el orden; Intro para ver las opciones',
+    dash_order_fail:      'No se ha podido guardar el orden en tu cuenta.',
+    dash_order_retry:     'Reintentar',
     ws_sync_idle:         'Sin cambios sin guardar',
     ws_sync_saving:       'Guardando…',
     ws_sync_saved_synced: 'Guardado y sincronizado',
@@ -9544,6 +9580,17 @@ const T = {
     wspl_m_interest:      'Interest',
     wspl_m_rows:          'Rows',
     wspl_sim:             'Projection',
+    wspl_m_overdue:       'Overdue',
+    wspl_spend:           'Spending breakdown',
+    wspl_nodata:          'No data yet',
+    dash_grip:            'Reorder',
+    dash_move_before:     'Move earlier',
+    dash_move_after:      'Move later',
+    dash_moved_pos:       '{name}: position {n} of {total}',
+    dash_reorder_hint:    'Alt and arrow keys to change the order',
+    dash_reorder_hint_plans: 'Arrow keys to change the order; Enter for options',
+    dash_order_fail:      'Your order could not be saved to your account.',
+    dash_order_retry:     'Retry',
     ws_sync_idle:         'No unsaved changes',
     ws_sync_saving:       'Saving…',
     ws_sync_saved_synced: 'Saved and synced',
@@ -12124,6 +12171,64 @@ const CAT_ORDER_KEY      = 'portfolio_cat_order';
 const CAT_DEFAULT_ORDER  = ['stock', 'etf', 'crypto', 'metal', 'real_estate', 'cash'];
 let _cardOrder = JSON.parse(localStorage.getItem(CARD_ORDER_KEY) || 'null') || [];
 let _catOrder  = JSON.parse(localStorage.getItem(CAT_ORDER_KEY)  || 'null') || [];
+// ── ORDEN DEL DASHBOARD · DOS GRUPOS, UN MODELO ─────────────────────────────
+// El orden de las categorías NO SOBREVIVÍA A UNA RECARGA. El arrastre guardaba
+// sólo las tarjetas VISIBLES (las categorías sin posiciones se filtran del
+// render) y el render sólo aceptaba un orden con las seis: cualquier cuenta sin
+// inmuebles o sin liquidez guardaba cinco, y al recargar volvía el orden por
+// defecto. Ahora el orden guardado es SIEMPRE el completo: lo visible se reparte
+// en los huecos que ya ocupaba y lo oculto conserva su sitio.
+// «Tus planes» usa el mismo modelo con identidades «kind:id» del documento —nunca
+// nombres ni posiciones— en su propia clave: los dos grupos no se mezclan.
+const PLAN_ORDER_KEY = 'aurix_plan_order';
+// `var` a propósito: los repintados lo consultan y alguno puede correr antes de que se evalúe el
+// controlador de arrastre, que vive mucho más abajo.
+var _aurixReorderBusy = null;   // id del contenedor que está arrastrando (los repintados esperan)
+var _AURIX_REORDER = Object.create(null);   // contenedor → { item, key, label, commit, enabled }
+// Orden completo: lo guardado que sigue existiendo, sin duplicados, y lo nuevo al final.
+function _aurixOrderNormalize(saved, known) {
+  const k = Array.isArray(known) ? known : [];
+  const ks = new Set(k), seen = new Set(), out = [];
+  (Array.isArray(saved) ? saved : []).forEach(x => { if (ks.has(x) && !seen.has(x)) { seen.add(x); out.push(x); } });
+  k.forEach(x => { if (!seen.has(x)) { seen.add(x); out.push(x); } });
+  return out;
+}
+// Lo visible, reordenado, vuelve a los huecos que ocupaba en el orden completo.
+function _aurixOrderMerge(full, visibleNew) {
+  const vis = new Set(visibleNew), q = visibleNew.slice();
+  const out = full.map(x => (vis.has(x) ? q.shift() : x));
+  return out.concat(q);
+}
+function _aurixPlanOrderRead() {
+  try { const v = JSON.parse(localStorage.getItem(PLAN_ORDER_KEY) || 'null'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }
+  catch (_) { return []; }
+}
+// GUARDAR NO ES APARENTAR GUARDADO. Si el almacén local rechaza la escritura o la
+// cuenta no la acepta, se dice y se ofrece reintentar; sin sesión no hay nada
+// remoto que prometer y no se afirma nada.
+let _aurixOrderFlushTimer = null;
+function _aurixOrderSaveFail() {
+  try {
+    _aurixShowToast(t('dash_order_fail'), { variant: 'error', sticky: true, tag: 'dash-order',
+      action: { label: t('dash_order_retry'), onClick: () => _aurixOrderFlushSoon(0) } });
+  } catch (_) {}
+}
+function _aurixOrderFlushSoon(ms) {
+  try { clearTimeout(_aurixOrderFlushTimer); } catch (_) {}
+  _aurixOrderFlushTimer = setTimeout(async () => {
+    let r = 'skipped';
+    if (!_bootLoadComplete) return;   // el merge de arranque programa su propio flush
+    try { r = await _flushStatePersistence('order'); } catch (_) { r = 'fail'; }
+    if (r === 'fail' || r === 'partial') _aurixOrderSaveFail();
+  }, ms == null ? 1200 : ms);
+}
+function _aurixOrderPersist(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list)); }
+  catch (_) { _aurixOrderSaveFail(); return false; }
+  try { localStorage.setItem(UI_STATE_TS_KEY, String(Date.now())); } catch (_) {}
+  _aurixOrderFlushSoon();
+  return true;
+}
 let _dd = null;          // active drag state (asset cards)
 let justDragged = false; // blocks post-drag click from opening a card
 
@@ -21718,7 +21823,7 @@ function _wshWireOnce() {
       // `'home'` es el id REAL de la pestaña del Resumen (el alias se normaliza
       // igualmente en `switchTab`, pero el llamador no tiene por qué depender
       // de esa traducción).
-      if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; try { switchTab('home'); } catch (_) { _wshRepaintHome(); } return; }
+      if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; _wsDashRestorePending = _wsDashReturnY != null; try { switchTab('home'); } catch (_) { _wshRepaintHome(); } return; }
       _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome(); return;
     }
     if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; _wshRepaintHome(); return; }
@@ -23548,7 +23653,27 @@ function _wsPlansAll() {
   const out = [];
   _wsPlansDocs().forEach(p => out.push({ kind: 'workspace', id: p.id, doc: p, spec: _WSPL_TYPES[p.type] }));
   _wsPlansGoals().forEach(g => out.push({ kind: 'goal', id: g.id, doc: g, spec: _WSPL_GOAL }));
-  return out.sort((a, b) => (b.doc.updatedAt || b.doc.createdAt || 0) - (a.doc.updatedAt || a.doc.createdAt || 0));
+  out.sort((a, b) => (b.doc.updatedAt || b.doc.createdAt || 0) - (a.doc.updatedAt || a.doc.createdAt || 0));
+  // EL ORDEN DEL USUARIO MANDA sobre el de última edición. Sin orden guardado no cambia nada; con
+  // él, lo guardado va en su sitio y un documento NUEVO entra al final. Un documento borrado no
+  // está en `out`, así que su identidad guardada simplemente no pinta nada.
+  const saved = _aurixPlanOrderRead();
+  if (!saved.length) return out;
+  const idx = new Map(saved.map((k, i) => [k, i]));
+  const rank = it => { const v = idx.get(it.kind + ':' + it.id); return v == null ? Infinity : v; };
+  return out.map((it, i) => [it, i]).sort((a, b) => (rank(a[0]) - rank(b[0])) || (a[1] - b[1])).map(x => x[0]);
+}
+// Al guardar se conserva el hueco de lo que hoy no se ve (quitado del Dashboard, capacidad sin
+// derecho ahora mismo) y se DESCARTA lo que ya no existe: borrado o tombstone.
+function _wsPlansOrderCommit(visible) {
+  const alive = new Set();
+  try { _ws4Projects().forEach(p => { if (p && p.id && _WSPL_TYPES[p.type]) alive.add('workspace:' + p.id); }); } catch (_) {}
+  try { _wsgGoals().forEach(g => { if (g && g.id) alive.add('goal:' + g.id); }); } catch (_) {}
+  visible.forEach(k => alive.add(k));
+  const seen = new Set();
+  const savedAlive = _aurixPlanOrderRead().filter(k => alive.has(k) && !seen.has(k) && seen.add(k));
+  const full = savedAlive.concat(visible.filter(k => savedAlive.indexOf(k) === -1));
+  _aurixOrderPersist(PLAN_ORDER_KEY, _aurixOrderMerge(full, visible));
 }
 function _wsPlansDocs() {
   let list = [];
@@ -23600,7 +23725,10 @@ function _wsPlanMetrics(p) {
       if (!r.count) return [];
       // Cobrado primero: es la magnitud que rellena la barra de progreso de debajo, así que
       // la cifra grande y el tramo coloreado hablan de lo mismo; lo pendiente va al lado.
-      return [m('wspl_m_collected', formatBase(r.totalCobrado)), m('wspl_m_pending', formatBase(r.totalPendiente))];
+      const out = [m('wspl_m_collected', formatBase(r.totalCobrado)), m('wspl_m_pending', formatBase(r.totalPendiente))];
+      // Vencido SÓLO si existe: un «Vencido 0 €» no aporta nada y ocupa el sitio de lo que sí.
+      if (Number(r.totalVencido) > 0) { const v = m('wspl_m_overdue', formatBase(r.totalVencido)); v.tone = 'warn'; out.push(v); }
+      return out;
     }
     if (p.type === 'real_estate_portfolio') {
       const r = calculateRealEstatePortfolio(inp.properties);
@@ -23719,6 +23847,33 @@ function _wsPlanShare(p) {
     }
   } catch (_) { return null; }
   return null;
+}
+// PRESUPUESTO · EL REPARTO DE LOS GASTOS, del propio documento. No es la proporción retirada
+// («55 % ingresos»): son las partidas de gasto con el MISMO color que la herramienta les da, sin
+// un porcentaje que interpretar. Sin gastos no se dibuja nada.
+function _wsPlanSpendHtml(p) {
+  if (!p || p.type !== 'monthly_budget') return '';
+  let r = null;
+  try { r = calculateMonthlyBudget((p && p.inputs) || {}); } catch (_) { return ''; }
+  const items = (r && Array.isArray(r.items) ? r.items : []).filter(x => x && Number(x.value) > 0);
+  const tot = items.reduce((a, x) => a + Number(x.value), 0);
+  if (!(tot > 0)) return '';
+  const esc = _intccEsc;
+  const top = items.slice().sort((a, b) => b.value - a.value);
+  const lbl = t('wspl_spend') + ': ' + top.map(x => x.name + ' ' + formatBase(x.value)).join(', ');
+  // SVG con `fill` por partida, como el anillo de la herramienta: el color de un DATO viene del
+  // motor y va en el elemento, nunca como `style` (eso es lo que la API de acento prohíbe).
+  const gap = 0.6, n = top.length, w = 100 - gap * (n - 1);
+  let x0 = 0;
+  const rects = top.map(x => {
+    const wd = Math.max(1.2, x.value / tot * w);
+    const r = '<rect x="' + x0.toFixed(2) + '" y="0" width="' + wd.toFixed(2) + '" height="6" fill="' + esc(x.color || '#5cc8ff') + '"/>';
+    x0 += wd + gap; return r;
+  }).join('');
+  return '<span class="wspl-viz">'
+    + '<svg class="wspl-spend" viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="' + esc(lbl) + '">' + rects + '</svg>'
+    + '<span class="wspl-share-t" aria-hidden="true">' + esc(t('wspl_spend')) + '</span>'
+    + '</span>';
 }
 // La barra es SVG-menos: dos cajas con su ancho en porcentaje. Sin librería, sin canvas y sin
 // animación permanente (§39). El `aria-label` publica la proporción en palabras porque una
@@ -23987,38 +24142,46 @@ function _renderDashboardPlans() {
     // salen las cifras. Es el principio del SPEC: common system + unique visual identity.
     const p = it.doc, spec = it.spec, goal = it.kind === 'goal';
     const mets = goal ? _wsGoalMetrics(p) : _wsPlanMetrics(p);
-    const share = _wsPlanShareHtml(goal ? _wsGoalShare(p) : _wsPlanShare(p));
+    const share = _wsPlanShareHtml(goal ? _wsGoalShare(p) : _wsPlanShare(p)) || (goal ? '' : _wsPlanSpendHtml(p));
     const nm = goal ? (p.name || t('wsg_title')) : _wsLabel('workspace', p);
-    const sub = _wsSubIfDistinct(nm, goal ? t('wsg_type_' + (p.type || 'wealth')) : t(spec.nameKey));
+    // RE-DECIDIDO (orden y Tus planes §2): la tarjeta publica SÓLO el nombre que eligió el
+    // usuario. El tipo («Presupuesto mensual», «Control de cobros»…) sigue dentro de la
+    // herramienta; aquí lo dicen el icono y el acento. El nombre guardado no se toca.
     // ENTRADA SÓLO SI ALGO CAMBIÓ. Esta sección se repinta con cada refresco del
     // Dashboard; animar cada repintado sería un bucle. Se anima la tarjeta nueva o la
     // que cambió de contenido, una vez.
     const sig = nm + '|' + mets.map(x => x.v).join('|') + '|' + share;
     const enter = _wsplSigs[it.kind + ':' + p.id] !== sig; _wsplSigs[it.kind + ':' + p.id] = sig;
+    const ref = it.kind + ':' + p.id;
+    // CINCO FRANJAS SIEMPRE, aunque alguna vaya vacía: en escritorio son las filas de una
+    // subrejilla compartida, así que cabecera, cifra, visual, métricas y CTA quedan a la misma
+    // altura en toda la fila sin estirar ninguna tarjeta con huecos.
     return `
-      <article class="wspl-card${enter ? ' is-enter' : ''}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-ws-accent="${esc(spec.accent || 'blue')}">
+      <article class="wspl-card${enter ? ' is-enter' : ''}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-wspl-ref="${esc(ref)}" data-ws-accent="${esc(spec.accent || 'blue')}">
         <div class="wspl-card-id">
+          <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + nm)}" aria-describedby="dashReorderHintPlans">
+            <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
+          </button>
           <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
-          <span class="wspl-card-txt">
-            <span class="wspl-name">${esc(nm)}</span>
-            ${sub ? `<span class="wspl-type">${esc(sub)}</span>` : ''}
-          </span>
+          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(nm)}">${esc(nm)}</span></span>
           <button type="button" class="wspl-menu" data-wspl-menu="${esc(p.id)}" data-wspl-mkind="${esc(it.kind)}"
             aria-haspopup="true" aria-expanded="false"
             title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + nm)}">
             <span aria-hidden="true">&#8943;</span>
           </button>
         </div>
-        ${mets.length ? `<span class="wspl-hero${mets[0].tone ? ' is-' + mets[0].tone : ''}"><i>${esc(mets[0].k)}</i><b>${esc(mets[0].v)}</b></span>` : ''}
-        ${share}
-        ${mets.length > 1 ? `<div class="wspl-metrics">${mets.slice(1).map(x =>
-          `<span class="wspl-m"><i>${esc(x.k)}</i><b>${esc(x.v)}</b></span>`).join('')}</div>` : ''}
-        ${spec.sim ? `<span class="wspl-sim">${esc(t('wspl_sim'))}</span>` : ''}
+        <div class="wspl-slot wspl-slot-hero">${mets.length
+          ? `<span class="wspl-hero${mets[0].tone ? ' is-' + mets[0].tone : ''}"><i>${esc(mets[0].k)}</i><b>${esc(mets[0].v)}</b></span>`
+          : `<span class="wspl-empty">${esc(t('wspl_nodata'))}</span>`}</div>
+        <div class="wspl-slot wspl-slot-viz">${share}</div>
+        <div class="wspl-slot wspl-slot-m">${mets.length > 1 ? `<div class="wspl-metrics">${mets.slice(1).map(x =>
+          `<span class="wspl-m${x.tone ? ' is-' + x.tone : ''}"><i>${esc(x.k)}</i><b>${esc(x.v)}</b></span>`).join('')}</div>` : ''}${spec.sim ? `<span class="wspl-sim">${esc(t('wspl_sim'))}</span>` : ''}</div>
         <button type="button" class="wspl-go" data-wspl-open="${esc(p.id)}" data-wspl-okind="${esc(it.kind)}" aria-label="${esc(t('wspl_continue') + ' — ' + nm)}">${esc(t('wspl_continue'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
       </article>`;
   }).join('');
   return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>
-    <div class="wspl-grid" data-wspl-n="${docs.length}">${cards}</div>`;
+    <div class="wspl-grid" id="wsPlansGrid" data-wspl-n="${docs.length}">${cards}</div>
+    <span id="dashReorderHintPlans" class="intcc-sr-only">${esc(t('dash_reorder_hint_plans'))}</span>`;
 }
 // EL GUARD DE LA SECCIÓN, Y FALLA CERRADO. Sin Premium CONFIRMADO no se pinta
 // nada: ni la sección, ni un hueco reservado, ni un candado, ni un teaser. Y
@@ -24034,9 +24197,21 @@ function updateDashboardPlans() {
   let drill = false;
   try { drill = (typeof activeCategory !== 'undefined') && activeCategory !== null; } catch (_) {}
   if (!prem || drill) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
-  sec.innerHTML = _renderDashboardPlans();
+  // Mientras el usuario arrastra una tarjeta, repintar se la arrancaría de la mano; el gesto
+  // termina en un repintado propio. Y un repintado idéntico no toca el DOM: ni foco perdido,
+  // ni menú cerrado, ni animación repetida.
+  if (_aurixReorderBusy === 'wsPlansGrid') return;
+  const html = _renderDashboardPlans();
+  if (sec._wsplHtml !== html || !sec.firstChild) { sec.innerHTML = html; sec._wsplHtml = html; }
   sec.style.display = '';
 }
+// GRUPO 2 · TUS PLANES. Identidad = «kind:id» del documento.
+_aurixReorderRegister('wsPlansGrid', {
+  item: '.wspl-card[data-wspl-ref]',
+  key: el => el.getAttribute('data-wspl-ref'),
+  label: el => ((el.querySelector('.wspl-name') || {}).textContent || '').trim(),
+  commit: visible => { _wsPlansOrderCommit(visible); try { const sec = document.getElementById('wsPlansSection'); if (sec) sec._wsplHtml = ''; } catch (_) {} },
+});
 // ════════════════════════════════════════════════════════════════════════════
 // DESCUBRIMIENTO EN EL RESUMEN · SÓLO PARA UN PLAN FREE CONFIRMADO
 // ════════════════════════════════════════════════════════════════════════════
@@ -24114,7 +24289,16 @@ function _wsPlansWireOnce() {
       return;
     }
     const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-menu],[data-wspl-templates],[data-ws-sync-retry]') : null;
-    if (!el || !el.closest('#wsPlansSection')) return;
+    // Pulsar la tarjeta abre el documento igual que «Continuar» (salvo sus propios controles, y
+    // salvo el clic que sigue a un arrastre).
+    if (!el) {
+      const card = e.target && e.target.closest ? e.target.closest('#wsPlansSection .wspl-card[data-wspl-id]') : null;
+      if (!card || justDragged || (e.target.closest && e.target.closest('button, a, .dash-grip'))) return;
+      _wsPlansOpen(card.getAttribute('data-wspl-id'), card.getAttribute('data-wspl-kind') || 'workspace');
+      return;
+    }
+    if (!el.closest('#wsPlansSection')) return;
+    if (justDragged && el.hasAttribute('data-wspl-open')) return;
     const mid = el.getAttribute('data-wspl-menu');
     if (mid) { e.preventDefault(); e.stopPropagation(); _wsPlansMenu(el, mid, el.getAttribute('data-wspl-mkind') || 'workspace'); return; }
     if (el.hasAttribute('data-ws-sync-retry')) { try { _wsDocsRetry(); } catch (_) {} return; }
@@ -24159,9 +24343,13 @@ function _wsPlansOpen(id, kind) {
     }
   }
   _wsReturnTab = 'dashboard';
+  // El sitio del Dashboard desde el que se abrió: «Volver» lo recupera (antes se conservaba sólo
+  // porque nadie tocaba el scroll; ahora la apertura sube al inicio del documento).
+  try { _wsDashReturnY = window.scrollY || 0; } catch (_) { _wsDashReturnY = null; }
   if (goalOpen) {
     try { switchTab('workspace'); } catch (_) {}
     try { _wsOpenSurface('goals'); } catch (_) {}
+    _wsDocTopPending = true; _wsDocTopConsume();
     return;
   }
   try { switchTab('workspace'); } catch (_) {}
@@ -25215,6 +25403,7 @@ function _wsbOpenDoc(id) {
   // Ya estando en el simulador, el despachador no repinta: abrir OTRA comparación
   // habría dejado en pantalla los supuestos de la anterior.
   if (opened) _wsbRepaintSurface();
+  if (opened) { _wsDocTopPending = true; _wsDocTopConsume(); }
   return opened;
 }
 
@@ -26857,6 +27046,28 @@ function _wsCatalogSurfaceKey(entryId) {
 function _wsRenderTool() { return _wsToolActive === 'comparator' ? _renderComparatorTool() : _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _wsToolActive === 'assets' ? _renderAssetPricesTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : key === 'loan' ? _wsLoanOutHtml(inp) : _wsToolOutHtml(inp); }
 
+// ── ABRIR UN DOCUMENTO ENSEÑA SU INICIO ─────────────────────────────────────
+// Abrir un documento guardado conservaba el scroll de donde se pulsó (el Dashboard a media
+// altura, la lista de documentos al pie de la herramienta): se aterrizaba en mitad del
+// formulario con la cabecera y el resumen fuera de la vista. El scroll es el de la VENTANA, y
+// `html` lleva `scroll-behavior: smooth`, así que se pide explícitamente sin animación.
+// Es UN aviso que se consume UNA vez, cuando la herramienta ya está montada y visible —al
+// final de la apertura o, si la pestaña todavía está cambiando, cuando `_applyTab` la monta—;
+// ni temporizadores ni un scroll en cada recálculo o edición.
+// `var` a propósito: `_applyTab` los lee y puede correr antes de que este bloque se evalúe.
+var _wsDocTopPending = false;
+var _wsDashReturnY = null, _wsDashRestorePending = false;
+function _aurixScrollWindowTo(y) {
+  try { window.scrollTo({ top: y, left: 0, behavior: 'instant' }); }
+  catch (_) { try { window.scrollTo(0, y); } catch (__) {} }
+}
+function _wsDocTopConsume() {
+  if (!_wsDocTopPending || typeof document === 'undefined') return;
+  const host = document.getElementById('aurixWorkspace');
+  if (!host || host.style.display === 'none' || !host.querySelector('.aurix-wsh')) return;
+  _wsDocTopPending = false;
+  _aurixScrollWindowTo(0);
+}
 function _wsOpenTool(toolKey, projectId) {
   const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables' || toolKey === 'loan' || toolKey === 'assets' || toolKey === 'comparator') ? toolKey : 'compound';
   if (key === 'compound'    && !AURIX_WS6_TOOL) return;   // WS.6 gate
@@ -26941,6 +27152,7 @@ function _wsOpenTool(toolKey, projectId) {
     }
   } catch (_) { _mounted = null; }
   if (!_mounted) renderWorkspaceHome();
+  if (projectId) { _wsDocTopPending = true; _wsDocTopConsume(); }
 }
 
 function _wsToolOnInput(el) {
@@ -58965,10 +59177,9 @@ function updateCategoryCards() {
     return;
   }
 
-  // Ordered list — respects user's saved drag order
-  const _ORDERED = _catOrder.length === CAT_DEFAULT_ORDER.length
-    ? _catOrder
-    : CAT_DEFAULT_ORDER;
+  // Ordered list — respects user's saved drag order. Un orden guardado PARCIAL (lo que el
+  // arrastre anterior escribía cuando había categorías ocultas) ya no se descarta: se completa.
+  const _ORDERED = _aurixOrderNormalize(_catOrder, CAT_DEFAULT_ORDER);
   // §7 — se FILTRA el render, no se borra ni un dato ni una categoría del
   // catálogo: la que hoy no tiene posiciones vuelve sola en cuanto haya una.
   // El orden se conserva exactamente (es un filtro sobre la lista ordenada).
@@ -59068,7 +59279,15 @@ function updateCategoryCards() {
     });
     return;
   }
+  // Mientras se arrastra, una reconstrucción arrancaría la tarjeta de la mano del usuario.
+  if (_aurixReorderBusy === 'categoriesGrid') return;
   grid.dataset.sig = sig;
+  // La instrucción de teclado que anuncian las tarjetas (aria-describedby), en el idioma actual.
+  try {
+    let hintEl = document.getElementById('dashReorderHint');
+    if (!hintEl) { hintEl = document.createElement('span'); hintEl.id = 'dashReorderHint'; hintEl.className = 'intcc-sr-only'; section.appendChild(hintEl); }
+    hintEl.textContent = t('dash_reorder_hint');
+  } catch (_) {}
   // ── CUÁNTAS CATEGORÍAS HAY, DECLARADO EN EL DOM ─────────────────────────
   // La rejilla era de tres columnas fijas pase lo que pase, así que UNA sola
   // categoría se quedaba en el primer tercio con dos tercios vacíos al lado, y
@@ -59148,7 +59367,10 @@ function updateCategoryCards() {
       </div>`;
     const emptySub  = isEmpty ? `<span class="cat-card-pct">${t('emptyCatSub')}</span>` : '';
 
-    return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
+    // Zona de agarre: decorativa para el lector de pantalla (un control dentro de un <button>
+    // no es válido); el teclado reordena con Alt+flechas sobre la propia tarjeta.
+    return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''} aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" aria-describedby="dashReorderHint">
+      <span class="dash-grip" aria-hidden="true" title="${t('dash_grip')}"><svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg></span>
       ${catStatusHtml}
       <div class="cat-card-content">
         <div class="cat-card-header">
@@ -59224,7 +59446,7 @@ function updateCategoryCards() {
     btn.addEventListener('touchend', (e) => {
       btn.classList.remove('is-pressing');
       if (isEmptyCard) { _tapOk = false; return; }
-      if (_tapOk && !justDragged) {
+      if (_tapOk && !justDragged && !(e.target && e.target.closest && e.target.closest('.dash-grip'))) {
         _tapOk = false;
         e.preventDefault(); // prevent ghost click
         setActiveCategory(btn.dataset.type);
@@ -59241,8 +59463,9 @@ function updateCategoryCards() {
     // click: fallback for desktop / non-touch.
     // Also gates keyboard activation: Enter / Space on a <button>
     // dispatches click, so empty cards stay un-drillable via keyboard.
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
       if (isEmptyCard) return;
+      if (e && e.target && e.target.closest && e.target.closest('.dash-grip')) return;
       if (!justDragged) setActiveCategory(btn.dataset.type);
     });
   });
@@ -64256,12 +64479,15 @@ function _applyTab(tab) {
     // user returns home via the logo / nav Dashboard — not the back button —
     // we must rebuild it explicitly, or the lower cards stay hidden.
     if (typeof updateCategoryCards === 'function') updateCategoryCards();
+    // Vuelta desde un documento abierto en «Tus planes»: al sitio de origen, una vez.
+    if (typeof _wsDashRestorePending !== 'undefined' && _wsDashRestorePending) { _wsDashRestorePending = false; const y = _wsDashReturnY; _wsDashReturnY = null; if (y != null) _aurixScrollWindowTo(y); }
     updateBottomNavActive();
   } else if (tab === 'workspace') {
     mainEl.style.display      = 'none';
     placeholder.style.display = 'none';
     if (workspaceEl) workspaceEl.style.display = '';
     renderWorkspace();
+    try { if (typeof _wsDocTopConsume === 'function') _wsDocTopConsume(); } catch (_) {}
     updateBottomNavActive();
   } else {
     mainEl.style.display       = 'none';
@@ -80137,286 +80363,209 @@ function _aurixRenderMenuIdentity() {
   }, { passive: true });
 })();
 
-// ── Cat-card drag & drop ────────────────────────────────────
-(function initCatCardDragDrop() {
-  const grid = document.getElementById('categoriesGrid');
-  if (!grid) return;
-
-  function saveCatOrder() {
-    _catOrder = [...grid.querySelectorAll('.cat-card[data-type]')].map(c => c.dataset.type);
-    localStorage.setItem(CAT_ORDER_KEY, JSON.stringify(_catOrder));
-    try { if (typeof _touchUiState === 'function') _touchUiState(); } catch (_) {} // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 P1
+// ── REORDENAR EL DASHBOARD · UN CONTROLADOR, DOS GRUPOS ─────────────────────
+// Sustituye al arrastre anterior de las categorías (mantener pulsada la tarjeta
+// entera e INTERCAMBIAR dos), que tenía tres defectos: guardaba sólo lo visible
+// (el orden no sobrevivía a la recarga), competía con el scroll y la apertura en
+// móvil, y no tenía alternativa de teclado.
+// Ahora:
+//   · se arrastra SÓLO desde la zona de agarre (`.dash-grip`, `touch-action:none`),
+//     así que el resto de la tarjeta sigue haciendo scroll y abriendo como siempre;
+//   · un toque en el agarre, sin arrastrar, abre «Mover antes / Mover después»
+//     (alternativa táctil), y Alt+flechas mueve con teclado;
+//   · cada grupo es un contenedor propio: el destino se busca DENTRO de él, así
+//     que no existe ningún camino para soltar una tarjeta en el otro grupo.
+// Las identidades son estables (tipo de categoría / «kind:id» del documento).
+function _aurixReorderRegister(containerId, o) { _AURIX_REORDER[containerId] = o; }
+function _aurixReorderKeys(c, o) { return [...c.querySelectorAll(o.item)].map(el => o.key(el)); }
+function _aurixReorderAnnounce(msg) {
+  try {
+    let lv = document.getElementById('dashReorderLive');
+    if (!lv) { lv = document.createElement('div'); lv.id = 'dashReorderLive'; lv.className = 'intcc-sr-only'; lv.setAttribute('aria-live', 'polite'); document.body.appendChild(lv); }
+    lv.textContent = ''; setTimeout(() => { lv.textContent = msg; }, 30);
+  } catch (_) {}
+}
+// Mover un paso (dir −1 antes, +1 después). Devuelve si se movió.
+function _aurixReorderStep(c, o, el, dir) {
+  const items = [...c.querySelectorAll(o.item)];
+  const i = items.indexOf(el), j = i + dir;
+  if (i < 0 || j < 0 || j >= items.length) return false;
+  const before = _aurixReorderKeys(c, o);
+  if (dir < 0) items[j].before(el); else items[j].after(el);
+  const after = _aurixReorderKeys(c, o);
+  if (after.join('|') !== before.join('|')) {
+    o.commit(after);
+    _aurixReorderAnnounce(t('dash_moved_pos').replace('{name}', o.label(el)).replace('{n}', String(j + 1)).replace('{total}', String(items.length)));
   }
-
-  // active:  hold timer has fired, drag is armed
-  // started: card has actually moved (real drag, not a tap)
-  let drag = {
-    active: false,
-    started: false,
-    card: null,
-    startX: 0,
-    startY: 0,
-    pressTimer: null,
+  return true;
+}
+function _aurixReorderMenu(c, o, el, anchor) {
+  const items = [...c.querySelectorAll(o.item)];
+  const i = items.indexOf(el);
+  const acts = [];
+  if (i > 0) acts.push({ k: 'before', label: t('dash_move_before') });
+  if (i >= 0 && i < items.length - 1) acts.push({ k: 'after', label: t('dash_move_after') });
+  if (!acts.length) return;
+  _wsPopoverMenu(anchor, 'dashReorderMenu', acts, act => {
+    _aurixReorderStep(c, o, el, act === 'before' ? -1 : 1);
+    // El foco sigue a la tarjeta movida, no se pierde en el body.
+    try { const g = el.querySelector('.dash-grip'); (g && g.tabIndex >= 0 ? g : el).focus({ preventScroll: false }); } catch (_) {}
+  });
+}
+function _aurixSuppressClick() { justDragged = true; setTimeout(() => { justDragged = false; }, 350); }
+(function initDashReorder() {
+  if (typeof document === 'undefined') return;
+  let d = null;   // { c, o, el, grip, id, x0, y0, gx, gy, moved, start, raf, py }
+  const findCtx = el => {
+    for (const id in _AURIX_REORDER) {
+      const c = document.getElementById(id);
+      if (c && c.contains(el)) return { id, c, o: _AURIX_REORDER[id] };
+    }
+    return null;
   };
-
-  function cleanup() {
-    if (!drag.card) return;
-
-    drag.card.style.transform     = '';
-    drag.card.style.zIndex        = '';
-    drag.card.style.transition    = '';
-    drag.card.style.boxShadow     = '';
-    drag.card.style.pointerEvents = '';
-    drag.card.classList.remove('dragging');
-
-    drag = {
-      active: false,
-      started: false,
-      card: null,
-      startX: 0,
-      startY: 0,
-      pressTimer: null,
-    };
-
-    window.removeEventListener('pointermove', onPointerMove);
-    window.removeEventListener('pointerup',   onPointerUp);
-    window.removeEventListener('pointercancel', onPointerCancel);
-
-    // Restore scroll immediately after any drag interaction ends
-    document.body.style.touchAction = 'auto';
-  }
-
-  // pointercancel fires when the browser takes over the gesture (e.g. scroll).
-  // Clear the timer so drag never activates after a scroll starts.
-  function onPointerCancel() {
-    clearTimeout(drag.pressTimer);
-    drag.card = null;
-    window.removeEventListener('pointermove',   onPointerMove);
-    window.removeEventListener('pointerup',     onPointerUp);
-    window.removeEventListener('pointercancel', onPointerCancel);
-  }
-
-  function onPointerMove(e) {
-    if (!drag.active) return;  // pointermove is only attached after hold, but guard anyway
-
-    // Block scroll only while the card is actually being dragged
-    e.preventDefault();
-
-    drag.started = true;
-    const card = drag.card;
-    if (!card) return;
-    card.style.transform =
-      `translate(${e.clientX - drag.startX}px, ${e.clientY - drag.startY}px) scale(1.05)`;
-  }
-
-  function onPointerUp(e) {
-    if (!drag.card) return;
-
-    clearTimeout(drag.pressTimer);
-
-    // Release any pointer capture so the browser resumes normal touch routing
-    try { drag.card.releasePointerCapture(e.pointerId); } catch (_) {}
-
-    const card = drag.card;
-
-    if (!drag.started) {
-      // Tap — let existing touchend/click handlers open the card
-      cleanup();
+  const place = () => {
+    if (!d) return;
+    d.el.style.transform = 'none';
+    const r = d.el.getBoundingClientRect();
+    d.el.style.transform = `translate(${d.px - d.gx - r.left}px, ${d.py - d.gy - r.top}px)`;
+  };
+  const edgeScroll = () => {
+    if (!d || !d.moved) return;
+    const m = 56, h = window.innerHeight;
+    const v = d.py < m ? -Math.ceil((m - d.py) / 6) : (d.py > h - m ? Math.ceil((d.py - (h - m)) / 6) : 0);
+    if (v) { window.scrollBy(0, v); place(); }
+    d.raf = requestAnimationFrame(edgeScroll);
+  };
+  const end = (commit) => {
+    if (!d) return;
+    const s = d; d = null;
+    try { cancelAnimationFrame(s.raf); } catch (_) {}
+    try { s.grip.releasePointerCapture(s.pid); } catch (_) {}
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    document.removeEventListener('keydown', onKey, true);
+    s.el.classList.remove('is-dragging');
+    s.c.classList.remove('is-reordering');
+    s.el.style.transform = ''; s.el.style.pointerEvents = '';
+    _aurixReorderBusy = null;
+    if (!s.moved) return;
+    _aurixSuppressClick();
+    if (!commit) {
+      // Escape / cancelación: se devuelve el orden con el que empezó el gesto.
+      s.start.forEach(k => { const n = [...s.c.querySelectorAll(s.o.item)].find(x => s.o.key(x) === k); if (n) s.c.appendChild(n); });
       return;
     }
-
-    // Real drag — ensure card is transparent so elementFromPoint sees through it
-    card.style.pointerEvents = 'none';
-    const el     = document.elementFromPoint(e.clientX, e.clientY);
-    card.style.pointerEvents = '';
-    const target = el?.closest('.cat-card[data-type]');
-
-    if (target && target !== card) {
-      const parent = card.parentNode;
-      const nextA  = card.nextSibling;
-      const nextB  = target.nextSibling;
-      parent.insertBefore(card,   nextB);
-      parent.insertBefore(target, nextA);
-      saveCatOrder();
+    const now = _aurixReorderKeys(s.c, s.o);
+    if (now.join('|') !== s.start.join('|')) s.o.commit(now);
+  };
+  const onCancel = () => end(false);
+  const onKey = e => { if (e.key === 'Escape' && d) { e.preventDefault(); e.stopPropagation(); end(false); } };
+  function onMove(e) {
+    if (!d || e.pointerId !== d.pid) return;
+    d.px = e.clientX; d.py = e.clientY;
+    if (!d.moved) {
+      if (Math.abs(d.px - d.x0) < 5 && Math.abs(d.py - d.y0) < 5) return;
+      if (!d.el.isConnected) { end(false); return; }
+      d.moved = true;
+      _aurixReorderBusy = d.id;
+      d.el.classList.add('is-dragging');
+      d.c.classList.add('is-reordering');
+      d.el.style.pointerEvents = 'none';
+      d.raf = requestAnimationFrame(edgeScroll);
     }
-
-    // Block the pointerup from propagating and prevent any default click action
+    e.preventDefault();
+    if (!d.el.isConnected) { end(false); return; }
+    // El destino se busca SÓLO entre los hermanos del mismo contenedor: soltar en el otro
+    // grupo no es un caso que haya que rechazar, es un caso que no existe.
+    const hit = document.elementFromPoint(d.px, d.py);
+    const tgt = hit && hit.closest ? hit.closest(d.o.item) : null;
+    if (tgt && tgt !== d.el && tgt.parentNode === d.el.parentNode && d.c.contains(tgt)) {
+      const items = [...d.c.querySelectorAll(d.o.item)];
+      if (items.indexOf(tgt) > items.indexOf(d.el)) tgt.after(d.el); else tgt.before(d.el);
+    }
+    place();
+  }
+  function onUp(e) {
+    if (!d || e.pointerId !== d.pid) return;
+    if (d.moved) { e.preventDefault(); e.stopPropagation(); end(true); return; }
+    // Un toque sin arrastre: alternativa táctil y de ratón al arrastre.
+    const s = d; end(false);
+    _aurixSuppressClick();
+    _aurixReorderMenu(s.c, s.o, s.el, s.grip);
+  }
+  document.addEventListener('pointerdown', e => {
+    if (d && e.pointerId !== d.pid && e.pointerType === 'touch') { end(false); return; }
+    if (d || e.button > 0) return;
+    const grip = e.target && e.target.closest ? e.target.closest('.dash-grip') : null;
+    if (!grip) return;
+    const ctx = findCtx(grip);
+    if (!ctx || (ctx.o.enabled && !ctx.o.enabled())) return;
+    const el = grip.closest(ctx.o.item);
+    if (!el) return;
+    // Sin esto el navegador inicia selección de texto o el arrastre nativo de la tarjeta.
     e.preventDefault();
     e.stopPropagation();
-
-    // Set global flag — the document capture listener will swallow any click
-    // that the browser fires in the next 100 ms as a result of this gesture
-    justDragged = true;
-    setTimeout(() => { justDragged = false; }, 150);
-
-    cleanup();
-
-    // Safety: ensure scroll is re-enabled even if cleanup had an edge case
-    setTimeout(() => { document.body.style.touchAction = 'auto'; }, 50);
-  }
-
-  const isMobile = 'ontouchstart' in window;
-
-  // ── Touch path (mobile) ────────────────────────────────────────────────────
-
-  // Hard reset — always clears state regardless of intermediate failures
-  function resetDrag() {
-    clearTimeout(drag.pressTimer);
-    if (drag.card) {
-      drag.card.style.transform     = '';
-      drag.card.style.zIndex        = '';
-      drag.card.style.transition    = '';
-      drag.card.style.boxShadow     = '';
-      drag.card.style.pointerEvents = '';
-      drag.card.classList.remove('dragging');
+    const r = el.getBoundingClientRect();
+    d = { id: ctx.id, c: ctx.c, o: ctx.o, el, grip, pid: e.pointerId, x0: e.clientX, y0: e.clientY,
+          px: e.clientX, py: e.clientY, gx: e.clientX - r.left, gy: e.clientY - r.top, moved: false,
+          start: _aurixReorderKeys(ctx.c, ctx.o), raf: 0 };
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    document.addEventListener('keydown', onKey, true);
+  }, true);
+  // Un segundo dedo es un pellizco: el arrastre se abandona y el zoom nativo manda.
+  document.addEventListener('touchstart', e => {
+    if (d && e.touches && e.touches.length > 1) { end(false); return; }   // SPEC 58 — two fingers → native pinch, abandon the drag
+  }, { passive: true, capture: true });
+  // El clic que sigue a un gesto de agarre no abre la tarjeta (ni la categoría ni el plan).
+  document.addEventListener('click', e => {
+    const grip = e.target && e.target.closest ? e.target.closest('.dash-grip') : null;
+    if (grip && findCtx(grip)) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  // Teclado: Alt+flechas sobre la tarjeta (o su agarre). Enter/Espacio en un agarre
+  // enfocable abre el mismo menú que el toque.
+  document.addEventListener('keydown', e => {
+    if (d) return;
+    const ctx = e.target && e.target.closest ? findCtx(e.target) : null;
+    if (!ctx || (ctx.o.enabled && !ctx.o.enabled())) return;
+    const el = e.target.closest(ctx.o.item);
+    if (!el) return;
+    const onGrip = !!(e.target.closest && e.target.closest('.dash-grip'));
+    if (onGrip && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); _aurixReorderMenu(ctx.c, ctx.o, el, e.target.closest('.dash-grip')); return; }
+    if (!(e.altKey || onGrip)) return;
+    const dir = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : 0;
+    if (!dir) return;
+    e.preventDefault(); e.stopPropagation();
+    const focusSel = onGrip ? '.dash-grip' : null;
+    if (_aurixReorderStep(ctx.c, ctx.o, el, dir)) {
+      try { (focusSel ? el.querySelector(focusSel) : el).focus(); } catch (_) {}
     }
-    drag.active  = false;
-    drag.started = false;
-    drag.card    = null;
-    document.body.style.touchAction = 'auto';
-  }
-
-  function onTouchStart(e) {
-    if (activeCategory) return;
-    if (drag.active) return;          // guard: another drag already armed
-    drag.card = null;                 // clear any stale reference before starting
-    const card = e.target.closest('.cat-card');
-    if (!card) return;
-    const touch = e.touches[0];
-    drag.card    = card;
-    drag.startX  = touch.clientX;
-    drag.startY  = touch.clientY;
-    drag.active  = false;
-    drag.started = false;
-
-    // Instant press feedback — user feels the touch immediately
-    card.style.transition = 'transform 0.08s ease';
-    card.style.transform  = 'scale(0.96)';
-    if (navigator.vibrate) navigator.vibrate(5);
-
-    drag.pressTimer = setTimeout(() => {
-      if (!drag.card) return;
-      drag.active                     = true;
-      document.body.style.touchAction = 'none';
-      card.style.transition           = 'all 0.15s ease';
-      card.style.transform            = 'scale(1.05)';
-      card.style.boxShadow            = '0 12px 30px rgba(0,0,0,0.25)';
-      card.style.zIndex               = '9999';
-      card.style.pointerEvents        = 'none';
-      card.classList.add('dragging');
-      if (navigator.vibrate) navigator.vibrate(15); // stronger pulse = drag armed
-    }, 1500); // 1.5 s hold — optimal balance of speed and intent
-  }
-
-  function onTouchMove(e) {
-    if (!drag.card) return;
-    if (e.touches && e.touches.length > 1) { try { resetDrag(); } catch (_) {} return; }   // SPEC 58 — two fingers → native pinch, abandon the drag
-
-    const touch = e.touches[0];
-    const dx = touch.clientX - drag.startX;
-    const dy = touch.clientY - drag.startY;
-
-    // Any movement before the hold completes → cancel drag, let browser scroll
-    if (!drag.active) {
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-        clearTimeout(drag.pressTimer);
-        drag.card.style.transform = '';
-        drag.card.style.transition = '';
-        drag.card = null;
-      }
-      return;
-    }
-
-    // Hold confirmed — track the card
-    drag.started = true;
-    e.preventDefault();
-    drag.card.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
-  }
-
-  function onTouchEnd(e) {
-    clearTimeout(drag.pressTimer);
-    if (!drag.card) return;
-    // Released before hold completed — snap scale back
-    if (!drag.active) {
-      drag.card.style.transform  = '';
-      drag.card.style.transition = '';
-      drag.card = null;
-      return;
-    }
-    if (drag.started) {
-      const touch  = e.changedTouches[0];
-      const el     = document.elementFromPoint(touch.clientX, touch.clientY);
-      const target = el?.closest('.cat-card[data-type]');
-      if (target && target !== drag.card) {
-        const parent = drag.card.parentNode;
-        const nextA  = drag.card.nextSibling;
-        const nextB  = target.nextSibling;
-        parent.insertBefore(drag.card, nextB);
-        parent.insertBefore(target,    nextA);
-        saveCatOrder();
-      }
-      justDragged = true;
-      setTimeout(() => { justDragged = false; }, 150);
-    }
-    resetDrag();
-  }
-
-  // ── Pointer path (desktop) ──────────────────────────────────────────────────
-
-  function onPointerDown(e) {
-    if (activeCategory) return;        // disabled in category detail view
-    if (drag.card) return;             // interaction already in progress
-    const card = e.target.closest('.cat-card');
-    if (!card) return;
-
-    drag.card    = card;
-    drag.startX  = e.clientX;
-    drag.startY  = e.clientY;
-    drag.started = false;
-    drag.active  = false;
-
-    // Arm drag after 220 ms hold. pointermove is intentionally NOT attached
-    // here — adding it on pointerdown would make window non-passive and block
-    // scroll even for taps. The browser scrolls freely until hold confirms drag.
-    drag.pressTimer = setTimeout(() => {
-      if (!drag.card) return; // cancelled by pointercancel before timer fired
-      drag.active                     = true;
-      document.body.style.touchAction = 'none';
-      card.style.zIndex               = '9999';
-      card.style.transition           = 'none';
-      card.style.pointerEvents        = 'none';
-      card.classList.add('dragging');
-      // Only now attach pointermove — the non-passive listener no longer
-      // blocks scroll because drag is already confirmed
-      window.addEventListener('pointermove', onPointerMove);
-    }, 220);
-
-    // pointerup handles tap/drop; pointercancel handles browser-scroll takeover
-    window.addEventListener('pointerup',     onPointerUp);
-    window.addEventListener('pointercancel', onPointerCancel);
-  }
-
-  // ── Register whichever event set matches the device ────────────────────────
-  if (isMobile) {
-    document.addEventListener('touchstart',  onTouchStart, { passive: true });
-    document.addEventListener('touchmove',   onTouchMove,  { passive: false });
-    document.addEventListener('touchend',    onTouchEnd);
-    document.addEventListener('touchcancel', resetDrag);
-  } else {
-    document.addEventListener('pointerdown', onPointerDown);
-  }
-
-  // Per-card click guard — blocks any synthetic click on a cat-card
-  // that the browser fires within 150 ms of a drag gesture ending
-  grid.querySelectorAll('.cat-card').forEach(card => {
-    card.addEventListener('click', e => {
-      if (justDragged) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    });
-  });
+  }, true);
 })();
+
+// GRUPO 1 · PATRIMONIO. Identidad = tipo de categoría.
+_aurixReorderRegister('categoriesGrid', {
+  item: '.cat-card[data-type]',
+  key: el => el.dataset.type,
+  label: el => ((el.querySelector('.cat-card-name') || {}).textContent || el.dataset.type || '').trim(),
+  enabled: () => activeCategory === null,
+  commit: visible => {
+    const full = _aurixOrderNormalize(_catOrder, CAT_DEFAULT_ORDER);
+    _catOrder = _aurixOrderMerge(full, visible.filter(k => CAT_DEFAULT_ORDER.includes(k)));
+    // La firma de la rejilla incluye el orden: se reescribe para que el próximo refresco de
+    // precios parchee en sitio en vez de reconstruir (y re-animar) las tarjetas.
+    try {
+      const grid = document.getElementById('categoriesGrid');
+      const parts = Object.create(null);
+      String(grid.dataset.sig || '').split('|').forEach(p => { parts[p.split(':')[0]] = p; });
+      if (visible.every(k => parts[k])) grid.dataset.sig = visible.map(k => parts[k]).join('|');
+    } catch (_) {}
+    _aurixOrderPersist(CAT_ORDER_KEY, _catOrder);
+  },
+});
 
 // ── Watchlist Store (single source of truth) ───────────────
 const watchlistStore = (() => {
@@ -82118,7 +82267,7 @@ if (typeof window !== 'undefined') {
   window.__aurixStorageDebug = function () {
     const KEYS = [
       'portfolio_assets', 'portfolio_history', 'category_history',
-      'portfolio_card_order', 'portfolio_cat_order',
+      'portfolio_card_order', 'portfolio_cat_order', 'aurix_plan_order',
       'aurix_watchlist', 'aurix_assets', 'aurix_holdings',
       'aurix.workspace.v1', 'aurix_insights_memory',
       'aurix_user_profile', 'aurix_behavior', 'aurix_decisions',

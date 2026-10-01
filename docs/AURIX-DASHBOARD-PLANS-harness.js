@@ -45,7 +45,7 @@ function ctx(opts) {
   vm.runInContext('var __UP = []; function openUpgradeIntent(o){ __UP.push(o); return false; }', sb);
   vm.runInContext('var _wsToolActive=null, _wsToolInputs=null, _wsToolEditId=null, _wsToolDirty=false, _wsReturnTab="tools", _wshView="home";', sb);
   ['_WSH_PROJECTS_KEY','_WSH_GOALS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES','_WSPL_GOAL',
-   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS','PLAN_ORDER_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    // §3 del cierre v789 — la tarjeta CALLA el subtítulo cuando repetiría el título
@@ -65,6 +65,9 @@ function ctx(opts) {
    '_wsPlanShare','_wsPlanShareHtml',
    // §25 — Objetivos entran a la vista por su propio almacén: sus owners al sandbox.
    '_wsgGoalsRaw','_wsgGoals','_wsPlansGoals','_wsPlansAll','_wsGoalShare','_wsGoalMetrics',
+   // ORDEN Y TUS PLANES — el orden del usuario manda sobre el de última edición, y el
+   // Presupuesto publica el reparto de sus gastos: sus owners al sandbox.
+   '_aurixPlanOrderRead','_aurixOrderNormalize','_aurixOrderMerge','_wsPlanSpendHtml',
    '_renderDashboardPlans']
     .forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
   if (opts.docs) vm.runInContext('localStorage.setItem(_WSH_PROJECTS_KEY, ' + JSON.stringify(JSON.stringify(opts.docs)) + ');', sb);
@@ -198,10 +201,12 @@ console.log('\n2 · Hasta dos métricas, nunca inventadas:');
     ['e1', 'e2', 'e3', 'e4'].every(id =>
       JSON.parse(R(vacio, 'JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === ' + JSON.stringify(id) + ')))')).length === 0),
     R(vacio, '_renderDashboardPlans()').slice(0, 200));
-  ok('2.7 …y aun así conserva su nombre y su tipo',
+  // RE-DECIDIDO (orden y Tus planes §2): la tarjeta publica SÓLO el nombre del usuario —el
+  // subtítulo de tipo se retira— y un documento sin datos lo DICE en vez de quedarse mudo.
+  ok('2.7 …y aun así conserva su nombre, sin subtítulo de tipo y con su estado explícito',
     (() => { const h = R(vacio, '_renderDashboardPlans()');
       return h.indexOf('Vacío') !== -1 && h.indexOf('wspl-metrics') === -1
-        && h.indexOf(R(vacio, 't("wstool_budget_n")')) !== -1; })());
+        && h.indexOf('wspl-type') === -1 && h.indexOf(R(vacio, 't("wspl_nodata")')) !== -1; })());
   // Una cartera con inmuebles pero SIN valoración declarada: el recuento sí, el
   // valor no — «0 €» diría que no vale nada.
   const sinValor = ctx({ docs: [{ id: 'v1', type: 'real_estate_portfolio', customName: 'Sin tasar', updatedAt: 1,
