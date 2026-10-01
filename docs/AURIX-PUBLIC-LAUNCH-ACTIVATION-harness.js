@@ -92,8 +92,10 @@ ok('18b la frontera real NO cambia: el muro nunca fue autorización, lo es el OT
   /signInWithOtp\(/.test(login) && /verifyOtp\(/.test(login));
 ok('19 OTP engine reused unchanged (signInWithOtp shouldCreateUser + verifyOtp)',
   /signInWithOtp\(\{[\s\S]{0,80}shouldCreateUser: true/.test(login) && /verifyOtp\(/.test(login));
-ok('20 public i18n copy present ES + EN (Accede a Aurix / Access Aurix)',
-  /'lg\.publicAccess':\s*'Accede a Aurix'/.test(login) && /'lg\.publicAccess':\s*'Access Aurix'/.test(login));
+// RE-DECIDIDO (ONBOARDING PREMIUM): el acceso público abre con una bienvenida, no con
+// «Accede a Aurix» repetido debajo por «Acceder». El contrato —acceso público en ES y EN— sigue.
+ok('20 public i18n copy present ES + EN (Bienvenido a Aurix / Welcome to Aurix)',
+  /'lg\.publicAccess':\s*'Bienvenido a Aurix'/.test(login) && /'lg\.publicAccess':\s*'Welcome to Aurix'/.test(login));
 
 // ── 6. ROLLBACK — single flag ───────────────────────────────────────────────
 ok('21 rollback is a single flag (PUBLIC_LAUNCH_ENABLED) in each surface',

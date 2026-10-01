@@ -48,13 +48,14 @@ ok('6 reduced-motion freezes the new ::after transitions', /@media \(prefers-red
 ok('6 entrance cascade untouched (still animates the 4 card types)', /\.modal--onboarding \.onb-lang-card,\s*\.modal--onboarding \.onb-chip,\s*\.modal--onboarding \.onb-exp-card,\s*\.modal--onboarding \.onb-bullet \{ animation: onb-card-rise/.test(css));
 
 // ── 7 ISOLATION — the three polished steps keep every markup hook ────────────
-ok('7 LANGUAGE keeps both lang cards + disabled continue', /data-onb-lang="es"/.test(LANG) && /data-onb-lang="en"/.test(LANG) && /id="onbLangContinue"[^>]*disabled/.test(LANG));
+// RE-DECIDIDO (ONBOARDING · CIERRE): el paso LANGUAGE se retira (el idioma se elige en el acceso y se cambia con el selector ES|EN de la cabecera; LANGUAGE guardado se migra a WELCOME) y los intereses dejan de ser interactivos (no tenían efecto en el recorrido normal).
+ok('7 el idioma se cambia desde la cabecera (ES|EN), no desde un paso propio', LANG === '' && /data-onb-langswitch="es"/.test(html) && /data-onb-langswitch="en"/.test(html));
 // ONBOARDING-EXCELLENCE-V1 — los intereses ya no son un paso propio: viven dentro
 // de WELCOME. Lo que este harness debe seguir defendiendo NO es dónde están, sino
 // que conservan sus 6 chips, su id y sus hooks — que es lo que hace que el pulido
 // de v539 y su consumidor (`_aurixBuildStarterWatchlist`) sigan funcionando.
-ok('7 los 6 chips de intereses + #onbInterestsGrid siguen intactos (ahora dentro de WELCOME)',
-   (WEL.match(/data-onb-interest=/g) || []).length === 6 && /id="onbInterestsGrid"/.test(WEL));
+ok('7 las 6 categorías quedan como EJEMPLOS no interactivos en WELCOME (sin botones ni selección)',
+   (WEL.match(/data-onb-interest=/g) || []).length === 0 && /class="onb-cat-examples"/.test(WEL) && (WEL.match(/<li /g) || []).length === 6 && !/<button[^>]*onb-chip/.test(WEL));
 ok('7 EXPERIENCE keeps its 3 data-onb-exp cards + tag/name/desc', (EXP.match(/data-onb-exp=/g) || []).length === 3 && (EXP.match(/class="onb-exp-tag"/g) || []).length === 3 && (EXP.match(/class="onb-exp-desc"/g) || []).length === 3);
 
 // ── 8 ISOLATION — Welcome + Investor Profile (incl. Age) untouched ───────────
@@ -65,7 +66,7 @@ ok('8 PROFILE still 4 identity cards + Age subordinate block inside it', (PROF.m
 // WELCOME (ONBOARDING-EXCELLENCE-V1); EXPERIENCE y PROFILE permanecen en el DOM
 // para Ajustes aunque salgan del recorrido.
 ok('8 la edad NO es un paso propio, y las secciones del overlay son las esperadas',
-   (html.match(/data-onb-step="/g) || []).length === 6 && html.indexOf('data-onb-step="AGE"') < 0,
+   (html.match(/data-onb-step="/g) || []).length === 5 && html.indexOf('data-onb-step="AGE"') < 0,
    (html.match(/data-onb-step="/g) || []).length + ' secciones');
 
 // ── 9 flow intact — delegated handlers + nav untouched ───────────────────────
@@ -85,7 +86,7 @@ ok('10 marker lives in CSS, not app.js logic', app.indexOf('SPEC 45 ONBOARDING F
 // los que trabajan los handlers delegados sigan existiendo, uno a uno.
 ok('10 todos los hooks por atributo del onboarding siguen presentes',
    // `data-onb-next` / `data-onb-back` son atributos booleanos: se buscan sin '='.
-   ['data-onb-step=', 'data-onb-lang=', 'data-onb-interest=', 'data-onb-exp=',
+   ['data-onb-step=', 'data-onb-langswitch=', 'data-onb-exp=',
     'data-onb-risk=', 'data-onb-age=', 'data-onb-next', 'data-onb-back']
      .every(h => html.indexOf(h) >= 0));
 
