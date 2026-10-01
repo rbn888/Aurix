@@ -140,7 +140,9 @@ ok('19 C: CTA preserved for the form sub-state (solid action-footer surface inta
 
 // 20. Scope guard: Real Estate + Cash + desktop remain excluded by the SPEC 63 rules
 //     (no data-mode="real_estate", no #liquidityOverlay in the flow/CTA additions).
-const spec63 = css.slice(css.indexOf('SPEC 63 A/B'));
+// El bloque SPEC 63 termina donde empieza el siguiente bloque propio de la hoja: la piel del
+// onboarding (`body.onb-addflow #liquidityOverlay …`) va DESPUÉS y no es una regla de SPEC 63.
+const spec63 = css.slice(css.indexOf('SPEC 63 A/B'), (css.indexOf('ONBOARDING PREMIUM · UN SOLO LENGUAJE') > css.indexOf('SPEC 63 A/B')) ? css.indexOf('ONBOARDING PREMIUM · UN SOLO LENGUAJE') : undefined);
 ok('20 RE/Cash excluded from SPEC 63 rules', spec63.length > 0 &&
   !/data-mode="real_estate"[^\n]*align-self/.test(spec63) && !/#liquidityOverlay/.test(spec63));
 

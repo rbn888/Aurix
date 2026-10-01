@@ -79,16 +79,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
 
     // ── ONBOARDING ──
     await p.waitForSelector('#onboardingOverlay.open', { timeout: 20000 });
-    ok(`${T} onboarding arranca en IDIOMA`, (await step(p)) === 'LANGUAGE');
-    // `force`: en WebKit de escritorio la tarjeta de idioma tiene una animación ambiental y
-    // Playwright nunca la ve «estable»; el toque de una persona sí llega.
-    await p.click('[data-onb-lang="es"]', { force: true }); await p.click('#onbLangContinue', { force: true }); await p.waitForTimeout(450);
-    ok(`${T} avanza a BIENVENIDA`, (await step(p)) === 'WELCOME');
-    await p.click('[data-onb-interest="stocks"]', { force: true }); await p.click('[data-onb-interest="crypto"]', { force: true });
+    // El idioma se elige en el acceso: el onboarding empieza en la BIENVENIDA.
+    ok(`${T} onboarding arranca en BIENVENIDA`, (await step(p)) === 'WELCOME');
     await p.locator('#onboardingOverlay [data-onb-next]:visible').first().click({ force: true }); await p.waitForTimeout(450);
     ok(`${T} avanza a ACTIVACIÓN`, (await step(p)) === 'ACTIVATION');
     await p.locator('#onboardingOverlay [data-onb-back]:visible').first().click({ force: true }); await p.waitForTimeout(450);
-    ok(`${T} retrocede a BIENVENIDA conservando la selección`, (await step(p)) === 'WELCOME' && await p.evaluate(() => document.querySelector('[data-onb-interest="stocks"]').classList.contains('is-selected')));
+    ok(`${T} retrocede a BIENVENIDA`, (await step(p)) === 'WELCOME');
     await p.locator('#onboardingOverlay [data-onb-next]:visible').first().click({ force: true }); await p.waitForTimeout(450);
     await p.click('#onbAddAssetBtn', { force: true }); await p.waitForTimeout(700);
     await p.locator('#modalOverlay button:has-text("Liquidez")').click(); await p.waitForTimeout(600);

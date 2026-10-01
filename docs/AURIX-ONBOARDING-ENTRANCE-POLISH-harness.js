@@ -36,7 +36,8 @@ ok('4 prefers-reduced-motion turns the cascade off', /@media \(prefers-reduced-m
 ok('5 .onb-step whole-step fade (onb-fade-in) intact', /\.onb-step \{[\s\S]{0,160}animation: onb-fade-in/.test(css) && /@keyframes onb-fade-in/.test(css));
 
 // ── 6 CSS-ONLY: no markup / handler / navigation / data change ──────────────
-ok('6 onboarding markup + steps intact', /id="onboardingOverlay"/.test(html) && /data-onb-step="LANGUAGE"/.test(html) && /data-onb-step="PROFILE"/.test(html));
+// RE-DECIDIDO (ONBOARDING · CIERRE): el paso LANGUAGE se retira (el idioma se elige en el acceso y se cambia con el selector ES|EN de la cabecera; LANGUAGE guardado se migra a WELCOME) y los intereses dejan de ser interactivos (no tenían efecto en el recorrido normal).
+ok('6 onboarding markup + steps intact', /id="onboardingOverlay"/.test(html) && /data-onb-step="WELCOME"/.test(html) && /data-onb-step="PROFILE"/.test(html) && /data-onb-langswitch="es"/.test(html));
 ok('6 onboarding controller + engine wiring untouched (present)', /_initOnboardingUI|maybeShowOnboarding/.test(app) && /AurixOnboarding|aurix:reset/.test(app));
 ok('6 this polish added no app.js logic (marker lives only in CSS)', app.indexOf('ONBOARDING POLISH') < 0 && css.indexOf('SPEC 45 ONBOARDING POLISH') >= 0);
 
