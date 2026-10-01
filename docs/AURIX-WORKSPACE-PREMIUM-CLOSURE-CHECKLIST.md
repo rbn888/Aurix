@@ -92,8 +92,13 @@ nombre guardado no se toca.
   pero no la barra de URL dinámica, `100dvh` real ni `env(safe-area-inset-*)`.
 - **Journey Premium autenticado.** El sandbox es OTP-only (`mailer_autoconfirm:false`):
   las personas se montan por la superficie saneada del resolver, no iniciando sesión.
-- **Stripe sigue en TEST.** Los importes de las sondas (69,99 € / 7,99 €) son la
-  ENTRADA del render, no producto: el paywall no lleva ni un precio en el bundle.
+- ~~**Stripe sigue en TEST.**~~ **CORREGIDO (registro del 2026-10-01):** el fundador hizo
+  una compra **LIVE** de 7,99 € en producción, recibió el cargo y Premium se activó. Esta
+  línea describía el estado de cuando se escribió el checklist y ya no vale para producción.
+  Las sondas de este cierre siguen siendo **simuladas** (persona Premium montada por la
+  superficie saneada del resolver, sin Checkout ni cobro). Los importes de las sondas
+  (69,99 € / 7,99 €) son la ENTRADA del render, no producto: el paywall no lleva ni un
+  precio en el bundle.
 - **Prueba de brillo físico reducido** (§2): no ejecutable desde aquí.
 - **`switchLang` en WebKit ≥1024** (arriba): pre-existente, fuera de alcance,
   pendiente de decisión del founder.
