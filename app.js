@@ -5302,6 +5302,10 @@ const T = {
     txValueAfter:      'Valor de la posición',
     txValueAfterEst:   'Valor de la posición (estimado)',
     reduceOpValue:     'Valor estimado de la venta',
+    reduceCashTitle:   'Retirar liquidez',
+    reduceCashAmount:  'Importe a retirar',
+    reduceCashLeft:    'Saldo restante',
+    reduceCashConfirm: 'Confirmar retirada',
     txSubmit:          'Añadir transacción',
     // Asset detail modal
     adValueLabel:      'Valor total',
@@ -8630,6 +8634,10 @@ const T = {
     txValueAfterEst:   'Position value (estimated)',
     reduceOpValue:     'Estimated sale value',
     txSubmit:          'Add transaction',
+    reduceCashTitle:   'Withdraw cash',
+    reduceCashAmount:  'Amount to withdraw',
+    reduceCashLeft:    'Remaining balance',
+    reduceCashConfirm: 'Confirm withdrawal',
     // Asset detail modal
     adValueLabel:      'Total value',
     adPriceLabel:      'Price',
@@ -75809,7 +75817,9 @@ function openReduceModal(id) {
     ? t('maxLabel')(formatQty(asset.qty), asset.goldUnit || 'g')
     : t('maxLabel')(formatQty(asset.qty), null);
   reduceQtyInput.value = '';
-  previewQtyLeft.textContent   = isGold
+  previewQtyLeft.textContent   = isCash
+    ? formatCurrency(asset.qty, assetCurr)
+    : isGold
     ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
     : formatQty(asset.qty);
   previewValueLeft.textContent = formatBase(totalBase);
@@ -75856,7 +75866,11 @@ function updateReducePreview() {
     if (opRow && opVal) {
       const px = Number(asset.price);
       const canValue = asset.type !== 'cash' && Number.isFinite(px) && px > 0 && amount > 0;
-      if (canValue) {
+      if (asset.type === 'cash' && amount > 0) {
+        if (opLbl) opLbl.textContent = t('reduceCashAmount');
+        opVal.textContent = formatCurrency(amount, cur);
+        opRow.hidden = false;
+      } else if (canValue) {
         if (opLbl) opLbl.textContent = t('reduceOpValue');
         opVal.textContent = formatDisplay(assetNativeValue({ ...asset, qty: amount }), cur);
         opRow.hidden = false;
@@ -75909,6 +75923,7 @@ reduceForm.addEventListener('submit', e => {
   if (!Array.isArray(asset.transactions)) asset.transactions = [];
   const _sellTs    = Date.now();
   const _sellPrice = Number.isFinite(currentPrice) ? currentPrice : 0;
+  _reduceApplyMode(isCash);
   const _isCashReduce = (asset.type === 'cash');
   // AURIX-CASH-LEDGER-TRUTH — retirar liquidez es una RETIRADA, no la venta de un
   // instrumento: no realiza plusvalía ni prorratea coste. La escribe el owner
@@ -75924,6 +75939,7 @@ reduceForm.addEventListener('submit', e => {
   }
   // AURIX-WEALTH-LEDGER-CAPTURE-1: cash reductions are withdrawals; everything
   // else is a sell (with durable realized PnL on the event).
+  { const r = document.getElementById('previewOpRow'); if (r) r.hidden = true; }
   // WN.8 AUDIT: a NON-cash sell here only REDUCES/CLOSES the asset — it does NOT
   // add the proceeds to any cash/liquidity asset. So selling ~30k of BTC drops
   // investable value by ~30k with no offsetting cash leg, which is why the chart
@@ -75933,6 +75949,27 @@ reduceForm.addEventListener('submit', e => {
   // (Real assets are NOT auto-mutated here — too risky / could double-count if
   // the user later records the cash manually; the reconciliation is visual +
   // metric only, anchored to the real current value.)
+// ── LIQUIDEZ: AÑADIR / RETIRAR, NO «REDUCIR POSICIÓN» ─────────────────────
+// La hoja es la misma para vender unidades y para retirar efectivo, pero con
+// efectivo «cantidad» y «valor» son el MISMO importe: se publicaban dos filas
+// iguales y una tercera («Valor de la operación —») que debía estar oculta. Con
+// liquidez se habla de importe a retirar y saldo restante, en su divisa. Los
+// textos de venta se restauran desde su clave i18n al abrir otro activo.
+function _reduceApplyMode(isCash) {
+  const ov = document.getElementById('reduceOverlay'); if (!ov) return;
+  const set = (sel, cashKey) => {
+    const el = ov.querySelector(sel); if (!el) return;
+    const base = el.getAttribute('data-i18n');
+    el.textContent = isCash ? t(cashKey) : (base ? t(base) : el.textContent);
+  };
+  set('[data-i18n="modalReduceTitle"]', 'reduceCashTitle');
+  set('label[for="reduceQty"]', 'reduceCashAmount');
+  set('[data-i18n="qtyRemaining"]', 'reduceCashLeft');
+  set('button[type="submit"]', 'reduceCashConfirm');
+  const valRow = document.getElementById('previewValueLeft');
+  if (valRow && valRow.parentElement) valRow.parentElement.hidden = !!isCash;
+}
+
   if (_isCashReduce) {
     const _cashRes = aurixCashOperation('withdrawal', {
       asset, amount, currency: (asset.assetCurrency || 'USD'), ts: _sellTs, source: asset.source || null,
