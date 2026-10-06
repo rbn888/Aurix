@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '760'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '761'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -8634,11 +8634,11 @@ const T = {
     txValueAfter:      'Position value',
     txValueAfterEst:   'Position value (estimated)',
     reduceOpValue:     'Estimated sale value',
-    txSubmit:          'Add transaction',
     reduceCashTitle:   'Withdraw cash',
     reduceCashAmount:  'Amount to withdraw',
     reduceCashLeft:    'Remaining balance',
     reduceCashConfirm: 'Confirm withdrawal',
+    txSubmit:          'Add transaction',
     // Asset detail modal
     adValueLabel:      'Total value',
     adPriceLabel:      'Price',
@@ -13961,6 +13961,12 @@ function convertToNewModel(flatAssets) {
     // Folds into the existing holdings jsonb column — no schema/RLS change.
     realizedPnL: a.realizedPnL || 0,
     transactions: a.transactions || [],
+    // AURIX-CLOSED-POSITIONS-1 · el CIERRE también es durable. `_closePosition`
+    // marcaba `lifecycleStatus='closed'` sólo en memoria: tras recargar, la fila
+    // volvía como posición ACTIVA a cero (contaba en el recuento y en la
+    // distribución). Va en el mismo jsonb de holdings — sin cambio de esquema,
+    // como `realizedPnL` — y sólo cuando está cerrada.
+    ...(a.lifecycleStatus === 'closed' ? { lifecycleStatus: 'closed', closedAt: a.closedAt || null } : {}),
   }));
   return { assets: catalogAssets, holdings };
 }
@@ -13971,12 +13977,6 @@ function convertToNewModel(flatAssets) {
 // set, propagating the loss to localStorage + Supabase). Instead we SALVAGE the holding so the
 // user's position survives: prefer full metadata from the legacy mirror (`portfolio_assets`),
 // otherwise preserve the authoritative financials (qty/costBasis/realizedPnL/transactions) with
-    // AURIX-CLOSED-POSITIONS-1 · el CIERRE también es durable. `_closePosition`
-    // marcaba `lifecycleStatus='closed'` sólo en memoria: tras recargar, la fila
-    // volvía como posición ACTIVA a cero (contaba en el recuento y en la
-    // distribución). Va en el mismo jsonb de holdings — sin cambio de esquema,
-    // como `realizedPnL` — y sólo cuando está cerrada.
-    ...(a.lifecycleStatus === 'closed' ? { lifecycleStatus: 'closed', closedAt: a.closedAt || null } : {}),
 // a degraded display. Only a genuinely EMPTY orphan (no qty, no transactions, no cost) is
 // dropped. Intentionally-deleted assets have no holding row, so they are never resurrected.
 function _aurixSalvageHolding(h, fallbackById) {
@@ -14009,6 +14009,7 @@ function _aurixSalvageHolding(h, fallbackById) {
       realizedPnL: h.realizedPnL != null ? h.realizedPnL : (fb.realizedPnL || 0),
       transactions: tx.length ? tx : (Array.isArray(fb.transactions) ? fb.transactions : []),
       _recovered: true,
+      ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
     });
   }
   return {
@@ -14019,7 +14020,7 @@ function _aurixSalvageHolding(h, fallbackById) {
     transactions: tx, coinId: null, marketSymbol: null, image: null, logo: null,
     karat: null, goldUnit: null, isin: null, rent: null, location: null,
     _recovered: true, _orphanAssetId: h.asset_id || null,
-      ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
+    ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
   };
 }
 
@@ -14030,22 +14031,11 @@ function _aurixLegacyFallbackById() {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
     const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.assets) ? raw.assets : []);
     const map = {};
-    ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
     arr.forEach(a => { if (a && a.id != null) map[a.id] = a; });
     return map;
   } catch (_) { return {}; }
 }
 
-function convertFromNewToFlat(catalogAssets, holdings, fallbackById) {
-  const assetMap = new Map((Array.isArray(catalogAssets) ? catalogAssets : []).map(a => [a.id, a]));
-  return (Array.isArray(holdings) ? holdings : []).map(h => {
-    const asset = assetMap.get(h.asset_id);
-    if (!asset) {
-      // CRITICAL-FIX: salvage instead of dropping (see _aurixSalvageHolding).
-      const salvaged = _aurixSalvageHolding(h, fallbackById);
-      if (!salvaged) return null;   // genuinely empty orphan only
-      try { console.warn('[DATA][RECOVERED] Orphaned holding salvaged (missing catalog asset):', h.asset_id, salvaged._recovered ? '(metadata ' + (fallbackById && (fallbackById[h.asset_id] || fallbackById[h.id]) ? 'from legacy mirror' : 'degraded') + ')' : ''); } catch (_) {}
-      return salvaged;
 // Cerrada = lo declara el holding, o (filas guardadas ANTES de que el cierre se
 // persistiera) lleva exactamente la huella de `_closePosition`: cantidad 0, coste 0
 // y operaciones registradas. Un activo a cero SIN operaciones no se toca: no hay
@@ -14072,6 +14062,16 @@ function _aurixHoldingIsClosed(h) {
   }
   return Math.abs(net) <= 1e-9;
 }
+function convertFromNewToFlat(catalogAssets, holdings, fallbackById) {
+  const assetMap = new Map((Array.isArray(catalogAssets) ? catalogAssets : []).map(a => [a.id, a]));
+  return (Array.isArray(holdings) ? holdings : []).map(h => {
+    const asset = assetMap.get(h.asset_id);
+    if (!asset) {
+      // CRITICAL-FIX: salvage instead of dropping (see _aurixSalvageHolding).
+      const salvaged = _aurixSalvageHolding(h, fallbackById);
+      if (!salvaged) return null;   // genuinely empty orphan only
+      try { console.warn('[DATA][RECOVERED] Orphaned holding salvaged (missing catalog asset):', h.asset_id, salvaged._recovered ? '(metadata ' + (fallbackById && (fallbackById[h.asset_id] || fallbackById[h.id]) ? 'from legacy mirror' : 'degraded') + ')' : ''); } catch (_) {}
+      return salvaged;
     }
     return {
       id:            h.id,
@@ -14095,6 +14095,7 @@ function _aurixHoldingIsClosed(h) {
       isin:          asset.isin       ?? null,
       rent:          asset.rent       ?? null,
       location:      asset.location   ?? null,   // WL.1: round-trip Wealth Location metadata
+      ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
     };
   }).filter(Boolean);
 }
@@ -14105,7 +14106,6 @@ function convertToLegacyFormat(catalogAssets, holdings) {
 
 function saveData({ assets: catalogAssets, holdings }, context) {
   // P0-DATA-INTEGRITY-LOCK — block a destructive local write (fewer assets/holdings/tx) unless an
-      ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
   // explicit user-destructive context authorises it. A blocked write leaves the last valid
   // portfolio untouched on disk (no overwrite), so a bad load/migration/sync cannot become loss.
   const previous = _aurixReadPersistedCounts();
@@ -28752,6 +28752,8 @@ function _wsJrnPreviewHtml(d) {
 function _wsJrnOnInput(el) {
   if (!_wsJrnDraft) _wsJrnDraft = _wsJrnNewDraft();
   _wsJrnDraft[el.getAttribute('data-wsjrn-input')] = el.value;
+  // Cambiar la divisa cambia la unidad de TODOS los campos: se repinta el formulario.
+  if (el.getAttribute('data-wsjrn-input') === 'currency') { _wsJrnRerender(); return; }
   const root = document.querySelector('.wsh-tool-view');
   const pv = root && root.querySelector('[data-wsjrn-preview]');
   if (pv) pv.innerHTML = _wsJrnPreviewHtml(_wsJrnDraft);
@@ -28829,8 +28831,6 @@ function _wsJrnChartHtml(res) {
   const esc = _intccEsc;
   const closed = res.list.filter(x => !x.open);
   if (!closed.length) return '';
-  // Cambiar la divisa cambia la unidad de TODOS los campos: se repinta el formulario.
-  if (el.getAttribute('data-wsjrn-input') === 'currency') { _wsJrnRerender(); return; }
   const W = 360, H = 140, padX = 16, midY = H / 2;
   const maxAbs = Math.max.apply(null, closed.map(x => Math.abs(x.ret)).concat([1]));
   const n = closed.length, slot = (W - 2 * padX) / n, bw = Math.min(30, slot * 0.55);
@@ -28891,6 +28891,13 @@ function _wsJrnFormHtml() {
   const sel = (k, label, opts) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsjrn-input="${k}">${opts.map(o => `<option value="${esc(o.v)}"${d[k] === o.v ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></span></label>`;
   const types = [['stock', 'wsjrn_type_stock'], ['etf', 'wsjrn_type_etf'], ['crypto', 'wsjrn_type_crypto'], ['other', 'wsjrn_type_other']].map(([v, lk]) => ({ v, l: t(lk) }));
   const ccys = ['EUR', 'USD', 'GBP'].map(c => ({ v: c, l: c }));
+  // ── LA UNIDAD DEL CAMPO ES LA DIVISA DEL DIARIO ───────────────────────────
+  // Era un «€» literal: con un diario en dólares el formulario decía euros, la
+  // lista decía la divisa BASE y el resumen la del documento — tres monedas para
+  // la misma operación. La divisa se elige sólo mientras el diario está VACÍO;
+  // con operaciones ya es del documento y no se mueve (ver `_wsJrnAdd`).
+  const hasTrades = !!(_wsToolInputs && Array.isArray(_wsToolInputs.trades) && _wsToolInputs.trades.length);
+  const unit = (typeof _aurixCurrencyGlyph === 'function') ? _aurixCurrencyGlyph(d.currency || 'EUR') : '€';
   return `
     <section class="wsh-card wsjrn-form-card">
       <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsjrn_add_title'))}</h3></header>
@@ -28966,13 +28973,6 @@ function _renderJournalTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="${esc(_WS_TOOL_ACCENT.journal)}">
       ${_wsSurfaceHeadHtml({ title: t('wstool_journal_n'), doc: _wsToolDocName(), help: [t('wstool_journal_d')] })}
-  // ── LA UNIDAD DEL CAMPO ES LA DIVISA DEL DIARIO ───────────────────────────
-  // Era un «€» literal: con un diario en dólares el formulario decía euros, la
-  // lista decía la divisa BASE y el resumen la del documento — tres monedas para
-  // la misma operación. La divisa se elige sólo mientras el diario está VACÍO;
-  // con operaciones ya es del documento y no se mueve (ver `_wsJrnAdd`).
-  const hasTrades = !!(_wsToolInputs && Array.isArray(_wsToolInputs.trades) && _wsToolInputs.trades.length);
-  const unit = (typeof _aurixCurrencyGlyph === 'function') ? _aurixCurrencyGlyph(d.currency || 'EUR') : '€';
       ${/* ── UN RESUMEN DE NADA NO ES UN RESUMEN ──────────────────────────────
             Con el diario vacío esta tarjeta publicaba cuatro guiones y empujaba
             el formulario 300 px hacia abajo: lo primero que veía el usuario era
@@ -75917,6 +75917,7 @@ function openReduceModal(id) {
       ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
       : `${formatQty(asset.qty)} ${t('unidades')}`;
 
+  _reduceApplyMode(isCash);
   reduceAssetInfo.innerHTML = `
     ${buildBadgeHtml(asset, badgeText)}
     <div>
@@ -75934,6 +75935,7 @@ function openReduceModal(id) {
     : isGold
     ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
     : formatQty(asset.qty);
+  { const r = document.getElementById('previewOpRow'); if (r) r.hidden = true; }
   previewValueLeft.textContent = formatBase(totalBase);
   reduceWarning.classList.remove('visible');
   reduceError.textContent = '';
@@ -75941,6 +75943,27 @@ function openReduceModal(id) {
   reduceOverlay.classList.add('open');
   document.body.classList.add('modal-open');
   reduceQtyInput.focus();
+}
+
+// ── LIQUIDEZ: AÑADIR / RETIRAR, NO «REDUCIR POSICIÓN» ─────────────────────
+// La hoja es la misma para vender unidades y para retirar efectivo, pero con
+// efectivo «cantidad» y «valor» son el MISMO importe: se publicaban dos filas
+// iguales y una tercera («Valor de la operación —») que debía estar oculta. Con
+// liquidez se habla de importe a retirar y saldo restante, en su divisa. Los
+// textos de venta se restauran desde su clave i18n al abrir otro activo.
+function _reduceApplyMode(isCash) {
+  const ov = document.getElementById('reduceOverlay'); if (!ov) return;
+  const set = (sel, cashKey) => {
+    const el = ov.querySelector(sel); if (!el) return;
+    const base = el.getAttribute('data-i18n');
+    el.textContent = isCash ? t(cashKey) : (base ? t(base) : el.textContent);
+  };
+  set('[data-i18n="modalReduceTitle"]', 'reduceCashTitle');
+  set('label[for="reduceQty"]', 'reduceCashAmount');
+  set('[data-i18n="qtyRemaining"]', 'reduceCashLeft');
+  set('button[type="submit"]', 'reduceCashConfirm');
+  const valRow = document.getElementById('previewValueLeft');
+  if (valRow && valRow.parentElement) valRow.parentElement.hidden = !!isCash;
 }
 
 function closeReduceModal() {
@@ -76035,7 +76058,6 @@ reduceForm.addEventListener('submit', e => {
   if (!Array.isArray(asset.transactions)) asset.transactions = [];
   const _sellTs    = Date.now();
   const _sellPrice = Number.isFinite(currentPrice) ? currentPrice : 0;
-  _reduceApplyMode(isCash);
   const _isCashReduce = (asset.type === 'cash');
   // AURIX-CASH-LEDGER-TRUTH — retirar liquidez es una RETIRADA, no la venta de un
   // instrumento: no realiza plusvalía ni prorratea coste. La escribe el owner
@@ -76051,7 +76073,6 @@ reduceForm.addEventListener('submit', e => {
   }
   // AURIX-WEALTH-LEDGER-CAPTURE-1: cash reductions are withdrawals; everything
   // else is a sell (with durable realized PnL on the event).
-  { const r = document.getElementById('previewOpRow'); if (r) r.hidden = true; }
   // WN.8 AUDIT: a NON-cash sell here only REDUCES/CLOSES the asset — it does NOT
   // add the proceeds to any cash/liquidity asset. So selling ~30k of BTC drops
   // investable value by ~30k with no offsetting cash leg, which is why the chart
@@ -76061,27 +76082,6 @@ reduceForm.addEventListener('submit', e => {
   // (Real assets are NOT auto-mutated here — too risky / could double-count if
   // the user later records the cash manually; the reconciliation is visual +
   // metric only, anchored to the real current value.)
-// ── LIQUIDEZ: AÑADIR / RETIRAR, NO «REDUCIR POSICIÓN» ─────────────────────
-// La hoja es la misma para vender unidades y para retirar efectivo, pero con
-// efectivo «cantidad» y «valor» son el MISMO importe: se publicaban dos filas
-// iguales y una tercera («Valor de la operación —») que debía estar oculta. Con
-// liquidez se habla de importe a retirar y saldo restante, en su divisa. Los
-// textos de venta se restauran desde su clave i18n al abrir otro activo.
-function _reduceApplyMode(isCash) {
-  const ov = document.getElementById('reduceOverlay'); if (!ov) return;
-  const set = (sel, cashKey) => {
-    const el = ov.querySelector(sel); if (!el) return;
-    const base = el.getAttribute('data-i18n');
-    el.textContent = isCash ? t(cashKey) : (base ? t(base) : el.textContent);
-  };
-  set('[data-i18n="modalReduceTitle"]', 'reduceCashTitle');
-  set('label[for="reduceQty"]', 'reduceCashAmount');
-  set('[data-i18n="qtyRemaining"]', 'reduceCashLeft');
-  set('button[type="submit"]', 'reduceCashConfirm');
-  const valRow = document.getElementById('previewValueLeft');
-  if (valRow && valRow.parentElement) valRow.parentElement.hidden = !!isCash;
-}
-
   if (_isCashReduce) {
     const _cashRes = aurixCashOperation('withdrawal', {
       asset, amount, currency: (asset.assetCurrency || 'USD'), ts: _sellTs, source: asset.source || null,
