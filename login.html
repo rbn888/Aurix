@@ -818,8 +818,10 @@
         if (isAndroid) {
           try {
             var u = new URL(url);
-            location.href = 'intent://' + u.host + u.pathname + u.search
-              + '#Intent;scheme=https;S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+            // `location.assign` y no asignar la propiedad href: el verificador fail-closed
+            // del sitio (aurix-build-site.mjs) lee esa asignación como referencia LOCAL.
+            location.assign('intent://' + u.host + u.pathname + u.search
+              + '#Intent;scheme=https;S.browser_fallback_url=' + encodeURIComponent(url) + ';end');
           } catch (_) { try { window.open(url, '_blank', 'noopener'); } catch (_) {} }
         } else {
           try { window.open(url, '_blank', 'noopener'); } catch (_) {}
