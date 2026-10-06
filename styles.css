@@ -3133,6 +3133,8 @@ body.modal-open {
    sin traer un componente nuevo: el bloque de previsualización ya existía para «reducir» y se
    reutiliza tal cual en compra/venta (§35: reutilizar antes que crear). */
 .reduce-preview-row.is-op { padding-bottom: 7px; border-bottom: 1px solid var(--border); }
+/* `display:flex` de la fila anulaba el `[hidden]` del navegador: la fila «Valor de la operación —» se veía con su guion. */
+.reduce-preview-row[hidden] { display: none; }
 .reduce-preview-row.is-op strong { font-size: 15.5px; font-weight: 800; color: var(--text-bright, #fff); }
 .reduce-preview {
   background: var(--bg-card-2);
