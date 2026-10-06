@@ -13961,6 +13961,12 @@ function convertToNewModel(flatAssets) {
 // set, propagating the loss to localStorage + Supabase). Instead we SALVAGE the holding so the
 // user's position survives: prefer full metadata from the legacy mirror (`portfolio_assets`),
 // otherwise preserve the authoritative financials (qty/costBasis/realizedPnL/transactions) with
+    // AURIX-CLOSED-POSITIONS-1 · el CIERRE también es durable. `_closePosition`
+    // marcaba `lifecycleStatus='closed'` sólo en memoria: tras recargar, la fila
+    // volvía como posición ACTIVA a cero (contaba en el recuento y en la
+    // distribución). Va en el mismo jsonb de holdings — sin cambio de esquema,
+    // como `realizedPnL` — y sólo cuando está cerrada.
+    ...(a.lifecycleStatus === 'closed' ? { lifecycleStatus: 'closed', closedAt: a.closedAt || null } : {}),
 // a degraded display. Only a genuinely EMPTY orphan (no qty, no transactions, no cost) is
 // dropped. Intentionally-deleted assets have no holding row, so they are never resurrected.
 function _aurixSalvageHolding(h, fallbackById) {
@@ -14003,6 +14009,7 @@ function _aurixSalvageHolding(h, fallbackById) {
     transactions: tx, coinId: null, marketSymbol: null, image: null, logo: null,
     karat: null, goldUnit: null, isin: null, rent: null, location: null,
     _recovered: true, _orphanAssetId: h.asset_id || null,
+      ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
   };
 }
 
@@ -14013,6 +14020,7 @@ function _aurixLegacyFallbackById() {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
     const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.assets) ? raw.assets : []);
     const map = {};
+    ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
     arr.forEach(a => { if (a && a.id != null) map[a.id] = a; });
     return map;
   } catch (_) { return {}; }
@@ -14028,6 +14036,32 @@ function convertFromNewToFlat(catalogAssets, holdings, fallbackById) {
       if (!salvaged) return null;   // genuinely empty orphan only
       try { console.warn('[DATA][RECOVERED] Orphaned holding salvaged (missing catalog asset):', h.asset_id, salvaged._recovered ? '(metadata ' + (fallbackById && (fallbackById[h.asset_id] || fallbackById[h.id]) ? 'from legacy mirror' : 'degraded') + ')' : ''); } catch (_) {}
       return salvaged;
+// Cerrada = lo declara el holding, o (filas guardadas ANTES de que el cierre se
+// persistiera) lleva exactamente la huella de `_closePosition`: cantidad 0, coste 0
+// y operaciones registradas. Un activo a cero SIN operaciones no se toca: no hay
+// prueba de que se vendiera. No se borra nada; sólo deja de contar como activa, y
+// recomprar la reactiva por el camino existente (`_reactivatePosition`).
+function _aurixHoldingIsClosed(h) {
+  if (!h) return false;
+  if (h.lifecycleStatus === 'closed') return true;
+  // Cantidad CANÓNICA cero (un «   » o un null son cantidad DESCONOCIDA, no cero) y
+  // operaciones que NETEAN a cero. Sin lo segundo, un holding cuya cantidad se
+  // blanqueó a 0 en disco pero con compras vivas —que `syncQtyFromTransactions`
+  // reparaba al pintar— se habría cerrado y la reparación se perdería al guardar.
+  // Lo encontró la revisión financiera.
+  const q = (typeof _aurixUsableQuantity === 'function') ? _aurixUsableQuantity(h.quantity)
+          : ((h.quantity === '' || h.quantity == null) ? NaN : Number(h.quantity));
+  if (q !== 0 || Number(h.costBasis) > 0) return false;
+  const tx = Array.isArray(h.transactions) ? h.transactions : [];
+  if (!tx.length) return false;
+  let net = 0;
+  for (const t of tx) {
+    const n = Number(t && t.qty);
+    if (!Number.isFinite(n)) return false;          // una operación ilegible no prueba un cierre
+    if (t.type === 'buy') net += n; else if (t.type === 'sell') net -= n;
+  }
+  return Math.abs(net) <= 1e-9;
+}
     }
     return {
       id:            h.id,
@@ -14061,6 +14095,7 @@ function convertToLegacyFormat(catalogAssets, holdings) {
 
 function saveData({ assets: catalogAssets, holdings }, context) {
   // P0-DATA-INTEGRITY-LOCK — block a destructive local write (fewer assets/holdings/tx) unless an
+      ...((typeof _aurixHoldingIsClosed === 'function' && _aurixHoldingIsClosed(h)) ? { lifecycleStatus: 'closed', closedAt: h.closedAt || null } : {}),
   // explicit user-destructive context authorises it. A blocked write leaves the last valid
   // portfolio untouched on disk (no overwrite), so a bad load/migration/sync cannot become loss.
   const previous = _aurixReadPersistedCounts();
