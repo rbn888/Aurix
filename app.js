@@ -13834,7 +13834,14 @@ function computeAurixTWRSeries(range) {
 }
 
 if (typeof window !== 'undefined') {
-  window.computeAurixTWRSeries = (range) => computeAurixTWRSeries(range || activeRange || '30d');
+  // ── UNA FUNCIÓN DE NIVEL SUPERIOR *ES* LA PROPIEDAD GLOBAL ─────────────────
+  // `window.X = (r) => X(r)` sustituye la declaración por la flecha, y la flecha
+  // se llama a sí misma. Chromium lo corta con un RangeError (que los try
+  // silencian); JavaScriptCore, en modo estricto, ejecuta la llamada de cola SIN
+  // pila y no vuelve NUNCA: era el cuelgue de WebKit de escritorio (ver el mismo
+  // arreglo en `auditAurixRenderVsCanonical`). Se captura la original antes.
+  const _computeAurixTWRSeriesFn = computeAurixTWRSeries;
+  window.computeAurixTWRSeries = (range) => _computeAurixTWRSeriesFn(range || activeRange || '30d');
   window.debugAurixTWRSeries = (range) => {
     const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
     const snaps = _aurixUsdSnapshotsForRange(r);
@@ -35216,7 +35223,17 @@ function auditAurixRenderVsCanonical(range) {
 }
 
 if (typeof window !== 'undefined') {
-  window.auditAurixRenderVsCanonical = (range) => auditAurixRenderVsCanonical(range || (typeof activeRange !== 'undefined' ? activeRange : '30d'));
+  // ── EL CUELGUE DE WEBKIT DE ESCRITORIO ────────────────────────────────────
+  // Esta línea era `window.auditAurixRenderVsCanonical = (range) =>
+  // auditAurixRenderVsCanonical(…)`. Una función de nivel superior ES la propiedad
+  // global, así que la asignación la sustituía por una flecha que se llama a sí
+  // misma. `renderWealthCurve` la invoca en cada pintado de escritorio: en Chromium
+  // la recursión acaba en RangeError y el `try` la silencia (la auditoría nunca
+  // corrió); en WebKit, con 'use strict', JavaScriptCore aplica llamadas de cola
+  // propias —sin pila que desbordar— y el hilo NO VUELVE. Por eso «switchLang
+  // cuelga WebKit en ≥1024»: el idioma sólo era el primer repintado del gráfico.
+  const _auditAurixRenderVsCanonicalFn = auditAurixRenderVsCanonical;
+  window.auditAurixRenderVsCanonical = (range) => _auditAurixRenderVsCanonicalFn(range || (typeof activeRange !== 'undefined' ? activeRange : '30d'));
   window.auditAurixRenderVsCanonicalAll = () => {
     const rows = ['24h', '7d', '30d', '1y', 'all'].map(auditAurixRenderVsCanonical);
     try {
