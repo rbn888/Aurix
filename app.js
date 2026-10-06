@@ -4761,7 +4761,7 @@ let lang = localStorage.getItem(LANG_KEY) || 'es';
 const T = {
   es: {
     // Summary
-    totalValue:      'Valor total',
+    totalValue:      'Patrimonio invertible',
     addAsset:        '+ Añadir activo',
     addLiquidity:    '+ Añadir liquidez',
     noPrices:        'precios no cargados',
@@ -8111,7 +8111,7 @@ const T = {
   },
   en: {
     // Summary
-    totalValue:      'Total value',
+    totalValue:      'Investable wealth',
     addAsset:        '+ Add asset',
     addLiquidity:    '+ Add liquidity',
     noPrices:        'prices not loaded',
@@ -23315,7 +23315,7 @@ function _wsProjMeta(p) {
   const r = p.results; if (!r) return '';
   if (p.type === 'compound_growth' && r.final != null) return formatBase(r.final);
   if (p.type === 'monthly_budget' && r.saveRate != null) return r.saveRate + '%';
-  if (p.type === 'trade_journal' && r.netProfit != null) return (r.netProfit >= 0 ? '+' : '') + formatBase(r.netProfit);
+  if (p.type === 'trade_journal' && r.netProfit != null) return _wsJrnMoney(r.netProfit, r.currency, true);
   return '';
 }
 
@@ -26922,8 +26922,10 @@ function _wsFieldUnit(u) {
 // Aquí el sufijo DECLARA su tamaño y la hoja reserva lo que de verdad hace falta. Un sufijo
 // vacío no pinta span: así el campo sin unidad recupera sus 22 px en vez de guardarlos para
 // nada.
-function _wsFieldUnitHtml(u) {
-  const s = _wsFieldUnit(u);
+// `literal`: la unidad es la de un DOCUMENTO que declara su divisa (Diario), así
+// que «€» no se traduce a la divisa base del usuario.
+function _wsFieldUnitHtml(u, literal) {
+  const s = literal ? u : _wsFieldUnit(u);
   if (s == null || s === '') return '';
   return '<span class="ws4-field-unit" data-ws-unit="' + (String(s).length > 1 ? 'lg' : 'sm') + '">' + _intccEsc(s) + '</span>';
 }
@@ -27430,7 +27432,10 @@ function _wsToolDocSummary(p) {
   const r = (p && p.results) || null;
   if (!r) return [];
   const m = (k, v) => ({ k: t(k), v: v });
-  const money = v => (Number.isFinite(Number(v)) ? formatBase(Number(v)) : null);
+  // `Number(null)` es 0 y es finito: un resultado NO publicable (diario con divisas
+  // mezcladas) salía como «0,00 €». Y la divisa es la que el documento GUARDÓ, si la
+  // declara; la base sólo para los que no la declaran.
+  const money = v => ((v != null && v !== '' && Number.isFinite(Number(v))) ? _wsJrnMoney(Number(v), r.currency) : null);
   const out = [];
   const push = (key, val) => { if (val != null && val !== '') out.push(m(key, val)); };
   try {
@@ -27619,7 +27624,7 @@ function _wsToolCommit(name, forceNew, targetId) {
   } else if (_wsToolActive === 'journal') {
     const r = calculateTradeJournal(_wsToolInputs.trades);
     type = 'trade_journal';
-    results = { netProfit: Math.round(r.netProfit), avgReturn: r.avgReturn == null ? null : Math.round(r.avgReturn * 10) / 10, avgReturnBasis: r.avgReturnBasis, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
+    results = { netProfit: r.netProfit == null ? null : Math.round(r.netProfit), currency: r.currency, avgReturn: r.avgReturn == null ? null : Math.round(r.avgReturn * 10) / 10, avgReturnBasis: r.avgReturnBasis, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
   } else if (_wsToolActive === 'budget') {
     const r = calculateMonthlyBudget(_wsToolInputs);
     type = 'monthly_budget';
@@ -28664,7 +28669,7 @@ function _wsJrnPreviewHtml(d) {
   if (buy <= 0 || qty <= 0) return '';
   const invested = buy * qty + fee;
   const sellRaw = (d.sell == null ? '' : String(d.sell)).trim();
-  if (sellRaw === '') return `<span class="wsjrn-prev is-open">${esc(t('wsjrn_st_open'))} · ${esc(formatBase(invested))}</span>`;
+  if (sellRaw === '') return `<span class="wsjrn-prev is-open">${esc(t('wsjrn_st_open'))} · ${esc(_wsJrnMoney(invested, d.currency))}</span>`;
   const exit = _wsNum(sellRaw) * qty, pl = exit - invested, ret = invested > 0 ? pl / invested * 100 : 0;
   const cls = pl >= 0 ? 'is-win' : 'is-loss';
   return `<span class="wsjrn-prev ${cls}">${esc(_wsJrnMoney(pl, d.currency, true))} · ${esc(_wsJrnPct(ret))}</span>`;
@@ -28708,7 +28713,10 @@ function _wsJrnAdd() {
   // visualización, no por una decisión sobre el diario.
   // La divisa se fija en la PRIMERA operación y no se mueve. Cambiar la divisa base
   // cambia cómo se muestran otras cosas; no reescribe en qué moneda operaste.
-  if (!_wsToolInputs.currency) _wsToolInputs.currency = trade.currency;
+  // Un diario VACÍO aún no ha operado en ninguna moneda: la que se elige con la
+  // primera operación pasa a ser la del documento (el defecto declara EUR, y sin
+  // esto un usuario en dólares no podía abrir un diario en dólares).
+  if (!_wsToolInputs.currency || !list.length) _wsToolInputs.currency = trade.currency;
   else trade.currency = _wsToolInputs.currency;
   if (_wsJrnEditId) { const i = list.findIndex(x => x && x.id === _wsJrnEditId); if (i >= 0) list[i] = trade; else list.push(trade); }
   else list.push(trade);
@@ -28747,6 +28755,8 @@ function _wsJrnChartHtml(res) {
   const esc = _intccEsc;
   const closed = res.list.filter(x => !x.open);
   if (!closed.length) return '';
+  // Cambiar la divisa cambia la unidad de TODOS los campos: se repinta el formulario.
+  if (el.getAttribute('data-wsjrn-input') === 'currency') { _wsJrnRerender(); return; }
   const W = 360, H = 140, padX = 16, midY = H / 2;
   const maxAbs = Math.max.apply(null, closed.map(x => Math.abs(x.ret)).concat([1]));
   const n = closed.length, slot = (W - 2 * padX) / n, bw = Math.min(30, slot * 0.55);
@@ -28802,7 +28812,8 @@ function _wsJrnFormHtml() {
   const d = _wsJrnDraft || _wsJrnNewDraft();
   const editing = !!_wsJrnEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
+  // La unidad es la del DIARIO: `literal`, para que «€» no se traduzca a la base.
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}">${_wsFieldUnitHtml(unit, true)}</span></label>`;
   const sel = (k, label, opts) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsjrn-input="${k}">${opts.map(o => `<option value="${esc(o.v)}"${d[k] === o.v ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></span></label>`;
   const types = [['stock', 'wsjrn_type_stock'], ['etf', 'wsjrn_type_etf'], ['crypto', 'wsjrn_type_crypto'], ['other', 'wsjrn_type_other']].map(([v, lk]) => ({ v, l: t(lk) }));
   const ccys = ['EUR', 'USD', 'GBP'].map(c => ({ v: c, l: c }));
@@ -28812,10 +28823,11 @@ function _wsJrnFormHtml() {
       <div class="wsjrn-form-grid">
         ${txt('asset', t('wsjrn_f_asset'))}
         ${sel('atype', t('wsjrn_f_type'), types)}
-        ${num('buy', t('wsjrn_f_buy'), '€')}
-        ${num('sell', t('wsjrn_f_sell'), '€')}
+        ${hasTrades ? '' : sel('currency', t('wsjrn_f_ccy'), ccys)}
+        ${num('buy', t('wsjrn_f_buy'), unit)}
+        ${num('sell', t('wsjrn_f_sell'), unit)}
         ${num('qty', t('wsjrn_f_qty'))}
-        ${num('fee', t('wsjrn_f_fee'), '€')}
+        ${num('fee', t('wsjrn_f_fee'), unit)}
         ${/* La divisa YA NO se elige por operación: es del DOCUMENTO, y el campo
               nuevo hereda la del diario. Elegirla por fila era lo que permitía
               construir un diario cuyos totales no eran de ninguna moneda. */''}
@@ -28850,14 +28862,14 @@ function _wsJrnListHtml(res) {
           ${ccyChip}
         </div>
         <div class="wsjrn-card-rows">
-          <span class="wsjrn-row"><i>${esc(t('wsjrn_buy'))}</i><b>${esc(formatBase(tr.buy))}</b></span>
-          <span class="wsjrn-row"><i>${esc(t('wsjrn_sell'))}</i><b>${tr.open ? '—' : esc(formatBase(tr.sell))}</b></span>
+          <span class="wsjrn-row"><i>${esc(t('wsjrn_buy'))}</i><b>${esc(_wsJrnMoney(tr.buy, tr.currency))}</b></span>
+          <span class="wsjrn-row"><i>${esc(t('wsjrn_sell'))}</i><b>${tr.open ? '—' : esc(_wsJrnMoney(tr.sell, tr.currency))}</b></span>
           <span class="wsjrn-row"><i>${esc(t('wsjrn_f_qty'))}</i><b>${esc(String(tr.qty))}</b></span>
         </div>
         <div class="wsjrn-card-pl">
           ${tr.open
             ? `<span class="wsjrn-status is-open">${esc(t('wsjrn_st_open'))}</span>`
-            : `<span class="wsjrn-ret is-${st}">${esc(_wsJrnPct(tr.ret))}</span><span class="wsjrn-pl is-${st}">${esc((tr.pl >= 0 ? '+' : '') + formatBase(tr.pl))}</span>`}
+            : `<span class="wsjrn-ret is-${st}">${esc(_wsJrnPct(tr.ret))}</span><span class="wsjrn-pl is-${st}">${esc(_wsJrnMoney(tr.pl, tr.currency, true))}</span>`}
         </div>
         <div class="wsjrn-card-acts">
           <button type="button" class="wsh-scard-x" data-wsjrn-act="edit" data-wsjrn-id="${esc(tr.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}">${ICON_EDIT}</button>
@@ -28880,6 +28892,13 @@ function _renderJournalTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="${esc(_WS_TOOL_ACCENT.journal)}">
       ${_wsSurfaceHeadHtml({ title: t('wstool_journal_n'), doc: _wsToolDocName(), help: [t('wstool_journal_d')] })}
+  // ── LA UNIDAD DEL CAMPO ES LA DIVISA DEL DIARIO ───────────────────────────
+  // Era un «€» literal: con un diario en dólares el formulario decía euros, la
+  // lista decía la divisa BASE y el resumen la del documento — tres monedas para
+  // la misma operación. La divisa se elige sólo mientras el diario está VACÍO;
+  // con operaciones ya es del documento y no se mueve (ver `_wsJrnAdd`).
+  const hasTrades = !!(_wsToolInputs && Array.isArray(_wsToolInputs.trades) && _wsToolInputs.trades.length);
+  const unit = (typeof _aurixCurrencyGlyph === 'function') ? _aurixCurrencyGlyph(d.currency || 'EUR') : '€';
       ${/* ── UN RESUMEN DE NADA NO ES UN RESUMEN ──────────────────────────────
             Con el diario vacío esta tarjeta publicaba cuatro guiones y empujaba
             el formulario 300 px hacia abajo: lo primero que veía el usuario era
