@@ -135,6 +135,23 @@ console.log('\n3 · Diario: la misma operación se lee en una sola moneda:');
   vm.runInContext('_wsToolInputs = { currency: "EUR", trades: [] }; _wsJrnDraft = null;', sb);
   ok('3.5 con el diario vacío se puede elegir la divisa del documento',
     /data-wsjrn-input="currency"/.test(vm.runInContext('_wsJrnFormHtml()', sb)));
+  // Captura v801: un borrador creado con la base (USD) antes de abrir un diario en EUR.
+  {
+    const c2 = sandbox();
+    vm.runInContext('var lang = "es", baseCurrency = "USD"; function t(k){ return k; } function _intccEsc(x){ return String(x == null ? "" : x); }'
+      + 'function formatBase(a){ return formatCurrency(a, baseCurrency); } function _wsFormatInputNumber(v){ return String(v); }'
+      + 'function _wsFieldUnit(u){ return u; } function _aurixCurrencyGlyph(c){ return ({ EUR: "€", USD: "$" })[c] || c; }'
+      + 'function _wsToolStateGet(){ return null; } function _wsNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }'
+      + 'function _wsSurfaceHeadHtml(){ return ""; } function _wsToolDocName(){ return ""; } function _wsToolSavedListHtml(){ return ""; } function _wsToolSaveBarHtml(){ return ""; }'
+      + 'var _WS_TOOL_ACCENT = { journal: "x" }, _wsJrnEditId = null, _wsJrnDraft = { currency: "USD", buy: "", qty: "", sell: "", fee: "" };'
+      + 'var _wsToolInputs = { currency: "EUR", trades: [{ id: "t1", asset: "BTC", atype: "crypto", buy: 52000, sell: 61000, qty: 0.5, fee: 20, currency: "EUR" }] };', c2);
+    load(c2, ['formatCurrency', '_wsJrnMoney', '_wsJrnPct', 'calculateTradeJournal', '_wsJrnNewDraft', '_wsJrnPreviewHtml', '_wsFieldUnitHtml',
+              '_wsJrnFormHtml', '_wsJrnListHtml', '_wsJrnSummaryHtml', '_wsJrnChartHtml', '_wsJournalDefaults', '_renderJournalTool']);
+    const html = vm.runInContext('_renderJournalTool()', c2);
+    const units = [...html.matchAll(/class="ws4-field-unit"[^>]*>([^<]*)</g)].map(m => m[1]);
+    ok('3.7 un borrador creado con la base (USD) se alinea con el diario en EUR al abrirlo',
+      units.length === 3 && units.every(u => u === '€') && vm.runInContext('_wsJrnDraft.currency', c2) === 'EUR', JSON.stringify(units));
+  }
   ok('3.6 la vista previa de una operación abierta usa la divisa del borrador',
     /US\$/.test(vm.runInContext('_wsJrnPreviewHtml({ buy: "10", qty: "2", fee: "", sell: "", currency: "USD" })', sb)));
 }
