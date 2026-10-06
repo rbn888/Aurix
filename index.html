@@ -2186,6 +2186,9 @@
       <div class="settings-techinfo">
         <span class="settings-techinfo-label" data-i18n="settingsBuild">Build</span>
         <span class="settings-techinfo-value" id="settingsBuildVersion">v1.0 · 2026.05</span>
+        <!-- Era un literal que nadie actualizaba: soporte no podía saber qué build tenía el usuario.
+             Se publica el MISMO identificador que el diagnóstico técnico (AURIX_BUILD, el que se sube en cada deploy). -->
+        <script>try{var _sbv=document.getElementById('settingsBuildVersion');if(_sbv&&window.AURIX_BUILD)_sbv.textContent=window.AURIX_BUILD;}catch(_){}</script>
       </div>
 
       </div>

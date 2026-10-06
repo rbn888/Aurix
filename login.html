@@ -621,7 +621,8 @@
         'lg.emb.copy': 'Copiar enlace',
         'lg.emb.copied': 'Enlace copiado',
         'lg.emb.micro': 'Solo tendrás que iniciar sesión una vez en ese navegador.',
-        'lg.emb.manual': 'Pulsa ⋯ y selecciona «Abrir en Safari».'
+        'lg.emb.manual': 'Pulsa ⋯ y selecciona «Abrir en Safari».',
+        'lg.emb.manual_android': 'Pulsa ⋮ y selecciona «Abrir en el navegador».'
       },
       en: {
         'lg.title': 'AURIX — Access',
@@ -657,7 +658,8 @@
         'lg.emb.copy': 'Copy link',
         'lg.emb.copied': 'Link copied',
         'lg.emb.micro': 'You will only need to sign in once in that browser.',
-        'lg.emb.manual': 'Tap ⋯ and choose “Open in Safari”.'
+        'lg.emb.manual': 'Tap ⋯ and choose “Open in Safari”.',
+        'lg.emb.manual_android': 'Tap ⋮ and choose “Open in browser”.'
       }
     };
     function tL(k) { return (LOGIN_I18N[LOGIN_LANG] && LOGIN_I18N[LOGIN_LANG][k]) || LOGIN_I18N.es[k] || ''; }
@@ -806,8 +808,24 @@
         // explícita. NO se promete que iOS abandone la WebView: no hay API para
         // forzar Safari, así que la instrucción manual se revela siempre tras el
         // intento en vez de fingir que funcionó.
-        try { window.open(url, '_blank', 'noopener'); } catch (_) {}
-        var man = document.getElementById('embManual'); if (man) man.style.display = '';
+        // ANDROID SÍ TIENE SALIDA: un `intent://` con `scheme=https` lo resuelve el
+        // sistema, no la WebView, y abre el navegador por defecto (o el selector).
+        // Antes sólo se hacía `window.open`, que dentro de la WebView de X vuelve a
+        // cargar la app EN LA MISMA WebView → login → este mismo interstitial: el
+        // bucle. `browser_fallback_url` mantiene el destino si no hay quien lo abra.
+        // iOS no tiene equivalente: ahí sigue el intento HTTPS + la instrucción manual.
+        var isAndroid = /Android/i.test(String(navigator.userAgent || ''));
+        if (isAndroid) {
+          try {
+            var u = new URL(url);
+            location.href = 'intent://' + u.host + u.pathname + u.search
+              + '#Intent;scheme=https;S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+          } catch (_) { try { window.open(url, '_blank', 'noopener'); } catch (_) {} }
+        } else {
+          try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+        }
+        var man = document.getElementById('embManual');
+        if (man) { if (isAndroid) man.textContent = tL('lg.emb.manual_android') || man.textContent; man.style.display = ''; }
       });
       if (copy) copy.addEventListener('click', function () {
         var url = _embTargetUrl();

@@ -49,7 +49,11 @@
   function _draw(ts) {
     if (!_ctx) return; // stopped — bail
 
-    _raf = requestAnimationFrame(_draw);
+    // `prefers-reduced-motion`: el orbe se pinta una vez, quieto, y el bucle no sigue.
+    let _rm = false;
+    try { _rm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (_) {}
+    _raf = _rm ? null : requestAnimationFrame(_draw);
+    if (_rm) ts = 0;
 
     const t      = ts * 0.001;
     const floatY = Math.sin(t * (2 * Math.PI / 7)) * (_H * 0.02);
