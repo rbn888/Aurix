@@ -28969,6 +28969,10 @@ function _renderJournalTool() {
   const esc = _intccEsc;
   if (!_wsToolInputs || !Array.isArray(_wsToolInputs.trades)) _wsToolInputs = _wsJournalDefaults();
   if (!_wsJrnDraft) _wsJrnDraft = _wsJrnNewDraft();
+  // El borrador puede haberse creado ANTES de abrir este diario (con la divisa base o
+  // la de otro documento): con operaciones, su divisa es la del DOCUMENTO, siempre.
+  // Sin esto las unidades decían «$» sobre un diario en euros — lo destapó la captura.
+  if (_wsToolInputs.trades.length && _wsToolInputs.currency) _wsJrnDraft.currency = _wsToolInputs.currency;
   const res = calculateTradeJournal(_wsToolInputs.trades);
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="${esc(_WS_TOOL_ACCENT.journal)}">
