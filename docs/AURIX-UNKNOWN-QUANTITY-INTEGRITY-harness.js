@@ -529,7 +529,12 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
     // si la cantidad no es certificable no emite flujo alguno, porque inventar el importe
     // de la salida contaminaría el rendimiento con una retirada que nadie puede probar.
     // Gate propio: docs/AURIX-WEALTH-TRANSACTION-INTEGRITY-harness.js (sección 7).
-    '_aurixLedgerAssetRemoval'];
+    '_aurixLedgerAssetRemoval',
+    // aurix/coherence-premium — reconocer un CIERRE heredado (guardado antes de que el
+    // estado se persistiera) exige cantidad CANÓNICA cero: una cantidad desconocida no es
+    // un cero y no puede cerrar una posición. Lo pidió la revisión financiera. Gate propio:
+    // docs/AURIX-COHERENCE-PREMIUM-harness.js §1.4b-1.4c.
+    '_aurixHoldingIsClosed'];
   ok('30.3 the quantity rule is used ONLY where this SPEC declares it',
     (app.match(/_aurixUsableQuantity\(/g) || []).length === DECLARED_CALL_SITES.length + 2   // +1 definicion, +1 recomputeDerivedFinancialState
     && DECLARED_CALL_SITES.every(n => /_aurixUsableQuantity\(/.test(fnSrc(n)))
