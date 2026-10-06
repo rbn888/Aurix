@@ -123,10 +123,17 @@ console.log('\n5 — iOS/Android: lo que de verdad se puede prometer:');
   const wire = fnSource(login, '_wireEmbeddedInterstitial');
   ok('5.1 el CTA usa navegación HTTPS estándar desde una interacción explícita',
      /window\.open\(url, '_blank', 'noopener'\)/.test(wire));
-  ok('5.2 sin esquemas privados ni hacks para forzar Safari',
-     !/x-safari|googlechrome:|intent:\/\/|package=/i.test(login));
+  // RE-DECIDIDO (aurix/coherence-premium): en ANDROID la salida existe y es estándar —un
+  // `intent://` con `scheme=https` lo resuelve el sistema, no la WebView— y sin ella el
+  // usuario de X volvía a la MISMA WebView: el bucle. Sigue prohibido todo lo que FUERCE
+  // un navegador concreto (x-safari, googlechrome:, package=) y el intent exige estar
+  // detrás de la detección de Android y llevar `browser_fallback_url`.
+  ok('5.2 sin esquemas para forzar un navegador concreto',
+     !/x-safari|googlechrome:|package=/i.test(login));
+  ok('5.2b intent:// sólo en Android, con scheme=https y destino de respaldo',
+     /isAndroid = \/Android\/i\.test/.test(wire) && /if \(isAndroid\) \{[\s\S]*intent:\/\/[\s\S]*#Intent;scheme=https;S\.browser_fallback_url=/.test(wire));
   ok('5.3 la instrucción manual se revela SIEMPRE tras el intento (no se finge éxito)',
-     /embManual'\); if \(man\) man\.style\.display = ''/.test(wire));
+     /embManual'\);\s*if \(man\) \{[^}]*man\.style\.display = ''; \}/.test(wire));
   ok('5.4 existe fallback de copiado sin depender de la Clipboard API',
      /navigator\.clipboard/.test(wire) && /execCommand\('copy'\)/.test(wire));
   ok('5.5 el portapapeles NO se toca sin que el usuario lo pida',

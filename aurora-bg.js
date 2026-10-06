@@ -227,6 +227,10 @@
 
   // ── Main loop ────────────────────────────────────────────────
   let _lastTs = 0;
+  let _staticDrawn = false;
+  function _reduceMotion() {
+    try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
+  }
 
   function animateBackground(ts) {
     requestAnimationFrame(animateBackground);
@@ -237,7 +241,14 @@
     if (lastActiveState !== _active) {
       canvas.style.opacity = _active ? '1' : '0';
       lastActiveState = _active;
+      _staticDrawn = false;
     }
+
+    // Con el lienzo invisible (otra vista, pestaña oculta) no se pinta: el bucle
+    // dibujaba ~170 partículas por frame en TODAS las vistas con opacidad 0.
+    // Con `prefers-reduced-motion` se pinta UNA vez por activación y se queda quieto.
+    if (!_active || document.hidden) return;
+    if (_reduceMotion()) { if (_staticDrawn) return; _staticDrawn = true; }
 
     ctx.clearRect(0, 0, W, H);
 
