@@ -40697,6 +40697,12 @@ function _aurixIntelQuestions(model, ctx, limit, policy) {
   const eligible = q.filter(item => {
     const d = declined[item.field];
     if (Number.isFinite(d) && now - d < _AURIX_INTEL_Q_DECLINED_MS) return false;
+    // La pregunta que ESTA sesión ya está enseñando sigue siendo la pregunta: el
+    // cooldown es para no insistir entre visitas, no para cambiarla de sitio al
+    // salir y volver de la pestaña. Sin esto, la impresión la mandaba al cooldown y
+    // en la siguiente pintura aparecía OTRA —y ésa también se marcaba—, así que
+    // navegar rotaba preguntas que el usuario no había contestado ni declinado.
+    try { if (typeof _intelMarkedQuestionId !== 'undefined' && _intelMarkedQuestionId === item.id) return true; } catch (_) {}
     const a = asked[item.id];
     if (a && Number.isFinite(a.at) && now - a.at < _AURIX_INTEL_Q_COOLDOWN_MS
         && !(actionAt != null && actionAt > a.at)) return false;
@@ -65092,7 +65098,46 @@ try { if (typeof window !== 'undefined') { window._aurixIntelligencePreviewHTML 
 // out of Workspace into this dedicated tab. PURELY a move: it reuses the
 // EXISTING renderers (desktop exec layout / mobile cockpit) reading the live
 // `_aurixWorkspaceIntelligence()` payload. Read-only — no editable sheet here.
+// ── INTELLIGENCE SE REPINTA CUANDO CAMBIAN SUS DATOS, NO SÓLO AL ENTRAR ──────
+// `renderIntelligenceTab` sólo corría al cambiar de pestaña: quien abría
+// Intelligence antes de que terminara la carga se quedaba en el estado «datos
+// insuficientes» hasta salir y volver, y una operación nueva no se reflejaba.
+// Se repinta (con retardo, una vez) si la pestaña está VISIBLE y además: estaba en
+// su estado de hidratación y ésta ya terminó, o cambió la FIRMA MATERIAL de la
+// cartera (activos, cantidades, nº de operaciones). Los ticks de precio NO repintan
+// —eso movería la pantalla cada pocos segundos— y con el foco dentro (una respuesta
+// a medio escribir) se espera a la siguiente ocasión.
+let _intelRefreshTimer = null, _intelRefreshSig = null;
+function _aurixIntelMaterialSig() {
+  try {
+    return activeAssets().map(a => [a.id, a.qty, Array.isArray(a.transactions) ? a.transactions.length : 0].join(':')).join('|');
+  } catch (_) { return null; }
+}
+function _aurixIntelScheduleRefresh() {
+  if (_intelRefreshTimer) return;
+  _intelRefreshTimer = setTimeout(() => {
+    _intelRefreshTimer = null;
+    try {
+      const ph = document.getElementById('tabPlaceholder');
+      if (!ph || !ph.classList.contains('tab-placeholder--intel')) { _intelRefreshSig = null; return; }
+      const screen = ph.querySelector('.aurix-intelligence-screen'); if (!screen) return;
+      const sig = _aurixIntelMaterialSig();
+      const hydrated = !!screen.querySelector('[data-hydrating="1"]') && !_intccHydrationPending();
+      const changed = _intelRefreshSig != null && sig != null && sig !== _intelRefreshSig;
+      if (_intelRefreshSig == null) _intelRefreshSig = sig;
+      if (!hydrated && !changed) return;
+      const ae = document.activeElement;
+      if (ae && ph.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+      _intelRefreshSig = sig;
+      ph.innerHTML = renderIntelligenceTab();
+      if (typeof _initIntelligenceCommandCenter === 'function') _initIntelligenceCommandCenter();
+    } catch (_) {}
+  }, 600);
+}
+
 function renderIntelligenceTab() {
+  // La firma material con la que se pinta: el refresco compara contra ÉSTA.
+  try { _intelRefreshSig = _aurixIntelMaterialSig(); } catch (_) {}
   // AURIX PREMIUM — Launch-1 gate: non-premium users see the premium preview (owner bypasses).
   // INT.PREVIEW.V1 (SPEC 2.4): that preview is no longer the dead "PRÓXIMAMENTE" card but a
   // real, personalised reading of the user's own portfolio. The gate itself is UNCHANGED —
@@ -72270,6 +72315,7 @@ function render(animate = false) {
     syncQtyFromTransactions(asset);
     syncCostBasisFromTransactions(asset);
   });
+  try { _aurixIntelScheduleRefresh(); } catch (_) {}
   // AURIX-ASSET-DETAIL-1: while the asset-detail screen is open, refresh it and
   // skip the dashboard/category section toggling so a price tick can't repaint
   // the dashboard over the screen. Data is synced above first.
