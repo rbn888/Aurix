@@ -132,7 +132,7 @@ const CAT = run('_WS_CATALOG', FREE);
     (CAT.find(e => e.id === 'tpl_assets') || {}).published === false
     && (CAT.find(e => e.id === 'tpl_journal') || {}).published === true
     && /totalsPublishable/.test(fnSrc('calculateTradeJournal'))
-    && /if \(!_wsToolInputs\.currency\) _wsToolInputs\.currency = trade\.currency;/.test(app));
+    && /if \(!_wsToolInputs\.currency \|\| !list\.length\) _wsToolInputs\.currency = trade\.currency;/.test(app));
   ok('1.11 su matemática SÍ se corrigió, aunque siga interna',
     /§J \/ §E — EL AGREGADO SALE DE IMPORTES/.test(app)
     && /averageReturnBasis/.test(app));
@@ -549,8 +549,11 @@ console.log('\n7 · Un documento, una moneda; y la mezcla no se suma:');
     !/exchangeRate|fxRate|convertCurrency/.test(fnSrc('calculateTradeJournal'))
     && !/exchangeRate|fxRate|convertCurrency/.test(fnSrc('calculateAssetPrices')),
     'la solución mínima segura NO convierte: declara');
-  ok('7.8 y la divisa por operación ya no se elige en el formulario',
-    !/sel\('currency', t\('wsjrn_f_ccy'\), ccys\)/.test(app));
+  // RE-DECIDIDO (aurix/coherence-premium): la divisa se elige como divisa del
+  // DOCUMENTO, y sólo mientras el diario está vacío. Con operaciones el selector no
+  // existe — que es lo que esta aserción protegía: que no se elija POR OPERACIÓN.
+  ok('7.8 la divisa no se elige por operación: sólo con el diario vacío (divisa del documento)',
+    /\$\{hasTrades \? '' : sel\('currency', t\('wsjrn_f_ccy'\), ccys\)\}/.test(app));
   const CK = ['wsjrn_mixed_ccy', 'wsjrn_doc_ccy', 'wsjrn_doc_ccy_hint'];
   const occ = k => (app.match(new RegExp('\\n    ' + k + ':', 'g')) || []).length;
   ok('7.9 la copy de la mezcla existe en ES y EN',
@@ -649,8 +652,20 @@ console.log('\n8 · Diario · un documento, una moneda, declarada:');
     !/_aurixCaptureFlow|aurixCashOperation|_ledgerTrade/.test(fnSrc('_wsJrnAdd')),
     'registro de decisiones, no un segundo ledger');
   ok('8.11 la divisa se fija en la primera operación y no se mueve',
-    /if \(!_wsToolInputs\.currency\) _wsToolInputs\.currency = trade\.currency;/.test(app)
+    /if \(!_wsToolInputs\.currency \|\| !list\.length\) _wsToolInputs\.currency = trade\.currency;/.test(app)
     && /else trade\.currency = _wsToolInputs\.currency;/.test(app));
+  // Un diario VACÍO que declaraba EUR (el de arranque sin sus ejemplos) aún no ha
+  // operado en ninguna moneda: un usuario en dólares tiene que poder abrirlo en dólares.
+  {
+    const c = jrnCtx('USD');
+    vm.runInContext("_wsToolInputs = { currency: 'EUR', trades: [] };", c);
+    add(c, { asset: 'AAPL', buy: '100', qty: '1', currency: 'USD' });
+    add(c, { asset: 'MSFT', buy: '300', qty: '1', currency: 'EUR' });
+    const r = calc(c);
+    ok('8.12 diario vacío: la primera operación elige la divisa; la segunda la hereda',
+      vm.runInContext('_wsToolInputs.currency', c) === 'USD' && r.currency === 'USD' && r.currencyMixed === false,
+      JSON.stringify({ doc: vm.runInContext('_wsToolInputs.currency', c), list: r.currencies }));
+  }
 }
 
 // Las comprobaciones que exigen ejecutar código asíncrono (el push remoto) corren
