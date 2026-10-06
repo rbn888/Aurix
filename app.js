@@ -6298,6 +6298,7 @@ const T = {
     wsb_p_base:        'Patrimonio de partida',
     wsb_p_years:       'Horizonte',
     wsb_p_ret:         'Rentabilidad supuesta',
+    wsb_need_inputs:   'Los resultados aparecen cuando declares el patrimonio de partida y el horizonte.',
     wsb_base_missing:  'Declara tu patrimonio de partida: sin él Aurix no proyecta desde cero, porque cero sería un dato y no lo tiene.',
     wsb_by_contrib:    'De lo que aportas',
     wsb_by_growth:     'Del crecimiento estimado',
@@ -9303,6 +9304,7 @@ const T = {
     wsb_p_base:        'Starting wealth',
     wsb_p_years:       'Horizon',
     wsb_p_ret:         'Assumed return',
+    wsb_need_inputs:   'Results appear once you declare your starting wealth and the horizon.',
     wsb_base_missing:  'Declare your starting wealth: without it Aurix does not project from zero, because zero would be a figure it does not have.',
     wsb_by_contrib:    'From what you contribute',
     wsb_by_growth:     'From estimated growth',
@@ -23848,7 +23850,14 @@ function _wsPlansEmptyState() {
   if (worst === 'error') return 'error';
   if (_wsDocTableState === 'yes') return 'empty';
   if (_wsDocTableState === 'no') return 'empty';    // no hay tabla: lo local ES todo lo que hay
-  return 'loading';
+  // ── NO SE ESPERA A UNA LECTURA QUE NADIE LANZA ────────────────────────────
+  // `_wsDocTableState` sólo sale de 'unknown' con un push aceptado o con
+  // `_wsDocsPull`, y la lectura remota no se invoca (Workspace Sync sigue
+  // diferido). Un usuario sin planes —y un Free siempre, porque no empuja— veía
+  // «Comprobando tus planes…» para siempre. Sin petición en vuelo, lo que hay en
+  // este dispositivo ES lo que hay: vacío, no cargando. Sólo una escritura EN
+  // VUELO es una respuesta pendiente de verdad.
+  return worst === 'saving' ? 'loading' : 'empty';
 }
 // LA PROPORCIÓN SE MIDE, NO SE ILUSTRA. Dos magnitudes del MISMO motor que ya calcula las
 // métricas de la tarjeta —no hay una segunda matemática— y sólo si las dos son ciertas y su
@@ -24943,6 +24952,13 @@ function _wsbCompare(scenarios) {
     rows, reference: ref, base, years, ratePct, convention: conv,
     // §C — el porcentaje NO APLICA con base cero, y se dice en vez de calcularse.
     pctApplicable: base.known && base.value > 0,
+    // ── UNA SOLA VALIDACIÓN PARA TODA LA SALIDA ─────────────────────────────
+    // El aviso decía «sin base Aurix no proyecta desde cero» y, debajo, tarjetas,
+    // impacto, gráfico, conclusión y «Guardar escenario» publicaban proyecciones
+    // desde 0. Sólo la comparación de dos supuestos lo respetaba. Ahora todas las
+    // salidas leen ESTE campo, que exige lo mismo que `_wsbTwoWay`: base declarada
+    // y horizonte.
+    publishable: base.known && years > 0,
     assumptions: ref.assumptions,
   };
 }
@@ -25088,6 +25104,23 @@ function _wsbChartHtml(baselineProj, results) {
 // calculaba (§C manda retirarla). Lo que distingue a un escenario es su
 // APORTACIÓN, y eso sí se dice. Y la diferencia se desglosa en sus DOS causas,
 // porque sólo una de ellas depende del usuario.
+// Gráfico y conclusión: sólo con una comparación publicable, y con su propio
+// contenedor para que editar un parámetro los repinte junto al resto (antes se
+// quedaban con la hipótesis anterior hasta un repintado completo).
+function _wsbTailHtml(cmp) {
+  if (!cmp || !cmp.publishable) return '';
+  const esc = _intccEsc;
+  return `
+      <section class="wsh-card wsb-compare">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_chart_title'))}</h3></header>
+        <div class="wsb-chart">${_wsbChartHtml(cmp.reference.final, cmp.rows)}</div>
+      </section>
+
+      <section class="wsh-card wsb-concl is-feature">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_concl_title'))}</h3></header>
+        <p class="wsb-concl-text">${esc(_wsbConclusion(cmp))}</p>
+      </section>`;
+}
 function _wsbCardsHtml(cmp) {
   const esc = _intccEsc;
   let saved = [];
@@ -25095,6 +25128,20 @@ function _wsbCardsHtml(cmp) {
   const isSaved = id => saved.some(x => x && x.scenarioId === id);
   const money = v => formatBase(Math.abs(v));
   const sign = v => (v >= 0 ? '+' : '−');
+  // Sin entrada válida la tarjeta conserva su identidad (nombre y aportación, que
+  // son datos del escenario) pero no publica cifras ni deja guardarlas.
+  if (!cmp.publishable) {
+    return (cmp.rows || []).map(s => `
+    <div class="wsb-card">
+      <div class="wsb-card-head">
+        <p class="wsb-card-name">${esc(s.name)}</p>
+        <span class="wsb-pill is-contrib">${esc(formatBase(s.monthly))}${esc(t('wsre_permonth'))}</span>
+      </div>
+      <div class="wsb-card-rows">
+        <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>—</b></div>
+      </div>
+    </div>`).join('');
+  }
   return (cmp.rows || []).map(s => `
     <div class="wsb-card">
       <div class="wsb-card-head">
@@ -25118,6 +25165,7 @@ function _wsbCardsHtml(cmp) {
 // aportación más alta, identificada por su importe y no por un juicio.
 function _wsbImpactInnerHtml(cmp) {
   const esc = _intccEsc;
+  if (!cmp.publishable) return `<p class="wsb-note">${esc(t('wsb_need_inputs'))}</p>`;
   const baseProj = cmp.reference.final;
   const rows = cmp.rows || [];
   const top = rows.length ? rows.reduce((a, b) => (b.projected > a.projected ? b : a), rows[0])
@@ -25164,6 +25212,8 @@ function _wsbParamInput(el) {
   if (grid) grid.innerHTML = _wsbCardsHtml(cmp);
   const imp = root.querySelector('[data-wsb-impact]');
   if (imp) imp.innerHTML = _wsbImpactInnerHtml(cmp);
+  const tail = root.querySelector('[data-wsb-tail]');
+  if (tail) tail.innerHTML = _wsbTailHtml(cmp);
   const note = root.querySelector('[data-wsb-basenote]');
   if (note) {
     note.innerHTML = cmp.base.known ? ''
@@ -25541,15 +25591,7 @@ function _renderScenarioBuilder() {
         <div class="wsb-grid" data-wsb-cards>${cards}</div>
       </section>
 
-      <section class="wsh-card wsb-compare">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_chart_title'))}</h3></header>
-        <div class="wsb-chart">${_wsbChartHtml(baseProj, results)}</div>
-      </section>
-
-      <section class="wsh-card wsb-concl is-feature">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_concl_title'))}</h3></header>
-        <p class="wsb-concl-text">${esc(_wsbConclusion(cmp))}</p>
-      </section>
+      <div data-wsb-tail>${_wsbTailHtml(cmp)}</div>
 
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
@@ -25560,6 +25602,7 @@ function _wsbSaveScenario(id, btn) {
   try {
     const bl = _wsbBaseline();
     const cmpS = _wsbCompare(_wsbScenarios());
+    if (!cmpS.publishable) return;          // no se guarda una proyección desde una base no declarada
     const baseProj = cmpS.reference.final;
     const s = _wsbScenarios().find(x => x.id === id);
     if (!s) return;
@@ -27209,7 +27252,16 @@ function _wsOpenTool(toolKey, projectId) {
 
 function _wsToolOnInput(el) {
   if (!_wsToolInputs) return;
-  _wsToolInputs[el.getAttribute('data-wstool-input')] = el.value;  // WS.15A raw value during edit (empty stays empty)
+  const _k = el.getAttribute('data-wstool-input');
+  const _prev = _wsToolInputs[_k];
+  // La canonización al perder el foco RE-EMITE el mismo valor como `input`. Eso no
+  // es una edición: marcarla sucia y repintar la barra destruía el botón «Guardar»
+  // entre el mousedown y el mouseup, y el primer clic se perdía (el campo pierde el
+  // foco JUSTO por ese clic). Mismo valor ⇒ ni sucio ni barra nueva.
+  let _same = String(_prev == null ? '' : _prev) === String(el.value);
+  if (!_same) { try { const a = _wsNumOrNull(_prev), b = _wsNumOrNull(el.value); _same = a != null && b != null && a === b; } catch (_) {} }
+  _wsToolInputs[_k] = el.value;  // WS.15A raw value during edit (empty stays empty)
+  if (_same) { try { _wsToolStateSet(_wsToolActive, _wsToolInputs); } catch (_) {} return; }
   _wsToolDirty = true;
   // WS.7A — keep the tool's last local state in sync; this never creates a project.
   _wsToolStateSet(_wsToolActive, _wsToolInputs);
@@ -27220,8 +27272,21 @@ function _wsToolOnInput(el) {
   // repinta por su propio contenedor, nunca reemplazando el campo enfocado.
   const top = root && root.querySelector('[data-wsbud-top]');
   if (top && _wsToolActive === 'budget') top.innerHTML = _wsBudgetTopHtml(_wsToolInputs);
-  const bar = root && root.querySelector('[data-wstool-savebar]');
-  if (bar) bar.innerHTML = _wsToolSaveBarHtml();
+  { const bar = root && root.querySelector('[data-wstool-savebar]');
+    if (typeof _wsToolSaveBarSync === 'function') _wsToolSaveBarSync(bar); else if (bar) bar.innerHTML = _wsToolSaveBarHtml(); }
+}
+// La barra de guardado sólo se reemplaza si su contenido CAMBIA: con el documento
+// ya sucio, cada pulsación pintaba un botón idéntico pero NUEVO, y un clic que
+// empezaba sobre el viejo terminaba sobre otro nodo — el clic no llegaba. La caché
+// vale sólo mientras el nodo sea el pintado aquí: cualquier otro repintado de la
+// barra (guardar, abrir) la invalida al cambiar el nodo.
+function _wsToolSaveBarSync(bar) {
+  if (!bar) return;
+  const h = _wsToolSaveBarHtml();
+  // Un aviso de «falta un campo» añadido a la barra caduca con la siguiente edición.
+  const stale = !!(bar.querySelector && bar.querySelector('.wsg-reqerr'));
+  if (!stale && bar._wsHtml === h && bar._wsNode && bar._wsNode === bar.firstElementChild) return;
+  bar.innerHTML = h; bar._wsHtml = h; bar._wsNode = bar.firstElementChild;
 }
 // ── EL SELECTOR DE PERIODO EDITA EL BORRADOR, Y NADA MÁS ──────────────────
 // No guarda, no duplica, no mueve el documento y no abre otro. Cambiar el mes
@@ -28343,7 +28408,8 @@ function _wsBudgetRepaint() {
   set('[data-wstool-out]', _wsBudgetOutHtml(_wsToolInputs));
   const help = root.querySelector('[data-wsbud-help]');
   if (help) { const open = !!(help.querySelector('details') || {}).open; help.innerHTML = _wsBudgetHelpHtml(_wsToolInputs); if (open) { const d = help.querySelector('details'); if (d) d.open = true; } }
-  set('[data-wstool-savebar]', _wsToolSaveBarHtml());
+  { const bar = root.querySelector('[data-wstool-savebar]');
+    if (typeof _wsToolSaveBarSync === 'function') _wsToolSaveBarSync(bar); else if (bar) bar.innerHTML = _wsToolSaveBarHtml(); }
   root.querySelectorAll('.wsbud-row').forEach(el => el.classList.toggle('is-sel', el.getAttribute('data-wsbud-row') === _wsBudSel));
   if (focusSel) { const b = root.querySelector('[data-wsbud-sel="' + focusSel + '"]'); if (b) b.focus(); }
 }

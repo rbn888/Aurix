@@ -226,7 +226,11 @@ console.log('\n3 · El vacío sólo se afirma cuando se sabe:');
     ['sin sesión · lo local es todo lo que hay',      { session: null,  table: 'unknown' }, 'empty'],
     ['tabla confirmada · el vacío es cierto',          { table: 'yes' },                    'empty'],
     ['tabla ausente · lo local es todo lo que hay',    { table: 'no' },                     'empty'],
-    ['todavía sin respuesta · no se sabe',             { table: 'unknown' },                'loading'],
+    // RE-DECIDIDO (aurix/coherence-premium): «unknown» sin petición en vuelo era un
+    // «Comprobando…» ETERNO — `_wsDocsPull` no se invoca (Workspace Sync diferido) y un
+    // Free nunca empuja. Sólo una escritura en vuelo es una respuesta pendiente.
+    ['sin petición en vuelo · lo local es lo que hay', { table: 'unknown' },                'empty'],
+    ['escritura en vuelo · todavía no se sabe',        { table: 'unknown', worst: 'saving' },'loading'],
     ['error de sincronización · no se sabe',           { table: 'unknown', worst: 'error' },'error'],
   ];
   casos.forEach(([n, o, exp]) => {
