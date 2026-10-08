@@ -47694,7 +47694,7 @@ function _aurixReturnSinceDate(ts) {
 function _aurixReturnSinceSuffix(emg) {
   try {
     if (!emg || !Number.isFinite(emg.returnSinceTs)) return '';
-    return '<span class="wsc-metric-since"> · ' + t('chartReturnSince')(_aurixReturnSinceDate(emg.returnSinceTs)) + '</span>';
+    return '<span class="wsc-metric-since"><span class="wsc-metric-since-sep"> · </span>' + t('chartReturnSince')(_aurixReturnSinceDate(emg.returnSinceTs)) + '</span>';
   } catch (_) { return ''; }
 }
 // SPEC DSH.CHART.RETURNS.01 — honest "no real return yet" badge text (new account / contributions
@@ -59315,7 +59315,9 @@ function countUpTotalValue(targetBase) {
     function easeOutFirst(t) { return 1 - Math.pow(1 - t, 2.5); }
     _countUpCurrent = end;
     (function step(now) {
-      const p = Math.min((now - t0) / dur, 1);
+      // El timestamp de rAF es el INICIO del frame y puede ser anterior a t0: sin el suelo, el easing
+      // extrapola por debajo de 0 y el patrimonio aparecía un instante en negativo.
+      const p = Math.max(0, Math.min((now - t0) / dur, 1));
       totalValueEl.textContent = formatBase(end * easeOutFirst(p));
       if (p < 1) { _countUpRaf = requestAnimationFrame(step); }
       else        { _countUpRaf = null; totalValueEl.textContent = formatBase(end); _applyValueSizeClass(); }
@@ -59351,7 +59353,7 @@ function countUpTotalValue(targetBase) {
 
   function step(now) {
     const elapsed  = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
+    const progress = Math.max(0, Math.min(elapsed / duration, 1));   // mismo suelo: nunca fuera de [start, end]
     const value    = start + (end - start) * easeOut(progress);
     totalValueEl.textContent = formatBase(value);
     if (progress < 1) {

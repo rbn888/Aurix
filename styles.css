@@ -24669,6 +24669,12 @@ body.aurix-skeleton #totalValue::after {
   .mobile-slide-chart .perf-toggle { width: 62px; padding: 2px; gap: 2px; }
   .mobile-slide-chart .perf-toggle .perf-btn { flex: 1 1 0; min-width: 0; padding: 4px 0; min-height: 26px; font-size: 11px; line-height: 1; }
   .mobile-slide-chart .perf-unit-block .chart-change { width: 92px; min-width: 92px; margin-top: 4px; min-height: 16px; line-height: 1.2; }
+  /* TOTAL «desde fecha fiable»: en el hueco fijo de 92 px la fecha va en su propia línea (sin separador)
+     en vez de salirse de la caja. Sólo existe cuando hay subperiodo publicado. */
+  .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-since { display: block; font-size: 10px; line-height: 1.25; letter-spacing: 0; }
+  .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-since-sep { display: none; }
+  .mobile-slide-chart .perf-unit-block .chart-change[data-fx-mark] .wsc-metric-val:has(.wsc-metric-since)::after { content: none; }
+  .mobile-slide-chart .perf-unit-block .chart-change[data-fx-mark] .wsc-metric-since::after { content: ' *'; }
   .mobile-slide-chart .range-toggle { flex: 1; min-width: 0; }
 
   /* PART 6 — give the plot breathing room (slightly taller).
