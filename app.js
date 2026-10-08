@@ -27041,12 +27041,21 @@ function _wsFieldUnitHtml(u, literal) {
 const _WS_DOC_CCYS = Object.freeze(['EUR', 'USD', 'GBP']);
 function _wsCcyCode(c) { const s = String(c == null ? '' : c).toUpperCase(); return /^[A-Z]{3}$/.test(s) ? s : null; }
 function _wsBaseCcy() { return _wsCcyCode(typeof baseCurrency !== 'undefined' ? baseCurrency : null) || 'EUR'; }
-// La moneda que declara un documento GUARDADO, o null. Orden de evidencia: la de
-// sus entradas, la sellada al guardar (desde 52ccd7a, la base visible al pulsar
-// Guardar) y la de sus resultados.
+// La moneda que declara un documento GUARDADO, o null. SÓLO cuenta lo que demuestra en qué
+// moneda se escribieron los importes:
+//   · `inputs.currency` — la escribe este código al CREAR el documento o al CONFIRMARLA;
+//   · `results.currency` del Diario y de Precios de activos — sale de la moneda de cada fila.
+// El sello `currency` de guardados anteriores (y el `results.currency` del interés compuesto)
+// era «la base visible en el último guardado»: si la base cambió antes de ese guardado, el
+// sello dice USD sobre importes tecleados en EUR. No acredita el significado original, así que
+// esos documentos quedan «Moneda sin confirmar» con sus importes intactos.
+const _WS_ROW_CCY_TYPES = Object.freeze(['trade_journal', 'asset_prices']);
 function _wsDocCurrencyOf(p) {
   if (!p) return null;
-  return _wsCcyCode(p.inputs && p.inputs.currency) || _wsCcyCode(p.currency) || _wsCcyCode(p.results && p.results.currency);
+  const own = _wsCcyCode(p.inputs && p.inputs.currency);
+  if (own) return own;
+  if (_WS_ROW_CCY_TYPES.indexOf(p.type) >= 0) return _wsCcyCode(p.results && p.results.currency);
+  return null;
 }
 // Importe en una moneda dada; sin moneda, la cifra tal cual y sin símbolo.
 function _wsMoneyIn(v, ccy, signed) {

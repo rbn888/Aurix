@@ -120,6 +120,21 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => ENG
     const lg = await p.evaluate(() => { const c = document.querySelector('[data-wsg-cardid="wsg_legacy"]'); return { pending: !!(c && c.querySelector('.wsccy-row.is-pending')), m: _wsGoalMetrics(_wsgGoals().find(x => x.id === 'wsg_legacy')).map(x => x.v).join(' ') }; });
     ok(`${T} objetivo antiguo: pendiente y métricas sin símbolo`, lg.pending && /500,00/.test(lg.m) && !/[€$]/.test(lg.m), JSON.stringify(lg));
 
+    ok(`${T} evidencia: filas reales del Diario/Precios sí; el sello del último guardado NO acredita la moneda`, await p.evaluate(() =>
+      _wsDocCurrencyOf({ type: 'trade_journal', currency: 'EUR', results: { currency: 'USD' }, inputs: {} }) === 'USD'
+      && _wsDocCurrencyOf({ type: 'monthly_budget', currency: 'EUR', inputs: {} }) === null
+      && _wsDocCurrencyOf({ type: 'compound_growth', currency: 'EUR', results: { currency: 'EUR' }, inputs: {} }) === null
+      && _wsDocCurrencyOf({ type: 'compound_growth', inputs: { currency: 'EUR' } }) === 'EUR'));
+    // CASO: documento creado con base EUR y RE-GUARDADO por la versión anterior tras pasar la base a USD
+    // ⇒ sello «USD» sobre importes tecleados en euros. No se acredita: sin confirmar, importes intactos.
+    await p.evaluate(() => {
+      const list = JSON.parse(localStorage.getItem('aurix_ws_projects_v1') || '[]');
+      list.push({ id: 'ws4_resealed', type: 'monthly_budget', customName: 'Re-sellado', currency: 'USD', inputs: { salary: 2500, housing: 700 }, results: { income: 2500, expenses: 700, free: 1800 }, revision: 3, createdAt: 1, updatedAt: 2 });
+      localStorage.setItem('aurix_ws_projects_v1', JSON.stringify(list));
+    });
+    await p.evaluate(() => _wsOpenTool('budget', 'ws4_resealed')); await p.waitForTimeout(500);
+    const rs = await p.evaluate(() => ({ ccy: _wsDocCcy(), pending: !!document.querySelector('.wsccy-row.is-pending'), plan: _wsPlanMetrics(_ws4Projects().find(x => x.id === 'ws4_resealed')).map(m => m.v).join(' '), inp: JSON.stringify(_ws4Projects().find(x => x.id === 'ws4_resealed').inputs) }));
+    ok(`${T} base cambiada ANTES del último guardado: «sin confirmar», sin $ ni €, importes intactos`, rs.ccy === null && rs.pending && !/[€$]/.test(rs.plan) && /1\.?800/.test(rs.plan) && rs.inp === '{"salary":2500,"housing":700}', JSON.stringify(rs));
     // ── F · fallo de almacenamiento: nada se marca guardado y el trabajo se conserva ──
     await p.evaluate(() => _wsOpenTool('compound', _ws4Projects().find(x => x.customName === 'Compuesto EUR').id)); await p.waitForTimeout(500);
     await p.evaluate(() => { const el = document.querySelector('[data-wstool-input="initial"]'); el.value = '7777'; el.dispatchEvent(new Event('input', { bubbles: true })); });
