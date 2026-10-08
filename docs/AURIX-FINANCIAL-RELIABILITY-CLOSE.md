@@ -182,3 +182,78 @@ ni tasa = 1.000; 1.000 € siguen siendo 1.000 € tras pasar la base a USD.
   probe-doc-currency (CR 1440) 30/30, probe-operations (CR 390) 17/17. Capturas: `docs/financial-reliability/`.
 - La demo NO verifica producción, sincronización real ni dispositivos físicos.
 - Retirar: borrar `v802-fr/` en `rbn888/aurix-demo` (o `git revert cc19a89 0452761`).
+
+## 8. Cierre final (2026-10-08, tercera entrega) — ESTADO: **PENDIENTE DE INTEGRACIÓN / VERIFICACIÓN REAL**
+
+No se declara cerrado: el comportamiento está implementado y verificado en la demo aislada, pero la
+sincronización real y el histórico con snapshots reales del servidor no se han podido ejercitar (ver
+`docs/financial-reliability/PROCEDIMIENTO-VERIFICACION-REAL.md`).
+
+### Implementado
+**Documentos en otro dispositivo — vigencia ACREDITADA, sin SQL.**
+- Prueba en los propios datos (sin relojes): `_wsDocStamp` (que escribe `revision` en el CUERPO) y los
+  tombstones entraron en el MISMO commit `52ccd7a`; antes nadie escribía `revision` en el cuerpo (subida
+  activa desde `225442d`). Un cuerpo con `revision` ⇒ lo escribió un cliente que borra con tombstone ⇒
+  vigente si la fila no tiene `deleted_at`. **Excepción** (revisión financiera): las plantillas internas
+  ws4 (`investment/budget/property/business/networth/fire`) se borraban en producción con `_ws4Delete`,
+  que filtraba sin tombstone ⇒ siempre ambiguas. `_ws4Delete` deja ahora tombstone (antes además borraba
+  TODAS las lápidas al guardar la lista filtrada).
+- Ausente en local + vigente ⇒ se recupera (con su moneda y revisión). Ambiguo (cuerpo sin `revision`) ⇒
+  se aparta en `aurix_ws_recoverable_v1` (por cuenta) y «Tus planes» dice «Hay N documentos antiguos…
+  [Revisar]»; recuperar es EXPLÍCITO, relee la fila remota y no restaura si otro dispositivo la borró;
+  la lista se poda con los tombstones remotos. Fondos asignados (sin borrado propio) sólo si su objetivo
+  está vivo; nunca se ofrecen como documentos. Nada se borra ni se restaura solo.
+- Cambios locales pendientes, conflicto por revisión, cambio de cuenta y respuesta tardía: guardas
+  existentes + contador de ambiguos por cuenta.
+
+**Cambio de tipo sin rentabilidad ficticia — LIMITAR, no corregir.**
+- Primer diseño (apunte técnico en el ledger) **retirado** tras revisión financiera: el salto depende de
+  qué punto inicia cada ventana (puntos de cliente al 0,92, de servidor al tipo real) y un apunte único
+  podía fabricar ±1,57 %.
+- Cada punto nuevo declara `fxBasis` ('dated'|'na') y `fxEurUsd`. Límite = último punto de CLIENTE sin
+  base declarada. Si hubo EUR invertible ANTES del límite (posiciones EUR activas o cerradas con
+  operaciones anteriores; la exposición actual no sirve), una variación cuya ventana empieza en o antes
+  del límite NO se publica (`fx_basis_change`) en: gráfico/24H (`_aurixComputePeriodReturn`), resumen y
+  `performance_state` remoto (`_aurixRangeReturn`), Intelligence (`_aurixInvestablePerformance` con el
+  inicio real de su ventana) y hechos de nivel (cambio de nivel, máximo histórico, por debajo del máximo).
+  El badge lo explica («Sin variación comparable: hasta el {fecha} Aurix valoraba los euros con 0,92…»).
+  Se levanta solo cuando la ventana empieza después del límite (24H al día siguiente…; ALL no se
+  publica mientras la serie contenga puntos antiguos).
+- Histórico intacto; ningún tipo histórico inventado; flujos derivados de compras EUR pasadas marcados
+  `fxBasis:'anchor_reconstructed'`.
+
+**Calidad del cambio en sus consumidores.**
+- Tipo no actual (último conocido con fecha, o sin tipo): hero «≈», variación «*», categorías afectadas
+  «≈»; explicación accesible por toque o teclado (botón enfocable + burbuja, Escape cierra), sin hover y
+  sin mover el diseño móvil; Ajustes con valor/fuente/fecha. Rentabilidad e Intelligence no publican
+  (`fx_rate_not_current`) sólo si hay activos EN EUR (base EUR con sólo USD: el % no depende del tipo).
+  Inmuebles fuera de lo invertible. Ningún punto nuevo se persiste con tipo no actual (guard existente).
+
+### Verificado (demo aislada local + pública; Chromium y WebKit de Playwright)
+Ver §9 con las cifras finales. Esperados a mano: control negativo +1,57 % ficticio sin el límite; movimiento
+real del EUR 1,1197→1,15 en ventana posterior = +1,43 %.
+
+### Pendiente / requisito de integración
+- Ejecutar el procedimiento de verificación real (cuenta sintética Premium, dos perfiles, histórico real).
+- SQL: **ninguno necesario**. Opcional, sólo lectura, para dimensionar ambiguos (en el procedimiento).
+- UX: no hay «descartar» para documentos ambiguos (el aviso permanece mientras existan).
+- ALL/1A permanecerán sin variación publicada para cuentas con EUR mientras su serie tenga puntos
+  anteriores al despliegue: es la consecuencia honesta de no inventar tipos históricos; reconsiderar
+  cuando exista un tipo histórico fechado (p. ej. BCE vía la API — exige desplegar un endpoint).
+- `computeAurixTWRSeries` (sin consumidor visible) no tiene la puerta.
+- Un dispositivo con bundle antiguo que siga escribiendo con 0,92 mantiene el límite (correcto).
+
+## 9. Resultados finales (tercera entrega)
+| Prueba | Resultado |
+|---|---|
+| probe-sync (dispositivo nuevo, vigente, borrado actual, ambiguo, plantilla interna, borrado remoto antes de recuperar, conflicto local, cambio de cuenta en vuelo, aislamiento) | 38/38 CR+WK |
+| probe-fx-correction (mercado constante, control negativo +1,57 %, cliente y servidor anteriores, EUR vendido, EUR posterior, movimiento real +1,43 %, tipo antiguo, sin tipo, inmueble, base EUR sólo USD, teclado) | 44/44 CR+WK |
+| probe-fx · probe-doc-currency · probe-operations · probe-regressions | 48/48 · 120/120 · 68/68 · 20/20 |
+| Gate completo (código final, sin cargas en paralelo) | **GO 290/290** (343 s) |
+| URL pública v802-fr: sonda de demo · probe-fx-correction · probe-sync · probe-fx | GO · 44/44 · 38/38 · 48/48 |
+
+Commits: `94706c3` (recuperación acreditada), `b4e60f2` (límite FX + calidad). Demo: `13b9621` sólo bajo `v802-fr/`.
+Revisión financiera adversarial: 2 rondas sobre este bloque; todos los hallazgos aplicados salvo los
+listados como pendientes en §8. **No ejecutado (no cuenta como aprobado):** sincronización real,
+histórico real con snapshots del servidor, 24H con la puerta de racha densa (se midió su owner de
+cálculo), dispositivos físicos.
