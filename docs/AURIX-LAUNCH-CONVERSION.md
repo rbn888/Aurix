@@ -43,6 +43,18 @@ Demo aislada local y publicada (Supabase falso, red bloqueada), Chromium y WebKi
   Premium sólo cuando el servidor lo confirma (`?billing=success` sólo inicia la espera).
 - Gate completo (código final, sin cargas en paralelo): **GO 290/290** (319 s); ensamblado del sitio OK.
 
+## Propuesta publicada
+- **Landing**: https://rbn888.github.io/aurix-demo/v803-launch/landing/index.html (ES/EN con el selector)
+- **App (demo)**: https://rbn888.github.io/aurix-demo/v803-launch/demo.html — build `v803-launch` · appjs 762.
+- Subruta aislada (commits `e46b3a9`, `eb9a924` en rbn888/aurix-demo); raíz, `v801/` y `v802-fr/` intactas.
+- Identificado: insignia «Demo · Datos ficticios · v762», etiqueta de propuesta en la landing, `noindex`.
+  Simulado: acceso por correo (código fijo), pagos (deshabilitados; los precios son copia del catálogo real),
+  precios en vivo, sincronización (base de datos falsa del navegador), tipo EUR/USD sin red.
+- En la copia de demo los CTA y las legales abren la DEMO (nunca producción); fuentes locales.
+- Verificado sobre la URL pública: sonda del entorno 116/116, onboarding 108/108, landing→CTA→acceso
+  con idioma conservado y 0 peticiones fuera del origen (CR/WK, 390/1440), paywall con contexto y planes,
+  compra bloqueada sin cargo.
+
 ## Bloqueos que requieren al propietario
 - **Cobro LIVE**: comprobar `POST /api/billing/status` (cuenta fundadora) → `ready_for_live:true`
   con 799/6999; no se puede desde aquí. Ningún pago ejecutado.
@@ -59,3 +71,4 @@ Demo aislada local y publicada (Supabase falso, red bloqueada), Chromium y WebKi
 - Captura del Dashboard en el hero repetida en «Cómo funciona» (paso 1).
 - Landing estática: si cambia el catálogo, actualizar precios a mano (`landing/app.js`).
 - Toast «tu portfolio ha empezado» (anglicismo).
+- Demo: al pulsar comprar aparecen dos avisos (el de la demo y «La compra todavía no está disponible»).
