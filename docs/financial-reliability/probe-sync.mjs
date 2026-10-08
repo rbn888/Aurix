@@ -31,8 +31,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => (pr
   // DISPOSITIVO NUEVO: el almacén local de documentos se vacía y se recarga.
   await p.evaluate(() => { localStorage.removeItem('aurix_ws_projects_v1'); });
   await p.reload(); await p.waitForTimeout(5000);
-  const got = await p.evaluate(() => _ws4Projects().map(x => x.id + '@' + x.revision + ':' + x.currency).join(','));
-  ok(`${T} recarga sin datos locales: el documento de A vuelve desde la tabla (misma moneda y revisión)`, got === 'ws4_sync_a@1:EUR', got);
+  const got = await p.evaluate(() => ({ docs: _ws4Projects().map(x => x.id).join(','), skipped: _wsDocsPullSkippedAbsent }));
+  // Una fila remota viva sin copia local puede ser un documento BORRADO en la ventana 09-16/17
+  // (sin tombstone): su existencia no prueba que siga vigente, así que NO se añade.
+  ok(`${T} fila remota sin copia local (dispositivo nuevo o borrado sin tombstone): NO se resucita`, got.docs === '' && got.skipped >= 1, JSON.stringify(got));
+  const ro = await p.evaluate(() => { updateDashboardPlans(); return { st: _wsPlansEmptyState(), txt: (document.querySelector('.wspl-note') || {}).textContent || '' }; });
+  ok(`${T} …y «Tus planes» lo DICE (documentos en la cuenta no recuperables aquí), no «no tienes planes»`, ro.st === 'remote_only' && /no puede recuperar/.test(ro.txt), JSON.stringify(ro));
+  // El documento sigue en este dispositivo (p. ej. nunca se borró aquí): se restaura la copia local.
+  await p.evaluate(() => { localStorage.setItem('aurix_ws_projects_v1', JSON.stringify([{ id: 'ws4_sync_a', type: 'compound_growth', customName: 'Plan de A', inputs: { initial: 1000, currency: 'EUR' }, results: { final: 1000, currency: 'EUR' }, currency: 'EUR', bodyVersion: 1, revision: 1, createdAt: 1, updatedAt: 1 }])); });
   ok(`${T} «Tus planes» no se queda en «Comprobando» tras la lectura`, await p.evaluate(() => !_wsDocsPullInFlight && _wsPlansEmptyState() !== 'loading'));
   // Edición local MÁS NUEVA que la remota: la lectura no la pisa.
   await p.evaluate(() => { const d = _ws4Projects().find(x => x.id === 'ws4_sync_a'); d.customName = 'Plan de A editado'; _ws4Persist(d); _wsDocsPulledFor = null; });
@@ -52,6 +58,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => (pr
     return [n1, _ws4Projects().find(x => x.id === 'ws4_sync_a').customName];
   });
   ok(`${T} con la subida fallida no se pisa lo local; confirmada la subida, el remoto más nuevo sí entra`, pend[0] === 'Local sin subir' && pend[1] === 'Remoto más nuevo', JSON.stringify(pend));
+  // TOMBSTONE remoto más nuevo: el borrado del otro dispositivo se aplica aquí (no se resucita).
+  const tomb = await p.evaluate(async () => {
+    const d = _ws4ProjectsRaw().find(x => x.id === 'ws4_sync_a');
+    await supabaseClient.from('workspace_documents').upsert([{ user_id: currentUser.id, doc_id: 'ws4_sync_a', kind: 'ws_project', body: d, revision: (d.revision || 1) + 1, deleted_at: new Date().toISOString(), currency: 'EUR', body_version: 1, updated_at: new Date().toISOString() }], { onConflict: 'user_id,doc_id' });
+    _wsDocSync['aurix_ws_projects_v1'] = { state: 'saved', at: Date.now() };
+    await _wsDocsPull();
+    return { visible: _ws4Projects().some(x => x.id === 'ws4_sync_a'), kept: _ws4ProjectsRaw().some(x => x.id === 'ws4_sync_a' && x.deletedAt) };
+  });
+  ok(`${T} un borrado remoto más nuevo se aplica (oculto, tombstone conservado)`, !tomb.visible && tomb.kept, JSON.stringify(tomb));
   // Las PREFERENCIAS (borradores de todas las herramientas) no se aplican al leer.
   const prefs = await p.evaluate(async () => {
     localStorage.setItem('aurix_ws_tool_state_v1', JSON.stringify({ receivables_app: { items: [{ id: 'cobro_local' }] } }));

@@ -6587,6 +6587,7 @@ const T = {
     wspl_m_avail:         'Disponible',
     wspl_m_deficit:       'Déficit',
     wspl_share_done_of:   'cobrado del total',
+    wspl_remote_only:     'Tu cuenta tiene documentos guardados que este dispositivo todavía no puede recuperar. Siguen intactos en tu cuenta.',
     wspl_share_goal:      'acumulado de la meta',
     wspl_m_expenses:      'Gastos',
     wspl_m_pending:       'Pendiente',
@@ -9577,6 +9578,7 @@ const T = {
     wspl_m_expenses:      'Expenses',
     wspl_m_pending:       'Pending',
     wspl_m_collected:     'Collected',
+    wspl_remote_only:     'Your account has saved documents that this device cannot recover yet. They remain intact in your account.',
     wspl_m_units:         'Properties',
     wspl_m_value:         'Value',
     wspl_m_trades:        'Trades',
@@ -21397,7 +21399,15 @@ async function _wsDocsPull() {
         }
         const body = r.body && typeof r.body === 'object' ? r.body : null;
         if (!body) continue;
-        if (!cur) { local.push(body); byId.set(String(r.doc_id), body); changed = true; }
+        // ── RECUPERAR UN DOCUMENTO AUSENTE EN LOCAL: DESACTIVADO (SPEC 1) ─────────────
+        // Entre 319d7b7 (09-16, subida activa) y 52ccd7a (09-17, tombstones) borrar FILTRABA el
+        // array sin dejar `deleted_at`: esas filas siguen vivas en remoto. Con la estructura
+        // actual «borrado en esa ventana» y «nunca estuvo en este dispositivo» son
+        // indistinguibles, y que la fila exista no prueba que siga vigente. Así que la lectura
+        // NO añade documentos: sólo actualiza (por revisión) y borra (por tombstone) los que
+        // este dispositivo ya tiene. Se cuenta para diagnóstico. Reactivar exige un marcador de
+        // vigencia en servidor (decisión + SQL revisado), no una inferencia del cliente.
+        if (!cur) { _wsDocsPullSkippedAbsent++; continue; }
         else if (remoteRev > (Number(cur.revision) || 1)) { Object.assign(cur, body); changed = true; }
       }
       if (changed) { try { localStorage.setItem(key, JSON.stringify(local)); touched++; } catch (_) {} }
@@ -21406,6 +21416,7 @@ async function _wsDocsPull() {
     // El comentario decía «sólo si el remoto es más reciente» y el código
     // sobrescribía SIEMPRE: un dispositivo que sólo entraba pisaba el último ajuste
     // del otro. No es dinero, pero es la misma clase de defecto que la sincronización
+let _wsDocsPullSkippedAbsent = 0;   // filas remotas sin copia local: NO se añaden (ver _wsDocsPull)
     // de Intelligence ya pagó una vez, y la revisión financiera lo señaló.
     // La revisión de una preferencia se deriva del instante de escritura
     // (`_wsDocRows`), así que aquí se compara contra la última aplicada y se guarda.
@@ -23990,6 +24001,9 @@ function _wsPlanSpendHtml(p) {
   const lbl = t('wspl_spend') + ': ' + top.map(x => x.name + ' ' + formatBase(x.value)).join(', ');
   // SVG con `fill` por partida, como el anillo de la herramienta: el color de un DATO viene del
   // motor y va en el elemento, nunca como `style` (eso es lo que la API de acento prohíbe).
+  // La cuenta TIENE documentos en el servidor que este dispositivo no recupera (ver _wsDocsPull):
+  // decir «no tienes planes» sería falso. Se dice lo que pasa.
+  if (_wsDocsPullSkippedAbsent > 0) return 'remote_only';
   const gap = 0.6, n = top.length, w = 100 - gap * (n - 1);
   let x0 = 0;
   const rects = top.map(x => {
@@ -24335,6 +24349,8 @@ function updateDashboardPlans() {
 // GRUPO 2 · TUS PLANES. Identidad = «kind:id» del documento.
 _aurixReorderRegister('wsPlansGrid', {
   item: '.wspl-card[data-wspl-ref]',
+      : st === 'remote_only'
+        ? `<p class="wspl-note is-warn">${esc(t('wspl_remote_only'))}</p>`
   key: el => el.getAttribute('data-wspl-ref'),
   label: el => ((el.querySelector('.wspl-name') || {}).textContent || '').trim(),
   commit: visible => { _wsPlansOrderCommit(visible); try { const sec = document.getElementById('wsPlansSection'); if (sec) sec._wsplHtml = ''; } catch (_) {} },
