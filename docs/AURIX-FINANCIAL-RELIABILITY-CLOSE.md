@@ -294,3 +294,14 @@ cálculo), dispositivos físicos.
   `revoke-qa-premium.sql`). Pasos exactos en el informe de esta entrega.
 - 24H real de la cuenta sintética: necesita ≥ 24 h de historia real (snapshots del servidor cada 15 min)
   ⇒ crear la cuenta hoy y pasar `probe-ranges` contra ella mañana.
+
+### Verificación REAL de documentos (2026-10-08, backend de producción autorizado)
+Código candidato servido en `http://localhost` (sin desplegar) contra el Supabase de producción, cuenta
+SINTÉTICA `rbn892+aurixqa1@gmail.com` (Premium temporal `qa`, 7 días, concedido por el founder), tres
+perfiles de navegador independientes. `docs/financial-reliability/qa-real/run-real-sync.mjs` → **GO 7/7**:
+sesión real; Premium efectivo; A guarda y la fila remota lleva revisión en el cuerpo; B (perfil limpio)
+lo recupera con nombre y moneda; A borra y la fila queda con tombstone (no se borra nada); B recarga y no
+reaparece; C (perfil limpio nuevo) no lo recupera ni lo ofrece como ambiguo. Sólo se escribió un documento
+`QA-SPEC1-…` (hoy, en tombstone). Ninguna otra cuenta tocada; producción sin cambios.
+Pendiente: 24H con historia real de esta cuenta (≥ 24 h de snapshots del servidor) y retirar el Premium
+temporal al terminar (`revoke-qa-premium.sql`).
