@@ -87,7 +87,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${T} retrocede a BIENVENIDA`, (await step(p)) === 'WELCOME');
     await p.locator('#onboardingOverlay [data-onb-next]:visible').first().click({ force: true }); await p.waitForTimeout(450);
     await p.click('#onbAddAssetBtn', { force: true }); await p.waitForTimeout(700);
-    await p.locator('#modalOverlay button:has-text("Liquidez")').click(); await p.waitForTimeout(600);
+    await p.locator('#modalOverlay button:has-text("Liquidez"), #modalOverlay button:has-text("Liquidity")').click(); await p.waitForTimeout(600);
     await p.fill('#liquidityQty', '2500'); await p.click('#liquidityOverlay .btn-submit'); await p.waitForTimeout(1300);
     ok(`${T} tras el primer activo: ÉXITO`, (await step(p)) === 'SUCCESS');
     await p.click('#onbGoDashboardBtn', { force: true }); await p.waitForTimeout(900);
@@ -95,7 +95,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       row: (JSON.parse(localStorage.getItem('aurix_demo_db_v1') || '{}').user_onboarding || [])[0] }));
     ok(`${T} finaliza: COMPLETED y guardado en el almacén de demo`, done.st === 'COMPLETED' && !done.ov && done.row && done.row.onboarding_completed === true, JSON.stringify(done));
     await p.reload(); await p.waitForTimeout(5000);
-    ok(`${T} al recargar no vuelve a pedir onboarding y conserva el activo`, (await step(p)) === 'closed' && (await p.evaluate(() => /2\.?\d{3}/.test(document.body.textContent))));
+    ok(`${T} al recargar no vuelve a pedir onboarding y conserva el activo`, (await step(p)) === 'closed' && (await p.evaluate(() => /2[.,]?\d{3}/.test(document.body.textContent))));
     // ── REINICIO ──
     await p.goto(ORIGIN + 'demo.html'); await p.click('[data-demo=reset]'); await p.waitForTimeout(600);
     const after = await p.evaluate(() => Object.keys(localStorage).filter(k => !/^__/.test(k)));
@@ -111,7 +111,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       await p.click('[data-demo=wealth]'); await p.waitForURL(/index\.html/); await p.waitForTimeout(5000);
       const TT = `${T}.${plan}`;
       const home = await p.evaluate(() => ({ plan: _aurixEnt.plan, prem: hasAurixPremiumAccess(), onb: document.getElementById('onboardingOverlay').classList.contains('open'),
-        total: (document.body.textContent.match(/\d{2}\.\d{3},\d{2}\s?US\$/) || [])[0], badge: (document.getElementById('aurixDemoBadge') || {}).textContent }));
+        total: (document.body.textContent.match(/\d{2}\.\d{3},\d{2}\s?US\$|\$\d{2},\d{3}\.\d{2}/) || [])[0], badge: (document.getElementById('aurixDemoBadge') || {}).textContent }));
         ok(`${TT} entra directamente al Dashboard con la cartera ficticia`, !home.onb && !!home.total, JSON.stringify(home));
       ok(`${TT} plan del entorno = ${plan} (sin suscripción real) y la marca lo dice`, home.plan === plan && home.prem === (plan === 'premium') && new RegExp(plan === 'premium' ? 'Premium' : 'Free').test(home.badge || ''), JSON.stringify(home));
       for (const tab of ['market', 'intelligence', 'workspace']) { await p.evaluate(t => switchTab(t), tab); await p.waitForTimeout(1800); }
