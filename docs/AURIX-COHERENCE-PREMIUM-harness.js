@@ -162,9 +162,11 @@ console.log('\n3 · Diario: la misma operación se lee en una sola moneda:');
 // ── 4 · «TUS PLANES»: NADA DE «COMPROBANDO…» ETERNO ─────────────────────────
 console.log('\n4 · Tus planes: el estado vacío no espera una lectura que nadie lanza:');
 {
-  const st = (table, worst) => {
+  const st = (table, worst, pull) => {
     const sb = sandbox();
     sb.__w = worst;
+    // La lectura de documentos ya tiene llamador (SPEC 1): su estado entra al sandbox.
+    vm.runInContext('var _wsDocsPullInFlight = ' + (pull === 'flight') + ', _wsDocsPullFailed = ' + (pull === 'failed') + ', _wsDocsPullSkippedAbsent = ' + (pull === 'remote' ? 1 : 0) + ';', sb);
     vm.runInContext('var _wsDocTableState = ' + JSON.stringify(table) + '; function _wsDocsSession(){ return "u1"; }'
       + 'function _wsDocSyncWorst(){ return __w; }', sb);
     load(sb, ['_wsPlansEmptyState']);
@@ -173,6 +175,9 @@ console.log('\n4 · Tus planes: el estado vacío no espera una lectura que nadie
   ok('4.1 tabla sin confirmar y nada en vuelo ⇒ vacío, no cargando', st('unknown', 'idle') === 'empty');
   ok('4.2 una escritura en vuelo sí es «comprobando»', st('unknown', 'saving') === 'loading');
   ok('4.3 un error sigue siendo error (no «no tienes planes»)', st('unknown', 'error') === 'error');
+  ok('4.4 la lectura de documentos EN VUELO es «comprobando»', st('unknown', 'idle', 'flight') === 'loading');
+  ok('4.5 una lectura fallida es error con reintento, no «no tienes planes»', st('yes', 'idle', 'failed') === 'error');
+  ok('4.6 documentos remotos que este dispositivo no recupera ⇒ se dice, no «no tienes planes»', st('yes', 'idle', 'remote') === 'remote_only');
 }
 
 // ── 5 · LA PREGUNTA NO ROTA AL NAVEGAR ──────────────────────────────────────

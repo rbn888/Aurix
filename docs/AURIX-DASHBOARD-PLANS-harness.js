@@ -40,6 +40,7 @@ function ctx(opts) {
   // El almacén REAL de Workspace, con su filtro de tombstones.
   vm.runInContext('var __LS = Object.create(null); var localStorage = { getItem: k => (k in __LS ? __LS[k] : null), setItem: (k,v) => { __LS[k] = String(v); }, removeItem: k => { delete __LS[k]; } };', sb);
   vm.runInContext('var _wsDocTableState = ' + JSON.stringify(opts.table || 'yes') + ';', sb);
+  vm.runInContext('var _wsDocsPullInFlight = ' + !!opts.pullInFlight + ', _wsDocsPullFailed = ' + !!opts.pullFailed + ', _wsDocsPullSkippedAbsent = ' + (opts.remoteOnly ? 1 : 0) + ';', sb);
   vm.runInContext('var __SESSION = ' + JSON.stringify(opts.session === undefined ? 'u1' : opts.session) + '; function _wsDocsSession(){ return __SESSION; }', sb);
   vm.runInContext('var __WORST = ' + JSON.stringify(opts.worst || 'idle') + '; function _wsDocSyncWorst(){ return __WORST; }', sb);
   vm.runInContext('var __GRANT = ' + JSON.stringify(opts.grant === undefined ? true : opts.grant) + '; function hasFeature(){ return __GRANT; } function hasAurixPremiumAccess(){ return __GRANT; } function _aurixEntIsCatalogPreview(){ return false; }', sb);

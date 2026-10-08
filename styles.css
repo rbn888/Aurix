@@ -30506,3 +30506,18 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
    se recorta con puntos suspensivos y el texto completo queda en title/aria-label. */
 .aurix-signal--health .aurix-signal-body { min-width: 0; }
 .aurix-signal--health .aurix-signal-msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Procedencia del tipo EUR/USD (Ajustes). */
+.settings-fx-note { margin: 2px 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+.settings-fx-note.is-warn { color: var(--aurix-warning); }
+#totalValue[data-fx-approx]::before { content: '≈ '; opacity: .7; }
+@media (max-width: 767px) { .update-fx-note { display: none; } }
+
+/* Explicación accesible de una cifra afectada por el tipo EUR/USD (toque, clic o teclado). */
+[data-fx-explain] { cursor: help; }
+[data-fx-explain]:focus-visible { outline: 2px solid var(--aurix-warning); outline-offset: 3px; border-radius: 6px; }
+.chart-change[data-fx-mark] .wsc-metric-val::after,
+.cat-card-value[data-fx-approx]::before { content: '≈ '; opacity: .7; }
+.chart-change[data-fx-mark] .wsc-metric-val::after { content: ' *'; }
+.aurix-fx-bubble { position: fixed; z-index: 2147482000; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45;
+  color: var(--text-muted); background: rgba(10, 14, 24, .97); border: 1px solid rgba(233, 168, 87, .45); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
