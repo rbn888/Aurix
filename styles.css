@@ -30460,3 +30460,16 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .aurix-premium-terms { margin: 10px 2px 0; font-size: 13px; line-height: 1.5; color: #b9c6de; text-align: center; }
 .aurix-premium-context { margin: 10px auto 0; max-width: 46ch; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.45;
   color: #e6eeff; background: rgba(79,142,247,.14); border: 1px solid rgba(125,184,255,.35); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPEC 2 · CONTRASTE MEDIDO (docs/launch-conversion/probe-contrast.mjs). Sólo color/opacidad,
+   ninguna medida de maquetación: el dashboard móvil protegido conserva su geometría.
+   ══════════════════════════════════════════════════════════════════════════ */
+.range-btn:not(.active) { color: #c2ccdd; }                    /* 4,35 → ≥ 4,5 sobre el panel */
+.cat-card-hint { color: #c2ccdd; }
+.cat-card:hover .cat-card-hint { opacity: 1; }
+@media (hover: none) { .cat-card-hint { opacity: 1; } }        /* táctil: visible y legible (0,62 → 1) */
+.market-status.crypto { color: #c39bff; }                      /* 3,28 → ≥ 4,5 */
+.market-status.crypto .dot { background: #c39bff; }
+.wsc-ylab { color: #b7c3d8; }                                   /* ejes: 3,22 → ≥ 4,5 */
+.mobile-chart-wrap .wsc-ylab { opacity: 1; }
