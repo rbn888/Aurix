@@ -40923,9 +40923,12 @@ function _aurixIntelQuestions(model, ctx, limit, policy) {
   const c = model.concentration, l = model.liquidity, d = model.diversification;
   // La concentración material es el hecho que MÁS cambia de lectura con contexto,
   // así que es la primera pregunta y sólo existe si el hecho existe.
+  // Y sólo si hay una POSICIÓN con nombre por la que preguntar: con todo en liquidez
+  // no hay posición invertida y la pregunta salía «¿Tu posición en — …?».
   if (!known.concentration_intent && c.availability === _AURIX_AI_AVAIL.AVAILABLE
       && (c.semanticLabel === _AURIX_AI_LABEL.DOMINANT_POSITION
-       || c.semanticLabel === _AURIX_AI_LABEL.CONCENTRATED)) {
+       || c.semanticLabel === _AURIX_AI_LABEL.CONCENTRATED)
+      && c.topContributor && c.topContributor.name) {
     q.push({ id: 'q_concentration_intent', field: 'concentration_intent',
       trigger: 'top_position_weight',
       subject: (c.topContributor && c.topContributor.name) || null,
