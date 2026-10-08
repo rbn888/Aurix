@@ -7648,6 +7648,11 @@ const T = {
     pw_per_year:       'al año',
     pw_per_month:      'al mes',
     pw_annual_note:    (perMonth, pct) => `Equivale a ${perMonth} al mes · ahorras un ${pct}%`,
+    // Lo que se COBRA y cada cuánto, antes de pulsar: el total anual no puede confundirse con un precio mensual.
+    pw_billed_year:    (amount) => `Un único cobro de ${amount} cada año.`,
+    pw_context:        (name) => `«${name}» forma parte de Premium.`,
+    pw_billed_month:   (amount) => `Un cobro de ${amount} cada mes.`,
+    pw_terms:          'Se renueva automáticamente al final de cada periodo. Puedes cancelar cuando quieras desde «Gestionar mi plan».',
     pw_trial:          (d) => `Incluye ${d} días de prueba`,
     pw_cta:            'Continuar',
     pw_opening:        'Abriendo…',
@@ -10567,6 +10572,10 @@ const T = {
     pw_per_year:       'per year',
     pw_per_month:      'per month',
     pw_annual_note:    (perMonth, pct) => `That is ${perMonth} a month · you save ${pct}%`,
+    pw_billed_year:    (amount) => `A single charge of ${amount} every year.`,
+    pw_context:        (name) => `“${name}” is part of Premium.`,
+    pw_billed_month:   (amount) => `A charge of ${amount} every month.`,
+    pw_terms:          'Renews automatically at the end of each period. You can cancel whenever you want from “Manage my plan”.',
     pw_trial:          (d) => `Includes a ${d}-day trial`,
     pw_cta:            'Continue',
     pw_opening:        'Opening…',
@@ -85172,6 +85181,7 @@ try {
           <span class="aurix-premium-price-amount">${esc(_aurixBillingMoney(row.amount_cents, row.currency))}</span>
           <span class="aurix-premium-price-per">${esc(per)}</span>
         </div>
+        <p class="aurix-premium-plan-billed">${esc((isYear ? t('pw_billed_year') : t('pw_billed_month'))(_aurixBillingMoney(row.amount_cents, row.currency)))}</p>
         ${saving ? `<p class="aurix-premium-plan-note">${esc(t('pw_annual_note')(
             _aurixBillingMoney(saving.perMonth, saving.currency), saving.pct))}</p>` : ''}
         ${Number(row.trial_days) > 0
@@ -85214,7 +85224,8 @@ try {
         ? `<div class="aurix-premium-plans">
              ${year ? _planCard(year, true) : ''}
              ${month ? _planCard(month, !year) : ''}
-           </div>`
+           </div>
+           <p class="aurix-premium-terms">${esc(t('pw_terms'))}</p>`
         : `<div class="aurix-premium-plans is-empty">
              <p class="aurix-premium-plan-note">${esc(t('pw_unavailable'))}</p>
            </div>`;
@@ -85225,6 +85236,14 @@ try {
           <span class="aurix-premium-eyebrow">${esc(t('pw_eyebrow'))}</span>
           <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">${esc(t('pw_title'))}</h2>
           <p class="aurix-premium-sub">${esc(t('pw_sub'))}</p>
+          ${(function () {
+            // QUÉ QUERÍA HACER EL USUARIO: el paywall llega con «origen:clave.de.funcion» y la nombra
+            // con el owner canónico de etiquetas. Sin clave reconocible, no se inventa contexto.
+            const m = /:([a-z][a-z0-9_]*\.[a-z0-9_.]+)$/.exec(String((typeof _lastSource !== 'undefined' && _lastSource) || ''));
+            if (managed || !m || typeof _featureLabel !== 'function') return '';
+            const name = _featureLabel(m[1]); if (!name) return '';
+            return `<p class="aurix-premium-context">${esc(t('pw_context')(name))}</p>`;
+          })()}
         </header>
 
         ${plans}
