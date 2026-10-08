@@ -41,20 +41,39 @@ Nuevo en este SPEC:
 | (commit de sincronización) | **Lectura de documentos de Workspace** | `_wsDocsPull` no tenía llamador: los guardados Premium se subían a `workspace_documents` (existe en producción: sonda anónima → `42501`) pero ningún dispositivo los leía. Ahora una lectura por cuenta al resolverse el derecho; descarta la respuesta si la cuenta cambió en vuelo; «Tus planes» dice «comprobando» mientras lee y «error + reintentar» si falla. Fusión preexistente por revisión, sin sustituir la lista. |
 | (commit de sincronización) | **Aislamiento entre cuentas** | Reproducido con dos cuentas sintéticas en la demo: B leía los parámetros de Escenarios de A (incluida la base de patrimonio declarada) y sus revisiones de preferencias. `aurix_ws_scn_params_v1` y el prefijo `aurix_ws_prefrev_` pasan al aparcado por cuenta existente. |
 
-### FALLO REPRODUCIDO (sin corregir en este SPEC)
-- **Tipo USD/EUR fijo** `usdToEur = 0.92` (`app.js` ~L12093, comentario «updated from API» falso). El
-  proxy existente ya sirve `EURUSD=X` (hoy 1,1197 ⇒ 0,8931). Error actual en producción: los activos USD
-  de un usuario con base EUR salen **+3,01 %** (1.000 USD = 920 € en vez de 893,10 €); los activos EUR
-  con base USD, **−2,92 %** (1.000 € = 1.086,96 $ en vez de 1.119,70 $). Consumidores: `toBase`,
-  `assetValueUSD`, `_nativeToUSD`, `_aurixFxLookup('EUR')` — centralizados, no dispersos.
-  **BLOQUEADO — decisión requerida**: el histórico (`recordSnapshot` → `totalValueUSD`), los flujos de
-  capital (`amountUSD`), el TWR y la ventana 24H pivotan en USD y se re-convierten con el tipo de HOY
-  (`toBase(x,'USD')`). Con el ancla fija un usuario sólo-EUR ve hoy un gráfico plano y correcto; con un
-  tipo vivo vería el ruido EUR/USD como «rendimiento» y un escalón de ~3 % el día del cambio — y
-  recalcularía todo el histórico con el tipo de hoy. Cambiarlo exige sellar el tipo (con fecha y fuente)
-  en cada snapshot/flujo o persistir en la moneda nativa: es Historical Engine (motor congelado) y
-  requiere decisión del founder + revisión financiera. No se ha cambiado nada; no se ha inventado tasa
-  ni 1:1. El tipo no se presenta en la UI como cotización.
+#### Continuación del SPEC 1 (2026-10-08, segunda entrega)
+
+| Commit | Bloque | Causa → cambio |
+|---|---|---|
+| `da5023d` | **Moneda antigua: el sello ya no acredita** | El sello `currency` del último guardado era «la base visible al guardar»: si la base cambió antes de ese guardado, decía USD sobre importes tecleados en EUR. Ahora sólo cuentan `inputs.currency` (escrito al crear o al confirmar) y la moneda de las filas del Diario/Precios de activos. Con sólo el sello ⇒ «Moneda sin confirmar», importes intactos. Caso de prueba: presupuesto creado en EUR y re-guardado con base USD. |
+| `138c12e` | **No resucitar borrados** | Entre `319d7b7` (09-16) y `52ccd7a` (09-17) borrar no dejaba tombstone: esas filas siguen vivas en remoto y son indistinguibles de «nunca estuvo en este dispositivo». La lectura **ya no añade** documentos ausentes en local (desactivado y documentado); sigue aplicando ediciones más nuevas y tombstones a los existentes. «Tus planes» dice «tu cuenta tiene documentos que este dispositivo no puede recuperar» en vez de «no tienes planes». Sin borrar filas remotas, sin SQL. |
+| `014a1b5` + `8facbfc` | **Tipo EUR/USD fechado** | Ver abajo. |
+
+**Tipo EUR/USD — CORREGIDO (antes «fallo reproducido / bloqueado»).**
+- Fuente: la integración EXISTENTE — `EURUSD=X` (Yahoo Finance) por el proxy de precios de Aurix, sin
+  credenciales en cliente ni coste. Es la MISMA fuente con la que el snapshot del SERVIDOR
+  (`supabase/functions/portfolio-snapshot`, cada 15 min desde 2026-08-17) ya valoraba EUR: el histórico
+  de producción mezclaba puntos de servidor al tipo real con puntos de cliente a 0,92 (≈3 % de
+  diferencia). El argumento del bloqueo anterior («con el ancla un usuario sólo-EUR ve un gráfico plano»)
+  era falso en producción. Alternativa evaluada: tipos de referencia del BCE (oficiales, diarios, sin
+  coste) — el cliente no puede llamarlos (CSP `connect-src`) y añadir un endpoint exige desplegar la API
+  (producción) y el plan Hobby no tiene margen de funciones: queda como mejora posible.
+- `usdToEur` = 1 / EURUSD del último tipo fechado. Estados: **actual** (< 12 h), **último conocido**
+  (con su fecha; total marcado aproximado) y **sin tipo** (0,92 sólo como respaldo marcado aproximado;
+  nunca 1:1). Fuera de «actual», el write-guard existente (fx_approx) no persiste puntos de cliente.
+- Visible (móvil: sólo «≈» + etiqueta accesible, el hero no cambia de forma; texto corto desde 768 px): Ajustes → «Cambio EUR/USD: 1 € = 1,1197 $ · Yahoo Finance · 08/10/2026, 14:05» (fecha del
+  CAMBIO, distinta de la de los precios); el hero añade «≈» y «total aproximado: cambio EUR/USD no actual»
+  sólo si la cartera necesita EUR↔otra moneda.
+- Revisión financiera (2.ª): [alto] los flujos DERIVADOS de transacciones pasadas en EUR se convertían
+  con el tipo de hoy (TWR cambiando cada día) ⇒ ahora con el ancla con la que se registró aquel escalón
+  (determinista). [medio] GBP/CHF/JPY se declaraban actuales por el `ts` global ⇒ frescura por par.
+  [medio] «sólo se refresca al arrancar» — no aplica: existe `setInterval(fetchExchangeRate, 1 h)`.
+- Residual: los puntos de cliente ya guardados a 0,92 no se re-escriben (no se toca historia); el primer
+  punto tras publicar sube ≈3 % sobre la parte en EUR (corrección, no rendimiento) — no comprobado si
+  `suspicious_jump` lo pone en cuarentena. El ≈ sólo está en hero y Ajustes (no en gráfico/24H/Intelligence).
+
+### FALLO REPRODUCIDO (sin corregir)
+- Ninguno abierto de este SPEC.
 
 ### PENDIENTE DE COMPROBAR (no ejecutado ⇒ no aprobado)
 - Sincronización REAL contra producción y entre dos dispositivos físicos (la demo usa Supabase falso
@@ -87,11 +106,12 @@ bloqueada), Chromium y WebKit de Playwright (≠ Safari real), 390 y 1440:
 
 | Prueba | Resultado |
 |---|---|
-| `docs/financial-reliability/probe-doc-currency.mjs` (fixtures B, C, E, F; ES/EN; recarga) | 116/116 |
+| `docs/financial-reliability/probe-doc-currency.mjs` (fixtures B, C, E, F + sello re-guardado; ES/EN; recarga) | 120/120 |
 | `docs/financial-reliability/probe-operations.mjs` (A, B, D; doble envío; cancelar; decimales ES) | 68/68 — sobre el build anterior falla (2.000 / 60) |
-| `docs/financial-reliability/probe-sync.mjs` (recuperación, sin pisar local ni subidas pendientes, preferencias no aplicadas, carrera de cuenta, aislamiento) | 22/22 (CR/WK, 1440) |
+| `docs/financial-reliability/probe-sync.mjs` (ausentes NO se resucitan y se dice, ediciones y tombstones sí, sin pisar subidas pendientes, preferencias no aplicadas, carrera de cuenta, aislamiento) | 26/26 (CR/WK, 1440) |
+| `docs/financial-reliability/probe-fx.mjs` (actual / último conocido / sin tipo; Ajustes y hero; móvil sin cambio de forma; por par; flujo derivado determinista; ES/EN) | 48/48 |
 | `docs/financial-reliability/probe-regressions.mjs` (WebKit escritorio, idioma ≠ moneda, Intelligence) | 20/20 |
-| Gate completo `node scripts/aurix-ci-gate.mjs` (local, sin cargas en paralelo) | **GO 290/290** (322 s) |
+| Gate completo `node scripts/aurix-ci-gate.mjs` (local, sin cargas en paralelo) | **GO 290/290** (334 s, tras el último cambio) |
 | `docs/financial-reliability/repro-save-first-click.mjs` | demo raíz: 1.er clic perdido; rama: no |
 
 Esperados escritos a mano: 1.000 − 250 = 750; retirada excesiva bloqueada; 30 + 2 − 1 = 31; objetivo
@@ -117,12 +137,8 @@ ni tasa = 1.000; 1.000 € siguen siendo 1.000 € tras pasar la base a USD.
   **Corregido**: con subida pendiente/fallida el remoto sólo añade documentos que faltan.
 - [medio] `_wsDocCurrencyOf` ponía el sello de la base por delante de `results.currency` (moneda real de
   filas en Diario/Precios de activos). **Corregido**: entradas → resultados → sello.
-- [bajo, RESIDUAL] Documentos subidos y borrados entre `319d7b7` (09-16) y `52ccd7a` (09-17) —cuando borrar
-  aún no dejaba tombstone— siguen vivos en remoto y la lectura los volvería a añadir. Población: Premium
-  que borró en esa ventana. Comprobable con SQL de lectura antes de publicar.
-- [observación, RESIDUAL] El sello antiguo `currency` es «la base al último guardado»: un documento
-  creado en EUR y re-guardado tras pasar a USD queda como USD (el usuario vio «$» al guardar; los datos no
-  permiten distinguirlo).
+- [bajo] Resurrección de borrados de la ventana 09-16/17 — **RESUELTO en la continuación** (la lectura no añade ausentes).
+- [observación] Sello antiguo = base al último guardado — **RESUELTO en la continuación** (ya no acredita).
 - [preexistente, fuera de alcance] `_wsbParamsSet` encola una clave que no sincroniza y puede dejar su
   estado de subida en «guardando».
 
@@ -131,6 +147,11 @@ ni tasa = 1.000; 1.000 € siguen siendo 1.000 € tras pasar la base a USD.
 - Documentos antiguos sin sello de moneda (guardados antes del 2026-09-17) y borradores rápidos
   antiguos pasarán a «Moneda sin confirmar» con cifras sin símbolo hasta que el usuario confirme. Es
   intencional (no se asigna la base por suposición) pero es visible.
+- **Bloqueo documentado — recuperación en dispositivo nuevo**: un dispositivo sin copia local (nuevo,
+  reinstalado, o iOS tras 7 días sin uso) NO recupera documentos de la cuenta (siguen intactos en el
+  servidor y se avisa en «Tus planes»). Reactivarla exige un marcador de vigencia fiable en servidor
+  (p. ej. marcar como borradas las filas de la ventana 09-16/17 tras revisarlas) — decisión + SQL revisado,
+  fuera de este SPEC.
 - La lectura de documentos es la primera vez que datos remotos de Workspace entran en el almacén local
   de usuarios reales. La fusión es por revisión y no borra, pero conviene verificarla con una cuenta
   sintética Premium en producción ANTES de publicar.
@@ -145,7 +166,19 @@ ni tasa = 1.000; 1.000 € siguen siendo 1.000 € tras pasar la base a USD.
 
 ## 6. Punto de reanudación
 1. `cd ~/claude-test/portfolio-coherence && git fetch && git status && git log --oneline origin/main..HEAD`.
-2. Decisión del founder sobre el tipo USD/EUR (§1 FALLO REPRODUCIDO): sellar tipo+fecha+fuente por
-   snapshot/flujo vs. mantener el ancla etiquetada. Con decisión: revisión financiera previa.
+2. Tipo EUR/USD: valorar si `suspicious_jump` pone en cuarentena el primer punto tras publicar, y si se
+   quiere el BCE como fuente (exige endpoint en la API = despliegue).
 3. Verificar la lectura de documentos con una cuenta sintética Premium real (dos navegadores).
 4. Publicar demo (subruta propia) si se quiere revisión visual del aviso «Moneda sin confirmar».
+
+## 7. Demo de revisión (continuación)
+- URL: **https://rbn888.github.io/aurix-demo/v802-fr/demo.html** (200, `noindex`). Repo `rbn888/aurix-demo`,
+  commits `0452761` + `cc19a89`, cambios SÓLO bajo `v802-fr/`; raíz y `v801/` intactas (200).
+- Fuente: rama `demo/financial-reliability` (= `demo/coherence-premium` + merge de esta rama + lista de
+  simulado ampliada). El panel de entrada dice qué está simulado: acceso por correo, pagos, precios en
+  vivo, sincronización (base de datos FALSA en el navegador) y el tipo EUR/USD (sin red ⇒ «sin tipo», total
+  con «≈»). Todos los datos son ficticios. El build declara `v761 (v801-coherence)`: no hay bump de versión.
+- Sobre la URL pública: sonda del entorno de demo 120/120, probe-fx 48/48, probe-sync 26/26,
+  probe-doc-currency (CR 1440) 30/30, probe-operations (CR 390) 17/17. Capturas: `docs/financial-reliability/`.
+- La demo NO verifica producción, sincronización real ni dispositivos físicos.
+- Retirar: borrar `v802-fr/` en `rbn888/aurix-demo` (o `git revert cc19a89 0452761`).
