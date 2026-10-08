@@ -21,7 +21,7 @@
 --                   status active/trialing) o, si ya caducó/canceló, un evento de
 --                   suscripción APLICADO en billing_events. Nunca el retorno de Stripe.
 --
--- QUÉ NO PUEDE MEDIR (no hay destino para esos eventos; ver docs/AURIX-SPEC3-CIERRE.md):
+-- QUÉ NO PUEDE MEDIR (no hay destino para esos eventos; ver docs/AURIX-LAUNCH-CONVERSION.md, SPEC 3):
 --   visita, clic en CTA, primer análisis mostrado, paywall mostrado.
 --
 -- EXCLUSIÓN: las cuentas con override 'founder' o 'qa' (fundador y cuentas de prueba)
