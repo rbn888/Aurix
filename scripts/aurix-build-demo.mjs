@@ -38,6 +38,9 @@ mkdirSync(join(out, 'demo'), { recursive: true });
 writeFileSync(join(out, 'demo/aurix-demo-runtime.js'),
   readFileSync(join(root, 'demo/aurix-demo-runtime.js'), 'utf8').replace(/__AURIX_DEMO_VERSION__/g, VERSION).replace(/__AURIX_DEMO_BUILD__/g, BUILD));
 cpSync(join(root, 'demo/demo-start.js'), join(out, 'demo/demo-start.js'));
+// Logos con licencia libre servidos en local (CC0: spothq/cryptocurrency-icons) en la ruta a la que la
+// demo reescribe jsDelivr. Sin ellos, la app muestra su fallback de letra, como antes.
+if (existsSync(join(root, 'demo/no-logo'))) cpSync(join(root, 'demo/no-logo'), join(out, 'demo/no-logo'), { recursive: true });
 cpSync(join(root, 'demo/demo.html'), join(out, 'demo.html'));
 writeFileSync(join(out, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 writeFileSync(join(out, 'config.js'), [
