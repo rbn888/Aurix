@@ -120,6 +120,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => ENG
     const lg = await p.evaluate(() => { const c = document.querySelector('[data-wsg-cardid="wsg_legacy"]'); return { pending: !!(c && c.querySelector('.wsccy-row.is-pending')), m: _wsGoalMetrics(_wsgGoals().find(x => x.id === 'wsg_legacy')).map(x => x.v).join(' ') }; });
     ok(`${T} objetivo antiguo: pendiente y métricas sin símbolo`, lg.pending && /500,00/.test(lg.m) && !/[€$]/.test(lg.m), JSON.stringify(lg));
 
+    ok(`${T} evidencia: la moneda de los resultados (filas reales) va antes que el sello de la base al guardar`, await p.evaluate(() => _wsDocCurrencyOf({ currency: 'EUR', results: { currency: 'USD' }, inputs: {} }) === 'USD' && _wsDocCurrencyOf({ currency: 'EUR', inputs: {} }) === 'EUR' && _wsDocCurrencyOf({ inputs: {} }) === null));
     // ── F · fallo de almacenamiento: nada se marca guardado y el trabajo se conserva ──
     await p.evaluate(() => _wsOpenTool('compound', _ws4Projects().find(x => x.customName === 'Compuesto EUR').id)); await p.waitForTimeout(500);
     await p.evaluate(() => { const el = document.querySelector('[data-wstool-input="initial"]'); el.value = '7777'; el.dispatchEvent(new Event('input', { bubbles: true })); });

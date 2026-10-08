@@ -4339,8 +4339,13 @@ const USER_SCOPED_WORK_KEYS = [
   'aurix_ws_projects_v1', 'aurix_ws_planning_v1', 'aurix_ws_tool_state_v1',
   'aurix_ws_pinned_v1', 'aurix_ws_recent_v1', 'aurix_ws_space_hidden_v1',
   'aurix_ws_space_top_v1', 'aurix_workspace_mode',
+  // Los parámetros de Escenarios guardan el patrimonio DECLARADO como base: tras cambiar de
+  // cuenta, el siguiente usuario los leía (reproducido en la demo con dos cuentas sintéticas).
+  'aurix_ws_scn_params_v1',
 ];
-const USER_SCOPED_WORK_PREFIXES = ['aurix_ws2_'];
+// `aurix_ws_prefrev_` — la revisión aplicada de cada preferencia sincronizada; heredarla hacía
+// que la cuenta siguiente descartara sus propias preferencias remotas por «más antiguas».
+const USER_SCOPED_WORK_PREFIXES = ['aurix_ws2_', 'aurix_ws_prefrev_'];
 const _AURIX_PARKED_SUFFIX = '__parked_';
 // Política de crecimiento. Con des-aparcado, lo aparcado se consume al volver su dueño, así
 // que crece sólo por usuarios que no vuelven. Dos topes, y agotar cualquiera de los dos NO
@@ -21187,6 +21192,8 @@ function _wsDocsQueue(key) {
 }
 // Y el reintento explícito que §4 pide, sobre la MISMA cola.
 function _wsDocsRetry() {
+  // Reintentar también la LECTURA si fue ella la que falló.
+  if (_wsDocsPullFailed) { _wsDocsPulledFor = null; try { _wsDocsPullOnce(); } catch (_) {} }
   const keys = Object.keys(_WS_DOC_KEYS).concat(_WS_PREF_KEYS);
   // Un fallo transitorio no prueba nada sobre el esquema: si la tabla se marcó
   // ausente por un error que NO era de esquema, el estado ya es 'error' y no 'no',
@@ -21314,18 +21321,43 @@ async function _wsDocsPush(key) {
 // cuerpo antiguo. Un documento que sólo existe en LOCAL no se toca: el remoto
 // añade y actualiza, nunca sustituye la lista entera — que es exactamente el
 // defecto de pérdida de datos que la sincronización de Intelligence ya pagó.
+// ── LA LECTURA NO TENÍA NINGÚN LLAMADOR ─────────────────────────────────────
+// La tabla existe en producción (sonda 2026-10-08: 42501 para `anon`) y el push sube cada
+// guardado Premium, pero nada leía: un documento guardado en el móvil no aparecía nunca en
+// el escritorio. Se lee UNA vez por cuenta, cuando el derecho está resuelto
+// (`_aurixEntApplyToUi`), y la fusión es la de siempre: por revisión, sin sustituir la lista.
+let _wsDocsPullInFlight = false;
+let _wsDocsPullFailed = false;
+let _wsDocsPulledFor = null;
+function _wsDocsPullOnce() {
+  const uid = _wsDocsSession();
+  if (!uid || _wsDocsPulledFor === uid || _wsDocsPullInFlight) return;
+  if (!_wsCanPersist()) return;
+  _wsDocsPulledFor = uid;
+  _wsDocsPull().then(okd => {
+    // Cualquier lectura que no terminó bien (fallo, respuesta descartada) se puede repetir.
+    if (okd !== true) _wsDocsPulledFor = null;
+    try { _wsPlansRepaint(); } catch (_) {}
+  }, () => { _wsDocsPulledFor = null; });
+}
 async function _wsDocsPull() {
   const userId = _wsDocsSession();
   if (!userId || _wsDocTableState === 'no') return false;
   if (!_wsCanPersist()) return false;          // simétrico con el push: sin plan, nada remoto
+  _wsDocsPullInFlight = true;
   try {
     const { data, error } = await supabaseClient.from(_WS_DOC_TABLE)
       .select('doc_id,kind,body,revision,deleted_at,body_version,currency')
       .eq('user_id', userId);
+    // LA CUENTA PUEDE HABER CAMBIADO MIENTRAS SE ESPERABA. Escribir la respuesta en el
+    // almacén ahora la mezclaría con el trabajo de OTRA cuenta: se descarta entera.
+    if (_wsDocsSession() !== userId || !_wsCanPersist()) return false;
     if (error) {
       if (_wsDocErrPermanent(error)) _wsDocTableState = 'no';
+      else _wsDocsPullFailed = true;
       return false;
     }
+    _wsDocsPullFailed = false;
     _wsDocTableState = 'yes';
     const rows = Array.isArray(data) ? data : [];
     let touched = 0;
@@ -21334,6 +21366,10 @@ async function _wsDocsPull() {
       const mine = rows.filter(r => r && r.kind === spec.kind);
       if (!mine.length) continue;
       const local = _wshReadStore(key);
+      // Con una subida PENDIENTE o FALLIDA de esta clave, lo local aún no está en el servidor:
+      // el remoto puede AÑADIR documentos que faltan, pero no pisar ni borrar los que ya hay.
+      const _st = _wsDocSync[key] && _wsDocSync[key].state;
+      const localPending = (_st === 'saving' || _st === 'error');
       const byId = new Map();
       local.forEach(item => { const id = spec.idOf(item); if (id) byId.set(String(id), item); });
       let changed = false;
@@ -21349,6 +21385,7 @@ async function _wsDocsPull() {
         // revisión al siguiente guardado. Ahora el tombstone se APLICA cuando es
         // más nuevo que lo que hay en local, con la misma regla de revisión que
         // todo lo demás: una edición posterior siempre gana.
+        if (cur && localPending) continue;
         if (r.deleted_at) {
           if (!cur) continue;                              // nunca lo tuvimos: nada que borrar
           if (cur.deletedAt) continue;                      // ya estaba marcado
@@ -21372,7 +21409,14 @@ async function _wsDocsPull() {
     // de Intelligence ya pagó una vez, y la revisión financiera lo señaló.
     // La revisión de una preferencia se deriva del instante de escritura
     // (`_wsDocRows`), así que aquí se compara contra la última aplicada y se guarda.
-    for (const r of rows.filter(x => x && x.kind === 'ws_pref')) {
+    // ── NO SE APLICAN AL LEER (SPEC 1, revisión financiera) ─────────────────
+    // `aurix_ws_tool_state_v1` es UN objeto con los borradores de TODAS las herramientas
+    // (operaciones del Diario, cobros con pagos…) y su revisión es el reloj del dispositivo:
+    // aplicarlo entero como last-writer-wins borraba trabajo de otra herramienta hecho en el
+    // otro dispositivo. Hasta fusionar por herramienta, las preferencias se SUBEN pero no se
+    // aplican al leer; los DOCUMENTOS (arriba) sí viajan.
+    const _WS_PULL_APPLIES_PREFS = false;
+    for (const r of (_WS_PULL_APPLIES_PREFS ? rows : []).filter(x => x && x.kind === 'ws_pref')) {
       const b = r.body || {};
       if (!b.key || _WS_PREF_KEYS.indexOf(b.key) === -1) continue;
       const remoteRev = Number(r.revision) || 0;
@@ -21387,7 +21431,8 @@ async function _wsDocsPull() {
     }
     if (touched) { _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now(); }
     return true;
-  } catch (_) { return false; }
+  } catch (_) { _wsDocsPullFailed = true; return false; }
+  finally { _wsDocsPullInFlight = false; }
 }
 // ── EL ESTADO QUE SE PINTA, Y NO AFIRMA LO QUE NO PUEDE DEMOSTRAR ───────────
 // §4 pide estados reales: sin guardar / guardando / guardado / error / reintentar.
@@ -23865,6 +23910,9 @@ function _wsPlansEmptyState() {
   let session = null;
   try { session = _wsDocsSession(); } catch (_) { session = null; }
   if (!session) return 'empty';                     // sin cuenta no hay nada remoto que esperar
+  // La lectura de los documentos de esta cuenta está EN VUELO: todavía no se sabe.
+  if (_wsDocsPullInFlight) return 'loading';
+  if (_wsDocsPullFailed) return 'error';
   let worst = 'idle';
   try { worst = _wsDocSyncWorst(); } catch (_) {}
   if (worst === 'error') return 'error';
@@ -27046,7 +27094,9 @@ function _wsBaseCcy() { return _wsCcyCode(typeof baseCurrency !== 'undefined' ? 
 // Guardar) y la de sus resultados.
 function _wsDocCurrencyOf(p) {
   if (!p) return null;
-  return _wsCcyCode(p.inputs && p.inputs.currency) || _wsCcyCode(p.currency) || _wsCcyCode(p.results && p.results.currency);
+  // `results.currency` ANTES que el sello: en Diario y Precios de activos sale de la moneda real
+  // de las filas; el sello antiguo era la base al último guardado (revisión financiera).
+  return _wsCcyCode(p.inputs && p.inputs.currency) || _wsCcyCode(p.results && p.results.currency) || _wsCcyCode(p.currency);
 }
 // Importe en una moneda dada; sin moneda, la cifra tal cual y sin símbolo.
 function _wsMoneyIn(v, ccy, signed) {
@@ -83167,6 +83217,8 @@ function _aurixEntLoaded() { return _aurixEnt.loaded === true; }
 // nacería con el mismo problema. Un owner, tres llamadas.
 function _aurixEntApplyToUi(features) {
   try { _aurixEntLastSig = JSON.stringify(features); } catch (_) {}
+  // Con el derecho resuelto, la lectura de los documentos guardados de ESTA cuenta.
+  try { _wsDocsPullOnce(); } catch (_) {}
   // La pestaña activa, si su contenido depende del derecho.
   try {
     const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
