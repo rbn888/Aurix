@@ -257,3 +257,40 @@ Revisión financiera adversarial: 2 rondas sobre este bloque; todos los hallazgo
 listados como pendientes en §8. **No ejecutado (no cuenta como aprobado):** sincronización real,
 histórico real con snapshots del servidor, 24H con la puerta de racha densa (se midió su owner de
 cálculo), dispositivos físicos.
+
+## 10. Verificación previa a integrar (2026-10-08, cuarta entrega)
+
+### Observado
+- **24H completo con su puerta de preparación** (motor real, historia DENSA cada 15 min, pulsando los
+  rangos en la UI de la demo, Chromium y WebKit — `docs/financial-reliability/probe-ranges-fx.mjs` 10/10):
+  control sólo USD publica 24H/7D/30D/1A/TOTAL; cuenta con EUR recién actualizada: los cinco rangos
+  muestran «Rendimiento no disponible» / «Historial disponible» con la explicación accesible, nunca un %.
+- **Defecto encontrado y corregido**: el 24H se pinta por OTRO pintor (gráfico de emergencia) que no
+  añadía la explicación — se mostraba «Rendimiento no disponible» sin decir por qué. Ahora ese pintor
+  también marca (y la nota mira la línea base del gráfico publicado, porque el 24H publica su propio motivo).
+- **Qué verá una cuenta afectada** (medido):
+  | Desde el despliegue | 24H | 7D | 30D | 1A | TOTAL |
+  |---|---|---|---|---|---|
+  | 0 h | sin % + nota | sin % + nota | sin % + nota | sin % + nota | sin % + nota |
+  | 30 h | % | sin % | sin % | sin % | sin % |
+  | 8 días | % | % | sin % | sin % | sin % |
+  | 370 días | % | % | % | % | sin % |
+  1A recupera el % cuando su ventana (365 d) empieza después del último punto antiguo: ≈ 1 año tras el
+  despliegue (o tras el último punto escrito por un cliente antiguo). TOTAL **no** lo recupera mientras la
+  serie contenga puntos antiguos (su ventana siempre empieza en ellos). Opciones para decidir: medir TOTAL
+  «desde el {fecha}» (re-etiquetado, sin inventar nada) o re-expresar el histórico con un tipo histórico
+  fechado (BCE vía la API: exige desplegar un endpoint).
+- **`computeAurixTWRSeries`**: sin consumidores en producto. Sólo `window.computeAurixTWRSeries` y
+  `window.debugAurixTWRSeries` (consola). Ningún render, Intelligence, persistencia ni `performance_state`
+  la lee; 4 harnesses lo vigilan (INT-TRUTH-FOUNDATION 2.10, INT-CORE-FACT-ENGINE, PC01, M.06 entitlements).
+  Su fórmula compartida `_aurixTwrChain` la usa `_aurixInvestablePerformance`, que SÍ tiene la protección.
+  No puede publicar sin la protección FX hoy; si se conecta en el futuro debe pasar por `_aurixFxBasisLimited`.
+- **Ensayo contra el backend real** (sin cuenta, sin enviar correo): el candidato servido en
+  `http://localhost` carga el login y el cliente Supabase de producción (CORS/CSP OK).
+
+### Pendiente (requiere acceso del founder)
+- Guardar en un perfil / recuperar en otro / borrar y confirmar que no reaparece **contra el backend real**:
+  kit listo en `docs/financial-reliability/qa-real/` (`grant-qa-premium.sql`, `run-real-sync.mjs`,
+  `revoke-qa-premium.sql`). Pasos exactos en el informe de esta entrega.
+- 24H real de la cuenta sintética: necesita ≥ 24 h de historia real (snapshots del servidor cada 15 min)
+  ⇒ crear la cuenta hoy y pasar `probe-ranges` contra ella mañana.
