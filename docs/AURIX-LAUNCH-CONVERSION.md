@@ -182,3 +182,50 @@ uno**. Reversión completa: `git revert --no-edit b496afd..<punta desplegada> &&
 4. **24H real + bloque FX/sincronización retenido**: sin él, los documentos de Workspace no se recuperan
    en otro dispositivo y el tipo EUR/USD sigue fijo en 0,92.
 5. **Medición**: sin destino para visita/CTA/análisis/paywall (decisión de privacidad + infraestructura).
+
+---
+
+# CIERRE FINAL PARA LANZAMIENTO (2026-10-08) · build `v805-launch-final` · appjs 765 · login 493
+
+## 1 · Fiabilidad pendiente
+Cuenta QA (lectura con su sesión, 18:08 UTC): **0 posiciones, 0 snapshots**. No hay historia ⇒ el 24H real no
+se puede comprobar. **Fecha más temprana**: 24 h después de que el titular registre 10.000 € + 1.000 US$ de
+liquidez en esa cuenta (paso exacto en «SPEC 3 · Bloque 1 — retenido»). Ninguna espera abierta. El bloque
+sincronización/FX sigue en `aurix/financial-reliability` y **no se despliega**.
+
+## 2 · Hallazgos (contrastados con v764, reproducidos en la demo equivalente)
+| Hallazgo | Reproducido | Corrección |
+|---|---|---|
+| Tras registrar liquidez, «Lo que importa hoy»: «no hay ningún cambio…» con 1 observación | Sí | `7069800`: con < 2 observaciones comparables (mismo owner que «Tu evolución») explica la espera |
+| Paywall: «retómalo en cualquier dispositivo» | Sí (`pw_v3_b`) | `6029f7e` |
+| Comparador sin índice: dos «+0 %» con el estilo de la cifra medida (suelo = origen) | Sí | `ae11d0d`: el origen se rotula «Inicio/Start»; sin suelo duplicado |
+`docs/launch-final/probe-findings.mjs` **72/72** (CR/WK × 390/1440 × ES/EN). Harnesses actualizados: VNEXT §12
+(211/211) y ADVANCED-INTELLIGENCE-CLOSURE I.8 (565/565) — fijaban como contrato la afirmación sin referencia y el
+«+0 %». «Guardado y sincronizado» en Workspace describe la subida confirmada, no la recuperación en otro
+dispositivo: se mantiene.
+
+## 3 · Confianza y precio
+- **Privacidad (borrador)**: `f038326` añade proveedores que el código usa y faltaban — Google Fonts (app y web),
+  Resend (correos) — y corrige las fuentes de cotización del servidor (CoinGecko, GeckoTerminal, Twelve Data,
+  Yahoo Finance; FMP sólo logotipos). Sigue «BORRADOR» con sus PENDIENTE.
+- **Stripe, comprobable desde el código**: catálogo 799/6999 EUR sin prueba; el checkout NO activa
+  `automatic_tax`, ni recoge NIF/dirección: cobra exactamente 7,99/69,99 sin desglose fiscal calculado por Aurix.
+  `/api/billing/status` comprueba clave/precios/webhook y que el portal EXISTE, no qué permite.
+- **Sólo el titular**: tratamiento del precio en Stripe (impuesto incluido o no), si el portal permite cambiar
+  mensual↔anual y cancela al final del periodo (lo afirman las condiciones), y lo que muestra la factura de la
+  compra real de 7,99 €.
+
+## 4 · Medición
+Hoy, sin infraestructura nueva: registro, primera posición, activación 7 d, checkout abierto y Premium confirmado
+(`db/spec3_funnel_readonly.sql`, sólo lectura). Sin destino: visita, CTA, primer análisis, paywall.
+**Opción mínima única (propuesta, no construida)**: una tabla `product_events` en el Supabase actual
+(0 € dentro del plan vigente; sin proveedor nuevo ni cookies): `user_id`, `event` (lista cerrada:
+`landing_cta` —capturado del `?src=` del enlace al completar el registro—, `first_analysis_shown`,
+`paywall_shown`), `created_at`; inserción sólo de la propia cuenta por RLS y **un evento por cuenta y tipo**
+(única) ⇒ recargas y repintados no duplican; sin importes, posiciones, correos ni contenido. La visita anónima
+queda fuera. Requiere: revisión del SQL/RLS y una línea en la política de privacidad (decisión del titular).
+
+## 5 · Entorno para capturas y vídeo
+Demo con datos ficticios y el código de `main` (equivalente a producción `v805-launch-final`):
+`https://rbn888.github.io/aurix-demo/v805/demo.html` (subruta aislada de la demo existente). Las capturas de la
+landing no se tocan.
