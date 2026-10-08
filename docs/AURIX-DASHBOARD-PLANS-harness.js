@@ -40,14 +40,14 @@ function ctx(opts) {
   // El almacén REAL de Workspace, con su filtro de tombstones.
   vm.runInContext('var __LS = Object.create(null); var localStorage = { getItem: k => (k in __LS ? __LS[k] : null), setItem: (k,v) => { __LS[k] = String(v); }, removeItem: k => { delete __LS[k]; } };', sb);
   vm.runInContext('var _wsDocTableState = ' + JSON.stringify(opts.table || 'yes') + ';', sb);
-  vm.runInContext('var _wsDocsPullInFlight = ' + !!opts.pullInFlight + ', _wsDocsPullFailed = ' + !!opts.pullFailed + ';', sb);
+  vm.runInContext('var _wsDocsPullInFlight = ' + !!opts.pullInFlight + ', _wsDocsPullFailed = ' + !!opts.pullFailed + ', _wsDocsPullSkippedAbsent = ' + (opts.remoteOnly ? 1 : 0) + ';', sb);
   vm.runInContext('var __SESSION = ' + JSON.stringify(opts.session === undefined ? 'u1' : opts.session) + '; function _wsDocsSession(){ return __SESSION; }', sb);
   vm.runInContext('var __WORST = ' + JSON.stringify(opts.worst || 'idle') + '; function _wsDocSyncWorst(){ return __WORST; }', sb);
   vm.runInContext('var __GRANT = ' + JSON.stringify(opts.grant === undefined ? true : opts.grant) + '; function hasFeature(){ return __GRANT; } function hasAurixPremiumAccess(){ return __GRANT; } function _aurixEntIsCatalogPreview(){ return false; }', sb);
   vm.runInContext('var __UP = []; function openUpgradeIntent(o){ __UP.push(o); return false; }', sb);
   vm.runInContext('var _wsToolActive=null, _wsToolInputs=null, _wsToolEditId=null, _wsToolDirty=false, _wsReturnTab="tools", _wshView="home";', sb);
   ['_WSH_PROJECTS_KEY','_WSH_GOALS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES','_WSPL_GOAL',
-   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS','PLAN_ORDER_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS','PLAN_ORDER_KEY','_WS_ROW_CCY_TYPES'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    // §3 del cierre v789 — la tarjeta CALLA el subtítulo cuando repetiría el título
@@ -81,7 +81,7 @@ function ctx(opts) {
 const R = (c, e) => vm.runInContext(e, c);
 
 const DOCS = [
-  { id: 'd1', type: 'monthly_budget',        customName: 'Presupuesto casa',  updatedAt: 500, currency: 'EUR', inputs: { salary: 2500, housing: 700, food: 300 } },
+  { id: 'd1', type: 'monthly_budget',        customName: 'Presupuesto casa',  updatedAt: 500, currency: 'EUR', inputs: { currency: 'EUR', salary: 2500, housing: 700, food: 300 } },
   { id: 'd2', type: 'monthly_budget',        customName: 'Presupuesto viaje', updatedAt: 400, inputs: { salary: 800, food: 200 } },
   { id: 'd3', type: 'receivables_app',       customName: 'Clientes 2026',     updatedAt: 300, inputs: { items: [{ id: 'r1', units: 1, unitPrice: 1000, paidAmount: 400 }] } },
   { id: 'd4', type: 'real_estate_portfolio', customName: 'Cartera Madrid',    updatedAt: 200, inputs: { properties: [{ id: 'p1', name: 'Piso', ptype: 'flat', buy: 200000, value: 250000 }] } },
@@ -193,6 +193,11 @@ console.log('\n2 · Hasta dos métricas, nunca inventadas:');
     ok('2.1b base USD: el presupuesto declarado en EUR sigue publicando «1500,00 €» (no $)', mu[0] && /^1\.?500,00\s€$/.test(mu[0].v), JSON.stringify(mu[0]));
     const m2 = JSON.parse(R(cu, 'JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === "d2")))'));
     ok('2.1c documento sin moneda: importes sin símbolo, nunca la base actual', m2.length > 0 && m2.every(x => !/[€$]/.test(x.v)), JSON.stringify(m2));
+    // El SELLO del último guardado (la base visible entonces) no acredita la moneda en que se
+    // escribieron los importes: con sólo el sello, el documento sigue sin confirmar.
+    const cs = ctx({ docs: [{ id: 's1', type: 'monthly_budget', customName: 'Sellado', updatedAt: 1, currency: 'USD', inputs: { salary: 2500, housing: 700 } }], base: 'USD' });
+    const ms = JSON.parse(R(cs, 'JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === "s1")))'));
+    ok('2.1d sólo el sello del último guardado ⇒ sin símbolo (sin confirmar)', ms.length > 0 && ms.every(x => !/[€$]/.test(x.v)), JSON.stringify(ms));
   }
   ok('2.2 cobros → pendiente y cobrado, de sus estados reales',
     (() => { const m = met('d3'); return m.length === 2 && m[0].k === 'Cobrado' && m[1].k === 'Pendiente'; })(),

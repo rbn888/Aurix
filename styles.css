@@ -30282,3 +30282,8 @@ body.ws-cover .aurix-wsh { max-width: none; }
 /* Compra/venta: Aurix registra, no ejecuta ni mueve liquidez. */
 .modal-note { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
 .modal-note[hidden] { display: none; }
+
+/* Procedencia del tipo EUR/USD (Ajustes). */
+.settings-fx-note { margin: 2px 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+.settings-fx-note.is-warn { color: var(--aurix-warning); }
+#totalValue[data-fx-approx]::before { content: '≈ '; opacity: .7; }

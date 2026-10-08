@@ -4845,6 +4845,11 @@ const T = {
     updated:         t => `Actualizado ${t}`,
     updateError:     'No se pudo actualizar',
     updateStaleSince:n => `Última actualización: hace ${n} min`,
+    // Tipo EUR/USD: fecha del CAMBIO, distinta de la de los precios de los activos.
+    fxRateLine:      (r, src, d) => `Cambio EUR/USD: 1 € = ${r} $ · ${src} · ${d}`,
+    fxRateStale:     (r, d) => `Cambio EUR/USD no actual: último conocido 1 € = ${r} $ (${d}). Los totales convertidos son aproximados.`,
+    fxRateNone:      'Sin tipo de cambio EUR/USD disponible: los totales convertidos son aproximados.',
+    fxHeroApprox:    ' · total aproximado: cambio EUR/USD no actual',
     rateLimit:       'Límite de API — reintentando pronto',
     // Autosave status
     saveSaving:      'Guardando…',
@@ -6582,12 +6587,12 @@ const T = {
     wspl_empty:           'Todavía no has guardado ningún plan.',
     wspl_empty_cta:       'Ver plantillas',
     wspl_loading:         'Comprobando tus planes guardados…',
+    wspl_remote_only:     'Tu cuenta tiene documentos guardados que este dispositivo todavía no puede recuperar. Siguen intactos en tu cuenta.',
     wspl_error:           'No se han podido cargar tus planes guardados.',
     wspl_m_income:        'Ingresos',
     wspl_m_avail:         'Disponible',
     wspl_m_deficit:       'Déficit',
     wspl_share_done_of:   'cobrado del total',
-    wspl_remote_only:     'Tu cuenta tiene documentos guardados que este dispositivo todavía no puede recuperar. Siguen intactos en tu cuenta.',
     wspl_share_goal:      'acumulado de la meta',
     wspl_m_expenses:      'Gastos',
     wspl_m_pending:       'Pendiente',
@@ -8206,6 +8211,10 @@ const T = {
     updated:         t => `Updated ${t}`,
     updateError:     'Update failed',
     updateStaleSince:n => `Last updated ${n} min ago`,
+    fxRateLine:      (r, src, d) => `EUR/USD rate: €1 = $${r} · ${src} · ${d}`,
+    fxRateStale:     (r, d) => `EUR/USD rate not current: last known €1 = $${r} (${d}). Converted totals are approximate.`,
+    fxRateNone:      'No EUR/USD exchange rate available: converted totals are approximate.',
+    fxHeroApprox:    ' · approximate total: EUR/USD rate not current',
     rateLimit:       'API limit — retrying soon',
     // Autosave status
     saveSaving:      'Saving…',
@@ -9569,6 +9578,7 @@ const T = {
     wspl_empty:           'You have not saved any plan yet.',
     wspl_empty_cta:       'See templates',
     wspl_loading:         'Checking your saved plans…',
+    wspl_remote_only:     'Your account has saved documents that this device cannot recover yet. They remain intact in your account.',
     wspl_error:           'Your saved plans could not be loaded.',
     wspl_m_income:        'Income',
     wspl_m_avail:         'Available',
@@ -9578,7 +9588,6 @@ const T = {
     wspl_m_expenses:      'Expenses',
     wspl_m_pending:       'Pending',
     wspl_m_collected:     'Collected',
-    wspl_remote_only:     'Your account has saved documents that this device cannot recover yet. They remain intact in your account.',
     wspl_m_units:         'Properties',
     wspl_m_value:         'Value',
     wspl_m_trades:        'Trades',
@@ -12112,7 +12121,10 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 
 const BASE_KEY   = 'portfolio_base_currency';
 let baseCurrency = localStorage.getItem(BASE_KEY) || 'USD';
-let usdToEur     = 0.92; // updated from API
+// EUR por 1 USD. Lo fija `_aurixFxSyncEur()` desde el tipo FECHADO de la caché FX (EURUSD=X,
+// la misma fuente que ya usa el snapshot del servidor). 0.92 es sólo el ANCLA de respaldo sin
+// tipo: no es una cotización y, cuando se usa, la conversión se declara aproximada.
+let usdToEur     = 0.92;
 
 // ── DOM ────────────────────────────────────────────────────
 const totalValueEl  = document.getElementById('totalValue');
@@ -13627,7 +13639,10 @@ function _aurixBackfillFlowsFromTransactions() {
         if (tx.opening === true) continue;
         scanned++;
         const native = Math.abs(Number(tx.qty) * Number(tx.price));
-        const usd = (typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native;
+        // Tx PASADA en EUR: ancla 0,92 (el tipo del cliente en aquel escalón), no el de hoy (TWR estable).
+        const _cur = String(a.assetCurrency || 'USD').toUpperCase();
+        const usd = (_cur === 'EUR') ? native / _AURIX_EUR_ANCHOR
+                  : ((typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native);
         if (!Number.isFinite(usd) || usd <= 0) continue;
         const isSell = String(tx.type || '').toLowerCase() === 'sell';
         const signed = isSell ? -usd : usd;
@@ -14488,7 +14503,16 @@ function formatChartTooltip(amount) {
 // is byte-identical to pre-F2.
 const _AURIX_FX_TTL      = 12 * 60 * 60 * 1000;   // 12h — FX drifts slowly vs. portfolio-valuation needs
 const _AURIX_FX_KEY      = 'aurix_fx_rates_v1';
-const _AURIX_FX_PAIRS    = { GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X' };
+const _AURIX_FX_PAIRS    = { EUR: 'EURUSD=X', GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X' };
+// ── EUR/USD DEJA DE SER UN NÚMERO FIJO (SPEC 1) ──────────────────────────────
+// `usdToEur = 0.92` llevaba fijo desde 2026-04-27 (el fetch a Frankfurter se retiró por la
+// CSP) con un comentario «updated from API» falso. El 2026-10-08 el tipo real era 1,1197
+// USD/EUR ⇒ los activos USD de una base EUR salían +3,01 %. Y el snapshot del SERVIDOR
+// (supabase/functions/portfolio-snapshot) ya valoraba EUR con EURUSD=X vivo: el histórico
+// mezclaba puntos de cliente a 0,92 con puntos de servidor al tipo real. Ahora el cliente usa
+// la MISMA fuente y fecha; sin tipo válido se declara aproximado (nunca 1:1, nunca «actual»).
+const _AURIX_EUR_ANCHOR  = 0.92;                  // respaldo SIN tipo — no es una cotización
+const _AURIX_FX_SOURCE   = 'Yahoo Finance';       // vía el proxy de precios de Aurix
 // STATIC fallback (USD per 1 unit) — approximate, last resort only; drives the
 // 'approx' status. EUR is intentionally absent (it uses the usdToEur anchor).
 const _AURIX_FX_FALLBACK = { USD: 1, GBP: 1.27, CHF: 1.11, JPY: 0.0064 };
@@ -14507,20 +14531,64 @@ function _aurixFxFresh() {
   return !!(c && c.rates && (Date.now() - c.ts) < _AURIX_FX_TTL);
 }
 // Rate (USD per 1 unit) + provenance. status: 'live' | 'approx' | 'unknown'.
+// Estado del tipo EUR: 'live' (obtenido hace < TTL), 'stale' (último conocido, con su fecha) o
+// 'none' (nunca se obtuvo en este dispositivo ⇒ ancla de respaldo, conversión aproximada).
+function _aurixFxEurState() {
+  const c = _aurixFxLoad();
+  const r = c && c.rates ? Number(c.rates.EUR) : NaN;
+  if (!(Number.isFinite(r) && r > 0)) return { rate: null, at: null, status: 'none', source: null };
+  const at = (c.at && Number.isFinite(Number(c.at.EUR))) ? Number(c.at.EUR) : Number(c.ts) || null;
+  const fresh = at != null && (Date.now() - at) < _AURIX_FX_TTL;
+  return { rate: r, at: at, status: fresh ? 'live' : 'stale', source: _AURIX_FX_SOURCE };
+}
+// Mantiene `usdToEur` (lo leen toBase/assetValueUSD/_nativeToUSD) alineado con el tipo fechado.
+function _aurixFxSyncEur() {
+  const st = _aurixFxEurState();
+  usdToEur = st.rate ? 1 / st.rate : _AURIX_EUR_ANCHOR;
+  return st;
+}
 function _aurixFxLookup(ccy) {
   const c = String(ccy || '').toUpperCase();
   if (c === 'USD') return { rate: 1, status: 'live' };
-  // EUR stays on the existing anchor → USD/EUR behaviour unchanged from pre-F2.
-  if (c === 'EUR') return { rate: (Number.isFinite(usdToEur) && usdToEur > 0) ? 1 / usdToEur : null, status: 'live' };
+  if (c === 'EUR') {
+    const st = _aurixFxEurState();
+    if (st.rate) return { rate: st.rate, status: st.status === 'live' ? 'live' : 'approx' };
+    return { rate: 1 / _AURIX_EUR_ANCHOR, status: 'approx' };
+  }
   if (_aurixFxFresh()) {
     const r = _aurixFxCache.rates[c];
-    if (Number.isFinite(r) && r > 0) return { rate: r, status: 'live' };
+    // Fresco por PAR: un par que no llegó en el último refresco conserva su tipo antiguo, y el
+    // `ts` global renovado no puede declararlo actual (revisión financiera).
+    const at = (_aurixFxCache.at && Number.isFinite(Number(_aurixFxCache.at[c]))) ? Number(_aurixFxCache.at[c]) : Number(_aurixFxCache.ts);
+    if (Number.isFinite(r) && r > 0 && (Date.now() - at) < _AURIX_FX_TTL) return { rate: r, status: 'live' };
   }
   const fb = _AURIX_FX_FALLBACK[c];
   if (Number.isFinite(fb) && fb > 0) return { rate: fb, status: 'approx' };
   return { rate: null, status: 'unknown' };
 }
 function _aurixFxRate(ccy)   { return _aurixFxLookup(ccy).rate; }     // number | null
+// ¿La cartera ACTIVA necesita el tipo EUR/USD para expresarse en la base? (EUR ↔ otra moneda)
+function _aurixFxEurInvolved() {
+  const base = String(typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD').toUpperCase();
+  const list = (typeof activeAssets === 'function') ? activeAssets() : [];
+  return list.some(a => { const c = String((a && a.assetCurrency) || 'USD').toUpperCase(); return c !== base && (c === 'EUR' || base === 'EUR'); });
+}
+// Procedencia verificable del tipo (valor, fuente, fecha) en Ajustes; devuelve el estado.
+function _aurixFxNoteRender() {
+  const st = _aurixFxEurState();
+  try {
+    const el = (typeof document !== 'undefined') ? document.getElementById('settingsFxNote') : null;
+    if (el) {
+      const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES';
+      const r = st.rate ? st.rate.toLocaleString(loc, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '';
+      const d = st.at ? new Date(st.at).toLocaleString(loc, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      el.textContent = st.status === 'live' ? t('fxRateLine')(r, st.source, d)
+                     : st.status === 'stale' ? t('fxRateStale')(r, d) : t('fxRateNone');
+      el.classList.toggle('is-warn', st.status !== 'live');
+    }
+  } catch (_) {}
+  return st;
+}
 function _aurixFxStatus(ccy) { return _aurixFxLookup(ccy).status; }   // 'live'|'approx'|'unknown'
 
 // Coverage helpers for the F2-C snapshot guard (skip closed positions).
@@ -14540,7 +14608,8 @@ function _aurixFxApproxUsed(list) { return _aurixFxCurrencies(list).some(c => _a
 // on the TTL, never throws, never blocks: offline / proxy failure simply keeps
 // the cached or static fallback. Does NOT fetch EUR (anchored on usdToEur).
 async function _aurixFxRefresh() {
-  if (_aurixFxFresh()) return;
+  // Una caché fresca SIN EUR (anterior a este cambio) no puede ahorrar la petición.
+  if (_aurixFxFresh() && _aurixFxEurState().status === 'live') return;
   if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return;
   try {
     const syms = Object.values(_AURIX_FX_PAIRS).join(',');
@@ -14548,17 +14617,25 @@ async function _aurixFxRefresh() {
     if (!res.ok) return;
     const json  = await res.json();
     const bySym = new Map((json && json.snapshot || []).map(p => [String(p.symbol), p]));
-    const rates = {};
+    const rates = {}, at = {};
     for (const [ccy, sym] of Object.entries(_AURIX_FX_PAIRS)) {
       const p = bySym.get(sym);
-      if (p && Number.isFinite(p.price) && p.price > 0) rates[ccy] = p.price;   // USD per 1 unit
+      if (p && Number.isFinite(p.price) && p.price > 0 && p.stale !== true) {
+        rates[ccy] = p.price;                                             // USD per 1 unit
+        at[ccy] = Number.isFinite(Number(p.timestamp)) ? Number(p.timestamp) : Date.now();   // fecha DEL TIPO
+      }
     }
     if (Object.keys(rates).length) {
-      _aurixFxCache = { ts: Date.now(), rates };
+      // Un par que no llega no borra el último conocido: conserva su tipo Y su fecha.
+      const prev = _aurixFxLoad();
+      const keepRates = Object.assign({}, prev && prev.rates), keepAt = Object.assign({}, prev && prev.at);
+      _aurixFxCache = { ts: Date.now(), rates: Object.assign(keepRates, rates), at: Object.assign(keepAt, at) };
       try { localStorage.setItem(_AURIX_FX_KEY, JSON.stringify(_aurixFxCache)); } catch (_) {}
     }
   } catch (_) { /* offline / proxy fail → keep cache / fallback; never throw */ }
+  finally { try { _aurixFxSyncEur(); } catch (_) {} }
 }
+try { _aurixFxSyncEur(); } catch (_) {}   // al cargar: el último tipo fechado conocido, si lo hay
 
 async function fetchExchangeRate() {
   // AURIX-FX-1 (F2-A): refresh the multi-currency rate cache (GBP/CHF/JPY) from
@@ -21331,6 +21408,7 @@ async function _wsDocsPush(key) {
 let _wsDocsPullInFlight = false;
 let _wsDocsPullFailed = false;
 let _wsDocsPulledFor = null;
+let _wsDocsPullSkippedAbsent = 0;   // filas remotas sin copia local: NO se añaden (ver _wsDocsPull)
 function _wsDocsPullOnce() {
   const uid = _wsDocsSession();
   if (!uid || _wsDocsPulledFor === uid || _wsDocsPullInFlight) return;
@@ -21416,7 +21494,6 @@ async function _wsDocsPull() {
     // El comentario decía «sólo si el remoto es más reciente» y el código
     // sobrescribía SIEMPRE: un dispositivo que sólo entraba pisaba el último ajuste
     // del otro. No es dinero, pero es la misma clase de defecto que la sincronización
-let _wsDocsPullSkippedAbsent = 0;   // filas remotas sin copia local: NO se añaden (ver _wsDocsPull)
     // de Intelligence ya pagó una vez, y la revisión financiera lo señaló.
     // La revisión de una preferencia se deriva del instante de escritura
     // (`_wsDocRows`), así que aquí se compara contra la última aplicada y se guarda.
@@ -23924,6 +24001,9 @@ function _wsPlansEmptyState() {
   // La lectura de los documentos de esta cuenta está EN VUELO: todavía no se sabe.
   if (_wsDocsPullInFlight) return 'loading';
   if (_wsDocsPullFailed) return 'error';
+  // La cuenta TIENE documentos en el servidor que este dispositivo no recupera (ver _wsDocsPull):
+  // decir «no tienes planes» sería falso. Se dice lo que pasa.
+  if (_wsDocsPullSkippedAbsent > 0) return 'remote_only';
   let worst = 'idle';
   try { worst = _wsDocSyncWorst(); } catch (_) {}
   if (worst === 'error') return 'error';
@@ -24001,9 +24081,6 @@ function _wsPlanSpendHtml(p) {
   const lbl = t('wspl_spend') + ': ' + top.map(x => x.name + ' ' + formatBase(x.value)).join(', ');
   // SVG con `fill` por partida, como el anillo de la herramienta: el color de un DATO viene del
   // motor y va en el elemento, nunca como `style` (eso es lo que la API de acento prohíbe).
-  // La cuenta TIENE documentos en el servidor que este dispositivo no recupera (ver _wsDocsPull):
-  // decir «no tienes planes» sería falso. Se dice lo que pasa.
-  if (_wsDocsPullSkippedAbsent > 0) return 'remote_only';
   const gap = 0.6, n = top.length, w = 100 - gap * (n - 1);
   let x0 = 0;
   const rects = top.map(x => {
@@ -24272,6 +24349,8 @@ function _renderDashboardPlans() {
     const st = _wsPlansEmptyState();
     const body = st === 'loading'
       ? `<p class="wspl-note">${esc(t('wspl_loading'))}</p>`
+      : st === 'remote_only'
+        ? `<p class="wspl-note is-warn">${esc(t('wspl_remote_only'))}</p>`
       : st === 'error'
         ? `<p class="wspl-note is-warn">${esc(t('wspl_error'))} <button type="button" class="wspl-link" data-ws-sync-retry>${esc(t('ws_sync_retry'))}</button></p>`
         : `<p class="wspl-note">${esc(t('wspl_empty'))} <button type="button" class="wspl-link" data-wspl-templates>${esc(t('wspl_empty_cta'))}</button></p>`;
@@ -24349,8 +24428,6 @@ function updateDashboardPlans() {
 // GRUPO 2 · TUS PLANES. Identidad = «kind:id» del documento.
 _aurixReorderRegister('wsPlansGrid', {
   item: '.wspl-card[data-wspl-ref]',
-      : st === 'remote_only'
-        ? `<p class="wspl-note is-warn">${esc(t('wspl_remote_only'))}</p>`
   key: el => el.getAttribute('data-wspl-ref'),
   label: el => ((el.querySelector('.wspl-name') || {}).textContent || '').trim(),
   commit: visible => { _wsPlansOrderCommit(visible); try { const sec = document.getElementById('wsPlansSection'); if (sec) sec._wsplHtml = ''; } catch (_) {} },
@@ -58418,7 +58495,15 @@ function setUpdateStatus(state) {
     error:      errorText,
     rate_limit: t('rateLimit'),
   };
-  updateTextEl.textContent = msg[state] ?? '';
+  // Sin tipo EUR/USD ACTUAL, el total convertido no se presenta como valoración fiable.
+  let _fxSuffix = '';
+  try {
+    const st = _aurixFxNoteRender();
+    if (st.status !== 'live' && _aurixFxEurInvolved()) _fxSuffix = t('fxHeroApprox');
+    const tv = document.getElementById('totalValue');
+    if (tv) { if (_fxSuffix) tv.setAttribute('data-fx-approx', st.status); else tv.removeAttribute('data-fx-approx'); }
+  } catch (_) {}
+  updateTextEl.textContent = (msg[state] ?? '') + ((state === 'ok' || state === 'error') ? _fxSuffix : '');
 }
 
 
@@ -76646,6 +76731,7 @@ function _applyCurrencyChange(currency) {
   document.querySelectorAll('.menu-curr-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
   _syncPerfCurrencyButtons();
+  try { _aurixFxNoteRender(); } catch (_) {}
   render(true);
   updateChart(true);
   updateDonut();
