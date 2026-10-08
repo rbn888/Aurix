@@ -87243,7 +87243,7 @@ function renderAurixSignal() {
 
   const msgEl = document.getElementById('aurixSignalMsg');
   const ctaEl = document.getElementById('aurixSignalCtaLabel');
-  if (msgEl) msgEl.textContent = state;
+  if (msgEl) { msgEl.textContent = state; msgEl.title = state; }
   if (ctaEl) ctaEl.textContent = t('signalHealthCta') || 'Ver análisis';
 
   sec.removeAttribute('data-kind');

@@ -39,6 +39,8 @@ for (const [EN, eng] of [['CR', chromium], ['WK', webkit]]) {
       chk(i.empty && i.emptyVisible, T + ' vacío: Intelligence muestra su estado vacío'); chk(!errs.length, T + ' vacío sin errores', errs[0]); await p.context().close(); }
     // SÓLO LIQUIDEZ y CONCENTRADO — la Salud del Dashboard es la de Intelligence; ninguna pregunta con «—».
     for (const n of ['cash', 'conc']) { const { p, errs } = await open(b, W, L, n); const d = await pill(p); chk(!(await over(p)), `${T} ${n}: sin desbordamiento`);
+      const ov = await p.evaluate(() => { const m = document.getElementById('aurixSignalMsg'), c = document.getElementById('aurixSignalCtaLabel'); if (!m || !c) return false; const a = m.getBoundingClientRect(), b = c.getBoundingClientRect(); return a.right > b.left + 1 && a.left < b.right; });
+      chk(!ov, `${T} ${n}: el estado no se monta sobre «Ver análisis»`);
       const i = await intel(p);
       chk(!!d && !!i.badge && d.indexOf(i.badge) >= 0, `${T} ${n}: Dashboard «${d}» = Intelligence «${i.badge}»`);
       chk(!/Riesgo|Risk/.test(d || ''), `${T} ${n}: sin «riesgo» del índice retirado`, d);

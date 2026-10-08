@@ -30499,3 +30499,10 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   .wsbud-top-card .wsbud-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .wsbud-top-card .wsbud-kpi.is-main { grid-column: auto; }
 }
+
+/* SPEC 3 · la Salud del Dashboard usa el vocabulario de Intelligence y algún estado es
+   largo («Salud: Todo depende de dos posiciones»): en móvil el texto se montaba sobre
+   «Ver análisis». Una sola línea como antes (sin tocar la altura del hero): el estado
+   se recorta con puntos suspensivos y el texto completo queda en title/aria-label. */
+.aurix-signal--health .aurix-signal-body { min-width: 0; }
+.aurix-signal--health .aurix-signal-msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
