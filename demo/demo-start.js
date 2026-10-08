@@ -84,12 +84,12 @@
       on: 'Recorrer onboarding', onb: 'Empieza como una cuenta nueva: acceso por correo simulado (código ' + R.code + ') y el onboarding completo.',
       app: 'Abrir aplicación demo', appb: 'Una cuenta ya configurada con una cartera ficticia.', empty: 'Cuenta vacía', emptyb: 'Cuenta configurada sin activos: estados vacíos.',
       plan: 'Experiencia', free: 'Free', prem: 'Premium (simulado, sin suscripción real)', reset: 'Reiniciar la demo', ver: 'Versión representada',
-      sim: 'Simulado o no disponible: acceso por correo (código fijo, sin envío), pagos (deshabilitados), precios y búsqueda de activos en vivo (no disponibles; se usan los precios guardados), sincronización entre dispositivos (cada navegador tiene su propia demo).' },
+      sim: 'Simulado o no disponible: acceso por correo (código fijo, sin envío), pagos (deshabilitados), precios y búsqueda de activos en vivo (no disponibles; se usan los precios guardados), sincronización entre dispositivos (cada navegador tiene su propia demo; base de datos falsa en este navegador), tipo de cambio EUR/USD (sin red: Ajustes dice «sin tipo» y el total convertido se marca aproximado ≈). Todos los datos son ficticios.' },
     en: { t: 'Aurix · Demo', s: 'Demo environment with fictitious data. Nothing you do here reaches Aurix: no accounts, no emails, no payments.',
       on: 'Walk through onboarding', onb: 'Start as a new account: simulated email access (code ' + R.code + ') and the full onboarding.',
       app: 'Open demo app', appb: 'An account already set up with a fictitious portfolio.', empty: 'Empty account', emptyb: 'Account set up with no assets: empty states.',
       plan: 'Experience', free: 'Free', prem: 'Premium (simulated, no real subscription)', reset: 'Reset the demo', ver: 'Version shown',
-      sim: 'Simulated or unavailable: email access (fixed code, nothing sent), payments (disabled), live prices and asset search (unavailable; stored prices are used), cross-device sync (each browser has its own demo).' },
+      sim: 'Simulated or unavailable: email access (fixed code, nothing sent), payments (disabled), live prices and asset search (unavailable; stored prices are used), cross-device sync (each browser has its own demo; fake database in this browser), EUR/USD exchange rate (no network: Settings says «no rate» and the converted total is marked approximate ≈). All data is fictitious.' },
   };
   function paint() {
     var l = T[lang()] || T.es;
