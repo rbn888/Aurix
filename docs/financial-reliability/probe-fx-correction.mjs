@@ -70,7 +70,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => (pr
   ok(`${T} control negativo: sin el límite, el mismo cálculo daría +1,57 % ficticio`, Math.abs(st1.ctl - 1.569) < 0.01, String(st1.ctl));
   ok(`${T} 7D del gráfico y rentabilidad de Intelligence: no publicadas (fx_basis_change)`, st1.r7[0] == null && st1.perf[0] === false && st1.perf[1] === 'fx_basis_change', JSON.stringify([st1.r7, st1.perf]));
   ok(`${T} el punto nuevo declara su base (fxBasis 'dated', fxEurUsd 1,1197) y el histórico antiguo queda intacto`, st1.last.fxBasis === 'dated' && st1.last.fxEurUsd === 1.1197 && st1.legacyKept >= 30, JSON.stringify(st1.last));
-  ok(`${T} la variación del gráfico explica la discontinuidad (accesible, no sólo hover)`, /Sin variación comparable/.test(st1.badge || ''), st1.badge);
+  ok(`${T} la variación del gráfico explica la discontinuidad (accesible, no sólo hover)`, /Sin variación comparable|No comparable change/.test(st1.badge || ''), st1.badge);
   const facts = await p.evaluate(() => { try { const L = _aurixFactLedger(); const all = [].concat(L.facts || [], L.gaps || []); return all.filter(x => x && /investable_level_change/.test(x.semanticKey || x.key || '')).map(x => (x.reason || x.status || '') + ':' + (x.value != null ? x.value : '')); } catch (e) { return ['ERR ' + e.message]; } });
   ok(`${T} Intelligence no publica el salto como cambio de nivel patrimonial`, !facts.some(x => /^[^:]*:\s*[0-9-]/.test(x) && !/fx_basis_change|gap|incorporation|no_material/.test(x)), JSON.stringify(facts));
   // EVIDENCIA HISTÓRICA, no exposición actual (revisión financiera).
@@ -110,7 +110,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => (pr
       return { badge: badge.getAttribute('data-fx-explain'), perf: perf.fallbackReason, valid: perf.valid, added: categoryHistory.length - before,
                hero: document.getElementById('totalValue').getAttribute('data-fx-explain'), cat: [...document.querySelectorAll('.cat-card-value[data-fx-approx]')].length };
     }, cache);
-    ok(`${T} ${lbl}: variación marcada aproximada con explicación accesible`, /aproximada/.test(r.badge || ''), JSON.stringify(r));
+    ok(`${T} ${lbl}: variación marcada aproximada con explicación accesible`, /aproximada|Approximate change/.test(r.badge || ''), JSON.stringify(r));
     ok(`${T} ${lbl}: no se publica rentabilidad ni se persiste un punto autoritativo`, r.valid === false && r.perf === 'fx_rate_not_current' && r.added === 0, JSON.stringify(r));
     ok(`${T} ${lbl}: hero «≈» con explicación accesible y sólo las categorías afectadas marcadas`, !!r.hero && r.cat >= 1 && r.cat <= 2, JSON.stringify(r));
   }

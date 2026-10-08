@@ -4893,6 +4893,9 @@ const T = {
     fxRateNone:      'Sin tipo de cambio EUR/USD disponible: los totales convertidos son aproximados.',
     fxHeroApprox:    ' · cambio no actual',   // corto: el «≈» marca el total; el detalle está en Ajustes
     fxBadgeApprox:   'Variación aproximada: el cambio EUR/USD no es actual, así que la valoración de hoy no es comparable con certeza.',
+    chartReturnSince: d => `desde ${d}`,
+    chartReturnSinceNote: d => `Rentabilidad desde el ${d}: antes de esa fecha Aurix valoraba los euros con un cambio fijo (0,92) y no es comparable. La curva conserva toda tu historia.`,
+    chartReturnFlowNote: 'La curva muestra tu patrimonio, que también sube o baja con lo que añades o retiras. El porcentaje es la rentabilidad sin esas aportaciones ni retiradas.',
     fxBadgeBasis:    d => `Sin variación comparable: hasta el ${d} Aurix valoraba los euros con un cambio fijo (0,92) y desde entonces con el tipo fechado. Comparar ambos puntos daría una rentabilidad que no existe.`,
     fxApproxShort:   'aproximado: cambio EUR/USD no actual',
     fxHeroApproxLong: 'Total aproximado: el cambio EUR/USD no es actual (detalle en Ajustes).',
@@ -8286,6 +8289,9 @@ const T = {
     fxRateNone:      'No EUR/USD exchange rate available: converted totals are approximate.',
     fxHeroApprox:    ' · FX not current',
     fxBadgeApprox:   'Approximate change: the EUR/USD rate is not current, so today\'s valuation cannot be compared with certainty.',
+    chartReturnSince: d => `since ${d}`,
+    chartReturnSinceNote: d => `Return since ${d}: before that date Aurix valued euros at a fixed rate (0.92), which is not comparable. The chart keeps your full history.`,
+    chartReturnFlowNote: 'The chart shows your wealth, which also rises or falls with what you add or withdraw. The percentage is the return excluding those contributions and withdrawals.',
     fxBadgeBasis:    d => `No comparable change: until ${d} Aurix valued euros at a fixed rate (0.92) and since then at the dated rate. Comparing both points would show a return that does not exist.`,
     fxApproxShort:   'approximate: EUR/USD rate not current',
     fxHeroApproxLong: 'Approximate total: the EUR/USD rate is not current (details in Settings).',
@@ -14777,7 +14783,9 @@ function _aurixFxBubbleWire() {
   const open = el => {
     close();
     const b = document.createElement('div'); b.id = 'aurixFxBubble'; b.className = 'aurix-fx-bubble'; b.setAttribute('role', 'status');
-    b.textContent = el.getAttribute('data-fx-explain'); document.body.appendChild(b);
+    b.textContent = el.getAttribute('data-fx-explain');
+    if (el.getAttribute('data-explain-kind') === 'info') b.classList.add('is-info');   // no es un aviso del tipo
+    document.body.appendChild(b);
     const r = el.getBoundingClientRect(), w = Math.min(300, window.innerWidth - 24);
     b.style.width = w + 'px';
     b.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left)) + 'px';
@@ -14809,20 +14817,45 @@ function _aurixFxBadgeNote(range, published) {
       // publicado NO tiene variación y su línea base cae antes del límite de base del tipo.
       const bTs = Number(published.baselineTs != null ? published.baselineTs : published.firstTs);
       limited = published.returnSuppressedReason === 'fx_basis_change' || published.fxBasisLimited === true
-        || (!Number.isFinite(published.returnPct) && Number.isFinite(bTs) && _aurixFxBasisLimited(bTs));
+        || (!Number.isFinite(published.returnPct) && Number.isFinite(bTs) && _aurixFxBasisLimited(bTs))
+        // TOTAL «desde fecha fiable» que el subperiodo aún no certifica: sigue limitado por el tipo.
+        || (!Number.isFinite(published.returnPct) && Number.isFinite(published.returnSinceTs));
     }
     else { const span = _AURIX_RANGE_MS[String(range || '').toLowerCase()]; limited = _aurixFxBasisLimited(span ? Date.now() - span : -Infinity); }
-    if (!limited) return '';
+    if (!limited) return _aurixReturnContextNote(published);
     const b = _aurixFxBasisBoundary();
     const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES';
     return t('fxBadgeBasis')(new Date(b).toLocaleDateString(loc, { day: '2-digit', month: '2-digit', year: 'numeric' }));
   } catch (_) { return ''; }
 }
+// Sin límite del tipo, el badge sólo se explica cuando el lector lo necesita: TOTAL anclado «desde
+// fecha fiable», o curva y porcentaje en sentidos OPUESTOS porque hubo aportaciones o retiradas (la
+// curva es patrimonio; el % es rentabilidad sin flujos). Lee el resultado PUBLICADO; nada se recalcula.
+function _aurixReturnContextNote(published) {
+  try {
+    if (!published || typeof published !== 'object' || published.returnState !== 'ok') return '';
+    const pct = Number(published.badgeReturnPct != null ? published.badgeReturnPct : published.returnPct);
+    if (!Number.isFinite(pct)) return '';
+    if (Number.isFinite(published.returnSinceTs)) return t('chartReturnSinceNote')(_aurixReturnSinceDate(published.returnSinceTs));
+    // Sólo si la curva visible y el % miden la MISMA ventana: con otra base (prefijo de servidor, 24H
+    // parcial) la diferencia no se debe a los flujos y la frase sería falsa.
+    if (published.firstTs !== published.baselineTs || published.lastTs !== published.currentTs) return '';
+    const p0 = Number(published.firstValue), p1 = Number(published.lastValue), nf = Number(published.netFlows);
+    if (!(p0 > 0) || !Number.isFinite(p1) || !Number.isFinite(nf) || nf === 0) return '';
+    const line = (p1 - p0) / p0 * 100;
+    if (Math.abs(line) > 0.05 && Math.abs(pct) > 0.05 && Math.sign(line) !== Math.sign(pct)) return t('chartReturnFlowNote');
+    return '';
+  } catch (_) { return ''; }
+}
 function _aurixFxMarkBadge(el, published) {
   try {
     _aurixFxBubbleWire();
-    const note = _aurixFxBadgeNote(typeof activeRange !== 'undefined' ? activeRange : '24h', published);
+    let note = _aurixFxBadgeNote(typeof activeRange !== 'undefined' ? activeRange : '24h', published);
+    // La nota de contexto explica «el porcentaje»: sin % pintado (neutro o «Calculando…») no se ata.
+    const ctx = !!note && note === _aurixReturnContextNote(published);
+    if (ctx && el.getAttribute('data-return-painted') !== '1') note = '';
     _aurixFxExplainBind(el, note);
+    if (ctx && note && note === t('chartReturnFlowNote')) el.setAttribute('data-explain-kind', 'info'); else el.removeAttribute('data-explain-kind');
     if (note) el.setAttribute('data-fx-mark', '1'); else el.removeAttribute('data-fx-mark');
   } catch (_) {}
 }
@@ -33499,6 +33532,7 @@ const _AURIX_LKG_RESULT_FIELDS = Object.freeze([
   'baselineTs', 'baselineValue', 'currentTs', 'currentValue',
   'collapsedRange', 'rangeCollapsedBecauseHistoryTooShort', 'visualQualityPassed',
   'colorClass',   // the contract's resolved tone — stored so the republish is not re-judged
+  'returnSinceTs',   // TOTAL «desde fecha fiable»: sin él, el % restaurado parecería de toda la historia
 ]);
 
 // The result CURRENTLY published per range (in-memory, this page's lifetime). Consumers that used to
@@ -43601,12 +43635,30 @@ function buildProductionPortfolioChart(range) {
     // still starts at the merged first point (out.points below). Flag off ⇒ _anchorIdx=0 ⇒ EXACT v502.
     const _canonOn = (typeof _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM !== 'undefined') && _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM;
     const _anchorIdx = (typeof _aurixCanonicalReturnAnchorIndex === 'function') ? _aurixCanonicalReturnAnchorIndex(pts, _canonOn) : 0;
-    const first = pts[_anchorIdx], last = pts[pts.length - 1];
+    const _lineFirst = pts[_anchorIdx], last = pts[pts.length - 1];
+    let first = _lineFirst;
     out.returnAnchorCanonicalOnly = _canonOn;
     out.returnAnchorBackendSkipped = _anchorIdx;
     // SPEC DSH.CHART.RETURNS.01 — the badge % is the FLOW-NEUTRAL real return (excludes capital
     // added/removed in the period). The LINE still draws the wealth series (points below), unchanged.
-    const per = _aurixComputePeriodReturn(r, { ts: first.ts, value: first.value }, { ts: last.ts, value: last.value });
+    let per = _aurixComputePeriodReturn(r, { ts: first.ts, value: first.value }, { ts: last.ts, value: last.value });
+    // P0 CHART FINAL RELIABILITY — TOTAL «desde fecha fiable». Si TOTAL empieza antes del cambio de base
+    // del tipo (SPEC 1), la rentabilidad se ancla en el PRIMER punto posterior a ese límite: la misma base
+    // que ya publican 24H/7D/30D/1A. La curva sigue dibujando toda la historia. Las puertas de TOTAL de
+    // abajo (madurez ≥ 21 d, puntos, base de construcción, flujos) se evalúan sobre ESE subperiodo; si no
+    // lo certifican queda el estado neutro de siempre. Nunca se presenta como rentabilidad de toda la historia.
+    let _sinceIdx = -1;
+    if (r === 'all' && per.fxBasisLimited === true && typeof _aurixFxBasisBoundary === 'function') {
+      const _b = _aurixFxBasisBoundary();
+      // Igual que el ancla canónica: un punto de servidor que llega tras el primer pintado no puede re-anclarlo.
+      if (Number.isFinite(_b)) for (let i = _anchorIdx + 1; i < pts.length - 1; i++) { if (pts[i].ts > _b && !(pts[i].raw && pts[i].raw.source === 'backend_snapshot')) { _sinceIdx = i; break; } }
+      if (_sinceIdx > 0) {
+        first = pts[_sinceIdx];
+        per = _aurixComputePeriodReturn(r, { ts: first.ts, value: first.value }, { ts: last.ts, value: last.value });
+        out.returnSinceTs = first.ts;
+      }
+    }
+    const _retPts = _sinceIdx > 0 ? pts.slice(_sinceIdx) : pts;
     // Visual quality — DIAGNOSTIC ONLY (never rejects; quarantine already removed cliffs/towers).
     try { const vg = _aurixProdVisualGate(pts.map(p => ({ value: p.value, ts: p.ts })), r); out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason; } catch (_) {}
 
@@ -43634,7 +43686,7 @@ function buildProductionPortfolioChart(range) {
     // 24H (full coverage, not collapsed) and ALL (all-history semantics) are unaffected.
     const _reqSpanMs = _AURIX_EMG_RANGE_MS[r];
     const _finiteRange = (r !== 'all') && Number.isFinite(_reqSpanMs) && _reqSpanMs > 0;
-    const _actualSpanMs = last.ts - first.ts;
+    const _actualSpanMs = last.ts - _lineFirst.ts;
     out.coverageRatio = _finiteRange ? +(_actualSpanMs / _reqSpanMs).toFixed(4) : null;
     out.historyTooShortForRange = !!(_finiteRange && (out.rangeCollapsedBecauseHistoryTooShort === true || (out.coverageRatio != null && out.coverageRatio < 0.8)));
     // SPEC DSH.CHART.24H_RETURN_CONTRACT_FINAL_OWNER.50 — compute the 24H post-construction recent-run anchor
@@ -43777,7 +43829,7 @@ function buildProductionPortfolioChart(range) {
       winFlows.forEach(f => { if (f.matchedStepTs != null) stepCounts[f.matchedStepTs] = (stepCounts[f.matchedStepTs] || 0) + 1; });
       if (Object.keys(stepCounts).some(k => stepCounts[k] > 1)) untrust.push('double_matched_flow_step');
       try {
-        const sv = pts.map(p => p.value).sort((a, b) => a - b);
+        const sv = _retPts.map(p => p.value).sort((a, b) => a - b);
         const med = sv.length ? sv[(sv.length - 1) >> 1] : 0;
         if (med > 0 && first.value < 0.55 * med) untrust.push('baseline_construction_low');
       } catch (_) {}
@@ -43792,14 +43844,15 @@ function buildProductionPortfolioChart(range) {
       // few snapshots / construction jumps → honest neutral, whether or not flows exist.
       const allMinSpan = (typeof _AURIX_ALL_MIN_TRUST_SPAN_MS === 'number') ? _AURIX_ALL_MIN_TRUST_SPAN_MS : (21 * 864e5);
       const allMinPts  = (typeof _AURIX_ALL_MIN_TRUST_POINTS === 'number') ? _AURIX_ALL_MIN_TRUST_POINTS : 8;
-      const allShort = _actualSpanMs < allMinSpan;
+      const allShort = (last.ts - first.ts) < allMinSpan;   // = _actualSpanMs salvo con «desde fecha fiable»
       let capitalStepBreakCount = 0, verticalJumpCount = 0;
-      try { capitalStepBreakCount = _aurixCapitalStepBreaks(pts.map(p => ({ time: p.ts, value: p.value })), 'all').length; } catch (_) {}
-      try { verticalJumpCount = _aurixVerticalJumps(pts.map(p => ({ time: p.ts, value: p.value }))).length; } catch (_) {}
+      try { capitalStepBreakCount = _aurixCapitalStepBreaks(_retPts.map(p => ({ time: p.ts, value: p.value })), 'all').length; } catch (_) {}
+      try { verticalJumpCount = _aurixVerticalJumps(_retPts.map(p => ({ time: p.ts, value: p.value }))).length; } catch (_) {}
       // (8) new account even with several points added quickly → SHORT span catches it.
       if (allShort) untrust.push('short_all_history');
       // (9) too few snapshots for a trustworthy lifetime return.
       if (out.finalPointCount < allMinPts) untrust.push('insufficient_all_points');
+      else if (_retPts.length < allMinPts) untrust.push('insufficient_all_points');   // subperiodo «desde fecha fiable»
       // (9) construction step / capital jump in the drawn line while still young → initial build
       //     or batch asset add, even with NO ledger flow recorded.
       if (allShort && (capitalStepBreakCount > 0 || verticalJumpCount > 0)) untrust.push('construction_step_in_window');
@@ -43814,7 +43867,7 @@ function buildProductionPortfolioChart(range) {
       out.backendLoaded = backendLoaded;
       out.capitalStepBreakCount = capitalStepBreakCount;
       out.verticalJumpCount = verticalJumpCount;
-      out.initialBuildDetected = allShort || (out.finalPointCount < allMinPts) || untrust.indexOf('baseline_construction_low') >= 0 || (capitalStepBreakCount > 0 || verticalJumpCount > 0);
+      out.initialBuildDetected = allShort || (_retPts.length < allMinPts) || untrust.indexOf('baseline_construction_low') >= 0 || (capitalStepBreakCount > 0 || verticalJumpCount > 0);
       out.allRangeReturnAllowed = untrust.length === 0;
       if (!out.allRangeReturnAllowed) {
         // (7) honest neutral state — never a giant construction-driven return.
@@ -47628,9 +47681,20 @@ try { if (typeof window !== 'undefined') window._aurixAuditTemporalWindowCore = 
 function _aurixEmergencyBadgeText(emg) {
   try {
     const mode = (typeof activePerfMode !== 'undefined' && activePerfMode === 'curr') ? 'curr' : 'pct';
-    if (mode === 'curr') return (typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(emg.returnValue) : ((emg.returnValue >= 0 ? '+' : '') + Math.round(emg.returnValue));
+    if (mode === 'curr') return ((typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(emg.returnValue) : ((emg.returnValue >= 0 ? '+' : '') + Math.round(emg.returnValue))) + _aurixReturnSinceSuffix(emg);
     const pf = (typeof _dshFmtPct === 'function') ? _dshFmtPct(emg.returnPct) : null;
-    return pf ? pf.text : ((emg.returnPct >= 0 ? '+' : '') + emg.returnPct.toFixed(2) + '%');
+    return (pf ? pf.text : ((emg.returnPct >= 0 ? '+' : '') + emg.returnPct.toFixed(2) + '%')) + _aurixReturnSinceSuffix(emg);
+  } catch (_) { return ''; }
+}
+// TOTAL anclado «desde fecha fiable»: el % dice desde cuándo, para no leerse como toda la historia.
+function _aurixReturnSinceDate(ts) {
+  const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES';
+  return new Date(ts).toLocaleDateString(loc, { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+function _aurixReturnSinceSuffix(emg) {
+  try {
+    if (!emg || !Number.isFinite(emg.returnSinceTs)) return '';
+    return '<span class="wsc-metric-since"> · ' + t('chartReturnSince')(_aurixReturnSinceDate(emg.returnSinceTs)) + '</span>';
   } catch (_) { return ''; }
 }
 // SPEC DSH.CHART.RETURNS.01 — honest "no real return yet" badge text (new account / contributions
@@ -47645,6 +47709,11 @@ function _aurixReturnInsufficientText() {
 }
 // Paint ONE badge node from the emergency chart: ready ⇒ %/€ + tone; pending ⇒ "Calculando…".
 // Percentage is shown ONLY when a line exists (state==='ready') — the two can never diverge.
+// Marca si el badge pinta un % (la nota de contexto sólo explica un % visible). Aislada: nunca
+// puede interrumpir el pintado.
+function _aurixMarkReturnPainted(el, on) {
+  try { if (on) el.setAttribute('data-return-painted', '1'); else el.removeAttribute('data-return-painted'); } catch (_) {}
+}
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
   try {
     if (!el) return;
@@ -47671,6 +47740,7 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
       let vs = null;
       try { if (typeof _aurixBuildContinuityValidatedSeries === 'function' && emg && Array.isArray(emg.points)) vs = _aurixBuildContinuityValidatedSeries(emg.points.map(p => ({ time: p.ts, value: p.value })), emg.range); } catch (_) {}
       const contract = _aurixResolveChartReturnContract(vs, emg && emg.range, { chart: emg });
+      if (typeof _aurixMarkReturnPainted === 'function') _aurixMarkReturnPainted(el, contract.state === 'ok');
       if (contract.state === 'ok') {
         el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
         el.className = 'chart-change ' + (contract.colorState === 'positive' ? 'up' : (contract.colorState === 'negative' ? 'down' : 'flat'));
@@ -47691,6 +47761,7 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
       return;
     }
     // ── v495 fallback (flag OFF) ──
+    if (typeof _aurixMarkReturnPainted === 'function') _aurixMarkReturnPainted(el, !!(emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)));
     if (emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)) {
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
       el.className = 'chart-change ' + emg.color;
@@ -73102,6 +73173,8 @@ function render(animate = false) {
   countUpTotalValue(investableValueBase());
   updatePerformance();
   assetCountEl.textContent = t('assetCount')(activeAssets().length);
+  // El marcador estático de index.html llega como skeleton (nunca un «0 activos» antes de leer la cartera).
+  assetCountEl.classList.remove('skeleton');
 
   // AURIX-EMPTY-1: hero empty mode. Single source of truth: assets.length.
   // Applied AFTER the regular value updates so the premium copy is the

@@ -30519,5 +30519,10 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .chart-change[data-fx-mark] .wsc-metric-val::after,
 .cat-card-value[data-fx-approx]::before { content: '≈ '; opacity: .7; }
 .chart-change[data-fx-mark] .wsc-metric-val::after { content: ' *'; }
+/* Explicación de contexto (curva = patrimonio, % = rentabilidad): neutra, no el ámbar del aviso de tipo. */
+.aurix-fx-bubble.is-info { border-color: rgba(255,255,255,.18); }
+[data-explain-kind="info"]:focus-visible { outline-color: #8fb6ff; }
+/* TOTAL «desde fecha fiable»: la fecha acompaña al %, en tono neutro (no hereda verde/rojo). */
+.wsc-metric-since { color: var(--text-muted); font-weight: 500; white-space: nowrap; }
 .aurix-fx-bubble { position: fixed; z-index: 2147482000; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45;
   color: var(--text-muted); background: rgba(10, 14, 24, .97); border: 1px solid rgba(233, 168, 87, .45); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
