@@ -8089,6 +8089,7 @@ const T = {
     compositionCenterSub:        'Cartera',
     // AURIX-WORKSPACE-TEASER-POLISH-1: natural one-word-ish health states for
     // the dashboard teaser line (display only; Health Score logic unchanged).
+    teaserHealthState:           l => `Salud: ${l}`,
     teaserHealthSolid:           'Salud sólida',
     teaserHealthModerate:        'Riesgo moderado',
     teaserHealthElevated:        'Riesgo elevado',
@@ -10964,6 +10965,7 @@ const T = {
     compositionTitle:            'Portfolio composition',
     compositionClose:            'Close',
     compositionCenterSub:        'Portfolio',
+    teaserHealthState:           l => `Health: ${l}`,
     teaserHealthSolid:           'Solid health',
     teaserHealthModerate:        'Moderate risk',
     teaserHealthElevated:        'Elevated risk',
@@ -87219,20 +87221,18 @@ function renderAurixSignal() {
   // Workspace teaser. The dashboard owns STATUS, so this shows only the
   // portfolio health STATE (natural copy) and a tone-coloured dot — no
   // rotating pool, no carousel. Workspace owns the full interpretation.
+  // SPEC 3 · UNA MÉTRICA, UNA LECTURA. El acceso «Ver análisis» abre Intelligence,
+  // así que dice la MISMA Salud que Intelligence: el estado de `_intccHealthScore`
+  // (dispersión de pesos). Antes leía `_aurixHealthScore` —el índice de deducciones
+  // que la revisión financiera declaró NOT COMPUTABLE— y una cartera 100 % liquidez
+  // salía «Riesgo elevado» aquí y «Débil» allí. Ninguna fórmula ni umbral cambia:
+  // cambia qué owner publica el Dashboard. Tono neutro, como en Intelligence.
   const snap  = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
-  const score = (typeof _aurixHealthScore    === 'function') ? _aurixHealthScore(snap) : null;
-  const tone  = (score && score.tone) || 'solid';
-
-  // Map the (unchanged) health tone to a natural teaser label so the line
-  // reads "Salud sólida" rather than "Salud de cartera · Salud sólida".
-  const _TEASER_LABEL = {
-    solid:    'teaserHealthSolid',
-    moderate: 'teaserHealthModerate',
-    elevated: 'teaserHealthElevated',
-    high:     'teaserHealthHigh',
-  };
-  const state = (score && score.score != null)
-    ? (t(_TEASER_LABEL[tone] || 'teaserHealthSolid') || score.label)
+  let h2 = null;
+  try { h2 = (typeof _intccHealthScore === 'function') ? _intccHealthScore(snap) : null; } catch (_) { h2 = null; }
+  const tone  = 'neutral';
+  const state = (h2 && h2.band !== 'empty' && h2.band !== 'no_positions' && h2.label)
+    ? t('teaserHealthState')(h2.label)
     : (t('healthScoreEmpty') || '—');
 
   const msgEl = document.getElementById('aurixSignalMsg');

@@ -17705,6 +17705,7 @@ body.gs-open { overflow: hidden; }
 .aurix-signal[data-tone="moderate"] .aurix-signal-icon { color: #7db8ff; }
 .aurix-signal[data-tone="elevated"] .aurix-signal-icon { color: #f4c45a; }
 .aurix-signal[data-tone="high"]     .aurix-signal-icon { color: #e0904a; }
+.aurix-signal[data-tone="neutral"]  .aurix-signal-icon { color: #7db8ff; }
 
 /* AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1 — health teaser as ONE compact
    insight/action: "Salud sólida · Ver análisis ›". Desktop + mobile.
