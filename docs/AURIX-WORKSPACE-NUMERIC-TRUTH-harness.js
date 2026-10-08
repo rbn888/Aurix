@@ -219,11 +219,19 @@ console.log('\n6 · Moneda coherente entre el campo y el resultado:');
   sb._AURIX_CCY_GLYPH = { EUR: '€', USD: 'US$' };
   sb.getCurrencySymbol = c => sb._AURIX_CCY_GLYPH[c] || '€';
   sb.baseCurrency = 'USD';
-  vm.runInContext(fnSrc('_wsFieldUnit'), sb);
-  vm.runInContext(fnSrc('_wsToolCcy'), sb);
-  ok('6.1 un campo declarado en «€» se pinta en la divisa BASE del usuario',
+  sb._aurixCurrencyGlyph = c => sb._AURIX_CCY_GLYPH[c] || c;
+  vm.runInContext('var _wshView = "goals", _wsToolInputs = null; function _wsbDocCcy(){ return null; }', sb);
+  ['_wsFieldUnit', '_wsToolCcy', '_wsSurfaceCcy', '_wsDocCcy', '_wsCcyCode', '_wsBaseCcy'].forEach(n => vm.runInContext(fnSrc(n), sb));
+  // RE-DECIDIDO (SPEC 1 · moneda del documento). Antes: «€» = divisa BASE en todas partes, así que
+  // cambiar la base re-etiquetaba los importes ya escritos de un documento. Ahora: fuera de un
+  // documento (formulario de creación) sigue siendo la base; dentro, la moneda del DOCUMENTO.
+  ok('6.1 un campo declarado en «€» fuera de un documento se pinta en la divisa BASE del usuario',
     vm.runInContext('_wsFieldUnit("€")', sb) === 'US$',
     vm.runInContext('_wsFieldUnit("€")', sb));
+  ok('6.1b dentro de un documento EUR se pinta su moneda aunque la base sea USD; sin moneda, sin símbolo',
+    vm.runInContext('_wshView = "tool"; _wsToolInputs = { currency: "EUR" }; _wsFieldUnit("€")', sb) === '€'
+    && vm.runInContext('_wsToolInputs = { }; _wsFieldUnit("€")', sb) === ''
+    && vm.runInContext('_wshView = "goals"; _wsFieldUnit("€")', sb) === 'US$');
   ok('6.2 una unidad que no es moneda no se toca',
     vm.runInContext('_wsFieldUnit("%")', sb) === '%'
     && vm.runInContext('_wsFieldUnit("años")', sb) === 'años'

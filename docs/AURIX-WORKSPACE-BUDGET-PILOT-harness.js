@@ -58,6 +58,9 @@ function ctx() {
   vm.runInContext('function t(k){ var dd=T[lang]||T.es; var v=dd[k]; if(v===undefined) v=T.es[k]; return v; }', sb);
   vm.runInContext('function _intccEsc(x){ return String(x == null ? "" : x).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c])); }', sb);
   vm.runInContext('function formatBase(v){ return String(Math.round(Number(v) || 0)) + " €"; }', sb);
+  // La moneda del documento la certifica docs/financial-reliability/probe-doc-currency.mjs; aquí la
+  // presentación sigue sustituida y el importe sale por el formatBase de este sandbox.
+  vm.runInContext('function _wsMoney(v){ return formatBase(v); }', sb);
   vm.runInContext('function _wsNum(v){ if (v == null || v === "") return 0; var n = Number(String(v).replace(/\\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0; }', sb);
   // Presupuesto con categorías del usuario: el motor lee FILAS, así que sus helpers
   // de lectura entran al sandbox (no cambian ninguna aritmética).

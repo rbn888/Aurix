@@ -441,8 +441,11 @@ function catalog() {
   OK('L8 ning\u00fan campo monetario de compound/loan tiene el s\u00edmbolo hardcodeado',
      !/'\u20ac'/.test(comp) && !/'\u20ac'/.test(loan) &&
      /_wsToolCcy\(\)/.test(comp) && /_wsToolCcy\(\)/.test(loan));
+  // RE-DECIDIDO (SPEC 1 · moneda del documento): la unidad es la moneda de la SUPERFICIE abierta
+  // (el documento; la base sólo fuera de un documento) y se pinta con el owner de glifos existente.
+  // El comportamiento lo certifica AURIX-WORKSPACE-NUMERIC-TRUTH 6.1/6.1b.
   OK('L9 la unidad se delega en el owner de divisa que ya exist\u00eda',
-     /getCurrencySymbol\(baseCurrency\)/.test(fn('_wsToolCcy')));
+     /_wsSurfaceCcy\(\)/.test(fn('_wsToolCcy')) && /_aurixCurrencyGlyph\(c\)/.test(fn('_wsToolCcy')));
 
   // ── Catálogo público ─────────────────────────────────────────────────────
   // ── RE-DECIDIDO por M.02 B3/B4, y por una raz\u00f3n incómoda: estas dos aserciones
