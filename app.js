@@ -72260,10 +72260,11 @@ function _initIntelligenceCommandCenter() {
   try {
     const root = document.querySelector('.aurix-intcc');
     try { _initIntelSeeChanges(root); } catch (_) {}
-    if (root && !root.classList.contains('is-empty')) {
-      requestAnimationFrame(() => root.classList.add('is-revealed'));
-      _intccAnimateScoreRings(root);
-    }
+    // El estado VACÍO también se revela: el CSS deja a opacidad 0 todo hijo de
+    // `.aurix-intcc` hasta `is-revealed`, así que sin esto una cuenta sin activos
+    // (o un fallo del Core, que cae al mismo vacío) veía la pestaña en blanco.
+    if (root) requestAnimationFrame(() => root.classList.add('is-revealed'));
+    if (root && !root.classList.contains('is-empty')) _intccAnimateScoreRings(root);
   } catch (_) {}
 
   try {
