@@ -73282,7 +73282,7 @@ function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
     const extra    = isCrypto ? ` data-key="${sym}" data-step="0"` : '';
     const onErr    = isCrypto
       ? `_logoFallback(this)`
-      : `this.parentElement.classList.remove('badge--has-logo')`;
+      : `this.style.display='none';this.parentElement.classList.remove('badge--has-logo')`;
     return `<div class="${cls} ${asset.type} badge--has-logo">` +
       `<img class="asset-badge-logo" src="${logoUrl}" alt="" loading="lazy" aria-hidden="true"` +
       `${extra} onerror="${onErr}">` +
