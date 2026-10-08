@@ -75,7 +75,7 @@ function dictOf(langIdx) {
     'intcc_drv_kind_eng','intcc_drv_kind_liq','intcc_drv_none',
     'intv15_drv_dependency','intv15_drv_category',
     'intv4_brief_title','intv4_brief_empty','intv4_brief_stale','intv4_brief_stale_note',
-    'intv15_brief_settled'];
+    'intv15_brief_settled','intv20_brief_no_ref'];
   const out = {};
   for (const k of KEYS) {
     const needle = '\n    ' + k + ':';
@@ -1123,7 +1123,9 @@ console.log('\n§12 · «Lo que importa hoy»: el vacío dice qué pasa, no que 
   const M = (o) => { const c = makeCtx((o && o.lang) || 'es');
     c.__matters = { stories: [], rankedBy: 'engine', stale: !!(o && o.stale) };
     c._intv4FindingRows = () => [];
-    const core = { ledger: { facts: (o && o.facts) || [] } };
+    // Con referencia (≥ 2 observaciones comparables) salvo que el caso diga lo contrario.
+    const core = { ledger: { facts: (o && o.facts) || [] },
+      dataAvailability: { observation: { observations: (o && o.obs != null) ? o.obs : 2 } } };
     return vm.runInContext('_intv5MattersHtml(' + JSON.stringify(core)
       + ', s => String(s == null ? "" : s), "balanced", [], null, {}, "")', c); };
 
@@ -1152,6 +1154,16 @@ console.log('\n§12 · «Lo que importa hoy»: el vacío dice qué pasa, no que 
     (() => { const h = M({ facts: [{ semanticKey: 'x' }] });
       return !/intv4-story-list/.test(h) && count(h, /class="intcc-empty-body"/g) === 1
         && !/intcc-surface-limit/.test(h); })());
+  // SIN REFERENCIA (menos de dos observaciones comparables, p. ej. tras registrar la
+  // primera liquidez) Aurix no puede saber si algo se movió: explica la espera y NUNCA
+  // afirma «no hay ningún cambio» ni «no hay movimientos».
+  ok('12.8 sin referencia: explica la espera, nunca afirma ausencia de cambios',
+    (() => { const h = M({ facts: [{ semanticKey: 'cash_weight' }], obs: 1 });
+      return /data-empty-state="intv20_brief_no_ref"/.test(h) && /primera referencia/.test(h)
+        && !/no hay ningún cambio|no hay movimientos/.test(h); })(),
+    (M({ facts: [{ semanticKey: 'cash_weight' }], obs: 1 }).match(/class="intcc-empty-body">([^<]*)</) || [, '?'])[1]);
+  ok('12.9 …y sin ningún hecho todavía se conserva «está leyendo», que no afirma nada',
+    /data-empty-state="intv4_brief_empty"/.test(M({ facts: [], obs: 0 })));
   ok('12.7 ES + EN (§37)',
     (() => { const en = M({ facts: [{ semanticKey: 'x' }], lang: 'en' });
       return /nothing in your wealth worth your attention/.test(en)

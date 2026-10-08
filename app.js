@@ -5832,6 +5832,8 @@ const T = {
     // El vacío que NO es ausencia: lo de hoy ya tiene su sitio, y está abajo.
     intv16_brief_in_changed: 'Lo relevante de hoy ya está recogido en «Qué ha cambiado», con su fecha.',
     intv19_brief_quiet: 'Hoy no hay movimientos nuevos en tu patrimonio.',
+    intv20_cmp_origin: 'Inicio',
+    intv20_brief_no_ref: 'Aurix necesita una primera referencia para detectar cambios. Los movimientos aparecerán aquí cuando pueda compararlos.',
     intv4_changed_title: 'Qué ha cambiado',
     intv4_changed_ref_since: (d) => `Sobre lo registrado desde el ${d}.`,
     intv4_changed_ref_24h:   'Durante las últimas 24 horas.',
@@ -9056,6 +9058,8 @@ const T = {
     intv15_brief_settled: 'Right now there is nothing in your wealth worth your attention.',
     intv16_brief_in_changed: 'What matters today is already recorded under “What changed”, with its date.',
     intv19_brief_quiet: 'There are no new movements in your wealth today.',
+    intv20_cmp_origin: 'Start',
+    intv20_brief_no_ref: 'Aurix needs a first reference to detect changes. Movements will appear here once it can compare them.',
     intv4_changed_title: 'What changed',
     intv4_changed_ref_since: (d) => `Against what is recorded since ${d}.`,
     intv4_changed_ref_24h:   'Over the last 24 hours.',
@@ -69947,9 +69951,20 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
   // Sin subtítulo defensivo: si hay hallazgos vigentes de otras ventanas, Hoy
   // dice lo único cierto sobre HOY —que no hay movimientos nuevos— sin remitir a
   // otra card ni negar lo que el hero cuenta.
+  // SIN REFERENCIA NO HAY «NINGÚN CAMBIO». Con menos de dos observaciones comparables
+  // (el MISMO owner con el que «Tu evolución» dice «creando tu primera referencia»), Aurix
+  // no puede saber si algo se movió: tras registrar la primera liquidez la card afirmaba
+  // «no hay ningún cambio». Ahora explica la espera.
+  let _nObs = 0;
+  try { _nObs = Number(core && core.dataAvailability && core.dataAvailability.observation
+    && core.dataAvailability.observation.observations) || 0; } catch (_) { _nObs = 0; }
+  // Sólo se sustituyen las dos frases que AFIRMAN ausencia de movimientos; «Aurix está
+  // leyendo tu patrimonio» (sin ningún hecho todavía) no afirma nada y se conserva.
+  const _claimsNoChange = _cededToChanged > 0 || _activeFindings > 0 || hasRead;
   const emptyKey = sel.stale ? 'intv4_brief_stale'
+    : ((_claimsNoChange && _nObs < 2) ? 'intv20_brief_no_ref'
     : ((_cededToChanged > 0 || _activeFindings > 0) ? 'intv19_brief_quiet'
-    : (hasRead ? 'intv15_brief_settled' : 'intv4_brief_empty'));
+    : (hasRead ? 'intv15_brief_settled' : 'intv4_brief_empty')));
   return `
     <section class="intcc-card intcc-watch intv4-brief intv5-matters"
              data-ranked-by="${esc(sel.rankedBy)}" data-items="${cards.length}"
