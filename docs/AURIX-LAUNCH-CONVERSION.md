@@ -1,7 +1,7 @@
 # AURIX · SPEC 2 — Conversión y acabado para lanzamiento · REGISTRO
 
 2026-10-08 · rama `aurix/launch-conversion` (worktree `~/claude-test/portfolio-launch`) · build
-`v803-launch` · appjs 762 · loginhtml 492. **No es «listo para vender»** (ver Bloqueos).
+`v803-launch` · appjs 763 · loginhtml 492. **No es «listo para vender»** (ver Bloqueos).
 
 ## Composición del candidato
 - Base: `aurix/financial-reliability` @ `3b4734f` (SPEC 1 completo, identificable por sus commits).
@@ -43,6 +43,29 @@ Demo aislada local y publicada (Supabase falso, red bloqueada), Chromium y WebKi
   Premium sólo cuando el servidor lo confirma (`?billing=success` sólo inicia la espera).
 - Gate completo (código final, sin cargas en paralelo): **GO 290/290** (319 s); ensamblado del sitio OK.
 
+## Cierre comercial y visual de la landing (2.ª entrega)
+| # | Cambio | Commit |
+|---|---|---|
+| 8 | Presupuesto: moneda y periodo en una cabecera compacta, después ingresos/gastos/disponible, después reparto y edición (sin tocar cálculo, valores, restricciones ni guardado) | `b56ade7` |
+| 9 | Logo de acción que no carga: se oculta la imagen rota y queda la letra | `c16b3be` |
+| 10 | Landing: estructura Hero → Reúne/Entiende/Planifica → Free/Premium → FAQ → CTA final → pie; copy del SPEC; 4 capturas distintas con pie fuera de la imagen; planes alineados; animación de entrada que no oculta sin JS | `92ae8a3` |
+| 11 | Versión appjs 763 | `bd7b611` |
+
+Demo (rama `demo/launch-conversion`, `9d3145b`, `7806d12`): una sola cartera de ejemplo coherente
+(reparto derivado de las posiciones, compra hace 90 días con ganancia modesta, acciones y cripto primero
+por el orden real), iconos BTC/ETH CC0-1.0 (spothq y atomiclabs) servidos localmente, insignia de demo
+sin tapar controles. **Acciones/ETF sin logo**: Financial Modeling Prep no es redistribuible → se
+conserva la letra (no se inventa logo).
+
+Verificado: gate completo **GO 290/290** · `probe-budget-header.mjs` 72/72 · `probe-landing-close.mjs` 158/158 (CR/WK × ES/EN ×
+320/390/1440 + sin JS) · harnesses de presupuesto, fórmulas, Workspace, entitlement e iconos en verde.
+
+Discrepancias registradas (no se cambia producto):
+- «controla cobros y pagos pendientes»: la plantilla real es **Control de cobros** (pagado/pendiente/vencido);
+  no hay una herramienta separada de pagos.
+- En inglés la cantidad de cripto sale con coma decimal («0,12 BTC») en el detalle de posiciones (captura B EN).
+- Salud: Dashboard «Salud sólida» frente a Intelligence «Equilibrada» (ya registrado, SPEC 1).
+
 ## Propuesta publicada
 - **Landing**: https://rbn888.github.io/aurix-demo/v803-launch/landing/index.html (ES/EN con el selector)
 - **App (demo)**: https://rbn888.github.io/aurix-demo/v803-launch/demo.html — build `v803-launch` · appjs 762.
@@ -67,8 +90,7 @@ Demo aislada local y publicada (Supabase falso, red bloqueada), Chromium y WebKi
 ## Backlog secundario
 - 320×640: la portada Free de Workspace no encaja sin scroll (ya antes de este SPEC).
 - Moneda base por defecto USD para cuentas nuevas aunque el idioma sea ES.
-- Demo: la insignia tapa el logotipo en móvil; «precios no cargados» por no haber red.
-- Captura del Dashboard en el hero repetida en «Cómo funciona» (paso 1).
+- Demo: «precios no cargados» por no haber red.
 - Landing estática: si cambia el catálogo, actualizar precios a mano (`landing/app.js`).
 - Toast «tu portfolio ha empezado» (anglicismo).
 - Demo: al pulsar comprar aparecen dos avisos (el de la demo y «La compra todavía no está disponible»).
