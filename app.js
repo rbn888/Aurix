@@ -11153,6 +11153,11 @@ function switchLang(newLang) {
   } else {
     render();
     updateDonut();
+    // El gráfico pinta sus textos (p. ej. «Histórico en construcción») al dibujarse: sin repintarlo
+    // se quedaba en el idioma anterior. Mismo repintado que ya hace el cambio de moneda.
+    try { if (typeof updateChart === 'function') updateChart(true); } catch (_) {}
+    // En móvil el gráfico lo pinta el «lite» (dashboard móvil protegido: sólo se le pide repintar).
+    try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '24h'); } catch (_) {}
     if (_lastUpdateState) setUpdateStatus(_lastUpdateState);
     const af = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
     searchInput.placeholder = T[lang].searchPH[af] || T[lang].searchPH.all;
