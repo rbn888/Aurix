@@ -3472,9 +3472,14 @@ console.log('\nSC · §6 · comparador de rentabilidad');
       // `_intv4Num` recorta los decimales que no aportan, así que el techo es
       // «+4 %» y no «+4,00 %»: se mide lo que de verdad publica.
       (() => { const n = (ax.match(/intv14-cmp-axis-t/g) || []).length;
+        // El origen es una REFERENCIA (cierre de lanzamiento): se rotula «Inicio», sin «+0 %».
         return n === 3 && /is-base/.test(ax)
-          && /\+4 %/.test(ax) && /−2,5 %/.test(ax) && /\+0 %/.test(ax); })(),
+          && /\+4 %/.test(ax) && /−2,5 %/.test(ax) && /Inicio/.test(ax) && !/\+0 %/.test(ax); })(),
       ax.replace(/<[^>]+>/g, '|').slice(0, 160));
+    ok('I8.1b sin comparador y sin pérdidas, el suelo ES el origen: ni duplicado ni «+0 %» que parezca una medición',
+      (() => { const up = [{ ts: T_0, value: 100 }, { ts: T_0 + D1, value: 104 }];
+        const a2 = run('_intv14CmpAxisHtml(' + JSON.stringify(up) + ', null, _intccEsc)', c);
+        return (a2.match(/intv14-cmp-axis-t/g) || []).length === 2 && /Inicio/.test(a2) && !/\+0 %/.test(a2); })());
     ok('I8.2 …tres y no más: informan sin saturar',
       (run('_intv14CmpAxisHtml(' + JSON.stringify(mine) + ', null, _intccEsc)', c)
         .match(/intv14-cmp-axis-t/g) || []).length <= 3);

@@ -70786,13 +70786,18 @@ function _intv14CmpAxisHtml(mine, other, esc) {
   const topPct = (v) => ((PAD_Y + (1 - (v - lo) / (hi - lo)) * (H - PAD_Y * 2)) / H) * 100;
   const fmt = (v) => { const r = Math.round((v - 100) * 100) / 100;
     return (r >= 0 ? '+' : '−') + _intv4Num(Math.abs(r), 2) + ' %'; };
-  const rows = [{ v: hi, cls: '' }, { v: lo, cls: '' }];
   // El origen común sólo se rotula si está DENTRO de la banda visible: fuera
   // de ella sería una etiqueta apuntando a una línea que no se dibuja.
-  if (lo <= 100 && hi >= 100) rows.push({ v: 100, cls: ' is-base' });
+  // SPEC CIERRE · el origen es una REFERENCIA, no una medición: se rotula «Inicio»
+  // sin porcentaje. Sin comparador elegido el suelo coincidía con él y salían dos
+  // «+0 %» con el mismo estilo que la cifra medida, como si el comparador valiera 0.
+  const baseIn = lo <= 100 && hi >= 100;
+  const rows = [{ v: hi, cls: '' }];
+  if (!(baseIn && lo === 100)) rows.push({ v: lo, cls: '' });
+  if (baseIn) rows.push({ v: 100, cls: ' is-base', label: _intv4T('intv20_cmp_origin') });
   return `<div class="intv14-cmp-axis" aria-hidden="true">${rows.map(r =>
     `<span class="intv14-cmp-axis-t${r.cls}" style="top:${topPct(r.v).toFixed(2)}%">${
-      esc(fmt(r.v))}</span>`).join('')}</div>`;
+      esc(r.label || fmt(r.v))}</span>`).join('')}</div>`;
 }
 
 // ── LA CARD ────────────────────────────────────────────────────────────────
