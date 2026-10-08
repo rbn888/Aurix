@@ -36,6 +36,7 @@ function ctx(opts) {
   vm.runInContext('function t(k){ var dd=T[lang]||T.es; var v=dd[k]; if(v===undefined) v=T.es[k]; return v; }', sb);
   vm.runInContext('function _intccEsc(x){ return String(x == null ? "" : x).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"}[c])); }', sb);
   vm.runInContext('function formatBase(v){ return String(Math.round(Number(v) || 0)) + " €"; }', sb);
+  vm.runInContext('var baseCurrency = ' + JSON.stringify(opts.base || 'EUR') + ';', sb);
   // El almacén REAL de Workspace, con su filtro de tombstones.
   vm.runInContext('var __LS = Object.create(null); var localStorage = { getItem: k => (k in __LS ? __LS[k] : null), setItem: (k,v) => { __LS[k] = String(v); }, removeItem: k => { delete __LS[k]; } };', sb);
   vm.runInContext('var _wsDocTableState = ' + JSON.stringify(opts.table || 'yes') + ';', sb);
@@ -58,6 +59,8 @@ function ctx(opts) {
    // Cobros parciales con historial: lo cobrado se deriva de `payments` (o del `paidAmount` antiguo).
    '_wsRecvPayments','_wsRecvParseDate','_wsRecvTodayIso',
    '_wsPlanMoney',
+   // MONEDA DEL DOCUMENTO — las cifras salen en la moneda que el documento declara, no en la base.
+   'formatCurrency','_wsJrnMoney','_wsCcyCode','_wsBaseCcy','_wsDocCurrencyOf','_wsMoneyIn','_wsgCcy','_wsgMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState',
    // SPRINT WORKSPACE PREMIUM V2 §17/§21 — la tarjeta publica ahora su proporción medida y su
    // menú, así que sus owners entran al sandbox: si faltaran, el render lanzaría y este
@@ -77,7 +80,7 @@ function ctx(opts) {
 const R = (c, e) => vm.runInContext(e, c);
 
 const DOCS = [
-  { id: 'd1', type: 'monthly_budget',        customName: 'Presupuesto casa',  updatedAt: 500, inputs: { salary: 2500, housing: 700, food: 300 } },
+  { id: 'd1', type: 'monthly_budget',        customName: 'Presupuesto casa',  updatedAt: 500, currency: 'EUR', inputs: { salary: 2500, housing: 700, food: 300 } },
   { id: 'd2', type: 'monthly_budget',        customName: 'Presupuesto viaje', updatedAt: 400, inputs: { salary: 800, food: 200 } },
   { id: 'd3', type: 'receivables_app',       customName: 'Clientes 2026',     updatedAt: 300, inputs: { items: [{ id: 'r1', units: 1, unitPrice: 1000, paidAmount: 400 }] } },
   { id: 'd4', type: 'real_estate_portfolio', customName: 'Cartera Madrid',    updatedAt: 200, inputs: { properties: [{ id: 'p1', name: 'Piso', ptype: 'flat', buy: 200000, value: 250000 }] } },
@@ -176,9 +179,20 @@ console.log('\n2 · Hasta dos métricas, nunca inventadas:');
   // (ingresos − gastos del mismo motor) y acompaña con ingresos y gastos.
   ok('2.1 presupuesto → disponible, ingresos y gastos, del mismo motor que la plantilla',
     (() => { const m = met('d1'); return m.length === 3 && m[0].k === 'Disponible' && m[1].k === 'Ingresos' && m[2].k === 'Gastos'
-      && m[0].v === R(c, '(function(){ var r = calculateMonthlyBudget({salary:2500,housing:700,food:300}); return formatBase(r.income - r.expenses); })()')
-      && m[1].v === R(c, 'formatBase(calculateMonthlyBudget({salary:2500,housing:700,food:300}).income)'); })(),
+      // RE-DECIDIDO (SPEC 1 · moneda del documento): la cifra sale en la moneda que el documento
+      // DECLARA (d1: EUR), no en la base de visualización. Antes se comparaba con formatBase.
+      && m[0].v === R(c, '(function(){ var r = calculateMonthlyBudget({salary:2500,housing:700,food:300}); return _wsMoneyIn(r.income - r.expenses, "EUR"); })()')
+      && m[1].v === R(c, '_wsMoneyIn(calculateMonthlyBudget({salary:2500,housing:700,food:300}).income, "EUR")'); })(),
     JSON.stringify(met('d1')));
+  // Cobertura equivalente del cambio: con la BASE en USD el documento EUR sigue en €, y un
+  // documento antiguo SIN moneda no recibe la base por suposición (cifra sin símbolo).
+  {
+    const cu = ctx({ docs: DOCS, base: 'USD' });
+    const mu = JSON.parse(R(cu, 'JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === "d1")))'));
+    ok('2.1b base USD: el presupuesto declarado en EUR sigue publicando «1500,00 €» (no $)', mu[0] && /^1\.?500,00\s€$/.test(mu[0].v), JSON.stringify(mu[0]));
+    const m2 = JSON.parse(R(cu, 'JSON.stringify(_wsPlanMetrics(_wsPlansDocs().find(p => p.id === "d2")))'));
+    ok('2.1c documento sin moneda: importes sin símbolo, nunca la base actual', m2.length > 0 && m2.every(x => !/[€$]/.test(x.v)), JSON.stringify(m2));
+  }
   ok('2.2 cobros → pendiente y cobrado, de sus estados reales',
     (() => { const m = met('d3'); return m.length === 2 && m[0].k === 'Cobrado' && m[1].k === 'Pendiente'; })(),
     JSON.stringify(met('d3')));

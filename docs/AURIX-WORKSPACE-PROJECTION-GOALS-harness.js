@@ -40,7 +40,9 @@ const KONSTS = ['_WS_PROJ_CONV','_WS_PROJ_CONV_DEFAULT','_WS_PROJ_TIMING','_WS_P
 const FNS = ['_wsNum','_wsNumOrNull','_wsProjMonthlyRate','_wsProject','calculateCompoundGrowth',
              'projectScenario','_wsgThisYear','_wsgAssumedRatePct','_wsgTargetAmount','calculateGoalProgress',
              '_wshReadStore','_wsbParams','_wsbParamsSet','_wsbBase','_wsbScenarios','_wsbCompare',
-             '_wsCanonicalNumStr'];
+             '_wsCanonicalNumStr',
+             // Los parámetros de la comparación llevan su moneda (base visible al nacer).
+             '_wsCcyCode','_wsBaseCcy'];
 function ctx(langCode) {
   const sb = { Math, Number, String, isFinite, isNaN, parseFloat, JSON, Array, Object, Date,
                console: { warn(){}, log(){} } };

@@ -77,6 +77,9 @@ console.log('\n2 · Escenarios sin base declarada no publican proyecciones:');
     sb.__params = params;
     vm.runInContext('var lang="es"; function t(k){ return k; } function _intccEsc(x){ return String(x); }'
       + 'function formatBase(v){ return Math.round(v) + " €"; } function _wsbParams(){ return __params; }'
+      // La moneda del documento la certifica docs/financial-reliability/probe-doc-currency.mjs en navegador;
+      // aquí se certifica la VALIDACIÓN, así que el importe sigue saliendo por el formatBase de este sandbox.
+      + 'function _wsbMoney(v){ return formatBase(v); }'
       + 'function _wsNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }'
       + 'function _wsNumOrNull(v){ if (v === "" || v == null) return null; const n = Number(v); return Number.isFinite(n) ? n : null; }'
       + 'var _WS_PROJ_CONV = { NOMINAL12: "n12" }, _WS_PROJ_CONV_DEFAULT = "eff", _WSB_MAX_SCENARIOS = 3;'

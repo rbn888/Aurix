@@ -386,7 +386,9 @@ console.log('\n8 · Regresión de la revisión financiera:');
       // que el owner de validación entra en el contexto REAL: stubearlo dejaría
       // de certificar la rama que decide si se guarda.
       ['_wsNum', '_wsNumOrNull', '_wsDraftMissing', '_wsDraftRequiredIn', '_wsDraftRequired',
-       '_wsgFormValues', '_wsgCreate'].forEach(n => vm.runInContext(fnSrc(n), sb));
+       '_wsgFormValues', '_wsgCreate',
+       // El objetivo nace con la moneda base visible: sus owners reales.
+       '_wsCcyCode', '_wsBaseCcy'].forEach(n => vm.runInContext(fnSrc(n), sb));
       vm.runInContext('_wsgCreate()', sb);
       return saved && saved.target === 250000 && saved.current === 10000
           && saved.monthly === 1500 && saved.targetYear === 2032;
@@ -400,7 +402,9 @@ console.log('\n8 · Regresión de la revisión financiera:');
   // El null de `target`/`remaining` llegaba a `Intl.NumberFormat.format`, que
   // coacciona a 0: el cero falso no se había eliminado, se había movido una capa.
   ok('8.15b un importe ausente se escribe con guion, no como 0,00',
-    /const money = v => \(v == null \|\| !Number\.isFinite\(Number\(v\)\)\) \? '—' : formatBase\(v\);/.test(app)
+    // RE-DECIDIDO (SPEC 1 · moneda del documento): el importe sale en la moneda del OBJETIVO
+    // (`_wsgMoney`), no en la base; el guion para lo ausente es el mismo.
+    /const money = v => \(v == null \|\| !Number\.isFinite\(Number\(v\)\)\) \? '—' : _wsgMoney\(g, v\);/.test(app)
     && /value: money\(prog\.target\)/.test(app) && /value: money\(prog\.remaining\)/.test(app));
   ok('8.15c y «tiene plazo» se deriva UNA vez, desde el motor',
     /const hasDate = prog\.hasDate === true;/.test(fnSrc('_wsgCardOutHtml'))
