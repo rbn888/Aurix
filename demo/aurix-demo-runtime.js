@@ -117,6 +117,16 @@
   // 2 · SUPABASE FALSO (localStorage de este navegador)
   // ══════════════════════════════════════════════════════════════════════════
   function db() { return rd(K.db, {}); }
+  // CATÁLOGO DE PRECIOS SIMULADO: copia del catálogo de producción verificado el 2026-10-08
+  // (billing_prices: 7,99 €/mes · 69,99 €/año, sin prueba) para que el paywall muestre sus planes.
+  // Comprar sigue DESHABILITADO en la demo (la API de cobro responde «demo»): nada llega a Stripe.
+  (function seedPrices() {
+    var d = db(); if (Array.isArray(d.billing_prices) && d.billing_prices.length) return;
+    d.billing_prices = [
+      { provider: 'stripe', provider_price_id: 'demo_price_month', plan: 'premium', billing_interval: 'month', amount_cents: 799, currency: 'EUR', trial_days: 0, active: true },
+      { provider: 'stripe', provider_price_id: 'demo_price_year', plan: 'premium', billing_interval: 'year', amount_cents: 6999, currency: 'EUR', trial_days: 0, active: true } ];
+    saveDb(d);
+  })();
   function saveDb(d) { wr(K.db, d); }
   function session() { return rd(K.auth, null); }
   var listeners = [];
