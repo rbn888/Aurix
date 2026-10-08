@@ -21,9 +21,6 @@
   /* ── Translations ───────────────────────────────────── */
   var I18N = {
     es: {
-      'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
-      'cta.enter': 'Comenzar', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
-      'launch.count': 'Lanzamiento en {h} h',
 
       'hero.eyebrow': 'Sistema operativo del patrimonio',
       'hero.h1a': 'Todo tu patrimonio.',
@@ -126,9 +123,6 @@
       'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
     },
     en: {
-      'nav.product': 'Platform', 'nav.market': 'Market', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
-      'cta.enter': 'Get Started', 'cta.request': 'Request Access', 'cta.joinLaunch': 'Join before Launch 1',
-      'launch.count': 'Launching in {h} h',
 
       'hero.eyebrow': 'Wealth Operating System',
       'hero.h1a': 'Your entire wealth.',
@@ -232,6 +226,132 @@
     }
   };
 
+  // ── SPEC 2 · LANDING DE CONVERSIÓN ── textos nuevos (audiencia, problema, beneficio, planes, FAQ).
+  // Se aplican DESPUÉS del diccionario: varias claves (hero.*, cta.*) ya existían con el copy
+  // anterior y en un literal de objeto ganaría la última aparición.
+  Object.assign(I18N.es, {
+      'nav.how': "Producto",
+      'nav.plans': "Planes",
+      'nav.faq': "Preguntas",
+      'hero.h1a': "Todo tu patrimonio.",
+      'hero.h1b': "Una visión más inteligente.",
+      'hero.sub': "Reúne tus inversiones, entiende qué está cambiando y planifica tus próximos pasos. Acciones, ETFs, fondos, cripto y más, en un solo lugar.",
+      'cta.start': "Crear cuenta gratis",
+      'cta.see': "Explorar Aurix",
+      'cta.premium': "Empezar y descubrir Premium",
+      'hero.note': "Sin tarjeta para empezar.",
+      'shot.tag': "Vista de Aurix · datos de ejemplo",
+      'alt.dashboard': "Dashboard de Aurix con datos de ejemplo",
+      'alt.positions': "Posiciones de una categoría en Aurix, con datos de ejemplo",
+      'alt.intelligence': "Intelligence de Aurix con datos de ejemplo",
+      'alt.workspace': "Presupuesto mensual de Aurix con datos de ejemplo",
+      'bridge': "Tus inversiones están repartidas. Tu visión no tiene por qué estarlo.",
+      'how.eyebrow': "Cómo funciona",
+      'how.lead': "Tú registras tus posiciones: Aurix no se conecta a tu banco ni te pide credenciales bancarias.",
+      'how.1.t': "Reúne todo tu patrimonio",
+      'how.1.d': "Consulta cuánto tienes, cómo se distribuye y cómo evoluciona. Organiza acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez en una sola visión.",
+      'how.1.note': "Añade tus posiciones manualmente y mantén tu información al día.",
+      'how.2.t': "Descubre qué merece tu atención",
+      'how.2.d': "Intelligence pone tu patrimonio en contexto: dónde se concentra, qué ha cambiado y cómo evoluciona su estructura. Una lectura de tus datos para entender mejor tu cartera.",
+      'how.3.t': "Convierte tus números en planes",
+      'how.3.d': "Organiza tu presupuesto, controla cobros pendientes, explora préstamos y proyecta tus objetivos y el interés compuesto. Herramientas y plantillas para planificar con tus propios números.",
+      'how.3.ex': "Plantillas como Presupuesto mensual, Control de cobros, Objetivos financieros o Portfolio inmobiliario; herramientas como Interés compuesto, Simulador de préstamos o Simulador de escenarios.",
+      'plans.title': "Empieza gratis. Pasa a Premium cuando quieras más.",
+      'free.price': "0 €",
+      'free.per': "sin coste",
+      'free.sub': "Sin tarjeta para empezar.",
+      'free.intro': "Incluye:",
+      'free.1': "Todas tus posiciones, sin límite de activos",
+      'free.2': "Dashboard con total, reparto y evolución",
+      'free.3': "Mercado: sigue índices y activos",
+      'free.4': "Una primera lectura de Intelligence sobre tu cartera",
+      'price.month': "7,99 €",
+      'price.month.per': "al mes",
+      'price.year.note': "O 69,99 € al año, cobrados anualmente: 5,83 € al mes, ahorras un 27 %.",
+      'prem.intro': "Todo lo incluido en Free, más:",
+      'prem.1': "Intelligence completa: concentración, estructura y cambios de tu patrimonio",
+      'prem.2': "Todas las herramientas y plantillas de Workspace",
+      'prem.3': "Guarda tus planes para retomarlos más tarde",
+      'price.terms': "Suscripción renovable. Cancela desde Gestionar mi plan.",
+      'faq.title': "Preguntas frecuentes",
+      'faq.1.q': "¿Qué puedo hacer gratis?",
+      'faq.1.a': "Registrar todas tus posiciones, ver tu patrimonio, su reparto y evolución, seguir el mercado y recibir una primera lectura de Intelligence. Premium añade Intelligence completa, todas las herramientas y plantillas de Workspace y el guardado de tus planes.",
+      'faq.2.q': "¿Aurix se conecta con mi banco o mi bróker?",
+      'faq.2.a': "No. Registras tus posiciones a mano y Aurix actualiza los precios de los activos cotizados. No necesita tus credenciales bancarias y no puede mover tu dinero.",
+      'faq.3.q': "¿Cómo se cobra Premium y cómo lo cancelo?",
+      'faq.3.a': "Mensual (7,99 € al mes) o anual (69,99 €, en un único cobro al año). La suscripción se renueva automáticamente al final de cada periodo hasta que la canceles desde «Gestionar mi plan» en la app. El pago lo procesa Stripe; Aurix no guarda tu tarjeta.",
+      'faq.4.q': "¿Aurix me dice qué comprar o vender?",
+      'faq.4.a': "No. Aurix organiza y explica tu patrimonio; no ofrece asesoramiento financiero ni recomendaciones de inversión.",
+      'faq.5.q': "¿Dónde puedo usarlo?",
+      'faq.5.a': "En el navegador del ordenador o del móvil, y puedes añadirlo a la pantalla de inicio. Tus datos se guardan en tu cuenta.",
+      'final.title': "Tu patrimonio, con más claridad.",
+      'final.note': "Empieza con Free. Descubre Premium desde la aplicación.",
+      'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
+      'cta.enter': 'Comenzar', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
+      'launch.count': 'Lanzamiento en {h} h',
+  });
+  Object.assign(I18N.en, {
+      'nav.how': "Product",
+      'nav.plans': "Plans",
+      'nav.faq': "FAQ",
+      'hero.h1a': "All your wealth.",
+      'hero.h1b': "A smarter view.",
+      'hero.sub': "Bring your investments together, understand what is changing and plan your next steps. Stocks, ETFs, funds, crypto and more, in one place.",
+      'cta.start': "Create a free account",
+      'cta.see': "Explore Aurix",
+      'cta.premium': "Start and discover Premium",
+      'hero.note': "No card needed to start.",
+      'shot.tag': "Aurix view · sample data",
+      'alt.dashboard': "Aurix Dashboard with sample data",
+      'alt.positions': "Positions in a category in Aurix, with sample data",
+      'alt.intelligence': "Aurix Intelligence with sample data",
+      'alt.workspace': "Aurix monthly budget with sample data",
+      'bridge': "Your investments are spread out. Your view doesn’t have to be.",
+      'how.eyebrow': "How it works",
+      'how.lead': "You record your positions yourself: Aurix does not connect to your bank or ask for your banking credentials.",
+      'how.1.t': "Bring all your wealth together",
+      'how.1.d': "See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view.",
+      'how.1.note': "Add your positions manually and keep your information up to date.",
+      'how.2.t': "Find out what deserves your attention",
+      'how.2.d': "Intelligence puts your wealth in context: where it is concentrated, what has changed and how its structure evolves. A reading of your data to better understand your portfolio.",
+      'how.3.t': "Turn your numbers into plans",
+      'how.3.d': "Organise your budget, keep track of pending collections, explore loans and project your goals and compound interest. Tools and templates to plan with your own numbers.",
+      'how.3.ex': "Templates such as Monthly budget, Payment control, Financial goals or Real estate portfolio; tools such as Compound interest, Loan simulator or Scenario builder.",
+      'plans.title': "Start free. Go Premium when you want more.",
+      'free.price': "€0",
+      'free.per': "no cost",
+      'free.sub': "No card needed to start.",
+      'free.intro': "Includes:",
+      'free.1': "All your positions, with no asset limit",
+      'free.2': "Dashboard with total, split and evolution",
+      'free.3': "Market: follow indices and assets",
+      'free.4': "A first Intelligence reading of your portfolio",
+      'price.month': "€7.99",
+      'price.month.per': "per month",
+      'price.year.note': "Or €69.99 a year, billed annually: €5.83 a month, you save 27%.",
+      'prem.intro': "Everything in Free, plus:",
+      'prem.1': "Full Intelligence: concentration, structure and changes in your wealth",
+      'prem.2': "All Workspace tools and templates",
+      'prem.3': "Save your plans to pick them up later",
+      'price.terms': "Renewing subscription. Cancel from Manage my plan.",
+      'faq.title': "Frequently asked questions",
+      'faq.1.q': "What can I do for free?",
+      'faq.1.a': "Record all your positions, see your wealth, its split and evolution, follow the market and get a first Intelligence reading. Premium adds full Intelligence, all Workspace tools and templates, and saving your plans.",
+      'faq.2.q': "Does Aurix connect to my bank or broker?",
+      'faq.2.a': "No. You record your positions by hand and Aurix updates the prices of listed assets. It does not need your banking credentials and cannot move your money.",
+      'faq.3.q': "How is Premium charged and how do I cancel?",
+      'faq.3.a': "Monthly (€7.99 a month) or annual (€69.99, in a single yearly charge). The subscription renews automatically at the end of each period until you cancel it from “Manage my plan” in the app. Payments are processed by Stripe; Aurix does not store your card.",
+      'faq.4.q': "Does Aurix tell me what to buy or sell?",
+      'faq.4.a': "No. Aurix organises and explains your wealth; it does not give financial advice or investment recommendations.",
+      'faq.5.q': "Where can I use it?",
+      'faq.5.a': "In the browser on your computer or phone, and you can add it to your home screen. Your data is kept in your account.",
+      'final.title': "Your wealth, with more clarity.",
+      'final.note': "Start with Free. Discover Premium from the app.",
+      'nav.product': 'Platform', 'nav.market': 'Market', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
+      'cta.enter': 'Get Started', 'cta.request': 'Request Access', 'cta.joinLaunch': 'Join before Launch 1',
+      'launch.count': 'Launching in {h} h',
+  });
+
   var LS_KEY = 'aurix_lang';
   // M.03 · B — ELECCIÓN EXPLÍCITA vs IDIOMA POR DEFECTO.
   //
@@ -253,6 +373,8 @@
     // English by default. Spanish stays available via the ES/EN toggle and is
     // remembered once chosen — we no longer auto-switch from the browser locale.
     var choice;
+    // Un enlace con `?lang=es|en` (p. ej. compartido desde una campaña) es una elección explícita.
+    try { var q = new URLSearchParams(location.search).get('lang'); if (q === 'es' || q === 'en') { langExplicit = true; return q; } } catch (_) {}
     try { choice = localStorage.getItem(LS_CHOICE_KEY); } catch (_) {}
     if (choice === 'es' || choice === 'en') { langExplicit = true; return choice; }
     var stored;
@@ -275,6 +397,12 @@
     for (var i = 0; i < nodes.length; i++) {
       var key = nodes[i].getAttribute('data-i18n');
       if (dict[key] != null) nodes[i].textContent = dict[key];
+    }
+    // Capturas del producto en el idioma activo (mismos datos ficticios) y su texto alternativo.
+    var imgs = document.querySelectorAll('img[data-i18n-src]');
+    for (var m = 0; m < imgs.length; m++) {
+      imgs[m].setAttribute('src', 'assets/' + imgs[m].getAttribute('data-i18n-src') + '-' + lang + '.jpg');
+      var ak = imgs[m].getAttribute('data-i18n-alt'); if (ak && dict[ak] != null) imgs[m].setAttribute('alt', dict[ak]);
     }
     // Reflect active state on every language toggle (header + mobile)
     var btns = document.querySelectorAll('.lang-btn');
@@ -609,6 +737,9 @@
     if (reduce || !('IntersectionObserver' in window)) {
       for (var r = 0; r < reveals.length; r++) reveals[r].classList.add('is-visible');
     } else {
+      // El estado oculto sólo existe si este código llega a ejecutarse: sin JS (o si falla antes),
+      // el contenido se ve tal cual.
+      document.documentElement.classList.add('reveal-ready');
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           if (en.isIntersecting) { en.target.classList.add('is-visible'); io.unobserve(en.target); }
