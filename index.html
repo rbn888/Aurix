@@ -1533,6 +1533,7 @@
           El activo se eliminará al llegar a 0.
         </div>
 
+        <p class="modal-note" data-i18n="tradeRecordNote" data-trade-note>Aurix registra la operación en tu cartera; no mueve dinero ni descuenta tu liquidez.</p>
         <div class="reduce-error" id="reduceError"></div>
 
         <button type="submit" class="btn-submit btn-submit--orange" data-i18n="confirmReduce">Confirmar reducción</button>
@@ -1568,6 +1569,7 @@
           </div>
         </div>
 
+        <p class="modal-note" data-i18n="tradeRecordNote" data-trade-note>Aurix registra la operación en tu cartera; no mueve dinero ni descuenta tu liquidez.</p>
         <div class="reduce-error" id="addError"></div>
 
         <button type="submit" class="btn-submit btn-submit--green" data-i18n="confirm">Confirmar</button>
@@ -1659,6 +1661,7 @@
             <strong id="txAfterVal">—</strong>
           </div>
         </div>
+        <p class="modal-note" data-i18n="tradeRecordNote" data-trade-note>Aurix registra la operación en tu cartera; no mueve dinero ni descuenta tu liquidez.</p>
         <div class="reduce-error" id="txError"></div>
         <button type="submit" class="btn-submit btn-submit--green" data-i18n="txSubmit">Añadir transacción</button>
       </form>
@@ -1995,6 +1998,8 @@
             <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="EUR" aria-pressed="false">EUR</button>
           </div>
         </div>
+        <!-- Procedencia del tipo EUR/USD: valor, fuente y fecha; o su ausencia. Lo pinta _aurixFxNoteRender(). -->
+        <p class="settings-fx-note" id="settingsFxNote" aria-live="polite"></p>
       </section>
 
       <section class="settings-section" data-pane="plan" id="settingsSectionPlan">

@@ -30269,3 +30269,21 @@ body.ws-cover .aurix-wsh { max-width: none; }
   }
 }
 @media (prefers-reduced-motion: reduce) { .wspl-card { transition: none; } .wspl-card:hover { transform: none; } }
+
+/* ── Moneda del documento (Workspace) ─────────────────────────────────────
+   Selector en documentos nuevos y aviso «sin confirmar» en los antiguos. */
+.wsccy-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; margin: 0 0 12px; }
+.wsccy-row .ws4-field { flex: 0 1 200px; min-width: 140px; }
+.wsccy-row.is-pending { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(233, 168, 87, .35); background: rgba(233, 168, 87, .08); }
+.wsccy-note { flex: 1 1 100%; margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.wsccy-note b { color: var(--aurix-warning); font-weight: 600; }
+.wsccy-confirm { min-height: 44px; }
+
+/* Compra/venta: Aurix registra, no ejecuta ni mueve liquidez. */
+.modal-note { margin: 4px 0 8px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+.modal-note[hidden] { display: none; }
+
+/* Procedencia del tipo EUR/USD (Ajustes). */
+.settings-fx-note { margin: 2px 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+.settings-fx-note.is-warn { color: var(--aurix-warning); }
+#totalValue[data-fx-approx]::before { content: '≈ '; opacity: .7; }

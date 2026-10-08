@@ -152,12 +152,16 @@ function ctx(persona, langCode) {
   vm.runInContext('var AURIX_WS6_TOOL=true, AURIX_WS7_TOOL=true, AURIX_WS8_TOOL=true, AURIX_WS12_TOOL=true, AURIX_WS13_TOOL=true, AURIX_WS14_TOOL=true, AURIX_WS15_TOOL=true, AURIX_WS16_TOOL=true;', sb);
   vm.runInContext('function _wshWriteStore(k,v){ localStorage.setItem(k, JSON.stringify(v)); return true; }', sb);
   vm.runInContext('function _wsDocsQueue(){} function _wsDocSyncSet(){}', sb);
+  // La moneda del documento al abrir (moneda declarada o base visible al nacer): sus owners reales.
+  vm.runInContext('var baseCurrency = "EUR"; var ' + konstOrLiteral('_WS_CCY_TOOLS') + ';', sb);
+  ['_wsCcyCode', '_wsBaseCcy', '_wsDocCurrencyOf'].forEach(n => vm.runInContext(fnSrc(n), sb));
   // La hoja legacy, con su gate real y su apertura observable.
   vm.runInContext('function _ws4Templates(){ return { investment:{fields:[]}, budget:{fields:[]}, property:{fields:[]}, business:{fields:[]}, networth:{fields:[]}, fire:{fields:[]} }; }', sb);
   vm.runInContext(fnSrc('_ws4OpenOrCreate')
     .replace("_ws4ActiveId = _ws4Draft.id; _wshView = 'workspace'; renderWorkspaceHome();", '__opened.push("ws4:" + type);'), sb);
   return sb;
 }
+function konstOrLiteral(name){ const m = new RegExp('^const ' + name + '\\s*=\\s*([^;]+);', 'm').exec(app); if (!m) throw new Error('missing const ' + name); return name + ' = ' + m[1]; }
 const R = (c, expr) => vm.runInContext(expr, c);
 
 // ── EXTRACTOR DE TARJETAS ──────────────────────────────────────────────────

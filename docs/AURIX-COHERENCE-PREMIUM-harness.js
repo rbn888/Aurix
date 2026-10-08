@@ -77,6 +77,9 @@ console.log('\n2 · Escenarios sin base declarada no publican proyecciones:');
     sb.__params = params;
     vm.runInContext('var lang="es"; function t(k){ return k; } function _intccEsc(x){ return String(x); }'
       + 'function formatBase(v){ return Math.round(v) + " €"; } function _wsbParams(){ return __params; }'
+      // La moneda del documento la certifica docs/financial-reliability/probe-doc-currency.mjs en navegador;
+      // aquí se certifica la VALIDACIÓN, así que el importe sigue saliendo por el formatBase de este sandbox.
+      + 'function _wsbMoney(v){ return formatBase(v); }'
       + 'function _wsNum(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }'
       + 'function _wsNumOrNull(v){ if (v === "" || v == null) return null; const n = Number(v); return Number.isFinite(n) ? n : null; }'
       + 'var _WS_PROJ_CONV = { NOMINAL12: "n12" }, _WS_PROJ_CONV_DEFAULT = "eff", _WSB_MAX_SCENARIOS = 3;'
@@ -159,9 +162,11 @@ console.log('\n3 · Diario: la misma operación se lee en una sola moneda:');
 // ── 4 · «TUS PLANES»: NADA DE «COMPROBANDO…» ETERNO ─────────────────────────
 console.log('\n4 · Tus planes: el estado vacío no espera una lectura que nadie lanza:');
 {
-  const st = (table, worst) => {
+  const st = (table, worst, pull) => {
     const sb = sandbox();
     sb.__w = worst;
+    // La lectura de documentos ya tiene llamador (SPEC 1): su estado entra al sandbox.
+    vm.runInContext('var _wsDocsPullInFlight = ' + (pull === 'flight') + ', _wsDocsPullFailed = ' + (pull === 'failed') + ', _wsDocsPullSkippedAbsent = ' + (pull === 'remote' ? 1 : 0) + ';', sb);
     vm.runInContext('var _wsDocTableState = ' + JSON.stringify(table) + '; function _wsDocsSession(){ return "u1"; }'
       + 'function _wsDocSyncWorst(){ return __w; }', sb);
     load(sb, ['_wsPlansEmptyState']);
@@ -170,6 +175,9 @@ console.log('\n4 · Tus planes: el estado vacío no espera una lectura que nadie
   ok('4.1 tabla sin confirmar y nada en vuelo ⇒ vacío, no cargando', st('unknown', 'idle') === 'empty');
   ok('4.2 una escritura en vuelo sí es «comprobando»', st('unknown', 'saving') === 'loading');
   ok('4.3 un error sigue siendo error (no «no tienes planes»)', st('unknown', 'error') === 'error');
+  ok('4.4 la lectura de documentos EN VUELO es «comprobando»', st('unknown', 'idle', 'flight') === 'loading');
+  ok('4.5 una lectura fallida es error con reintento, no «no tienes planes»', st('yes', 'idle', 'failed') === 'error');
+  ok('4.6 documentos remotos que este dispositivo no recupera ⇒ se dice, no «no tienes planes»', st('yes', 'idle', 'remote') === 'remote_only');
 }
 
 // ── 5 · LA PREGUNTA NO ROTA AL NAVEGAR ──────────────────────────────────────

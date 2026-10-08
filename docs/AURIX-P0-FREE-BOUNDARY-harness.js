@@ -150,6 +150,8 @@ function ctx(persona, langCode) {
    '_wsToolDefaults','_wsBudgetDefaults','_wsToolDefaultsFor','_wsToolSuggestName','_wsToolMissingRequired',
    '_wsDraftMissing','_wsToolOnInput','_wsRefViz','_wsProjViz','_wsProjMeta','_wsPinKindLabel',
    '_wsToolShowRequired','_wsDraftRequired','_wsDraftRequiredIn',
+   // MONEDA DEL DOCUMENTO — el guardado sella la moneda del documento, no la base del momento.
+   '_wsCcyCode','_wsBaseCcy','_wsDocCurrencyOf','_wsDocCcy',
    ].forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
   // Hojas que no son la lógica bajo prueba.
   vm.runInContext(`
@@ -378,7 +380,8 @@ console.log('\n2 · El CTA llega al pago sin peaje:');
 console.log('\n3 · Guardado nombrado y ciclo de vida:');
 {
   const c = ctx('premium','es');
-  const setup = () => R(c, '_wsToolActive="budget"; _wsToolInputs=_wsToolDefaultsFor("budget"); _wsToolEditId=null; _wsToolDirty=true; __modal.length=0;');
+  // Un borrador NUEVO nace con la moneda base visible: es lo que hace su owner (`_wsOpenTool`).
+  const setup = () => R(c, '_wsToolActive="budget"; _wsToolInputs=_wsToolDefaultsFor("budget"); _wsToolInputs.currency=_wsBaseCcy(); _wsToolEditId=null; _wsToolDirty=true; __modal.length=0;');
   const confirm = name => R(c, '(function(){ var m=__modal[__modal.length-1]; m.onOk(' + JSON.stringify(name) + '); })()');
   // §4 — con candidatos del mismo tipo o con una instancia abierta, Guardar
   // PREGUNTA primero. Estos dos helpers responden la pregunta como lo haría el

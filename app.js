@@ -4339,8 +4339,13 @@ const USER_SCOPED_WORK_KEYS = [
   'aurix_ws_projects_v1', 'aurix_ws_planning_v1', 'aurix_ws_tool_state_v1',
   'aurix_ws_pinned_v1', 'aurix_ws_recent_v1', 'aurix_ws_space_hidden_v1',
   'aurix_ws_space_top_v1', 'aurix_workspace_mode',
+  // Los parámetros de Escenarios guardan el patrimonio DECLARADO como base: tras cambiar de
+  // cuenta, el siguiente usuario los leía (reproducido en la demo con dos cuentas sintéticas).
+  'aurix_ws_scn_params_v1',
 ];
-const USER_SCOPED_WORK_PREFIXES = ['aurix_ws2_'];
+// `aurix_ws_prefrev_` — la revisión aplicada de cada preferencia sincronizada; heredarla hacía
+// que la cuenta siguiente descartara sus propias preferencias remotas por «más antiguas».
+const USER_SCOPED_WORK_PREFIXES = ['aurix_ws2_', 'aurix_ws_prefrev_'];
 const _AURIX_PARKED_SUFFIX = '__parked_';
 // Política de crecimiento. Con des-aparcado, lo aparcado se consume al volver su dueño, así
 // que crece sólo por usuarios que no vuelven. Dos topes, y agotar cualquiera de los dos NO
@@ -4840,6 +4845,11 @@ const T = {
     updated:         t => `Actualizado ${t}`,
     updateError:     'No se pudo actualizar',
     updateStaleSince:n => `Última actualización: hace ${n} min`,
+    // Tipo EUR/USD: fecha del CAMBIO, distinta de la de los precios de los activos.
+    fxRateLine:      (r, src, d) => `Cambio EUR/USD: 1 € = ${r} $ · ${src} · ${d}`,
+    fxRateStale:     (r, d) => `Cambio EUR/USD no actual: último conocido 1 € = ${r} $ (${d}). Los totales convertidos son aproximados.`,
+    fxRateNone:      'Sin tipo de cambio EUR/USD disponible: los totales convertidos son aproximados.',
+    fxHeroApprox:    ' · total aproximado: cambio EUR/USD no actual',
     rateLimit:       'Límite de API — reintentando pronto',
     // Autosave status
     saveSaving:      'Guardando…',
@@ -5291,6 +5301,8 @@ const T = {
     reNamePH:          'ej. Apartamento Madrid',
     // Transaction modal
     txModalTitle:      'Añadir transacción',
+    // Comprar o vender REGISTRA la posición: no hay contrapartida automática en la liquidez.
+    tradeRecordNote:   'Aurix registra la operación en tu cartera; no mueve dinero ni descuenta tu liquidez.',
     txTypeLabel:       'Tipo',
     txTypeBuy:         'Compra',
     txTypeSell:        'Venta',
@@ -6575,6 +6587,7 @@ const T = {
     wspl_empty:           'Todavía no has guardado ningún plan.',
     wspl_empty_cta:       'Ver plantillas',
     wspl_loading:         'Comprobando tus planes guardados…',
+    wspl_remote_only:     'Tu cuenta tiene documentos guardados que este dispositivo todavía no puede recuperar. Siguen intactos en tu cuenta.',
     wspl_error:           'No se han podido cargar tus planes guardados.',
     wspl_m_income:        'Ingresos',
     wspl_m_avail:         'Disponible',
@@ -7042,7 +7055,14 @@ const T = {
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
     wsmodal_cancel:    'Cancelar',
     // ── GUARDADO NOMBRADO · un modal, tres acciones ──────────────────────────
-    wsname_save_title:  'Guardar en Mi espacio',
+    // Mi espacio publica FAVORITOS, no documentos: el título prometía un sitio
+    // donde el documento guardado no iba a aparecer.
+    wsname_save_title:  'Guardar documento',
+    wsccy_label:        'Moneda',
+    wsccy_choose:       'Elige…',
+    wsccy_confirm:      'Confirmar moneda',
+    wsccy_pending_t:    'Moneda sin confirmar.',
+    wsccy_pending_d:    'Este documento se guardó sin registrar su moneda. Los importes se conservan tal cual; indica en qué moneda están para verlos con su símbolo.',
     wsname_saveas_title:'Guardar como…',
     wsname_field:       'Nombre',
     // ── §4 · LA DECISIÓN DE GUARDADO ─────────────────────────────────────────
@@ -8191,6 +8211,10 @@ const T = {
     updated:         t => `Updated ${t}`,
     updateError:     'Update failed',
     updateStaleSince:n => `Last updated ${n} min ago`,
+    fxRateLine:      (r, src, d) => `EUR/USD rate: €1 = $${r} · ${src} · ${d}`,
+    fxRateStale:     (r, d) => `EUR/USD rate not current: last known €1 = $${r} (${d}). Converted totals are approximate.`,
+    fxRateNone:      'No EUR/USD exchange rate available: converted totals are approximate.',
+    fxHeroApprox:    ' · approximate total: EUR/USD rate not current',
     rateLimit:       'API limit — retrying soon',
     // Autosave status
     saveSaving:      'Saving…',
@@ -8624,6 +8648,7 @@ const T = {
     reNamePH:          'e.g. Madrid Apartment',
     // Transaction modal
     txModalTitle:      'Add transaction',
+    tradeRecordNote:   'Aurix records the trade in your portfolio; it does not move money or deduct from your cash.',
     txTypeLabel:       'Type',
     txTypeBuy:         'Buy',
     txTypeSell:        'Sell',
@@ -9553,6 +9578,7 @@ const T = {
     wspl_empty:           'You have not saved any plan yet.',
     wspl_empty_cta:       'See templates',
     wspl_loading:         'Checking your saved plans…',
+    wspl_remote_only:     'Your account has saved documents that this device cannot recover yet. They remain intact in your account.',
     wspl_error:           'Your saved plans could not be loaded.',
     wspl_m_income:        'Income',
     wspl_m_avail:         'Available',
@@ -9983,7 +10009,12 @@ const T = {
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
     wsmodal_cancel:    'Cancel',
-    wsname_save_title:  'Save to My Space',
+    wsname_save_title:  'Save document',
+    wsccy_label:        'Currency',
+    wsccy_choose:       'Choose…',
+    wsccy_confirm:      'Confirm currency',
+    wsccy_pending_t:    'Currency not confirmed.',
+    wsccy_pending_d:    'This document was saved without recording its currency. The amounts are kept as they are; tell us which currency they are in to show them with their symbol.',
     wsname_saveas_title:'Save as…',
     wsname_field:       'Name',
     wssave_title:         'Save',
@@ -12090,7 +12121,10 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 
 const BASE_KEY   = 'portfolio_base_currency';
 let baseCurrency = localStorage.getItem(BASE_KEY) || 'USD';
-let usdToEur     = 0.92; // updated from API
+// EUR por 1 USD. Lo fija `_aurixFxSyncEur()` desde el tipo FECHADO de la caché FX (EURUSD=X,
+// la misma fuente que ya usa el snapshot del servidor). 0.92 es sólo el ANCLA de respaldo sin
+// tipo: no es una cotización y, cuando se usa, la conversión se declara aproximada.
+let usdToEur     = 0.92;
 
 // ── DOM ────────────────────────────────────────────────────
 const totalValueEl  = document.getElementById('totalValue');
@@ -13605,7 +13639,10 @@ function _aurixBackfillFlowsFromTransactions() {
         if (tx.opening === true) continue;
         scanned++;
         const native = Math.abs(Number(tx.qty) * Number(tx.price));
-        const usd = (typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native;
+        // Tx PASADA en EUR: ancla 0,92 (el tipo del cliente en aquel escalón), no el de hoy (TWR estable).
+        const _cur = String(a.assetCurrency || 'USD').toUpperCase();
+        const usd = (_cur === 'EUR') ? native / _AURIX_EUR_ANCHOR
+                  : ((typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native);
         if (!Number.isFinite(usd) || usd <= 0) continue;
         const isSell = String(tx.type || '').toLowerCase() === 'sell';
         const signed = isSell ? -usd : usd;
@@ -14466,7 +14503,16 @@ function formatChartTooltip(amount) {
 // is byte-identical to pre-F2.
 const _AURIX_FX_TTL      = 12 * 60 * 60 * 1000;   // 12h — FX drifts slowly vs. portfolio-valuation needs
 const _AURIX_FX_KEY      = 'aurix_fx_rates_v1';
-const _AURIX_FX_PAIRS    = { GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X' };
+const _AURIX_FX_PAIRS    = { EUR: 'EURUSD=X', GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X' };
+// ── EUR/USD DEJA DE SER UN NÚMERO FIJO (SPEC 1) ──────────────────────────────
+// `usdToEur = 0.92` llevaba fijo desde 2026-04-27 (el fetch a Frankfurter se retiró por la
+// CSP) con un comentario «updated from API» falso. El 2026-10-08 el tipo real era 1,1197
+// USD/EUR ⇒ los activos USD de una base EUR salían +3,01 %. Y el snapshot del SERVIDOR
+// (supabase/functions/portfolio-snapshot) ya valoraba EUR con EURUSD=X vivo: el histórico
+// mezclaba puntos de cliente a 0,92 con puntos de servidor al tipo real. Ahora el cliente usa
+// la MISMA fuente y fecha; sin tipo válido se declara aproximado (nunca 1:1, nunca «actual»).
+const _AURIX_EUR_ANCHOR  = 0.92;                  // respaldo SIN tipo — no es una cotización
+const _AURIX_FX_SOURCE   = 'Yahoo Finance';       // vía el proxy de precios de Aurix
 // STATIC fallback (USD per 1 unit) — approximate, last resort only; drives the
 // 'approx' status. EUR is intentionally absent (it uses the usdToEur anchor).
 const _AURIX_FX_FALLBACK = { USD: 1, GBP: 1.27, CHF: 1.11, JPY: 0.0064 };
@@ -14485,20 +14531,64 @@ function _aurixFxFresh() {
   return !!(c && c.rates && (Date.now() - c.ts) < _AURIX_FX_TTL);
 }
 // Rate (USD per 1 unit) + provenance. status: 'live' | 'approx' | 'unknown'.
+// Estado del tipo EUR: 'live' (obtenido hace < TTL), 'stale' (último conocido, con su fecha) o
+// 'none' (nunca se obtuvo en este dispositivo ⇒ ancla de respaldo, conversión aproximada).
+function _aurixFxEurState() {
+  const c = _aurixFxLoad();
+  const r = c && c.rates ? Number(c.rates.EUR) : NaN;
+  if (!(Number.isFinite(r) && r > 0)) return { rate: null, at: null, status: 'none', source: null };
+  const at = (c.at && Number.isFinite(Number(c.at.EUR))) ? Number(c.at.EUR) : Number(c.ts) || null;
+  const fresh = at != null && (Date.now() - at) < _AURIX_FX_TTL;
+  return { rate: r, at: at, status: fresh ? 'live' : 'stale', source: _AURIX_FX_SOURCE };
+}
+// Mantiene `usdToEur` (lo leen toBase/assetValueUSD/_nativeToUSD) alineado con el tipo fechado.
+function _aurixFxSyncEur() {
+  const st = _aurixFxEurState();
+  usdToEur = st.rate ? 1 / st.rate : _AURIX_EUR_ANCHOR;
+  return st;
+}
 function _aurixFxLookup(ccy) {
   const c = String(ccy || '').toUpperCase();
   if (c === 'USD') return { rate: 1, status: 'live' };
-  // EUR stays on the existing anchor → USD/EUR behaviour unchanged from pre-F2.
-  if (c === 'EUR') return { rate: (Number.isFinite(usdToEur) && usdToEur > 0) ? 1 / usdToEur : null, status: 'live' };
+  if (c === 'EUR') {
+    const st = _aurixFxEurState();
+    if (st.rate) return { rate: st.rate, status: st.status === 'live' ? 'live' : 'approx' };
+    return { rate: 1 / _AURIX_EUR_ANCHOR, status: 'approx' };
+  }
   if (_aurixFxFresh()) {
     const r = _aurixFxCache.rates[c];
-    if (Number.isFinite(r) && r > 0) return { rate: r, status: 'live' };
+    // Fresco por PAR: un par que no llegó en el último refresco conserva su tipo antiguo, y el
+    // `ts` global renovado no puede declararlo actual (revisión financiera).
+    const at = (_aurixFxCache.at && Number.isFinite(Number(_aurixFxCache.at[c]))) ? Number(_aurixFxCache.at[c]) : Number(_aurixFxCache.ts);
+    if (Number.isFinite(r) && r > 0 && (Date.now() - at) < _AURIX_FX_TTL) return { rate: r, status: 'live' };
   }
   const fb = _AURIX_FX_FALLBACK[c];
   if (Number.isFinite(fb) && fb > 0) return { rate: fb, status: 'approx' };
   return { rate: null, status: 'unknown' };
 }
 function _aurixFxRate(ccy)   { return _aurixFxLookup(ccy).rate; }     // number | null
+// ¿La cartera ACTIVA necesita el tipo EUR/USD para expresarse en la base? (EUR ↔ otra moneda)
+function _aurixFxEurInvolved() {
+  const base = String(typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD').toUpperCase();
+  const list = (typeof activeAssets === 'function') ? activeAssets() : [];
+  return list.some(a => { const c = String((a && a.assetCurrency) || 'USD').toUpperCase(); return c !== base && (c === 'EUR' || base === 'EUR'); });
+}
+// Procedencia verificable del tipo (valor, fuente, fecha) en Ajustes; devuelve el estado.
+function _aurixFxNoteRender() {
+  const st = _aurixFxEurState();
+  try {
+    const el = (typeof document !== 'undefined') ? document.getElementById('settingsFxNote') : null;
+    if (el) {
+      const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES';
+      const r = st.rate ? st.rate.toLocaleString(loc, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '';
+      const d = st.at ? new Date(st.at).toLocaleString(loc, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      el.textContent = st.status === 'live' ? t('fxRateLine')(r, st.source, d)
+                     : st.status === 'stale' ? t('fxRateStale')(r, d) : t('fxRateNone');
+      el.classList.toggle('is-warn', st.status !== 'live');
+    }
+  } catch (_) {}
+  return st;
+}
 function _aurixFxStatus(ccy) { return _aurixFxLookup(ccy).status; }   // 'live'|'approx'|'unknown'
 
 // Coverage helpers for the F2-C snapshot guard (skip closed positions).
@@ -14518,7 +14608,8 @@ function _aurixFxApproxUsed(list) { return _aurixFxCurrencies(list).some(c => _a
 // on the TTL, never throws, never blocks: offline / proxy failure simply keeps
 // the cached or static fallback. Does NOT fetch EUR (anchored on usdToEur).
 async function _aurixFxRefresh() {
-  if (_aurixFxFresh()) return;
+  // Una caché fresca SIN EUR (anterior a este cambio) no puede ahorrar la petición.
+  if (_aurixFxFresh() && _aurixFxEurState().status === 'live') return;
   if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return;
   try {
     const syms = Object.values(_AURIX_FX_PAIRS).join(',');
@@ -14526,17 +14617,25 @@ async function _aurixFxRefresh() {
     if (!res.ok) return;
     const json  = await res.json();
     const bySym = new Map((json && json.snapshot || []).map(p => [String(p.symbol), p]));
-    const rates = {};
+    const rates = {}, at = {};
     for (const [ccy, sym] of Object.entries(_AURIX_FX_PAIRS)) {
       const p = bySym.get(sym);
-      if (p && Number.isFinite(p.price) && p.price > 0) rates[ccy] = p.price;   // USD per 1 unit
+      if (p && Number.isFinite(p.price) && p.price > 0 && p.stale !== true) {
+        rates[ccy] = p.price;                                             // USD per 1 unit
+        at[ccy] = Number.isFinite(Number(p.timestamp)) ? Number(p.timestamp) : Date.now();   // fecha DEL TIPO
+      }
     }
     if (Object.keys(rates).length) {
-      _aurixFxCache = { ts: Date.now(), rates };
+      // Un par que no llega no borra el último conocido: conserva su tipo Y su fecha.
+      const prev = _aurixFxLoad();
+      const keepRates = Object.assign({}, prev && prev.rates), keepAt = Object.assign({}, prev && prev.at);
+      _aurixFxCache = { ts: Date.now(), rates: Object.assign(keepRates, rates), at: Object.assign(keepAt, at) };
       try { localStorage.setItem(_AURIX_FX_KEY, JSON.stringify(_aurixFxCache)); } catch (_) {}
     }
   } catch (_) { /* offline / proxy fail → keep cache / fallback; never throw */ }
+  finally { try { _aurixFxSyncEur(); } catch (_) {} }
 }
+try { _aurixFxSyncEur(); } catch (_) {}   // al cargar: el último tipo fechado conocido, si lo hay
 
 async function fetchExchangeRate() {
   // AURIX-FX-1 (F2-A): refresh the multi-currency rate cache (GBP/CHF/JPY) from
@@ -21172,6 +21271,8 @@ function _wsDocsQueue(key) {
 }
 // Y el reintento explícito que §4 pide, sobre la MISMA cola.
 function _wsDocsRetry() {
+  // Reintentar también la LECTURA si fue ella la que falló.
+  if (_wsDocsPullFailed) { _wsDocsPulledFor = null; try { _wsDocsPullOnce(); } catch (_) {} }
   const keys = Object.keys(_WS_DOC_KEYS).concat(_WS_PREF_KEYS);
   // Un fallo transitorio no prueba nada sobre el esquema: si la tabla se marcó
   // ausente por un error que NO era de esquema, el estado ya es 'error' y no 'no',
@@ -21299,18 +21400,44 @@ async function _wsDocsPush(key) {
 // cuerpo antiguo. Un documento que sólo existe en LOCAL no se toca: el remoto
 // añade y actualiza, nunca sustituye la lista entera — que es exactamente el
 // defecto de pérdida de datos que la sincronización de Intelligence ya pagó.
+// ── LA LECTURA NO TENÍA NINGÚN LLAMADOR ─────────────────────────────────────
+// La tabla existe en producción (sonda 2026-10-08: 42501 para `anon`) y el push sube cada
+// guardado Premium, pero nada leía: un documento guardado en el móvil no aparecía nunca en
+// el escritorio. Se lee UNA vez por cuenta, cuando el derecho está resuelto
+// (`_aurixEntApplyToUi`), y la fusión es la de siempre: por revisión, sin sustituir la lista.
+let _wsDocsPullInFlight = false;
+let _wsDocsPullFailed = false;
+let _wsDocsPulledFor = null;
+let _wsDocsPullSkippedAbsent = 0;   // filas remotas sin copia local: NO se añaden (ver _wsDocsPull)
+function _wsDocsPullOnce() {
+  const uid = _wsDocsSession();
+  if (!uid || _wsDocsPulledFor === uid || _wsDocsPullInFlight) return;
+  if (!_wsCanPersist()) return;
+  _wsDocsPulledFor = uid;
+  _wsDocsPull().then(okd => {
+    // Cualquier lectura que no terminó bien (fallo, respuesta descartada) se puede repetir.
+    if (okd !== true) _wsDocsPulledFor = null;
+    try { _wsPlansRepaint(); } catch (_) {}
+  }, () => { _wsDocsPulledFor = null; });
+}
 async function _wsDocsPull() {
   const userId = _wsDocsSession();
   if (!userId || _wsDocTableState === 'no') return false;
   if (!_wsCanPersist()) return false;          // simétrico con el push: sin plan, nada remoto
+  _wsDocsPullInFlight = true;
   try {
     const { data, error } = await supabaseClient.from(_WS_DOC_TABLE)
       .select('doc_id,kind,body,revision,deleted_at,body_version,currency')
       .eq('user_id', userId);
+    // LA CUENTA PUEDE HABER CAMBIADO MIENTRAS SE ESPERABA. Escribir la respuesta en el
+    // almacén ahora la mezclaría con el trabajo de OTRA cuenta: se descarta entera.
+    if (_wsDocsSession() !== userId || !_wsCanPersist()) return false;
     if (error) {
       if (_wsDocErrPermanent(error)) _wsDocTableState = 'no';
+      else _wsDocsPullFailed = true;
       return false;
     }
+    _wsDocsPullFailed = false;
     _wsDocTableState = 'yes';
     const rows = Array.isArray(data) ? data : [];
     let touched = 0;
@@ -21319,6 +21446,10 @@ async function _wsDocsPull() {
       const mine = rows.filter(r => r && r.kind === spec.kind);
       if (!mine.length) continue;
       const local = _wshReadStore(key);
+      // Con una subida PENDIENTE o FALLIDA de esta clave, lo local aún no está en el servidor:
+      // el remoto puede AÑADIR documentos que faltan, pero no pisar ni borrar los que ya hay.
+      const _st = _wsDocSync[key] && _wsDocSync[key].state;
+      const localPending = (_st === 'saving' || _st === 'error');
       const byId = new Map();
       local.forEach(item => { const id = spec.idOf(item); if (id) byId.set(String(id), item); });
       let changed = false;
@@ -21334,6 +21465,7 @@ async function _wsDocsPull() {
         // revisión al siguiente guardado. Ahora el tombstone se APLICA cuando es
         // más nuevo que lo que hay en local, con la misma regla de revisión que
         // todo lo demás: una edición posterior siempre gana.
+        if (cur && localPending) continue;
         if (r.deleted_at) {
           if (!cur) continue;                              // nunca lo tuvimos: nada que borrar
           if (cur.deletedAt) continue;                      // ya estaba marcado
@@ -21345,7 +21477,15 @@ async function _wsDocsPull() {
         }
         const body = r.body && typeof r.body === 'object' ? r.body : null;
         if (!body) continue;
-        if (!cur) { local.push(body); byId.set(String(r.doc_id), body); changed = true; }
+        // ── RECUPERAR UN DOCUMENTO AUSENTE EN LOCAL: DESACTIVADO (SPEC 1) ─────────────
+        // Entre 319d7b7 (09-16, subida activa) y 52ccd7a (09-17, tombstones) borrar FILTRABA el
+        // array sin dejar `deleted_at`: esas filas siguen vivas en remoto. Con la estructura
+        // actual «borrado en esa ventana» y «nunca estuvo en este dispositivo» son
+        // indistinguibles, y que la fila exista no prueba que siga vigente. Así que la lectura
+        // NO añade documentos: sólo actualiza (por revisión) y borra (por tombstone) los que
+        // este dispositivo ya tiene. Se cuenta para diagnóstico. Reactivar exige un marcador de
+        // vigencia en servidor (decisión + SQL revisado), no una inferencia del cliente.
+        if (!cur) { _wsDocsPullSkippedAbsent++; continue; }
         else if (remoteRev > (Number(cur.revision) || 1)) { Object.assign(cur, body); changed = true; }
       }
       if (changed) { try { localStorage.setItem(key, JSON.stringify(local)); touched++; } catch (_) {} }
@@ -21357,7 +21497,14 @@ async function _wsDocsPull() {
     // de Intelligence ya pagó una vez, y la revisión financiera lo señaló.
     // La revisión de una preferencia se deriva del instante de escritura
     // (`_wsDocRows`), así que aquí se compara contra la última aplicada y se guarda.
-    for (const r of rows.filter(x => x && x.kind === 'ws_pref')) {
+    // ── NO SE APLICAN AL LEER (SPEC 1, revisión financiera) ─────────────────
+    // `aurix_ws_tool_state_v1` es UN objeto con los borradores de TODAS las herramientas
+    // (operaciones del Diario, cobros con pagos…) y su revisión es el reloj del dispositivo:
+    // aplicarlo entero como last-writer-wins borraba trabajo de otra herramienta hecho en el
+    // otro dispositivo. Hasta fusionar por herramienta, las preferencias se SUBEN pero no se
+    // aplican al leer; los DOCUMENTOS (arriba) sí viajan.
+    const _WS_PULL_APPLIES_PREFS = false;
+    for (const r of (_WS_PULL_APPLIES_PREFS ? rows : []).filter(x => x && x.kind === 'ws_pref')) {
       const b = r.body || {};
       if (!b.key || _WS_PREF_KEYS.indexOf(b.key) === -1) continue;
       const remoteRev = Number(r.revision) || 0;
@@ -21372,7 +21519,8 @@ async function _wsDocsPull() {
     }
     if (touched) { _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now(); }
     return true;
-  } catch (_) { return false; }
+  } catch (_) { _wsDocsPullFailed = true; return false; }
+  finally { _wsDocsPullInFlight = false; }
 }
 // ── EL ESTADO QUE SE PINTA, Y NO AFIRMA LO QUE NO PUEDE DEMOSTRAR ───────────
 // §4 pide estados reales: sin guardar / guardando / guardado / error / reintentar.
@@ -21796,7 +21944,7 @@ function _wshWireOnce() {
   try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -21940,6 +22088,7 @@ function _wshWireOnce() {
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
     if (t.hasAttribute('data-wsb2-save')) { _wsbSaveInstance(); return; }
+    if (t.hasAttribute('data-wsccy-confirm')) { _wsCcyConfirm(t); return; }
     if (t.hasAttribute('data-wsb2-open')) {
       const docs = _wsSaveCandidates('scenario_compare', null);
       if (!docs.length) return;
@@ -21963,6 +22112,7 @@ function _wshWireOnce() {
   document.addEventListener('input', e => {
     const el = e.target;
     if (!el || !el.getAttribute) return;
+    if (el.hasAttribute('data-wsccy-scope')) { _wsCcyOnSelect(el); return; }
     if (el.getAttribute('data-wsp-input')) { _wspOnInput(); return; }
     if (el.getAttribute('data-ws4-input')) { _ws4OnInput(el); return; }
     if (el.getAttribute('data-wsg-input')) { _wsgOnInput(el); return; }
@@ -23323,7 +23473,7 @@ function _wsProjViz(p) {
 }
 function _wsProjMeta(p) {
   const r = p.results; if (!r) return '';
-  if (p.type === 'compound_growth' && r.final != null) return formatBase(r.final);
+  if (p.type === 'compound_growth' && r.final != null) return _wsMoneyIn(r.final, _wsDocCurrencyOf(p));
   if (p.type === 'monthly_budget' && r.saveRate != null) return r.saveRate + '%';
   if (p.type === 'trade_journal' && r.netProfit != null) return _wsJrnMoney(r.netProfit, r.currency, true);
   return '';
@@ -23463,7 +23613,7 @@ function _wsToolPreviewHtml(toolKey) {
       const r = { final: pr.final, series: pr.series.map(x => ({ total: x.value })) };
       const W = 120, H = 30, n = r.series.length, max = Math.max.apply(null, r.series.map(s => s.total).concat([1]));
       const pts = r.series.map((s, i) => `${((i / ((n - 1) || 1)) * W).toFixed(1)},${(H - (s.total / max) * (H - 4) - 2).toFixed(1)}`).join(' ');
-      return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,${H} ${pts} ${W},${H}"/><polyline class="wspv-spark-line" points="${pts}"/></svg></div>`;
+      return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(_wsMoney(r.final))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,${H} ${pts} ${W},${H}"/><polyline class="wspv-spark-line" points="${pts}"/></svg></div>`;
     }
     if (toolKey === 'budget') {
       // WS.F1 — premium donut: expenses + free arcs over income, free money centered.
@@ -23482,11 +23632,11 @@ function _wsToolPreviewHtml(toolKey) {
             ${seg(expLen, 0, 'is-exp')}
             ${seg(freeLen, -expLen, 'is-free')}
           </svg>
-          <div class="wspv-dn-center"><b class="wspv-dn-v">${esc(formatBase(r.free))}</b><i class="wspv-dn-k">${esc(t('wstool_bud_free'))}</i></div>
+          <div class="wspv-dn-center"><b class="wspv-dn-v">${esc(_wsMoney(r.free))}</b><i class="wspv-dn-k">${esc(t('wstool_bud_free'))}</i></div>
         </div>
         <div class="wspv-dn-legend">
-          <span class="wspv-dn-li"><i class="wspv-dn-dot is-inc"></i>${esc(t('wstool_budget_sec_income'))}<b>${esc(formatBase(r.income))}</b></span>
-          <span class="wspv-dn-li"><i class="wspv-dn-dot is-exp"></i>${esc(t('wstool_budget_sec_expenses'))}<b>${esc(formatBase(r.expenses))}</b></span>
+          <span class="wspv-dn-li"><i class="wspv-dn-dot is-inc"></i>${esc(t('wstool_budget_sec_income'))}<b>${esc(_wsMoney(r.income))}</b></span>
+          <span class="wspv-dn-li"><i class="wspv-dn-dot is-exp"></i>${esc(t('wstool_budget_sec_expenses'))}<b>${esc(_wsMoney(r.expenses))}</b></span>
         </div>
       </div>`;
     }
@@ -23752,7 +23902,9 @@ function _wsPlansDocs() {
 function _wsPlanMoney(cents, currency) {
   const n = Number(cents);
   if (!Number.isFinite(n)) return '—';
-  const cur = String(currency || (typeof baseCurrency !== 'undefined' ? baseCurrency : 'EUR') || 'EUR').toUpperCase();
+  // Sin moneda declarada no se le pone la base: cifra sin símbolo.
+  const cur = _wsCcyCode(currency);
+  if (!cur) return _wsMoneyIn(Math.round(n), null).replace(/[.,]00$/, '');
   try {
     return new Intl.NumberFormat((typeof lang !== 'undefined' && lang === 'en') ? 'en-IE' : 'es-ES',
       { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n);
@@ -23760,6 +23912,7 @@ function _wsPlanMoney(cents, currency) {
 }
 function _wsPlanMetrics(p) {
   const inp = (p && p.inputs) || {};
+  const _PCCY = _wsDocCurrencyOf(p);   // la moneda del DOCUMENTO, no la de visualización
   const m = (k, v) => ({ k: t(k), v: v });
   try {
     if (p.type === 'monthly_budget') {
@@ -23768,18 +23921,18 @@ function _wsPlanMetrics(p) {
       // LA CIFRA QUE IMPORTA VA PRIMERO y es la del documento: lo que queda (o falta)
       // = ingresos − gastos, del mismo motor. Es lo que se lee al abrir la plantilla.
       const fr = Number(r.income) - Number(r.expenses);
-      const head = fr < 0 ? m('wspl_m_deficit', '−' + formatBase(Math.abs(fr))) : m('wspl_m_avail', formatBase(fr));
+      const head = fr < 0 ? m('wspl_m_deficit', '−' + _wsMoneyIn(Math.abs(fr), _PCCY)) : m('wspl_m_avail', _wsMoneyIn(fr, _PCCY));
       head.tone = fr < 0 ? 'neg' : 'pos';
-      return [head, m('wspl_m_income', formatBase(r.income)), m('wspl_m_expenses', formatBase(r.expenses))];
+      return [head, m('wspl_m_income', _wsMoneyIn(r.income, _PCCY)), m('wspl_m_expenses', _wsMoneyIn(r.expenses, _PCCY))];
     }
     if (p.type === 'receivables_app') {
       const r = calculateReceivables(inp.items);
       if (!r.count) return [];
       // Cobrado primero: es la magnitud que rellena la barra de progreso de debajo, así que
       // la cifra grande y el tramo coloreado hablan de lo mismo; lo pendiente va al lado.
-      const out = [m('wspl_m_collected', formatBase(r.totalCobrado)), m('wspl_m_pending', formatBase(r.totalPendiente))];
+      const out = [m('wspl_m_collected', _wsMoneyIn(r.totalCobrado, _PCCY)), m('wspl_m_pending', _wsMoneyIn(r.totalPendiente, _PCCY))];
       // Vencido SÓLO si existe: un «Vencido 0 €» no aporta nada y ocupa el sitio de lo que sí.
-      if (Number(r.totalVencido) > 0) { const v = m('wspl_m_overdue', formatBase(r.totalVencido)); v.tone = 'warn'; out.push(v); }
+      if (Number(r.totalVencido) > 0) { const v = m('wspl_m_overdue', _wsMoneyIn(r.totalVencido, _PCCY)); v.tone = 'warn'; out.push(v); }
       return out;
     }
     if (p.type === 'real_estate_portfolio') {
@@ -23788,7 +23941,7 @@ function _wsPlanMetrics(p) {
       // El VALOR sólo si alguien lo ha declarado: sin valoraciones, `valueTotal`
       // es cero y publicar «0» diría que la cartera no vale nada.
       const out = [m('wspl_m_units', String(r.count))];
-      if (r.valueTotal > 0) out.unshift(m('wspl_m_value', formatBase(r.valueTotal)));
+      if (r.valueTotal > 0) out.unshift(m('wspl_m_value', _wsMoneyIn(r.valueTotal, _PCCY)));
       return out;
     }
     if (p.type === 'trade_journal') {
@@ -23806,15 +23959,15 @@ function _wsPlanMetrics(p) {
     if (p.type === 'compound_growth') {
       const r = p.results || {};
       if (!Number.isFinite(Number(r.final))) return [];
-      const out = [m('wspl_m_final', _wsPlanMoney(r.final, p.currency))];
+      const out = [m('wspl_m_final', _wsPlanMoney(r.final, _PCCY))];
       if (Number(r.years) > 0) out.push(m('wspl_m_years', String(r.years)));
       return out;
     }
     if (p.type === 'loan_simulation') {
       const r = p.results || {};
       if (!Number.isFinite(Number(r.monthlyPayment))) return [];
-      const out = [m('wspl_m_payment', _wsPlanMoney(r.monthlyPayment, p.currency))];
-      if (Number.isFinite(Number(r.totalInterest))) out.push(m('wspl_m_interest', _wsPlanMoney(r.totalInterest, p.currency)));
+      const out = [m('wspl_m_payment', _wsPlanMoney(r.monthlyPayment, _PCCY))];
+      if (Number.isFinite(Number(r.totalInterest))) out.push(m('wspl_m_interest', _wsPlanMoney(r.totalInterest, _PCCY)));
       return out;
     }
     if (p.type === 'asset_prices') {
@@ -23829,8 +23982,8 @@ function _wsPlanMetrics(p) {
     if (p.type === 'scenario_compare') {
       const r = p.results || {};
       if (!Number.isFinite(Number(r.altFinal))) return [];
-      const out = [{ k: t('wsb2_alt'), v: _wsPlanMoney(r.altFinal, p.currency) }];
-      if (Number.isFinite(Number(r.diff))) out.push({ k: t('wsb2_diff_short'), v: (r.diff >= 0 ? '+' : '−') + _wsPlanMoney(Math.abs(r.diff), p.currency) });
+      const out = [{ k: t('wsb2_alt'), v: _wsPlanMoney(r.altFinal, _PCCY) }];
+      if (Number.isFinite(Number(r.diff))) out.push({ k: t('wsb2_diff_short'), v: (r.diff >= 0 ? '+' : '−') + _wsPlanMoney(Math.abs(r.diff), _PCCY) });
       return out;
     }
   } catch (_) { return []; }
@@ -23845,6 +23998,12 @@ function _wsPlansEmptyState() {
   let session = null;
   try { session = _wsDocsSession(); } catch (_) { session = null; }
   if (!session) return 'empty';                     // sin cuenta no hay nada remoto que esperar
+  // La lectura de los documentos de esta cuenta está EN VUELO: todavía no se sabe.
+  if (_wsDocsPullInFlight) return 'loading';
+  if (_wsDocsPullFailed) return 'error';
+  // La cuenta TIENE documentos en el servidor que este dispositivo no recupera (ver _wsDocsPull):
+  // decir «no tienes planes» sería falso. Se dice lo que pasa.
+  if (_wsDocsPullSkippedAbsent > 0) return 'remote_only';
   let worst = 'idle';
   try { worst = _wsDocSyncWorst(); } catch (_) {}
   if (worst === 'error') return 'error';
@@ -23878,8 +24037,8 @@ function _wsGoalShare(g) {
 function _wsGoalMetrics(g) {
   const out = [];
   const tgt = Number(g && g.target), cur = Number(g && g.current);
-  if (Number.isFinite(cur)) out.push({ k: t('wspl_m_saved'), v: formatBase(cur) });
-  if (Number.isFinite(tgt) && tgt > 0) out.push({ k: t('wspl_m_target'), v: formatBase(tgt) });
+  if (Number.isFinite(cur)) out.push({ k: t('wspl_m_saved'), v: _wsgMoney(g, cur) });
+  if (Number.isFinite(tgt) && tgt > 0) out.push({ k: t('wspl_m_target'), v: _wsgMoney(g, tgt) });
   return out;
 }
 function _wsPlanShare(p) {
@@ -24190,6 +24349,8 @@ function _renderDashboardPlans() {
     const st = _wsPlansEmptyState();
     const body = st === 'loading'
       ? `<p class="wspl-note">${esc(t('wspl_loading'))}</p>`
+      : st === 'remote_only'
+        ? `<p class="wspl-note is-warn">${esc(t('wspl_remote_only'))}</p>`
       : st === 'error'
         ? `<p class="wspl-note is-warn">${esc(t('wspl_error'))} <button type="button" class="wspl-link" data-ws-sync-retry>${esc(t('ws_sync_retry'))}</button></p>`
         : `<p class="wspl-note">${esc(t('wspl_empty'))} <button type="button" class="wspl-link" data-wspl-templates>${esc(t('wspl_empty_cta'))}</button></p>`;
@@ -24863,6 +25024,9 @@ function _wsbParams() {
     baseImportedAt: Number.isFinite(Number(o.baseImportedAt)) ? Number(o.baseImportedAt) : null,
     baseImportedValue: o.baseImportedValue != null ? o.baseImportedValue : null,
     convention: o.convention || _WS_PROJ_CONV_DEFAULT,
+    // La moneda de la comparación. Sin parámetros guardados nace en la base
+    // visible; unos parámetros ANTERIORES sin moneda quedan sin confirmar.
+    currency: raw == null ? _wsBaseCcy() : _wsCcyCode(o.currency),
     // ── §11 · BASE Y ALTERNATIVA ────────────────────────────────────────────
     // Dos supuestos comparables sobre el MISMO capital de partida y el MISMO
     // horizonte —§11 lo exige: comparar con distinto horizonte no compara nada—.
@@ -25026,8 +25190,8 @@ function _wsbTwoLineChartHtml(cmp) {
   const endA = sa[sa.length - 1], endB = sb[sb.length - 1];
   const alt = String(t('wsb_chart_alt') || '')
     .replace('{y}', String(cmp.years))
-    .replace('{a}', formatBase(endA ? endA.value : 0))
-    .replace('{b}', formatBase(endB ? endB.value : 0));
+    .replace('{a}', _wsbMoney(endA ? endA.value : 0))
+    .replace('{b}', _wsbMoney(endB ? endB.value : 0));
   return `
     <svg class="wsb2-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(alt)}">
       <line class="wsb2-axis" x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}"/>
@@ -25071,8 +25235,8 @@ function _wsbConclusion(cmp) {
   const spread = top.projected - ref;
   if (!(Math.abs(spread) > 0.5)) return t('wsb_concl_flat');
   return String(t('wsb_concl_spread') || '')
-    .replace('{amt}', formatBase(Math.abs(spread)))
-    .replace('{m}', formatBase(top.monthly))
+    .replace('{amt}', _wsbMoney(Math.abs(spread)))
+    .replace('{m}', _wsbMoney(top.monthly))
     .replace('{y}', String((cmp && cmp.years) || 0));
 }
 
@@ -25126,7 +25290,7 @@ function _wsbCardsHtml(cmp) {
   let saved = [];
   try { saved = _wsScenarios(); } catch (_) { saved = []; }
   const isSaved = id => saved.some(x => x && x.scenarioId === id);
-  const money = v => formatBase(Math.abs(v));
+  const money = v => _wsbMoney(Math.abs(v));
   const sign = v => (v >= 0 ? '+' : '−');
   // Sin entrada válida la tarjeta conserva su identidad (nombre y aportación, que
   // son datos del escenario) pero no publica cifras ni deja guardarlas.
@@ -25135,7 +25299,7 @@ function _wsbCardsHtml(cmp) {
     <div class="wsb-card">
       <div class="wsb-card-head">
         <p class="wsb-card-name">${esc(s.name)}</p>
-        <span class="wsb-pill is-contrib">${esc(formatBase(s.monthly))}${esc(t('wsre_permonth'))}</span>
+        <span class="wsb-pill is-contrib">${esc(_wsbMoney(s.monthly))}${esc(t('wsre_permonth'))}</span>
       </div>
       <div class="wsb-card-rows">
         <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>—</b></div>
@@ -25146,10 +25310,10 @@ function _wsbCardsHtml(cmp) {
     <div class="wsb-card">
       <div class="wsb-card-head">
         <p class="wsb-card-name">${esc(s.name)}</p>
-        <span class="wsb-pill is-contrib">${esc(formatBase(s.monthly))}${esc(t('wsre_permonth'))}</span>
+        <span class="wsb-pill is-contrib">${esc(_wsbMoney(s.monthly))}${esc(t('wsre_permonth'))}</span>
       </div>
       <div class="wsb-card-rows">
-        <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>${esc(formatBase(s.projected))}</b></div>
+        <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>${esc(_wsbMoney(s.projected))}</b></div>
         <div class="wsb-row is-diff"><span>${esc(t('wsb_diff'))}</span><b>${sign(s.diff)}${esc(money(s.diff))}</b></div>
         <div class="wsb-row is-cause"><span>${esc(t('wsb_by_contrib'))}</span><b>${sign(s.byContribution)}${esc(money(s.byContribution))}</b></div>
         <div class="wsb-row is-cause"><span>${esc(t('wsb_by_growth'))}</span><b>${sign(s.byGrowth)}${esc(money(s.byGrowth))}</b></div>
@@ -25178,16 +25342,16 @@ function _wsbImpactInnerHtml(cmp) {
       <div class="wsb-impact-row">
         <div class="wsb-impact-col">
           <span class="wsb-impact-label">${esc(t('wsb_impact_nocontrib'))}</span>
-          <span class="wsb-impact-val">${esc(formatBase(baseProj))}</span>
+          <span class="wsb-impact-val">${esc(_wsbMoney(baseProj))}</span>
         </div>
         <div class="wsb-impact-arrow" aria-hidden="true">→</div>
         <div class="wsb-impact-col is-best">
-          <span class="wsb-impact-label">${esc(t('wsb_impact_highest'))} · ${esc(formatBase(top.monthly))}${esc(t('wsre_permonth'))}</span>
-          <span class="wsb-impact-val">${esc(formatBase(top.projected))}</span>
+          <span class="wsb-impact-label">${esc(t('wsb_impact_highest'))} · ${esc(_wsbMoney(top.monthly))}${esc(t('wsre_permonth'))}</span>
+          <span class="wsb-impact-val">${esc(_wsbMoney(top.projected))}</span>
         </div>
       </div>
       <div class="wsb-impact-uplift">
-        <span class="wsb-impact-delta">${spread >= 0 ? '+' : '−'}${esc(formatBase(Math.abs(spread)))}</span>
+        <span class="wsb-impact-delta">${spread >= 0 ? '+' : '−'}${esc(_wsbMoney(Math.abs(spread)))}</span>
         ${spreadPct != null ? `<span class="wsb-impact-pct">${spreadPct >= 0 ? '+' : '−'}${Math.abs(spreadPct)}%</span>`
                             : `<span class="wsb-impact-pct is-na">${esc(t('wsb_pct_na'))}</span>`}
         <span class="wsb-impact-cap">${esc(t('wsb_impact_spread'))}</span>
@@ -25292,7 +25456,7 @@ function _wsbTwoWayInnerHtml() {
   // tecla igual que el resultado, pero en su propio contenedor, y así el estado
   // («sin guardar» / «cambios pendientes») no puede quedarse contando una
   // historia vieja junto a una cifra nueva.
-  return `${head}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div><div data-wsb2-savebar>${_wsbSaveBarHtml()}</div>`;
+  return `${head}${_wsCcyRowHtml('scenario', _wsbEditId || '', _wsbDocCcy(), _wsbCcyEditable())}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div><div data-wsb2-savebar>${_wsbSaveBarHtml()}</div>`;
 }
 // La SALIDA, aparte: es lo único que se repinta mientras se teclea, así que el
 // campo enfocado nunca puede ser el nodo reemplazado.
@@ -25307,18 +25471,18 @@ function _wsbTwoWayOutHtml(cmp) {
   return `
     <div class="wsb2-out">
       <div class="wsb2-ends">
-        <span class="wsb2-end is-a"><i>${esc(t('wsb2_base'))}</i><b>${esc(formatBase(cmp.a.proj.final))}</b></span>
-        <span class="wsb2-end is-b"><i>${esc(t('wsb2_alt'))}</i><b>${esc(formatBase(cmp.b.proj.final))}</b></span>
+        <span class="wsb2-end is-a"><i>${esc(t('wsb2_base'))}</i><b>${esc(_wsbMoney(cmp.a.proj.final))}</b></span>
+        <span class="wsb2-end is-b"><i>${esc(t('wsb2_alt'))}</i><b>${esc(_wsbMoney(cmp.b.proj.final))}</b></span>
       </div>
       <div class="wsb2-diff">
-        <span class="wsb2-diff-v ${cmp.diff >= 0 ? 'is-pos' : 'is-neg'}">${esc(sign + formatBase(Math.abs(cmp.diff)))}</span>
+        <span class="wsb2-diff-v ${cmp.diff >= 0 ? 'is-pos' : 'is-neg'}">${esc(sign + _wsbMoney(Math.abs(cmp.diff)))}</span>
         <span class="wsb2-diff-k">${esc(t('wsb2_diff'))} · ${esc(pct)}</span>
       </div>
       ${/* La diferencia, DESCOMPUESTA: lo que has puesto de más y lo que ha
             crecido. Las dos partes suman el total por construcción. */''}
       <div class="wsb2-break">
-        <span class="wsb2-brk"><i>${esc(t('wsb_by_contrib'))}</i><b>${esc(formatBase(cmp.byContribution))}</b></span>
-        <span class="wsb2-brk"><i>${esc(t('wsb_by_growth'))}</i><b>${esc(formatBase(cmp.byGrowth))}</b></span>
+        <span class="wsb2-brk"><i>${esc(t('wsb_by_contrib'))}</i><b>${esc(_wsbMoney(cmp.byContribution))}</b></span>
+        <span class="wsb2-brk"><i>${esc(t('wsb_by_growth'))}</i><b>${esc(_wsbMoney(cmp.byGrowth))}</b></span>
       </div>
       <div class="wsb2-chart">${_wsbTwoLineChartHtml(cmp)}</div>
     </div>`;
@@ -25338,7 +25502,11 @@ let _wsbDirty  = true;     // ¿hay cambios sin guardar respecto a la instancia?
 // Los supuestos que definen la comparación. Es la lista EXHAUSTIVA de lo que se
 // guarda y de lo que se restaura: si un parámetro influye en el resultado y no
 // está aquí, reabrir el documento lo recalcularía con el del último borrador.
-const _WSB_DOC_KEYS = Object.freeze(['baseMode', 'baseManual', 'years', 'ret', 'convention', 'baseMonthly', 'altMonthly', 'altRet']);
+const _WSB_DOC_KEYS = Object.freeze(['baseMode', 'baseManual', 'years', 'ret', 'convention', 'baseMonthly', 'altMonthly', 'altRet', 'currency']);
+function _wsbMoney(v, signed) { return _wsMoneyIn(v, _wsbDocCcy(), signed); }
+function _wsbDocCcy() { try { return _wsCcyCode(_wsbParams().currency); } catch (_) { return null; } }
+// Sólo una comparación NUEVA (sin documento abierto) puede elegir su moneda.
+function _wsbCcyEditable() { return !_wsbEditId && !!_wsbDocCcy(); }
 function _wsbDocInputs() {
   const p = _wsbParams(), o = {};
   _WSB_DOC_KEYS.forEach(k => { o[k] = p[k]; });
@@ -25452,13 +25620,15 @@ function _wsbCommit(name, forceNew, targetId) {
     customName: name || (existing ? existing.customName : undefined),
     inputs: _wsbDocInputs(),
     results,
-    currency: (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency) : 'EUR',
+    currency: _wsbDocCcy(),
     bodyVersion: 1,
     revision: existing ? (Number(existing.revision) || 1) : 0,
     createdAt: existing ? (existing.createdAt || now) : now,
     updatedAt: now,
   };
-  _ws4Persist(proj);
+  // Si el almacén rechaza la escritura NO se marca «Guardado»: la comparación sigue
+  // pendiente en pantalla y el motivo se dice junto al botón (como en las herramientas).
+  if (_ws4Persist(proj) === false) { try { _wsbSaveError(t('wssave_failed')); } catch (_) {} return; }
   _wsbEditId = proj.id; _wsbDirty = false;
   _wsbRepaintSurface();
   try { updateDashboardPlans(); } catch (_) {}
@@ -25496,6 +25666,8 @@ function _wsbOpenDoc(id) {
   // El gate se vuelve a preguntar en la apertura, como en todas las demás.
   const patch = {};
   _WSB_DOC_KEYS.forEach(k => { if (p.inputs && p.inputs[k] !== undefined) patch[k] = p.inputs[k]; });
+  // La del DOCUMENTO, aunque sea null: heredar la del borrador anterior sería reinterpretarlo.
+  patch.currency = _wsDocCurrencyOf(p);
   const opened = _wsOpenSurface('scenario', {
     keepDoc: true,
     before: () => { _wsbParamsSet(patch); _wsbEditId = id; _wsbDirty = false; },
@@ -25622,7 +25794,7 @@ function _wsbSaveScenario(id, btn) {
       convention: cmpS.convention,
       baseValue: cmpS.base.value,
       baseSource: cmpS.base.source,
-      currency: (typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'EUR',
+      currency: _wsbDocCcy(),
       projected: Math.round(p.projected),
       diff: Math.round(rowS.diff),
       diffByContribution: Math.round(rowS.byContribution),
@@ -26106,10 +26278,15 @@ function _renderWorkspaceDetail() {
 // Real goals with a deterministic progress engine. Aurix Sync reads real wealth
 // (read-only); manual mode uses the entered amount. No wealthEngine, no APIs, no AI.
 const _WSG_TYPES = ['wealth', 'emergency', 'home', 'fire', 'free'];
+// La moneda de un objetivo: la suya, declarada al crearlo. Uno ANTERIOR sin
+// moneda queda sin confirmar (cifras sin símbolo) hasta que el usuario la indique.
+function _wsgCcy(g) { return _wsCcyCode(g && g.currency); }
+function _wsgMoney(g, v, signed) { return _wsMoneyIn(v, _wsgCcy(g), signed); }
+function _wsgGlyph(g) { const c = _wsgCcy(g); return c ? _aurixCurrencyGlyph(c) : ''; }
 function _wsgThisYear() { try { return new Date().getFullYear(); } catch (_) { return 2026; } }
 function _wsgGoalsRaw() { return _wshReadStore(_WSH_GOALS_KEY); }
 function _wsgGoals() { return _wsgGoalsRaw().filter(g => g && !g.deletedAt); }
-function _wsgSaveAll(list) { _wshWriteStore(_WSH_GOALS_KEY, list); }
+function _wsgSaveAll(list) { return _wshWriteStore(_WSH_GOALS_KEY, list); }
 // Mismo contrato que los proyectos: revisión monótona y borrado por tombstone.
 function _wsgTombstone(id) {
   const list = _wsgGoalsRaw();
@@ -26123,7 +26300,7 @@ function _wsgTombstone(id) {
 // Working copy (unsaved edits) overrides the stored goal for display/edit.
 function _wsgGet(id) { return _wsgWorking[id] || _wsgGoals().find(g => g && g.id === id) || null; }
 function _wsgStored(id) { return _wsgGoals().find(g => g && g.id === id) || null; }
-function _wsgPersist(g) { _wsDocStamp(g); const list = _wsgGoalsRaw(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); _wsgSaveAll(list); }
+function _wsgPersist(g) { _wsDocStamp(g); const list = _wsgGoalsRaw(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); return _wsgSaveAll(list); }
 
 // ════════════════════════════════════════════════════════════════════════════
 // WORKSPACE COMPLETION · §D — PROGRESO DE UN OBJETIVO
@@ -26315,8 +26492,8 @@ function _wsgReading(goal, prog) {
     // cuánto habría que aportar. Sin eso, «aumenta el ritmo» es un consejo vacío.
     if (prog.hasDate && prog.requiredMonthly != null) {
       return String(t('wsg_read_behind_req') || '')
-        .replace('{req}', formatBase(prog.requiredMonthly))
-        .replace('{gap}', formatBase(Math.abs(prog.gapAtDate || 0)));
+        .replace('{req}', _wsgMoney(goal, prog.requiredMonthly))
+        .replace('{gap}', _wsgMoney(goal, Math.abs(prog.gapAtDate || 0)));
     }
     return t('wsg_read_behind_nomonthly');
   }
@@ -26394,8 +26571,11 @@ function _wsgCreate() {
   const now = Date.now();
   const g = { id: 'wsg_' + now, type, name, target: v.target, current: v.current,
               monthly: v.monthly, targetYear: v.targetYear, mode: 'manual',
+              // Nace en la moneda que el formulario mostraba: la base visible.
+              currency: _wsBaseCcy(),
               createdAt: now, updatedAt: now };
-  _wsgPersist(g);
+  // Si el almacén rechaza la escritura, el formulario conserva lo escrito y lo dice.
+  if (_wsgPersist(g) === false) { _wsgSaveFailed(root); return; }
   _wsgPrefill = null;
   // §23 — PREGUNTAR, NO DECIDIR. El objetivo ya está guardado (eso no se pregunta); lo que se
   // ofrece es la OTRA acción, que es distinta (§22). Va como una tira dentro de la propia tarjeta
@@ -26408,6 +26588,13 @@ function _wsgCreate() {
 // Vive UN repintado: es una pregunta, no un estado. No se persiste —una preferencia de «ya te lo
 // pregunté» que sobreviviera a la sesión sería un dato nuevo sobre el usuario para no volver a
 // enseñar una tira— y se apaga en cuanto responde o se va de la superficie.
+function _wsgSaveFailed(host) {
+  if (!host) return;
+  const prev = host.querySelector('.wsg-reqerr'); if (prev) prev.remove();
+  const p = document.createElement('p'); p.className = 'wsg-reqerr'; p.setAttribute('role', 'alert');
+  p.textContent = String(t('wssave_failed') || '');
+  host.appendChild(p);
+}
 let _wsgAskDash = null;
 function _wsgAskDashHtml(id) {
   if (_wsgAskDash !== id) return '';
@@ -26463,7 +26650,10 @@ function _wsgOnInput(el) {
 // P5 — explicit save + lifecycle actions (Guardar / Duplicar / Eliminar / Renombrar).
 function _wsgSaveGoal(id) {
   const g = _wsgWorking[id]; if (!g) return;
-  g.updatedAt = Date.now(); _wsgPersist(g);
+  g.updatedAt = Date.now();
+  // Un guardado que no ocurrió NO descarta la copia de trabajo: los cambios siguen
+  // en pantalla, pendientes, y el motivo se dice junto al botón.
+  if (_wsgPersist(g) === false) { _wsgSaveFailed(document.querySelector('[data-wsg-cardid="' + String(id).replace(/"/g, '') + '"]')); return; }
   delete _wsgWorking[id]; delete _wsgDirty[id];
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
 }
@@ -26537,7 +26727,7 @@ function _wsgCardOutHtml(g, prog) {
   // eliminado, se había movido una capa. Y con `undefined` habría salido «NaN €»,
   // que es peor. Un importe ausente se escribe con el guion, que es la convención
   // declarada del producto para un dato que no existe.
-  const money = v => (v == null || !Number.isFinite(Number(v))) ? '—' : formatBase(v);
+  const money = v => (v == null || !Number.isFinite(Number(v))) ? '—' : _wsgMoney(g, v);
   const rows = [
     { label: t('wsg_r_target'),    value: money(prog.target) },
     { label: t('wsg_r_current'),   value: money(prog.current) },
@@ -26595,9 +26785,9 @@ function _wsFundAgo(ts) {
   if (days === 1) return t('wsfund_yesterday');
   return t('wsfund_days_ago')(days);
 }
-function _wsFundSignAmt(m) {
+function _wsFundSignAmt(m, g) {
   const esc = _intccEsc;
-  return (m.type === 'remove' ? '−' : '+') + esc(formatBase(Math.max(0, Number(m.amount) || 0)));
+  return (m.type === 'remove' ? '−' : '+') + esc(_wsgMoney(g, Math.max(0, Number(m.amount) || 0)));
 }
 
 // Separate "Fondos asignados" block inside each goal card. Does NOT mix with the
@@ -26609,15 +26799,15 @@ function _wsFundBlockHtml(g) {
   const pct = target > 0 ? Math.max(0, Math.min(100, Math.round(f.totalAssigned / target * 100))) : 0;
   const last = f.lastMovement;
   const lastHtml = last
-    ? `<div class="wsfund-last"><span class="wsfund-last-lbl">${esc(t('wsfund_last_lbl'))}</span><span class="wsfund-last-amt is-${last.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(last)}</span><span class="wsfund-last-meta">${esc(_wsFundAgo(last.createdAt))}${last.note ? ' · ' + esc(last.note) : ''}</span></div>`
+    ? `<div class="wsfund-last"><span class="wsfund-last-lbl">${esc(t('wsfund_last_lbl'))}</span><span class="wsfund-last-amt is-${last.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(last, g)}</span><span class="wsfund-last-meta">${esc(_wsFundAgo(last.createdAt))}${last.note ? ' · ' + esc(last.note) : ''}</span></div>`
     : `<div class="wsfund-last is-empty">${esc(t('wsfund_none'))}</div>`;
-  const hist = f.movements.slice(0, 3).map(m => `<li class="wsfund-mv"><span class="wsfund-mv-amt is-${m.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(m)}</span><span class="wsfund-mv-note">${esc(m.note || t('wsfund_mv_default'))}</span></li>`).join('');
+  const hist = f.movements.slice(0, 3).map(m => `<li class="wsfund-mv"><span class="wsfund-mv-amt is-${m.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(m, g)}</span><span class="wsfund-mv-note">${esc(m.note || t('wsfund_mv_default'))}</span></li>`).join('');
   const more = f.movementCount > 3 ? `<li class="wsfund-more">${esc(t('wsfund_more')(f.movementCount - 3))}</li>` : '';
   return `
     <div class="wsfund-block">
       <div class="wsfund-head">
         <span class="wsfund-title">${esc(t('wsfund_assigned'))}</span>
-        <span class="wsfund-amount">${esc(formatBase(f.totalAssigned))}</span>
+        <span class="wsfund-amount">${esc(_wsgMoney(g, f.totalAssigned))}</span>
       </div>
       <div class="wsfund-progress"><div class="wsfund-bar-track"><span class="wsfund-bar-fill" style="width:${pct}%"></span></div><span class="wsfund-pct">${pct}%</span></div>
       <span class="wsfund-sub">${esc(t('wsfund_progress_by'))}</span>
@@ -26650,7 +26840,7 @@ function _wsFundModal(goalId) {
         <button type="button" class="wsfund-type is-active" data-wsfund-type="add">${esc(t('wsfund_add'))}</button>
         <button type="button" class="wsfund-type" data-wsfund-type="remove">${esc(t('wsfund_remove'))}</button>
       </div>
-      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value="">${_wsFieldUnitHtml('€')}</span></label>
+      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value="">${_wsFieldUnitHtml(_wsgGlyph(_wsgGet(goalId)), true)}</span></label>
       <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_note'))}</span><input class="wsg-text" type="text" id="wsFundNote" placeholder="${esc(t('wsfund_note_ph'))}"></label>
       <p class="wsfund-disclaimer">${esc(t('wsfund_disclaimer'))}</p>
       <div class="ws-modal-actions">
@@ -26722,7 +26912,7 @@ function _renderGoals() {
     // ningún assert de cálculo se enterara.
     // ABIERTA la que se acaba de crear —para que su pregunta de Dashboard se vea— y la que tiene
     // cambios sin guardar, porque plegar trabajo a medias lo esconde.
-    const kpis = [{ k: t('wspl_m_target'), v: Number.isFinite(Number(g.target)) && Number(g.target) > 0 ? formatBase(g.target) : '' }];
+    const kpis = [{ k: t('wspl_m_target'), v: Number.isFinite(Number(g.target)) && Number(g.target) > 0 ? _wsgMoney(g, g.target) : '' }];
     const inner = `
         <div class="wsg-card-head">
           ${AURIX_WS_USE_REAL_DATA ? `<div class="ws4-modes wsg-modes">
@@ -26730,11 +26920,12 @@ function _renderGoals() {
             <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-wsg-mode="sync" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_sync'))}</button>
           </div>` : ''}
         </div>
+        ${_wsCcyRowHtml('goal', g.id, _wsgCcy(g), false)}
         <div class="wsg-card-edit">
           ${isSync
             ? `<div class="wsg-sync-note">${esc(real.hasReal ? t('wsg_sync_on')(formatBase(real.wealth)) : t('ws4_sync_none'))}</div>`
-            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000">${_wsFieldUnitHtml('€')}</span></label>`}
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50">${_wsFieldUnitHtml('€')}</span></label>
+            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000">${_wsFieldUnitHtml(_wsgGlyph(g), true)}</span></label>`}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50">${_wsFieldUnitHtml(_wsgGlyph(g), true)}</span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
         ${_wsFundBlockHtml(g)}
@@ -26980,13 +27171,148 @@ function _wsFieldUnitHtml(u, literal) {
   if (s == null || s === '') return '';
   return '<span class="ws4-field-unit" data-ws-unit="' + (String(s).length > 1 ? 'lg' : 'sm') + '">' + _intccEsc(s) + '</span>';
 }
+// ── LA MONEDA ES DEL DOCUMENTO, NO DE LA PREFERENCIA ───────────────────────
+// Los documentos pintaban con la divisa BASE del usuario: cambiar la base en
+// Ajustes convertía «1.000 €» en «1.000 $» cambiando sólo el símbolo, y cada
+// guardado re-sellaba `currency` con la base de ESE momento. Ahora cada documento
+// declara su moneda al nacer (la base vigente en la creación, que es la que el
+// usuario ve en los campos) y la conserva. Un documento antiguo sin moneda NO
+// hereda la base actual: queda «sin confirmar», sus importes se pintan sin
+// símbolo y el usuario la confirma en el propio documento.
+const _WS_DOC_CCYS = Object.freeze(['EUR', 'USD', 'GBP']);
+function _wsCcyCode(c) { const s = String(c == null ? '' : c).toUpperCase(); return /^[A-Z]{3}$/.test(s) ? s : null; }
+function _wsBaseCcy() { return _wsCcyCode(typeof baseCurrency !== 'undefined' ? baseCurrency : null) || 'EUR'; }
+// La moneda que declara un documento GUARDADO, o null. SÓLO cuenta lo que demuestra en qué
+// moneda se escribieron los importes:
+//   · `inputs.currency` — la escribe este código al CREAR el documento o al CONFIRMARLA;
+//   · `results.currency` del Diario y de Precios de activos — sale de la moneda de cada fila.
+// El sello `currency` de guardados anteriores (y el `results.currency` del interés compuesto)
+// era «la base visible en el último guardado»: si la base cambió antes de ese guardado, el
+// sello dice USD sobre importes tecleados en EUR. No acredita el significado original, así que
+// esos documentos quedan «Moneda sin confirmar» con sus importes intactos.
+const _WS_ROW_CCY_TYPES = Object.freeze(['trade_journal', 'asset_prices']);
+function _wsDocCurrencyOf(p) {
+  if (!p) return null;
+  const own = _wsCcyCode(p.inputs && p.inputs.currency);
+  if (own) return own;
+  if (_WS_ROW_CCY_TYPES.indexOf(p.type) >= 0) return _wsCcyCode(p.results && p.results.currency);
+  return null;
+}
+// Importe en una moneda dada; sin moneda, la cifra tal cual y sin símbolo.
+function _wsMoneyIn(v, ccy, signed) {
+  const n = Number(v);
+  if (v == null || v === '' || !Number.isFinite(n)) return '—';
+  const c = _wsCcyCode(ccy);
+  if (c) return _wsJrnMoney(n, c, signed);
+  let s;
+  try { s = new Intl.NumberFormat((typeof lang !== 'undefined' && lang === 'en') ? 'en-US' : 'es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n); }
+  catch (_) { s = n.toFixed(2); }
+  return ((signed && n >= 0) ? '+' : '') + s;
+}
+// La herramienta abierta.
+function _wsDocCcy() { return _wsCcyCode(_wsToolInputs && _wsToolInputs.currency); }
+function _wsMoney(v, signed) { return _wsMoneyIn(v, _wsDocCcy(), signed); }
+// La superficie abierta: herramienta, comparación de escenarios o, fuera de un
+// documento, la base (formularios de creación, que nacen en la base).
+function _wsSurfaceCcy() {
+  const v = (typeof _wshView !== 'undefined') ? _wshView : '';
+  if (v === 'tool') return _wsDocCcy();
+  if (v === 'scenario') return _wsbDocCcy();
+  return _wsBaseCcy();
+}
 function _wsToolCcy() {
-  try {
-    if (typeof getCurrencySymbol === 'function' && typeof baseCurrency !== 'undefined') {
-      return getCurrencySymbol(baseCurrency) || '€';
-    }
-  } catch (_) {}
-  return '€';
+  const c = _wsSurfaceCcy();
+  return c ? _aurixCurrencyGlyph(c) : '';
+}
+// ── EL SELECTOR, EN EL CONTEXTO DEL DOCUMENTO ──────────────────────────────
+// `editable`: documento nuevo sin operaciones — elegir su moneda no reinterpreta
+// nada. Con moneda fija no se pinta nada (los importes ya la dicen). Pendiente:
+// aviso + elección EXPLÍCITA; no hay opción preseleccionada para no asignar la
+// base por suposición.
+function _wsCcyRowHtml(scope, id, ccy, editable) {
+  const esc = _intccEsc;
+  const c = _wsCcyCode(ccy);
+  if (c && !editable) return '';
+  const list = _WS_DOC_CCYS.slice(); if (c && list.indexOf(c) < 0) list.push(c);
+  const opts = (c ? '' : `<option value="" selected disabled>${esc(t('wsccy_choose'))}</option>`)
+    + list.map(x => `<option value="${x}"${x === c ? ' selected' : ''}>${x}</option>`).join('');
+  const sel = `<select class="ws4-num wsjrn-select wsccy-select" data-wsccy-scope="${esc(scope)}" data-wsccy-id="${esc(id || '')}" aria-label="${esc(t('wsccy_label'))}">${opts}</select>`;
+  if (c) return `<div class="wsccy-row"><label class="ws4-field"><span class="ws4-field-name">${esc(t('wsccy_label'))}</span><span class="ws4-field-input">${sel}</span></label></div>`;
+  return `<div class="wsccy-row is-pending" role="group" data-wsccy-pending="${esc(scope)}">
+    <p class="wsccy-note"><b>${esc(t('wsccy_pending_t'))}</b> ${esc(t('wsccy_pending_d'))}</p>
+    <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsccy_label'))}</span><span class="ws4-field-input">${sel}</span></label>
+    <button type="button" class="wsh-cta is-primary wsccy-confirm" data-wsccy-confirm="${esc(scope)}" data-wsccy-id="${esc(id || '')}">${esc(t('wsccy_confirm'))}</button>
+  </div>`;
+}
+// Operaciones PROPIAS del usuario (no los ejemplos con los que nace el borrador).
+function _wsToolHasOwnOps() {
+  const inp = _wsToolInputs || {};
+  if (_wsToolActive === 'receivables') return (Array.isArray(inp.items) ? inp.items : []).some(i => i && !/^rc_d\d+$/.test(String(i.id)));
+  if (_wsToolActive === 'realestate') return (Array.isArray(inp.properties) ? inp.properties : []).some(i => i && !/^pr_d\d+$/.test(String(i.id)));
+  return false;
+}
+const _WS_CCY_TOOLS = Object.freeze(['compound', 'loan', 'budget', 'receivables', 'realestate']);
+function _wsToolCcyEditable() {
+  return _WS_CCY_TOOLS.indexOf(_wsToolActive) >= 0 && !_wsToolEditId && !_wsToolHasOwnOps() && !!_wsDocCcy();
+}
+function _wsToolCcyRowHtml() {
+  if (_WS_CCY_TOOLS.indexOf(_wsToolActive) < 0) return '';
+  return _wsCcyRowHtml('tool', _wsToolEditId || '', _wsDocCcy(), _wsToolCcyEditable());
+}
+function _wsToolRepaint() {
+  const c = (typeof document !== 'undefined') ? document.getElementById('aurixWorkspace') : null;
+  if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); }
+}
+// Elegir en un documento NUEVO aplica al momento. En uno pendiente, elegir no
+// basta: la moneda se declara con «Confirmar».
+function _wsCcyOnSelect(el) {
+  if (el.closest && el.closest('[data-wsccy-pending]')) return;
+  const c = _wsCcyCode(el.value); if (!c) return;
+  const scope = el.getAttribute('data-wsccy-scope');
+  if (scope === 'tool') {
+    if (!_wsToolCcyEditable()) return;
+    _wsToolInputs.currency = c; _wsToolDirty = true;
+    try { _wsToolStateSet(_wsToolActive, _wsToolInputs); } catch (_) {}
+    _wsToolRepaint();
+  } else if (scope === 'scenario') {
+    if (!_wsbCcyEditable()) return;
+    _wsbParamsSet({ currency: c }); _wsbDirty = true;
+    _wsbRepaintSurface();
+  }
+}
+// Confirmar la moneda de un documento ANTIGUO es declarar un dato que faltaba:
+// se escribe en el documento guardado sin tocar ni un importe.
+function _wsCcyStampSaved(id, c) {
+  const p = _ws4ProjectsRaw().find(x => x && x.id === id);
+  if (!p) return true;
+  p.inputs = Object.assign({}, p.inputs, { currency: c }); p.currency = c;
+  if (p.results && typeof p.results === 'object') p.results.currency = c;
+  return _ws4Persist(p) !== false;
+}
+function _wsCcyConfirm(btn) {
+  const scope = btn.getAttribute('data-wsccy-confirm'), id = btn.getAttribute('data-wsccy-id') || '';
+  const row = btn.closest('[data-wsccy-pending]');
+  const sel = row && row.querySelector('[data-wsccy-scope]');
+  const c = _wsCcyCode(sel && sel.value);
+  if (!c) { try { sel.focus(); } catch (_) {} return; }
+  if (scope === 'tool') {
+    if (_wsToolEditId && !_wsCcyStampSaved(_wsToolEditId, c)) { try { _wsToolSaveError(t('wssave_failed')); } catch (_) {} return; }
+    _wsToolInputs.currency = c;
+    try { _wsToolStateSet(_wsToolActive, _wsToolInputs); } catch (_) {}
+    _wsToolRepaint();
+  } else if (scope === 'scenario') {
+    if (_wsbEditId && !_wsCcyStampSaved(_wsbEditId, c)) { try { _wsbSaveError(t('wssave_failed')); } catch (_) {} return; }
+    _wsbParamsSet({ currency: c });
+    _wsbRepaintSurface();
+  } else if (scope === 'goal') {
+    const list = _wsgGoalsRaw(); const g = list.find(x => x && x.id === id);
+    if (!g) return;
+    g.currency = c; _wsDocStamp(g);
+    if (_wshWriteStore(_WSH_GOALS_KEY, list) === false) return;
+    if (_wsgWorking[id]) _wsgWorking[id].currency = c;
+    _wsgRerenderGoals();
+  }
+  try { updateDashboardPlans(); } catch (_) {}
 }
 function _wsToolDefaults() {
   // WS.11A — autonomous defaults; NO Dashboard/portfolio read. Capital inicial 1.000 €.
@@ -27202,9 +27528,14 @@ function _wsOpenTool(toolKey, projectId) {
     const p = _ws4Projects().find(x => x && x.id === projectId);
     // Se canoniza al ABRIR lo que ya estaba guardado, en la medida en que se puede
     // hacer sin adivinar (ver `_wsCanonicalizeInputs`).
-    if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(p.inputs)); _wsToolEditId = projectId; _wsToolDirty = false; }
+    if (p && p.inputs) {
+      _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(p.inputs)); _wsToolEditId = projectId; _wsToolDirty = false;
+      // La moneda que el documento DECLARA (o null = sin confirmar). Nunca la base actual.
+      if (_WS_CCY_TOOLS.indexOf(key) >= 0) _wsToolInputs.currency = _wsDocCurrencyOf(p);
+    }
     else {
       _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false;
+      if (_WS_CCY_TOOLS.indexOf(key) >= 0) _wsToolInputs.currency = _wsBaseCcy();   // nace en la base visible
       // §10 — sólo un borrador NUEVO nace con el mes local actual. Un documento
       // cargado conserva lo suyo: si no trae periodo, se lee «Sin periodo» hasta
       // que el usuario elija. Por eso esto NO vive en los defaults, que también
@@ -27216,6 +27547,9 @@ function _wsOpenTool(toolKey, projectId) {
     const last = _wsToolStateGet(key);
     _wsToolInputs = last ? Object.assign(_wsToolDefaultsFor(key), _wsCanonicalizeInputs(last)) : _wsToolDefaultsFor(key);
     _wsToolEditId = null; _wsToolDirty = false;
+    // Borrador NUEVO: nace en la base visible. Borrador ANTERIOR sin moneda: sus
+    // cifras se escribieron con otro símbolo posible, así que queda sin confirmar.
+    if (_WS_CCY_TOOLS.indexOf(key) >= 0) _wsToolInputs.currency = last ? _wsCcyCode(last.currency) : _wsBaseCcy();
     // §10 — un borrador NUEVO nace con el mes local actual. `undefined` y no
     // «falsy»: si el usuario eligió «Sin periodo» el valor es `''`, y volver a
     // ponerle el mes de hoy sería deshacer su decisión en cada apertura.
@@ -27508,7 +27842,8 @@ function _wsToolDocSummary(p) {
   // `Number(null)` es 0 y es finito: un resultado NO publicable (diario con divisas
   // mezcladas) salía como «0,00 €». Y la divisa es la que el documento GUARDÓ, si la
   // declara; la base sólo para los que no la declaran.
-  const money = v => ((v != null && v !== '' && Number.isFinite(Number(v))) ? _wsJrnMoney(Number(v), r.currency) : null);
+  const _ccy = _wsDocCurrencyOf(p);   // la del documento; sin ella, cifra sin símbolo
+  const money = v => ((v != null && v !== '' && Number.isFinite(Number(v))) ? _wsMoneyIn(Number(v), _ccy) : null);
   const out = [];
   const push = (key, val) => { if (val != null && val !== '') out.push(m(key, val)); };
   try {
@@ -27724,7 +28059,7 @@ function _wsToolCommit(name, forceNew, targetId) {
       // día lo recomputaría con la vigente y movería el resultado en silencio.
       convention: pr.assumptions.convention,
       annualRatePct: pr.assumptions.annualRatePct,
-      currency: pr.assumptions.currency,
+      currency: _wsDocCcy(),
     };
   }
   const proj = {
@@ -27738,7 +28073,7 @@ function _wsToolCommit(name, forceNew, targetId) {
     // La divisa del documento, declarada: ya viajaba al remoto (`_wsDocRows`) pero
     // no quedaba en el cuerpo, así que reabrirlo en otra divisa base reinterpretaba
     // sus importes sin decirlo.
-    currency: (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency) : 'EUR',
+    currency: _wsDocCcy(),   // la del DOCUMENTO (null = sin confirmar), nunca la base del momento
     bodyVersion: 1,
     revision: existing ? (Number(existing.revision) || 1) : 0,
     createdAt: existing ? (existing.createdAt || now) : now,
@@ -27827,7 +28162,7 @@ function _wsToolSaveBarHtml() {
 function _wsToolMilestones(res) {
   const out = [];
   const TH = [50000, 100000, 250000, 500000, 1000000];
-  for (const thr of TH) { const pt = res.series.find(s => s.total >= thr); if (pt && pt.year > 0) out.push(t('wstool_ms_cross')(formatBase(thr), pt.year)); }
+  for (const thr of TH) { const pt = res.series.find(s => s.total >= thr); if (pt && pt.year > 0) out.push(t('wstool_ms_cross')(_wsMoney(thr), pt.year)); }
   const cross = res.series.find(s => s.contributed > 0 && (s.total - s.contributed) > s.contributed);
   if (cross && cross.year > 0) out.push(t('wstool_ms_crossover')(cross.year));
   return out.slice(0, 5);
@@ -27893,7 +28228,7 @@ function _wsAssumptionsHtml(p) {
         <summary class="wstool-asm-sum">${esc(t('wstool_asm_title'))}</summary>
         <ul class="wstool-asm-list">${rows.filter(Boolean).map(r => `<li>${esc(r)}</li>`).join('')}</ul>
         ${unknown.length ? `<p class="wstool-asm-gap">${esc(t('wstool_asm_missing'))}</p>` : ''}
-        ${p.realFinal != null ? `<p class="wstool-asm-real">${esc(String(t('wstool_asm_real') || '').replace('{v}', formatBase(p.realFinal)))}</p>` : ''}
+        ${p.realFinal != null ? `<p class="wstool-asm-real">${esc(String(t('wstool_asm_real') || '').replace('{v}', _wsMoney(p.realFinal)))}</p>` : ''}
       </details>`;
 }
 function _wsToolOutHtml(inp) {
@@ -27914,7 +28249,7 @@ function _wsToolOutHtml(inp) {
     <div class="wstool-result">
       <div class="wstool-res-main">
         <span class="wstool-res-label">${esc(t('wstool_res_final'))}</span>
-        <span class="wstool-res-final">${esc(formatBase(p.final))}</span>
+        <span class="wstool-res-final">${esc(_wsMoney(p.final))}</span>
         <span class="wstool-res-orient">${esc(t('wstool_orient'))}</span>
       </div>
       ${/* §25 — LAS TRES COMPONENTES SE DISTINGUEN SIN LEER. Ya estaban separadas como cifras
@@ -27924,9 +28259,9 @@ function _wsToolOutHtml(inp) {
             (info), lo que entra a plazos (in) y lo que produce el interés (green) — y el signo
             del crecimiento sigue siendo el que manda su color cuando es negativo. */''}
       <div class="wstool-res-split is-quad">
-        <div class="wstool-res-cell" data-ws-accent="info"><span class="wstool-res-v">${esc(formatBase(p.initial))}</span><span class="wstool-res-k">${esc(t('wstool_res_initial'))}</span></div>
-        <div class="wstool-res-cell" data-ws-accent="in"><span class="wstool-res-v">${esc(formatBase(p.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
-        <div class="wstool-res-cell${p.growth < 0 ? ' is-loss' : ' is-gain'}" data-ws-accent="${p.growth < 0 ? 'out' : 'up'}"><span class="wstool-res-v">${p.growth < 0 ? '−' : '+'}${esc(formatBase(Math.abs(p.growth)))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
+        <div class="wstool-res-cell" data-ws-accent="info"><span class="wstool-res-v">${esc(_wsMoney(p.initial))}</span><span class="wstool-res-k">${esc(t('wstool_res_initial'))}</span></div>
+        <div class="wstool-res-cell" data-ws-accent="in"><span class="wstool-res-v">${esc(_wsMoney(p.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
+        <div class="wstool-res-cell${p.growth < 0 ? ' is-loss' : ' is-gain'}" data-ws-accent="${p.growth < 0 ? 'out' : 'up'}"><span class="wstool-res-v">${p.growth < 0 ? '−' : '+'}${esc(_wsMoney(Math.abs(p.growth)))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
       </div>
     </div>
     ${/* §25 — LA CURVA VA JUSTO DESPUÉS DE LAS CIFRAS. Los supuestos estaban DENTRO del bloque de
@@ -27960,6 +28295,7 @@ function _renderCompoundTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="teal">
       ${_wsSurfaceHeadHtml({ title: t('wstool_compound_n'), doc: _wsToolDocName(), help: [t('wstool_compound_d')] })}
+      ${_wsToolCcyRowHtml()}
       ${/* «DATOS DE ENTRADA» debajo de «Interés compuesto» no informaba de nada:
             los campos ya son visiblemente los datos de entrada. Se retira el
             título de sección, no los campos. */''}
@@ -28150,7 +28486,7 @@ function _wsBudgetDonutHtml(res, sel) {
   const centre = pick
     ? '<i style="color:' + esc(pick.color) + '">' + esc(pick.name) + '</i>'
       + '<b>' + Math.round(pick.value / res.expenses * 100) + '%</b>'
-      + '<em>' + esc(formatBase(pick.value)) + '</em>'
+      + '<em>' + esc(_wsMoney(pick.value)) + '</em>'
     : '<i style="color:' + esc(top.color) + '">' + esc(top.name) + '</i>'
       + '<b>' + topPct + '%</b>'
       + '<em>' + esc(t('wsbud_dn_top')) + '</em>';
@@ -28173,7 +28509,7 @@ function _wsBudgetChartHtml(res, sel) {
     const on = sel === it.id;
     return `<li><button type="button" class="wsbud-leg${on ? ' is-sel' : ''}" data-wsbud-sel="${esc(it.id)}" aria-pressed="${on ? 'true' : 'false'}">`
       + `<i style="background:${esc(it.color)}"></i><span class="wsbud-leg-n">${esc(it.name)}</span>`
-      + `<b>${esc(formatBase(it.value))}</b><em>${pct(it.value)}</em></button></li>`;
+      + `<b>${esc(_wsMoney(it.value))}</b><em>${pct(it.value)}</em></button></li>`;
   }).join('');
   // «DINERO LIBRE» NO ES UNA PORCIÓN DEL ANILLO. Estaba en la misma lista que las
   // categorías, con su punto de color y sin porcentaje, y el anillo (que reparte sólo
@@ -28181,7 +28517,7 @@ function _wsBudgetChartHtml(res, sel) {
   // la lista y se dice qué es: lo no asignado, su proporción sobre INGRESOS y que no
   // entra en el reparto. No se interpreta como «ahorro»: el usuario puede tener sus
   // propias categorías de ahorro dentro de los gastos.
-  const freeLeg = res.free > 0 ? `<p class="wsbud-free-note"><b>${esc(t('wstool_bud_free'))}</b> ${esc(String(t(res.saveRate == null ? 'wsbud_free_note_nr' : 'wsbud_free_note')).replace('{a}', formatBase(res.free)).replace('{r}', String(Math.round(res.saveRate || 0))))}</p>` : '';
+  const freeLeg = res.free > 0 ? `<p class="wsbud-free-note"><b>${esc(t('wstool_bud_free'))}</b> ${esc(String(t(res.saveRate == null ? 'wsbud_free_note_nr' : 'wsbud_free_note')).replace('{a}', _wsMoney(res.free)).replace('{r}', String(Math.round(res.saveRate || 0))))}</p>` : '';
   return `
     <div class="wsbud-chart-wrap">
       ${/* §18 — LA BARRA DE REPARTO SE RETIRA, y se auditó antes de decidirlo. Contaba lo MISMO
@@ -28290,13 +28626,13 @@ function _wsBudgetTopHtml(inp) {
             ingresos y gastos eran dos celdas idénticas y había que leerlas para saber cuál era
             cuál. El acento es un TONO en el filete y la cifra, no un relleno de color. */''}
       <div class="wsbud-kpis">
-        <span class="wsbud-kpi" data-ws-accent="in"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(formatBase(res.income))}</b></span>
-        <span class="wsbud-kpi" data-ws-accent="out"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(formatBase(res.expenses))}</b></span>
+        <span class="wsbud-kpi" data-ws-accent="in"><i>${esc(t('wstool_bud_income_t'))}</i><b>${esc(_wsMoney(res.income))}</b></span>
+        <span class="wsbud-kpi" data-ws-accent="out"><i>${esc(t('wstool_bud_expenses_t'))}</i><b>${esc(_wsMoney(res.expenses))}</b></span>
         ${/* §15 — LA TASA DE AHORRO ACOMPAÑA, NO REINA. Tenía una tarjeta propia de 123 px de alto
               para una cifra secundaria. Aquí va pegada al disponible, que es su denominador
               natural, y se dice sobre qué se calcula. Cuando no hay ingresos no se publica un
               0 %: el motor devuelve `null` y aquí no se pinta el sufijo. */''}
-        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</b>${
+        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(_wsMoney(res.free))}</b>${
           (res.saveRate == null || res.saveRate < 0) ? '' : `<em class="wsbud-kpi-sub">${esc(Math.round(res.saveRate) + '% ' + t('wsbud_kpi_save'))}</em>`}</span>
         ${/* §11 — EL PERIODO, CUARTA CELDA DEL RESUMEN. Estuvo en la línea del título y la CAPTURA
               lo tumbó: a 360 el chip dejaba «Presupuesto mensual» en una columna de 30 px —una
@@ -28316,7 +28652,7 @@ function _wsBudgetTopHtml(inp) {
 // tiene su propia frase, exacta y neutra. Sin ingresos ni gastos, la frase dice
 // lo único cierto: que la proporción no se puede calcular. Nada de consejos.
 function _wsBudgetReading(res) {
-  if (res.deficit) return String(t('wstool_bud_read_deficit') || '').replace('{d}', formatBase(Math.abs(res.free)));
+  if (res.deficit) return String(t('wstool_bud_read_deficit') || '').replace('{d}', _wsMoney(Math.abs(res.free)));
   if (!res.applicable) return t('wstool_bud_read_noincome');
   if (res.free === 0) return t('wsbud_read_zero');
   return String(t('wstool_bud_read_neutral') || '').replace('{r}', String(Math.round(res.saveRate)));
@@ -28469,7 +28805,7 @@ function _wsBudgetDelete(id) {
   // Sólo se pregunta cuando se pierde un dato: una fila vacía o a cero se va sin más.
   if (_wsNum(r.amount) === 0) { go(); return; }
   _wsModal2({ title: t('wsbud_del_title'),
-    text: String(t('wsbud_del_text')).replace('{n}', _wsBudgetRowName(r)).replace('{a}', formatBase(_wsNum(r.amount))),
+    text: String(t('wsbud_del_text')).replace('{n}', _wsBudgetRowName(r)).replace('{a}', _wsMoney(_wsNum(r.amount))),
     okLabel: t('wsmodal_delete'), danger: true, onOk: go });
 }
 // ── RENOMBRAR ──────────────────────────────────────────────────────────────────
@@ -28583,6 +28919,7 @@ function _renderBudgetTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-wsbud-view>
       ${_wsSurfaceHeadHtml({ title: t('wstool_budget_n'), doc: _wsToolDocName(), help: [t('wstool_budget_d')] })}
+      ${_wsToolCcyRowHtml()}
       <section class="wsh-card wsbud-top-card" data-wsbud-top>${_wsBudgetTopHtml(inp)}</section>
       ${/* ── PRIMERO ENTENDER, DESPUÉS EDITAR ──────────────────────────────────────────────
             El orden del DOM ES el de lectura: resumen → reparto → edición → ayuda. En móvil se
@@ -29203,7 +29540,7 @@ function _wsRePreviewLine(d) {
   const one = calculateRealEstatePortfolio([d]).list[0];
   if (!one || (one.buy <= 0 && one.rent <= 0)) return '';
   const cf = one.cashflowMonthly;
-  return `<span class="wsre-prev is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))} · ${esc(_wsJrnPct(one.netYield))} · ${esc(t('wsre_kpi_equity'))} ${esc(formatBase(one.equity))}</span>`;
+  return `<span class="wsre-prev is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + _wsMoney(cf))}${esc(t('wsre_permonth'))} · ${esc(_wsJrnPct(one.netYield))} · ${esc(t('wsre_kpi_equity'))} ${esc(_wsMoney(one.equity))}</span>`;
 }
 function _wsRePhoto(input) {
   const f = input && input.files && input.files[0]; if (!f) return;
@@ -29292,10 +29629,10 @@ function _wsReSummaryHtml(r) {
   const cfCls = r.cashflowMonthly >= 0 ? 'is-pos' : 'is-neg';
   return `
     <div class="wsre-summary">
-      <div class="wsre-sum-head"><span class="wsre-sum-count">${r.count} ${esc(t('wsre_unit'))}</span><span class="wsre-sum-value">${esc(formatBase(r.valueTotal))}</span><span class="wsre-sum-vlbl">${esc(t('wsre_kpi_value'))}</span></div>
+      <div class="wsre-sum-head"><span class="wsre-sum-count">${r.count} ${esc(t('wsre_unit'))}</span><span class="wsre-sum-value">${esc(_wsMoney(r.valueTotal))}</span><span class="wsre-sum-vlbl">${esc(t('wsre_kpi_value'))}</span></div>
       <div class="wsre-kpis">
-        <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(formatBase(r.equityTotal))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
-        <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
+        <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(_wsMoney(r.equityTotal))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
+        <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + _wsMoney(r.cashflowMonthly))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
         <div class="wsre-kpi is-yield"><span class="wsre-kpi-v">${esc(_wsJrnPct(r.avgYield))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_yield'))}</span></div>
       </div>
     </div>`;
@@ -29334,9 +29671,9 @@ function _wsReMoreHtml(r) {
                 aria-expanded="false" aria-controls="wsreMoreBody">${esc(t('wsre_more_title'))}</button>
         <div class="wsre-more-body" id="wsreMoreBody">
           <div class="wsre-subkpis">
-            <span class="wsre-subkpi"><b>${esc(formatBase(r.mortgageTotal))}</b><i>${esc(t('wsre_kpi_mortgage'))}</i></span>
-            <span class="wsre-subkpi"><b>${esc((r.cashflowAnnual >= 0 ? '+' : '') + formatBase(r.cashflowAnnual))}</b><i>${esc(t('wsre_kpi_cf_annual'))}</i></span>
-            <span class="wsre-subkpi"><b>${esc(formatBase(r.buyTotal))}</b><i>${esc(t('wsre_kpi_buy'))}</i></span>
+            <span class="wsre-subkpi"><b>${esc(_wsMoney(r.mortgageTotal))}</b><i>${esc(t('wsre_kpi_mortgage'))}</i></span>
+            <span class="wsre-subkpi"><b>${esc((r.cashflowAnnual >= 0 ? '+' : '') + _wsMoney(r.cashflowAnnual))}</b><i>${esc(t('wsre_kpi_cf_annual'))}</i></span>
+            <span class="wsre-subkpi"><b>${esc(_wsMoney(r.buyTotal))}</b><i>${esc(t('wsre_kpi_buy'))}</i></span>
           </div>
           ${/* ── §E · LAS TRES CAPAS, SEPARADAS ────────────────────────────
                 «Separar resultado operativo, pago de deuda y apreciación.» Antes
@@ -29346,10 +29683,10 @@ function _wsReMoreHtml(r) {
                 apreciación va aparte y se nombra LATENTE: no es dinero cobrado
                 y no entra en el flujo. */''}
           <div class="wsre-layers">
-            <span class="wsre-layer"><i>${esc(t('wsre_l_noi'))}</i><b>${esc((r.noiMonthlyTotal >= 0 ? '+' : '') + formatBase(r.noiMonthlyTotal))}</b></span>
-            <span class="wsre-layer"><i>${esc(t('wsre_l_debt'))}</i><b>${esc('−' + formatBase(Math.abs(r.debtServiceMonthlyTotal)))}</b></span>
-            <span class="wsre-layer is-total"><i>${esc(t('wsre_l_cf'))}</i><b class="${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</b></span>
-            ${r.valuesDeclared > 0 ? `<span class="wsre-layer is-latent"><i>${esc(t('wsre_l_appr'))}</i><b>${esc((r.appreciationTotal >= 0 ? '+' : '') + formatBase(r.appreciationTotal))}</b></span>` : ''}
+            <span class="wsre-layer"><i>${esc(t('wsre_l_noi'))}</i><b>${esc((r.noiMonthlyTotal >= 0 ? '+' : '') + _wsMoney(r.noiMonthlyTotal))}</b></span>
+            <span class="wsre-layer"><i>${esc(t('wsre_l_debt'))}</i><b>${esc('−' + _wsMoney(Math.abs(r.debtServiceMonthlyTotal)))}</b></span>
+            <span class="wsre-layer is-total"><i>${esc(t('wsre_l_cf'))}</i><b class="${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + _wsMoney(r.cashflowMonthly))}</b></span>
+            ${r.valuesDeclared > 0 ? `<span class="wsre-layer is-latent"><i>${esc(t('wsre_l_appr'))}</i><b>${esc((r.appreciationTotal >= 0 ? '+' : '') + _wsMoney(r.appreciationTotal))}</b></span>` : ''}
           </div>
         </div>
       </div>
@@ -29377,10 +29714,10 @@ function _wsRePropCard(p) {
           <span class="wsre-type-chip">${esc(t('wsre_t_' + p.ptype))}</span>
         </div>
         <div class="wsre-card-rows">
-          <span class="wsre-prow"><i>${esc(t('wsre_kpi_cashflow'))}</i><b class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}</b></span>
-          <span class="wsre-prow"><i>${esc(t('wsre_kpi_equity'))}</i><b>${esc(formatBase(p.equity))}</b></span>
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_cashflow'))}</i><b class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + _wsMoney(cf))}</b></span>
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_equity'))}</i><b>${esc(_wsMoney(p.equity))}</b></span>
           <span class="wsre-prow"><i>${esc(t('wsre_kpi_yield'))}</i><b>${esc(_wsJrnPct(p.netYield))}</b></span>
-          <span class="wsre-prow"><i>${esc(t('wsre_kpi_mortgage'))}</i><b>${esc(formatBase(p.mortgage))}</b></span>
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_mortgage'))}</i><b>${esc(_wsMoney(p.mortgage))}</b></span>
         </div>
         <div class="wsre-card-acts">
           <button type="button" class="wsre-mini" data-wsre-act="edit" data-wsre-id="${esc(p.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button>
@@ -29454,18 +29791,18 @@ function _wsReDetailHtml(p) {
       <section class="wsh-card wsre-detail-hero">
         <div class="wsre-detail-cover ${p.photo ? 'has-photo' : 'is-' + (p.ptype || 'flat')}"${p.photo ? ` style="background-image:url(${p.photo})"` : ''}>${p.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(p.ptype)}</svg>` + _wsAssetImg(_WSRE_ASSET[p.ptype || 'flat'], esc(p.name || ''))}<span class="wsre-status is-${esc(one.status)}"></span></div>
         <div class="wsre-detail-kpis">
-          <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cf >= 0 ? 'is-pos' : 'is-neg'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
-          <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(formatBase(one.equity))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
+          <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cf >= 0 ? 'is-pos' : 'is-neg'}">${esc((cf >= 0 ? '+' : '') + _wsMoney(cf))}${esc(t('wsre_permonth'))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
+          <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(_wsMoney(one.equity))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
           <div class="wsre-kpi is-yield"><span class="wsre-kpi-v">${esc(_wsJrnPct(one.netYield))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_yield'))}</span></div>
         </div>
       </section>
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_d_finance'))}</h3></header>
         <div class="wsre-d-rows">
-          ${row(t('wsre_f_buy'), formatBase(one.buy))}
-          ${row(t('wsre_f_value'), formatBase(one.value))}
-          ${row(t('wsre_kpi_mortgage'), formatBase(one.mortgage))}
-          ${row(t('wsre_kpi_equity'), formatBase(one.equity))}
+          ${row(t('wsre_f_buy'), _wsMoney(one.buy))}
+          ${row(t('wsre_f_value'), _wsMoney(one.value))}
+          ${row(t('wsre_kpi_mortgage'), _wsMoney(one.mortgage))}
+          ${row(t('wsre_kpi_equity'), _wsMoney(one.equity))}
           ${row(t('wsre_d_gross'), _wsJrnPct(one.grossYield))}
           ${row(t('wsre_d_roi'), _wsJrnPct(one.roi))}
         </div>
@@ -29504,6 +29841,7 @@ function _renderRealEstateTool() {
             ocupaba una línea. La nota de permanencia local no se pierde: viaja a
             la ayuda, junto al subtítulo. */''}
       ${_wsSurfaceHeadHtml({ title: t('wsre_n'), doc: _wsToolDocName(), help: [t('wsre_d'), t('wsre_local_note')] })}
+      ${_wsToolCcyRowHtml()}
       ${/* Sin inmuebles, el resumen serían seis ceros y una rejilla de capas
             vacía. No se pinta: lo primero es la acción de añadir el primero. */''}
       ${r.count ? `<section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>` : ''}
@@ -29645,7 +29983,7 @@ function _wsRecvPreviewLine(d) {
   const paid = cur ? _wsRecvPayments(cur).reduce((s, p) => s + p.amount, 0) : _wsNum(d.paidAmount);
   const pending = Math.max(0, total - paid);
   const st = _wsRecvStatus(total, paid, d.dueDate);
-  return `<span class="wsrecv-prev"><b>${esc(formatBase(total))}</b> · ${esc(t('wsrecv_pending'))} ${esc(formatBase(pending))} · <em class="is-${st}">${esc(t('wsrecv_st_' + st))}</em></span>`;
+  return `<span class="wsrecv-prev"><b>${esc(_wsMoney(total))}</b> · ${esc(t('wsrecv_pending'))} ${esc(_wsMoney(pending))} · <em class="is-${st}">${esc(t('wsrecv_st_' + st))}</em></span>`;
 }
 // Un error de validación junto al formulario que lo provoca, por el canal común
 // (`.wsg-reqerr` con role=alert) y marcando el campo culpable.
@@ -29680,11 +30018,11 @@ function _wsRecvAdd() {
     // y por eso el total nuevo no puede quedar por debajo de lo ya cobrado.
     payments = _wsRecvPayments(prev);
     const paid = payments.reduce((s, p) => s + p.amount, 0);
-    if (total < paid - _WSRECV_EPS) return _wsRecvFail(form, '[data-wsrecv-input="unitPrice"]', String(t('wsrecv_err_total_below')).replace('{p}', formatBase(paid)));
+    if (total < paid - _WSRECV_EPS) return _wsRecvFail(form, '[data-wsrecv-input="unitPrice"]', String(t('wsrecv_err_total_below')).replace('{p}', _wsMoney(paid)));
   } else {
     const opening = Math.max(0, _wsNum(d.paidAmount));
     if (_wsNum(d.paidAmount) < 0) return _wsRecvFail(form, '[data-wsrecv-input="paidAmount"]', t('wsrecv_err_neg'));
-    if (opening > total + _WSRECV_EPS) return _wsRecvFail(form, '[data-wsrecv-input="paidAmount"]', String(t('wsrecv_err_over')).replace('{p}', formatBase(total)));
+    if (opening > total + _WSRECV_EPS) return _wsRecvFail(form, '[data-wsrecv-input="paidAmount"]', String(t('wsrecv_err_over')).replace('{p}', _wsMoney(total)));
     // Lo «ya cobrado» al dar de alta es un cobro ANTERIOR sin fecha conocida: no
     // se le pone la de hoy, porque nadie ha dicho que se cobrara hoy.
     payments = opening > 0 ? [{ id: 'pm_' + now + '_0', amount: opening, date: null, at: now, legacy: true }] : [];
@@ -29732,7 +30070,7 @@ function _wsRecvPaySave() {
   if (amt == null || String(raw).trim() === '') return _wsRecvFail(root, '[data-wsrecv-pay-amt]', t('wsrecv_err_amount'));
   if (Number(amt) < 0 || /^\s*-/.test(String(raw))) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', t('wsrecv_err_neg'));
   if (!(Number(amt) > 0)) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', t('wsrecv_err_amount'));
-  if (Number(amt) > pending + _WSRECV_EPS) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', String(t('wsrecv_err_over')).replace('{p}', formatBase(pending)));
+  if (Number(amt) > pending + _WSRECV_EPS) return _wsRecvFail(root, '[data-wsrecv-pay-amt]', String(t('wsrecv_err_over')).replace('{p}', _wsMoney(pending)));
   const iso = _wsRecvParseDate(dateEl ? dateEl.value : '');
   if (!iso) return _wsRecvFail(root, '[data-wsrecv-pay-date]', t('wsrecv_err_date'));
   if (iso > _wsRecvTodayIso()) return _wsRecvFail(root, '[data-wsrecv-pay-date]', t('wsrecv_err_future'));
@@ -29788,9 +30126,9 @@ function _wsRecvSummaryHtml(r) {
   return `
     <div class="wsrecv-summary">
       <div class="wsrecv-kpis">
-        <div class="wsrecv-kpi is-total"><span class="wsrecv-kpi-v">${esc(formatBase(r.grand))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_total'))}</span></div>
-        <div class="wsrecv-kpi is-collected"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalCobrado))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_collected'))}</span></div>
-        <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
+        <div class="wsrecv-kpi is-total"><span class="wsrecv-kpi-v">${esc(_wsMoney(r.grand))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_total'))}</span></div>
+        <div class="wsrecv-kpi is-collected"><span class="wsrecv-kpi-v">${esc(_wsMoney(r.totalCobrado))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_collected'))}</span></div>
+        <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(_wsMoney(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
       </div>
       <div class="wsrecv-sumbar"${r.porcentajeCobrado == null ? ` data-ws-na="1" aria-label="${esc(t('wstool_bud_na'))}"` : ``}>${r.porcentajeCobrado == null ? `` : `<span class="wsrecv-sumbar-fill" style="width:${Math.round(r.porcentajeCobrado)}%"></span>`}</div>
       ${/* §H — la barra se blindó y la etiqueta DE AL LADO se quedó sin blindar:
@@ -29814,7 +30152,7 @@ function _wsRecvPayFormHtml(it) {
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsrecv_pay_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-pay-amt value="" placeholder="${esc(_wsFormatInputNumber(String(Math.round(it.pendingAmount * 100) / 100)))}"></span></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsrecv_pay_date'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="numeric" autocomplete="off" data-wsrecv-pay-date value="${esc(_wsRecvDateText(_wsRecvTodayIso()))}" placeholder="${esc(t('wsrecv_date_ph'))}"></span></label>
         </div>
-        <button type="button" class="wsrecv-pay-full" data-wsrecv-pay-full="${esc(String(Math.round(it.pendingAmount * 100) / 100))}">${esc(String(t('wsrecv_pay_full')).replace('{a}', formatBase(it.pendingAmount)))}</button>
+        <button type="button" class="wsrecv-pay-full" data-wsrecv-pay-full="${esc(String(Math.round(it.pendingAmount * 100) / 100))}">${esc(String(t('wsrecv_pay_full')).replace('{a}', _wsMoney(it.pendingAmount)))}</button>
         <div class="wsrecv-pay-btns">
           <button type="button" class="wsg-act" data-wsrecv-pay-cancel>${esc(t('wsjrn_cancel'))}</button>
           <button type="button" class="wsh-cta is-primary" data-wsrecv-pay-save>${esc(t('wsrecv_pay_save'))}</button>
@@ -29825,8 +30163,8 @@ function _wsRecvHistHtml(it) {
   const esc = _intccEsc;
   if (!it.payments.length) return '';
   const rows = it.payments.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || (a.at - b.at)).map(p => `
-          <li class="wsrecv-hist-row"><span class="wsrecv-hist-d">${esc(p.date ? _wsRecvDateText(p.date) : t('wsrecv_hist_nodate'))}</span><b>${esc(formatBase(p.amount))}</b>
-            <button type="button" class="wsrecv-hist-x" data-wsrecv-paydel="${esc(p.id)}" data-wsrecv-id="${esc(it.id)}" aria-label="${esc(String(t('wsrecv_hist_del')).replace('{a}', formatBase(p.amount)))}" title="${esc(t('wsrecv_hist_del_t'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></li>`).join('');
+          <li class="wsrecv-hist-row"><span class="wsrecv-hist-d">${esc(p.date ? _wsRecvDateText(p.date) : t('wsrecv_hist_nodate'))}</span><b>${esc(_wsMoney(p.amount))}</b>
+            <button type="button" class="wsrecv-hist-x" data-wsrecv-paydel="${esc(p.id)}" data-wsrecv-id="${esc(it.id)}" aria-label="${esc(String(t('wsrecv_hist_del')).replace('{a}', _wsMoney(p.amount)))}" title="${esc(t('wsrecv_hist_del_t'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></li>`).join('');
   return `<div class="wsrecv-hist"><p class="wsrecv-hist-t">${esc(t('wsrecv_hist_title'))} · ${it.payments.length}</p><ul class="wsrecv-hist-list">${rows}</ul></div>`;
 }
 function _wsRecvCardHtml(it) {
@@ -29842,9 +30180,9 @@ function _wsRecvCardHtml(it) {
         <span class="wsrecv-status is-${esc(it.status)}">${esc(t('wsrecv_st_' + it.status))}</span>
       </div>
       <div class="wsrecv-amounts">
-        <span class="wsrecv-amt"><i>${esc(t('wsrecv_total'))}</i><b>${esc(formatBase(it.totalAmount))}</b></span>
-        <span class="wsrecv-amt"><i>${esc(t('wsrecv_paid'))}</i><b>${esc(formatBase(it.paidAmount))}</b></span>
-        <span class="wsrecv-amt is-pending"><i>${esc(t('wsrecv_pending'))}</i><b>${esc(formatBase(it.pendingAmount))}</b></span>
+        <span class="wsrecv-amt"><i>${esc(t('wsrecv_total'))}</i><b>${esc(_wsMoney(it.totalAmount))}</b></span>
+        <span class="wsrecv-amt"><i>${esc(t('wsrecv_paid'))}</i><b>${esc(_wsMoney(it.paidAmount))}</b></span>
+        <span class="wsrecv-amt is-pending"><i>${esc(t('wsrecv_pending'))}</i><b>${esc(_wsMoney(it.pendingAmount))}</b></span>
       </div>
       <div class="wsrecv-bar" role="img" aria-label="${esc(pct + '% ' + t('wsrecv_kpi_collected').toLowerCase())}"><span class="wsrecv-bar-fill is-${esc(it.status)}" style="width:${pct}%"></span></div>
       ${_wsRecvHistHtml(it)}
@@ -29931,6 +30269,7 @@ function _renderReceivablesTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
       ${_wsSurfaceHeadHtml({ title: t('wsapp_receivables_n'), doc: _wsToolDocName(), help: [t('wsrecv_sub'), t('wsrecv_manual_note')] })}
+      ${_wsToolCcyRowHtml()}
       ${r.list.length ? `<section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>` : ''}
       <section class="wsh-card wsrecv-list-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
@@ -30009,8 +30348,8 @@ function _wsLoanInsights(res) {
   const out = [];
   const costInterestPct = res.totalPaid > 0 ? Math.round(res.totalInterest / (res.principal + res.totalInterest) * 100) : 0;
   if (costInterestPct >= 30) out.push(t('wsloan_ins_interest')(costInterestPct));
-  if (res.years > 5) { const less = calculateLoan({ principal: res.principal, rate: res.annual, years: res.years - 5 }); const saved = res.totalInterest - less.totalInterest; if (saved > 0) out.push(t('wsloan_ins_term')(5, formatBase(saved))); }
-  const up = calculateLoan({ principal: res.principal, rate: res.annual + 1, years: res.years }); const diff = up.base - res.base; if (diff > 0) out.push(t('wsloan_ins_rate')(formatBase(diff)));
+  if (res.years > 5) { const less = calculateLoan({ principal: res.principal, rate: res.annual, years: res.years - 5 }); const saved = res.totalInterest - less.totalInterest; if (saved > 0) out.push(t('wsloan_ins_term')(5, _wsMoney(saved))); }
+  const up = calculateLoan({ principal: res.principal, rate: res.annual + 1, years: res.years }); const diff = up.base - res.base; if (diff > 0) out.push(t('wsloan_ins_rate')(_wsMoney(diff)));
   return out.slice(0, 3);
 }
 // ── EL CONTRATO QUE SE ESTÁ SIMULANDO, DECLARADO (§G) ───────────────────────
@@ -30025,8 +30364,8 @@ function _wsLoanInsights(res) {
 function _wsLoanContractHtml(res) {
   const esc = _intccEsc;
   const rows = [t('wsloan_ct_fixed'), t('wsloan_ct_nominal'), t('wsloan_ct_monthly')];
-  if (res.fees > 0) rows.push(String(t('wsloan_ct_fees') || '').replace('{f}', formatBase(res.fees)));
-  if (res.totalInsurance > 0) rows.push(String(t('wsloan_ct_ins') || '').replace('{i}', formatBase(res.totalInsurance)));
+  if (res.fees > 0) rows.push(String(t('wsloan_ct_fees') || '').replace('{f}', _wsMoney(res.fees)));
+  if (res.totalInsurance > 0) rows.push(String(t('wsloan_ct_ins') || '').replace('{i}', _wsMoney(res.totalInsurance)));
   rows.push(t('wsloan_ct_excluded'));
   return `
       <details class="wstool-asm wsloan-contract">
@@ -30037,8 +30376,8 @@ function _wsLoanContractHtml(res) {
 function _wsLoanAmortHtml(res) {
   const esc = _intccEsc;
   if (!res.table.length) return '';
-  const rows = res.table.map(x => `<tr><td>${x.month}</td><td>${esc(formatBase(x.payment))}</td><td>${esc(formatBase(x.principal))}</td><td>${esc(formatBase(x.interest))}</td><td>${esc(formatBase(x.balance))}</td></tr>`).join('');
-  const cards = res.table.map(x => `<div class="wsloan-amort-card"><span class="wsloan-amort-m">${esc(t('wsloan_am_month'))} ${x.month}</span><span><i>${esc(t('wsloan_am_capital'))}</i> <b>${esc(formatBase(x.principal))}</b></span><span><i>${esc(t('wsloan_am_interest'))}</i> <b>${esc(formatBase(x.interest))}</b></span><span><i>${esc(t('wsloan_am_balance'))}</i> <b>${esc(formatBase(x.balance))}</b></span></div>`).join('');
+  const rows = res.table.map(x => `<tr><td>${x.month}</td><td>${esc(_wsMoney(x.payment))}</td><td>${esc(_wsMoney(x.principal))}</td><td>${esc(_wsMoney(x.interest))}</td><td>${esc(_wsMoney(x.balance))}</td></tr>`).join('');
+  const cards = res.table.map(x => `<div class="wsloan-amort-card"><span class="wsloan-amort-m">${esc(t('wsloan_am_month'))} ${x.month}</span><span><i>${esc(t('wsloan_am_capital'))}</i> <b>${esc(_wsMoney(x.principal))}</b></span><span><i>${esc(t('wsloan_am_interest'))}</i> <b>${esc(_wsMoney(x.interest))}</b></span><span><i>${esc(t('wsloan_am_balance'))}</i> <b>${esc(_wsMoney(x.balance))}</b></span></div>`).join('');
   return `<details class="wsloan-amort"><summary>${esc(t('wsloan_amort_title'))}</summary>
     <div class="wsloan-amort-tablewrap"><table class="wsloan-amort-table"><thead><tr><th>${esc(t('wsloan_am_month'))}</th><th>${esc(t('wsloan_am_payment'))}</th><th>${esc(t('wsloan_am_capital'))}</th><th>${esc(t('wsloan_am_interest'))}</th><th>${esc(t('wsloan_am_balance'))}</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="wsloan-amort-cards">${cards}</div>
@@ -30051,11 +30390,11 @@ function _wsLoanOutHtml(inp) {
   return `
     <div class="wsloan-hero">
       <span class="wsloan-hero-lbl">${esc(t('wsloan_kpi_monthly'))}</span>
-      <span class="wsloan-hero-v">${esc(formatBase(res.monthlyPayment))}${esc(t('wsre_permonth'))}</span>
+      <span class="wsloan-hero-v">${esc(_wsMoney(res.monthlyPayment))}${esc(t('wsre_permonth'))}</span>
     </div>
     <div class="wsloan-kpis">
-      <div class="wsloan-kpi" data-ws-accent="out"><span class="wsloan-kpi-v">${esc(formatBase(res.totalInterest))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_interest'))}</span></div>
-      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(formatBase(res.totalPaid))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_total'))}</span></div>
+      <div class="wsloan-kpi" data-ws-accent="out"><span class="wsloan-kpi-v">${esc(_wsMoney(res.totalInterest))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_interest'))}</span></div>
+      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(_wsMoney(res.totalPaid))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_total'))}</span></div>
       <div class="wsloan-kpi"><span class="wsloan-kpi-v">${_wsLoanPct(res.annual)}%</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_rate'))}</span></div>
       <div class="wsloan-kpi"><span class="wsloan-kpi-v">${res.years}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_years'))}</span></div>
     </div>
@@ -30066,8 +30405,8 @@ function _wsLoanOutHtml(inp) {
             que pides y cuál el que cuesta pedirlo. Azul lo que recibes, coral lo que pagas — el
             mismo par que el §6 propone para préstamos, y por la API compartida. */''}
       <div class="wsloan-legend">
-        <span class="wsloan-leg is-cap" data-ws-accent="info"><i></i>${esc(t('wsloan_capital'))} <b>${esc(formatBase(res.principal))}</b></span>
-        <span class="wsloan-leg is-int" data-ws-accent="out"><i></i>${esc(t('wsloan_kpi_interest'))} <b>${esc(formatBase(res.totalInterest))}</b></span>
+        <span class="wsloan-leg is-cap" data-ws-accent="info"><i></i>${esc(t('wsloan_capital'))} <b>${esc(_wsMoney(res.principal))}</b></span>
+        <span class="wsloan-leg is-int" data-ws-accent="out"><i></i>${esc(t('wsloan_kpi_interest'))} <b>${esc(_wsMoney(res.totalInterest))}</b></span>
       </div>
     </div>
     ${insights.length ? `<div class="wsloan-insights"><span class="wsloan-insights-t">${esc(t('wsloan_insights_title'))}</span><ul>${insights.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
@@ -30129,17 +30468,17 @@ function _wsLoanCmpOutHtml(inp) {
   const dYears = A.years - B.years;
   const intSaved = -dInt;
   const insight = (intSaved > 0 && dCuota > 0)
-    ? t('wsloan_cmp_insight')(formatBase(intSaved), formatBase(dCuota))
-    : (intSaved > 0 ? t('wsloan_cmp_insight_save')(formatBase(intSaved)) : '');
+    ? t('wsloan_cmp_insight')(_wsMoney(intSaved), _wsMoney(dCuota))
+    : (intSaved > 0 ? t('wsloan_cmp_insight_save')(_wsMoney(intSaved)) : '');
   const row = (label, val, cls) => `<div class="wsloan-cmp-row"><span>${esc(label)}</span><b class="${cls || ''}">${esc(val)}</b></div>`;
   return `
     <div class="wsloan-cmp-rows">
       ${/* §G — LA CUOTA NUEVA, EN ABSOLUTO. Sólo se publicaba el DELTA, y «+180 €
             al mes» no dice cuánto vas a pagar: al acortar el plazo la consecuencia
             que importa es la cuota resultante, no su diferencia. */''}
-      ${row(t('wsloan_cmp_newpay'), formatBase(B.monthlyPayment), '')}
-      ${row(t('wsloan_cmp_dcuota'), (dCuota >= 0 ? '+' : '') + formatBase(dCuota), dCuota > 0 ? 'is-neg' : 'is-pos')}
-      ${row(t('wsloan_cmp_dint'), (dInt >= 0 ? '+' : '') + formatBase(dInt), dInt > 0 ? 'is-neg' : 'is-pos')}
+      ${row(t('wsloan_cmp_newpay'), _wsMoney(B.monthlyPayment), '')}
+      ${row(t('wsloan_cmp_dcuota'), (dCuota >= 0 ? '+' : '') + _wsMoney(dCuota), dCuota > 0 ? 'is-neg' : 'is-pos')}
+      ${row(t('wsloan_cmp_dint'), (dInt >= 0 ? '+' : '') + _wsMoney(dInt), dInt > 0 ? 'is-neg' : 'is-pos')}
       ${row(t('wsloan_cmp_dyears'), (dYears >= 0 ? '−' : '+') + Math.abs(dYears) + ' ' + t('wstool_unit_years'), '')}
     </div>
     ${insight ? `<p class="wsloan-cmp-insight">${esc(insight)}</p>` : ''}`;
@@ -30200,6 +30539,7 @@ function _renderLoanTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool" data-ws-accent="blue">
       ${_wsSurfaceHeadHtml({ title: t('wsloan_n'), doc: _wsToolDocName(), help: [t('wsloan_sub')] })}
+      ${_wsToolCcyRowHtml()}
       ${/* §26 — SOBRE EL ARMAZÓN COMPARTIDO, tercer consumidor. La legibilidad de esta
             herramienta ya era la mejor de Workspace y NO se toca: lo que cambia es el reparto de
             la caja (edición a la izquierda, respuesta a la derecha) y la densidad, que es lo que
@@ -58155,7 +58495,15 @@ function setUpdateStatus(state) {
     error:      errorText,
     rate_limit: t('rateLimit'),
   };
-  updateTextEl.textContent = msg[state] ?? '';
+  // Sin tipo EUR/USD ACTUAL, el total convertido no se presenta como valoración fiable.
+  let _fxSuffix = '';
+  try {
+    const st = _aurixFxNoteRender();
+    if (st.status !== 'live' && _aurixFxEurInvolved()) _fxSuffix = t('fxHeroApprox');
+    const tv = document.getElementById('totalValue');
+    if (tv) { if (_fxSuffix) tv.setAttribute('data-fx-approx', st.status); else tv.removeAttribute('data-fx-approx'); }
+  } catch (_) {}
+  updateTextEl.textContent = (msg[state] ?? '') + ((state === 'ok' || state === 'error') ? _fxSuffix : '');
 }
 
 
@@ -75593,6 +75941,9 @@ document.getElementById('manualPrice')?.addEventListener('input', updatePreview)
 // ── Add Asset ──────────────────────────────────────────────
 assetForm.addEventListener('submit', e => {
   e.preventDefault();
+  // UN ENVÍO POR APERTURA. Al cerrarse, la hoja deja de recibir clics, pero el foco sigue
+  // en su campo y un segundo Enter la volvía a enviar: un inmueble entraba dos veces.
+  if (!modalOverlay.classList.contains('open')) return;
 
   // WL.2 (Fase 2 — Wealth Location): read the optional location/custodian once
   // so every add/buy/edit branch below can stamp it. null when left blank →
@@ -75968,6 +76319,7 @@ function _reduceApplyMode(isCash) {
   set('button[type="submit"]', 'reduceCashConfirm');
   const valRow = document.getElementById('previewValueLeft');
   if (valRow && valRow.parentElement) valRow.parentElement.hidden = !!isCash;
+  const note = ov.querySelector('[data-trade-note]'); if (note) note.hidden = !!isCash;
 }
 
 function closeReduceModal() {
@@ -76163,6 +76515,7 @@ function openAddModal(id) {
   `;
 
   addQtyLabelEl.textContent = isCash ? t('addQtyLabelCash') : t('addQtyLabel')(isGold ? asset.goldUnit || 'g' : null);
+  { const n = document.querySelector('#addOverlay [data-trade-note]'); if (n) n.hidden = !!isCash; }
   addQtyInput.value         = '';
   addError.textContent      = '';
   previewAddQtyTotal.textContent   = isCash
@@ -76378,6 +76731,7 @@ function _applyCurrencyChange(currency) {
   document.querySelectorAll('.menu-curr-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
   _syncPerfCurrencyButtons();
+  try { _aurixFxNoteRender(); } catch (_) {}
   render(true);
   updateChart(true);
   updateDonut();
@@ -76521,6 +76875,9 @@ document.querySelectorAll('.re-curr-btn').forEach(btn => {
 
 liquidityForm.addEventListener('submit', e => {
   e.preventDefault();
+  // UN ENVÍO POR APERTURA: un doble Enter registraba la aportación dos veces (1.000 € → 2.000 €
+  // con dos operaciones). Reducir/añadir ya lo evitaban anulando su destino al cerrar.
+  if (!liquidityOverlay.classList.contains('open')) return;
   const curr = liquidityCurrIn.value || 'EUR';
   const qty  = parseLocalFloat(liquidityQtyInput.value);
   if (isNaN(qty) || qty <= 0) { liquidityQtyInput.focus(); return; }
@@ -82969,6 +83326,8 @@ function _aurixEntLoaded() { return _aurixEnt.loaded === true; }
 // nacería con el mismo problema. Un owner, tres llamadas.
 function _aurixEntApplyToUi(features) {
   try { _aurixEntLastSig = JSON.stringify(features); } catch (_) {}
+  // Con el derecho resuelto, la lectura de los documentos guardados de ESTA cuenta.
+  try { _wsDocsPullOnce(); } catch (_) {}
   // La pestaña activa, si su contenido depende del derecho.
   try {
     const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
