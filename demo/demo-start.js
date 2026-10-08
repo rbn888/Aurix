@@ -25,6 +25,11 @@
     { id: 'demo_eth',  ticker: 'ETH',  name: 'Ethereum',  type: 'crypto', qty: 1.5,  price: 3000,  assetCurrency: 'USD' },
     { id: 'demo_cash', ticker: 'USD',  name: 'Efectivo',  type: 'cash',   qty: 6500, price: 1,     assetCurrency: 'USD' },
   ];
+  // Compra única hace 90 días (el inicio del histórico), a un precio modesto por debajo del actual:
+  // la ganancia por posición (≈ +3,5 % … +5,3 %) cuadra con la subida del ≈ 4 % del histórico.
+  var BUY = { demo_msft: 395, demo_aapl: 182, demo_vwce: 114, demo_btc: 59000, demo_eth: 2850 };
+  var BUY_TS = Date.now() - 90 * 86400000;
+  ASSETS.forEach(function (a) { if (BUY[a.id]) a.transactions = [{ type: 'buy', qty: a.qty, price: BUY[a.id], ts: BUY_TS }]; });
   function history(days) {
     var now = Date.now(), hist = [], cats = [];
     // Pesos por categoría DERIVADOS de las propias posiciones (antes eran fijos y no cuadraban con ellas).
