@@ -30469,3 +30469,9 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   .modal--onboarding .onb-progress { display: none; }
   .modal--onboarding .onb-skip { font-size: 12px; padding: 6px 8px; }
 }
+
+/* SPEC 2 · paywall: periodicidad del cobro y condiciones, legibles (≥ 4,5:1) antes de pagar. */
+.aurix-premium-plan-billed { margin: 2px 0 0; font-size: 13px; line-height: 1.4; color: #c9d6ee; }
+.aurix-premium-terms { margin: 10px 2px 0; font-size: 13px; line-height: 1.5; color: #b9c6de; text-align: center; }
+.aurix-premium-context { margin: 10px auto 0; max-width: 46ch; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.45;
+  color: #e6eeff; background: rgba(79,142,247,.14); border: 1px solid rgba(125,184,255,.35); }
