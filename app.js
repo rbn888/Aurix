@@ -4342,6 +4342,8 @@ const USER_SCOPED_WORK_KEYS = [
   // Los parámetros de Escenarios guardan el patrimonio DECLARADO como base: tras cambiar de
   // cuenta, el siguiente usuario los leía (reproducido en la demo con dos cuentas sintéticas).
   'aurix_ws_scn_params_v1',
+  // Documentos remotos AMBIGUOS apartados para recuperación explícita: son de la cuenta.
+  'aurix_ws_recoverable_v1',
 ];
 // `aurix_ws_prefrev_` — la revisión aplicada de cada preferencia sincronizada; heredarla hacía
 // que la cuenta siguiente descartara sus propias preferencias remotas por «más antiguas».
@@ -6592,6 +6594,12 @@ const T = {
     wspl_error:           'No se han podido cargar tus planes guardados.',
     wspl_m_income:        'Ingresos',
     wspl_m_avail:         'Disponible',
+    wspl_recover_note:    n => `${n === 1 ? 'Hay 1 documento antiguo' : 'Hay ' + n + ' documentos antiguos'} de tu cuenta cuya vigencia no se puede confirmar (pudo borrarse). No se restaura${n === 1 ? '' : 'n'} solo${n === 1 ? '' : 's'}.`,
+    wspl_recover_btn:     'Revisar',
+    wsrec_title:          'Documentos antiguos sin confirmar',
+    wsrec_text:           'Se guardaron antes de que Aurix registrara los borrados, así que no se sabe si los eliminaste. Recupera sólo el que quieras conservar.',
+    wsrec_ok:             'Recuperar',
+    wsrec_untitled:       'Documento sin nombre',
     wspl_m_deficit:       'Déficit',
     wspl_share_done_of:   'cobrado del total',
     wspl_share_goal:      'acumulado de la meta',
@@ -9587,6 +9595,12 @@ const T = {
     wspl_m_deficit:       'Deficit',
     wspl_share_done_of:   'collected of the total',
     wspl_share_goal:      'saved of the goal',
+    wspl_recover_note:    n => `${n === 1 ? 'There is 1 old document' : 'There are ' + n + ' old documents'} in your account whose status cannot be confirmed (it may have been deleted). ${n === 1 ? 'It is' : 'They are'} not restored automatically.`,
+    wspl_recover_btn:     'Review',
+    wsrec_title:          'Old unconfirmed documents',
+    wsrec_text:           'They were saved before Aurix recorded deletions, so it is unknown whether you deleted them. Recover only the one you want to keep.',
+    wsrec_ok:             'Recover',
+    wsrec_untitled:       'Untitled document',
     wspl_m_expenses:      'Expenses',
     wspl_m_pending:       'Pending',
     wspl_m_collected:     'Collected',
@@ -21410,7 +21424,78 @@ async function _wsDocsPush(key) {
 let _wsDocsPullInFlight = false;
 let _wsDocsPullFailed = false;
 let _wsDocsPulledFor = null;
-let _wsDocsPullSkippedAbsent = 0;   // filas remotas sin copia local: NO se añaden (ver _wsDocsPull)
+let _wsDocsPullSkippedAbsent = 0;   // nº de documentos remotos AMBIGUOS apartados (= _wsRecoverable().length)
+// ── VIGENCIA ACREDITADA DE UN DOCUMENTO REMOTO AUSENTE EN LOCAL (SPEC 1) ─────────────────────
+// Entre 225442d (09-15, subida) y 52ccd7a (09-17) borrar FILTRABA el array sin dejar `deleted_at`:
+// esas filas siguen vivas en remoto y su existencia NO prueba vigencia. La prueba está en los
+// propios datos, sin relojes: `_wsDocStamp` (que escribe `revision` en el CUERPO) y los tombstones
+// llegaron en el MISMO commit 52ccd7a, y antes nadie escribía `revision` en el cuerpo. Un cuerpo
+// con `revision` numérica lo escribió un cliente que, al borrar, deja tombstone ⇒ vigente si la
+// fila no lo tiene. Un cuerpo sin ella es AMBIGUO: se aparta para que el usuario decida.
+// Fondos asignados: no tienen borrado (libro de movimientos); valen si su objetivo está vivo.
+const _WS4_INTERNAL_TYPES = Object.freeze(['investment', 'budget', 'property', 'business', 'networth', 'fire']);
+function _wsDocVigenciaAcreditada(kind, body) {
+  if (!body || typeof body !== 'object') return false;
+  if (kind === 'ws_funding') { try { return !!body.goalId && _wsgGoals().some(g => g && g.id === body.goalId); } catch (_) { return false; } }
+  // Excepción (revisión financiera): las plantillas INTERNAS de la hoja ws4 se borraban en producción
+  // con `_ws4Delete`, que FILTRABA sin tombstone aunque su cuerpo llevara `revision`. Su evidencia no
+  // vale: quedan ambiguas. Herramientas, objetivos y escenarios siempre borraron con tombstone.
+  if (kind === 'ws_project' && _WS4_INTERNAL_TYPES.indexOf(String(body.type)) >= 0) return false;
+  return typeof body.revision === 'number' && Number.isFinite(body.revision) && body.revision >= 1;
+}
+const _WS_RECOVERABLE_KEY = 'aurix_ws_recoverable_v1';
+function _wsRecoverable() { try { const v = JSON.parse(localStorage.getItem(_WS_RECOVERABLE_KEY) || '[]'); return Array.isArray(v) ? v.filter(x => x && x.key && x.docId) : []; } catch (_) { return []; } }
+try { _wsDocsPullSkippedAbsent = (function () { try { const v = JSON.parse(localStorage.getItem('aurix_ws_recoverable_v1') || '[]'); return Array.isArray(v) ? v.length : 0; } catch (_) { return 0; } })(); } catch (_) {}
+function _wsRecoverableMerge(items, tombstoned) {
+  const list = _wsRecoverable();
+  const k = x => x.key + '|' + x.docId;
+  const idx = new Map(list.map((x, i) => [k(x), i]));
+  (items || []).forEach(it => { const j = idx.get(k(it)); if (j == null) { idx.set(k(it), list.length); list.push(Object.assign({ seenAt: Date.now() }, it)); } else if (it.revision > (list[j].revision || 0)) list[j] = Object.assign({}, list[j], it); });
+  // Lo que ya tiene copia local (recuperado o re-creado) o un borrado remoto deja de estar pendiente.
+  const dead = new Set(tombstoned || []);
+  const out = list.filter(x => {
+    if (dead.has(k(x))) return false; const spec = _WS_DOC_KEYS[x.key]; if (!spec) return false; return !_wshReadStore(x.key).some(d => String(spec.idOf(d)) === x.docId); });
+  try { localStorage.setItem(_WS_RECOVERABLE_KEY, JSON.stringify(out)); } catch (_) {}
+  _wsDocsPullSkippedAbsent = out.length;
+  return out;
+}
+// Recuperación EXPLÍCITA: el usuario elige; el documento vuelve con una revisión nueva (así el
+// resto de dispositivos lo reconocen como vigente) y se sube.
+async function _wsRecoverDoc(entry) {
+  const spec = entry && _WS_DOC_KEYS[entry.key]; if (!spec) return false;
+  // Antes de restaurar, la fila remota se vuelve a mirar: si OTRO dispositivo la borró desde la
+  // última lectura, no se resucita (el upsert de la subida no comprueba revisiones).
+  try {
+    const uid = _wsDocsSession();
+    if (uid && typeof supabaseClient !== 'undefined' && supabaseClient) {
+      const { data, error } = await supabaseClient.from(_WS_DOC_TABLE).select('doc_id,deleted_at,revision').eq('user_id', uid).eq('doc_id', entry.docId);
+      if (_wsDocsSession() !== uid) return false;
+      if (error) { try { _wsPlansRepaint(); } catch (_) {} return false; }          // sin confirmar, no se restaura
+      const row = Array.isArray(data) ? data[0] : null;
+      if (row && row.deleted_at) { _wsRecoverableMerge([], [entry.key + '|' + entry.docId]); try { _wsPlansRepaint(); } catch (_) {} return false; }
+      if (row && Number(row.revision) > (Number(entry.revision) || 0)) entry = Object.assign({}, entry, { revision: Number(row.revision) });
+    }
+  } catch (_) { return false; }
+  const store = _wshReadStore(entry.key);
+  if (!store.some(d => String(spec.idOf(d)) === entry.docId)) {
+    const doc = JSON.parse(JSON.stringify(entry.body || {}));
+    delete doc.deletedAt;
+    doc.revision = Math.max(Number(entry.revision) || 1, Number(doc.revision) || 0);
+    _wsDocStamp(doc);
+    store.push(doc);
+    if (_wshWriteStore(entry.key, store) === false) return false;
+  }
+  _wsRecoverableMerge([]);
+  try { _wsPlansRepaint(); } catch (_) {}
+  return true;
+}
+function _wsRecoverOpen() {
+  const list = _wsRecoverable(); if (!list.length) return;
+  const docs = list.map(x => ({ name: (x.body && (x.body.customName || x.body.name || x.body.title)) || t('wsrec_untitled'),
+    meta: (function () { try { return _wsTypeLabel(x.body && x.body.type) || ''; } catch (_) { return ''; } })() }));
+  _wsPickDocModal({ title: t('wsrec_title'), text: t('wsrec_text'), docs: docs, okLabel: t('wsrec_ok'),
+    onPick: (d) => { const i = docs.indexOf(d); if (i >= 0) _wsRecoverDoc(list[i]); } });
+}
 function _wsDocsPullOnce() {
   const uid = _wsDocsSession();
   if (!uid || _wsDocsPulledFor === uid || _wsDocsPullInFlight) return;
@@ -21479,15 +21564,15 @@ async function _wsDocsPull() {
         }
         const body = r.body && typeof r.body === 'object' ? r.body : null;
         if (!body) continue;
-        // ── RECUPERAR UN DOCUMENTO AUSENTE EN LOCAL: DESACTIVADO (SPEC 1) ─────────────
-        // Entre 319d7b7 (09-16, subida activa) y 52ccd7a (09-17, tombstones) borrar FILTRABA el
-        // array sin dejar `deleted_at`: esas filas siguen vivas en remoto. Con la estructura
-        // actual «borrado en esa ventana» y «nunca estuvo en este dispositivo» son
-        // indistinguibles, y que la fila exista no prueba que siga vigente. Así que la lectura
-        // NO añade documentos: sólo actualiza (por revisión) y borra (por tombstone) los que
-        // este dispositivo ya tiene. Se cuenta para diagnóstico. Reactivar exige un marcador de
-        // vigencia en servidor (decisión + SQL revisado), no una inferencia del cliente.
-        if (!cur) { _wsDocsPullSkippedAbsent++; continue; }
+        if (!cur) {
+          // Ausente en local. Se RECUPERA sólo si su vigencia está acreditada (ver
+          // `_wsDocVigenciaAcreditada`); si es ambiguo se aparta para recuperación EXPLÍCITA.
+          if (_wsDocVigenciaAcreditada(spec.kind, body)) { local.push(body); byId.set(String(r.doc_id), body); changed = true; }
+          // Un fondo sin su objetivo NO es un documento que el usuario pueda decidir: vuelve solo
+          // cuando su objetivo esté vivo (no tiene borrado propio).
+          else if (spec.kind !== 'ws_funding') ambiguous.push({ key: key, kind: spec.kind, docId: String(r.doc_id), revision: remoteRev, body: body });
+          continue;
+        }
         else if (remoteRev > (Number(cur.revision) || 1)) { Object.assign(cur, body); changed = true; }
       }
       if (changed) { try { localStorage.setItem(key, JSON.stringify(local)); touched++; } catch (_) {} }
@@ -21571,6 +21656,7 @@ function _wsSyncBadgeRefresh() {
       const k = el.getAttribute('data-ws-sync-slot');
       el.innerHTML = _wsSyncBadgeHtml(k && k !== '1' ? k : null);
     });
+  try { _wsDocsPullSkippedAbsent = _wsRecoverable().length; } catch (_) { _wsDocsPullSkippedAbsent = 0; }   // de ESTA cuenta
   } catch (_) {}
 }
 
@@ -21598,6 +21684,7 @@ let _wshView    = 'home';
 // §2 — de SESIÓN, no de disco: la portada no es una preferencia y no debe
 // convertirse en un muro dentro de la misma visita.
 // `_wsFreeCoverSeen` se retiró: era el contador de «ya la has visto» que convertía
+    const ambiguous = [], tombstoned = [];
 // la frontera del plan en una pantalla de un solo uso. Un guard no se gasta.
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
@@ -21624,6 +21711,7 @@ let _wsReturnTab = 'tools'; // WS.14A — tab to return to from a tool/app/view 
 function _wsBackLabel() {
   const o = _wsBackOrigin();
   const k = o === 'space' ? 'wsback_space' : o === 'templates' ? 'wsback_templates'
+          tombstoned.push(key + '|' + String(r.doc_id));   // lo apartado como ambiguo deja de estarlo
     : o === 'internal' ? 'wsback_internal' : o === 'dashboard' ? 'wsback_dashboard' : 'wsback_tools';
   return t(k) || t('wstool_back');
 }
@@ -21647,6 +21735,8 @@ function _wsBackShort() {
   const o = _wsBackOrigin();
   const k = o === 'space' ? 'wsback_s_space' : o === 'templates' ? 'wsback_s_templates'
     : o === 'internal' ? 'wsback_s_internal' : o === 'dashboard' ? 'wsback_s_dashboard' : 'wsback_s_tools';
+    // Los ambiguos se CONSERVAN aparte (por cuenta), nunca se restauran solos ni se borran.
+    try { _wsRecoverableMerge(ambiguous, tombstoned); } catch (_) {}
   return t(k) || _wsBackLabel();
 }
 // El NOMBRE del documento abierto, que no es el nombre de la plantilla. Vacío
@@ -24352,7 +24442,7 @@ function _renderDashboardPlans() {
     const body = st === 'loading'
       ? `<p class="wspl-note">${esc(t('wspl_loading'))}</p>`
       : st === 'remote_only'
-        ? `<p class="wspl-note is-warn">${esc(t('wspl_remote_only'))}</p>`
+        ? `<p class="wspl-note is-warn">${esc(t('wspl_recover_note')(_wsDocsPullSkippedAbsent))} <button type="button" class="wspl-link" data-ws-recover>${esc(t('wspl_recover_btn'))}</button></p>`
       : st === 'error'
         ? `<p class="wspl-note is-warn">${esc(t('wspl_error'))} <button type="button" class="wspl-link" data-ws-sync-retry>${esc(t('ws_sync_retry'))}</button></p>`
         : `<p class="wspl-note">${esc(t('wspl_empty'))} <button type="button" class="wspl-link" data-wspl-templates>${esc(t('wspl_empty_cta'))}</button></p>`;
@@ -24401,7 +24491,9 @@ function _renderDashboardPlans() {
         <button type="button" class="wspl-go" data-wspl-open="${esc(p.id)}" data-wspl-okind="${esc(it.kind)}" aria-label="${esc(t('wspl_continue') + ' — ' + nm)}">${esc(t('wspl_continue'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
       </article>`;
   }).join('');
-  return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>
+  const _rec = (typeof _wsDocsPullSkippedAbsent === 'number' && _wsDocsPullSkippedAbsent > 0)
+    ? `<p class="wspl-note is-warn">${esc(t('wspl_recover_note')(_wsDocsPullSkippedAbsent))} <button type="button" class="wspl-link" data-ws-recover>${esc(t('wspl_recover_btn'))}</button></p>` : '';
+  return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>${_rec}
     <div class="wspl-grid" id="wsPlansGrid" data-wspl-n="${docs.length}">${cards}</div>
     <span id="dashReorderHintPlans" class="intcc-sr-only">${esc(t('dash_reorder_hint_plans'))}</span>`;
 }
@@ -24510,7 +24602,7 @@ function _wsPlansWireOnce() {
       try { switchTab(dest === 'workspace' ? 'workspace' : 'intelligence'); } catch (_) {}
       return;
     }
-    const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-menu],[data-wspl-templates],[data-ws-sync-retry]') : null;
+    const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-menu],[data-wspl-templates],[data-ws-sync-retry],[data-ws-recover]') : null;
     // Pulsar la tarjeta abre el documento igual que «Continuar» (salvo sus propios controles, y
     // salvo el clic que sigue a un arrastre).
     if (!el) {
@@ -24679,6 +24771,7 @@ function _renderWorkspaceHome(metrics) {
   // Antes cada rejilla derivaba sus atributos por su cuenta y el chip comercial se
   // pintaba SIEMPRE, así que un usuario Premium veía «Premium» dentro de cada
   // tarjeta que ya tenía pagada —ruido, no información— y una tarjeta bloqueada
+    if (el.hasAttribute('data-ws-recover')) { try { _wsRecoverOpen(); } catch (_) {} return; }
   // ofrecía «Abrir ›» para después denegar en silencio.
   //
   // `_wsCardModel` resuelve UNA vez, con `_wsToolAccess` (el mismo owner que decide
@@ -25784,7 +25877,7 @@ function _wsbSaveScenario(id, btn) {
     const p = { projected: rowS.projected, contributed: rowS.contributed };
     const store = _wshReadStore(_WSH_SCENARIOS_KEY);
     if (store.some(x => x && x.scenarioId === id)) return; // already saved
-    store.push({
+    store.push(_wsDocStamp({
       scenarioId: id,
       name: s.name,
       monthly: s.monthly,
@@ -25802,7 +25895,7 @@ function _wsbSaveScenario(id, btn) {
       diffByContribution: Math.round(rowS.byContribution),
       diffByGrowth: Math.round(rowS.byGrowth),
       createdAt: Date.now(),
-    });
+    }));
     _wshWriteStore(_WSH_SCENARIOS_KEY, store);
     if (btn) { btn.textContent = t('wsb_saved'); btn.classList.add('is-saved'); btn.setAttribute('disabled', ''); }
   } catch (_) {}
@@ -26178,7 +26271,9 @@ function _ws4Duplicate() {
 function _ws4Delete() {
   const p = _ws4Get(); if (!p) return;
   _wsConfirm(() => {
-    _ws4SaveAll(_ws4Projects().filter(x => x && x.id !== p.id));
+    // Borrado SEGURO (tombstone): filtrar aquí guardaba la lista sin lápidas — borraba TODAS las
+    // anteriores y dejaba este documento resucitable por la lectura remota.
+    if (_ws4ProjectsRaw().some(x => x && x.id === p.id)) _ws4Tombstone(p.id);
     _ws4Draft = null; _ws4ActiveId = null; _wshView = 'home'; renderWorkspaceHome();
   });
 }
@@ -26762,7 +26857,8 @@ function _wsFundRead() { return _wshReadStore(_WSH_FUNDING_KEY); }
 function _wsFundSaveAll(list) { _wshWriteStore(_WSH_FUNDING_KEY, list); }
 function _wsFundAdd(goalId, amount, type, note) {
   const list = _wsFundRead();
-  list.push({ id: 'fnd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), goalId, amount: Math.max(0, Number(amount) || 0), type: type === 'remove' ? 'remove' : 'add', note: note || '', createdAt: Date.now() });
+  // Sellado al nacer: la revisión en el cuerpo acredita su vigencia en otro dispositivo.
+  list.push(_wsDocStamp({ id: 'fnd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), goalId, amount: Math.max(0, Number(amount) || 0), type: type === 'remove' ? 'remove' : 'add', note: note || '', createdAt: Date.now() }));
   _wsFundSaveAll(list);
 }
 function calculateGoalFunding(goalId) {

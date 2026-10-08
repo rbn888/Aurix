@@ -28,17 +28,43 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]].filter(e => (pr
   // A guarda un documento: se sube a la tabla falsa con su revisión.
   await p.evaluate(() => { const d = { id: 'ws4_sync_a', type: 'compound_growth', customName: 'Plan de A', inputs: { initial: 1000, currency: 'EUR' }, results: { final: 1000, currency: 'EUR' }, currency: 'EUR', bodyVersion: 1, revision: 0, createdAt: 1, updatedAt: 1 }; _ws4Persist(d); });
   await p.evaluate(() => _wsDocsPush('aurix_ws_projects_v1')); await p.waitForTimeout(300);
+  // Filas remotas sembradas (tabla FALSA de la demo): un documento ANTIGUO ambiguo (cuerpo sin
+  // `revision`: lo escribió un cliente anterior a los tombstones, pudo borrarse), uno BORRADO
+  // ahora (deleted_at) y un fondo asignado a un objetivo que este dispositivo no tiene.
+  await p.evaluate(async () => {
+    const up = rows => supabaseClient.from('workspace_documents').upsert(rows, { onConflict: 'user_id,doc_id' });
+    const base = { user_id: currentUser.id, currency: 'EUR', body_version: 1, updated_at: new Date().toISOString() };
+    await up([Object.assign({}, base, { doc_id: 'ws4_old', kind: 'ws_project', revision: 1, deleted_at: null, body: { id: 'ws4_old', type: 'monthly_budget', customName: 'Antiguo ambiguo', inputs: { salary: 1000 } } }),
+              Object.assign({}, base, { doc_id: 'ws4_gone', kind: 'ws_project', revision: 3, deleted_at: new Date().toISOString(), body: { id: 'ws4_gone', type: 'monthly_budget', customName: 'Borrado', inputs: {}, revision: 3 } }),
+              Object.assign({}, base, { doc_id: 'ws4_tpl', kind: 'ws_project', revision: 2, deleted_at: null, body: { id: 'ws4_tpl', type: 'investment', name: 'Plantilla interna', inputs: {}, revision: 2 } }),
+              Object.assign({}, base, { doc_id: 'fnd_orphan', kind: 'ws_funding', revision: 1, deleted_at: null, body: { id: 'fnd_orphan', goalId: 'wsg_nope', amount: 50, type: 'add', revision: 1 } })]);
+  });
   // DISPOSITIVO NUEVO: el almacén local de documentos se vacía y se recarga.
-  await p.evaluate(() => { localStorage.removeItem('aurix_ws_projects_v1'); });
+  await p.evaluate(() => { localStorage.removeItem('aurix_ws_projects_v1'); localStorage.removeItem('aurix_ws_goal_funding_v1'); });
   await p.reload(); await p.waitForTimeout(5000);
-  const got = await p.evaluate(() => ({ docs: _ws4Projects().map(x => x.id).join(','), skipped: _wsDocsPullSkippedAbsent }));
-  // Una fila remota viva sin copia local puede ser un documento BORRADO en la ventana 09-16/17
-  // (sin tombstone): su existencia no prueba que siga vigente, así que NO se añade.
-  ok(`${T} fila remota sin copia local (dispositivo nuevo o borrado sin tombstone): NO se resucita`, got.docs === '' && got.skipped >= 1, JSON.stringify(got));
-  const ro = await p.evaluate(() => { updateDashboardPlans(); return { st: _wsPlansEmptyState(), txt: (document.querySelector('.wspl-note') || {}).textContent || '' }; });
-  ok(`${T} …y «Tus planes» lo DICE (documentos en la cuenta no recuperables aquí), no «no tienes planes»`, ro.st === 'remote_only' && /no puede recuperar/.test(ro.txt), JSON.stringify(ro));
-  // El documento sigue en este dispositivo (p. ej. nunca se borró aquí): se restaura la copia local.
-  await p.evaluate(() => { localStorage.setItem('aurix_ws_projects_v1', JSON.stringify([{ id: 'ws4_sync_a', type: 'compound_growth', customName: 'Plan de A', inputs: { initial: 1000, currency: 'EUR' }, results: { final: 1000, currency: 'EUR' }, currency: 'EUR', bodyVersion: 1, revision: 1, createdAt: 1, updatedAt: 1 }])); });
+  const got = await p.evaluate(() => ({ docs: _ws4ProjectsRaw().map(x => x.id + '@' + x.revision + ':' + x.currency).sort().join(','), rec: _wsRecoverable().map(x => x.docId).sort().join(','), fund: _wshReadStore('aurix_ws_goal_funding_v1').length }));
+  ok(`${T} dispositivo nuevo: el documento VIGENTE (cuerpo con revisión) se recupera con su moneda y revisión`, got.docs === 'ws4_sync_a@1:EUR', JSON.stringify(got));
+  ok(`${T} registro antiguo AMBIGUO: no se restaura solo, queda apartado para recuperación explícita`, /ws4_old/.test(got.rec) && !/ws4_old/.test(got.docs), JSON.stringify(got));
+  ok(`${T} plantilla interna ws4 con revisión (en producción se borraba sin tombstone): no se restaura sola`, !/ws4_tpl/.test(got.docs) && /ws4_tpl/.test(got.rec), JSON.stringify(got));
+  ok(`${T} borrado actual (tombstone): no se resucita ni se aparta`, !/ws4_gone/.test(got.docs) && !/ws4_gone/.test(got.rec), JSON.stringify(got));
+  ok(`${T} fondo de un objetivo que no está aquí: no se añade ni se ofrece como documento`, got.fund === 0 && !/fnd_orphan/.test(got.rec), JSON.stringify(got));
+  const ro = await p.evaluate(() => { updateDashboardPlans(); return (document.querySelector('#wsPlansSection .wspl-note') || {}).textContent || ''; });
+  ok(`${T} «Tus planes» dice que hay documentos antiguos sin confirmar y ofrece revisarlos`, /documentos? antiguos?/.test(ro) && /Revisar/.test(ro), ro);
+  // Recuperación EXPLÍCITA del ambiguo: vuelve con revisión nueva y se sube.
+  // Borrado REMOTO de otro apartado entre la lectura y la recuperación: no se resucita y sale de la lista.
+  const raceDel = await p.evaluate(async () => {
+    await supabaseClient.from('workspace_documents').upsert([{ user_id: currentUser.id, doc_id: 'ws4_old2', kind: 'ws_project', revision: 1, deleted_at: null, currency: 'EUR', body_version: 1, updated_at: new Date().toISOString(), body: { id: 'ws4_old2', type: 'monthly_budget', customName: 'Antiguo 2', inputs: {} } }], { onConflict: 'user_id,doc_id' });
+    _wsDocsPulledFor = null; await _wsDocsPull();
+    const listed = _wsRecoverable().some(x => x.docId === 'ws4_old2');
+    await supabaseClient.from('workspace_documents').upsert([{ user_id: currentUser.id, doc_id: 'ws4_old2', kind: 'ws_project', revision: 2, deleted_at: new Date().toISOString(), currency: 'EUR', body_version: 1, updated_at: new Date().toISOString(), body: { id: 'ws4_old2' } }], { onConflict: 'user_id,doc_id' });
+    const r = await _wsRecoverDoc(_wsRecoverable().find(x => x.docId === 'ws4_old2'));
+    return { listed, recovered: r, local: _ws4Projects().some(x => x.id === 'ws4_old2'), still: _wsRecoverable().some(x => x.docId === 'ws4_old2') };
+  });
+  ok(`${T} borrado remoto entre la lectura y «Recuperar»: no se resucita y sale de la lista`, raceDel.listed && raceDel.recovered === false && !raceDel.local && !raceDel.still, JSON.stringify(raceDel));
+  await p.evaluate(async () => { const e = _wsRecoverable().find(x => x.docId === 'ws4_old'); await _wsRecoverDoc(e); });
+  await p.waitForTimeout(1800);
+  const rec2 = await p.evaluate(async () => { const { data } = await supabaseClient.from('workspace_documents').select('doc_id,revision,body').eq('user_id', currentUser.id); const r = (data || []).find(x => x.doc_id === 'ws4_old'); return { local: _ws4Projects().some(x => x.id === 'ws4_old'), pending: _wsRecoverable().some(x => x.docId === 'ws4_old'), remoteRev: r && r.revision, bodyRev: r && r.body && r.body.revision }; });
+  ok(`${T} recuperar a mano: vuelve en local, sale de la lista y se sube acreditado (revisión en el cuerpo)`, rec2.local && !rec2.pending && rec2.remoteRev >= 2 && typeof rec2.bodyRev === 'number', JSON.stringify(rec2));
   ok(`${T} «Tus planes» no se queda en «Comprobando» tras la lectura`, await p.evaluate(() => !_wsDocsPullInFlight && _wsPlansEmptyState() !== 'loading'));
   // Edición local MÁS NUEVA que la remota: la lectura no la pisa.
   await p.evaluate(() => { const d = _ws4Projects().find(x => x.id === 'ws4_sync_a'); d.customName = 'Plan de A editado'; _ws4Persist(d); _wsDocsPulledFor = null; });
