@@ -5291,6 +5291,8 @@ const T = {
     reNamePH:          'ej. Apartamento Madrid',
     // Transaction modal
     txModalTitle:      'Añadir transacción',
+    // Comprar o vender REGISTRA la posición: no hay contrapartida automática en la liquidez.
+    tradeRecordNote:   'Aurix registra la operación en tu cartera; no mueve dinero ni descuenta tu liquidez.',
     txTypeLabel:       'Tipo',
     txTypeBuy:         'Compra',
     txTypeSell:        'Venta',
@@ -8631,6 +8633,7 @@ const T = {
     reNamePH:          'e.g. Madrid Apartment',
     // Transaction modal
     txModalTitle:      'Add transaction',
+    tradeRecordNote:   'Aurix records the trade in your portfolio; it does not move money or deduct from your cash.',
     txTypeLabel:       'Type',
     txTypeBuy:         'Buy',
     txTypeSell:        'Sell',
@@ -75780,6 +75783,9 @@ document.getElementById('manualPrice')?.addEventListener('input', updatePreview)
 // ── Add Asset ──────────────────────────────────────────────
 assetForm.addEventListener('submit', e => {
   e.preventDefault();
+  // UN ENVÍO POR APERTURA. Al cerrarse, la hoja deja de recibir clics, pero el foco sigue
+  // en su campo y un segundo Enter la volvía a enviar: un inmueble entraba dos veces.
+  if (!modalOverlay.classList.contains('open')) return;
 
   // WL.2 (Fase 2 — Wealth Location): read the optional location/custodian once
   // so every add/buy/edit branch below can stamp it. null when left blank →
@@ -76155,6 +76161,7 @@ function _reduceApplyMode(isCash) {
   set('button[type="submit"]', 'reduceCashConfirm');
   const valRow = document.getElementById('previewValueLeft');
   if (valRow && valRow.parentElement) valRow.parentElement.hidden = !!isCash;
+  const note = ov.querySelector('[data-trade-note]'); if (note) note.hidden = !!isCash;
 }
 
 function closeReduceModal() {
@@ -76350,6 +76357,7 @@ function openAddModal(id) {
   `;
 
   addQtyLabelEl.textContent = isCash ? t('addQtyLabelCash') : t('addQtyLabel')(isGold ? asset.goldUnit || 'g' : null);
+  { const n = document.querySelector('#addOverlay [data-trade-note]'); if (n) n.hidden = !!isCash; }
   addQtyInput.value         = '';
   addError.textContent      = '';
   previewAddQtyTotal.textContent   = isCash
@@ -76708,6 +76716,9 @@ document.querySelectorAll('.re-curr-btn').forEach(btn => {
 
 liquidityForm.addEventListener('submit', e => {
   e.preventDefault();
+  // UN ENVÍO POR APERTURA: un doble Enter registraba la aportación dos veces (1.000 € → 2.000 €
+  // con dos operaciones). Reducir/añadir ya lo evitaban anulando su destino al cerrar.
+  if (!liquidityOverlay.classList.contains('open')) return;
   const curr = liquidityCurrIn.value || 'EUR';
   const qty  = parseLocalFloat(liquidityQtyInput.value);
   if (isNaN(qty) || qty <= 0) { liquidityQtyInput.focus(); return; }
