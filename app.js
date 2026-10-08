@@ -15222,18 +15222,21 @@ function computeRangePnL(range) {
   return null;
 }
 
+// Separador del idioma activo («0,12» en ES, «0.12» en EN). Antes era 'es-ES' fijo y en
+// inglés las cantidades salían con coma decimal. Mismos dígitos: sólo cambia el separador.
+function _qtyLocale() { return (typeof lang !== 'undefined' && lang === 'en') ? 'en-US' : 'es-ES'; }
 function formatQty(n) {
   const abs = Math.abs(n);
-  if (abs >= 1000) return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(n);
-  if (abs >= 1)    return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 4 }).format(n);
-  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 8 }).format(n);
+  if (abs >= 1000) return new Intl.NumberFormat(_qtyLocale(), { maximumFractionDigits: 2 }).format(n);
+  if (abs >= 1)    return new Intl.NumberFormat(_qtyLocale(), { maximumFractionDigits: 4 }).format(n);
+  return new Intl.NumberFormat(_qtyLocale(), { maximumFractionDigits: 8 }).format(n);
 }
 
 // Formats a gram quantity: auto-promotes to kg at ≥ 1 000 g (max 2 decimal places).
 function gramsToDisplay(g) {
   if (g >= 1000) {
     const kg = +(g / 1000).toFixed(2);
-    return `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(kg)} kg`;
+    return `${new Intl.NumberFormat(_qtyLocale(), { maximumFractionDigits: 2 }).format(kg)} kg`;
   }
   return `${formatQty(g)} g`;
 }
