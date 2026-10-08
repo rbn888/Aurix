@@ -30473,3 +30473,9 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .market-status.crypto .dot { background: #c39bff; }
 .wsc-ylab { color: #b7c3d8; }                                   /* ejes: 3,22 → ≥ 4,5 */
 .mobile-chart-wrap .wsc-ylab { opacity: 1; }
+/* SPEC 2 · portada Free de Workspace: un ejemplo de uso concreto bajo el subtítulo. */
+.wsfc-eg { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: #c2ccdd; }
+/* El ejemplo NO puede comerse el encaje certificado de la portada (CTA sin scroll a 360×740): en
+   pantallas bajas se omite; el paywall al que lleva el CTA ya da ejemplos por capacidad. */
+.wsfc-sub + .wsfc-eg { margin-top: 4px; }
+@media (max-height: 760px) { .wsfc-eg { display: none; } }

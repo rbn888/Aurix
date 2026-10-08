@@ -6560,6 +6560,8 @@ const T = {
     wsfc_eyebrow:      'WORKSPACE',
     wsfc_title:        'Organiza, calcula y planifica tu patrimonio',
     wsfc_sub:          'Tus herramientas y plantillas para explorar escenarios, ordenar tus finanzas y dar forma a tus planes.',
+    // Usos concretos, sin datos simulados: qué puede hacer alguien con estas capacidades.
+    wsfc_eg:           'Por ejemplo: calcular la cuota de una hipoteca, preparar el presupuesto del mes o saber cuánto te falta para un objetivo.',
     wsfc_cta:          'Descubrir Workspace completo',
     // La espera mientras el servidor resuelve el plan. No afirma NADA del plan.
     wsfc_pending:      'Preparando tu espacio de trabajo…',
@@ -9563,6 +9565,7 @@ const T = {
     wsfc_eyebrow:      'WORKSPACE',
     wsfc_title:        'Organize, calculate and plan your wealth',
     wsfc_sub:          'Your tools and templates to explore scenarios, put your finances in order and give shape to your plans.',
+    wsfc_eg:           'For example: work out a mortgage payment, prepare this month’s budget or see how far you are from a goal.',
     wsfc_cta:          'Explore the full Workspace',
     wsfc_pending:      'Preparing your workspace…',
     wspl_title:           'Your plans',
@@ -27379,6 +27382,7 @@ function _renderWorkspaceFreeCover() {
           <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'WORKSPACE'))}</p>
           <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
           <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
+          <p class="wsfc-eg">${esc(tx('wsfc_eg', ''))}</p>
           <ul class="wsfc-caps" data-wsfc-caps="${caps.length}">
             ${caps.map(c => `<li class="wsfc-cap" data-ws-accent="${esc(_WS_TOOL_ACCENT[c.k] || 'blue')}">
               <span class="wsfc-cap-ico">${_wsCapIconHtml(c.icon)}</span>
