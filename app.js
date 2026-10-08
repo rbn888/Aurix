@@ -11189,6 +11189,9 @@ function switchLang(newLang) {
     // also re-applies the .tab-placeholder--intel scroll-owner hook).
     _applyTab(currentTab);
   } else {
+    // Las tarjetas de categoría sólo se reconstruyen si cambia su firma (presencia por categoría), y
+    // el idioma no forma parte de ella: «Ver activos →» se quedaba en el idioma anterior. Se invalida.
+    try { const _cg = document.getElementById('categoriesGrid'); if (_cg) delete _cg.dataset.sig; } catch (_) {}
     render();
     updateDonut();
     // El gráfico pinta sus textos (p. ej. «Histórico en construcción») al dibujarse: sin repintarlo
