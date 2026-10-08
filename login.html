@@ -387,7 +387,7 @@
         <p class="beta-hint" data-i18n="lg.emb.text">Abre Aurix en Safari o Chrome para mantener tu sesión iniciada y acceder más fácilmente la próxima vez.</p>
         <button id="embOpen" type="button" class="auth-btn" data-i18n="lg.emb.cta">Abrir en el navegador</button>
         <button id="embCopy" type="button" class="auth-link" data-i18n="lg.emb.copy">Copiar enlace</button>
-        <p id="embManual" class="otp-hint" style="display:none" data-i18n="lg.emb.manual">Pulsa ⋯ y selecciona «Abrir en Safari».</p>
+        <p id="embManual" class="otp-hint" style="display:none" data-i18n="lg.emb.manual">Pulsa ⋯ (o el icono de Safari) y elige «Abrir en Safari». También puedes copiar el enlace y pegarlo en Safari.</p>
         <p class="otp-hint" data-i18n="lg.emb.micro">Solo tendrás que iniciar sesión una vez en ese navegador.</p>
       </div>
 
@@ -693,7 +693,7 @@
         'lg.emb.copy': 'Copiar enlace',
         'lg.emb.copied': 'Enlace copiado',
         'lg.emb.micro': 'Solo tendrás que iniciar sesión una vez en ese navegador.',
-        'lg.emb.manual': 'Pulsa ⋯ y selecciona «Abrir en Safari».',
+        'lg.emb.manual': 'Pulsa ⋯ (o el icono de Safari) y elige «Abrir en Safari». También puedes copiar el enlace y pegarlo en Safari.',
         'lg.emb.manual_android': 'Pulsa ⋮ y selecciona «Abrir en el navegador».'
       },
       en: {
@@ -731,7 +731,7 @@
         'lg.emb.copy': 'Copy link',
         'lg.emb.copied': 'Link copied',
         'lg.emb.micro': 'You will only need to sign in once in that browser.',
-        'lg.emb.manual': 'Tap ⋯ and choose “Open in Safari”.',
+        'lg.emb.manual': 'Tap ⋯ (or the Safari icon) and choose “Open in Safari”. You can also copy the link and paste it into Safari.',
         'lg.emb.manual_android': 'Tap ⋮ and choose “Open in browser”.'
       }
     };
@@ -908,6 +908,16 @@
       var inv = document.querySelector('.invite-section'); if (inv) inv.style.display = 'none';
       var hint = document.querySelector('.beta-hint:not([data-i18n="lg.emb.text"])'); if (hint) hint.style.display = 'none';
       emb.style.display = '';
+      // FUERA DE ANDROID NO HAY SALIDA PROGRAMÁTICA: en iOS `window.open` vuelve a abrir Aurix
+      // DENTRO del mismo navegador de la app (el mismo bloqueo). Así que no se ofrece ese botón:
+      // la acción principal es copiar el enlace y la instrucción para abrirlo en Safari se ve
+      // desde el principio. Android conserva su salida real (`intent://`).
+      if (!/Android/i.test(String(navigator.userAgent || ''))) {
+        var _o = document.getElementById('embOpen'), _c = document.getElementById('embCopy'), _m = document.getElementById('embManual');
+        if (_o) _o.style.display = 'none';
+        if (_c) _c.className = 'auth-btn';
+        if (_m) _m.style.display = '';
+      }
       _authTrace('embedded_browser_detected', { uaEmbedded: true });
       return true;
     }
