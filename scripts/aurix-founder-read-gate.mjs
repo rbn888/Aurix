@@ -44,7 +44,7 @@ const fakeReq = (method = 'GET', headers = {}) => ({ method, headers });
 const ADMIN = 'service-role-de-pruebas-suficientemente-largo-0000';
 const READ = 'aurix-founder-read-token-de-pruebas-largo-123456';
 
-const { overviewHandler: overview, healthHandler: health } =
+const { overviewHandler: overview, healthHandler: health, affiliatesHandler: affiliates } =
   await import('../api/_founder-read-handlers.mjs');
 const tok = await import('../api/_founder-read-token.mjs');
 
@@ -92,7 +92,7 @@ check('query string no autoriza (no se lee la URL)',
   tok.readTokenAuthorized(fakeReq('GET', {})) === false);
 
 stubSource(OVERVIEW_DATA);
-for (const [label, handler] of [['overview', overview], ['health', health]]) {
+for (const [label, handler] of [['overview', overview], ['health', health], ['affiliates', affiliates]]) {
   let r = fakeRes(); await handler(fakeReq('GET', {}), r);
   check(`${label}: sin credencial → 401 genérico`,
     r.statusCode === 401 && r.body?.error?.code === 'UNAUTHORIZED', String(r.statusCode));
@@ -118,10 +118,10 @@ check('no emite set-cookie', !('set-cookie' in ok.headers));
 // (ver sección G) y dos ficheros de ruta rechazarían el deployment entero.
 const ROUTE = 'api/read/[surface].mjs';
 const routeSrc = read(ROUTE).replace(/\/\/.*$/gm, '').trim();
-check(`${ROUTE}: importa los dos handlers`,
-  /import \{ overviewHandler, healthHandler \} from '\.\.\/_founder-read-handlers\.mjs';/.test(routeSrc));
-check(`${ROUTE}: mapea overview y health, y nada más`,
-  /const SURFACES = \{ overview: overviewHandler, health: healthHandler \};/.test(routeSrc));
+check(`${ROUTE}: importa los tres handlers`,
+  /import \{ overviewHandler, healthHandler, affiliatesHandler \} from '\.\.\/_founder-read-handlers\.mjs';/.test(routeSrc));
+check(`${ROUTE}: mapea overview, health y affiliates, y nada más`,
+  /const SURFACES = \{ overview: overviewHandler, health: healthHandler, affiliates: affiliatesHandler \};/.test(routeSrc));
 check(`${ROUTE}: superficie desconocida → 404, sin ruta por defecto`,
   /hasOwnProperty\.call\(SURFACES, surface\)/.test(routeSrc) &&
   /status\(404\)/.test(routeSrc) && !/status\(200\)/.test(routeSrc));
@@ -131,8 +131,8 @@ check(`${ROUTE}: la superficie se lee del router, no de la URL`,
 // guard dentro de los handlers, que es lo que este gate ejecuta de verdad.
 check(`${ROUTE}: no decide credencial ni contrato`,
   !/AURIX_FOUNDER_READ_TOKEN|authorization|contract|Access-Control/i.test(routeSrc));
-check(`${ROUTE}: las dos superficies del contrato Founder están servidas`,
-  ['overview', 'health'].every((k) => new RegExp(`\\b${k}:`).test(routeSrc)));
+check(`${ROUTE}: las tres superficies del contrato Founder están servidas`,
+  ['overview', 'health', 'affiliates'].every((k) => new RegExp(`\\b${k}:`).test(routeSrc)));
 // Los ficheros de ruta antiguos NO deben volver: reintroducirlos sube el cupo
 // a 14 y el deployment se rechaza entero.
 for (const gone of ['api/read/overview.js', 'api/read/health.js']) {
@@ -144,10 +144,10 @@ check('la ruta es .mjs (un .js no puede requerir los módulos .mjs)',
   existsSync(path.join(ROOT, 'api/read/[surface].mjs')) &&
   !existsSync(path.join(ROOT, 'api/read/[surface].js')));
 const handlers = read('api/_founder-read-handlers.mjs').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-check('handlers: ambos exigen el guard',
-  (handlers.match(/guardFounderRead\(req, res\)/g) ?? []).length === 2);
+check('handlers: los tres exigen el guard',
+  (handlers.match(/guardFounderRead\(req, res\)/g) ?? []).length === 3);
 check('handlers: no mencionan CORS', !/Access-Control/i.test(handlers));
-check('handlers: declaran el contrato', (handlers.match(/contract: CONTRACT/g) ?? []).length === 2);
+check('handlers: declaran el contrato', (handlers.match(/contract: CONTRACT/g) ?? []).length === 3);
 check('handlers: sin verbo de escritura',
   !/\b(insert|update|delete|patch|post)\b/i.test(handlers.replace(/method/g, '')));
 

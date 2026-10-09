@@ -352,6 +352,22 @@
       'launch.count': 'Launching in {h} h',
   });
 
+  // AURIX-AFFILIATES-V1 · aviso de recomendación (sólo aparece con un `?ref=`).
+  Object.assign(I18N.es, {
+      'ref.title': 'Has llegado por una recomendación',
+      'ref.body': '¿Recordamos el código de quien te recomendó en este navegador, hasta 30 días, para atribuirle tu registro si te das de alta más tarde? Sólo se guarda el código y la fecha. Si no aceptas, no se guarda nada y la recomendación sólo cuenta si te registras ahora.',
+      'ref.accept': 'Sí, recordarlo',
+      'ref.decline': 'No, gracias',
+      'ref.more': 'Privacidad',
+  });
+  Object.assign(I18N.en, {
+      'ref.title': 'You arrived through a referral',
+      'ref.body': 'May we remember the referrer’s code in this browser, for up to 30 days, so your sign-up is credited to them if you join later? Only the code and the date are stored. If you decline, nothing is stored and the referral only counts if you sign up now.',
+      'ref.accept': 'Yes, remember it',
+      'ref.decline': 'No, thanks',
+      'ref.more': 'Privacy',
+  });
+
   var LS_KEY = 'aurix_lang';
   // M.03 · B — ELECCIÓN EXPLÍCITA vs IDIOMA POR DEFECTO.
   //
@@ -571,7 +587,7 @@
   }
   function updateAppLinks() {
     var links = document.querySelectorAll('[data-app-link]');
-    for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlForLang());
+    for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlWithRef());
   }
   // Soporte y legales: páginas PÚBLICAS servidas por el dominio de la app. El
   // idioma viaja en `?lang=` (elección explícita, no una pista): quien está
@@ -584,6 +600,154 @@
       var page = LEGAL_URLS[links[i].getAttribute('data-legal-link')];
       if (page) links[i].setAttribute('href', APP_URL + page + '?lang=' + v);
     }
+  }
+
+  /* ── AURIX-AFFILIATES-V1 · ATRIBUCIÓN DE PRIMERA PARTE ──────────────────────
+     Un enlace de afiliado es `aurixsystem.io/?ref=123456` (6 dígitos exactos; lo
+     demás se ignora). Aurix NO calcula comisiones: sólo traslada a la app de qué
+     códigos vino este visitante, y la BD lo fija UNA vez, al registrarse.
+
+     CONSENTIMIENTO. Sin él no se guarda NADA en el dispositivo: el código viaja
+     sólo en el enlace a la app (vale si se registra en esta misma visita). Con
+     él, hasta 5 códigos DISTINTOS {code, seenAt} en orden de primera vista, en
+     localStorage, y se podan los de más de 30 días. El aviso sale SÓLO si hay
+     un `ref` en la URL o ya guardado: un visitante normal no ve ningún banner.
+     Si llega un sexto código distinto se descarta el más antiguo (la ventana
+     siempre son las 5 recomendaciones más recientes).
+
+     VISITAS. Con un `?ref=` válido se suma UNA visita por carga de página al
+     contador anónimo `aurix_affiliate_click` (PostgREST, clave publicable). No
+     guarda nada en el dispositivo, así que no necesita consentimiento. Es un
+     indicador inflable, nunca evidencia de dinero.
+
+     HACIA LA APP. Con toques, el CTA lleva a `login.html` (no a la raíz: la raíz
+     redirige al acceso SIN conservar la query) con `aref=<code>-<seg36>.…` y,
+     si hubo consentimiento, `aconsent=1`. Las funciones puras de este bloque
+     (entre los marcadores) las ejecuta el harness tal cual. */
+  /* AURIX-REF:BEGIN */
+  var REF_RE = /^[0-9]{6}$/;
+  var REF_MAX = 5;
+  var REF_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  var REF_LS_KEY = 'aurix_ref_touches';
+  var REF_CONSENT_KEY = 'aurix_ref_consent';
+  function refFromSearch(search) {
+    var m = /[?&]ref=([^&#]*)/.exec(String(search || ''));
+    if (!m) return null;
+    var v = m[1];
+    try { v = decodeURIComponent(v); } catch (_) { return null; }
+    return REF_RE.test(v) ? v : null;
+  }
+  // Limpia, deduplica, poda (>30 días o fecha futura imposible) y ordena por
+  // primera vista. Nunca devuelve más de REF_MAX.
+  function refPrune(touches, nowMs) {
+    var out = [], seen = {};
+    var list = Array.isArray(touches) ? touches : [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      if (!t || typeof t.code !== 'string' || !REF_RE.test(t.code)) continue;
+      var at = Date.parse(t.seenAt);
+      if (!isFinite(at) || at < nowMs - REF_TTL_MS || at > nowMs + 5 * 60 * 1000) continue;
+      if (seen[t.code]) continue;
+      seen[t.code] = 1;
+      out.push({ code: t.code, seenAt: new Date(at).toISOString() });
+    }
+    out.sort(function (a, b) { return Date.parse(a.seenAt) - Date.parse(b.seenAt); });
+    return out.length > REF_MAX ? out.slice(out.length - REF_MAX) : out;
+  }
+  function refMerge(touches, code, nowMs) {
+    var list = refPrune(touches, nowMs);
+    if (code && REF_RE.test(code)) {
+      var has = false;
+      for (var i = 0; i < list.length; i++) if (list[i].code === code) has = true;
+      if (!has) list.push({ code: code, seenAt: new Date(nowMs).toISOString() });
+    }
+    return refPrune(list, nowMs);
+  }
+  // Compacto y seguro en URL: `123456-<segundos en base 36>` separados por `.`.
+  function refEncode(touches) {
+    var parts = [];
+    for (var i = 0; i < touches.length && i < REF_MAX; i++) {
+      parts.push(touches[i].code + '-' + Math.floor(Date.parse(touches[i].seenAt) / 1000).toString(36));
+    }
+    return parts.join('.');
+  }
+  /* AURIX-REF:END */
+
+  var REF_URL_CODE = null;     // el `?ref=` de ESTA carga, si es válido
+  var REF_TOUCHES = [];        // en memoria SIEMPRE; en disco sólo con consentimiento
+  var REF_CONSENT = false;
+  function refStorageGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+  function refPersist() {
+    if (!REF_CONSENT) return;   // sin consentimiento, ni una escritura
+    try {
+      if (REF_TOUCHES.length) localStorage.setItem(REF_LS_KEY, JSON.stringify(REF_TOUCHES));
+      else localStorage.removeItem(REF_LS_KEY);
+    } catch (_) {}
+  }
+  function initReferral() {
+    var now = Date.now();
+    REF_URL_CODE = refFromSearch(location.search);
+    REF_CONSENT = refStorageGet(REF_CONSENT_KEY) === '1';
+    var stored = [];
+    if (REF_CONSENT) { try { stored = JSON.parse(refStorageGet(REF_LS_KEY) || '[]'); } catch (_) { stored = []; } }
+    REF_TOUCHES = refMerge(stored, REF_URL_CODE, now);
+    refPersist();
+    if (REF_URL_CODE) countReferralVisit(REF_URL_CODE);
+    if (REF_URL_CODE && !REF_CONSENT) showReferralNotice();
+  }
+  function appUrlWithRef() {
+    var base = appUrlForLang();
+    if (!REF_TOUCHES.length) return base;
+    return APP_URL + 'login.html' + base.slice(APP_URL.length)
+      + '&aref=' + refEncode(REF_TOUCHES) + (REF_CONSENT ? '&aconsent=1' : '');
+  }
+  // Fire-and-forget. Si falla, la visita no cuenta y no pasa nada más.
+  var AURIX_SUPABASE_URL = 'https://ozcasyufbknnuemllwso.supabase.co';
+  var AURIX_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_wlZsjnPGXay9jsRqcXA08Q_bVhmI7sU';
+  function countReferralVisit(code) {
+    try {
+      if (typeof fetch !== 'function') return;
+      fetch(AURIX_SUPABASE_URL + '/rest/v1/rpc/aurix_affiliate_click', {
+        method: 'POST', keepalive: true, credentials: 'omit',
+        headers: { 'Content-Type': 'application/json', apikey: AURIX_SUPABASE_PUBLISHABLE_KEY,
+                   Authorization: 'Bearer ' + AURIX_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ p_code: code })
+      }).catch(function () {});
+    } catch (_) {}
+  }
+  function showReferralNotice() {
+    if (document.getElementById('refNotice')) return;
+    var box = document.createElement('section');
+    box.id = 'refNotice';
+    box.className = 'ref-notice';
+    box.setAttribute('role', 'region');
+    box.setAttribute('aria-labelledby', 'refNoticeTitle');
+    box.innerHTML =
+      '<p class="ref-notice-title" id="refNoticeTitle" data-i18n="ref.title"></p>' +
+      '<p class="ref-notice-body" data-i18n="ref.body"></p>' +
+      '<div class="ref-notice-actions">' +
+        '<button type="button" class="ref-btn ref-btn-primary" data-ref-consent="1" data-i18n="ref.accept"></button>' +
+        '<button type="button" class="ref-btn" data-ref-consent="0" data-i18n="ref.decline"></button>' +
+        '<a class="ref-more" data-legal-link="privacy" href="' + APP_URL + 'privacy.html" data-i18n="ref.more"></a>' +
+      '</div>';
+    var nodes = box.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < nodes.length; i++) nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
+    box.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('[data-ref-consent]') : null;
+      if (!b) return;
+      if (b.getAttribute('data-ref-consent') === '1') {
+        REF_CONSENT = true;
+        try { localStorage.setItem(REF_CONSENT_KEY, '1'); } catch (_) {}
+        refPersist();
+      }
+      // Rechazar no guarda NADA (tampoco un "no"): el aviso volverá con el
+      // próximo enlace de recomendación, y mientras tanto el código sólo viaja
+      // en el enlace a la app.
+      if (box.parentNode) box.parentNode.removeChild(box);
+      updateAppLinks();
+    });
+    document.body.appendChild(box);
+    updateLegalLinks();
   }
 
   /* ── Init ───────────────────────────────────────────── */
@@ -688,6 +852,7 @@
   window.addEventListener('pageshow', applyLaunchGate);
 
   function init() {
+    initReferral();   // AURIX-AFFILIATES-V1 — antes de pintar los CTA
     applyLang(detectLang());
 
     // Point every "Enter Aurix" CTA at the canonical app URL (with ?lang=).

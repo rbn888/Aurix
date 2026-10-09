@@ -1,5 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════════
-// AURIX-FOUNDER-READ-1 · los dos handlers del contrato `aurix.read.v1`
+// AURIX-FOUNDER-READ-1 · los handlers del contrato `aurix.read.v1`
+// (overview · health · affiliates — este último desde AURIX-AFFILIATES-V1)
 // ════════════════════════════════════════════════════════════════════════════
 // Viven en un módulo `.mjs` (fuera del enrutado, por el prefijo `_`) y las rutas
 // `api/read/*.js` solo los delegan. Motivo: el paquete no declara
@@ -7,7 +8,7 @@
 // Vercel — y este código gobierna una frontera de seguridad que TIENE que poder
 // ejecutarse en un gate local, tal cual, sin duplicarlo ni simularlo.
 //
-// Ambos handlers: solo GET · credencial propia · sin CORS · sin cookies · sin
+// Todos los handlers: solo GET · credencial propia · sin CORS · sin cookies · sin
 // escritura · y todo subsistema ausente se declara `available: false`.
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -30,10 +31,11 @@ import { CONTRACT, callAggregate, platformIdentity, unavailable } from './_found
  * NO EXPONE filas de usuario, emails, nombres, user_ids, holdings, símbolos,
  * valores de cartera ni flujos de capital.
  *
- * MONETIZACIÓN: fuera del contrato a propósito. `user_portfolios.subscription`
- * es estado declarado por el cliente en prelanzamiento (ENFORCE_ENTITLEMENTS =
- * false) y no es verdad comercial: publicarlo sería presentar lo planeado como
- * real.
+ * MONETIZACIÓN: fuera de ESTA superficie. `user_portfolios.subscription` es un
+ * espejo que sincroniza el cliente y no es verdad comercial, así que no se lee.
+ * Desde M.04 la verdad comercial existe y vive en servidor (billing_* /
+ * subscriptions, escritos sólo por el webhook de Stripe); la evidencia de cobro
+ * que Founder necesita se publica aparte, en `/api/read/affiliates`.
  */
 export async function overviewHandler(req, res) {
   if (!guardFounderRead(req, res)) return;
@@ -83,5 +85,40 @@ export async function healthHandler(req, res) {
     integrity: agg.ok ? agg.data.integrity : unavailable(agg.reason),
     continuity: agg.ok ? agg.data.continuity : unavailable(agg.reason),
     providers: { available: false, reason: 'per_instance_counters_not_durable' },
+  });
+}
+
+/**
+ * GET /api/read/affiliates — EVIDENCIA para las comisiones de afiliado.
+ *
+ * Aurix no calcula comisiones: publica lo que necesita Founder Platform para
+ * calcularlas, desde `public.founder_read_affiliates()`
+ * (db/founder_read_affiliates_1.sql):
+ *   attributions → public.acquisition_attributions + auth.users (alta y hash del
+ *                  correo; nunca el correo)
+ *   payments     → public.billing_payments (sólo Premium, sólo de usuarios con
+ *                  atribución) + premiumBefore
+ *   refunds      → public.billing_refunds   (enlazados por payment intent)
+ *   disputes     → public.billing_disputes  (enlazados por payment intent)
+ *   clicks       → public.affiliate_clicks  (indicador anónimo; no es evidencia
+ *                  de dinero)
+ *
+ * A DIFERENCIA de overview/health, esta superficie SÍ lleva filas por usuario:
+ * una comisión se paga por un cliente concreto. Por eso la función de SQL sólo
+ * devuelve usuarios que llegaron con código, y el correo viaja como hash.
+ *
+ * Este handler no transforma nada: pasa el bloque tal cual o declara
+ * `available: false` con su motivo (no aplicado, sin configurar, inalcanzable).
+ */
+export async function affiliatesHandler(req, res) {
+  if (!guardFounderRead(req, res)) return;
+
+  const agg = await callAggregate('founder_read_affiliates');
+
+  return res.status(200).json({
+    contract: CONTRACT,
+    generatedAt: new Date().toISOString(),
+    platform: platformIdentity(),
+    affiliates: agg.ok ? agg.data : unavailable(agg.reason),
   });
 }

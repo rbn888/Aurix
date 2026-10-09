@@ -657,6 +657,59 @@
       return 'es';
     })();
     document.documentElement.lang = LOGIN_LANG;
+
+    // ── AURIX-AFFILIATES-V1 · TOQUES DE RECOMENDACIÓN DESDE LA LANDING ──────────
+    // Llegan como `?aref=<code>-<seg36>.…` (los arma `refEncode` de landing/app.js),
+    // igual que `?lang=`: el almacenamiento no se comparte entre dominios. El
+    // acceso es OTP con CÓDIGO dentro de esta página (no hay enlace mágico ni
+    // emailRedirectTo), así que la URL —y con ella `aref`— sigue aquí hasta el
+    // verify; recargar la pestaña la conserva. Se guardan en sessionStorage SÓLO
+    // si la landing trajo `aconsent=1`; si no, viven en memoria y nada más.
+    // Tras confirmar la sesión se llama UNA vez a `aurix_attribution_capture`
+    // (la BD valida y decide; sólo acepta cuentas de < 24 h). Cualquier fallo se
+    // ignora: la atribución jamás bloquea un acceso.
+    const _AFF_SS_KEY = 'aurix_ref_touches';
+    /* AURIX-AREF:BEGIN */
+    function _affDecode(raw, nowMs) {
+      const out = [], seen = {};
+      String(raw || '').split('.').slice(0, 5).forEach(function (part) {
+        const m = /^([0-9]{6})-([0-9a-z]{1,10})$/.exec(part);
+        if (!m || seen[m[1]]) return;
+        const ms = parseInt(m[2], 36) * 1000;
+        if (!isFinite(ms) || ms < nowMs - 31 * 864e5 || ms > nowMs + 5 * 60e3) return;
+        seen[m[1]] = 1;
+        out.push({ code: m[1], seenAt: new Date(ms).toISOString() });
+      });
+      return out.length ? out : null;
+    }
+    /* AURIX-AREF:END */
+    let _AFF_TOUCHES = (function () {
+      try {
+        const q = new URLSearchParams(location.search);
+        const fromUrl = _affDecode(q.get('aref'), Date.now());
+        if (fromUrl) {
+          if (q.get('aconsent') === '1') { try { sessionStorage.setItem(_AFF_SS_KEY, JSON.stringify(fromUrl)); } catch (_) {} }
+          return fromUrl;
+        }
+        let ss = null; try { ss = JSON.parse(sessionStorage.getItem(_AFF_SS_KEY) || 'null'); } catch (_) { ss = null; }
+        return (Array.isArray(ss) && ss.length) ? ss : null;
+      } catch (_) { return null; }
+    })();
+    let _affCaptureDone = false;
+    function _affCapture() {
+      if (_affCaptureDone || !_AFF_TOUCHES || !client) return Promise.resolve();
+      _affCaptureDone = true;
+      const touches = _AFF_TOUCHES;
+      _AFF_TOUCHES = null;
+      try { sessionStorage.removeItem(_AFF_SS_KEY); } catch (_) {}
+      try {
+        const call = Promise.resolve(client.rpc('aurix_attribution_capture', { p_touches: touches }))
+          .then(function () {}, function () {});
+        // Acotado: como mucho 1,5 s antes de entrar, nunca un acceso colgado.
+        return Promise.race([call, new Promise(function (r) { setTimeout(r, 1500); })]).catch(function () {});
+      } catch (_) { return Promise.resolve(); }
+    }
+
     const LOGIN_I18N = {
       es: {
         'lg.title': 'AURIX — Acceso',
@@ -1560,6 +1613,7 @@
         const onAurix = window.location.pathname.startsWith('/Aurix/');
         const target  = window.location.origin + (onAurix ? '/Aurix/' : '/') + 'index.html';
         _authTrace('otp:redirect-attempt', { redirectAttempted: true, sessionPresent: true });
+        try { await _affCapture(); } catch (_) {}   // AURIX-AFFILIATES-V1 · nunca bloquea
         window.location.replace(target);
 
       } finally {

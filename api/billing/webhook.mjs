@@ -59,6 +59,9 @@
 //
 // Required env (Vercel):  STRIPE_WEBHOOK_SECRET, SUPABASE_URL,
 //                         SUPABASE_SERVICE_ROLE_KEY
+// Used if present:        STRIPE_SECRET_KEY (test-mode gate; and, for
+//                         `invoice.paid` in the basil shape, a read-only lookup
+//                         of the invoice's payment intent)
 //
 // Stripe treats a non-2xx as "retry later", which is what we want for a
 // transient failure and NOT what we want for an event we have deliberately
@@ -73,15 +76,29 @@ const PROVIDER = 'stripe';
 // captured request IS a valid signature — the timestamp is the only thing that
 // makes it stale.
 const TOLERANCE_SEC = 300;
-// Only these change commercial state. Everything else is recorded and ignored:
+// Only these change commercial state (plus the payment EVIDENCE set below, which
+// changes none). Everything else is recorded and ignored:
 // `checkout.session.completed` in particular grants NOTHING here — it can arrive
 // without period bounds, and B1's premium_bound constraint exists precisely
 // because such a row is byte-identical to a lifetime purchase.
-const HANDLED = new Set([
+const SUBSCRIPTION_EVENTS = new Set([
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',
 ]);
+// AURIX-AFFILIATES-V1 · EVIDENCIA DE COBRO. Estos cinco NO cambian el acceso: van
+// a OTRO escritor (`aurix_billing_record_payment_event`, db/billing_payments_1.sql)
+// que sólo REGISTRA lo cobrado, reembolsado o disputado para que Founder Platform
+// calcule comisiones sobre dinero real. Misma firma, misma puerta de modo TEST y
+// mismo ledger de idempotencia que las suscripciones.
+const PAYMENT_EVENTS = new Set([
+  'invoice.paid',
+  'charge.refunded',
+  'charge.dispute.created',
+  'charge.dispute.updated',
+  'charge.dispute.closed',
+]);
+const HANDLED = new Set([...SUBSCRIPTION_EVENTS, ...PAYMENT_EVENTS]);
 
 const json = (obj, status) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -143,6 +160,119 @@ function periodOf(o, item, key) {
 // exterior. Los logs de Vercel son "exterior" a efectos de esa clasificación.
 function safeDetail(txt) {
   return String(txt || '').split(/DETAIL|CONTEXT|Failing row/i)[0].slice(0, 200);
+}
+
+// ── EVIDENCIA DE COBRO: extracción de las DOS formas del payload ────────────
+// La versión de API del endpoint no la controlamos (ver "DÓNDE VIVE EL
+// PERIODO"). Desde `2025-03-31.basil` Stripe QUITÓ `invoice.payment_intent`,
+// `invoice.charge` y `charge.invoice`; movió la suscripción de la factura a
+// `parent.subscription_details.subscription` y el precio de cada línea a
+// `lines.data[].pricing.price_details.price`. Se leen las dos formas.
+const idOf = (v) => (typeof v === 'string' && v) ? v
+  : (v && typeof v === 'object' && typeof v.id === 'string' && v.id) ? v.id : null;
+const intOf = (v) => (Number.isInteger(v) && v >= 0) ? v : null;
+
+function invoiceLinePrice(inv) {
+  const lines = (inv && inv.lines && Array.isArray(inv.lines.data)) ? inv.lines.data : [];
+  const priceOf = (l) => idOf(l && l.price)
+    || idOf(l && l.pricing && l.pricing.price_details && l.pricing.price_details.price);
+  // La línea de la suscripción (no un prorrateo) es la que dice QUÉ se compró.
+  const isSub = (l) => l && (l.type === 'subscription'
+    || (l.parent && l.parent.type === 'subscription_item_details'));
+  const pick = lines.find(l => isSub(l) && !l.proration && priceOf(l))
+    || lines.find(l => isSub(l) && priceOf(l))
+    || lines.find(l => priceOf(l));
+  return pick ? priceOf(pick) : null;
+}
+
+// Forma `basil`: la factura ya no trae su payment intent. Se pide a Stripe
+// (`GET /v1/invoice_payments?invoice=…`, sólo lectura, sin SDK) y se toma el del
+// pago `paid`. Sin clave o sin respuesta ⇒ null, y el escritor lo registra como
+// `missing_link` (el webhook contesta 500 y Stripe reintenta): perder el enlace
+// en silencio dejaría un reembolso futuro imposible de descontar.
+async function paymentIntentFromInvoicePayments(invoiceId, stripeKey) {
+  if (!invoiceId || !stripeKey) return null;
+  try {
+    const r = await fetch('https://api.stripe.com/v1/invoice_payments?invoice='
+      + encodeURIComponent(invoiceId) + '&limit=10', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${stripeKey}`, 'Stripe-Version': '2025-03-31.basil' },
+    });
+    if (!r || !r.ok) return null;
+    const body = await r.json().catch(() => null);
+    const list = (body && Array.isArray(body.data)) ? body.data : [];
+    const paid = list.find(p => p && p.status === 'paid' && p.payment && idOf(p.payment.payment_intent));
+    return paid ? idOf(paid.payment.payment_intent) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function recordPaymentEvent(event, rpc, stripeKey) {
+  const o = (event.data && event.data.object) || {};
+  const base = {
+    p_provider: PROVIDER,
+    p_event_id: String(event.id),
+    p_event_type: String(event.type).slice(0, 120),
+    p_event_at: iso(event.created) || new Date().toISOString(),
+    p_livemode: event.livemode === true,
+    p_customer_id: idOf(o.customer),
+    p_invoice_id: null, p_subscription_id: null, p_payment_intent_id: null,
+    p_charge_id: null, p_price_id: null, p_amount: null,
+    p_currency: (typeof o.currency === 'string') ? o.currency : null,
+    p_billing_reason: null, p_paid_at: null, p_dispute_id: null, p_status: null,
+  };
+
+  if (event.type === 'invoice.paid') {
+    const paid = intOf(o.amount_paid);
+    let pi = idOf(o.payment_intent);                                   // forma antigua
+    if (!pi && paid > 0) pi = await paymentIntentFromInvoicePayments(idOf(o.id), stripeKey);
+    Object.assign(base, {
+      p_invoice_id: idOf(o.id),
+      p_subscription_id: idOf(o.subscription)                          // forma antigua
+        || idOf(o.parent && o.parent.subscription_details
+                && o.parent.subscription_details.subscription),      // forma basil
+      p_payment_intent_id: pi,
+      p_price_id: invoiceLinePrice(o),
+      p_amount: paid,
+      p_billing_reason: (typeof o.billing_reason === 'string') ? o.billing_reason.slice(0, 60) : null,
+      p_paid_at: iso(o.status_transitions && o.status_transitions.paid_at),
+    });
+  } else if (event.type === 'charge.refunded') {
+    // `amount_refunded` es ACUMULADO: el escritor se queda con el máximo.
+    Object.assign(base, {
+      p_payment_intent_id: idOf(o.payment_intent),
+      p_charge_id: idOf(o.id),
+      p_amount: intOf(o.amount_refunded),
+    });
+  } else {
+    // charge.dispute.*: el objeto es la disputa.
+    Object.assign(base, {
+      p_dispute_id: idOf(o.id),
+      p_payment_intent_id: idOf(o.payment_intent),
+      p_charge_id: idOf(o.charge),
+      p_amount: intOf(o.amount),
+      p_status: (typeof o.status === 'string') ? o.status.slice(0, 60) : null,
+    });
+  }
+
+  try {
+    const r = await rpc('aurix_billing_record_payment_event', base);
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '');
+      console.error('[billing/webhook] record failed', r.status, safeDetail(detail));
+      return json({ ok: false, error: 'record_failed' }, 500);
+    }
+    const out = await r.json().catch(() => null);
+    const outcome = (out && out.outcome) || 'recorded';
+    // Cobro sin payment intent: la fila está guardada, el enlace no. 500 a
+    // propósito para que Stripe reintente y el reintento lo complete.
+    if (outcome === 'missing_link') return json({ ok: false, outcome }, 500);
+    return json({ ok: true, outcome });
+  } catch (e) {
+    console.error('[billing/webhook] record error', (e && e.message) || e);
+    return json({ ok: false, error: 'record_failed' }, 500);
+  }
 }
 
 export default async function handler(request) {
@@ -231,6 +361,10 @@ export default async function handler(request) {
     String(process.env.BILLING_ALLOW_TEST_EVENTS || '').trim() === '1';
   if (event.livemode === false && !_allowTestEvents) {
     return json({ ok: true, outcome: 'ignored_testmode' });
+  }
+
+  if (PAYMENT_EVENTS.has(event.type)) {
+    return recordPaymentEvent(event, rpc, _stripeKey);
   }
 
   const o = (event.data && event.data.object) || {};

@@ -1,4 +1,4 @@
-// /api/read/[surface]  ·  surface = overview | health
+// /api/read/[surface]  ·  surface = overview | health | affiliates
 // ============================================================================
 // AURIX-FOUNDER-READ-1 · la ÚNICA función Serverless de la frontera de lectura
 // que Aurix publica para Founder Platform. Contrato `aurix.read.v1`, SOLO GET.
@@ -35,9 +35,11 @@
 // AVISO PARA QUIEN AÑADA FUNCIONES: `api/` está en el tope del plan. Un fichero
 // nuevo en `api/` que no empiece por `_` rompe el deployment ENTERO.
 
-import { overviewHandler, healthHandler } from '../_founder-read-handlers.mjs';
+import { overviewHandler, healthHandler, affiliatesHandler } from '../_founder-read-handlers.mjs';
 
-const SURFACES = { overview: overviewHandler, health: healthHandler };
+// AURIX-AFFILIATES-V1 · `affiliates` entra como SUPERFICIE, no como fichero: un
+// `api/read/affiliates.js` sería la función 13 y tumbaría el deployment entero.
+const SURFACES = { overview: overviewHandler, health: healthHandler, affiliates: affiliatesHandler };
 
 export default async function handler(req, res) {
   const surface = String((req.query && req.query.surface) || '');
