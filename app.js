@@ -4833,6 +4833,8 @@ const T = {
     chartAvailableHistory:'Historial disponible',
     chartInsufficientHistory: 'Historial insuficiente',
     chartReturnUnavailable:   'Rendimiento no disponible',
+    // Sólo cuando la causa CERTIFICADA es el cambio de base del tipo (EUR a 0,92 → tipo fechado).
+    chartReturnPreparing:     'Rentabilidad en preparación',
     chartTipValue:   'Valor cartera',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
@@ -4898,6 +4900,10 @@ const T = {
     chartReturnFlowNote: 'La curva muestra tu patrimonio, que también sube o baja con lo que añades o retiras. El porcentaje es la rentabilidad sin esas aportaciones ni retiradas.',
     fxBadgeBasis:    d => `Sin variación comparable: hasta el ${d} Aurix valoraba los euros con un cambio fijo (0,92) y desde entonces con el tipo fechado. Comparar ambos puntos daría una rentabilidad que no existe.`,
     fxApproxShort:   'aproximado: cambio EUR/USD no actual',
+    // Ventana que se está construyendo con datos comparables; TOTAL declara su puerta real (21 días).
+    // Sin fecha de llegada: el porcentaje depende también de las demás comprobaciones.
+    chartReturnPreparingNote: (span, d) => `Estamos construyendo ${span} comparable con tipos de cambio actualizados desde el ${d}. Tu historial anterior se conserva. La rentabilidad aparecerá cuando existan datos suficientes y fiables.`,
+    chartReturnPreparingSpan: r => ({ '24h': 'un periodo de 24 horas', '7d': 'un periodo de 7 días', '30d': 'un periodo de 30 días', '1y': 'un periodo de un año' })[r] || 'un periodo de al menos 21 días',
     fxHeroApproxLong: 'Total aproximado: el cambio EUR/USD no es actual (detalle en Ajustes).',
     rateLimit:       'Límite de API — reintentando pronto',
     // Autosave status
@@ -8234,6 +8240,7 @@ const T = {
     chartAvailableHistory:'Available history',
     chartInsufficientHistory: 'Insufficient history',
     chartReturnUnavailable:   'Return unavailable',
+    chartReturnPreparing:     'Return being prepared',
     chartTipValue:   'Portfolio value',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
@@ -8294,6 +8301,8 @@ const T = {
     chartReturnFlowNote: 'The chart shows your wealth, which also rises or falls with what you add or withdraw. The percentage is the return excluding those contributions and withdrawals.',
     fxBadgeBasis:    d => `No comparable change: until ${d} Aurix valued euros at a fixed rate (0.92) and since then at the dated rate. Comparing both points would show a return that does not exist.`,
     fxApproxShort:   'approximate: EUR/USD rate not current',
+    chartReturnPreparingNote: (span, d) => `We are building ${span} comparable with updated exchange rates since ${d}. Your earlier history is kept. The return will appear once there is enough reliable data.`,
+    chartReturnPreparingSpan: r => ({ '24h': 'a 24-hour period', '7d': 'a 7-day period', '30d': 'a 30-day period', '1y': 'a one-year period' })[r] || 'a period of at least 21 days',
     fxHeroApproxLong: 'Approximate total: the EUR/USD rate is not current (details in Settings).',
     rateLimit:       'API limit — retrying soon',
     // Autosave status
@@ -14812,21 +14821,41 @@ function _aurixFxBadgeNote(range, published) {
     if (st.status !== 'live' && _aurixFxEurExposureNative() > 0) return t('fxBadgeApprox');
     // La nota dice lo que el cálculo HIZO: con el gráfico publicado, su motivo; sin él, el rango.
     let limited;
-    if (published && typeof published === 'object') {
-      // El 24H decide en su propia rama de preparación y publica otro motivo: se mira también si lo
-      // publicado NO tiene variación y su línea base cae antes del límite de base del tipo.
-      const bTs = Number(published.baselineTs != null ? published.baselineTs : published.firstTs);
-      limited = published.returnSuppressedReason === 'fx_basis_change' || published.fxBasisLimited === true
-        || (!Number.isFinite(published.returnPct) && Number.isFinite(bTs) && _aurixFxBasisLimited(bTs))
-        // TOTAL «desde fecha fiable» que el subperiodo aún no certifica: sigue limitado por el tipo.
-        || (!Number.isFinite(published.returnPct) && Number.isFinite(published.returnSinceTs));
-    }
+    if (published && typeof published === 'object') limited = _aurixFxBasisLimitedPublished(published);
     else { const span = _AURIX_RANGE_MS[String(range || '').toLowerCase()]; limited = _aurixFxBasisLimited(span ? Date.now() - span : -Infinity); }
     if (!limited) return _aurixReturnContextNote(published);
     const b = _aurixFxBasisBoundary();
     const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES';
     return t('fxBadgeBasis')(new Date(b).toLocaleDateString(loc, { day: '2-digit', month: '2-digit', year: 'numeric' }));
   } catch (_) { return ''; }
+}
+// ¿El resultado PUBLICADO está limitado por el cambio de base del tipo? Lee sus campos; no recalcula.
+function _aurixFxBasisLimitedPublished(published) {
+  // El 24H decide en su propia rama de preparación y publica otro motivo: se mira también si lo
+  // publicado NO tiene variación y su línea base cae antes del límite de base del tipo.
+  const bTs = Number(published.baselineTs != null ? published.baselineTs : published.firstTs);
+  return published.returnSuppressedReason === 'fx_basis_change' || published.fxBasisLimited === true
+    || (!Number.isFinite(published.returnPct) && Number.isFinite(bTs) && _aurixFxBasisLimited(bTs))
+    // TOTAL «desde fecha fiable» que el subperiodo aún no certifica: sigue limitado por el tipo.
+    || (!Number.isFinite(published.returnPct) && Number.isFinite(published.returnSinceTs));
+}
+// «Rentabilidad en preparación»: SÓLO si el resultado publicado no tiene % y la causa es el cambio de
+// base del tipo con el tipo actual en vigor (el tipo no actual tiene su propia nota). Cualquier otro
+// estado neutro (historial insuficiente, carga, error) conserva su etiqueta. Presentación pura.
+function _aurixFxReturnPreparing(published) {
+  try {
+    if (!published || typeof published !== 'object' || Number.isFinite(published.returnPct)) return false;
+    if (typeof _aurixFxBasisBoundary !== 'function' || _aurixFxBasisBoundary() == null) return false;
+    if (_aurixFxEurState().status !== 'live' && _aurixFxEurExposureNative() > 0) return false;
+    return _aurixFxBasisLimitedPublished(published) === true;
+  } catch (_) { return false; }
+}
+function _aurixFxReturnPreparingNote(published) {
+  const r0 = String((published && published.range) || (typeof activeRange !== 'undefined' ? activeRange : '')).toLowerCase();
+  const r = r0 === '1a' ? '1y' : r0;
+  const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES';
+  const d = new Date(_aurixFxBasisBoundary()).toLocaleDateString(loc, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return t('chartReturnPreparingNote')(t('chartReturnPreparingSpan')(r), d);
 }
 // Sin límite del tipo, el badge sólo se explica cuando el lector lo necesita: TOTAL anclado «desde
 // fecha fiable», o curva y porcentaje en sentidos OPUESTOS porque hubo aportaciones o retiradas (la
@@ -14850,7 +14879,8 @@ function _aurixReturnContextNote(published) {
 function _aurixFxMarkBadge(el, published) {
   try {
     _aurixFxBubbleWire();
-    let note = _aurixFxBadgeNote(typeof activeRange !== 'undefined' ? activeRange : '24h', published);
+    let note = _aurixFxReturnPreparing(published) ? _aurixFxReturnPreparingNote(published)
+      : _aurixFxBadgeNote(typeof activeRange !== 'undefined' ? activeRange : '24h', published);
     // La nota de contexto explica «el porcentaje»: sin % pintado (neutro o «Calculando…») no se ata.
     const ctx = !!note && note === _aurixReturnContextNote(published);
     if (ctx && el.getAttribute('data-return-painted') !== '1') note = '';
@@ -42254,7 +42284,7 @@ try { if (typeof window !== 'undefined') window._aurixResolveReturnPresentation 
 // como está. No lee series, no recalcula y no decide estados.
 const _AURIX_CHART_STATE_KEYS = Object.freeze([
   'chartPartialHistory', 'chartAvailableHistory', 'chartInsufficientHistory',
-  'chartReturnUnavailable', 'chartCalculating',
+  'chartReturnUnavailable', 'chartCalculating', 'chartReturnPreparing',
 ]);
 function _aurixRelabelChartStateTexts(root) {
   if (typeof document === 'undefined' || typeof T === 'undefined') return 0;
@@ -47730,6 +47760,9 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
     // BLOCK-B — a restored LKG frame is DEFINITIVE (it passed the publication contract when it was
     // produced), so the badge must publish with it instead of holding: otherwise the line would be
     // on screen with an empty return area and the frame would no longer be atomic.
+    // Sin % por el cambio de base del tipo ⇒ «Rentabilidad en preparación» (mismo tono plano, sin color).
+    const _fxPrep = () => (typeof _aurixFxReturnPreparing === 'function') && _aurixFxReturnPreparing(emg);
+    const _fxPrepText = () => _aurixChartStateI18n('chartReturnPreparing', 'Rentabilidad en preparación');
     const _holdPending = () => { try { if (emg && emg._aurixLkgRestored) return false; return (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending; } catch (_) { return false; } };
     // SPEC DSH.CHART.RETURN-BADGE-TRUST-UNIFICATION.14 — resolve %, colour, badge label + Calculando/neutral
     // from the ONE unified contract (continuity-validated series + proven flow-neutral/maturity gates). The
@@ -47745,7 +47778,7 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
         el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
         el.className = 'chart-change ' + (contract.colorState === 'positive' ? 'up' : (contract.colorState === 'negative' ? 'down' : 'flat'));
       } else if (contract.state === 'neutral') {
-        el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
+        el.innerHTML = '<span class="wsc-metric-val">' + (_fxPrep() ? _fxPrepText() : _aurixReturnInsufficientText()) + '</span>';
         el.className = 'chart-change flat';
       } else {
         // SPEC P0-FIRST-DEFINITIVE-PAINT — non-terminal: publish nothing while sources are pending.
@@ -47755,7 +47788,8 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
         // if the helper is absent (isolated unit context), fall back to the exact prior pending markup.
         const _pb = (typeof _aurixHistoryPresentationBadge === 'function') ? _aurixHistoryPresentationBadge(emg, surface)
           : { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating' };
-        el.innerHTML = _pb.html; el.className = _pb.className;
+        if (_fxPrep()) { el.innerHTML = '<span class="wsc-metric-val">' + _fxPrepText() + '</span>'; el.className = 'chart-change flat'; }
+        else { el.innerHTML = _pb.html; el.className = _pb.className; }
       }
       try { console.log('[UI][RETURN_CONTRACT_BADGE]', { surface: surface || null, contractState: contract.state, reason: contract.reason, returnPct: contract.returnPct, colorState: contract.colorState, continuityState: contract.continuityState, coverageRatio: contract.coverageRatio, badgeEligible: contract.badgeEligible, chartHash: emg && emg.chartHash }); } catch (_) {}
       return;
