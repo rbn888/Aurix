@@ -611,14 +611,15 @@
      sólo en el enlace a la app (vale si se registra en esta misma visita). Con
      él, hasta 5 códigos DISTINTOS {code, seenAt} en orden de primera vista, en
      localStorage, y se podan los de más de 30 días. El aviso sale SÓLO si hay
-     un `ref` en la URL o ya guardado: un visitante normal no ve ningún banner.
+     un `ref` válido en la URL: un visitante normal no ve ningún banner.
      Si llega un sexto código distinto se descarta el más antiguo (la ventana
      siempre son las 5 recomendaciones más recientes).
 
-     VISITAS. Con un `?ref=` válido se suma UNA visita por carga de página al
-     contador anónimo `aurix_affiliate_click` (PostgREST, clave publicable). No
-     guarda nada en el dispositivo, así que no necesita consentimiento. Es un
-     indicador inflable, nunca evidencia de dinero.
+     VISITAS Y REGISTRO. Con un `?ref=` se llama UNA vez por carga a
+     `aurix_affiliate_click` (PostgREST, clave publicable): cuenta la visita y
+     dice si el código existe y está activo en el registro de Founder. Sólo si
+     vale se muestra el aviso, se guarda (con permiso) y se lleva a la app. No
+     guarda nada en el dispositivo, así que no necesita consentimiento.
 
      HACIA LA APP. Con toques, el CTA lleva a `login.html` (no a la raíz: la raíz
      redirige al acceso SIN conservar la query) con `aref=<code>-<seg36>.…` y,
@@ -673,8 +674,9 @@
   }
   /* AURIX-REF:END */
 
-  var REF_URL_CODE = null;     // el `?ref=` de ESTA carga, si es válido
-  var REF_TOUCHES = [];        // en memoria SIEMPRE; en disco sólo con consentimiento
+  var REF_URL_CODE = null;     // el `?ref=` de ESTA carga, si tiene forma válida
+  var REF_TOUCHES = [];        // VALIDADOS por el registro; en disco sólo con consentimiento
+  var REF_UNVERIFIED = [];     // el de esta visita si el registro no respondió: sólo URL, nunca disco
   var REF_CONSENT = false;
   function refStorageGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
   function refPersist() {
@@ -684,36 +686,57 @@
       else localStorage.removeItem(REF_LS_KEY);
     } catch (_) {}
   }
+  // EL REGISTRO DECIDE. Sólo un código que Founder declaró y que está activo
+  // AHORA vale (`aurix_affiliate_click` → {valid}). Válido: se recuerda (con
+  // consentimiento), se pide el consentimiento y viaja a la app. Inválido: se
+  // ignora del todo. Sin respuesta: viaja en el enlace de ESTA visita y nada más
+  // (la BD lo vuelve a validar al capturar).
   function initReferral() {
     var now = Date.now();
     REF_URL_CODE = refFromSearch(location.search);
     REF_CONSENT = refStorageGet(REF_CONSENT_KEY) === '1';
     var stored = [];
     if (REF_CONSENT) { try { stored = JSON.parse(refStorageGet(REF_LS_KEY) || '[]'); } catch (_) { stored = []; } }
-    REF_TOUCHES = refMerge(stored, REF_URL_CODE, now);
+    REF_TOUCHES = refPrune(stored, now);
     refPersist();
-    if (REF_URL_CODE) countReferralVisit(REF_URL_CODE);
-    if (REF_URL_CODE && !REF_CONSENT) showReferralNotice();
+    if (!REF_URL_CODE) return null;
+    var code = REF_URL_CODE;
+    return checkReferralCode(code).then(function (valid) {
+      if (valid === true) {
+        REF_TOUCHES = refMerge(REF_TOUCHES, code, Date.now());
+        refPersist();
+        if (!REF_CONSENT) showReferralNotice();
+      } else if (valid === null) {
+        REF_UNVERIFIED = refMerge([], code, Date.now());
+      }
+      updateAppLinks();
+    });
   }
   function appUrlWithRef() {
     var base = appUrlForLang();
-    if (!REF_TOUCHES.length) return base;
+    var all = REF_UNVERIFIED.length ? refMerge(REF_TOUCHES.concat(REF_UNVERIFIED), null, Date.now()) : REF_TOUCHES;
+    if (!all.length) return base;
     return APP_URL + 'login.html' + base.slice(APP_URL.length)
-      + '&aref=' + refEncode(REF_TOUCHES) + (REF_CONSENT ? '&aconsent=1' : '');
+      + '&aref=' + refEncode(all) + (REF_CONSENT ? '&aconsent=1' : '');
   }
-  // Fire-and-forget. Si falla, la visita no cuenta y no pasa nada más.
+  // Cuenta la visita Y pregunta si el código vale. true / false / null (sin respuesta).
   var AURIX_SUPABASE_URL = 'https://ozcasyufbknnuemllwso.supabase.co';
   var AURIX_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_wlZsjnPGXay9jsRqcXA08Q_bVhmI7sU';
-  function countReferralVisit(code) {
+  function checkReferralCode(code) {
     try {
-      if (typeof fetch !== 'function') return;
-      fetch(AURIX_SUPABASE_URL + '/rest/v1/rpc/aurix_affiliate_click', {
-        method: 'POST', keepalive: true, credentials: 'omit',
+      if (typeof fetch !== 'function') return Promise.resolve(null);
+      return fetch(AURIX_SUPABASE_URL + '/rest/v1/rpc/aurix_affiliate_click', {
+        method: 'POST', credentials: 'omit',
         headers: { 'Content-Type': 'application/json', apikey: AURIX_SUPABASE_PUBLISHABLE_KEY,
                    Authorization: 'Bearer ' + AURIX_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({ p_code: code })
-      }).catch(function () {});
-    } catch (_) {}
+      }).then(function (r) {
+        if (!r || !r.ok) return null;
+        return r.json().then(function (j) {
+          return (j && typeof j.valid === 'boolean') ? j.valid : null;
+        }, function () { return null; });
+      }, function () { return null; });
+    } catch (_) { return Promise.resolve(null); }
   }
   function showReferralNotice() {
     if (document.getElementById('refNotice')) return;

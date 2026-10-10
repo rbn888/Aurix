@@ -4,5 +4,11 @@
     "api/cron/welcome-email.js": {
       "includeFiles": "email/**"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/control/affiliate-codes",
+      "destination": "/api/read/control-affiliate-codes"
+    }
+  ]
 }

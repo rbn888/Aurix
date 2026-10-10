@@ -39,6 +39,7 @@ const FOREIGN_SECRET_ENVS = [
   'COINGECKO_DEMO_API_KEY',
   'CRON_SECRET',
   'PIN_HASH',
+  'AURIX_AFFILIATE_CONTROL_TOKEN',   // AURIX-AFFILIATES-V1: leer no es controlar
 ];
 
 /** true si alguien ha reutilizado otro secreto del proyecto como token Founder. */

@@ -4,7 +4,7 @@
 -- ----------------------------------------------------------------------------
 -- *** NO EJECUTADO. ***   psql -v ON_ERROR_STOP=1 -f db/affiliate_attribution_1_rollback.sql
 -- Orden de rollback: PRIMERO db/founder_read_affiliates_1_rollback.sql (que lee
--- estas tablas), después este fichero.
+-- estas tablas), después este fichero, y por último db/affiliate_codes_1_rollback.sql.
 --
 -- DESTRUCTIVO PARA LA EVIDENCIA: borra las atribuciones capturadas y el recuento
 -- de visitas. Una atribución no se puede reconstruir después (se fija al
@@ -16,6 +16,7 @@ begin;
 
 drop function if exists public.aurix_affiliate_click(text);
 drop function if exists public.aurix_attribution_capture(jsonb);
+drop function if exists public.aurix_affiliate_code_live_at(text, timestamptz);
 drop table    if exists public.affiliate_clicks;
 drop table    if exists public.acquisition_attributions;
 drop function if exists public.aurix_attribution_immutable();

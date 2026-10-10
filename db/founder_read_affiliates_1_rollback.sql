@@ -3,11 +3,14 @@
 -- Pareja explícita de: db/founder_read_affiliates_1.sql
 -- *** NO EJECUTADO. ***   psql -v ON_ERROR_STOP=1 -f db/founder_read_affiliates_1_rollback.sql
 -- Sólo retira la función de lectura: GET /api/read/affiliates pasa a responder
--- `affiliates: { available: false, reason: 'not_applied' }`. No borra evidencia.
+-- `affiliates: { available: false, reason: 'not_applied' }`. Borra también
+-- affiliate_premium_backfill (se vuelve a sembrar al reaplicar, con la foto de ESE
+-- momento). No borra evidencia de cobro ni atribuciones.
 -- ============================================================================
 
 begin;
 drop function if exists public.founder_read_affiliates();
+drop table    if exists public.affiliate_premium_backfill;
 do $$
 begin
   if to_regprocedure('public.founder_read_affiliates()') is not null then

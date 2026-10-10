@@ -7,7 +7,8 @@
 -- ejecutarlo de una vez.   *** NO APLICADO DESDE EL REPO ***
 --   psql -v ON_ERROR_STOP=1 -f db/affiliate_attribution_1.sql
 --   (SIN `-1`: el fichero abre y cierra su propia transacción.)
--- Orden: 1/3. Después db/billing_payments_1.sql y db/founder_read_affiliates_1.sql.
+-- Orden: DESPUÉS de db/affiliate_codes_1.sql (valida contra su registro); luego
+-- db/billing_payments_1.sql y db/founder_read_affiliates_1.sql.
 -- Pareja: db/affiliate_attribution_1_rollback.sql
 --
 -- QUÉ ES, Y QUÉ NO ES
@@ -31,7 +32,8 @@
 -- LAS VISITAS SON UN INDICADOR, NO UNA PRUEBA
 --   `affiliate_clicks` cuenta cargas de la landing con un `?ref=` válido, por
 --   código y por día (Europe/Madrid). La llamada es ANÓNIMA —no hay sesión en la
---   landing— y por tanto INFLABLE por cualquiera: sirve para el embudo del
+--   landing— y por tanto INFLABLE (sólo con códigos reales y activos del
+--   registro de Founder; uno inventado no deja fila): sirve para el embudo del
 --   fundador, NUNCA para calcular dinero. No guarda IP, ni cookie, ni agente de
 --   usuario, ni nada que identifique a quien visita: sólo (código, día, número).
 --   Topes: 100000 por fila y 10000 códigos distintos por día, para que un
@@ -120,8 +122,34 @@ create policy acquisition_attributions_no_client
 revoke all on public.acquisition_attributions from anon, authenticated;
 
 
+-- ── 2b. ¿Estaba vivo este código en ese instante? (registro de Founder) ──────
+-- Existe en affiliate_codes (db/affiliate_codes_1.sql), no está retirado ni
+-- bloqueado, el instante cae en uno de sus intervalos activos (to null = sigue
+-- activo) y dentro de la ventana de su campaña. Un código que Founder no ha
+-- declarado no vale NUNCA, aunque tenga seis cifras.
+create or replace function public.aurix_affiliate_code_live_at(p_code text, p_at timestamptz)
+returns boolean
+language sql
+stable
+set search_path = public, pg_temp
+as $$
+  select coalesce((
+    select c.status not in ('retirado','bloqueada')
+           and p_at between c.starts_at and c.ends_at
+           and exists (
+             select 1 from jsonb_array_elements(c.active_intervals) i
+              where (i ->> 'from')::timestamptz <= p_at
+                and (jsonb_typeof(i -> 'to') = 'null' or p_at <= (i ->> 'to')::timestamptz))
+      from public.affiliate_codes c
+     where c.code = p_code), false);
+$$;
+
+revoke all on function public.aurix_affiliate_code_live_at(text, timestamptz) from public, anon, authenticated;
+
+
 -- ── 3. public.aurix_attribution_capture(jsonb) — sólo el propio usuario ──────
--- Resultados: captured · already_captured · too_late · invalid · unauthenticated.
+-- Resultados: captured · already_captured · too_late · no_valid_code · invalid ·
+-- unauthenticated.
 -- Nunca lanza por un dato del cliente: el login no puede depender de esto.
 create or replace function public.aurix_attribution_capture(p_touches jsonb)
 returns jsonb
@@ -195,6 +223,16 @@ begin
     return jsonb_build_object('outcome', 'too_late');
   end if;
 
+  -- SÓLO CÓDIGOS DEL REGISTRO: se queda con los toques cuyo código existía y
+  -- estaba activo cuando se vio. Si no queda ninguno no se guarda nada.
+  select jsonb_agg(t.e order by t.o)
+    into v_norm
+    from jsonb_array_elements(v_norm) with ordinality as t(e, o)
+   where public.aurix_affiliate_code_live_at(t.e ->> 'code', (t.e ->> 'seenAt')::timestamptz);
+  if v_norm is null then
+    return jsonb_build_object('outcome', 'no_valid_code');
+  end if;
+
   insert into public.acquisition_attributions (user_id, touches)
   values (v_uid, v_norm)
   on conflict (user_id) do nothing;
@@ -240,7 +278,7 @@ revoke all on public.affiliate_clicks from anon, authenticated;
 -- ANÓNIMA A PROPÓSITO: la landing no tiene sesión. Por eso mismo es inflable y
 -- se documenta como indicador. Sin IP, sin cookie, sin identificador: no hay
 -- nada personal que guardar, y por eso no necesita consentimiento.
--- Resultados: counted · capped · invalid.
+-- Devuelve {valid, outcome}: counted · capped · invalid.
 create or replace function public.aurix_affiliate_click(p_code text)
 returns jsonb
 language plpgsql
@@ -250,15 +288,20 @@ as $$
 declare
   v_day date := (now() at time zone 'Europe/Madrid')::date;
 begin
-  if p_code is null or p_code !~ '^[0-9]{6}$' then
-    return jsonb_build_object('outcome', 'invalid');
+  -- Sólo cuenta un código ACTIVO AHORA (status 'activa', intervalo abierto y
+  -- dentro de la campaña). Uno desconocido o parado no deja ni una fila: un
+  -- bucle con códigos inventados no infla nada. `valid` es lo que la landing
+  -- usa para decidir si muestra el aviso y si lleva el código a la app.
+  if p_code is null or p_code !~ '^[0-9]{6}$'
+     or not public.aurix_affiliate_code_live_at(p_code, now())
+     or not exists (select 1 from public.affiliate_codes c where c.code = p_code and c.status = 'activa') then
+    return jsonb_build_object('valid', false, 'outcome', 'invalid');
   end if;
 
-  -- Tope de filas por día: un bucle que recorra los 10^6 códigos no puede
-  -- crear un millón de filas diarias.
+  -- Tope de filas por día (defensa adicional; con el registro ya es pequeño).
   if not exists (select 1 from public.affiliate_clicks c where c.code = p_code and c.day = v_day)
      and (select count(*) from public.affiliate_clicks c where c.day = v_day) >= 10000 then
-    return jsonb_build_object('outcome', 'capped');
+    return jsonb_build_object('valid', true, 'outcome', 'capped');
   end if;
 
   insert into public.affiliate_clicks as c (code, day, clicks)
@@ -266,7 +309,7 @@ begin
   on conflict (code, day) do update
      set clicks = least(c.clicks + 1, 100000);
 
-  return jsonb_build_object('outcome', 'counted');
+  return jsonb_build_object('valid', true, 'outcome', 'counted');
 end;
 $$;
 
@@ -282,7 +325,8 @@ declare
   v_fk oid := to_regprocedure('public.aurix_affiliate_click(text)')::oid;
 begin
   if to_regclass('public.acquisition_attributions') is null
-     or to_regclass('public.affiliate_clicks') is null then
+     or to_regclass('public.affiliate_clicks') is null
+     or to_regclass('public.affiliate_codes') is null then
     raise exception 'AFFILIATES-1 APPLY FAIL: falta una tabla';
   end if;
   if v_fc is null or v_fk is null then

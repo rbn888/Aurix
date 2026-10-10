@@ -4,8 +4,8 @@
 -- Apply: pegar el fichero ENTERO en el editor SQL y ejecutarlo de una vez.
 --   *** NO APLICADO DESDE EL REPO ***
 --   psql -v ON_ERROR_STOP=1 -f db/founder_read_affiliates_1.sql   (SIN `-1`)
--- Requiere: db/affiliate_attribution_1.sql y db/billing_payments_1.sql (y M.04,
--- y entitlement_overrides de B1). Orden: 3/3.
+-- Requiere: db/affiliate_codes_1.sql, db/affiliate_attribution_1.sql y
+-- db/billing_payments_1.sql (y M.04, y subscriptions/entitlement_overrides de B1).
 -- Pareja: db/founder_read_affiliates_1_rollback.sql
 --
 -- QUÉ DEVUELVE (GET /api/read/affiliates · contrato aurix.read.v1)
@@ -26,27 +26,46 @@
 -- un cliente concreto. Lo que se minimiza: el correo viaja como hash, no hay
 -- nombre, ni cartera, ni IP; y sólo aparecen usuarios que llegaron con código.
 --
--- premiumBefore — "¿este usuario ya tenía Premium antes de ESTE cobro?" Founder
--- lo usa para distinguir una conversión nueva de una renovación o una vuelta.
--- Es true si se cumple CUALQUIERA de estas tres:
---   (a) hay un cobro anterior (paid_at menor, otra factura) del mismo usuario
---       con importe > 0;
---   (b) hay un evento de suscripción APLICADO de ese usuario recibido más de
---       10 minutos antes de paid_at. El margen existe porque el `created` de la
---       PROPIA suscripción nueva llega casi a la vez que su primer cobro.
---       LIMITACIÓN DECLARADA: el ledger no guarda el plan resultante, así que un
---       intento anterior que se aplicó como Free (p. ej. `incomplete`, primer pago
---       fallido) también cuenta. El error es CONSERVADOR: marca como "ya tenía"
---       a alguien que no tenía, nunca al revés;
---   (c) hay un override de entitlement concedido (allowed) creado antes de
---       paid_at — cualquier clave: un comp, aunque sea de una función, es acceso
---       Premium regalado antes de pagar.
+-- premiumBefore — "¿este usuario ya tenía Premium CONCEDIDO antes de ESTE
+-- cobro?". Sólo cuenta evidencia de acceso realmente concedido; un primer pago
+-- fallido (incomplete / incomplete_expired) o una suscripción nunca pagada NO:
+--   (a) un cobro anterior PAGADO (otra factura, importe > 0, paid_at menor);
+--   (b) un override de entitlement concedido (allowed) creado antes de paid_at;
+--   (c) estar en `affiliate_premium_backfill`, sembrada AL APLICAR esta migración
+--       con quien entonces tenía Premium (billing_payments empieza vacía, así que
+--       sin esto un cliente antiguo parecería nuevo en su primera renovación).
+-- Ya no se usa el ledger de eventos: no guarda el plan resultante, y un
+-- `created` incomplete aplicado como Free contaba como "ya tenía".
+--
+-- registry — huella del registro de códigos recibido de Founder: la función
+-- devuelve las filas vigentes en la forma del contrato y el handler calcula
+-- `canonicalRegistry()` + sha256 (registry: {hash, count, updatedAt}).
 --
 -- SEGURIDAD: stable, SECURITY DEFINER, search_path fijo, sólo service_role.
 -- No escribe nada.
 -- ============================================================================
 
 begin;
+
+-- ── Premium histórico, sembrado UNA vez al aplicar ──────────────────────────
+create table if not exists public.affiliate_premium_backfill (
+  user_id   uuid        primary key references auth.users (id) on delete cascade,
+  seeded_at timestamptz not null default now()
+);
+alter table public.affiliate_premium_backfill enable row level security;
+drop policy if exists affiliate_premium_backfill_no_client on public.affiliate_premium_backfill;
+create policy affiliate_premium_backfill_no_client on public.affiliate_premium_backfill
+  as restrictive for all to anon, authenticated using (false) with check (false);
+revoke all on public.affiliate_premium_backfill from anon, authenticated;
+
+-- Predicado: `plan = 'premium'`. aurix_billing_apply_event sólo escribe ese plan
+-- para active/trialing/past_due CON precio del catálogo (acceso concedido);
+-- incomplete → Free/expired e incomplete_expired → expired. `canceled` NO cuenta:
+-- el webhook fuerza 'canceled' en cualquier `subscription.deleted`, también el de
+-- una suscripción incomplete que nunca se pagó, así que no prueba nada.
+insert into public.affiliate_premium_backfill (user_id)
+select s.user_id from public.subscriptions s where s.plan = 'premium'
+on conflict (user_id) do nothing;
 
 create or replace function public.founder_read_affiliates()
 returns jsonb
@@ -70,14 +89,11 @@ as $$
                       where e.provider = p.provider and e.user_id = p.user_id
                         and e.invoice_id <> p.invoice_id
                         and e.amount_paid_cents > 0 and e.paid_at < p.paid_at)
-             or exists (select 1 from public.billing_events be
-                         where be.user_id = p.user_id and be.applied
-                           and be.outcome = 'applied'
-                           and be.event_type like 'customer.subscription.%'
-                           and be.received_at < p.paid_at - interval '10 minutes')
              or exists (select 1 from public.entitlement_overrides o
                          where o.user_id = p.user_id and o.allowed
                            and o.created_at < p.paid_at)
+             or exists (select 1 from public.affiliate_premium_backfill b
+                         where b.user_id = p.user_id and b.seeded_at < p.paid_at)
            ) as premium_before
       from public.billing_payments p
      where p.plan = 'premium'
@@ -157,6 +173,9 @@ as $$
                'clicks', clk.clicks
              ) order by clk.rn)
         from clk where clk.rn <= (select n from lim)), '[]'::jsonb),
+    'registry', jsonb_build_object(
+      'codes',     public.aurix_affiliate_registry_rows(),
+      'updatedAt', (select max(c.updated_at) from public.affiliate_codes c)),
     'truncated', (
          (select count(*) from att) > (select n from lim)
       or (select count(*) from pay) > (select n from lim)

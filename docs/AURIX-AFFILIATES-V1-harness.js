@@ -98,39 +98,49 @@ console.log('A · landing · captura del código');
   const STATE = between(LAND, 'var REF_URL_CODE = null;', 'function showReferralNotice() {')
     .replace(/function showReferralNotice\(\) \{$/, '');
   const LANGSRC = between(LAND, 'function appUrlForLang()', '}');
-  function landing(search, init) {
+  // `valid`: respuesta del registro (true/false), 'down' = el RPC no responde.
+  async function landing(search, init, valid) {
     const ls = store(init); const calls = []; let notices = 0;
-    const ctx = { Date, JSON, Math, isFinite, Array, String, localStorage: ls,
+    const ctx = { Date, JSON, Math, isFinite, Array, String, Promise, localStorage: ls,
       location: { search }, lang: 'es', langExplicit: false, APP_URL: 'https://app.aurixsystem.io/',
-      fetch: (url, opts) => { calls.push({ url, opts }); return Promise.resolve({}); },
+      fetch: (url, opts) => { calls.push({ url, opts });
+        if (valid === 'down') return Promise.reject(new Error('offline'));
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ valid: valid !== false, outcome: 'x' }) }); },
+      updateAppLinks: () => {},
       showReferralNotice: () => { notices++; } };
     vm.createContext(ctx);
     vm.runInContext(REF + '\n' + LANGSRC + '\n' + STATE, ctx);
-    vm.runInContext('initReferral()', ctx);
+    await vm.runInContext('initReferral()', ctx);
     return { ctx, ls, calls, notices: () => notices, url: () => vm.runInContext('appUrlWithRef()', ctx) };
   }
-  const v1 = landing('?ref=123456', {});
+  const v1 = await landing('?ref=123456', {}, true);
   ok('A.8 SIN consentimiento: ni una escritura en localStorage', v1.ls.writes === 0 && Object.keys(v1.ls._m).length === 0);
-  ok('A.9 …pero el código viaja en el enlace a la app (atribución en la misma visita), sin `aconsent`',
+  ok('A.9 código VÁLIDO en el registro: viaja en el enlace a la app (misma visita), sin `aconsent`',
     /^https:\/\/app\.aurixsystem\.io\/login\.html\?langhint=es&aref=123456-[0-9a-z]+$/.test(v1.url()), v1.url());
-  ok('A.10 con `ref` y sin consentimiento se muestra el aviso', v1.notices() === 1);
-  ok('A.11 una visita por carga, anónima, por PostgREST al contador (no una función de api/)',
+  ok('A.10 código válido y sin consentimiento: se muestra el aviso', v1.notices() === 1);
+  ok('A.11 una llamada por carga, anónima, por PostgREST al contador/validador (no una función de api/)',
     v1.calls.length === 1 && /\/rest\/v1\/rpc\/aurix_affiliate_click$/.test(v1.calls[0].url) &&
     JSON.parse(v1.calls[0].opts.body).p_code === '123456' && v1.calls[0].opts.credentials === 'omit');
-  const v2 = landing('', {});
-  ok('A.12 visitante normal: sin aviso, sin visita, sin almacenamiento y el enlace de siempre',
+  const v2 = await landing('', {}, true);
+  ok('A.12 visitante normal: sin aviso, sin llamada, sin almacenamiento y el enlace de siempre',
     v2.notices() === 0 && v2.calls.length === 0 && v2.ls.writes === 0 &&
     v2.url() === 'https://app.aurixsystem.io/?langhint=es');
-  const v3 = landing('?ref=12345x', {});
-  ok('A.13 un `ref` inválido es como no tenerlo', v3.notices() === 0 && v3.calls.length === 0 && v3.url().indexOf('aref') < 0);
+  const v3 = await landing('?ref=12345x', {}, true);
+  ok('A.13 un `ref` sin forma válida es como no tenerlo', v3.notices() === 0 && v3.calls.length === 0 && v3.url().indexOf('aref') < 0);
+  const v3b = await landing('?ref=999999', { aurix_ref_consent: '1' }, false);
+  ok('A.13b el REGISTRO dice que no vale: ni aviso, ni disco, ni enlace',
+    v3b.notices() === 0 && v3b.url().indexOf('aref') < 0 && !('aurix_ref_touches' in v3b.ls._m));
+  const v3c = await landing('?ref=123456', { aurix_ref_consent: '1' }, 'down');
+  ok('A.13c el registro no responde: viaja SÓLO en el enlace de esta visita, sin aviso y sin disco (aunque haya permiso)',
+    /aref=123456-/.test(v3c.url()) && v3c.notices() === 0 && !('aurix_ref_touches' in v3c.ls._m));
   const seen = new Date(Date.now() - 2 * DAY).toISOString();
-  const v4 = landing('?ref=654321', { aurix_ref_consent: '1',
-    aurix_ref_touches: JSON.stringify([{ code: '111111', seenAt: seen }]) });
+  const v4 = await landing('?ref=654321', { aurix_ref_consent: '1',
+    aurix_ref_touches: JSON.stringify([{ code: '111111', seenAt: seen }]) }, true);
   const saved = JSON.parse(v4.ls._m.aurix_ref_touches);
   ok('A.14 CON consentimiento: se guarda la lista fusionada y el enlace lleva `aconsent=1`',
     saved.length === 2 && saved[0].code === '111111' && saved[1].code === '654321' &&
     /&aconsent=1$/.test(v4.url()) && v4.notices() === 0);
-  const v5 = landing('', { aurix_ref_touches: JSON.stringify([{ code: '111111', seenAt: seen }]) });
+  const v5 = await landing('', { aurix_ref_touches: JSON.stringify([{ code: '111111', seenAt: seen }]) }, true);
   ok('A.15 sin la marca de consentimiento, lo que hubiera en disco NO se lee',
     v5.url().indexOf('aref') < 0);
   ok('A.16 el aviso es bilingüe (es/en) por el i18n de la landing',
@@ -386,6 +396,101 @@ console.log('\nD · lectura Founder · /api/read/affiliates');
   ok('D.9 una superficie desconocida sigue siendo 404', unk.statusCode === 404);
 }
 
+// ══ H · CONTROL: POST /api/control/affiliate-codes ═════════════════════════
+console.log('\nH · control · registro de códigos empujado por Founder');
+{
+  const READ = 'aurix-founder-read-token-de-pruebas-largo-123456';
+  const CTRL = 'aurix-affiliate-control-token-de-pruebas-0123456789';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-de-pruebas-suficientemente-largo-0000';
+  process.env.AURIX_FOUNDER_READ_TOKEN = READ;
+  process.env.AURIX_AFFILIATE_CONTROL_TOKEN = CTRL;
+  const C = await import(path.join(root, 'api/_affiliate-control.mjs'));
+  const R = await import(path.join(root, 'api/read/[surface].mjs'));
+  const fakeRes = () => ({ statusCode: null, body: null, headers: {},
+    setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, status(c) { this.statusCode = c; return this; },
+    json(b) { this.body = b; return this; }, end() { return this; } });
+  const codes = [
+    { code: '234567', campaignId: 'camp-b', startsAt: '2026-10-01T00:00:00.000Z', endsAt: '2026-12-31T23:59:59.000Z',
+      status: 'activa', activeIntervals: [{ from: '2026-10-01T00:00:00.000Z', to: null }] },
+    { code: '123456', campaignId: 'camp-a', startsAt: '2026-09-01T00:00:00.000Z', endsAt: '2026-12-31T23:59:59.000Z',
+      status: 'pausada', activeIntervals: [{ from: '2026-09-01T00:00:00.000Z', to: '2026-09-20T00:00:00.000Z' }] }];
+  const body = { contract: 'aurix.affiliate-control.v1', action: 'codes.replace',
+    actionId: '7f1c2a90-1b2c-4d5e-8f90-0123456789ab', issuedAt: '2026-10-10T10:00:00.000Z', codes };
+  // Referencia independiente: la función del contrato de Founder, tal cual.
+  const crypto = require('crypto');
+  const founderHash = crypto.createHash('sha256').update(JSON.stringify([...codes]
+    .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))
+    .map(c => ({ code: c.code, campaignId: c.campaignId, startsAt: c.startsAt, endsAt: c.endsAt, status: c.status,
+      activeIntervals: c.activeIntervals.map(i => ({ from: i.from, to: i.to })) })))).digest('hex');
+  ok('H.1 canonicalRegistry/registryHash = los del contrato de Founder (orden y claves exactos)',
+    C.registryHash(codes) === founderHash && C.canonicalRegistry(codes).indexOf('{"code":"123456","campaignId"') === 1);
+  let rpcBody = null;
+  globalThis.fetch = async (url, init) => { rpcBody = { url: String(url), body: JSON.parse(init.body) };
+    // La BD devuelve lo GUARDADO (claves de jsonb reordenadas: no debe importar).
+    const rows = [...codes].sort((a, b) => a.code < b.code ? -1 : 1).map(c => ({ status: c.status, code: c.code,
+      endsAt: c.endsAt, startsAt: c.startsAt, campaignId: c.campaignId, activeIntervals: c.activeIntervals.map(i => ({ to: i.to, from: i.from })) }));
+    return new Response(JSON.stringify({ outcome: 'stored', applied: true, at: '2026-10-10T10:00:01.000Z', rows }), { status: 200 }); };
+  const post = async (b, headers, method) => { const r = fakeRes();
+    await R.default({ method: method || 'POST', headers: Object.assign({ authorization: `Bearer ${CTRL}` }, headers || {}),
+      query: { surface: 'control-affiliate-codes' }, body: b }, r); return r; };
+  const okp = await post(body);
+  ok('H.2 POST válido ⇒ 200 con el resultado del contrato y la huella de lo GUARDADO',
+    okp.statusCode === 200 && okp.body.contract === 'aurix.affiliate-control.v1' && okp.body.action === 'codes.replace' &&
+    okp.body.actionId === body.actionId && okp.body.applied === true && okp.body.count === 2 &&
+    okp.body.registryHash === founderHash && okp.body.at === '2026-10-10T10:00:01.000Z', JSON.stringify(okp.body));
+  ok('H.3 la BD recibe actionId, huella enviada y códigos; por la RPC del reemplazo',
+    /\/rpc\/aurix_affiliate_codes_replace$/.test(rpcBody.url) && rpcBody.body.p_action_id === body.actionId &&
+    rpcBody.body.p_registry_hash === founderHash && rpcBody.body.p_codes.length === 2);
+  ok('H.4 sin CORS, no-store', !('access-control-allow-origin' in okp.headers) && okp.headers['cache-control'] === 'no-store');
+  ok('H.5 la credencial de LECTURA no controla ⇒ 401 genérico', (await post(body, { authorization: `Bearer ${READ}` })).statusCode === 401);
+  ok('H.6 sin credencial ⇒ 401', (await post(body, { authorization: '' })).statusCode === 401);
+  ok('H.7 GET en la ruta de control ⇒ 405', (await post(body, {}, 'GET')).statusCode === 405);
+  const rget = fakeRes(); await R.default({ method: 'POST', headers: { authorization: `Bearer ${READ}` }, query: { surface: 'affiliates' } }, rget);
+  ok('H.8 las superficies de lectura siguen siendo sólo GET', rget.statusCode === 405);
+  process.env.AURIX_AFFILIATE_CONTROL_TOKEN = READ;
+  ok('H.9 un token de control IGUAL al de lectura deshabilita el control', !C.controlTokenConfigured() && (await post(body, { authorization: `Bearer ${READ}` })).statusCode === 401);
+  process.env.AURIX_AFFILIATE_CONTROL_TOKEN = 'corto';
+  ok('H.10 token < 32 ⇒ deshabilitado', !C.controlTokenConfigured());
+  process.env.AURIX_AFFILIATE_CONTROL_TOKEN = CTRL;
+  const bad = (mut) => { const b = JSON.parse(JSON.stringify(body)); mut(b); return b; };
+  const cases = [
+    ['código con 0 inicial', b => { b.codes[0].code = '012345'; }],
+    ['código de 7 cifras', b => { b.codes[0].code = '1234567'; }],
+    ['código repetido', b => { b.codes[1].code = b.codes[0].code; }],
+    ['estado desconocido', b => { b.codes[0].status = 'retirado'; }],
+    ['fecha no ISO de toISOString', b => { b.codes[0].startsAt = '2026-10-01T00:00:00Z'; }],
+    ['ventana invertida', b => { b.codes[0].endsAt = '2026-01-01T00:00:00.000Z'; }],
+    ['intervalo invertido', b => { b.codes[1].activeIntervals[0].to = '2026-08-01T00:00:00.000Z'; }],
+    ['clave sobrante', b => { b.codes[0].extra = 1; }],
+    ['actionId no uuid', b => { b.actionId = 'abc'; }],
+    ['acción distinta', b => { b.action = 'codes.add'; }],
+    ['contrato distinto', b => { b.contract = 'aurix.affiliate-control.v2'; }],
+    ['más de 1000', b => { b.codes = Array.from({ length: 1001 }, (_, i) => Object.assign({}, codes[0], { code: String(100000 + i) })); }],
+  ];
+  const bads = [];
+  for (const [n, m] of cases) { const r = await post(bad(m)); if (r.statusCode !== 400) bads.push(n + '→' + r.statusCode); }
+  ok('H.11 cualquier entrada inválida rechaza el cuerpo ENTERO con 400 (sin tocar la BD)', bads.length === 0, bads.join(' | '));
+  const big = await post('x'.repeat(300 * 1024));
+  ok('H.12 cuerpo > 256 KB ⇒ 413', big.statusCode === 413);
+  globalThis.fetch = async () => new Response(JSON.stringify({ outcome: 'conflict' }), { status: 200 });
+  ok('H.13 mismo actionId con otro contenido ⇒ 409', (await post(body)).statusCode === 409);
+  globalThis.fetch = async () => new Response(JSON.stringify({ outcome: 'replay', applied: false, at: '2026-10-10T10:00:01.000Z', rows: [] }), { status: 200 });
+  const rp = await post(body);
+  ok('H.14 replay ⇒ 200 applied=false', rp.statusCode === 200 && rp.body.applied === false);
+  const vj = JSON.parse(read('vercel.json'));
+  ok('H.15 la ruta pública es una REWRITE a la función única (sin función nueva)',
+    Array.isArray(vj.rewrites) && vj.rewrites.some(r => r.source === '/api/control/affiliate-codes' &&
+      r.destination === '/api/read/control-affiliate-codes') && !fs.existsSync(path.join(root, 'api/control')));
+  // La lectura publica la huella del registro guardado.
+  const DATA = { available: true, attributions: [], payments: [], refunds: [], disputes: [], clicks: [], truncated: false,
+    registry: { codes: [...codes].sort((a, b) => a.code < b.code ? -1 : 1), updatedAt: '2026-10-10T10:00:01+00:00' } };
+  globalThis.fetch = async () => new Response(JSON.stringify(DATA), { status: 200 });
+  const rr = fakeRes(); await R.default({ method: 'GET', headers: { authorization: `Bearer ${READ}` }, query: { surface: 'affiliates' } }, rr);
+  ok('H.16 `affiliates.registry` = {hash, count, updatedAt} con la misma huella que Founder',
+    rr.body.affiliates.registry && rr.body.affiliates.registry.hash === founderHash && rr.body.affiliates.registry.count === 2 &&
+    rr.body.affiliates.registry.updatedAt === '2026-10-10T10:00:01+00:00' && !('codes' in rr.body.affiliates.registry));
+}
+
 // ══ E · CUPO DE FUNCIONES ═══════════════════════════════════════════════════
 console.log('\nE · cupo de funciones del plan');
 {
@@ -486,19 +591,56 @@ console.log('\nF · SQL · forma de las garantías');
   ok('F.24 lectura: el correo sale como sha256 de lower(trim()), y null si no hay',
     /encode\(sha256\(convert_to\(lower\(trim\(att\.email\)\), 'UTF8'\)\), 'hex'\)/.test(fr) &&
     /nullif\(trim\(att\.email\), ''\) is null then null/.test(fr) && !/'email'\s*,/.test(fr));
-  ok('F.25 lectura: premiumBefore = cobro previo > 0 · evento aplicado > 10 min antes · override previo',
+  ok('F.25 lectura: premiumBefore = cobro previo PAGADO · override previo · backfill histórico (NO el ledger)',
     /e\.amount_paid_cents > 0 and e\.paid_at < p\.paid_at/.test(fr) &&
-    /be\.received_at < p\.paid_at - interval '10 minutes'/.test(fr) &&
-    /o\.allowed\s+and o\.created_at < p\.paid_at/.test(fr) && /'premiumBefore',\s+pay\.premium_before/.test(fr));
+    /o\.allowed\s+and o\.created_at < p\.paid_at/.test(fr) &&
+    /from public\.affiliate_premium_backfill b\s+where b\.user_id = p\.user_id and b\.seeded_at < p\.paid_at/.test(fr) &&
+    !/billing_events/.test(fr) && /'premiumBefore',\s+pay\.premium_before/.test(fr));
+  ok('F.25b backfill sembrado al aplicar con plan = premium (canceled NO cuenta), tabla cerrada',
+    /insert into public\.affiliate_premium_backfill \(user_id\)\s+select s\.user_id from public\.subscriptions s where s\.plan = 'premium'/.test(rd) &&
+    /revoke all on public\.affiliate_premium_backfill from anon, authenticated;/.test(rd));
   ok('F.26 lectura: tope de 5000 por lista con `truncated`, y visitas de los últimos 400 días',
     /select 5000 as n/.test(fr) && /'truncated'/.test(fr) && /- 400/.test(fr) &&
     /'day',\s+to_char\(clk\.day, 'YYYY-MM-DD'\)/.test(fr));
   const keys = ['userId', 'registeredAt', 'capturedAt', 'emailHash', 'touches', 'invoiceId', 'subscriptionId',
     'paymentIntentId', 'amountCents', 'currency', 'plan', 'interval', 'billingReason', 'paidAt', 'livemode',
     'premiumBefore', 'amountRefundedCents', 'at', 'disputeId', 'status', 'code', 'day', 'clicks',
-    'attributions', 'payments', 'refunds', 'disputes', 'truncated', 'available'];
+    'attributions', 'payments', 'refunds', 'disputes', 'truncated', 'available', 'registry'];
   ok('F.27 lectura: publica exactamente las claves del contrato', keys.every(k => fr.includes(`'${k}'`)),
     keys.filter(k => !fr.includes(`'${k}'`)).join(','));
+}
+
+// ══ F2 · REGISTRO DE CÓDIGOS (SQL) ═════════════════════════════════════════
+console.log('\nF2 · SQL · registro autorizado de códigos');
+{
+  const RG = read('db/affiliate_codes_1.sql'), rg = sqlCode(RG);
+  const rep = sqlFn(RG, 'aurix_affiliate_codes_replace');
+  ok('F2.1 tabla y auditoría cerradas al cliente; escritor sólo service_role',
+    /revoke all on public\.affiliate_codes\s+from anon, authenticated;/.test(rg) &&
+    /revoke all on public\.affiliate_code_pushes from anon, authenticated;/.test(rg) &&
+    /revoke all\s+on function public\.aurix_affiliate_codes_replace\(uuid, timestamptz, text, jsonb\) from public, anon, authenticated;/.test(rg) &&
+    /grant\s+execute on function public\.aurix_affiliate_codes_replace\(uuid, timestamptz, text, jsonb\) to service_role;/.test(rg));
+  ok('F2.2 reemplazo: upsert + lo ausente pasa a retirado sin intervalos; nunca se borra',
+    /on conflict \(code\) do update set/.test(rep) &&
+    /set status = 'retirado', active_intervals = '\[\]'::jsonb/.test(rep) && !/delete from/i.test(rep));
+  ok('F2.3 replay del mismo actionId ⇒ applied=false; con otro contenido ⇒ conflict',
+    /from public\.affiliate_code_pushes where action_id = p_action_id[\s\S]{0,200}'conflict'[\s\S]{0,120}'replay', 'applied', false/.test(rep));
+  ok('F2.4 una transacción serializada, y applied = hubo cambios',
+    /pg_advisory_xact_lock/.test(rep) && /v_applied := \(v_up \+ v_ret\) > 0;/.test(rep));
+  ok('F2.5 lo guardado se publica en la forma del contrato, ordenado por código y sin retirados',
+    /'campaignId',\s+c\.campaign_id/.test(RG) && /order by c\.code collate "C"/.test(RG) && /where c\.status <> 'retirado'/.test(RG));
+  const live = sqlFn(SQL_ATT, 'aurix_affiliate_code_live_at');
+  ok('F2.6 vivo en un instante = no retirado/bloqueado + intervalo + ventana de campaña',
+    /c\.status not in \('retirado','bloqueada'\)/.test(live) && /p_at between c\.starts_at and c\.ends_at/.test(live) &&
+    /jsonb_typeof\(i -> 'to'\) = 'null' or p_at <= \(i ->> 'to'\)::timestamptz/.test(live));
+  const cap = sqlFn(SQL_ATT, 'aurix_attribution_capture');
+  ok('F2.7 la captura conserva sólo toques vivos al verse; si no queda ninguno, no_valid_code y nada guardado',
+    /aurix_affiliate_code_live_at\(t\.e ->> 'code', \(t\.e ->> 'seenAt'\)::timestamptz\)/.test(cap) &&
+    cap.indexOf("'no_valid_code'") < cap.indexOf('insert into public.acquisition_attributions'));
+  const clk = sqlFn(SQL_ATT, 'aurix_affiliate_click');
+  ok('F2.8 la visita sólo cuenta un código ACTIVO AHORA; uno desconocido no deja fila y devuelve valid:false',
+    /aurix_affiliate_code_live_at\(p_code, now\(\)\)/.test(clk) && /c\.status = 'activa'/.test(clk) &&
+    clk.indexOf("'valid', false") < clk.indexOf('insert into public.affiliate_clicks'));
 }
 
 // ══ G · PRIVACIDAD ══════════════════════════════════════════════════════════

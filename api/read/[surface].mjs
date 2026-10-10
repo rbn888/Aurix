@@ -36,10 +36,15 @@
 // nuevo en `api/` que no empiece por `_` rompe el deployment ENTERO.
 
 import { overviewHandler, healthHandler, affiliatesHandler } from '../_founder-read-handlers.mjs';
+import { affiliateCodesControlHandler } from '../_affiliate-control.mjs';
 
 // AURIX-AFFILIATES-V1 · `affiliates` entra como SUPERFICIE, no como fichero: un
 // `api/read/affiliates.js` sería la función 13 y tumbaría el deployment entero.
 const SURFACES = { overview: overviewHandler, health: healthHandler, affiliates: affiliatesHandler };
+// CONTROL (escritura de Founder), aparte de las lecturas: vercel.json reescribe
+// /api/control/affiliate-codes aquí. Su handler sólo acepta POST con la
+// credencial de CONTROL; las de arriba siguen siendo sólo GET.
+const CONTROL = { 'control-affiliate-codes': affiliateCodesControlHandler };
 
 export default async function handler(req, res) {
   const surface = String((req.query && req.query.surface) || '');
@@ -47,7 +52,7 @@ export default async function handler(req, res) {
   // resolvería a una función heredada del prototipo y la llamaríamos con (req, res).
   const owner = Object.prototype.hasOwnProperty.call(SURFACES, surface)
     ? SURFACES[surface]
-    : null;
+    : Object.prototype.hasOwnProperty.call(CONTROL, surface) ? CONTROL[surface] : null;
   if (typeof owner !== 'function') {
     res.setHeader('Cache-Control', 'no-store');
     return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Not found' } });

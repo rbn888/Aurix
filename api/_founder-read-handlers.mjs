@@ -14,6 +14,7 @@
 
 import { guardFounderRead } from './_founder-read-token.mjs';
 import { CONTRACT, callAggregate, platformIdentity, unavailable } from './_founder-read-source.mjs';
+import { registryHash } from './_affiliate-control.mjs';
 
 /**
  * GET /api/read/overview — resumen Founder de Aurix.
@@ -102,6 +103,7 @@ export async function healthHandler(req, res) {
  *   disputes     → public.billing_disputes  (enlazados por payment intent)
  *   clicks       → public.affiliate_clicks  (indicador anónimo; no es evidencia
  *                  de dinero)
+ *   registry     → public.affiliate_codes   (huella del registro de Founder)
  *
  * A DIFERENCIA de overview/health, esta superficie SÍ lleva filas por usuario:
  * una comisión se paga por un cliente concreto. Por eso la función de SQL sólo
@@ -119,6 +121,20 @@ export async function affiliatesHandler(req, res) {
     contract: CONTRACT,
     generatedAt: new Date().toISOString(),
     platform: platformIdentity(),
-    affiliates: agg.ok ? agg.data : unavailable(agg.reason),
+    affiliates: agg.ok ? withRegistryHash(agg.data) : unavailable(agg.reason),
   });
+}
+
+/**
+ * `registry` llega de SQL como las filas vigentes del registro de códigos; aquí se
+ * resume a {hash, count, updatedAt} con la MISMA `canonicalRegistry()` que usa
+ * Founder, para que pueda comprobar que Aurix tiene exactamente lo que envió.
+ */
+function withRegistryHash(data) {
+  const reg = data && data.registry;
+  if (!reg || !Array.isArray(reg.codes)) return data;
+  return {
+    ...data,
+    registry: { hash: registryHash(reg.codes), count: reg.codes.length, updatedAt: reg.updatedAt || null },
+  };
 }
