@@ -31,6 +31,10 @@ Cada uno termina en `… APPLY VERIFIED`; si no, no se confirmó nada.
 - [ ] Confirmar `STRIPE_SECRET_KEY` (LIVE): el webhook la usa para leer el payment intent de `invoice.paid` (forma basil).
 - [ ] Merge a `main` = despliegue de Pages (app/login) y Vercel (API/landing). Hacerlo DESPUÉS del paso 1.
 
+## 2b · Founder Platform
+- [ ] En `.env.local` de Founder: `AURIX_AFFILIATE_CONTROL_TOKEN=` el mismo valor del paso 2 (nunca el de lectura).
+- [ ] Abrir Afiliados → «Sincronizar»: entrega el registro y lee la evidencia. Debe decir «Aurix tiene el registro de enlaces al día».
+
 ## 3 · Stripe LIVE (después del despliegue)
 - [ ] En el endpoint `…/api/billing/webhook` activar: `invoice.paid`, `charge.refunded`,
       `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed`.
