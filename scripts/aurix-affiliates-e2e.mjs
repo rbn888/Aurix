@@ -252,6 +252,12 @@ await waitFor('subscription.* concede Premium (M.04)', async () => {
   return r.j && r.j[0] && r.j[0].plan === 'premium';
 });
 
+// Lo que Founder vería ANTES del reembolso, para que su propio e2e lo procese
+// (`npm run affiliates:e2e` en Founder Platform). Fuera del repo y sin secretos.
+const OUT_DIR = process.env.E2E_OUT_DIR || '/tmp/aurix-affiliates-e2e';
+(await import('node:fs')).mkdirSync(OUT_DIR, { recursive: true });
+writeFileSync(path.join(OUT_DIR, 'affiliates-before-refund.json'), JSON.stringify({ code: CODE, read: await readAffiliates() }));
+
 // ── 11 · Reembolso ──────────────────────────────────────────────────────────
 await stripe('/refunds', { payment_intent: pay.payment_intent_id, amount: 1000 });
 const ref = await waitFor('charge.refunded llega a billing_refunds', async () => {
@@ -268,6 +274,7 @@ check('lectura affiliates: atribución, cobro (premiumBefore=false) y reembolso 
   a.payments.some((p) => p.userId === userId && p.premiumBefore === false && p.paymentIntentId === pay.payment_intent_id) &&
   a.refunds.some((r) => r.paymentIntentId === pay.payment_intent_id && r.amountRefundedCents === 1000), a);
 console.log(JSON.stringify(out, null, 2));
+writeFileSync(path.join(OUT_DIR, 'affiliates-after-refund.json'), JSON.stringify({ code: CODE, read: out }));
 
 await stripe('/subscriptions/' + sub.id, null, 'DELETE').catch(() => {});   // sin renovaciones en TEST
 log('E2E OK');
