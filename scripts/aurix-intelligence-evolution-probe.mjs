@@ -369,7 +369,9 @@ if (!BASE) for (const lng of ['es', 'en']) {
     var evP = _intv19Evolution(core, ['investable_return_all', 'investable_return_30d', 'investable_return_7d'], []).items.filter(function(x){ return x.family === 'return'; }).length;
     return JSON.stringify({ mine: mine, c: c, other: other, c2: c2, c3: c3, evS: evS, evP: evP }); })()`));
   ok(`${T} M · con memoria por posición, Tu evolución publica el cambio neto del peso de la mayor posición`,
-    /position/.test(mine_fam(mm)) && mm.c && mm.c.range === 'all' && Math.abs(mm.c.deltaPp - 7.6) < 0.01 && /(7,6|7\.6)/.test(mm.mine.txt), JSON.stringify(mm.mine) + JSON.stringify(mm.c));
+    // RE-DECIDIDO (V2.1): con memoria por posición, el cambio lo cuenta el TITULAR de la
+    // métrica activa (familia `top`); la cifra exigida es la misma.
+    /position|top/.test(mine_fam(mm)) && mm.c && mm.c.range === 'all' && Math.abs(mm.c.deltaPp - 7.6) < 0.01 && /(7,6|7\.6)/.test(mm.mine.txt), JSON.stringify(mm.mine) + JSON.stringify(mm.c));
   ok(`${T} M · la memoria de otra cuenta no se lee`, !/position/.test(mm.other.fam || ''), JSON.stringify(mm.other));
   ok(`${T} M · si un activo ya vendido pudo ser inmueble, esa fila no se usa (cae a 30D)`, mm.c2 && mm.c2.range === '30D', JSON.stringify(mm.c2));
   ok(`${T} M · si la mayor posición cambia de activo, no se afirma su evolución`, mm.c3 === null, JSON.stringify(mm.c3));

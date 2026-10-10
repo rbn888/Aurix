@@ -5845,6 +5845,55 @@ const T = {
     // Cada clave se corresponde con un `semanticKey` del ledger, así que un hecho sin
     // copy no puede publicarse y un copy sin hecho no puede existir.
     intv4_brief_title: 'Lo que importa hoy',
+    // ── INTELLIGENCE V2.1 (intv22) ──
+    intv22_in_7d: 'En 7 días', intv22_in_30d: 'En 30 días', intv22_since: d => `Desde el ${d}`,
+    intv22_h_top_same: (l, n, a, b, d) => `${l}, el peso de tu mayor posición (${n}) pasó del ${a} al ${b} (${d}).`,
+    intv22_h_top_changed: (l, a, na, b, nb) => `${l}, el peso máximo de una posición pasó del ${a} (${na}) al ${b} (${nb}).`,
+    intv22_h_top_anon: (l, a, b, d) => `${l}, el peso máximo de una posición pasó del ${a} al ${b} (${d}).`,
+    intv22_h_liq: (l, a, b, d) => `${l}, el peso de tu liquidez pasó del ${a} al ${b} (${d}).`,
+    intv22_h_eff: (l, a, b) => `${l}, el reparto de tus posiciones pasó de equivaler a ${a} posiciones a ${b}.`,
+    intv22_h_value: (l, a, b, d) => `${l}, tu cartera pasó de ${a} a ${b} (${d}), aportaciones y retiradas incluidas.`,
+    intv22_h_ret: (l, v) => `${l}, tu rentabilidad sin aportaciones ni retiradas fue del ${v}.`,
+    intv22_m_top: 'Mayor posición', intv22_m_effective: 'Reparto efectivo', intv22_m_liquidity: 'Liquidez',
+    intv22_m_return: 'Rentabilidad', intv22_m_value: 'Valor',
+    intv22_st_start: 'Inicio', intv22_st_now: 'Actual', intv22_st_delta: 'Cambio',
+    intv22_pos_unit: 'posiciones',
+    intv22_plot_aria: 'Usa las flechas para recorrer las observaciones.',
+    intv22_obs_note: n => `${n} observaciones registradas`,
+    intv22_tip_obs: 'observación registrada',
+    intv22_note_top: 'Peso máximo de una posición en cada fecha registrada; el tooltip dice qué activo lo tenía.',
+    intv22_note_effective: 'A cuántas posiciones de igual peso equivale tu reparto. Mide el reparto de pesos, no la diversificación de riesgos.',
+    intv22_note_liquidity: 'Peso de la liquidez sobre tu cartera en cada fecha registrada.',
+    intv22_note_return: 'Rentabilidad acumulada del periodo, sin aportaciones ni retiradas.',
+    intv22_note_value: 'Es valor, no rentabilidad: incluye lo que añades o retiras.',
+    intv22_xq_conc_down: '¿Por qué pesa menos mi posición principal que al principio del periodo?',
+    intv22_xq_conc_up: '¿Por qué pesa más mi posición principal que al principio del periodo?',
+    intv22_xa_conc_down: n => `${n} pesa menos porque el resto de tu cartera ha crecido más que ella.`,
+    intv22_xa_conc_up: n => `${n} pesa más porque ha crecido más que el resto de tu cartera.`,
+    intv22_xa_conc_ev: (v, t, na, nb) => `En el periodo su valor cambió un ${v} y el de tu cartera un ${t}; pasaste de ${na} a ${nb} posiciones.`,
+    intv22_xa_conc_new: n => `Hoy la posición con más peso es ${n}.`,
+    intv22_xq_spread: '¿Ha mejorado el reparto de mi cartera o simplemente tengo más activos?',
+    intv22_xa_spread_better: 'Ha mejorado el reparto: el peso está más equilibrado, no sólo hay más activos.',
+    intv22_xa_spread_more: 'Sobre todo tienes más activos: el peso sigue concentrado en pocas posiciones.',
+    intv22_xa_spread_less: 'El reparto se ha estrechado: el peso se concentra en menos posiciones.',
+    intv22_xa_spread_ev: (na, nb, ea, eb) => `Pasaste de ${na} a ${nb} posiciones, y el equilibrio entre ellas fue del ${ea} al ${eb} del máximo posible.`,
+    intv22_xa_spread_why: 'Importa porque un reparto más equilibrado hace que tu patrimonio dependa menos de una sola posición.',
+    intv22_xq_market_ops: '¿Qué parte del cambio procede del mercado y cuál de mis operaciones?',
+    intv22_xa_mo_ops: 'La mayor parte del cambio la explican tus operaciones, no el mercado.',
+    intv22_xa_mo_market: 'La mayor parte del cambio la explica el mercado, no tus operaciones.',
+    intv22_xa_mo_ev: (d, m, o) => `Desde el ${d}: mercado ${m}; tus compras, ventas y movimientos de liquidez ${o}.`,
+    intv22_xa_mo_lim: 'Con los valores registrados por Aurix en cada fecha; los dividendos no registrados no se separan.',
+    intv22_xq_liq: '¿Por qué cambió el peso de mi liquidez?',
+    intv22_xa_liq_rest: 'Tu liquidez apenas se movió: su peso cambió porque cambió el valor del resto de tu cartera.',
+    intv22_xa_liq_flows: 'Su peso cambió sobre todo por aportaciones o retiradas registradas.',
+    intv22_xa_liq_cash: 'Su peso cambió porque cambió el saldo de tu liquidez.',
+    intv22_xa_liq_ev: (c, r) => `En el periodo, la liquidez cambió ${c} y el resto de la cartera ${r}.`,
+    intv22_xq_cov: '¿Desde cuándo puede comparar Aurix mi cartera?',
+    intv22_xa_cov: d => `Aurix puede comparar tu cartera desde el ${d}.`,
+    intv22_xa_cov_ev: l => `Con observaciones comparables para: ${l}. Las ventanas más largas aparecerán cuando haya historia que las cubra.`,
+    intv22_tag_price: n => `Mayor movimiento de precio: ${n}`,
+    intv22_scn_shock: 'Caída simulada del 10 %',
+    intv22_scn_bar_aria: 'Peso de tu cartera afectado por el escenario',
     // ── INTELLIGENCE V2 (intv21) ──
     intv21_today_ret: p => `Rentabilidad de las últimas 24 h: ${p}, sin contar aportaciones ni retiradas.`,
     intv21_today_driver_up: (n, pp) => `Lo que más impulsó el resultado: ${n}, con una contribución de ${pp}.`,
@@ -9167,6 +9216,55 @@ const T = {
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
     // SPEC INT.04 — presentation layer for the Intelligence Core (see the ES block).
     intv4_brief_title: 'What matters today',
+    // ── INTELLIGENCE V2.1 (intv22) ──
+    intv22_in_7d: 'Over 7 days', intv22_in_30d: 'Over 30 days', intv22_since: d => `Since ${d}`,
+    intv22_h_top_same: (l, n, a, b, d) => `${l}, the weight of your largest position (${n}) went from ${a} to ${b} (${d}).`,
+    intv22_h_top_changed: (l, a, na, b, nb) => `${l}, the largest weight of any position went from ${a} (${na}) to ${b} (${nb}).`,
+    intv22_h_top_anon: (l, a, b, d) => `${l}, the largest weight of any position went from ${a} to ${b} (${d}).`,
+    intv22_h_liq: (l, a, b, d) => `${l}, your cash weight went from ${a} to ${b} (${d}).`,
+    intv22_h_eff: (l, a, b) => `${l}, your spread went from the equivalent of ${a} positions to ${b}.`,
+    intv22_h_value: (l, a, b, d) => `${l}, your portfolio went from ${a} to ${b} (${d}), contributions and withdrawals included.`,
+    intv22_h_ret: (l, v) => `${l}, your return excluding contributions and withdrawals was ${v}.`,
+    intv22_m_top: 'Largest position', intv22_m_effective: 'Effective spread', intv22_m_liquidity: 'Cash',
+    intv22_m_return: 'Return', intv22_m_value: 'Value',
+    intv22_st_start: 'Start', intv22_st_now: 'Now', intv22_st_delta: 'Change',
+    intv22_pos_unit: 'positions',
+    intv22_plot_aria: 'Use the arrow keys to move between observations.',
+    intv22_obs_note: n => `${n} recorded observations`,
+    intv22_tip_obs: 'recorded observation',
+    intv22_note_top: 'Largest weight of any position on each recorded date; the tooltip names the asset.',
+    intv22_note_effective: 'How many equally weighted positions your spread is worth. It measures weight spread, not risk diversification.',
+    intv22_note_liquidity: 'Cash as a share of your portfolio on each recorded date.',
+    intv22_note_return: 'Cumulative return for the period, excluding contributions and withdrawals.',
+    intv22_note_value: 'This is value, not return: it includes what you add or withdraw.',
+    intv22_xq_conc_down: 'Why does my main position weigh less than at the start of the period?',
+    intv22_xq_conc_up: 'Why does my main position weigh more than at the start of the period?',
+    intv22_xa_conc_down: n => `${n} weighs less because the rest of your portfolio grew more than it did.`,
+    intv22_xa_conc_up: n => `${n} weighs more because it grew more than the rest of your portfolio.`,
+    intv22_xa_conc_ev: (v, t, na, nb) => `Over the period its value changed ${v} and your portfolio ${t}; you went from ${na} to ${nb} positions.`,
+    intv22_xa_conc_new: n => `Today the heaviest position is ${n}.`,
+    intv22_xq_spread: 'Has my portfolio become better spread, or do I just have more assets?',
+    intv22_xa_spread_better: 'It is better spread: the weight is more balanced, not just spread over more assets.',
+    intv22_xa_spread_more: 'Mostly you have more assets: the weight is still concentrated in a few positions.',
+    intv22_xa_spread_less: 'The spread has narrowed: the weight sits in fewer positions.',
+    intv22_xa_spread_ev: (na, nb, ea, eb) => `You went from ${na} to ${nb} positions, and the balance between them went from ${ea} to ${eb} of the maximum possible.`,
+    intv22_xa_spread_why: 'It matters because a more balanced spread makes your wealth depend less on a single position.',
+    intv22_xq_market_ops: 'How much of the change came from the market and how much from my own transactions?',
+    intv22_xa_mo_ops: 'Most of the change comes from your transactions, not the market.',
+    intv22_xa_mo_market: 'Most of the change comes from the market, not your transactions.',
+    intv22_xa_mo_ev: (d, m, o) => `Since ${d}: market ${m}; your buys, sells and cash movements ${o}.`,
+    intv22_xa_mo_lim: 'Based on the values Aurix recorded on each date; unrecorded dividends are not separated.',
+    intv22_xq_liq: 'Why did my cash weight change?',
+    intv22_xa_liq_rest: 'Your cash barely moved: its weight changed because the rest of your portfolio changed in value.',
+    intv22_xa_liq_flows: 'Its weight changed mainly because of recorded contributions or withdrawals.',
+    intv22_xa_liq_cash: 'Its weight changed because your cash balance changed.',
+    intv22_xa_liq_ev: (c, r) => `Over the period, cash changed ${c} and the rest of the portfolio ${r}.`,
+    intv22_xq_cov: 'Since when can Aurix compare my portfolio?',
+    intv22_xa_cov: d => `Aurix can compare your portfolio since ${d}.`,
+    intv22_xa_cov_ev: l => `With comparable observations for: ${l}. Longer windows will appear once history covers them.`,
+    intv22_tag_price: n => `Largest price move: ${n}`,
+    intv22_scn_shock: 'Simulated 10% fall',
+    intv22_scn_bar_aria: 'Share of your portfolio affected by the scenario',
     // ── INTELLIGENCE V2 (intv21) ──
     intv21_today_ret: p => `Return over the last 24 h: ${p}, excluding contributions and withdrawals.`,
     intv21_today_driver_up: (n, pp) => `Biggest boost to the result: ${n}, contributing ${pp}.`,
@@ -68544,7 +68642,18 @@ function _intv4ExploreHtml(core, esc, intel) {
   // V2 — preguntas CONTEXTUALES (hechos reales de esta cartera, contestables).
   // El catálogo genérico sólo completa hasta tres si faltan.
   let ctx21 = [];
-  try { ctx21 = (typeof _intv21ExploreQs === 'function') ? _intv21ExploreQs(_intv21Weights(), {}, esc).slice(0, _INTV4_EXPLORE_MAX) : []; } catch (_) { ctx21 = []; }
+  // V2.1 — conjunto CONGELADO por huella material (estable en scroll, acordeones,
+  // cargas asíncronas y navegación). Con fuentes en vuelo no se decide nada.
+  let x22 = null;
+  try { x22 = (typeof _intv22ExploreQs === 'function') ? _intv22ExploreQs(_intv21Weights(), esc) : null; } catch (_) { x22 = null; }
+  if (x22 && x22.pending) {
+    return `
+    <section class="intcc-card intcc-explore intv4-explore is-pending" data-explore="" data-pending="1" aria-busy="true">
+      <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
+      <div class="intv22-skel is-list"></div>
+    </section>`;
+  }
+  if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id } }));
   const all = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
     // §3 — LABEL Y RESPUESTA SE RESUELVEN EN LA MISMA PASADA Y DESDE EL MISMO
     // `q`, así que no pueden cruzarse: un reordenamiento del catálogo mueve el
@@ -68561,12 +68670,16 @@ function _intv4ExploreHtml(core, esc, intel) {
     (typeof _aurixIntelOwner === 'function') ? _aurixIntelOwner({}) : null));
   const qs = all
     .filter(x => picked.has(x.q.id))
+    // V2.1 — la concentración por posición es de Factores: el catálogo no la repite.
+    .filter(x => !(typeof _intv22ExploreQs === 'function' && x.q.causalRoot === _AURIX_CAUSAL_ROOT.TOP_POSITION))
     .sort((a, b) => {
       const ha = hot.has(a.q.causalRoot) ? 1 : 0, hb = hot.has(b.q.causalRoot) ? 1 : 0;
       if (ha !== hb) return hb - ha;
       return a.q.id < b.q.id ? -1 : 1;
     })
-    .slice(0, (typeof _intv21ExploreQs === 'function') ? Math.max(0, (ctx21.length >= 3 ? 0 : 3 - ctx21.length)) : _INTV4_EXPLORE_MAX);
+    // V2.1 — con preguntas contextuales, el catálogo genérico no se mezcla (repetía
+    // cifras de Factores); sólo una cuenta sin ninguna contextual lo conserva.
+    .slice(0, ctx21.length ? 0 : _INTV4_EXPLORE_MAX);
   ctx21.slice().reverse().forEach(c => qs.unshift({ q: { id: c.id, causalRoot: c.root }, label: c.label, answer: c.answer, fact: c.fact }));
   if (!qs.length) return '';
   return `
@@ -69280,6 +69393,29 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
   // Ningún número de días sale de la serie de nivel ni de la edad de la cuenta:
   // cada fila lleva sus propios extremos. Sin la frase permanente de «mayor plazo».
   const evo = _intv19Evolution(core, alreadyPublished, hoyKeys);
+  // V2.1 — el titular sale de la MÉTRICA y la VENTANA activas; las evidencias del
+  // ledger (≤2) no repiten la familia que el titular ya cuenta.
+  let evo22 = '';
+  try { evo22 = (typeof _intv22EvoModuleHtml === 'function') ? _intv22EvoModuleHtml(esc) : ''; } catch (_) { evo22 = ''; }
+  if (evo22) {
+    const am = (evo22.match(/data-metric="([^"]+)"/) || [, ''])[1];
+    const ak = (evo22.match(/data-evo-fact="([^"]+)"/) || [, ''])[1];
+    const fam = (typeof _INTV22_SAME_FAMILY !== 'undefined' && am) ? _INTV22_SAME_FAMILY[am] : '';
+    const ev = evo.items.filter(x => !fam || x.family !== fam).slice(0, 2);
+    const factAttr22 = (x) => (x.family === 'return' || x.family === 'level') ? ` data-fact="${esc(x.key)}"` : '';
+    return `
+      <section class="intcc-card intcc-timeline intv4-memory is-stable intv22-memory"
+               data-obs="${esc(String(nObs))}" data-declared="${declared.length}" data-events="${events.length}"
+               data-evo-families="${esc((am ? [am] : []).concat(ev.map(x => x.family)).join(','))}"
+               data-evo-keys="${esc((ak ? [ak] : []).concat(ev.map(x => x.key)).join(','))}"
+               data-stable="0">
+        <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
+        ${evo22}
+        ${ev.length ? `<ul class="intv15-stable-list">
+          ${ev.map(x => `<li class="intv15-stable-row" data-evo-family="${esc(x.family)}" data-evo-key="${esc(x.key)}"${factAttr22(x)} data-period="${esc(x.period || '')}"><span class="intv4-mem-what">${esc(x.txt)}</span></li>`).join('')}
+        </ul>` : ''}
+      </section>`;
+  }
   // V2 — módulo visual (métrica × ventana) entre el titular y las evidencias.
   let evoViz = '';
   try { evoViz = (typeof _intv21EvoModuleHtml === 'function') ? _intv21EvoModuleHtml(esc) : ''; } catch (_) { evoViz = ''; }
@@ -71977,13 +72113,14 @@ const _INTV21_SEL = Object.freeze({
   movers: '.intv21-movers', scenarios: '.intv21-scen', log: '.intv21-log',
 });
 function _intv21Read() {
-  const def = { hidden: {}, shown: {}, evoMetric: null, evoWin: null, scen: null };
+  const def = { hidden: {}, shown: {}, evoMetric: null, evoWin: null, scen: null, explore22: null };
   try {
     const o = (typeof _aurixIntelReadOwned === 'function') ? _aurixIntelReadOwned(_INTV21_KEY, {}) : null;
     if (!o) return def;
     const obj = (x) => (x && typeof x === 'object' && !Array.isArray(x)) ? x : {};
     const str = (x) => (typeof x === 'string' && x.length < 40) ? x : null;
-    return { hidden: obj(o.hidden), shown: obj(o.shown), evoMetric: str(o.evoMetric), evoWin: str(o.evoWin), scen: str(o.scen) };
+    const ex = (o.explore22 && typeof o.explore22 === 'object' && Array.isArray(o.explore22.ids)) ? o.explore22 : null;
+    return { hidden: obj(o.hidden), shown: obj(o.shown), evoMetric: str(o.evoMetric), evoWin: str(o.evoWin), scen: str(o.scen), explore22: ex };
   } catch (_) { return def; }
 }
 function _intv21Write(patch) {
@@ -72516,7 +72653,7 @@ function _intv21AttrWindow(range, ref, refStart, refEnd) {
   const tol = Math.max(0.1, 0.1 * Math.abs(ref));
   const sameSign = Math.abs(ref) < 0.05 || Math.abs(sum) < 0.05 || Math.sign(sum) === Math.sign(ref);
   if (!sameSign || Math.abs(sum - ref) > tol) return null;
-  return { range, label: W.label, startAt: start.ts, endAt: end.ts, rows: out, sum, twr: ref };
+  return { range, label: W.label, startAt: start.ts, endAt: end.ts, rows: out, sum, twr: ref, base: D };
 }
 function _intv21Attribution() {
   for (const range of ['30d', '7d']) {
@@ -72718,7 +72855,10 @@ function _intv21Tip(plot, idx) {
     const i = Math.max(0, Math.min(pts.length - 1, idx));
     const p = pts[i];
     plot.setAttribute('data-tip', String(i));
-    tip.textContent = _intccDate(p[2]) + ' · ' + p[3] + (p[4] ? ' · ' + p[4] : '');
+    tip.textContent = _intccDate(p[2]) + ' · ' + p[3] + (p[4] ? ' · ' + p[4] : '')
+      + (plot.getAttribute('data-sparse') === '1' ? ' · ' + _intv4T('intv22_tip_obs') : '');
+    const cd = plot.querySelector('.intv22-cursor-dot');
+    if (cd) { cd.style.left = (p[0] * 100) + '%'; cd.style.top = (p[1] * 100) + '%'; cd.classList.add('is-on'); }
     tip.classList.add('is-on');
     const w = plot.clientWidth, h = plot.clientHeight;
     const x = p[0] * w;
@@ -72731,6 +72871,8 @@ function _intv21TipHide(plot) {
   const tip = plot && plot.querySelector('.intv21-evo-tip'), cur = plot && plot.querySelector('.intv21-evo-cursor');
   if (tip) tip.classList.remove('is-on');
   if (cur) cur.classList.remove('is-on');
+  const cd = plot && plot.querySelector('.intv22-cursor-dot');
+  if (cd) cd.classList.remove('is-on');
   if (plot) plot.removeAttribute('data-tip');
 }
 function _intv21Nearest(plot, clientX) {
@@ -72785,11 +72927,11 @@ function _intv21Wire() {
       // funciones puras que el render completo), el resto de la pestaña no se toca.
       try {
         if ('evoMetric' in patch || 'evoWin' in patch) {
-          const html = _intv21EvoModuleHtml(_intccEsc);
+          const html = (typeof _intv22EvoModuleHtml === 'function') ? _intv22EvoModuleHtml(_intccEsc) : _intv21EvoModuleHtml(_intccEsc);
           if (html) document.querySelectorAll('.intv21-evo').forEach(n => { n.outerHTML = html; });
         }
         if ('scen' in patch) {
-          const html = _intv21ScenarioHtml(_intv21Weights(), _intccEsc);
+          const html = (typeof _intv22ScenarioHtml === 'function') ? _intv22ScenarioHtml(_intv21Weights(), _intccEsc) : _intv21ScenarioHtml(_intv21Weights(), _intccEsc);
           if (html) document.querySelectorAll('.intv21-scen').forEach(n => { n.outerHTML = html; });
         }
       } catch (_) {}
@@ -72841,6 +72983,413 @@ try {
     };
   }
 } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX INTELLIGENCE V2.1 · GRÁFICO, COHERENCIA Y ORDEN FINAL (intv22)
+// ════════════════════════════════════════════════════════════════════════════
+// Corrección sobre v808 con la evidencia de la cuenta real. NO toca ningún cálculo:
+// las series siguen saliendo de `_intv21EvoSeries` (owners certificados), los
+// escenarios de `_intv21Scenarios` y la atribución de `_intv21Attribution`.
+// Lo que cambia es la VERDAD de la presentación:
+//   · CAUSA de «primera referencia» con historia real: el titular de Tu evolución
+//     salía sólo de hechos del ledger, y el de peso de la mayor posición se descarta
+//     cuando cambia el activo dominante (Bitcoin → Microsoft). Sin rentabilidad
+//     publicable la card caía al vacío aunque el gráfico tuviera tres métricas.
+//     Ahora el titular sale de la métrica y la ventana ACTIVAS.
+//   · CAUSA de los «palos verticales»: las series escasas se dibujaban como tallos
+//     sin línea. Ahora se unen sus observaciones reales (sin crear valores).
+//   · Explora se congela por huella material; las etiquetas, por visita.
+const _INTV22_METRICS = ['top', 'effective', 'liquidity', 'return', 'value'];
+const _INTV22_SRC = { top: 'top', effective: 'diversification', liquidity: 'liquidity', return: 'return', value: 'value' };
+const _INTV22_WINS = ['7d', '30d', 'all'];
+// ¿Hay alguna fuente de la que dependan las métricas todavía en vuelo? Mientras lo
+// esté, ni controles, ni titular, ni preguntas se deciden: no cambian por un
+// render parcial. Sin sesión no hay nada que esperar.
+function _intv22Pending() {
+  try {
+    const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+    if (!authed) return false;
+    const m = (typeof _aurixAssetMemory !== 'undefined') ? _aurixAssetMemory : null;
+    if (m && (m.state === 'loading' || m.state === 'idle')) return true;
+    if (typeof _aurixChartPublicationSourcesPending === 'function' && _aurixChartPublicationSourcesPending().pending) return true;
+  } catch (_) {}
+  return false;
+}
+function _intv22Series(metric, win) {
+  const src = _INTV22_SRC[metric];
+  if (!src) return null;
+  const s = _intv21EvoSeries(src, win);
+  if (!s || !Array.isArray(s.pts) || s.pts.length < 2) return null;
+  const pts = s.pts.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.v)).sort((a, b) => a.ts - b.ts);
+  if (pts.length < 2) return null;
+  return Object.assign({}, s, { pts, metric, win });
+}
+// Disponibilidad real. «Desde inicio» sólo cuando empieza de verdad antes que 30D
+// (más de 3 días): con una historia de un mes serían dos botones con el mismo dato.
+function _intv22Availability() {
+  const avail = {};
+  _INTV22_METRICS.forEach(m => {
+    const wins = {};
+    _INTV22_WINS.forEach(w => { const s = _intv22Series(m, w); if (s) wins[w] = s; });
+    // Dos observaciones a horas de distancia no son un periodo comparable.
+    if (wins.all && (wins.all.pts[wins.all.pts.length - 1].ts - wins.all.pts[0].ts) < _INTV21_DAY) delete wins.all;
+    if (wins.all && wins['30d'] && !(wins.all.pts[0].ts < wins['30d'].pts[0].ts - 3 * _INTV21_DAY)) delete wins.all;
+    if (wins.all && wins['7d'] && !wins['30d'] && !(wins.all.pts[0].ts < wins['7d'].pts[0].ts - 3 * _INTV21_DAY)) delete wins.all;
+    const keys = _INTV22_WINS.filter(w => wins[w]);
+    if (keys.length) avail[m] = { wins: keys, series: wins };
+  });
+  return avail;
+}
+// Selección determinista: la guardada si sigue siendo válida; si no, la primera
+// métrica disponible y su ventana válida MÁS LARGA.
+function _intv22Selection(avail) {
+  const st = _intv21Read();
+  const stored = st.evoMetric === 'diversification' ? 'effective' : st.evoMetric;
+  const metrics = _INTV22_METRICS.filter(m => avail[m]);
+  if (!metrics.length) return null;
+  const metric = (stored && avail[stored]) ? stored : metrics[0];
+  const wins = avail[metric].wins;
+  const win = (st.evoWin && wins.indexOf(st.evoWin) !== -1) ? st.evoWin : wins[wins.length - 1];
+  return { metric, win, metrics, wins, series: avail[metric].series[win] };
+}
+function _intv22WinLead(win, startTs) {
+  if (win === '7d') return _intv4T('intv22_in_7d');
+  if (win === '30d') return _intv4T('intv22_in_30d');
+  return _intv4T('intv22_since', _intccDate(startTs));
+}
+// Inicio · Actual · Cambio, con la unidad de cada métrica (pp para pesos).
+function _intv22Stats(metric, s) {
+  const a = s.pts[0], b = s.pts[s.pts.length - 1];
+  const val = (v) => metric === 'value' ? _intv4Money(v) : (metric === 'effective' ? _intv21Fixed(v, 1)
+    : (metric === 'return' ? _intv21Pct(v, 2, true) : _intv21Pct(v, 1)));
+  let delta;
+  if (metric === 'value') { const pct = a.v > 0 ? (b.v / a.v - 1) * 100 : null; delta = (b.v - a.v >= 0 ? '+' : '−') + _intv4Money(Math.abs(b.v - a.v)) + (pct != null ? ' (' + _intv21Pct(pct, 1, true) + ')' : ''); }
+  else if (metric === 'effective') delta = ((b.v - a.v) > 0 ? '+' : ((b.v - a.v) < 0 ? '−' : '')) + _intv21Fixed(b.v - a.v, 1);
+  else if (metric === 'return') delta = _intv21Pct(b.v - a.v, 2, true);
+  else { const dd = b.v - a.v; delta = (dd > 0 ? '+' : (dd < 0 ? '−' : '')) + _intv21Fixed(dd, 1) + ' pp'; }
+  return { a, b, start: val(a.v), now: val(b.v), delta };
+}
+function _intv22Headline(sel) {
+  const s = sel.series, m = sel.metric, st = _intv22Stats(m, s);
+  const lead = _intv22WinLead(sel.win, st.a.ts);
+  if (m === 'top') {
+    const na = st.a.note, nb = st.b.note;
+    if (!na || !nb) return _intv4T('intv22_h_top_anon', lead, st.start, st.now, st.delta);
+    return na === nb ? _intv4T('intv22_h_top_same', lead, na, st.start, st.now, st.delta)
+                     : _intv4T('intv22_h_top_changed', lead, st.start, na, st.now, nb);
+  }
+  if (m === 'liquidity') return _intv4T('intv22_h_liq', lead, st.start, st.now, st.delta);
+  if (m === 'effective') return _intv4T('intv22_h_eff', lead, st.start, st.now);
+  if (m === 'value') return _intv4T('intv22_h_value', lead, st.start, st.now, st.delta);
+  return _intv4T('intv22_h_ret', lead, st.now);
+}
+// ── RENDERER DEL GRÁFICO ────────────────────────────────────────────────────
+// Une SÓLO observaciones reales (nunca crea un valor intermedio). Corta la línea
+// únicamente en una serie densa cuando falta un tramo de observaciones; una serie
+// escasa (las fechas registradas de la memoria por posición) se une entera y el
+// tooltip dice que son observaciones registradas. Escala con un rango MÍNIMO por
+// unidad para no exagerar cambios de décimas; nunca recorta un extremo.
+const _INTV22_MIN_SPAN = { pct: 4, n: 1, pct_signed: 1 };
+function _intv22Svg(s, metric) {
+  const W = 600, H = 168, pl = 10, pr = 10, pt = 16, pb = 16;
+  let pts = s.pts;
+  if (pts.length > 240) {
+    const step = (pts.length - 1) / 239, keep = new Set([0, pts.length - 1]);
+    for (let i = 0; i < 240; i++) keep.add(Math.round(i * step));
+    pts = pts.filter((_, i) => keep.has(i));
+  }
+  const unit = metric === 'return' ? 'pct_signed' : s.unit;
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts;
+  let lo = Math.min.apply(null, pts.map(p => p.v)), hi = Math.max.apply(null, pts.map(p => p.v));
+  if (metric === 'return') { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const minSpan = unit === 'money' ? Math.max(1, ((hi + lo) / 2) * 0.04) : (_INTV22_MIN_SPAN[unit] || 1);
+  if (hi - lo < minSpan) { const mid = (hi + lo) / 2; lo = mid - minSpan / 2; hi = mid + minSpan / 2; }
+  if (unit === 'pct' && lo < 0) { hi -= lo; lo = 0; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  const X = ts => pl + ((ts - t0) / Math.max(1, t1 - t0)) * (W - pl - pr);
+  const Y = v => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+  const xy = pts.map(p => ({ x: +X(p.ts).toFixed(1), y: +Y(p.v).toFixed(1) }));
+  let body = '';
+  [0.2, 0.5, 0.8].forEach(f => { const y = (pt + f * (H - pt - pb)).toFixed(1); body += `<line class="intv21-evo-grid" x1="${pl}" x2="${W - pr}" y1="${y}" y2="${y}"/>`; });
+  if (metric === 'return' && lo < 0 && hi > 0) body += `<line class="intv21-evo-zero" x1="${pl}" x2="${W - pr}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"/>`;
+  const dense = pts.length > 12;
+  let brk = Infinity;
+  if (dense) {
+    const gaps = [];
+    for (let i = 1; i < pts.length; i++) gaps.push(pts[i].ts - pts[i - 1].ts);
+    const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)] || 0;
+    brk = Math.max(6 * 3600e3, 2.5 * med);
+  }
+  let d = '', area = '', segStart = 0;
+  xy.forEach((p, i) => {
+    const cut = i === 0 || (pts[i].ts - pts[i - 1].ts) > brk;
+    d += (cut ? 'M' : 'L') + p.x + ' ' + p.y + ' ';
+  });
+  // Relleno suave bajo cada tramo continuo (estética del sistema, no dato).
+  const base = (H - pb).toFixed(1);
+  xy.forEach((p, i) => {
+    const last = i === xy.length - 1 || (pts[i + 1].ts - pts[i].ts) > brk;
+    if (last) {
+      const seg = xy.slice(segStart, i + 1);
+      if (seg.length >= 2) area += `M${seg[0].x} ${base} ` + seg.map(q => 'L' + q.x + ' ' + q.y).join(' ') + ` L${seg[seg.length - 1].x} ${base} Z `;
+      segStart = i + 1;
+    }
+  });
+  body += `<path class="intv22-area" d="${area.trim()}"/>`;
+  body += `<path class="intv21-evo-line" pathLength="1" d="${d.trim()}"/>`;
+  body += `<line class="intv21-evo-cursor" x1="0" x2="0" y1="${pt}" y2="${H - pb}"/>`;
+  const dot = (p, cls) => `<span class="intv21-evo-dot${cls}" style="left:${(p.x / W * 100).toFixed(2)}%;top:${(p.y / H * 100).toFixed(2)}%"></span>`;
+  // Un punto en CADA observación de una serie escasa; en una densa, los extremos
+  // (el cursor del tooltip marca cualquier observación intermedia).
+  const dots = dense ? dot(xy[0], ' is-end') + dot(xy[xy.length - 1], ' is-end is-last')
+                     : xy.map((p, i) => dot(p, i === xy.length - 1 ? ' is-last' : '')).join('');
+  return { svg: `<svg class="intv21-evo-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">${body}</svg><div class="intv21-evo-dots" aria-hidden="true">${dots}<span class="intv22-cursor-dot"></span></div>`,
+    pts: pts.map((p, i) => ({ x: xy[i].x / W, y: xy[i].y / H, t: p.ts, v: p.v, n: p.note || '' })), dense, unit };
+}
+const _intv22Animated = new Set();
+// El módulo completo: titular de la métrica activa, controles, gráfico y
+// Inicio · Actual · Cambio. Altura constante entre métricas y ventanas.
+function _intv22EvoModuleHtml(esc) {
+  if (_intv22Pending()) {
+    return `<div class="intv21-evo intv22-evo is-pending" data-pending="1" aria-busy="true"><div class="intv22-skel"></div></div>`;
+  }
+  const avail = _intv22Availability();
+  const sel = _intv22Selection(avail);
+  if (!sel) return '';
+  const s = sel.series, g = _intv22Svg(s, sel.metric), st = _intv22Stats(sel.metric, s);
+  const head = _intv22Headline(sel);
+  const sig = sel.metric + '|' + sel.win + '|' + s.pts[0].ts + '|' + s.pts[s.pts.length - 1].ts + '|' + s.pts.length;
+  const anim = !_intv22Animated.has(sig);
+  _intv22Animated.add(sig);
+  const fmt = (v) => sel.metric === 'value' ? _intv4Money(v) : (sel.metric === 'effective' ? _intv21Fixed(v, 1) + ' ' + _intv4T('intv22_pos_unit')
+    : (sel.metric === 'return' ? _intv21Pct(v, 2, true) : _intv21Pct(v, 1)));
+  const data = g.pts.map(p => [+p.x.toFixed(4), +p.y.toFixed(4), p.t, fmt(p.v), p.n]);
+  const sparse = !g.dense;
+  return `
+    <div class="intv21-evo intv22-evo" data-metric="${esc(sel.metric)}" data-win="${esc(sel.win)}" data-kind="${sparse ? 'observations' : 'line'}"
+         data-points="${g.pts.length}" data-evo-fact="${esc('evo_' + sel.metric + '_' + sel.win)}">
+      <p class="intv15-stable-head intv22-head" data-evo-family="${esc(sel.metric)}" data-evo-key="${esc('evo_' + sel.metric + '_' + sel.win)}" data-period="${esc(sel.win)}"><span class="intv4-mem-what">${esc(head)}</span></p>
+      <div class="intv21-evo-ctrl">
+        <div class="intv21-seg" role="group" aria-label="${esc(_intv4T('intv21_evo_metric_aria'))}">${sel.metrics.map(m => `
+          <button type="button" class="intv21-chip${m === sel.metric ? ' is-on' : ''}" data-intv21-evo-metric="${esc(m)}" aria-pressed="${m === sel.metric ? 'true' : 'false'}">${esc(_intv4T('intv22_m_' + m))}</button>`).join('')}
+        </div>
+        <div class="intv21-seg is-win" role="group" aria-label="${esc(_intv4T('intv21_evo_win_aria'))}">${sel.wins.map(w => `
+          <button type="button" class="intv21-chip${w === sel.win ? ' is-on' : ''}" data-intv21-evo-win="${esc(w)}" aria-pressed="${w === sel.win ? 'true' : 'false'}">${esc(_intv4T('intv21_win_' + w))}</button>`).join('')}
+        </div>
+      </div>
+      <dl class="intv22-stats">
+        <div><dt>${esc(_intv4T('intv22_st_start'))}</dt><dd>${esc(st.start)}</dd></div>
+        <div><dt>${esc(_intv4T('intv22_st_now'))}</dt><dd>${esc(st.now)}</dd></div>
+        <div><dt>${esc(_intv4T('intv22_st_delta'))}</dt><dd class="is-${(st.b.v - st.a.v) > 0 ? 'up' : ((st.b.v - st.a.v) < 0 ? 'down' : 'flat')}">${esc(st.delta)}</dd></div>
+      </dl>
+      <div class="intv21-evo-plot${anim ? ' is-anim' : ''}" tabindex="0" role="img"
+           aria-label="${esc(head + ' ' + _intv4T('intv22_plot_aria'))}" data-sparse="${sparse ? '1' : '0'}"
+           data-pts="${esc(JSON.stringify(data))}">
+        ${g.svg}
+        <div class="intv21-evo-tip" aria-hidden="true"></div>
+      </div>
+      <div class="intv21-evo-axis"><span>${esc(_intccDate(st.a.ts))}</span><span>${esc(sparse ? _intv4T('intv22_obs_note', g.pts.length) : '')}</span><span>${esc(_intccDate(st.b.ts))}</span></div>
+      <p class="intv21-evo-note">${esc(_intv4T('intv22_note_' + sel.metric))}</p>
+    </div>`;
+}
+// Familia de evidencia del ledger que la métrica activa ya cuenta (no se repite).
+const _INTV22_SAME_FAMILY = { top: 'position', return: 'return', value: 'level', liquidity: 'structure', effective: '' };
+
+// ── EXPLORA · PREGUNTAS ESTABLES ────────────────────────────────────────────
+// Huella MATERIAL: qué posiciones hay, cuál domina y en qué tramo de 5 puntos está
+// su peso. Mientras no cambie (o no venza el cooldown de 7 días) el conjunto de
+// preguntas es el mismo en cualquier render, scroll, acordeón o navegación.
+function _intv22Fingerprint(W) {
+  try {
+    const rows = (W && W.rows) || [];
+    const ids = rows.map(r => r.id).sort().join(',');
+    const top = rows[0] ? rows[0].id + ':' + Math.floor(rows[0].w * 20) : '';
+    let h = 0; const str = ids + '|' + top;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return 'f' + h.toString(36);
+  } catch (_) { return 'f0'; }
+}
+const _INTV22_EXPLORE_COOLDOWN = 7 * 864e5;
+// Candidatas. Cada una sólo existe si Aurix puede contestarla con datos
+// certificados; la respuesta sigue conclusión → evidencia → relevancia.
+function _intv22ExploreCandidates(W, esc) {
+  const out = [];
+  const rows = _intv21MemRows();
+  const now = _intv21Now();
+  const name = (id) => { const a = ((typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []).find(x => String(x.id) === String(id)); return a ? _intv21Name(a) : '—'; };
+  const p = (html) => html.map(t => `<p>${esc(t)}</p>`).join('');
+  // 1 · CONCENTRACIÓN · ¿por qué pesa menos (o más) la posición principal?
+  try {
+    const s = _intv22Series('top', '30d') || _intv22Series('top', '7d');
+    if (rows && s) {
+      const a = s.pts[0], b = s.pts[s.pts.length - 1];
+      const start = rows.find(r => r.ts === a.ts), end = rows.find(r => r.ts === b.ts);
+      const ws = start && _intv21RowWeights(start), we = end && _intv21RowWeights(end);
+      if (ws && we && Math.abs(b.v - a.v) >= 1) {
+        const domStart = ws.pos.slice().sort((x, y) => y.v - x.v)[0];
+        const domEnd = we.pos.slice().sort((x, y) => y.v - x.v)[0];
+        const sameEnd = we.pos.find(x => x.id === domStart.id);
+        const valChg = sameEnd ? (sameEnd.v / domStart.v - 1) * 100 : -100;
+        const totChg = (we.tot / ws.tot - 1) * 100;
+        const lines = [];
+        const down = b.v < a.v;
+        lines.push(_intv4T(down ? 'intv22_xa_conc_down' : 'intv22_xa_conc_up', domStart.a ? _intv21Name(domStart.a) : name(domStart.id)));
+        lines.push(_intv4T('intv22_xa_conc_ev', _intv21Pct(valChg, 1, true), _intv21Pct(totChg, 1, true), ws.pos.length, we.pos.length));
+        if (domEnd.id !== domStart.id) lines.push(_intv4T('intv22_xa_conc_new', _intv21Name(domEnd.a)));
+        out.push({ id: 'x22_conc_why', family: 'concentration', root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+          label: _intv4T(down ? 'intv22_xq_conc_down' : 'intv22_xq_conc_up'), answer: p(lines) });
+      }
+    }
+  } catch (_) {}
+  // 2 · REPARTO EFECTIVO · ¿mejor reparto o sólo más activos?
+  try {
+    const s = _intv22Series('effective', '30d') || _intv22Series('effective', '7d');
+    if (rows && s) {
+      const a = s.pts[0], b = s.pts[s.pts.length - 1];
+      const ws = _intv21RowWeights(rows.find(r => r.ts === a.ts)), we = _intv21RowWeights(rows.find(r => r.ts === b.ts));
+      if (ws && we && Math.abs(b.v - a.v) >= 0.3) {
+        const evA = a.v / ws.pos.length * 100, evB = b.v / we.pos.length * 100;
+        const better = evB > evA + 2, onlyMore = !better && we.pos.length > ws.pos.length;
+        out.push({ id: 'x22_spread', family: 'effective', root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+          label: _intv4T('intv22_xq_spread'),
+          answer: p([_intv4T(better ? 'intv22_xa_spread_better' : (onlyMore ? 'intv22_xa_spread_more' : 'intv22_xa_spread_less')),
+                     _intv4T('intv22_xa_spread_ev', ws.pos.length, we.pos.length, _intv21Pct(evA, 0), _intv21Pct(evB, 0)),
+                     _intv4T('intv22_xa_spread_why')]) });
+      }
+    }
+  } catch (_) {}
+  // 3 · CONTRIBUCIÓN · ¿qué parte viene del mercado y cuál de mis operaciones?
+  try {
+    for (const range of ['30d', '7d']) {
+      let pr = null;
+      try { pr = _aurixInvestablePerformance(range); } catch (_) { pr = null; }
+      if (!pr || !pr.valid || pr.coversNominal === false) continue;
+      const att = _intv21AttrWindow(range, pr.returnPct, pr.startAt, pr.endAt);
+      if (!att) continue;
+      const st = rows.find(r => r.ts === att.startAt), en = rows.find(r => r.ts === att.endAt);
+      const ws = st && _intv21RowWeights(st), we = en && _intv21RowWeights(en);
+      if (!ws || !we) continue;
+      // Liquidez en otra divisa: su variación de tipo no es «operación» ni «mercado» de
+      // posiciones atribuidas ⇒ no se reparte.
+      if (we.pos.concat(ws.pos).some(x => _intccIsMonetary(x.a.type) && String(x.a.assetCurrency || 'USD').toUpperCase() !== 'USD')) continue;
+      const total = we.tot - ws.tot;
+      const market = att.rows.reduce((s2, x) => s2 + x.c, 0) / 100 * att.base;   // Σ contribuciones × base Dietz
+      const ops = total - market;
+      out.push({ id: 'x22_market_ops', family: 'contribution', root: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
+        label: _intv4T('intv22_xq_market_ops'),
+        answer: p([_intv4T(Math.abs(ops) > Math.abs(market) ? 'intv22_xa_mo_ops' : 'intv22_xa_mo_market'),
+                   _intv4T('intv22_xa_mo_ev', _intccDate(att.startAt), (market >= 0 ? '+' : '−') + _intv4Money(Math.abs(market)), (ops >= 0 ? '+' : '−') + _intv4Money(Math.abs(ops))),
+                   _intv4T('intv22_xa_mo_lim')]) });
+      break;
+    }
+  } catch (_) {}
+  // 4 · LIQUIDEZ · ¿por qué cambió? (aportaciones/retiradas frente al resto)
+  try {
+    const s = _intv22Series('liquidity', '7d') || _intv22Series('liquidity', '30d');
+    if (rows && s) {
+      const a = s.pts[0], b = s.pts[s.pts.length - 1];
+      const ws = _intv21RowWeights(rows.find(r => r.ts === a.ts)), we = _intv21RowWeights(rows.find(r => r.ts === b.ts));
+      if (ws && we && Math.abs(b.v - a.v) >= 0.2) {
+        const cash = (w) => w.pos.filter(x => _intv21IsCash((typeof _aurixCategoryBucket === 'function') ? _aurixCategoryBucket(x.a) : x.a.type)).reduce((s2, x) => s2 + x.v, 0);
+        const cA = cash(ws), cB = cash(we);
+        const fl = ((typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [])
+          .filter(f => f && (f.kind === 'deposit' || f.kind === 'withdrawal') && f.ts > a.ts && f.ts <= b.ts);
+        const net = fl.reduce((s2, f) => s2 + (Number(f.amountUSD) || 0), 0);
+        const cashMoved = Math.abs(cB - cA) > Math.max(1, 0.005 * cA);
+        const key = !cashMoved ? 'intv22_xa_liq_rest' : (Math.abs(net) > 0.5 * Math.abs(cB - cA) ? 'intv22_xa_liq_flows' : 'intv22_xa_liq_cash');
+        out.push({ id: 'x22_liq_why', family: 'liquidity', root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+          label: _intv4T('intv22_xq_liq'),
+          answer: p([_intv4T(key), _intv4T('intv22_xa_liq_ev', (cB - cA >= 0 ? '+' : '−') + _intv4Money(Math.abs(cB - cA)), (we.tot - cB - (ws.tot - cA) >= 0 ? '+' : '−') + _intv4Money(Math.abs(we.tot - cB - (ws.tot - cA))))]) });
+      }
+    }
+  } catch (_) {}
+  // 5 · COBERTURA TEMPORAL · ¿desde cuándo puede comparar Aurix?
+  try {
+    const avail = _intv22Availability();
+    const firsts = [];
+    Object.keys(avail).forEach(m => avail[m].wins.forEach(w => firsts.push(avail[m].series[w].pts[0].ts)));
+    if (firsts.length) {
+      const since = Math.min.apply(null, firsts);
+      out.push({ id: 'x22_coverage', family: 'coverage', root: _AURIX_CAUSAL_ROOT.DATA_COVERAGE,
+        label: _intv4T('intv22_xq_cov'),
+        answer: p([_intv4T('intv22_xa_cov', _intccDate(since)), _intv4T('intv22_xa_cov_ev', Object.keys(avail).map(m => _intv4T('intv22_m_' + m).toLowerCase()).join(', '))]) });
+    }
+  } catch (_) {}
+  return out;
+}
+function _intv22ExploreQs(W, esc) {
+  const cands = _intv22ExploreCandidates(W, esc);
+  const byId = new Map(cands.map(c => [c.id, c]));
+  if (_intv22Pending()) return { qs: [], frozen: false, pending: true };
+  const st = _intv21Read();
+  const fp = _intv22Fingerprint(W), now = Date.now();
+  const fr = st.explore22;
+  let ids = (fr && fr.fp === fp && Array.isArray(fr.ids) && now - Number(fr.at) < _INTV22_EXPLORE_COOLDOWN) ? fr.ids : null;
+  if (!ids) {
+    // Prioridad fija y familias distintas: el conjunto no depende del orden de llegada.
+    ids = ['x22_conc_why', 'x22_market_ops', 'x22_spread', 'x22_liq_why', 'x22_coverage'].filter(id => byId.has(id)).slice(0, 4);
+    if (ids.length) _intv21Write({ explore22: { fp, ids, at: now } });
+  }
+  return { qs: ids.map(id => byId.get(id)).filter(Boolean), frozen: true, pending: false };
+}
+
+// ── LO QUE IMPORTA HOY · sin relleno estático ──────────────────────────────
+// La liquidez estática deja de vivir aquí (su evolución es de Tu evolución). Sólo
+// con CERO hechos actuales se publica una lectura estructural, para que una
+// cartera con activos nunca quede en blanco.
+function _intv22TodayFallback(W, count) {
+  if (count > 0 || !W || !W.rows.length) return [];
+  return [{ factId: 'positions_count', family: 'structure', period: 'now', kind: 'structural', priority: 6,
+    value: W.rows.length, unit: 'positions', dir: 'flat', evidence: 'investable_weights',
+    text: _intv4T('intv21_today_positions', W.rows.length) }];
+}
+
+// ── ETIQUETAS · ESTABLES DURANTE LA VISITA ──────────────────────────────────
+// Se deciden una vez con las fuentes asentadas y se conservan mientras no cambie la
+// huella material ni lo oculto. El movimiento se rotula como lo que es: PRECIO.
+let _intv22TagMemo = null;
+function _intv22HeroTags(ctx) {
+  try {
+    const st = _intv21Read();
+    const key = _intv22Fingerprint(ctx.W) + '|' + JSON.stringify(st.hidden || {});
+    if (_intv22TagMemo && _intv22TagMemo.key === key) return _intv22TagMemo.tags;
+    const today = (ctx.todayItems || []).filter(x => x.kind === 'mover');
+    const tags = _intv21HeroTags(Object.assign({}, ctx, { todayItems: today }))
+      .map(t2 => t2.id === 'tag_move' ? Object.assign({}, t2, { label: _intv4T('intv22_tag_price', (today[0] || {}).assetName || '') }) : t2);
+    if (!_intv22Pending()) _intv22TagMemo = { key, tags };
+    return tags;
+  } catch (_) { return []; }
+}
+
+// ── DEPENDENCIAS Y ESCENARIOS · tres bloques comparables ────────────────────
+// Mismos cálculos de v808. Desde 768 px los tres escenarios se ven a la vez; en
+// móvil, pestañas y uno visible. El peso afectado es una barra rotulada; el
+// impacto estimado es la única cifra.
+function _intv22ScenarioHtml(W, esc) {
+  const sc = _intv21Scenarios(W);
+  if (!sc.length) return '';
+  const st = _intv21Read();
+  const cur = sc.find(s => s.id === st.scen) || sc[0];
+  const subject = (s) => s.id === 'top3' ? s.names.join(' · ') : s.names[0];
+  return `
+    <section class="intcc-card intv21-scen intv22-scen" data-scen="${esc(cur.id)}" data-impact="${esc(cur.impact.toFixed(4))}" data-n="${sc.length}">
+      <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_scn_title'))}</h3>
+      <div class="intv21-seg intv22-scn-tabs" role="tablist" aria-label="${esc(_intv4T('intv21_scn_aria'))}">${sc.map(s => `
+        <button type="button" role="tab" class="intv21-chip${s.id === cur.id ? ' is-on' : ''}" data-intv21-scen="${esc(s.id)}" aria-selected="${s.id === cur.id ? 'true' : 'false'}" aria-controls="intv22-scn-${esc(s.id)}">${esc(_intv4T('intv21_scn_opt_' + s.id))}</button>`).join('')}
+      </div>
+      <div class="intv22-scn-grid">${sc.map(s => `
+        <div class="intv22-scn-block${s.id === cur.id ? ' is-on' : ''}" id="intv22-scn-${esc(s.id)}" role="tabpanel" data-scn="${esc(s.id)}" data-impact="${esc(s.impact.toFixed(4))}">
+          <p class="intv22-scn-kind">${esc(_intv4T('intv21_scn_opt_' + s.id))}</p>
+          <p class="intv22-scn-subject">${esc(subject(s))}</p>
+          <p class="intv22-scn-shock">${esc(_intv4T('intv22_scn_shock'))}</p>
+          <p class="intv22-scn-impact"><span class="intv21-scn-val">≈ ${esc(_intv21Pct(s.impact, 1, true))}</span><span class="intv21-scn-unit">${esc(_intv4T('intv21_scn_unit'))}</span></p>
+          <div class="intv21-scn-track" role="img" aria-label="${esc(_intv4T('intv22_scn_bar_aria'))}"><span class="intv21-scn-fill" style="width:${Math.max(0, Math.min(100, s.w * 100)).toFixed(1)}%"></span></div>
+          <p class="intv22-scn-bar-l">${esc(_intv4T('intv21_scn_affected'))}</p>
+        </div>`).join('')}
+      </div>
+      <p class="intv21-foot">${esc(_intv4T('intv21_scn_disclaimer'))}</p>
+    </section>`;
+}
 
 function _renderIntelligenceCommandCenter() {
   const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
@@ -73018,8 +73567,9 @@ function _renderIntelligenceCommandCenter() {
   const _storiesFull21 = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
   const _today21 = (typeof _intv21TodayItems === 'function') ? _intv21TodayItems(core, _storiesFull21, _W21) : [];
   const mattersSel = (typeof _intv21TrimStories === 'function') ? _intv21TrimStories(_storiesFull21, _today21) : _storiesFull21;
-  const _struct21 = (typeof _intv21TodayStructural === 'function')
-    ? _intv21TodayStructural(_W21, _drvItems21, 2 - (_today21.length + mattersSel.length)) : [];
+  // V2.1 — sin relleno estático: sólo con CERO hechos actuales, una lectura estructural.
+  const _struct21 = (typeof _intv22TodayFallback === 'function')
+    ? _intv22TodayFallback(_W21, _today21.length + mattersSel.length) : [];
 
   // NOTA DE ORDEN — este bloque se resuelve aquí, antes del recuento, porque
   // «Lo que importa hoy» necesita saber qué publica «Qué ha cambiado» para no
@@ -73133,7 +73683,7 @@ function _renderIntelligenceCommandCenter() {
   let _stab21 = null;
   try { _stab21 = (typeof _intv17Evolution === 'function') ? _intv17Evolution(core) : null; } catch (_) { _stab21 = null; }
   let _tags21 = [];
-  try { _tags21 = (typeof _intv21HeroTags === 'function') ? _intv21HeroTags({ core, score, driversItems: _drvItems21, todayItems: _today21, stab: _stab21,
+  try { _tags21 = (typeof _intv22HeroTags === 'function') ? _intv22HeroTags({ core, score, driversItems: _drvItems21, todayItems: _today21, stab: _stab21,
     todayKeys: mattersSel.map(st => st.semanticKey), W: _W21 }) : []; } catch (_) { _tags21 = []; }
   const _tagsOf21 = (list) => (typeof _intv21TagsHtml === 'function') ? _intv21TagsHtml(list, esc) : '';
   const tagsHtml = _tagsOf21(_tags21);
@@ -73331,7 +73881,8 @@ function _renderIntelligenceCommandCenter() {
   let _att21 = null;
   try { _att21 = (typeof _intv21Attribution === 'function') ? _intv21Attribution() : null; } catch (_) { _att21 = null; }
   const moversHtml = (typeof _intv21MoversHtml === 'function') ? _intv21MoversHtml(_att21, esc) : '';
-  const scenHtml = (typeof _intv21ScenarioHtml === 'function') ? _intv21ScenarioHtml(_W21, esc) : '';
+  const scenHtml = (typeof _intv22ScenarioHtml === 'function') ? _intv22ScenarioHtml(_W21, esc)
+    : ((typeof _intv21ScenarioHtml === 'function') ? _intv21ScenarioHtml(_W21, esc) : '');
   const _evoKeys21 = ((memoryHtml.match(/data-evo-keys="([^"]*)"/) || [, ''])[1] || '').split(',').filter(Boolean);
   const _chgKeys21 = (changedHtml.match(/data-fact="([^"]+)"/g) || []).map(m => m.slice(11, -1));
   // Sólo lo que está DE VERDAD en pantalla (los apoyos de Hoy ya no se pintan).

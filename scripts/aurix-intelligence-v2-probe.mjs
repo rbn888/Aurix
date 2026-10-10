@@ -73,7 +73,44 @@ const QA = [
   ['a14', 'FND', 'Fondo Global', 'fund', 0.8, 0.1, 0.5],
 ];
 const TOTAL = 100000;
+// REAL · la cuenta observada en producción (V2.1): historia 10-sep → 10-oct (30 días),
+// peso máximo 51,6 % (Bitcoin) → 28,7 % (Microsoft), liquidez 7D 6,8 % → 7,2 %,
+// reparto efectivo 2,5 → 5,2; Microsoft 29 %, Bitcoin 22 %, Apple 18 %, top-3 69 %,
+// acciones 51 %. Las posiciones nuevas entran sin operación registrada: «Qué movió»
+// NO puede certificarse (y debe desaparecer).
+function personaReal() {
+  const now = Date.now(), endAt = now - H, start = now - 30 * DAY;
+  const NOW_W = { a1: 28.7, a2: 22, a3: 18, a4: 14.6, a5: 7.2, a6: 4, a7: 0.6875, a8: 0.6875, a9: 0.6875, a10: 0.6875, a11: 0.6875, a12: 0.6875, a13: 0.6875, a14: 0.6875 };
+  const START_W = { a2: 51.6, a1: 34, a3: 10, a5: 4.4 };
+  const D7_W = Object.assign({}, NOW_W); { const f = (100 - 6.8) / (100 - 7.2); Object.keys(D7_W).forEach(k => { D7_W[k] = k === 'a5' ? 6.8 : NOW_W[k] * f; }); }
+  // Total estable: el reparto cambia sin inventar una rentabilidad que el fixture no tiene.
+  const total = (t) => 100000 * (1 + 0.002 * Math.sin((t - start) / (9 * H)));   // relativo: determinista entre ejecuciones
+  const weightsAt = (t) => {
+    if (t <= start + H) return START_W;
+    if (t <= now - 7 * DAY) { const f = (t - start) / (23 * DAY); const o = {}; Object.keys(D7_W).forEach(k => { o[k] = (START_W[k] || 0) * (1 - f) + D7_W[k] * f; }); return o; }
+    const f = Math.min(1, (t - (now - 7 * DAY)) / (7 * DAY - H)); const o = {}; Object.keys(NOW_W).forEach(k => { o[k] = D7_W[k] * (1 - f) + NOW_W[k] * f; }); return o;
+  };
+  const typeOf = Object.fromEntries(QA.map(r => [r[0], r[3]]));
+  const bucket = t2 => ({ cash: 'liquidity' })[t2] || t2;
+  const at = (t) => { const w = weightsAt(t), tot = total(t), vals = {}, cv = { crypto: 0, stock: 0, etf: 0, fund: 0, metal: 0, real_estate: 0, liquidity: 0, other: 0 };
+    Object.keys(w).forEach(k => { if (!(w[k] > 0)) return; const v = +(tot * w[k] / 100).toFixed(2); vals[k] = v; cv[bucket(typeOf[k])] += v; });
+    Object.keys(cv).forEach(k => cv[k] = +cv[k].toFixed(2)); return { vals, cv, tot: +tot.toFixed(2) }; };
+  const hist = [], cats = [], server = [];
+  for (let ts = start; ts <= endAt + 1; ts += DAY) { const s2 = at(ts); hist.push({ ts, value: s2.tot }); cats.push(Object.assign({ ts, total: s2.tot }, s2.cv)); }
+  { const s2 = at(endAt); hist.push({ ts: endAt, value: s2.tot }); cats.push(Object.assign({ ts: endAt, total: s2.tot }, s2.cv)); }
+  for (let ts = start; ts <= endAt + 1; ts += (endAt - ts <= 26 * H ? 15 * 60e3 : 6 * H)) { const s2 = at(ts); server.push({ ts, total_value_usd: s2.tot, real_estate: 0, category_values: s2.cv, confidence: 'high' }); }
+  const srvTs = server.map(x => x.ts), firstAtOrAfter = (t) => srvTs.find(x => x >= t);
+  const memTs = Array.from(new Set([srvTs[srvTs.length - 1], firstAtOrAfter(now - DAY), firstAtOrAfter(now - 7 * DAY), firstAtOrAfter(now - 30 * DAY), srvTs[0]].filter(Number.isFinite))).sort((a, b) => a - b);
+  const memRows = memTs.map(ts => ({ ts, values: at(ts).vals, re: 0 }));
+  const assets = QA.map(r => { const price = r[3] === 'cash' ? 1 : (r[1] === 'BTC' ? 60000 : (r[1] === 'ETH' ? 3000 : 100 + r[4]));
+    const v = 100000 * NOW_W[r[0]] / 100;
+    return { id: r[0], ticker: r[1], name: r[2], type: r[3], qty: v / price, price, assetCurrency: 'USD', change24h: r[3] === 'cash' ? null : r[5],
+      transactions: [{ type: 'buy', qty: v / price, price, ts: now - 60 * DAY }], createdAt: now - 60 * DAY,
+      ...(r[3] === 'crypto' ? { coinId: r[2].toLowerCase() } : { marketSymbol: r[1] }) }; });
+  return { hist, cats, server, memRows, assets, lineage: true, now };
+}
 function persona(kind) {
+  if (kind === 'real') return personaReal();
   const now = Date.now();
   let spec = QA.map(r => r.slice());
   if (kind === 'calm') spec = spec.map(r => { r[5] = r[5] * 0.08; r[6] = r[6] * 0.1; return r; });
@@ -163,7 +200,14 @@ const READ = `(function(){
   var hoy = pick('.intv5-matters'); var evo = pick('.intv21-evo'); var mv = pick('.intv21-movers'); var sc = pick('.intv21-scen');
   var ex = pick('.intcc-explore'); var log = pick('.intv21-log'); var tagsBox = pick('.intv21-tags');
   var reg = (typeof debugAurixIntelFacts === 'function') ? debugAurixIntelFacts() : null;
-  var avail = {}; try { _INTV21_EVO_METRICS.forEach(function(m){ avail[m] = _INTV21_EVO_WINS.filter(function(w){ return !!_intv21EvoSeries(m,w); }); }); } catch(_){}
+  var avail = {}; try { var A=_intv22Availability(); Object.keys(A).forEach(function(m){ avail[m] = A[m].wins; }); } catch(_){}
+  var evoCard = pick('.intv4-memory'); var plot = pick('.intv21-evo-plot');
+  var plotInfo = plot ? (function(){ var pr=plot.getBoundingClientRect(), cr=evoCard.getBoundingClientRect(); var dots=[].slice.call(plot.querySelectorAll('.intv21-evo-dot'));
+    return { stems: plot.querySelectorAll('.intv21-evo-stem').length, dots: dots.length, contained: dots.every(function(d){ var r=d.getBoundingClientRect(); return r.left >= pr.left-6 && r.right <= pr.right+6 && r.top >= pr.top-6 && r.bottom <= pr.bottom+6; }) && pr.right <= cr.right + 1,
+      line: !!plot.querySelector('.intv21-evo-line'), segs: ((plot.querySelector('.intv21-evo-line')||{getAttribute:function(){return '';}}).getAttribute('d').match(/L/g)||[]).length, h: Math.round(pr.height), cardH: Math.round(cr.height) }; })() : null;
+  var xa = ex ? [].slice.call(ex.querySelectorAll('.intcc-x-answer')).map(function(a){ return a.textContent.replace(/\s+/g,' ').trim(); }) : [];
+  var scBlocks = sc ? [].slice.call(sc.querySelectorAll('.intv22-scn-block')).filter(vis).length : 0;
+  var scTabs = sc ? [].slice.call(sc.querySelectorAll('.intv22-scn-tabs .intv21-chip')).filter(vis).map(function(b){ return Math.round(b.getBoundingClientRect().height); }) : [];
   var att = null; try { att = _intv21Attribution(); } catch(_){}
   var scn = null; try { scn = _intv21Scenarios(_intv21Weights()).map(function(s){ return { id: s.id, impact: +s.impact.toFixed(3), names: s.names }; }); } catch(_){}
   return JSON.stringify({
@@ -177,12 +221,16 @@ const READ = `(function(){
     evo: evo ? { metric: evo.getAttribute('data-metric'), win: evo.getAttribute('data-win'), kind: evo.getAttribute('data-kind'), pts: Number(evo.getAttribute('data-points')),
       metrics: [].slice.call(evo.querySelectorAll('[data-intv21-evo-metric]')).map(function(b){ return b.getAttribute('data-intv21-evo-metric'); }),
       wins: [].slice.call(evo.querySelectorAll('[data-intv21-evo-win]')).map(function(b){ return b.getAttribute('data-intv21-evo-win'); }),
-      evRows: document.querySelectorAll('.intv4-memory .intv15-stable-row').length, head: txt(pick('.intv4-memory .intv15-stable-head')) } : null,
+      evRows: document.querySelectorAll('.intv4-memory .intv15-stable-row').length, head: txt(pick('.intv4-memory .intv15-stable-head')),
+      stats: txt(pick('.intv22-stats')), chips: [].slice.call(evo.querySelectorAll('.intv21-chip')).map(function(b){ return txt(b); }), plot: plotInfo } : null,
+    xa: xa, scBlocks: scBlocks, scTabs: scTabs, scFull: sc ? (sc.getBoundingClientRect().width > document.querySelector('.aurix-intcc').getBoundingClientRect().width * 0.8) : null,
+    drvTxt: txt(drv),
     avail: avail,
     movers: mv ? { range: mv.getAttribute('data-range'), rows: [].slice.call(mv.querySelectorAll('.intv21-mv-row')).map(function(r){ return txt(r); }) } : null,
     att: att ? { range: att.range, sum: +att.sum.toFixed(3), twr: +att.twr.toFixed(3), ups: att.ups.map(function(x){ return x.name + ' ' + x.c.toFixed(3); }), downs: att.downs.map(function(x){ return x.name + ' ' + x.c.toFixed(3); }) } : null,
     scen: sc ? { id: sc.getAttribute('data-scen'), impact: Number(sc.getAttribute('data-impact')), text: txt(sc) } : null, scn: scn,
     explore: ex ? [].slice.call(ex.querySelectorAll('.intcc-x-q')).map(function(b){ return { id: b.getAttribute('data-intcc-q'), label: txt(b) }; }) : [],
+    firstRef: /primera referencia|first historical reference/i.test(txt(root)),
     log: log ? Number(log.getAttribute('data-items')) : 0,
     dups: reg ? reg.duplicates : null, nFacts: reg ? reg.facts.length : 0,
     factsBad: reg ? reg.facts.filter(function(f){ return !f.factId || !f.family || !f.owner; }).length : null,
@@ -195,11 +243,11 @@ const prior = CMP && existsSync(CMP) ? JSON.parse(readFileSync(CMP, 'utf8')) : n
 const baseline = {};
 const ENGINES = (process.env.ENGINES || 'CR,WK').split(',');
 const FULL = !!process.env.FULL;
-const PERSONAS = (process.env.PERSONAS || 'qa14,fresh,calm,volatile,flows,stale').split(',');
+const PERSONAS = (process.env.PERSONAS || 'real,qa14,fresh,calm,volatile,flows,stale').split(',');
 for (const E of ENGINES) {
   const browser = await (E === 'WK' ? PWm.webkit : PWm.chromium).launch({ headless: true });
   for (const kind of PERSONAS) for (const lng of (process.env.LANGS || 'es,en').split(',')) {
-    const widths = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : ((kind === 'qa14' || FULL) ? [360, 390, 768, 1024, 1440] : [390, 1440]);
+    const widths = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : ((kind === 'qa14' || kind === 'real' || FULL) ? [360, 390, 768, 1024, 1440] : [390, 1440]);
     for (const w of widths) {
       const T = `[${E} ${kind} ${lng} ${w}]`;
       const ctx = await browser.newContext({ viewport: { width: w, height: w < 768 ? 844 : 1000 }, deviceScaleFactor: 1 });
@@ -208,7 +256,7 @@ for (const E of ENGINES) {
       const P = await mount(page, kind, lng);
       const r = JSON.parse(await page.evaluate(READ));
       const key = [kind, lng, w].join('|');
-      if (E === 'CR') baseline[key] = { hv: r.healthVal, hb: r.healthBadge, radar: r.radarHash, drivers: r.driversHash };
+      if (E === 'CR') baseline[key] = { hv: r.healthVal, hb: r.healthBadge, radar: r.radarHash, drivers: r.driversHash, scn: JSON.stringify(r.scn) };
       if (BASE) { await ctx.close(); continue; }
       ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
       ok(`${T} sin scroll horizontal ni cards solapadas`, !r.hscroll && r.overlaps.length === 0 && r.cards.every(c => c.sw <= 1 || /intcc-m-hero|intcc-hero/.test(c.full)), JSON.stringify(r.overlaps) + JSON.stringify(r.cards.filter(c => c.sw > 1 && !/intcc-m-hero|intcc-hero/.test(c.full))));
@@ -218,10 +266,20 @@ for (const E of ENGINES) {
       ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Hoy/Evolución → Movió/Escenarios → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
       if (prior && prior[key]) {
         const p = prior[key];
-        ok(`${T} Salud, Radar y Factores idénticos a HEAD`, p.hv === r.healthVal && p.hb === r.healthBadge && p.radar === r.radarHash && p.drivers === r.driversHash,
+        ok(`${T} Salud, Radar, Factores y escenarios idénticos a HEAD`, p.hv === r.healthVal && p.hb === r.healthBadge && p.radar === r.radarHash && p.drivers === r.driversHash && (p.scn == null || p.scn === JSON.stringify(r.scn)),
           JSON.stringify({ p, now: { hv: r.healthVal, hb: r.healthBadge, radar: r.radarHash, drivers: r.driversHash } }));
       }
-      ok(`${T} Hoy publica entre 2 y 4 hechos`, r.hoy && r.hoy.items >= 2 && r.hoy.items <= 4, JSON.stringify(r.hoy));
+      // RE-DECIDIDO (V2.1): 1–4 hechos actuales, sin relleno estático.
+      ok(`${T} Hoy publica entre 1 y 4 hechos y nunca la liquidez estática`, r.hoy && r.hoy.items >= 1 && r.hoy.items <= 4
+        && !/La liquidez es el|Cash is \d/.test(r.hoy.text) && !/No tienes liquidez registrada|You have no cash recorded/.test(r.hoy.text), JSON.stringify(r.hoy));
+      ok(`${T} Tu evolución: nunca «primera referencia» si alguna métrica tiene dos observaciones`, !(Object.keys(r.avail).length && r.firstRef), JSON.stringify(r.avail));
+      ok(`${T} gráfico: sin palos verticales, puntos y línea contenidos`, !r.evo || !r.evo.plot || (r.evo.plot.stems === 0 && r.evo.plot.line && r.evo.plot.contained), JSON.stringify(r.evo && r.evo.plot));
+      ok(`${T} «Diversificación» retirada de la métrica de pesos; etiqueta de precio`, !(r.evo && r.evo.chips.some(c => /Diversificación|Diversification/.test(c)))
+        && !r.tags.some(t => /Principal movimiento|Main move/.test(t.label)), JSON.stringify({ c: r.evo && r.evo.chips, t: r.tags }));
+      { const nums = new Set((r.drvTxt.match(/\d+(?:[.,]\d+)?%/g) || []));
+        (r.scn || []).forEach(x => nums.add(String(Math.abs(x.impact).toFixed(1)).replace('.', lng === 'en' ? '.' : ',') + '%'));
+        const hit = r.xa.filter(a => (a.match(/\d+(?:[.,]\d+)?%/g) || []).some(n => nums.has(n)));
+        ok(`${T} Explora no repite cifras de Factores ni de Dependencias`, hit.length === 0 && !r.explore.some(q => /ctx_top3_drop|ctx_top2/.test(q.id)), JSON.stringify({ hit, nums: Array.from(nums) })); }
       ok(`${T} etiquetas del hero: ≤3, dimensiones distintas, sin cifras, contenidas`, r.tags.length <= 3 && new Set(r.tags.map(t => t.dim)).size === r.tags.length
         && r.tags.every(t => !/\d/.test(t.label) && t.fit), JSON.stringify(r.tags));
       const ux = await page.evaluate(`(function(){ var vis=function(e){ return e && e.getBoundingClientRect().width>0; };
@@ -242,13 +300,14 @@ for (const E of ENGINES) {
         ok(`${T} QA · Escenarios: Microsoft −10 % ≈ −2,9 %, Top 3 ≈ −6,9 %, Acciones ≈ −5,1 %`, r.scn && Math.abs(r.scn.find(s => s.id === 'top1').impact + 2.9) < 0.01
           && Math.abs(r.scn.find(s => s.id === 'top3').impact + 6.9) < 0.01 && Math.abs(r.scn.find(s => s.id === 'class').impact + 5.1) < 0.01
           && /−2[.,]9%/.test(r.scen.text) && /(hipotético, no una previsión|not a forecast)/i.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
-        ok(`${T} QA · Tu evolución ofrece 7D, 30D y Desde inicio en rentabilidad y las cinco métricas`, r.avail.return && r.avail.return.join() === '7d,30d,all'
-          && ['value', 'top', 'liquidity', 'diversification'].every(m => (r.avail[m] || []).length) && r.evo && r.evo.pts >= 2, JSON.stringify({ a: r.avail, e: r.evo }));
+        // RE-DECIDIDO (V2.1): «Desde inicio» sólo cuando empieza de verdad antes que 30D;
+        // con la rentabilidad recortada al régimen comparable coincide con 30D y no se duplica.
+        ok(`${T} QA · Tu evolución ofrece 7D y 30D en rentabilidad, «Desde inicio» donde existe y las cinco métricas`, r.avail.return && /^7d,30d/.test(r.avail.return.join()) && (r.avail.top || []).indexOf('all') !== -1
+          && ['value', 'top', 'liquidity', 'effective'].every(m => (r.avail[m] || []).length) && r.evo && r.evo.pts >= 2, JSON.stringify({ a: r.avail, e: r.evo }));
         ok(`${T} QA · Qué movió: contribuciones certificadas que concilian con la rentabilidad flow-neutral (mismo signo, ≤ máx(0,1 pp, 10 %))`, r.movers && r.att && Math.abs(r.att.sum - r.att.twr) <= Math.max(0.1, 0.1 * Math.abs(r.att.twr))
           && (Math.sign(r.att.sum) === Math.sign(r.att.twr))
           && r.movers.rows.length >= 2, JSON.stringify({ m: r.movers, a: r.att }));
-        ok(`${T} QA · Explora: 3–4 preguntas contextuales con Microsoft y Bitcoin`, r.explore.length >= 3 && r.explore.length <= 4 && r.explore.filter(q => /^ctx_/.test(q.id)).length >= 3
-          && r.explore.some(q => q.id === 'ctx_top2' && /Microsoft/.test(q.label) && /Bitcoin/.test(q.label)), JSON.stringify(r.explore));
+        ok(`${T} QA · Explora: sólo preguntas contextuales contestables (sin mezclar el catálogo)`, r.explore.length >= 1 && r.explore.length <= 4 && r.explore.every(q => /^x22_/.test(q.id)), JSON.stringify(r.explore));
       }
       if (kind === 'qa14' && w === 1440) {
         // Revisión financiera · casos adversariales.
@@ -273,6 +332,48 @@ for (const E of ENGINES) {
         ok(`${T} revisión · liquidez histórica sólo con linaje que cubra la ventana`, adv.liqAll === false && adv.liqCov !== 'no_reclassification_recorded'
           && !r.explore.some(q => q.id === 'ctx_liq_start'), JSON.stringify(adv));
       }
+      if (kind === 'real') {
+        const H1 = lng === 'en' ? /Over 30 days, the largest weight of any position went from 51\.6% \(Bitcoin\) to 28\.7% \(Microsoft\)/ : /En 30 días, el peso máximo de una posición pasó del 51,6% \(Bitcoin\) al 28,7% \(Microsoft\)/;
+        ok(`${T} REAL · sin «primera referencia» y titular de la métrica activa (peso máximo, cambio de dominante)`, !r.firstRef && r.evo && r.evo.metric === 'top' && H1.test(r.evo.head), JSON.stringify(r.evo && r.evo.head));
+        ok(`${T} REAL · ventanas reales: liquidez sólo 7D (linaje), reparto efectivo 30D, sin «Desde inicio» duplicado`, (r.avail.liquidity || []).join() === '7d'
+          && (r.avail.effective || []).indexOf('30d') !== -1 && (r.avail.top || []).indexOf('all') === -1, JSON.stringify(r.avail));
+        ok(`${T} REAL · Inicio · Actual · Cambio en pp`, /51[.,]6%/.test(r.evo.stats) && /28[.,]7%/.test(r.evo.stats) && /−22[.,]9 pp/.test(r.evo.stats), r.evo.stats);
+        ok(`${T} REAL · cada observación es un punto unido por línea (sin tallos)`, r.evo.plot && r.evo.plot.stems === 0 && r.evo.plot.dots === r.evo.pts && r.evo.plot.segs === r.evo.pts - 1, JSON.stringify(r.evo.plot));
+        ok(`${T} REAL · Qué movió no certificable ⇒ ausente; Dependencias a ancho completo`, !r.movers && (w < 1024 || r.scFull === true), JSON.stringify({ m: r.movers, full: r.scFull }));
+        ok(`${T} REAL · escenarios: tres bloques desde 768 px; pestañas ≥44 px y uno visible en móvil`, w >= 768 ? r.scBlocks === 3 : (r.scBlocks === 1 && r.scTabs.length === 3 && r.scTabs.every(h => h >= 44)), JSON.stringify({ b: r.scBlocks, t: r.scTabs }));
+        ok(`${T} REAL · Explora: 3–4 preguntas de familias distintas`, r.explore.length >= 3 && r.explore.length <= 4, JSON.stringify(r.explore));
+        if (w === 390 || w === 1440) {
+          const evoSwitch = async (m) => { await page.locator(`.intv21-evo [data-intv21-evo-metric="${m}"]:visible`).first().click(); await page.waitForTimeout(220);
+            return JSON.parse(await page.evaluate(`JSON.stringify({ head: (document.querySelector('.intv22-head')||{}).textContent, h: Math.round(document.querySelector('.intv21-evo-plot').getBoundingClientRect().height), win: document.querySelector('.intv21-evo').getAttribute('data-win') })`)); };
+          const plotH0 = r.evo.plot.h;
+          const lq = await evoSwitch('liquidity');
+          ok(`${T} REAL · liquidez: «En 7 días … del 6,8% al 7,2% (+0,4 pp)»`, (lng === 'en' ? /Over 7 days, your cash weight went from 6\.8% to 7\.2% \(\+0\.4 pp\)/ : /En 7 días, el peso de tu liquidez pasó del 6,8% al 7,2% \(\+0,4 pp\)/).test(lq.head) && lq.h === plotH0, JSON.stringify(lq));
+          const ef = await evoSwitch('effective');
+          ok(`${T} REAL · reparto efectivo: «… de equivaler a 2,5 posiciones a 5,2»`, (lng === 'en' ? /Over 30 days, your spread went from the equivalent of 2\.5 positions to 5\.2/ : /En 30 días, el reparto de tus posiciones pasó de equivaler a 2,5 posiciones a 5,2/).test(ef.head) && ef.h === plotH0, JSON.stringify(ef));
+          await evoSwitch('top');
+          const plot = page.locator('.intv21-evo-plot:visible').first(); await plot.scrollIntoViewIfNeeded(); await page.waitForTimeout(120);
+          const bb = await plot.boundingBox(); await page.mouse.move(bb.x + 3, bb.y + bb.height / 2); await page.waitForTimeout(120);
+          const tip = await page.evaluate(`(document.querySelector('.intv21-evo-tip.is-on')||{}).textContent || ''`);
+          ok(`${T} REAL · tooltip: fecha · porcentaje · activo dominante · observación registrada`, /Bitcoin/.test(tip) && /51[.,]6%/.test(tip) && /(observación registrada|recorded observation)/.test(tip), tip);
+          // ESTABILIDAD DE EXPLORA: scroll, acordeón, carga asíncrona, navegación y recarga.
+          const ids = async () => page.evaluate(`[].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).map(function(b){ return b.getAttribute('data-intcc-q'); }).join(',')
+            + ' | ' + [].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width > 0; }).map(function(t){ return t.getAttribute('data-tag'); }).join(',')`);
+          const q0 = await ids();
+          await page.mouse.wheel(0, 3000); await page.waitForTimeout(150);
+          const q1 = await ids();
+          await page.locator('.intcc-explore .intcc-x-q:visible').first().click(); await page.waitForTimeout(150);
+          const q2 = await ids();
+          await page.evaluate(`(function(){ var m=_aurixAssetMemory; _aurixAssetMemory = { userId: m.userId, rows: m.rows.map(function(r){ return Object.assign({}, r); }), state: 'ready', at: Date.now() };
+            var ph=document.getElementById('tabPlaceholder')||document.querySelector('.tab-placeholder--intel'); ph.innerHTML = renderIntelligenceTab(); _initIntelligenceCommandCenter(); })()`); await page.waitForTimeout(150);
+          const q3 = await ids();
+          await page.evaluate(`switchTab('home')`); await page.waitForTimeout(400); await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(900);
+          const q4 = await ids();
+          await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForFunction(`typeof switchTab === 'function'`, null, { timeout: 60000 }); await page.waitForTimeout(900);
+          await inject(page, P, 'intelligence'); await page.waitForTimeout(1200);
+          const q5 = await ids();
+          ok(`${T} REAL · Explora y etiquetas idénticas tras scroll, acordeón, carga asíncrona, navegación y recarga`, q0 && [q1, q2, q3, q4, q5].every(x => x === q0), JSON.stringify([q0, q1, q2, q3, q4, q5]));
+        }
+      }
       if (kind === 'fresh') {
         ok(`${T} cuenta nueva: sin Qué movió y sin rentabilidad inventada`, !r.movers && !(r.hoy.rows || []).some(x => x.k === 'return' || x.k === 'driver'), JSON.stringify(r.hoy));
       }
@@ -292,7 +393,7 @@ for (const E of ENGINES) {
         await page.locator('.intv21-evo [data-intv21-evo-metric="liquidity"]:visible').first().click();
         await page.waitForTimeout(250);
         const after = await page.evaluate(`(function(){ var e=document.querySelector('.intv21-evo'); return e ? [e.getAttribute('data-metric'), e.getAttribute('data-kind'), document.activeElement && document.activeElement.getAttribute('data-intv21-evo-metric'), document.querySelectorAll('.aurix-intcc').length] : null; })()`);
-        ok(`${T} evolución: cambiar de métrica actualiza sólo el módulo y conserva el foco`, before && after && after[0] === 'liquidity' && after[1] === 'dots' && after[2] === 'liquidity' && after[3] === 1, JSON.stringify([before, after]));
+        ok(`${T} evolución: cambiar de métrica actualiza sólo el módulo y conserva el foco`, before && after && after[0] === 'liquidity' && after[1] === 'observations' && after[2] === 'liquidity' && after[3] === 1, JSON.stringify([before, after]));
         const plot = page.locator('.intv21-evo-plot:visible').first();
         await plot.scrollIntoViewIfNeeded(); await page.waitForTimeout(150);
         const bb = await plot.boundingBox();
@@ -302,9 +403,16 @@ for (const E of ENGINES) {
         await plot.focus(); await page.keyboard.press('Home');
         const kb = await page.evaluate(`(function(){ var p=document.querySelector('.intv21-evo-plot'); return p ? p.getAttribute('data-tip') : null; })()`);
         ok(`${T} teclado: Inicio lleva al primer punto`, kb === '0', kb);
-        await page.locator('.intv21-scen [data-intv21-scen="top3"]').first().click(); await page.waitForTimeout(200);
-        const sc2 = await page.evaluate(`document.querySelector('.intv21-scen').getAttribute('data-scen')`);
-        ok(`${T} escenario: el selector cambia el escenario`, sc2 === 'top3', sc2);
+        // Desde 768 px los tres escenarios se ven a la vez (sin pestañas); en móvil, pestañas.
+        let sc2 = 'top3';
+        if (w < 768) {
+          await page.locator('.intv21-scen [data-intv21-scen="top3"]:visible').first().click(); await page.waitForTimeout(200);
+          sc2 = await page.evaluate(`document.querySelector('.intv21-scen').getAttribute('data-scen')`);
+          ok(`${T} escenario: la pestaña cambia el escenario visible`, sc2 === 'top3', sc2);
+        } else {
+          const nb = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv22-scn-block')).filter(function(b){ return b.getBoundingClientRect().width > 0; }).length`);
+          ok(`${T} escenario: los tres bloques visibles en escritorio`, nb === 3, String(nb));
+        }
         // «Entendido» en Qué ha cambiado: el hecho pasa a ser HISTORIA y vive sólo en el Registro.
         const ackFact = await page.evaluate(`(function(){ var b=[].slice.call(document.querySelectorAll('.intv4-changed [data-intel-ack]')).filter(function(e){ return e.getBoundingClientRect().width>0; })[0];
           return b ? b.closest('[data-fact]').getAttribute('data-fact') : null; })()`);
@@ -333,7 +441,7 @@ for (const E of ENGINES) {
         const per = await page.evaluate(`(function(){ var e=document.querySelector('.intv21-evo'), s=document.querySelector('.intv21-scen');
           return { m: e && e.getAttribute('data-metric'), s: s && s.getAttribute('data-scen'), tags: [].slice.call(document.querySelectorAll('.intv21-tag')).map(function(t){ return t.getAttribute('data-tag'); }), n: document.querySelectorAll('.aurix-intcc').length,
             dups: (debugAurixIntelFacts()||{}).duplicates }; })()`);
-        ok(`${T} recarga y vuelta: métrica, escenario y etiqueta oculta persisten; cero duplicados`, per.n === 1 && per.s === 'top3' && (!tagId || per.tags.indexOf(tagId) === -1) && Array.isArray(per.dups) && per.dups.length === 0
+        ok(`${T} recarga y vuelta: métrica, escenario y etiqueta oculta persisten; cero duplicados`, per.n === 1 && (w >= 768 || per.s === 'top3') && (!tagId || per.tags.indexOf(tagId) === -1) && Array.isArray(per.dups) && per.dups.length === 0
           && per.m === 'liquidity', JSON.stringify(per));
       }
       if (process.env.SHOTS_ALL) await page.screenshot({ path: join(OUT, `${E}-${kind}-${lng}-${w}.png`), fullPage: true });
