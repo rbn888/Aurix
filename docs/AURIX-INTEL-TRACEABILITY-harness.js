@@ -129,7 +129,7 @@ function extractDict(langIdx) {
 }
 const DICT = { es: extractDict(0), en: extractDict(1) };
 
-const CONSTS = ['_AURIX_AI_LABEL','_AURIX_AI_AVAIL','_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
+const CONSTS = ['_INTV21_DAY','_AURIX_AI_LABEL','_AURIX_AI_AVAIL','_AURIX_INTEL_MEM_MAX_ENTRIES','_AURIX_OBS_CLASS','_AURIX_EV_GAP','_AURIX_CATBREADTH_TAXONOMY','_AURIX_FLOW_INTENT','_AURIX_FLOW_INTENT_EXTERNAL','_AURIX_BUCKET_MAP_KEY','_AURIX_LINEAGE_KEY','_AURIX_LINEAGE_MAX','_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AURIX_CATHIST_INVESTABLE',
   '_AURIX_CATHIST_RECON_ABS_TOL','_AURIX_CATHIST_RECON_REL_TOL','_AURIX_CATHIST_WINDOWS','_AURIX_BACKEND_CADENCE_MS','_AURIX_BACKEND_STALE_FACTOR',
   '_AURIX_CAPITAL_FLOWS_KEY','_WSC_INTERNAL_KINDS','_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD',
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
@@ -139,7 +139,7 @@ const CONSTS = ['_AURIX_AI_LABEL','_AURIX_AI_AVAIL','_AURIX_INTEL_MEM_MAX_ENTRIE
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE'];
-const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_intv21LogItems','_intv21LogHtml','_intv21Now','_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -858,10 +858,16 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
   run('_aurixIntelAcknowledge(' + JSON.stringify(id1) + ', { signature: '
     + (sg1 === '' ? 'null' : JSON.stringify(sg1)) + ' })', c1);
   const h2 = run('_renderIntelligenceCommandCenter()', c1);
-  ok('10.7 al acusar, la fila SIGUE en «Qué ha cambiado» y pasa a revisada',
-    /data-reviewed="1"/.test(h2) && /class="intv12-ack is-done"/.test(h2)
-    && count(h2, /class="intv4-chg /g) === count(h1, /class="intv4-chg /g),
-    JSON.stringify({ before: count(h1, /class="intv4-chg /g), after: count(h2, /class="intv4-chg /g) }));
+  // RE-DECIDIDO (INTELLIGENCE V2): un hecho, una sección. Lo REVISADO es historia
+  // y vive en el «Registro de Aurix»; «Qué ha cambiado» publica sólo lo pendiente.
+  // Se certifica el MOVIMIENTO real: la fila sale de Cambios y entra revisada en
+  // el Registro, con su identidad de hallazgo para devolverle el foco.
+  const reviewedInLog = (h) => count(h, /class="intv21-log-item[^"]*" data-fact="[^"]*" data-state="reviewed"/g);
+  ok('10.7 al acusar, la fila SALE de «Qué ha cambiado» y entra revisada en el Registro',
+    count(h2, /class="intv4-chg /g) === count(h1, /class="intv4-chg /g) - 1
+    && !/class="intv12-ack is-done"/.test(h2) && reviewedInLog(h2) === reviewedInLog(h1) + 1,
+    JSON.stringify({ before: count(h1, /class="intv4-chg /g), after: count(h2, /class="intv4-chg /g),
+      logBefore: reviewedInLog(h1), logAfter: reviewedInLog(h2) }));
   ok('10.8 …y deja de ser interactiva: ya no hay botón para esa fila',
     !new RegExp('data-intel-ack="' + id1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"').test(h2));
   ok('10.9 …el contador del hero baja y el CTA desaparece si era el último',
@@ -878,12 +884,13 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
         && count(h2, /class="intcc-tl-item/g) === count(h1, /class="intcc-tl-item/g); })(),
     JSON.stringify({ mem_before: count(h1, /class="intcc-tl-item/g),
       mem_after: count(h2, /class="intcc-tl-item/g) }));
-  ok('10.12 PERSISTE tras refrescar: un contexto nuevo con el mismo almacenamiento lo lee revisado',
+  ok('10.12 PERSISTE tras refrescar: un contexto nuevo con el mismo almacenamiento lo lee revisado (en el Registro)',
     (() => { const c2 = isolateAck(makeCtx(APPLE));
       c2._aurixActiveUserId = 'founder-qa';
       c2.__store = JSON.parse(JSON.stringify(c1.__store));
       const h3 = run('_renderIntelligenceCommandCenter()', c2);
-      return /data-reviewed="1"/.test(h3) && Number(heroPending(h3)) === Number(heroPending(h2)); })());
+      return reviewedInLog(h3) === reviewedInLog(h2) && reviewedInLog(h3) > 0
+        && Number(heroPending(h3)) === Number(heroPending(h2)); })());
   ok('10.13 es IDEMPOTENTE: acusar dos veces no crea un episodio ni cambia el contador',
     (() => { const before = JSON.stringify(run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c1).ack);
       run('_aurixIntelAcknowledge(' + JSON.stringify(id1) + ', { signature: '
@@ -892,14 +899,14 @@ console.log('\n10 · Cierre de QA del founder: una bandeja, un historial, cinco 
       const h4 = run('_renderIntelligenceCommandCenter()', c1);
       return Object.keys(JSON.parse(before)).length === Object.keys(JSON.parse(after)).length
         && Number(heroPending(h4)) === Number(heroPending(h2)); })());
-  ok('10.14 CROSS-DEVICE: el acuse viaja por el merge y el otro dispositivo lo lee revisado',
+  ok('10.14 CROSS-DEVICE: el acuse viaja por el merge y el otro dispositivo lo lee revisado (en el Registro)',
     (() => { const mine = run('_aurixIntelReadOwned(_AURIX_INTEL_CTX_KEY, {})', c1);
       const other = isolateAck(makeCtx(APPLE));
       other._aurixActiveUserId = 'founder-qa';
       const merged = run('_aurixIntelCtxMerge(' + JSON.stringify(mine) + ', null)', other);
       run('_aurixIntelWriteOwned(_AURIX_INTEL_CTX_KEY, ' + JSON.stringify(merged) + ', {})', other);
       const h5 = run('_renderIntelligenceCommandCenter()', other);
-      return /data-reviewed="1"/.test(h5); })());
+      return reviewedInLog(h5) > 0; })());
   // EVIDENCIA NUEVA REABRE, Y UNA SOLA VEZ. Se usa el hallazgo CON FIRMA —la
   // deriva de exposición—, que es el caso del ciclo de vida: acusado con su firma
   // queda cubierto, y una firma distinta (un episodio materialmente nuevo) vuelve

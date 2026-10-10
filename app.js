@@ -2385,7 +2385,8 @@ async function _aurixHydrateAssetMemory() {
       .eq('user_id', uid).gte('schema_version', 2).not('asset_values', 'is', null)
       .gte('ts', iso(since)).order('ts', { ascending: asc }).limit(1);
     _aurixAssetMemory = { userId: uid, rows: [], state: 'loading', at: now };
-    const res = await Promise.all([q(floor, false), q(now - 7 * 864e5, true), q(now - 30 * 864e5, true), q(floor, true)]
+    // V2 — quinta fila: la primera de las últimas 24 h (contribución diaria de Hoy).
+    const res = await Promise.all([q(floor, false), q(now - 864e5, true), q(now - 7 * 864e5, true), q(now - 30 * 864e5, true), q(floor, true)]
       .map(p => Promise.resolve(p).then(r => r, () => ({ error: true }))));
     if (typeof _aurixIsResetStale === 'function' && _aurixIsResetStale(gen)) { _aurixAssetMemory = { userId: null, rows: [], state: 'idle', at: 0 }; return; }
     if (!currentUser || currentUser.id !== uid) { _aurixAssetMemory = { userId: null, rows: [], state: 'idle', at: 0 }; return; }
@@ -4327,6 +4328,8 @@ const USER_SCOPED_LOCAL_KEYS = [
   // va sellado con su dueño y la lectura falla cerrada sin sello, así que el
   // aislamiento no depende sólo de que esta purga corra.
   'aurix_intel_ctx_v1', 'aurix_intel_mem_v1',
+  // Intelligence V2 — etiquetas ocultas, último día mostrado y selecciones de la cuenta.
+  'aurix_intel_v2_v1',
   // §6.2 — el comparador se guarda «solo sesión/local y separada por cuenta».
   // Va sellado con su dueño como los dos de arriba, y además se purga aquí.
   'aurix_cmp_state_v1',
@@ -5842,6 +5845,72 @@ const T = {
     // Cada clave se corresponde con un `semanticKey` del ledger, así que un hecho sin
     // copy no puede publicarse y un copy sin hecho no puede existir.
     intv4_brief_title: 'Lo que importa hoy',
+    // ── INTELLIGENCE V2 (intv21) ──
+    intv21_today_ret: p => `Rentabilidad de las últimas 24 h: ${p}, sin contar aportaciones ni retiradas.`,
+    intv21_today_driver_up: (n, pp) => `Lo que más impulsó el resultado: ${n}, con una contribución de ${pp}.`,
+    intv21_today_driver_down: (n, pp) => `Lo que más frenó el resultado: ${n}, con una contribución de ${pp}.`,
+    intv21_today_mover: (n, p) => `Mayor movimiento de precio: ${n}, ${p} en 24 h. Es el precio del activo, no su impacto en tu cartera.`,
+    intv21_today_mover_session: (n, p) => `Mayor movimiento de precio: ${n}, ${p} en la última sesión. Es el precio del activo, no su impacto en tu cartera.`,
+    intv21_today_liq: p => `La liquidez es el ${p} de tu patrimonio invertible.`,
+    intv21_today_liq_none: 'No tienes liquidez registrada en tu patrimonio invertible.',
+    intv21_today_positions: n => `Tu patrimonio invertible se reparte en ${n} ${n === 1 ? 'posición' : 'posiciones'}.`,
+    intv21_tags_aria: 'Lecturas destacadas',
+    intv21_tag_conc_high: 'Concentración elevada',
+    intv21_tag_conc_moderate: 'Concentración moderada',
+    intv21_tag_conc_low: 'Peso repartido',
+    intv21_tag_move: n => `Principal movimiento: ${n}`,
+    intv21_tag_liq_up: 'Liquidez en aumento',
+    intv21_tag_liq_down: 'Liquidez a la baja',
+    intv21_tag_liq_stable: 'Liquidez estable',
+    intv21_tag_class: c => `Más peso en ${c}`,
+    intv21_tag_hide: l => `Ocultar «${l}»`,
+    intv21_win_7d: '7D', intv21_win_30d: '30D', intv21_win_all: 'Desde inicio',
+    intv21_evo_metric_aria: 'Métrica', intv21_evo_win_aria: 'Periodo',
+    intv21_evo_m_return: 'Rentabilidad', intv21_evo_m_value: 'Valor', intv21_evo_m_top: 'Mayor posición',
+    intv21_evo_m_liquidity: 'Liquidez', intv21_evo_m_diversification: 'Diversificación',
+    intv21_evo_note_return: 'Rentabilidad acumulada del periodo, sin aportaciones ni retiradas.',
+    intv21_evo_note_value: 'Valor de tu patrimonio invertible. Es valor, no rentabilidad: incluye lo que añades o retiras.',
+    intv21_evo_note_top: 'Peso de tu mayor posición en cada fecha registrada.',
+    intv21_evo_note_liquidity: 'Peso de la liquidez en cada fecha registrada.',
+    intv21_evo_note_diversification: 'Posiciones efectivas en cada fecha registrada.',
+    intv21_evo_aria: (m, d0, v0, d1, v1) => `${m}: ${v0} el ${d0} y ${v1} el ${d1}. Usa las flechas para recorrer los puntos.`,
+    intv21_mv_title: 'Qué movió tu patrimonio',
+    intv21_mv_period: (w, a, b) => `${w} · ${a} – ${b}`,
+    intv21_mv_up: 'Impulsaron el resultado',
+    intv21_mv_down: 'Lo frenaron',
+    intv21_mv_foot: 'Contribución al resultado en puntos porcentuales, sin aportaciones ni retiradas. No es la subida del activo.',
+    intv21_scn_title: 'Dependencias y escenarios',
+    intv21_scn_aria: 'Escenario',
+    intv21_scn_opt_top1: 'Mayor posición', intv21_scn_opt_top3: 'Tres mayores', intv21_scn_opt_class: 'Mayor clase',
+    intv21_scn_lead_top1: n => `Si ${n} cae un 10 %, tu patrimonio invertible bajaría aproximadamente:`,
+    intv21_scn_lead_top3: n => `Si tus tres mayores posiciones (${n}) caen un 10 %, tu patrimonio invertible bajaría aproximadamente:`,
+    intv21_scn_lead_class: c => `Si todo lo que tienes en ${c} cae un 10 %, tu patrimonio invertible bajaría aproximadamente:`,
+    intv21_scn_viz_aria: p => `Impacto aproximado: ${p} de tu patrimonio invertible.`,
+    intv21_scn_unit: 'de tu patrimonio invertible',
+    intv21_scn_affected: 'Peso afectado', intv21_scn_rest: 'Resto de la cartera',
+    intv21_scn_disclaimer: 'Escenario hipotético, no una previsión.',
+    intv21_xq_top2: (a, b) => `¿Cuánto depende mi patrimonio de ${a} y ${b} juntos?`,
+    intv21_xa_top2: p => `Juntos son el ${p} de tu patrimonio invertible.`,
+    intv21_xq_conc_week: '¿Ha aumentado mi concentración durante la última semana?',
+    intv21_xq_conc_month: '¿Ha aumentado mi concentración durante el último mes?',
+    intv21_xq_conc_start: '¿Ha aumentado mi concentración desde el inicio?',
+    intv21_xa_conc_owned_up: 'Sí: tu mayor posición pesa más que al principio del periodo.',
+    intv21_xa_conc_owned_down: 'No: tu mayor posición pesa menos que al principio del periodo.',
+    intv21_xa_conc_owned_flat: 'No de forma material: el peso de tu mayor posición se mantiene.',
+    intv21_xa_conc_up: (pp, d) => `Sí: tu mayor posición pesa ${pp} puntos más que el ${d}.`,
+    intv21_xa_conc_down: (pp, d) => `No: tu mayor posición pesa ${pp} puntos menos que el ${d}.`,
+    intv21_xa_conc_flat: (pp, d) => `No de forma material desde el ${d}.`,
+    intv21_xq_top3: '¿Qué ocurriría si mis tres mayores posiciones cayeran un 10 %?',
+    intv21_xa_top3: 'Aurix lo calcula con tus pesos actuales en «Dependencias y escenarios», sin suponer que nada más caería con ellas.',
+    intv21_go_scen: 'Ver el escenario', intv21_go_evo: 'Ver en Tu evolución',
+    intv21_xq_liq: '¿Cómo ha cambiado mi liquidez desde el inicio?',
+    intv21_xa_liq: (a, b, d0, d1) => `Pasó del ${a} el ${d0} al ${b} el ${d1}, sobre tu patrimonio invertible.`,
+    intv21_log_title: 'Registro de Aurix',
+    intv21_log_more: n => `Ver ${n} más`,
+    intv21_log_state_reviewed: 'Revisado', intv21_log_state_recorded: 'Registrado',
+    intv21_fam_performance: 'Rentabilidad', intv21_fam_wealth_level: 'Patrimonio', intv21_fam_capital_flow: 'Flujos',
+    intv21_fam_liquidity: 'Liquidez', intv21_fam_exposure: 'Exposición', intv21_fam_concentration: 'Concentración',
+    intv21_fam_diversification: 'Diversificación', intv21_fam_portfolio_record: 'Operación', intv21_fam_other: 'Cartera',
     // CHECKPOINT F — la card promete ACTUALIDAD. Cuando el dato certificado
     // más reciente ya está fuera de la ventana no hay actualidad que publicar,
     // y callar sin decir por qué se lee como «no pasa nada». Se declara.
@@ -9098,6 +9167,72 @@ const T = {
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
     // SPEC INT.04 — presentation layer for the Intelligence Core (see the ES block).
     intv4_brief_title: 'What matters today',
+    // ── INTELLIGENCE V2 (intv21) ──
+    intv21_today_ret: p => `Return over the last 24 h: ${p}, excluding contributions and withdrawals.`,
+    intv21_today_driver_up: (n, pp) => `Biggest boost to the result: ${n}, contributing ${pp}.`,
+    intv21_today_driver_down: (n, pp) => `Biggest drag on the result: ${n}, contributing ${pp}.`,
+    intv21_today_mover: (n, p) => `Largest price move: ${n}, ${p} in 24 h. This is the asset's price, not its impact on your portfolio.`,
+    intv21_today_mover_session: (n, p) => `Largest price move: ${n}, ${p} in the last session. This is the asset's price, not its impact on your portfolio.`,
+    intv21_today_liq: p => `Cash is ${p} of your investable wealth.`,
+    intv21_today_liq_none: 'You have no cash recorded in your investable wealth.',
+    intv21_today_positions: n => `Your investable wealth is spread across ${n} ${n === 1 ? 'position' : 'positions'}.`,
+    intv21_tags_aria: 'Key readings',
+    intv21_tag_conc_high: 'High concentration',
+    intv21_tag_conc_moderate: 'Moderate concentration',
+    intv21_tag_conc_low: 'Weight spread out',
+    intv21_tag_move: n => `Main move: ${n}`,
+    intv21_tag_liq_up: 'Cash rising',
+    intv21_tag_liq_down: 'Cash falling',
+    intv21_tag_liq_stable: 'Cash steady',
+    intv21_tag_class: c => `Most weight in ${c}`,
+    intv21_tag_hide: l => `Hide “${l}”`,
+    intv21_win_7d: '7D', intv21_win_30d: '30D', intv21_win_all: 'Since start',
+    intv21_evo_metric_aria: 'Metric', intv21_evo_win_aria: 'Period',
+    intv21_evo_m_return: 'Return', intv21_evo_m_value: 'Value', intv21_evo_m_top: 'Largest position',
+    intv21_evo_m_liquidity: 'Cash', intv21_evo_m_diversification: 'Diversification',
+    intv21_evo_note_return: 'Cumulative return for the period, excluding contributions and withdrawals.',
+    intv21_evo_note_value: 'Value of your investable wealth. This is value, not return: it includes what you add or withdraw.',
+    intv21_evo_note_top: 'Weight of your largest position on each recorded date.',
+    intv21_evo_note_liquidity: 'Weight of cash on each recorded date.',
+    intv21_evo_note_diversification: 'Effective positions on each recorded date.',
+    intv21_evo_aria: (m, d0, v0, d1, v1) => `${m}: ${v0} on ${d0} and ${v1} on ${d1}. Use the arrow keys to move between points.`,
+    intv21_mv_title: 'What moved your wealth',
+    intv21_mv_period: (w, a, b) => `${w} · ${a} – ${b}`,
+    intv21_mv_up: 'Lifted the result',
+    intv21_mv_down: 'Held it back',
+    intv21_mv_foot: 'Contribution to the result in percentage points, excluding contributions and withdrawals. Not the asset\'s own rise.',
+    intv21_scn_title: 'Dependencies and scenarios',
+    intv21_scn_aria: 'Scenario',
+    intv21_scn_opt_top1: 'Largest position', intv21_scn_opt_top3: 'Top three', intv21_scn_opt_class: 'Largest class',
+    intv21_scn_lead_top1: n => `If ${n} falls 10%, your investable wealth would drop by roughly:`,
+    intv21_scn_lead_top3: n => `If your three largest positions (${n}) fall 10%, your investable wealth would drop by roughly:`,
+    intv21_scn_lead_class: c => `If everything you hold in ${c} falls 10%, your investable wealth would drop by roughly:`,
+    intv21_scn_viz_aria: p => `Approximate impact: ${p} of your investable wealth.`,
+    intv21_scn_unit: 'of your investable wealth',
+    intv21_scn_affected: 'Weight affected', intv21_scn_rest: 'Rest of the portfolio',
+    intv21_scn_disclaimer: 'Hypothetical scenario, not a forecast.',
+    intv21_xq_top2: (a, b) => `How much does my wealth depend on ${a} and ${b} together?`,
+    intv21_xa_top2: p => `Together they are ${p} of your investable wealth.`,
+    intv21_xq_conc_week: 'Has my concentration increased over the last week?',
+    intv21_xq_conc_month: 'Has my concentration increased over the last month?',
+    intv21_xq_conc_start: 'Has my concentration increased since the start?',
+    intv21_xa_conc_owned_up: 'Yes: your largest position weighs more than at the start of the period.',
+    intv21_xa_conc_owned_down: 'No: your largest position weighs less than at the start of the period.',
+    intv21_xa_conc_owned_flat: 'Not materially: your largest position\'s weight is holding steady.',
+    intv21_xa_conc_up: (pp, d) => `Yes: your largest position weighs ${pp} points more than on ${d}.`,
+    intv21_xa_conc_down: (pp, d) => `No: your largest position weighs ${pp} points less than on ${d}.`,
+    intv21_xa_conc_flat: (pp, d) => `Not materially since ${d}.`,
+    intv21_xq_top3: 'What would happen if my three largest positions fell 10%?',
+    intv21_xa_top3: 'Aurix works it out with your current weights in “Dependencies and scenarios”, without assuming anything else would fall with them.',
+    intv21_go_scen: 'See the scenario', intv21_go_evo: 'See it in Your evolution',
+    intv21_xq_liq: 'How has my cash changed since the start?',
+    intv21_xa_liq: (a, b, d0, d1) => `It went from ${a} on ${d0} to ${b} on ${d1}, as a share of your investable wealth.`,
+    intv21_log_title: 'Aurix log',
+    intv21_log_more: n => `Show ${n} more`,
+    intv21_log_state_reviewed: 'Reviewed', intv21_log_state_recorded: 'Recorded',
+    intv21_fam_performance: 'Return', intv21_fam_wealth_level: 'Wealth', intv21_fam_capital_flow: 'Flows',
+    intv21_fam_liquidity: 'Cash', intv21_fam_exposure: 'Exposure', intv21_fam_concentration: 'Concentration',
+    intv21_fam_diversification: 'Diversification', intv21_fam_portfolio_record: 'Transaction', intv21_fam_other: 'Portfolio',
     intv4_brief_stale_note: 'Your portfolio value has not refreshed recently: the above is the latest Aurix can certify.',
     intv4_brief_stale: 'Aurix does not have recent enough data to say what matters today. It will speak again as soon as your portfolio updates.',
     intv4_brief_empty: 'Aurix is reading your wealth. As soon as there is a fact it can prove, it will appear here.',
@@ -68138,7 +68273,9 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims, hoy) {
   // El acontecimiento que ya titula «Lo que importa hoy» no se repite aquí; si no
   // queda ninguno propio, la card no se pinta (y su «Entendido» sólo existe sobre
   // filas de esta sección).
-  const rows = _intv4FindingRows(core, { all: true, hoy: hoy });
+  // V2 — lo REVISADO es historia y vive en el Registro de Aurix: aquí sólo lo
+  // pendiente, así que un hecho nunca ocupa las dos cards.
+  const rows = _intv4FindingRows(core, { all: true, hoy: hoy }).filter(x => !x.reviewed);
   const pending = rows.filter(x => !x.reviewed);
   const candidates = rows;
   rows.forEach(x => seen.add(x.fd.rootCause));
@@ -68404,6 +68541,10 @@ function _intv15ExploreLabel(q, core, intel) {
 }
 function _intv4ExploreHtml(core, esc, intel) {
   const hot = new Set(_aurixIntelRootsOf(intel));
+  // V2 — preguntas CONTEXTUALES (hechos reales de esta cartera, contestables).
+  // El catálogo genérico sólo completa hasta tres si faltan.
+  let ctx21 = [];
+  try { ctx21 = (typeof _intv21ExploreQs === 'function') ? _intv21ExploreQs(_intv21Weights(), {}, esc).slice(0, _INTV4_EXPLORE_MAX) : []; } catch (_) { ctx21 = []; }
   const all = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
     // §3 — LABEL Y RESPUESTA SE RESUELVEN EN LA MISMA PASADA Y DESDE EL MISMO
     // `q`, así que no pueden cruzarse: un reordenamiento del catálogo mueve el
@@ -68425,7 +68566,8 @@ function _intv4ExploreHtml(core, esc, intel) {
       if (ha !== hb) return hb - ha;
       return a.q.id < b.q.id ? -1 : 1;
     })
-    .slice(0, _INTV4_EXPLORE_MAX);
+    .slice(0, (typeof _intv21ExploreQs === 'function') ? Math.max(0, (ctx21.length >= 3 ? 0 : 3 - ctx21.length)) : _INTV4_EXPLORE_MAX);
+  ctx21.slice().reverse().forEach(c => qs.unshift({ q: { id: c.id, causalRoot: c.root }, label: c.label, answer: c.answer, fact: c.fact }));
   if (!qs.length) return '';
   return `
     <section class="intcc-card intcc-explore intv4-explore"
@@ -68435,7 +68577,7 @@ function _intv4ExploreHtml(core, esc, intel) {
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intcc-explore-list">
         ${qs.map(x => `
-          <div class="intcc-x-item" data-root="${esc(x.q.causalRoot)}">
+          <div class="intcc-x-item" data-root="${esc(x.q.causalRoot)}"${x.fact ? ` data-x-fact="${esc(x.fact.factId)}"` : ''}${/^ctx_/.test(x.q.id) ? ' data-ctx="1"' : ''}>
             <button type="button" class="intcc-x-q" id="intcc-xq-${esc(x.q.id)}"
                     data-intcc-q="${esc(x.q.id)}" aria-expanded="false"
                     aria-controls="intcc-x-${esc(x.q.id)}">
@@ -69138,8 +69280,12 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
   // Ningún número de días sale de la serie de nivel ni de la edad de la cuenta:
   // cada fila lleva sus propios extremos. Sin la frase permanente de «mayor plazo».
   const evo = _intv19Evolution(core, alreadyPublished, hoyKeys);
+  // V2 — módulo visual (métrica × ventana) entre el titular y las evidencias.
+  let evoViz = '';
+  try { evoViz = (typeof _intv21EvoModuleHtml === 'function') ? _intv21EvoModuleHtml(esc) : ''; } catch (_) { evoViz = ''; }
   if (evo.items.length) {
-    const head = evo.items[0], rest = evo.items.slice(1, 4);
+    // V2 — titular de una línea y como mucho DOS evidencias.
+    const head = evo.items[0], rest = evo.items.slice(1, 3);
     const st = evo.stab && evo.items.some(x => x.family === 'structure') ? evo.stab : null;
     // Las filas que SON un hecho del ledger declaran su clave como las demás
     // superficies (`data-fact`): es la identidad que usa la antirrepetición.
@@ -69154,6 +69300,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
                data-stable-codes="${esc(st.rows.map(x => x.code).join(','))}"` : ''}>
         <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
         <p class="intv15-stable-head" data-evo-family="${esc(head.family)}" data-evo-key="${esc(head.key)}"${factAttr(head)} data-period="${esc(head.period || '')}"><span class="intv4-mem-what">${esc(head.txt)}</span></p>
+        ${evoViz}
         ${rest.length ? `<ul class="intv15-stable-list">
           ${rest.map(x => `<li class="intv15-stable-row" data-evo-family="${esc(x.family)}" data-evo-key="${esc(x.key)}"${factAttr(x)} data-period="${esc(x.period || '')}"><span class="intv4-mem-what">${esc(x.txt)}</span></li>`).join('')}
         </ul>` : ''}
@@ -69167,6 +69314,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
       <section class="intcc-card intcc-timeline intv4-memory is-elsewhere" data-compact="1" data-stable="0">
         <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
         <p class="intcc-empty-body">${esc(_intv4T('intv17_in_today'))}</p>
+        ${evoViz}
       </section>`;
   }
   // Sin dos observaciones comparables de ninguna familia: un estado breve.
@@ -69175,6 +69323,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished, intel, excludeFields, lim
              data-obs="${esc(String(nObs))}" data-compact="1" data-no-comparison="1">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
       <p class="intcc-empty-body">${esc(_intv4T('intv17_first_ref'))}</p>
+      ${evoViz}
     </section>`;
 }
 
@@ -70372,8 +70521,12 @@ function _intv5MattersStories(core, skipRoots, intel, acks) {
     .slice(0, 4);
   return { stories, rankedBy: rank.size ? 'intelligence' : 'core', stale: _stale };
 }
-function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) {
+function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine, extra) {
   const sel = _intv5MattersStories(core, skipRoots, intel, acks);
+  const _head21 = (extra && Array.isArray(extra.head)) ? extra.head : [];
+  const _tail21 = (extra && Array.isArray(extra.tail)) ? extra.tail : [];
+  if (extra && typeof _intv21TrimStories === 'function') sel.stories = _intv21TrimStories(sel.stories, _head21);
+  const _item21 = (it) => (typeof _intv21TodayItemHtml === 'function') ? _intv21TodayItemHtml(it, esc) : '';
   // A2 — qué hechos publica ya el destino del contador. Los que coinciden se
   // titulan aquí por su SIGNIFICADO y llevan el hecho como evidencia de apoyo,
   // para que la misma frase no salga dos veces en la misma pantalla.
@@ -70439,7 +70592,7 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
   // que merezca tu atención» (aquí). Las dos frases son del MISMO estado y se
   // contradicen. Se cuenta cuántas cedieron para poder decir la verdad.
   let _cededToChanged = 0;
-  const cards = sel.stories
+  const cards = _head21.map(_item21).filter(Boolean).concat(sel.stories
     // ── CHECKPOINT H · UN HECHO, UNA UBICACIÓN ─────────────────────────────
     // La regla anterior dejaba pasar el hecho si esta card podía añadirle un
     // «por qué», y eso publicaba `positions_registered_today` en «Lo que
@@ -70455,7 +70608,7 @@ function _intv5MattersHtml(core, esc, depth, skipRoots, intel, acks, limitLine) 
     // es «Qué ha cambiado» quien no lo repite (por identidad de evento, ver
     // `_intv17IsHoyEvent`). Ya no cede por raíz ni por evento.
     .map(st => _intv4StoryHtml(st, esc, depth, publishedKeys))
-    .filter(Boolean);
+    .filter(Boolean), _tail21.map(_item21).filter(Boolean));
   // EL CONTROL «ENTENDIDO» VIVE EN UN SOLO SITIO. Aquí se construía una segunda
   // copia por historia —con el MISMO `data-intel-ack`— que además nunca se
   // renderizaba: el `return` usaba `cards`. Dos controles con la misma identidad
@@ -71797,6 +71950,898 @@ async function _aurixChatSubmit() {
   _aurixChatRender();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX INTELLIGENCE V2 · PROFUNDIDAD SIN REPETICIÓN (intv21)
+// ════════════════════════════════════════════════════════════════════════════
+// Una capa de PRESENTACIÓN sobre owners que ya existen. No calcula ninguna
+// verdad financiera nueva: lee el Core, `_aurixInvestablePerformance` (índice
+// flow-neutral), `_aurixEligibleInvestableSeries` (nivel invertible), la memoria
+// por posición (`portfolio_snapshots.asset_values`, 4 filas), las cotizaciones
+// de cada activo y el top-3 de Factores. Lo que no puede certificar, no lo dice.
+//
+// REGISTRO ÚNICO DE HECHOS. Cada superficie publica sus hechos con la misma
+// forma (fact_id · familia · periodo · cifra/unidad · evidencia · frescura ·
+// materialidad · prioridad · owner · última presentación) y el registro impide
+// que un fact_id —o una familia en un mismo periodo— tenga dos dueños. Las
+// etiquetas del hero NO son hechos: son atajos al owner y no llevan cifra.
+//
+// MEMORIA PROPIA, sellada con el dueño (`_aurixIntelReadOwned`) y purgada en un
+// cambio de usuario (USER_SCOPED_LOCAL_KEYS): etiquetas ocultas con la firma
+// material con la que se ocultaron, último día mostrado de cada hecho y las
+// selecciones de Tu evolución y de Escenarios. NO toca la memoria de
+// presentación del Core (`aurix_intv4_shown_v1`), que razona sobre hechos.
+const _INTV21_KEY = 'aurix_intel_v2_v1';
+const _INTV21_DAY = 864e5;
+const _INTV21_SEL = Object.freeze({
+  drivers: '.intcc-drivers', today: '.intv5-matters', evolution: '.intv4-memory',
+  movers: '.intv21-movers', scenarios: '.intv21-scen', log: '.intv21-log',
+});
+function _intv21Read() {
+  const def = { hidden: {}, shown: {}, evoMetric: null, evoWin: null, scen: null };
+  try {
+    const o = (typeof _aurixIntelReadOwned === 'function') ? _aurixIntelReadOwned(_INTV21_KEY, {}) : null;
+    if (!o) return def;
+    const obj = (x) => (x && typeof x === 'object' && !Array.isArray(x)) ? x : {};
+    const str = (x) => (typeof x === 'string' && x.length < 40) ? x : null;
+    return { hidden: obj(o.hidden), shown: obj(o.shown), evoMetric: str(o.evoMetric), evoWin: str(o.evoWin), scen: str(o.scen) };
+  } catch (_) { return def; }
+}
+function _intv21Write(patch) {
+  try {
+    if (typeof _aurixIntelWriteOwned !== 'function') return false;
+    const cur = _intv21Read();
+    const next = Object.assign({}, cur, patch || {});
+    return _aurixIntelWriteOwned(_INTV21_KEY, next, {});
+  } catch (_) { return false; }
+}
+function _intv21Fixed(v, dp) {
+  const d = dp == null ? 1 : dp;
+  return Math.abs(v).toFixed(d).replace('.', (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',');
+}
+function _intv21Pct(v, dp, signed) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '';
+  const body = _intv21Fixed(n, dp) + '%';
+  if (!signed) return (n < 0 ? '−' : '') + body;
+  return (n > 0 ? '+' : (n < 0 ? '−' : '')) + body;
+}
+function _intv21Pp(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '';
+  return (n > 0 ? '+' : (n < 0 ? '−' : '')) + _intv21Fixed(n, 2) + ' pp';
+}
+function _intv21Name(a) {
+  try { return (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '—'); }
+  catch (_) { return (a && (a.name || a.ticker)) || '—'; }
+}
+function _intv21Now() { return (typeof _aurixNow === 'function') ? _aurixNow() : Date.now(); }
+
+// ── REGISTRO ────────────────────────────────────────────────────────────────
+let _intv21LastRegistry = null;
+function _intv21Registry() {
+  const facts = [];
+  const store = _intv21Read();
+  return {
+    facts,
+    add(f) {
+      if (!f || !f.factId || !f.owner) return;
+      facts.push({
+        factId: String(f.factId), family: String(f.family || ''), period: String(f.period || ''),
+        value: Number.isFinite(f.value) ? f.value : null, unit: f.unit || null,
+        evidence: f.evidence || null, freshness: Number.isFinite(f.freshness) ? f.freshness : null,
+        materiality: f.materiality || 'material', priority: Number.isFinite(f.priority) ? f.priority : 0,
+        owner: String(f.owner),
+        lastShownAt: Number.isFinite(store.shown[f.factId]) ? store.shown[f.factId] : null,
+      });
+    },
+    // fact_id repetido, o la misma familia en el mismo periodo con DOS dueños.
+    duplicates() {
+      const byId = new Map(), byFp = new Map(), out = [];
+      facts.forEach(f => {
+        if (byId.has(f.factId) && byId.get(f.factId) !== f.owner) out.push({ kind: 'fact_id', factId: f.factId, owners: [byId.get(f.factId), f.owner] });
+        else byId.set(f.factId, f.owner);
+        if (!f.family || !f.period) return;
+        const k = f.family + '|' + f.period;
+        if (byFp.has(k) && byFp.get(k) !== f.owner) out.push({ kind: 'family_period', key: k, owners: [byFp.get(k), f.owner] });
+        else if (!byFp.has(k)) byFp.set(k, f.owner);
+      });
+      return out;
+    },
+  };
+}
+// Sella «mostrado» al DÍA (como la memoria del Core): veinte pinturas de la misma
+// jornada escriben el mismo valor, así que repintar no escribe nada.
+function _intv21RecordShown(reg, extraKeys) {
+  try {
+    const st = _intv21Read();
+    const day = Math.floor(Date.now() / _INTV21_DAY) * _INTV21_DAY;
+    let dirty = false;
+    const shown = {};
+    Object.keys(st.shown).forEach(k => { if (Number.isFinite(st.shown[k]) && day - st.shown[k] < 45 * _INTV21_DAY) shown[k] = st.shown[k]; else dirty = true; });
+    reg.facts.map(f => f.factId).concat(extraKeys || []).forEach(k => { if (shown[k] !== day) { shown[k] = day; dirty = true; } });
+    const keys = Object.keys(shown);
+    if (keys.length > 80) { keys.sort((a, b) => shown[a] - shown[b]).slice(0, keys.length - 80).forEach(k => delete shown[k]); dirty = true; }
+    if (dirty) _intv21Write({ shown });
+  } catch (_) {}
+}
+
+// ── PESOS ACTUALES (mismo perímetro que Factores) ──────────────────────────
+// Posiciones INVERTIBLES valoradas: el top-3 de Factores (`_intTop3Investable`)
+// usa exactamente este denominador, así que «Microsoft 29 %» es el mismo número
+// aquí y allí.
+function _intv21Weights() {
+  const out = { total: 0, rows: [], classes: [] };
+  try {
+    const inv = (typeof investableAssets === 'function') ? investableAssets() : [];
+    const tot = (typeof investableValueUSD === 'function') ? investableValueUSD() : 0;
+    if (!inv.length || !(tot > 0)) return out;
+    out.total = tot;
+    const cls = {};
+    inv.forEach(a => {
+      const v = (typeof assetValueUSD === 'function') ? (assetValueUSD(a) || 0) : 0;
+      if (!(v > 0)) return;
+      const bucket = (typeof _aurixCategoryBucket === 'function') ? _aurixCategoryBucket(a) : String(a.type || 'other');
+      out.rows.push({ id: String(a.id), name: _intv21Name(a), type: a.type || '', bucket, usd: v, w: v / tot, a });
+      cls[bucket] = (cls[bucket] || 0) + v;
+    });
+    out.rows.sort((x, y) => y.usd - x.usd);
+    // Clases: la MISMA distribución que publica Factores («Acciones, 51 %»), con su
+    // mismo rótulo; sólo si no existe se agrupa por el bucket del activo.
+    const dist = (typeof getInvestableDistribution === 'function') ? (getInvestableDistribution() || []) : [];
+    out.classes = dist.length
+      ? dist.filter(d => d && Number(d.pct) > 0).map(d => ({ bucket: String(d.type), w: Number(d.pct) / 100 }))
+      : Object.keys(cls).map(k => ({ bucket: k, usd: cls[k], w: cls[k] / tot })).sort((x, y) => y.w - x.w);
+  } catch (_) {}
+  return out;
+}
+
+function _intv21IsCash(b) { return b === 'cash' || b === 'liquidity'; }
+function _intv21ClassLabel(b) {
+  try { if (typeof TYPE_META !== 'undefined' && TYPE_META[b] && TYPE_META[b].label) return TYPE_META[b].label; } catch (_) {}
+  return _intv5CatLabel(_intv21IsCash(b) ? 'liquidity' : b);
+}
+// Las filas que publica Factores (mismo owner): las etiquetas y Hoy las consultan
+// para no repetirlas. Fuera del renderer, que no deriva nada por su cuenta.
+function _intv21DriverItems(snap) {
+  try { return (typeof buildPortfolioDrivers === 'function') ? (buildPortfolioDrivers(snap).items || []) : []; } catch (_) { return []; }
+}
+// ── HOY · 24 H ──────────────────────────────────────────────────────────────
+// Prioridad del SPEC: rentabilidad 24 h flow-neutral certificada → activo que
+// más impulsó o frenó → mayor movimiento de PRECIO → (cambios materiales del
+// Core) → lectura estructural si no hay nada más. Cada tipo dice lo que es:
+// «rentabilidad», «contribución», «precio». Un flujo NUNCA se presenta como
+// rentabilidad (eso lo publica el Core con su propia historia de flujo).
+function _intv21TodayItems(core, stories, W) {
+  const items = [];
+  const now = _intv21Now();
+  let stale = true;
+  try { stale = (typeof _aurixTodayDataStale === 'function') ? _aurixTodayDataStale(core, now) : true; } catch (_) { stale = true; }
+  const has24Story = (stories || []).some(st => st && st.causalRoot === _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN
+    && String((st.window && st.window.range) || '').toUpperCase() === '24H');
+  let ret24 = null;
+  try {
+    const p = (typeof _aurixInvestablePerformance === 'function') ? _aurixInvestablePerformance('24h') : null;
+    // La ventana 24H está anclada al ÚLTIMO dato, no al reloj: con un último dato de
+    // hace días, «las últimas 24 h» serían falsas. Sólo se publica si acaba ahora.
+    if (p && p.valid && Number.isFinite(p.returnPct) && p.coversNominal !== false && !stale
+        && Number.isFinite(p.endAt) && now - p.endAt <= 6 * 3600e3 && p.endAt <= now + 6e5) ret24 = p;
+  } catch (_) { ret24 = null; }
+  if (ret24 && !has24Story) {
+    items.push({ factId: 'ret_24h', family: 'performance', period: '24H', kind: 'return', priority: 1,
+      value: ret24.returnPct, unit: 'pct', dir: ret24.returnPct > 0 ? 'up' : (ret24.returnPct < 0 ? 'down' : 'flat'),
+      evidence: 'investable_twr_24h', freshness: ret24.endAt,
+      text: _intv4T('intv21_today_ret', _intv21Pct(ret24.returnPct, 2, true)) });
+  }
+  // CONTRIBUCIÓN 24 H: con valores de SERVIDOR (`asset_values`, fila de hace 24 h y
+  // la última), el mismo cálculo que «Qué movió» y conciliado con la rentabilidad
+  // 24 h certificada. No usa `change24h`: en acciones es la última sesión, no 24 h.
+  let driver = null;
+  if (ret24 && W && W.rows.length) {
+    let att = null;
+    try { att = (typeof _intv21AttrWindow === 'function') ? _intv21AttrWindow('24h', ret24.returnPct, ret24.startAt, ret24.endAt) : null; } catch (_) { att = null; }
+    const rk = att ? att.rows.slice().sort((a, b) => Math.abs(b.c) - Math.abs(a.c)) : [];
+    const best = rk[0] || null;
+    // «Lo que más» exige un líder claro: con el segundo a menos de 0,05 pp no se nombra a ninguno.
+    if (best && Math.abs(best.c) >= 0.05 && (!rk[1] || Math.abs(best.c) - Math.abs(rk[1].c) >= 0.05)) {
+      driver = best;
+      items.push({ factId: 'contrib_24h:' + best.id, family: 'contribution', period: '24H', kind: 'driver', priority: 2,
+        value: +best.c.toFixed(4), unit: 'pp', dir: best.c > 0 ? 'up' : 'down', assetId: best.id, assetName: best.name,
+        evidence: 'asset_values_24h', freshness: att.endAt,
+        text: _intv4T(best.c > 0 ? 'intv21_today_driver_up' : 'intv21_today_driver_down', best.name, _intv21Pp(best.c)) });
+    }
+  }
+  // MOVIMIENTO DE PRECIO: la variación que publica la cotización. Sólo con el dato
+  // del día fresco y cotización de mercado viva (los fondos con NAV manual no la
+  // actualizan). Cripto cotiza 24/7 ⇒ «en 24 h»; el resto ⇒ «en la última sesión».
+  if (!stale && W && W.rows.length) {
+    const quoted = W.rows.filter(r => !_intccIsMonetary(r.type) && Number.isFinite(Number(r.a.change24h))
+      && (r.type === 'crypto' ? !!r.a.coinId || !!r.a.marketSymbol : !!r.a.marketSymbol));
+    const mover = quoted.sort((a, b) => Math.abs(Number(b.a.change24h)) - Math.abs(Number(a.a.change24h)))[0];
+    if (mover && Math.abs(Number(mover.a.change24h)) >= 1 && !(driver && driver.id === mover.id)) {
+      const chg = Number(mover.a.change24h), h24 = mover.type === 'crypto';
+      items.push({ factId: 'price_' + (h24 ? '24h' : 'session') + ':' + mover.id, family: 'price_move', period: h24 ? '24H' : 'session',
+        kind: 'mover', priority: 3, value: +chg.toFixed(4), unit: 'pct', dir: chg > 0 ? 'up' : 'down', assetId: mover.id, assetName: mover.name,
+        evidence: 'quote_change', freshness: now,
+        text: _intv4T(h24 ? 'intv21_today_mover' : 'intv21_today_mover_session', mover.name, _intv21Pct(chg, 1, true)) });
+    }
+  }
+  return items;
+}
+// Lectura estructural de reserva: sólo si Hoy quedaría con menos de dos hechos.
+function _intv21TodayStructural(W, driversItems, need) {
+  const out = [];
+  if (!(need > 0) || !W || !W.rows.length) return out;
+  try {
+    const showsCash = (driversItems || []).some(it => _intccIsMonetary(it.type));
+    const liq = W.classes.find(c => _intv21IsCash(c.bucket));
+    if (!showsCash) {
+      const w = liq ? liq.w * 100 : 0;
+      out.push({ factId: 'liq_level', family: 'liquidity', period: 'now', kind: 'structural', priority: 5,
+        value: +w.toFixed(2), unit: 'pct', dir: 'flat', evidence: 'investable_weights',
+        text: liq ? _intv4T('intv21_today_liq', _intv21Pct(w, 1)) : _intv4T('intv21_today_liq_none') });
+    }
+    if (out.length < need) {
+      out.push({ factId: 'positions_count', family: 'structure', period: 'now', kind: 'structural', priority: 6,
+        value: W.rows.length, unit: 'positions', dir: 'flat', evidence: 'investable_weights',
+        text: _intv4T('intv21_today_positions', W.rows.length) });
+    }
+  } catch (_) {}
+  return out.slice(0, need);
+}
+function _intv21TodayItemHtml(it, esc) {
+  return `
+    <article class="intv4-story intv21-today is-${esc(it.dir || 'flat')}" data-fact="${esc(it.factId)}"
+             data-kind="${esc(it.kind)}" data-family="${esc(it.family)}" data-period="${esc(it.period)}">
+      <p class="intv4-story-head">${esc(it.text)}</p>
+    </article>`;
+}
+// UNA regla para recortar Hoy, la usan el renderer y la card: lo nuevo de
+// prioridad 1–3 va delante y las historias del Core ocupan el resto (máx. 4).
+function _intv21TrimStories(stories, head) {
+  return (stories || []).slice(0, Math.max(0, 4 - ((head || []).length)));
+}
+
+// ── ETIQUETAS DEL HERO ──────────────────────────────────────────────────────
+// Dimensiones distintas, sin cifras, cada una lleva al análisis propietario. La
+// concentración elevada es CRÍTICA (se mantiene mientras dure); el resto rota por
+// lo menos mostrado, sellado al día ⇒ nada cambia entre dos pinturas del mismo día.
+function _intv21HeroTags(ctx) {
+  const st = _intv21Read();
+  const cand = [];
+  try {
+    const band = ctx.score && ctx.score.band;
+    const top = (ctx.driversItems || [])[0];
+    const top1 = top && Number.isFinite(Number(top.pctRaw)) ? Number(top.pctRaw) : null;
+    let lvl = null;
+    if (band === 'weight_in_few' || band === 'single_position' || (top1 != null && top1 >= 25)) lvl = 'high';
+    else if (band === 'weight_uneven') lvl = 'moderate';
+    else if (band === 'weight_spread') lvl = 'low';
+    if (lvl) cand.push({ id: 'tag_conc', dim: 'concentration', sig: lvl, critical: lvl === 'high', target: 'drivers',
+      tone: lvl === 'high' ? 'warn' : 'calm', label: _intv4T('intv21_tag_conc_' + lvl) });
+  } catch (_) {}
+  try {
+    const mv = (ctx.todayItems || []).find(x => x.kind === 'driver' || x.kind === 'mover');
+    if (mv) cand.push({ id: 'tag_move', dim: 'movement', sig: mv.assetId + ':' + mv.dir, critical: false, target: 'today',
+      tone: 'calm', label: _intv4T('intv21_tag_move', mv.assetName) });
+  } catch (_) {}
+  try {
+    const facts = (ctx.core && ctx.core.ledger && ctx.core.ledger.facts) || [];
+    const drift = facts.find(f => f && typeof f.semanticKey === 'string' && /^cash_drift_(24H|7D)$/i.test(f.semanticKey));
+    const stab = ctx.stab && Array.isArray(ctx.stab.rows) && ctx.stab.rows.some(r => r && r.code === 'liquidity');
+    let lq = null;
+    if (drift && (drift.direction === 'up' || drift.direction === 'down')) lq = drift.direction;
+    else if (stab) lq = 'stable';
+    if (lq) cand.push({ id: 'tag_liq', dim: 'liquidity', sig: lq, critical: false,
+      target: (ctx.todayKeys || []).some(k => /^cash_/.test(String(k))) ? 'today' : 'evolution',
+      tone: 'calm', label: _intv4T('intv21_tag_liq_' + lq) });
+  } catch (_) {}
+  // Reserva: la clase dominante sólo entra si faltan lecturas de las otras tres dimensiones.
+  try {
+    const c = (ctx.W && ctx.W.classes || []).find(x => !_intv21IsCash(x.bucket));
+    if (cand.length < 3 && c && ctx.W.classes.length > 1) cand.push({ id: 'tag_class', dim: 'class', sig: c.bucket, critical: false, target: 'scenarios',
+      tone: 'calm', fallback: true, label: _intv4T('intv21_tag_class', _intv21ClassLabel(c.bucket)) });
+  } catch (_) {}
+  const visible = cand.filter(c => c.label && st.hidden[c.id] !== c.sig);
+  const crit = visible.filter(c => c.critical);
+  // Secundarias: las de dato vivo antes que la de reserva; entre iguales, la menos mostrada.
+  const rest = visible.filter(c => !c.critical)
+    .sort((a, b) => ((a.fallback ? 1 : 0) - (b.fallback ? 1 : 0))
+      || ((st.shown['tag:' + a.id] || 0) - (st.shown['tag:' + b.id] || 0)) || (a.id < b.id ? -1 : 1));
+  return crit.concat(rest).slice(0, 3);
+}
+function _intv21TagsHtml(tags, esc) {
+  if (!tags || !tags.length) return '';
+  return `<div class="intv21-tags" role="list" aria-label="${esc(_intv4T('intv21_tags_aria'))}">${tags.map(t2 => `
+    <span class="intv21-tag is-${esc(t2.tone)}" role="listitem" data-tag="${esc(t2.id)}" data-dim="${esc(t2.dim)}">
+      <button type="button" class="intv21-tag-go" data-intv21-go="${esc(t2.target)}">${esc(t2.label)}</button>
+      <button type="button" class="intv21-tag-x" data-intv21-hide="${esc(t2.id)}" data-intv21-sig="${esc(t2.sig)}"
+              aria-label="${esc(_intv4T('intv21_tag_hide', t2.label))}"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
+    </span>`).join('')}</div>`;
+}
+
+// ── TU EVOLUCIÓN VISUAL ─────────────────────────────────────────────────────
+// Rentabilidad y valor son series densas de owners certificados; mayor posición,
+// liquidez y diversificación sólo existen en las fechas que guarda la memoria por
+// posición (hasta 4 filas reales) y se dibujan como PUNTOS: no se interpola nada.
+const _INTV21_EVO_METRICS = ['return', 'value', 'top', 'liquidity', 'diversification'];
+const _INTV21_EVO_WINS = ['7d', '30d', 'all'];
+const _INTV21_WIN_MS = { '7d': 7 * _INTV21_DAY, '30d': 30 * _INTV21_DAY };
+function _intv21MemRows() {
+  try {
+    const m = (typeof _aurixAssetMemory !== 'undefined') ? _aurixAssetMemory : null;
+    if (!m || m.state !== 'ready' || !Array.isArray(m.rows) || m.rows.length < 2) return null;
+    const uid = (typeof _aurixActiveUserId !== 'undefined') ? _aurixActiveUserId : null;
+    if (!uid || m.userId !== uid) return null;
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const rows = m.rows.filter(r => r.ts >= epoch).sort((a, b) => a.ts - b.ts);
+    if (rows.length < 2) return null;
+    const now = _intv21Now(), end = rows[rows.length - 1];
+    if (!(now - end.ts <= 36 * 3600e3) || end.ts > now + 6e5) return null;
+    return rows;
+  } catch (_) { return null; }
+}
+// Una fila sólo vale si cada asset_id es un activo conocido (vivo o cerrado) y el
+// inmueble que declaran los tipos actuales explica EXACTAMENTE su columna.
+function _intv21RowWeights(row) {
+  const known = new Map(((typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []).map(a => [String(a.id), a]));
+  let re = 0, tot = 0;
+  const pos = [];
+  for (const id of Object.keys(row.values || {})) {
+    const v = Number(row.values[id]);
+    if (!Number.isFinite(v)) return null;
+    const a = known.get(String(id));
+    if (!a) { if (v === 0) continue; return null; }
+    if (a.type === 'real_estate') { re += v; continue; }
+    if (v <= 0) continue;
+    tot += v; pos.push({ id: String(id), v, a });
+  }
+  if (Math.abs(re - (Number(row.re) || 0)) > 1 || !(tot > 0)) return null;
+  return { tot, pos };
+}
+function _intv21EvoSeries(metric, win) {
+  const now = _intv21Now();
+  const span = _INTV21_WIN_MS[win] || null;
+  try {
+    if (metric === 'return') {
+      const p = _aurixInvestablePerformance(win);
+      if (!p || !p.valid || !p.index || (span && p.coversNominal === false)) return null;
+      const pts = p.index.timestamps.map((ts, i) => ({ ts, v: p.index.values[i] - 100 }));
+      return pts.length >= 2 ? { kind: 'line', unit: 'pct', pts, zero: true } : null;
+    }
+    if (metric === 'value') {
+      const e = _aurixEligibleInvestableSeries(win);
+      const s = (e && Array.isArray(e.series)) ? e.series.filter(p => p && Number.isFinite(p.ts) && p.value > 0) : [];
+      if (s.length < 2) return null;
+      if (span && (s[s.length - 1].ts - s[0].ts) < 0.8 * span) return null;
+      return { kind: 'line', unit: 'money', pts: s.map(p => ({ ts: p.ts, v: p.value })) };
+    }
+    const rows = _intv21MemRows();
+    if (!rows) return null;
+    const inWin = rows.filter(r => !span || r.ts >= now - span - _INTV21_DAY);
+    if (inWin.length < 2) return null;
+    if (span && (inWin[inWin.length - 1].ts - inWin[0].ts) < 0.8 * span) return null;
+    const pts = [];
+    let liqOk = false;
+    if (metric === 'liquidity') {
+      try { const v = (typeof _aurixClassificationValidity === 'function') ? _aurixClassificationValidity('liquidity', inWin[0].ts, inWin[inWin.length - 1].ts) : null;
+        liqOk = !!(v && v.validity === 'no_reclassification_recorded'); } catch (_) { liqOk = false; }
+    }
+    for (const r of inWin) {
+      const w = _intv21RowWeights(r);
+      if (!w) return null;
+      if (metric === 'top') {
+        const top = w.pos.slice().sort((a, b) => b.v - a.v)[0];
+        if (!top || w.pos.length < 2) return null;
+        pts.push({ ts: r.ts, v: (top.v / w.tot) * 100, note: _intv21Name(top.a) });
+      } else if (metric === 'liquidity') {
+        // Liquidez histórica = clasificación de HOY aplicada al pasado: sólo vale si el
+        // linaje certifica que nadie entró ni salió de liquidez en la ventana.
+        if (!liqOk) return null;
+        const liq = w.pos.filter(p => (typeof _aurixCategoryBucket === 'function' ? _aurixCategoryBucket(p.a) : p.a.type) === 'liquidity')
+          .reduce((s, p) => s + p.v, 0);
+        pts.push({ ts: r.ts, v: (liq / w.tot) * 100 });
+      } else if (metric === 'diversification') {
+        const hhi = w.pos.reduce((s, p) => s + Math.pow(p.v / w.tot, 2), 0);
+        if (!(hhi > 0)) return null;
+        pts.push({ ts: r.ts, v: 1 / hhi });
+      } else return null;
+    }
+    return { kind: 'dots', unit: metric === 'diversification' ? 'n' : 'pct', pts };
+  } catch (_) { return null; }
+}
+function _intv21EvoFmt(unit, v) {
+  if (unit === 'money') return _intv4Money(v);
+  if (unit === 'n') return _intv4Num(v, 1);
+  if (unit === 'pct_signed') return _intv21Pct(v, 2, true);
+  return _intv21Pct(v, 1);
+}
+// Reparto del eje temporal: los saltos mayores que 2,5× el intervalo típico (y
+// más de 6 h) cortan la línea — un hueco se ve como hueco.
+function _intv21EvoSvg(series, metric) {
+  const W = 600, H = 168, pl = 8, pr = 8, pt = 14, pb = 22;
+  let pts = series.pts;
+  if (pts.length > 240) {
+    const step = (pts.length - 1) / 239, keep = new Set([0, pts.length - 1]);
+    for (let i = 0; i < 240; i++) keep.add(Math.round(i * step));
+    pts = pts.filter((_, i) => keep.has(i));
+  }
+  const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts;
+  let lo = Math.min.apply(null, pts.map(p => p.v)), hi = Math.max.apply(null, pts.map(p => p.v));
+  if (series.zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
+  const X = ts => pl + ((ts - t0) / Math.max(1, t1 - t0)) * (W - pl - pr);
+  const Y = v => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+  const xy = pts.map(p => ({ x: +X(p.ts).toFixed(1), y: +Y(p.v).toFixed(1) }));
+  let body = '';
+  if (series.zero && lo < 0 && hi > 0) body += `<line class="intv21-evo-zero" x1="${pl}" x2="${W - pr}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"/>`;
+  [0.25, 0.5, 0.75].forEach(f => { const y = (pt + f * (H - pt - pb)).toFixed(1); body += `<line class="intv21-evo-grid" x1="${pl}" x2="${W - pr}" y1="${y}" y2="${y}"/>`; });
+  if (series.kind === 'line') {
+    const gaps = [];
+    for (let i = 1; i < pts.length; i++) gaps.push(pts[i].ts - pts[i - 1].ts);
+    const med = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)] || 0;
+    const brk = Math.max(6 * 3600e3, 2.5 * med);
+    let d = '';
+    xy.forEach((p, i) => { d += (i === 0 || (pts[i].ts - pts[i - 1].ts) > brk ? 'M' : 'L') + p.x + ' ' + p.y + ' '; });
+    body += `<path class="intv21-evo-line" pathLength="1" d="${d.trim()}"/>`;
+  } else {
+    xy.forEach(p => { body += `<line class="intv21-evo-stem" x1="${p.x}" x2="${p.x}" y1="${H - pb}" y2="${p.y}"/>`; });
+  }
+  // Los puntos van en HTML (porcentaje del lienzo): con `preserveAspectRatio="none"`
+  // un círculo SVG se deformaría en elipse en cuanto cambia el ancho.
+  const dot = (p, cls) => `<span class="intv21-evo-dot${cls}" style="left:${(p.x / W * 100).toFixed(2)}%;top:${(p.y / H * 100).toFixed(2)}%"></span>`;
+  const dotsHtml = series.kind === 'line' ? dot(xy[0], ' is-end') + dot(xy[xy.length - 1], ' is-end is-last') : xy.map(p => dot(p, '')).join('');
+  body += `<line class="intv21-evo-cursor" x1="0" x2="0" y1="${pt}" y2="${H - pb}"/>`;
+  return { svg: `<svg class="intv21-evo-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">${body}</svg><div class="intv21-evo-dots" aria-hidden="true">${dotsHtml}</div>`,
+    pts: pts.map((p, i) => ({ x: xy[i].x / W, y: xy[i].y / H, t: p.ts, v: p.v, n: p.note || '' })) };
+}
+const _intv21Animated = new Set();
+function _intv21EvoModuleHtml(esc) {
+  const avail = {};
+  _INTV21_EVO_METRICS.forEach(m => {
+    const wins = _INTV21_EVO_WINS.filter(w => !!_intv21EvoSeries(m, w));
+    if (wins.length) avail[m] = wins;
+  });
+  const metrics = _INTV21_EVO_METRICS.filter(m => avail[m]);
+  if (!metrics.length) return '';
+  const st = _intv21Read();
+  const metric = (st.evoMetric && avail[st.evoMetric]) ? st.evoMetric : metrics[0];
+  const wins = avail[metric];
+  const win = (st.evoWin && wins.indexOf(st.evoWin) !== -1) ? st.evoWin : (wins.indexOf('30d') !== -1 ? '30d' : wins[wins.length - 1]);
+  const s = _intv21EvoSeries(metric, win);
+  if (!s) return '';
+  const unit = metric === 'return' ? 'pct_signed' : s.unit;
+  const g = _intv21EvoSvg(s, metric);
+  const first = g.pts[0], last = g.pts[g.pts.length - 1];
+  const sig = metric + '|' + win + '|' + first.t + '|' + last.t + '|' + g.pts.length;
+  const anim = !_intv21Animated.has(sig);
+  _intv21Animated.add(sig);
+  const data = g.pts.map(p => [+p.x.toFixed(4), +p.y.toFixed(4), p.t, _intv21EvoFmt(unit, p.v), p.n]);
+  const winLabel = w => _intv4T('intv21_win_' + w);
+  return `
+    <div class="intv21-evo" data-metric="${esc(metric)}" data-win="${esc(win)}" data-kind="${esc(s.kind)}" data-points="${g.pts.length}">
+      <div class="intv21-evo-ctrl">
+        <div class="intv21-seg" role="group" aria-label="${esc(_intv4T('intv21_evo_metric_aria'))}">${metrics.map(m => `
+          <button type="button" class="intv21-chip${m === metric ? ' is-on' : ''}" data-intv21-evo-metric="${esc(m)}" aria-pressed="${m === metric ? 'true' : 'false'}">${esc(_intv4T('intv21_evo_m_' + m))}</button>`).join('')}
+        </div>
+        <div class="intv21-seg is-win" role="group" aria-label="${esc(_intv4T('intv21_evo_win_aria'))}">${_INTV21_EVO_WINS.filter(w => wins.indexOf(w) !== -1).map(w => `
+          <button type="button" class="intv21-chip${w === win ? ' is-on' : ''}" data-intv21-evo-win="${esc(w)}" aria-pressed="${w === win ? 'true' : 'false'}">${esc(winLabel(w))}</button>`).join('')}
+        </div>
+      </div>
+      <p class="intv21-evo-note">${esc(_intv4T('intv21_evo_note_' + metric))}</p>
+      <div class="intv21-evo-plot${anim ? ' is-anim' : ''}" tabindex="0" role="img"
+           aria-label="${esc(_intv4T('intv21_evo_aria', _intv4T('intv21_evo_m_' + metric), _intccDate(first.t), first.v === null ? '' : _intv21EvoFmt(unit, s.pts[0].v), _intccDate(last.t), _intv21EvoFmt(unit, s.pts[s.pts.length - 1].v)))}"
+           data-pts="${esc(JSON.stringify(data))}">
+        ${g.svg}
+        <div class="intv21-evo-tip" aria-hidden="true"></div>
+      </div>
+      ${/* Las cifras de los extremos sólo en las métricas de PUNTOS, que no publica
+            ninguna otra card: la rentabilidad o el valor de un periodo ya pueden estar
+            en el titular o en «Qué ha cambiado», y el tooltip los da bajo demanda. */''}
+      <div class="intv21-evo-axis"><span>${esc(_intccDate(first.t))}${s.kind === 'dots' ? ` · <b>${esc(_intv21EvoFmt(unit, s.pts[0].v))}</b>` : ''}</span><span>${esc(_intccDate(last.t))}${s.kind === 'dots' ? ` · <b>${esc(_intv21EvoFmt(unit, s.pts[s.pts.length - 1].v))}</b>` : ''}</span></div>
+    </div>`;
+}
+
+// ── QUÉ MOVIÓ TU PATRIMONIO ─────────────────────────────────────────────────
+// Ventanas certificables (la fila de inicio es la primera fila de servidor dentro de
+// la tolerancia de su ventana; la de fin, la última y fresca).
+const _INTV21_ATT_WINS = {
+  '30d': { label: '30D', ok: (r, now, end) => r.ts - (now - 30 * _INTV21_DAY) <= 3 * _INTV21_DAY && r.ts >= now - 33 * _INTV21_DAY && (end.ts - r.ts) >= 27 * _INTV21_DAY },
+  '7d':  { label: '7D',  ok: (r, now, end) => r.ts - (now - 7 * _INTV21_DAY) <= _INTV21_DAY && r.ts >= now - 8 * _INTV21_DAY && (end.ts - r.ts) >= 6 * _INTV21_DAY },
+  '24h': { label: '24H', ok: (r, now, end) => r.ts - (now - _INTV21_DAY) <= 2 * 3600e3 && r.ts >= now - 26 * 3600e3 && (end.ts - r.ts) >= 20 * 3600e3 },
+};
+// Contribución de cada posición en UNA ventana, con valores de servidor
+// (`asset_values`) y el flujo de sus operaciones registradas:
+//   c_i = (V_end − V_start − F_i) / D,   D = V_start + Σ_j F_j · (t_end − t_j)/(t_end − t_start)
+// (Modified Dietz: el mismo denominador que pondera el capital que estuvo invertido).
+// Fail closed si: una fila no concilia (activos desconocidos, inmueble); hay un
+// asiento de apertura, un tipo de operación desconocido, una operación en divisa no
+// USD o una posición que aparece sin operación; la valoración de una operación no
+// es posible con el owner de valoración (`assetNativeValue`, que respeta gramos,
+// onzas y quilates del oro físico). Se publica sólo si la suma concilia con la
+// rentabilidad flow-neutral `ref` del periodo: MISMO SIGNO y |Σ − ref| ≤ máx(0,1 pp,
+// 10 % de |ref|).
+function _intv21AttrWindow(range, ref, refStart, refEnd) {
+  const rows = _intv21MemRows();
+  const W = _INTV21_ATT_WINS[range];
+  if (!rows || !W || !Number.isFinite(ref)) return null;
+  const now = _intv21Now(), end = rows[rows.length - 1];
+  const start = rows.slice(0, -1).find(r => W.ok(r, now, end));
+  if (!start) return null;
+  // La conciliación sólo vale si compara EL MISMO periodo que la rentabilidad.
+  const ALIGN = 6 * 3600e3;
+  if (Number.isFinite(refStart) && Math.abs(start.ts - refStart) > ALIGN) return null;
+  if (Number.isFinite(refEnd) && Math.abs(end.ts - refEnd) > ALIGN) return null;
+  const ws = _intv21RowWeights(start), we = _intv21RowWeights(end);
+  if (!ws || !we) return null;
+  const known = new Map(((typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []).map(a => [String(a.id), a]));
+  const ids = new Set(ws.pos.map(p => p.id).concat(we.pos.map(p => p.id)));
+  const span = end.ts - start.ts;
+  if (!(span > 0) || typeof assetNativeValue !== 'function') return null;
+  const per = [];
+  let weighted = 0;
+  for (const id of ids) {
+    const a = known.get(id);
+    if (!a) return null;
+    const vs = (ws.pos.find(p => p.id === id) || {}).v || 0;
+    const ve = (we.pos.find(p => p.id === id) || {}).v || 0;
+    if (_intccIsMonetary(a.type)) continue;                   // su cambio ES flujo
+    const tx = (Array.isArray(a.transactions) ? a.transactions : [])
+      .filter(x => x && Number.isFinite(Number(x.ts)) && Number(x.ts) > start.ts && Number(x.ts) <= end.ts);
+    if (tx.some(x => x.opening === true)) return null;
+    if (tx.length && String(a.assetCurrency || 'USD').toUpperCase() !== 'USD') return null;
+    let flow = 0;
+    for (const x of tx) {
+      const ty = String(x.type || '').toLowerCase();
+      const v = Number(assetNativeValue(Object.assign({}, a, { qty: Number(x.qty), price: Number(x.price) })));
+      if (!Number.isFinite(v) || v < 0) return null;
+      if (ty === 'buy') flow += v; else if (ty === 'sell') flow -= v; else return null;
+      weighted += (ty === 'buy' ? v : -v) * ((end.ts - Number(x.ts)) / span);
+    }
+    if (vs === 0 && ve > 0 && !tx.length) return null;
+    per.push({ id, name: _intv21Name(a), dv: ve - vs - flow });
+  }
+  // Aportaciones/retiradas de LIQUIDEZ: no son posiciones atribuibles, pero el
+  // capital estuvo (o dejó de estar) invertido. Mismo ledger que neutraliza la TWR.
+  try {
+    const fl = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    fl.filter(f => f && (f.kind === 'deposit' || f.kind === 'withdrawal') && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD)
+      && f.ts > start.ts && f.ts <= end.ts)
+      .forEach(f => { weighted += Number(f.amountUSD) * ((end.ts - f.ts) / span); });
+  } catch (_) { return null; }
+  const D = ws.tot + weighted;
+  if (!(D > 0)) return null;
+  const out = per.map(x => ({ id: x.id, name: x.name, c: (x.dv / D) * 100 }));
+  const sum = out.reduce((s, x) => s + x.c, 0);
+  const tol = Math.max(0.1, 0.1 * Math.abs(ref));
+  const sameSign = Math.abs(ref) < 0.05 || Math.abs(sum) < 0.05 || Math.sign(sum) === Math.sign(ref);
+  if (!sameSign || Math.abs(sum - ref) > tol) return null;
+  return { range, label: W.label, startAt: start.ts, endAt: end.ts, rows: out, sum, twr: ref };
+}
+function _intv21Attribution() {
+  for (const range of ['30d', '7d']) {
+    let twr = null, p = null;
+    try { p = _aurixInvestablePerformance(range); if (p && p.valid && p.coversNominal !== false) twr = p.returnPct; } catch (_) { twr = null; }
+    const r = _intv21AttrWindow(range, twr, p && p.startAt, p && p.endAt);
+    if (!r) continue;
+    const ups = r.rows.filter(x => x.c >= 0.01).sort((a, b) => b.c - a.c).slice(0, 3);
+    const downs = r.rows.filter(x => x.c <= -0.01).sort((a, b) => a.c - b.c).slice(0, 3);
+    if (!ups.length && !downs.length) continue;
+    return Object.assign(r, { ups, downs });
+  }
+  return null;
+}
+function _intv21MoversHtml(att, esc) {
+  if (!att) return '';
+  const max = Math.max.apply(null, att.ups.concat(att.downs).map(x => Math.abs(x.c)).concat([0.01]));
+  const row = (x, dir) => `
+    <li class="intv21-mv-row is-${dir}" data-asset="${esc(x.id)}">
+      <span class="intv21-mv-name">${esc(x.name)}</span>
+      <span class="intv21-mv-track" aria-hidden="true"><span class="intv21-mv-bar" style="width:${Math.max(4, Math.min(100, Math.abs(x.c) / max * 100)).toFixed(1)}%"></span></span>
+      <span class="intv21-mv-val">${esc(_intv21Pp(x.c))}</span>
+    </li>`;
+  const period = _intv4T('intv21_mv_period', _intv4T('intv21_win_' + att.range), _intccDate(att.startAt), _intccDate(att.endAt));
+  return `
+    <section class="intcc-card intv21-movers" data-range="${esc(att.range)}" data-ups="${att.ups.length}" data-downs="${att.downs.length}">
+      <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_mv_title'))}</h3>
+      <p class="intv21-mv-period">${esc(period)}</p>
+      ${att.ups.length ? `<p class="intv21-mv-h">${esc(_intv4T('intv21_mv_up'))}</p><ul class="intv21-mv-list">${att.ups.map(x => row(x, 'up')).join('')}</ul>` : ''}
+      ${att.downs.length ? `<p class="intv21-mv-h">${esc(_intv4T('intv21_mv_down'))}</p><ul class="intv21-mv-list">${att.downs.map(x => row(x, 'down')).join('')}</ul>` : ''}
+      <p class="intv21-foot">${esc(_intv4T('intv21_mv_foot'))}</p>
+    </section>`;
+}
+
+// ── DEPENDENCIAS Y ESCENARIOS ───────────────────────────────────────────────
+// Determinista: impacto ≈ peso afectado × variación simulada (−10 %). Sin
+// correlaciones y sin suponer que activos distintos caerían juntos: cada
+// escenario dice exactamente qué cae y nada más. La liquidez no se «cae».
+function _intv21Scenarios(W) {
+  const out = [];
+  if (!W || !W.rows.length) return out;
+  const inv = W.rows.filter(r => !_intccIsMonetary(r.type));
+  if (inv[0]) out.push({ id: 'top1', names: [inv[0].name], w: inv[0].w });
+  if (inv.length >= 3) out.push({ id: 'top3', names: inv.slice(0, 3).map(r => r.name), w: inv.slice(0, 3).reduce((s, r) => s + r.w, 0) });
+  const c = W.classes.find(x => !_intv21IsCash(x.bucket));
+  if (c) out.push({ id: 'class', names: [_intv21ClassLabel(c.bucket)], bucket: c.bucket, w: c.w });
+  out.forEach(s => { s.shock = -10; s.impact = s.w * s.shock; });
+  return out;
+}
+function _intv21ScenarioHtml(W, esc) {
+  const sc = _intv21Scenarios(W);
+  if (!sc.length) return '';
+  const st = _intv21Read();
+  const cur = sc.find(s => s.id === st.scen) || sc[0];
+  const lead = _intv4T('intv21_scn_lead_' + cur.id, cur.names.join(', '));
+  const wPct = Math.max(0, Math.min(100, cur.w * 100));
+  return `
+    <section class="intcc-card intv21-scen" data-scen="${esc(cur.id)}" data-impact="${esc(cur.impact.toFixed(4))}">
+      <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_scn_title'))}</h3>
+      <div class="intv21-seg" role="group" aria-label="${esc(_intv4T('intv21_scn_aria'))}">${sc.map(s => `
+        <button type="button" class="intv21-chip${s.id === cur.id ? ' is-on' : ''}" data-intv21-scen="${esc(s.id)}" aria-pressed="${s.id === cur.id ? 'true' : 'false'}">${esc(_intv4T('intv21_scn_opt_' + s.id))}</button>`).join('')}
+      </div>
+      <p class="intv21-scn-lead">${esc(lead)}</p>
+      <div class="intv21-scn-viz" role="img" aria-label="${esc(_intv4T('intv21_scn_viz_aria', _intv21Pct(cur.impact, 1, true)))}">
+        <div class="intv21-scn-num"><span class="intv21-scn-val">≈ ${esc(_intv21Pct(cur.impact, 1, true))}</span><span class="intv21-scn-unit">${esc(_intv4T('intv21_scn_unit'))}</span></div>
+        <div class="intv21-scn-track" aria-hidden="true"><span class="intv21-scn-fill" style="width:${wPct.toFixed(1)}%"></span></div>
+        <div class="intv21-scn-legend" aria-hidden="true"><span>${esc(_intv4T('intv21_scn_affected'))}</span><span>${esc(_intv4T('intv21_scn_rest'))}</span></div>
+      </div>
+      <p class="intv21-foot">${esc(_intv4T('intv21_scn_disclaimer'))}</p>
+    </section>`;
+}
+
+// ── EXPLORA CONTEXTUAL ──────────────────────────────────────────────────────
+// Preguntas que salen de hechos REALES de esta cartera y que se pueden contestar.
+// Si la respuesta ya es de otra card (escenario, evolución), la pregunta lleva a
+// ella sin repetir su cifra.
+function _intv21ExploreQs(W, claims, esc) {
+  const qs = [];
+  const inv = (W && W.rows || []).filter(r => !_intccIsMonetary(r.type));
+  try {
+    if (inv.length >= 3) {
+      const w2 = (inv[0].w + inv[1].w) * 100;
+      if (w2 >= 30) qs.push({ id: 'ctx_top2', root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+        label: _intv4T('intv21_xq_top2', inv[0].name, inv[1].name),
+        answer: `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_top2', _intv21Pct(w2, 0)))}</p>`,
+        fact: { factId: 'top2_weight', family: 'concentration', period: 'now_top2', value: +w2.toFixed(2), unit: 'pct' } });
+    }
+  } catch (_) {}
+  try {
+    const c = (typeof _aurixAssetMemoryTopWeight === 'function') ? _aurixAssetMemoryTopWeight() : null;
+    const claimed = (claims.evoKeys || []).some(k => /^top_position_weight_/.test(String(k)));
+    if (c && Number.isFinite(c.deltaPp)) {
+      const span = c.range === '7D' ? 'week' : (c.range === '30D' ? 'month' : 'start');
+      const dirKey = !c.material ? 'flat' : (c.deltaPp > 0 ? 'up' : 'down');
+      qs.push({ id: 'ctx_conc_' + span, root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+        label: _intv4T('intv21_xq_conc_' + span),
+        answer: claimed
+          ? `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_conc_owned_' + dirKey))}</p><button type="button" class="intv21-link" data-intv21-go="evolution" data-intv21-evo-metric="top">${esc(_intv4T('intv21_go_evo'))}</button>`
+          : `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_conc_' + dirKey, _intv4Num(Math.abs(c.deltaPp), 1), _intccDate(c.startAt)))}</p>`,
+        fact: claimed ? null : { factId: 'top_weight_change_' + c.range, family: 'concentration', period: c.range, value: c.deltaPp, unit: 'pp' } });
+    }
+  } catch (_) {}
+  try {
+    if (inv.length >= 3) qs.push({ id: 'ctx_top3_drop', root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+      label: _intv4T('intv21_xq_top3'),
+      answer: `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_top3'))}</p><button type="button" class="intv21-link" data-intv21-go="scenarios" data-intv21-scen="top3">${esc(_intv4T('intv21_go_scen'))}</button>` });
+  } catch (_) {}
+  try {
+    const s = _intv21EvoSeries('liquidity', 'all');
+    if (s && s.pts.length >= 2) {
+      const a = s.pts[0], b = s.pts[s.pts.length - 1];
+      qs.push({ id: 'ctx_liq_start', root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+        label: _intv4T('intv21_xq_liq'),
+        answer: `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_liq', _intv21Pct(a.v, 1), _intv21Pct(b.v, 1), _intccDate(a.ts), _intccDate(b.ts)))}</p><button type="button" class="intv21-link" data-intv21-go="evolution" data-intv21-evo-metric="liquidity" data-intv21-evo-win="all">${esc(_intv4T('intv21_go_evo'))}</button>`,
+        fact: { factId: 'liq_change_all', family: 'liquidity', period: 'all', value: +(b.v - a.v).toFixed(2), unit: 'pp' } });
+    }
+  } catch (_) {}
+  return qs.filter(q => q.label);
+}
+
+// ── REGISTRO DE AURIX ───────────────────────────────────────────────────────
+// Lo ya revisado del historial de hallazgos (`findingsAll` fuera de lo activo) y
+// los hitos/registros fechados del ledger. Nada de lo que está visible arriba.
+function _intv21LogItems(core, visibleKeys) {
+  const out = [];
+  const seen = new Set(visibleKeys || []);
+  try {
+    const rows = (typeof _intv4FindingRows === 'function') ? _intv4FindingRows(core, { all: true }) : [];
+    rows.filter(x => x.reviewed).forEach(x => {
+      const k = x.fd.semanticKey;
+      if (seen.has(k)) return;
+      const w = (x.f && x.f.window) || {};
+      const at = Number.isFinite(w.endAt) ? w.endAt : null;
+      if (!Number.isFinite(at)) return;
+      seen.add(k);
+      out.push({ key: k, at, family: (x.f && x.f.family) || '', state: 'reviewed', txt: x.txt, finding: x.fd.findingId || '' });
+    });
+  } catch (_) {}
+  try {
+    const now = _intv21Now();
+    const facts = (core && core.ledger && core.ledger.facts) || [];
+    facts.filter(f => f && (f.causalRoot === _AURIX_CAUSAL_ROOT.WEALTH_LEVEL || f.causalRoot === _AURIX_CAUSAL_ROOT.RECORDED_OPERATION))
+      .forEach(f => {
+        if (seen.has(f.semanticKey)) return;
+        const v = f.values || {}, w = f.window || {};
+        const at = Number.isFinite(v.at) ? v.at : (Number.isFinite(w.endAt) ? w.endAt : null);
+        if (!Number.isFinite(at) || now - at < _INTV21_DAY) return;     // sólo lo HISTÓRICO
+        const txt = _intv4FactText(f);
+        if (!txt) return;
+        seen.add(f.semanticKey);
+        out.push({ key: f.semanticKey, at, family: f.family || '', state: 'recorded', txt });
+      });
+  } catch (_) {}
+  return out.sort((a, b) => b.at - a.at).slice(0, 10);
+}
+function _intv21LogHtml(items, esc) {
+  if (!items || !items.length) return '';
+  const groups = [];
+  items.forEach((it, i) => {
+    const d = _intccDate(it.at);
+    const g = groups[groups.length - 1];
+    if (g && g.d === d) g.items.push(Object.assign({ i }, it)); else groups.push({ d, items: [Object.assign({ i }, it)] });
+  });
+  const famKey = f => 'intv21_fam_' + (['performance', 'wealth_level', 'capital_flow', 'liquidity', 'exposure', 'concentration', 'diversification', 'portfolio_record'].indexOf(f) !== -1 ? f : 'other');
+  return `
+    <section class="intcc-card intv21-log" id="aurix-intel-log" data-items="${items.length}">
+      <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_log_title'))}</h3>
+      <ol class="intv21-log-list">${groups.map(g => `
+        <li class="intv21-log-day"><span class="intv21-log-date">${esc(g.d)}</span>
+          <ul>${g.items.map(it => `
+            <li class="intv21-log-item${it.i >= 5 ? ' is-more' : ''}" data-fact="${esc(it.key)}" data-state="${esc(it.state)}"${it.finding ? ` data-finding="${esc(it.finding)}"` : ''}>
+              <span class="intv21-log-fam">${esc(_intv4T(famKey(it.family)))}</span>
+              <span class="intv21-log-txt">${esc(it.txt)}</span>
+              <span class="intv21-log-state">${esc(_intv4T('intv21_log_state_' + it.state))}</span>
+            </li>`).join('')}</ul></li>`).join('')}
+      </ol>
+      ${items.length > 5 ? `<button type="button" class="intv21-link intv21-log-more" data-intv21-log-more="1" aria-expanded="false">${esc(_intv4T('intv21_log_more', items.length - 5))}</button>` : ''}
+    </section>`;
+}
+
+// ── INTERACCIÓN (una delegación, sin listeners por nodo) ────────────────────
+let _intv21Wired = false;
+function _intv21Goto(target) {
+  const sel = _INTV21_SEL[target];
+  if (!sel) return;
+  const el = [].slice.call(document.querySelectorAll(sel)).find(n => n.getBoundingClientRect().height > 0);
+  if (!el) return;
+  const rm = (typeof reducedMotion !== 'undefined' && reducedMotion)
+    || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  el.scrollIntoView({ behavior: rm ? 'auto' : 'smooth', block: 'start' });
+  const h = el.querySelector('.intcc-card-title');
+  if (h) { if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (_) {} }
+}
+function _intv21Tip(plot, idx) {
+  try {
+    const pts = JSON.parse(plot.getAttribute('data-pts') || '[]');
+    const tip = plot.querySelector('.intv21-evo-tip'), cur = plot.querySelector('.intv21-evo-cursor');
+    if (!pts.length || !tip) return;
+    const i = Math.max(0, Math.min(pts.length - 1, idx));
+    const p = pts[i];
+    plot.setAttribute('data-tip', String(i));
+    tip.textContent = _intccDate(p[2]) + ' · ' + p[3] + (p[4] ? ' · ' + p[4] : '');
+    tip.classList.add('is-on');
+    const w = plot.clientWidth, h = plot.clientHeight;
+    const x = p[0] * w;
+    tip.style.left = Math.max(0, Math.min(w - tip.offsetWidth, x - tip.offsetWidth / 2)) + 'px';
+    tip.style.top = Math.max(0, p[1] * h - tip.offsetHeight - 10) + 'px';
+    if (cur) { const vx = (p[0] * 600).toFixed(1); cur.setAttribute('x1', vx); cur.setAttribute('x2', vx); cur.classList.add('is-on'); }
+  } catch (_) {}
+}
+function _intv21TipHide(plot) {
+  const tip = plot && plot.querySelector('.intv21-evo-tip'), cur = plot && plot.querySelector('.intv21-evo-cursor');
+  if (tip) tip.classList.remove('is-on');
+  if (cur) cur.classList.remove('is-on');
+  if (plot) plot.removeAttribute('data-tip');
+}
+function _intv21Nearest(plot, clientX) {
+  const pts = JSON.parse(plot.getAttribute('data-pts') || '[]');
+  const r = plot.getBoundingClientRect();
+  const fx = (clientX - r.left) / Math.max(1, r.width);
+  let best = 0, bd = Infinity;
+  pts.forEach((p, i) => { const d = Math.abs(p[0] - fx); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function _intv21Wire() {
+  if (_intv21Wired || typeof document === 'undefined') return;
+  _intv21Wired = true;
+  document.addEventListener('click', e => {
+    const tgt = e.target && e.target.closest ? e.target : null;
+    if (!tgt) return;
+    const hide = tgt.closest('[data-intv21-hide]');
+    if (hide) {
+      e.preventDefault();
+      const id = hide.getAttribute('data-intv21-hide');
+      const st = _intv21Read();
+      const hidden = Object.assign({}, st.hidden, { [id]: hide.getAttribute('data-intv21-sig') });
+      if (!_intv21Write({ hidden })) return;            // sin dueño no se finge que se guardó
+      // Local: se retira la etiqueta de los dos heroes; nada más se mueve.
+      document.querySelectorAll('.intv21-tag[data-tag="' + id + '"]').forEach(n => {
+        const box = n.parentNode; n.remove();
+        if (box && !box.querySelector('.intv21-tag')) box.remove();
+      });
+      const h = document.querySelector('.intv21-tag-go') || document.querySelector('.intcc-hero-title, .intcc-m-hero-title');
+      if (h) { if (!h.hasAttribute('tabindex') && !/BUTTON/.test(h.tagName)) h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (_) {} }
+      return;
+    }
+    const more = tgt.closest('[data-intv21-log-more]');
+    if (more) {
+      const card = more.closest('.intv21-log');
+      if (card) { card.classList.add('is-all'); more.setAttribute('aria-expanded', 'true'); more.hidden = true; }
+      const first = card && card.querySelector('.intv21-log-item.is-more');
+      if (first) { first.setAttribute('tabindex', '-1'); try { first.focus({ preventScroll: true }); } catch (_) {} }
+      return;
+    }
+    const m = tgt.closest('[data-intv21-evo-metric], [data-intv21-evo-win], [data-intv21-scen], [data-intv21-go]');
+    if (!m) return;
+    const patch = {};
+    if (m.hasAttribute('data-intv21-evo-metric')) {
+      patch.evoMetric = m.getAttribute('data-intv21-evo-metric');
+      if (m.hasAttribute('data-intv21-evo-win')) patch.evoWin = m.getAttribute('data-intv21-evo-win');
+    } else if (m.hasAttribute('data-intv21-evo-win')) patch.evoWin = m.getAttribute('data-intv21-evo-win');
+    if (m.hasAttribute('data-intv21-scen')) patch.scen = m.getAttribute('data-intv21-scen');
+    const go = m.getAttribute('data-intv21-go');
+    if (Object.keys(patch).length && _intv21Write(patch)) {
+      // ACTUALIZACIÓN LOCAL: sólo el módulo afectado se vuelve a pintar (mismas
+      // funciones puras que el render completo), el resto de la pestaña no se toca.
+      try {
+        if ('evoMetric' in patch || 'evoWin' in patch) {
+          const html = _intv21EvoModuleHtml(_intccEsc);
+          if (html) document.querySelectorAll('.intv21-evo').forEach(n => { n.outerHTML = html; });
+        }
+        if ('scen' in patch) {
+          const html = _intv21ScenarioHtml(_intv21Weights(), _intccEsc);
+          if (html) document.querySelectorAll('.intv21-scen').forEach(n => { n.outerHTML = html; });
+        }
+      } catch (_) {}
+      if (!go) {
+        const sel = patch.scen ? '.intv21-scen [data-intv21-scen="' + patch.scen + '"]'
+          : ('evoMetric' in patch ? '.intv21-evo [data-intv21-evo-metric="' + patch.evoMetric + '"]' : '.intv21-evo [data-intv21-evo-win="' + patch.evoWin + '"]');
+        const b = document.querySelector(sel);
+        if (b) try { b.focus({ preventScroll: true }); } catch (_) {}
+      }
+    }
+    if (go) _intv21Goto(go);
+  });
+  const move = e => {
+    const plot = e.target && e.target.closest ? e.target.closest('.intv21-evo-plot') : null;
+    if (!plot) return;
+    _intv21Tip(plot, _intv21Nearest(plot, e.clientX));
+  };
+  document.addEventListener('pointermove', move, { passive: true });
+  document.addEventListener('pointerdown', move, { passive: true });
+  document.addEventListener('pointerout', e => {
+    const plot = e.target && e.target.closest ? e.target.closest('.intv21-evo-plot') : null;
+    if (plot && !(e.relatedTarget && plot.contains(e.relatedTarget)) && e.pointerType === 'mouse') _intv21TipHide(plot);
+  });
+  document.addEventListener('keydown', e => {
+    const plot = e.target && e.target.classList && e.target.classList.contains('intv21-evo-plot') ? e.target : null;
+    if (!plot) return;
+    const n = JSON.parse(plot.getAttribute('data-pts') || '[]').length;
+    const cur = plot.hasAttribute('data-tip') ? Number(plot.getAttribute('data-tip')) : n - 1;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); _intv21Tip(plot, cur - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); _intv21Tip(plot, cur + 1); }
+    else if (e.key === 'Home') { e.preventDefault(); _intv21Tip(plot, 0); }
+    else if (e.key === 'End') { e.preventDefault(); _intv21Tip(plot, n - 1); }
+    else if (e.key === 'Escape') _intv21TipHide(plot);
+  });
+  document.addEventListener('focusin', e => {
+    const plot = e.target && e.target.classList && e.target.classList.contains('intv21-evo-plot') ? e.target : null;
+    if (plot) _intv21Tip(plot, JSON.parse(plot.getAttribute('data-pts') || '[]').length - 1);
+  });
+  document.addEventListener('focusout', e => {
+    const plot = e.target && e.target.classList && e.target.classList.contains('intv21-evo-plot') ? e.target : null;
+    if (plot) _intv21TipHide(plot);
+  });
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.debugAurixIntelFacts = () => {
+      const r = _intv21LastRegistry;
+      return r ? { facts: r.facts.slice(), duplicates: r.duplicates() } : null;
+    };
+  }
+} catch (_) {}
+
 function _renderIntelligenceCommandCenter() {
   const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
   const esc  = _intccEsc;
@@ -71964,7 +73009,17 @@ function _renderIntelligenceCommandCenter() {
   // Memoria, Qué ha cambiado y Descubrimientos suprimieran un hecho que nadie
   // estaba mostrando y republicaran otro que sí. Es exactamente la duplicación que
   // estas superficies existen para evitar.
-  const mattersSel = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
+  // V2 — Hoy: los hechos de 24 h (rentabilidad, contribución, precio) van delante
+  // y RECORTAN las historias del Core con UNA regla compartida con la card.
+  // typeof-guard en cada llamada V2: los harnesses ejecutan el renderer aislado y,
+  // sin la capa V2, la pantalla debe ser exactamente la anterior.
+  const _W21 = (typeof _intv21Weights === 'function') ? _intv21Weights() : { total: 0, rows: [], classes: [] };
+  const _drvItems21 = (typeof _intv21DriverItems === 'function') ? _intv21DriverItems(snap) : [];
+  const _storiesFull21 = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
+  const _today21 = (typeof _intv21TodayItems === 'function') ? _intv21TodayItems(core, _storiesFull21, _W21) : [];
+  const mattersSel = (typeof _intv21TrimStories === 'function') ? _intv21TrimStories(_storiesFull21, _today21) : _storiesFull21;
+  const _struct21 = (typeof _intv21TodayStructural === 'function')
+    ? _intv21TodayStructural(_W21, _drvItems21, 2 - (_today21.length + mattersSel.length)) : [];
 
   // NOTA DE ORDEN — este bloque se resuelve aquí, antes del recuento, porque
   // «Lo que importa hoy» necesita saber qué publica «Qué ha cambiado» para no
@@ -72071,10 +73126,23 @@ function _renderIntelligenceCommandCenter() {
   const seeChanges = (variant) => findingCount > 0 ? `
       <a class="intv12-see-changes" href="#aurix-intel-changes" data-intel-see-changes="${esc(variant)}"
          data-count="${findingCount}">${esc(_intv4T('intel_see_changes', findingCount))}</a>`
-    : (reviewedCount > 0 ? `
-      <a class="intv12-see-changes is-quiet" href="#aurix-intel-changes" data-intel-see-changes="${esc(variant)}"
-         data-reviewed="${reviewedCount}">${esc(_intv4T('intel_see_history', reviewedCount))}</a>` : '');
+    // V2 — el historial revisado vive en el Registro, que se compone más abajo:
+    // se deja una marca y se resuelve cuando se sabe si el Registro tiene filas.
+    : (reviewedCount > 0 ? `<!--intv21:history:${esc(variant)}-->` : '');
   const seeChangesHtml = seeChanges('desktop');
+  let _stab21 = null;
+  try { _stab21 = (typeof _intv17Evolution === 'function') ? _intv17Evolution(core) : null; } catch (_) { _stab21 = null; }
+  let _tags21 = [];
+  try { _tags21 = (typeof _intv21HeroTags === 'function') ? _intv21HeroTags({ core, score, driversItems: _drvItems21, todayItems: _today21, stab: _stab21,
+    todayKeys: mattersSel.map(st => st.semanticKey), W: _W21 }) : []; } catch (_) { _tags21 = []; }
+  const _tagsOf21 = (list) => (typeof _intv21TagsHtml === 'function') ? _intv21TagsHtml(list, esc) : '';
+  const tagsHtml = _tagsOf21(_tags21);
+  // En móvil Salud publica sus propias etiquetas (`_intccHealthReadHtml`): el hero
+  // móvil no repite ninguna. En escritorio esas etiquetas no se pintan.
+  const _healthRead21 = _intccHealthReadHtml(score, intel, esc);
+  const _healthLabels21 = (_healthRead21.match(/class="intcc-m-health-tag[^"]*"[^>]*>([^<]+)</g) || [])
+    .map(m => m.replace(/^.*>/, '').replace(/<$/, '').trim().toLowerCase());
+  const tagsMobileHtml = _tagsOf21(_tags21.filter(t2 => _healthLabels21.indexOf(String(t2.label).toLowerCase()) === -1), esc);
   const seeChangesMobileHtml = seeChanges('mobile');
   const heroHtml = `
     <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}"
@@ -72120,6 +73188,7 @@ function _renderIntelligenceCommandCenter() {
           <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
           <p class="intcc-hero-sub">${esc(reading.sub)}</p>
           ${seeChangesHtml}
+          ${tagsHtml}
           ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
         </div>
         <div class="intcc-hero-orb-wrap">${_intccOrbHtml()}</div>
@@ -72137,6 +73206,7 @@ function _renderIntelligenceCommandCenter() {
         <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
         <p class="intcc-m-hero-hint">${esc(reading.sub)}</p>
         ${seeChangesMobileHtml}
+        ${tagsMobileHtml}
         ${ctxChips.length ? `<div class="intcc-chips">${ctxChips.map(c =>
           `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
       </div>
@@ -72170,7 +73240,7 @@ function _renderIntelligenceCommandCenter() {
               un umbral. */''}
         ${/* SALUD = título, anillo y estado a la izquierda; a la derecha UNA
               lectura y hasta dos etiquetas derivadas de sus causas reales. */''}
-        ${_intccHealthReadHtml(score, intel, esc)}
+        ${_healthRead21}
         </div>
     </section>`;
 
@@ -72217,7 +73287,7 @@ function _renderIntelligenceCommandCenter() {
   // nada y el resto de cards recupera su fila base, que es la que tenían antes
   // de que el comparador existiera.
 
-  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap, _gaps.today);
+  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap, _gaps.today, { head: _today21, tail: _struct21 });
   const publishedKeys = [];
   mattersSel.forEach(st => {
     publishedKeys.push(st.semanticKey);
@@ -72257,6 +73327,41 @@ function _renderIntelligenceCommandCenter() {
   const _wowSkip = (score && score.score != null) ? ['wow_nominal_vs_effective'] : [];
   const discoveryHtml = discHtml ? '' : _intv4DiscoveryHtml(core, esc, publishedTexts, _wowSkip);
 
+  // ── V2 · QUÉ MOVIÓ · ESCENARIOS · REGISTRO, y el registro único de hechos ──
+  let _att21 = null;
+  try { _att21 = (typeof _intv21Attribution === 'function') ? _intv21Attribution() : null; } catch (_) { _att21 = null; }
+  const moversHtml = (typeof _intv21MoversHtml === 'function') ? _intv21MoversHtml(_att21, esc) : '';
+  const scenHtml = (typeof _intv21ScenarioHtml === 'function') ? _intv21ScenarioHtml(_W21, esc) : '';
+  const _evoKeys21 = ((memoryHtml.match(/data-evo-keys="([^"]*)"/) || [, ''])[1] || '').split(',').filter(Boolean);
+  const _chgKeys21 = (changedHtml.match(/data-fact="([^"]+)"/g) || []).map(m => m.slice(11, -1));
+  // Sólo lo que está DE VERDAD en pantalla (los apoyos de Hoy ya no se pintan).
+  const _log21 = (typeof _intv21LogItems === 'function') ? _intv21LogItems(core, mattersSel.map(st => st.semanticKey).concat(_evoKeys21, _chgKeys21)) : [];
+  const logHtml = (typeof _intv21LogHtml === 'function') ? _intv21LogHtml(_log21, esc) : '';
+  try {
+    if (typeof _intv21Registry !== 'function') throw 0;
+    const reg = _intv21Registry();
+    _today21.concat(_struct21).forEach(it => reg.add(Object.assign({ owner: 'today' }, it)));
+    mattersSel.forEach(st => reg.add({ factId: st.semanticKey, family: st.family || st.causalRoot,
+      period: String((st.window && st.window.range) || ''), value: Number(st.value), owner: 'today',
+      evidence: 'core_ledger', freshness: st.window && st.window.endAt, priority: 4 }));
+    _drvItems21.forEach(it => reg.add({ factId: 'weight:' + it.name, family: 'position_weight', period: 'now',
+      value: Number(it.pctRaw), unit: 'pct', owner: 'drivers', evidence: 'investable_weights', priority: 2 }));
+    _evoKeys21.forEach(k => reg.add({ factId: k, family: 'evolution:' + k.replace(/_[0-9a-z]+$/i, ''), period: (k.match(/_([0-9a-z]+)$/i) || [, ''])[1],
+      owner: 'evolution', evidence: 'core_ledger|asset_memory', priority: 4 }));
+    if (_att21) _att21.ups.concat(_att21.downs).forEach(x => reg.add({ factId: 'contrib_' + _att21.range + ':' + x.id,
+      family: 'contribution', period: _att21.range.toUpperCase(), value: +x.c.toFixed(4), unit: 'pp', owner: 'movers',
+      evidence: 'asset_values+transactions', freshness: _att21.endAt, priority: 4 }));
+    (scenHtml.match(/data-scen="([^"]+)" data-impact="([^"]+)"/) ? [scenHtml.match(/data-scen="([^"]+)" data-impact="([^"]+)"/)] : [])
+      .forEach(m => reg.add({ factId: 'scenario:' + m[1], family: 'scenario', period: m[1], value: Number(m[2]), unit: 'pct',
+        owner: 'scenarios', evidence: 'investable_weights', materiality: 'hypothetical', priority: 5 }));
+    (exploreHtml.match(/data-x-fact="([^"]+)"/g) || []).forEach(m => { const id = m.slice(13, -1); reg.add({ factId: id,
+      family: 'explore:' + id, period: 'q', owner: 'explore', evidence: 'investable_weights|asset_memory', priority: 5 }); });
+    _chgKeys21.forEach(k => reg.add({ factId: k, family: 'changed:' + k, period: 'active', owner: 'changed', evidence: 'core_findings', priority: 3 }));
+    _log21.forEach(it => reg.add({ factId: it.key, family: it.family, period: 'log', owner: 'log', evidence: 'findings_history', freshness: it.at, priority: 6 }));
+    _intv21LastRegistry = reg;
+    _intv21RecordShown(reg, _tags21.map(t2 => 'tag:' + t2.id));
+  } catch (_) {}
+
   // Data honesty stays available but does not occupy a permanent giant card: it
   // is a quiet line beside the disclaimer, and the Explore catalogue still offers
   // it as a full question when it is genuinely relevant.
@@ -72283,14 +73388,25 @@ function _renderIntelligenceCommandCenter() {
     _intv4RecordShown(shown);
   } catch (_) {}
 
+  // «Ver el historial» sólo si el Registro existe y tiene lo revisado: un enlace sin
+  // destino es peor que no tener enlace.
+  const _revLog21 = _log21.filter(it => it.state === 'reviewed').length;
+  const _hist21 = (variant) => (typeof _intv21LogHtml !== 'function' && reviewedCount > 0) ? `
+      <a class="intv12-see-changes is-quiet" href="#aurix-intel-changes" data-intel-see-changes="${esc(variant)}"
+         data-reviewed="${reviewedCount}">${esc(_intv4T('intel_see_history', reviewedCount))}</a>` : _revLog21 > 0 ? `
+      <a class="intv12-see-changes is-quiet" href="#aurix-intel-log" data-intel-see-changes="${esc(variant)}"
+         data-reviewed="${_revLog21}">${esc(_intv4T('intel_see_history', _revLog21))}</a>` : '';
+  const _heroOut21 = heroHtml.replace('<!--intv21:history:desktop-->', _hist21('desktop'));
+  const _mHeroOut21 = mHeroHtml.replace('<!--intv21:history:mobile-->', _hist21('mobile'));
   return `
-    <div class="aurix-intcc aurix-intv5 aurix-intv6"
+    <div class="aurix-intcc aurix-intv5 aurix-intv6 aurix-intv21"
+         data-tags="${_tags21.length}"
          data-changed-state="${esc(changed.state)}"
          data-changed-evidence="${changed.evidence ? '1' : '0'}"
          data-has-question="${intelQHtml ? '1' : '0'}"
          data-liq-cta="${liqCtaHtml ? '1' : '0'}">
-      ${heroHtml}
-      ${mHeroHtml}
+      ${_heroOut21}
+      ${_mHeroOut21}
       ${mHealthHtml}
       ${intelQCardHtml}
       ${radarHtml}
@@ -72298,10 +73414,13 @@ function _renderIntelligenceCommandCenter() {
       ${exploreHtml}
       ${mattersHtml}
       ${memoryHtml}
+      ${moversHtml}
+      ${scenHtml}
       ${structureHtml}
       ${discHtml}
       ${changedHtml}
       ${discoveryHtml}
+      ${logHtml}
       ${/* CHECKPOINT J — el pie publica SÓLO la advertencia de producto. La
             limitación técnica que colgaba aquí se ha ido a la card de Factores,
             que es el análisis que limita. */''}
@@ -72444,12 +73563,15 @@ function _initIntelSeeChanges(root) {
       }
       const a = ev.target && ev.target.closest ? ev.target.closest('[data-intel-see-changes]') : null;
       if (!a) return;
-      const dest = document.getElementById('aurix-intel-changes');
+      // V2 — el historial revisado vive en el Registro: el destino lo dice el enlace.
+      const _href = String(a.getAttribute('href') || '').replace(/^#/, '') || 'aurix-intel-changes';
+      const dest = document.getElementById(_href);
       if (!dest) return;                       // sin destino no se intercepta nada
       ev.preventDefault();
       try { dest.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }); }
       catch (_) { dest.scrollIntoView(); }
-      const h = document.getElementById('aurix-intel-changes-title') || dest;
+      const h = document.getElementById('aurix-intel-changes-title') && _href === 'aurix-intel-changes'
+        ? document.getElementById('aurix-intel-changes-title') : (dest.querySelector('.intcc-card-title') || dest);
       try { h.focus({ preventScroll: true }); } catch (_) { try { h.focus(); } catch (_) {} }
     } catch (_) {}
   });
@@ -72833,6 +73955,7 @@ try {
 } catch (_) {}
 }
 function _initIntelligenceCommandCenter() {
+  try { if (typeof _intv21Wire === 'function') _intv21Wire(); } catch (_) {}
   try {
     const root = document.querySelector('.aurix-intcc');
     try { _initIntelSeeChanges(root); } catch (_) {}

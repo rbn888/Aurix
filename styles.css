@@ -21365,11 +21365,14 @@ body.gs-open { overflow: hidden; }
      este rango o se pinta ANTES del hero (flex-column con orders 1…10). La
      pregunta va justo detrás del hero, que es su sitio en la lectura: primero
      qué pasa, después qué te pregunta Aurix. En ≤640px el bloque de abajo la
-     recoloca detrás de Salud, que es la composición que pidió el founder. */
+     recoloca detrás de Salud, que es la composición que pidió el founder.
+     RE-DECIDIDO (INTELLIGENCE V2): en una columna, el MISMO orden que escritorio
+     — Radar · Factores · Explora → Hoy · Evolución → Qué movió · Escenarios →
+     … → Registro. Las cards nuevas declaran el suyo en el bloque V2. */
   .intv12-qcard    { order: 2; }
-  .intcc-drivers   { order: 3; }
-  .intcc-explore   { order: 4; }
-  .intcc-radar     { order: 5; }
+  .intcc-radar     { order: 3; }
+  .intcc-drivers   { order: 4; }
+  .intcc-explore   { order: 5; }
   /* §6 — el comparador va DETRÁS del Radar y DELANTE de «Lo que importa hoy».
      Mi primer intento fue darle el MISMO `order` que `.intcc-watch` y dejar que
      el empate lo resolviera el orden del DOM: habría funcionado y no habría
@@ -21379,13 +21382,13 @@ body.gs-open { overflow: hidden; }
      en qué punto del renderer se concatena una plantilla es una composición que
      nadie puede leer en la hoja de estilos. Se renumera explícitamente.
      El ORDEN VISUAL de las demás cards no cambia: sólo se abre un hueco. */
-  .intv14-cmp      { order: 6; }
-  .intcc-watch     { order: 7; }
-  .intcc-timeline  { order: 8; }
-  .intv5-structure { order: 9; }
-  .intv4-changed   { order: 10; }
-  .intv4-discovery { order: 12; }
-  .intcc-disclaimer { order: 13; }
+  .intv14-cmp      { order: 10; }
+  .intcc-watch     { order: 6; }
+  .intcc-timeline  { order: 7; }
+  .intv5-structure { order: 11; }
+  .intv4-changed   { order: 13; }
+  .intv4-discovery { order: 14; }
+  .intcc-disclaimer { order: 16; }
 }
 @media (max-width: 640px) {
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
@@ -27222,7 +27225,7 @@ button.intv8-intel-pause:focus-visible { outline: 2px solid var(--focus-ring-col
      el 9, que ahora lo ocupa «Qué ha cambiado»: dos hermanos con el mismo `order`
      los resuelve el orden del DOM, y eso es precisamente lo que no puede decidir
      una composición. */
-  .intv9-disc          { order: 11; }
+  .intv9-disc          { order: 12; }
 }
 @media (max-width: 640px) {
   .intv9-disc-text { font-size: 12.5px; }
@@ -30532,3 +30535,185 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .wsc-metric-since { color: var(--text-muted); font-weight: 500; white-space: nowrap; }
 .aurix-fx-bubble { position: fixed; z-index: 2147482000; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45;
   color: var(--text-muted); background: rgba(10, 14, 24, .97); border: 1px solid rgba(233, 168, 87, .45); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AURIX INTELLIGENCE V2 · PROFUNDIDAD SIN REPETICIÓN (intv21)
+   ════════════════════════════════════════════════════════════════════════════
+   REJILLA. Las filas 1–2 (hero; pregunta; Radar · Factores · Explora) siguen
+   pineadas como siempre. De la fila 3 en adelante cada card declara sólo sus
+   COLUMNAS y la fila la decide el orden del DOM (colocación automática): una card
+   condicional que no existe no deja hueco, y no hace falta una variante `:has`
+   por cada combinación. Especificidad doble a propósito: gana a las variantes
+   `:has(.intv12-qcard):has(.intv14-cmp)` existentes sin `!important`. */
+@media (min-width: 1024px) {
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-watch,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-timeline,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-movers,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-scen,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv5-structure,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv9-disc,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-changed,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-discovery,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-log,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-disclaimer { grid-row: auto; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-watch    { grid-column: 1 / 7; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-timeline { grid-column: 7 / 13; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-movers  { grid-column: 1 / 7; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-scen    { grid-column: 7 / 13; }
+  .aurix-intcc.aurix-intv21.aurix-intv21:not(:has(> .intv21-movers)) > .intv21-scen { grid-column: 1 / 13; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv9-disc,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-changed,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-discovery,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-log,
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-disclaimer { grid-column: 1 / 13; }
+  .aurix-intcc.aurix-intv21 > .intv21-movers,
+  .aurix-intcc.aurix-intv21 > .intv21-scen { align-self: start; }
+}
+/* UNA COLUMNA (≤1023px): el MISMO orden que escritorio. Las cards existentes lo
+   declaran en su bloque; aquí sólo las nuevas, sin repetir ningún valor. */
+@media (max-width: 1023px) {
+  .intv21-movers { order: 8; }
+  .intv21-scen   { order: 9; }
+  .intv21-log    { order: 15; }
+}
+
+/* ── Etiquetas del hero ── */
+.intv21-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.intv21-tag {
+  display: inline-flex; align-items: center; max-width: 100%;
+  border-radius: 999px; border: 1px solid rgba(74,130,240,0.26);
+  background: rgba(74,130,240,0.08); box-shadow: inset 0 0 12px rgba(74,130,240,0.10);
+}
+.intv21-tag.is-warn { border-color: rgba(233,168,87,0.32); background: rgba(233,168,87,0.08); box-shadow: inset 0 0 12px rgba(233,168,87,0.10); }
+.intv21-tag-go {
+  appearance: none; border: 0; background: none; cursor: pointer; min-height: 30px;
+  padding: 0 4px 0 12px; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2;
+  color: #cfe0ff; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.intv21-tag.is-warn .intv21-tag-go { color: #f6d7a8; }
+.intv21-tag-x {
+  appearance: none; border: 0; background: none; cursor: pointer; flex: 0 0 auto;
+  width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%;
+  color: rgba(190,210,245,0.6);
+}
+.intv21-tag-x svg { width: 10px; height: 10px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+.intv21-tag-x:hover, .intv21-tag-go:hover { color: #fff; }
+.intv21-tag-go:focus-visible, .intv21-tag-x:focus-visible,
+.intv21-chip:focus-visible, .intv21-link:focus-visible, .intv21-evo-plot:focus-visible {
+  outline: 2px solid rgba(120,170,255,0.9); outline-offset: 2px; border-radius: 999px;
+}
+.intv21-evo-plot:focus-visible { border-radius: 12px; }
+.intcc-m-hero .intv21-tags { margin-top: 10px; gap: 6px; }
+
+/* ── Hoy: los hechos de 24 h comparten la anatomía de la historia ── */
+.intv21-today .intv4-story-head { font-size: 14.5px; }
+
+/* ── Controles segmentados (Evolución / Escenarios) ── */
+.intv21-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.intv21-chip {
+  appearance: none; cursor: pointer; min-height: 30px; padding: 0 12px; border-radius: 999px;
+  font: inherit; font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
+  color: rgba(198,214,246,0.82); border: 1px solid rgba(255,255,255,0.09); background: rgba(255,255,255,0.04);
+}
+.intv21-chip:hover { color: #fff; border-color: rgba(74,130,240,0.35); }
+.intv21-chip.is-on { color: #fff; border-color: rgba(74,130,240,0.55); background: rgba(74,130,240,0.20); box-shadow: inset 0 0 12px rgba(74,130,240,0.22); }
+.intv21-link {
+  appearance: none; border: 0; background: none; cursor: pointer; padding: 6px 0; min-height: 30px;
+  font: inherit; font-size: 12.5px; font-weight: 650; color: #9fc2ff;
+}
+.intv21-link::after { content: ' →'; }
+.intcc-x-answer .intv21-link { margin: -4px 14px 10px; }
+.intv21-foot { margin: 14px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text-muted); }
+
+/* ── Tu evolución visual ── */
+.intv21-evo { margin: 14px 0 6px; }
+.intv21-evo-ctrl { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.intv21-evo-note { margin: 10px 0 8px; font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
+.intv21-evo-plot {
+  position: relative; height: 150px; border-radius: 12px; outline: none; touch-action: pan-y;
+  background: linear-gradient(180deg, rgba(74,130,240,0.06), rgba(74,130,240,0.0));
+}
+.intv21-evo-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.intv21-evo-grid { stroke: rgba(150,180,240,0.10); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.intv21-evo-zero { stroke: rgba(150,180,240,0.32); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.intv21-evo-line {
+  fill: none; stroke: #5c9cff; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round;
+  vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 6px rgba(92,156,255,0.45));
+}
+.intv21-evo-dots { position: absolute; inset: 0; pointer-events: none; }
+.intv21-evo-dot {
+  position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
+  background: #9fc2ff; border: 1.5px solid #0b1428; box-shadow: 0 0 8px rgba(92,156,255,0.55);
+}
+.intv21-evo-dot.is-end { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; background: #cfe0ff; }
+.intv21-evo-dot.is-last { width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; }
+.intv21-evo-stem { stroke: rgba(92,156,255,0.35); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.intv21-evo-cursor { stroke: rgba(207,224,255,0.45); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; }
+.intv21-evo-cursor.is-on { opacity: 1; }
+.intv21-evo-plot.is-anim .intv21-evo-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: intv21Draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.intv21-evo-plot.is-anim .intv21-evo-dot, .intv21-evo-plot.is-anim .intv21-evo-stem { opacity: 0; animation: intv21Fade 0.5s ease 0.35s forwards; }
+@keyframes intv21Draw { to { stroke-dashoffset: 0; } }
+@keyframes intv21Fade { to { opacity: 1; } }
+.intv21-evo-tip {
+  position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0; white-space: nowrap;
+  padding: 5px 9px; border-radius: 8px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: #fff; background: rgba(12,20,40,0.94); border: 1px solid rgba(74,130,240,0.4);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+.intv21-evo-tip.is-on { opacity: 1; }
+.intv21-evo-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* ── Qué movió tu patrimonio ── */
+.intv21-mv-period { margin: -6px 0 10px; font-size: 11.5px; color: var(--text-muted); }
+.intv21-mv-h { margin: 12px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(150,180,240,0.7); }
+.intv21-mv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.intv21-mv-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.intv21-mv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.intv21-mv-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.intv21-mv-bar { display: block; height: 100%; border-radius: 999px; animation: intccBarGrow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.intv21-mv-row.is-up .intv21-mv-bar { background: linear-gradient(90deg, rgba(63,191,127,0.92), rgba(130,215,175,0.55)); }
+.intv21-mv-row.is-down .intv21-mv-bar { background: linear-gradient(90deg, rgba(233,168,87,0.92), rgba(240,200,140,0.55)); }
+.intv21-mv-val { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-bright); text-align: right; min-width: 64px; }
+
+/* ── Dependencias y escenarios ── */
+.intv21-scn-lead { margin: 14px 0 6px; font-size: 13px; line-height: 1.5; color: rgba(198,214,246,0.88); }
+.intv21-scn-num { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.intv21-scn-val { font-size: 30px; font-weight: 750; letter-spacing: -0.01em; color: #fff; font-variant-numeric: tabular-nums; }
+.intv21-scn-unit { font-size: 12px; color: var(--text-muted); }
+.intv21-scn-track { position: relative; height: 10px; margin-top: 12px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.intv21-scn-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, rgba(92,156,255,0.98), rgba(150,190,255,0.55)); box-shadow: 0 0 12px rgba(92,156,255,0.35); transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+.intv21-scn-legend { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+
+/* ── Registro de Aurix ── */
+.intv21-log-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.intv21-log-day > ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 8px; }
+.intv21-log-date { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(150,180,240,0.7); }
+.intv21-log-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 10px;
+  padding: 8px 0 8px 12px; border-left: 2px solid rgba(74,130,240,0.28);
+}
+.intv21-log-fam { font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #9fc2ff; }
+.intv21-log-txt { min-width: 0; font-size: 13px; line-height: 1.45; color: var(--text-bright); }
+.intv21-log-state { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.intv21-log:not(.is-all) .intv21-log-item.is-more { display: none; }
+.intv21-log:not(.is-all) .intv21-log-day:not(:has(.intv21-log-item:not(.is-more))) { display: none; }
+.intv21-log-more { margin-top: 10px; }
+@media (max-width: 640px) {
+  .intv21-log-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .intv21-log-fam { grid-column: 1 / -1; }
+  .intv21-evo-ctrl { flex-direction: column; }
+  .intv21-scn-val { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intv21-evo-plot.is-anim .intv21-evo-line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
+  .intv21-evo-plot.is-anim .intv21-evo-dot, .intv21-evo-plot.is-anim .intv21-evo-stem { animation: none; opacity: 1; }
+  .intv21-mv-bar, .intv21-scn-fill { animation: none; transition: none; }
+}
+/* Las etiquetas viven en la columna de texto del hero móvil: sin `min-width: 0`
+   un rótulo largo (EN) empujaba la columna fuera de la card. */
+.intcc-m-hero .intcc-m-hero-text { min-width: 0; }
+.intcc-m-hero .intv21-tag { max-width: 100%; min-width: 0; }
+/* Las etiquetas no aportan ANCHO INTRÍNSECO a la columna: con `nowrap` empujaban
+   el orbe (y su halo) fuera de la card. Ocupan el ancho que la columna ya tiene. */
+.intcc-m-hero .intv21-tags { width: 0; min-width: 100%; }
+.intv21-evo-axis b { font-weight: 650; color: var(--text-bright); }

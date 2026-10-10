@@ -1580,9 +1580,12 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   // que el orden de lectura hubiera cambiado. Se mide la secuencia RELATIVA, que
   // es la que el founder aprobó, y además se exige que no haya empates: un
   // `order` repetido dejaría la composición en manos del orden del DOM (N.8c).
-  ok('1.1 MÓVIL · Factores → Explora → Radar → Comparador → Hoy → Evolución → Cambios',
-    (() => { const seq = ['.intcc-hero', '.intv12-qcard', '.intcc-drivers', '.intcc-explore',
-        '.intcc-radar', '.intv14-cmp', '.intcc-watch', '.intcc-timeline', '.intv4-changed'];
+  // RE-DECIDIDO (INTELLIGENCE V2): «En móvil: mismo orden» que escritorio — Radar ·
+  // Factores · Explora → Hoy · Evolución → (Qué movió · Escenarios, en el bloque V2)
+  // → … → Cambios. El comparador ya no vive aquí (Workspace); conserva un valor único.
+  ok('1.1 MÓVIL · Radar → Factores → Explora → Hoy → Evolución → … → Cambios (mismo orden que escritorio)',
+    (() => { const seq = ['.intcc-hero', '.intv12-qcard', '.intcc-radar', '.intcc-drivers', '.intcc-explore',
+        '.intcc-watch', '.intcc-timeline', '.intv14-cmp', '.intv4-changed'];
       const v = seq.map(ordOf);
       if (v.some(x => x === null)) return false;
       for (let i = 1; i < v.length; i++) if (!(v[i] > v[i - 1])) return false;
@@ -1872,9 +1875,11 @@ console.log('\n§15 · memoria patrimonial');
   // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): la lista con scroll se sustituye por UN
   // titular y como máximo TRES evidencias, así que ya no hay nada que recortar. Lo
   // que la card declara ahora es qué familias publica.
-  ok('15.9 la card declara qué evidencias publica y nunca más de un titular + tres',
+  // RE-DECIDIDO (INTELLIGENCE V2): titular de una línea y como máximo DOS
+  // evidencias — el módulo visual ocupa el espacio de la tercera.
+  ok('15.9 la card declara qué evidencias publica y nunca más de un titular + dos',
     /data-evo-families="\$\{esc\(evo\.items\.map\(x => x\.family\)\.join\(','\)\)\}"/.test(fnSrc('_intv4MemoryHtml'))
-    && /evo\.items\.slice\(1, 4\)/.test(fnSrc('_intv4MemoryHtml'))
+    && /evo\.items\.slice\(1, 3\)/.test(fnSrc('_intv4MemoryHtml'))
     && /return \{ items: items\.slice\(0, 4\)/.test(fnSrc('_intv19Evolution')));
   // CHECKPOINT G — la fila publica ahora FECHA · PERIODO. El invariante no es
   // el literal de la plantilla: es que sin fecha no se estampa una, y que el

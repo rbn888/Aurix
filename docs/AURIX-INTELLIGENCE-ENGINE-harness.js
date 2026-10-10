@@ -1641,8 +1641,13 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
     // mueve PRIORIDAD (con la historia de presentación, el contexto y la memoria) y
     // nunca una cifra. El invariante que esta prueba fija sigue siendo que hay UNA
     // sola selección y que la alimentan los mismos argumentos en los dos sitios.
+    // RE-DECIDIDO (INTELLIGENCE V2): Hoy antepone los hechos de 24 h y RECORTA las
+    // historias con UNA regla (`_intv21TrimStories`) que usan renderer y card.
+    // Sigue habiendo UNA selección: la misma llamada, los mismos argumentos.
     /_intv5MattersStories\(core, skipRoots, intel, acks\)/.test(mFn)
-    && /const mattersSel = _intv5MattersStories\(core, skipRoots, intel, _ackMap\)\.stories/.test(src)
+    && /_intv21TrimStories\(sel\.stories, _head21\)/.test(mFn)
+    && /const _storiesFull21 = _intv5MattersStories\(core, skipRoots, intel, _ackMap\)\.stories/.test(src)
+    && /const mattersSel = \(typeof _intv21TrimStories === 'function'\) \? _intv21TrimStories\(_storiesFull21, _today21\) : _storiesFull21/.test(src)
     && /const mattersRoots = mattersSel\.map/.test(src)
     && /const publishedTexts = mattersSel\.map/.test(src)
     && /const shown = mattersSel\.map/.test(src)
@@ -1657,7 +1662,8 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
     (() => { const r = fnSrc('_renderIntelligenceCommandCenter');
       return /_intv4ExploreHtml\(core, esc, intel\)/.test(r)
         // CHECKPOINT J — las dos reciben además la limitación que les toca.
-        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap, _gaps\.today\)/.test(r)
+        // + los hechos de 24 h que la card antepone (INTELLIGENCE V2).
+        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap, _gaps\.today, \{ head: _today21, tail: _struct21 \}\)/.test(r)
         // + lo que titula Hoy (SPEC MEMORIA ÚTIL §5: Tu evolución no repite a Hoy).
         && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields, _gaps\.evolution,\s*mattersSel\.map\(st => st\.semanticKey\)\)/.test(r)
         && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());
@@ -1790,7 +1796,8 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
   // CSS queda inerte y la card no monta contenedor de scroll.
   ok('V.18 sin scroll interno: la card está acotada por construcción, sin barra horizontal',
     /\.intv10-mem-scroll \{ overflow-x: hidden/.test(css)
-    && !/intv10-mem-scroll/.test(fnSrc('_intv4MemoryHtml')) && /evo\.items\.slice\(1, 4\)/.test(fnSrc('_intv4MemoryHtml')));
+    // RE-DECIDIDO (INTELLIGENCE V2): titular + como mucho DOS evidencias.
+    && !/intv10-mem-scroll/.test(fnSrc('_intv4MemoryHtml')) && /evo\.items\.slice\(1, 3\)/.test(fnSrc('_intv4MemoryHtml')));
   ok('V.19 la barra es discreta y aparece al interactuar; en táctil no hay barra',
     /\.intv10-mem-scroll:hover, \.intv10-mem-scroll:focus-within/.test(css)
     && /@media \(max-width: 1023px\)[\s\S]{0,400}\.intv10-mem-scroll::-webkit-scrollbar \{ width: 0; \}/.test(css));
