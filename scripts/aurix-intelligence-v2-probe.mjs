@@ -130,7 +130,8 @@ const READ = `(function(){
     factsBad: reg ? reg.facts.filter(function(f){ return !f.factId || !f.family || !f.owner; }).length : null,
   });
 })()`;
-const ORDER = ['intcc-hero', 'intcc-radar', 'intcc-drivers', 'intcc-explore', 'intcc-watch', 'intcc-timeline', 'intv21-movers', 'intv21-scen', 'intv21-log'];
+// RE-DECIDIDO (SPEC casi final §5): … Explora → Evolución → Dependencias → Hoy → Qué movió → Registro.
+const ORDER = ['intcc-hero', 'intcc-radar', 'intcc-drivers', 'intcc-explore', 'intcc-timeline', 'intv21-scen', 'intcc-watch', 'intv21-movers', 'intv21-log'];
 const orderOf = (cards) => cards.map(c => ORDER.findIndex(o => c.c.split('.').indexOf(o) !== -1 || c.c.indexOf(o) === 0)).filter(i => i >= 0);
 const BASE = process.env.AURIX_V2_BASELINE, CMP = process.env.AURIX_V2_COMPARE;
 const prior = CMP && existsSync(CMP) ? JSON.parse(readFileSync(CMP, 'utf8')) : null;
@@ -157,7 +158,7 @@ for (const E of ENGINES) {
       ok(`${T} cero hechos duplicados por fact_id/familia/periodo`, Array.isArray(r.dups) && r.dups.length === 0 && r.factsBad === 0, JSON.stringify(r.dups));
       ok(`${T} nunca «No hay nada que destacar» como contenido`, !/nada que destacar|nothing to highlight/i.test(r.screen));
       const ord = orderOf(r.cards);
-      ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Hoy/Evolución → Movió/Escenarios → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
+      ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Evolución/Dependencias → Hoy → Movió → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
       if (prior && prior[key]) {
         const p = prior[key];
         ok(`${T} Salud, Radar, Factores y escenarios idénticos a HEAD`, p.hv === r.healthVal && p.hb === r.healthBadge && p.radar === r.radarHash && p.drivers === r.driversHash && (p.scn == null || p.scn === JSON.stringify(r.scn)),
@@ -174,10 +175,13 @@ for (const E of ENGINES) {
         && !r.tags.some(t => /Principal movimiento|Main move/.test(t.label)), JSON.stringify({ c: r.evo && r.evo.chips, t: r.tags }));
       { const nums = new Set((r.drvTxt.match(/\d+(?:[.,]\d+)?%/g) || []));
         (r.scn || []).forEach(x => nums.add(String(Math.abs(x.impact).toFixed(1)).replace('.', lng === 'en' ? '.' : ',') + '%'));
-        const hit = r.xa.filter(a => (a.match(/\d+(?:[.,]\d+)?%/g) || []).some(n => nums.has(n)));
+        // RE-DECIDIDO (§4): las familias «clases frente a posiciones» y «reparto entre clases»
+        // responden CON los pesos de Factores por definición; el resto sigue sin repetirlos.
+        const hit = r.xa.filter((a, i) => !/^x3_class_/.test((r.explore[i] || {}).id || '') && (a.match(/\d+(?:[.,]\d+)?%/g) || []).some(n => nums.has(n)));
         ok(`${T} Explora no repite cifras de Factores ni de Dependencias`, hit.length === 0 && !r.explore.some(q => /ctx_top3_drop|ctx_top2/.test(q.id)), JSON.stringify({ hit, nums: Array.from(nums) })); }
-      ok(`${T} etiquetas del hero: ≤3, dimensiones distintas, sin cifras, contenidas`, r.tags.length <= 3 && new Set(r.tags.map(t => t.dim)).size === r.tags.length
-        && r.tags.every(t => !/\d/.test(t.label) && t.fit), JSON.stringify(r.tags));
+      // RE-DECIDIDO (§3): las etiquetas son HECHOS (pueden llevar su cifra) y nunca el veredicto «Concentración elevada».
+      ok(`${T} etiquetas del hero: ≤3, dimensiones distintas, hechos sin veredicto, contenidas`, r.tags.length <= 3 && new Set(r.tags.map(t => t.dim)).size === r.tags.length
+        && r.tags.every(t => t.fit && !/Concentración elevada|High concentration/.test(t.label)), JSON.stringify(r.tags));
       const ux = await page.evaluate(`(function(){ var vis=function(e){ return e && e.getBoundingClientRect().width>0; };
         var mh=document.querySelector('.intcc-m-health'); var hl=mh && vis(mh) ? [].slice.call(mh.querySelectorAll('.intcc-m-health-tag')).map(function(e){ return e.textContent.trim().toLowerCase(); }) : [];
         var tl=[].slice.call(document.querySelectorAll('.intv21-tag')).filter(vis).map(function(e){ return e.querySelector('.intv21-tag-go').textContent.trim().toLowerCase(); });
@@ -187,18 +191,22 @@ for (const E of ENGINES) {
       ok(`${T} Tu evolución: titular + ≤2 evidencias`, !r.evo || r.evo.evRows <= 2, JSON.stringify(r.evo));
       if (kind === 'qa14') {
         ok(`${T} QA · Salud 33`, r.healthVal === '33', r.healthVal);
-        ok(`${T} QA · 2–3 etiquetas; «Concentración elevada» visible una sola vez (hero, o Salud en móvil)`, r.tags.length >= 2 && (r.tags.some(t => t.id === 'tag_conc' && /Concentración elevada|High concentration/.test(t.label))
-          || (w <= 640 && /Concentración elevada|High concentration/.test(r.screen))), JSON.stringify(r.tags));
+        // RE-DECIDIDO (§9): el hero publica hechos; «Concentración elevada» queda sólo como etiqueta de Salud (móvil).
+        ok(`${T} QA · 2–3 etiquetas de hechos; el hero no repite el titular de las tres mayores`, r.tags.length >= 2 && !r.tags.some(t => t.id === 'tag_conc' || t.id === 'tag_top3'), JSON.stringify(r.tags));
         // RE-DECIDIDO (SPEC previo al cierre §7): el movimiento de cotización sólo de una
         // posición con peso que importa (las tres mayores de Factores). En QA la que más
         // se mueve de ellas es Bitcoin, que ya es la contribución ⇒ no hay fila de precio.
-        ok(`${T} QA · Hoy: rentabilidad 24 h y contribución distinguidas; precio sólo de las tres mayores`, r.hoy.rows.some(x => x.k === 'return') && r.hoy.rows.some(x => x.k === 'driver' && /contribu/i.test(x.t))
-          && r.hoy.rows.filter(x => x.k === 'mover').every(x => /Microsoft|Bitcoin|Apple/.test(x.t) && /cotización|price/i.test(x.t)
-            && (/Bitcoin/.test(x.t) ? /24 h/.test(x.t) : /última sesión disponible|last available session/.test(x.t)))
+        // RE-DECIDIDO (SPEC casi final §7): compiten TODAS las posiciones, ordenadas por peso ×
+        // variación y con el umbral de materialidad de la contribución (0,05 pp). Solana
+        // (0,8 % × 6,1 % = 0,049 pp) no llega; Ethereum (13,5 % × 3,1 %) sí. Máximo tres hechos.
+        ok(`${T} QA · Hoy: rentabilidad, contribución en pp y cotizaciones materiales, distinguidas`, r.hoy.rows.length <= 3 && r.hoy.rows.some(x => x.k === 'return')
+          && r.hoy.rows.some(x => x.k === 'driver' && /(restó|sumó|took|added) \d+[.,]\d+ pp/.test(x.t))
+          && r.hoy.rows.filter(x => x.k === 'mover').every(x => /cotización|price/i.test(x.t)
+            && (/Solana|Bitcoin|Ethereum|Cardano|Chainlink/.test(x.t) ? /24 h/.test(x.t) : /última sesión disponible|last available session/.test(x.t)))
           && !/Solana/.test(r.hoy.text), JSON.stringify(r.hoy.rows));
         ok(`${T} QA · Escenarios: Microsoft −10 % ≈ −2,9 %, Top 3 ≈ −6,9 %, Acciones ≈ −5,1 %`, r.scn && Math.abs(r.scn.find(s => s.id === 'top1').impact + 2.9) < 0.01
           && Math.abs(r.scn.find(s => s.id === 'top3').impact + 6.9) < 0.01 && Math.abs(r.scn.find(s => s.id === 'class').impact + 5.1) < 0.01
-          && /−2[.,]9%/.test(r.scen.text) && /(hipotético, no una previsión|not a forecast)/i.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
+          && /−2[.,]9%/.test(r.scen.text) && /(Hipotético|Hypothetical)/.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
         // RE-DECIDIDO (V2.1): «Desde inicio» sólo cuando empieza de verdad antes que 30D;
         // con la rentabilidad recortada al régimen comparable coincide con 30D y no se duplica.
         ok(`${T} QA · Tu evolución ofrece 7D y 30D en rentabilidad, «Desde inicio» donde existe y las cinco métricas`, r.avail.return && /^7d,30d/.test(r.avail.return.join()) && (r.avail.top || []).indexOf('all') !== -1
@@ -206,7 +214,7 @@ for (const E of ENGINES) {
         ok(`${T} QA · Qué movió: contribuciones certificadas que concilian con la rentabilidad flow-neutral (mismo signo, ≤ máx(0,1 pp, 10 %))`, r.movers && r.att && Math.abs(r.att.sum - r.att.twr) <= Math.max(0.1, 0.1 * Math.abs(r.att.twr))
           && (Math.sign(r.att.sum) === Math.sign(r.att.twr))
           && r.movers.rows.length >= 2, JSON.stringify({ m: r.movers, a: r.att }));
-        ok(`${T} QA · Explora: sólo preguntas contextuales contestables (sin mezclar el catálogo)`, r.explore.length >= 1 && r.explore.length <= 4 && r.explore.every(q => /^x22_/.test(q.id)), JSON.stringify(r.explore));
+        ok(`${T} QA · Explora: sólo preguntas contextuales contestables (sin mezclar el catálogo)`, r.explore.length >= 1 && r.explore.length <= 4 && r.explore.every(q => /^x(22|3)_/.test(q.id)), JSON.stringify(r.explore));
       }
       if (kind === 'qa14' && w === 1440) {
         // Revisión financiera · casos adversariales.
@@ -239,7 +247,8 @@ for (const E of ENGINES) {
           && (r.avail.effective || []).indexOf('30d') !== -1 && (r.avail.top || []).indexOf('all') === -1, JSON.stringify(r.avail));
         ok(`${T} REAL · Inicio · Actual · Cambio en pp`, /51[.,]6%/.test(r.evo.stats) && /28[.,]7%/.test(r.evo.stats) && /−22[.,]9 pp/.test(r.evo.stats), r.evo.stats);
         ok(`${T} REAL · cada observación es un punto unido por línea (sin tallos)`, r.evo.plot && r.evo.plot.stems === 0 && r.evo.plot.dots === r.evo.pts && r.evo.plot.segs === r.evo.pts - 1, JSON.stringify(r.evo.plot));
-        ok(`${T} REAL · Qué movió no certificable ⇒ ausente; Dependencias a ancho completo`, !r.movers && (w < 1024 || r.scFull === true), JSON.stringify({ m: r.movers, full: r.scFull }));
+        // RE-DECIDIDO (§6): en escritorio Dependencias es la columna junto a Evolución.
+        ok(`${T} REAL · Qué movió no certificable ⇒ ausente; Dependencias junto a Evolución en escritorio`, !r.movers && (w < 1024 || r.scFull === false), JSON.stringify({ m: r.movers, full: r.scFull }));
         ok(`${T} REAL · escenarios: tres bloques desde 768 px; pestañas ≥44 px y uno visible en móvil`, w >= 768 ? r.scBlocks === 3 : (r.scBlocks === 1 && r.scTabs.length === 3 && r.scTabs.every(h => h >= 44)), JSON.stringify({ b: r.scBlocks, t: r.scTabs }));
         ok(`${T} REAL · Explora: 3–4 preguntas de familias distintas`, r.explore.length >= 3 && r.explore.length <= 4, JSON.stringify(r.explore));
         if (w === 390 || w === 1440) {

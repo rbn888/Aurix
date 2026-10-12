@@ -1583,9 +1583,11 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   // RE-DECIDIDO (INTELLIGENCE V2): «En móvil: mismo orden» que escritorio — Radar ·
   // Factores · Explora → Hoy · Evolución → (Qué movió · Escenarios, en el bloque V2)
   // → … → Cambios. El comparador ya no vive aquí (Workspace); conserva un valor único.
-  ok('1.1 MÓVIL · Radar → Factores → Explora → Hoy → Evolución → … → Cambios (mismo orden que escritorio)',
+  // RE-DECIDIDO (SPEC casi final post-v810 §5): Evolución y Dependencias antes de Hoy,
+  // que cierra la pantalla; DOM, visual, teclado y lector en el mismo orden.
+  ok('1.1 MÓVIL · Radar → Factores → Explora → Evolución → (Dependencias) → Hoy → … → Cambios (mismo orden que escritorio)',
     (() => { const seq = ['.intcc-hero', '.intv12-qcard', '.intcc-radar', '.intcc-drivers', '.intcc-explore',
-        '.intcc-watch', '.intcc-timeline', '.intv14-cmp', '.intv4-changed'];
+        '.intcc-timeline', '.intcc-watch', '.intv14-cmp', '.intv4-changed'];
       const v = seq.map(ordOf);
       if (v.some(x => x === null)) return false;
       for (let i = 1; i < v.length; i++) if (!(v[i] > v[i - 1])) return false;
