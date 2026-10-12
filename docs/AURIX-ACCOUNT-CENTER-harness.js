@@ -234,8 +234,7 @@ ok('8.6 cero ternarios `lang === \'es\'` pintando texto en el Account Center',
 ok('8.7 los textos derivados usan el helper existente (_settingsT), no un traductor nuevo',
    /statusKey = session \? 'settingsSessionActive' : 'settingsSessionNone'/.test(app) &&
    /_settingsT\(statusKey\)/.test(app) &&
-   // RE-DECIDIDO (SPEC previo al cierre §13): una tercera rama, acceso concedido sin suscripción.
-   /descKey = isPremiumTier\(plan\.tier\) \? 'settingsPlanDescPremium'\s*:\s*\(_aurixAccessGranted\(\) \? 'settingsPlanDescGranted' : 'settingsPlanDescFree'\)/.test(app) &&
+   /descKey = isPremiumTier\(plan\.tier\) \? 'settingsPlanDescPremium' : 'settingsPlanDescFree'/.test(app) &&
    /_settingsT\(descKey\)/.test(app) &&
    (app.match(/^function _settingsT\(/gm) || []).length === 1 &&
    !/const (AC_T|ACCOUNT_T|_acT) *=/.test(appCode));

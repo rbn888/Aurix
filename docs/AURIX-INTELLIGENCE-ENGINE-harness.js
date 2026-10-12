@@ -926,10 +926,7 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
         context: { fields: {} } };
       let r = null;
       try { r = sb2.READ(null, {}, null, intel); } catch (e) { badStates.push([lang, st, 'THROW ' + e.message]); return; }
-      // RE-DECIDIDO (SPEC previo al cierre §4): «el subtítulo añade contexto real o desaparece».
-      // Atención y descubrimiento pueden ir sin subtítulo (su titular ya es la conclusión).
-      const subOptional = st === 'attention_material_fact' || st === 'discovery';
-      if (!r || !r.title || (!r.sub && !subOptional) || /undefined|\[object/.test(r.title + (r.sub || ''))) badStates.push([lang, st, r && r.title, r && r.sub]);
+      if (!r || !r.title || !r.sub || /undefined|\[object/.test(r.title + r.sub)) badStates.push([lang, st, r && r.title, r && r.sub]);
     });
     DISCOVERY_CODES.forEach(code => {
       let txt = null;

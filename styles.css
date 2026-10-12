@@ -21291,10 +21291,6 @@ body.gs-open { overflow: hidden; }
      `> .clase` para ganar a `> *` por especificidad, no por `!important`. */
   .aurix-intv6 > .intcc-watch,
   .aurix-intv6 > .intcc-timeline { align-self: start; }
-  /* Con una respuesta de Explora abierta, Radar y Factores conservan la altura que
-     tenían (el JS la fija como `min-height`) y no se estiran: crece sólo Explora. */
-  .aurix-intv6.is-x-open > .intcc-radar,
-  .aurix-intv6.is-x-open > .intcc-drivers { align-self: start; }
   /* Each card lays its own content out over the full row height it receives. */
   .aurix-intv6 .intcc-radar,
   .aurix-intv6 .intcc-drivers,
@@ -30591,12 +30587,18 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv21-tag.is-warn { border-color: rgba(233,168,87,0.32); background: rgba(233,168,87,0.08); box-shadow: inset 0 0 12px rgba(233,168,87,0.10); }
 .intv21-tag-go {
   appearance: none; border: 0; background: none; cursor: pointer; min-height: 30px;
-  padding: 0 12px; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2;
+  padding: 0 4px 0 12px; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2;
   color: #cfe0ff; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .intv21-tag.is-warn .intv21-tag-go { color: #f6d7a8; }
-.intv21-tag-go:hover { color: #fff; }
-.intv21-tag-go:focus-visible,
+.intv21-tag-x {
+  appearance: none; border: 0; background: none; cursor: pointer; flex: 0 0 auto;
+  width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%;
+  color: rgba(190,210,245,0.6);
+}
+.intv21-tag-x svg { width: 10px; height: 10px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; fill: none; }
+.intv21-tag-x:hover, .intv21-tag-go:hover { color: #fff; }
+.intv21-tag-go:focus-visible, .intv21-tag-x:focus-visible,
 .intv21-chip:focus-visible, .intv21-link:focus-visible, .intv21-evo-plot:focus-visible {
   outline: 2px solid rgba(120,170,255,0.9); outline-offset: 2px; border-radius: 999px;
 }
@@ -30605,22 +30607,6 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 
 /* ── Hoy: los hechos de 24 h comparten la anatomía de la historia ── */
 .intv21-today .intv4-story-head { font-size: 14.5px; }
-.intv21-today.has-icon { display: flex; align-items: center; gap: 12px; }
-.intv3-today-iconwrap { flex: 0 0 auto; display: inline-flex; }
-.intv21-today .intv3-today-icon { width: 28px; height: 28px; font-size: 11px; }
-
-/* ── Acabado Premium · el dorado marca SÓLO el hallazgo principal ──
-   Un filo superior y el rótulo del bloque de Inteligencia del hero (escritorio y
-   móvil). No es positivo ni alerta: es jerarquía. Ninguna otra card lo lleva. */
-.aurix-intv21 .intcc-hero-intel,
-.aurix-intv21 .intcc-m-hero { position: relative; }
-.aurix-intv21 .intcc-hero-intel::after,
-.aurix-intv21 .intcc-m-hero::after {
-  content: ''; position: absolute; left: 18px; right: 18px; top: 0; height: 1px; pointer-events: none;
-  background: linear-gradient(90deg, rgba(222,186,118,0), rgba(222,186,118,0.55) 30%, rgba(222,186,118,0.55) 70%, rgba(222,186,118,0));
-}
-.aurix-intv21 .intcc-hero-body .intcc-eyebrow,
-.aurix-intv21 .intcc-m-hero .intcc-card-title { color: rgba(226,196,138,0.92); }
 
 /* ── Controles segmentados (Evolución / Escenarios) ── */
 .intv21-seg { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -30741,17 +30727,9 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv22-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 10px; }
 .intv22-stats > div { min-width: 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); }
 .intv22-stats dt { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(150,180,240,0.7); }
-.intv22-stats dd { margin: 3px 0 0; font-size: 14px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.3; }
+.intv22-stats dd { margin: 3px 0 0; font-size: 14px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .intv22-stats dd.is-up { color: #8fe6b6; }
 .intv22-stats dd.is-down { color: #f3cf9a; }
-/* Cambio sin valoración (pesos, reparto, valor con aportaciones): azul, no verde/rojo. */
-.intv22-stats dd.is-neutral { color: #9cc0ff; }
-/* Cifras completas en móvil: con importes largos los KPIs se apilan en dos filas
-   (Inicio · Último dato arriba, Cambio a lo ancho) antes que encoger la letra. */
-@media (max-width: 420px) {
-  .intv22-evo[data-metric="value"] .intv22-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .intv22-evo[data-metric="value"] .intv22-stats > div:last-child { grid-column: 1 / -1; }
-}
 .intv22-area { fill: rgba(92,156,255,0.10); stroke: none; }
 .intv21-evo-plot.is-anim .intv22-area { opacity: 0; animation: intv21Fade 0.6s ease 0.3s forwards; }
 .intv22-cursor-dot {
