@@ -227,153 +227,8 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
-  // ── P1 · SEGUNDO REPINTADO: resolved → pending → resolved ───────────────────
-  // Un observador cuenta cada vez que Explora o Evolución, YA resueltas en esta
-  // página, vuelven a un placeholder. `__probeMark` distingue recarga real (se
-  // pierde) de repintado interno (sobrevive).
-  const WATCH = `(function(){ if (window.__regWatch) return; window.__regWatch = 1; window.__probeMark = window.__probeMark || Math.random();
-    window.__reg = { resolved: { evo: false, ex: false }, back: [] };
-    var vis=function(e){ var r=e.getBoundingClientRect(); return r.width>0 && r.height>0; };
-    var chk=function(){ var R=window.__reg;
-      var evoOk=[].slice.call(document.querySelectorAll('.intv21-evo:not(.is-pending)')).some(vis), exOk=[].slice.call(document.querySelectorAll('.intcc-explore:not(.is-pending)')).some(vis);
-      var evoP=[].slice.call(document.querySelectorAll('.intv21-evo.is-pending')).some(vis), exP=[].slice.call(document.querySelectorAll('.intcc-explore.is-pending')).some(vis);
-      if (R.resolved.evo && evoP) R.back.push('evo'); if (R.resolved.ex && exP) R.back.push('explore');
-      if (evoOk) R.resolved.evo = true; if (exOk) R.resolved.ex = true; };
-    new MutationObserver(chk).observe(document.body, { childList: true, subtree: true }); chk(); })()`;
-  const reg = async (page) => JSON.parse(await page.evaluate(`JSON.stringify({ back: (window.__reg||{back:[]}).back, mark: window.__probeMark || null, trace: (window.__aurixIntelTrace||[]).filter(function(t){ return /memo|pending/.test(t.r); }) })`));
-  {
-    // R1 · la cartera se actualiza (precios + una posición nueva ⇒ otra huella) mientras
-    // una fuente vuelve a estar en vuelo: es la transición que deja placeholders.
-    for (const w of [390, 1440]) {
-      const T = `[${E} P1 huella ${w}]`;
-      const P = persona('real');
-      const { ctx, page, errs } = await newPage(w);
-      await boot(page, P, 'es');
-      await page.evaluate(SESSION(P, 'uA', { delay: 200 }));
-      await page.evaluate(`(function(){ _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1500);
-      await page.evaluate(WATCH);
-      const s0 = await st(page);
-      await page.evaluate(`(function(){ window.__memDelay = 1500;
-        var m = assets.find(function(a){ return a.id === 'a1'; }); if (m) m.price = m.price * 1.35;
-        assets.push({ id: 'a99', ticker: 'KO', name: 'Coca-Cola', type: 'stock', qty: 1, price: 60, assetCurrency: 'USD', change24h: 0.2, marketSymbol: 'KO', transactions: [{ type: 'buy', qty: 1, price: 60, ts: Date.now() - 864e5 }] });
-        _aurixHydrateAssetMemory(); render(false); })()`);
-      await page.waitForTimeout(900);
-      const mid = await st(page);
-      await page.waitForTimeout(1600);
-      const r = await reg(page), s1 = await st(page);
-      ok(`${T} la actualización de la cartera con la memoria en vuelo NO devuelve Explora/Evolución a placeholder`, r.back.length === 0 && mid.pend.length === 0 && !!s0.explore && !!s0.evo, JSON.stringify({ back: r.back, mid, trace: r.trace }));
-      ok(`${T} y al terminar quedan resueltas (repintado interno, sin recarga)`, s1.pend.length === 0 && !!s1.explore && !!s1.evo && r.mark != null, JSON.stringify(s1));
-      ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-      await ctx.close();
-    }
-  }
-  {
-    // R2 · diez ciclos entrada / regreso / recarga, con la memoria lenta.
-    const T = `[${E} P1 ciclos 390]`;
-    const P = persona('real');
-    const { ctx, page, errs } = await newPage(390);
-    await boot(page, P, 'es');
-    let reloads = 0, backs = 0, empty = 0; const log = [];
-    for (let i = 0; i < 10; i++) {
-      const realReload = i % 3 === 2;
-      if (realReload) { await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForFunction(`typeof switchTab === 'function'`, null, { timeout: 60000 }); await page.waitForTimeout(700); reloads++; }
-      const fresh = await page.evaluate(`typeof window.__regWatch === 'undefined'`);
-      if (fresh) { await page.evaluate(SESSION(P, 'uA', { delay: 400 })); await page.evaluate(`_aurixHydrateAssetMemory()`); }
-      await page.evaluate(`switchTab('intelligence')`); await page.evaluate(WATCH);
-      await page.waitForTimeout(1300);
-      await page.evaluate(`switchTab('home')`); await page.waitForTimeout(250);
-      await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(700);
-      const r = await reg(page), s = await st(page);
-      backs += r.back.length; if (s.pend.length || !s.explore || !s.evo) empty++;
-      log.push((realReload ? 'R' : 'n') + ':' + r.back.length + ':' + s.pend.length);
-    }
-    ok(`${T} 10 ciclos (${reloads} recargas reales): cero regresiones a placeholder y cero cards vacías al final de cada ciclo`, backs === 0 && empty === 0, log.join(' '));
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-  {
-    // R3 · cinco cambios rápidos de métrica/periodo con la memoria refrescándose.
-    const T = `[${E} P1 rápidos 1440]`;
-    const P = persona('real');
-    const { ctx, page, errs } = await newPage(1440);
-    await boot(page, P, 'es');
-    await page.evaluate(SESSION(P, 'uA', { delay: 200 }));
-    await page.evaluate(`(function(){ _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1500);
-    await page.evaluate(WATCH);
-    await page.evaluate(`(function(){ window.__memDelay = 900; _aurixHydrateAssetMemory(); })()`);
-    const seq = [['metric', 'liquidity'], ['win', '7d'], ['metric', 'effective'], ['metric', 'top'], ['win', '30d']];
-    for (const [k, v] of seq) { await page.locator(`.intv21-evo [data-intv21-evo-${k}="${v}"]:visible`).first().click({ timeout: 4000 }).catch(() => {}); await page.waitForTimeout(60); }
-    await page.waitForTimeout(1800);
-    const r = await reg(page), s = await st(page);
-    ok(`${T} cinco cambios rápidos: la selección final es la última pulsada y ninguna respuesta tardía la pisa`, s.evo === 'top|30d' && r.back.length === 0 && s.pend.length === 0, JSON.stringify({ s, back: r.back }));
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-  {
-    // R4 · error parcial y actualización posterior: un fallo no borra lo válido.
-    const T = `[${E} P1 error 390]`;
-    const P = persona('real');
-    const { ctx, page, errs } = await newPage(390);
-    await boot(page, P, 'es');
-    await page.evaluate(SESSION(P, 'uA', { delay: 200 }));
-    await page.evaluate(`(function(){ _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1500);
-    await page.evaluate(WATCH);
-    const s0 = await st(page);
-    await page.evaluate(`(function(){ window.__memFail = true; window.__memDelay = 300; _aurixHydrateAssetMemory(); render(false); })()`); await page.waitForTimeout(1300);
-    const s1 = await st(page);
-    await page.evaluate(`(function(){ window.__memFail = false; _aurixHydrateAssetMemory(); render(false); })()`); await page.waitForTimeout(1300);
-    const r = await reg(page), s2 = await st(page);
-    ok(`${T} lectura fallida tras una válida: ningún placeholder y Explora sigue publicada`, r.back.length === 0 && s1.pend.length === 0 && !!s1.explore, JSON.stringify({ s0, s1, back: r.back }));
-    ok(`${T} la actualización posterior vuelve a dejar Evolución completa`, s2.pend.length === 0 && s2.evo === s0.evo && s2.explore === s0.explore, JSON.stringify({ s0, s2 }));
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-  {
-    // R5 · borrar una posición con una fuente en vuelo: lo guardado mencionaba una
-    // posición que ya no existe ⇒ no se reutiliza (esqueleto honesto, luego resuelto).
-    const T = `[${E} P1 borrado 1440]`;
-    const P = persona('real');
-    const { ctx, page, errs } = await newPage(1440);
-    await boot(page, P, 'es');
-    await page.evaluate(SESSION(P, 'uA', { delay: 200 }));
-    await page.evaluate(`(function(){ _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1500);
-    const mid = JSON.parse(await page.evaluate(`(function(){ var i=assets.findIndex(function(a){ return a.id==='a1'; }); assets.splice(i,1);
-      _aurixAssetMemory = { userId: 'uA', rows: [], state: 'loading', at: Date.now() };
-      var ph=document.getElementById('tabPlaceholder'); ph.innerHTML = renderIntelligenceTab(); _initIntelligenceCommandCenter();
-      var ex=document.querySelector('.intcc-explore'), ev=document.querySelector('.intv21-evo');
-      return JSON.stringify({ ex: ex ? ex.textContent : '', ev: ev ? ev.textContent : '' }); })()`));
-    ok(`${T} tras borrar Microsoft, lo guardado que la mencionaba no se reutiliza mientras llega la actualización`, !/Microsoft/.test(mid.ex + mid.ev), JSON.stringify(mid).slice(0, 300));
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-
-  // ── P2 · GRÁFICO: cadencia mixta de producción (diaria antigua + 15 min reciente) ──
-  if (!process.env.P0_ONLY) {
-    const T = `[${E} P2 gráfico]`;
-    const P = persona('real');
-    const { ctx, page, errs } = await newPage(1440);
-    await boot(page, P, 'es');
-    const g = JSON.parse(await page.evaluate(`(function(){
-      var D=864e5, now=Date.now(), pts=[], v=100000;
-      for (var t=now-70*D; t<now-35*D; t+=D) pts.push({ ts: t, v: v += 120 });            // retención: 1 fila/día
-      for (var t2=now-35*D; t2<now-10*D; t2+=15*60e3) pts.push({ ts: t2, v: v += 1 });    // capturas cada 15 min
-      var gapAt = now-10*D + 14*3600e3;                                                    // 14 h sin capturas (hueco REAL)
-      for (var t3=gapAt; t3<now; t3+=15*60e3) pts.push({ ts: t3, v: v += 1 });
-      var r = _intv22Svg({ pts: pts, unit: 'money' }, 'value');
-      // regla anterior (mediana GLOBAL): cuántos cortes habría producido
-      var gs=[]; for (var i=1;i<pts.length;i++) gs.push(pts[i].ts-pts[i-1].ts); var med=gs.slice().sort(function(a,b){return a-b;})[Math.floor(gs.length/2)];
-      var old=gs.filter(function(x){ return x > Math.max(6*3600e3, 2.5*med); }).length;
-      return JSON.stringify({ gaps: r.gaps, oldCuts: old, areas: (r.svg.match(/class="intv22-area"/g)||[]).length, bridge: /intv3-evo-bridge/.test(r.svg),
-        areaSubs: ((r.svg.match(/class="intv22-area" d="([^"]+)"/)||[,''])[1].match(/Z/g)||[]).length,
-        segs: ((r.svg.match(/class="intv21-evo-line"[^>]*d="([^"]+)"/)||[,''])[1].match(/M/g)||[]).length }); })()`));
-    ok(`${T} la regla anterior partía la historia diaria en ${g.oldCuts} tramos sueltos (causa del «código de barras»)`, g.oldCuts >= 20, JSON.stringify(g));
-    ok(`${T} ahora: sólo el hueco real de 14 h se corta, con puente discontinuo; un único path de relleno, sin rellenar el hueco`, g.gaps === 1 && g.segs === 2 && g.bridge && g.areas === 1 && g.areaSubs === 2, JSON.stringify(g));
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-
   // ── FREE / PREMIUM · plan contratado vs acceso efectivo (sólo presentación) ──
-  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const kind of ['free', 'premium', 'granted']) {
+  if (!process.env.P0_ONLY) for (const kind of ['free', 'premium', 'granted']) {
     const T = `[${E} plan ${kind} 390]`;
     const P = persona('real');
     const { ctx, page, errs } = await newPage(390);
@@ -399,7 +254,7 @@ for (const E of ENGINES) {
   }
 
   // ── PRESENTACIÓN · matriz de personas × idioma × ancho, sesión resuelta ──────
-  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const kind of (process.env.PERSONAS || 'real,qa14,fresh,calm,stale,flows').split(',')) for (const lng of (process.env.LANGS || 'es,en').split(',')) {
+  if (!process.env.P0_ONLY) for (const kind of (process.env.PERSONAS || 'real,qa14,fresh,calm,stale,flows').split(',')) for (const lng of (process.env.LANGS || 'es,en').split(',')) {
     const widths = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : ((kind === 'real' || kind === 'qa14') ? [390, 1024, 1440, 360] : [390, 1440]);
     for (const w of widths) {
       const T = `[${E} ${kind} ${lng} ${w}]`;
@@ -425,61 +280,6 @@ for (const E of ENGINES) {
       ok(`${T} Radar: cinco ejes, cinco marcadores, figura cerrada y valores finitos`, !r.radar || (r.radar.axes === 5 && r.radar.dots === 5 && r.radar.uniq === 5 && r.radar.closed && r.radar.finite), JSON.stringify(r.radar));
       ok(`${T} Explora: ninguna pregunta repetida y respuestas con conclusión`, new Set(r.qs).size === r.qs.length, JSON.stringify(r.qs));
       ok(`${T} cero hechos duplicados en el registro`, !r.dups || r.dups.length === 0, JSON.stringify(r.dups));
-      // ── SPEC casi final post-v810 ─────────────────────────────────────────────
-      const L = JSON.parse(await page.evaluate(`(function(){
-        var vis=function(e){ if(!e) return false; var r=e.getBoundingClientRect(); return r.width>0 && r.height>0 && getComputedStyle(e).display!=='none'; };
-        var root=document.querySelector('.aurix-intcc');
-        var KEYS=[['hero','intcc-hero'],['hero','intcc-m-hero'],['radar','intcc-radar'],['drivers','intcc-drivers'],['explore','intcc-explore'],['evo','intcc-timeline'],['scen','intv21-scen'],['today','intcc-watch']];
-        var kids=[].slice.call(root.children).filter(vis);
-        var kindOf=function(e){ for (var i=0;i<KEYS.length;i++) if (e.classList.contains(KEYS[i][1])) return KEYS[i][0]; return null; };
-        var dom=kids.map(kindOf).filter(Boolean);
-        var visual=kids.slice().sort(function(a,b){ var A=a.getBoundingClientRect(), B=b.getBoundingClientRect(); return (Math.round(A.top)-Math.round(B.top)) || (A.left-B.left); }).map(kindOf).filter(Boolean);
-        var titles=[].slice.call(root.querySelectorAll('.intcc-card .intcc-card-title, .intcc-hero-health-label')).filter(vis)
-          .filter(function(h){ return !h.closest('.intcc-m-hero') && !h.closest('.intv12-qcard'); })
-          .map(function(h){ var c=getComputedStyle(h); return [c.fontSize, c.fontWeight, c.letterSpacing, c.color, c.textTransform].join('/'); });
-        var scen=root.querySelector('.intv21-scen'), blocks=scen ? [].slice.call(scen.querySelectorAll('.intv22-scn-block')).filter(vis).map(function(b){ var r=b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }) : [];
-        var hoy=root.querySelector('.intcc-watch');
-        return JSON.stringify({ dom: dom, visual: visual, titles: titles, blocks: blocks, hoyN: hoy ? hoy.querySelectorAll('.intv4-story').length : 0,
-          scenOn: scen ? scen.getAttribute('data-scen') : null, foot: scen ? !!scen.querySelector('.intv21-foot') : false, tag: scen ? /Hipotético|Hypothetical/.test(scen.textContent) : false });
-      })()`));
-      const WANT = ['hero', 'radar', 'drivers', 'explore', 'evo', 'scen', 'today'];
-      ok(`${T} orden definitivo en el DOM: Hero → Radar → Factores → Explora → Evolución → Dependencias → Hoy`, JSON.stringify(L.dom.filter((k, i, a) => a.indexOf(k) === i)) === JSON.stringify(WANT.filter(k => L.dom.indexOf(k) !== -1)), JSON.stringify(L.dom));
-      ok(`${T} el orden visual coincide con el del DOM`, JSON.stringify(L.visual.filter((k, i, a) => a.indexOf(k) === i)) === JSON.stringify(L.dom.filter((k, i, a) => a.indexOf(k) === i)), JSON.stringify({ d: L.dom, v: L.visual }));
-      ok(`${T} todos los títulos de sección comparten token (tamaño, peso, tracking, color)`, new Set(L.titles).size === 1, JSON.stringify(Array.from(new Set(L.titles))));
-      ok(`${T} Dependencias: hipotético en el encabezado, sin nota inferior; escenarios ${w >= 1024 ? 'en vertical' : (w >= 768 ? 'en fila' : 'en pestañas')}`, L.tag && !L.foot
-        && (w >= 1024 ? (L.blocks.length === 3 && L.blocks.every(b => Math.abs(b[0] - L.blocks[0][0]) <= 1) && L.blocks[1][1] > L.blocks[0][1]) : true), JSON.stringify(L));
-      ok(`${T} Hoy publica como mucho tres hechos`, L.hoyN <= 3, String(L.hoyN));
-      if (kind === 'real') ok(`${T} cuenta madura: Explora ofrece 3–4 preguntas`, r.qs.length >= 3 && r.qs.length <= 4, JSON.stringify(r.qs));
-      if ((w === 1440 || w === 390) && await page.evaluate(`!!document.querySelector('.intv21-evo-plot')`)) {
-        // Estabilidad: cambiar métrica/periodo no cambia la altura de Evolución ni mueve Hoy.
-        const H = async () => JSON.parse(await page.evaluate(`JSON.stringify({ evo: Math.round(document.querySelector('.intcc-timeline').getBoundingClientRect().height), plot: Math.round(document.querySelector('.intv21-evo-plot').getBoundingClientRect().height), hoy: Math.round(document.querySelector('.intcc-watch') ? document.querySelector('.intcc-watch').getBoundingClientRect().top + scrollY : 0) })`));
-        const h0 = await H(); const hs = [];
-        for (const m of await page.evaluate(`[].slice.call(document.querySelectorAll('.intv21-evo [data-intv21-evo-metric]')).map(function(b){ return b.getAttribute('data-intv21-evo-metric'); })`)) {
-          await page.locator(`.intv21-evo [data-intv21-evo-metric="${m}"]:visible`).first().click(); await page.waitForTimeout(150);
-          for (const wn of await page.evaluate(`[].slice.call(document.querySelectorAll('.intv21-evo [data-intv21-evo-win]')).map(function(b){ return b.getAttribute('data-intv21-evo-win'); })`)) {
-            await page.locator(`.intv21-evo [data-intv21-evo-win="${wn}"]:visible`).first().click(); await page.waitForTimeout(120);
-            const h = await H(); h.k = m + '/' + wn; hs.push(h);
-            const g = JSON.parse(await page.evaluate(`JSON.stringify({ areas: document.querySelectorAll('.intv21-evo .intv22-area').length, stems: document.querySelectorAll('.intv21-evo .intv21-evo-stem').length, segs: ((document.querySelector('.intv21-evo-line')||{getAttribute:function(){return '';}}).getAttribute('d').match(/M/g)||[]).length, pts: Number(document.querySelector('.intv21-evo').getAttribute('data-points')), gaps: Number(document.querySelector('.intv21-evo').getAttribute('data-gaps')) })`));
-            ok(`${T} gráfico ${m}/${wn}: un solo relleno, sin tallos, tramos = huecos reales + 1`, g.areas === 1 && g.stems === 0 && g.segs === g.gaps + 1, JSON.stringify(g));
-          }
-        }
-        ok(`${T} Evolución conserva su altura y Hoy no se mueve al cambiar métrica y periodo`, hs.every(h => (w >= 1024 ? h.evo === h0.evo : Math.abs(h.evo - h0.evo) <= 1) && h.plot === h0.plot && Math.abs(h.hoy - h0.hoy) <= 1), JSON.stringify({ h0, hs }));
-        // Etiquetas: cada una navega a su destino, lo selecciona y mueve el foco.
-        const tagIds = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width>0; }).map(function(t){ return t.querySelector('.intv21-tag-go').getAttribute('data-intv21-go'); })`);
-        for (const go of tagIds) {
-          await page.evaluate(`window.scrollTo(0,0)`); await page.waitForTimeout(80);
-          await page.locator(`.intv21-tag-go[data-intv21-go="${go}"]:visible`).first().click(); await page.waitForTimeout(700);
-          const nav = JSON.parse(await page.evaluate(`(function(){ var go=${JSON.stringify(go)}, p=go.split(':'); var a=document.activeElement; var card=a && a.closest ? a.closest('.intcc-card') : null;
-            var evo=document.querySelector('.intv21-evo'), sc=document.querySelector('.intv21-scen');
-            return JSON.stringify({ card: card ? card.className.split(' ').slice(0,3).join('.') : null, y: Math.round(scrollY), evo: evo ? evo.getAttribute('data-metric')+':'+evo.getAttribute('data-win') : null, scen: sc ? sc.getAttribute('data-scen') : null,
-              fact: p[0]==='today' ? !!document.querySelector('.intcc-watch [data-fact="'+p.slice(1).join(':')+'"]') : null, flash: !!document.querySelector('.intv3-flash') }); })()`));
-          const k = go.split(':');
-          const okDest = (k[0] === 'evolution' ? /intcc-timeline/.test(nav.card) && nav.evo === k[1] + ':' + k[2]
-            : k[0] === 'scenarios' ? /intv21-scen/.test(nav.card) && nav.scen === k[1]
-            : k[0] === 'today' ? /intcc-watch/.test(nav.card) && nav.fact === true : /intcc-drivers/.test(nav.card));
-          ok(`${T} etiqueta «${go}» lleva a su destino, lo selecciona y mueve el foco`, okDest && nav.y > 0, JSON.stringify(nav));
-        }
-      }
       if (w === 390 || w === 1440) {
         // Etiquetas estables: volver y recargar con los mismos hechos.
         const t0 = r.tags.join(',');

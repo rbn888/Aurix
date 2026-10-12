@@ -21387,9 +21387,8 @@ body.gs-open { overflow: hidden; }
      nadie puede leer en la hoja de estilos. Se renumera explícitamente.
      El ORDEN VISUAL de las demás cards no cambia: sólo se abre un hueco. */
   .intv14-cmp      { order: 10; }
-  /* ORDEN DEFINITIVO: … Explora → Tu evolución → Dependencias → Lo que importa hoy. */
-  .intcc-timeline  { order: 6; }
-  .intcc-watch     { order: 8; }
+  .intcc-watch     { order: 6; }
+  .intcc-timeline  { order: 7; }
   .intv5-structure { order: 11; }
   .intv4-changed   { order: 13; }
   .intv4-discovery { order: 14; }
@@ -30561,14 +30560,11 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-discovery,
   .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-log,
   .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-disclaimer { grid-row: auto; }
-  /* Fila de análisis: Evolución (principal) | Dependencias (secundaria). Hoy y
-     «Qué movió» cierran a ancho completo. Sin una de las dos, la otra ocupa la fila. */
-  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-timeline { grid-column: 1 / 8; }
-  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-scen    { grid-column: 8 / 13; }
-  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-watch    { grid-column: 1 / 13; }
-  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-movers  { grid-column: 1 / 13; }
-  .aurix-intcc.aurix-intv21.aurix-intv21:not(:has(> .intv21-scen)) > .intcc-timeline { grid-column: 1 / 13; }
-  .aurix-intcc.aurix-intv21.aurix-intv21:not(:has(> .intcc-timeline)) > .intv21-scen { grid-column: 1 / 13; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-watch    { grid-column: 1 / 7; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intcc-timeline { grid-column: 7 / 13; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-movers  { grid-column: 1 / 7; }
+  .aurix-intcc.aurix-intv21.aurix-intv21 > .intv21-scen    { grid-column: 7 / 13; }
+  .aurix-intcc.aurix-intv21.aurix-intv21:not(:has(> .intv21-movers)) > .intv21-scen { grid-column: 1 / 13; }
   .aurix-intcc.aurix-intv21.aurix-intv21 > .intv9-disc,
   .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-changed,
   .aurix-intcc.aurix-intv21.aurix-intv21 > .intv4-discovery,
@@ -30580,8 +30576,8 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 /* UNA COLUMNA (≤1023px): el MISMO orden que escritorio. Las cards existentes lo
    declaran en su bloque; aquí sólo las nuevas, sin repetir ningún valor. */
 @media (max-width: 1023px) {
-  .intv21-scen   { order: 7; }
-  .intv21-movers { order: 9; }
+  .intv21-movers { order: 8; }
+  .intv21-scen   { order: 9; }
   .intv21-log    { order: 15; }
 }
 
@@ -30610,12 +30606,6 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 /* ── Hoy: los hechos de 24 h comparten la anatomía de la historia ── */
 .intv21-today .intv4-story-head { font-size: 14.5px; }
 .intv21-today.has-icon { display: flex; align-items: center; gap: 12px; }
-/* Hoy cierra la pantalla a ancho completo y COMPACTO: de dos a tres hechos se
-   reparten en columnas en escritorio; uno solo ocupa su altura, sin hueco. */
-@media (min-width: 1024px) {
-  .aurix-intv21 > .intcc-watch .intv4-story-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); column-gap: 28px; }
-  .aurix-intv21 > .intcc-watch .intv4-story { border-top: 0; }
-}
 .intv3-today-iconwrap { flex: 0 0 auto; display: inline-flex; }
 .intv21-today .intv3-today-icon { width: 28px; height: 28px; font-size: 11px; }
 
@@ -30627,29 +30617,7 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .aurix-intv21 .intcc-hero-intel::after,
 .aurix-intv21 .intcc-m-hero::after {
   content: ''; position: absolute; left: 18px; right: 18px; top: 0; height: 1px; pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(255,233,190,0) 0%, rgba(255,233,190,0.95) 50%, rgba(255,233,190,0) 100%) no-repeat,
-    linear-gradient(90deg, rgba(222,186,118,0), rgba(222,186,118,0.5) 30%, rgba(222,186,118,0.5) 70%, rgba(222,186,118,0));
-  background-size: 22% 100%, 100% 100%;
-  background-position: -30% 0, 0 0;
-  /* Un destello lento recorre el filo y descansa: ~1,8 s de recorrido cada 9 s. */
-  animation: intv3GoldSweep 9s ease-in-out 1.2s infinite;
-}
-@keyframes intv3GoldSweep {
-  0%   { background-position: -30% 0, 0 0; }
-  20%  { background-position: 130% 0, 0 0; }
-  100% { background-position: 130% 0, 0 0; }
-}
-/* Realce breve del destino al que lleva una etiqueta del hero. */
-.intv3-flash { animation: intv3Flash 1.2s ease-out 1; border-radius: 12px; }
-@keyframes intv3Flash {
-  0%   { box-shadow: 0 0 0 0 rgba(110,160,255,0); }
-  25%  { box-shadow: 0 0 0 2px rgba(110,160,255,0.55), 0 0 22px rgba(110,160,255,0.25); }
-  100% { box-shadow: 0 0 0 0 rgba(110,160,255,0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .aurix-intv21 .intcc-hero-intel::after, .aurix-intv21 .intcc-m-hero::after { animation: none; }
-  .intv3-flash { animation: none; }   /* sin movimiento: el foco ya marca el destino */
+  background: linear-gradient(90deg, rgba(222,186,118,0), rgba(222,186,118,0.55) 30%, rgba(222,186,118,0.55) 70%, rgba(222,186,118,0));
 }
 .aurix-intv21 .intcc-hero-body .intcc-eyebrow,
 .aurix-intv21 .intcc-m-hero .intcc-card-title { color: rgba(226,196,138,0.92); }
@@ -30781,30 +30749,9 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 /* Cifras completas en móvil: con importes largos los KPIs se apilan en dos filas
    (Inicio · Último dato arriba, Cambio a lo ancho) antes que encoger la letra. */
 @media (max-width: 420px) {
-  /* El MISMO reparto en todas las métricas: cambiar de métrica no mueve lo de abajo. */
-  .intv22-evo .intv22-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .intv22-evo .intv22-stats > div:last-child { grid-column: 1 / -1; }
+  .intv22-evo[data-metric="value"] .intv22-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .intv22-evo[data-metric="value"] .intv22-stats > div:last-child { grid-column: 1 / -1; }
 }
-/* ── Paleta por métrica (un token: línea, puntos, relleno, chip activo y Cambio) ──
-   Mayor posición índigo · Reparto cian · Liquidez turquesa · Valor violeta ·
-   Rentabilidad verde/rojo SÓLO según su resultado. */
-.intv22-evo { --evo-rgb: 92,156,255; }
-.intv22-evo[data-metric="top"]       { --evo-rgb: 122,134,255; }
-.intv22-evo[data-metric="effective"] { --evo-rgb: 72,196,232; }
-.intv22-evo[data-metric="liquidity"] { --evo-rgb: 64,206,190; }
-.intv22-evo[data-metric="value"]     { --evo-rgb: 150,120,255; }
-.intv22-evo[data-metric="return"][data-dir="up"]   { --evo-rgb: 95,214,160; }
-.intv22-evo[data-metric="return"][data-dir="down"] { --evo-rgb: 233,120,110; }
-.intv22-evo .intv21-evo-line { stroke: rgb(var(--evo-rgb)); filter: drop-shadow(0 0 6px rgba(var(--evo-rgb),0.40)); }
-.intv22-evo .intv22-area { fill: rgba(var(--evo-rgb),0.10); }
-.intv22-evo .intv21-evo-dot { background: rgb(var(--evo-rgb)); box-shadow: 0 0 8px rgba(var(--evo-rgb),0.5); }
-.intv22-evo .intv21-evo-dot.is-end { background: rgb(var(--evo-rgb)); }
-.intv22-evo .intv22-cursor-dot { border-color: rgb(var(--evo-rgb)); box-shadow: 0 0 10px rgba(var(--evo-rgb),0.75); }
-.intv22-evo .intv21-seg:not(.is-win) .intv21-chip.is-on { border-color: rgba(var(--evo-rgb),0.6); background: rgba(var(--evo-rgb),0.18); box-shadow: inset 0 0 12px rgba(var(--evo-rgb),0.2); }
-.intv22-evo .intv22-stats dd.is-neutral { color: rgb(var(--evo-rgb)); }
-.intv3-evo-bridge { fill: none; stroke: rgba(var(--evo-rgb, 92,156,255),0.55); stroke-width: 1.5; stroke-dasharray: 3 5; vector-effect: non-scaling-stroke; }
-.intv21-evo-plot.is-anim .intv3-evo-bridge { opacity: 0; animation: intv21Fade 0.5s ease 0.45s forwards; }
-@media (prefers-reduced-motion: reduce) { .intv21-evo-plot.is-anim .intv3-evo-bridge { animation: none; opacity: 1; } }
 .intv22-area { fill: rgba(92,156,255,0.10); stroke: none; }
 .intv21-evo-plot.is-anim .intv22-area { opacity: 0; animation: intv21Fade 0.6s ease 0.3s forwards; }
 .intv22-cursor-dot {
@@ -30814,21 +30761,12 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv22-cursor-dot.is-on { opacity: 1; }
 .intv22-evo .intv21-evo-axis { gap: 8px; }
 .intv22-evo .intv21-evo-axis > span:nth-child(2) { flex: 1 1 auto; text-align: center; }
-/* Esqueleto con la FORMA del contenido (sólo primera carga real): titular,
-   controles, tres KPIs y el área del gráfico a su altura definitiva. */
-.intv3-sk {
-  display: block; border-radius: 10px;
+.intv22-skel {
+  height: 300px; border-radius: 12px;
   background: linear-gradient(100deg, rgba(255,255,255,0.03) 30%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 70%);
   background-size: 200% 100%; animation: intv22Shimmer 1.6s linear infinite;
 }
-.intv3-sk-head { height: 18px; width: 72%; margin: 4px 0 18px; }
-.intv3-sk-row { display: flex; gap: 8px; margin-bottom: 14px; }
-.intv3-sk-chip { height: 32px; width: 92px; border-radius: 999px; }
-.intv3-sk-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
-.intv3-sk-kpis > .intv3-sk { height: 52px; }
-.intv3-sk-plot { height: 168px; border-radius: 12px; }
-.intv3-sk-list { display: flex; flex-direction: column; gap: 8px; }
-.intv3-sk-list > .intv3-sk { height: 52px; }
+.intv22-skel.is-list { height: 220px; }
 @keyframes intv22Shimmer { to { background-position: -200% 0; } }
 
 /* Dependencias y escenarios: tres bloques comparables desde 768 px; pestañas y un
@@ -30846,16 +30784,7 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 @media (min-width: 768px) {
   .intv22-scen .intv22-scn-tabs { display: none; }
   .intv22-scen .intv22-scn-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 0; }
-  /* El escenario ligado al hallazgo principal queda destacado (azul, no dorado). */
-  .intv22-scen .intv22-scn-block.is-on { border-color: rgba(110,160,255,0.38); background: rgba(74,130,240,0.07); }
-}
-/* Escritorio: Dependencias es la columna junto a Evolución ⇒ escenarios en vertical. */
-@media (min-width: 1024px) {
-  .aurix-intv21 > .intv21-scen .intv22-scn-grid { grid-template-columns: minmax(0, 1fr); }
-}
-.intv3-scn-tag {
-  display: inline-block; margin-left: 10px; padding: 2px 8px; border-radius: 999px; vertical-align: 1px;
-  font-size: 9.5px; letter-spacing: 0.08em; color: rgba(190,210,245,0.85); border: 1px solid rgba(150,180,240,0.28);
+  .intv22-scen .intv22-scn-block.is-on { border-color: rgba(255,255,255,0.06); }
 }
 @media (max-width: 767px) {
   .intv22-scen .intv22-scn-block:not(.is-on) { display: none; }
@@ -30863,6 +30792,6 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   .intv22-evo .intv21-chip { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .intv3-sk { animation: none; }
+  .intv22-skel { animation: none; }
   .intv21-evo-plot.is-anim .intv22-area { animation: none; opacity: 1; }
 }
