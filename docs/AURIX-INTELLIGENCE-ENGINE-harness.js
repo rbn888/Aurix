@@ -1783,8 +1783,13 @@ group('V · estabilización · lo que el founder reprodujo en QA autenticada');
       return r.length === 0; })());
   // RE-DECIDIDO (SPEC MEMORIA ÚTIL §3): titular + evidencias, en UNA sola lista.
   ok('V.17 UNA sola lista: la unión blanca del raíl se resuelve por estructura',
+    // RE-DECIDIDO (V2.1): la card tiene dos ramas que pintan evidencias (titular de
+    // la métrica activa, y la heredada sin módulo). El invariante es UNA lista por
+    // card PINTADA: se mide por cada `return` de plantilla, no sobre todo el fuente.
     (() => { const m = fnSrc('_intv4MemoryHtml');
-      return (m.match(/class="intv15-stable-list"/g) || []).length === 1
+      const branches = m.split('return `').slice(1);
+      return branches.length >= 1 && branches.every(b => (b.match(/class="intv15-stable-list"/g) || []).length <= 1)
+        && (m.match(/class="intv15-stable-list"/g) || []).length >= 1
         && !/class="intcc-tl-list"/.test(m) && !/intv9-mem-declared/.test(m); })());
   // §15 — EL SCROLL DEJA DE RESERVAR ALTURA. `max-height` incondicional montaba
   // un contenedor con barra propia incluso con tres recuerdos, y el resultado era
