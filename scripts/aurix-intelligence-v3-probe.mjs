@@ -376,6 +376,151 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // ── V7 · P0 · EXPLORA RESPONDE Y SE VE; CARGA ACOTADA; DEPENDENCIAS SIN RECORTE ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng, kind] of (process.env.V7_MATRIX || '1024:es:real,390:es:real,1440:en:qa14,360:es:cash').split(',').map(x => x.split(':'))) {
+    const W7 = Number(w), T = `[${E} V7 ${kind} ${W7} ${lng}]`;
+    if (!W7) continue;
+    const P = persona(kind);
+    const { ctx, page, errs } = await newPage(W7);
+    await boot(page, P, lng);
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1600);
+    await page.mouse.move(1, 1);
+    // Explora: cada pregunta abre SU respuesta, visible y legible (elementFromPoint), y se cierra.
+    const ids = await page.evaluate(`[].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).map(function(b){ return b.getAttribute('data-intcc-q'); })`);
+    const res = [];
+    const vis = (id) => page.evaluate(`(function(){ var b=document.querySelector('[data-intcc-q="' + ${JSON.stringify(id)} + '"]'); var a=document.getElementById(b.getAttribute('aria-controls'));
+      var inn=a && a.querySelector('.intcc-x-answer-in p, .intcc-x-answer-in'); if(!inn) return { ok:false, why:'no-answer' }; a.parentElement.scrollIntoView({ block: 'center', behavior: 'instant' });
+      var r=inn.getBoundingClientRect(); var z=a.parentElement.getBoundingClientRect();
+      var cx=r.left+Math.min(40, r.width/2), cy=Math.max(r.top, z.top)+8; var hit=document.elementFromPoint(cx, cy);
+      return { ok: !!hit && a.contains(hit) && z.height >= 40 && r.height >= 14, zh: Math.round(z.height), ah: Math.round(r.height), exp: b.getAttribute('aria-expanded'), hit: hit ? hit.className : null,
+        uniq: document.querySelectorAll('[id="' + b.getAttribute('aria-controls') + '"]').length }; })()`);
+    for (const id of ids) {
+      await page.evaluate(`document.querySelector('[data-intcc-q="${id}"]').scrollIntoView({ block: 'center', behavior: 'instant' })`);
+      await page.locator(`[data-intcc-q="${id}"]`).click(); await page.mouse.move(1, 1); await page.waitForTimeout(800);
+      const o = await vis(id);
+      await page.locator(`[data-intcc-q="${id}"]`).click(); await page.waitForTimeout(250);
+      const closed = await page.evaluate(`document.querySelectorAll('.intcc-explore .intcc-x-answer.is-open').length === 0 && document.querySelector('[data-intcc-q="${id}"]').getAttribute('aria-expanded') === 'false'`);
+      res.push({ id, ...o, closed });
+    }
+    ok(`${T} Explora: cada pregunta abre SU respuesta visible y legible, y se cierra al volver a pulsarla`, ids.length >= 2 && res.every(x => x.ok && x.exp === 'true' && x.uniq === 1 && x.closed), JSON.stringify(res));
+    // Teclado: Enter y Espacio.
+    if (ids.length) {
+      await page.focus(`[data-intcc-q="${ids[0]}"]`); await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+      const k1 = await page.evaluate(`document.querySelector('[data-intcc-q="${ids[0]}"]').getAttribute('aria-expanded')`);
+      await page.keyboard.press('Space'); await page.waitForTimeout(250);
+      const k2 = await page.evaluate(`document.querySelector('[data-intcc-q="${ids[0]}"]').getAttribute('aria-expanded')`);
+      ok(`${T} Explora: Enter abre y Espacio cierra`, k1 === 'true' && k2 === 'false', JSON.stringify([k1, k2]));
+    }
+    // Dependencias en todo el rango: sin recorte, tres cards visibles, sin superficies encima.
+    const sim = [];
+    for (const v of [-50, -25, -10, 0, 10, 25, 35, 50]) {
+      const r = JSON.parse(await page.evaluate(`(function(){ var s=document.querySelector('.intv21-scen input[type="range"]'); s.value=${v}; s.dispatchEvent(new Event('input',{bubbles:true}));
+        return new Promise(function(res){ setTimeout(function(){ var sc=document.querySelector('.intv21-scen'); sc.scrollIntoView({ block: 'center' }); var cr=sc.getBoundingClientRect();
+          var bad=[]; [].slice.call(sc.querySelectorAll('.intv22-scn-block p, .intv22-scn-block .intv21-scn-val, .intv5-sim-value')).forEach(function(e){ e.scrollIntoView({ block: 'center' }); var r=e.getBoundingClientRect(); if(!r.width) return;
+            if (r.right > cr.right + 1 || r.left < cr.left - 1 || e.scrollWidth > e.clientWidth + 1) bad.push('clip:' + e.className);
+            var h=document.elementFromPoint(r.left + Math.min(6, r.width/2), r.top + r.height/2); if (h && !sc.contains(h)) bad.push('covered:' + e.className + '>' + (h.className||h.tagName)); });
+          res(JSON.stringify({ v: ${v}, h: Math.round(cr.height), bad: bad, blocks: [].slice.call(sc.querySelectorAll('.intv22-scn-block')).filter(function(b){ return b.getBoundingClientRect().height > 0; }).length })); }, 420); }); })()`));
+      sim.push(r);
+    }
+    ok(`${T} Dependencias −50…+50 (incl. +35): sin recortes, sin capas encima, tres resultados y altura constante`, sim.every(x => !x.bad.length && x.blocks === 3) && new Set(sim.map(x => x.h)).size === 1, JSON.stringify(sim.filter(x => x.bad.length).concat([{ hs: sim.map(x => x.h) }])));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+  // Carga: snapshots del servidor todavía cargando y memoria sin arrancar ⇒ el esqueleto no dura.
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) {
+    const T = `[${E} V7 carga lenta 390]`;
+    const P = persona('real');
+    const { ctx, page, errs } = await newPage(390);
+    await boot(page, P, 'es');
+    await page.evaluate(SESSION(P, 'uA', { delay: 300 }));
+    // Las fuentes del gráfico en una espera transitoria que no termina (reconciliación
+    // remota sin asentar) y la memoria por posición SIN arrancar: la combinación que en v814
+    // dejaba Explora y Evolución en esqueleto (esperaban a las dos).
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; switchTab('intelligence'); setTimeout(function(){ _aurixRemoteLoadOutcome = null; window.__t0 = Date.now(); _aurixIntelScheduleRefresh(); }, 0); })()`);
+    // Sondeo desde Node (no `waitForFunction`): aquí el sondeo en página dejaba sin turno a
+    // los temporizadores de la propia app y el cambio de pestaña no llegaba a ocurrir.
+    let t = null;
+    for (let i = 0; i < 100 && t == null; i++) {
+      await page.waitForTimeout(100);
+      t = await page.evaluate(`(function(){ var p=[].slice.call(document.querySelectorAll('[data-pending="1"]')).filter(function(e){ return e.getBoundingClientRect().height>0; }); return p.length === 0 && document.querySelector('.intcc-explore:not(.is-pending)') && document.querySelector('.intv21-evo:not(.is-pending)') ? Date.now() - window.__t0 : null; })()`);
+    }
+    const dbg = await page.evaluate(`JSON.stringify({ tab: currentTab, mem: _aurixAssetMemory.state + ':' + (_aurixAssetMemory.rows||[]).length, src: _aurixChartPublicationSourcesPending(), calls: window.__memCalls })`);
+    ok(`${T} con las fuentes del gráfico aún en espera y la memoria sin arrancar, Explora y Evolución se resuelven en < 3 s`, t != null && t < 3000 && /remote_load_not_settled/.test(dbg), String(t) + ' ' + dbg);
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
+  // ── V7 · REVISIÓN FINANCIERA: un fallo no transitorio no repinta en cada tick, y la
+  // memoria que llega tarde (> tope) no deja fijado un Explora sin sus preguntas.
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY && process.env.V7_MATRIX !== 'none:es' || process.env.V7_REVIEW) {
+    {
+      const T = `[${E} V7 fallo persistente 390]`;
+      const P = persona('real');
+      const { ctx, page, errs } = await newPage(390);
+      await boot(page, P, 'es');
+      await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+      await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1500);
+      await page.evaluate(`(function(){ _aurixRemoteLoadOutcome = 'failed'; _aurixCanonicalCatHistory = null; _aurixCanonicalHistoryLoaded = false; document.getElementById('tabPlaceholder').innerHTML = renderIntelligenceTab(); _intelRefreshSig = _aurixIntelMaterialSig(); })()`); await page.waitForTimeout(600);
+      const r = await page.evaluate(`(function(){ var s=document.querySelector('.aurix-intelligence-screen'); window.__scr = s; var held=!!document.querySelector('.intv21-evo[data-hist-held="1"]'); for (var i=0;i<4;i++) _aurixIntelScheduleRefresh(); return held; })()`);
+      await page.waitForTimeout(700);
+      const same = await page.evaluate(`window.__scr === document.querySelector('.aurix-intelligence-screen')`);
+      ok(`${T} con la historia retenida por un fallo NO transitorio, los refrescos no repintan Intelligence`, r && same, JSON.stringify({ held: r, same }));
+      ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+      await ctx.close();
+    }
+    {
+      const T = `[${E} V7 memoria tardía 390]`;
+      const P = persona('real');
+      const { ctx, page, errs } = await newPage(390);
+      await boot(page, P, 'es');
+      await page.evaluate(SESSION(P, 'uA', { delay: 9500 }));
+      await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; switchTab('intelligence'); })()`);
+      await page.waitForTimeout(8900);
+      const a = JSON.parse(await page.evaluate(`JSON.stringify({ mem: _aurixAssetMemory.state, ex: !!document.querySelector('.intcc-explore:not(.is-pending)'), fixed: !!(_intv21Read().explore22) })`));
+      await page.waitForTimeout(2500);
+      const b = JSON.parse(await page.evaluate(`JSON.stringify({ mem: _aurixAssetMemory.state, fixed: !!(_intv21Read().explore22), ids: (_intv21Read().explore22||{}).ids || [] })`));
+      ok(`${T} vencido el tope, Explora se publica pero NO fija el conjunto con la memoria en vuelo`, a.mem === 'loading' && a.ex && !a.fixed, JSON.stringify(a));
+      ok(`${T} al llegar la memoria, el conjunto fijado incluye sus preguntas`, b.mem === 'ready' && b.fixed && b.ids.includes('x22_conc_why'), JSON.stringify(b));
+      ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+      await ctx.close();
+    }
+  }
+
+  // ── V7 · UNIVERSO MÍNIMO Y EVOLUCIÓN (fecha del último dato, cambio de líder, reparto) ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const kind of (process.env.V7_UNIVERSE || 'cashonly,one,stale,real').split(',')) {
+    if (kind === 'none') continue;
+    const T = `[${E} V7 universo ${kind} 390]`;
+    const P = persona(kind);
+    const { ctx, page, errs } = await newPage(390);
+    await boot(page, P, 'es');
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1800);
+    const U = JSON.parse(await page.evaluate(`(function(){ var txt=function(e){ return e ? e.textContent.replace(/\\s+/g,' ').trim() : ''; };
+      var vis=function(e){ return e && e.getBoundingClientRect().height>0; };
+      var drv=document.querySelector('.intcc-drivers'), evo=document.querySelector('.intv21-evo');
+      var pend=[].slice.call(document.querySelectorAll('[data-pending="1"],[data-hydrating="1"]')).filter(vis).length;
+      var dl=evo ? [].slice.call(evo.querySelectorAll('.intv22-stats > div')) : [];
+      var chip=evo ? evo.querySelector('[data-intv21-evo-metric="effective"]') : null;
+      var notes=document.querySelectorAll('[id="intv7-evo-note-effective"]').length;
+      return JSON.stringify({ pend: pend, rank: drv ? [].slice.call(drv.querySelectorAll('.intcc-drv-row .intcc-drv-name')).map(function(n){ return n.firstChild ? n.firstChild.textContent.trim() : ''; }) : [],
+        evo: !!evo, metric: evo ? evo.getAttribute('data-metric') : null, kpi1: dl[1] ? txt(dl[1]) : '', kpi2dt: dl[2] ? txt(dl[2].querySelector('dt')) : '', asof: evo ? !!evo.querySelector('.intv7-asof') : false,
+        chipDesc: chip ? chip.getAttribute('aria-describedby') : null, notes: notes, top: evo ? txt(evo.querySelector('.intv22-head')) : '',
+        xq: [].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).length, ex: !!document.querySelector('.intcc-explore') }); })()`));
+    ok(`${T} nada se queda cargando`, U.pend === 0, JSON.stringify(U));
+    ok(`${T} Factores nunca lista la liquidez como inversión`, !U.rank.some(n => /Euros/.test(n)), JSON.stringify(U.rank));
+    if (kind === 'cashonly') ok(`${T} sólo liquidez: ni Evolución de «mayor inversión» ni pregunta de inversiones inventada`, !(U.evo && U.metric === 'top') && !/Euros/.test(U.top), JSON.stringify(U));
+    if (kind === 'one') ok(`${T} una inversión: la mayor inversión es Bitcoin, nunca Euros`, !/Euros/.test(U.top + U.kpi1), JSON.stringify(U));
+    if (kind === 'stale') ok(`${T} el último dato antiguo dice su fecha («Dato del …»)`, U.asof && /Dato del \d/.test(U.kpi1), JSON.stringify(U));
+    if (kind === 'real') {
+      ok(`${T} dato actual: «Último dato» sin fecha visible añadida`, !U.asof, JSON.stringify(U));
+      ok(`${T} cambio de líder: «Cambio del peso máximo» se explica (accesible)`, /Cambio del peso máximo\. Tu mayor inversión cambió de Bitcoin a Microsoft/.test(U.kpi2dt), U.kpi2dt);
+      ok(`${T} «Reparto» se explica UNA vez y el chip la referencia`, U.notes === 1 && U.chipDesc === 'intv7-evo-note-effective', JSON.stringify(U));
+    }
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ── V6 · CONTRATO FINANCIERO ÚNICO: la liquidez no es una inversión ──────────
   if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng] of (process.env.V6_MATRIX || '360:es,375:en,390:es,768:es,1024:es,1440:es,1440:en').split(',').map(x => x.split(':'))) {
     const W6 = Number(w), T = `[${E} V6 cash ${W6} ${lng}]`;

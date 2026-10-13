@@ -20837,6 +20837,9 @@ body.gs-open { overflow: hidden; }
 .aurix-intv6 .intcc-explore.has-reserve.is-x-open .intcc-explore-list,
 .intcc-explore.has-reserve.is-x-open .intcc-explore-list { flex: 0 0 auto; justify-content: flex-start; overflow: visible; }
 .intv6-x-answers { display: none; }
+/* Medición (síncrona, sin pintar): la zona en flujo pero invisible. */
+.intcc-explore.is-pending .intv7-x-sk-zone { display: block; height: 132px; margin-top: 12px; border-radius: 12px; background: rgba(255,255,255,0.025); }
+.intcc-explore.is-measuring .intv6-x-answers { display: block; visibility: hidden; }
 .intcc-explore.is-x-open .intv6-x-answers { display: block; flex: 1 1 auto; min-height: 0; margin-top: 10px; overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid rgba(74,130,240,0.30); border-radius: 12px; background: rgba(74,130,240,0.05); scrollbar-width: thin; }
 .intv6-x-answers .intcc-x-answer.is-open > .intcc-x-answer-in { border-top: 0; }
@@ -30827,6 +30830,7 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv22-stats > div { min-width: 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); }
 .intv22-stats dt { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(150,180,240,0.7); }
 .intv22-stats dd { margin: 3px 0 0; font-size: 14px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.3; }
+.intv22-stats dd .intv7-asof { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: rgba(200,214,240,0.72); }
 .intv22-stats dd.is-up { color: #8fe6b6; }
 .intv22-stats dd.is-down { color: #f3cf9a; }
 /* Cambio sin valoración (pesos, reparto, valor con aportaciones): azul, no verde/rojo. */
@@ -30888,6 +30892,12 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv22-scn-block { min-width: 0; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.06); }
 .intv22-scn-kind { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(150,180,240,0.75); }
 .intv22-scn-subject { margin: 4px 0 0; font-size: 13.5px; font-weight: 650; line-height: 1.35; color: var(--text-bright); overflow-wrap: anywhere; }
+/* El slider cambia la frase («bajara un 10 %» / «no cambiara» / «subiera un 25 %») y el
+   importe: se reservan sus líneas para que la sección NO cambie de altura en todo el
+   rango (era el «recorte» aparente a +35). */
+.intv22-scen .intv22-scn-subject { min-height: 2.7em; }
+.intv22-scen .intv5-sim-money { min-height: 1.4em; }
+@media (min-width: 768px) { .intv22-scen .intv22-scn-impact { min-height: 54px; align-content: flex-start; } }   /* cifra + unidad: dos líneas reservadas */
 .intv22-scn-shock { margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted); }
 .intv22-scn-impact { margin: 8px 0 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
 .intv22-scen .intv21-scn-val { font-size: 24px; }
