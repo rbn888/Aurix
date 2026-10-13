@@ -133,9 +133,7 @@ const READ = `(function(){
 })()`;
 // RE-DECIDIDO (V5): … Explora → Evolución → Hoy → Dependencias → Qué movió → Registro.
 const ORDER = ['intcc-hero', 'intcc-radar', 'intcc-drivers', 'intcc-explore', 'intcc-timeline', 'intcc-watch', 'intv21-scen', 'intv21-movers', 'intv21-log'];
-// RE-DECIDIDO (V7 §2): en ≤1023 px, Factores antes que Radar (también en el DOM).
-const ORDER_NARROW = ['intcc-hero', 'intcc-drivers', 'intcc-radar', 'intcc-explore', 'intcc-timeline', 'intcc-watch', 'intv21-scen', 'intv21-movers', 'intv21-log'];
-const orderOf = (cards, w) => cards.map(c => (w < 1024 ? ORDER_NARROW : ORDER).findIndex(o => c.c.split('.').indexOf(o) !== -1 || c.c.indexOf(o) === 0)).filter(i => i >= 0);
+const orderOf = (cards) => cards.map(c => ORDER.findIndex(o => c.c.split('.').indexOf(o) !== -1 || c.c.indexOf(o) === 0)).filter(i => i >= 0);
 const BASE = process.env.AURIX_V2_BASELINE, CMP = process.env.AURIX_V2_COMPARE;
 const prior = CMP && existsSync(CMP) ? JSON.parse(readFileSync(CMP, 'utf8')) : null;
 const baseline = {};
@@ -160,8 +158,8 @@ for (const E of ENGINES) {
       ok(`${T} sin scroll horizontal ni cards solapadas`, !r.hscroll && r.overlaps.length === 0 && r.cards.every(c => c.sw <= 1 || /intcc-m-hero|intcc-hero/.test(c.full)), JSON.stringify(r.overlaps) + JSON.stringify(r.cards.filter(c => c.sw > 1 && !/intcc-m-hero|intcc-hero/.test(c.full))));
       ok(`${T} cero hechos duplicados por fact_id/familia/periodo`, Array.isArray(r.dups) && r.dups.length === 0 && r.factsBad === 0, JSON.stringify(r.dups));
       ok(`${T} nunca «No hay nada que destacar» como contenido`, !/nada que destacar|nothing to highlight/i.test(r.screen));
-      const ord = orderOf(r.cards, w);
-      ok(`${T} orden: Intelligence+Salud → ${w < 1024 ? 'Factores/Radar' : 'Radar/Factores'}/Explora → Evolución/Hoy → Dependencias → Movió → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
+      const ord = orderOf(r.cards);
+      ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Evolución/Hoy → Dependencias → Movió → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
       if (prior && prior[key]) {
         const p = prior[key];
         // RE-DECIDIDO (V6): Factores cambia A PROPÓSITO (ranking de inversiones, liquidez aparte);
