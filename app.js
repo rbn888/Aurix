@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '777'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '776'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6026,8 +6026,6 @@ const T = {
     intv21_mv_foot: 'Contribución al resultado en puntos porcentuales, sin aportaciones ni retiradas. No es la subida del activo.',
     intv21_scn_title: 'Dependencias y escenarios',
     intv5_sim_lead: 'Elige un movimiento y compara su efecto en tus principales dependencias.',
-    intv8_dep_kind: 'Dependencia', intv8_dep_note: 'Escenario uniforme sobre los pesos actuales; no es una previsión.',
-    intv8_dep_choose: 'Elegir dependencia',
     intv5_sim_aria: 'Movimiento simulado', intv5_sim_less: 'Bajar 5 puntos', intv5_sim_more: 'Subir 5 puntos',
     intv5_if_top1_down: (n, p) => `Si ${n} bajara un ${p}`, intv5_if_top1_up: (n, p) => `Si ${n} subiera un ${p}`, intv5_if_top1_flat: n => `Si ${n} no cambiara`,
     intv5_if_top3_down: (n, p) => `Si tus tres mayores inversiones bajaran un ${p}`, intv5_if_top3_up: (n, p) => `Si tus tres mayores inversiones subieran un ${p}`, intv5_if_top3_flat: () => 'Si tus tres mayores inversiones no cambiaran',
@@ -9462,8 +9460,6 @@ const T = {
     intv21_mv_foot: 'Contribution to the result in percentage points, excluding contributions and withdrawals. Not the asset\'s own rise.',
     intv21_scn_title: 'Dependencies and scenarios',
     intv5_sim_lead: 'Choose a move and compare its effect on your main dependencies.',
-    intv8_dep_kind: 'Dependency', intv8_dep_note: 'Uniform scenario on current weights; not a forecast.',
-    intv8_dep_choose: 'Choose dependency',
     intv5_sim_aria: 'Simulated move', intv5_sim_less: 'Down 5 points', intv5_sim_more: 'Up 5 points',
     intv5_if_top1_down: (n, p) => `If ${n} fell ${p}`, intv5_if_top1_up: (n, p) => `If ${n} rose ${p}`, intv5_if_top1_flat: n => `If ${n} did not change`,
     intv5_if_top3_down: (n, p) => `If your three largest investments fell ${p}`, intv5_if_top3_up: (n, p) => `If your three largest investments rose ${p}`, intv5_if_top3_flat: () => 'If your three largest investments did not change',
@@ -72404,17 +72400,14 @@ const _INTV21_SEL = Object.freeze({
   movers: '.intv21-movers', scenarios: '.intv21-scen', log: '.intv21-log',
 });
 function _intv21Read() {
-  const def = { hidden: {}, shown: {}, evoMetric: null, evoWin: null, scen: null, explore22: null, deps: null };
+  const def = { hidden: {}, shown: {}, evoMetric: null, evoWin: null, scen: null, explore22: null };
   try {
     const o = (typeof _aurixIntelReadOwned === 'function') ? _aurixIntelReadOwned(_INTV21_KEY, {}) : null;
     if (!o) return def;
     const obj = (x) => (x && typeof x === 'object' && !Array.isArray(x)) ? x : {};
     const str = (x) => (typeof x === 'string' && x.length < 40) ? x : null;
     const ex = (o.explore22 && typeof o.explore22 === 'object' && Array.isArray(o.explore22.ids)) ? o.explore22 : null;
-    // Dependencias elegidas: sólo IDENTIDADES (`a:<id>` · `g:top3` · `c:<clase>`), nunca cifras.
-    // Una identidad inválida sólo anula SU hueco, nunca toda la selección.
-    const deps = (Array.isArray(o.deps) && o.deps.length <= 3) ? o.deps.map(k => (typeof k === 'string' && k.length <= 120 && /^(a|g|c):./.test(k)) ? k : null) : null;
-    return { hidden: obj(o.hidden), shown: obj(o.shown), evoMetric: str(o.evoMetric), evoWin: str(o.evoWin), scen: str(o.scen), explore22: ex, deps };
+    return { hidden: obj(o.hidden), shown: obj(o.shown), evoMetric: str(o.evoMetric), evoWin: str(o.evoWin), scen: str(o.scen), explore22: ex };
   } catch (_) { return def; }
 }
 function _intv21Write(patch) {
@@ -73278,101 +73271,9 @@ function _intv21Nearest(plot, clientX) {
   pts.forEach((p, i) => { const d = Math.abs(p[0] - fx); if (d < bd) { bd = d; best = i; } });
   return best;
 }
-// ── Selector de dependencia (popover de lista, accesible) ────────────────────
-function _intv8DepClose(except, refocus) {
-  document.querySelectorAll('.intv8-dep.is-dep-open').forEach(b => {
-    if (except && b === except) return;
-    b.classList.remove('is-dep-open', 'is-dep-up');
-    const btn = b.querySelector('[data-dep-open]'), list = b.querySelector('.intv8-dep-list');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-    if (list) { list.hidden = true; list.removeAttribute('aria-activedescendant'); }
-    if (refocus && btn) try { btn.focus({ preventScroll: true }); } catch (_) {}
-  });
-}
-// El catálogo del RENDER (mismos pesos y total que las cards ya pintadas): elegir otra
-// dependencia nunca mezcla dos instantáneas de precios.
-function _intv8DepCatOf(card) {
-  try { const c = JSON.parse(card.getAttribute('data-dep-cat') || 'null'); if (Array.isArray(c) && c.length) return c; } catch (_) {}
-  return _intv8DepCatalog(_intv21Weights());
-}
-function _intv8DepOpen(btn) {
-  const block = btn.closest('.intv8-dep'), card = btn.closest('.intv5-sim');
-  const list = block && block.querySelector('.intv8-dep-list');
-  if (!block || !card || !list) return;
-  _intv8DepClose(block);
-  const mine = block.getAttribute('data-dep'), slot = block.getAttribute('data-dep-slot');
-  const used = [].map.call(card.querySelectorAll('.intv8-dep'), b => b.getAttribute('data-dep')).filter(k => k !== mine);
-  const cat = _intv8DepCatOf(card);
-  // Las seis más materiales que NO usan las otras dos cards (ocultas, no deshabilitadas);
-  // la actual siempre está, marcada.
-  let opts = cat.filter(d => used.indexOf(d.key) === -1).sort((x, y) => y.w - x.w);
-  const cur = opts.find(d => d.key === mine);
-  opts = opts.slice(0, 6);
-  if (cur && opts.indexOf(cur) === -1) opts[opts.length - 1] = cur;
-  const esc = _intccEsc;
-  list.innerHTML = opts.map((d, i) => `<li class="intv8-dep-opt${d.key === mine ? ' is-on' : ''}" role="option" id="intv8-dep-o${slot}-${i}" data-dep-key="${esc(d.key)}" aria-selected="${d.key === mine ? 'true' : 'false'}"><span class="intv8-dep-oname">${esc(d.name)}</span><span class="intv8-dep-ow">${esc(_intv21Pct(d.w * 100, 0))}</span></li>`).join('');
-  list.hidden = false;
-  block.classList.add('is-dep-open');
-  btn.setAttribute('aria-expanded', 'true');
-  // Si no cabe por debajo dentro de la pantalla (nav inferior incluida), se abre hacia arriba.
-  try { const r = list.getBoundingClientRect(); if (r.bottom > (window.innerHeight || 0) - 84) block.classList.add('is-dep-up'); } catch (_) {}
-  const on = list.querySelector('[aria-selected="true"]') || list.firstElementChild;
-  _intv8DepActive(list, on);
-  try { list.setAttribute('tabindex', '-1'); list.focus({ preventScroll: true }); } catch (_) {}
-}
-function _intv8DepActive(list, li) {
-  if (!list || !li) return;
-  list.querySelectorAll('.intv8-dep-opt.is-active').forEach(x => x.classList.remove('is-active'));
-  li.classList.add('is-active');
-  list.setAttribute('aria-activedescendant', li.id);
-  try { li.scrollIntoView({ block: 'nearest' }); } catch (_) {}
-}
-function _intv8DepPick(li) {
-  const block = li.closest('.intv8-dep'), card = li.closest('.intv5-sim');
-  if (!block || !card) return;
-  const key = li.getAttribute('data-dep-key'), slot = Number(block.getAttribute('data-dep-slot'));
-  const cur = [].map.call(card.querySelectorAll('.intv8-dep'), b => b.getAttribute('data-dep'));
-  _intv8DepClose(null, true);
-  if (key === cur[slot] || cur.some((k, i) => i !== slot && k === key)) return;   // nunca duplicada
-  const d = _intv8DepCatOf(card).find(x => x.key === key);
-  if (!d) return;
-  cur[slot] = key;
-  try { _intv21Write({ deps: cur }); } catch (_) {}
-  const tmp = document.createElement('div');
-  tmp.innerHTML = _intv8DepBlockHtml(d, slot, _intccEsc).trim();
-  const nb = tmp.firstElementChild;
-  block.replaceWith(nb);
-  // SÓLO esta card cambia; el movimiento elegido se conserva y las cifras se pintan ya.
-  _intv5SimApply(card, Number(card.getAttribute('data-shock')), false);
-  nb.classList.add('is-swap');
-  nb.addEventListener('animationend', () => nb.classList.remove('is-swap'), { once: true });
-  const nbtn = nb.querySelector('[data-dep-open]');
-  if (nbtn) try { nbtn.focus({ preventScroll: true }); } catch (_) {}
-}
 function _intv21Wire() {
   if (_intv21Wired || typeof document === 'undefined') return;
   _intv21Wired = true;
-  document.addEventListener('click', e => {
-    const t = e.target && e.target.closest ? e.target : null;
-    if (!t) return;
-    const opener = t.closest('[data-dep-open]');
-    if (opener) { const open = opener.getAttribute('aria-expanded') === 'true'; if (open) _intv8DepClose(null, true); else _intv8DepOpen(opener); return; }
-    const opt = t.closest('.intv8-dep-opt');
-    if (opt) { _intv8DepPick(opt); return; }
-    if (!t.closest('.intv8-dep-list')) _intv8DepClose(null, false);
-  });
-  document.addEventListener('keydown', e => {
-    const list = e.target && e.target.classList && e.target.classList.contains('intv8-dep-list') ? e.target : null;
-    if (!list) { if (e.key === 'Escape' && document.querySelector('.intv8-dep.is-dep-open')) _intv8DepClose(null, true); return; }
-    const opts = [].slice.call(list.querySelectorAll('.intv8-dep-opt'));
-    const i = opts.indexOf(list.querySelector('.intv8-dep-opt.is-active'));
-    if (e.key === 'ArrowDown') { e.preventDefault(); _intv8DepActive(list, opts[Math.min(opts.length - 1, i + 1)]); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); _intv8DepActive(list, opts[Math.max(0, i - 1)]); }
-    else if (e.key === 'Home') { e.preventDefault(); _intv8DepActive(list, opts[0]); }
-    else if (e.key === 'End') { e.preventDefault(); _intv8DepActive(list, opts[opts.length - 1]); }
-    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (opts[i]) _intv8DepPick(opts[i]); }
-    else if (e.key === 'Escape' || e.key === 'Tab') { if (e.key === 'Escape') e.preventDefault(); _intv8DepClose(null, e.key === 'Escape'); }
-  });
   // Simulador: el control y los botones ±5 actualizan los tres escenarios a la vez.
   document.addEventListener('input', e => {
     const inp = e.target && e.target.closest ? e.target.closest('.intv5-sim input[type="range"]') : null;
@@ -74184,72 +74085,9 @@ function _intv22HeroTags(ctx) {
 // la moneda principal. No modela correlaciones, rebalanceos, divisa futura ni
 // impuestos, y no es una previsión.
 const _INTV5_SIM = { min: -50, max: 50, step: 5, start: -10 };
-// ── DEPENDENCIAS PERSONALIZABLES ─────────────────────────────────────────────
-// Catálogo SÓLO con lo que el owner de pesos ya clasifica (cartera financiera): cada
-// inversión (nunca la liquidez), «tres mayores» si existe, y cada clase de inversión
-// con peso. Identidad estable: `a:<id>` · `g:top3` · `c:<clase>`. Una clase cuyo peso es
-// EXACTAMENTE el de una única inversión es la misma dependencia: no se ofrece dos veces.
-// El cálculo NO cambia: impacto = peso actual × movimiento (`_intv5SimApply`).
-function _intv8DepCatalog(W) {
-  const out = [];
-  if (!W || !Array.isArray(W.rows) || !W.rows.length) return out;
-  const isLiq = (r) => _intccIsMonetary(r.type) || (typeof _intv6IsLiquidity === 'function' && r.a && _intv6IsLiquidity(r.a));
-  const inv = W.rows.filter(r => !isLiq(r) && r.w > 0);
-  inv.forEach((r, i) => out.push({ key: 'a:' + r.id, kind: 'asset', scn: i === 0 ? 'top1' : 'asset', name: r.name, names: [r.name], w: r.w }));
-  if (inv.length >= 3) out.push({ key: 'g:top3', kind: 'group', scn: 'top3', name: _intv4T('intv21_scn_opt_top3'), names: inv.slice(0, 3).map(r => r.name), w: inv.slice(0, 3).reduce((t, r) => t + r.w, 0) });
-  (W.classes || []).filter(c => !_intv21IsCash(c.bucket) && c.w > 0).forEach((c, i) => {
-    // La clase ES una única inversión (un solo miembro y el mismo peso): misma dependencia.
-    const members = inv.filter(r => r.bucket === c.bucket);
-    if (members.length === 1 && Math.abs(members[0].w - c.w) < 1e-6) return;
-    out.push({ key: 'c:' + c.bucket, kind: 'class', scn: i === 0 ? 'class' : 'cls', name: _intv21ClassLabel(c.bucket), names: [_intv21ClassLabel(c.bucket)], w: c.w });
-  });
-  return out;
-}
-// Selección: la que el usuario eligió (POR CUENTA, sólo identidades) si sigue existiendo;
-// cada hueco que ya no exista se rellena con la mejor opción no repetida. Sin elección
-// guardada, la de Aurix (mayor inversión → tres mayores → mayor clase → el resto por
-// peso), determinista sobre los pesos: no la cambia una recarga ni un cambio de idioma.
-// Nunca la misma identidad dos veces. Aquí no se escribe nada.
-function _intv8DepPref(cat) {
-  const by = new Map(cat.map(d => [d.key, d]));
-  return [cat.find(d => d.kind === 'asset'), by.get('g:top3'), cat.find(d => d.kind === 'class')].filter(Boolean)
-    .concat(cat.slice().sort((x, y) => y.w - x.w)).map(d => d.key).filter((k, i, a) => a.indexOf(k) === i);
-}
-function _intv8DepSelection(W) {
-  const cat = _intv8DepCatalog(W);
-  if (!cat.length) return { cat, sel: [] };
-  const by = new Map(cat.map(d => [d.key, d]));
-  const pref = _intv8DepPref(cat);
-  const n = Math.min(3, cat.length);
-  const saved = (() => { try { const st = _intv21Read(); return Array.isArray(st.deps) ? st.deps : null; } catch (_) { return null; } })();
-  const keys = [];
-  for (let i = 0; i < n; i++) { const k = saved && saved[i]; keys.push(k && by.has(k) && keys.indexOf(k) === -1 ? k : null); }
-  for (let i = 0; i < n; i++) if (!keys[i]) keys[i] = pref.find(p => keys.indexOf(p) === -1) || null;
-  return { cat, sel: keys.filter(Boolean).map(k => by.get(k)) };
-}
-function _intv8DepBlockHtml(d, slot, esc) {
-  return `
-        <div class="intv22-scn-block intv8-dep" id="intv22-scn-s${slot}" data-scn="${esc(d.scn)}" data-dep="${esc(d.key)}" data-dep-slot="${slot}" data-copy="${esc(d.kind === 'asset' ? 'top1' : (d.kind === 'group' ? 'top3' : 'class'))}" data-w="${esc(String(d.w))}" data-label="${esc(d.names[0])}">
-          <div class="intv8-dep-head">
-            <p class="intv22-scn-kind" id="intv8-dep-k${slot}">${esc(_intv4T('intv8_dep_kind'))}</p>
-            <button type="button" class="intv8-dep-btn" id="intv8-dep-b${slot}" data-dep-open="${slot}" aria-haspopup="listbox" aria-expanded="false" aria-controls="intv8-dep-l${slot}" aria-labelledby="intv8-dep-k${slot} intv8-dep-b${slot}">
-              <span class="intv8-dep-name">${esc(d.name)}</span><svg class="intv8-dep-chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <ul class="intv8-dep-list" id="intv8-dep-l${slot}" role="listbox" aria-labelledby="intv8-dep-k${slot}" hidden></ul>
-          </div>
-          <p class="intv22-scn-subject" data-sim-subject></p>
-          ${/* La línea de nombres existe SIEMPRE (vacía si no es un grupo): cambiar de
-                dependencia no cambia la altura de la card. */''}<p class="intv22-scn-shock${d.kind === 'group' ? '' : ' is-empty'}"${d.kind === 'group' ? ` title="${esc(d.names.join(' · '))}"` : ' aria-hidden="true"'}>${d.kind === 'group' ? esc(d.names.join(' · ')) : '&nbsp;'}</p>
-          <p class="intv22-scn-impact"><span class="intv21-scn-val" data-sim-pct></span><span class="intv21-scn-unit">${esc(_intv4T('intv21_scn_unit'))}</span></p>
-          <p class="intv5-sim-money" data-sim-money></p>
-          <div class="intv5-sim-bar" role="img" data-sim-bar><span class="intv5-sim-zero"></span><span class="intv5-sim-fill"></span></div>
-        </div>`;
-}
 function _intv22ScenarioHtml(W, esc) {
   const sc = _intv21Scenarios(W);
   if (!sc.length) return '';
-  const deps = _intv8DepSelection(W);
-  if (!deps.sel.length) return '';
   const st = _intv21Read();
   // Destacado: el escenario del hallazgo principal (o el que eligió una etiqueta).
   let def = sc[0];
@@ -74261,12 +74099,10 @@ function _intv22ScenarioHtml(W, esc) {
   // La base viaja en USD y se convierte AL PINTAR: si la moneda principal cambia con la
   // card abierta (Ajustes o sincronización), el importe sigue siendo correcto.
   const base = Number(W && W.total) || 0;
-  // Escala de las barras: la mayor dependencia POSIBLE del catálogo (con la selección de
-  // Aurix coincide con la de antes); así cambiar una card no reescala las otras dos.
-  const wMax = Math.max.apply(null, deps.cat.map(s => s.w));
+  const wMax = Math.max.apply(null, sc.map(s => s.w));
   const v0 = _INTV5_SIM.start;
   return `
-    <section class="intcc-card intv21-scen intv22-scen intv5-sim" aria-describedby="intv8-dep-note" data-n-deps="${deps.sel.length}" data-dep-cat="${esc(JSON.stringify(deps.cat))}" data-scen="${esc(cur.id)}" data-shock="${v0}" data-base="${esc(String(base))}" data-wmax="${esc(String(wMax))}" data-n="${sc.length}">
+    <section class="intcc-card intv21-scen intv22-scen intv5-sim" data-scen="${esc(cur.id)}" data-shock="${v0}" data-base="${esc(String(base))}" data-wmax="${esc(String(wMax))}" data-n="${sc.length}">
       <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_scn_title'))}</h3>
       <div class="intv5-sim-ctrl">
         <p class="intv5-sim-lead" id="intv5-sim-lead">${esc(_intv4T('intv5_sim_lead'))}</p>
@@ -74283,9 +74119,16 @@ function _intv22ScenarioHtml(W, esc) {
           <output class="intv5-sim-value" data-sim-value aria-live="polite">${esc(_intv5SimPct(v0))}</output>
         </div>
       </div>
-      <div class="intv22-scn-grid">${deps.sel.map((d, i) => _intv8DepBlockHtml(d, i, esc)).join('')}
+      <div class="intv22-scn-grid">${sc.map(s => `
+        <div class="intv22-scn-block" id="intv22-scn-${esc(s.id)}" data-scn="${esc(s.id)}" data-w="${esc(String(s.w))}" data-label="${esc(s.names[0])}">
+          <p class="intv22-scn-kind">${esc(_intv4T('intv21_scn_opt_' + s.id))}</p>
+          <p class="intv22-scn-subject" data-sim-subject></p>
+          ${s.id === 'top3' ? `<p class="intv22-scn-shock">${esc(s.names.join(' · '))}</p>` : ''}
+          <p class="intv22-scn-impact"><span class="intv21-scn-val" data-sim-pct></span><span class="intv21-scn-unit">${esc(_intv4T('intv21_scn_unit'))}</span></p>
+          <p class="intv5-sim-money" data-sim-money></p>
+          <div class="intv5-sim-bar" role="img" data-sim-bar><span class="intv5-sim-zero"></span><span class="intv5-sim-fill"></span></div>
+        </div>`).join('')}
       </div>
-      <span class="intcc-sr-only" id="intv8-dep-note">${esc(_intv4T('intv8_dep_note'))}</span>
     </section>`;
 }
 function _intv5SimPct(v) {
@@ -74321,7 +74164,7 @@ function _intv5SimApply(card, shock, animate) {
     const money = v === 0 ? 0 : (Number.isFinite(base) && base > 0 ? impact / 100 * base : NaN);
     b.setAttribute('data-impact', String(impact)); b.setAttribute('data-money', String(money)); b.setAttribute('data-dir', dir);
     const subj = b.querySelector('[data-sim-subject]');
-    if (subj) subj.textContent = _intv4T('intv5_if_' + (b.getAttribute('data-copy') || id) + '_' + dir, b.getAttribute('data-label'), _intv21Pct(Math.abs(v), 0));
+    if (subj) subj.textContent = _intv4T('intv5_if_' + id + '_' + dir, b.getAttribute('data-label'), _intv21Pct(Math.abs(v), 0));
     const pct = b.querySelector('[data-sim-pct]'), mon = b.querySelector('[data-sim-money]');
     const paint = (k) => {
       const i = impact * k, m = money * k;

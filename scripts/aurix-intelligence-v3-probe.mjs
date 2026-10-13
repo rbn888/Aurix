@@ -459,9 +459,7 @@ for (const E of ENGINES) {
       await boot(page, P, process.env.DUMP_L || 'es');
       await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
       await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1800);
-      if (process.env.DUMP_SHOT) { if (process.env.DUMP_PRE) await page.evaluate(process.env.DUMP_PRE); await page.waitForTimeout(500);
-        if (process.env.DUMP_CLIP) { const el = page.locator(process.env.DUMP_CLIP); await el.scrollIntoViewIfNeeded(); await page.waitForTimeout(300); if (process.env.DUMP_CLICK) { await page.locator(process.env.DUMP_CLICK).click(); await page.waitForTimeout(400); } await page.screenshot({ path: `${process.env.DUMP_SHOT}-${kind}-${W}.png` }); }
-        else await page.screenshot({ path: `${process.env.DUMP_SHOT}-${kind}-${W}.png`, fullPage: true }); continue; }
+      if (process.env.DUMP_SHOT) { if (process.env.DUMP_PRE) await page.evaluate(process.env.DUMP_PRE); await page.waitForTimeout(500); await page.screenshot({ path: `${process.env.DUMP_SHOT}-${kind}-${W}.png`, fullPage: true }); continue; }
       if (process.env.DUMP_JS) console.log(await page.evaluate(process.env.DUMP_JS));
       else console.log(`=== ${kind} ${W}\n` + JSON.parse(await page.evaluate(PRES)).text);
       await ctx.close();
@@ -535,113 +533,6 @@ for (const E of ENGINES) {
       ok(`${T} cambio de líder: «Cambio del peso máximo» se explica (accesible)`, /Cambio del peso máximo\. Tu mayor inversión cambió de Bitcoin a Microsoft/.test(U.kpi2dt), U.kpi2dt);
       ok(`${T} «Reparto» se explica UNA vez y el chip la referencia`, U.notes === 1 && U.chipDesc === 'intv7-evo-note-effective', JSON.stringify(U));
     }
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-
-  // ── DEP · DEPENDENCIAS PERSONALIZABLES ───────────────────────────────────────
-  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng, kind] of (process.env.DEP_MATRIX || '360:es:real,390:en:cash,390:es:one,390:es:cashonly,1024:es:fresh,1440:es:real,1440:en:qa14').split(',').map(x => x.split(':'))) {
-    const WD = Number(w); if (!WD) continue;
-    const T = `[${E} DEP ${kind} ${WD} ${lng}]`;
-    const P = persona(kind);
-    const touch = WD < 768;
-    const ctx = await browser.newContext({ viewport: { width: WD, height: WD < 768 ? 844 : 1000 }, deviceScaleFactor: 1, hasTouch: touch });
-    const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
-    await boot(page, P, lng);
-    const enter = async (uid) => { await page.evaluate(SESSION(P, uid, { delay: 0 })); await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900); };
-    await enter('uA');
-    const DS = `(function(){ var c=document.querySelector('.intv5-sim'); if(!c) return JSON.stringify(null); var bl=[].slice.call(c.querySelectorAll('.intv8-dep'));
-      var W=_intv21Weights(); var inv=W.rows.filter(function(r){ return !_intccIsMonetary(r.type) && !_intv6IsLiquidity(r.a) && r.w>0; }); var cls=W.classes.filter(function(x){ return !_intv21IsCash(x.bucket) && x.w>0; });
-      return JSON.stringify({ keys: bl.map(function(b){ return b.getAttribute('data-dep'); }), h: Math.round(c.getBoundingClientRect().height*10)/10, shock: Number(c.getAttribute('data-shock')),
-        rects: bl.map(function(b){ var r=b.getBoundingClientRect(); return [Math.round(r.top-c.getBoundingClientRect().top), Math.round(r.height)]; }),
-        imp: bl.map(function(b){ return [Number(b.getAttribute('data-w')), Number(b.getAttribute('data-impact'))]; }),
-        exp0: inv[0] ? 'a:'+inv[0].id : null, top3: inv.length>=3, cls0: cls[0] ? 'c:'+cls[0].bucket : null, inv: inv.length,
-        sub: bl.map(function(b){ return b.querySelector('[data-sim-subject]').textContent; }) }); })()`;
-    const ds = async () => JSON.parse(await page.evaluate(DS));
-    const d0 = await ds();
-    if (kind === 'cashonly') { ok(`${T} sólo liquidez: sin simulaciones (no hay dependencias invertidas)`, d0 === null, JSON.stringify(d0)); ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | ')); await ctx.close(); continue; }
-    const want = [d0.exp0, d0.top3 ? 'g:top3' : null, d0.cls0].filter(Boolean);
-    if (kind === 'one') ok(`${T} una inversión: una sola card (su clase sería la misma dependencia)`, d0.keys.length === 1 && d0.keys[0] === d0.exp0, JSON.stringify(d0.keys));
-    else ok(`${T} selección inicial de Aurix: mayor inversión → tres mayores → mayor clase`, JSON.stringify(d0.keys) === JSON.stringify(want), JSON.stringify({ keys: d0.keys, want }));
-    ok(`${T} sin duplicados y fórmula protegida (impacto = peso × movimiento)`, new Set(d0.keys).size === d0.keys.length && d0.imp.every(x => Math.abs(x[1] - x[0] * d0.shock) < 1e-12) && d0.shock === -10, JSON.stringify(d0.imp));
-    if (d0.keys.length < 2) { ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | ')); await ctx.close(); continue; }
-    // Movimiento distinto del inicial: debe conservarse al cambiar de dependencia.
-    await page.evaluate(`(function(){ var s=document.querySelector('.intv5-sim input[type="range"]'); s.value=25; s.dispatchEvent(new Event('input',{bubbles:true})); })()`);
-    await page.evaluate(`document.querySelector('.intv5-sim').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(150);
-    const tapAt = async (sel) => { const b = JSON.parse(await page.evaluate(`(function(){ var r=document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return JSON.stringify([r.left + Math.min(30, r.width / 2), r.top + r.height / 2]); })()`)); if (touch) await page.touchscreen.tap(b[0], b[1]); else await page.mouse.click(b[0], b[1]); await page.waitForTimeout(220); };
-    const a1 = await ds();
-    await tapAt('#intv8-dep-b1');
-    const PO = JSON.parse(await page.evaluate(`(function(){ var c=document.querySelector('.intv5-sim'); var l=document.getElementById('intv8-dep-l1'); var r=l.getBoundingClientRect(); var b=document.getElementById('intv8-dep-b1');
-      var keys=[].slice.call(l.querySelectorAll('[data-dep-key]')).map(function(o){ return o.getAttribute('data-dep-key'); });
-      return JSON.stringify({ open: !l.hidden, exp: b.getAttribute('aria-expanded'), n: keys.length, keys: keys, sel: (l.querySelector('[aria-selected="true"]')||{}).getAttribute ? l.querySelector('[aria-selected="true"]').getAttribute('data-dep-key') : null,
-        inVp: r.left >= -0.5 && r.right <= innerWidth + 0.5 && r.top >= -0.5 && r.bottom <= innerHeight + 0.5, h: Math.round(c.getBoundingClientRect().height*10)/10, foc: document.activeElement === l,
-        tgt: [].slice.call(l.querySelectorAll('[data-dep-key]')).every(function(o){ return o.getBoundingClientRect().height >= (innerWidth < 768 ? 44 : 40) - 0.5; }), oh: [].slice.call(l.querySelectorAll('[data-dep-key]')).map(function(o){ return Math.round(o.getBoundingClientRect().height*10)/10; }) }); })()`));
-    const others = a1.keys.filter((k, i) => i !== 1);
-    ok(`${T} el selector abre un popover accesible sin mover nada: ≤ 6 opciones, sin las de las otras cards, la actual marcada, dentro de la pantalla`,
-      PO.open && PO.exp === 'true' && PO.n >= 1 && PO.n <= 6 && !PO.keys.some(k => others.indexOf(k) !== -1) && PO.sel === a1.keys[1] && PO.inVp && PO.h === a1.h && PO.foc && PO.tgt, JSON.stringify(PO));
-    // Elegir otra (la primera distinta de la actual).
-    const pick = PO.keys.find(k => k !== a1.keys[1]);
-    if (pick) {
-      await tapAt(`#intv8-dep-l1 [data-dep-key="${pick}"]`);
-      const a2 = await ds();
-      const foc = await page.evaluate(`document.activeElement && document.activeElement.id`);
-      const closed = await page.evaluate(`document.getElementById('intv8-dep-l1').hidden`);
-      ok(`${T} elegir cambia SÓLO esa card, conserva el movimiento (+25), la altura y las otras dos; cierra y devuelve el foco`,
-        a2.keys[1] === pick && a2.keys[0] === a1.keys[0] && a2.keys[2] === a1.keys[2] && a2.shock === 25 && a2.h === a1.h && JSON.stringify(a2.rects) === JSON.stringify(a1.rects)
-        && a2.imp.every(x => Math.abs(x[1] - x[0] * 25) < 1e-12) && foc === 'intv8-dep-b1' && closed, JSON.stringify({ a1: a1.keys, a2: a2.keys, h: [a1.h, a2.h], r: [a1.rects, a2.rects], foc, closed }));
-      // Alturas estables con la nueva selección en todo el recorrido.
-      const HS = JSON.parse(await page.evaluate(`(function(){ var c=document.querySelector('.intv5-sim'); var s=c.querySelector('input[type="range"]'); var out=[];
-        [-50,-25,-10,0,10,25,50].forEach(function(v){ s.value=v; s.dispatchEvent(new Event('input',{bubbles:true})); out.push(Math.round(c.getBoundingClientRect().height*10)/10); }); s.value=25; s.dispatchEvent(new Event('input',{bubbles:true})); return JSON.stringify(out); })()`));
-      ok(`${T} altura constante de −50 a +50 con la selección personalizada`, HS.every(h => h === HS[0]) && HS[0] === a1.h, JSON.stringify({ HS, h: a1.h }));
-    }
-    // Teclado: Enter abre, flecha abajo, Escape cierra y devuelve el foco; Enter elige.
-    await page.focus('#intv8-dep-b2'); await page.keyboard.press('Enter'); await page.waitForTimeout(160);
-    const k1 = await page.evaluate(`!document.getElementById('intv8-dep-l2').hidden && document.activeElement.id === 'intv8-dep-l2'`);
-    await page.keyboard.press('Escape'); await page.waitForTimeout(120);
-    const k2 = await page.evaluate(`document.getElementById('intv8-dep-l2').hidden && document.activeElement.id === 'intv8-dep-b2'`);
-    const before = (await ds()).keys;
-    await page.keyboard.press('Enter'); await page.waitForTimeout(160); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(220);
-    const after = (await ds()).keys;
-    const nOpts = await page.evaluate(`1`);
-    ok(`${T} teclado: Enter abre, Escape cierra con el foco en el título, flechas + Enter eligen sin duplicar`, k1 && k2 && new Set(after).size === after.length && after[0] === before[0] && after[1] === before[1], JSON.stringify({ k1, k2, before, after }));
-    // Tocar fuera cierra.
-    await tapAt('#intv8-dep-b0'); const o1 = await page.evaluate(`!document.getElementById('intv8-dep-l0').hidden`);
-    await tapAt('.intv5-sim .intcc-card-title'); const o2 = await page.evaluate(`document.getElementById('intv8-dep-l0').hidden`);
-    ok(`${T} tocar fuera cierra el popover`, o1 && o2, JSON.stringify({ o1, o2 }));
-    // Persistencia por cuenta: recarga ⇒ misma selección y el movimiento vuelve a −10.
-    const chosen = (await ds()).keys;
-    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForFunction(`typeof switchTab === 'function'`, null, { timeout: 60000 }); await page.waitForTimeout(900);
-    await enter('uA');
-    const r1 = await ds();
-    ok(`${T} recargar conserva la selección de esta cuenta y el movimiento vuelve a −10`, JSON.stringify(r1.keys) === JSON.stringify(chosen) && r1.shock === -10, JSON.stringify({ chosen, r1: r1.keys, shock: r1.shock }));
-    // Otra cuenta: nunca hereda la selección.
-    await enter('uB');
-    const b1 = await ds();
-    ok(`${T} otra cuenta no hereda la selección (vuelve la de Aurix)`, JSON.stringify(b1.keys) === JSON.stringify(d0.keys), JSON.stringify({ b1: b1.keys, d0: d0.keys }));
-    // Dependencia eliminada: sólo esa card se sustituye por la mejor no repetida.
-    if (kind === 'real' || kind === 'qa14') {
-      await enter('uA');
-      // Selección PERSONALIZADA guardada (lo que hace el selector) y re-pintado.
-      await page.evaluate(`(function(){ var d=_intv8DepSelection(_intv21Weights()); var cat=d.cat; var cls=cat.filter(function(x){ return x.kind==='class'; }); var k=[d.sel[0].key, 'g:top3', (cls[1]||cls[0]).key];
-        _intv21Write({ deps: k }); _intelRefreshSig='\u0000dep'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1300);
-      const s1 = await ds();
-      const gone = s1.keys.find(k => /^a:/.test(k));
-      if (gone) {
-        const id = gone.slice(2);
-        await page.evaluate(`(function(){ var i=assets.findIndex(function(a){ return String(a.id)===${JSON.stringify(id)}; }); if (i>=0) assets.splice(i,1); _intelRefreshSig='\\u0000del'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1400);
-        const s2 = await ds();
-        const slot = s1.keys.indexOf(gone);
-        ok(`${T} si una dependencia desaparece, sólo su card se sustituye (sin duplicar ni huecos)`, s2.keys.length === s1.keys.length && s2.keys.indexOf(gone) === -1 && new Set(s2.keys).size === s2.keys.length
-          && s2.keys.every((k, i) => i === slot || k === s1.keys[i] || (/^g:/.test(k) && /^g:/.test(s1.keys[i]))), JSON.stringify({ s1: s1.keys, s2: s2.keys }));
-      }
-    }
-    // Moneda: el importe se recalcula en la moneda nueva con la misma fórmula.
-    const fx = JSON.parse(await page.evaluate(`(function(){ var b0=baseCurrency, r0=usdToEur; baseCurrency='EUR'; usdToEur=0.9; var c=document.querySelector('.intv5-sim'); var s=c.querySelector('input[type="range"]'); s.value=-50; s.dispatchEvent(new Event('input',{bubbles:true}));
-      var out=[].slice.call(c.querySelectorAll('.intv8-dep')).map(function(b){ return { m: Number(b.getAttribute('data-money')), w: Number(b.getAttribute('data-w')), t: b.querySelector('[data-sim-money]').textContent }; }); var usd=Number(c.getAttribute('data-base'));
-      baseCurrency=b0; usdToEur=r0; s.value=-10; s.dispatchEvent(new Event('input',{bubbles:true})); return JSON.stringify({ out: out, usd: usd }); })()`));
-    ok(`${T} moneda: importe = peso × movimiento × total, convertido una sola vez (EUR)`, fx.out.every(o => Math.abs(o.m - o.w * -50 / 100 * fx.usd * 0.9) < 0.01 && /€/.test(o.t)), JSON.stringify(fx).slice(0, 300));
-    const HS2 = await page.evaluate(`document.documentElement.scrollWidth > document.documentElement.clientWidth + 1`);
-    ok(`${T} sin desplazamiento horizontal`, !HS2, String(HS2));
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }
