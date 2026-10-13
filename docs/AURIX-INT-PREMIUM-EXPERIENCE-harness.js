@@ -675,8 +675,7 @@ console.log('\n8 · Explore is contextual, not a fixed list:');
   // desplegable en flujo necesita para animar sin `max-height` inventado. Se
   // cuenta la clase EXACTA.
   ok('8.7 every rendered question has a real answer',
-    // RE-DECIDIDO (V5.1): la respuesta prioritaria entra abierta (`is-open`).
-    (sec.match(/class="intcc-x-answer(?: is-open)?"/g) || []).length === qids.length
+    (sec.match(/class="intcc-x-answer"/g) || []).length === qids.length
     && !/<div class="intcc-x-answer"[^>]*>\s*<div class="intcc-x-answer-in">\s*<\/div>/.test(sec),
     JSON.stringify({ qids: qids.length,
       answers: (sec.match(/class="intcc-x-answer"/g) || []).length }));

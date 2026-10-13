@@ -206,7 +206,7 @@ for (const E of ENGINES) {
           && !/Solana/.test(r.hoy.text), JSON.stringify(r.hoy.rows));
         ok(`${T} QA · Escenarios: Microsoft −10 % ≈ −2,9 %, Top 3 ≈ −6,9 %, Acciones ≈ −5,1 %`, r.scn && Math.abs(r.scn.find(s => s.id === 'top1').impact + 2.9) < 0.01
           && Math.abs(r.scn.find(s => s.id === 'top3').impact + 6.9) < 0.01 && Math.abs(r.scn.find(s => s.id === 'class').impact + 5.1) < 0.01
-          && /−2[.,]9%/.test(r.scen.text) && /(compara su efecto en tus principales dependencias|compare its effect on your main dependencies)/.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
+          && /−2[.,]9%/.test(r.scen.text) && /(manteniendo lo demás constante|holding everything else constant)/.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
         // RE-DECIDIDO (V2.1): «Desde inicio» sólo cuando empieza de verdad antes que 30D;
         // con la rentabilidad recortada al régimen comparable coincide con 30D y no se duplica.
         ok(`${T} QA · Tu evolución ofrece 7D y 30D en rentabilidad, «Desde inicio» donde existe y las cinco métricas`, r.avail.return && /^7d,30d/.test(r.avail.return.join()) && (r.avail.top || []).indexOf('all') !== -1

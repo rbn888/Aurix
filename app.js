@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '773'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '772'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5971,9 +5971,6 @@ const T = {
     intv3_tag_class1: (c, p) => `${c}: ${p} de tu cartera`,
     intv3_tag_class2: (a, b, p) => `${a} y ${b} reúnen el ${p}`,
     intv3_tag_driver: n => `${n}, principal movimiento de tu cartera en 24 h`,
-    intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'última sesión',
-    intv51_today_weight: p => `${p} de tu cartera financiera.`,
-    intv51_today_weight_tiny: 'Menos del 0,1 % de tu cartera financiera.',
     intv3_tag_quote: n => `Cotización de ${n}`,
     intv3_tag_liq_up: w => `Más peso en liquidez ${w}`,
     intv3_tag_liq_down: w => `Menos peso en liquidez ${w}`,
@@ -6004,7 +6001,7 @@ const T = {
     intv21_mv_down: 'Lo frenaron',
     intv21_mv_foot: 'Contribución al resultado en puntos porcentuales, sin aportaciones ni retiradas. No es la subida del activo.',
     intv21_scn_title: 'Dependencias y escenarios',
-    intv5_sim_lead: 'Elige un movimiento y compara su efecto en tus principales dependencias.',
+    intv5_sim_lead: 'Explora cómo afectaría este movimiento, manteniendo lo demás constante',
     intv5_sim_aria: 'Movimiento simulado', intv5_sim_less: 'Bajar 5 puntos', intv5_sim_more: 'Subir 5 puntos',
     intv5_if_top1_down: (n, p) => `Si ${n} bajara un ${p}`, intv5_if_top1_up: (n, p) => `Si ${n} subiera un ${p}`, intv5_if_top1_flat: n => `Si ${n} no cambiara`,
     intv5_if_top3_down: (n, p) => `Si tus tres mayores posiciones bajaran un ${p}`, intv5_if_top3_up: (n, p) => `Si tus tres mayores posiciones subieran un ${p}`, intv5_if_top3_flat: () => 'Si tus tres mayores posiciones no cambiaran',
@@ -9384,9 +9381,6 @@ const T = {
     intv3_tag_class1: (c, p) => `${c}: ${p} of your portfolio`,
     intv3_tag_class2: (a, b, p) => `${a} and ${b} hold ${p}`,
     intv3_tag_driver: n => `${n}, your portfolio's main move in 24 h`,
-    intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'last session',
-    intv51_today_weight: p => `${p} of your financial portfolio.`,
-    intv51_today_weight_tiny: 'Less than 0.1% of your financial portfolio.',
     intv3_tag_quote: n => `${n} price`,
     intv3_tag_liq_up: w => `More weight in cash ${w}`,
     intv3_tag_liq_down: w => `Less weight in cash ${w}`,
@@ -9417,7 +9411,7 @@ const T = {
     intv21_mv_down: 'Held it back',
     intv21_mv_foot: 'Contribution to the result in percentage points, excluding contributions and withdrawals. Not the asset\'s own rise.',
     intv21_scn_title: 'Dependencies and scenarios',
-    intv5_sim_lead: 'Choose a move and compare its effect on your main dependencies.',
+    intv5_sim_lead: 'Explore how this move would affect you, holding everything else constant',
     intv5_sim_aria: 'Simulated move', intv5_sim_less: 'Down 5 points', intv5_sim_more: 'Up 5 points',
     intv5_if_top1_down: (n, p) => `If ${n} fell ${p}`, intv5_if_top1_up: (n, p) => `If ${n} rose ${p}`, intv5_if_top1_flat: n => `If ${n} did not change`,
     intv5_if_top3_down: (n, p) => `If your three largest positions fell ${p}`, intv5_if_top3_up: (n, p) => `If your three largest positions rose ${p}`, intv5_if_top3_flat: () => 'If your three largest positions did not change',
@@ -38478,10 +38472,6 @@ function _aurixFactLedger(opts) {
         // otra pregunta y tiene su propio owner certificado en «Factores
         // principales»; no se reimplementa aquí ni se aproxima con el coste.
         const sameEpoch = today.every(r => r.effectiveToday);
-        // MONEDA (verificado en V5.1): pese al nombre, `costUSD` —y por tanto `grossUSD`—
-        // YA está en moneda principal (`_aurixRegisteredOperations` lo convierte con
-        // `toBase` al leer el ledger), igual que el denominador. El cociente es
-        // base/base y no se vuelve a convertir: hacerlo duplicaría el tipo de cambio.
         const share = (grossUSD != null && sameEpoch && denom && denom > 0) ? grossUSD / denom : null;
         // §5 — «significativo» decide el TONO, no la existencia. Sin peso medible el
         // registro entra como informativo: se publica, no urge.
@@ -68088,10 +68078,8 @@ function _intv4FactText(fact) {
     // «por un coste registrado de 0» en todos los casos sin importe certificado —es
     // decir, en TODOS los metales y TODAS las bajas—. Lo destapó el gate de copy.
     const hasAmt = v.grossUSD != null && Number.isFinite(Number(v.grossUSD));
-    // CORREGIDO EN V5.1: `grossUSD` (Σ costUSD) ya está en moneda principal —el ledger
-    // lo convierte al leerlo—; v812 lo volvía a convertir y en EUR aplicaba el tipo dos
-    // veces. Se formatea tal cual.
-    const amt = hasAmt ? _intv4Money(Math.abs(Number(v.grossUSD))) : null;
+    // `grossUSD` es USD (Σ costUSD): se convierte a la moneda principal antes de formatear.
+    const amt = hasAmt ? ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(Math.abs(Number(v.grossUSD))) : _intv4Money(Math.abs(Number(v.grossUSD)))) : null;
     // LA GUARDA DE PROCEDENCIA VA PRIMERO, Y CUBRE LOS DOS CAMINOS. Estaba sólo en
     // el de una operación, así que la tanda afirmaba «Hoy has registrado 3
     // posiciones» con la procedencia DESCONOCIDA — exactamente lo que §3 dice que
@@ -68147,9 +68135,9 @@ function _intv4FactText(fact) {
     const inAmt  = Math.abs(Number(v.inUSD)  || 0);
     const outAmt = Math.abs(Number(v.outUSD) || 0);
     const base = (inAmt > 0 && outAmt > 0)
-      ? _intv4T('intv4_f_cashmov_both', _intv4Money(inAmt), _intv4Money(outAmt))
-      : (outAmt > 0 ? _intv4T('intv4_f_cashmov_out', _intv4Money(outAmt))
-      : (inAmt  > 0 ? _intv4T('intv4_f_cashmov_in',  _intv4Money(inAmt))
+      ? _intv4T('intv4_f_cashmov_both', ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(inAmt) : _intv4Money(inAmt)), ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(outAmt) : _intv4Money(outAmt)))
+      : (outAmt > 0 ? _intv4T('intv4_f_cashmov_out', ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(outAmt) : _intv4Money(outAmt)))
+      : (inAmt  > 0 ? _intv4T('intv4_f_cashmov_in',  ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(inAmt) : _intv4Money(inAmt)))
                     : _intv4T('intv4_f_cashmov_nc', v.events || 0)));
     return _cmSince(base);
   }
@@ -68729,8 +68717,6 @@ function _intv4ExploreRotation(ids, now, owner) {
 // §17 — LA VENTANA ES LA QUE HAY. «¿Qué ha cambiado este mes?» con 40 días de
 // historial es defendible; con 3 no lo es. Se nombra el span REAL observado y, por
 // debajo de dos días, no se nombra ninguno.
-// Estado de Explora elegido por el usuario en esta sesión (en memoria, por cuenta).
-let _intv51XState = null;
 const _INTV3_EXPLORE_SKIP = new Set(['q_historical', 'q_current_value', 'q_data_quality', 'q_structure']);
 // Familia de significado compartida entre el catálogo y las preguntas contextuales.
 const _INTV3_EXPLORE_FAMILY_OF = { q_performance: 'market', x22_market_ops: 'market', q_liquidity: 'liquidity', x22_liq_why: 'liquidity',
@@ -68851,17 +68837,6 @@ function _intv4ExploreHtml(core, esc, intel) {
     .slice(0, ctx21.length ? Math.max(0, 3 - ctx21.length) : _INTV4_EXPLORE_MAX);
   ctx21.slice().reverse().forEach(c => qs.unshift({ q: { id: c.id, causalRoot: c.root }, label: c.label, answer: c.answer, fact: c.fact }));
   if (!qs.length) return '';
-  // V5.1 · LA RESPUESTA PRIORITARIA YA ABIERTA. La card tiene altura estable y una
-  // zona reservada para la respuesta: vacía parecía una card a medio cargar. Se abre
-  // la que el motor considera más relevante (raíz en atención de Intelligence; si
-  // ninguna, la primera del orden de prioridad), salvo que el usuario haya decidido
-  // otra cosa en esta sesión para esta cuenta: entonces manda su elección (también
-  // «ninguna»), y un repintado o una llegada tardía no la vuelve a abrir.
-  const _xs = (typeof _intv51XState !== 'undefined') ? _intv51XState : null, _xid = (typeof _intv22Ident === 'function') ? _intv22Ident() : '';
-  const _defOpen = (qs.find(x => hot.has(x.q.causalRoot)) || qs[0]).q.id;
-  const openId = (_xs && _xs.id === _xid && _xs.user)
-    ? (_xs.open && qs.some(x => x.q.id === _xs.open) ? _xs.open : (_xs.open ? _defOpen : null))
-    : _defOpen;
   const html = `
     <section class="intcc-card intcc-explore intv4-explore"
              data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
@@ -68870,9 +68845,9 @@ function _intv4ExploreHtml(core, esc, intel) {
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intcc-explore-list">
         ${qs.map(x => `
-          <div class="intcc-x-item${x.q.id === openId ? ' is-active' : ''}" data-root="${esc(x.q.causalRoot)}"${x.fact ? ` data-x-fact="${esc(x.fact.factId)}"` : ''}${/^ctx_/.test(x.q.id) ? ' data-ctx="1"' : ''}>
-            <button type="button" class="intcc-x-q${x.q.id === openId ? ' is-active' : ''}" id="intcc-xq-${esc(x.q.id)}"
-                    data-intcc-q="${esc(x.q.id)}" aria-expanded="${x.q.id === openId ? 'true' : 'false'}"
+          <div class="intcc-x-item" data-root="${esc(x.q.causalRoot)}"${x.fact ? ` data-x-fact="${esc(x.fact.factId)}"` : ''}${/^ctx_/.test(x.q.id) ? ' data-ctx="1"' : ''}>
+            <button type="button" class="intcc-x-q" id="intcc-xq-${esc(x.q.id)}"
+                    data-intcc-q="${esc(x.q.id)}" aria-expanded="false"
                     aria-controls="intcc-x-${esc(x.q.id)}">
               <span class="intcc-x-label">${esc(x.label)}</span>
               <span class="intcc-x-caret" aria-hidden="true">
@@ -68885,7 +68860,7 @@ function _intv4ExploreHtml(core, esc, intel) {
                    sueltos sólo colapsaría el primero. La alternativa —`max-height`
                    con un tope inventado— recorta en cuanto la respuesta crece, que
                    es justo lo que el encargo prohíbe. */''}
-            <div class="intcc-x-answer${x.q.id === openId ? ' is-open' : ''}" id="intcc-x-${esc(x.q.id)}" role="region"
+            <div class="intcc-x-answer" id="intcc-x-${esc(x.q.id)}" role="region"
                  aria-labelledby="intcc-xq-${esc(x.q.id)}">
               <div class="intcc-x-answer-in">${x.answer}</div>
             </div>
@@ -72512,7 +72487,7 @@ function _intv21TodayItems(core, stories, W) {
       const chg = Number(mover.a.change24h), h24 = mover.type === 'crypto';
       items.push({ factId: 'price_' + (h24 ? '24h' : 'session') + ':' + mover.id, family: 'price_move', period: h24 ? '24H' : 'session',
         kind: 'mover', priority: 3, value: +chg.toFixed(4), unit: 'pct', dir: chg > 0 ? 'up' : 'down', assetId: mover.id, assetName: mover.name,
-        weight: mover.w, evidence: 'quote_change', freshness: now,
+        evidence: 'quote_change', freshness: now,
         text: _intv4T((h24 ? 'intv21_today_mover' : 'intv21_today_mover_session') + (chg > 0 ? '_up' : '_down'), mover.name, _intv21Pct(Math.abs(chg), 1)) });
     });
   }
@@ -72539,13 +72514,6 @@ function _intv21TodayStructural(W, driversItems, need) {
   } catch (_) {}
   return out.slice(0, need);
 }
-// Peso como CONTEXTO, nunca redondeado a «0 %» para una posición que existe: un
-// decimal por debajo del 10 % y «menos del 0,1 %» si aun así no llega.
-function _intv51WeightText(w) {
-  const p = w * 100;
-  if (p < 0.05) return _intv4T('intv51_today_weight_tiny');
-  return _intv4T('intv51_today_weight', _intv21Pct(p, p < 10 ? 1 : 0));
-}
 function _intv21TodayItemHtml(it, esc) {
   // El sujeto se reconoce por su icono (el mismo de Market y Seguimiento; sin logo,
   // el monograma elegante del propio helper). Sólo para hechos de UN activo.
@@ -72557,10 +72525,7 @@ function _intv21TodayItemHtml(it, esc) {
   return `
     <article class="intv4-story intv21-today is-${esc(it.dir || 'flat')}${icon ? ' has-icon' : ''}" data-fact="${esc(it.factId)}"
              data-kind="${esc(it.kind)}" data-family="${esc(it.family)}" data-period="${esc(it.period)}">
-      ${/* V5.1 · por qué importa ESTA cotización a esta cartera: su peso actual. Es
-            contexto, no impacto (peso × variación nunca se publica como contribución). */''}
-      ${icon}<div class="intv3-today-txt"><p class="intv4-story-head">${esc(it.text)}</p>${it.kind === 'mover' && Number.isFinite(it.weight) && it.weight > 0
-        ? `<p class="intv4-story-why intv51-weight">${esc(_intv51WeightText(it.weight))}</p>` : ''}</div>
+      ${icon}<p class="intv4-story-head">${esc(it.text)}</p>
     </article>`;
 }
 // UNA regla para recortar Hoy, la usan el renderer y la card: lo nuevo de
@@ -73485,9 +73450,7 @@ function _intv3MemoAssetsAlive(ids) {
 }
 function _intv22Ident() {
   try { return String((typeof currentUser !== 'undefined' && currentUser && currentUser.id) || '') + '|' + String(typeof lang !== 'undefined' ? lang : '')
-    + '|' + String(typeof _aurixResetGeneration !== 'undefined' ? _aurixResetGeneration : 0)
-    // La moneda principal también: el contenido guardado lleva importes formateados.
-    + '|' + String(typeof baseCurrency !== 'undefined' ? baseCurrency : ''); }
+    + '|' + String(typeof _aurixResetGeneration !== 'undefined' ? _aurixResetGeneration : 0); }
   catch (_) { return ''; }
 }
 // Primera carga real (sin nada válido aún): esqueleto con la FORMA del contenido
@@ -73790,11 +73753,8 @@ function _intv22HeroTags(ctx) {
     // claro); una cotización se nombra como lo que es, sin unicidad ni «hoy».
     const mv = (ctx.todayItems || []).find(x => x.kind === 'driver' && x.assetName)
             || (ctx.todayItems || []).find(x => x.kind === 'mover' && x.assetName);
-    // Una cotización se etiqueta con su HECHO (variación y periodo), no con «Cotización
-    // de X», que parecía un enlace sin descubrimiento.
     if (mv) tags.push({ id: 'tag_move', dim: 'movement', sig: mv.factId, target: 'today:' + mv.factId, tone: 'calm',
-      label: mv.kind === 'driver' ? _intv4T('intv3_tag_driver', mv.assetName)
-        : _intv4T('intv51_tag_quote', mv.assetName, _intv21Pct(mv.value, 1, true), _intv4T(mv.period === '24H' ? 'intv51_p_24h' : 'intv51_p_session')) });
+      label: _intv4T(mv.kind === 'driver' ? 'intv3_tag_driver' : 'intv3_tag_quote', mv.assetName) });
     // 4 · Liquidez: la serie de Evolución que la sustenta, con su periodo real.
     try {
       const av = _intv22Availability().liquidity;
@@ -73846,8 +73806,6 @@ function _intv22ScenarioHtml(W, esc) {
         <div class="intv5-sim-row">
           <button type="button" class="intv5-sim-step" data-sim-step="-1" aria-label="${esc(_intv4T('intv5_sim_less'))}">−</button>
           <div class="intv5-sim-range">
-            ${/* Rail BIPOLAR: el tramo activo nace en 0 (centro) y va hacia el valor. */''}
-            <div class="intv5-sim-track" aria-hidden="true"><span class="intv5-sim-rail"></span><span class="intv5-sim-active"></span><span class="intv5-sim-origin"></span></div>
             <input type="range" min="${_INTV5_SIM.min}" max="${_INTV5_SIM.max}" step="${_INTV5_SIM.step}" value="${v0}"
                    aria-label="${esc(_intv4T('intv5_sim_aria'))}" aria-describedby="intv5-sim-lead" aria-valuetext="${esc(_intv5SimPct(v0))}">
             <div class="intv5-sim-ticks" aria-hidden="true"><span>−50</span><span>−25</span><span>0</span><span>+25</span><span>+50</span></div>
@@ -73857,7 +73815,7 @@ function _intv22ScenarioHtml(W, esc) {
         </div>
       </div>
       <div class="intv22-scn-grid">${sc.map(s => `
-        <div class="intv22-scn-block" id="intv22-scn-${esc(s.id)}" data-scn="${esc(s.id)}" data-w="${esc(String(s.w))}" data-label="${esc(s.names[0])}">
+        <div class="intv22-scn-block${s.id === cur.id ? ' is-on' : ''}" id="intv22-scn-${esc(s.id)}" data-scn="${esc(s.id)}" data-w="${esc(String(s.w))}" data-label="${esc(s.names[0])}">
           <p class="intv22-scn-kind">${esc(_intv4T('intv21_scn_opt_' + s.id))}</p>
           <p class="intv22-scn-subject" data-sim-subject></p>
           ${s.id === 'top3' ? `<p class="intv22-scn-shock">${esc(s.names.join(' · '))}</p>` : ''}
@@ -73883,13 +73841,6 @@ function _intv5SimApply(card, shock, animate) {
   card.setAttribute('data-shock', String(v));
   const input = card.querySelector('input[type="range"]');
   if (input) { if (Number(input.value) !== v) input.value = String(v); input.setAttribute('aria-valuetext', _intv5SimPct(v)); }
-  // Tramo activo del rail: de 0 (centro) al valor, en la MISMA escala que el pulgar.
-  const track = card.querySelector('.intv5-sim-track');
-  if (track) {
-    const p = (v - _INTV5_SIM.min) / (_INTV5_SIM.max - _INTV5_SIM.min);
-    track.style.setProperty('--a', String(Math.min(p, 0.5))); track.style.setProperty('--b', String(Math.max(p, 0.5)));
-    track.setAttribute('data-dir', v > 0 ? 'up' : (v < 0 ? 'down' : 'flat'));
-  }
   const out = card.querySelector('[data-sim-value]');
   if (out) out.textContent = _intv5SimPct(v);
   const dir = v > 0 ? 'up' : (v < 0 ? 'down' : 'flat');
@@ -75118,23 +75069,6 @@ function _intv5ExploreMeasure(card) {
   card.__intv5Measures = (card.__intv5Measures || 0) + 1;
   _intv5ExploreFade(list);
 }
-// Tras CUALQUIER repintado (también el que reutiliza el contenido guardado mientras
-// llega una fuente) el estado abierto/cerrado es el que eligió el usuario en esta
-// sesión para esta cuenta: lo guardado antes de su elección no puede reabrir nada.
-function _intv51ApplyXState(root) {
-  const st = (typeof _intv51XState !== 'undefined') ? _intv51XState : null;
-  if (!root || !st || !st.user || st.id !== _intv22Ident()) return;
-  const card = root.querySelector('.intcc-explore:not(.is-pending)');
-  if (!card) return;
-  if (st.open && !card.querySelector('[data-intcc-q="' + String(st.open).replace(/"/g, '') + '"]')) return;   // ya no existe: manda el render
-  card.querySelectorAll('.intcc-x-item').forEach(item => {
-    const btn = item.querySelector('[data-intcc-q]'), ans = item.querySelector('.intcc-x-answer');
-    const on = !!(st.open && btn && btn.getAttribute('data-intcc-q') === st.open);
-    item.classList.toggle('is-active', on);
-    if (btn) { btn.classList.toggle('is-active', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); }
-    if (ans) ans.classList.toggle('is-open', on);
-  });
-}
 function _intv5ExploreFade(list) {
   if (!list) return;
   const card = list.closest('.intcc-explore');
@@ -75158,7 +75092,6 @@ function _initIntelligenceCommandCenter() {
     else if (root) root.classList.add('is-revealed', 'is-instant');
     _intv5RevealNext = false;
     if (root && !root.classList.contains('is-empty')) _intccAnimateScoreRings(root);
-    try { _intv51ApplyXState(root); } catch (_) {}
     try { _intv5ExploreReserve(root); } catch (_) {}
     try { _intv5SimInit(root); } catch (_) {}
   } catch (_) {}
@@ -75415,8 +75348,6 @@ function _initIntelligenceCommandCenter() {
       const item     = btn.closest('.intcc-x-item');
       const list     = btn.closest('.intcc-explore-list');
       const willOpen = !ans.classList.contains('is-open');
-      // V5.1 · la elección del usuario manda en los repintados de esta sesión.
-      try { if (typeof _intv51XState !== 'undefined') _intv51XState = { id: (typeof _intv22Ident === 'function') ? _intv22Ident() : '', open: willOpen ? btn.getAttribute('data-intcc-q') : null, user: true }; } catch (_) {}
       // INT.2R — only one answer open at a time; collapse the rest first.
       if (list) {
         list.querySelectorAll('.intcc-x-answer.is-open').forEach(a => a.classList.remove('is-open'));
