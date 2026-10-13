@@ -5923,7 +5923,6 @@ const T = {
     intv22_m_liquidity_aria: 'Peso de la liquidez', intv22_m_return_aria: 'Rentabilidad sin aportaciones ni retiradas',
     intv22_m_value_aria: 'Valor de la cartera, con aportaciones y retiradas',
     intv22_st_start: 'Inicio', intv22_st_now: 'Último dato', intv22_st_delta: 'Cambio',
-    intv7_x_choose: 'Elige una pregunta para ver la respuesta',
     intv7_tip_new_leader: n => `${n} pasó a ser tu mayor inversión`,
     intv7_k_asof: d => `Dato del ${d}`,
     intv7_k_top_peak_help: (a, b) => `Tu mayor inversión cambió de ${a} a ${b}: el cambio compara el peso de la mayor posición en cada momento, no el de un mismo activo.`,
@@ -5931,7 +5930,7 @@ const T = {
     intv22_plot_aria: 'Usa las flechas para recorrer las observaciones.',
     intv22_obs_note: n => `${n} observaciones registradas`,
     intv22_tip_obs: 'observación registrada',
-    intv22_note_top: '', intv22_note_return: '',
+    intv22_note_top: 'El porcentaje es el peso de la inversión que lideraba tu cartera en cada observación.', intv22_note_return: '',
     intv22_note_liquidity: 'Mide el peso de la liquidez dentro de tu cartera financiera. Que suba o baje no es bueno ni malo por sí mismo.',
     intv22_note_value: 'Incluye aportaciones y retiradas: no es rentabilidad.',
     intv22_h_top_back: (l, n) => `${l}, el peso de ${n}, tu mayor inversión, terminó como empezó tras cambiar entre medias.`,
@@ -5942,16 +5941,17 @@ const T = {
     intv22_h_ret_back: l => `${l}, tus inversiones terminaron como empezaron tras moverse entre medias, sin contar aportaciones ni retiradas.`,
     intv22_note_effective: 'Equivale a tener ese número de posiciones con el mismo peso. Mide cómo se reparte el dinero, no el riesgo.',
     intv3_xq_split: (a, b) => `¿Qué parte de mi cartera está entre ${a} y ${b}?`,
-    intv3_xa_split: (t, a, pa, b, pb) => `El ${t}: ${a} reúne el ${pa} y ${b} el ${pb}, hoy.`,
+    intv3_xa_split: (t, a, pa, b, pb) => `${a} y ${b} reúnen hoy el ${t} de tu cartera financiera.`,
+    intv9_xa_split_ev: (a, pa, b, pb) => `${a}, ${pa}; ${b}, ${pb}.`,
     intv3_xq_cp: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?',
-    intv3_xa_cp_both: (n, w3) => `Las dos cosas a la vez: tu dinero invertido está en ${n} clases de inversión, pero tus tres mayores inversiones reúnen hoy el ${w3}.`,
-    intv3_xa_cp_spread: (n, w3) => `Estás repartido en las dos cosas: ${n} clases de inversión, y tus tres mayores inversiones reúnen hoy el ${w3}, menos que el resto de tus inversiones juntas.`,
-    intv3_xa_cp_two: (n, w3, c) => `Tu dinero invertido está en solo dos clases de inversión (${c[0]} y ${c[1]}), y tus tres mayores inversiones reúnen hoy el ${w3}.`,
+    intv3_xa_cp_both: (n, w3) => `Las dos cosas a la vez: tu dinero invertido está en ${n} clases de inversión, pero el peso sigue recayendo en tus tres mayores inversiones.`,
+    intv3_xa_cp_spread: (n, w3) => `Estás repartido en las dos cosas: ${n} clases de inversión, y tus tres mayores inversiones pesan menos que el resto juntas.`,
+    intv3_xa_cp_two: (n, w3, c) => `Tu dinero invertido está en solo dos clases de inversión: ${c[0]} y ${c[1]}.`,
     intv3_xa_cp_note: 'Repartir entre clases y repartir entre posiciones son cosas distintas: puedes tener la primera sin la segunda.',
     intv22_ago_7d: 'hace 7 días', intv22_ago_30d: 'hace 30 días', intv22_ago_all: 'al principio',
     intv22_xq_conc_down: (n, ago) => `¿Por qué ${n} pesa menos que ${ago}?`,
     intv22_xq_conc_up: (n, ago) => `¿Por qué ${n} pesa más que ${ago}?`,
-    intv22_xa_conc: (v, t) => `Porque su valor en tu cartera cambió un ${v}, frente a un ${t} del total.`,
+    intv22_xa_conc: (v, t) => `Su valor en tu cartera cambió un ${v}, frente a un ${t} del total.`,
     intv3_xq_lead: n => `¿Qué cambió para que ${n} pasara a ser mi mayor inversión?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Desde ${ago}, el valor de ${na} en tu cartera cambió un ${va} y el de ${nb} un ${vb}: hoy ${nb} vale más.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} es una posición nueva que hoy vale más que ${na}, cuyo valor en tu cartera cambió un ${va} desde ${ago}.`,
@@ -5968,9 +5968,9 @@ const T = {
     intv22_xq_liq: l => `¿Por qué cambió el peso de mi liquidez ${l}?`,
     intv6_xq_liq_up: l => `¿Por qué aumentó el peso de mi liquidez ${l}?`,
     intv6_xq_liq_down: l => `¿Por qué disminuyó el peso de mi liquidez ${l}?`,
-    intv22_xa_liq_rest: 'Tu liquidez apenas se movió: su peso cambió porque cambió el valor del resto de tu cartera.',
+    intv22_xa_liq_rest: 'Tu liquidez apenas se movió: lo que cambió fue el valor del resto de tu cartera.',
     intv22_xa_liq_flows: 'Su peso cambió sobre todo por aportaciones o retiradas registradas.',
-    intv22_xa_liq_cash: 'Su peso cambió porque cambió el saldo de tu liquidez.',
+    intv22_xa_liq_cash: 'Cambió el saldo de tu liquidez.',
     intv22_xa_liq_ev: (l, c, r) => `${l}, tu liquidez cambió ${c} y el resto de la cartera ${r}.`,
     intv22_tag_price: n => `Cotización de ${n}`,
     intv22_scn_shock: 'Caída simulada del 10 %',
@@ -9359,7 +9359,6 @@ const T = {
     intv22_m_liquidity_aria: 'Weight of cash', intv22_m_return_aria: 'Return excluding contributions and withdrawals',
     intv22_m_value_aria: 'Portfolio value, including contributions and withdrawals',
     intv22_st_start: 'Start', intv22_st_now: 'Latest', intv22_st_delta: 'Change',
-    intv7_x_choose: 'Choose a question to see the answer',
     intv7_tip_new_leader: n => `${n} became your largest investment`,
     intv7_k_asof: d => `As of ${d}`,
     intv7_k_top_peak_help: (a, b) => `Your largest investment changed from ${a} to ${b}: the change compares the weight of the largest position at each point, not of one asset.`,
@@ -9367,7 +9366,7 @@ const T = {
     intv22_plot_aria: 'Use the arrow keys to move between observations.',
     intv22_obs_note: n => `${n} recorded observations`,
     intv22_tip_obs: 'recorded observation',
-    intv22_note_top: '', intv22_note_return: '',
+    intv22_note_top: 'The percentage is the weight of the investment that led your portfolio at each observation.', intv22_note_return: '',
     intv22_note_liquidity: 'It measures the weight of cash within your financial portfolio. Going up or down is neither good nor bad in itself.',
     intv22_note_value: 'It includes contributions and withdrawals: it is not return.',
     intv22_h_top_back: (l, n) => `${l}, the weight of ${n}, your largest investment, ended where it started after moving in between.`,
@@ -9378,16 +9377,17 @@ const T = {
     intv22_h_ret_back: l => `${l}, your investments ended where they started after moving in between, excluding contributions and withdrawals.`,
     intv22_note_effective: 'It is like holding that many positions of equal weight. It measures how your money is spread, not risk.',
     intv3_xq_split: (a, b) => `How much of my portfolio is in ${a} and ${b}?`,
-    intv3_xa_split: (t, a, pa, b, pb) => `${t}: ${a} holds ${pa} and ${b} ${pb}, today.`,
+    intv3_xa_split: (t, a, pa, b, pb) => `${a} and ${b} together hold ${t} of your financial portfolio today.`,
+    intv9_xa_split_ev: (a, pa, b, pb) => `${a}, ${pa}; ${b}, ${pb}.`,
     intv3_xq_cp: 'Am I spread across several investment classes, or do I still depend on a few investments?',
-    intv3_xa_cp_both: (n, w3) => `Both at once: your invested money is in ${n} investment classes, but your three largest investments hold ${w3} today.`,
-    intv3_xa_cp_spread: (n, w3) => `You are spread on both counts: ${n} investment classes, and your three largest investments hold ${w3} today, less than the rest of your investments combined.`,
-    intv3_xa_cp_two: (n, w3, c) => `Your invested money is in just two investment classes (${c[0]} and ${c[1]}), and your three largest investments hold ${w3} today.`,
+    intv3_xa_cp_both: (n, w3) => `Both at once: your invested money is in ${n} investment classes, but the weight still rests on your three largest investments.`,
+    intv3_xa_cp_spread: (n, w3) => `You are spread on both counts: ${n} investment classes, and your three largest investments weigh less than the rest combined.`,
+    intv3_xa_cp_two: (n, w3, c) => `Your invested money is in just two investment classes: ${c[0]} and ${c[1]}.`,
     intv3_xa_cp_note: 'Spreading across classes and spreading across positions are different things: you can have one without the other.',
     intv22_ago_7d: '7 days ago', intv22_ago_30d: '30 days ago', intv22_ago_all: 'at the start',
     intv22_xq_conc_down: (n, ago) => `Why does ${n} weigh less than ${ago}?`,
     intv22_xq_conc_up: (n, ago) => `Why does ${n} weigh more than ${ago}?`,
-    intv22_xa_conc: (v, t) => `Because its value in your portfolio changed ${v}, against ${t} for the total.`,
+    intv22_xa_conc: (v, t) => `Its value in your portfolio changed ${v}, against ${t} for the total.`,
     intv3_xq_lead: n => `What changed for ${n} to become my largest investment?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Compared with ${ago}, the value of ${na} in your portfolio changed ${va} and that of ${nb} ${vb}: today ${nb} is worth more.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} is a new position that is now worth more than ${na}, whose value in your portfolio changed ${va} compared with ${ago}.`,
@@ -9404,9 +9404,9 @@ const T = {
     intv22_xq_liq: l => `Why did the weight of my cash change ${l}?`,
     intv6_xq_liq_up: l => `Why did the weight of my cash rise ${l}?`,
     intv6_xq_liq_down: l => `Why did the weight of my cash fall ${l}?`,
-    intv22_xa_liq_rest: 'Your cash barely moved: its weight changed because the rest of your portfolio changed in value.',
-    intv22_xa_liq_flows: 'Its weight changed mainly because of recorded contributions or withdrawals.',
-    intv22_xa_liq_cash: 'Its weight changed because your cash balance changed.',
+    intv22_xa_liq_rest: 'Your cash barely moved: what changed was the value of the rest of your portfolio.',
+    intv22_xa_liq_flows: 'Most of the change comes from recorded contributions or withdrawals.',
+    intv22_xa_liq_cash: 'Your cash balance changed.',
     intv22_xa_liq_ev: (l, c, r) => `${l}, your cash changed ${c} and the rest of the portfolio ${r}.`,
     intv22_tag_price: n => `${n} price`,
     intv22_scn_shock: 'Simulated 10% fall',
@@ -68868,7 +68868,6 @@ function _intv4ExploreHtml(core, esc, intel) {
     <section class="intcc-card intcc-explore intv4-explore is-pending" data-explore="" data-pending="1" aria-busy="true">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intv3-sk-list"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span></div>
-      ${/* V7 · la zona de respuesta también se reserva: la card resuelta no crece al llegar. */''}<span class="intv7-x-sk-zone" aria-hidden="true"></span>
     </section>`;
   }
   if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id },
@@ -68925,7 +68924,7 @@ function _intv4ExploreHtml(core, esc, intel) {
   // para esta cuenta— decide, y un repintado no la cambia.
   const openId = (_xs && _xs.id === _xid && _xs.user && _xs.open && qs.some(x => x.q.id === _xs.open)) ? _xs.open : null;
   const html = `
-    <section class="intcc-card intcc-explore intv4-explore intv7-x${openId ? ' is-x-open' : ''}"${(typeof _intv7ExploreUnsettled === 'function' && _intv7ExploreUnsettled()) ? ' data-hist-held="1"' : ''}
+    <section class="intcc-card intcc-explore intv4-explore intv9-x${openId ? ' is-x-open' : ''}"${(typeof _intv7ExploreUnsettled === 'function' && _intv7ExploreUnsettled()) ? ' data-hist-held="1"' : ''}
              data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
              data-pool="${all.length}"
              data-hot="${qs.filter(x => hot.has(x.q.causalRoot)).length}">
@@ -68941,18 +68940,11 @@ function _intv4ExploreHtml(core, esc, intel) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
               </span>
             </button>
+            ${/* CIERRE · ACORDEÓN REAL: la respuesta vive DEBAJO de su pregunta. Sin panel
+                  reservado ni texto de selección; cerrada no ocupa espacio. */''}<div class="intcc-x-answer${x.q.id === openId ? ' is-open' : ''}" id="intcc-x-${esc(x.q.id)}" role="region" aria-labelledby="intcc-xq-${esc(x.q.id)}">
+              <div class="intcc-x-answer-in">${x.answer}</div>
+            </div>
           </div>`).join('')}
-      </div>
-      ${/* V6 · las respuestas viven en UNA zona bajo las preguntas (no dentro de cada
-            pregunta): abierta una, las preguntas se compactan arriba y ella ocupa el
-            espacio reservado; `aria-controls`/`aria-labelledby` siguen enlazándolas. */''}
-      ${/* V7 · PANEL INFERIOR RESERVADO: misma altura abierto o cerrado; las preguntas
-            no se mueven nunca. Cerrado, una indicación discreta (no una explicación). */''}
-      <div class="intv6-x-answers" data-x-n="${qs.length}"><p class="intv7-x-empty" aria-hidden="true">${esc(_intv4T('intv7_x_choose'))}</p>${qs.map(x => `
-        <div class="intcc-x-answer${x.q.id === openId ? ' is-open' : ''}" id="intcc-x-${esc(x.q.id)}" role="region"
-             aria-labelledby="intcc-xq-${esc(x.q.id)}">
-          <div class="intcc-x-answer-in">${x.answer}</div>
-        </div>`).join('')}
       </div>
     </section>`;
   if (x22 && !x22.pending) _intv22ExploreMemo = { id: _intv22Ident(), fp: fp22, html, ids: (typeof _intv3AssetIds === 'function') ? _intv3AssetIds() : null };
@@ -72609,7 +72601,10 @@ function _intv21TodayItems(core, stories, W) {
   if (ret24 && W && W.rows.length) {
     let att = null;
     try { att = (typeof _intv21AttrWindow === 'function') ? _intv21AttrWindow('24h', ret24.returnPct, ret24.startAt, ret24.endAt) : null; } catch (_) { att = null; }
-    const rk = att ? att.rows.slice().sort((a, b) => Math.abs(b.c) - Math.abs(a.c)) : [];
+    // CIERRE · una divisa/liquidez nunca es «lo que más movió tu cartera» (su variación es de
+    // tipo de cambio, no de mercado): sale del ranking de contribución.
+    const liqIds = new Set(W.rows.filter(r => _intccIsMonetary(r.type) || (typeof _intv6IsLiquidity === 'function' && _intv6IsLiquidity(r.a))).map(r => String(r.id)));
+    const rk = att ? att.rows.filter(x => !liqIds.has(String(x.id))).sort((a, b) => Math.abs(b.c) - Math.abs(a.c)) : [];
     const best = rk[0] || null;
     // «Lo que más» exige un líder claro: con el segundo a menos de 0,05 pp no se nombra a ninguno.
     if (best && Math.abs(best.c) >= 0.05 && (!rk[1] || Math.abs(best.c) - Math.abs(rk[1].c) >= 0.05)) {
@@ -72628,7 +72623,7 @@ function _intv21TodayItems(core, stories, W) {
     // cartera (peso × variación de la cotización), y sólo se publican las que
     // alcanzan el mismo umbral de materialidad que exige la contribución (0,05 pp).
     // El orden usa el producto; lo publicado es la cotización, nunca un impacto.
-    const quoted = W.rows.filter(r => !(driver && driver.id === r.id) && !_intccIsMonetary(r.type) && Number.isFinite(Number(r.a.change24h))
+    const quoted = W.rows.filter(r => !(driver && driver.id === r.id) && !_intccIsMonetary(r.type) && !(typeof _intv6IsLiquidity === 'function' && _intv6IsLiquidity(r.a)) && Number.isFinite(Number(r.a.change24h))
       && (r.type === 'crypto' ? !!r.a.coinId || !!r.a.marketSymbol : !!r.a.marketSymbol))
       .filter(r => Math.abs(Number(r.a.change24h)) >= 1 && r.w * Math.abs(Number(r.a.change24h)) >= 0.05)
       .sort((a, b) => (b.w * Math.abs(Number(b.a.change24h))) - (a.w * Math.abs(Number(a.a.change24h))) || (a.id < b.id ? -1 : 1));
@@ -73355,6 +73350,8 @@ function _intv21Wire() {
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest ? e.target : null;
     if (!t) return;
+    // Interacciones internas: ningún destello dorado mientras el contenido se recoloca.
+    if (t.closest('[data-sim-step], [data-intv21-evo-metric], [data-intv21-evo-win], [data-intv21-scen], [data-intv21-go], [data-dep-open], .intv8-dep-opt, [data-intcc-q]')) _intv7GoldQuiet();
     const opener = t.closest('[data-dep-open]');
     if (opener) { const open = opener.getAttribute('aria-expanded') === 'true'; if (open) _intv8DepClose(null, true); else _intv8DepOpen(opener); return; }
     const opt = t.closest('.intv8-dep-opt');
@@ -73376,6 +73373,7 @@ function _intv21Wire() {
   // Simulador: el control y los botones ±5 actualizan los tres escenarios a la vez.
   document.addEventListener('input', e => {
     const inp = e.target && e.target.closest ? e.target.closest('.intv5-sim input[type="range"]') : null;
+    if (inp) _intv7GoldQuiet();
     if (inp) _intv5SimApply(inp.closest('.intv5-sim'), Number(inp.value), true);
   });
   document.addEventListener('click', e => {
@@ -74042,10 +74040,10 @@ function _intv22ExploreCandidates(W, esc) {
     const tot = R.reduce((a, r) => a + r.usd, 0);
     if (R.length >= 4 && C.length >= 2 && tot > 0) {
       const top = R.slice(0, 3), u3 = top.reduce((a, r) => a + r.usd, 0), w3 = _intv21Pct(top.reduce((a, r) => a + r.w, 0) * 100, 0);
-      const key = C.length === 2 ? 'intv3_xa_cp_two' : (u3 > tot - u3 ? 'intv3_xa_cp_both' : 'intv3_xa_cp_spread');
+      const key = C.length === 2 ? 'intv3_xa_cp_two' : (u3 >= tot - u3 ? 'intv3_xa_cp_both' : 'intv3_xa_cp_spread');
       out.push({ id: 'x3_class_pos', family: 'class_position', priority: 2, period: 'now', evidence: 'weights', assets: top.map(r => r.id), materiality: u3 / tot, root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
         label: _intv4T('intv3_xq_cp'),
-        answer: p([_intv4T(key, C.length, w3, C.slice(0, 2).map(c => _intv21ClassLabel(c.bucket))), _intv4T('intv3_xa_cp_note')]) });
+        answer: p([_intv4T(key, C.length, w3, C.slice(0, 2).map(c => _intv21ClassLabel(c.bucket)))]) });
     }
   } catch (_) {}
   // 7 · REPARTO ENTRE LAS DOS CLASES PRINCIPALES (sin liquidez): la etiqueta del hero
@@ -74061,7 +74059,7 @@ function _intv22ExploreCandidates(W, esc) {
       const pa = Math.round(a.w * 100), pb = Math.round(b.w * 100);
       out.push({ id: 'x3_class_split', family: 'dependency_class', priority: 6, period: 'now', evidence: 'weights', assets: [], materiality: a.w + b.w, root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
         label: _intv4T('intv3_xq_split', la, lb),
-        answer: p([_intv4T('intv3_xa_split', _intv21Pct(pa + pb, 0), la, _intv21Pct(pa, 0), lb, _intv21Pct(pb, 0))]) });
+        answer: p([_intv4T('intv3_xa_split', _intv21Pct(pa + pb, 0), la, _intv21Pct(pa, 0), lb, _intv21Pct(pb, 0)), _intv4T('intv9_xa_split_ev', la, _intv21Pct(pa, 0), lb, _intv21Pct(pb, 0))]) });
     }
   } catch (_) {}
   return out;
@@ -74314,6 +74312,7 @@ function _intv5SimApply(card, shock, animate) {
   if (out) out.textContent = _intv5SimPct(v);
   const dir = v > 0 ? 'up' : (v < 0 ? 'down' : 'flat');
   card.setAttribute('data-dir', dir);   // V7 · el signo colorea valor, porcentajes, importes y barras
+  card.style.setProperty('--sim-k', String(Math.abs(v) / _INTV5_SIM.max));   // intensidad sobria y progresiva
   card.querySelectorAll('.intv22-scn-block').forEach(b => {
     const id = b.getAttribute('data-scn'), w = Number(b.getAttribute('data-w')) || 0;
     const impact = v === 0 ? 0 : w * v;                        // % de la cartera financiera
@@ -75509,25 +75508,33 @@ function _intv5ExploreReserve(root) {
   }
 }
 function _intv5ExploreMeasure(card) {
-  const list = card.querySelector('.intcc-explore-list'), zone = card.querySelector('.intv6-x-answers');
-  if (!list || !zone) return;
-  if (!(card.getBoundingClientRect().width > 0)) return;  // sin layout todavía: lo mide el observador
-  // V7 · LA ALTURA NO DEPENDE DEL ESTADO. El panel inferior tiene UNA altura por anchura:
-  // la de la respuesta más larga (medida en flujo pero invisible), con un mínimo legible
-  // y un tope; lo que no cabe desplaza DENTRO del panel. Abrir, cerrar o cambiar de
-  // pregunta no cambia la altura de la card ni mueve ninguna pregunta.
-  card.classList.add('is-measuring');
-  let maxAns = 0;
-  card.querySelectorAll('.intcc-x-answer > .intcc-x-answer-in').forEach(a => { maxAns = Math.max(maxAns, a.scrollHeight + 2); });
-  card.classList.remove('is-measuring');
-  const desktop = !!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches);
-  const MIN = 112, CAP = desktop ? 240 : 208;
-  const ph = Math.ceil(Math.max(MIN, Math.min(CAP, maxAns)));
-  card.style.setProperty('--x-panel-h', ph + 'px');
-  card.style.height = '';
-  card.classList.add('has-reserve');
+  // CIERRE · ACORDEÓN: Explora ya no reserva altura (sin panel vacío). Sólo se limpia
+  // cualquier reserva heredada; la card mide lo que miden sus preguntas abiertas.
+  if (!card) return;
+  card.style.height = ''; card.style.removeProperty('--x-panel-h');
+  card.classList.remove('has-reserve', 'is-overflow');
   card.__intv5Measures = (card.__intv5Measures || 0) + 1;
-  _intv5ExploreFade(zone);
+}
+// Escritorio: con una respuesta abierta, Radar y Factores CONSERVAN su altura (no se
+// estiran con la fila); sólo crece Explora. Se libera al cerrar.
+let _intv9LockH = null;
+function _intv9LockRow(card, on) {
+  try {
+    const grid = card && card.parentElement;
+    if (!grid) return;
+    const desk = !!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches);
+    const sib = [].slice.call(grid.querySelectorAll(':scope > .intcc-radar, :scope > .intcc-drivers'));
+    const vw = window.innerWidth || 0;
+    if (on && desk) {
+      // Alturas de la fila CERRADA; un repintado con la respuesta abierta reutiliza las
+      // mismas (misma anchura) en vez de medir una fila ya estirada.
+      if (!_intv9LockH || _intv9LockH.vw !== vw) _intv9LockH = { vw, h: sib.map(n => n.getBoundingClientRect().height) };
+      sib.forEach((n, i) => { n.style.height = (_intv9LockH.h[i] || n.getBoundingClientRect().height) + 'px'; n.style.alignSelf = 'start'; n.__intv9Lock = true; });
+    } else if (!on) {
+      _intv9LockH = null;
+      sib.forEach(n => { n.style.height = ''; n.style.alignSelf = ''; if (!n.getAttribute('style')) n.removeAttribute('style'); n.__intv9Lock = false; });
+    }
+  } catch (_) {}
 }
 // Tras CUALQUIER repintado (también el que reutiliza el contenido guardado mientras
 // llega una fuente) el estado abierto/cerrado es el que eligió el usuario en esta
@@ -75547,6 +75554,7 @@ function _intv51ApplyXState(root) {
     if (btn) { btn.classList.toggle('is-active', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); }
     if (ans) ans.classList.toggle('is-open', on);
   });
+  try { _intv9LockRow(card, !!card.querySelector('.intcc-x-answer.is-open')); } catch (_) {}
 }
 function _intv5ExploreFade(list) {
   if (!list) return;
@@ -75561,7 +75569,22 @@ function _intv5ExploreFade(list) {
 // antes). IntersectionObserver + una clase; el oyente de scroll sólo apunta la hora
 // (pasivo, sin pintar). Sin movimiento reducido no existe.
 const _INTV7_GOLD_SEL = '.aurix-intv21 > .intcc-hero, .aurix-intv21 > .intcc-m-hero, .aurix-intv21 > .intcc-radar, .aurix-intv21 > .intcc-drivers, .aurix-intv21 > .intcc-explore, .aurix-intv21 > .intcc-timeline, .aurix-intv21 > .intcc-watch, .aurix-intv21 > .intv21-scen';
-let _intv7GoldIO = null, _intv7ScrollAt = 0;
+let _intv7GoldIO = null, _intv7ScrollAt = 0, _intv7QuietUntil = 0, _intv9GoldLite = false;
+// Interacciones internas (preguntas, métricas, simulador, selector, compensación de
+// scroll) silencian el destello un momento: sólo una ENTRADA real por scroll lo dispara.
+function _intv7GoldQuiet(ms) { _intv7QuietUntil = Date.now() + (ms || 900); }
+// Fluidez: se miden los frames del primer destello; si se pierden (>20 % por encima de
+// 34 ms), se rebaja el brillo y después queda sólo el Hero.
+let _intv9GoldWatching = false;
+function _intv9GoldWatch() {
+  if (_intv9GoldWatching || _intv9GoldLite || typeof requestAnimationFrame !== 'function') return;
+  _intv9GoldWatching = true;
+  let last = 0, n = 0, slow = 0; const t0 = performance.now();
+  const f = (t) => { if (last) { n++; if (t - last > 34) slow++; } last = t;
+    if (t - t0 < 800) requestAnimationFrame(f);
+    else { _intv9GoldWatching = false; if (n > 8 && slow / n > 0.2) { _intv9GoldLite = true; const r = document.querySelector('.aurix-intv21'); if (r) r.classList.add('is-gold-lite'); } } };
+  requestAnimationFrame(f);
+}
 function _intv7GoldWire() {
   try {
     if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
@@ -75573,13 +75596,20 @@ function _intv7GoldWire() {
         if (en.intersectionRatio < 0.05) { el.__g7Out = true; return; }
         if (en.intersectionRatio >= 0.3 && el.__g7Out && Date.now() - _intv7ScrollAt < 600) {
           el.__g7Out = false;
+          if (Date.now() < _intv7QuietUntil) return;
+          const hero = el.classList.contains('intcc-hero') || el.classList.contains('intcc-m-hero');
+          if (_intv9GoldLite && !hero) return;   // degradado: sólo el Hero
+          // Móvil: un único destello a la vez.
+          if ((window.innerWidth || 0) < 768 && document.querySelector('.aurix-intv21 > .is-gold-in')) return;
+          _intv9GoldWatch();
           if (el.classList.contains('is-gold-in')) { el.classList.remove('is-gold-in'); void el.offsetWidth; }
           el.classList.add('is-gold-in');
-          el.addEventListener('animationend', function f(ev) { if (ev.animationName === 'intv7GoldIn') { el.classList.remove('is-gold-in'); el.removeEventListener('animationend', f); } });
+          el.addEventListener('animationend', function f(ev) { if (ev.animationName === 'intv9GoldIn') { el.classList.remove('is-gold-in'); el.removeEventListener('animationend', f); } });
         }
       }), { threshold: [0, 0.05, 0.3] });
     }
     _intv7GoldIO.disconnect();
+    if (_intv9GoldLite) { const r = document.querySelector('.aurix-intv21'); if (r) r.classList.add('is-gold-lite'); }
     const vh = window.innerHeight || 0;
     document.querySelectorAll(_INTV7_GOLD_SEL).forEach(el => {
       const r = el.getBoundingClientRect();
@@ -75854,35 +75884,48 @@ function _initIntelligenceCommandCenter() {
 
   if (!_intccExploreWired) {
     _intccExploreWired = true;
-    document.addEventListener('click', e => {
-      const btn = e.target && e.target.closest ? e.target.closest('[data-intcc-q]') : null;
-      if (!btn) return;
+    const toggle = (btn) => {
       const ans = document.getElementById('intcc-x-' + btn.getAttribute('data-intcc-q'));
-      if (!ans) return;
-      const item     = btn.closest('.intcc-x-item');
-      const list     = btn.closest('.intcc-explore-list');
+      const card = btn.closest('.intcc-explore');
+      if (!ans || !card) return;
       const willOpen = !ans.classList.contains('is-open');
+      try { if (typeof _intv7GoldQuiet === 'function') _intv7GoldQuiet(); } catch (_) {}
       // V5.1 · la elección del usuario manda en los repintados de esta sesión.
       try { if (typeof _intv51XState !== 'undefined') _intv51XState = { id: (typeof _intv22Ident === 'function') ? _intv22Ident() : '', open: willOpen ? btn.getAttribute('data-intcc-q') : null, user: true }; } catch (_) {}
-      // INT.2R — only one answer open at a time; collapse the rest first (en toda la card:
-      // V6 · las respuestas viven en su propia zona, fuera de la lista).
-      const xcard = btn.closest('.intcc-explore') || list;
-      if (xcard) {
-        xcard.querySelectorAll('.intcc-x-answer.is-open').forEach(a => a.classList.remove('is-open'));
-        xcard.querySelectorAll('.intcc-x-q.is-active').forEach(b => { b.classList.remove('is-active'); b.setAttribute('aria-expanded', 'false'); });
-        xcard.querySelectorAll('.intcc-x-item.is-active').forEach(i => i.classList.remove('is-active'));
-        xcard.classList.toggle('is-x-open', willOpen);
-      }
-      if (willOpen) {
-        ans.classList.add('is-open');
-        btn.classList.add('is-active');
-        btn.setAttribute('aria-expanded', 'true');
-        if (item) item.classList.add('is-active');
-        // La respuesta abre desde su principio dentro de su panel. V7 · la PÁGINA no se
-        // desplaza: el control pulsado se queda bajo el dedo o el puntero.
-        try { const z = ans.parentElement; if (z) z.scrollTop = 0; } catch (_) {}
-      }
-      try { _intv5ExploreFade(ans.parentElement); } catch (_) {}
+      const top0 = btn.getBoundingClientRect().top;
+      if (willOpen) _intv9LockRow(card, true);
+      // Una sola abierta: la anterior se cierra AL INSTANTE (si estaba encima, el control
+      // pulsado subiría a mitad de animación); la nueva se abre con su transición.
+      card.querySelectorAll('.intcc-x-answer.is-open').forEach(a => { if (a !== ans) { a.classList.add('is-instant'); a.classList.remove('is-open'); } });
+      card.querySelectorAll('.intcc-x-q.is-active').forEach(b => { if (b !== btn) { b.classList.remove('is-active'); b.setAttribute('aria-expanded', 'false'); } });
+      card.querySelectorAll('.intcc-x-item.is-active').forEach(i => { if (i !== btn.closest('.intcc-x-item')) i.classList.remove('is-active'); });
+      ans.classList.remove('is-instant');
+      ans.classList.toggle('is-open', willOpen);
+      btn.classList.toggle('is-active', willOpen);
+      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      const item = btn.closest('.intcc-x-item'); if (item) item.classList.toggle('is-active', willOpen);
+      card.classList.toggle('is-x-open', willOpen);
+      // El control se queda bajo el dedo/puntero: se compensa lo que se haya movido.
+      const dy = btn.getBoundingClientRect().top - top0;
+      if (Math.abs(dy) > 0.5) { try { window.scrollBy({ top: dy, left: 0, behavior: 'instant' }); } catch (_) { window.scrollBy(0, dy); } }
+      requestAnimationFrame(() => card.querySelectorAll('.intcc-x-answer.is-instant').forEach(a => a.classList.remove('is-instant')));
+      if (!willOpen) setTimeout(() => { if (!card.querySelector('.intcc-x-answer.is-open')) _intv9LockRow(card, false); }, 280);
+    };
+    document.addEventListener('click', e => {
+      const btn = e.target && e.target.closest ? e.target.closest('[data-intcc-q]') : null;
+      if (btn) toggle(btn);
+    });
+    // Escape cierra la respuesta abierta y devuelve el foco a su pregunta.
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      const inX = e.target && e.target.closest ? e.target.closest('.intcc-explore') : null;
+      if (!inX) return;
+      const openA = inX.querySelector('.intcc-x-answer.is-open');
+      if (!openA) return;
+      const btn = inX.querySelector('[aria-controls="' + openA.id + '"]');
+      if (!btn) return;
+      toggle(btn);
+      try { btn.focus({ preventScroll: true }); } catch (_) {}
     });
   }
 }

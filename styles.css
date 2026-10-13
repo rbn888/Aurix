@@ -20838,9 +20838,6 @@ body.gs-open { overflow: hidden; }
 .intcc-explore.has-reserve.is-x-open .intcc-explore-list { flex: 0 0 auto; justify-content: flex-start; overflow: visible; }
 .intv6-x-answers { display: none; }
 /* Medición (síncrona, sin pintar): la zona en flujo pero invisible. */
-.intcc-explore.is-pending .intv7-x-sk-zone { display: block; height: 132px; margin-top: 12px; border-radius: 12px; background: rgba(255,255,255,0.025); }
-/* V7 · en escritorio el panel reservado de Explora es más alto: el esqueleto lo reserva igual. */
-@media (min-width: 1024px) { .intcc-explore.is-pending .intv7-x-sk-zone { height: 172px; } }
 .intcc-explore.is-measuring .intv6-x-answers { display: block; visibility: hidden; }
 .intcc-explore.is-x-open .intv6-x-answers { display: block; flex: 1 1 auto; min-height: 0; margin-top: 10px; overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid rgba(74,130,240,0.30); border-radius: 12px; background: rgba(74,130,240,0.05); scrollbar-width: thin; }
@@ -31072,62 +31069,6 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   .aurix-intv21.aurix-intcc { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
-   AURIX INTELLIGENCE V7 · EXPLORA — PANEL INFERIOR RESERVADO
-   Las preguntas tienen posición, separación y altura FIJAS (no dependen de si hay
-   una respuesta abierta). Debajo, UN panel con altura medida por anchura
-   (`--x-panel-h`): cerrado muestra una indicación discreta; abierto, la respuesta
-   (sólo una). Cambiar de pregunta sustituye el contenido en el mismo frame.
-   ════════════════════════════════════════════════════════════════════════════ */
-.aurix-intcc .intcc-explore.intv7-x { display: flex; flex-direction: column; }
-.aurix-intcc .intcc-explore.intv7-x .intcc-explore-list,
-.aurix-intcc .intcc-explore.intv7-x.has-reserve .intcc-explore-list,
-.aurix-intcc .intcc-explore.intv7-x.has-reserve.is-x-open .intcc-explore-list {
-  flex: 0 0 auto; justify-content: flex-start; gap: 8px; overflow: visible; min-height: 0; }
-.aurix-intcc .intcc-explore.intv7-x .intcc-x-q { min-height: 44px; }
-/* Hover sólo con puntero real: en táctil el hover «pegado» parecía otra pregunta activa. */
-.aurix-intcc .intcc-explore.intv7-x .intcc-x-q:hover { background: transparent; }
-@media (hover: hover) and (pointer: fine) {
-  .aurix-intcc .intcc-explore.intv7-x .intcc-x-q:hover { background: rgba(74,130,240,0.07); }
-}
-.aurix-intcc .intcc-explore.intv7-x .intv6-x-answers,
-.aurix-intcc .intcc-explore.intv7-x.is-x-open .intv6-x-answers {
-  display: block; position: relative; margin-top: 12px;
-  flex: 0 0 var(--x-panel-h, 132px); height: var(--x-panel-h, 132px); min-height: 0;
-  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
-  border-radius: 12px; border: 1px solid rgba(92,150,255,0.34);
-  background: linear-gradient(180deg, rgba(8,14,30,0.72), rgba(10,18,38,0.62));
-  box-shadow: 0 0 0 1px rgba(92,150,255,0.06), 0 8px 22px -14px rgba(74,130,240,0.45);
-  animation: none; }
-/* Detalle dorado: un trazo corto en la esquina superior izquierda (no un borde entero). */
-.aurix-intcc .intcc-explore.intv7-x .intv6-x-answers::before {
-  content: ''; position: sticky; display: block; top: 0; left: 14px; width: 28px; height: 2px; margin: -1px 0 0 14px;
-  border-radius: 0 0 2px 2px; background: linear-gradient(90deg, rgba(230,196,120,0.9), rgba(230,196,120,0.2)); z-index: 1; }
-.aurix-intcc .intcc-explore.intv7-x:not(.is-x-open) .intv6-x-answers {
-  border-color: rgba(92,150,255,0.16); box-shadow: none; background: rgba(8,14,30,0.38); }
-.aurix-intcc .intcc-explore.intv7-x:not(.is-x-open) .intv6-x-answers::before { opacity: 0.45; }
-.intv7-x-empty { display: none; }
-.aurix-intcc .intcc-explore.intv7-x:not(.is-x-open) .intv7-x-empty {
-  display: flex; align-items: center; justify-content: center; height: calc(100% - 2px); margin: 0; padding: 0 16px;
-  font-size: 12.5px; font-weight: 500; color: rgba(190,206,236,0.72); text-align: center; }
-.aurix-intcc .intcc-explore.intv7-x .intv6-x-answers .intcc-x-answer { display: none; opacity: 1; transition: none; grid-template-rows: none; }
-.aurix-intcc .intcc-explore.intv7-x .intv6-x-answers .intcc-x-answer.is-open { display: block; }
-.aurix-intcc .intcc-explore.intv7-x .intv6-x-answers .intcc-x-answer > .intcc-x-answer-in { overflow: visible; border-top: 0; }
-.aurix-intcc .intcc-explore.intv7-x.is-measuring .intv6-x-answers { height: auto; flex-basis: auto; overflow: visible; }
-.aurix-intcc .intcc-explore.intv7-x.is-measuring .intv6-x-answers .intcc-x-answer { display: block; position: absolute; left: 0; right: 0; top: 0; visibility: hidden; }
-.aurix-intcc .intcc-explore.intv7-x.is-measuring .intv6-x-answers .intcc-x-answer > .intcc-x-answer-in { visibility: hidden; }
-@media (prefers-reduced-motion: no-preference) {
-  .aurix-intcc .intcc-explore.intv7-x .intv6-x-answers .intcc-x-answer.is-open > .intcc-x-answer-in { animation: intv7XIn 160ms ease-out both; }
-}
-@keyframes intv7XIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-/* Escritorio: la card se alinea con Radar y Factores; el panel ocupa el resto de la fila
-   (nunca menos que su altura medida) y la lista conserva su ritmo arriba. */
-@media (min-width: 1024px) {
-  .aurix-intcc .intcc-explore.intv7-x .intv6-x-answers,
-  .aurix-intcc .intcc-explore.intv7-x.is-x-open .intv6-x-answers { flex: 1 1 0; height: auto; min-height: var(--x-panel-h, 132px); }
-  .aurix-intcc .intcc-explore.intv7-x .intcc-explore-list { gap: 10px; }
-}
-
 /* ── V7 · EVOLUCIÓN · Mayor inversión en columnas ──────────────────────────── */
 .intv6-bars .intv6-bar.is-top { fill: rgba(var(--evo-rgb), 0.88); }
 .intv6-bars .intv6-bar.is-top.is-other { fill: rgba(var(--evo-rgb), 0.42); stroke: rgba(var(--evo-rgb), 0.85); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
@@ -31151,17 +31092,7 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 }
 @keyframes intv7SimUpd { from { opacity: 0.55; } to { opacity: 1; } }
 
-/* ── V7 · DESTELLO DORADO AL ENTRAR ─────────────────────────────────────────── */
-.aurix-intv21 > .intcc-hero::before, .aurix-intv21 > .intcc-m-hero::before,
-.aurix-intv21 > .intcc-radar::before, .aurix-intv21 > .intcc-drivers::before, .aurix-intv21 > .intcc-explore::before,
-.aurix-intv21 > .intcc-timeline::before, .aurix-intv21 > .intcc-watch::before, .aurix-intv21 > .intv21-scen::before {
-  content: ''; position: absolute; left: 18px; right: 18px; top: -1px; height: 1px; pointer-events: none; z-index: 2;
-  opacity: 0; background: linear-gradient(90deg, rgba(255,236,196,0) 0%, rgba(255,236,196,0.85) 50%, rgba(255,236,196,0) 100%) no-repeat;
-  background-size: 22% 100%; background-position: -30% 0; }
-.aurix-intv21 > .is-gold-in::before { animation: intv7GoldIn 780ms ease-out 1 both; }
-@media (max-width: 640px) { .aurix-intv21 > .is-gold-in::before { animation-duration: 600ms; background-size: 30% 100%; } }
-@keyframes intv7GoldIn { 0% { opacity: 0; background-position: -30% 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; background-position: 130% 0; } }
-@media (prefers-reduced-motion: reduce) { .aurix-intv21 > .is-gold-in::before { animation: none; } }
+
 
 /* V7 · el tooltip de Evolución nunca sale de su gráfico (texto largo: dos líneas). */
 .intv22-evo .intv21-evo-tip { white-space: normal; max-width: min(260px, calc(100% - 8px)); line-height: 1.35; }
@@ -31218,3 +31149,74 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv22-scen .intv8-dep .intv22-scn-shock.is-empty { visibility: hidden; }
 .intv22-scen .intv8-dep .intv22-scn-subject { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @media (min-width: 768px) and (max-width: 1023px) { .intv22-scen .intv8-dep .intv22-scn-subject { -webkit-line-clamp: 3; } }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CIERRE · EXPLORA = ACORDEÓN REAL
+   En reposo sólo las preguntas (ritmo constante, sin panel ni texto de selección).
+   La respuesta se abre DEBAJO de su pregunta: superficie profunda, filete azul
+   eléctrico de 1 px y una línea lateral; nada de dorado ni de verde. Altura y
+   opacidad cortas; con movimiento reducido, al instante.
+   ════════════════════════════════════════════════════════════════════════════ */
+.aurix-intcc .intcc-explore.intv9-x .intcc-explore-list { flex: 0 0 auto; justify-content: flex-start; gap: 8px; overflow: visible; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-q { min-height: 44px; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-q:hover { background: transparent; }
+@media (hover: hover) and (pointer: fine) { .aurix-intcc .intcc-explore.intv9-x .intcc-x-q:hover { background: rgba(var(--aurix-electric), 0.07); } }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-item.is-active { border-color: rgba(var(--aurix-electric), 0.78); background: rgba(8,14,30,0.55); box-shadow: 0 0 0 1px rgba(var(--aurix-electric), 0.14); }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer { transition: grid-template-rows 200ms cubic-bezier(0.22,1,0.36,1), opacity 160ms ease; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer.is-instant { transition: none; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer > .intcc-x-answer-in { border-top: 0; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer.is-open > .intcc-x-answer-in { border-top: 0; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer-in > .intv9-x-box,
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer-in { box-sizing: border-box; }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer.is-open > .intcc-x-answer-in {
+  margin: 0 10px 10px; border: 1px solid rgba(var(--aurix-electric), 0.42); border-left: 2px solid rgb(var(--aurix-electric));
+  border-radius: 10px; background: rgba(5,10,22,0.86); }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer p { padding: 10px 12px; font-size: 13px; line-height: 1.5; color: rgba(236,242,255,0.96); }
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer p + p { padding-top: 0; color: rgba(206,219,244,0.9); }
+@media (prefers-reduced-motion: reduce) { .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer { transition: none; } }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CIERRE · SISTEMA VISUAL PREMIUM ÚNICO (tokens; ningún valor suelto por card)
+   Dorado = pertenencia/profundidad · azul eléctrico = interacción y foco ·
+   verde/rojo = resultado · azul neutro = estructura.
+   ════════════════════════════════════════════════════════════════════════════ */
+.aurix-intcc {
+  --aurix-electric: 77,141,255;
+  --aurix-gold: 222,190,130;
+  --intel-radius: 18px;
+  --intel-border: rgba(104,136,206,0.24);
+  --intel-border-hover: rgba(116,150,226,0.40);
+  --intel-gold-tint: inset 0 0 0 1px rgba(var(--aurix-gold),0.05);
+}
+/* Mismo borde, radio e intensidad en TODAS las cards (Hero incluido: su protagonismo es
+   la luz interior, no un borde distinto). */
+.aurix-intv21 > .intcc-card, .aurix-intv21 > .intcc-hero,
+.aurix-intv21 .intcc-hero, .aurix-intv21 .intcc-m-hero, .aurix-intv21 .intcc-m-health {
+  border-width: 1px; border-style: solid; border-color: var(--intel-border); border-radius: var(--intel-radius); }
+.aurix-intv21 > .intcc-card:not(.intcc-m-hero):not(.intcc-m-health):not(:hover) { box-shadow: var(--intel-gold-tint); }
+@media (hover: hover) and (pointer: fine) { .aurix-intv21 > .intcc-card:hover { border-color: var(--intel-border-hover); } }
+/* Foco de teclado uniforme (azul eléctrico) en todos los controles de Intelligence. */
+.aurix-intcc :is(button, [role="option"], [tabindex="0"], input[type="range"], a):focus-visible { outline: 2px solid rgba(var(--aurix-electric),0.95); outline-offset: 2px; }
+
+/* ── DESTELLO DORADO AL ENTRAR · sigue el borde (con su radio) ────────────────
+   Un arco de ~10 % del perímetro recorre parte del borde, con fundido en ambos
+   extremos, y desaparece sin residuo. Nunca cruza el contenido (máscara de borde). */
+@property --g9a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.aurix-intv21 > .intcc-hero::before, .aurix-intv21 > .intcc-m-hero::before,
+.aurix-intv21 > .intcc-radar::before, .aurix-intv21 > .intcc-drivers::before, .aurix-intv21 > .intcc-explore::before,
+.aurix-intv21 > .intcc-timeline::before, .aurix-intv21 > .intcc-watch::before, .aurix-intv21 > .intv21-scen::before {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 2; opacity: 0;
+  background: conic-gradient(from var(--g9a), rgba(var(--aurix-gold),0) 0deg, rgba(255,236,196,0.5) 18deg, rgba(var(--aurix-gold),0) 38deg, rgba(var(--aurix-gold),0) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.aurix-intv21.is-gold-lite > .is-gold-in::before { background: conic-gradient(from var(--g9a), rgba(var(--aurix-gold),0) 0deg, rgba(255,236,196,0.28) 18deg, rgba(var(--aurix-gold),0) 38deg, rgba(var(--aurix-gold),0) 360deg); }
+.aurix-intv21 > .is-gold-in::before { animation: intv9GoldIn 820ms ease-out 1 both; }
+@media (max-width: 640px) { .aurix-intv21 > .is-gold-in::before { animation-duration: 640ms; } }
+@keyframes intv9GoldIn { 0% { opacity: 0; --g9a: -30deg; } 18% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; --g9a: 70deg; } }
+@media (prefers-reduced-motion: reduce) { .aurix-intv21 > .is-gold-in::before { animation: none; } }
+
+/* CIERRE · Dependencias: la intensidad de la barra crece con el escenario, sobria. */
+.intv5-sim .intv5-sim-bar .intv5-sim-fill { opacity: calc(0.55 + 0.45 * var(--sim-k, 0.2)); }
+/* CIERRE · el esqueleto de Explora tiene la geometría de las preguntas reales: entre
+   1024 y 1279 px las etiquetas ocupan dos líneas. */
+@media (min-width: 1024px) and (max-width: 1279px) { .intcc-explore.is-pending .intv3-sk-list > .intv3-sk { height: 64px; } }

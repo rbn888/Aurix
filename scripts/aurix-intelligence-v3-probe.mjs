@@ -539,6 +539,58 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // ── CIERRE · ciclos de entrada/regreso/recarga, sistema visual único, acordeón limpio ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng] of (process.env.CIERRE_MATRIX || '390:es,1440:en').split(',').map(x => x.split(':'))) {
+    const WC = Number(w); if (!WC) continue;
+    const T = `[${E} CIERRE ${WC} ${lng}]`;
+    const P = persona('real');
+    const { ctx, page, errs } = await newPage(WC);
+    await boot(page, P, lng);
+    await page.evaluate(SESSION(P, 'uA', { delay: 150 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; switchTab('intelligence'); })()`); await page.waitForTimeout(1600);
+    const cyc = [];
+    for (let i = 0; i < 10; i++) {
+      if (i % 4 === 3) { await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForFunction(`typeof switchTab === 'function'`, null, { timeout: 60000 }); await page.waitForTimeout(700); await page.evaluate(SESSION(P, 'uA', { delay: 150 })); await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; })()`); }
+      else await page.evaluate(`switchTab('home')`);
+      await page.waitForTimeout(350);
+      await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1500);
+      cyc.push(JSON.parse(await page.evaluate(`JSON.stringify({ ex: !!document.querySelector('.intcc-explore:not(.is-pending)'), evo: !!document.querySelector('.intv21-evo:not(.is-pending)'),
+        pend: [].slice.call(document.querySelectorAll('[data-pending="1"],[data-hydrating="1"]')).filter(function(e){ return e.getBoundingClientRect().height>0; }).length,
+        open: document.querySelectorAll('.intcc-x-answer.is-open').length })`)));
+    }
+    ok(`${T} 10 ciclos de entrada, regreso a Dashboard y recarga: Explora y Evolución siempre resueltas, sin esqueletos ni respuestas abiertas solas`, cyc.every(c => c.ex && c.evo && c.pend === 0 && c.open === 0), JSON.stringify(cyc));
+    const V = JSON.parse(await page.evaluate(`(function(){ var vis=function(e){ var r=e.getBoundingClientRect(); return r.width>0&&r.height>0; };
+      var cards=[].slice.call(document.querySelectorAll('.aurix-intv21 > .intcc-card, .aurix-intv21 > .intcc-hero')).filter(vis);
+      var sig=cards.map(function(c){ var cs=getComputedStyle(c); return [cs.borderTopWidth, cs.borderTopStyle, cs.borderTopColor, cs.borderTopLeftRadius].join('|'); });
+      var gold=cards.filter(function(c){ var cs=getComputedStyle(c,'::before'); return cs.content!=='none' && cs.content!=='normal' && parseFloat(cs.opacity) > 0.01; }).length;
+      return JSON.stringify({ n: cards.length, uniq: sig.filter(function(v,i,a){ return a.indexOf(v)===i; }), gold: gold }); })()`));
+    ok(`${T} todas las cards comparten el mismo borde exterior (grosor, tono y radio) y no queda ningún residuo dorado`, V.n >= 6 && V.uniq.length === 1 && V.gold === 0, JSON.stringify(V));
+    // Respuesta abierta: sin dorado ni verde; filete azul eléctrico.
+    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(150);
+    await page.locator('.intcc-explore .intcc-x-q').first().click({ force: true }); await page.waitForTimeout(320);
+    const A = JSON.parse(await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open > .intcc-x-answer-in'); if(!a) return JSON.stringify(null); var cs=getComputedStyle(a);
+      var rgb=function(x){ return (x.match(/[\\d.]+/g)||[]).map(Number); }; var b=rgb(cs.borderLeftColor), t=rgb(getComputedStyle(a.querySelector('p')).color);
+      return JSON.stringify({ bl: b, txt: t, green: t[1] > t[0] + 40 && t[1] > t[2], golden: b[0] > b[2] + 30 }); })()`));
+    ok(`${T} la respuesta abierta usa el azul eléctrico (sin dorado ni verde)`, A && !A.green && !A.golden && A.bl[2] > A.bl[0], JSON.stringify(A));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+  // Una divisa nunca es «lo que más movió tu cartera» ni una cotización en Hoy.
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY && process.env.CIERRE_MATRIX !== 'none') {
+    const T = `[${E} CIERRE divisa en Hoy]`;
+    const P = persona('cash');
+    P.assets.forEach(a => { if (a.type === 'cash') { a.change24h = 3.5; a.assetCurrency = 'EUR'; } });
+    const { ctx, page, errs } = await newPage(390);
+    await boot(page, P, 'es');
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1800);
+    const H = await page.evaluate(`(document.querySelector('.intcc-watch')||{textContent:''}).textContent.replace(/\\s+/g,' ')`);
+    const tags = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv21-tag')).map(function(t){ return t.textContent; }).join(' | ')`);
+    ok(`${T} Hoy y las etiquetas nunca tratan la liquidez (Euros) como un movimiento de mercado`, !/Euros/.test(H) && !/Euros/.test(tags), JSON.stringify({ H: H.slice(0, 200), tags }));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ── DEP · DEPENDENCIAS PERSONALIZABLES ───────────────────────────────────────
   if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng, kind] of (process.env.DEP_MATRIX || '360:es:real,390:en:cash,390:es:one,390:es:cashonly,1024:es:fresh,1440:es:real,1440:en:qa14').split(',').map(x => x.split(':'))) {
     const WD = Number(w); if (!WD) continue;
@@ -675,67 +727,62 @@ for (const E of ENGINES) {
       return JSON.stringify({ lead: !!d.querySelector('.intcc-drv-explain'), n: d.querySelectorAll('.intv15-drv-factor').length, f: [].slice.call(d.querySelectorAll('.intv15-drv-factor')).map(function(x){ return x.getAttribute('data-factor'); }), tags: tags, rows: d.querySelectorAll('.intcc-drv-row').length }); })()`));
     ok(`${T} Factores: sin línea redundante, ≤ 2 lecturas y sin repetir el Hero`, !F.lead && F.n <= 2 && F.rows >= 1
       && !(F.tags.indexOf('tag_top3') !== -1 && F.f.indexOf('dependency') !== -1), JSON.stringify(F));
-    // EXPLORA: estado y geometría.
+    // EXPLORA (RE-DECIDIDO · cierre definitivo): ACORDEÓN REAL. La respuesta se abre DEBAJO
+    // de su pregunta, sin panel reservado ni texto de selección; una sola abierta; el
+    // control pulsado no se mueve (se compensa el scroll); Radar y Factores no cambian.
     const XS = `(function(){ var c=document.querySelector('.intcc-explore'); var r=c.getBoundingClientRect(); var qs=[].slice.call(c.querySelectorAll('.intcc-x-q'));
-      return JSON.stringify({ h: Math.round(r.height*10)/10, q: qs.map(function(b){ var x=b.getBoundingClientRect(); return [Math.round((x.top-r.top)*10)/10, Math.round(x.height*10)/10]; }),
-        vt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().top*10)/10; }),
+      var nb=[].slice.call(document.querySelectorAll('.aurix-intcc > .intcc-radar, .aurix-intcc > .intcc-drivers')).map(function(n){ return Math.round(n.getBoundingClientRect().height*10)/10; });
+      return JSON.stringify({ h: Math.round(r.height*10)/10, nb: nb, vt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().top*10)/10; }),
         open: [].slice.call(c.querySelectorAll('.intcc-x-answer.is-open')).map(function(a){ return a.id; }), exp: qs.map(function(b){ return b.getAttribute('aria-expanded'); }),
         ctl: qs.every(function(b){ var id=b.getAttribute('aria-controls'); return document.querySelectorAll('[id="'+id+'"]').length===1; }),
-        ids: qs.map(function(b){ return b.getAttribute('data-intcc-q'); }), tgt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().height); }) }); })()`;
+        ids: qs.map(function(b){ return b.getAttribute('data-intcc-q'); }), tgt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().height); }),
+        panel: !!c.querySelector('.intv6-x-answers, .intv7-x-empty'), txt: /Elige una pregunta|Choose a question/.test(c.textContent) }); })()`;
     const xs = async () => JSON.parse(await page.evaluate(XS));
-    // Pulsación en las COORDENADAS del control (sin el desplazamiento automático de la
-    // herramienta): es exactamente «el control queda bajo el dedo/puntero».
     const press = async (id) => { const b = JSON.parse(await page.evaluate(`(function(){ var r=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']').getBoundingClientRect(); return JSON.stringify([r.left + Math.min(40, r.width / 2), r.top + r.height / 2]); })()`));
       if (touch) await page.touchscreen.tap(b[0], b[1]); else { await page.mouse.click(b[0], b[1]); }
-      await page.waitForTimeout(260); };
-    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(150);
+      await page.waitForTimeout(320); };
+    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'start', behavior: 'instant' }); window.scrollBy({ top: -90, behavior: 'instant' })`); await page.waitForTimeout(250);
     const x0 = await xs();
     const n = x0.ids.length;
-    ok(`${T} Explora: ${n} preguntas, todas cerradas al entrar, aria-controls único y objetivos ≥ 44 px`, n >= 1 && x0.open.length === 0 && x0.exp.every(v => v === 'false') && x0.ctl && x0.tgt.every(h => h >= 44), JSON.stringify(x0));
-    const same = (a, b) => JSON.stringify(a.q) === JSON.stringify(b.q) && Math.abs(a.h - b.h) <= 0.5;
+    ok(`${T} Explora: ${n} preguntas cerradas al entrar, sin panel vacío ni texto de selección, aria-controls único y objetivos ≥ 44 px`, n >= 1 && x0.open.length === 0 && x0.exp.every(v => v === 'false') && x0.ctl && x0.tgt.every(h => h >= 44) && !x0.panel && !x0.txt, JSON.stringify(x0));
+    const below = (id) => page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']'); var a=document.getElementById(b.getAttribute('aria-controls')); var br=b.getBoundingClientRect(), ar=a.getBoundingClientRect(); var inn=a.querySelector('.intcc-x-answer-in');
+      return ar.top >= br.bottom - 1 && b.closest('.intcc-x-item').contains(a) && ar.height >= 30 && inn.scrollHeight <= inn.clientHeight + 1; })()`);
+    const near = (a, b) => Math.abs(a - b) <= 1.2;
     const bad = [];
     for (let i = 0; i < n; i++) {
       const id = x0.ids[i];
+      const p0 = await xs();
       await press(id);
       const s1 = await xs();
-      const seen = await page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']'); var a=document.getElementById(b.getAttribute('aria-controls')); var z=a.parentElement; var zr=z.getBoundingClientRect();
-        var p=a.querySelector('p')||a; var r=p.getBoundingClientRect(); var h=document.elementFromPoint(r.left+Math.min(30,r.width/2), Math.max(r.top, zr.top)+6);
-        return !!h && a.contains(h) && zr.height >= 100; })()`);
-      if (!same(s1, x0) || s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || s1.exp[i] !== 'true' || !seen) bad.push({ id, s1, seen });
+      const ok1 = await below(id);
+      if (s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || !near(s1.vt[i], p0.vt[i]) || !ok1 || s1.nb.some((h, k) => Math.abs(h - x0.nb[k]) > 1)) bad.push({ step: 'open', id, before: p0.vt[i], after: s1.vt[i], open: s1.open, ok1, nb: [x0.nb, s1.nb] });
       if (n >= 2) {
-        const j = x0.ids[(i + 1) % n];
+        const jx = (i + 1) % n, j = x0.ids[jx];
         await press(j);
         const s2 = await xs();
-        if (!same(s2, x0) || s2.open.length !== 1 || s2.open[0] !== 'intcc-x-' + j) bad.push({ step: 'swap', id, j, s2 });
+        if (s2.open.length !== 1 || s2.open[0] !== 'intcc-x-' + j || !near(s2.vt[jx], s1.vt[jx])) bad.push({ step: 'swap', id, j, before: s1.vt[jx], after: s2.vt[jx], open: s2.open });
         await press(j);
         const s3 = await xs();
-        if (!same(s3, x0) || s3.open.length !== 0 || JSON.stringify(s3.vt) !== JSON.stringify(s2.vt)) bad.push({ step: 'close-same', j, vt2: s2.vt, vt3: s3.vt });
+        if (s3.open.length !== 0 || !near(s3.vt[jx], s2.vt[jx]) || s3.nb.some((h, k) => Math.abs(h - x0.nb[k]) > 1)) bad.push({ step: 'close-same', j, before: s2.vt[jx], after: s3.vt[jx], open: s3.open });
       } else {
         await press(id);
         const s3 = await xs();
-        if (!same(s3, x0) || s3.open.length !== 0 || JSON.stringify(s3.vt) !== JSON.stringify(s1.vt)) bad.push({ step: 'close-same', id, s3 });
+        if (s3.open.length !== 0 || !near(s3.vt[i], s1.vt[i])) bad.push({ step: 'close-same', id, s3 });
       }
     }
-    ok(`${T} Explora: abrir/sustituir/cerrar (${touch ? 'toque' : 'clic'}) sin mover preguntas ni la altura; una sola respuesta, visible; el control queda bajo el dedo`, bad.length === 0, JSON.stringify(bad).slice(0, 600));
-    // Teclado: Enter abre, Espacio cierra (y el foco sigue en el control).
-    await page.focus(`.intcc-explore [data-intcc-q="${x0.ids[0]}"]`); await page.keyboard.press('Enter'); await page.waitForTimeout(220);
-    const k1 = await xs(); await page.keyboard.press(' '); await page.waitForTimeout(220); const k2 = await xs();
+    ok(`${T} Explora: abrir/sustituir/cerrar (${touch ? 'toque' : 'clic'}) bajo su pregunta, una sola abierta, el control no se mueve y Radar/Factores no cambian`, bad.length === 0, JSON.stringify(bad).slice(0, 700));
+    // Teclado: Enter abre, Espacio cierra; Escape cierra y devuelve el foco.
+    await page.focus(`.intcc-explore [data-intcc-q="${x0.ids[0]}"]`); await page.keyboard.press('Enter'); await page.waitForTimeout(260);
+    const k1 = await xs(); await page.keyboard.press(' '); await page.waitForTimeout(260); const k2 = await xs();
+    await page.keyboard.press('Enter'); await page.waitForTimeout(260); await page.keyboard.press('Escape'); await page.waitForTimeout(260); const k3 = await xs();
     const foc = await page.evaluate(`document.activeElement && document.activeElement.getAttribute('data-intcc-q')`);
-    ok(`${T} Explora: Enter abre y Espacio cierra, con el foco en el mismo control`, k1.open.length === 1 && k1.exp[0] === 'true' && k2.open.length === 0 && foc === x0.ids[0] && same(k1, x0) && same(k2, x0), JSON.stringify({ k1: k1.open, k2: k2.open, foc }));
-    // Respuesta larga: completa alcanzable dentro del panel.
-    const R = JSON.parse(await page.evaluate(`(async function(){ var c=document.querySelector('.intcc-explore'); var out=[];
-      var qs=[].slice.call(c.querySelectorAll('.intcc-x-q'));
-      for (var i=0;i<qs.length;i++){ qs[i].click(); await new Promise(function(r){ setTimeout(r,200); }); var z=c.querySelector('.intv6-x-answers'); z.scrollTop=z.scrollHeight; await new Promise(function(r){ setTimeout(r,60); });
-        var a=c.querySelector('.intcc-x-answer.is-open'); var ps=a.querySelectorAll('p'); var last=ps[ps.length-1]||a; var zr=z.getBoundingClientRect(), lr=last.getBoundingClientRect();
-        out.push({ ok: lr.bottom <= zr.bottom + 1 && lr.top >= zr.top - 1 - Math.max(0, lr.height - zr.height), over: z.scrollHeight > z.clientHeight + 1 }); qs[i].click(); await new Promise(function(r){ setTimeout(r,120); }); }
-      return JSON.stringify(out); })()`));
-    ok(`${T} Explora: cada respuesta se lee completa (desplaza dentro del panel si no cabe)`, R.every(x => x.ok), JSON.stringify(R));
-    // Repintado: conserva la pregunta abierta y la geometría.
+    ok(`${T} Explora: Enter abre, Espacio cierra y Escape cierra con el foco en la pregunta`, k1.open.length === 1 && k1.exp[0] === 'true' && k2.open.length === 0 && k3.open.length === 0 && foc === x0.ids[0], JSON.stringify({ k1: k1.open, k2: k2.open, k3: k3.open, foc }));
+    // Repintado: conserva la pregunta abierta y no estira a las vecinas.
     if (n >= 2) {
       await press(x0.ids[1]);
       await page.evaluate(`(function(){ _intelRefreshSig = '\\u0000probe'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1300);
       const r1 = await xs();
-      ok(`${T} Explora: un repintado conserva la pregunta abierta y la geometría`, r1.open.length === 1 && r1.open[0] === 'intcc-x-' + x0.ids[1] && same(r1, x0), JSON.stringify(r1));
+      ok(`${T} Explora: un repintado conserva la pregunta abierta y no estira Radar/Factores`, r1.open.length === 1 && r1.open[0] === 'intcc-x-' + x0.ids[1] && r1.nb.every((h, k) => Math.abs(h - x0.nb[k]) <= 1), JSON.stringify({ r1, nb0: x0.nb }));
       await press(x0.ids[1]);
     }
     // EVOLUCIÓN · Mayor inversión en columnas; tooltip con el activo y dentro del viewport; altura constante.
@@ -936,12 +983,15 @@ for (const E of ENGINES) {
       await page.locator('.intcc-explore .intcc-x-q').nth(i).click(); await page.mouse.move(1, 1); await page.waitForTimeout(320);
       const g = JSON.parse(await page.evaluate(geo));
       if (process.env.DBG) console.log('X', i, JSON.stringify(['radar', 'drv', 'ex', 'evo', 'hoy'].map(k => [k, g[k].t - g0[k].t, g[k].h - g0[k].h])));
-      const d = ['radar', 'drv', 'ex', 'evo', 'hoy', 'scen'].filter(k => g[k] && g0[k] && (Math.abs(g[k].t - g0[k].t) > 1 || Math.abs(g[k].h - g0[k].h) > 1));
+      // RE-DECIDIDO (cierre definitivo · acordeón): Explora crece por su respuesta y lo de
+      // debajo baja con naturalidad; lo que NO puede cambiar son Radar y Factores.
+      const d = ['radar', 'drv'].filter(k => g[k] && g0[k] && (Math.abs(g[k].t - g0[k].t) > 1 || Math.abs(g[k].h - g0[k].h) > 1));
       if (d.length) moved.push(i + ':' + d.join('+'));
-      const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); var z=document.querySelector('.intv6-x-answers'); if(!a) return 'closed'; if(!z) return false; var ar=a.getBoundingClientRect(), zr=z.getBoundingClientRect(), c=document.querySelector('.intcc-explore').getBoundingClientRect(); return ar.top >= zr.top - 1 && ar.top < zr.bottom && zr.bottom <= c.bottom + 1; })()`);
+      const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); if(!a) return 'closed'; var b=document.getElementById(a.getAttribute('aria-labelledby')); var ar=a.getBoundingClientRect(), br=b.getBoundingClientRect(); var inn=a.querySelector('.intcc-x-answer-in');
+        return ar.top >= br.bottom - 1 && ar.height >= 30 && inn.scrollHeight <= inn.clientHeight + 1; })()`);
       if (!vis) moved.push(i + ':answer-not-visible');
     }
-    ok(`${T} abrir cada respuesta de Explora no cambia ninguna altura ni posición (${nq} preguntas)`, nq >= 2 && moved.length === 0, JSON.stringify(moved));
+    ok(`${T} abrir cada respuesta de Explora: aparece bajo su pregunta y Radar/Factores no cambian (${nq} preguntas)`, nq >= 2 && moved.length === 0, JSON.stringify(moved));
     ok(`${T} sólo una respuesta abierta a la vez`, await page.evaluate(`document.querySelectorAll('.intcc-x-answer.is-open').length <= 1`));
     // V5.1 · si el usuario la cierra, ningún repintado (normal o con fuente en vuelo) la reabre.
     { await page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="true"]'); if (b) b.click(); })()`); await page.waitForTimeout(250);
