@@ -133,7 +133,7 @@ const memRows = (page) => page.evaluate(`JSON.stringify((_aurixAssetMemory.rows|
 const ENGINES = (process.env.ENGINES || 'CR,WK').split(',');
 for (const E of ENGINES) {
   const browser = await (E === 'WK' ? PWm.webkit : PWm.chromium).launch({ headless: true });
-  const newPage = async (w) => { const ctx = await browser.newContext({ viewport: { width: w, height: w < 768 ? 844 : 1000 }, deviceScaleFactor: 1 });
+  const newPage = async (w, rm) => { const ctx = await browser.newContext({ viewport: { width: w, height: w < 768 ? 844 : 1000 }, deviceScaleFactor: 1, reducedMotion: rm ? 'reduce' : 'no-preference' });
     const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message)); return { ctx, page, errs }; };
 
   // ── P0.1 · HIDRATACIÓN TARDÍA: entrar ANTES de que llegue la memoria ─────────
@@ -376,9 +376,76 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // ── V6 · CONTRATO FINANCIERO ÚNICO: la liquidez no es una inversión ──────────
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng] of (process.env.V6_MATRIX || '360:es,375:en,390:es,768:es,1024:es,1440:es,1440:en').split(',').map(x => x.split(':'))) {
+    const W6 = Number(w), T = `[${E} V6 cash ${W6} ${lng}]`;
+    if (!W6) continue;
+    const P = persona('cash');
+    const RM = W6 === 375;   // movimiento reducido en una de las celdas de la matriz
+    const { ctx, page, errs } = await newPage(W6, RM);
+    await boot(page, P, lng);
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1600);
+    const U = JSON.parse(await page.evaluate(`(function(){ var vis=function(e){ return e && e.getBoundingClientRect().width>0; };
+      var q=function(s){ return [].slice.call(document.querySelectorAll(s)).filter(vis); };
+      var txt=function(e){ return e ? e.textContent.replace(/\\s+/g,' ').trim() : ''; };
+      var hero=(q('.intcc-m-hero-title')[0]||q('.intcc-hero-title')[0]);
+      var drv=q('.intcc-drivers')[0];
+      var evo=document.querySelector('.intv21-evo');
+      var sc=document.querySelector('.intv21-scen');
+      var top1=sc ? sc.querySelector('.intv22-scn-block[data-scn="top1"]') : null, top3=sc ? sc.querySelector('.intv22-scn-block[data-scn="top3"]') : null;
+      return JSON.stringify({ hero: txt(hero), tags: q('.intv21-tag').map(txt),
+        rank: drv ? [].slice.call(drv.querySelectorAll('.intcc-drv-row .intcc-drv-name')).map(function(n){ return n.firstChild ? n.firstChild.textContent.trim() : ''; }) : [],
+        drv: txt(drv), evo: evo ? { metric: evo.getAttribute('data-metric'), head: txt(evo.querySelector('.intv22-head')), stats: txt(evo.querySelector('.intv22-stats')) } : null,
+        xq: q('.intcc-explore .intcc-x-q').map(txt), xa: [].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-answer')).map(txt).join(' | '),
+        s1: top1 ? txt(top1) : '', s3: top3 ? txt(top3) : '' }); })()`));
+    const EUROS = /Euros/;
+    ok(`${T} Hero: la liquidez nunca entra en «pesan más que…»; si es la mayor partida, se dice como liquidez`, !/Euros, |Euros y|y Euros/.test(U.hero)
+      && (/liquidez|cash/i.test(U.hero) || !EUROS.test(U.hero)), U.hero);
+    ok(`${T} Factores: el ranking es de INVERSIONES (sin Euros) y la liquidez va aparte`, U.rank.length >= 3 && !U.rank.some(n => EUROS.test(n))
+      && /(liquidez representa|cash makes up)/i.test(U.drv) && !/estabilidad|stability|oportunidades|opportunities/i.test(U.drv), JSON.stringify({ rank: U.rank, drv: U.drv.slice(0, 220) }));
+    ok(`${T} Evolución (mayor posición): nunca la liquidez`, !U.evo || U.evo.metric !== 'top' || (!EUROS.test(U.evo.head) && !EUROS.test(U.evo.stats)), JSON.stringify(U.evo));
+    ok(`${T} Explora: ninguna pregunta trata la liquidez como posición; la liquidez se pregunta como liquidez`, !U.xq.some(x => EUROS.test(x)) && !EUROS.test(U.xa.replace(/liquidez|cash/gi, '')), JSON.stringify(U.xq));
+    ok(`${T} Escenarios: mayor posición y tres mayores son inversiones`, /Bitcoin/.test(U.s1) && !EUROS.test(U.s1) && !EUROS.test(U.s3), JSON.stringify([U.s1.slice(0, 80), U.s3.slice(0, 120)]));
+    ok(`${T} etiquetas del hero sin tratar la liquidez como posición`, !U.tags.some(t => /^Euros/.test(t)), JSON.stringify(U.tags));
+    // ── Fase B: composición móvil, contraste y áreas seguras ──
+    const B = JSON.parse(await page.evaluate(`(function(){
+      var vis=function(e){ return e && e.getBoundingClientRect().width>0; };
+      var hero=[].slice.call(document.querySelectorAll('.intcc-m-hero-title, .intcc-hero-title')).filter(vis)[0];
+      var lh=parseFloat(getComputedStyle(hero).lineHeight); var lines=Math.round(hero.getBoundingClientRect().height / lh);
+      var tags=[].slice.call(document.querySelectorAll('.intv21-tag')).filter(vis).map(function(t){ return Math.round(t.getBoundingClientRect().top); });
+      var rows=tags.filter(function(v,i,a){ return a.indexOf(v)===i; }).length;
+      var lum=function(c){ var m=c.match(/[\\d.]+/g).map(Number); var a=m.length>3?m[3]:1; var bg=[22,30,50];
+        var rgb=[0,1,2].map(function(i){ return m[i]*a + bg[i]*(1-a); }).map(function(v){ v/=255; return v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4); });
+        return 0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2]; };
+      var ratio=function(e){ var L=lum(getComputedStyle(e).color), B2=lum('rgb(22,30,50)'); return (Math.max(L,B2)+0.05)/(Math.min(L,B2)+0.05); };
+      var sec=[].slice.call(document.querySelectorAll('.intv4-story-why, .intv21-evo-axis, .intv5-sim-lead, .intv15-drv-factor, .intv22-stats dt, .intv22-scn-kind, .intv6-y-lab')).filter(vis);
+      var low=sec.map(function(e){ return [e.className.split(' ')[0], +ratio(e).toFixed(2)]; }).filter(function(x){ return x[1] < 4.5; });
+      var st=[].slice.call(document.querySelectorAll('.intcc-watch .intv21-today.has-icon')).filter(vis).map(function(a){ var ic=a.querySelector('.intv3-today-icon').getBoundingClientRect(); var mk=getComputedStyle(a,'::before'); var ar=a.getBoundingClientRect();
+        var mt=ar.top + parseFloat(mk.top) + parseFloat(mk.marginTop||0) + parseFloat(mk.height)/2; return Math.abs(mt - (ic.top + ic.height/2)); });
+      var val=document.querySelector('.intv5-sim-value'), rng=document.querySelector('.intv5-sim-range');
+      var vr=val.getBoundingClientRect(), rr=rng.getBoundingClientRect();
+      var root=document.querySelector('.aurix-intcc'), last=[].slice.call(root.children).filter(vis).pop(); var pb=parseFloat(getComputedStyle(root).paddingBottom);
+      return JSON.stringify({ lines: lines, rows: rows, ntags: tags.length, low: low, align: st, near: Math.abs((vr.top+vr.bottom)/2 - (rr.top+rr.bottom)/2) < 60, pb: pb,
+        hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 }); })()`));
+    ok(`${T} hero: titular en ≤4 líneas${W6 < 768 ? ' y etiquetas en filas compactas' : ''}`, B.lines <= 4 && (W6 >= 768 || B.rows < B.ntags || B.ntags <= 1), JSON.stringify(B));
+    ok(`${T} contraste ≥ 4,5:1 en los textos secundarios`, B.low.length === 0, JSON.stringify(B.low));
+    ok(`${T} Hoy: la marca de dirección centrada con el icono (±3 px)`, B.align.every(d => d <= 3), JSON.stringify(B.align));
+    ok(`${T} simulador: el valor forma parte del control; sin scroll horizontal`, B.near && !B.hscroll, JSON.stringify(B));
+    if (W6 < 768) ok(`${T} la última card queda libre de la barra fija y el área segura (≥ 96 px de margen final)`, B.pb >= 96, String(B.pb));
+    if (RM) { const anim = await page.evaluate(`(function(){ var a=[]; var hero=document.querySelector('.intcc-m-hero, .intcc-hero'); if (hero) a.push(getComputedStyle(hero,'::after').animationName);
+        var t=document.querySelector('.intcc-card-title'); if (t) a.push(getComputedStyle(t,'::before').animationName);
+        var b=document.querySelector('.intv6-bar, .intv6-stem'); if (b) a.push(getComputedStyle(b).animationName); return a; })()`);
+      ok(`${T} movimiento reducido: sin destello, sin pulso y sin crecimiento animado`, anim.every(n => n === 'none'), JSON.stringify(anim)); }
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    if (process.env.DUMP) console.log(T, JSON.stringify(U, null, 1));
+    await ctx.close();
+  }
+
   // ── V5 · GEOMETRÍA ESTABLE, SIMULADOR, MONEDA Y ESQUELETOS ──────────────────
   if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng] of (process.env.V5_MATRIX || '360:es,390:es,390:en,768:es,1024:es,1440:es,1440:en').split(',').map(x => x.split(':'))) {
     const W5 = Number(w), T = `[${E} V5 ${W5} ${lng}]`;
+    if (!W5) continue;
     const P = persona('real');
     const { ctx, page, errs } = await newPage(W5);
     await boot(page, P, lng);
@@ -388,7 +455,11 @@ for (const E of ENGINES) {
     const sk = JSON.parse(await page.evaluate(`JSON.stringify({ evo: Math.round((document.querySelector('.intcc-timeline')||{getBoundingClientRect:function(){return{height:0};}}).getBoundingClientRect().height), ex: Math.round((document.querySelector('.intcc-explore')||{getBoundingClientRect:function(){return{height:0};}}).getBoundingClientRect().height), pend: document.querySelectorAll('[data-pending="1"]').length })`));
     await page.waitForTimeout(1500);
     const rs = JSON.parse(await page.evaluate(`JSON.stringify({ evo: Math.round(document.querySelector('.intcc-timeline').getBoundingClientRect().height), ex: Math.round(document.querySelector('.intcc-explore').getBoundingClientRect().height) })`));
-    ok(`${T} primera carga: esqueletos con la geometría real (±15 % de la card resuelta)`, sk.pend >= 1 && Math.abs(sk.evo - rs.evo) <= 0.15 * rs.evo && Math.abs(sk.ex - rs.ex) <= 0.15 * rs.ex, JSON.stringify({ sk, rs }));
+    // RE-DECIDIDO (V6): en escritorio la reserva de Explora se MIDE con las respuestas reales
+    // (que no existen en la primera carga) y está acotada a 1,2× la fila; el esqueleto ocupa la
+    // fila y la card resuelta nunca pasa de ese tope. Evolución y móvil: ±15 %.
+    ok(`${T} primera carga: esqueletos con la geometría real`, sk.pend >= 1 && Math.abs(sk.evo - rs.evo) <= 0.15 * rs.evo
+      && (W5 >= 1024 ? (rs.ex <= 1.2 * sk.ex + 1 && rs.ex >= sk.ex - 1) : Math.abs(sk.ex - rs.ex) <= 0.15 * rs.ex), JSON.stringify({ sk, rs }));
     const geo = `JSON.stringify((function(){ var q=function(s){ var e=document.querySelector(s); if(!e) return null; var r=e.getBoundingClientRect(); return { t: Math.round(r.top+scrollY), h: Math.round(r.height), l: Math.round(r.left), r: Math.round(r.right), sh: e.scrollHeight - e.clientHeight }; };
       return { radar: q('.intcc-radar'), drv: q('.intcc-drivers'), ex: q('.intcc-explore'), evo: q('.intcc-timeline'), hoy: q('.intcc-watch'), scen: q('.intv21-scen') }; })())`;
     await page.mouse.move(1, 1); await page.waitForFunction(`!!document.querySelector('.aurix-intcc.is-revealed')`, null, { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(1100);
@@ -397,7 +468,10 @@ for (const E of ENGINES) {
     const x0 = JSON.parse(await page.evaluate(`JSON.stringify({ open: document.querySelectorAll('.intcc-explore .intcc-x-answer.is-open').length,
       exp: [].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).filter(function(b){ return b.getAttribute('aria-expanded') === 'true'; }).length,
       first: (document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="true"]')||{getAttribute:function(){return null;}}).getAttribute('data-intcc-q') })`));
-    ok(`${T} Explora entra con la respuesta prioritaria abierta (una sola; aria-expanded coherente)`, x0.open === 1 && x0.exp === 1, JSON.stringify(x0));
+    // RE-DECIDIDO (V6): entra CERRADA y con las preguntas repartidas por toda la altura.
+    const spread = await page.evaluate(`(function(){ var l=document.querySelector('.intcc-explore-list'), qs=l ? l.querySelectorAll('.intcc-x-item') : []; if(!l||!qs.length) return 0;
+      var lr=l.getBoundingClientRect(), a=qs[0].getBoundingClientRect(), b=qs[qs.length-1].getBoundingClientRect(); return (b.bottom - a.top) / lr.height; })()`);
+    ok(`${T} Explora entra cerrada (ninguna respuesta abierta) y con las preguntas repartidas`, x0.open === 0 && x0.exp === 0 && spread >= 0.75, JSON.stringify({ x0, spread }));
     // Explora: abrir / cerrar cada respuesta no mueve nada.
     const nq = await page.evaluate(`document.querySelectorAll('.intcc-explore .intcc-x-q').length`);
     let moved = [];
@@ -407,7 +481,7 @@ for (const E of ENGINES) {
       if (process.env.DBG) console.log('X', i, JSON.stringify(['radar', 'drv', 'ex', 'evo', 'hoy'].map(k => [k, g[k].t - g0[k].t, g[k].h - g0[k].h])));
       const d = ['radar', 'drv', 'ex', 'evo', 'hoy', 'scen'].filter(k => g[k] && g0[k] && (Math.abs(g[k].t - g0[k].t) > 1 || Math.abs(g[k].h - g0[k].h) > 1));
       if (d.length) moved.push(i + ':' + d.join('+'));
-      const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); var l=document.querySelector('.intcc-explore-list'); if(!a) return 'closed'; if(!l) return false; var ar=a.getBoundingClientRect(), lr=l.getBoundingClientRect(); return ar.top >= lr.top - 1 && ar.top < lr.bottom; })()`);
+      const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); var z=document.querySelector('.intv6-x-answers'); if(!a) return 'closed'; if(!z) return false; var ar=a.getBoundingClientRect(), zr=z.getBoundingClientRect(), c=document.querySelector('.intcc-explore').getBoundingClientRect(); return ar.top >= zr.top - 1 && ar.top < zr.bottom && zr.bottom <= c.bottom + 1; })()`);
       if (!vis) moved.push(i + ':answer-not-visible');
     }
     ok(`${T} abrir cada respuesta de Explora no cambia ninguna altura ni posición (${nq} preguntas)`, nq >= 2 && moved.length === 0, JSON.stringify(moved));
@@ -492,7 +566,7 @@ for (const E of ENGINES) {
       ok(`${T} sin insignia «Hipotético» ni nota al pie; frase única junto al control`, await page.evaluate(`!document.querySelector('.intv3-scn-tag') && !document.querySelector('.intv21-scen .intv21-foot') && /compara su efecto en tus principales dependencias|compare its effect on your main dependencies/.test(document.querySelector('.intv21-scen').textContent)`));
       // V5.1 · rail bipolar: el tramo nace en 0; ningún escenario destacado por defecto.
       const bip = JSON.parse(await page.evaluate(`(function(){ var s=document.querySelector('.intv21-scen input[type="range"]'), t=document.querySelector('.intv21-scen .intv5-sim-track'), act=t.querySelector('.intv5-sim-active'), o=t.querySelector('.intv5-sim-origin');
-        var get=function(v){ s.value=v; s.dispatchEvent(new Event('input',{bubbles:true})); return new Promise(function(res){ setTimeout(function(){ var a=act.getBoundingClientRect(), z=o.getBoundingClientRect(); res({ v: v, dir: t.getAttribute('data-dir'), l: Math.round(a.left), r: Math.round(a.right), w: Math.round(a.width), z: Math.round(z.left + z.width/2) }); }, 260); }); };
+        var get=function(v){ s.value=v; s.dispatchEvent(new Event('input',{bubbles:true})); return new Promise(function(res){ setTimeout(function(){ var a=act.getBoundingClientRect(), z=o.getBoundingClientRect(); res({ v: v, dir: t.getAttribute('data-dir'), l: Math.round(a.left), r: Math.round(a.right), w: Math.round(a.width), z: Math.round(z.left + z.width/2) }); }, 650); }); };
         var out=[]; return [-50,-10,0,10,50].reduce(function(p,v){ return p.then(function(){ return get(v).then(function(x){ out.push(x); }); }); }, Promise.resolve()).then(function(){ s.value=-10; s.dispatchEvent(new Event('input',{bubbles:true}));
           return JSON.stringify({ out: out, on: document.querySelectorAll('.intv21-scen .intv22-scn-block.is-on').length }); }); })()`));
       const by = Object.fromEntries(bip.out.map(x => [x.v, x]));
@@ -559,7 +633,9 @@ for (const E of ENGINES) {
       ok(`${T} sin scroll horizontal ni cards solapadas`, !r.hscroll && r.overlaps.length === 0, JSON.stringify(r.overlaps));
       ok(`${T} etiquetas del hero sin X ni control de cierre`, r.tagX === 0, String(r.tagX));
       ok(`${T} KPIs de evolución completos (sin elipsis ni recorte)`, r.kpiClip.length === 0, JSON.stringify(r.kpiClip));
-      ok(`${T} KPI «Último dato», nunca «Actual»`, !r.evo || /Último dato|Latest/.test(r.evo.stats) && !/\bActual\b|\bNow\b/.test(r.evo.stats), r.evo && r.evo.stats);
+      // RE-DECIDIDO (V6): cada KPI dice QUÉ mide; nunca «Actual».
+      ok(`${T} KPI con significado (nunca «Actual»)`, !r.evo || (!/\bActual\b|\bNow\b/.test(r.evo.stats)
+        && (r.evo.metric !== 'top' || (/al inicio|at start/.test(r.evo.stats) && !/Peso máximo(?! )|Top weight(?! change)/.test(r.evo.stats)))), r.evo && r.evo.stats);
       ok(`${T} titular de evolución sin cifras ni paréntesis`, !r.evo || (!/\d/.test(r.evo.head.replace(/^(En|Over) \d+ (días|days),|^(Desde el|Since) [^,]+(, \d{4})?,/, '')) && !/[()]/.test(r.evo.head)), r.evo && r.evo.head);
       ok(`${T} color de Cambio sólo con valoración (rentabilidad)`, !r.evo || r.evo.metric === 'return' || /is-neutral/.test(r.evo.deltaCls), JSON.stringify(r.evo));
       ok(`${T} sin jerga prohibida`, !r.jargon.length, JSON.stringify(r.jargon));
@@ -614,7 +690,10 @@ for (const E of ENGINES) {
             await clickSettled(page.locator(`.intv21-evo [data-intv21-evo-win="${wn}"]:visible`).first()); await page.waitForTimeout(120);
             const h = await H(); h.k = m + '/' + wn; hs.push(h);
             const g = JSON.parse(await page.evaluate(`JSON.stringify({ areas: document.querySelectorAll('.intv21-evo .intv22-area').length, stems: document.querySelectorAll('.intv21-evo .intv21-evo-stem').length, segs: ((document.querySelector('.intv21-evo-line')||{getAttribute:function(){return '';}}).getAttribute('d').match(/M/g)||[]).length, pts: Number(document.querySelector('.intv21-evo').getAttribute('data-points')), gaps: Number(document.querySelector('.intv21-evo').getAttribute('data-gaps')) })`));
-            ok(`${T} gráfico ${m}/${wn}: un solo relleno, sin tallos, tramos = huecos reales + 1`, g.areas === 1 && g.stems === 0 && g.segs === g.gaps + 1, JSON.stringify(g));
+            const bars = await page.evaluate(`(function(){ var p=document.querySelector('.intv21-evo-plot'); return p.getAttribute('data-chart') === 'bars' ? p.querySelectorAll('.intv6-head, .intv6-bar').length : -1; })()`);
+            // RE-DECIDIDO (V6): estructurales = una barra por observación, sin línea ni relleno.
+            ok(`${T} gráfico ${m}/${wn}: ${bars >= 0 ? 'una barra por observación real' : 'un solo relleno, sin tallos, tramos = huecos reales + 1'}`,
+              bars >= 0 ? (bars === g.pts && g.areas === 0 && g.segs === 0) : (g.areas === 1 && g.stems === 0 && g.segs === g.gaps + 1), JSON.stringify({ g, bars }));
           }
         }
         ok(`${T} Evolución conserva su altura y Hoy no se mueve al cambiar métrica y periodo`, hs.every(h => (w >= 1024 ? h.evo === h0.evo : Math.abs(h.evo - h0.evo) <= 1) && h.plot === h0.plot && Math.abs(h.hoy - h0.hoy) <= 1), JSON.stringify({ h0, hs }));
@@ -641,11 +720,11 @@ for (const E of ENGINES) {
         const t1 = JSON.parse(await page.evaluate(PRES)).tags.join(',');
         ok(`${T} etiquetas idénticas al volver`, t0 === t1, JSON.stringify([t0, t1]));
         // Acordeón de Explora: crece su card y empuja; Radar/Factores no se estiran.
-        const acc = await page.evaluate(`(function(){ var q=document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="false"]'); if(!q) return null;
+        const acc = await page.evaluate(`(function(){ var q=document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="false"]'); if(!q) return null; var _ans=document.getElementById(q.getAttribute('aria-controls'));
           var rad=document.querySelector('.intv7-radar, .intcc-radar'), drv=document.querySelector('.intcc-drivers');
           var h0=[rad&&rad.getBoundingClientRect().height, drv&&drv.getBoundingClientRect().height]; q.click();
           return new Promise(function(res){ setTimeout(function(){ var h1=[rad&&rad.getBoundingClientRect().height, drv&&drv.getBoundingClientRect().height];
-            var a=q.parentNode.querySelector('.intcc-x-answer'); res(JSON.stringify({ h0:h0, h1:h1, open: q.getAttribute('aria-expanded'), ah: a ? a.getBoundingClientRect().height : 0 })); }, 450); }); })()`);
+            var a=_ans; res(JSON.stringify({ h0:h0, h1:h1, open: q.getAttribute('aria-expanded'), ah: a ? a.getBoundingClientRect().height : 0 })); }, 450); }); })()`);
         if (acc) { const A = JSON.parse(acc);
           ok(`${T} Explora abierta: la respuesta ocupa sitio y Radar/Factores no cambian de alto`, A.open === 'true' && A.ah > 10 && Math.abs((A.h0[0] || 0) - (A.h1[0] || 0)) < 1 && Math.abs((A.h0[1] || 0) - (A.h1[1] || 0)) < 1, acc);
           if ((kind === 'real' || kind === 'qa14') && lng === 'es') await page.screenshot({ path: join(OUT, `${E}-${kind}-${lng}-${w}-open.png`), fullPage: true }); }

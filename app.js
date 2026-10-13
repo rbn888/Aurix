@@ -5623,8 +5623,9 @@ const T = {
     intel_sub_history:     'Las conclusiones de evolución aparecerán solas en cuanto haya observaciones suficientes.',
     // Descubrimientos: cada uno nace de una RELACIÓN entre hechos, nunca de una causa inventada.
     intel_d_apparent:      (pos, eff) => `Tienes ${pos} posiciones, pero tu peso se reparte como si tuvieras ${eff}.`,
-    intel_h_apparent_top3: (n, names, rest) => `Tienes ${n} posiciones, pero ${names[0]}, ${names[1]} y ${names[2]} pesan más que las otras ${rest} juntas.`,
-    intel_h_apparent:      n => `Tienes ${n} posiciones, pero tu dinero se concentra en unas pocas.`,
+    intel_h_apparent_top3: (n, names, rest) => `${names[0]}, ${names[1]} y ${names[2]} pesan más que tus otras ${rest} inversiones juntas.`,
+    intel_h_apparent:      n => `Tienes ${n} inversiones, pero tu dinero invertido se concentra en unas pocas.`,
+    intv6_h_liquidity:     p => `El ${p} de tu cartera financiera está en liquidez.`,
     intel_d_conc_rising:   pct => `Tu posición principal ha pasado a pesar el ${pct}% y ha cruzado el umbral de concentración.`,
     // A1 — «aportado» afirma INTENCIÓN (dinero nuevo desde fuera) y el ledger
     // sólo certifica MECANISMO: un `deposit` puede ser el registro de efectivo
@@ -5809,7 +5810,8 @@ const T = {
     intv7_pending_generic: (d) => `${d}: Aurix todavía no tiene evidencia que pueda certificar.`,
     intv7_stab_meaning: 'Estabilidad = porcentaje del máximo que tu cartera conservó en su peor momento, con las aportaciones y retiradas neutralizadas.',
     intcc_drivers_title: 'Factores principales',
-    intcc_drv_explain_asset: name => `${name} representa actualmente la mayor exposición individual de tu patrimonio.`,
+    intcc_drv_explain_asset: name => `Tu mayor inversión es ${name}.`,
+    intv6_drv_liquidity: pct => `La liquidez representa el ${pct} de tu cartera financiera.`,
     intcc_drv_explain_cash:  (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades.`,
     intcc_drv_kind_eng:  'Exposición',
     intcc_drv_kind_liq:  'Liquidez',
@@ -5823,8 +5825,8 @@ const T = {
     // posición del 5 % puede explicar más resultado que una del 40 %. Lo que el
     // peso SÍ demuestra —aritmética pura— es cuánto mueve cada posición el VALOR
     // del conjunto. Se dice eso y se para ahí.
-    intv15_drv_dependency: (n, pct) => `Tus ${n} mayores posiciones concentran el ${pct} de tu cartera financiera: el valor del conjunto se mueve sobre todo con ellas.`,
-    intv15_drv_category: (label, pct) => `Por clase de activo, tu mayor exposición es ${label}, con el ${pct} de tu cartera financiera.`,
+    intv15_drv_dependency: (n, pct) => `Tus ${n} mayores inversiones reúnen el ${pct} de tu cartera financiera.`,
+    intv15_drv_category: (label, pct) => `Por clase de inversión, la mayor es ${label}, con el ${pct} de tu cartera financiera.`,
     intcc_explore_title: 'Explora tu patrimonio',
     intcc_explore_hint:  'Toca una pregunta para ver la respuesta.',
     intcc_q_movers:        '¿Qué mueve más mi patrimonio?',
@@ -5892,13 +5894,16 @@ const T = {
     intv4_brief_title: 'Lo que importa hoy',
     // ── INTELLIGENCE V2.1 (intv22) ──
     intv22_in_7d: 'En 7 días', intv22_in_30d: 'En 30 días', intv22_since: d => `Desde el ${d}`,
-    intv22_h_top_changed: (l, na, nb) => `${l}, tu mayor posición pasó de ser ${na} a ${nb}.`,
-    intv22_h_top_up: (l, n) => `${l}, ${n} ganó peso como tu mayor posición.`,
-    intv22_h_top_down: (l, n) => `${l}, ${n} perdió peso, aunque sigue siendo tu mayor posición.`,
-    intv22_h_top_flat: (l, n) => `${l}, el peso de ${n}, tu mayor posición, se mantuvo.`,
-    intv22_h_topx_up: l => `${l}, tu mayor posición ganó peso.`,
-    intv22_h_topx_down: l => `${l}, tu mayor posición perdió peso.`,
-    intv22_h_topx_flat: l => `${l}, el peso de tu mayor posición se mantuvo.`,
+    intv22_h_top_changed: (l, na, nb) => `${l}, tu mayor inversión pasó de ${na} a ${nb}.`,
+    intv22_h_top_up: (l, n) => `${l}, ${n} ganó peso como tu mayor inversión.`,
+    intv22_h_top_down: (l, n) => `${l}, ${n} perdió peso, aunque sigue siendo tu mayor inversión.`,
+    intv22_h_top_flat: (l, n) => `${l}, el peso de ${n}, tu mayor inversión, se mantuvo.`,
+    intv22_h_topx_up: l => `${l}, tu mayor inversión ganó peso.`,
+    intv22_h_topx_down: l => `${l}, tu mayor inversión perdió peso.`,
+    intv22_h_topx_flat: l => `${l}, el peso de tu mayor inversión se mantuvo.`,
+    intv6_k_at_start: n => `${n} al inicio`, intv6_k_at_end: n => `${n} al final`, intv6_k_top_peak: 'Cambio del peso máximo', intv6_k_weight_chg: 'Cambio de peso',
+    intv6_k_eff_start: 'Posiciones efectivas al inicio', intv6_k_liq_start: 'Liquidez al inicio', intv6_k_liq_end: 'Liquidez al final',
+    intv6_k_val_start: 'Valor inicial', intv6_k_val_end: 'Último valor', intv6_k_val_chg: 'Cambio de valor',
     intv22_h_liq_up: l => `${l}, tu liquidez ganó peso en la cartera.`,
     intv22_h_liq_down: l => `${l}, tu liquidez perdió peso en la cartera.`,
     intv22_h_liq_flat: l => `${l}, el peso de tu liquidez se mantuvo.`,
@@ -5911,13 +5916,13 @@ const T = {
     intv22_h_ret_up: l => `${l}, tus inversiones ganaron valor sin contar aportaciones ni retiradas.`,
     intv22_h_ret_down: l => `${l}, tus inversiones perdieron valor sin contar aportaciones ni retiradas.`,
     intv22_h_ret_flat: l => `${l}, tus inversiones se mantuvieron sin contar aportaciones ni retiradas.`,
-    intv22_m_top: 'Mayor posición', intv22_m_effective: 'Reparto', intv22_m_liquidity: 'Liquidez',
+    intv22_m_top: 'Mayor inversión', intv22_m_effective: 'Reparto', intv22_m_liquidity: 'Liquidez',
     intv22_m_return: 'Rentabilidad', intv22_m_value: 'Valor',
     intv22_m_top_aria: 'Peso de la mayor posición', intv22_m_effective_aria: 'Reparto efectivo, en posiciones equivalentes',
     intv22_m_liquidity_aria: 'Peso de la liquidez', intv22_m_return_aria: 'Rentabilidad sin aportaciones ni retiradas',
     intv22_m_value_aria: 'Valor de la cartera, con aportaciones y retiradas',
     intv22_st_start: 'Inicio', intv22_st_now: 'Último dato', intv22_st_delta: 'Cambio',
-    intv22_pos_unit: 'posiciones',
+    intv22_pos_unit: 'posiciones efectivas',
     intv22_plot_aria: 'Usa las flechas para recorrer las observaciones.',
     intv22_obs_note: n => `${n} observaciones registradas`,
     intv22_tip_obs: 'observación registrada',
@@ -5925,16 +5930,16 @@ const T = {
     intv22_note_effective: 'Equivale a tener ese número de posiciones con el mismo peso. Mide cómo se reparte el dinero, no el riesgo.',
     intv3_xq_split: (a, b) => `¿Qué parte de mi cartera está entre ${a} y ${b}?`,
     intv3_xa_split: (t, a, pa, b, pb) => `El ${t}: ${a} reúne el ${pa} y ${b} el ${pb}, hoy.`,
-    intv3_xq_cp: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas posiciones?',
-    intv3_xa_cp_both: (n, w3) => `Las dos cosas a la vez: tu dinero está en ${n} clases de activo, pero tus tres mayores posiciones reúnen hoy el ${w3}.`,
-    intv3_xa_cp_spread: (n, w3) => `Estás repartido en las dos cosas: ${n} clases de activo, y tus tres mayores posiciones reúnen hoy el ${w3}, menos que el resto juntas.`,
-    intv3_xa_cp_two: (n, w3, c) => `Tu dinero está en solo dos clases de activo (${c[0]} y ${c[1]}), y tus tres mayores posiciones reúnen hoy el ${w3}.`,
+    intv3_xq_cp: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?',
+    intv3_xa_cp_both: (n, w3) => `Las dos cosas a la vez: tu dinero invertido está en ${n} clases de inversión, pero tus tres mayores inversiones reúnen hoy el ${w3}.`,
+    intv3_xa_cp_spread: (n, w3) => `Estás repartido en las dos cosas: ${n} clases de inversión, y tus tres mayores inversiones reúnen hoy el ${w3}, menos que el resto de tus inversiones juntas.`,
+    intv3_xa_cp_two: (n, w3, c) => `Tu dinero invertido está en solo dos clases de inversión (${c[0]} y ${c[1]}), y tus tres mayores inversiones reúnen hoy el ${w3}.`,
     intv3_xa_cp_note: 'Repartir entre clases y repartir entre posiciones son cosas distintas: puedes tener la primera sin la segunda.',
     intv22_ago_7d: 'hace 7 días', intv22_ago_30d: 'hace 30 días', intv22_ago_all: 'al principio',
     intv22_xq_conc_down: (n, ago) => `¿Por qué ${n} pesa menos que ${ago}?`,
     intv22_xq_conc_up: (n, ago) => `¿Por qué ${n} pesa más que ${ago}?`,
     intv22_xa_conc: (v, t) => `Porque su valor en tu cartera cambió un ${v}, frente a un ${t} del total.`,
-    intv3_xq_lead: n => `¿Qué cambió para que ${n} pasara a ser mi mayor posición?`,
+    intv3_xq_lead: n => `¿Qué cambió para que ${n} pasara a ser mi mayor inversión?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Desde ${ago}, el valor de ${na} en tu cartera cambió un ${va} y el de ${nb} un ${vb}: hoy ${nb} vale más.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} es una posición nueva que hoy vale más que ${na}, cuyo valor en tu cartera cambió un ${va} desde ${ago}.`,
     intv22_xq_spread: ago => `¿Mi dinero está mejor repartido que ${ago} o solo tengo más posiciones?`,
@@ -5948,6 +5953,8 @@ const T = {
     intv22_xa_mo_ev: (d, m, o) => `Desde el ${d}: mercado ${m}; tus compras, ventas y movimientos de liquidez ${o}.`,
     intv22_xa_mo_lim: 'Los dividendos que no hayas registrado no se separan.',
     intv22_xq_liq: l => `¿Por qué cambió el peso de mi liquidez ${l}?`,
+    intv6_xq_liq_up: l => `¿Por qué aumentó el peso de mi liquidez ${l}?`,
+    intv6_xq_liq_down: l => `¿Por qué disminuyó el peso de mi liquidez ${l}?`,
     intv22_xa_liq_rest: 'Tu liquidez apenas se movió: su peso cambió porque cambió el valor del resto de tu cartera.',
     intv22_xa_liq_flows: 'Su peso cambió sobre todo por aportaciones o retiradas registradas.',
     intv22_xa_liq_cash: 'Su peso cambió porque cambió el saldo de tu liquidez.',
@@ -5967,9 +5974,9 @@ const T = {
     intv21_today_liq_none: 'No tienes liquidez registrada en tu patrimonio invertible.',
     intv21_today_positions: n => `Tu patrimonio invertible se reparte en ${n} ${n === 1 ? 'posición' : 'posiciones'}.`,
     intv21_tags_aria: 'Lecturas destacadas',
-    intv3_tag_top3: p => `Tres posiciones reúnen el ${p}`,
+    intv3_tag_top3: p => `Tres mayores inversiones: ${p}`,
     intv3_tag_class1: (c, p) => `${c}: ${p} de tu cartera`,
-    intv3_tag_class2: (a, b, p) => `${a} y ${b} reúnen el ${p}`,
+    intv3_tag_class2: (a, b, p) => `${a} y ${b}: ${p}`,
     intv3_tag_driver: n => `${n}, principal movimiento de tu cartera en 24 h`,
     intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'última sesión',
     intv51_today_weight: p => `${p} de tu cartera financiera.`,
@@ -6007,7 +6014,7 @@ const T = {
     intv5_sim_lead: 'Elige un movimiento y compara su efecto en tus principales dependencias.',
     intv5_sim_aria: 'Movimiento simulado', intv5_sim_less: 'Bajar 5 puntos', intv5_sim_more: 'Subir 5 puntos',
     intv5_if_top1_down: (n, p) => `Si ${n} bajara un ${p}`, intv5_if_top1_up: (n, p) => `Si ${n} subiera un ${p}`, intv5_if_top1_flat: n => `Si ${n} no cambiara`,
-    intv5_if_top3_down: (n, p) => `Si tus tres mayores posiciones bajaran un ${p}`, intv5_if_top3_up: (n, p) => `Si tus tres mayores posiciones subieran un ${p}`, intv5_if_top3_flat: () => 'Si tus tres mayores posiciones no cambiaran',
+    intv5_if_top3_down: (n, p) => `Si tus tres mayores inversiones bajaran un ${p}`, intv5_if_top3_up: (n, p) => `Si tus tres mayores inversiones subieran un ${p}`, intv5_if_top3_flat: () => 'Si tus tres mayores inversiones no cambiaran',
     intv5_if_class_down: (c, p) => `Si todo lo que tienes en ${c} bajara un ${p}`, intv5_if_class_up: (c, p) => `Si todo lo que tienes en ${c} subiera un ${p}`, intv5_if_class_flat: c => `Si todo lo que tienes en ${c} no cambiara`,
     intv21_scn_aria: 'Escenario',
     intv21_scn_opt_top1: 'Mayor posición', intv21_scn_opt_top3: 'Tres mayores', intv21_scn_opt_class: 'Mayor clase',
@@ -9100,8 +9107,9 @@ const T = {
     intel_sub_changed:     n => `${n} ${n === 1 ? 'reading has' : 'readings have'} moved. They are detailed below.`,
     intel_sub_history:     'Evolution conclusions will appear on their own once there are enough observations.',
     intel_d_apparent:      (pos, eff) => `You hold ${pos} positions, but your weight is spread as if you held ${eff}.`,
-    intel_h_apparent_top3: (n, names, rest) => `You hold ${n} positions, but ${names[0]}, ${names[1]} and ${names[2]} outweigh the other ${rest} combined.`,
-    intel_h_apparent:      n => `You hold ${n} positions, but your money sits in just a few.`,
+    intel_h_apparent_top3: (n, names, rest) => `${names[0]}, ${names[1]} and ${names[2]} outweigh your other ${rest} investments combined.`,
+    intel_h_apparent:      n => `You hold ${n} investments, but your invested money sits in just a few.`,
+    intv6_h_liquidity:     p => `${p} of your financial portfolio is in cash.`,
     intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
     intel_d_capital:       'Your wealth rose on the cash you recorded, not on market return.',
     intel_d_intent:        pct => `You said preserving is your priority, and today one position weighs ${pct}%.`,
@@ -9234,13 +9242,14 @@ const T = {
     intv7_pending_generic: (d) => `${d}: Aurix has no certifiable evidence for it yet.`,
     intv7_stab_meaning: 'Stability = the percentage of its peak your portfolio kept at its worst moment, with contributions and withdrawals neutralised.',
     intcc_drivers_title: 'Key drivers',
-    intcc_drv_explain_asset: name => `${name} is currently the single largest exposure in your wealth.`,
+    intcc_drv_explain_asset: name => `Your largest investment is ${name}.`,
+    intv6_drv_liquidity: pct => `Cash makes up ${pct} of your financial portfolio.`,
     intcc_drv_explain_cash:  (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities.`,
     intcc_drv_kind_eng:  'Exposure',
     intcc_drv_kind_liq:  'Liquidity',
     intcc_drv_none:      'Not enough positions yet to identify your key drivers.',
-    intv15_drv_dependency: (n, pct) => `Your ${n} largest positions hold ${pct} of your financial portfolio: the value of the whole moves mainly with them.`,
-    intv15_drv_category: (label, pct) => `By asset class, your largest exposure is ${label}, at ${pct} of your financial portfolio.`,
+    intv15_drv_dependency: (n, pct) => `Your ${n} largest investments hold ${pct} of your financial portfolio.`,
+    intv15_drv_category: (label, pct) => `By investment class, the largest is ${label}, at ${pct} of your financial portfolio.`,
     intcc_explore_title: 'Explore your wealth',
     intcc_explore_hint:  'Tap a question to see the answer.',
     intcc_q_movers:        'What moves my wealth most?',
@@ -9305,13 +9314,16 @@ const T = {
     intv4_brief_title: 'What matters today',
     // ── INTELLIGENCE V2.1 (intv22) ──
     intv22_in_7d: 'Over 7 days', intv22_in_30d: 'Over 30 days', intv22_since: d => `Since ${d}`,
-    intv22_h_top_changed: (l, na, nb) => `${l}, your largest position changed from ${na} to ${nb}.`,
-    intv22_h_top_up: (l, n) => `${l}, ${n} gained weight as your largest position.`,
-    intv22_h_top_down: (l, n) => `${l}, ${n} lost weight but is still your largest position.`,
-    intv22_h_top_flat: (l, n) => `${l}, the weight of ${n}, your largest position, held steady.`,
-    intv22_h_topx_up: l => `${l}, your largest position gained weight.`,
-    intv22_h_topx_down: l => `${l}, your largest position lost weight.`,
-    intv22_h_topx_flat: l => `${l}, the weight of your largest position held steady.`,
+    intv22_h_top_changed: (l, na, nb) => `${l}, your largest investment changed from ${na} to ${nb}.`,
+    intv22_h_top_up: (l, n) => `${l}, ${n} gained weight as your largest investment.`,
+    intv22_h_top_down: (l, n) => `${l}, ${n} lost weight but is still your largest investment.`,
+    intv22_h_top_flat: (l, n) => `${l}, the weight of ${n}, your largest investment, held steady.`,
+    intv22_h_topx_up: l => `${l}, your largest investment gained weight.`,
+    intv22_h_topx_down: l => `${l}, your largest investment lost weight.`,
+    intv22_h_topx_flat: l => `${l}, the weight of your largest investment held steady.`,
+    intv6_k_at_start: n => `${n} at start`, intv6_k_at_end: n => `${n} at end`, intv6_k_top_peak: 'Top weight change', intv6_k_weight_chg: 'Weight change',
+    intv6_k_eff_start: 'Effective positions at start', intv6_k_liq_start: 'Cash at start', intv6_k_liq_end: 'Cash at end',
+    intv6_k_val_start: 'Starting value', intv6_k_val_end: 'Latest value', intv6_k_val_chg: 'Value change',
     intv22_h_liq_up: l => `${l}, cash took up more of your portfolio.`,
     intv22_h_liq_down: l => `${l}, cash took up less of your portfolio.`,
     intv22_h_liq_flat: l => `${l}, the weight of your cash held steady.`,
@@ -9324,13 +9336,13 @@ const T = {
     intv22_h_ret_up: l => `${l}, your investments gained value, excluding contributions and withdrawals.`,
     intv22_h_ret_down: l => `${l}, your investments lost value, excluding contributions and withdrawals.`,
     intv22_h_ret_flat: l => `${l}, your investments held steady, excluding contributions and withdrawals.`,
-    intv22_m_top: 'Largest position', intv22_m_effective: 'Spread', intv22_m_liquidity: 'Cash',
+    intv22_m_top: 'Largest investment', intv22_m_effective: 'Spread', intv22_m_liquidity: 'Cash',
     intv22_m_return: 'Return', intv22_m_value: 'Value',
     intv22_m_top_aria: 'Weight of the largest position', intv22_m_effective_aria: 'Effective spread, in equivalent positions',
     intv22_m_liquidity_aria: 'Weight of cash', intv22_m_return_aria: 'Return excluding contributions and withdrawals',
     intv22_m_value_aria: 'Portfolio value, including contributions and withdrawals',
     intv22_st_start: 'Start', intv22_st_now: 'Latest', intv22_st_delta: 'Change',
-    intv22_pos_unit: 'positions',
+    intv22_pos_unit: 'effective positions',
     intv22_plot_aria: 'Use the arrow keys to move between observations.',
     intv22_obs_note: n => `${n} recorded observations`,
     intv22_tip_obs: 'recorded observation',
@@ -9338,16 +9350,16 @@ const T = {
     intv22_note_effective: 'It is like holding that many positions of equal weight. It measures how your money is spread, not risk.',
     intv3_xq_split: (a, b) => `How much of my portfolio is in ${a} and ${b}?`,
     intv3_xa_split: (t, a, pa, b, pb) => `${t}: ${a} holds ${pa} and ${b} ${pb}, today.`,
-    intv3_xq_cp: 'Am I spread across several asset classes, or do I still depend on a few positions?',
-    intv3_xa_cp_both: (n, w3) => `Both at once: your money is in ${n} asset classes, but your three largest positions hold ${w3} today.`,
-    intv3_xa_cp_spread: (n, w3) => `You are spread on both counts: ${n} asset classes, and your three largest positions hold ${w3} today, less than the rest combined.`,
-    intv3_xa_cp_two: (n, w3, c) => `Your money is in just two asset classes (${c[0]} and ${c[1]}), and your three largest positions hold ${w3} today.`,
+    intv3_xq_cp: 'Am I spread across several investment classes, or do I still depend on a few investments?',
+    intv3_xa_cp_both: (n, w3) => `Both at once: your invested money is in ${n} investment classes, but your three largest investments hold ${w3} today.`,
+    intv3_xa_cp_spread: (n, w3) => `You are spread on both counts: ${n} investment classes, and your three largest investments hold ${w3} today, less than the rest of your investments combined.`,
+    intv3_xa_cp_two: (n, w3, c) => `Your invested money is in just two investment classes (${c[0]} and ${c[1]}), and your three largest investments hold ${w3} today.`,
     intv3_xa_cp_note: 'Spreading across classes and spreading across positions are different things: you can have one without the other.',
     intv22_ago_7d: '7 days ago', intv22_ago_30d: '30 days ago', intv22_ago_all: 'at the start',
     intv22_xq_conc_down: (n, ago) => `Why does ${n} weigh less than ${ago}?`,
     intv22_xq_conc_up: (n, ago) => `Why does ${n} weigh more than ${ago}?`,
     intv22_xa_conc: (v, t) => `Because its value in your portfolio changed ${v}, against ${t} for the total.`,
-    intv3_xq_lead: n => `What changed for ${n} to become my largest position?`,
+    intv3_xq_lead: n => `What changed for ${n} to become my largest investment?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Compared with ${ago}, the value of ${na} in your portfolio changed ${va} and that of ${nb} ${vb}: today ${nb} is worth more.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} is a new position that is now worth more than ${na}, whose value in your portfolio changed ${va} compared with ${ago}.`,
     intv22_xq_spread: ago => `Is my money better spread than ${ago}, or do I just hold more positions?`,
@@ -9361,6 +9373,8 @@ const T = {
     intv22_xa_mo_ev: (d, m, o) => `Since ${d}: market ${m}; your buys, sells and cash movements ${o}.`,
     intv22_xa_mo_lim: 'Dividends you have not recorded are not separated.',
     intv22_xq_liq: l => `Why did the weight of my cash change ${l}?`,
+    intv6_xq_liq_up: l => `Why did the weight of my cash rise ${l}?`,
+    intv6_xq_liq_down: l => `Why did the weight of my cash fall ${l}?`,
     intv22_xa_liq_rest: 'Your cash barely moved: its weight changed because the rest of your portfolio changed in value.',
     intv22_xa_liq_flows: 'Its weight changed mainly because of recorded contributions or withdrawals.',
     intv22_xa_liq_cash: 'Its weight changed because your cash balance changed.',
@@ -9380,9 +9394,9 @@ const T = {
     intv21_today_liq_none: 'You have no cash recorded in your investable wealth.',
     intv21_today_positions: n => `Your investable wealth is spread across ${n} ${n === 1 ? 'position' : 'positions'}.`,
     intv21_tags_aria: 'Key readings',
-    intv3_tag_top3: p => `Three positions hold ${p}`,
+    intv3_tag_top3: p => `Top three investments: ${p}`,
     intv3_tag_class1: (c, p) => `${c}: ${p} of your portfolio`,
-    intv3_tag_class2: (a, b, p) => `${a} and ${b} hold ${p}`,
+    intv3_tag_class2: (a, b, p) => `${a} and ${b}: ${p}`,
     intv3_tag_driver: n => `${n}, your portfolio's main move in 24 h`,
     intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'last session',
     intv51_today_weight: p => `${p} of your financial portfolio.`,
@@ -9420,7 +9434,7 @@ const T = {
     intv5_sim_lead: 'Choose a move and compare its effect on your main dependencies.',
     intv5_sim_aria: 'Simulated move', intv5_sim_less: 'Down 5 points', intv5_sim_more: 'Up 5 points',
     intv5_if_top1_down: (n, p) => `If ${n} fell ${p}`, intv5_if_top1_up: (n, p) => `If ${n} rose ${p}`, intv5_if_top1_flat: n => `If ${n} did not change`,
-    intv5_if_top3_down: (n, p) => `If your three largest positions fell ${p}`, intv5_if_top3_up: (n, p) => `If your three largest positions rose ${p}`, intv5_if_top3_flat: () => 'If your three largest positions did not change',
+    intv5_if_top3_down: (n, p) => `If your three largest investments fell ${p}`, intv5_if_top3_up: (n, p) => `If your three largest investments rose ${p}`, intv5_if_top3_flat: () => 'If your three largest investments did not change',
     intv5_if_class_down: (c, p) => `If everything you hold in ${c} fell ${p}`, intv5_if_class_up: (c, p) => `If everything you hold in ${c} rose ${p}`, intv5_if_class_flat: c => `If everything you hold in ${c} did not change`,
     intv21_scn_aria: 'Scenario',
     intv21_scn_opt_top1: 'Largest position', intv21_scn_opt_top3: 'Top three', intv21_scn_opt_class: 'Largest class',
@@ -68808,7 +68822,7 @@ function _intv4ExploreHtml(core, esc, intel) {
     return `
     <section class="intcc-card intcc-explore intv4-explore is-pending" data-explore="" data-pending="1" aria-busy="true">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
-      <div class="intv3-sk-list"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk intv3-sk-reserve"></span></div>
+      <div class="intv3-sk-list"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span></div>
     </section>`;
   }
   if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id } }));
@@ -68858,12 +68872,13 @@ function _intv4ExploreHtml(core, esc, intel) {
   // otra cosa en esta sesión para esta cuenta: entonces manda su elección (también
   // «ninguna»), y un repintado o una llegada tardía no la vuelve a abrir.
   const _xs = (typeof _intv51XState !== 'undefined') ? _intv51XState : null, _xid = (typeof _intv22Ident === 'function') ? _intv22Ident() : '';
-  const _defOpen = (qs.find(x => hot.has(x.q.causalRoot)) || qs[0]).q.id;
-  const openId = (_xs && _xs.id === _xid && _xs.user)
-    ? (_xs.open && qs.some(x => x.q.id === _xs.open) ? _xs.open : (_xs.open ? _defOpen : null))
-    : _defOpen;
+  // V6 · NINGUNA respuesta se abre sola (re-decide V5.1): cerrada, la card reparte las
+  // preguntas por toda su altura; abierta, las preguntas suben y la respuesta ocupa la
+  // zona inferior, con la MISMA altura. Sólo la elección del usuario —en esta sesión y
+  // para esta cuenta— decide, y un repintado no la cambia.
+  const openId = (_xs && _xs.id === _xid && _xs.user && _xs.open && qs.some(x => x.q.id === _xs.open)) ? _xs.open : null;
   const html = `
-    <section class="intcc-card intcc-explore intv4-explore"
+    <section class="intcc-card intcc-explore intv4-explore${openId ? ' is-x-open' : ''}"
              data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
              data-pool="${all.length}"
              data-hot="${qs.filter(x => hot.has(x.q.causalRoot)).length}">
@@ -68879,17 +68894,16 @@ function _intv4ExploreHtml(core, esc, intel) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
               </span>
             </button>
-            ${/* EL ENVOLTORIO INTERIOR ES LO QUE PERMITE ANIMAR SIN NÚMERO MÁGICO.
-                   El desplegable en flujo se hace con `grid-template-rows: 0fr → 1fr`,
-                   y esa técnica necesita UN hijo al que colapsar. Con los párrafos
-                   sueltos sólo colapsaría el primero. La alternativa —`max-height`
-                   con un tope inventado— recorta en cuanto la respuesta crece, que
-                   es justo lo que el encargo prohíbe. */''}
-            <div class="intcc-x-answer${x.q.id === openId ? ' is-open' : ''}" id="intcc-x-${esc(x.q.id)}" role="region"
-                 aria-labelledby="intcc-xq-${esc(x.q.id)}">
-              <div class="intcc-x-answer-in">${x.answer}</div>
-            </div>
           </div>`).join('')}
+      </div>
+      ${/* V6 · las respuestas viven en UNA zona bajo las preguntas (no dentro de cada
+            pregunta): abierta una, las preguntas se compactan arriba y ella ocupa el
+            espacio reservado; `aria-controls`/`aria-labelledby` siguen enlazándolas. */''}
+      <div class="intv6-x-answers">${qs.map(x => `
+        <div class="intcc-x-answer${x.q.id === openId ? ' is-open' : ''}" id="intcc-x-${esc(x.q.id)}" role="region"
+             aria-labelledby="intcc-xq-${esc(x.q.id)}">
+          <div class="intcc-x-answer-in">${x.answer}</div>
+        </div>`).join('')}
       </div>
     </section>`;
   if (x22 && !x22.pending) _intv22ExploreMemo = { id: _intv22Ident(), fp: fp22, html, ids: (typeof _intv3AssetIds === 'function') ? _intv3AssetIds() : null };
@@ -69779,12 +69793,17 @@ function _intelDiscoveryText(d) {
 function _intelDiscoveryHeadline(d) {
   if (!d) return '';
   if (d.code === 'apparent_vs_effective_diversification') {
-    let rows = [];
-    try { rows = (typeof _intv21Weights === 'function') ? _intv21Weights().rows : []; } catch (_) { rows = []; }
-    const n = rows.length;
+    let U = null;
+    try { U = (typeof _intv6Universe === 'function') ? _intv6Universe() : null; } catch (_) { U = null; }
+    const inv = U ? U.invested : [];
+    // V6 · Si la liquidez pesa más que la mayor inversión, ESE es el hecho: se dice como
+    // liquidez (sin valorarla) y nunca entra en «pesan más que las otras».
+    if (U && U.liquidity.w > 0 && (!inv.length || U.liquidity.w > inv[0].w)) {
+      return _intv4T('intv6_h_liquidity', _intv21Pct(U.liquidity.w * 100, 0));
+    }
+    const n = inv.length;
     if (n >= 4) {
-      // Sobre la suma de posiciones POSITIVAS (las mismas que cuenta el descubrimiento).
-      const tot = rows.reduce((a, r) => a + r.usd, 0), top = rows.slice(0, 3), u3 = top.reduce((a, r) => a + r.usd, 0);
+      const tot = inv.reduce((t, r) => t + r.usd, 0), top = inv.slice(0, 3), u3 = top.reduce((t, r) => t + r.usd, 0);
       if (tot > 0 && u3 > tot - u3) return _intv4T('intel_h_apparent_top3', n, top.map(r => r.name), n - 3);
     }
     return n >= 4 ? _intv4T('intel_h_apparent', n) : '';
@@ -70397,8 +70416,11 @@ function _intccHealthReading(score, intel) {
     ? intel.model.concentration.semanticLabel : null;
   const concentrated = lbl === _AURIX_AI_LABEL.DOMINANT_POSITION || lbl === _AURIX_AI_LABEL.CONCENTRATED;
   const MAP = {
-    weight_in_few:   { read: 'intv19_h_read_few',    tags: [concentrated ? 'intv19_h_tag_conc' : null, 'intv19_h_tag_div'] },
-    weight_uneven:   { read: 'intv19_h_read_uneven', tags: [concentrated ? 'intv19_h_tag_conc' : null, 'intv19_h_tag_improve'] },
+    // V6 · UNA señal por hecho: la lectura ya dice que el peso depende de pocas
+    // posiciones; «Concentración elevada» y «Diversificación limitada» lo repetían dos
+    // veces. Queda la de concentración si el modelo la certifica; si no, la de la banda.
+    weight_in_few:   { read: 'intv19_h_read_few',    tags: [concentrated ? 'intv19_h_tag_conc' : 'intv19_h_tag_div'] },
+    weight_uneven:   { read: 'intv19_h_read_uneven', tags: [concentrated ? 'intv19_h_tag_conc' : 'intv19_h_tag_improve'] },
     weight_spread:   { read: 'intv19_h_read_spread', tags: ['intv19_h_tag_balanced'] },
     single_position: { read: 'intv19_h_read_single', tags: ['intv19_h_tag_conc'] },
     two_positions:   { read: 'intv19_h_read_two',    tags: ['intv19_h_tag_div'] },
@@ -70569,24 +70591,28 @@ function _aurixGapsBySurface(core) {
 // Con UNA sola posición no se publica dependencia: «tu mayor posición concentra el
 // X %» es la fila que ya está encima, y repetirla es el ruido que el §12 prohíbe.
 function _intv5DriversHtml(snap, esc, limitLine) {
+  // V6 · el ranking es de POSICIONES INVERTIDAS (contrato único) y lo calcula su OWNER
+  // (`_intv6InvestedDrivers`); la card sólo publica. La liquidez sale del ranking y, si
+  // habría entrado en él, se dice aparte y sin valorarla.
   let drivers = { items: [], pct: 0 };
-  try { drivers = (typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : drivers; } catch (_) {}
+  try {
+    drivers = ((typeof _intv6InvestedDrivers === 'function') && _intv6InvestedDrivers())
+      || ((typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : drivers);
+  } catch (_) {}
   const items = (drivers.items || []).slice(0, 3);
   const top = items[0];
-  const lead = top
-    ? (_intccIsMonetary(top.type) ? _intv4T('intcc_drv_explain_cash', top.name, top.pct)
-                                  : _intv4T('intcc_drv_explain_asset', top.name))
-    : '';
-  // DEPENDENCIA. `drivers.pct` cubre EXACTAMENTE las posiciones listadas, así que
-  // el recuento sale de `items.length` y no de la constante 3.
+  const lead = top ? _intv4T('intcc_drv_explain_asset', top.name) : '';
+  const liqPct = Number(drivers.liquidityPct) || 0;
+  const liqLine = (liqPct > 0 && (items.length < 3 || liqPct >= Number(items[items.length - 1].pctRaw)))
+    ? _intv4T('intv6_drv_liquidity', _aurixPctLabel(liqPct)) : '';
+  // DEPENDENCIA. `drivers.pct` cubre EXACTAMENTE las posiciones listadas.
   const depLine = (items.length >= 2 && Number.isFinite(Number(drivers.pct)) && Number(drivers.pct) > 0)
     ? _intv4T('intv15_drv_dependency', items.length, _aurixPctLabel(Number(drivers.pct)))
     : '';
-  // CLASE DE ACTIVO. Sólo con más de una categoría registrada: con una sola, «tu
-  // mayor clase es X con el 100 %» no explica nada que las filas no digan ya.
-  const tc = snap && snap.topCategory;
-  const catLine = (tc && tc.label && Number.isFinite(Number(tc.pctTotal))
-                   && Number(snap.categoryCount) > 1)
+  // CLASE DE INVERSIÓN con más peso (del owner; sin él, la de `snap.topCategory`), sólo con más de una.
+  const tc = drivers.topCategory || (snap && snap.topCategory);
+  const catCount = drivers.categoryCount != null ? Number(drivers.categoryCount) : Number(snap && snap.categoryCount);
+  const catLine = (tc && tc.label && Number.isFinite(Number(tc.pctTotal)) && catCount > 1)
     ? _intv4T('intv15_drv_category', tc.label, _aurixPctLabel(Number(tc.pctTotal)))
     : '';
   return `
@@ -70597,6 +70623,7 @@ function _intv5DriversHtml(snap, esc, limitLine) {
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_drivers_title'))}</h3>
       ${items.length ? `
         ${lead ? `<p class="intcc-drv-explain">${esc(lead)}</p>` : ''}
+        ${liqLine ? `<p class="intv6-drv-liq" data-liq-w="${esc(String(liqPct))}">${esc(liqLine)}</p>` : ''}
         <ol class="intcc-drv-list">
           ${items.map((it, i) => `
             <li class="intcc-drv-row${_intccIsMonetary(it.type) ? ' is-monetary' : ''}">
@@ -70613,7 +70640,7 @@ function _intv5DriversHtml(snap, esc, limitLine) {
           ${depLine ? `<li class="intv15-drv-factor" data-factor="dependency">${esc(depLine)}</li>` : ''}
           ${catLine ? `<li class="intv15-drv-factor" data-factor="category">${esc(catLine)}</li>` : ''}
         </ul>` : ''}`
-        : `<p class="intcc-empty-body">${esc(_intv4T('intcc_drv_none'))}</p>`}
+        : `${liqLine ? `<p class="intv6-drv-liq">${esc(liqLine)}</p>` : ''}<p class="intcc-empty-body">${esc(_intv4T('intcc_drv_none'))}</p>`}
       ${limitLine ? `<p class="intcc-drv-limit">${esc(limitLine)}</p>` : ''}
     </section>`;
 }
@@ -72442,6 +72469,45 @@ function _intv21Weights() {
 }
 
 function _intv21IsCash(b) { return b === 'cash' || b === 'liquidity'; }
+// ══ V6 · CONTRATO FINANCIERO ÚNICO ══════════════════════════════════════════
+// LIQUIDEZ: lo que la clasificación AUTORITATIVA marca como tal (bucket
+// `liquidity`, o tipo monetario —el mismo criterio que ya usaban escenarios y Hoy—);
+// nunca por nombre o ticker; una stablecoin sólo lo es si el sistema la clasifica así.
+// POSICIONES INVERTIDAS: el resto. CARTERA FINANCIERA: ambas (sin inmueble); es el
+// DENOMINADOR de pesos e impactos, como hasta ahora. Salud y Radar no lo usan.
+function _intv6IsLiquidity(a) {
+  try { return (typeof _aurixCategoryBucket === 'function' && _aurixCategoryBucket(a) === 'liquidity') || _intccIsMonetary(a && a.type); }
+  catch (_) { return false; }
+}
+// OWNER de Factores (V6): las tres mayores INVERSIONES (pesos sobre la cartera
+// financiera, mismo redondeo que `_intTop3Investable`), el peso de la liquidez y la
+// clase de inversión con más peso. La card sólo publica; no calcula ninguna cifra.
+// `buildPortfolioDrivers` se queda como estaba: lo consumen el Core y el modelo de
+// concentración (Salud/Radar), que no cambian.
+function _intv6InvestedDrivers() {
+  const U = _intv6Universe();
+  if (!U.W || !(U.W.total > 0)) return null;
+  const inv = U.invested.slice(0, 3);
+  const ci = U.classesInvested[0] || null;
+  return {
+    items: inv.map(r => { const raw = r.w * 100; return { name: r.name, type: r.type, pct: Math.round(raw), pctRaw: +raw.toFixed(4), pctLabel: _intccPctLabel(raw) }; }),
+    pct: Math.round(inv.reduce((t, r) => t + r.w, 0) * 100),
+    liquidityPct: +(U.liquidity.w * 100).toFixed(4),
+    topCategory: ci ? { type: ci.bucket, label: _intv21ClassLabel(ci.bucket), pctTotal: ci.w * 100 } : null,
+    categoryCount: U.classesInvested.length,
+  };
+}
+// Sobre `_intv21Weights()` (o los W dados): filas de inversiones (orden por valor) y
+// liquidez agregada; los pesos siguen siendo sobre la cartera financiera.
+function _intv6Universe(W0) {
+  const W = W0 || _intv21Weights();
+  const rows = (W && W.rows) || [];
+  const invested = rows.filter(r => !_intv6IsLiquidity(r.a));
+  const liq = rows.filter(r => _intv6IsLiquidity(r.a));
+  const liqUsd = liq.reduce((t, r) => t + r.usd, 0);
+  return { W, invested, liquidity: { usd: liqUsd, w: W && W.total > 0 ? liqUsd / W.total : 0, rows: liq },
+    classesInvested: ((W && W.classes) || []).filter(c => !_intv21IsCash(c.bucket) && c.w > 0) };
+}
 function _intv21ClassLabel(b) {
   try { if (typeof TYPE_META !== 'undefined' && TYPE_META[b] && TYPE_META[b].label) return TYPE_META[b].label; } catch (_) {}
   return _intv5CatLabel(_intv21IsCash(b) ? 'liquidity' : b);
@@ -72701,8 +72767,10 @@ function _intv21EvoSeries(metric, win) {
       const w = _intv21RowWeights(r);
       if (!w) return null;
       if (metric === 'top') {
-        const top = w.pos.slice().sort((a, b) => b.v - a.v)[0];
-        if (!top || w.pos.length < 2) return null;
+        // V6 · la MAYOR INVERSIÓN: la liquidez nunca es «mayor posición» (contrato único).
+        const inv = w.pos.filter(p => !(typeof _intv6IsLiquidity === 'function' && _intv6IsLiquidity(p.a)));
+        const top = inv.slice().sort((a, b) => b.v - a.v)[0];
+        if (!top || inv.length < 2) return null;
         pts.push({ ts: r.ts, v: (top.v / w.tot) * 100, note: _intv21Name(top.a) });
       } else if (metric === 'liquidity') {
         // Liquidez histórica = clasificación de HOY aplicada al pasado: sólo vale si el
@@ -73118,8 +73186,11 @@ function _intv21Tip(plot, idx) {
     const i = Math.max(0, Math.min(pts.length - 1, idx));
     const p = pts[i];
     plot.setAttribute('data-tip', String(i));
-    tip.textContent = _intccDate(p[2]) + ' · ' + p[3] + (p[4] ? ' · ' + p[4] : '')
-      + (plot.getAttribute('data-sparse') === '1' ? ' · ' + _intv4T('intv22_tip_obs') : '');
+    // V6 · barras: «13 oct · Microsoft · 28,8 %» (fecha · sujeto · valor).
+    tip.textContent = plot.getAttribute('data-chart') === 'bars'
+      ? _intccDate(p[2]) + (p[4] ? ' · ' + p[4] : '') + ' · ' + p[3]
+      : _intccDate(p[2]) + ' · ' + p[3] + (p[4] ? ' · ' + p[4] : '')
+        + (plot.getAttribute('data-sparse') === '1' ? ' · ' + _intv4T('intv22_tip_obs') : '');
     const cd = plot.querySelector('.intv22-cursor-dot');
     if (cd) { cd.style.left = (p[0] * 100) + '%'; cd.style.top = (p[1] * 100) + '%'; cd.classList.add('is-on'); }
     tip.classList.add('is-on');
@@ -73364,6 +73435,17 @@ function _intv22Dir(metric, st) {
   if (st.start === st.now) return 'flat';
   return st.b.v > st.a.v ? 'up' : (st.b.v < st.a.v ? 'down' : 'flat');
 }
+function _intv6KpiLabels(metric, st) {
+  if (metric === 'top') {
+    const na = st.a.note, nb = st.b.note;
+    if (na && nb && na !== nb) return [_intv4T('intv6_k_at_start', na), _intv4T('intv6_k_at_end', nb), _intv4T('intv6_k_top_peak')];
+    if (nb) return [_intv4T('intv6_k_at_start', nb), _intv4T('intv6_k_at_end', nb), _intv4T('intv6_k_weight_chg')];
+  }
+  if (metric === 'effective') return [_intv4T('intv6_k_eff_start'), _intv4T('intv22_st_now'), _intv4T('intv22_st_delta')];
+  if (metric === 'liquidity') return [_intv4T('intv6_k_liq_start'), _intv4T('intv6_k_liq_end'), _intv4T('intv6_k_weight_chg')];
+  if (metric === 'value') return [_intv4T('intv6_k_val_start'), _intv4T('intv6_k_val_end'), _intv4T('intv6_k_val_chg')];
+  return [_intv4T('intv22_st_start'), _intv4T('intv22_st_now'), _intv4T('intv22_st_delta')];
+}
 function _intv22Headline(sel) {
   const s = sel.series, m = sel.metric, st = _intv22Stats(m, s);
   const lead = _intv22WinLead(sel.win, st.a.ts);
@@ -73386,7 +73468,46 @@ function _intv22Headline(sel) {
 // tooltip dice que son observaciones registradas. Escala con un rango MÍNIMO por
 // unidad para no exagerar cambios de décimas; nunca recorta un extremo.
 const _INTV22_MIN_SPAN = { pct: 4, n: 1, pct_signed: 1 };
+// V6 · MÉTRICAS ESTRUCTURALES = BARRAS. Mayor inversión, reparto y liquidez son
+// observaciones registradas (pocas y discretas), no una serie continua: una barra por
+// observación real, sin barras intermedias, escala desde 0 declarada y sin unir con
+// una línea (si cambia el activo dominante, cada barra lleva el suyo). Valor y
+// rentabilidad conservan línea + área.
+const _INTV6_BAR_METRICS = { top: 'lollipop', effective: 'bar', liquidity: 'outline' };
+function _intv6BarsSvg(s, metric) {
+  const W = 600, H = 168, pl = 44, pr = 10, pt = 14, pb = 14;
+  const pts = s.pts;
+  const n = pts.length, max = Math.max.apply(null, pts.map(p => p.v));
+  const unitPct = metric !== 'effective';
+  const step = unitPct ? (max * 1.15 > 40 ? 20 : 10) : (max * 1.2 > 8 ? 2 : 1);
+  let hi = Math.max(step, Math.min(unitPct ? 100 : Infinity, Math.ceil((max * 1.15) / step) * step));
+  // La línea media (hi/2) debe ser un valor entero que su etiqueta pueda decir sin redondear.
+  if (!unitPct && hi % 2) hi += 1;
+  const Y = v => pt + (1 - v / hi) * (H - pt - pb);
+  const slot = (W - pl - pr) / n, bw = Math.min(slot * 0.46, 46);
+  const xs = pts.map((_, i) => pl + slot * (i + 0.5));
+  const style = _INTV6_BAR_METRICS[metric];
+  let body = '', labels = '';
+  [0, hi / 2, hi].forEach(v => {
+    const y = Y(v).toFixed(1);
+    body += `<line class="intv21-evo-grid${v === 0 ? ' is-base' : ''}" x1="${pl}" x2="${W - pr}" y1="${y}" y2="${y}"/>`;
+    const lab = unitPct ? _intv21Pct(v, 0) : _intv21Fixed(v, 0);
+    labels += `<span class="intv6-y-lab" style="top:${(Y(v) / H * 100).toFixed(2)}%">${lab}</span>`;
+  });
+  pts.forEach((p, i) => {
+    const x = xs[i], y = Y(p.v), base = Y(0);
+    if (style === 'lollipop') body += `<line class="intv6-stem" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${base.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+    else body += `<rect class="intv6-bar is-${style}" x="${(x - bw / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, base - y).toFixed(1)}" rx="3"/>`;
+  });
+  const dots = style === 'lollipop'
+    ? pts.map((p, i) => `<span class="intv21-evo-dot intv6-head${i === n - 1 ? ' is-last' : ''}" style="left:${(xs[i] / W * 100).toFixed(2)}%;top:${(Y(p.v) / H * 100).toFixed(2)}%"></span>`).join('')
+    : '';
+  return { svg: `<svg class="intv21-evo-svg intv6-bars" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">${body}<line class="intv21-evo-cursor" x1="0" x2="0" y1="${pt}" y2="${H - pb}"/></svg>`
+      + `<div class="intv21-evo-dots" aria-hidden="true">${dots}<span class="intv22-cursor-dot"></span></div><div class="intv6-y" aria-hidden="true">${labels}</div>`,
+    pts: pts.map((p, i) => ({ x: xs[i] / W, y: Y(p.v) / H, t: p.ts, v: p.v, n: p.note || '' })), dense: false, unit: s.unit, gaps: 0, bars: true };
+}
 function _intv22Svg(s, metric) {
+  if (_INTV6_BAR_METRICS[metric]) return _intv6BarsSvg(s, metric);
   const W = 600, H = 168, pl = 10, pr = 10, pt = 16, pb = 16;
   let pts = s.pts;
   // Aclarado por TIEMPO, no por índice: por índice, el tramo de 15 min se comía casi
@@ -73527,13 +73648,18 @@ function _intv22EvoModuleHtml(esc) {
   _intv22Animated.add(sig);
   const fmt = (v) => sel.metric === 'value' ? _intv4Money(v) : (sel.metric === 'effective' ? _intv21Fixed(v, 1) + ' ' + _intv4T('intv22_pos_unit')
     : (sel.metric === 'return' ? _intv21Pct(v, 2, true) : _intv21Pct(v, 1)));
-  const data = g.pts.map(p => [+p.x.toFixed(4), +p.y.toFixed(4), p.t, fmt(p.v), p.n]);
+  // Etiqueta del punto en el tooltip: el activo (mayor inversión) o la naturaleza de la
+  // métrica (liquidez); reparto lleva la unidad en el propio valor.
+  const ptLabel = (p) => sel.metric === 'liquidity' ? _intv4T('intv22_m_liquidity') : p.n;
+  const data = g.pts.map(p => [+p.x.toFixed(4), +p.y.toFixed(4), p.t, fmt(p.v), ptLabel(p)]);
   const sparse = !g.dense;
   // Verde/rojo sólo donde la dirección TIENE valoración (rentabilidad). Más peso,
   // más liquidez o más valor con aportaciones no son «mejor»: tono neutro.
   const dir = _intv22Dir(sel.metric, st);
   const tone = sel.metric === 'return' ? dir : 'neutral';
   const note = _intv4T('intv22_note_' + sel.metric);
+  // V6 · cada KPI dice QUÉ mide (identidad o naturaleza de la métrica), no sólo «Inicio».
+  const kl = _intv6KpiLabels(sel.metric, st);
   const held = !_intv22HistoryPublishable();
   const html = `
     <div class="intv21-evo intv22-evo" data-metric="${esc(sel.metric)}" data-win="${esc(sel.win)}" data-kind="${sparse ? 'observations' : 'line'}"
@@ -73548,11 +73674,11 @@ function _intv22EvoModuleHtml(esc) {
         </div>
       </div>
       <dl class="intv22-stats">
-        <div><dt>${esc(_intv4T('intv22_st_start'))}</dt><dd>${esc(st.start)}</dd></div>
-        <div><dt>${esc(_intv4T('intv22_st_now'))}</dt><dd title="${esc(_intccDate(st.b.ts))}" aria-label="${esc(st.now + ' · ' + _intccDate(st.b.ts))}">${esc(st.now)}</dd></div>
-        <div><dt>${esc(_intv4T('intv22_st_delta'))}</dt><dd class="is-${tone}">${esc(st.delta)}</dd></div>
+        <div><dt>${esc(kl[0])}</dt><dd>${esc(st.start)}</dd></div>
+        <div><dt>${esc(kl[1])}</dt><dd title="${esc(_intccDate(st.b.ts))}" aria-label="${esc(st.now + ' · ' + _intccDate(st.b.ts))}">${esc(st.now)}</dd></div>
+        <div><dt>${esc(kl[2])}</dt><dd class="is-${tone}">${esc(st.delta)}</dd></div>
       </dl>
-      <div class="intv21-evo-plot${anim ? ' is-anim' : ''}" tabindex="0" role="img"
+      <div class="intv21-evo-plot${anim ? ' is-anim' : ''}${g.bars ? ' is-bars' : ''}" data-chart="${g.bars ? 'bars' : 'line'}" tabindex="0" role="img"
            aria-label="${esc([head, note, _intv4T('intv22_plot_aria')].filter(Boolean).join(' '))}" data-sparse="${sparse ? '1' : '0'}"
            data-pts="${esc(JSON.stringify(data))}">
         ${g.svg}
@@ -73605,8 +73731,11 @@ function _intv22ExploreCandidates(W, esc) {
       const start = rows.find(r => r.ts === a.ts), end = rows.find(r => r.ts === b.ts);
       const ws = start && _intv21RowWeights(start), we = end && _intv21RowWeights(end);
       if (ws && we && Math.abs(b.v - a.v) >= 1) {
-        const domStart = ws.pos.slice().sort((x, y) => y.v - x.v)[0];
-        const domEnd = we.pos.slice().sort((x, y) => y.v - x.v)[0];
+        // V6 · la mayor INVERSIÓN de cada fecha (la liquidez nunca es «posición principal»).
+        const notLiq = (x) => !(typeof _intv6IsLiquidity === 'function' && _intv6IsLiquidity(x.a));
+        const domStart = ws.pos.filter(notLiq).sort((x, y) => y.v - x.v)[0];
+        const domEnd = we.pos.filter(notLiq).sort((x, y) => y.v - x.v)[0];
+        if (!domStart || !domEnd) throw 0;
         const sameEnd = we.pos.find(x => x.id === domStart.id);
         const valChg = sameEnd ? (sameEnd.v / domStart.v - 1) * 100 : -100;
         const totChg = (we.tot / ws.tot - 1) * 100;
@@ -73693,7 +73822,7 @@ function _intv22ExploreCandidates(W, esc) {
         const cashMoved = Math.abs(cB - cA) > Math.max(1, 0.005 * cA);
         const key = !cashMoved ? 'intv22_xa_liq_rest' : (Math.abs(net) > 0.5 * Math.abs(cB - cA) ? 'intv22_xa_liq_flows' : 'intv22_xa_liq_cash');
         out.push({ id: 'x22_liq_why', family: 'liquidity', root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
-          label: _intv4T('intv22_xq_liq', lead.toLowerCase()),
+          label: _intv4T(b.v > a.v ? 'intv6_xq_liq_up' : 'intv6_xq_liq_down', lead.toLowerCase()),
           answer: p([_intv4T(key), _intv4T('intv22_xa_liq_ev', lead, (cB - cA >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(cB - cA)), (we.tot - cB - (ws.tot - cA) >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(we.tot - cB - (ws.tot - cA))))]) });
       }
     }
@@ -73706,7 +73835,8 @@ function _intv22ExploreCandidates(W, esc) {
   // (la comparación «más que el resto» es aritmética).
   try {
     // Clases de ACTIVO: la liquidez no cuenta como una más.
-    const R = (W && W.rows) || [], C = ((W && W.classes) || []).filter(c => c.w > 0 && !_intv21IsCash(c.bucket));
+    // V6 · «tres mayores posiciones» = tres mayores INVERSIONES (pesos sobre la cartera financiera).
+    const R = (typeof _intv6Universe === 'function') ? _intv6Universe(W).invested : ((W && W.rows) || []), C = ((W && W.classes) || []).filter(c => c.w > 0 && !_intv21IsCash(c.bucket));
     const tot = R.reduce((a, r) => a + r.usd, 0);
     if (R.length >= 4 && C.length >= 2 && tot > 0) {
       const top = R.slice(0, 3), u3 = top.reduce((a, r) => a + r.usd, 0), w3 = _intv21Pct(top.reduce((a, r) => a + r.w, 0) * 100, 0);
@@ -73766,11 +73896,13 @@ function _intv22TodayFallback(W, count) { return []; }
 function _intv22HeroTags(ctx) {
   try {
     const W = ctx.W || { rows: [], classes: [] };
-    const rows = W.rows || [], tags = [];
+    const U = _intv6Universe(W);
+    const rows = U.invested, tags = [];
     const tot = rows.reduce((a, r) => a + r.usd, 0);
-    // 1 · Tres mayores (posiciones). No si el titular ya lo dice.
+    // 1 · Tres mayores INVERSIONES (V6: la liquidez nunca entra). No si el titular ya lo dice.
+    // Con 3 o menos inversiones «tres mayores» serían TODAS: no se publica.
     if (rows.length >= 4 && tot > 0) {
-      const top = rows.slice(0, 3), u3 = top.reduce((a, r) => a + r.usd, 0);
+      const top = rows.slice(0, 3);
       const said = ctx.heroTitle && ctx.heroTitle === _intv4T('intel_h_apparent_top3', rows.length, top.map(r => r.name), rows.length - 3);
       const pct = _intv21Pct(top.reduce((a, r) => a + r.w, 0) * 100, 0);
       if (!said) tags.push({ id: 'tag_top3', dim: 'positions', sig: top.map(r => r.id).join(',') + ':' + pct, target: 'scenarios:top3', tone: 'calm',
@@ -75116,7 +75248,7 @@ function _intv5ExploreMeasure(card) {
   card.style.height = Math.ceil(h) + 'px';
   card.classList.add('has-reserve');
   card.__intv5Measures = (card.__intv5Measures || 0) + 1;
-  _intv5ExploreFade(list);
+  _intv5ExploreFade(card.querySelector('.intv6-x-answers') || list);
 }
 // Tras CUALQUIER repintado (también el que reutiliza el contenido guardado mientras
 // llega una fuente) el estado abierto/cerrado es el que eligió el usuario en esta
@@ -75127,8 +75259,10 @@ function _intv51ApplyXState(root) {
   const card = root.querySelector('.intcc-explore:not(.is-pending)');
   if (!card) return;
   if (st.open && !card.querySelector('[data-intcc-q="' + String(st.open).replace(/"/g, '') + '"]')) return;   // ya no existe: manda el render
+  card.classList.toggle('is-x-open', !!st.open);
   card.querySelectorAll('.intcc-x-item').forEach(item => {
-    const btn = item.querySelector('[data-intcc-q]'), ans = item.querySelector('.intcc-x-answer');
+    const btn = item.querySelector('[data-intcc-q]');
+    const ans = btn ? document.getElementById('intcc-x-' + btn.getAttribute('data-intcc-q')) : null;
     const on = !!(st.open && btn && btn.getAttribute('data-intcc-q') === st.open);
     item.classList.toggle('is-active', on);
     if (btn) { btn.classList.toggle('is-active', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); }
@@ -75417,22 +75551,24 @@ function _initIntelligenceCommandCenter() {
       const willOpen = !ans.classList.contains('is-open');
       // V5.1 · la elección del usuario manda en los repintados de esta sesión.
       try { if (typeof _intv51XState !== 'undefined') _intv51XState = { id: (typeof _intv22Ident === 'function') ? _intv22Ident() : '', open: willOpen ? btn.getAttribute('data-intcc-q') : null, user: true }; } catch (_) {}
-      // INT.2R — only one answer open at a time; collapse the rest first.
-      if (list) {
-        list.querySelectorAll('.intcc-x-answer.is-open').forEach(a => a.classList.remove('is-open'));
-        list.querySelectorAll('.intcc-x-q.is-active').forEach(b => { b.classList.remove('is-active'); b.setAttribute('aria-expanded', 'false'); });
-        list.querySelectorAll('.intcc-x-item.is-active').forEach(i => i.classList.remove('is-active'));
+      // INT.2R — only one answer open at a time; collapse the rest first (en toda la card:
+      // V6 · las respuestas viven en su propia zona, fuera de la lista).
+      const xcard = btn.closest('.intcc-explore') || list;
+      if (xcard) {
+        xcard.querySelectorAll('.intcc-x-answer.is-open').forEach(a => a.classList.remove('is-open'));
+        xcard.querySelectorAll('.intcc-x-q.is-active').forEach(b => { b.classList.remove('is-active'); b.setAttribute('aria-expanded', 'false'); });
+        xcard.querySelectorAll('.intcc-x-item.is-active').forEach(i => i.classList.remove('is-active'));
+        xcard.classList.toggle('is-x-open', willOpen);
       }
       if (willOpen) {
         ans.classList.add('is-open');
         btn.classList.add('is-active');
         btn.setAttribute('aria-expanded', 'true');
         if (item) item.classList.add('is-active');
-        // La respuesta ocupa la zona reservada DENTRO de la card: si la lista desplaza,
-        // la pregunta abierta se lleva arriba del área visible (sin mover la página).
-        try { if (list && item && list.scrollHeight > list.clientHeight + 1) list.scrollTo({ top: item.offsetTop - list.offsetTop, behavior: reducedMotion ? 'auto' : 'smooth' }); } catch (_) {}
+        // La respuesta abre desde su principio dentro de su zona.
+        try { const z = ans.parentElement; if (z) z.scrollTop = 0; } catch (_) {}
       }
-      try { _intv5ExploreFade(list); } catch (_) {}
+      try { _intv5ExploreFade(ans.parentElement); } catch (_) {}
     });
   }
 }

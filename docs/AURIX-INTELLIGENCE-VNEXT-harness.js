@@ -1064,16 +1064,15 @@ console.log('\n§8 · Factores: dependencia y clase de activo, que la lista no d
   const three = DRV({ items: P3, pct: 77 });
   ok('8.1 con tres posiciones se publica la DEPENDENCIA conjunta, con su cifra real',
     /data-factor="dependency"/.test(three)
-    && /Tus 3 mayores posiciones concentran el 77% de tu cartera financiera/.test(three)
-    // §6 — sin afirmación causal: describe concentración del VALOR, no atribuye
-    // el rendimiento a esas posiciones.
+    // RE-DECIDIDO (V6 · contrato financiero único): el ranking es de INVERSIONES y la
+    // frase es una evidencia breve («reúnen»), sin afirmación causal.
+    && /Tus 3 mayores inversiones reúnen el 77% de tu cartera financiera/.test(three)
     && !/depende tu evolución|explican|atribu/i.test(three)
-    && /el valor del conjunto se mueve sobre todo con ellas/.test(three)
     && /data-drv-dep="77"/.test(three),
     (three.match(/data-factor="dependency">([^<]*)</) || [, '?'])[1]);
   ok('8.2 …y el recuento es el REAL, nunca la constante tres',
     (() => { const two = DRV({ items: P3.slice(0, 2), pct: 56 });
-      return /Tus 2 mayores posiciones concentran el 56% de tu cartera financiera/.test(two)
+      return /Tus 2 mayores inversiones reúnen el 56% de tu cartera financiera/.test(two)
         && /data-drv-rows="2"/.test(two); })(),
     (DRV({ items: P3.slice(0, 2), pct: 56 }).match(/data-factor="dependency">([^<]*)</) || [, '?'])[1]);
   ok('8.3 con UNA sola posición no hay dependencia que explicar (§12 · anti-ruido)',
@@ -1083,7 +1082,7 @@ console.log('\n§8 · Factores: dependencia y clase de activo, que la lista no d
     !/data-factor="dependency"/.test(DRV({ items: P3, pct: 0 })));
   ok('8.5 se publica la CLASE DE ACTIVO dominante, que la lista de posiciones no dice',
     /data-factor="category"/.test(three)
-    && /Por clase de activo, tu mayor exposición es Cripto, con el 62% de tu cartera financiera/.test(three)
+    && /Por clase de inversión, la mayor es Cripto, con el 62% de tu cartera financiera/.test(three)
     && /data-drv-cat="crypto"/.test(three),
     (three.match(/data-factor="category">([^<]*)</) || [, '?'])[1]);
   ok('8.6 con UNA sola categoría registrada no se publica: no explicaría nada',
@@ -1107,10 +1106,9 @@ console.log('\n§8 · Factores: dependencia y clase de activo, que la lista no d
                                   css.indexOf('.intv15-drv-factors') + 300)));
   ok('8.12 ES + EN (§37), con las MISMAS cifras',
     (() => { const en = DRV({ items: P3, pct: 77, lang: 'en' });
-      return /Your 3 largest positions hold 77% of your financial portfolio/.test(en)
-        && /the value of the whole moves mainly with them/.test(en)
+      return /Your 3 largest investments hold 77% of your financial portfolio/.test(en)
         && !/depends on|explained|attribut/i.test(en)
-        && /By asset class, your largest exposure is Cripto, at 62% of your financial portfolio/.test(en)
+        && /By investment class, the largest is Cripto, at 62% of your financial portfolio/.test(en)
         && !/\bmaterial\b/i.test(en); })(),
     (DRV({ items: P3, pct: 77, lang: 'en' }).match(/data-factor="dependency">([^<]*)</) || [, '?'])[1]);
 }
