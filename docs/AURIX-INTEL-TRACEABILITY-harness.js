@@ -396,8 +396,10 @@ console.log('\n3 · Una sola pregunta, un solo nodo, y en su sitio:');
       /@media \(max-width: 640px\)[\s\S]*?\.intv12-qcard\s*\{ order: 2; \}/.test(css));
     ok('3.5 la dock conserva declinar y pausar en su plantilla',
       /data-intel-answer="__decline"/.test(app) && /data-intel-answer="__pause"/.test(app));
-    ok('3.6 la card se emite entre Salud y Radar en el renderer',
-      /\$\{mHealthHtml\}\s*\n\s*\$\{intelQCardHtml\}\s*\n\s*\$\{radarHtml\}/.test(app));
+    // RE-DECIDIDO (V7): tras la pregunta va la pareja Factores/Radar, cuyo orden en el DOM
+    // decide el breakpoint (móvil: Factores primero). La pregunta sigue entre Salud y ella.
+    ok('3.6 la card se emite entre Salud y la pareja Radar/Factores en el renderer',
+      /\$\{mHealthHtml\}\s*\n\s*\$\{intelQCardHtml\}\s*\n[\s\S]{0,400}?radarHtml \+ driversHtml/.test(app));
   }
   ok('3.7 sin pregunta, la rejilla de escritorio es EXACTAMENTE la de hoy (el cambio va condicionado con `:has`)',
     /\.aurix-intcc:has\(\.intv12-qcard\) \.intv12-qcard\s*\{ grid-column: 1 \/ 13; grid-row: 2; \}/.test(css));

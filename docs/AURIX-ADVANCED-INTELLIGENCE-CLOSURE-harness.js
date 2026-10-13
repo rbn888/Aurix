@@ -1586,8 +1586,9 @@ console.log('\n§11 · radar · cinco puntos y figura cerrada');
   // → … → Cambios. El comparador ya no vive aquí (Workspace); conserva un valor único.
   // RE-DECIDIDO (SPEC casi final post-v810 §5): Evolución y Dependencias antes de Hoy,
   // que cierra la pantalla; DOM, visual, teclado y lector en el mismo orden.
-  ok('1.1 MÓVIL · Radar → Factores → Explora → Evolución → (Dependencias) → Hoy → … → Cambios (mismo orden que escritorio)',
-    (() => { const seq = ['.intcc-hero', '.intv12-qcard', '.intcc-radar', '.intcc-drivers', '.intcc-explore',
+  // RE-DECIDIDO (V7 §2): en móvil, Factores ANTES que Radar (también en el DOM).
+  ok('1.1 MÓVIL · Factores → Radar → Explora → Evolución → (Dependencias) → Hoy → … → Cambios',
+    (() => { const seq = ['.intcc-hero', '.intv12-qcard', '.intcc-drivers', '.intcc-radar', '.intcc-explore',
         '.intcc-timeline', '.intcc-watch', '.intv14-cmp', '.intv4-changed'];
       const v = seq.map(ordOf);
       if (v.some(x => x === null)) return false;
@@ -4193,11 +4194,12 @@ console.log('\nDC · C y D · el radar y los factores, preservados y verificados
     /11\.26 el marco exterior ocupa entre el 50 % y el 58 %/.test(s_self));
 
   // ── D · FACTORES ────────────────────────────────────────────────────
-  ok('D.1 el titular coincide con el PUESTO 1 del ranking',
+  // RE-DECIDIDO (V7 §5): «Tu mayor inversión es X» se retira (es la fila 1 del ranking).
+  ok('D.1 sin titular redundante: el puesto 1 del ranking ya nombra la mayor inversión',
     (() => { const sec = section(hB, 'intcc-drivers');
       const lead = (sec.match(/class="intcc-drv-explain">([^<]*)</) || [, ''])[1];
       const first = (sec.match(/class="intcc-drv-name">([^<]*)/) || [, ''])[1];
-      return !!lead && !!first && lead.indexOf(first) !== -1; })(),
+      return !lead && !!first; })(),
     JSON.stringify({ lead: (section(hB, 'intcc-drivers').match(/class="intcc-drv-explain">([^<]*)</) || [, ''])[1],
       first: (section(hB, 'intcc-drivers').match(/class="intcc-drv-name">([^<]*)/) || [, ''])[1] }));
   ok('D.2 el ranking y los pesos salen del MISMO owner de exposición',

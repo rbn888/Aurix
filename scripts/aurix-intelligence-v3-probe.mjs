@@ -451,6 +451,22 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // Diagnóstico (no aserta): DUMP=persona,… DUMP_W=390 → texto visible de cada card.
+  if (process.env.DUMP) {
+    for (const kind of process.env.DUMP.split(',')) {
+      const W = Number(process.env.DUMP_W || 390), P = persona(kind);
+      const { ctx, page } = await newPage(W);
+      await boot(page, P, process.env.DUMP_L || 'es');
+      await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+      await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1800);
+      if (process.env.DUMP_SHOT) { if (process.env.DUMP_PRE) await page.evaluate(process.env.DUMP_PRE); await page.waitForTimeout(500); await page.screenshot({ path: `${process.env.DUMP_SHOT}-${kind}-${W}.png`, fullPage: true }); continue; }
+      if (process.env.DUMP_JS) console.log(await page.evaluate(process.env.DUMP_JS));
+      else console.log(`=== ${kind} ${W}\n` + JSON.parse(await page.evaluate(PRES)).text);
+      await ctx.close();
+    }
+    continue;
+  }
+
   // ── V7 · REVISIÓN FINANCIERA: un fallo no transitorio no repinta en cada tick, y la
   // memoria que llega tarde (> tope) no deja fijado un Explora sin sus preguntas.
   if (!process.env.P0_ONLY && !process.env.P1_ONLY && process.env.V7_MATRIX !== 'none:es' || process.env.V7_REVIEW) {
@@ -521,6 +537,192 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // ── V7F · CIERRE PREMIUM: Explora, Evolución, Dependencias, orden, Factores, dorado ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng, kind] of (process.env.V7F_MATRIX || '360:es:real,390:es:real,390:en:cash,768:es:flows,1024:es:real,1440:es:real,1440:en:cash').split(',').map(x => x.split(':'))) {
+    const WF = Number(w); if (!WF) continue;
+    const T = `[${E} V7F ${kind} ${WF} ${lng}]`;
+    const P = persona(kind);
+    const touch = WF < 768;
+    const ctx = await browser.newContext({ viewport: { width: WF, height: WF < 768 ? 844 : 1000 }, deviceScaleFactor: 1, hasTouch: touch });
+    const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
+    await boot(page, P, lng);
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
+    await page.mouse.move(1, 1);
+    // ORDEN: DOM = visual; en móvil Factores antes que Radar.
+    const O = JSON.parse(await page.evaluate(`(function(){ var vis=function(e){ var r=e.getBoundingClientRect(); return r.width>0&&r.height>0; };
+      var kids=[].slice.call(document.querySelector('.aurix-intcc').children).filter(vis);
+      var names=kids.map(function(k){ return k.className.split(' ').filter(function(c){ return /^intcc-(m-hero|m-health|hero|radar|drivers|explore|timeline|watch)$|^intv21-scen$|^intv12-qcard$/.test(c); })[0]||k.className.split(' ')[0]; });
+      var tops=kids.map(function(k){ var r=k.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; });
+      var mono=true; for (var i=1;i<tops.length;i++) if (tops[i][0] < tops[i-1][0] - 1 || (Math.abs(tops[i][0]-tops[i-1][0])<=1 && tops[i][1] < tops[i-1][1])) mono=false;
+      return JSON.stringify({ names: names, mono: mono }); })()`));
+    const ix = (n) => O.names.indexOf(n);
+    if (WF < 1024) ok(`${T} orden móvil: Factores → Radar → Explora → Evolución → Hoy → Dependencias (DOM = visual)`,
+      ix('intcc-drivers') < ix('intcc-radar') && ix('intcc-radar') < ix('intcc-explore') && ix('intcc-explore') < ix('intcc-timeline') && ix('intcc-timeline') < ix('intcc-watch') && ix('intcc-watch') < ix('intv21-scen') && O.mono, JSON.stringify(O));
+    else ok(`${T} escritorio: Radar | Factores | Explora → Evolución | Hoy → Dependencias, DOM = visual`,
+      ix('intcc-radar') < ix('intcc-drivers') && ix('intcc-drivers') < ix('intcc-explore') && ix('intcc-timeline') < ix('intcc-watch') && O.mono, JSON.stringify(O));
+    // FACTORES: sin «Tu mayor inversión es X»; ≤ 2 lecturas; nada literal del Hero.
+    const F = JSON.parse(await page.evaluate(`(function(){ var d=document.querySelector('.intcc-drivers'); var tags=[].slice.call(document.querySelectorAll('.intv21-tag')).map(function(t){ return t.getAttribute('data-tag'); });
+      return JSON.stringify({ lead: !!d.querySelector('.intcc-drv-explain'), n: d.querySelectorAll('.intv15-drv-factor').length, f: [].slice.call(d.querySelectorAll('.intv15-drv-factor')).map(function(x){ return x.getAttribute('data-factor'); }), tags: tags, rows: d.querySelectorAll('.intcc-drv-row').length }); })()`));
+    ok(`${T} Factores: sin línea redundante, ≤ 2 lecturas y sin repetir el Hero`, !F.lead && F.n <= 2 && F.rows >= 1
+      && !(F.tags.indexOf('tag_top3') !== -1 && F.f.indexOf('dependency') !== -1), JSON.stringify(F));
+    // EXPLORA: estado y geometría.
+    const XS = `(function(){ var c=document.querySelector('.intcc-explore'); var r=c.getBoundingClientRect(); var qs=[].slice.call(c.querySelectorAll('.intcc-x-q'));
+      return JSON.stringify({ h: Math.round(r.height*10)/10, q: qs.map(function(b){ var x=b.getBoundingClientRect(); return [Math.round((x.top-r.top)*10)/10, Math.round(x.height*10)/10]; }),
+        vt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().top*10)/10; }),
+        open: [].slice.call(c.querySelectorAll('.intcc-x-answer.is-open')).map(function(a){ return a.id; }), exp: qs.map(function(b){ return b.getAttribute('aria-expanded'); }),
+        ctl: qs.every(function(b){ var id=b.getAttribute('aria-controls'); return document.querySelectorAll('[id="'+id+'"]').length===1; }),
+        ids: qs.map(function(b){ return b.getAttribute('data-intcc-q'); }), tgt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().height); }) }); })()`;
+    const xs = async () => JSON.parse(await page.evaluate(XS));
+    // Pulsación en las COORDENADAS del control (sin el desplazamiento automático de la
+    // herramienta): es exactamente «el control queda bajo el dedo/puntero».
+    const press = async (id) => { const b = JSON.parse(await page.evaluate(`(function(){ var r=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']').getBoundingClientRect(); return JSON.stringify([r.left + Math.min(40, r.width / 2), r.top + r.height / 2]); })()`));
+      if (touch) await page.touchscreen.tap(b[0], b[1]); else { await page.mouse.click(b[0], b[1]); }
+      await page.waitForTimeout(260); };
+    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(150);
+    const x0 = await xs();
+    const n = x0.ids.length;
+    ok(`${T} Explora: ${n} preguntas, todas cerradas al entrar, aria-controls único y objetivos ≥ 44 px`, n >= 1 && x0.open.length === 0 && x0.exp.every(v => v === 'false') && x0.ctl && x0.tgt.every(h => h >= 44), JSON.stringify(x0));
+    const same = (a, b) => JSON.stringify(a.q) === JSON.stringify(b.q) && Math.abs(a.h - b.h) <= 0.5;
+    const bad = [];
+    for (let i = 0; i < n; i++) {
+      const id = x0.ids[i];
+      await press(id);
+      const s1 = await xs();
+      const seen = await page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']'); var a=document.getElementById(b.getAttribute('aria-controls')); var z=a.parentElement; var zr=z.getBoundingClientRect();
+        var p=a.querySelector('p')||a; var r=p.getBoundingClientRect(); var h=document.elementFromPoint(r.left+Math.min(30,r.width/2), Math.max(r.top, zr.top)+6);
+        return !!h && a.contains(h) && zr.height >= 100; })()`);
+      if (!same(s1, x0) || s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || s1.exp[i] !== 'true' || !seen) bad.push({ id, s1, seen });
+      if (n >= 2) {
+        const j = x0.ids[(i + 1) % n];
+        await press(j);
+        const s2 = await xs();
+        if (!same(s2, x0) || s2.open.length !== 1 || s2.open[0] !== 'intcc-x-' + j) bad.push({ step: 'swap', id, j, s2 });
+        await press(j);
+        const s3 = await xs();
+        if (!same(s3, x0) || s3.open.length !== 0 || JSON.stringify(s3.vt) !== JSON.stringify(s2.vt)) bad.push({ step: 'close-same', j, vt2: s2.vt, vt3: s3.vt });
+      } else {
+        await press(id);
+        const s3 = await xs();
+        if (!same(s3, x0) || s3.open.length !== 0 || JSON.stringify(s3.vt) !== JSON.stringify(s1.vt)) bad.push({ step: 'close-same', id, s3 });
+      }
+    }
+    ok(`${T} Explora: abrir/sustituir/cerrar (${touch ? 'toque' : 'clic'}) sin mover preguntas ni la altura; una sola respuesta, visible; el control queda bajo el dedo`, bad.length === 0, JSON.stringify(bad).slice(0, 600));
+    // Teclado: Enter abre, Espacio cierra (y el foco sigue en el control).
+    await page.focus(`.intcc-explore [data-intcc-q="${x0.ids[0]}"]`); await page.keyboard.press('Enter'); await page.waitForTimeout(220);
+    const k1 = await xs(); await page.keyboard.press(' '); await page.waitForTimeout(220); const k2 = await xs();
+    const foc = await page.evaluate(`document.activeElement && document.activeElement.getAttribute('data-intcc-q')`);
+    ok(`${T} Explora: Enter abre y Espacio cierra, con el foco en el mismo control`, k1.open.length === 1 && k1.exp[0] === 'true' && k2.open.length === 0 && foc === x0.ids[0] && same(k1, x0) && same(k2, x0), JSON.stringify({ k1: k1.open, k2: k2.open, foc }));
+    // Respuesta larga: completa alcanzable dentro del panel.
+    const R = JSON.parse(await page.evaluate(`(async function(){ var c=document.querySelector('.intcc-explore'); var out=[];
+      var qs=[].slice.call(c.querySelectorAll('.intcc-x-q'));
+      for (var i=0;i<qs.length;i++){ qs[i].click(); await new Promise(function(r){ setTimeout(r,200); }); var z=c.querySelector('.intv6-x-answers'); z.scrollTop=z.scrollHeight; await new Promise(function(r){ setTimeout(r,60); });
+        var a=c.querySelector('.intcc-x-answer.is-open'); var ps=a.querySelectorAll('p'); var last=ps[ps.length-1]||a; var zr=z.getBoundingClientRect(), lr=last.getBoundingClientRect();
+        out.push({ ok: lr.bottom <= zr.bottom + 1 && lr.top >= zr.top - 1 - Math.max(0, lr.height - zr.height), over: z.scrollHeight > z.clientHeight + 1 }); qs[i].click(); await new Promise(function(r){ setTimeout(r,120); }); }
+      return JSON.stringify(out); })()`));
+    ok(`${T} Explora: cada respuesta se lee completa (desplaza dentro del panel si no cabe)`, R.every(x => x.ok), JSON.stringify(R));
+    // Repintado: conserva la pregunta abierta y la geometría.
+    if (n >= 2) {
+      await press(x0.ids[1]);
+      await page.evaluate(`(function(){ _intelRefreshSig = '\\u0000probe'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1300);
+      const r1 = await xs();
+      ok(`${T} Explora: un repintado conserva la pregunta abierta y la geometría`, r1.open.length === 1 && r1.open[0] === 'intcc-x-' + x0.ids[1] && same(r1, x0), JSON.stringify(r1));
+      await press(x0.ids[1]);
+    }
+    // EVOLUCIÓN · Mayor inversión en columnas; tooltip con el activo y dentro del viewport; altura constante.
+    const hasTop = await page.evaluate(`!!document.querySelector('[data-intv21-evo-metric="top"]')`);
+    if (hasTop) {
+      await page.locator('[data-intv21-evo-metric="top"]').click(); await page.waitForTimeout(350);
+      const V = JSON.parse(await page.evaluate(`(function(){ var e=document.querySelector('.intv21-evo'); var pts=JSON.parse(e.querySelector('.intv21-evo-plot').getAttribute('data-pts'));
+        var bars=[].slice.call(e.querySelectorAll('rect.intv6-bar.is-top')); var last=pts[pts.length-1][4];
+        return JSON.stringify({ stems: e.querySelectorAll('.intv6-stem').length, bars: bars.length, pts: pts.length, other: bars.filter(function(b){ return b.classList.contains('is-other'); }).length, exp: pts.filter(function(p){ return p[4] && p[4] !== last; }).length }); })()`));
+      ok(`${T} Evolución: Mayor inversión en columnas (una por observación, sin tallos); otro líder en tono secundario`, V.stems === 0 && V.bars === V.pts && V.other === V.exp, JSON.stringify(V));
+      const plot = page.locator('.intv21-evo-plot');
+      await plot.focus();
+      const tips = [];
+      for (let k = 0; k < V.pts + 1; k++) { await page.keyboard.press(k === 0 ? 'Home' : 'ArrowRight'); await page.waitForTimeout(80);
+        tips.push(JSON.parse(await page.evaluate(`(function(){ var t=document.querySelector('.intv21-evo-tip'); var r=t.getBoundingClientRect(); return JSON.stringify({ on: t.classList.contains('is-on'), l: r.left, r: r.right, t: t.textContent, vw: innerWidth }); })()`))); }
+      const shown = tips.filter(x => x.on);
+      const lead = await page.evaluate(`JSON.parse(document.querySelector('.intv21-evo-plot').getAttribute('data-pts')).map(function(p){ return p[4]; })`);
+      ok(`${T} Evolución: el tooltip nombra al líder de cada observación y queda dentro del viewport`, shown.length >= 1 && shown.every(x => x.l >= -0.5 && x.r <= x.vw + 0.5) && shown.every(x => lead.some(nm => nm && x.t.indexOf(nm) !== -1)), JSON.stringify(tips).slice(0, 500));
+      if (kind === 'real') ok(`${T} Evolución: el relevo del líder se dice como hecho medido, sin causa inventada`, tips.some(x => /pasó a ser tu mayor inversión|became your largest investment/.test(x.t)) && !tips.some(x => /compraste|vendiste|por mercado|you bought|you sold/i.test(x.t)), JSON.stringify(tips.map(x => x.t)));
+    }
+    const HE = JSON.parse(await page.evaluate(`(async function(){ var hs=[]; var card=document.querySelector('.intcc-timeline'); var ms=[].slice.call(document.querySelectorAll('[data-intv21-evo-metric]')).map(function(b){ return b.getAttribute('data-intv21-evo-metric'); });
+      for (var i=0;i<ms.length;i++){ document.querySelector('[data-intv21-evo-metric="'+ms[i]+'"]').click(); await new Promise(function(r){ setTimeout(r,200); });
+        var ws=[].slice.call(document.querySelectorAll('[data-intv21-evo-win]')).map(function(b){ return b.getAttribute('data-intv21-evo-win'); });
+        for (var j=0;j<ws.length;j++){ document.querySelector('[data-intv21-evo-win="'+ws[j]+'"]').click(); await new Promise(function(r){ setTimeout(r,160); }); hs.push([ms[i], ws[j], Math.round(document.querySelector('.intcc-timeline').getBoundingClientRect().height)]); } }
+      return JSON.stringify(hs); })()`));
+    ok(`${T} Evolución: misma altura en todas las métricas y periodos`, HE.length >= 1 && HE.every(x => Math.abs(x[2] - HE[0][2]) <= 1), JSON.stringify(HE));
+    // DEPENDENCIAS · color por signo, cero exacto, actualización síncrona de los tres.
+    const D = JSON.parse(await page.evaluate(`(function(){ var c=document.querySelector('.intv5-sim'); var inp=c.querySelector('input[type="range"]'); var out=[]; var h0=Math.round(c.getBoundingClientRect().height);
+      var rgb=function(e){ return getComputedStyle(e).color.match(/[\\d.]+/g).map(Number); };
+      [-50,-25,-10,0,10,25,50].forEach(function(v){ inp.value=String(v); inp.dispatchEvent(new Event('input', { bubbles: true }));
+        var blocks=[].slice.call(c.querySelectorAll('.intv22-scn-block')); var val=rgb(c.querySelector('[data-sim-value]'));
+        var cls=function(x){ return x[0] > x[1] + 40 ? 'red' : (x[1] > x[0] + 40 ? 'green' : 'neutral'); };
+        out.push({ v: v, val: cls(val), pcts: blocks.map(function(b){ return cls(rgb(b.querySelector('[data-sim-pct]'))); }), mons: blocks.map(function(b){ var m=b.querySelector('[data-sim-money]'); return m.textContent ? cls(rgb(m)) : 'empty'; }),
+          sync: blocks.every(function(b){ return b.getAttribute('data-dir') === (v>0?'up':(v<0?'down':'flat')) && Math.abs(Number(b.getAttribute('data-impact')) - (v===0?0:Number(b.getAttribute('data-w'))*v)) < 1e-9; }),
+          fill: blocks.map(function(b){ return Math.round(b.querySelector('.intv5-sim-fill').getBoundingClientRect().width*10)/10; }),
+          zero: blocks.map(function(b){ return b.querySelector('[data-sim-pct]').textContent; }), h: Math.round(c.getBoundingClientRect().height) }); });
+      return JSON.stringify({ h0: h0, out: out }); })()`));
+    const want = (v) => v < 0 ? 'red' : (v > 0 ? 'green' : 'neutral');
+    ok(`${T} Dependencias: rojo en negativo, verde en positivo, neutro en 0 (valor, % e importe), los tres en el mismo frame`,
+      D.out.every(o => o.val === want(o.v) && o.pcts.every(c => c === want(o.v)) && o.mons.every(c => c === 'empty' || c === want(o.v)) && o.sync), JSON.stringify(D.out.map(o => [o.v, o.val, o.pcts.join('/'), o.mons.join('/'), o.sync])));
+    ok(`${T} Dependencias: en 0, «0 %» exacto y ninguna barra fuera del centro; altura constante`,
+      D.out.filter(o => o.v === 0).every(o => o.fill.every(f => f < 1) && o.zero.every(z => /^0\s?%$/.test(z.trim()))) && D.out.every(o => Math.abs(o.h - D.h0) <= 1), JSON.stringify(D.out.filter(o => o.v === 0).concat([{ hs: D.out.map(o => o.h), h0: D.h0 }])));
+    // CONTRASTE de lo nuevo.
+    const L = JSON.parse(await page.evaluate(`(function(){ var vis=function(e){ var r=e.getBoundingClientRect(); return r.width>0&&r.height>0&&getComputedStyle(e).visibility!=='hidden'; };
+      var lum=function(c){ var m=c.match(/[\\d.]+/g).map(Number); var a=m.length>3?m[3]:1; var bg=[22,30,50];
+        var rgb=[0,1,2].map(function(i){ return m[i]*a + bg[i]*(1-a); }).map(function(v){ v/=255; return v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2]; };
+      var ratio=function(e){ var L=lum(getComputedStyle(e).color), B2=lum('rgb(22,30,50)'); return (Math.max(L,B2)+0.05)/(Math.min(L,B2)+0.05); };
+      var sec=[].slice.call(document.querySelectorAll('.intv7-x-empty, .intv7-asof, [data-sim-value], [data-sim-pct], [data-sim-money], .intv15-drv-factor, .intcc-x-answer.is-open p, .intcc-x-label, .intv21-evo-axis span')).filter(vis);
+      return JSON.stringify(sec.map(function(e){ return [e.className.split(' ')[0] || e.tagName, +ratio(e).toFixed(2)]; }).filter(function(x){ return x[1] < 4.5; })); })()`));
+    ok(`${T} contraste AA (≥ 4,5:1) en Explora, Factores, Evolución y Dependencias`, L.length === 0, JSON.stringify(L));
+    const HS = await page.evaluate(`document.documentElement.scrollWidth > document.documentElement.clientWidth + 1`);
+    ok(`${T} sin desplazamiento horizontal`, !HS, String(HS));
+    // Cambio de cuenta: la pregunta abierta de A no aparece abierta en B.
+    if (kind === 'real' && WF === 390) {
+      await press(x0.ids[0]);
+      await page.evaluate(SESSION(P, 'uB', { delay: 0 }));
+      await page.evaluate(`(function(){ _aurixHydrateAssetMemory(); _intelRefreshSig = '\\u0000acct'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1500);
+      const b1 = await xs();
+      ok(`${T} Explora: el estado no se comparte entre cuentas`, b1.open.length === 0, JSON.stringify(b1.open));
+    }
+    // Cruce de breakpoint: el DOM se reordena.
+    if (WF === 1440 && lng === 'es') {
+      await page.setViewportSize({ width: 900, height: 1000 }); await page.waitForTimeout(1400);
+      const o2 = JSON.parse(await page.evaluate(`JSON.stringify([].slice.call(document.querySelector('.aurix-intcc').children).map(function(k){ return k.className.split(' ')[1]||k.className; }))`));
+      ok(`${T} al cruzar a ≤1023 px el DOM pasa a Factores → Radar`, o2.indexOf('intcc-drivers') !== -1 && o2.indexOf('intcc-drivers') < o2.indexOf('intcc-radar'), JSON.stringify(o2));
+    }
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+  // ── V7F · DORADO AL ENTRAR (una vez por entrada; nada al pintar; ausente con movimiento reducido) ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY && process.env.V7F_MATRIX !== 'none') for (const RMx of [false, true]) {
+    const T = `[${E} V7F dorado 1440${RMx ? ' movimiento reducido' : ''}]`;
+    const P = persona('real');
+    const { ctx, page, errs } = await newPage(1440, RMx);
+    await boot(page, P, 'es');
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
+    await page.evaluate(`(function(){ window.__g=[]; new MutationObserver(function(ms){ ms.forEach(function(m){ var t=m.target; if (t.classList && t.classList.contains('is-gold-in') && m.oldValue && m.oldValue.indexOf('is-gold-in')===-1) window.__g.push(t.className.split(' ')[1]); }); })
+      .observe(document.querySelector('.aurix-intcc'), { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true }); window.__long=0; var last=performance.now(); (function f(t){ if (t-last>50) window.__long++; last=t; if (!window.__stopF) requestAnimationFrame(f); })(last); })()`);
+    const g0 = await page.evaluate(`window.__g.length`);
+    for (let i = 0; i < 12; i++) { await page.mouse.move(700, 500); await page.mouse.wheel(0, 260); await page.waitForTimeout(90); }
+    await page.waitForTimeout(900);
+    const g1 = JSON.parse(await page.evaluate(`JSON.stringify(window.__g)`));
+    for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, i % 2 ? 40 : -40); await page.waitForTimeout(90); }
+    await page.waitForTimeout(900);
+    const g2 = JSON.parse(await page.evaluate(`JSON.stringify(window.__g)`));
+    const live = await page.evaluate(`document.querySelectorAll('.is-gold-in').length`);
+    const pe = await page.evaluate(`(function(){ var e=document.querySelector('.intv21-scen'); return getComputedStyle(e,'::before').pointerEvents; })()`);
+    if (!RMx) {
+      ok(`${T} nada al pintar; al entrar por scroll destellan los bloques nuevos, una vez cada uno`, g0 === 0 && g1.length >= 1 && new Set(g1).size === g1.length, JSON.stringify({ g0, g1 }));
+      ok(`${T} pequeños vaivenes no lo repiten; termina (no queda animación viva) y no intercepta el puntero`, g2.length === g1.length && live === 0 && pe === 'none', JSON.stringify({ g1: g1.length, g2: g2.length, live, pe }));
+    } else ok(`${T} con movimiento reducido no existe`, g2.length === 0, JSON.stringify(g2));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ── V6 · CONTRATO FINANCIERO ÚNICO: la liquidez no es una inversión ──────────
   if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng] of (process.env.V6_MATRIX || '360:es,375:en,390:es,768:es,1024:es,1440:es,1440:en').split(',').map(x => x.split(':'))) {
     const W6 = Number(w), T = `[${E} V6 cash ${W6} ${lng}]`;
@@ -548,7 +750,8 @@ for (const E of ENGINES) {
     ok(`${T} Hero: la liquidez nunca entra en «pesan más que…»; si es la mayor partida, se dice como liquidez`, !/Euros, |Euros y|y Euros/.test(U.hero)
       && (/liquidez|cash/i.test(U.hero) || !EUROS.test(U.hero)), U.hero);
     ok(`${T} Factores: el ranking es de INVERSIONES (sin Euros) y la liquidez va aparte`, U.rank.length >= 3 && !U.rank.some(n => EUROS.test(n))
-      && /(liquidez representa|cash makes up)/i.test(U.drv) && !/estabilidad|stability|oportunidades|opportunities/i.test(U.drv), JSON.stringify({ rank: U.rank, drv: U.drv.slice(0, 220) }));
+      // RE-DECIDIDO (V7 §5): si el Hero ya dice el % de liquidez, Factores lo dice con otra frase.
+      && /(liquidez representa|cash makes up|liquidez \(\d+\s?%\) queda fuera|cash \(\d+\s?%\) is left out)/i.test(U.drv) && !/estabilidad|stability|oportunidades|opportunities/i.test(U.drv), JSON.stringify({ rank: U.rank, drv: U.drv.slice(0, 220) }));
     ok(`${T} Evolución (mayor posición): nunca la liquidez`, !U.evo || U.evo.metric !== 'top' || (!EUROS.test(U.evo.head) && !EUROS.test(U.evo.stats)), JSON.stringify(U.evo));
     ok(`${T} Explora: ninguna pregunta trata la liquidez como posición; la liquidez se pregunta como liquidez`, !U.xq.some(x => EUROS.test(x)) && !EUROS.test(U.xa.replace(/liquidez|cash/gi, '')), JSON.stringify(U.xq));
     ok(`${T} Escenarios: mayor posición y tres mayores son inversiones`, /Bitcoin/.test(U.s1) && !EUROS.test(U.s1) && !EUROS.test(U.s3), JSON.stringify([U.s1.slice(0, 80), U.s3.slice(0, 120)]));
@@ -805,9 +1008,10 @@ for (const E of ENGINES) {
         return JSON.stringify({ dom: dom, visual: visual, titles: titles, blocks: blocks, hoyN: hoy ? hoy.querySelectorAll('.intv4-story').length : 0,
           scenOn: scen ? scen.getAttribute('data-scen') : null, foot: scen ? !!scen.querySelector('.intv21-foot') : false, tag: scen ? /Hipotético|Hypothetical/.test(scen.textContent) : false });
       })()`));
-      // RE-DECIDIDO (V5): Evolución → Hoy → Dependencias.
-      const WANT = ['hero', 'radar', 'drivers', 'explore', 'evo', 'today', 'scen'];
-      ok(`${T} orden definitivo en el DOM: Hero → Radar → Factores → Explora → Evolución → Hoy → Dependencias`, JSON.stringify(L.dom.filter((k, i, a) => a.indexOf(k) === i)) === JSON.stringify(WANT.filter(k => L.dom.indexOf(k) !== -1)), JSON.stringify(L.dom));
+      // RE-DECIDIDO (V5): Evolución → Hoy → Dependencias. RE-DECIDIDO (V7): en ≤1023 px,
+      // Factores ANTES que Radar (orden móvil del SPEC, también en el DOM).
+      const WANT = w < 1024 ? ['hero', 'drivers', 'radar', 'explore', 'evo', 'today', 'scen'] : ['hero', 'radar', 'drivers', 'explore', 'evo', 'today', 'scen'];
+      ok(`${T} orden definitivo en el DOM: Hero → ${w < 1024 ? 'Factores → Radar' : 'Radar → Factores'} → Explora → Evolución → Hoy → Dependencias`, JSON.stringify(L.dom.filter((k, i, a) => a.indexOf(k) === i)) === JSON.stringify(WANT.filter(k => L.dom.indexOf(k) !== -1)), JSON.stringify(L.dom));
       ok(`${T} el orden visual coincide con el del DOM`, JSON.stringify(L.visual.filter((k, i, a) => a.indexOf(k) === i)) === JSON.stringify(L.dom.filter((k, i, a) => a.indexOf(k) === i)), JSON.stringify({ d: L.dom, v: L.visual }));
       ok(`${T} todos los títulos de sección comparten token (tamaño, peso, tracking, color)`, new Set(L.titles).size === 1, JSON.stringify(Array.from(new Set(L.titles))));
       // RE-DECIDIDO (V5): sin insignia ni nota; los tres resultados siempre visibles —en fila

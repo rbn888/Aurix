@@ -5812,6 +5812,7 @@ const T = {
     intcc_drivers_title: 'Factores principales',
     intcc_drv_explain_asset: name => `Tu mayor inversión es ${name}.`,
     intv6_drv_liquidity: pct => `La liquidez representa el ${pct} de tu cartera financiera.`,
+    intv7_drv_liq_aside: pct => `La liquidez (${pct}) queda fuera del ranking: no es una inversión.`,
     intcc_drv_explain_cash:  (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades.`,
     intcc_drv_kind_eng:  'Exposición',
     intcc_drv_kind_liq:  'Liquidez',
@@ -5922,13 +5923,23 @@ const T = {
     intv22_m_liquidity_aria: 'Peso de la liquidez', intv22_m_return_aria: 'Rentabilidad sin aportaciones ni retiradas',
     intv22_m_value_aria: 'Valor de la cartera, con aportaciones y retiradas',
     intv22_st_start: 'Inicio', intv22_st_now: 'Último dato', intv22_st_delta: 'Cambio',
+    intv7_x_choose: 'Elige una pregunta para ver la respuesta',
+    intv7_tip_new_leader: n => `${n} pasó a ser tu mayor inversión`,
     intv7_k_asof: d => `Dato del ${d}`,
     intv7_k_top_peak_help: (a, b) => `Tu mayor inversión cambió de ${a} a ${b}: el cambio compara el peso de la mayor posición en cada momento, no el de un mismo activo.`,
     intv22_pos_unit: 'posiciones efectivas',
     intv22_plot_aria: 'Usa las flechas para recorrer las observaciones.',
     intv22_obs_note: n => `${n} observaciones registradas`,
     intv22_tip_obs: 'observación registrada',
-    intv22_note_top: '', intv22_note_liquidity: '', intv22_note_return: '', intv22_note_value: '',
+    intv22_note_top: '', intv22_note_return: '',
+    intv22_note_liquidity: 'Mide el peso de la liquidez dentro de tu cartera financiera. Que suba o baje no es bueno ni malo por sí mismo.',
+    intv22_note_value: 'Incluye aportaciones y retiradas: no es rentabilidad.',
+    intv22_h_top_back: (l, n) => `${l}, el peso de ${n}, tu mayor inversión, terminó como empezó tras cambiar entre medias.`,
+    intv22_h_topx_back: l => `${l}, el peso de tu mayor inversión terminó como empezó tras cambiar entre medias.`,
+    intv22_h_liq_back: l => `${l}, el peso de tu liquidez terminó como empezó tras cambiar entre medias.`,
+    intv22_h_eff_back: l => `${l}, el reparto de tu dinero terminó como empezó tras cambiar entre medias.`,
+    intv22_h_value_back: l => `${l}, el valor de tu cartera terminó como empezó tras cambiar entre medias.`,
+    intv22_h_ret_back: l => `${l}, tus inversiones terminaron como empezaron tras moverse entre medias, sin contar aportaciones ni retiradas.`,
     intv22_note_effective: 'Equivale a tener ese número de posiciones con el mismo peso. Mide cómo se reparte el dinero, no el riesgo.',
     intv3_xq_split: (a, b) => `¿Qué parte de mi cartera está entre ${a} y ${b}?`,
     intv3_xa_split: (t, a, pa, b, pb) => `El ${t}: ${a} reúne el ${pa} y ${b} el ${pb}, hoy.`,
@@ -5950,9 +5961,9 @@ const T = {
     intv22_xa_spread_less: 'Está más concentrado: el peso recae en menos posiciones.',
     intv22_xa_spread_ev: (na, nb) => `Has pasado de ${na} a ${nb} posiciones.`,
     intv22_xq_market_ops: l => `¿Cuánto del cambio de mi cartera ${l} viene del mercado y cuánto de mis operaciones?`,
-    intv22_xa_mo_ops: 'La mayor parte la explican tus operaciones, no el mercado.',
+    intv22_xa_mo_ops: 'La mayor parte no viene del precio de tus inversiones, sino de movimientos en tu cartera.',
     intv22_xa_mo_market: 'La mayor parte la explica el mercado, no tus operaciones.',
-    intv22_xa_mo_ev: (d, m, o) => `Desde el ${d}: mercado ${m}; tus compras, ventas y movimientos de liquidez ${o}.`,
+    intv22_xa_mo_ev: (d, m, o) => `Desde el ${d}: mercado ${m}; compras, ventas y movimientos de liquidez (incluidos dividendos no registrados) ${o}.`,
     intv22_xa_mo_lim: 'Los dividendos que no hayas registrado no se separan.',
     intv22_xq_liq: l => `¿Por qué cambió el peso de mi liquidez ${l}?`,
     intv6_xq_liq_up: l => `¿Por qué aumentó el peso de mi liquidez ${l}?`,
@@ -5987,6 +5998,7 @@ const T = {
     intv3_tag_liq_up: w => `Más peso en liquidez ${w}`,
     intv3_tag_liq_down: w => `Menos peso en liquidez ${w}`,
     intv3_tag_liq_flat: w => `Peso de la liquidez estable ${w}`,
+    intv3_tag_liq_back: w => `Liquidez ${w}: mismo peso que al inicio`,
     intv3_win_7d: 'en 7 días', intv3_win_30d: 'en 30 días', intv3_win_all: 'desde el inicio',
     intv21_tag_conc_high: 'Concentración elevada',
     intv21_tag_conc_moderate: 'Concentración moderada',
@@ -9246,6 +9258,7 @@ const T = {
     intcc_drivers_title: 'Key drivers',
     intcc_drv_explain_asset: name => `Your largest investment is ${name}.`,
     intv6_drv_liquidity: pct => `Cash makes up ${pct} of your financial portfolio.`,
+    intv7_drv_liq_aside: pct => `Cash (${pct}) is left out of the ranking: it is not an investment.`,
     intcc_drv_explain_cash:  (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities.`,
     intcc_drv_kind_eng:  'Exposure',
     intcc_drv_kind_liq:  'Liquidity',
@@ -9344,13 +9357,23 @@ const T = {
     intv22_m_liquidity_aria: 'Weight of cash', intv22_m_return_aria: 'Return excluding contributions and withdrawals',
     intv22_m_value_aria: 'Portfolio value, including contributions and withdrawals',
     intv22_st_start: 'Start', intv22_st_now: 'Latest', intv22_st_delta: 'Change',
+    intv7_x_choose: 'Choose a question to see the answer',
+    intv7_tip_new_leader: n => `${n} became your largest investment`,
     intv7_k_asof: d => `As of ${d}`,
     intv7_k_top_peak_help: (a, b) => `Your largest investment changed from ${a} to ${b}: the change compares the weight of the largest position at each point, not of one asset.`,
     intv22_pos_unit: 'effective positions',
     intv22_plot_aria: 'Use the arrow keys to move between observations.',
     intv22_obs_note: n => `${n} recorded observations`,
     intv22_tip_obs: 'recorded observation',
-    intv22_note_top: '', intv22_note_liquidity: '', intv22_note_return: '', intv22_note_value: '',
+    intv22_note_top: '', intv22_note_return: '',
+    intv22_note_liquidity: 'It measures the weight of cash within your financial portfolio. Going up or down is neither good nor bad in itself.',
+    intv22_note_value: 'It includes contributions and withdrawals: it is not return.',
+    intv22_h_top_back: (l, n) => `${l}, the weight of ${n}, your largest investment, ended where it started after moving in between.`,
+    intv22_h_topx_back: l => `${l}, the weight of your largest investment ended where it started after moving in between.`,
+    intv22_h_liq_back: l => `${l}, the weight of your cash ended where it started after moving in between.`,
+    intv22_h_eff_back: l => `${l}, the spread of your money ended where it started after moving in between.`,
+    intv22_h_value_back: l => `${l}, your portfolio value ended where it started after moving in between.`,
+    intv22_h_ret_back: l => `${l}, your investments ended where they started after moving in between, excluding contributions and withdrawals.`,
     intv22_note_effective: 'It is like holding that many positions of equal weight. It measures how your money is spread, not risk.',
     intv3_xq_split: (a, b) => `How much of my portfolio is in ${a} and ${b}?`,
     intv3_xa_split: (t, a, pa, b, pb) => `${t}: ${a} holds ${pa} and ${b} ${pb}, today.`,
@@ -9372,9 +9395,9 @@ const T = {
     intv22_xa_spread_less: 'It is more concentrated: the weight sits in fewer positions.',
     intv22_xa_spread_ev: (na, nb) => `You went from ${na} to ${nb} positions.`,
     intv22_xq_market_ops: l => `How much of my portfolio's change ${l} comes from the market and how much from my own transactions?`,
-    intv22_xa_mo_ops: 'Most of it comes from your transactions, not the market.',
+    intv22_xa_mo_ops: 'Most of it does not come from the price of your investments but from movements in your portfolio.',
     intv22_xa_mo_market: 'Most of it comes from the market, not your transactions.',
-    intv22_xa_mo_ev: (d, m, o) => `Since ${d}: market ${m}; your buys, sells and cash movements ${o}.`,
+    intv22_xa_mo_ev: (d, m, o) => `Since ${d}: market ${m}; buys, sells and cash movements (including unrecorded dividends) ${o}.`,
     intv22_xa_mo_lim: 'Dividends you have not recorded are not separated.',
     intv22_xq_liq: l => `Why did the weight of my cash change ${l}?`,
     intv6_xq_liq_up: l => `Why did the weight of my cash rise ${l}?`,
@@ -9409,6 +9432,7 @@ const T = {
     intv3_tag_liq_up: w => `More weight in cash ${w}`,
     intv3_tag_liq_down: w => `Less weight in cash ${w}`,
     intv3_tag_liq_flat: w => `Cash weight steady ${w}`,
+    intv3_tag_liq_back: w => `Cash ${w}: same weight as at the start`,
     intv3_win_7d: 'over 7 days', intv3_win_30d: 'over 30 days', intv3_win_all: 'since the start',
     intv21_tag_conc_high: 'High concentration',
     intv21_tag_conc_moderate: 'Moderate concentration',
@@ -66353,6 +66377,14 @@ try { if (typeof window !== 'undefined') { window._aurixIntelligencePreviewHTML 
 // —eso movería la pantalla cada pocos segundos— y con el foco dentro (una respuesta
 // a medio escribir) se espera a la siguiente ocasión.
 let _intelRefreshTimer = null, _intelRefreshSig = null;
+function _intv7Narrow() { try { return !!(window.matchMedia && window.matchMedia('(max-width: 1023px)').matches); } catch (_) { return false; } }
+// Al cruzar 1024 px el orden del DOM cambia: se fuerza UN repintado por el owner único.
+try {
+  const _intv7Mq = window.matchMedia && window.matchMedia('(max-width: 1023px)');
+  if (_intv7Mq) (_intv7Mq.addEventListener ? _intv7Mq.addEventListener.bind(_intv7Mq, 'change') : _intv7Mq.addListener.bind(_intv7Mq))(() => {
+    if (_intelRefreshSig != null) { _intelRefreshSig = '\u0000bp'; _aurixIntelScheduleRefresh(); }
+  });
+} catch (_) {}
 function _aurixIntelMaterialSig() {
   try {
     return activeAssets().map(a => [a.id, a.qty, Array.isArray(a.transactions) ? a.transactions.length : 0].join(':')).join('|');
@@ -68230,7 +68262,8 @@ function _intv4FactText(fact) {
   }
   if (k === 'top_position_weight')     return _intv4T('intv4_f_top1', v.name || '—', _intv4Num(fact.value, 0));
   if (k === 'top3_weight')             return _intv4T('intv4_f_top3', _intv4Num(fact.value, 0));
-  if (k === 'effective_holdings')      return _intv4T('intv4_f_eff', v.positions, _intv4Num(v.effectiveN, 1));
+  // V7 · con una sola posición «equivale a 1 posición» no dice nada (y no concuerda): silencio.
+  if (k === 'effective_holdings')      return Number(v.positions) >= 2 ? _intv4T('intv4_f_eff', v.positions, _intv4Num(v.effectiveN, 1)) : '';
   return '';                                                     // unmapped ⇒ silent
 }
 function _intv4WhyText(factOrRoot) {
@@ -68834,7 +68867,8 @@ function _intv4ExploreHtml(core, esc, intel) {
       ${/* V7 · la zona de respuesta también se reserva: la card resuelta no crece al llegar. */''}<span class="intv7-x-sk-zone" aria-hidden="true"></span>
     </section>`;
   }
-  if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id } }));
+  if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id },
+    meta: { family: q.family, period: q.period, priority: q.priority, evidence: q.evidence } }));
   const all = ((core.contextualQuestions && core.contextualQuestions.selected) || [])
     // §3 — LABEL Y RESPUESTA SE RESUELVEN EN LA MISMA PASADA Y DESDE EL MISMO
     // `q`, así que no pueden cruzarse: un reordenamiento del catálogo mueve el
@@ -68872,7 +68906,7 @@ function _intv4ExploreHtml(core, esc, intel) {
     .filter(x => typeof _INTV3_EXPLORE_FAMILY_OF === 'undefined'
       || !ctx21.some(c => _INTV3_EXPLORE_FAMILY_OF[x.q.id] && _INTV3_EXPLORE_FAMILY_OF[x.q.id] === _INTV3_EXPLORE_FAMILY_OF[c.id]))
     .slice(0, ctx21.length ? Math.max(0, 3 - ctx21.length) : _INTV4_EXPLORE_MAX);
-  ctx21.slice().reverse().forEach(c => qs.unshift({ q: { id: c.id, causalRoot: c.root }, label: c.label, answer: c.answer, fact: c.fact }));
+  ctx21.slice().reverse().forEach(c => qs.unshift({ q: { id: c.id, causalRoot: c.root }, label: c.label, answer: c.answer, fact: c.fact, meta: c.meta }));
   if (!qs.length) return '';
   // V5.1 · LA RESPUESTA PRIORITARIA YA ABIERTA. La card tiene altura estable y una
   // zona reservada para la respuesta: vacía parecía una card a medio cargar. Se abre
@@ -68887,14 +68921,14 @@ function _intv4ExploreHtml(core, esc, intel) {
   // para esta cuenta— decide, y un repintado no la cambia.
   const openId = (_xs && _xs.id === _xid && _xs.user && _xs.open && qs.some(x => x.q.id === _xs.open)) ? _xs.open : null;
   const html = `
-    <section class="intcc-card intcc-explore intv4-explore${openId ? ' is-x-open' : ''}"${(typeof _intv7ExploreUnsettled === 'function' && _intv7ExploreUnsettled()) ? ' data-hist-held="1"' : ''}
+    <section class="intcc-card intcc-explore intv4-explore intv7-x${openId ? ' is-x-open' : ''}"${(typeof _intv7ExploreUnsettled === 'function' && _intv7ExploreUnsettled()) ? ' data-hist-held="1"' : ''}
              data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
              data-pool="${all.length}"
              data-hot="${qs.filter(x => hot.has(x.q.causalRoot)).length}">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intcc-explore-list">
         ${qs.map(x => `
-          <div class="intcc-x-item${x.q.id === openId ? ' is-active' : ''}" data-root="${esc(x.q.causalRoot)}"${x.fact ? ` data-x-fact="${esc(x.fact.factId)}"` : ''}${/^ctx_/.test(x.q.id) ? ' data-ctx="1"' : ''}>
+          <div class="intcc-x-item${x.q.id === openId ? ' is-active' : ''}" data-root="${esc(x.q.causalRoot)}"${x.meta ? ` data-x-family="${esc(x.meta.family || '')}" data-x-period="${esc(x.meta.period || '')}" data-x-evidence="${esc(x.meta.evidence || '')}" data-x-priority="${esc(String(x.meta.priority || ''))}"` : ''}${x.fact ? ` data-x-fact="${esc(x.fact.factId)}"` : ''}${/^ctx_/.test(x.q.id) ? ' data-ctx="1"' : ''}>
             <button type="button" class="intcc-x-q${x.q.id === openId ? ' is-active' : ''}" id="intcc-xq-${esc(x.q.id)}"
                     data-intcc-q="${esc(x.q.id)}" aria-expanded="${x.q.id === openId ? 'true' : 'false'}"
                     aria-controls="intcc-x-${esc(x.q.id)}">
@@ -68908,7 +68942,9 @@ function _intv4ExploreHtml(core, esc, intel) {
       ${/* V6 · las respuestas viven en UNA zona bajo las preguntas (no dentro de cada
             pregunta): abierta una, las preguntas se compactan arriba y ella ocupa el
             espacio reservado; `aria-controls`/`aria-labelledby` siguen enlazándolas. */''}
-      <div class="intv6-x-answers">${qs.map(x => `
+      ${/* V7 · PANEL INFERIOR RESERVADO: misma altura abierto o cerrado; las preguntas
+            no se mueven nunca. Cerrado, una indicación discreta (no una explicación). */''}
+      <div class="intv6-x-answers" data-x-n="${qs.length}"><p class="intv7-x-empty" aria-hidden="true">${esc(_intv4T('intv7_x_choose'))}</p>${qs.map(x => `
         <div class="intcc-x-answer${x.q.id === openId ? ' is-open' : ''}" id="intcc-x-${esc(x.q.id)}" role="region"
              aria-labelledby="intcc-xq-${esc(x.q.id)}">
           <div class="intcc-x-answer-in">${x.answer}</div>
@@ -70599,7 +70635,7 @@ function _aurixGapsBySurface(core) {
 //
 // Con UNA sola posición no se publica dependencia: «tu mayor posición concentra el
 // X %» es la fila que ya está encima, y repetirla es el ruido que el §12 prohíbe.
-function _intv5DriversHtml(snap, esc, limitLine) {
+function _intv5DriversHtml(snap, esc, limitLine, hero) {
   // V6 · el ranking es de POSICIONES INVERTIDAS (contrato único) y lo calcula su OWNER
   // (`_intv6InvestedDrivers`); la card sólo publica. La liquidez sale del ranking y, si
   // habría entrado en él, se dice aparte y sin valorarla.
@@ -70609,30 +70645,33 @@ function _intv5DriversHtml(snap, esc, limitLine) {
       || ((typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : drivers);
   } catch (_) {}
   const items = (drivers.items || []).slice(0, 3);
-  const top = items[0];
-  const lead = top ? _intv4T('intcc_drv_explain_asset', top.name) : '';
+  // V7 · sin «Tu mayor inversión es X»: es la fila 1 del ranking.
   const liqPct = Number(drivers.liquidityPct) || 0;
+  // V7 · lo que el Hero ya publica (titular y etiquetas) no se repite literalmente aquí.
+  const heroTags = (hero && Array.isArray(hero.tags)) ? hero.tags : [];
+  const heroSaysLiq = !!(hero && hero.title && liqPct > 0 && /liquidez|cash/i.test(hero.title) && hero.title.indexOf(_intv21Pct(liqPct, 0)) !== -1);
   const liqLine = (liqPct > 0 && (items.length < 3 || liqPct >= Number(items[items.length - 1].pctRaw)))
-    ? _intv4T('intv6_drv_liquidity', _aurixPctLabel(liqPct)) : '';
+    ? _intv4T(heroSaysLiq ? 'intv7_drv_liq_aside' : 'intv6_drv_liquidity', _aurixPctLabel(liqPct)) : '';
   // DEPENDENCIA. `drivers.pct` cubre EXACTAMENTE las posiciones listadas.
-  const depLine = (items.length >= 2 && Number.isFinite(Number(drivers.pct)) && Number(drivers.pct) > 0)
+  const depLine = (items.length >= 2 && Number.isFinite(Number(drivers.pct)) && Number(drivers.pct) > 0
+                   && !heroTags.some(t => t && t.id === 'tag_top3'))
     ? _intv4T('intv15_drv_dependency', items.length, _aurixPctLabel(Number(drivers.pct)))
     : '';
   // CLASE DE INVERSIÓN con más peso (del owner; sin él, la de `snap.topCategory`), sólo con más de una.
   const tc = drivers.topCategory || (snap && snap.topCategory);
   const catCount = drivers.categoryCount != null ? Number(drivers.categoryCount) : Number(snap && snap.categoryCount);
-  const catLine = (tc && tc.label && Number.isFinite(Number(tc.pctTotal)) && catCount > 1)
+  const catLine = (tc && tc.label && Number.isFinite(Number(tc.pctTotal)) && catCount > 1
+                   && !heroTags.some(t => t && t.id === 'tag_class' && String(t.sig || '').indexOf('+') === -1))
     ? _intv4T('intv15_drv_category', tc.label, _aurixPctLabel(Number(tc.pctTotal)))
     : '';
   return `
     <section class="intcc-card intcc-drivers"
              data-drv-rows="${items.length}"
              data-drv-dep="${depLine ? esc(String(drivers.pct)) : ''}"
-             data-drv-cat="${catLine ? esc(String(tc.type || '')) : ''}">
+             data-drv-cat="${catLine ? esc(String(tc.type || '')) : ''}"
+             data-drv-reads="${[liqLine, depLine, catLine].filter(Boolean).slice(0, 2).length}">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_drivers_title'))}</h3>
       ${items.length ? `
-        ${lead ? `<p class="intcc-drv-explain">${esc(lead)}</p>` : ''}
-        ${liqLine ? `<p class="intv6-drv-liq" data-liq-w="${esc(String(liqPct))}">${esc(liqLine)}</p>` : ''}
         <ol class="intcc-drv-list">
           ${items.map((it, i) => `
             <li class="intcc-drv-row${_intccIsMonetary(it.type) ? ' is-monetary' : ''}">
@@ -70645,9 +70684,12 @@ function _intv5DriversHtml(snap, esc, limitLine) {
         ${/* §8 — los dos factores que la lista NO dice: de cuánto depende el
               conjunto, y qué clase de activo pesa más. Van después de las filas
               porque son su interpretación, no su encabezado. */''}
-        ${(depLine || catLine) ? `<ul class="intv15-drv-factors">
-          ${depLine ? `<li class="intv15-drv-factor" data-factor="dependency">${esc(depLine)}</li>` : ''}
-          ${catLine ? `<li class="intv15-drv-factor" data-factor="category">${esc(catLine)}</li>` : ''}
+        ${/* V7 · como máximo DOS lecturas, en orden fijo de relevancia: la liquidez que
+              habría entrado en el ranking, la dependencia de las mayores y la clase. */''}
+        ${(liqLine || depLine || catLine) ? `<ul class="intv15-drv-factors">
+          ${[liqLine ? `<li class="intv15-drv-factor intv6-drv-liq" data-factor="liquidity" data-liq-w="${esc(String(liqPct))}">${esc(liqLine)}</li>` : '',
+             depLine ? `<li class="intv15-drv-factor" data-factor="dependency">${esc(depLine)}</li>` : '',
+             catLine ? `<li class="intv15-drv-factor" data-factor="category">${esc(catLine)}</li>` : ''].filter(Boolean).slice(0, 2).join('')}
         </ul>` : ''}`
         : `${liqLine ? `<p class="intv6-drv-liq">${esc(liqLine)}</p>` : ''}<p class="intcc-empty-body">${esc(_intv4T('intcc_drv_none'))}</p>`}
       ${limitLine ? `<p class="intcc-drv-limit">${esc(limitLine)}</p>` : ''}
@@ -73198,6 +73240,9 @@ function _intv21Tip(plot, idx) {
     // V6 · barras: «13 oct · Microsoft · 28,8 %» (fecha · sujeto · valor).
     tip.textContent = plot.getAttribute('data-chart') === 'bars'
       ? _intccDate(p[2]) + (p[4] ? ' · ' + p[4] : '') + ' · ' + p[3]
+        // V7 · el relevo del líder es un hecho MEDIDO entre dos observaciones (pesos), no
+        // una causa: se dice sólo eso, nunca «compraste» ni «por mercado».
+        + ((i > 0 && p[4] && pts[i - 1][4] && p[4] !== pts[i - 1][4] && plot.closest('.intv22-evo[data-metric="top"]')) ? '. ' + _intv4T('intv7_tip_new_leader', p[4]) : '')
       : _intccDate(p[2]) + ' · ' + p[3] + (p[4] ? ' · ' + p[4] : '')
         + (plot.getAttribute('data-sparse') === '1' ? ' · ' + _intv4T('intv22_tip_obs') : '');
     const cd = plot.querySelector('.intv22-cursor-dot');
@@ -73420,7 +73465,12 @@ function _intv22Series(metric, win) {
 function _intv22Availability() {
   const avail = {};
   const hist = _intv22HistoryPublishable();
+  // V7 · sin ninguna INVERSIÓN (sólo liquidez) las métricas de estructura son triviales
+  // (una posición, 100 % de liquidez): sólo queda el valor.
+  let noInvest = false;
+  try { const U = _intv6Universe(); noInvest = !!(U && Array.isArray(U.invested) && U.invested.length === 0 && U.liquidity && U.liquidity.w > 0); } catch (_) {}
   _INTV22_METRICS.forEach(m => {
+    if (noInvest && (m === 'top' || m === 'effective' || m === 'liquidity')) return;
     // Valor y rentabilidad leen la historia del gráfico: con sus fuentes sin certificar
     // no se publican (ni se sustituyen por la caché local), y el resto sigue.
     if ((m === 'value' || m === 'return') && !hist) return;
@@ -73462,7 +73512,9 @@ function _intv22Stats(metric, s) {
   else if (metric === 'effective') delta = ((b.v - a.v) > 0 ? '+' : ((b.v - a.v) < 0 ? '−' : '')) + _intv21Fixed(b.v - a.v, 1);
   else if (metric === 'return') delta = _intv21Pct(b.v - a.v, 2, true);
   else { const dd = b.v - a.v; delta = (dd > 0 ? '+' : (dd < 0 ? '−' : '')) + _intv21Fixed(dd, 1) + ' pp'; }
-  return { a, b, start: val(a.v), now: val(b.v), delta };
+  // V7 · ¿se movió entre medias? (a la MISMA precisión publicada; ningún umbral nuevo)
+  const moved = s.pts.slice(1, -1).some(p => val(p.v) !== val(a.v));
+  return { a, b, start: val(a.v), now: val(b.v), delta, moved };
 }
 // El titular RESUME y los KPIs llevan las cifras: sin repetir Inicio/Último dato/
 // Cambio ni paréntesis. La dirección sale de las MISMAS cifras que se pintan (a la
@@ -73488,7 +73540,9 @@ function _intv6KpiLabels(metric, st) {
 function _intv22Headline(sel) {
   const s = sel.series, m = sel.metric, st = _intv22Stats(m, s);
   const lead = _intv22WinLead(sel.win, st.a.ts);
-  const dir = _intv22Dir(m, st);
+  let dir = _intv22Dir(m, st);
+  // V7 · «se mantuvo» sólo si NO se movió entre medias: comparar extremos no basta.
+  if (dir === 'flat' && st.moved) dir = 'back';
   if (m === 'top') {
     const na = st.a.note, nb = st.b.note;
     if (na && nb && na !== nb) return _intv4T('intv22_h_top_changed', lead, na, nb);
@@ -73512,7 +73566,10 @@ const _INTV22_MIN_SPAN = { pct: 4, n: 1, pct_signed: 1 };
 // observación real, sin barras intermedias, escala desde 0 declarada y sin unir con
 // una línea (si cambia el activo dominante, cada barra lleva el suyo). Valor y
 // rentabilidad conservan línea + área.
-const _INTV6_BAR_METRICS = { top: 'lollipop', effective: 'bar', liquidity: 'outline' };
+// V7 · Mayor inversión pasa de piruleta a COLUMNA (como Reparto, en azul eléctrico); si en
+// una observación el líder era OTRO activo, su columna lleva un tono secundario de la
+// misma paleta (y el tooltip dice cuál era). Sin continuidad entre observaciones.
+const _INTV6_BAR_METRICS = { top: 'top', effective: 'bar', liquidity: 'outline' };
 function _intv6BarsSvg(s, metric) {
   const W = 600, H = 168, pl = 44, pr = 10, pt = 14, pb = 14;
   const pts = s.pts;
@@ -73535,8 +73592,9 @@ function _intv6BarsSvg(s, metric) {
   });
   pts.forEach((p, i) => {
     const x = xs[i], y = Y(p.v), base = Y(0);
+    const other = style === 'top' && p.note && pts[n - 1].note && p.note !== pts[n - 1].note;
     if (style === 'lollipop') body += `<line class="intv6-stem" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${base.toFixed(1)}" y2="${y.toFixed(1)}"/>`;
-    else body += `<rect class="intv6-bar is-${style}" x="${(x - bw / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, base - y).toFixed(1)}" rx="3"/>`;
+    else body += `<rect class="intv6-bar is-${style}${other ? ' is-other' : ''}"${other ? ` data-leader="${_intccEsc(p.note)}"` : ''} x="${(x - bw / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, base - y).toFixed(1)}" rx="3"/>`;
   });
   const dots = style === 'lollipop'
     ? pts.map((p, i) => `<span class="intv21-evo-dot intv6-head${i === n - 1 ? ' is-last' : ''}" style="left:${(xs[i] / W * 100).toFixed(2)}%;top:${(Y(p.v) / H * 100).toFixed(2)}%"></span>`).join('')
@@ -73802,7 +73860,8 @@ function _intv22ExploreCandidates(W, esc) {
             ? _intv4T('intv3_xa_lead_both', ago, nm, _intv21Pct(valChg, 1, true), _intv21Name(domEnd.a), _intv21Pct((domEnd.v / endStart.v - 1) * 100, 1, true))
             : _intv4T('intv3_xa_lead_new', _intv21Name(domEnd.a), nm, _intv21Pct(valChg, 1, true), ago));
         } else lines.push(_intv4T('intv22_xa_conc', _intv21Pct(valChg, 1, true), _intv21Pct(totChg, 1, true)));
-        out.push({ id: 'x22_conc_why', family: 'concentration', root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+        out.push({ id: 'x22_conc_why', family: lost ? 'leader_change' : 'dependency', priority: lost ? 1 : 5, period: s.win, evidence: 'memory',
+          assets: [domStart.id, domEnd.id].filter((v, i, a) => a.indexOf(v) === i), materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
           label: lost ? _intv4T('intv3_xq_lead', _intv21Name(domEnd.a)) : _intv4T(down ? 'intv22_xq_conc_down' : 'intv22_xq_conc_up', nm, ago), answer: p(lines) });
       }
     }
@@ -73817,7 +73876,7 @@ function _intv22ExploreCandidates(W, esc) {
       if (ws && we && Math.abs(b.v - a.v) >= 0.3) {
         const evA = a.v / ws.pos.length * 100, evB = b.v / we.pos.length * 100;
         const better = evB > evA + 2, onlyMore = !better && we.pos.length > ws.pos.length;
-        out.push({ id: 'x22_spread', family: 'effective', root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+        out.push({ id: 'x22_spread', family: 'effective', priority: 4, period: s.win, evidence: 'memory', assets: [], materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
           label: _intv4T('intv22_xq_spread', ago),
           answer: p([_intv4T(better ? 'intv22_xa_spread_better' : (onlyMore ? 'intv22_xa_spread_more' : 'intv22_xa_spread_less')),
                      _intv4T('intv22_xa_spread_ev', ws.pos.length, we.pos.length)]) });
@@ -73843,11 +73902,10 @@ function _intv22ExploreCandidates(W, esc) {
       const total = we.tot - ws.tot;
       const market = att.rows.reduce((s2, x) => s2 + x.c, 0) / 100 * att.base;   // Σ contribuciones × base Dietz
       const ops = total - market;
-      out.push({ id: 'x22_market_ops', family: 'contribution', root: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
+      out.push({ id: 'x22_market_ops', family: 'contribution', priority: 7, period: range, evidence: 'ledger', assets: [], materiality: Math.abs(total), root: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
         label: _intv4T('intv22_xq_market_ops', _intv4T('intv22_in_' + range).toLowerCase()),
         answer: p([_intv4T(Math.abs(ops) > Math.abs(market) ? 'intv22_xa_mo_ops' : 'intv22_xa_mo_market'),
-                   _intv4T('intv22_xa_mo_ev', _intccDate(att.startAt), (market >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(market)), (ops >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(ops))),
-                   _intv4T('intv22_xa_mo_lim')]) });
+                   _intv4T('intv22_xa_mo_ev', _intccDate(att.startAt), (market >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(market)), (ops >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(ops)))]) });
       break;
     }
   } catch (_) {}
@@ -73866,7 +73924,7 @@ function _intv22ExploreCandidates(W, esc) {
         const net = fl.reduce((s2, f) => s2 + (Number(f.amountUSD) || 0), 0);
         const cashMoved = Math.abs(cB - cA) > Math.max(1, 0.005 * cA);
         const key = !cashMoved ? 'intv22_xa_liq_rest' : (Math.abs(net) > 0.5 * Math.abs(cB - cA) ? 'intv22_xa_liq_flows' : 'intv22_xa_liq_cash');
-        out.push({ id: 'x22_liq_why', family: 'liquidity', root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+        out.push({ id: 'x22_liq_why', family: 'liquidity', priority: 3, period: s.win, evidence: fl.length ? 'ledger' : 'memory', assets: [], materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
           label: _intv4T(b.v > a.v ? 'intv6_xq_liq_up' : 'intv6_xq_liq_down', lead.toLowerCase()),
           answer: p([_intv4T(key), _intv4T('intv22_xa_liq_ev', lead, (cB - cA >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(cB - cA)), (we.tot - cB - (ws.tot - cA) >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(we.tot - cB - (ws.tot - cA))))]) });
       }
@@ -73886,7 +73944,7 @@ function _intv22ExploreCandidates(W, esc) {
     if (R.length >= 4 && C.length >= 2 && tot > 0) {
       const top = R.slice(0, 3), u3 = top.reduce((a, r) => a + r.usd, 0), w3 = _intv21Pct(top.reduce((a, r) => a + r.w, 0) * 100, 0);
       const key = C.length === 2 ? 'intv3_xa_cp_two' : (u3 > tot - u3 ? 'intv3_xa_cp_both' : 'intv3_xa_cp_spread');
-      out.push({ id: 'x3_class_pos', family: 'class_position', root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
+      out.push({ id: 'x3_class_pos', family: 'class_position', priority: 2, period: 'now', evidence: 'weights', assets: top.map(r => r.id), materiality: u3 / tot, root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
         label: _intv4T('intv3_xq_cp'),
         answer: p([_intv4T(key, C.length, w3, C.slice(0, 2).map(c => _intv21ClassLabel(c.bucket))), _intv4T('intv3_xa_cp_note')]) });
     }
@@ -73895,11 +73953,14 @@ function _intv22ExploreCandidates(W, esc) {
   // sólo da la mayor; aquí el peso de cada una y el conjunto, con los pesos de Factores.
   try {
     const C = ((W && W.classes) || []).filter(c => c.w > 0 && !_intv21IsCash(c.bucket));
-    if (C.length >= 2 && C[1].w >= 0.1) {
+    // V7 · si el Hero ya publica la suma de las dos clases (su etiqueta de dos clases),
+    // esta pregunta repetiría la misma cifra: no se ofrece.
+    const heroSaysTwo = C.length >= 2 && C[0].w < 0.5 && C[0].w + C[1].w >= 0.5;
+    if (C.length >= 2 && C[1].w >= 0.1 && !heroSaysTwo) {
       const a = C[0], b = C[1], la = _intv21ClassLabel(a.bucket), lb = _intv21ClassLabel(b.bucket);
       // El total es la SUMA de las partes publicadas (mismo redondeo): nunca 31 + 31 = 61.
       const pa = Math.round(a.w * 100), pb = Math.round(b.w * 100);
-      out.push({ id: 'x3_class_split', family: 'class_split', root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
+      out.push({ id: 'x3_class_split', family: 'dependency_class', priority: 6, period: 'now', evidence: 'weights', assets: [], materiality: a.w + b.w, root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
         label: _intv4T('intv3_xq_split', la, lb),
         answer: p([_intv4T('intv3_xa_split', _intv21Pct(pa + pb, 0), la, _intv21Pct(pa, 0), lb, _intv21Pct(pb, 0))]) });
     }
@@ -73914,15 +73975,35 @@ function _intv22ExploreQs(W, esc) {
   const fp = _intv22Fingerprint(W), now = Date.now();
   const fr = st.explore22;
   // `v` sella el conjunto de familias: con familias nuevas se recalcula UNA vez.
-  let ids = (fr && fr.fp === fp && fr.v === 3 && Array.isArray(fr.ids) && now - Number(fr.at) < _INTV22_EXPLORE_COOLDOWN) ? fr.ids : null;
+  // V7 · UN RANKING: prioridad de familia (relevo del líder → clases frente a posiciones →
+  // liquidez → reparto → dependencia → aportaciones), después materialidad; empate por id.
+  // Con la misma evidencia, el mismo orden: no rota por reloj ni por decoración.
+  const ranked = cands.slice().sort((x, y) => (x.priority || 9) - (y.priority || 9) || (y.materiality || 0) - (x.materiality || 0) || (x.id < y.id ? -1 : 1));
+  const ideal = ranked.slice(0, 4).map(c => c.id);
+  const rankOf = (id) => ranked.findIndex(c => c.id === id);
+  let ids = (fr && fr.fp === fp && fr.v === 4 && Array.isArray(fr.ids) && now - Number(fr.at) < _INTV22_EXPLORE_COOLDOWN) ? fr.ids.filter(id => byId.has(id)) : null;
+  // Lo fijado se conserva (histéresis: una pregunta no entra y sale por décimas); sólo un
+  // hecho NUEVO más relevante que la última fijada la sustituye, o entra si hay hueco.
+  if (ids) {
+    let changed = ids.length !== ((fr && fr.ids) || []).length;
+    ideal.filter(id => ids.indexOf(id) === -1).forEach(id => {
+      if (ids.length < 4) { ids.push(id); changed = true; return; }
+      // Histéresis real: sólo una FAMILIA de más prioridad desplaza a la fijada; dentro de
+      // la misma prioridad, una diferencia de décimas en materialidad no rota preguntas.
+      const prio = (x) => (byId.get(x) && byId.get(x).priority) || 9;
+      const worst = ids.slice().sort((x, y) => prio(y) - prio(x) || rankOf(y) - rankOf(x))[0];
+      if (prio(id) < prio(worst)) { ids[ids.indexOf(worst)] = id; changed = true; }
+    });
+    ids.sort((x, y) => rankOf(x) - rankOf(y));
+    if (changed && ids.length && !_intv7ExploreUnsettled()) _intv21Write({ explore22: { fp, ids, at: now, v: 4 } });
+  }
   if (!ids) {
-    // Prioridad fija y familias distintas: el conjunto no depende del orden de llegada.
-    ids = ['x22_conc_why', 'x3_class_pos', 'x22_market_ops', 'x22_spread', 'x22_liq_why', 'x3_class_split'].filter(id => byId.has(id)).slice(0, 4);
+    ids = ideal;
     // Con la historia todavía llegando no se FIJA (la pregunta que la usa aún no existe):
     // se publica lo disponible y se fija al asentarse.
     // Tampoco con la memoria por posición aún en vuelo (pasado el tope de espera): sus
     // preguntas llegarían después y el conjunto fijado las dejaría fuera una semana.
-    if (ids.length && !_intv7ExploreUnsettled()) _intv21Write({ explore22: { fp, ids, at: now, v: 3 } });
+    if (ids.length && !_intv7ExploreUnsettled()) _intv21Write({ explore22: { fp, ids, at: now, v: 4 } });
   }
   return { qs: ids.map(id => byId.get(id)).filter(Boolean), frozen: true, pending: false };
 }
@@ -73982,7 +74063,8 @@ function _intv22HeroTags(ctx) {
       if (av && av.wins.length) {
         const win = av.wins.indexOf('30d') !== -1 ? '30d' : av.wins[0];
         const st = _intv22Stats('liquidity', av.series[win]);
-        const dir = _intv22Dir('liquidity', st);
+        let dir = _intv22Dir('liquidity', st);
+        if (dir === 'flat' && st.moved) dir = 'back';   // V7 · «estable» no se deduce de los extremos
         tags.push({ id: 'tag_liq', dim: 'liquidity', sig: win + ':' + dir, target: 'evolution:liquidity:' + win, tone: 'calm',
           label: _intv4T('intv3_tag_liq_' + dir, _intv4T('intv3_win_' + win)) });
       }
@@ -74074,6 +74156,7 @@ function _intv5SimApply(card, shock, animate) {
   const out = card.querySelector('[data-sim-value]');
   if (out) out.textContent = _intv5SimPct(v);
   const dir = v > 0 ? 'up' : (v < 0 ? 'down' : 'flat');
+  card.setAttribute('data-dir', dir);   // V7 · el signo colorea valor, porcentajes, importes y barras
   card.querySelectorAll('.intv22-scn-block').forEach(b => {
     const id = b.getAttribute('data-scn'), w = Number(b.getAttribute('data-w')) || 0;
     const impact = v === 0 ? 0 : w * v;                        // % de la cartera financiera
@@ -74088,16 +74171,10 @@ function _intv5SimApply(card, shock, animate) {
       if (pct) pct.textContent = impact === 0 ? _intv21Pct(0, 0) : '≈ ' + _intv21Pct(i, 1, true);
       if (mon) mon.textContent = Number.isFinite(money) ? (money === 0 ? '' : (m > 0 ? '+' : '−')) + _intv4Money(Math.abs(m)) : '';
     };
-    const rm = (typeof reducedMotion !== 'undefined' && reducedMotion) || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    if (!animate || rm || typeof requestAnimationFrame !== 'function') paint(1);
-    else {
-      const t0 = performance.now(), from = Number(b.__simLast) || 0, to = impact;
-      const step = (t) => { const k = Math.min(1, (t - t0) / 180); const cur = from + (to - from) * (1 - Math.pow(1 - k, 3));
-        if (pct) pct.textContent = impact === 0 && k === 1 ? _intv21Pct(0, 0) : '≈ ' + _intv21Pct(cur, 1, true);
-        if (k < 1) requestAnimationFrame(step); else paint(1); };
-      requestAnimationFrame(step);
-      if (mon) mon.textContent = Number.isFinite(money) ? (money === 0 ? '' : (money > 0 ? '+' : '−')) + _intv4Money(Math.abs(money)) : '';
-    }
+    // V7 · cifras finales EN EL MISMO FRAME para los tres escenarios (sin contar hacia
+    // arriba); la transición es sólo visual (opacidad, ~150 ms, sin ella con movimiento reducido).
+    paint(1);
+    if (animate) { const box = b.querySelector('.intv22-scn-impact') || b; box.classList.remove('is-upd'); void box.offsetWidth; box.classList.add('is-upd'); }
     b.__simLast = impact;
     // Barra simétrica: media pista por lado; la escala es el mayor impacto posible
     // de los tres escenarios en ±50 %, así que las tres barras son comparables.
@@ -74259,7 +74336,7 @@ function _renderIntelligenceCommandCenter() {
   // contestado en esta misma pantalla, no se repite.
   const _gaps = _aurixGapsBySurface(core);
   Object.keys(_gaps).forEach((k) => { if (_gaps[k] && exploreHtml.indexOf(_gaps[k]) !== -1) _gaps[k] = ''; });
-  const driversHtml   = _intv5DriversHtml(snap, esc, _gaps.drivers);
+  let driversHtml     = _intv5DriversHtml(snap, esc, _gaps.drivers);
   // ESTRUCTURA se RETIRA de la presentación por decisión de producto: republicaba
   // diversificación efectiva, equivalencia de posiciones y concentración principal,
   // que ya publican Salud, Radar y Factores. `_intv5StructureHtml` y todo lo que la
@@ -74412,6 +74489,8 @@ function _renderIntelligenceCommandCenter() {
   try { _tags21 = (typeof _intv22HeroTags === 'function') ? _intv22HeroTags({ core, score, driversItems: _drvItems21, todayItems: _today21, stab: _stab21,
     todayKeys: mattersSel.map(st => st.semanticKey), W: _W21, heroTitle: reading.title }) : []; } catch (_) { _tags21 = []; }
   const _tagsOf21 = (list) => (typeof _intv21TagsHtml === 'function') ? _intv21TagsHtml(list, esc) : '';
+  // V7 · Factores no repite literalmente lo que el Hero ya publica.
+  try { driversHtml = _intv5DriversHtml(snap, esc, _gaps.drivers, { tags: _tags21, title: reading.title }); } catch (_) {}
   const tagsHtml = _tagsOf21(_tags21);
   // En móvil Salud publica sus propias etiquetas (`_intccHealthReadHtml`): el hero
   // móvil no repite ninguna. En escritorio esas etiquetas no se pintan.
@@ -74688,8 +74767,10 @@ function _renderIntelligenceCommandCenter() {
       ${_mHeroOut21}
       ${mHealthHtml}
       ${intelQCardHtml}
-      ${radarHtml}
-      ${driversHtml}
+      ${/* V7 · ORDEN MÓVIL (≤1023 px): Factores ANTES que Radar, en el DOM (teclado y
+            lector siguen lo que se ve). Escritorio pinea sus celdas por rejilla y
+            conserva Radar → Factores → Explora. Cruzar el breakpoint repinta. */''}
+      ${(typeof _intv7Narrow === 'function' && _intv7Narrow()) ? driversHtml + radarHtml : radarHtml + driversHtml}
       ${exploreHtml}
       ${/* ORDEN DEFINITIVO (DOM = visual = teclado = lector): Evolución y
             Hoy forman la fila de lectura (⅔ | ⅓); Dependencias, a ancho completo. */''}
@@ -75271,42 +75352,25 @@ function _intv5ExploreReserve(root) {
   }
 }
 function _intv5ExploreMeasure(card) {
-  const list = card.querySelector('.intcc-explore-list');
-  if (!list) return;
-  const rect0 = card.getBoundingClientRect();
-  if (!(rect0.width > 0)) return;                 // sin layout todavía: lo mide el observador
-  card.style.height = ''; card.classList.remove('has-reserve');
-  const openA = card.querySelector('.intcc-x-answer.is-open > .intcc-x-answer-in');
-  const closed = card.getBoundingClientRect().height - (openA ? openA.getBoundingClientRect().height : 0);
-  if (!(closed > 0)) return;
-  // CAUSA DEL P0 «la pregunta se abre pero no se ve» (v814): las respuestas viven en una
-  // zona con `display:none` mientras está cerrada, así que medían 0 px, no se reservaba
-  // sitio y al abrir la zona quedaba en 2 px (sus bordes). Se miden con la zona EN FLUJO
-  // pero invisible (`is-measuring`), sin pintar entre medias.
+  const list = card.querySelector('.intcc-explore-list'), zone = card.querySelector('.intv6-x-answers');
+  if (!list || !zone) return;
+  if (!(card.getBoundingClientRect().width > 0)) return;  // sin layout todavía: lo mide el observador
+  // V7 · LA ALTURA NO DEPENDE DEL ESTADO. El panel inferior tiene UNA altura por anchura:
+  // la de la respuesta más larga (medida en flujo pero invisible), con un mínimo legible
+  // y un tope; lo que no cabe desplaza DENTRO del panel. Abrir, cerrar o cambiar de
+  // pregunta no cambia la altura de la card ni mueve ninguna pregunta.
   card.classList.add('is-measuring');
   let maxAns = 0;
-  card.querySelectorAll('.intcc-x-answer > .intcc-x-answer-in').forEach(a => { maxAns = Math.max(maxAns, a.scrollHeight + 1); });
+  card.querySelectorAll('.intcc-x-answer > .intcc-x-answer-in').forEach(a => { maxAns = Math.max(maxAns, a.scrollHeight + 2); });
   card.classList.remove('is-measuring');
-  const ZONE = 12;                                // margen superior + bordes de la zona
-  let h = closed + ZONE + maxAns;
-  const grid = card.parentElement, desktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
-  if (desktop && grid) {
-    const sib = [].slice.call(grid.querySelectorAll(':scope > .intcc-radar, :scope > .intcc-drivers'));
-    const prevAlign = sib.map(n => n.style.alignSelf);
-    sib.forEach(n => { n.style.alignSelf = 'start'; });
-    const row = Math.max(closed, ...sib.map(n => n.getBoundingClientRect().height));
-    // Se restaura EXACTAMENTE (sin dejar `style=""`): Radar y Factores no cambian ni un byte.
-    sib.forEach((n, i) => { n.style.alignSelf = prevAlign[i]; if (!n.getAttribute('style')) n.removeAttribute('style'); });
-    h = Math.max(row, Math.min(h, row * 1.2));
-  } else {
-    h = Math.min(h, Math.max(closed, (window.innerHeight || 800) * 0.75));
-  }
-  // Abierta, la respuesta SIEMPRE tiene una zona legible (hasta 120 px; el resto desplaza).
-  h = Math.max(h, closed + ZONE + Math.min(maxAns, 120));
-  card.style.height = Math.ceil(h) + 'px';
+  const desktop = !!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches);
+  const MIN = 112, CAP = desktop ? 240 : 208;
+  const ph = Math.ceil(Math.max(MIN, Math.min(CAP, maxAns)));
+  card.style.setProperty('--x-panel-h', ph + 'px');
+  card.style.height = '';
   card.classList.add('has-reserve');
   card.__intv5Measures = (card.__intv5Measures || 0) + 1;
-  _intv5ExploreFade(card.querySelector('.intv6-x-answers') || list);
+  _intv5ExploreFade(zone);
 }
 // Tras CUALQUIER repintado (también el que reutiliza el contenido guardado mientras
 // llega una fuente) el estado abierto/cerrado es el que eligió el usuario en esta
@@ -75334,9 +75398,43 @@ function _intv5ExploreFade(list) {
   if (card) card.classList.toggle('is-overflow', more);
   if (!list.__intv5Fade) { list.__intv5Fade = true; list.addEventListener('scroll', () => _intv5ExploreFade(list), { passive: true }); }
 }
+// ── V7 · DESTELLO DORADO AL ENTRAR (no una animación permanente) ───────────────
+// Un recorrido breve por el filo superior de cada bloque cuando ENTRA en pantalla por un
+// desplazamiento real (no al pintar, no en pequeños vaivenes: tiene que haber salido
+// antes). IntersectionObserver + una clase; el oyente de scroll sólo apunta la hora
+// (pasivo, sin pintar). Sin movimiento reducido no existe.
+const _INTV7_GOLD_SEL = '.aurix-intv21 > .intcc-hero, .aurix-intv21 > .intcc-m-hero, .aurix-intv21 > .intcc-radar, .aurix-intv21 > .intcc-drivers, .aurix-intv21 > .intcc-explore, .aurix-intv21 > .intcc-timeline, .aurix-intv21 > .intcc-watch, .aurix-intv21 > .intv21-scen';
+let _intv7GoldIO = null, _intv7ScrollAt = 0;
+function _intv7GoldWire() {
+  try {
+    if (typeof IntersectionObserver !== 'function' || typeof document === 'undefined') return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!_intv7GoldIO) {
+      window.addEventListener('scroll', () => { _intv7ScrollAt = Date.now(); }, { passive: true, capture: true });
+      _intv7GoldIO = new IntersectionObserver(es => es.forEach(en => {
+        const el = en.target;
+        if (en.intersectionRatio < 0.05) { el.__g7Out = true; return; }
+        if (en.intersectionRatio >= 0.3 && el.__g7Out && Date.now() - _intv7ScrollAt < 600) {
+          el.__g7Out = false;
+          if (el.classList.contains('is-gold-in')) { el.classList.remove('is-gold-in'); void el.offsetWidth; }
+          el.classList.add('is-gold-in');
+          el.addEventListener('animationend', function f(ev) { if (ev.animationName === 'intv7GoldIn') { el.classList.remove('is-gold-in'); el.removeEventListener('animationend', f); } });
+        }
+      }), { threshold: [0, 0.05, 0.3] });
+    }
+    _intv7GoldIO.disconnect();
+    const vh = window.innerHeight || 0;
+    document.querySelectorAll(_INTV7_GOLD_SEL).forEach(el => {
+      const r = el.getBoundingClientRect();
+      el.__g7Out = !(r.bottom > 0 && r.top < vh);   // lo que ya se ve al pintar no destella
+      _intv7GoldIO.observe(el);
+    });
+  } catch (_) {}
+}
 let _intv5RevealNext = false;
 function _initIntelligenceCommandCenter() {
   try { if (typeof _intv21Wire === 'function') _intv21Wire(); } catch (_) {}
+  try { _intv7GoldWire(); } catch (_) {}
   try {
     const root = document.querySelector('.aurix-intcc');
     try { _initIntelSeeChanges(root); } catch (_) {}
@@ -75623,11 +75721,9 @@ function _initIntelligenceCommandCenter() {
         btn.classList.add('is-active');
         btn.setAttribute('aria-expanded', 'true');
         if (item) item.classList.add('is-active');
-        // La respuesta abre desde su principio dentro de su zona, y si la zona queda fuera de
-        // la pantalla (móvil) se trae a la vista: abrir es un gesto del usuario.
-        try { const z = ans.parentElement; if (z) { z.scrollTop = 0;
-          const r = z.getBoundingClientRect(), vh = window.innerHeight || 0;
-          if (r.top < 0 || r.bottom > vh - 80) z.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' }); } } catch (_) {}
+        // La respuesta abre desde su principio dentro de su panel. V7 · la PÁGINA no se
+        // desplaza: el control pulsado se queda bajo el dedo o el puntero.
+        try { const z = ans.parentElement; if (z) z.scrollTop = 0; } catch (_) {}
       }
       try { _intv5ExploreFade(ans.parentElement); } catch (_) {}
     });
