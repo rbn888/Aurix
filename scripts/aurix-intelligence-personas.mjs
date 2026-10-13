@@ -61,10 +61,6 @@ export function persona(kind) {
   if (kind === 'calm') spec = spec.map(r => { r[5] = r[5] * 0.08; r[6] = r[6] * 0.1; return r; });
   if (kind === 'volatile') spec = spec.map(r => { r[5] = r[3] === 'cash' ? 0 : r[5] * 3.2; return r; });
   if (kind === 'fresh') spec = spec.slice(0, 4).map((r, i) => { r[4] = [50, 30, 15, 5][i]; return r; });
-  // V6 · la cuenta del móvil: la LIQUIDEZ es la mayor partida (43 %) y no es una inversión.
-  if (kind === 'cash') spec = [['a5', 'EUR', 'Euros', 'cash', 43, 0, 0], ['a2', 'BTC', 'Bitcoin', 'crypto', 25, -2.4, -5.0],
-    ['a4', 'ETH', 'Ethereum', 'crypto', 15, 3.1, 6.0], ['a1', 'MSFT', 'Microsoft', 'stock', 8, 0.8, 3.0],
-    ['a3', 'AAPL', 'Apple', 'stock', 5, 0.4, 2.0], ['a7', 'SOL', 'Solana', 'crypto', 4, -6.1, -9.0]];
   const days = kind === 'fresh' ? 0 : 44;
   const endAt = kind === 'stale' ? now - 5 * DAY : now - H;
   // precio(t) por activo: deriva lineal hasta −24 h y el cambio 24 h en el último día

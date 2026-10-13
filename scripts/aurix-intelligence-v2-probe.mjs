@@ -98,7 +98,6 @@ const READ = `(function(){
   var evoCard = pick('.intv4-memory'); var plot = pick('.intv21-evo-plot');
   var plotInfo = plot ? (function(){ var pr=plot.getBoundingClientRect(), cr=evoCard.getBoundingClientRect(); var dots=[].slice.call(plot.querySelectorAll('.intv21-evo-dot'));
     return { stems: plot.querySelectorAll('.intv21-evo-stem').length, dots: dots.length, contained: dots.every(function(d){ var r=d.getBoundingClientRect(); return r.left >= pr.left-6 && r.right <= pr.right+6 && r.top >= pr.top-6 && r.bottom <= pr.bottom+6; }) && pr.right <= cr.right + 1,
-      bars: plot.getAttribute('data-chart') === 'bars', heads: plot.querySelectorAll('.intv6-head, .intv6-bar').length,
       line: !!plot.querySelector('.intv21-evo-line'), segs: ((plot.querySelector('.intv21-evo-line')||{getAttribute:function(){return '';}}).getAttribute('d').match(/L/g)||[]).length, h: Math.round(pr.height), cardH: Math.round(cr.height) }; })() : null;
   var xa = ex ? [].slice.call(ex.querySelectorAll('.intcc-x-answer')).map(function(a){ return a.textContent.replace(/\s+/g,' ').trim(); }) : [];
   var scBlocks = sc ? [].slice.call(sc.querySelectorAll('.intv22-scn-block')).filter(vis).length : 0;
@@ -162,9 +161,7 @@ for (const E of ENGINES) {
       ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Evolución/Hoy → Dependencias → Movió → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
       if (prior && prior[key]) {
         const p = prior[key];
-        // RE-DECIDIDO (V6): Factores cambia A PROPÓSITO (ranking de inversiones, liquidez aparte);
-        // Salud, Radar y los cálculos de escenarios siguen idénticos.
-        ok(`${T} Salud, Radar y escenarios idénticos a HEAD`, p.hv === r.healthVal && p.hb === r.healthBadge && p.radar === r.radarHash && (p.scn == null || p.scn === JSON.stringify(r.scn)),
+        ok(`${T} Salud, Radar, Factores y escenarios idénticos a HEAD`, p.hv === r.healthVal && p.hb === r.healthBadge && p.radar === r.radarHash && p.drivers === r.driversHash && (p.scn == null || p.scn === JSON.stringify(r.scn)),
           JSON.stringify({ p, now: { hv: r.healthVal, hb: r.healthBadge, radar: r.radarHash, drivers: r.driversHash } }));
       }
       // RE-DECIDIDO (V2.1): 1–4 hechos actuales, sin relleno estático.
@@ -173,10 +170,7 @@ for (const E of ENGINES) {
       ok(`${T} Hoy publica entre 1 y 4 hechos (o su estado honesto vacío) y nunca la liquidez estática`, r.hoy && r.hoy.items <= 4 && (r.hoy.items >= 1 || (kind === 'stale' && /recientes|recent enough/.test(r.hoy.text)))
         && !/La liquidez es el|Cash is \d/.test(r.hoy.text) && !/No tienes liquidez registrada|You have no cash recorded/.test(r.hoy.text), JSON.stringify(r.hoy));
       ok(`${T} Tu evolución: nunca «primera referencia» si alguna métrica tiene dos observaciones`, !(Object.keys(r.avail).length && r.firstRef), JSON.stringify(r.avail));
-      // RE-DECIDIDO (V6): las métricas estructurales son BARRAS (una por observación, sin línea);
-      // valor y rentabilidad, línea.
-      ok(`${T} gráfico: barras por observación (estructurales) o línea (valor), contenido`, !r.evo || !r.evo.plot || (r.evo.plot.contained
-        && (r.evo.plot.bars ? (!r.evo.plot.line && r.evo.plot.heads === r.evo.pts) : (r.evo.plot.stems === 0 && r.evo.plot.line))), JSON.stringify(r.evo && r.evo.plot));
+      ok(`${T} gráfico: sin palos verticales, puntos y línea contenidos`, !r.evo || !r.evo.plot || (r.evo.plot.stems === 0 && r.evo.plot.line && r.evo.plot.contained), JSON.stringify(r.evo && r.evo.plot));
       ok(`${T} «Diversificación» retirada de la métrica de pesos; etiqueta de precio`, !(r.evo && r.evo.chips.some(c => /Diversificación|Diversification/.test(c)))
         && !r.tags.some(t => /Principal movimiento|Main move/.test(t.label)), JSON.stringify({ c: r.evo && r.evo.chips, t: r.tags }));
       { const nums = new Set((r.drvTxt.match(/\d+(?:[.,]\d+)?%/g) || []));
@@ -247,14 +241,12 @@ for (const E of ENGINES) {
       }
       if (kind === 'real') {
         // RE-DECIDIDO (§9): el titular resume sin cifras; las cifras viven en los KPIs (assert de abajo).
-        // RE-DECIDIDO (V6): «mayor inversión».
-        const H1 = lng === 'en' ? /^Over 30 days, your largest investment changed from Bitcoin to Microsoft\.$/ : /^En 30 días, tu mayor inversión pasó de Bitcoin a Microsoft\.$/;
+        const H1 = lng === 'en' ? /^Over 30 days, your largest position changed from Bitcoin to Microsoft\.$/ : /^En 30 días, tu mayor posición pasó de ser Bitcoin a Microsoft\.$/;
         ok(`${T} REAL · sin «primera referencia» y titular de la métrica activa (peso máximo, cambio de dominante)`, !r.firstRef && r.evo && r.evo.metric === 'top' && H1.test(r.evo.head), JSON.stringify(r.evo && r.evo.head));
         ok(`${T} REAL · ventanas reales: liquidez sólo 7D (linaje), reparto efectivo 30D, sin «Desde inicio» duplicado`, (r.avail.liquidity || []).join() === '7d'
           && (r.avail.effective || []).indexOf('30d') !== -1 && (r.avail.top || []).indexOf('all') === -1, JSON.stringify(r.avail));
         ok(`${T} REAL · Inicio · Actual · Cambio en pp`, /51[.,]6%/.test(r.evo.stats) && /28[.,]7%/.test(r.evo.stats) && /−22[.,]9 pp/.test(r.evo.stats), r.evo.stats);
-        // RE-DECIDIDO (V6): mayor inversión = una barra (lollipop) por observación, nunca unidas.
-        ok(`${T} REAL · una barra por observación, sin línea que las una`, r.evo.plot && r.evo.plot.bars && !r.evo.plot.line && r.evo.plot.heads === r.evo.pts, JSON.stringify(r.evo.plot));
+        ok(`${T} REAL · cada observación es un punto unido por línea (sin tallos)`, r.evo.plot && r.evo.plot.stems === 0 && r.evo.plot.dots === r.evo.pts && r.evo.plot.segs === r.evo.pts - 1, JSON.stringify(r.evo.plot));
         // RE-DECIDIDO (V5): Dependencias a ancho completo, debajo de Evolución | Hoy.
         ok(`${T} REAL · Qué movió no certificable ⇒ ausente; Dependencias a ancho completo en escritorio`, !r.movers && (w < 1024 || r.scFull === true), JSON.stringify({ m: r.movers, full: r.scFull }));
         // RE-DECIDIDO (V5): un único control y los tres resultados siempre visibles (también en móvil).
@@ -274,8 +266,7 @@ for (const E of ENGINES) {
           const plot = page.locator('.intv21-evo-plot:visible').first(); await plot.scrollIntoViewIfNeeded(); await page.waitForTimeout(120);
           const bb = await plot.boundingBox(); await page.mouse.move(bb.x + 3, bb.y + bb.height / 2); await page.waitForTimeout(120);
           const tip = await page.evaluate(`(document.querySelector('.intv21-evo-tip.is-on')||{}).textContent || ''`);
-          // RE-DECIDIDO (V6): «fecha · activo · peso».
-          ok(`${T} REAL · tooltip: fecha · activo dominante · peso`, /· Bitcoin · 51[.,]6\s?%/.test(tip), tip);
+          ok(`${T} REAL · tooltip: fecha · porcentaje · activo dominante · observación registrada`, /Bitcoin/.test(tip) && /51[.,]6%/.test(tip) && /(observación registrada|recorded observation)/.test(tip), tip);
           // ESTABILIDAD DE EXPLORA: scroll, acordeón, carga asíncrona, navegación y recarga.
           const ids = async () => page.evaluate(`[].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).map(function(b){ return b.getAttribute('data-intcc-q'); }).join(',')
             + ' | ' + [].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width > 0; }).map(function(t){ return t.getAttribute('data-tag'); }).join(',')`);

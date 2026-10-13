@@ -20827,23 +20827,11 @@ body.gs-open { overflow: hidden; }
 .intcc-x-answer.is-open > .intcc-x-answer-in { border-top: 1px solid rgba(74,130,240,0.22); }
 .intcc-x-answer p { margin: 0; padding: 12px 14px; font-size: 13px; line-height: 1.55; color: var(--text-bright); }
 .intcc-x-answer p + p { padding-top: 0; }
-/* EXPLORA (V6) · altura estable medida con el contenido real.
-   CERRADA: las preguntas se reparten por toda la altura útil (sin bloque vacío).
-   ABIERTA: las preguntas se compactan arriba y UNA respuesta ocupa la zona inferior;
-   si no cabe, desplaza dentro de su zona con degradado. La card no cambia de alto. */
+/* EXPLORA · altura estable con zona de respuesta reservada (la mide el JS con el
+   contenido real). La lista ocupa el resto y desplaza dentro si hace falta. */
 .intcc-explore.has-reserve { display: flex; flex-direction: column; overflow: hidden; position: relative; }
 .aurix-intv6 .intcc-explore.has-reserve .intcc-explore-list,
-.intcc-explore.has-reserve .intcc-explore-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; justify-content: space-evenly; scrollbar-width: thin; }
-.aurix-intv6 .intcc-explore.has-reserve.is-x-open .intcc-explore-list,
-.intcc-explore.has-reserve.is-x-open .intcc-explore-list { flex: 0 0 auto; justify-content: flex-start; overflow: visible; }
-.intv6-x-answers { display: none; }
-.intcc-explore.is-x-open .intv6-x-answers { display: block; flex: 1 1 auto; min-height: 0; margin-top: 10px; overflow-y: auto; overscroll-behavior: contain;
-  border: 1px solid rgba(74,130,240,0.30); border-radius: 12px; background: rgba(74,130,240,0.05); scrollbar-width: thin; }
-.intv6-x-answers .intcc-x-answer.is-open > .intcc-x-answer-in { border-top: 0; }
-@media (prefers-reduced-motion: no-preference) {
-  .intcc-explore.is-x-open .intv6-x-answers { animation: intv6XIn 180ms ease-out; }
-}
-@keyframes intv6XIn { from { opacity: 0; } to { opacity: 1; } }
+.intcc-explore.has-reserve .intcc-explore-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; justify-content: flex-start; scrollbar-width: thin; }
 .intcc-explore.has-reserve.is-overflow::after {
   content: ''; position: absolute; left: 1px; right: 1px; bottom: 1px; height: 36px; pointer-events: none;
   border-radius: 0 0 16px 16px; background: linear-gradient(180deg, rgba(10,16,32,0), rgba(10,16,32,0.92));
@@ -30878,7 +30866,7 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .intv3-sk-chip { min-width: 84px; color: transparent; pointer-events: none; }
 .intv22-evo.is-pending .intv22-stats dd, .intv22-evo.is-pending .intv22-stats dt { color: transparent; }
 .intv3-sk-list { display: flex; flex-direction: column; gap: 8px; }
-.intv3-sk-list > .intv3-sk { height: 52px; }
+.intv3-sk-list > .intv3-sk { height: 60px; }
 .intv3-sk-list > .intv3-sk.intv3-sk-reserve { height: 96px; opacity: 0.5; }
 @keyframes intv22Shimmer { to { background-position: -200% 0; } }
 
@@ -30915,7 +30903,6 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   background: transparent; transition: left 160ms ease, width 160ms ease, background-color 160ms ease; }
 .intv5-sim-track[data-dir="down"] .intv5-sim-active { background: rgba(233,120,110,0.62); }
 .intv5-sim-track[data-dir="up"] .intv5-sim-active { background: rgba(95,214,160,0.62); }
-.intv5-sim-track[data-dir="flat"] .intv5-sim-active { width: 0; transition: none; }   /* en 0, sin tramo y al instante */
 .intv5-sim-origin { position: absolute; left: 50%; top: 50%; width: 2px; height: 18px; margin: -9px 0 0 -1px; border-radius: 1px; background: rgba(207,224,255,0.55); }
 .intv5-sim-range input[type="range"] { position: relative; width: 100%; height: 44px; margin: 0; cursor: pointer; background: transparent; -webkit-appearance: none; appearance: none; }
 .intv5-sim-range input[type="range"]::-webkit-slider-runnable-track { height: 44px; background: transparent; }
@@ -30946,115 +30933,4 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 @media (prefers-reduced-motion: reduce) {
   .intv3-sk { animation: none; }
   .intv21-evo-plot.is-anim .intv22-area { animation: none; opacity: 1; }
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
-   AURIX INTELLIGENCE V6 · FASE B — gráficos, composición, contraste y móvil
-   ════════════════════════════════════════════════════════════════════════════ */
-/* Identidad cromática por métrica (selector activo, KPI de cambio, barras/línea,
-   puntos y tooltip). Mayor inversión azul eléctrico · Reparto cian · Liquidez
-   turquesa · Valor violeta · Rentabilidad verde/rojo sólo según su resultado. */
-.intv22-evo[data-metric="top"]       { --evo-rgb: 77,141,255; }
-.intv22-evo[data-metric="effective"] { --evo-rgb: 56,189,248; }
-.intv22-evo[data-metric="liquidity"] { --evo-rgb: 45,212,170; }
-.intv22-evo[data-metric="value"]     { --evo-rgb: 167,139,250; }
-
-/* Barras / lollipop de las métricas estructurales (además del color, cada una se
-   distingue por FORMA: tallo con cabeza, barra sólida, barra con contorno). */
-.intv6-bars .intv6-bar.is-bar { fill: rgba(var(--evo-rgb), 0.80); }
-.intv6-bars .intv6-bar.is-outline { fill: rgba(var(--evo-rgb), 0.22); stroke: rgb(var(--evo-rgb)); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
-.intv6-bars .intv6-stem { stroke: rgba(var(--evo-rgb), 0.85); stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.intv6-bars .intv21-evo-grid { stroke: rgba(170,195,240,0.16); }
-.intv6-bars .intv21-evo-grid.is-base { stroke: rgba(170,195,240,0.42); }
-.intv21-evo-plot.is-bars .intv6-head { width: 12px; height: 12px; margin: -6px 0 0 -6px; border-width: 2px; }
-/* KPIs de Evolución: la etiqueta dice QUÉ mide («Posiciones efectivas al inicio»,
-   «Microsoft al final») y puede ocupar dos líneas; se reservan SIEMPRE dos para que
-   cambiar de métrica no cambie la altura en ningún ancho. */
-.aurix-intv21 .intv22-evo .intv22-stats dt { min-height: 2.5em; line-height: 1.25; }
-.intv6-y { position: absolute; left: 0; top: 0; bottom: 0; width: 42px; pointer-events: none; }
-.intv6-y-lab { position: absolute; left: 4px; transform: translateY(-50%); font-size: 10.5px; line-height: 1; color: rgba(190,206,238,0.86); font-variant-numeric: tabular-nums; }
-.intv21-evo-plot.is-anim.is-bars .intv6-bar,
-.intv21-evo-plot.is-anim.is-bars .intv6-stem { transform-box: fill-box; transform-origin: 50% 100%; animation: intv6Grow 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-@keyframes intv6Grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-@media (prefers-reduced-motion: reduce) {
-  .intv21-evo-plot.is-anim.is-bars .intv6-bar, .intv21-evo-plot.is-anim.is-bars .intv6-stem { animation: none; }
-}
-
-/* Contraste de los textos secundarios (≥4,5:1 sobre las superficies de las cards)
-   sin perder jerarquía: título > dato > explicación > metadato. */
-.aurix-intv21 .intcc-m-hero-hint,
-.aurix-intv21 .intv4-story-why,
-.aurix-intv21 .intv21-evo-axis,
-.aurix-intv21 .intv5-sim-lead,
-.aurix-intv21 .intv22-scn-shock,
-.aurix-intv21 .intv21-scn-unit,
-.aurix-intv21 .intv15-drv-factor,
-.aurix-intv21 .intcc-m-health-read-txt { color: rgba(203,215,240,0.90); }
-.aurix-intv21 .intv22-stats dt,
-.aurix-intv21 .intv22-scn-kind,
-.aurix-intv21 .intcc-drv-kind,
-.aurix-intv21 .intv5-sim-ticks { color: rgba(176,198,240,0.92); }
-.aurix-intv21 .intv21-chip:not(.is-on) { color: rgba(214,226,250,0.92); }
-
-/* Factores: la liquidez, separada del ranking de inversiones. */
-.intv6-drv-liq { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.45;
-  color: rgba(220,232,252,0.95); background: rgba(45,212,170,0.07); border-left: 3px solid rgba(45,212,170,0.65); }
-
-/* Hoy: la marca de dirección centrada con el icono y el bloque principal. */
-.intv21-today.has-icon::before { top: 50%; margin-top: -9px; }
-
-/* Navegación desde el hero: el destino no queda bajo la cabecera ni la barra fija. */
-.aurix-intv21 > * { scroll-margin-top: 76px; scroll-margin-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-
-@media (max-width: 767px) {
-  /* HERO MÓVIL compacto: menos aire vertical, esfera algo menor, etiquetas en fila. */
-  .aurix-intv21 .intcc-m-hero { padding-top: 14px; padding-bottom: 14px; gap: 10px; }
-  .aurix-intv21 .intcc-m-hero-title { font-size: 18px; line-height: 1.22; }
-  .aurix-intv21 .intcc-m-orb .intcc-orb { width: 58px; height: 58px; }
-  .aurix-intv21 .intcc-m-hero .intv21-tags { gap: 6px; }
-  .aurix-intv21 .intcc-m-hero .intv21-tag-go { min-height: 32px; font-size: 11.5px; padding: 0 10px; position: relative; }
-  .aurix-intv21 .intcc-m-hero .intv21-tag-go::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }   /* objetivo táctil 44 px */
-  /* Rótulo y titular junto a la esfera; etiquetas y demás a TODO el ancho, en fila
-     con wrapping natural (antes compartían columna con la esfera: una por fila). */
-  .aurix-intv21 .intcc-m-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: start; }
-  .aurix-intv21 .intcc-m-hero-text { display: contents; }
-  .aurix-intv21 .intcc-m-hero-text > * { grid-column: 1 / -1; }
-  .aurix-intv21 .intcc-m-hero-text > .intcc-card-title,
-  .aurix-intv21 .intcc-m-hero-text > .intcc-m-hero-title { grid-column: 1; }
-  .aurix-intv21 .intcc-m-hero .intcc-m-orb { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
-
-  /* EVOLUCIÓN: métricas en un control segmentado compacto; periodos debajo. */
-  .aurix-intv21 .intv22-evo .intv21-evo-ctrl { gap: 8px; }
-  .aurix-intv21 .intv22-evo .intv21-seg:not(.is-win) { display: flex; flex-wrap: nowrap; width: 100%; padding: 3px; gap: 2px;
-    border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(150,180,240,0.14); }
-  .aurix-intv21 .intv22-evo .intv21-seg:not(.is-win) .intv21-chip { flex: 1 1 0; min-width: 0; min-height: 44px; padding: 0 4px; border: 0;
-    border-radius: 9px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; background: transparent; box-shadow: none; }
-  .aurix-intv21 .intv22-evo .intv21-seg:not(.is-win) .intv21-chip.is-on { background: rgba(var(--evo-rgb),0.20); box-shadow: inset 0 0 0 1px rgba(var(--evo-rgb),0.55); }
-  .aurix-intv21 .intv22-evo .intv21-seg.is-win .intv21-chip { min-height: 44px; padding: 0 14px; }
-  .aurix-intv21 .intv22-evo .intv22-stats { margin: 10px 0 8px; gap: 6px; }
-
-  .aurix-intv21 .intv22-evo .intv21-evo-plot { height: 170px; }
-
-  /* FACTORES MÓVIL: más compacto, liquidez separada del ranking. */
-  .aurix-intv21 .intcc-drivers .intcc-drv-explain { margin-bottom: 8px; }
-  .aurix-intv21 .intcc-drivers .intcc-drv-list { gap: 6px; }
-  .aurix-intv21 .intcc-drivers .intv15-drv-factors { margin-top: 10px; }
-
-  /* SIMULADOR MÓVIL: el valor forma parte del control; slider con todo el ancho útil. */
-  .aurix-intv21 .intv5-sim-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-areas: "val val val" "minus range plus"; column-gap: 8px; row-gap: 2px; }
-  .aurix-intv21 .intv5-sim-row > [data-sim-step="-1"] { grid-area: minus; }
-  .aurix-intv21 .intv5-sim-row > [data-sim-step="1"] { grid-area: plus; }
-  .aurix-intv21 .intv5-sim-row > .intv5-sim-range { grid-area: range; }
-  .aurix-intv21 .intv5-sim-row > .intv5-sim-value { grid-area: val; text-align: center; min-width: 0; font-size: 17px; }
-  .aurix-intv21 .intv5-sim-step { width: 44px; height: 44px; border-radius: 11px; font-size: 18px; }
-  .aurix-intv21 .intv22-scen .intv22-scn-grid { gap: 8px; }
-  .aurix-intv21 .intv22-scen .intv22-scn-block { padding: 10px 12px; }
-  .aurix-intv21 .intv22-scen .intv21-scn-val { font-size: 21px; }
-  .aurix-intv21 .intv22-scen .intv5-sim-bar { margin-top: 8px; }
-  /* «de tu cartera financiera» una sola vez a la vista; en los demás bloques sigue
-     ahí para el lector de pantalla. */
-  .aurix-intv21 .intv22-scen .intv22-scn-block + .intv22-scn-block .intv21-scn-unit {
-    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  /* La última card nunca queda bajo la barra fija ni el área segura. */
-  .aurix-intv21.aurix-intcc { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }
