@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '775'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '774'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5922,8 +5922,6 @@ const T = {
     intv22_m_liquidity_aria: 'Peso de la liquidez', intv22_m_return_aria: 'Rentabilidad sin aportaciones ni retiradas',
     intv22_m_value_aria: 'Valor de la cartera, con aportaciones y retiradas',
     intv22_st_start: 'Inicio', intv22_st_now: 'Último dato', intv22_st_delta: 'Cambio',
-    intv7_k_asof: d => `Dato del ${d}`,
-    intv7_k_top_peak_help: (a, b) => `Tu mayor inversión cambió de ${a} a ${b}: el cambio compara el peso de la mayor posición en cada momento, no el de un mismo activo.`,
     intv22_pos_unit: 'posiciones efectivas',
     intv22_plot_aria: 'Usa las flechas para recorrer las observaciones.',
     intv22_obs_note: n => `${n} observaciones registradas`,
@@ -9344,8 +9342,6 @@ const T = {
     intv22_m_liquidity_aria: 'Weight of cash', intv22_m_return_aria: 'Return excluding contributions and withdrawals',
     intv22_m_value_aria: 'Portfolio value, including contributions and withdrawals',
     intv22_st_start: 'Start', intv22_st_now: 'Latest', intv22_st_delta: 'Change',
-    intv7_k_asof: d => `As of ${d}`,
-    intv7_k_top_peak_help: (a, b) => `Your largest investment changed from ${a} to ${b}: the change compares the weight of the largest position at each point, not of one asset.`,
     intv22_pos_unit: 'effective positions',
     intv22_plot_aria: 'Use the arrow keys to move between observations.',
     intv22_obs_note: n => `${n} recorded observations`,
@@ -66372,11 +66368,7 @@ function _aurixIntelScheduleRefresh() {
       // espera termina, se repintan sin depender de un render ajeno.
       const hydrated = (!!screen.querySelector('[data-hydrating="1"]') && !_intccHydrationPending())
         || (!!screen.querySelector('[data-pending="1"]') && typeof _intv22Pending === 'function' && !_intv22Pending())
-        // Cada bloque retenido se repinta cuando cae SU causa (y sólo entonces): Evolución
-        // al ser publicable la historia; Explora al asentarse historia y memoria. Un fallo
-        // no transitorio no repinta en cada tick de precio.
-        || (!!screen.querySelector('.intv21-evo[data-hist-held="1"]') && typeof _intv22HistoryPublishable === 'function' && _intv22HistoryPublishable())
-        || (!!screen.querySelector('.intcc-explore[data-hist-held="1"]') && typeof _intv7ExploreUnsettled === 'function' && !_intv7ExploreUnsettled());
+        || (!!screen.querySelector('[data-hist-held="1"]') && typeof _intv22HistoryPublishable === 'function' && _intv22HistoryPublishable());
       const changed = _intelRefreshSig != null && sig != null && sig !== _intelRefreshSig;
       if (_intelRefreshSig == null) _intelRefreshSig = sig;
       if (!hydrated && !changed) return;
@@ -68831,7 +68823,6 @@ function _intv4ExploreHtml(core, esc, intel) {
     <section class="intcc-card intcc-explore intv4-explore is-pending" data-explore="" data-pending="1" aria-busy="true">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
       <div class="intv3-sk-list"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span></div>
-      ${/* V7 · la zona de respuesta también se reserva: la card resuelta no crece al llegar. */''}<span class="intv7-x-sk-zone" aria-hidden="true"></span>
     </section>`;
   }
   if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id } }));
@@ -68887,7 +68878,7 @@ function _intv4ExploreHtml(core, esc, intel) {
   // para esta cuenta— decide, y un repintado no la cambia.
   const openId = (_xs && _xs.id === _xid && _xs.user && _xs.open && qs.some(x => x.q.id === _xs.open)) ? _xs.open : null;
   const html = `
-    <section class="intcc-card intcc-explore intv4-explore${openId ? ' is-x-open' : ''}"${(typeof _intv7ExploreUnsettled === 'function' && _intv7ExploreUnsettled()) ? ' data-hist-held="1"' : ''}
+    <section class="intcc-card intcc-explore intv4-explore${openId ? ' is-x-open' : ''}"
              data-explore="${qs.map(x => esc(x.q.id)).join(',')}"
              data-pool="${all.length}"
              data-hot="${qs.filter(x => hot.has(x.q.causalRoot)).length}">
@@ -73347,51 +73338,21 @@ function _intv22Pending() {
   try {
     const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
     if (!authed) return false;
-    // CAUSA DEL P0 «esqueletos largos» (v814): la memoria por posición sólo se pedía
-    // DESPUÉS de hidratar todo el historial del servidor, y Explora/Evolución esperaban
-    // además a las fuentes del gráfico (que sólo necesitan valor y rentabilidad).
-    // Ahora la memoria arranca en cuanto Intelligence la necesita, y la espera es SÓLO
-    // la suya, acotada: pasado el tope se publica lo que haya.
-    let m = (typeof _aurixAssetMemory !== 'undefined') ? _aurixAssetMemory : null;
-    if (m && m.state === 'idle' && typeof _aurixHydrateAssetMemory === 'function') {
-      try { _aurixIntelTrace('mem_kick', 'intelligence'); _aurixHydrateAssetMemory(); } catch (_) {}
-      m = _aurixAssetMemory;
-    }
-    if (m && m.state === 'loading' && m.userId === authed && !(Array.isArray(m.rows) && m.rows.length >= 2)) {
-      const left = _INTV7_MEM_WAIT - (Date.now() - m.at);
-      if (left > 0) {
-        // Al vencer, un repintado publica lo disponible (nunca un esqueleto indefinido).
-        if (_intv7DeadlineFor !== m.at) {
-          _intv7DeadlineFor = m.at;
-          try { setTimeout(() => { if (typeof _aurixIntelScheduleRefresh === 'function') _aurixIntelScheduleRefresh(); }, left + 50); } catch (_) {}
-        }
-        return true;
-      }
-      _aurixIntelTrace('mem_timeout', 'intelligence');
+    // SÓLO esperas que TERMINAN por sí solas. Antes contaba como «pendiente» cualquier
+    // fuente no publicable —una lectura fallida, un ledger incompleto o una memoria que
+    // nunca arrancó— y Explora y Tu evolución quedaban en placeholder hasta que otro
+    // render ajeno las rescataba. Un fallo no es una carga: se publica sin esa fuente.
+    const m = (typeof _aurixAssetMemory !== 'undefined') ? _aurixAssetMemory : null;
+    if (m && m.state === 'loading' && m.userId === authed && !(Array.isArray(m.rows) && m.rows.length >= 2) && Date.now() - m.at < 60000) return true;
+    const be = (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready';
+    // Memoria sin arrancar: sólo se espera mientras la hidratación que la lanza siga en vuelo.
+    if (m && m.state === 'idle' && (be === 'idle' || be === 'loading')) return true;
+    if (typeof _aurixChartPublicationSourcesPending === 'function') {
+      const r = _aurixChartPublicationSourcesPending();
+      if (r.pending && _INTV22_TRANSIENT.has(r.reason)) return true;
     }
   } catch (_) {}
   return false;
-}
-const _INTV7_MEM_WAIT = 8000;
-// ¿Le falta todavía a Explora una fuente que se resolverá sola? (historia transitoria o
-// memoria por posición de ESTA cuenta en vuelo). Mientras tanto publica, pero no fija.
-function _intv7ExploreUnsettled() {
-  try {
-    if (_intv22HistoryTransient()) return true;
-    const m = (typeof _aurixAssetMemory !== 'undefined') ? _aurixAssetMemory : null;
-    const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null;
-    return !!(uid && m && m.state === 'loading' && m.userId === uid);
-  } catch (_) { return false; }
-}
-let _intv7DeadlineFor = null;
-// ¿Está la historia del gráfico en una espera que se resolverá sola? (no bloquea: sólo
-// retiene valor/rentabilidad y aplaza fijar el conjunto de Explora).
-function _intv22HistoryTransient() {
-  try {
-    if (typeof _aurixChartPublicationSourcesPending !== 'function') return false;
-    const r = _aurixChartPublicationSourcesPending();
-    return !!(r.pending && _INTV22_TRANSIENT.has(r.reason));
-  } catch (_) { return false; }
 }
 // Bloqueos de publicación que se resuelven solos (cada pierna liquida también al
 // fallar). Los demás —lectura canónica fallida, hidratación fallida, conjunto de
@@ -73699,11 +73660,6 @@ function _intv22EvoModuleHtml(esc) {
   const note = _intv4T('intv22_note_' + sel.metric);
   // V6 · cada KPI dice QUÉ mide (identidad o naturaleza de la métrica), no sólo «Inicio».
   const kl = _intv6KpiLabels(sel.metric, st);
-  // V7 · «Último dato» dice su fecha cuando no es de hoy (sin ella parece actual).
-  const lastDay = _intccDate(st.b.ts), stale = lastDay !== _intccDate(Date.now());
-  // V7 · si cambia la mayor inversión, «Cambio del peso máximo» compara posiciones
-  // distintas: se explica una vez, accesible (lectores de pantalla y puntero).
-  const peakHelp = (sel.metric === 'top' && st.a.note && st.b.note && st.a.note !== st.b.note) ? _intv4T('intv7_k_top_peak_help', st.a.note, st.b.note) : '';
   const held = !_intv22HistoryPublishable();
   const html = `
     <div class="intv21-evo intv22-evo" data-metric="${esc(sel.metric)}" data-win="${esc(sel.win)}" data-kind="${sparse ? 'observations' : 'line'}"
@@ -73711,20 +73667,19 @@ function _intv22EvoModuleHtml(esc) {
       <p class="intv15-stable-head intv22-head" data-evo-family="${esc(sel.metric)}" data-evo-key="${esc('evo_' + sel.metric + '_' + sel.win)}" data-period="${esc(sel.win)}"><span class="intv4-mem-what">${esc(head)}</span></p>
       <div class="intv21-evo-ctrl">
         <div class="intv21-seg" role="group" aria-label="${esc(_intv4T('intv21_evo_metric_aria'))}">${sel.metrics.map(m => `
-          <button type="button" class="intv21-chip${m === sel.metric ? ' is-on' : ''}" data-intv21-evo-metric="${esc(m)}" aria-pressed="${m === sel.metric ? 'true' : 'false'}" aria-label="${esc(_intv4T('intv22_m_' + m + '_aria'))}"${_intv4T('intv22_note_' + m) ? ` title="${esc(_intv4T('intv22_note_' + m))}" aria-describedby="intv7-evo-note-${esc(m)}"` : ''}>${esc(_intv4T('intv22_m_' + m))}</button>`).join('')}
+          <button type="button" class="intv21-chip${m === sel.metric ? ' is-on' : ''}" data-intv21-evo-metric="${esc(m)}" aria-pressed="${m === sel.metric ? 'true' : 'false'}" aria-label="${esc(_intv4T('intv22_m_' + m + '_aria'))}"${_intv4T('intv22_note_' + m) ? ` title="${esc(_intv4T('intv22_note_' + m))}"` : ''}>${esc(_intv4T('intv22_m_' + m))}</button>`).join('')}
         </div>
-        ${/* La explicación de «Reparto» existe UNA vez en el documento; el chip la referencia. */ sel.metrics.filter(m => _intv4T('intv22_note_' + m)).map(m => `<span class="intcc-sr-only" id="intv7-evo-note-${esc(m)}">${esc(_intv4T('intv22_note_' + m))}</span>`).join('')}
         <div class="intv21-seg is-win" role="group" aria-label="${esc(_intv4T('intv21_evo_win_aria'))}">${sel.wins.map(w => `
           <button type="button" class="intv21-chip${w === sel.win ? ' is-on' : ''}" data-intv21-evo-win="${esc(w)}" aria-pressed="${w === sel.win ? 'true' : 'false'}">${esc(_intv4T('intv21_win_' + w))}</button>`).join('')}
         </div>
       </div>
       <dl class="intv22-stats">
         <div><dt>${esc(kl[0])}</dt><dd>${esc(st.start)}</dd></div>
-        <div><dt>${esc(kl[1])}</dt><dd title="${esc(lastDay)}"${stale ? '' : ` aria-label="${esc(st.now + ' · ' + lastDay)}"`}>${esc(st.now)}${stale ? `<span class="intv7-asof">${esc(_intv4T('intv7_k_asof', lastDay))}</span>` : ''}</dd></div>
-        <div><dt${peakHelp ? ` title="${esc(peakHelp)}"` : ''}>${esc(kl[2])}${peakHelp ? `<span class="intcc-sr-only">. ${esc(peakHelp)}</span>` : ''}</dt><dd class="is-${tone}">${esc(st.delta)}</dd></div>
+        <div><dt>${esc(kl[1])}</dt><dd title="${esc(_intccDate(st.b.ts))}" aria-label="${esc(st.now + ' · ' + _intccDate(st.b.ts))}">${esc(st.now)}</dd></div>
+        <div><dt>${esc(kl[2])}</dt><dd class="is-${tone}">${esc(st.delta)}</dd></div>
       </dl>
       <div class="intv21-evo-plot${anim ? ' is-anim' : ''}${g.bars ? ' is-bars' : ''}" data-chart="${g.bars ? 'bars' : 'line'}" tabindex="0" role="img"
-           aria-label="${esc([head, _intv4T('intv22_plot_aria')].filter(Boolean).join(' '))}"${note ? ` aria-describedby="intv7-evo-note-${esc(sel.metric)}"` : ''} data-sparse="${sparse ? '1' : '0'}"
+           aria-label="${esc([head, note, _intv4T('intv22_plot_aria')].filter(Boolean).join(' '))}" data-sparse="${sparse ? '1' : '0'}"
            data-pts="${esc(JSON.stringify(data))}">
         ${g.svg}
         <div class="intv21-evo-tip" aria-hidden="true"></div>
@@ -73918,11 +73873,7 @@ function _intv22ExploreQs(W, esc) {
   if (!ids) {
     // Prioridad fija y familias distintas: el conjunto no depende del orden de llegada.
     ids = ['x22_conc_why', 'x3_class_pos', 'x22_market_ops', 'x22_spread', 'x22_liq_why', 'x3_class_split'].filter(id => byId.has(id)).slice(0, 4);
-    // Con la historia todavía llegando no se FIJA (la pregunta que la usa aún no existe):
-    // se publica lo disponible y se fija al asentarse.
-    // Tampoco con la memoria por posición aún en vuelo (pasado el tope de espera): sus
-    // preguntas llegarían después y el conjunto fijado las dejaría fuera una semana.
-    if (ids.length && !_intv7ExploreUnsettled()) _intv21Write({ explore22: { fp, ids, at: now, v: 3 } });
+    if (ids.length) _intv21Write({ explore22: { fp, ids, at: now, v: 3 } });
   }
   return { qs: ids.map(id => byId.get(id)).filter(Boolean), frozen: true, pending: false };
 }
@@ -75279,16 +75230,9 @@ function _intv5ExploreMeasure(card) {
   const openA = card.querySelector('.intcc-x-answer.is-open > .intcc-x-answer-in');
   const closed = card.getBoundingClientRect().height - (openA ? openA.getBoundingClientRect().height : 0);
   if (!(closed > 0)) return;
-  // CAUSA DEL P0 «la pregunta se abre pero no se ve» (v814): las respuestas viven en una
-  // zona con `display:none` mientras está cerrada, así que medían 0 px, no se reservaba
-  // sitio y al abrir la zona quedaba en 2 px (sus bordes). Se miden con la zona EN FLUJO
-  // pero invisible (`is-measuring`), sin pintar entre medias.
-  card.classList.add('is-measuring');
   let maxAns = 0;
   card.querySelectorAll('.intcc-x-answer > .intcc-x-answer-in').forEach(a => { maxAns = Math.max(maxAns, a.scrollHeight + 1); });
-  card.classList.remove('is-measuring');
-  const ZONE = 12;                                // margen superior + bordes de la zona
-  let h = closed + ZONE + maxAns;
+  let h = closed + maxAns;
   const grid = card.parentElement, desktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
   if (desktop && grid) {
     const sib = [].slice.call(grid.querySelectorAll(':scope > .intcc-radar, :scope > .intcc-drivers'));
@@ -75301,8 +75245,6 @@ function _intv5ExploreMeasure(card) {
   } else {
     h = Math.min(h, Math.max(closed, (window.innerHeight || 800) * 0.75));
   }
-  // Abierta, la respuesta SIEMPRE tiene una zona legible (hasta 120 px; el resto desplaza).
-  h = Math.max(h, closed + ZONE + Math.min(maxAns, 120));
   card.style.height = Math.ceil(h) + 'px';
   card.classList.add('has-reserve');
   card.__intv5Measures = (card.__intv5Measures || 0) + 1;
@@ -75623,11 +75565,8 @@ function _initIntelligenceCommandCenter() {
         btn.classList.add('is-active');
         btn.setAttribute('aria-expanded', 'true');
         if (item) item.classList.add('is-active');
-        // La respuesta abre desde su principio dentro de su zona, y si la zona queda fuera de
-        // la pantalla (móvil) se trae a la vista: abrir es un gesto del usuario.
-        try { const z = ans.parentElement; if (z) { z.scrollTop = 0;
-          const r = z.getBoundingClientRect(), vh = window.innerHeight || 0;
-          if (r.top < 0 || r.bottom > vh - 80) z.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' }); } } catch (_) {}
+        // La respuesta abre desde su principio dentro de su zona.
+        try { const z = ans.parentElement; if (z) z.scrollTop = 0; } catch (_) {}
       }
       try { _intv5ExploreFade(ans.parentElement); } catch (_) {}
     });
