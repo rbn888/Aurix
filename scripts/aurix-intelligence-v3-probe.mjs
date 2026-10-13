@@ -393,7 +393,12 @@ for (const E of ENGINES) {
       return { radar: q('.intcc-radar'), drv: q('.intcc-drivers'), ex: q('.intcc-explore'), evo: q('.intcc-timeline'), hoy: q('.intcc-watch'), scen: q('.intv21-scen') }; })())`;
     await page.mouse.move(1, 1); await page.waitForFunction(`!!document.querySelector('.aurix-intcc.is-revealed')`, null, { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(1100);
     const g0 = JSON.parse(await page.evaluate(geo));
-    // Explora: abrir cada respuesta no mueve nada.
+    // V5.1 · al entrar ya hay UNA respuesta abierta (la prioritaria), sin hueco vacío.
+    const x0 = JSON.parse(await page.evaluate(`JSON.stringify({ open: document.querySelectorAll('.intcc-explore .intcc-x-answer.is-open').length,
+      exp: [].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).filter(function(b){ return b.getAttribute('aria-expanded') === 'true'; }).length,
+      first: (document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="true"]')||{getAttribute:function(){return null;}}).getAttribute('data-intcc-q') })`));
+    ok(`${T} Explora entra con la respuesta prioritaria abierta (una sola; aria-expanded coherente)`, x0.open === 1 && x0.exp === 1, JSON.stringify(x0));
+    // Explora: abrir / cerrar cada respuesta no mueve nada.
     const nq = await page.evaluate(`document.querySelectorAll('.intcc-explore .intcc-x-q').length`);
     let moved = [];
     for (let i = 0; i < nq; i++) {
@@ -402,11 +407,20 @@ for (const E of ENGINES) {
       if (process.env.DBG) console.log('X', i, JSON.stringify(['radar', 'drv', 'ex', 'evo', 'hoy'].map(k => [k, g[k].t - g0[k].t, g[k].h - g0[k].h])));
       const d = ['radar', 'drv', 'ex', 'evo', 'hoy', 'scen'].filter(k => g[k] && g0[k] && (Math.abs(g[k].t - g0[k].t) > 1 || Math.abs(g[k].h - g0[k].h) > 1));
       if (d.length) moved.push(i + ':' + d.join('+'));
-      const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); var l=document.querySelector('.intcc-explore-list'); if(!a||!l) return false; var ar=a.getBoundingClientRect(), lr=l.getBoundingClientRect(); return ar.top >= lr.top - 1 && ar.top < lr.bottom; })()`);
+      const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); var l=document.querySelector('.intcc-explore-list'); if(!a) return 'closed'; if(!l) return false; var ar=a.getBoundingClientRect(), lr=l.getBoundingClientRect(); return ar.top >= lr.top - 1 && ar.top < lr.bottom; })()`);
       if (!vis) moved.push(i + ':answer-not-visible');
     }
     ok(`${T} abrir cada respuesta de Explora no cambia ninguna altura ni posición (${nq} preguntas)`, nq >= 2 && moved.length === 0, JSON.stringify(moved));
     ok(`${T} sólo una respuesta abierta a la vez`, await page.evaluate(`document.querySelectorAll('.intcc-x-answer.is-open').length <= 1`));
+    // V5.1 · si el usuario la cierra, ningún repintado (normal o con fuente en vuelo) la reabre.
+    { await page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="true"]'); if (b) b.click(); })()`); await page.waitForTimeout(250);
+      const r1 = await page.evaluate(`(function(){ var ph=document.getElementById('tabPlaceholder'); ph.innerHTML=renderIntelligenceTab(); _initIntelligenceCommandCenter(); return document.querySelectorAll('.intcc-explore .intcc-x-answer.is-open').length; })()`);
+      const r2 = await page.evaluate(`(function(){ _aurixAssetMemory = { userId: 'uA', rows: [], state: 'loading', at: Date.now() }; var ph=document.getElementById('tabPlaceholder'); ph.innerHTML=renderIntelligenceTab(); _initIntelligenceCommandCenter();
+        var n=document.querySelectorAll('.intcc-explore .intcc-x-answer.is-open').length; return n; })()`);
+      // La lectura forzada a mano no existe: se libera y la hidratación REAL la sustituye.
+      await page.evaluate(`(function(){ _aurixAssetMemory = { userId: 'uA', rows: [], state: 'idle', at: 0 }; _aurixHydrateAssetMemory(); })()`); await page.waitForTimeout(1500);
+      const r3 = await page.evaluate(`document.querySelectorAll('.intcc-explore .intcc-x-answer.is-open').length`);
+      ok(`${T} cerrada por el usuario, sigue cerrada tras repintar, con memoria en vuelo y al llegar la memoria`, r1 === 0 && r2 === 0 && r3 === 0, JSON.stringify([r1, r2, r3])); }
     { const m0 = await page.evaluate(`(document.querySelector('.intcc-explore')||{}).__intv5Measures || 0`); await page.waitForTimeout(1500);
       const m1 = await page.evaluate(`(document.querySelector('.intcc-explore')||{}).__intv5Measures || 0`);
       ok(`${T} la reserva de Explora no oscila (ninguna medida nueva en reposo)`, m1 === m0 && m1 >= 1, JSON.stringify({ m0, m1 })); }
@@ -474,15 +488,27 @@ for (const E of ENGINES) {
       ok(`${T} flechas del teclado mueven el control en pasos de 5`, await page.evaluate(`document.querySelector('.intv21-scen input[type="range"]').value === '-10'`));
       await page.evaluate(`switchTab('home')`); await page.waitForTimeout(250); await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(600);
       ok(`${T} la selección no persiste: al volver empieza en −10 %`, await page.evaluate(`document.querySelector('.intv21-scen input[type="range"]').value === '-10'`));
-      ok(`${T} sin insignia «Hipotético» ni nota al pie; frase única junto al control`, await page.evaluate(`!document.querySelector('.intv3-scn-tag') && !document.querySelector('.intv21-scen .intv21-foot') && /manteniendo lo demás constante|holding everything else constant/.test(document.querySelector('.intv21-scen').textContent)`));
+      // RE-DECIDIDO (V5.1): nueva frase única.
+      ok(`${T} sin insignia «Hipotético» ni nota al pie; frase única junto al control`, await page.evaluate(`!document.querySelector('.intv3-scn-tag') && !document.querySelector('.intv21-scen .intv21-foot') && /compara su efecto en tus principales dependencias|compare its effect on your main dependencies/.test(document.querySelector('.intv21-scen').textContent)`));
+      // V5.1 · rail bipolar: el tramo nace en 0; ningún escenario destacado por defecto.
+      const bip = JSON.parse(await page.evaluate(`(function(){ var s=document.querySelector('.intv21-scen input[type="range"]'), t=document.querySelector('.intv21-scen .intv5-sim-track'), act=t.querySelector('.intv5-sim-active'), o=t.querySelector('.intv5-sim-origin');
+        var get=function(v){ s.value=v; s.dispatchEvent(new Event('input',{bubbles:true})); return new Promise(function(res){ setTimeout(function(){ var a=act.getBoundingClientRect(), z=o.getBoundingClientRect(); res({ v: v, dir: t.getAttribute('data-dir'), l: Math.round(a.left), r: Math.round(a.right), w: Math.round(a.width), z: Math.round(z.left + z.width/2) }); }, 260); }); };
+        var out=[]; return [-50,-10,0,10,50].reduce(function(p,v){ return p.then(function(){ return get(v).then(function(x){ out.push(x); }); }); }, Promise.resolve()).then(function(){ s.value=-10; s.dispatchEvent(new Event('input',{bubbles:true}));
+          return JSON.stringify({ out: out, on: document.querySelectorAll('.intv21-scen .intv22-scn-block.is-on').length }); }); })()`));
+      const by = Object.fromEntries(bip.out.map(x => [x.v, x]));
+      ok(`${T} rail bipolar: −10 nace en 0 hacia la izquierda, +10 igual a la derecha, 0 sin tramo, ±50 simétricos`,
+        by[-10].dir === 'down' && Math.abs(by[-10].r - by[-10].z) <= 2 && by[10].dir === 'up' && Math.abs(by[10].l - by[10].z) <= 2 && Math.abs(by[10].w - by[-10].w) <= 1
+        && by[0].dir === 'flat' && by[0].w <= 1 && Math.abs(by[50].w - by[-50].w) <= 1 && by[50].w > by[10].w, JSON.stringify(bip.out));
+      ok(`${T} ningún escenario aparece seleccionado por defecto`, bip.on === 0, String(bip.on));
     }
     // Moneda: importes de Explora en la moneda principal (EUR) y convertidos.
     if (W5 === 1440) {
       const cur = JSON.parse(await page.evaluate(`(function(){ baseCurrency='EUR'; usdToEur=0.9; var ph=document.getElementById('tabPlaceholder'); ph.innerHTML=renderIntelligenceTab(); _initIntelligenceCommandCenter();
         var t=[].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-answer')).map(function(a){ return a.textContent; }).join(' ');
-        var sc=document.querySelector('.intv21-scen .intv22-scn-block'); return JSON.stringify({ t: t.slice(0, 900), scen: sc ? sc.textContent : '' }); })()`));
+        var sc=document.querySelector('.intv21-scen .intv22-scn-block'); var ex=document.querySelector('.intcc-explore');
+        return JSON.stringify({ t: t.slice(0, 900), scen: sc ? sc.textContent : '', ex: ex ? ex.className + '|' + ex.getAttribute('data-explore') : 'none', pend: _intv22Pending(), mem: _aurixAssetMemory.state + ':' + (_aurixAssetMemory.rows||[]).length }); })()`));
       // la memoria del fixture es USD: +399,51 US$ ⇒ 359,56 € con 0,9
-      ok(`${T} EUR: los importes de Explora se convierten (no USD con el símbolo €)`, !/399[.,]51/.test(cur.t) && /359[.,]56/.test(cur.t) && /€/.test(cur.t + cur.scen), cur.t.slice(0, 300));
+      ok(`${T} EUR: los importes de Explora se convierten (no USD con el símbolo €)`, !/399[.,]51/.test(cur.t) && /359[.,]56/.test(cur.t) && /€/.test(cur.t + cur.scen), JSON.stringify({ ex: cur.ex, pend: cur.pend, mem: cur.mem, t: cur.t.slice(0, 200) }));
     }
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
@@ -568,6 +594,15 @@ for (const E of ENGINES) {
       ok(`${T} Dependencias: sin insignia ni nota, tres resultados ${w >= 768 ? 'en fila' : 'apilados'}`, !L.tag && !L.foot && L.blocks.length === 3
         && (w >= 768 ? L.blocks.every(b => Math.abs(b[1] - L.blocks[0][1]) <= 1) : (L.blocks[1][1] > L.blocks[0][1] && L.blocks[2][1] > L.blocks[1][1])), JSON.stringify(L));
       ok(`${T} Hoy publica como mucho tres hechos`, L.hoyN <= 3, String(L.hoyN));
+      // V5.1 · cada cotización dice por qué importa (su peso) y la etiqueta lleva el hecho.
+      const H51 = JSON.parse(await page.evaluate(`(function(){ var rows=[].slice.call(document.querySelectorAll('.intcc-watch .intv4-story[data-kind="mover"]'));
+        var tags=[].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width>0 && t.getAttribute('data-dim') === 'movement'; }).map(function(t){ return t.textContent.trim(); });
+        return JSON.stringify({ movers: rows.map(function(r){ var w=r.querySelector('.intv51-weight'); return { t: r.querySelector('.intv4-story-head').textContent, w: w ? w.textContent : null }; }),
+          drivers: [].slice.call(document.querySelectorAll('.intcc-watch .intv4-story[data-kind="driver"] .intv51-weight')).length, tags: tags }); })()`));
+      ok(`${T} Hoy: cada cotización lleva su peso como contexto; la contribución certificada no lo repite`, H51.drivers === 0
+        && H51.movers.every(m => /^(La cotización de|.+'s price)/.test(m.t) && (/[1-9][\d.,]*\s?% (de tu cartera financiera|of your financial portfolio)\.$/.test(m.w || '') || /^(Menos del 0,1 %|Less than 0\.1%)/.test(m.w || ''))), JSON.stringify(H51));
+      ok(`${T} etiqueta de movimiento: hecho con cifra y periodo, o «principal movimiento» sólo si es contribución certificada`,
+        H51.tags.every(t => /^[^:]+: [+−]\d+[.,]\d\s?% · (24 h|última sesión|last session)$/.test(t) || /principal movimiento de tu cartera|portfolio's main move/.test(t)) && !H51.tags.some(t => /^Cotización de|price$/.test(t)), JSON.stringify(H51.tags));
       if (kind === 'real') ok(`${T} cuenta madura: Explora ofrece 3–4 preguntas`, r.qs.length >= 3 && r.qs.length <= 4, JSON.stringify(r.qs));
       if ((w === 1440 || w === 390) && await page.evaluate(`!!document.querySelector('.intv21-evo-plot')`)) {
         // Estabilidad: cambiar métrica/periodo no cambia la altura de Evolución ni mueve Hoy.
@@ -606,7 +641,7 @@ for (const E of ENGINES) {
         const t1 = JSON.parse(await page.evaluate(PRES)).tags.join(',');
         ok(`${T} etiquetas idénticas al volver`, t0 === t1, JSON.stringify([t0, t1]));
         // Acordeón de Explora: crece su card y empuja; Radar/Factores no se estiran.
-        const acc = await page.evaluate(`(function(){ var q=document.querySelector('.intcc-explore .intcc-x-q'); if(!q) return null;
+        const acc = await page.evaluate(`(function(){ var q=document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="false"]'); if(!q) return null;
           var rad=document.querySelector('.intv7-radar, .intcc-radar'), drv=document.querySelector('.intcc-drivers');
           var h0=[rad&&rad.getBoundingClientRect().height, drv&&drv.getBoundingClientRect().height]; q.click();
           return new Promise(function(res){ setTimeout(function(){ var h1=[rad&&rad.getBoundingClientRect().height, drv&&drv.getBoundingClientRect().height];

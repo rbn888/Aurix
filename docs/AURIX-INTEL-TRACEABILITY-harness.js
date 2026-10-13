@@ -36,7 +36,19 @@ let pass=0,fail=0; function ok(n,c,info){ if(c){pass++;console.log('  ✓ '+n);}
 
 const DAY = 86400000, HOUR = 36e5, MIN = 60000;
 const T0 = 1750000000000;
-const NOW = Date.now();                 // the certified exposure reader checks freshness against the real clock
+// RELOJ CONGELADO (V5.1). Antes: `Date.now()` del ordenador, y el registro «de hoy»
+// se fabricaba a `now − 2 h`, que entre 00:00 y 02:00 UTC caía en el día anterior
+// (día UTC del producto) y fallaba también en v811. Ahora TODO —datos y el `Date`
+// del sandbox— sale de UN reloj inyectado: mediodía UTC de una fecha fija, o
+// `AURIX_HARNESS_NOW` para comprobar cualquier instante. Ninguna espera real.
+const CLOCK = process.env.AURIX_HARNESS_NOW ? Date.parse(process.env.AURIX_HARNESS_NOW) : Date.UTC(2026, 9, 14, 12, 0, 0);
+function frozenDate(now) {
+  return class FrozenDate extends Date {
+    constructor(...a) { if (a.length) super(...a); else super(now); }
+    static now() { return now; }
+  };
+}
+const NOW = CLOCK;                       // the certified exposure reader checks freshness against the (frozen) clock
 
 // ── REAL copy, lifted out of both dictionaries ──────────────────────────────
 // Not a stub: the actual `intv4_*` block from each language, plus the few
@@ -139,7 +151,7 @@ const CONSTS = ['_INTV21_DAY','_AURIX_AI_LABEL','_AURIX_AI_AVAIL','_AURIX_INTEL_
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_MEMORY_WINDOW_ORDER',
   '_INTV4_SHOWN_KEY','_AURIX_INTEL_HEALTH_POSITIVE','_AURIX_INTEL_DISC_MAX','_AURIX_INTEL_DIM_ROOT','_AURIX_AI_EVOLUTION_RANGES','_AURIX_INTEL_CTX_KEY','_AURIX_INTEL_CTX_KEY_LEGACY',
   '_AURIX_INTEL_FIELDS','_AURIX_INTEL_EXCLUSIVE_CLAIMS','_AURIX_INTEL_PROVENANCE','_AURIX_INTEL_QUESTION_LIMIT','_AURIX_LOSS_TIER','_AURIX_LOSS_IMPACT_STRUCTURAL_SHARE','_INTV4_EXPLORE_PERIOD_WEEKS','_INTV4_PERIMETER','_INTV5_TIER','_AURIX_TODAY_HISTORICAL_RANGES','_AURIX_TODAY_MAX_AGE_MS','_AURIX_TODAY_STALE_MS','_AURIX_GAP_SURFACE'];
-const FNS = ['_intv21LogItems','_intv21LogHtml','_intv21Now','_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
+const FNS = ['_intv21LogItems','_intv21LogHtml','_intv21Now','_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_intv4ActiveReviewFindings','_aurixNow','_aurixTodayEventAt','_aurixTodayIsRecentClaim','_aurixTodayDatedAt','_aurixTodayFresh','_aurixTodayDataStale','_intv5RecencyTier','_aurixLossImpactShare','_aurixLossSeverityTier','_aurixEpisodeOf','_aurixIntelResolveCertified','_aurixIntelAcknowledge','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner','_aurixIntelCtxMerge','_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlowIsDerived','_aurixFlowDupKey','_aurixFlowUnpairableDerived','_aurixFlowDuplicateIds','_aurixFlowDuplicateReport','_aurixFlowIntentOf','_aurixEvidence','_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth','_aurixEventIdentity','_aurixCanonicalFindings','_intv4FindingRows','_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','toBase','formatCurrency','formatBase','_intv22UsdMoney','_aurixUsableQuantity','_aurixCategoryBucket',
   'isClosedAsset','activeAssets','isInvestableAsset','investableAssets','investableValueUSD',
   'liquidityNominal','assetNativeValue','assetValueUSD','_aurixPointValuationIncomplete',
   '_aurixFlowIsInternal','_aurixLoadCapitalFlows','_aurixInvestableSnapshots',
@@ -179,7 +191,7 @@ const FNS = ['_intv21LogItems','_intv21LogHtml','_intv21Now','_intv4ExploreRotat
 
 function makeCtx(opts) {
   const o = opts || {};
-  const sb = { Math, Number, JSON, Array, String, Object, Set, Map, Date, isFinite, Intl,
+  const sb = { Math, Number, JSON, Array, String, Object, Set, Map, Date: frozenDate(o.now || CLOCK), isFinite, Intl,
     console: { warn(){}, log(){}, debug(){} } };
   vm.createContext(sb);
   sb.baseCurrency = o.baseCurrency || 'USD';
@@ -289,7 +301,9 @@ const EVEN_NO_HISTORY = {
 
 console.log('AURIX-INTEL-TRACEABILITY — SPEC ADVANCED INTELLIGENCE · A2\n');
 
-const NOWTS = Date.now();
+const NOWTS = CLOCK;
+const OP_AGO = (() => { const d = new Date(NOWTS); const ds = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.max(10e3, Math.min(2 * HOUR, NOWTS - ds - 10e3)); })();
 const movedServer = srvHistory(NOWTS, 30, { crypto: 55000, stock: 20000, liquidity: 25000 },
                                            { crypto: 85000, stock: 10000, liquidity: 5000 });
 const MOVED = Object.assign({}, MATURE, { serverRows: movedServer });
@@ -742,7 +756,7 @@ console.log('\n9 · La ausencia no cura nada: sólo una medición resuelve un co
   // −1 pp, y el umbral declarado son 3 pp. Eso es evidencia positiva de que la
   // deriva dejó de ser material — no una ausencia.
   const settled = Object.assign({}, MATURE, {
-    serverRows: srvHistory(Date.now(), 30, { crypto: 50000, stock: 25000, liquidity: 25000 },
+    serverRows: srvHistory(CLOCK, 30, { crypto: 50000, stock: 25000, liquidity: 25000 },
                                             { crypto: 51000, stock: 25000, liquidity: 24000 }) });
   const rSettled = coreOf(settled);
   ok('9.1 una deriva medida por debajo de su umbral RESUELVE, con su motivo',
@@ -1180,9 +1194,11 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
     { id: 'oldcash', ts: NOWTS - 40 * DAY, amountUSD: 10869.57, kind: 'deposit',
       source: 'user', revision: 1, recordedAt: NOWTS - 40 * DAY },
     // Y la incorporación de HOY, con su procedencia.
-    { id: 'msfttoday', ts: NOWTS - 2 * HOUR, amountUSD: 22000, kind: 'asset_add',
+    // «De hoy» de VERDAD con cualquier reloj: hasta 2 h antes, nunca antes del inicio
+    // del día UTC (el día del producto). Antes era `NOWTS − 2 h` a secas.
+    { id: 'msfttoday', ts: NOWTS - OP_AGO, amountUSD: 22000, kind: 'asset_add',
       source: 'user', intent: 'INTERNAL_BUY', assetId: 'a2', revision: 1,
-      recordedAt: NOWTS - 2 * HOUR },
+      recordedAt: NOWTS - OP_AGO },
   ];
   const CASE = Object.assign({}, MATURE, {
     serverRows: srvHistory(NOWTS, 30, { crypto: 55000, stock: 20000, liquidity: 25000 },
@@ -1261,6 +1277,39 @@ console.log('\nADV · Una operación registrada HOY llega a la pantalla:');
   ok('ADV.9 en inglés se publica igual y sin decir «up»',
     /Today you (recorded|bought)/.test(en.html) && !/\bis up\b/.test(en.html),
     (en.html.match(/Today you [^<]{0,60}/) || [, ''])[0] || 'ausente');
+  // ── MONEDA (V5.1) · el registro en USD y en EUR ─────────────────────────────
+  // `costUSD`/`grossUSD` ya están en moneda principal (el ledger aplica `toBase`): el
+  // importe se convierte UNA vez (22.000 × 0,92 = 20.240 €; v812 lo convertía dos) y
+  // el peso es el MISMO en las dos monedas (base/base).
+  { // El peso se lee del HECHO del Core (no de la copia, que a esta profundidad no lo pinta).
+    const renderFx = (cur) => { const c = makeCtx(Object.assign({}, CASE, { baseCurrency: cur }));
+      run('var __lastLedger = null; var __fl = _aurixFactLedger; _aurixFactLedger = function (o) { var r = __fl(o); __lastLedger = r; return r; };', c);
+      const html = run('_renderIntelligenceCommandCenter()', c);
+      const f = JSON.parse(run('JSON.stringify(((__lastLedger && __lastLedger.facts) || []).filter(function(x){ return /^(operation_registered_|positions_registered_today)/.test(x.semanticKey); }).map(function(x){ return x.values; }))', c))[0] || null;
+      return { html, share: f ? f.shareOfValue : undefined }; };
+    const U = renderFx('USD'), E = renderFx('EUR');
+    const amtOf = (hh) => { const m = hh.match(/coste registrado[^0-9]{0,12}([\d.,]+)\s*(€|US\$)/); return m ? m[1] + ' ' + m[2] : null; };
+    ok('ADV.FX el importe del registro en EUR se convierte UNA vez (20.240,00 €)', amtOf(E.html) === '20.240,00 €' && amtOf(U.html) === '22.000,00 US$', JSON.stringify([amtOf(U.html), amtOf(E.html)]));
+    ok('ADV.FX el peso del registro (shareOfValue del Core) es el mismo en USD y en EUR', typeof U.share === 'number' && U.share > 0 && Math.abs(U.share - E.share) < 1e-4, JSON.stringify([U.share, E.share])); }
+  // ── LÍMITES DE MEDIANOCHE (UTC, el día del producto) con el reloj inyectado ──
+  // Mismo caso a las 00:00:30, 01:59 y 02:01 UTC: una operación de HOY se publica;
+  // una de las 23:59:50 del día anterior, NO (sin «lo hiciste hoy» inventado).
+  const atClock = (iso, opAgoMs) => {
+    const now = Date.parse(iso);
+    const flows = [{ id: 'oldcash', ts: now - 40 * DAY, amountUSD: 10869.57, kind: 'deposit', source: 'user', revision: 1, recordedAt: now - 40 * DAY },
+      { id: 'msfttoday', ts: now - opAgoMs, amountUSD: 22000, kind: 'asset_add', source: 'user', intent: 'INTERNAL_BUY', assetId: 'a2', revision: 1, recordedAt: now - opAgoMs }];
+    return render(Object.assign({}, MATURE, { now, flows,
+      serverRows: srvHistory(now, 30, { crypto: 55000, stock: 20000, liquidity: 25000 }, { crypto: 55000, stock: 42000, liquidity: 25000 }) })).html;
+  };
+  const dayStartOf = iso => { const d = new Date(Date.parse(iso)); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
+  [['2026-10-14T00:00:30Z', 20 * 1000], ['2026-10-14T01:59:00Z', 2 * HOUR - 2 * MIN], ['2026-10-14T02:01:00Z', 2 * HOUR]].forEach(([iso, ago]) => {
+    const html = atClock(iso, ago);
+    ok('ADV.M ' + iso + ' · la operación de hoy (' + new Date(Date.parse(iso) - ago).toISOString().slice(11, 19) + ' UTC) se publica',
+      Date.parse(iso) - ago >= dayStartOf(iso) && /Hoy has (registrado|comprado)/.test(html), (html.match(/Hoy has [^<]{0,60}/) || [, ''])[0] || 'ausente');
+  });
+  { const iso = '2026-10-14T00:00:10Z', html = atClock(iso, 20 * 1000);   // 23:59:50 del 13
+    ok('ADV.M antes de medianoche · una operación de AYER (23:59:50 UTC) no se publica como de hoy', !/Hoy has (registrado|comprado)/.test(html),
+      (html.match(/Hoy has [^<]{0,60}/) || [, ''])[0]); }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
