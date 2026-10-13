@@ -130,8 +130,8 @@ const READ = `(function(){
     factsBad: reg ? reg.facts.filter(function(f){ return !f.factId || !f.family || !f.owner; }).length : null,
   });
 })()`;
-// RE-DECIDIDO (V5): … Explora → Evolución → Hoy → Dependencias → Qué movió → Registro.
-const ORDER = ['intcc-hero', 'intcc-radar', 'intcc-drivers', 'intcc-explore', 'intcc-timeline', 'intcc-watch', 'intv21-scen', 'intv21-movers', 'intv21-log'];
+// RE-DECIDIDO (SPEC casi final §5): … Explora → Evolución → Dependencias → Hoy → Qué movió → Registro.
+const ORDER = ['intcc-hero', 'intcc-radar', 'intcc-drivers', 'intcc-explore', 'intcc-timeline', 'intv21-scen', 'intcc-watch', 'intv21-movers', 'intv21-log'];
 const orderOf = (cards) => cards.map(c => ORDER.findIndex(o => c.c.split('.').indexOf(o) !== -1 || c.c.indexOf(o) === 0)).filter(i => i >= 0);
 const BASE = process.env.AURIX_V2_BASELINE, CMP = process.env.AURIX_V2_COMPARE;
 const prior = CMP && existsSync(CMP) ? JSON.parse(readFileSync(CMP, 'utf8')) : null;
@@ -158,7 +158,7 @@ for (const E of ENGINES) {
       ok(`${T} cero hechos duplicados por fact_id/familia/periodo`, Array.isArray(r.dups) && r.dups.length === 0 && r.factsBad === 0, JSON.stringify(r.dups));
       ok(`${T} nunca «No hay nada que destacar» como contenido`, !/nada que destacar|nothing to highlight/i.test(r.screen));
       const ord = orderOf(r.cards);
-      ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Evolución/Hoy → Dependencias → Movió → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
+      ok(`${T} orden: Intelligence+Salud → Radar/Factores/Explora → Evolución/Dependencias → Hoy → Movió → Registro`, ord.every((x, i) => i === 0 || x >= ord[i - 1]), JSON.stringify(r.cards.map(c => c.c)));
       if (prior && prior[key]) {
         const p = prior[key];
         ok(`${T} Salud, Radar, Factores y escenarios idénticos a HEAD`, p.hv === r.healthVal && p.hb === r.healthBadge && p.radar === r.radarHash && p.drivers === r.driversHash && (p.scn == null || p.scn === JSON.stringify(r.scn)),
@@ -206,7 +206,7 @@ for (const E of ENGINES) {
           && !/Solana/.test(r.hoy.text), JSON.stringify(r.hoy.rows));
         ok(`${T} QA · Escenarios: Microsoft −10 % ≈ −2,9 %, Top 3 ≈ −6,9 %, Acciones ≈ −5,1 %`, r.scn && Math.abs(r.scn.find(s => s.id === 'top1').impact + 2.9) < 0.01
           && Math.abs(r.scn.find(s => s.id === 'top3').impact + 6.9) < 0.01 && Math.abs(r.scn.find(s => s.id === 'class').impact + 5.1) < 0.01
-          && /−2[.,]9%/.test(r.scen.text) && /(manteniendo lo demás constante|holding everything else constant)/.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
+          && /−2[.,]9%/.test(r.scen.text) && /(Hipotético|Hypothetical)/.test(r.scen.text), JSON.stringify({ scn: r.scn, t: r.scen && r.scen.text }));
         // RE-DECIDIDO (V2.1): «Desde inicio» sólo cuando empieza de verdad antes que 30D;
         // con la rentabilidad recortada al régimen comparable coincide con 30D y no se duplica.
         ok(`${T} QA · Tu evolución ofrece 7D y 30D en rentabilidad, «Desde inicio» donde existe y las cinco métricas`, r.avail.return && /^7d,30d/.test(r.avail.return.join()) && (r.avail.top || []).indexOf('all') !== -1
@@ -247,10 +247,9 @@ for (const E of ENGINES) {
           && (r.avail.effective || []).indexOf('30d') !== -1 && (r.avail.top || []).indexOf('all') === -1, JSON.stringify(r.avail));
         ok(`${T} REAL · Inicio · Actual · Cambio en pp`, /51[.,]6%/.test(r.evo.stats) && /28[.,]7%/.test(r.evo.stats) && /−22[.,]9 pp/.test(r.evo.stats), r.evo.stats);
         ok(`${T} REAL · cada observación es un punto unido por línea (sin tallos)`, r.evo.plot && r.evo.plot.stems === 0 && r.evo.plot.dots === r.evo.pts && r.evo.plot.segs === r.evo.pts - 1, JSON.stringify(r.evo.plot));
-        // RE-DECIDIDO (V5): Dependencias a ancho completo, debajo de Evolución | Hoy.
-        ok(`${T} REAL · Qué movió no certificable ⇒ ausente; Dependencias a ancho completo en escritorio`, !r.movers && (w < 1024 || r.scFull === true), JSON.stringify({ m: r.movers, full: r.scFull }));
-        // RE-DECIDIDO (V5): un único control y los tres resultados siempre visibles (también en móvil).
-        ok(`${T} REAL · escenarios: los tres resultados visibles bajo un único control`, r.scBlocks === 3, JSON.stringify({ b: r.scBlocks, t: r.scTabs }));
+        // RE-DECIDIDO (§6): en escritorio Dependencias es la columna junto a Evolución.
+        ok(`${T} REAL · Qué movió no certificable ⇒ ausente; Dependencias junto a Evolución en escritorio`, !r.movers && (w < 1024 || r.scFull === false), JSON.stringify({ m: r.movers, full: r.scFull }));
+        ok(`${T} REAL · escenarios: tres bloques desde 768 px; pestañas ≥44 px y uno visible en móvil`, w >= 768 ? r.scBlocks === 3 : (r.scBlocks === 1 && r.scTabs.length === 3 && r.scTabs.every(h => h >= 44)), JSON.stringify({ b: r.scBlocks, t: r.scTabs }));
         ok(`${T} REAL · Explora: 3–4 preguntas de familias distintas`, r.explore.length >= 3 && r.explore.length <= 4, JSON.stringify(r.explore));
         if (w === 390 || w === 1440) {
           const evoSwitch = async (m) => { await page.locator(`.intv21-evo [data-intv21-evo-metric="${m}"]:visible`).first().click(); await page.waitForTimeout(220);
@@ -315,9 +314,16 @@ for (const E of ENGINES) {
         await plot.focus(); await page.keyboard.press('Home');
         const kb = await page.evaluate(`(function(){ var p=document.querySelector('.intv21-evo-plot'); return p ? p.getAttribute('data-tip') : null; })()`);
         ok(`${T} teclado: Inicio lleva al primer punto`, kb === '0', kb);
-        // RE-DECIDIDO (V5): sin pestañas; los tres resultados visibles en todos los anchos.
-        { const nb = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv22-scn-block')).filter(function(b){ return b.getBoundingClientRect().width > 0; }).length`);
-          ok(`${T} escenario: los tres resultados visibles`, nb === 3, String(nb)); }
+        // Desde 768 px los tres escenarios se ven a la vez (sin pestañas); en móvil, pestañas.
+        let sc2 = 'top3';
+        if (w < 768) {
+          await page.locator('.intv21-scen [data-intv21-scen="top3"]:visible').first().click(); await page.waitForTimeout(200);
+          sc2 = await page.evaluate(`document.querySelector('.intv21-scen').getAttribute('data-scen')`);
+          ok(`${T} escenario: la pestaña cambia el escenario visible`, sc2 === 'top3', sc2);
+        } else {
+          const nb = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv22-scn-block')).filter(function(b){ return b.getBoundingClientRect().width > 0; }).length`);
+          ok(`${T} escenario: los tres bloques visibles en escritorio`, nb === 3, String(nb));
+        }
         // «Entendido» en Qué ha cambiado: el hecho pasa a ser HISTORIA y vive sólo en el Registro.
         const ackFact = await page.evaluate(`(function(){ var b=[].slice.call(document.querySelectorAll('.intv4-changed [data-intel-ack]')).filter(function(e){ return e.getBoundingClientRect().width>0; })[0];
           return b ? b.closest('[data-fact]').getAttribute('data-fact') : null; })()`);
@@ -346,7 +352,7 @@ for (const E of ENGINES) {
         const per = await page.evaluate(`(function(){ var e=document.querySelector('.intv21-evo'), s=document.querySelector('.intv21-scen');
           return { m: e && e.getAttribute('data-metric'), s: s && s.getAttribute('data-scen'), tags: [].slice.call(document.querySelectorAll('.intv21-tag')).map(function(t){ return t.getAttribute('data-tag'); }), n: document.querySelectorAll('.aurix-intcc').length,
             dups: (debugAurixIntelFacts()||{}).duplicates }; })()`);
-        ok(`${T} recarga y vuelta: métrica y escenario persisten, etiquetas idénticas; cero duplicados`, per.n === 1 && per.tags.join(',') === tags0 && Array.isArray(per.dups) && per.dups.length === 0
+        ok(`${T} recarga y vuelta: métrica y escenario persisten, etiquetas idénticas; cero duplicados`, per.n === 1 && (w >= 768 || per.s === 'top3') && per.tags.join(',') === tags0 && Array.isArray(per.dups) && per.dups.length === 0
           && per.m === 'liquidity', JSON.stringify(per));
       }
       if (process.env.SHOTS_ALL) await page.screenshot({ path: join(OUT, `${E}-${kind}-${lng}-${w}.png`), fullPage: true });
