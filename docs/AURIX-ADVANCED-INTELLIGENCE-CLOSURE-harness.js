@@ -793,7 +793,8 @@ console.log('\n§7 · hero · titular, revisiones y orden');
 {
   const src0 = fnSrc('_renderIntelligenceCommandCenter');
   ok('7.1 el orden del cuerpo es eyebrow → titular → frase → revisiones → etiquetas',
-    (() => { const i = src0.indexOf('intcc-eyebrow'), j = src0.indexOf('intcc-hero-title'),
+    // RE-DECIDIDO (V5): el rótulo «INTELIGENCIA» es ahora el título común de sección.
+    (() => { const i = src0.indexOf('intcc-hero-intel-label'), j = src0.indexOf('intcc-hero-title'),
         k = src0.indexOf('intcc-hero-sub'), l = src0.indexOf('${seeChangesHtml}'), m = src0.indexOf('intcc-chips');
       return i >= 0 && i < j && j < k && k < l && l < m; })());
   // §7 pide DOS piezas: el recuento («1 cambio merece revisión») y el acceso («Ver

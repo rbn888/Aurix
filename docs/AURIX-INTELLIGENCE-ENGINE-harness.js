@@ -1650,7 +1650,8 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
     /_intv5MattersStories\(core, skipRoots, intel, acks\)/.test(mFn)
     && /_intv21TrimStories\(sel\.stories, _head21\)/.test(mFn)
     && /const _storiesFull21 = _intv5MattersStories\(core, skipRoots, intel, _ackMap\)\.stories/.test(src)
-    && /const mattersSel = \(typeof _intv21TrimStories === 'function'\) \? _intv21TrimStories\(_storiesFull21, _today21\) : _storiesFull21/.test(src)
+    // RE-DECIDIDO (V5): la cabecera de Hoy son SÓLO los hechos certificados; las cotizaciones completan.
+    && /const mattersSel = \(typeof _intv21TrimStories === 'function'\) \? _intv21TrimStories\(_storiesFull21, _todayHead21\) : _storiesFull21/.test(src)
     && /const mattersRoots = mattersSel\.map/.test(src)
     && /const publishedTexts = mattersSel\.map/.test(src)
     && /const shown = mattersSel\.map/.test(src)
@@ -1666,7 +1667,8 @@ group('U · superficies finales · Explora, prioridad, Memoria, cambios, descubr
       return /_intv4ExploreHtml\(core, esc, intel\)/.test(r)
         // CHECKPOINT J — las dos reciben además la limitación que les toca.
         // + los hechos de 24 h que la card antepone (INTELLIGENCE V2).
-        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap, _gaps\.today, \{ head: _today21, tail: _struct21 \}\)/.test(r)
+        // RE-DECIDIDO (V5): cabecera certificada; cotizaciones y reserva al final.
+        && /_intv5MattersHtml\(core, esc, depth, skipRoots, intel, _ackMap, _gaps\.today, \{ head: _todayHead21, tail: _todayMovers21\.concat\(_struct21\) \}\)/.test(r)
         // + lo que titula Hoy (SPEC MEMORIA ÚTIL §5: Tu evolución no repite a Hoy).
         && /_intv4MemoryHtml\(core, esc, publishedKeys, intel, discFields, _gaps\.evolution,\s*mattersSel\.map\(st => st\.semanticKey\)\)/.test(r)
         && /_intv9DiscoveriesHtml\(intel, esc, mattersRoots\.concat\(skipRoots\), heroDiscId\)/.test(r); })());

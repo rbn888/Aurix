@@ -5970,7 +5970,7 @@ const T = {
     intv3_tag_top3: p => `Tres posiciones reúnen el ${p}`,
     intv3_tag_class1: (c, p) => `${c}: ${p} de tu cartera`,
     intv3_tag_class2: (a, b, p) => `${a} y ${b} reúnen el ${p}`,
-    intv3_tag_driver: n => `${n}, lo que más movió tu cartera en 24 h`,
+    intv3_tag_driver: n => `${n}, principal movimiento de tu cartera en 24 h`,
     intv3_tag_quote: n => `Cotización de ${n}`,
     intv3_tag_liq_up: w => `Más peso en liquidez ${w}`,
     intv3_tag_liq_down: w => `Menos peso en liquidez ${w}`,
@@ -6001,10 +6001,11 @@ const T = {
     intv21_mv_down: 'Lo frenaron',
     intv21_mv_foot: 'Contribución al resultado en puntos porcentuales, sin aportaciones ni retiradas. No es la subida del activo.',
     intv21_scn_title: 'Dependencias y escenarios',
-    intv3_scn_tag: 'Hipotético',
-    intv3_scn_if_top1: n => `Si ${n} bajara un 10 %`,
-    intv3_scn_if_top3: () => 'Si tus tres mayores posiciones bajaran un 10 %',
-    intv3_scn_if_class: c => `Si todo lo que tienes en ${c} bajara un 10 %`,
+    intv5_sim_lead: 'Explora cómo afectaría este movimiento, manteniendo lo demás constante',
+    intv5_sim_aria: 'Movimiento simulado', intv5_sim_less: 'Bajar 5 puntos', intv5_sim_more: 'Subir 5 puntos',
+    intv5_if_top1_down: (n, p) => `Si ${n} bajara un ${p}`, intv5_if_top1_up: (n, p) => `Si ${n} subiera un ${p}`, intv5_if_top1_flat: n => `Si ${n} no cambiara`,
+    intv5_if_top3_down: (n, p) => `Si tus tres mayores posiciones bajaran un ${p}`, intv5_if_top3_up: (n, p) => `Si tus tres mayores posiciones subieran un ${p}`, intv5_if_top3_flat: () => 'Si tus tres mayores posiciones no cambiaran',
+    intv5_if_class_down: (c, p) => `Si todo lo que tienes en ${c} bajara un ${p}`, intv5_if_class_up: (c, p) => `Si todo lo que tienes en ${c} subiera un ${p}`, intv5_if_class_flat: c => `Si todo lo que tienes en ${c} no cambiara`,
     intv21_scn_aria: 'Escenario',
     intv21_scn_opt_top1: 'Mayor posición', intv21_scn_opt_top3: 'Tres mayores', intv21_scn_opt_class: 'Mayor clase',
     intv21_scn_lead_top1: n => `Si ${n} cae un 10 %, tu patrimonio invertible bajaría aproximadamente:`,
@@ -9379,7 +9380,7 @@ const T = {
     intv3_tag_top3: p => `Three positions hold ${p}`,
     intv3_tag_class1: (c, p) => `${c}: ${p} of your portfolio`,
     intv3_tag_class2: (a, b, p) => `${a} and ${b} hold ${p}`,
-    intv3_tag_driver: n => `${n}, the biggest mover of your portfolio in 24 h`,
+    intv3_tag_driver: n => `${n}, your portfolio's main move in 24 h`,
     intv3_tag_quote: n => `${n} price`,
     intv3_tag_liq_up: w => `More weight in cash ${w}`,
     intv3_tag_liq_down: w => `Less weight in cash ${w}`,
@@ -9410,10 +9411,11 @@ const T = {
     intv21_mv_down: 'Held it back',
     intv21_mv_foot: 'Contribution to the result in percentage points, excluding contributions and withdrawals. Not the asset\'s own rise.',
     intv21_scn_title: 'Dependencies and scenarios',
-    intv3_scn_tag: 'Hypothetical',
-    intv3_scn_if_top1: n => `If ${n} fell 10%`,
-    intv3_scn_if_top3: () => 'If your three largest positions fell 10%',
-    intv3_scn_if_class: c => `If everything you hold in ${c} fell 10%`,
+    intv5_sim_lead: 'Explore how this move would affect you, holding everything else constant',
+    intv5_sim_aria: 'Simulated move', intv5_sim_less: 'Down 5 points', intv5_sim_more: 'Up 5 points',
+    intv5_if_top1_down: (n, p) => `If ${n} fell ${p}`, intv5_if_top1_up: (n, p) => `If ${n} rose ${p}`, intv5_if_top1_flat: n => `If ${n} did not change`,
+    intv5_if_top3_down: (n, p) => `If your three largest positions fell ${p}`, intv5_if_top3_up: (n, p) => `If your three largest positions rose ${p}`, intv5_if_top3_flat: () => 'If your three largest positions did not change',
+    intv5_if_class_down: (c, p) => `If everything you hold in ${c} fell ${p}`, intv5_if_class_up: (c, p) => `If everything you hold in ${c} rose ${p}`, intv5_if_class_flat: c => `If everything you hold in ${c} did not change`,
     intv21_scn_aria: 'Scenario',
     intv21_scn_opt_top1: 'Largest position', intv21_scn_opt_top3: 'Top three', intv21_scn_opt_class: 'Largest class',
     intv21_scn_lead_top1: n => `If ${n} falls 10%, your investable wealth would drop by roughly:`,
@@ -65867,6 +65869,8 @@ function _applyTab(tab) {
     } else if (tab === 'intelligence') {
       // INT.2 — Aurix Intelligence Command Center. Read-only patrimonial reading;
       // init wires reveal animations + the inline explore delegation.
+      // V5 — la animación de entrada es SÓLO de la entrada en la pestaña.
+      _intv5RevealNext = true;
       placeholder.innerHTML = renderIntelligenceTab();
       // SPEC INTELLIGENCE-MOBILE-SCROLL — robust, :has()-independent scroll-owner hook.
       placeholder.classList.add('tab-placeholder--intel');
@@ -68074,7 +68078,8 @@ function _intv4FactText(fact) {
     // «por un coste registrado de 0» en todos los casos sin importe certificado —es
     // decir, en TODOS los metales y TODAS las bajas—. Lo destapó el gate de copy.
     const hasAmt = v.grossUSD != null && Number.isFinite(Number(v.grossUSD));
-    const amt = hasAmt ? _intv4Money(Math.abs(Number(v.grossUSD))) : null;
+    // `grossUSD` es USD (Σ costUSD): se convierte a la moneda principal antes de formatear.
+    const amt = hasAmt ? ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(Math.abs(Number(v.grossUSD))) : _intv4Money(Math.abs(Number(v.grossUSD)))) : null;
     // LA GUARDA DE PROCEDENCIA VA PRIMERO, Y CUBRE LOS DOS CAMINOS. Estaba sólo en
     // el de una operación, así que la tanda afirmaba «Hoy has registrado 3
     // posiciones» con la procedencia DESCONOCIDA — exactamente lo que §3 dice que
@@ -68130,9 +68135,9 @@ function _intv4FactText(fact) {
     const inAmt  = Math.abs(Number(v.inUSD)  || 0);
     const outAmt = Math.abs(Number(v.outUSD) || 0);
     const base = (inAmt > 0 && outAmt > 0)
-      ? _intv4T('intv4_f_cashmov_both', _intv4Money(inAmt), _intv4Money(outAmt))
-      : (outAmt > 0 ? _intv4T('intv4_f_cashmov_out', _intv4Money(outAmt))
-      : (inAmt  > 0 ? _intv4T('intv4_f_cashmov_in',  _intv4Money(inAmt))
+      ? _intv4T('intv4_f_cashmov_both', ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(inAmt) : _intv4Money(inAmt)), ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(outAmt) : _intv4Money(outAmt)))
+      : (outAmt > 0 ? _intv4T('intv4_f_cashmov_out', ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(outAmt) : _intv4Money(outAmt)))
+      : (inAmt  > 0 ? _intv4T('intv4_f_cashmov_in',  ((typeof _intv22UsdMoney === 'function') ? _intv22UsdMoney(inAmt) : _intv4Money(inAmt)))
                     : _intv4T('intv4_f_cashmov_nc', v.events || 0)));
     return _cmSince(base);
   }
@@ -68789,7 +68794,7 @@ function _intv4ExploreHtml(core, esc, intel) {
     return `
     <section class="intcc-card intcc-explore intv4-explore is-pending" data-explore="" data-pending="1" aria-busy="true">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_explore_title'))}</h3>
-      <div class="intv3-sk-list"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span></div>
+      <div class="intv3-sk-list"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk intv3-sk-reserve"></span></div>
     </section>`;
   }
   if (x22) ctx21 = x22.qs.map(q => ({ id: q.id, root: q.root, label: q.label, answer: q.answer, fact: { factId: q.id } }));
@@ -73049,6 +73054,7 @@ function _intv21Goto(target) {
     if (kind === 'scenarios' && a1 && _intv21Write({ scen: a1 })) {
       const html = _intv22ScenarioHtml(_intv21Weights(), _intccEsc);
       if (html) document.querySelectorAll('.intv21-scen').forEach(n => { n.outerHTML = html; });
+      _intv5SimInit(document);
     }
   } catch (_) {}
   const el = [].slice.call(document.querySelectorAll(sel)).find(n => n.getBoundingClientRect().height > 0);
@@ -73108,9 +73114,20 @@ function _intv21Nearest(plot, clientX) {
 function _intv21Wire() {
   if (_intv21Wired || typeof document === 'undefined') return;
   _intv21Wired = true;
+  // Simulador: el control y los botones ±5 actualizan los tres escenarios a la vez.
+  document.addEventListener('input', e => {
+    const inp = e.target && e.target.closest ? e.target.closest('.intv5-sim input[type="range"]') : null;
+    if (inp) _intv5SimApply(inp.closest('.intv5-sim'), Number(inp.value), true);
+  });
   document.addEventListener('click', e => {
     const tgt = e.target && e.target.closest ? e.target : null;
     if (!tgt) return;
+    const stp = tgt.closest('[data-sim-step]');
+    if (stp) {
+      const card = stp.closest('.intv5-sim');
+      if (card) _intv5SimApply(card, (Number(card.getAttribute('data-shock')) || 0) + Number(stp.getAttribute('data-sim-step')) * _INTV5_SIM.step, true);
+      return;
+    }
     const more = tgt.closest('[data-intv21-log-more]');
     if (more) {
       const card = more.closest('.intv21-log');
@@ -73440,11 +73457,15 @@ function _intv22Ident() {
 // —titular, controles, tres KPIs y el área del gráfico— a su altura definitiva, no
 // un rectángulo vacío.
 function _intv3EvoSkeleton() {
+  // Mismas clases que el módulo resuelto ⇒ misma geometría (titular, controles, KPIs,
+  // área del gráfico y fechas); sólo el relleno es de carga.
+  const chip = '<span class="intv21-chip intv3-sk-chip" aria-hidden="true">&nbsp;</span>';
   return `<div class="intv21-evo intv22-evo is-pending" data-pending="1" aria-busy="true">
-    <div class="intv3-sk intv3-sk-head"></div>
-    <div class="intv3-sk-row"><span class="intv3-sk intv3-sk-chip"></span><span class="intv3-sk intv3-sk-chip"></span><span class="intv3-sk intv3-sk-chip"></span></div>
-    <div class="intv3-sk-kpis"><span class="intv3-sk"></span><span class="intv3-sk"></span><span class="intv3-sk"></span></div>
-    <div class="intv3-sk intv3-sk-plot"></div></div>`;
+    <p class="intv15-stable-head intv22-head"><span class="intv3-sk intv3-sk-line"></span></p>
+    <div class="intv21-evo-ctrl"><div class="intv21-seg">${chip.repeat(4)}</div><div class="intv21-seg is-win">${chip.repeat(2)}</div></div>
+    <dl class="intv22-stats">${'<div><dt>&nbsp;</dt><dd>&nbsp;</dd></div>'.repeat(3)}</dl>
+    <div class="intv21-evo-plot intv3-sk"></div>
+    <div class="intv21-evo-axis"><span>&nbsp;</span></div></div>`;
 }
 function _intv22EvoModuleHtml(esc) {
   const stSel = (() => { const st = _intv21Read(); return String(st.evoMetric || '') + '|' + String(st.evoWin || ''); })();
@@ -73525,6 +73546,13 @@ function _intv22Fingerprint(W) {
 const _INTV22_EXPLORE_COOLDOWN = 7 * 864e5;
 // Candidatas. Cada una sólo existe si Aurix puede contestarla con datos
 // certificados; la respuesta sigue conclusión → evidencia → relevancia.
+// Las filas de servidor (`asset_values`) están en USD: se convierten a la moneda
+// principal con el MISMO conversor de la app antes de formatear. Formatear un importe
+// USD con `formatBase` en una cuenta EUR publicaba dólares con el símbolo del euro.
+function _intv22UsdMoney(usd) {
+  const v = (typeof toBase === 'function') ? toBase(usd, 'USD') : usd;
+  return Number.isFinite(v) ? _intv4Money(v) : '—';
+}
 function _intv22ExploreCandidates(W, esc) {
   const out = [];
   const rows = _intv21MemRows();
@@ -73607,7 +73635,7 @@ function _intv22ExploreCandidates(W, esc) {
       out.push({ id: 'x22_market_ops', family: 'contribution', root: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
         label: _intv4T('intv22_xq_market_ops', _intv4T('intv22_in_' + range).toLowerCase()),
         answer: p([_intv4T(Math.abs(ops) > Math.abs(market) ? 'intv22_xa_mo_ops' : 'intv22_xa_mo_market'),
-                   _intv4T('intv22_xa_mo_ev', _intccDate(att.startAt), (market >= 0 ? '+' : '−') + _intv4Money(Math.abs(market)), (ops >= 0 ? '+' : '−') + _intv4Money(Math.abs(ops))),
+                   _intv4T('intv22_xa_mo_ev', _intccDate(att.startAt), (market >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(market)), (ops >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(ops))),
                    _intv4T('intv22_xa_mo_lim')]) });
       break;
     }
@@ -73629,7 +73657,7 @@ function _intv22ExploreCandidates(W, esc) {
         const key = !cashMoved ? 'intv22_xa_liq_rest' : (Math.abs(net) > 0.5 * Math.abs(cB - cA) ? 'intv22_xa_liq_flows' : 'intv22_xa_liq_cash');
         out.push({ id: 'x22_liq_why', family: 'liquidity', root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
           label: _intv4T('intv22_xq_liq', lead.toLowerCase()),
-          answer: p([_intv4T(key), _intv4T('intv22_xa_liq_ev', lead, (cB - cA >= 0 ? '+' : '−') + _intv4Money(Math.abs(cB - cA)), (we.tot - cB - (ws.tot - cA) >= 0 ? '+' : '−') + _intv4Money(Math.abs(we.tot - cB - (ws.tot - cA))))]) });
+          answer: p([_intv4T(key), _intv4T('intv22_xa_liq_ev', lead, (cB - cA >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(cB - cA)), (we.tot - cB - (ws.tot - cA) >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(we.tot - cB - (ws.tot - cA))))]) });
       }
     }
   } catch (_) {}
@@ -73746,39 +73774,111 @@ function _intv22HeroTags(ctx) {
 // Mismos cálculos de v808. Desde 768 px los tres escenarios se ven a la vez; en
 // móvil, pestañas y uno visible. El peso afectado es una barra rotulada; el
 // impacto estimado es la única cifra.
+// ── DEPENDENCIAS Y ESCENARIOS · SIMULADOR COMÚN (V5) ─────────────────────────
+// UN control (−50 % … +50 %, pasos de 5, empieza en −10 % y no se guarda) mueve a la
+// vez los tres escenarios existentes. El cálculo es EXACTAMENTE el certificado:
+// impacto = peso actual × movimiento (lineal, simétrico), y el importe es ese
+// porcentaje sobre el MISMO universo de los pesos (cartera financiera), convertido a
+// la moneda principal. No modela correlaciones, rebalanceos, divisa futura ni
+// impuestos, y no es una previsión.
+const _INTV5_SIM = { min: -50, max: 50, step: 5, start: -10 };
 function _intv22ScenarioHtml(W, esc) {
   const sc = _intv21Scenarios(W);
   if (!sc.length) return '';
   const st = _intv21Read();
-  // Sin elección guardada, el escenario por defecto es el que corresponde al hallazgo
-  // principal: si las tres mayores pesan más que el resto (lo que dice el titular),
-  // «Tres mayores»; si no, el primero.
+  // Destacado: el escenario del hallazgo principal (o el que eligió una etiqueta).
   let def = sc[0];
   try {
     const rows = (W && W.rows) || [], tot = rows.reduce((a, r) => a + r.usd, 0), u3 = rows.slice(0, 3).reduce((a, r) => a + r.usd, 0);
     if (rows.length >= 4 && tot > 0 && u3 > tot - u3) def = sc.find(s => s.id === 'top3') || sc[0];
   } catch (_) {}
   const cur = sc.find(s => s.id === st.scen) || def;
-  // El SUJETO se lee como la hipótesis completa («Si Microsoft bajara un 10 %»); los
-  // nombres de las tres mayores van debajo. Mismo cálculo: peso × −10 %.
-  const subject = (s) => _intv4T('intv3_scn_if_' + s.id, s.names[0]);
+  // La base viaja en USD y se convierte AL PINTAR: si la moneda principal cambia con la
+  // card abierta (Ajustes o sincronización), el importe sigue siendo correcto.
+  const base = Number(W && W.total) || 0;
+  const wMax = Math.max.apply(null, sc.map(s => s.w));
+  const v0 = _INTV5_SIM.start;
   return `
-    <section class="intcc-card intv21-scen intv22-scen" data-scen="${esc(cur.id)}" data-impact="${esc(cur.impact.toFixed(4))}" data-n="${sc.length}">
-      <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_scn_title'))}<span class="intv3-scn-tag">${esc(_intv4T('intv3_scn_tag'))}</span></h3>
-      <div class="intv21-seg intv22-scn-tabs" role="tablist" aria-label="${esc(_intv4T('intv21_scn_aria'))}">${sc.map(s => `
-        <button type="button" role="tab" class="intv21-chip${s.id === cur.id ? ' is-on' : ''}" data-intv21-scen="${esc(s.id)}" aria-selected="${s.id === cur.id ? 'true' : 'false'}" aria-controls="intv22-scn-${esc(s.id)}">${esc(_intv4T('intv21_scn_opt_' + s.id))}</button>`).join('')}
+    <section class="intcc-card intv21-scen intv22-scen intv5-sim" data-scen="${esc(cur.id)}" data-shock="${v0}" data-base="${esc(String(base))}" data-wmax="${esc(String(wMax))}" data-n="${sc.length}">
+      <h3 class="intcc-card-title" tabindex="-1">${esc(_intv4T('intv21_scn_title'))}</h3>
+      <div class="intv5-sim-ctrl">
+        <p class="intv5-sim-lead" id="intv5-sim-lead">${esc(_intv4T('intv5_sim_lead'))}</p>
+        <div class="intv5-sim-row">
+          <button type="button" class="intv5-sim-step" data-sim-step="-1" aria-label="${esc(_intv4T('intv5_sim_less'))}">−</button>
+          <div class="intv5-sim-range">
+            <input type="range" min="${_INTV5_SIM.min}" max="${_INTV5_SIM.max}" step="${_INTV5_SIM.step}" value="${v0}"
+                   aria-label="${esc(_intv4T('intv5_sim_aria'))}" aria-describedby="intv5-sim-lead" aria-valuetext="${esc(_intv5SimPct(v0))}">
+            <div class="intv5-sim-ticks" aria-hidden="true"><span>−50</span><span>−25</span><span>0</span><span>+25</span><span>+50</span></div>
+          </div>
+          <button type="button" class="intv5-sim-step" data-sim-step="1" aria-label="${esc(_intv4T('intv5_sim_more'))}">+</button>
+          <output class="intv5-sim-value" data-sim-value aria-live="polite">${esc(_intv5SimPct(v0))}</output>
+        </div>
       </div>
       <div class="intv22-scn-grid">${sc.map(s => `
-        <div class="intv22-scn-block${s.id === cur.id ? ' is-on' : ''}" id="intv22-scn-${esc(s.id)}" role="tabpanel" data-scn="${esc(s.id)}" data-impact="${esc(s.impact.toFixed(4))}">
+        <div class="intv22-scn-block${s.id === cur.id ? ' is-on' : ''}" id="intv22-scn-${esc(s.id)}" data-scn="${esc(s.id)}" data-w="${esc(String(s.w))}" data-label="${esc(s.names[0])}">
           <p class="intv22-scn-kind">${esc(_intv4T('intv21_scn_opt_' + s.id))}</p>
-          <p class="intv22-scn-subject">${esc(subject(s))}</p>
+          <p class="intv22-scn-subject" data-sim-subject></p>
           ${s.id === 'top3' ? `<p class="intv22-scn-shock">${esc(s.names.join(' · '))}</p>` : ''}
-          <p class="intv22-scn-impact"><span class="intv21-scn-val">≈ ${esc(_intv21Pct(s.impact, 1, true))}</span><span class="intv21-scn-unit">${esc(_intv4T('intv21_scn_unit'))}</span></p>
-          <div class="intv21-scn-track" role="img" aria-label="${esc(_intv4T('intv22_scn_bar_aria'))}"><span class="intv21-scn-fill" style="width:${Math.max(0, Math.min(100, s.w * 100)).toFixed(1)}%"></span></div>
-          <p class="intv22-scn-bar-l">${esc(_intv4T('intv21_scn_affected'))}</p>
+          <p class="intv22-scn-impact"><span class="intv21-scn-val" data-sim-pct></span><span class="intv21-scn-unit">${esc(_intv4T('intv21_scn_unit'))}</span></p>
+          <p class="intv5-sim-money" data-sim-money></p>
+          <div class="intv5-sim-bar" role="img" data-sim-bar><span class="intv5-sim-zero"></span><span class="intv5-sim-fill"></span></div>
         </div>`).join('')}
       </div>
     </section>`;
+}
+function _intv5SimPct(v) {
+  const n = Number(v) || 0;
+  return (n > 0 ? '+' : (n < 0 ? '−' : '')) + _intv21Pct(Math.abs(n), 0);
+}
+// Pinta los tres resultados para un movimiento `shock` (en %). Puro presentación:
+// lee los pesos del propio marcado (los del render) y no escribe nada.
+function _intv5SimApply(card, shock, animate) {
+  if (!card) return;
+  const v = Math.max(_INTV5_SIM.min, Math.min(_INTV5_SIM.max, Math.round(Number(shock) / _INTV5_SIM.step) * _INTV5_SIM.step));
+  const baseUsd = Number(card.getAttribute('data-base'));
+  const base = (typeof toBase === 'function') ? toBase(baseUsd, 'USD') : baseUsd;   // moneda principal ACTUAL
+  const wMax = Number(card.getAttribute('data-wmax')) || 0;
+  card.setAttribute('data-shock', String(v));
+  const input = card.querySelector('input[type="range"]');
+  if (input) { if (Number(input.value) !== v) input.value = String(v); input.setAttribute('aria-valuetext', _intv5SimPct(v)); }
+  const out = card.querySelector('[data-sim-value]');
+  if (out) out.textContent = _intv5SimPct(v);
+  const dir = v > 0 ? 'up' : (v < 0 ? 'down' : 'flat');
+  card.querySelectorAll('.intv22-scn-block').forEach(b => {
+    const id = b.getAttribute('data-scn'), w = Number(b.getAttribute('data-w')) || 0;
+    const impact = v === 0 ? 0 : w * v;                        // % de la cartera financiera
+    // Sin tipo de cambio no se publica importe (nunca un cero inventado junto a un % ≠ 0).
+    const money = v === 0 ? 0 : (Number.isFinite(base) && base > 0 ? impact / 100 * base : NaN);
+    b.setAttribute('data-impact', String(impact)); b.setAttribute('data-money', String(money)); b.setAttribute('data-dir', dir);
+    const subj = b.querySelector('[data-sim-subject]');
+    if (subj) subj.textContent = _intv4T('intv5_if_' + id + '_' + dir, b.getAttribute('data-label'), _intv21Pct(Math.abs(v), 0));
+    const pct = b.querySelector('[data-sim-pct]'), mon = b.querySelector('[data-sim-money]');
+    const paint = (k) => {
+      const i = impact * k, m = money * k;
+      if (pct) pct.textContent = impact === 0 ? _intv21Pct(0, 0) : '≈ ' + _intv21Pct(i, 1, true);
+      if (mon) mon.textContent = Number.isFinite(money) ? (money === 0 ? '' : (m > 0 ? '+' : '−')) + _intv4Money(Math.abs(m)) : '';
+    };
+    const rm = (typeof reducedMotion !== 'undefined' && reducedMotion) || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (!animate || rm || typeof requestAnimationFrame !== 'function') paint(1);
+    else {
+      const t0 = performance.now(), from = Number(b.__simLast) || 0, to = impact;
+      const step = (t) => { const k = Math.min(1, (t - t0) / 180); const cur = from + (to - from) * (1 - Math.pow(1 - k, 3));
+        if (pct) pct.textContent = impact === 0 && k === 1 ? _intv21Pct(0, 0) : '≈ ' + _intv21Pct(cur, 1, true);
+        if (k < 1) requestAnimationFrame(step); else paint(1); };
+      requestAnimationFrame(step);
+      if (mon) mon.textContent = Number.isFinite(money) ? (money === 0 ? '' : (money > 0 ? '+' : '−')) + _intv4Money(Math.abs(money)) : '';
+    }
+    b.__simLast = impact;
+    // Barra simétrica: media pista por lado; la escala es el mayor impacto posible
+    // de los tres escenarios en ±50 %, así que las tres barras son comparables.
+    const fill = b.querySelector('.intv5-sim-fill'), bar = b.querySelector('[data-sim-bar]');
+    const frac = wMax > 0 ? Math.min(1, Math.abs(impact) / (wMax * _INTV5_SIM.max)) : 0;
+    if (fill) { fill.style.width = (frac * 50).toFixed(2) + '%'; fill.style.left = impact < 0 ? (50 - frac * 50).toFixed(2) + '%' : '50%'; }
+    if (bar) { bar.setAttribute('data-dir', dir); bar.setAttribute('aria-label', (pct ? pct.textContent : '') + ' ' + _intv4T('intv21_scn_unit')); }
+  });
+}
+function _intv5SimInit(root) {
+  (root || document).querySelectorAll('.intv5-sim').forEach(card => _intv5SimApply(card, Number(card.getAttribute('data-shock')) || _INTV5_SIM.start, false));
 }
 
 function _renderIntelligenceCommandCenter() {
@@ -73955,8 +74055,14 @@ function _renderIntelligenceCommandCenter() {
   const _W21 = (typeof _intv21Weights === 'function') ? _intv21Weights() : { total: 0, rows: [], classes: [] };
   const _drvItems21 = (typeof _intv21DriverItems === 'function') ? _intv21DriverItems(snap) : [];
   const _storiesFull21 = _intv5MattersStories(core, skipRoots, intel, _ackMap).stories;
-  const _today21 = (typeof _intv21TodayItems === 'function') ? _intv21TodayItems(core, _storiesFull21, _W21) : [];
-  const mattersSel = (typeof _intv21TrimStories === 'function') ? _intv21TrimStories(_storiesFull21, _today21) : _storiesFull21;
+  // PRIORIDAD DE HOY (V5): 1 · contribución / rentabilidad certificadas → 2 · cambios
+  // estructurales materiales del Core → 3 · movimientos de cotización, que sólo
+  // completan hasta tres. Lo que no se publica no entra en el registro ni en etiquetas.
+  const _todayAll21 = (typeof _intv21TodayItems === 'function') ? _intv21TodayItems(core, _storiesFull21, _W21) : [];
+  const _todayHead21 = _todayAll21.filter(x => x.kind !== 'mover');
+  const mattersSel = (typeof _intv21TrimStories === 'function') ? _intv21TrimStories(_storiesFull21, _todayHead21) : _storiesFull21;
+  const _todayMovers21 = _todayAll21.filter(x => x.kind === 'mover').slice(0, Math.max(0, 3 - _todayHead21.length - mattersSel.length));
+  const _today21 = _todayHead21.concat(_todayMovers21);
   // V2.1 — sin relleno estático: sólo con CERO hechos actuales, una lectura estructural.
   const _struct21 = (typeof _intv22TodayFallback === 'function')
     ? _intv22TodayFallback(_W21, _today21.length + mattersSel.length) : [];
@@ -74124,7 +74230,9 @@ function _renderIntelligenceCommandCenter() {
         </div>
       <div class="intcc-hero-intel">
         <div class="intcc-hero-body">
-          <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
+          ${/* V5 · «INTELIGENCIA» usa la MISMA jerarquía que todo título de sección
+                (el de Salud incluido): punto azul, tipografía y tono comunes. */''}
+          <h3 class="intcc-card-title intcc-hero-health-label intcc-hero-intel-label">${esc(t('intcc_eyebrow'))}</h3>
           <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
           ${reading.sub ? `<p class="intcc-hero-sub">${esc(reading.sub)}</p>` : ''}
           ${seeChangesHtml}
@@ -74227,7 +74335,7 @@ function _renderIntelligenceCommandCenter() {
   // nada y el resto de cards recupera su fila base, que es la que tenían antes
   // de que el comparador existiera.
 
-  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap, _gaps.today, { head: _today21, tail: _struct21 });
+  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots, intel, _ackMap, _gaps.today, { head: _todayHead21, tail: _todayMovers21.concat(_struct21) });
   const publishedKeys = [];
   mattersSel.forEach(st => {
     publishedKeys.push(st.semanticKey);
@@ -74354,10 +74462,10 @@ function _renderIntelligenceCommandCenter() {
       ${driversHtml}
       ${exploreHtml}
       ${/* ORDEN DEFINITIVO (DOM = visual = teclado = lector): Evolución y
-            Dependencias forman la fila de análisis; Hoy cierra, a ancho completo. */''}
+            Hoy forman la fila de lectura (⅔ | ⅓); Dependencias, a ancho completo. */''}
       ${memoryHtml}
-      ${scenHtml}
       ${mattersHtml}
+      ${scenHtml}
       ${moversHtml}
       ${structureHtml}
       ${discHtml}
@@ -74897,6 +75005,78 @@ try {
       && _intv14CmpState().benchmarkId) _intv14CmpRepaint();
 } catch (_) {}
 }
+// ── EXPLORA · ZONA DE RESPUESTA RESERVADA ──────────────────────────────────
+// La card tiene una altura ESTABLE: preguntas cerradas + la respuesta más larga real
+// (medida, no inventada). Abrir una respuesta sustituye ese espacio reservado y no
+// cambia la altura de la card, de la fila ni de lo de abajo. En escritorio la reserva
+// se acota a un poco más que la fila Radar/Factores; si una respuesta no cabe, la
+// lista desplaza dentro de la card con un degradado de continuidad.
+function _intv5ExploreReserve(root) {
+  const card = root && root.querySelector('.intcc-explore:not(.is-pending)');
+  if (!card) return;
+  // El observador se instala ANTES de medir: si la pestaña aún no tiene layout (en
+  // plena transición), la medida llega en cuanto la card tiene tamaño, sin timers.
+  // SIN BUCLE: medir cambia la altura de la página, y en navegadores con barra de
+  // desplazamiento clásica eso puede mostrarla/ocultarla y estrechar la card unos
+  // 15 px, lo que volvía a medir (oscilación continua). Sólo un cambio de anchura
+  // REAL (> 24 px) o de breakpoint vuelve a medir.
+  const isDesk = () => !!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches);
+  const w = card.getBoundingClientRect().width;
+  // Visible al pintar ⇒ se mide YA (sin un frame con la altura sin reservar).
+  if (w > 0) { _intv5ExploreMeasure(card); card.__intv5W0 = w; card.__intv5D0 = isDesk(); }
+  // Después, sólo un cambio real de anchura/breakpoint (o la primera vez que la card
+  // tiene layout) vuelve a medir, y en el SIGUIENTE frame: medir dentro del callback
+  // cambia el tamaño observado y provoca el aviso de bucle de ResizeObserver.
+  if (!card.__intv5Ro && typeof ResizeObserver === 'function') {
+    card.__intv5Ro = new ResizeObserver(() => {
+      if (!card.isConnected) return;
+      const w1 = card.getBoundingClientRect().width, d1 = isDesk();
+      const w0 = card.__intv5W0 || 0;
+      if (w1 > 0 && (!w0 || Math.abs(w1 - w0) > 24 || d1 !== card.__intv5D0)) {
+        card.__intv5W0 = w1; card.__intv5D0 = d1;
+        requestAnimationFrame(() => { if (card.isConnected) _intv5ExploreMeasure(card); });
+      }
+    });
+    card.__intv5Ro.observe(card);
+  }
+}
+function _intv5ExploreMeasure(card) {
+  const list = card.querySelector('.intcc-explore-list');
+  if (!list) return;
+  const rect0 = card.getBoundingClientRect();
+  if (!(rect0.width > 0)) return;                 // sin layout todavía: lo mide el observador
+  card.style.height = ''; card.classList.remove('has-reserve');
+  const openA = card.querySelector('.intcc-x-answer.is-open > .intcc-x-answer-in');
+  const closed = card.getBoundingClientRect().height - (openA ? openA.getBoundingClientRect().height : 0);
+  if (!(closed > 0)) return;
+  let maxAns = 0;
+  card.querySelectorAll('.intcc-x-answer > .intcc-x-answer-in').forEach(a => { maxAns = Math.max(maxAns, a.scrollHeight + 1); });
+  let h = closed + maxAns;
+  const grid = card.parentElement, desktop = window.matchMedia && window.matchMedia('(min-width: 1024px)').matches;
+  if (desktop && grid) {
+    const sib = [].slice.call(grid.querySelectorAll(':scope > .intcc-radar, :scope > .intcc-drivers'));
+    const prevAlign = sib.map(n => n.style.alignSelf);
+    sib.forEach(n => { n.style.alignSelf = 'start'; });
+    const row = Math.max(closed, ...sib.map(n => n.getBoundingClientRect().height));
+    // Se restaura EXACTAMENTE (sin dejar `style=""`): Radar y Factores no cambian ni un byte.
+    sib.forEach((n, i) => { n.style.alignSelf = prevAlign[i]; if (!n.getAttribute('style')) n.removeAttribute('style'); });
+    h = Math.max(row, Math.min(h, row * 1.2));
+  } else {
+    h = Math.min(h, Math.max(closed, (window.innerHeight || 800) * 0.75));
+  }
+  card.style.height = Math.ceil(h) + 'px';
+  card.classList.add('has-reserve');
+  card.__intv5Measures = (card.__intv5Measures || 0) + 1;
+  _intv5ExploreFade(list);
+}
+function _intv5ExploreFade(list) {
+  if (!list) return;
+  const card = list.closest('.intcc-explore');
+  const more = list.scrollHeight - list.clientHeight - list.scrollTop > 2;
+  if (card) card.classList.toggle('is-overflow', more);
+  if (!list.__intv5Fade) { list.__intv5Fade = true; list.addEventListener('scroll', () => _intv5ExploreFade(list), { passive: true }); }
+}
+let _intv5RevealNext = false;
 function _initIntelligenceCommandCenter() {
   try { if (typeof _intv21Wire === 'function') _intv21Wire(); } catch (_) {}
   try {
@@ -74905,8 +75085,15 @@ function _initIntelligenceCommandCenter() {
     // El estado VACÍO también se revela: el CSS deja a opacidad 0 todo hijo de
     // `.aurix-intcc` hasta `is-revealed`, así que sin esto una cuenta sin activos
     // (o un fallo del Core, que cae al mismo vacío) veía la pestaña en blanco.
-    if (root) requestAnimationFrame(() => root.classList.add('is-revealed'));
+    // V5 · Un repintado interno (llega la memoria, la historia o un contexto) NO
+    // repite la entrada: antes todas las cards volvían a opacidad 0 y se desplazaban
+    // 16 px, y la pantalla «parecía refrescarse». Sólo entrar en la pestaña anima.
+    if (root && _intv5RevealNext) requestAnimationFrame(() => root.classList.add('is-revealed'));
+    else if (root) root.classList.add('is-revealed', 'is-instant');
+    _intv5RevealNext = false;
     if (root && !root.classList.contains('is-empty')) _intccAnimateScoreRings(root);
+    try { _intv5ExploreReserve(root); } catch (_) {}
+    try { _intv5SimInit(root); } catch (_) {}
   } catch (_) {}
 
   try {
@@ -75161,23 +75348,6 @@ function _initIntelligenceCommandCenter() {
       const item     = btn.closest('.intcc-x-item');
       const list     = btn.closest('.intcc-explore-list');
       const willOpen = !ans.classList.contains('is-open');
-      // LA RESPUESTA CRECE SU CARD, NO LA FILA. En escritorio Explora comparte fila
-      // con Radar y Factores (alturas parejas a propósito); al abrir, las vecinas se
-      // fijan a la altura que YA tenían y dejan de estirarse, así que sólo Explora
-      // crece y empuja lo de abajo. Al cerrar todo vuelve a la fila simétrica.
-      try {
-        const grid = btn.closest('.aurix-intcc');
-        const sibs = grid ? [].slice.call(grid.querySelectorAll(':scope > .intcc-radar, :scope > .intcc-drivers')) : [];
-        if (willOpen) {
-          if (grid && !grid.classList.contains('is-x-open')) {
-            sibs.forEach(n => { n.style.minHeight = n.getBoundingClientRect().height + 'px'; });
-            grid.classList.add('is-x-open');
-          }
-        } else if (grid) {
-          grid.classList.remove('is-x-open');
-          sibs.forEach(n => { n.style.minHeight = ''; });
-        }
-      } catch (_) {}
       // INT.2R — only one answer open at a time; collapse the rest first.
       if (list) {
         list.querySelectorAll('.intcc-x-answer.is-open').forEach(a => a.classList.remove('is-open'));
@@ -75189,7 +75359,11 @@ function _initIntelligenceCommandCenter() {
         btn.classList.add('is-active');
         btn.setAttribute('aria-expanded', 'true');
         if (item) item.classList.add('is-active');
+        // La respuesta ocupa la zona reservada DENTRO de la card: si la lista desplaza,
+        // la pregunta abierta se lleva arriba del área visible (sin mover la página).
+        try { if (list && item && list.scrollHeight > list.clientHeight + 1) list.scrollTo({ top: item.offsetTop - list.offsetTop, behavior: reducedMotion ? 'auto' : 'smooth' }); } catch (_) {}
       }
+      try { _intv5ExploreFade(list); } catch (_) {}
     });
   }
 }
