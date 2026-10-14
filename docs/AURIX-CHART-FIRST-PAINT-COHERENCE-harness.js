@@ -107,5 +107,33 @@ console.log('\n2 · primer render del boot');
      app.indexOf('window.__aurixBootReady.dashboard = true;') < app.indexOf('try { scheduleAurixMobileLite(); } catch (_) {}'));
 }
 
+// ── 3 · la curva guardada sólo vuelve si es de ESTA cuenta, ESTA divisa y está al día ─────
+console.log('\n3 · curva guardada (LKG): cuenta, divisa y frescura del punto final');
+{
+  let NOW = 1800000000000; const store = {};
+  const sb = { Math, Number, JSON, Array, Object, String, isFinite, console: { log(){}, warn(){} },
+    Date: { now: () => NOW }, _aurixActiveUserId: 'user-A', baseCurrency: 'EUR',
+    localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } } };
+  vm.createContext(sb);
+  ['_WSC_LASTGOOD_KEY', '_WSC_LASTGOOD_MAX_AGE', '_AURIX_CHART_LKG_PUBLICATION', '_AURIX_LKG_RESULT_FIELDS', '_AURIX_24H_ENDPOINT_FRESH_MS'].forEach(k => vm.runInContext(konstSrc(k), sb));
+  ['_wscLoadLastGood', '_wscSaveLastGood', '_wscGetFreshLastGood', '_aurixLkgOwner', '_aurixLkgCcy', '_aurixChartLkgSave', '_aurixChartLkgRestore'].forEach(f => vm.runInContext(fnSrc(f), sb));
+  const SAVE = vm.runInContext('_aurixChartLkgSave', sb), RESTORE = vm.runInContext('_aurixChartLkgRestore', sb);
+  const frame = { range: '24h', state: 'ready', returnState: 'ok', badgeReturnPct: -1.1, returnPct: -1.1, chartHash: 'h1',
+    points: [0, 1, 2, 3].map(i => ({ ts: NOW - (3 - i) * 15 * 60000, value: 100 - i })) };
+  SAVE(frame, frame.points, '24h', 'down');
+  const r1 = RESTORE('24h');
+  ok('misma cuenta, misma divisa y punto final reciente ⇒ se restaura con su %', !!r1 && r1.badgeReturnPct === -1.1 && r1._aurixLkgRestored === true);
+  sb._aurixActiveUserId = 'user-B';
+  ok('otra cuenta en el mismo navegador ⇒ no se restaura', RESTORE('24h') === null);
+  sb._aurixActiveUserId = 'user-A'; sb.baseCurrency = 'USD';
+  ok('otra divisa base ⇒ no se restaura (ni curva ni %)', RESTORE('24h') === null);
+  sb.baseCurrency = 'EUR';
+  NOW += 91 * 60000;
+  ok('punto final de hace > 90 min ⇒ no se presenta como actual', RESTORE('24h') === null);
+  NOW -= 91 * 60000;
+  const all = JSON.parse(store.aurixLastGoodChartByRange); delete all['24h'].owner; store.aurixLastGoodChartByRange = JSON.stringify(all);
+  ok('registro sin sello (anterior a la regla) ⇒ no se restaura', RESTORE('24h') === null);
+}
+
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail === 0 ? 0 : 1);

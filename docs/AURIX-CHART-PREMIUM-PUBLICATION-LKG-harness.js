@@ -45,6 +45,8 @@ vm.runInContext(konstSrc('_AURIX_LKG_RESULT_FIELDS'), sb);
 vm.runInContext(konstSrc('_aurixPublishedChartByRange'), sb);
 vm.runInContext(fnSrc('_aurixPublishedChartFor'), sb);
 vm.runInContext(fnSrc('_aurixMarkChartPublished'), sb);
+vm.runInContext(fnSrc('_aurixLkgOwner'), sb);
+vm.runInContext(fnSrc('_aurixLkgCcy'), sb);
 vm.runInContext(fnSrc('_aurixChartLkgSave'), sb);
 vm.runInContext(fnSrc('_aurixChartLkgRestore'), sb);
 const SAVE    = vm.runInContext('_aurixChartLkgSave', sb);

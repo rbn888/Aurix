@@ -35192,6 +35192,8 @@ function _aurixMarkChartPublished(emg) {
 // Persist a DEFINITIVE publication as this range's LKG. Called only where the final publication
 // contract already said yes (FRC badgeEligible + a real render series), never for a provisional or
 // insufficient frame — so a new account can never manufacture an LKG out of construction data.
+function _aurixLkgOwner() { try { return (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? String(_aurixActiveUserId) : null; } catch (_) { return null; } }
+function _aurixLkgCcy() { try { return (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency) : null; } catch (_) { return null; } }
 function _aurixChartLkgSave(emg, renderPoints, range, colorClass) {
   try {
     if (!_AURIX_CHART_LKG_PUBLICATION) return;
@@ -35212,6 +35214,8 @@ function _aurixChartLkgSave(emg, renderPoints, range, colorClass) {
       percent: Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : emg.returnPct,
       // BLOCK-B widening — the full coherent publication.
       range: r, identity: emg.chartHash || null, result: result,
+      // De quién y en qué divisa: el frame sólo se republica para la MISMA cuenta y la MISMA base.
+      owner: _aurixLkgOwner(), ccy: _aurixLkgCcy(),
     });
   } catch (_) {}
 }
@@ -35226,6 +35230,8 @@ function _aurixChartLkgRestore(range) {
     if (!r) return null;
     const rec = _wscGetFreshLastGood(r, Date.now());
     if (!rec || !rec.result || rec.range !== r || rec.result.range !== r) return null;   // never cross ranges
+    // Misma cuenta y misma divisa base que ahora; un registro sin sello (anterior a esta regla) no vale.
+    if (rec.owner !== _aurixLkgOwner() || rec.ccy !== _aurixLkgCcy()) return null;
     const vals = Array.isArray(rec.series) ? rec.series : null;
     const tss  = Array.isArray(rec.tsArr) ? rec.tsArr : null;
     if (!vals || !tss || vals.length < 2 || vals.length !== tss.length) return null;
@@ -35238,6 +35244,13 @@ function _aurixChartLkgRestore(range) {
       emg.points.push({ ts: tss[i], value: vals[i] });
     }
     emg.pointCount = Number.isFinite(emg.pointCount) ? emg.pointCount : emg.points.length;
+    // NUNCA UN «ACTUAL» CADUCADO. El frame se publica como el de ahora (curva + % junto al hero), así
+    // que su último punto tiene que cumplir la misma frescura que ya exige el retorno publicado
+    // (`_AURIX_24H_ENDPOINT_FRESH_MS`, 90 min). Más viejo ⇒ no se restaura: el contenedor queda en su
+    // estado de carga hasta el frame definitivo (sin esperas nuevas: es el camino sin LKG de siempre).
+    const _fresh = (typeof _AURIX_24H_ENDPOINT_FRESH_MS === 'number') ? _AURIX_24H_ENDPOINT_FRESH_MS : 90 * 60000;
+    const _endTs = emg.points[emg.points.length - 1].ts;
+    if (!(Date.now() - _endTs <= _fresh)) return null;
     emg._aurixLkgRestored = true;
     emg._aurixLkgAgeMs = Date.now() - rec.ts;
     return emg;
