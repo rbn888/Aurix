@@ -31168,7 +31168,9 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer.is-open > .intcc-x-answer-in { border-top: 0; }
 .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer-in > .intv9-x-box,
 .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer-in { box-sizing: border-box; }
-
+.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer.is-open > .intcc-x-answer-in {
+  margin: 0 10px 10px; border: 1px solid rgba(var(--aurix-electric), 0.42); border-left: 2px solid rgb(var(--aurix-electric));
+  border-radius: 10px; background: rgba(5,10,22,0.86); }
 .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer p { padding: 10px 12px; font-size: 13px; line-height: 1.5; color: rgba(236,242,255,0.96); }
 .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer p + p { padding-top: 0; color: rgba(206,219,244,0.9); }
 @media (prefers-reduced-motion: reduce) { .aurix-intcc .intcc-explore.intv9-x .intcc-x-answer { transition: none; } }
@@ -31202,9 +31204,8 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 @property --g9a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .aurix-intv21 > .intcc-hero::before, .aurix-intv21 > .intcc-m-hero::before,
 .aurix-intv21 > .intcc-radar::before, .aurix-intv21 > .intcc-drivers::before, .aurix-intv21 > .intcc-explore::before,
-.aurix-intv21 > .intcc-timeline::before, .aurix-intv21 > .intcc-watch::before, .aurix-intv21 > .intv21-scen::before,
-.aurix-intv21 > .intcc-m-health::before {
-  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 2; opacity: 0;
+.aurix-intv21 > .intcc-timeline::before, .aurix-intv21 > .intcc-watch::before, .aurix-intv21 > .intv21-scen::before {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 2; opacity: 0;
   background: conic-gradient(from var(--g9a), rgba(var(--aurix-gold),0) 0deg, rgba(255,236,196,0.5) 18deg, rgba(var(--aurix-gold),0) 38deg, rgba(var(--aurix-gold),0) 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
           mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
@@ -31219,101 +31220,3 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 /* CIERRE · el esqueleto de Explora tiene la geometría de las preguntas reales: entre
    1024 y 1279 px las etiquetas ocupan dos líneas. */
 @media (min-width: 1024px) and (max-width: 1279px) { .intcc-explore.is-pending .intv3-sk-list > .intv3-sk { height: 64px; } }
-
-/* ════════════════════════════════════════════════════════════════════════════
-   CIERRE VISUAL · EVOLUCIÓN — la «cuña» junto al último punto
-   CAUSA: la línea se dibujaba por longitud (0–0,9 s) mientras el relleno aparecía
-   ENTERO por opacidad (0,3–0,9 s): durante la animación, el relleno por delante de la
-   línea se leía como un bloque oscuro sin trazo. Línea, relleno y puente se revelan
-   ahora JUNTOS, de izquierda a derecha, con un único recorte (mismos datos).
-   ════════════════════════════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion: no-preference) {
-  .intv21-evo-plot.is-anim:not(.is-bars) .intv21-evo-svg { animation: intv9Reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
-  .intv21-evo-plot.is-anim:not(.is-bars) .intv21-evo-line { stroke-dasharray: none; stroke-dashoffset: 0; animation: none; }
-  .intv21-evo-plot.is-anim:not(.is-bars) .intv22-area,
-  .intv21-evo-plot.is-anim:not(.is-bars) .intv3-evo-bridge { animation: none; opacity: 1; }
-}
-@keyframes intv9Reveal { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-
-/* ════════════════════════════════════════════════════════════════════════════
-   CIERRE VISUAL · EXPLORA — MODO RESPUESTA SUPERPUESTO (misma altura exterior)
-   La pregunta activa se superpone sobre la lista como cabecera; su respuesta, debajo,
-   desplaza sólo su cuerpo. Las demás quedan en su sitio, ocultas e inertes, así que la
-   card mide lo mismo abierta y cerrada. Una sola línea lateral eléctrica: sin caja
-   dentro de caja, sin dorado ni verde.
-   ════════════════════════════════════════════════════════════════════════════ */
-.aurix-intcc .intcc-explore.intv9-x { position: relative; }
-.aurix-intcc .intcc-explore.intv9-x .intcc-x-item.is-x-hidden { visibility: hidden; }
-.aurix-intcc .intcc-explore.intv9-x.is-x-open .intcc-x-item.is-active {
-  position: absolute; z-index: 3; top: var(--x-top, 52px); left: var(--x-pl, 16px); right: var(--x-pr, 16px); bottom: var(--x-pb, 16px);
-  display: flex; flex-direction: column; overflow: hidden;
-  background: linear-gradient(180deg, rgb(9,15,32), rgb(6,11,24)); border-color: rgba(var(--aurix-electric), 0.5); box-shadow: none; }
-@media (prefers-reduced-motion: no-preference) { .aurix-intcc .intcc-explore.intv9-x.is-x-open .intcc-x-item.is-active { animation: intv10XIn 150ms ease-out; } }
-@keyframes intv10XIn { from { opacity: 0; } to { opacity: 1; } }
-.aurix-intcc .intcc-explore.intv9-x.is-x-open .intcc-x-item.is-active > .intcc-x-q { flex: 0 0 auto; }
-.aurix-intcc .intcc-explore.intv9-x.is-x-open .intcc-x-item.is-active > .intcc-x-answer {
-  display: block; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; opacity: 1; transition: none; }
-.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer::-webkit-scrollbar { width: 0; height: 0; }
-.aurix-intcc .intcc-explore.intv9-x.is-x-open .intcc-x-item.is-active > .intcc-x-answer > .intcc-x-answer-in {
-  overflow: visible; margin: 0 14px 14px; padding: 0; border: 0; border-left: 2px solid rgba(var(--aurix-electric), 0.95); border-radius: 0; background: none; }
-.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer p { padding: 4px 0 4px 12px; }
-.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer p + p { padding-top: 6px; }
-.aurix-intcc .intcc-explore.intv9-x .intcc-x-item.is-active.is-more::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 28px; pointer-events: none; border-radius: 0 0 12px 12px;
-  background: linear-gradient(180deg, rgba(6,11,24,0), rgb(6,11,24)); }
-.aurix-intcc .intcc-explore.intv9-x .intcc-x-answer { transition: none; }
-/* CIERRE VISUAL · fechas y unidades de Evolución nunca se parten. */
-.intv21-evo-axis span, .intv22-stats dd .intv7-asof { white-space: nowrap; }
-
-/* ════════════════════════════════════════════════════════════════════════════
-   CIERRE VISUAL · DEPENDENCIAS Y ESCENARIOS — acabado Premium
-   Superficie azul-negro profunda con filete azul tenue (no gris), jerarquía
-   overline → nombre → escenario → % (dato principal) → importe (~75 %) → barra.
-   ════════════════════════════════════════════════════════════════════════════ */
-.aurix-intcc .intv22-scen .intv22-scn-block {
-  background: linear-gradient(180deg, rgb(11,18,38) 0%, rgb(7,12,27) 100%);
-  border: 1px solid rgba(var(--aurix-electric), 0.16);
-  box-shadow: inset 0 1px 0 rgba(160,190,255,0.05), inset 0 -10px 24px rgba(0,0,0,0.18);
-  border-radius: 14px; }
-.aurix-intcc .intv22-scen .intv22-scn-kind { font-size: 10px; letter-spacing: 0.09em; color: rgba(168,188,230,0.82); }
-.aurix-intcc .intv22-scen .intv8-dep-btn { font-size: 15px; color: #fff; }
-.aurix-intcc .intv22-scen .intv22-scn-subject { font-size: 13px; font-weight: 500; line-height: 1.38; color: rgba(214,226,248,0.9); }
-.aurix-intcc .intv22-scen .intv22-scn-shock { font-size: 11.5px; color: rgba(176,196,236,0.82); }
-.aurix-intcc .intv22-scen .intv21-scn-val { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.aurix-intcc .intv22-scen .intv21-scn-unit { font-size: 12px; font-weight: 500; color: rgba(186,204,238,0.82); }
-.aurix-intcc .intv22-scen .intv5-sim-money { font-size: 19px; font-weight: 650; line-height: 1.25; }
-.aurix-intcc .intv22-scen .intv5-sim-bar { height: 8px; background: rgba(255,255,255,0.07); box-shadow: inset 0 1px 2px rgba(0,0,0,0.35); overflow: visible; }
-.aurix-intcc .intv22-scen .intv5-sim-fill { transition: left 190ms ease, width 190ms ease, background-color 190ms ease; }
-.aurix-intcc .intv22-scen .intv5-sim-bar[data-dir="down"] .intv5-sim-fill { box-shadow: -2px 0 8px rgba(var(--sim-neg), 0.45); }
-.aurix-intcc .intv22-scen .intv5-sim-bar[data-dir="up"] .intv5-sim-fill { box-shadow: 2px 0 8px rgba(var(--sim-pos), 0.45); }
-.aurix-intcc .intv22-scen .intv5-sim-bar[data-dir="flat"] .intv5-sim-fill { box-shadow: none; background: none; }
-@media (prefers-reduced-motion: reduce) { .aurix-intcc .intv22-scen .intv5-sim-fill { transition: none; } }
-/* Control principal: rail, cero y marcas legibles; la marca de cero asoma por encima y
-   por debajo del pulgar. */
-.aurix-intcc .intv5-sim-rail { background: rgba(255,255,255,0.18); }
-.aurix-intcc .intv5-sim-origin { height: 28px; margin-top: -14px; width: 2px; background: rgba(214,228,255,0.85); }
-.aurix-intcc .intv5-sim-ticks { color: rgba(190,208,242,0.92); }
-/* Móvil: menos espacio muerto dentro de cada dependencia (mismo contenido y objetivos). */
-@media (max-width: 767px) {
-  .aurix-intcc .intv22-scen .intv22-scn-block { padding: 10px 12px 12px; }
-  .aurix-intcc .intv22-scen .intv8-dep-head .intv22-scn-kind { margin-bottom: -6px; }
-  .aurix-intcc .intv22-scen .intv22-scn-subject { margin: 2px 0 0; min-height: 2.76em; }
-  .aurix-intcc .intv22-scen .intv22-scn-shock { margin: 0; min-height: 1.3em; }
-  .aurix-intcc .intv22-scen .intv22-scn-impact { margin: 4px 0 0; }
-  .aurix-intcc .intv22-scen .intv21-scn-val { font-size: 23px; }
-  .aurix-intcc .intv22-scen .intv5-sim-money { font-size: 17px; margin: 0; min-height: 0; }
-  .aurix-intcc .intv22-scen .intv5-sim-bar { margin-top: 8px; }
-}
-@media (max-width: 767px) {
-  .aurix-intcc .intv22-scen .intv22-scn-block { padding: 8px 12px 10px; }
-  .aurix-intcc .intv22-scen .intv8-dep-head .intv22-scn-kind { margin-bottom: -9px; position: relative; z-index: 1; pointer-events: none; }
-  .aurix-intcc .intv22-scen .intv22-scn-subject { margin: 0; }
-  .aurix-intcc .intv22-scen .intv22-scn-impact { margin: 2px 0 0; }
-  .aurix-intcc .intv22-scen .intv5-sim-bar { margin-top: 6px; }
-}
-.intv8-dep-list { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-/* CIERRE VISUAL · el destello va por el filo INTERIOR del borde: en las cards con
-   overflow:hidden (Hero, Explora, Salud móvil) el filo exterior quedaba recortado. */
-/* En 0 la barra desaparece al instante (sin transición ni brillo residual). */
-.aurix-intcc .intv22-scen .intv5-sim-bar[data-dir="flat"] .intv5-sim-fill { transition: none; width: 0 !important; }
-@media (min-width: 768px) and (max-width: 1023px) { .aurix-intcc .intv22-scen .intv8-dep .intv22-scn-subject { min-height: 4.2em; } }

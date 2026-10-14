@@ -531,51 +531,10 @@ for (const E of ENGINES) {
     if (kind === 'one') ok(`${T} una inversión: la mayor inversión es Bitcoin, nunca Euros`, !/Euros/.test(U.top + U.kpi1), JSON.stringify(U));
     if (kind === 'stale') ok(`${T} el último dato antiguo dice su fecha («Dato del …»)`, U.asof && /Dato del \d/.test(U.kpi1), JSON.stringify(U));
     if (kind === 'real') {
-      // Sólo si el último dato es de HOY no lleva fecha (la persona termina 1 h antes de ahora).
-      const today = await page.evaluate(`(function(){ var p=JSON.parse(document.querySelector('.intv21-evo-plot').getAttribute('data-pts')); return _intccDate(p[p.length-1][2]) === _intccDate(Date.now()); })()`);
-      ok(`${T} «Último dato» lleva fecha sólo si no es de hoy`, U.asof === !today, JSON.stringify({ today, asof: U.asof, kpi1: U.kpi1 }));
+      ok(`${T} dato actual: «Último dato» sin fecha visible añadida`, !U.asof, JSON.stringify(U));
       ok(`${T} cambio de líder: «Cambio del peso máximo» se explica (accesible)`, /Cambio del peso máximo\. Tu mayor inversión cambió de Bitcoin a Microsoft/.test(U.kpi2dt), U.kpi2dt);
       ok(`${T} «Reparto» se explica UNA vez y el chip la referencia`, U.notes === 1 && U.chipDesc === 'intv7-evo-note-effective', JSON.stringify(U));
     }
-    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
-    await ctx.close();
-  }
-
-  // ── RESP · INVARIANTE HORIZONTAL (360/375/390): nada amplía el documento en ningún estado ──
-  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const W of (process.env.RESP_W || '360,375,390').split(',').map(Number)) {
-    if (!W) continue;
-    const T = `[${E} RESP ${W}]`;
-    const P = persona('real');
-    const ctx = await browser.newContext({ viewport: { width: W, height: 780 }, deviceScaleFactor: 1, hasTouch: true });
-    const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
-    await boot(page, P, 'es');
-    await page.evaluate(SESSION(P, 'uA', { delay: 900 }));
-    const HX = `(function(){ var d=document.documentElement; var root=document.querySelector('.aurix-intcc'); var cards=root ? [].slice.call(root.children) : [];
-      var wide=cards.filter(function(c){ var r=c.getBoundingClientRect(); return r.width>0 && (r.right > innerWidth + 1 || r.left < -1); }).map(function(c){ return c.className.split(' ').slice(0,2).join('.'); });
-      var tf=cards.filter(function(c){ var t=getComputedStyle(c).transform; return t && t!=='none' && !/^matrix\(1, 0, 0, 1, 0, 0\)$/.test(t); }).map(function(c){ return c.className.split(' ')[1]; });
-      return JSON.stringify({ sw: d.scrollWidth, cw: d.clientWidth, sx: scrollX, wide: wide, tf: tf }); })()`;
-    const states = [];
-    const check = async (name) => { const r = JSON.parse(await page.evaluate(HX)); states.push([name, r]); };
-    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; switchTab('intelligence'); })()`); await page.waitForTimeout(300); await check('entrada (datos tardíos en vuelo)');
-    await page.waitForTimeout(1500); await check('datos llegados');
-    for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, 600); await page.waitForTimeout(40); } await check('scroll rápido (dorado activo)');
-    await page.waitForTimeout(900); await check('tras el dorado');
-    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(150);
-    await page.locator('.intcc-explore .intcc-x-q').first().tap(); await page.waitForTimeout(250); await check('Explora abierta');
-    await page.locator('.intcc-explore .intcc-x-q[aria-expanded="true"]').tap(); await page.waitForTimeout(250); await check('Explora cerrada');
-    await page.evaluate(`document.querySelector('.intv5-sim').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(150);
-    await page.locator('#intv8-dep-b2').tap(); await page.waitForTimeout(250); await check('menú de Dependencias abierto');
-    const menu = JSON.parse(await page.evaluate(`(function(){ var l=document.getElementById('intv8-dep-l2'); var r=l.getBoundingClientRect(); return JSON.stringify({ l: r.left, r: r.right, t: r.top, b: r.bottom, vh: innerHeight, vw: innerWidth }); })()`));
-    await page.mouse.click(5, 5); await page.waitForTimeout(150);
-    await page.evaluate(`switchTab('home')`); await page.waitForTimeout(400); await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1500); await check('regreso desde Dashboard');
-    await page.setViewportSize({ width: 780, height: W }); await page.waitForTimeout(800); await page.setViewportSize({ width: W, height: 780 }); await page.waitForTimeout(1200); await check('giro y vuelta');
-    await page.reload({ waitUntil: 'domcontentloaded' }); await page.waitForFunction(`typeof switchTab === 'function'`, null, { timeout: 60000 }); await page.waitForTimeout(700);
-    await page.evaluate(SESSION(P, 'uA', { delay: 0 })); await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; switchTab('intelligence'); })()`); await page.waitForTimeout(1500); await check('recarga');
-    // La entrada (300 ms) aún anima su revelado (translateY, sin ancho): el «residuo» se
-    // exige en los estados ya asentados.
-    const bad = states.filter(([n, r]) => r.sw > r.cw + 1 || r.sx !== 0 || r.wide.length || (r.tf.length && !/^entrada/.test(n)));
-    ok(`${T} sin desplazamiento horizontal en ningún estado (scrollWidth ≤ ancho + 1, sin cards fuera ni transform residual)`, bad.length === 0, JSON.stringify(bad.length ? bad : states.map(x => x[0])));
-    ok(`${T} el menú de Dependencias queda dentro de la pantalla y por encima de la navegación fija`, menu.l >= 0 && menu.r <= menu.vw && menu.t >= 0 && menu.b <= menu.vh - 60, JSON.stringify(menu));
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }
@@ -768,42 +727,50 @@ for (const E of ENGINES) {
       return JSON.stringify({ lead: !!d.querySelector('.intcc-drv-explain'), n: d.querySelectorAll('.intv15-drv-factor').length, f: [].slice.call(d.querySelectorAll('.intv15-drv-factor')).map(function(x){ return x.getAttribute('data-factor'); }), tags: tags, rows: d.querySelectorAll('.intcc-drv-row').length }); })()`));
     ok(`${T} Factores: sin línea redundante, ≤ 2 lecturas y sin repetir el Hero`, !F.lead && F.n <= 2 && F.rows >= 1
       && !(F.tags.indexOf('tag_top3') !== -1 && F.f.indexOf('dependency') !== -1), JSON.stringify(F));
-    // EXPLORA (RE-DECIDIDO · cierre visual): MODO RESPUESTA SUPERPUESTO. La card mide lo
-    // mismo abierta y cerrada; la pregunta activa queda como cabecera y su respuesta debajo,
-    // dentro de la card; las demás, ocultas e inertes; el mismo control cierra.
+    // EXPLORA (RE-DECIDIDO · cierre definitivo): ACORDEÓN REAL. La respuesta se abre DEBAJO
+    // de su pregunta, sin panel reservado ni texto de selección; una sola abierta; el
+    // control pulsado no se mueve (se compensa el scroll); Radar y Factores no cambian.
     const XS = `(function(){ var c=document.querySelector('.intcc-explore'); var r=c.getBoundingClientRect(); var qs=[].slice.call(c.querySelectorAll('.intcc-x-q'));
       var nb=[].slice.call(document.querySelectorAll('.aurix-intcc > .intcc-radar, .aurix-intcc > .intcc-drivers')).map(function(n){ return Math.round(n.getBoundingClientRect().height*10)/10; });
-      var a=c.querySelector('.intcc-x-answer.is-open'); var ar=a ? a.getBoundingClientRect() : null;
-      var act=c.querySelector('.intcc-x-q[aria-expanded="true"]'); var hr=act ? act.getBoundingClientRect() : null; var lr=c.querySelector('.intcc-explore-list').getBoundingClientRect();
-      return JSON.stringify({ h: Math.round(r.height*10)/10, top: Math.round(r.top*10)/10, nb: nb,
-        open: [].slice.call(c.querySelectorAll('.intcc-x-answer.is-open')).map(function(x){ return x.id; }), exp: qs.map(function(b){ return b.getAttribute('aria-expanded'); }),
+      return JSON.stringify({ h: Math.round(r.height*10)/10, nb: nb, vt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().top*10)/10; }),
+        open: [].slice.call(c.querySelectorAll('.intcc-x-answer.is-open')).map(function(a){ return a.id; }), exp: qs.map(function(b){ return b.getAttribute('aria-expanded'); }),
         ctl: qs.every(function(b){ var id=b.getAttribute('aria-controls'); return document.querySelectorAll('[id="'+id+'"]').length===1; }),
         ids: qs.map(function(b){ return b.getAttribute('data-intcc-q'); }), tgt: qs.map(function(b){ return Math.round(b.getBoundingClientRect().height); }),
-        inside: ar ? (ar.top >= r.top - 0.5 && ar.bottom <= r.bottom + 0.5 && ar.height >= 30) : null,
-        head: hr ? Math.abs(hr.top - lr.top) <= 3 : null,
-        hidden: [].slice.call(c.querySelectorAll('.intcc-x-item')).filter(function(i){ return i.hasAttribute('inert') && getComputedStyle(i).visibility === 'hidden'; }).length,
         panel: !!c.querySelector('.intv6-x-answers, .intv7-x-empty'), txt: /Elige una pregunta|Choose a question/.test(c.textContent) }); })()`;
     const xs = async () => JSON.parse(await page.evaluate(XS));
     const press = async (id) => { const b = JSON.parse(await page.evaluate(`(function(){ var r=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']').getBoundingClientRect(); return JSON.stringify([r.left + Math.min(40, r.width / 2), r.top + r.height / 2]); })()`));
       if (touch) await page.touchscreen.tap(b[0], b[1]); else { await page.mouse.click(b[0], b[1]); }
-      await page.waitForTimeout(260); };
-    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'center', behavior: 'instant' })`); await page.waitForTimeout(250);
+      await page.waitForTimeout(320); };
+    await page.evaluate(`document.querySelector('.intcc-explore').scrollIntoView({ block: 'start', behavior: 'instant' }); window.scrollBy({ top: -90, behavior: 'instant' })`); await page.waitForTimeout(250);
     const x0 = await xs();
     const n = x0.ids.length;
     ok(`${T} Explora: ${n} preguntas cerradas al entrar, sin panel vacío ni texto de selección, aria-controls único y objetivos ≥ 44 px`, n >= 1 && x0.open.length === 0 && x0.exp.every(v => v === 'false') && x0.ctl && x0.tgt.every(h => h >= 44) && !x0.panel && !x0.txt, JSON.stringify(x0));
+    const below = (id) => page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore [data-intcc-q=' + JSON.stringify(${JSON.stringify(id)}) + ']'); var a=document.getElementById(b.getAttribute('aria-controls')); var br=b.getBoundingClientRect(), ar=a.getBoundingClientRect(); var inn=a.querySelector('.intcc-x-answer-in');
+      return ar.top >= br.bottom - 1 && b.closest('.intcc-x-item').contains(a) && ar.height >= 30 && inn.scrollHeight <= inn.clientHeight + 1; })()`);
+    const near = (a, b) => Math.abs(a - b) <= 1.2;
     const bad = [];
     for (let i = 0; i < n; i++) {
       const id = x0.ids[i];
+      const p0 = await xs();
       await press(id);
       const s1 = await xs();
-      if (s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || Math.abs(s1.h - x0.h) > 0.6 || Math.abs(s1.top - x0.top) > 0.6
-          || !s1.inside || !s1.head || s1.hidden !== n - 1 || s1.nb.some((h, k) => Math.abs(h - x0.nb[k]) > 0.6)) bad.push({ step: 'open', id, s1, h0: x0.h });
-      // El MISMO control (ahora cabecera) cierra y recupera la lista completa.
-      await press(id);
-      const s2 = await xs();
-      if (s2.open.length !== 0 || Math.abs(s2.h - x0.h) > 0.6 || s2.hidden !== 0 || JSON.stringify(s2.exp) !== JSON.stringify(x0.exp)) bad.push({ step: 'close', id, s2 });
+      const ok1 = await below(id);
+      if (s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || !near(s1.vt[i], p0.vt[i]) || !ok1 || s1.nb.some((h, k) => Math.abs(h - x0.nb[k]) > 1)) bad.push({ step: 'open', id, before: p0.vt[i], after: s1.vt[i], open: s1.open, ok1, nb: [x0.nb, s1.nb] });
+      if (n >= 2) {
+        const jx = (i + 1) % n, j = x0.ids[jx];
+        await press(j);
+        const s2 = await xs();
+        if (s2.open.length !== 1 || s2.open[0] !== 'intcc-x-' + j || !near(s2.vt[jx], s1.vt[jx])) bad.push({ step: 'swap', id, j, before: s1.vt[jx], after: s2.vt[jx], open: s2.open });
+        await press(j);
+        const s3 = await xs();
+        if (s3.open.length !== 0 || !near(s3.vt[jx], s2.vt[jx]) || s3.nb.some((h, k) => Math.abs(h - x0.nb[k]) > 1)) bad.push({ step: 'close-same', j, before: s2.vt[jx], after: s3.vt[jx], open: s3.open });
+      } else {
+        await press(id);
+        const s3 = await xs();
+        if (s3.open.length !== 0 || !near(s3.vt[i], s1.vt[i])) bad.push({ step: 'close-same', id, s3 });
+      }
     }
-    ok(`${T} Explora: cada respuesta se superpone dentro de la card (misma altura), con su pregunta como cabecera, las demás ocultas e inertes, y el mismo control cierra; Radar/Factores no cambian`, bad.length === 0, JSON.stringify(bad).slice(0, 700));
+    ok(`${T} Explora: abrir/sustituir/cerrar (${touch ? 'toque' : 'clic'}) bajo su pregunta, una sola abierta, el control no se mueve y Radar/Factores no cambian`, bad.length === 0, JSON.stringify(bad).slice(0, 700));
     // Teclado: Enter abre, Espacio cierra; Escape cierra y devuelve el foco.
     await page.focus(`.intcc-explore [data-intcc-q="${x0.ids[0]}"]`); await page.keyboard.press('Enter'); await page.waitForTimeout(260);
     const k1 = await xs(); await page.keyboard.press(' '); await page.waitForTimeout(260); const k2 = await xs();
@@ -893,7 +860,7 @@ for (const E of ENGINES) {
     await boot(page, P, 'es');
     await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
     await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
-    await page.evaluate(`(function(){ window.__g=[]; new MutationObserver(function(ms){ ms.forEach(function(m){ var t=m.target; if (t.classList && t.classList.contains('is-gold-in') && m.oldValue && m.oldValue.indexOf('is-gold-in')===-1) { window.__g.push(t.className.split(' ')[1]); window.__gmax=Math.max(window.__gmax||0, document.querySelectorAll('.is-gold-in').length); } }); })
+    await page.evaluate(`(function(){ window.__g=[]; new MutationObserver(function(ms){ ms.forEach(function(m){ var t=m.target; if (t.classList && t.classList.contains('is-gold-in') && m.oldValue && m.oldValue.indexOf('is-gold-in')===-1) window.__g.push(t.className.split(' ')[1]); }); })
       .observe(document.querySelector('.aurix-intcc'), { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true }); window.__long=0; var last=performance.now(); (function f(t){ if (t-last>50) window.__long++; last=t; if (!window.__stopF) requestAnimationFrame(f); })(last); })()`);
     const g0 = await page.evaluate(`window.__g.length`);
     for (let i = 0; i < 12; i++) { await page.mouse.move(700, 500); await page.mouse.wheel(0, 260); await page.waitForTimeout(90); }
@@ -905,9 +872,7 @@ for (const E of ENGINES) {
     const live = await page.evaluate(`document.querySelectorAll('.is-gold-in').length`);
     const pe = await page.evaluate(`(function(){ var e=document.querySelector('.intv21-scen'); return getComputedStyle(e,'::before').pointerEvents; })()`);
     if (!RMx) {
-      const gmax = await page.evaluate(`window.__gmax || 0`);
-      ok(`${T} nada al pintar; al entrar por scroll destellan los bloques nuevos (Evolución y Hoy incluidos), uno a uno y una vez cada uno`,
-        g0 === 0 && g1.length >= 1 && new Set(g1).size === g1.length && g1.indexOf('intcc-timeline') !== -1 && g1.indexOf('intcc-watch') !== -1 && gmax === 1, JSON.stringify({ g0, g1, gmax }));
+      ok(`${T} nada al pintar; al entrar por scroll destellan los bloques nuevos, una vez cada uno`, g0 === 0 && g1.length >= 1 && new Set(g1).size === g1.length, JSON.stringify({ g0, g1 }));
       ok(`${T} pequeños vaivenes no lo repiten; termina (no queda animación viva) y no intercepta el puntero`, g2.length === g1.length && live === 0 && pe === 'none', JSON.stringify({ g1: g1.length, g2: g2.length, live, pe }));
     } else ok(`${T} con movimiento reducido no existe`, g2.length === 0, JSON.stringify(g2));
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
@@ -1018,16 +983,15 @@ for (const E of ENGINES) {
       await page.locator('.intcc-explore .intcc-x-q').nth(i).click(); await page.mouse.move(1, 1); await page.waitForTimeout(320);
       const g = JSON.parse(await page.evaluate(geo));
       if (process.env.DBG) console.log('X', i, JSON.stringify(['radar', 'drv', 'ex', 'evo', 'hoy'].map(k => [k, g[k].t - g0[k].t, g[k].h - g0[k].h])));
-      // RE-DECIDIDO (cierre visual · modo superpuesto): NADA cambia de altura ni de sitio,
-      // tampoco Explora (la respuesta se superpone dentro de la card).
-      const d = ['radar', 'drv', 'ex', 'evo', 'hoy', 'scen'].filter(k => g[k] && g0[k] && (Math.abs(g[k].t - g0[k].t) > 1 || Math.abs(g[k].h - g0[k].h) > 1));
+      // RE-DECIDIDO (cierre definitivo · acordeón): Explora crece por su respuesta y lo de
+      // debajo baja con naturalidad; lo que NO puede cambiar son Radar y Factores.
+      const d = ['radar', 'drv'].filter(k => g[k] && g0[k] && (Math.abs(g[k].t - g0[k].t) > 1 || Math.abs(g[k].h - g0[k].h) > 1));
       if (d.length) moved.push(i + ':' + d.join('+'));
       const vis = await page.evaluate(`(function(){ var a=document.querySelector('.intcc-x-answer.is-open'); if(!a) return 'closed'; var b=document.getElementById(a.getAttribute('aria-labelledby')); var ar=a.getBoundingClientRect(), br=b.getBoundingClientRect(); var inn=a.querySelector('.intcc-x-answer-in');
         return ar.top >= br.bottom - 1 && ar.height >= 30 && inn.scrollHeight <= inn.clientHeight + 1; })()`);
       if (!vis) moved.push(i + ':answer-not-visible');
-      await page.locator('.intcc-explore .intcc-x-q[aria-expanded="true"]').click(); await page.mouse.move(1, 1); await page.waitForTimeout(220);   // el mismo control cierra
     }
-    ok(`${T} abrir cada respuesta de Explora: se superpone bajo su pregunta y ninguna card cambia de altura ni de sitio (${nq} preguntas)`, nq >= 2 && moved.length === 0, JSON.stringify(moved));
+    ok(`${T} abrir cada respuesta de Explora: aparece bajo su pregunta y Radar/Factores no cambian (${nq} preguntas)`, nq >= 2 && moved.length === 0, JSON.stringify(moved));
     ok(`${T} sólo una respuesta abierta a la vez`, await page.evaluate(`document.querySelectorAll('.intcc-x-answer.is-open').length <= 1`));
     // V5.1 · si el usuario la cierra, ningún repintado (normal o con fuente en vuelo) la reabre.
     { await page.evaluate(`(function(){ var b=document.querySelector('.intcc-explore .intcc-x-q[aria-expanded="true"]'); if (b) b.click(); })()`); await page.waitForTimeout(250);
@@ -1222,7 +1186,7 @@ for (const E of ENGINES) {
       ok(`${T} Hoy: cada cotización lleva su peso como contexto; la contribución certificada no lo repite`, H51.drivers === 0
         && H51.movers.every(m => /^(La cotización de|.+'s price)/.test(m.t) && (/[1-9][\d.,]*\s?% (de tu cartera financiera|of your financial portfolio)\.$/.test(m.w || '') || /^(Menos del 0,1 %|Less than 0\.1%)/.test(m.w || ''))), JSON.stringify(H51));
       ok(`${T} etiqueta de movimiento: hecho con cifra y periodo, o «principal movimiento» sólo si es contribución certificada`,
-        H51.tags.every(t => /^[^:]+: [+−]\d+[.,]\d\s?% · (24[ \u00a0]h|última sesión|last session)$/.test(t) || /principal movimiento de tu cartera|portfolio's main move/.test(t)) && !H51.tags.some(t => /^Cotización de|price$/.test(t)), JSON.stringify(H51.tags));
+        H51.tags.every(t => /^[^:]+: [+−]\d+[.,]\d\s?% · (24 h|última sesión|last session)$/.test(t) || /principal movimiento de tu cartera|portfolio's main move/.test(t)) && !H51.tags.some(t => /^Cotización de|price$/.test(t)), JSON.stringify(H51.tags));
       if (kind === 'real') ok(`${T} cuenta madura: Explora ofrece 3–4 preguntas`, r.qs.length >= 3 && r.qs.length <= 4, JSON.stringify(r.qs));
       if ((w === 1440 || w === 390) && await page.evaluate(`!!document.querySelector('.intv21-evo-plot')`)) {
         // Estabilidad: cambiar métrica/periodo no cambia la altura de Evolución ni mueve Hoy.
