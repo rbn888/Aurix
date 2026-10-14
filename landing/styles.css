@@ -1298,6 +1298,14 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
 .hero-sub{ max-width:640px; }
 .hero-cta{ justify-content:center; }
 .hero-visual{ width:100%; max-width:1080px; }
+@media (min-width:861px){ .hero-visual{ max-width:1000px; } }
+/* Market: subsección compacta de «Reúne» — texto encima, captura centrada del ancho del hero. */
+.how-market{ margin-top:56px; text-align:center; }
+.how-market-copy{ max-width:62ch; margin:0 auto 24px; }
+.how-market-copy h3{ font-size:24px; font-weight:750; letter-spacing:-.02em; margin:0 0 10px; }
+.how-market-copy p{ color:var(--muted); font-size:16px; line-height:1.6; margin:0; }
+.how-market .how-market-fig{ max-width:1000px; margin:0 auto; }
+@media (max-width:860px){ .how-market{ margin-top:44px; text-align:left; } .how-market-copy{ margin:0; } .how-market-fig{ display:none; } }
 .hero-visual.shot-fig{ align-self:auto; }
 
 .shot-fig{ margin:0; min-width:0; }

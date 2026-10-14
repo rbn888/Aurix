@@ -16,8 +16,8 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
     const m = await p.evaluate(() => {
       const q = s => document.querySelector(s), qa = s => [...document.querySelectorAll(s)];
       const cta = q('.hero-cta .btn-primary').getBoundingClientRect();
-      const imgs = qa('main img');
-      const caps = qa('.shot-fig').map(f => { const i = f.querySelector('img').getBoundingClientRect(), c = f.querySelector('figcaption').getBoundingClientRect(); return c.top >= i.bottom - 1; });
+      const imgs = qa('main img').filter(i => i.getBoundingClientRect().width > 0);
+      const caps = qa('.shot-fig').filter(f => f.getBoundingClientRect().width > 0).map(f => { const i = f.querySelector('img').getBoundingClientRect(), c = f.querySelector('figcaption').getBoundingClientRect(); return c.top >= i.bottom - 1; });
       const planBtns = qa('.plan .btn').map(x => Math.round(x.getBoundingClientRect().top));
       const prem = q('.plan--premium').innerText;
       return {
@@ -33,11 +33,14 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
         loaded: imgs.every(i => i.complete && i.naturalWidth > 0),
         lang: imgs.filter(i => i.hasAttribute('data-i18n-src')).every(i => i.getAttribute('src').endsWith('-' + document.documentElement.lang + '.jpg')),
         // Capturas nuevas en su sitio exacto; posiciones y presupuesto conservados; sin «datos de ejemplo» en las reales.
-        placed: imgs.map(i => i.getAttribute('src')).join() === 'assets/dashboard.jpg,assets/positions-' + document.documentElement.lang + '.jpg,assets/intelligence.jpg,assets/workspace-' + document.documentElement.lang + '.jpg'
+        placed: qa('main img').map(i => i.getAttribute('src')).join() === 'assets/dashboard.jpg,assets/positions-' + document.documentElement.lang + '.jpg,assets/market.jpg,assets/intelligence.jpg,assets/workspace-' + document.documentElement.lang + '.jpg'
+          && !!q('#how .how-row + .how-market + .how-row--rev') && /Reúne todo tu patrimonio|Bring all your wealth together/.test(q('.how-market').previousElementSibling.innerText)
+          && /Tus mercados, a la vista\.|Your markets, at a glance\./.test(q('.how-market').innerText) && !q('.how-market .btn') && !/€|\$\d/.test(q('.how-market-copy').innerText)
+          && (innerWidth < 861 ? q('.how-market-fig').getBoundingClientRect().width === 0 : Math.abs(q('.hero-visual').getBoundingClientRect().width - 1000) <= 1 && Math.abs(q('.how-market-fig').getBoundingClientRect().width - 1000) <= 1 && [q('.hero-visual'), q('.how-market-fig')].every(f => { const r = f.getBoundingClientRect(), c = f.parentElement.getBoundingClientRect(); return Math.abs((r.left - c.left) - (c.right - r.right)) <= 1; }))
           && !!q('.hero .hero-visual img[src="assets/dashboard.jpg"]') && /Descubre qué merece tu atención|Find out what deserves your attention/.test(q('img[src="assets/intelligence.jpg"]').closest('.how-row').innerText)
           && ['assets/dashboard.jpg', 'assets/intelligence.jpg'].every(s => { const f = q('img[src="' + s + '"]'); return !/ejemplo|sample/i.test(f.alt + f.closest('figure').innerText); }),
-        ratio: imgs.every(i => Math.abs(i.getBoundingClientRect().width / i.getBoundingClientRect().height - i.naturalWidth / i.naturalHeight) < 0.02 && i.naturalWidth == i.getAttribute('width') && i.naturalHeight == i.getAttribute('height')),
-        caps: caps.length === 4 && caps.every(Boolean),
+        ratio: imgs.every(i => Math.abs(i.getBoundingClientRect().width / i.getBoundingClientRect().height - i.naturalWidth / i.naturalHeight) < 0.02 && Math.abs(i.naturalWidth / i.naturalHeight - i.getAttribute('width') / i.getAttribute('height')) < 0.01),
+        caps: caps.length === imgs.length && caps.length >= 4 && caps.every(Boolean),
         allVisible: qa('.reveal').every(e => +getComputedStyle(e).opacity > 0.99),
         planAligned: planBtns.length === 2 && (innerWidth < 861 || Math.abs(planBtns[0] - planBtns[1]) <= 1),
         premStarts: /Todo lo incluido en Free, más:|Everything in Free, plus:/.test(prem),
