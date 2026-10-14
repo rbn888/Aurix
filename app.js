@@ -43853,6 +43853,23 @@ function _aurixChartPublicationSourcesPending() {
   return out;
 }
 try { if (typeof window !== 'undefined') window._aurixChartPublicationSourcesPending = _aurixChartPublicationSourcesPending; } catch (_) {}
+// SPEC P0 CHART RELIABILITY & PREMIUM FIRST PAINT — ANTES DEL PRIMER RENDER DEL BOOT NO SE PUBLICA NADA.
+// En móvil con sesión cacheada el shell aparece al instante con el hero en skeleton, y el boot espera
+// auth + cartera + tipo por red antes de su primer render(). Dos disparadores no esperaban: el autostart
+// del gráfico lite (700 ms) y el repintado de foreground (`pageshow` ⇒ badges a 400 ms). Sin usuario,
+// `_aurixChartPublicationSourcesPending` dice «nada pendiente», así que pintaban curva, badge y tarjetas
+// desde la caché local SIN auth — historia DESCONOCIDA publicada como completa: hero en skeleton junto a
+// una curva (a veces gris y fragmentada, con «Rendimiento no disponible»), que luego desaparecía y
+// reaparecía. No es una regla nueva: el paso 6 del boot ya es el disparador fiable del primer pintado.
+// Sin `__aurixBootReady` (sandbox de unidad) o con el boot forzado/terminado ⇒ comportamiento previo.
+function _aurixDashboardFirstRenderPending() {
+  try {
+    const r = (typeof window !== 'undefined') ? window.__aurixBootReady : null;
+    if (!r || r.dashboard === true) return false;
+    try { if (_aurixBootFinished) return false; } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
 function _aurixReturnPendingHTML() {
   const _txt  = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculating', _AURIX_RETURN_PENDING_TEXT) : _AURIX_RETURN_PENDING_TEXT;
   const _aria = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculatingAria', 'Calculando rendimiento') : 'Calculando rendimiento';
@@ -49499,7 +49516,12 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
     if (useContract) {
       let vs = null;
       try { if (typeof _aurixBuildContinuityValidatedSeries === 'function' && emg && Array.isArray(emg.points)) vs = _aurixBuildContinuityValidatedSeries(emg.points.map(p => ({ time: p.ts, value: p.value })), emg.range); } catch (_) {}
-      const contract = _aurixResolveChartReturnContract(vs, emg && emg.range, { chart: emg });
+      // BLOCK-B — un frame LKG restaurado se certificó con sus fuentes completas y se republica VERBATIM
+      // precisamente MIENTRAS la hidratación está en curso. Juzgarlo con la readiness viva lo dejaba en
+      // «Calculando…» sobre una curva ya terminada y coloreada (reentrada: 1–2 s). Su readiness es la suya;
+      // continuidad, `returnState`, FX y épocas se siguen evaluando igual sobre el propio frame.
+      const _ctxC = (emg && emg._aurixLkgRestored) ? { chart: emg, hydrationState: 'ready', sourcesComplete: true } : { chart: emg };
+      const contract = _aurixResolveChartReturnContract(vs, emg && emg.range, _ctxC);
       if (typeof _aurixMarkReturnPainted === 'function') _aurixMarkReturnPainted(el, contract.state === 'ok');
       if (contract.state === 'ok') {
         el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
@@ -51654,6 +51676,7 @@ function _aurixNodeIsVisible(el) {
 function _aurixRepaintReturnBadges(reason) {
   try {
     if (typeof document === 'undefined') return;
+    if ((typeof _aurixDashboardFirstRenderPending === 'function') && _aurixDashboardFirstRenderPending()) return;   // el boot pinta el primero (ver el predicado)
     const nodes = _aurixFindReturnBadgeNodes();
     nodes.forEach(n => { try { _aurixPaintReturnBadge(n, (n.id || ('.' + (String(n.className || '').split(' ')[0] || 'chart-change')))); } catch (_) {} });
     // [UI][RETURN_BADGE_BINDING] — prove no visible node is left in "Calculando…" once ready.
@@ -55540,6 +55563,7 @@ function scheduleAurixMobileLite(range) {
     if (_aurixMobileLiteTimer) { try { clearTimeout(_aurixMobileLiteTimer); } catch (_) {} }
     _aurixMobileLiteTimer = setTimeout(function () {
       const paint = function () {
+        if ((typeof _aurixDashboardFirstRenderPending === 'function') && _aurixDashboardFirstRenderPending()) return;   // curva, badge y tarjetas: los publica el boot
         renderAurixMobileLiteChart(r, token);
         try { _aurixMobileSetPerfIndicator(); } catch (_) {}  // RC4-B FASE 2 — green/red %/€ metric
         try { renderAurixMobileDonutLite(); } catch (_) {}   // donut slide rides the same deferred pass
@@ -82985,7 +83009,8 @@ btnAdd.addEventListener('click', openModal);
       tries++;
       try {
         const area = document.getElementById('wealthCurveMobile');
-        const ready = area && (typeof getAurixRenderSeries === 'function');
+        // Antes del primer render del boot no se pinta: se reintenta con el mismo presupuesto (el paso 6 pinta).
+        const ready = area && (typeof getAurixRenderSeries === 'function') && !((typeof _aurixDashboardFirstRenderPending === 'function') && _aurixDashboardFirstRenderPending());
         if (ready) { scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); return; }
       } catch (_) {}
       if (tries < 12) { try { setTimeout(kick, 500); } catch (_) {} }   // up to ~6s, then placeholder stays
