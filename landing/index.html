@@ -87,20 +87,19 @@
       <div class="hero-bg" aria-hidden="true"></div>
       <div class="container hero-inner">
         <div class="hero-copy">
-          <h1 class="hero-title reveal"><span data-i18n="hero.h1a">All your wealth.</span><br><span data-i18n="hero.h1b">A smarter view.</span></h1>
-          <p class="hero-sub reveal" data-i18n="hero.sub">Bring your investments together, understand what is changing and plan your next steps. Stocks, ETFs, funds, crypto and more, in one place.</p>
-          <div class="hero-cta reveal">
+          <h1 class="hero-title"><span data-i18n="hero.h1a">All your wealth.</span><br><span data-i18n="hero.h1b">A smarter view.</span></h1>
+          <p class="hero-sub" data-i18n="hero.sub">Bring your investments together, understand what is changing and plan your next steps. Stocks, ETFs, funds, crypto and more, in one place.</p>
+          <div class="hero-cta">
             <a class="btn btn-primary btn-lg" href="https://app.aurixsystem.io/" data-app-link data-launch-cta data-i18n="cta.start">Create a free account</a>
             <a class="btn btn-ghost btn-lg" href="#how" data-i18n="cta.see">Explore Aurix</a>
           </div>
           <span class="hero-cta-note launch-count" id="launchCountdown" hidden></span>
         </div>
 
-        <!-- Dashboard e Intelligence: capturas originales, sólo en inglés (no se simula traducción) y SIN la etiqueta
-             «datos de ejemplo». Posiciones y Presupuesto conservan sus capturas ES/EN con datos de ejemplo. -->
-        <figure class="shot-fig hero-visual reveal">
-          <img src="assets/dashboard.jpg" srcset="assets/dashboard.jpg 1600w, assets/dashboard-2x.jpg 2480w" sizes="(min-width:861px) 1000px, 100vw" width="1600" height="991" alt="Aurix Dashboard: investable wealth, portfolio evolution and categories for stocks, ETFs and funds, crypto, metals, real estate and liquidity" data-i18n-alt="alt.dashboard" fetchpriority="high" decoding="async">
-          <figcaption class="shot-cap" data-i18n="shot.view">Aurix view</figcaption>
+        <!-- Dashboard e Intelligence: capturas originales, sólo en inglés (no se simula traducción); su alt no dice
+             «datos de ejemplo». Posiciones y Presupuesto: capturas ES/EN con datos de ejemplo, y así lo dice su alt. -->
+        <figure class="shot-fig hero-visual">
+          <img src="assets/dashboard.jpg" srcset="assets/dashboard.jpg 1600w, assets/dashboard-2x.jpg 2480w" sizes="(min-width:861px) 900px, calc(100vw - 36px)" width="1600" height="991" alt="Aurix Dashboard: investable wealth, portfolio evolution and categories for stocks, ETFs and funds, crypto, metals, real estate and liquidity" data-i18n-alt="alt.dashboard" fetchpriority="high" decoding="async">
         </figure>
       </div>
     </section>
@@ -120,26 +119,16 @@
         <div class="how-row reveal">
           <div class="how-copy">
             <h3 data-i18n="how.1.t">Bring all your wealth together</h3>
-            <p data-i18n="how.1.d">See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view.</p>
+            <p data-i18n="how.1.d">See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view. Follow the markets and assets that interest you in Market.</p>
           </div>
-          <figure class="shot-fig"><img src="assets/positions-en.jpg" data-i18n-src="positions" width="1560" height="900" loading="lazy" decoding="async" alt="Positions in a category in Aurix, with sample data" data-i18n-alt="alt.positions"><figcaption class="shot-cap" data-i18n="shot.tag">Aurix view · sample data</figcaption></figure>
+          <figure class="shot-fig"><img src="assets/positions-en.jpg" data-i18n-src="positions" width="1560" height="900" loading="lazy" decoding="async" alt="Positions in a category in Aurix, with sample data" data-i18n-alt="alt.positions"></figure>
         </div>
-        <!-- Market: subsección del paso «Reúne», no un cuarto paso. Captura sólo en inglés y con datos
-             de mercado reales del momento de la captura; por debajo de 861 px no se muestra (pendiente de
-             una captura móvil: la tabla de escritorio no se puede encuadrar legible sin editarla). -->
-        <div class="how-market reveal">
-          <div class="how-market-copy">
-            <h3 data-i18n="how.mkt.t">Your markets, at a glance.</h3>
-            <p data-i18n="how.mkt.d">Browse stocks, ETFs and crypto, compare their movements and save the assets you want to follow.</p>
-          </div>
-          <figure class="shot-fig how-market-fig"><img src="assets/market.jpg" srcset="assets/market.jpg 1600w, assets/market-2x.jpg 2480w" sizes="1000px" width="1600" height="807" loading="lazy" decoding="async" alt="Aurix Market: list of stocks, ETFs and crypto with price, 24-hour change, trend and saved assets" data-i18n-alt="alt.market"><figcaption class="shot-cap" data-i18n="shot.view">Aurix view</figcaption></figure>
-        </div>
-        <div class="how-row how-row--rev reveal">
+        <div class="how-row how-row--rev how-row--focus reveal">
           <div class="how-copy">
             <h3 data-i18n="how.2.t">Find out what deserves your attention</h3>
             <p data-i18n="how.2.d">Intelligence puts your wealth in context: where it is concentrated, what has changed and how its structure evolves. A reading of your data to better understand your portfolio.</p>
           </div>
-          <figure class="shot-fig"><img src="assets/intelligence.jpg" width="1600" height="839" loading="lazy" decoding="async" alt="Aurix Intelligence: portfolio health, concentration reading, radar, key drivers and questions to explore your wealth" data-i18n-alt="alt.intelligence"><figcaption class="shot-cap" data-i18n="shot.view">Aurix view</figcaption></figure>
+          <figure class="shot-fig"><img src="assets/intelligence.jpg" width="1600" height="839" loading="lazy" decoding="async" alt="Aurix Intelligence: portfolio health, concentration reading, radar, key drivers and questions to explore your wealth" data-i18n-alt="alt.intelligence"></figure>
         </div>
         <div class="how-row reveal">
           <div class="how-copy">
@@ -147,7 +136,7 @@
             <p data-i18n="how.3.d">Plan with your own numbers: organise your budget, set goals and see how a loan or compound interest would affect them.</p>
             <p class="how-note" data-i18n="how.3.ex">For example: Monthly budget, Financial goals, Loan simulator and Compound interest.</p>
           </div>
-          <figure class="shot-fig"><img src="assets/workspace-en.jpg" data-i18n-src="workspace" width="1600" height="1000" loading="lazy" decoding="async" alt="Aurix monthly budget with sample data" data-i18n-alt="alt.workspace"><figcaption class="shot-cap" data-i18n="shot.tag">Aurix view · sample data</figcaption></figure>
+          <figure class="shot-fig"><img src="assets/workspace-en.jpg" data-i18n-src="workspace" width="1600" height="1000" loading="lazy" decoding="async" alt="Aurix monthly budget with sample data" data-i18n-alt="alt.workspace"></figure>
         </div>
       </div>
     </section>

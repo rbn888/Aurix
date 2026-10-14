@@ -392,8 +392,13 @@ body.menu-open .mobile-menu{ opacity:1; transform:none; pointer-events:auto; }
 .footer-bottom{ display:flex; align-items:center; justify-content:space-between; margin-top:48px; padding-top:24px; border-top:1px solid var(--divider); color:var(--dim); font-size:13.5px; }
 
 /* ── Reveal on scroll ────────────────────────────────── */
-.reveal-ready .reveal{ opacity:0; transform:translateY(20px); transition:opacity .7s var(--ease), transform .7s var(--ease); }
+.reveal-ready .reveal{ opacity:0; transform:translateY(10px); transition:opacity .4s var(--ease), transform .4s var(--ease); }
 .reveal-ready .reveal.is-visible{ opacity:1; transform:none; }
+/* Filas texto+imagen: anima cada columna (la imagen 80 ms después), no la fila entera. */
+.reveal-ready .how-row.reveal{ opacity:1; transform:none; transition:none; }
+.reveal-ready .how-row.reveal > *{ opacity:0; transform:translateY(10px); transition:opacity .4s var(--ease), transform .4s var(--ease); }
+.reveal-ready .how-row.reveal.is-visible > *{ opacity:1; transform:none; }
+.reveal-ready .how-row.reveal.is-visible > .shot-fig{ transition-delay:80ms; }
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width:1100px){
@@ -760,7 +765,7 @@ body.modal-open{ overflow:hidden; }
 
 @media (prefers-reduced-motion: reduce){
   html{ scroll-behavior:auto; }
-  .reveal{ opacity:1; transform:none; transition:none; }
+  .reveal, .reveal-ready .reveal, .reveal-ready .how-row.reveal > *{ opacity:1; transform:none; transition:none; }
   *{ animation:none !important; }
   .btn:hover, .feature:hover, .ws-card:hover, .frag-card:hover, .pain-card:hover{ transform:none; }
   .anim-bars b, .ws-ind b{ transform:none; transition:none; }
@@ -1298,20 +1303,16 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
 .hero-sub{ max-width:640px; }
 .hero-cta{ justify-content:center; }
 .hero-visual{ width:100%; max-width:1080px; }
-@media (min-width:861px){ .hero-visual{ max-width:1000px; } }
-/* Market: subsección compacta de «Reúne» — texto encima, captura centrada del ancho del hero. */
-.how-market{ margin-top:56px; text-align:center; }
-.how-market-copy{ max-width:62ch; margin:0 auto 24px; }
-.how-market-copy h3{ font-size:24px; font-weight:750; letter-spacing:-.02em; margin:0 0 10px; }
-.how-market-copy p{ color:var(--muted); font-size:16px; line-height:1.6; margin:0; }
-.how-market .how-market-fig{ max-width:1000px; margin:0 auto; }
-@media (max-width:860px){ .how-market{ margin-top:44px; text-align:left; } .how-market-copy{ margin:0; } .how-market-fig{ display:none; } }
+@media (min-width:861px){ .hero-visual{ max-width:900px; } }
 .hero-visual.shot-fig{ align-self:auto; }
 
 .shot-fig{ margin:0; min-width:0; }
 .shot-fig img{ display:block; width:100%; height:auto; border-radius:var(--radius); border:1px solid var(--border-hi);
-  background:#0a0f1a; box-shadow:0 24px 60px rgba(0,0,0,.45); }
-.shot-cap{ margin-top:10px; font-size:13px; color:var(--muted); text-align:center; }
+  background:#0a0f1a; box-shadow:0 16px 40px rgba(0,0,0,.36); }
+/* Intelligence: el bloque principal tras «Reúne» — más escala y aire, sin elementos nuevos. */
+.how-row--focus{ margin-top:72px; }
+.how-row--focus .how-copy h3{ font-size:28px; }
+.how-row--focus .how-copy p{ color:var(--text); opacity:.82; }
 
 .section--bridge{ padding:24px 0 8px; }
 .bridge-line{ margin:0 auto; max-width:30ch; text-align:center; font-size:clamp(22px, 3vw, 32px); font-weight:750;

@@ -239,8 +239,6 @@
       'cta.start': "Crear cuenta gratis",
       'cta.see': "Explorar Aurix",
       'cta.premium': "Crear cuenta y descubrir Premium",
-      'shot.tag': "Vista de Aurix · datos de ejemplo",
-      'shot.view': "Vista de Aurix",
       'alt.dashboard': "Dashboard de Aurix (interfaz en inglés): patrimonio invertible, evolución de la cartera y categorías de acciones, ETF y fondos, cripto, metales, inmuebles y liquidez",
       'alt.positions': "Posiciones de una categoría en Aurix, con datos de ejemplo",
       'alt.intelligence': "Intelligence de Aurix (interfaz en inglés): salud de la cartera, lectura de concentración, radar, principales posiciones y preguntas para explorar el patrimonio",
@@ -249,10 +247,7 @@
       'how.eyebrow': "Cómo funciona",
       'how.lead': "Tú registras tus posiciones: Aurix no se conecta a tu banco ni te pide credenciales bancarias.",
       'how.1.t': "Reúne todo tu patrimonio",
-      'how.1.d': "Consulta cuánto tienes, cómo se distribuye y cómo evoluciona. Organiza acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez en una sola visión.",
-      'how.mkt.t': "Tus mercados, a la vista.",
-      'how.mkt.d': "Consulta acciones, ETFs y criptomonedas, compara sus movimientos y guarda los activos que quieres seguir.",
-      'alt.market': "Market de Aurix (interfaz en inglés): lista de acciones, ETFs y cripto con precio, variación en 24 horas, tendencia y activos guardados",
+      'how.1.d': "Consulta cuánto tienes, cómo se distribuye y cómo evoluciona. Organiza acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez en una sola visión. Sigue los mercados y los activos que te interesan desde Market.",
       'how.2.t': "Descubre qué merece tu atención",
       'how.2.d': "Intelligence pone tu patrimonio en contexto: dónde se concentra, qué ha cambiado y cómo evoluciona su estructura. Una lectura de tus datos para entender mejor tu cartera.",
       'how.3.t': "Convierte tus números en planes",
@@ -301,8 +296,6 @@
       'cta.start': "Create a free account",
       'cta.see': "Explore Aurix",
       'cta.premium': "Create an account and explore Premium",
-      'shot.tag': "Aurix view · sample data",
-      'shot.view': "Aurix view",
       'alt.dashboard': "Aurix Dashboard: investable wealth, portfolio evolution and categories for stocks, ETFs and funds, crypto, metals, real estate and liquidity",
       'alt.positions': "Positions in a category in Aurix, with sample data",
       'alt.intelligence': "Aurix Intelligence: portfolio health, concentration reading, radar, key drivers and questions to explore your wealth",
@@ -311,10 +304,7 @@
       'how.eyebrow': "How it works",
       'how.lead': "You record your positions yourself: Aurix does not connect to your bank or ask for your banking credentials.",
       'how.1.t': "Bring all your wealth together",
-      'how.1.d': "See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view.",
-      'how.mkt.t': "Your markets, at a glance.",
-      'how.mkt.d': "Browse stocks, ETFs and crypto, compare their movements and save the assets you want to follow.",
-      'alt.market': "Aurix Market: list of stocks, ETFs and crypto with price, 24-hour change, trend and saved assets",
+      'how.1.d': "See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view. Follow the markets and assets that interest you in Market.",
       'how.2.t': "Find out what deserves your attention",
       'how.2.d': "Intelligence puts your wealth in context: where it is concentrated, what has changed and how its structure evolves. A reading of your data to better understand your portfolio.",
       'how.3.t': "Turn your numbers into plans",
@@ -931,13 +921,21 @@
     } else {
       // El estado oculto sólo existe si este código llega a ejecutarse: sin JS (o si falla antes),
       // el contenido se ve tal cual.
+      var showAll = function () { for (var z = 0; z < reveals.length; z++) reveals[z].classList.add('is-visible'); };
+      try {
       document.documentElement.classList.add('reveal-ready');
+      var ioAlive = false;
       var io = new IntersectionObserver(function (entries) {
+        ioAlive = true;
         entries.forEach(function (en) {
-          if (en.isIntersecting) { en.target.classList.add('is-visible'); io.unobserve(en.target); }
+          // Lo que ya quedó por encima (salto a un ancla, scroll restaurado) se muestra sin animar.
+          if (en.isIntersecting || en.boundingClientRect.bottom <= 0) { en.target.classList.add('is-visible'); io.unobserve(en.target); }
         });
       }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
       for (var k = 0; k < reveals.length; k++) io.observe(reveals[k]);
+      // Si el observador no llega a entregar su primera lectura, nada se queda oculto.
+      setTimeout(function () { if (!ioAlive) showAll(); }, 1500);
+      } catch (_) { showAll(); }
     }
 
     // Total-value counter — subtle count-up to the fictional figure on reveal.
