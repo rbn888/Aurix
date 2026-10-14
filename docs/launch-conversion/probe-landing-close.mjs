@@ -49,7 +49,7 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
         market: (() => { const f = q('.how-aside').getBoundingClientRect(), c = q('.how-aside').parentElement.getBoundingClientRect(), i = q('.how-aside img'), a = q('.how-aside a');
           const intel = q('.how-row--focus .shot-fig').getBoundingClientRect(), hero = q('.hero-visual').getBoundingClientRect();
           const lang = document.documentElement.lang;
-          return f.height > 0 && a.getAttribute('href') === 'assets/market-full.jpg' && a.target === '_blank' && /Market/.test(a.getAttribute('aria-label'))
+          return f.height > 0 && a.getAttribute('href') === 'assets/market-full.jpg' && a.target === '_blank' && a.rel === 'noopener noreferrer' && /Market/.test(a.getAttribute('aria-label'))
             && (lang === 'en' ? /interface in Spanish/.test(i.alt) : /Market de Aurix/.test(i.alt))
             && (innerWidth < 861 ? Math.abs(f.width - intel.width) <= 1 : f.width <= 680 && f.width < intel.width * 0.9 && f.width < hero.width * 0.7 && Math.abs((f.left - c.left) - (c.right - f.right)) <= 1); })(),
         intel: (() => { const f = q('.how-row--focus .shot-fig').getBoundingClientRect(), row = q('.how-row--focus').getBoundingClientRect(); return innerWidth < 861 ? f.width >= row.width - 1 && f.top > q('.how-row--focus .how-copy').getBoundingClientRect().bottom - 1 : f.width / row.width > 0.55 && f.width / row.width < 0.65; })(),
