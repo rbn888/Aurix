@@ -541,6 +541,78 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // ── FINAL · etiquetas con evidencia exacta, Liquidez, redondeo de Reparto, flujos en Hoy ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const [w, lng] of (process.env.FINAL_MATRIX || '390:es,1440:en').split(',').map(x => x.split(':'))) {
+    const WF = Number(w); if (!WF) continue;
+    const T = `[${E} FINAL ${WF} ${lng}]`;
+    const P = persona('real');
+    const { ctx, page, errs } = await newPage(WF);
+    await boot(page, P, lng);
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
+    // Etiquetas: informativas sin botón; interactivas con destino que EXISTE.
+    const TG = JSON.parse(await page.evaluate(`JSON.stringify([].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width>0; }).map(function(t){ var b=t.querySelector('[data-intv21-go]'); return { id: t.getAttribute('data-tag'), go: b ? b.getAttribute('data-intv21-go') : null, info: t.classList.contains('is-info') && !t.querySelector('button') }; }))`));
+    ok(`${T} composición actual (clase, tres mayores) = etiqueta informativa, sin botón ni foco`, TG.filter(t => t.id === 'tag_class' || t.id === 'tag_top3').every(t => t.info && !t.go), JSON.stringify(TG));
+    const bad = [];
+    for (const t of TG.filter(x => x.go)) {
+      await page.evaluate(`window.scrollTo({ top: 0, behavior: 'instant' })`); await page.waitForTimeout(150);
+      await page.locator(`.intv21-tag [data-intv21-go="${t.go}"]:visible`).first().click(); await page.waitForTimeout(1300);
+      const r = JSON.parse(await page.evaluate(`(function(){ var a=document.activeElement; var r=a.getBoundingClientRect(); var navTop=innerHeight; var nav=document.querySelector('.bottom-nav, nav.mobile-nav, .tabbar'); if (nav && getComputedStyle(nav).position==='fixed' && nav.getBoundingClientRect().top > innerHeight / 2) navTop=nav.getBoundingClientRect().top;
+        var evo=document.querySelector('.intv21-evo');
+        return JSON.stringify({ cls: a.className, fact: a.getAttribute('data-fact'), top: r.top, bottom: r.bottom, vh: innerHeight, navTop: navTop, flash: a.classList.contains('intv3-flash'), metric: evo ? evo.getAttribute('data-metric') : null, win: evo ? evo.getAttribute('data-win') : null }); })()`));
+      const parts = t.go.split(':');
+      const exact = parts[0] === 'today' ? r.fact === parts.slice(1).join(':') : (parts[0] === 'evolution' ? (/intv22-stats/.test(r.cls) && r.metric === parts[1] && (!parts[2] || r.win === parts[2])) : true);
+      if (!exact || !r.flash || r.top < 0 || r.bottom > Math.min(r.vh, r.navTop) + 1) bad.push({ t, r });
+    }
+    ok(`${T} cada etiqueta interactiva lleva a su evidencia EXACTA (seleccionada, enfocada, visible sobre la navegación y realzada)`, bad.length === 0, JSON.stringify(bad).slice(0, 600));
+    // Liquidez: 7D certificada aunque 30D no lo esté (el linaje de la persona empieza hace 16 días).
+    const LQ = JSON.parse(await page.evaluate(`(function(){ var a=_intv22Availability(); return JSON.stringify({ liq: a.liquidity ? a.liquidity.wins : null }); })()`));
+    ok(`${T} Liquidez: se ofrece con 7D válida aunque 30D no lo sea`, Array.isArray(LQ.liq) && LQ.liq.indexOf('7d') !== -1 && LQ.liq.indexOf('30d') === -1, JSON.stringify(LQ));
+    // Linaje tardío: sin columna leída no hay Liquidez (causa en el marcado); al llegar, aparece sin cambiar la métrica elegida.
+    await page.evaluate(`(function(){ _intv21Write({ evoMetric: 'effective', evoWin: null }); _aurixLineageColumnSeen = false; _intelRefreshSig = '\\u0000l'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1200);
+    const L1 = JSON.parse(await page.evaluate(`(function(){ var e=document.querySelector('.intv21-evo'); if (!e) return JSON.stringify({ none: true, pend: !!document.querySelector('.intcc-timeline.is-pending, [data-pending="1"]'), tl: (document.querySelector('.intcc-timeline')||{}).className || null, trace: (window.__aurixIntelTrace||[]).slice(-6) }); return JSON.stringify({ why: e.getAttribute('data-liq-why'), wait: e.getAttribute('data-liq-wait'), chip: !!e.querySelector('[data-intv21-evo-metric="liquidity"]'), metric: e.getAttribute('data-metric') }); })()`));
+    await page.evaluate(`(function(){ _aurixLineageColumnSeen = true; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1200);
+    const L2 = JSON.parse(await page.evaluate(`(function(){ var e=document.querySelector('.intv21-evo'); if (!e) return JSON.stringify({ none: true, tl: (document.querySelector('.intcc-timeline')||{}).className || null, ph: (document.getElementById('tabPlaceholder')||{}).className, trace: (window.__aurixIntelTrace||[]).slice(-6) }); return JSON.stringify({ why: e.getAttribute('data-liq-why'), chip: !!e.querySelector('[data-intv21-evo-metric="liquidity"]'), metric: e.getAttribute('data-metric') }); })()`));
+    ok(`${T} linaje tardío: Liquidez falta con su causa (lineage_not_account_wide) y aparece al llegar, sin cambiar la métrica elegida`,
+      L1.why === 'lineage_not_account_wide' && L1.wait === '1' && !L1.chip && L1.metric === 'effective' && L2.chip && !L2.why && L2.metric === 'effective', JSON.stringify({ L1, L2 }));
+    // Reparto: redondeo coherente (3,42 → 3,36 no es «3,4 → 3,4, −0,1»).
+    const RP = JSON.parse(await page.evaluate(`(function(){ var t=Date.now(); var st=_intv22Stats('effective', { pts: [{ ts: t-7*864e5, v: 3.42 }, { ts: t, v: 3.36 }] }); var st2=_intv22Stats('effective', { pts: [{ ts: t-7*864e5, v: 3.401 }, { ts: t, v: 3.402 }] });
+      var st3=_intv22Stats('liquidity', { pts: [{ ts: t-7*864e5, v: 3.44 }, { ts: t, v: 3.46 }] });
+      var st4=_intv22Stats('liquidity', { pts: [{ ts: t-30*864e5, v: 3.40 }, { ts: t-15*864e5, v: 18 }, { ts: t, v: 3.44 }] });
+      var h4=_intv22Headline({ series: { pts: [{ ts: t-30*864e5, v: 3.40 }, { ts: t-15*864e5, v: 18 }, { ts: t, v: 3.44 }] }, metric: 'liquidity', win: '30d' });
+      return JSON.stringify({ a: [st.start, st.now, st.delta, _intv22Dir('effective', st)], b: [st2.start, st2.now, st2.delta, _intv22Dir('effective', st2)], c: [st3.start, st3.now, st3.delta], h4: h4 }); })()`));
+    const dec = lng === 'en' ? '.' : ',';
+    ok(`${T} Reparto: inicio, final y cambio coherentes al redondear; «apenas cambió» si la diferencia está bajo la resolución`,
+      RP.a[0] === '3' + dec + '42' && RP.a[1] === '3' + dec + '36' && RP.a[2] === '−0' + dec + '06' && RP.a[3] === 'slight' && RP.b[0] === RP.b[1] && !/[+−]/.test(RP.b[2]) && RP.b[3] === 'flat'
+      && RP.c[2] === '+0' + dec + '02 pp' && /cerca de donde empezó|close to where it started/.test(RP.h4), JSON.stringify(RP));
+    // Hoy: flujos autoritativos del día (familia distinta), bruto y neto; nunca duplicados.
+    await page.evaluate(`(function(){ var n=Date.now(); localStorage.setItem(_AURIX_CAPITAL_FLOWS_KEY, JSON.stringify([{ id: 'f1', ts: n - 3600e3, amountUSD: 1000, amount: 1000, currency: 'USD', intent: 'EXTERNAL_CASH_CONTRIBUTION', kind: 'deposit', source: 'user', revision: 1 }, { id: 'f2', ts: n - 1800e3, amountUSD: -250, amount: 250, currency: 'USD', intent: 'EXTERNAL_CASH_WITHDRAWAL', kind: 'withdrawal', source: 'user', revision: 1 },
+        { id: 'f3', ts: n - 900e3, amountUSD: 5000, kind: 'deposit', source: 'user', revision: 1 }]));
+      _intelRefreshSig = '\\u0000f'; _aurixIntelScheduleRefresh(); })()`); await page.waitForTimeout(1300);
+    const HF = await page.evaluate(`(function(){ var w=document.querySelector('.intcc-watch'); return w ? w.textContent.replace(/\\s+/g,' ') : ''; })()`);
+    // El depósito SIN intención declarada (f3: registrar efectivo que ya se tenía) no cuenta.
+    ok(`${T} Hoy no cuenta como aportación un depósito sin intención externa declarada`, !/5000|5\.000|5,000/.test(HF), HF.slice(0, 300));
+    ok(`${T} Hoy publica los flujos del día con bruto de entradas, de salidas y neto`, lng === 'en' ? /contributions of .+? and withdrawals of .+? \(net \+/.test(HF) : /aportaciones por .+? y retiradas por .+? \(neto \+/.test(HF), HF.slice(0, 300));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+  // Explora móvil con dos preguntas: el cuerpo abierto enseña al menos tres líneas.
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY && process.env.FINAL_MATRIX !== 'none') {
+    const T = `[${E} FINAL Explora 2 preguntas 390]`;
+    const P = persona('cash');
+    const { ctx, page, errs } = await newPage(390);
+    await boot(page, P, 'es');
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
+    const R = JSON.parse(await page.evaluate(`(async function(){ var c=document.querySelector('.intcc-explore'); var qs=[].slice.call(c.querySelectorAll('.intcc-x-q')); var out=[];
+      for (var i=0;i<qs.length;i++){ qs[i].click(); await new Promise(function(r){ setTimeout(r,250); }); var a=c.querySelector('.intcc-x-answer.is-open'); var p=a.querySelector('p'); var lh=parseFloat(getComputedStyle(p).lineHeight)||20;
+        out.push({ vis: Math.round(a.clientHeight), need: Math.round(Math.min(a.scrollHeight, 3*lh)), inside: a.getBoundingClientRect().bottom <= c.getBoundingClientRect().bottom + 0.5 }); qs[i].click(); await new Promise(function(r){ setTimeout(r,200); }); }
+      return JSON.stringify({ n: qs.length, out: out }); })()`));
+    ok(`${T} cada respuesta abierta muestra al menos tres líneas (o entera) sin salir de la card`, R.n >= 1 && R.out.every(o => o.vis + 1 >= o.need && o.inside), JSON.stringify(R));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ── RESP · INVARIANTE HORIZONTAL (360/375/390): nada amplía el documento en ningún estado ──
   if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const W of (process.env.RESP_W || '360,375,390').split(',').map(Number)) {
     if (!W) continue;
@@ -796,7 +868,10 @@ for (const E of ENGINES) {
       const id = x0.ids[i];
       await press(id);
       const s1 = await xs();
-      if (s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || Math.abs(s1.h - x0.h) > 0.6 || Math.abs(s1.top - x0.top) > 0.6
+      // RE-DECIDIDO (cierre final §5): en móvil la card puede crecer lo MÍNIMO para enseñar
+      // tres líneas del cuerpo; en escritorio la altura exterior no cambia.
+      const hOk = WF < 1024 ? (s1.h >= x0.h - 0.6 && s1.h <= x0.h + 120) : Math.abs(s1.h - x0.h) <= 0.6;
+      if (s1.open.length !== 1 || s1.open[0] !== 'intcc-x-' + id || s1.exp.filter(v => v === 'true').length !== 1 || !hOk || Math.abs(s1.top - x0.top) > 0.6
           || !s1.inside || !s1.head || s1.hidden !== n - 1 || s1.nb.some((h, k) => Math.abs(h - x0.nb[k]) > 0.6)) bad.push({ step: 'open', id, s1, h0: x0.h });
       // El MISMO control (ahora cabecera) cierra y recupera la lista completa.
       await press(id);
@@ -897,7 +972,7 @@ for (const E of ENGINES) {
       .observe(document.querySelector('.aurix-intcc'), { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true }); window.__long=0; var last=performance.now(); (function f(t){ if (t-last>50) window.__long++; last=t; if (!window.__stopF) requestAnimationFrame(f); })(last); })()`);
     const g0 = await page.evaluate(`window.__g.length`);
     for (let i = 0; i < 12; i++) { await page.mouse.move(700, 500); await page.mouse.wheel(0, 260); await page.waitForTimeout(90); }
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(5200);   // la cola es secuencial: se deja terminar antes de contar
     const g1 = JSON.parse(await page.evaluate(`JSON.stringify(window.__g)`));
     for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, i % 2 ? 40 : -40); await page.waitForTimeout(90); }
     await page.waitForTimeout(900);
@@ -1242,7 +1317,9 @@ for (const E of ENGINES) {
         }
         ok(`${T} Evolución conserva su altura y Hoy no se mueve al cambiar métrica y periodo`, hs.every(h => (w >= 1024 ? h.evo === h0.evo : Math.abs(h.evo - h0.evo) <= 1) && h.plot === h0.plot && Math.abs(h.hoy - h0.hoy) <= 1), JSON.stringify({ h0, hs }));
         // Etiquetas: cada una navega a su destino, lo selecciona y mueve el foco.
-        const tagIds = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width>0; }).map(function(t){ return t.querySelector('.intv21-tag-go').getAttribute('data-intv21-go'); })`);
+        // RE-DECIDIDO (cierre final): sólo las etiquetas con evidencia exacta son interactivas;
+        // la composición actual sin destino propio es informativa (sin botón).
+        const tagIds = await page.evaluate(`[].slice.call(document.querySelectorAll('.intv21-tag')).filter(function(t){ return t.getBoundingClientRect().width>0 && t.querySelector('.intv21-tag-go'); }).map(function(t){ return t.querySelector('.intv21-tag-go').getAttribute('data-intv21-go'); })`);
         for (const go of tagIds) {
           await page.evaluate(`window.scrollTo(0,0)`); await page.waitForTimeout(80);
           await page.locator(`.intv21-tag-go[data-intv21-go="${go}"]:visible`).first().click(); await page.waitForTimeout(700);

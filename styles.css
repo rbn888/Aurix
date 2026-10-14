@@ -31317,3 +31317,27 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 /* En 0 la barra desaparece al instante (sin transición ni brillo residual). */
 .aurix-intcc .intv22-scen .intv5-sim-bar[data-dir="flat"] .intv5-sim-fill { transition: none; width: 0 !important; }
 @media (min-width: 768px) and (max-width: 1023px) { .aurix-intcc .intv22-scen .intv8-dep .intv22-scn-subject { min-height: 4.2em; } }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CIERRE FINAL · ETIQUETAS: interactivas sólo con evidencia exacta; las demás informativas
+   ════════════════════════════════════════════════════════════════════════════ */
+.intv21-tag.is-info .intv21-tag-info { display: inline-flex; align-items: center; cursor: default; }
+.aurix-intcc .intv3-flash { animation: intv3Flash 1.4s ease-out 1; border-radius: 12px; }
+@keyframes intv3Flash {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--aurix-electric),0); }
+  25%  { box-shadow: 0 0 0 2px rgba(var(--aurix-electric),0.75), 0 0 22px rgba(var(--aurix-electric),0.3); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--aurix-electric),0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurix-intcc .intv3-flash { animation: none; outline: 2px solid rgba(var(--aurix-electric),0.9); outline-offset: 3px; }
+}
+.intv21-tag.is-info { border-color: rgba(150,170,214,0.22); background: rgba(150,170,214,0.05); box-shadow: none; }
+.intv21-tag.is-info .intv21-tag-info { min-height: 30px; padding: 0 12px; font-size: 12px; font-weight: 600; line-height: 1.2; color: rgba(212,224,246,0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* CIERRE FINAL · el destello dura según el recorrido (variable fijada por el owner). */
+.aurix-intv21 > .is-gold-in::before { animation-duration: var(--g9-dur, 820ms); }
+@media (max-width: 640px) { .aurix-intv21 > .is-gold-in::before { animation-duration: var(--g9-dur, 640ms); } }
+/* CIERRE FINAL · Dependencias: importe 20–25 % menor que el porcentaje y algo menos intenso (AA). */
+.aurix-intcc .intv22-scen .intv5-sim-money { font-size: 20px; }
+@media (max-width: 767px) { .aurix-intcc .intv22-scen .intv5-sim-money { font-size: 18px; } }
+.intv5-sim .intv22-scn-block[data-dir="down"] [data-sim-money] { color: rgba(var(--sim-neg), 0.86); }
+.intv5-sim .intv22-scn-block[data-dir="up"] [data-sim-money] { color: rgba(var(--sim-pos), 0.86); }
