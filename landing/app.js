@@ -240,9 +240,10 @@
       'cta.see': "Explorar Aurix",
       'cta.premium': "Crear cuenta y descubrir Premium",
       'shot.tag': "Vista de Aurix · datos de ejemplo",
-      'alt.dashboard': "Dashboard de Aurix con datos de ejemplo",
+      'shot.view': "Vista de Aurix",
+      'alt.dashboard': "Dashboard de Aurix (interfaz en inglés): patrimonio invertible, evolución de la cartera y categorías de acciones, ETF y fondos, cripto, metales, inmuebles y liquidez",
       'alt.positions': "Posiciones de una categoría en Aurix, con datos de ejemplo",
-      'alt.intelligence': "Intelligence de Aurix con datos de ejemplo",
+      'alt.intelligence': "Intelligence de Aurix (interfaz en inglés): salud de la cartera, lectura de concentración, radar, principales posiciones y preguntas para explorar el patrimonio",
       'alt.workspace': "Presupuesto mensual de Aurix con datos de ejemplo",
       'bridge': "Tus inversiones están repartidas. Tu visión no tiene por qué estarlo.",
       'how.eyebrow': "Cómo funciona",
@@ -298,9 +299,10 @@
       'cta.see': "Explore Aurix",
       'cta.premium': "Create an account and explore Premium",
       'shot.tag': "Aurix view · sample data",
-      'alt.dashboard': "Aurix Dashboard with sample data",
+      'shot.view': "Aurix view",
+      'alt.dashboard': "Aurix Dashboard: investable wealth, portfolio evolution and categories for stocks, ETFs and funds, crypto, metals, real estate and liquidity",
       'alt.positions': "Positions in a category in Aurix, with sample data",
-      'alt.intelligence': "Aurix Intelligence with sample data",
+      'alt.intelligence': "Aurix Intelligence: portfolio health, concentration reading, radar, key drivers and questions to explore your wealth",
       'alt.workspace': "Aurix monthly budget with sample data",
       'bridge': "Your investments are spread out. Your view doesn’t have to be.",
       'how.eyebrow': "How it works",
@@ -409,9 +411,11 @@
       if (dict[key] != null) nodes[i].textContent = dict[key];
     }
     // Capturas del producto en el idioma activo (mismos datos ficticios) y su texto alternativo.
-    var imgs = document.querySelectorAll('img[data-i18n-src]');
+    // Sin data-i18n-src (Dashboard, Intelligence) sólo existe una versión: se localiza el alt, no el archivo.
+    var imgs = document.querySelectorAll('img[data-i18n-alt]');
     for (var m = 0; m < imgs.length; m++) {
-      imgs[m].setAttribute('src', 'assets/' + imgs[m].getAttribute('data-i18n-src') + '-' + lang + '.jpg');
+      var sk = imgs[m].getAttribute('data-i18n-src');
+      if (sk) imgs[m].setAttribute('src', 'assets/' + sk + '-' + lang + '.jpg');
       var ak = imgs[m].getAttribute('data-i18n-alt'); if (ak && dict[ak] != null) imgs[m].setAttribute('alt', dict[ak]);
     }
     // Reflect active state on every language toggle (header + mobile)

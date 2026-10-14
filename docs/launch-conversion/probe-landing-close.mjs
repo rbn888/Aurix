@@ -31,7 +31,12 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
         restLazy: imgs.slice(1).every(i => i.getAttribute('loading') === 'lazy'),
         dims: imgs.every(i => +i.getAttribute('width') > 0 && +i.getAttribute('height') > 0),
         loaded: imgs.every(i => i.complete && i.naturalWidth > 0),
-        lang: imgs.every(i => i.getAttribute('src').endsWith('-' + document.documentElement.lang + '.jpg')),
+        lang: imgs.filter(i => i.hasAttribute('data-i18n-src')).every(i => i.getAttribute('src').endsWith('-' + document.documentElement.lang + '.jpg')),
+        // Capturas nuevas en su sitio exacto; posiciones y presupuesto conservados; sin «datos de ejemplo» en las reales.
+        placed: imgs.map(i => i.getAttribute('src')).join() === 'assets/dashboard.jpg,assets/positions-' + document.documentElement.lang + '.jpg,assets/intelligence.jpg,assets/workspace-' + document.documentElement.lang + '.jpg'
+          && !!q('.hero .hero-visual img[src="assets/dashboard.jpg"]') && /Descubre qué merece tu atención|Find out what deserves your attention/.test(q('img[src="assets/intelligence.jpg"]').closest('.how-row').innerText)
+          && ['assets/dashboard.jpg', 'assets/intelligence.jpg'].every(s => { const f = q('img[src="' + s + '"]'); return !/ejemplo|sample/i.test(f.alt + f.closest('figure').innerText); }),
+        ratio: imgs.every(i => Math.abs(i.getBoundingClientRect().width / i.getBoundingClientRect().height - i.naturalWidth / i.naturalHeight) < 0.02 && i.naturalWidth == i.getAttribute('width') && i.naturalHeight == i.getAttribute('height')),
         caps: caps.length === 4 && caps.every(Boolean),
         allVisible: qa('.reveal').every(e => +getComputedStyle(e).opacity > 0.99),
         planAligned: planBtns.length === 2 && (innerWidth < 861 || Math.abs(planBtns[0] - planBtns[1]) <= 1),
@@ -48,7 +53,7 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
     chk(!m.overflow, tag + ' sin desbordamiento'); chk(m.ctaFold, tag + ' CTA en el primer pliegue'); chk(m.empty === 0, tag + ' 0 claves vacías');
     chk(m.order === 'hero,section--bridge,how,plans,faq,start', tag + ' estructura ' + m.order); chk(m.removed, tag + ' secciones retiradas');
     chk(m.explore, tag + ' Explorar → #how'); chk(m.heroEager && m.restLazy && m.dims, tag + ' carga eager/lazy y dimensiones');
-    chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.caps, tag + ' pie fuera de la imagen');
+    chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.placed, tag + ' capturas en su ubicación'); chk(m.ratio, tag + ' proporción y dimensiones reservadas'); chk(m.caps, tag + ' pie fuera de la imagen');
     chk(m.allVisible, tag + ' todo visible tras recorrer'); chk(m.planAligned, tag + ' CTA de planes alineados');
     chk(m.premStarts && m.prices && m.renew, tag + ' Premium: intro, precios y renovación'); chk(m.noCard, tag + ' sin «sin tarjeta»'); chk(m.premCta, tag + ' CTA Premium'); chk(m.ctaDest, tag + ' CTA → app con idioma'); chk(m.noDemo, tag + ' sin demos'); chk(m.meta, tag + ' título/descr. vigentes'); chk(errs.length === 0, tag + ' sin errores ' + errs[0]);
     await p.close();
