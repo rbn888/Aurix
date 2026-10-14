@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '781'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '780'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5962,26 +5962,19 @@ const T = {
     intv11_xa_cp_ev: (cls, names) => `Clases: ${_intv11List(cls, 'es')}. Tres mayores: ${_intv11List(names, 'es')}.`,
     intv3_xa_cp_note: 'Repartir entre clases y repartir entre posiciones son cosas distintas: puedes tener la primera sin la segunda.',
     intv22_ago_7d: 'hace 7 días', intv22_ago_30d: 'hace 30 días', intv22_ago_all: 'al principio',
-    intv22_xq_conc_down: (n, ago) => `¿Qué cambió en el peso de ${n} desde ${ago}?`,
-    intv22_xq_conc_up: (n, ago) => `¿Qué cambió en el peso de ${n} desde ${ago}?`,
+    intv22_xq_conc_down: (n, ago) => `¿Por qué ${n} pesa menos que ${ago}?`,
+    intv22_xq_conc_up: (n, ago) => `¿Por qué ${n} pesa más que ${ago}?`,
     intv22_xa_conc: (v, t) => `Su valor en tu cartera ${_intv9Mv(v, 'es')}; el total de tu cartera ${_intv9Mv(t, 'es')}.`,
-    intv12_xa_conc: (n, down, ago, v, t) => `${n} pesa ${down ? 'menos' : 'más'} que ${ago}: el valor de tu posición ${_intv9Mv(v, 'es')} y el total de tu cartera ${_intv9Mv(t, 'es')}.`,
     intv3_xq_lead: n => `¿Qué cambió para que ${n} pasara a ser mi mayor inversión?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Desde ${ago}, el valor de ${na} en tu cartera cambió un ${va} y el de ${nb} un ${vb}: hoy ${nb} vale más.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} es una posición nueva que hoy vale más que ${na}, cuyo valor en tu cartera cambió un ${va} desde ${ago}.`,
     intv9_xa_lead_new: (nb, ago) => `${nb} no figuraba en tu cartera ${ago} y hoy es tu mayor inversión.`,
-    intv9_xa_lead_old: (na, chg) => `${na} sigue en tu cartera; el valor de tu posición ${_intv9Mv(chg, 'es')} durante el periodo.`,
+    intv9_xa_lead_old: (na, chg) => `${na} sigue en tu cartera; su valor ${_intv9Mv(chg, 'es')} durante el periodo.`,
     intv9_xa_lead_gone: na => `${na} ya no figura en tu cartera.`,
     intv9_xa_lead_both: (ago, na, nb, wb) => `${ago.charAt(0).toUpperCase() + ago.slice(1)} tu mayor inversión era ${na}; hoy es ${nb}.`,
-    intv9_xa_lead_ev: (na, ca, nb, cb) => `Durante el periodo, el valor de tu posición en ${na} ${_intv9Mv(ca, 'es')} y el de tu posición en ${nb} ${_intv9Mv(cb, 'es')}.`,
+    intv9_xa_lead_ev: (na, ca, nb, cb) => `Durante el periodo, el valor de ${na} en tu cartera ${_intv9Mv(ca, 'es')} y el de ${nb} ${_intv9Mv(cb, 'es')}.`,
     intv22_xq_spread: ago => `¿Mi dinero está mejor repartido que ${ago} o solo tengo más posiciones?`,
     intv22_xa_spread_better: 'Está mejor repartido: el peso se ha equilibrado entre tus posiciones.',
-    intv12_xa_spread_up: ago => `Sí: el peso de tu dinero está más repartido que ${ago}.`,
-    intv12_xa_spread_up_conc: ago => `Sí: el peso de tu dinero está más repartido que ${ago}, aunque tus tres mayores inversiones siguen reuniendo la mitad o más de tu cartera.`,
-    intv12_xa_spread_down: ago => `No: el peso de tu dinero está más concentrado que ${ago}.`,
-    intv12_xa_spread_down_more: ago => `No: aunque tienes más posiciones, el peso de tu dinero está más concentrado que ${ago}.`,
-    intv12_xa_spread_same: ago => `El reparto de tu dinero es parecido al de ${ago}.`,
-    intv12_xa_spread_same_more: ago => `Tienes más posiciones, pero el reparto de tu dinero es parecido al de ${ago}.`,
     intv22_xa_spread_more: 'Sobre todo tienes más posiciones: el peso sigue recayendo en unas pocas.',
     intv22_xa_spread_less: 'Está más concentrado: el peso recae en menos posiciones.',
     intv22_xa_spread_ev: (na, nb) => `Has pasado de ${na} a ${nb} posiciones.`,
@@ -5991,8 +5984,8 @@ const T = {
     intv22_xa_mo_ev: (d, m, o) => `Desde el ${d}: mercado ${m}; compras, ventas y movimientos de liquidez (incluidos dividendos no registrados) ${o}.`,
     intv22_xa_mo_lim: 'Los dividendos que no hayas registrado no se separan.',
     intv22_xq_liq: l => `¿Por qué cambió el peso de mi liquidez ${l}?`,
-    intv6_xq_liq_up: l => `¿Qué cambió en el peso de mi liquidez ${l}?`,
-    intv6_xq_liq_down: l => `¿Qué cambió en el peso de mi liquidez ${l}?`,
+    intv6_xq_liq_up: l => `¿Por qué aumentó el peso de mi liquidez ${l}?`,
+    intv6_xq_liq_down: l => `¿Por qué disminuyó el peso de mi liquidez ${l}?`,
     intv22_xa_liq_rest: 'Tu liquidez apenas se movió: lo que cambió fue el valor del resto de tu cartera.',
     intv22_xa_liq_flows: 'Su peso cambió sobre todo por aportaciones o retiradas registradas.',
     intv22_xa_liq_cash: 'Cambió el saldo de tu liquidez.',
@@ -9428,26 +9421,19 @@ const T = {
     intv11_xa_cp_ev: (cls, names) => `Classes: ${_intv11List(cls, 'en')}. Three largest: ${_intv11List(names, 'en')}.`,
     intv3_xa_cp_note: 'Spreading across classes and spreading across positions are different things: you can have one without the other.',
     intv22_ago_7d: '7 days ago', intv22_ago_30d: '30 days ago', intv22_ago_all: 'at the start',
-    intv22_xq_conc_down: (n, ago) => `What changed in the weight of ${n} compared with ${ago}?`,
-    intv22_xq_conc_up: (n, ago) => `What changed in the weight of ${n} compared with ${ago}?`,
+    intv22_xq_conc_down: (n, ago) => `Why does ${n} weigh less than ${ago}?`,
+    intv22_xq_conc_up: (n, ago) => `Why does ${n} weigh more than ${ago}?`,
     intv22_xa_conc: (v, t) => `Its value in your portfolio ${_intv9Mv(v, 'en')}; your portfolio as a whole ${_intv9Mv(t, 'en')}.`,
-    intv12_xa_conc: (n, down, ago, v, t) => `${n} weighs ${down ? 'less' : 'more'} than ${ago}: the value of your position ${_intv9Mv(v, 'en')} and your portfolio as a whole ${_intv9Mv(t, 'en')}.`,
     intv3_xq_lead: n => `What changed for ${n} to become my largest investment?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Compared with ${ago}, the value of ${na} in your portfolio changed ${va} and that of ${nb} ${vb}: today ${nb} is worth more.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} is a new position that is now worth more than ${na}, whose value in your portfolio changed ${va} compared with ${ago}.`,
     intv9_xa_lead_new: (nb, ago) => `${nb} was not in your portfolio ${ago} and is now your largest investment.`,
-    intv9_xa_lead_old: (na, chg) => `${na} is still in your portfolio; the value of your position ${_intv9Mv(chg, 'en')} over the period.`,
+    intv9_xa_lead_old: (na, chg) => `${na} is still in your portfolio; its value ${_intv9Mv(chg, 'en')} over the period.`,
     intv9_xa_lead_gone: na => `${na} is no longer in your portfolio.`,
     intv9_xa_lead_both: (ago, na, nb, wb) => `${ago.charAt(0).toUpperCase() + ago.slice(1)}, your largest investment was ${na}; today it is ${nb}.`,
-    intv9_xa_lead_ev: (na, ca, nb, cb) => `Over the period, the value of your ${na} position ${_intv9Mv(ca, 'en')} and that of your ${nb} position ${_intv9Mv(cb, 'en')}.`,
+    intv9_xa_lead_ev: (na, ca, nb, cb) => `Over the period, the value of ${na} in your portfolio ${_intv9Mv(ca, 'en')} and that of ${nb} ${_intv9Mv(cb, 'en')}.`,
     intv22_xq_spread: ago => `Is my money better spread than ${ago}, or do I just hold more positions?`,
     intv22_xa_spread_better: 'It is better spread: the weight is more balanced across your positions.',
-    intv12_xa_spread_up: ago => `Yes: your money is more evenly spread than ${ago}.`,
-    intv12_xa_spread_up_conc: ago => `Yes: your money is more evenly spread than ${ago}, although your three largest investments still hold half or more of your portfolio.`,
-    intv12_xa_spread_down: ago => `No: your money is more concentrated than ${ago}.`,
-    intv12_xa_spread_down_more: ago => `No: although you hold more positions, your money is more concentrated than ${ago}.`,
-    intv12_xa_spread_same: ago => `The spread of your money is similar to what it was ${ago}.`,
-    intv12_xa_spread_same_more: ago => `You hold more positions, but the spread of your money is similar to what it was ${ago}.`,
     intv22_xa_spread_more: 'Mostly you hold more positions: the weight still sits in a few of them.',
     intv22_xa_spread_less: 'It is more concentrated: the weight sits in fewer positions.',
     intv22_xa_spread_ev: (na, nb) => `You went from ${na} to ${nb} positions.`,
@@ -9457,8 +9443,8 @@ const T = {
     intv22_xa_mo_ev: (d, m, o) => `Since ${d}: market ${m}; buys, sells and cash movements (including unrecorded dividends) ${o}.`,
     intv22_xa_mo_lim: 'Dividends you have not recorded are not separated.',
     intv22_xq_liq: l => `Why did the weight of my cash change ${l}?`,
-    intv6_xq_liq_up: l => `What changed in the weight of my cash ${l}?`,
-    intv6_xq_liq_down: l => `What changed in the weight of my cash ${l}?`,
+    intv6_xq_liq_up: l => `Why did the weight of my cash rise ${l}?`,
+    intv6_xq_liq_down: l => `Why did the weight of my cash fall ${l}?`,
     intv22_xa_liq_rest: 'Your cash barely moved: what changed was the value of the rest of your portfolio.',
     intv22_xa_liq_flows: 'Most of the change comes from recorded contributions or withdrawals.',
     intv22_xa_liq_cash: 'Your cash balance changed.',
@@ -66473,8 +66459,7 @@ function _aurixIntelScheduleRefresh() {
         // no transitorio no repinta en cada tick de precio.
         || (!!screen.querySelector('.intv21-evo[data-hist-held="1"]') && typeof _intv22HistoryPublishable === 'function' && _intv22HistoryPublishable())
         || (!!screen.querySelector('.intcc-explore[data-hist-held="1"]') && typeof _intv7ExploreUnsettled === 'function' && !_intv7ExploreUnsettled())
-        || (!!screen.querySelector('.intv21-evo[data-liq-wait="1"]') && typeof _aurixLineageColumnSeen !== 'undefined' && !!_aurixLineageColumnSeen)
-        || (!!screen.querySelector('[data-ret-wait="1"]') && typeof _intv12RetReady === 'function' && _intv12RetReady());
+        || (!!screen.querySelector('.intv21-evo[data-liq-wait="1"]') && typeof _aurixLineageColumnSeen !== 'undefined' && !!_aurixLineageColumnSeen);
       const changed = _intelRefreshSig != null && sig != null && sig !== _intelRefreshSig;
       if (_intelRefreshSig == null) _intelRefreshSig = sig;
       if (!hydrated && !changed) return;
@@ -72635,15 +72620,6 @@ function _intv21DriverItems(snap) {
 // Core) → lectura estructural si no hay nada más. Cada tipo dice lo que es:
 // «rentabilidad», «contribución», «precio». Un flujo NUNCA se presenta como
 // rentabilidad (eso lo publica el Core con su propia historia de flujo).
-let _intv12RetWait = false, _intv12RetCheckAt = 0, _intv12RetReadyMemo = false;
-function _intv12RetReady() {
-  // Comprobación acotada (como mucho cada 4 s): el refresco se llama en cada tick.
-  const t = Date.now();
-  if (t - _intv12RetCheckAt < 4000) return _intv12RetReadyMemo;
-  _intv12RetCheckAt = t;
-  try { const p = _aurixInvestablePerformance('24h'); _intv12RetReadyMemo = !!(p && p.valid); } catch (_) { _intv12RetReadyMemo = false; }
-  return _intv12RetReadyMemo;
-}
 function _intv21TodayItems(core, stories, W) {
   const items = [];
   const now = _intv21Now();
@@ -72658,10 +72634,6 @@ function _intv21TodayItems(core, stories, W) {
     // hace días, «las últimas 24 h» serían falsas. Sólo se publica si acaba ahora.
     if (p && p.valid && Number.isFinite(p.returnPct) && p.coversNominal !== false && !stale
         && Number.isFinite(p.endAt) && now - p.endAt <= 6 * 3600e3 && p.endAt <= now + 6e5) ret24 = p;
-    // CIERRE · CARGA TARDÍA: si la rentabilidad 24 h aún espera su fuente canónica (llega
-    // con la sincronización), Hoy se marca en espera y el refresco la incorpora al llegar
-    // (antes se perdía hasta salir y volver: la firma material no cambia).
-    _intv12RetWait = !!(!ret24 && !stale && p && !p.valid && /^awaiting/.test(String(p.fallbackReason || '')));
   } catch (_) { ret24 = null; }
   if (ret24 && !has24Story) {
     items.push({ factId: 'ret_24h', family: 'performance', period: '24H', kind: 'return', priority: 1,
@@ -74127,7 +74099,7 @@ function _intv22ExploreCandidates(W, esc) {
             // Si la antigua líder ya no está, se dice eso (nunca «bajó un 100 %»: no es mercado).
             lines.push(sameEnd ? _intv4T('intv9_xa_lead_ev', nm, valChg, nb, (domEnd.v / endStart.v - 1) * 100) : _intv4T('intv9_xa_lead_gone', nm));
           }
-        } else lines.push(_intv4T('intv12_xa_conc', nm, down, ago, valChg, totChg));
+        } else lines.push(_intv4T('intv22_xa_conc', valChg, totChg));
         out.push({ id: 'x22_conc_why', family: lost ? 'leader_change' : 'dependency', priority: lost ? 1 : 5, period: s.win, evidence: 'memory',
           assets: [domStart.id, domEnd.id].filter((v, i, a) => a.indexOf(v) === i), materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
           label: lost ? _intv4T('intv3_xq_lead', _intv21Name(domEnd.a)) : _intv4T(down ? 'intv22_xq_conc_down' : 'intv22_xq_conc_up', nm, ago), answer: p(lines) });
@@ -74142,29 +74114,12 @@ function _intv22ExploreCandidates(W, esc) {
       const a = s.pts[0], b = s.pts[s.pts.length - 1];
       const ws = _intv21RowWeights(rows.find(r => r.ts === a.ts)), we = _intv21RowWeights(rows.find(r => r.ts === b.ts));
       if (ws && we && Math.abs(b.v - a.v) >= 0.3) {
-        // CIERRE · MISMA EVIDENCIA QUE EVOLUCIÓN. Causa demostrada de la contradicción:
-        // Explora decidía «mejor repartido» con el cociente posiciones efectivas /
-        // posiciones (3 → 14 posiciones lo hundía) mientras Evolución, con la MISMA serie
-        // y ventana, publica la dirección del reparto efectivo (2,5 → 5,2: más
-        // equilibrado). Ahora la conclusión ES la de Evolución (mismo `_intv22Stats`/
-        // `_intv22Dir`), y la concentración ACTUAL sólo se añade si está demostrada
-        // (las tres mayores inversiones pesan al menos lo que el resto).
-        const st = _intv22Stats('effective', s);
-        let dir = _intv22Dir('effective', st);
-        if ((dir === 'flat' || dir === 'slight') && st.moved) dir = 'same';
-        const mv = dir === 'up' ? 'up' : (dir === 'down' ? 'down' : 'same');
-        let conc = false;
-        // Concentración ACTUAL demostrable en el MISMO universo que el reparto (cartera
-        // financiera, liquidez incluida): las tres mayores inversiones reúnen la mitad o
-        // más, entre al menos siete (con pesos iguales, 3 de 7 nunca llega a la mitad).
-        try { const R = _intv6Universe(W).invested; const w3 = R.slice(0, 3).reduce((t, r) => t + r.w, 0); conc = R.length >= 7 && w3 >= 0.5; } catch (_) {}
-        const more = we.pos.length > ws.pos.length;
-        const key = 'intv12_xa_spread_' + mv + (mv === 'up' && conc ? '_conc' : '') + (mv !== 'up' && more ? '_more' : '');
-        const lines = [_intv4T(key, ago)];
-        if (we.pos.length !== ws.pos.length) lines.push(_intv4T('intv22_xa_spread_ev', ws.pos.length, we.pos.length));
+        const evA = a.v / ws.pos.length * 100, evB = b.v / we.pos.length * 100;
+        const better = evB > evA + 2, onlyMore = !better && we.pos.length > ws.pos.length;
         out.push({ id: 'x22_spread', family: 'effective', priority: 4, period: s.win, evidence: 'memory', assets: [], materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
           label: _intv4T('intv22_xq_spread', ago),
-          answer: p(lines) });
+          answer: p([_intv4T(better ? 'intv22_xa_spread_better' : (onlyMore ? 'intv22_xa_spread_more' : 'intv22_xa_spread_less')),
+                     _intv4T('intv22_xa_spread_ev', ws.pos.length, we.pos.length)]) });
       }
     }
   } catch (_) {}
@@ -74204,18 +74159,11 @@ function _intv22ExploreCandidates(W, esc) {
       if (ws && we && Math.abs(b.v - a.v) >= 0.2) {
         const cash = (w) => w.pos.filter(x => _intv21IsCash((typeof _aurixCategoryBucket === 'function') ? _aurixCategoryBucket(x.a) : x.a.type)).reduce((s2, x) => s2 + x.v, 0);
         const cA = cash(ws), cB = cash(we);
-        // CIERRE · sólo flujos con intención EXTERNA declarada: registrar efectivo que ya se
-        // tenía (deposit sin intención) no es una aportación.
-        const ext12 = (typeof _AURIX_FLOW_INTENT_EXTERNAL !== 'undefined') ? _AURIX_FLOW_INTENT_EXTERNAL : [];
         const fl = ((typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [])
-          .filter(f => f && (f.kind === 'deposit' || f.kind === 'withdrawal') && f.ts > a.ts && f.ts <= b.ts
-            && typeof _aurixFlowIntentOf === 'function' && ext12.indexOf(_aurixFlowIntentOf(f)) !== -1);
+          .filter(f => f && (f.kind === 'deposit' || f.kind === 'withdrawal') && f.ts > a.ts && f.ts <= b.ts);
         const net = fl.reduce((s2, f) => s2 + (Number(f.amountUSD) || 0), 0);
         const cashMoved = Math.abs(cB - cA) > Math.max(1, 0.005 * cA);
-        // «Sobre todo por aportaciones/retiradas» exige además que el flujo neto vaya en el
-        // MISMO sentido que el cambio de liquidez (si empuja al revés, no lo explica).
-        const flowsExplain = net !== 0 && (net > 0) === (cB - cA > 0) && Math.abs(net) > 0.5 * Math.abs(cB - cA);
-        const key = !cashMoved ? 'intv22_xa_liq_rest' : (flowsExplain ? 'intv22_xa_liq_flows' : 'intv22_xa_liq_cash');
+        const key = !cashMoved ? 'intv22_xa_liq_rest' : (Math.abs(net) > 0.5 * Math.abs(cB - cA) ? 'intv22_xa_liq_flows' : 'intv22_xa_liq_cash');
         out.push({ id: 'x22_liq_why', family: 'liquidity', priority: 3, period: s.win, evidence: fl.length ? 'ledger' : 'memory', assets: [], materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
           label: _intv4T(b.v > a.v ? 'intv6_xq_liq_up' : 'intv6_xq_liq_down', lead.toLowerCase()),
           answer: p([_intv4T(key), _intv4T('intv22_xa_liq_ev', lead, (cB - cA >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(cB - cA)), (we.tot - cB - (ws.tot - cA) >= 0 ? '+' : '−') + _intv22UsdMoney(Math.abs(we.tot - cB - (ws.tot - cA))))]) });
@@ -75116,7 +75064,7 @@ function _renderIntelligenceCommandCenter() {
   const _heroOut21 = heroHtml.replace('<!--intv21:history:desktop-->', _hist21('desktop'));
   const _mHeroOut21 = mHeroHtml.replace('<!--intv21:history:mobile-->', _hist21('mobile'));
   return `
-    <div class="aurix-intcc aurix-intv5 aurix-intv6 aurix-intv21"${(typeof _intv12RetWait !== 'undefined' && _intv12RetWait) ? ' data-ret-wait="1"' : ''}
+    <div class="aurix-intcc aurix-intv5 aurix-intv6 aurix-intv21"
          data-tags="${_tags21.length}"
          data-changed-state="${esc(changed.state)}"
          data-changed-evidence="${changed.evidence ? '1' : '0'}"
