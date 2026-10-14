@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '780'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '779'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5933,14 +5933,6 @@ const T = {
     intv22_note_top: 'El porcentaje es el peso de la inversión que lideraba tu cartera en cada observación.', intv22_note_return: '',
     intv22_note_liquidity: 'Mide el peso de la liquidez dentro de tu cartera financiera. Que suba o baje no es bueno ni malo por sí mismo.',
     intv22_note_value: 'Incluye aportaciones y retiradas: no es rentabilidad.',
-    intv22_h_top_slight: (l, n) => `${l}, el peso de ${n}, tu mayor inversión, apenas cambió.`,
-    intv22_h_top_nearback: (l, n) => `${l}, el peso de ${n}, tu mayor inversión, terminó cerca de donde empezó tras cambiar entre medias.`,
-    intv22_h_topx_nearback: l => `${l}, el peso de tu mayor inversión terminó cerca de donde empezó tras cambiar entre medias.`,
-    intv22_h_liq_nearback: l => `${l}, el peso de tu liquidez terminó cerca de donde empezó tras cambiar entre medias.`,
-    intv22_h_eff_nearback: l => `${l}, el reparto de tu dinero terminó cerca de donde empezó tras cambiar entre medias.`,
-    intv22_h_topx_slight: l => `${l}, el peso de tu mayor inversión apenas cambió.`,
-    intv22_h_liq_slight: l => `${l}, el peso de tu liquidez apenas cambió.`,
-    intv22_h_eff_slight: l => `${l}, el reparto de tu dinero apenas cambió.`,
     intv22_h_top_back: (l, n) => `${l}, el peso de ${n}, tu mayor inversión, terminó como empezó tras cambiar entre medias.`,
     intv22_h_topx_back: l => `${l}, el peso de tu mayor inversión terminó como empezó tras cambiar entre medias.`,
     intv22_h_liq_back: l => `${l}, el peso de tu liquidez terminó como empezó tras cambiar entre medias.`,
@@ -5955,11 +5947,6 @@ const T = {
     intv3_xa_cp_both: (n, w3) => `Las dos cosas a la vez: tu dinero invertido está en ${n} clases de inversión, pero el peso sigue recayendo en tus tres mayores inversiones.`,
     intv3_xa_cp_spread: (n, w3) => `Estás repartido en las dos cosas: ${n} clases de inversión, y tus tres mayores inversiones pesan menos que el resto juntas.`,
     intv3_xa_cp_two: (n, w3, c) => `Tu dinero invertido está en solo dos clases de inversión: ${c[0]} y ${c[1]}.`,
-    intv11_xa_cp_many_conc: n => `Repartes entre ${n} clases de inversión, pero no tanto entre posiciones: el peso sigue recayendo en tus tres mayores inversiones.`,
-    intv11_xa_cp_many_spread: n => `Estás repartido en las dos cosas: ${n} clases de inversión, y tus tres mayores inversiones pesan menos que el resto juntas.`,
-    intv11_xa_cp_two_conc: () => `Solo repartes entre dos clases de inversión, y el peso recae en tus tres mayores inversiones.`,
-    intv11_xa_cp_two_spread: () => `Solo repartes entre dos clases de inversión, aunque tus tres mayores inversiones pesan menos que el resto juntas.`,
-    intv11_xa_cp_ev: (cls, names) => `Clases: ${_intv11List(cls, 'es')}. Tres mayores: ${_intv11List(names, 'es')}.`,
     intv3_xa_cp_note: 'Repartir entre clases y repartir entre posiciones son cosas distintas: puedes tener la primera sin la segunda.',
     intv22_ago_7d: 'hace 7 días', intv22_ago_30d: 'hace 30 días', intv22_ago_all: 'al principio',
     intv22_xq_conc_down: (n, ago) => `¿Por qué ${n} pesa menos que ${ago}?`,
@@ -5995,9 +5982,6 @@ const T = {
     intv22_scn_bar_aria: 'Peso de tu cartera afectado por el escenario',
     // ── INTELLIGENCE V2 (intv21) ──
     intv21_today_ret: p => `Rentabilidad de las últimas 24 h: ${p}, sin contar aportaciones ni retiradas.`,
-    intv11_today_flows_in: (i) => `En las últimas 24 h registraste aportaciones por ${i}.`,
-    intv11_today_flows_out: (i, o) => `En las últimas 24 h registraste retiradas por ${o}.`,
-    intv11_today_flows_both: (i, o, n) => `En las últimas 24 h registraste aportaciones por ${i} y retiradas por ${o} (neto ${n}).`,
     intv21_today_driver_up: (n, pp) => `${n} sumó ${pp} a tu cartera en 24 h.`,
     intv21_today_driver_down: (n, pp) => `${n} restó ${pp} a tu cartera en 24 h.`,
     intv21_today_mover_up: (n, p) => `La cotización de ${n} subió un ${p} en 24 h.`,
@@ -6020,8 +6004,6 @@ const T = {
     intv3_tag_liq_down: w => `Menos peso en liquidez ${w}`,
     intv3_tag_liq_flat: w => `Peso de la liquidez estable ${w}`,
     intv3_tag_liq_back: w => `Liquidez ${w}: mismo peso que al inicio`,
-    intv3_tag_liq_slight: w => `Liquidez ${w}: su peso apenas cambió`,
-    intv3_tag_liq_nearback: w => `Liquidez ${w}: cerca de su peso inicial tras moverse`,
     intv3_win_7d: 'en 7 días', intv3_win_30d: 'en 30 días', intv3_win_all: 'desde el inicio',
     intv21_tag_conc_high: 'Concentración elevada',
     intv21_tag_conc_moderate: 'Concentración moderada',
@@ -9392,14 +9374,6 @@ const T = {
     intv22_note_top: 'The percentage is the weight of the investment that led your portfolio at each observation.', intv22_note_return: '',
     intv22_note_liquidity: 'It measures the weight of cash within your financial portfolio. Going up or down is neither good nor bad in itself.',
     intv22_note_value: 'It includes contributions and withdrawals: it is not return.',
-    intv22_h_top_slight: (l, n) => `${l}, the weight of ${n}, your largest investment, barely changed.`,
-    intv22_h_top_nearback: (l, n) => `${l}, the weight of ${n}, your largest investment, ended close to where it started after moving in between.`,
-    intv22_h_topx_nearback: l => `${l}, the weight of your largest investment ended close to where it started after moving in between.`,
-    intv22_h_liq_nearback: l => `${l}, the weight of your cash ended close to where it started after moving in between.`,
-    intv22_h_eff_nearback: l => `${l}, the spread of your money ended close to where it started after moving in between.`,
-    intv22_h_topx_slight: l => `${l}, the weight of your largest investment barely changed.`,
-    intv22_h_liq_slight: l => `${l}, the weight of your cash barely changed.`,
-    intv22_h_eff_slight: l => `${l}, the spread of your money barely changed.`,
     intv22_h_top_back: (l, n) => `${l}, the weight of ${n}, your largest investment, ended where it started after moving in between.`,
     intv22_h_topx_back: l => `${l}, the weight of your largest investment ended where it started after moving in between.`,
     intv22_h_liq_back: l => `${l}, the weight of your cash ended where it started after moving in between.`,
@@ -9414,11 +9388,6 @@ const T = {
     intv3_xa_cp_both: (n, w3) => `Both at once: your invested money is in ${n} investment classes, but the weight still rests on your three largest investments.`,
     intv3_xa_cp_spread: (n, w3) => `You are spread on both counts: ${n} investment classes, and your three largest investments weigh less than the rest combined.`,
     intv3_xa_cp_two: (n, w3, c) => `Your invested money is in just two investment classes: ${c[0]} and ${c[1]}.`,
-    intv11_xa_cp_many_conc: n => `You spread across ${n} investment classes, but less so across positions: the weight still rests on your three largest investments.`,
-    intv11_xa_cp_many_spread: n => `You are spread on both counts: ${n} investment classes, and your three largest investments weigh less than the rest combined.`,
-    intv11_xa_cp_two_conc: () => `You only spread across two investment classes, and the weight rests on your three largest investments.`,
-    intv11_xa_cp_two_spread: () => `You only spread across two investment classes, although your three largest investments weigh less than the rest combined.`,
-    intv11_xa_cp_ev: (cls, names) => `Classes: ${_intv11List(cls, 'en')}. Three largest: ${_intv11List(names, 'en')}.`,
     intv3_xa_cp_note: 'Spreading across classes and spreading across positions are different things: you can have one without the other.',
     intv22_ago_7d: '7 days ago', intv22_ago_30d: '30 days ago', intv22_ago_all: 'at the start',
     intv22_xq_conc_down: (n, ago) => `Why does ${n} weigh less than ${ago}?`,
@@ -9454,9 +9423,6 @@ const T = {
     intv22_scn_bar_aria: 'Share of your portfolio affected by the scenario',
     // ── INTELLIGENCE V2 (intv21) ──
     intv21_today_ret: p => `Return over the last 24 h: ${p}, excluding contributions and withdrawals.`,
-    intv11_today_flows_in: (i) => `Over the last 24 h you recorded contributions of ${i}.`,
-    intv11_today_flows_out: (i, o) => `Over the last 24 h you recorded withdrawals of ${o}.`,
-    intv11_today_flows_both: (i, o, n) => `Over the last 24 h you recorded contributions of ${i} and withdrawals of ${o} (net ${n}).`,
     intv21_today_driver_up: (n, pp) => `${n} added ${pp} to your portfolio in 24 h.`,
     intv21_today_driver_down: (n, pp) => `${n} took ${pp} off your portfolio in 24 h.`,
     intv21_today_mover_up: (n, p) => `${n}'s price rose ${p} in 24 h.`,
@@ -9479,8 +9445,6 @@ const T = {
     intv3_tag_liq_down: w => `Less weight in cash ${w}`,
     intv3_tag_liq_flat: w => `Cash weight steady ${w}`,
     intv3_tag_liq_back: w => `Cash ${w}: same weight as at the start`,
-    intv3_tag_liq_slight: w => `Cash ${w}: its weight barely changed`,
-    intv3_tag_liq_nearback: w => `Cash ${w}: near its starting weight after moving`,
     intv3_win_7d: 'over 7 days', intv3_win_30d: 'over 30 days', intv3_win_all: 'since the start',
     intv21_tag_conc_high: 'High concentration',
     intv21_tag_conc_moderate: 'Moderate concentration',
@@ -66458,8 +66422,7 @@ function _aurixIntelScheduleRefresh() {
         // al ser publicable la historia; Explora al asentarse historia y memoria. Un fallo
         // no transitorio no repinta en cada tick de precio.
         || (!!screen.querySelector('.intv21-evo[data-hist-held="1"]') && typeof _intv22HistoryPublishable === 'function' && _intv22HistoryPublishable())
-        || (!!screen.querySelector('.intcc-explore[data-hist-held="1"]') && typeof _intv7ExploreUnsettled === 'function' && !_intv7ExploreUnsettled())
-        || (!!screen.querySelector('.intv21-evo[data-liq-wait="1"]') && typeof _aurixLineageColumnSeen !== 'undefined' && !!_aurixLineageColumnSeen);
+        || (!!screen.querySelector('.intcc-explore[data-hist-held="1"]') && typeof _intv7ExploreUnsettled === 'function' && !_intv7ExploreUnsettled());
       const changed = _intelRefreshSig != null && sig != null && sig !== _intelRefreshSig;
       if (_intelRefreshSig == null) _intelRefreshSig = sig;
       if (!hydrated && !changed) return;
@@ -72662,34 +72625,6 @@ function _intv21TodayItems(core, stories, W) {
         text: _intv4T(best.c > 0 ? 'intv21_today_driver_up' : 'intv21_today_driver_down', best.name, _intv21Fixed(Math.abs(best.c), 2) + '\u00a0pp') });
     }
   }
-  // CIERRE FINAL · FLUJOS DEL DÍA (familia distinta de precio y contribución): sólo los
-  // del ledger AUTORITATIVO (aportación/retirada; sin transferencias, sin duplicados ni
-  // borrados, que ya filtra su lector). Bruto de entradas y de salidas por separado y su
-  // neto; si alguna cifra no es conciliable, no se publica nada. Si el Core ya cuenta
-  // ese capital externo en sus historias, no se repite.
-  try {
-    const coreFlows = (stories || []).some(st => st && st.causalRoot === _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL);
-    // SÓLO intención EXTERNA declarada (el ledger emite deposit/withdrawal también al
-    // registrar efectivo que ya se tenía o al dar de baja una fila: sin `intent` es
-    // UNKNOWN_LEGACY y queda fuera de todo agregado externo). Importe = el REGISTRADO por
-    // el usuario en la moneda principal (nunca `amountUSD` reconvertido al tipo de hoy);
-    // si alguno no lo tiene o va en otra moneda, no se publica nada.
-    const ext = (typeof _AURIX_FLOW_INTENT_EXTERNAL !== 'undefined') ? _AURIX_FLOW_INTENT_EXTERNAL : [];
-    const fl = coreFlows ? [] : ((typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [])
-      .filter(f => f && (f.kind === 'deposit' || f.kind === 'withdrawal') && f.ts > now - 864e5 && f.ts <= now + 6e5
-        && typeof _aurixFlowIntentOf === 'function' && ext.indexOf(_aurixFlowIntentOf(f)) !== -1);
-    const base11 = (typeof baseCurrency !== 'undefined' && baseCurrency) ? String(baseCurrency).toUpperCase() : 'USD';
-    if (fl.length && fl.every(f => Number.isFinite(Number(f.amount)) && Number(f.amount) !== 0 && String(f.currency || '').toUpperCase() === base11
-        && (f.kind === 'deposit') === (Number(f.amountUSD) > 0))) {
-      const inUsd = fl.filter(f => f.kind === 'deposit').reduce((t, f) => t + Math.abs(Number(f.amount)), 0);
-      const outUsd = fl.filter(f => f.kind === 'withdrawal').reduce((t, f) => t + Math.abs(Number(f.amount)), 0);
-      const key = inUsd > 0 && outUsd > 0 ? 'intv11_today_flows_both' : (inUsd > 0 ? 'intv11_today_flows_in' : 'intv11_today_flows_out');
-      items.push({ factId: 'flows_24h', family: 'flows', period: '24H', kind: 'flow', priority: 2,
-        value: inUsd - outUsd, unit: 'money', dir: inUsd - outUsd > 0 ? 'up' : (inUsd - outUsd < 0 ? 'down' : 'flat'),
-        evidence: 'capital_flows_ledger', freshness: Math.max.apply(null, fl.map(f => f.ts)),
-        text: _intv4T(key, _intv4Money(inUsd), _intv4Money(outUsd), (inUsd - outUsd >= 0 ? '+' : '−') + _intv4Money(Math.abs(inUsd - outUsd))) });
-    }
-  } catch (_) {}
   // MOVIMIENTO DE PRECIO: la variación que publica la cotización. Sólo con el dato
   // del día fresco y cotización de mercado viva (los fondos con NAV manual no la
   // actualizan). Cripto cotiza 24/7 ⇒ «en 24 h»; el resto ⇒ «en la última sesión».
@@ -72818,8 +72753,8 @@ function _intv21HeroTags(ctx) {
 function _intv21TagsHtml(tags, esc) {
   if (!tags || !tags.length) return '';
   return `<div class="intv21-tags" role="list" aria-label="${esc(_intv4T('intv21_tags_aria'))}">${tags.map(t2 => `
-    <span class="intv21-tag is-${esc(t2.tone)}${t2.target ? '' : ' is-info'}" role="listitem" data-tag="${esc(t2.id)}" data-dim="${esc(t2.dim)}">
-      ${t2.target ? `<button type="button" class="intv21-tag-go" data-intv21-go="${esc(t2.target)}">${esc(t2.label)}</button>` : `<span class="intv21-tag-info">${esc(t2.label)}</span>`}
+    <span class="intv21-tag is-${esc(t2.tone)}" role="listitem" data-tag="${esc(t2.id)}" data-dim="${esc(t2.dim)}">
+      <button type="button" class="intv21-tag-go" data-intv21-go="${esc(t2.target)}">${esc(t2.label)}</button>
     </span>`).join('')}</div>`;
 }
 
@@ -73296,19 +73231,14 @@ function _intv21Goto(target) {
   try {
     if (kind === 'today' && a1) spot = el.querySelector('[data-fact="' + String([a1, a2].filter(Boolean).join(':')).replace(/"/g, '') + '"]') || el;
     if (kind === 'scenarios' && a1) spot = el.querySelector('.intv22-scn-block[data-scn="' + a1 + '"]') || el;
-    // CIERRE · la EVIDENCIA exacta: los KPIs de la métrica y periodo ya seleccionados.
-    if (kind === 'evolution') spot = el.querySelector('.intv22-stats') || el.querySelector('.intv21-evo') || el;
+    if (kind === 'evolution') spot = el.querySelector('.intv21-evo') || el;
   } catch (_) { spot = el; }
-  // Se centra la evidencia (no el principio de la sección): ni la cabecera ni la
-  // navegación fija la tapan. El foco va a ella sin volver a desplazar.
-  try { _intv7GoldQuiet(1500); } catch (_) {}
-  spot.scrollIntoView({ behavior: rm ? 'auto' : 'smooth', block: 'center' });
-  if (!spot.hasAttribute('tabindex')) spot.setAttribute('tabindex', '-1');
-  try { spot.focus({ preventScroll: true }); } catch (_) {}
+  el.scrollIntoView({ behavior: rm ? 'auto' : 'smooth', block: 'start' });
+  const h = el.querySelector('.intcc-card-title');
+  if (h) { if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex', '-1'); try { h.focus({ preventScroll: true }); } catch (_) {} }
   try {
     spot.classList.remove('intv3-flash'); void spot.offsetWidth; spot.classList.add('intv3-flash');
-    // Con movimiento reducido no hay animación: el realce es estático y se retira solo.
-    setTimeout(() => spot.classList.remove('intv3-flash'), 1600);
+    spot.addEventListener('animationend', () => spot.classList.remove('intv3-flash'), { once: true });
   } catch (_) {}
 }
 function _intv21Tip(plot, idx) {
@@ -73651,21 +73581,6 @@ function _intv22Series(metric, win) {
 }
 // Disponibilidad real. «Desde inicio» sólo cuando empieza de verdad antes que 30D
 // (más de 3 días): con una historia de un mes serían dos botones con el mismo dato.
-// CIERRE FINAL · ¿Por qué no hay Liquidez? Causa DEMOSTRADA para la ventana más corta
-// (7D): el linaje de clasificación aún no leído de la cuenta (transitorio: llega con la
-// sincronización), cobertura que empieza después de la ventana, o reclasificación dentro
-// de ella. Sin nombres ni importes: sólo el código de la causa.
-function _intv11LiqReason() {
-  try {
-    const rows = _intv21MemRows();
-    if (!rows || rows.length < 2) return 'history_insufficient';
-    const now = _intv21Now(), span = _INTV21_WIN_MS['7d'];
-    const inWin = rows.filter(r => r.ts >= now - span - _INTV21_DAY);
-    if (inWin.length < 2) return 'history_insufficient';
-    const v = _aurixClassificationValidity('liquidity', inWin[0].ts, inWin[inWin.length - 1].ts);
-    return (v && v.validity === 'no_reclassification_recorded') ? '' : String((v && v.reason) || 'unknown');
-  } catch (_) { return 'unknown'; }
-}
 function _intv22Availability() {
   const avail = {};
   const hist = _intv22HistoryPublishable();
@@ -73709,24 +73624,16 @@ function _intv22WinLead(win, startTs) {
 // Inicio · Actual · Cambio, con la unidad de cada métrica (pp para pesos).
 function _intv22Stats(metric, s) {
   const a = s.pts[0], b = s.pts[s.pts.length - 1];
-  // CIERRE FINAL · coherencia de redondeo. Inicio, final y cambio salen de los MISMOS
-  // valores originales; si a un decimal se leen iguales pero difieren, las tres cifras
-  // pasan a dos decimales (nunca «3,4 → 3,4, cambio −0,1») y el titular dice «apenas».
-  const structural = metric === 'effective' || metric === 'top' || metric === 'liquidity';
-  const fx = (v, d) => metric === 'effective' ? _intv21Fixed(v, d) : _intv21Pct(v, d);
-  const zero1 = _intv21Fixed(b.v - a.v, 1) === _intv21Fixed(0, 1);
-  const dp = (structural && Math.abs(b.v - a.v) >= 0.005 && (fx(a.v, 1) === fx(b.v, 1) || zero1)) ? 2 : 1;
-  const val = (v) => metric === 'value' ? _intv4Money(v) : (metric === 'effective' ? _intv21Fixed(v, dp)
-    : (metric === 'return' ? _intv21Pct(v, 2, true) : _intv21Pct(v, dp)));
+  const val = (v) => metric === 'value' ? _intv4Money(v) : (metric === 'effective' ? _intv21Fixed(v, 1)
+    : (metric === 'return' ? _intv21Pct(v, 2, true) : _intv21Pct(v, 1)));
   let delta;
-  const sgn = (dd, d) => (_intv21Fixed(dd, d) === _intv21Fixed(0, d) ? '' : (dd > 0 ? '+' : (dd < 0 ? '−' : '')));
   if (metric === 'value') { const pct = a.v > 0 ? (b.v / a.v - 1) * 100 : null; delta = (b.v - a.v >= 0 ? '+' : '−') + _intv4Money(Math.abs(b.v - a.v)) + (pct != null ? ' (' + _intv21Pct(pct, 1, true) + ')' : ''); }
-  else if (metric === 'effective') delta = sgn(b.v - a.v, dp) + _intv21Fixed(b.v - a.v, dp);
+  else if (metric === 'effective') delta = ((b.v - a.v) > 0 ? '+' : ((b.v - a.v) < 0 ? '−' : '')) + _intv21Fixed(b.v - a.v, 1);
   else if (metric === 'return') delta = _intv21Pct(b.v - a.v, 2, true);
-  else { const dd = b.v - a.v; delta = sgn(dd, dp) + _intv21Fixed(dd, dp) + ' pp'; }
+  else { const dd = b.v - a.v; delta = (dd > 0 ? '+' : (dd < 0 ? '−' : '')) + _intv21Fixed(dd, 1) + ' pp'; }
   // V7 · ¿se movió entre medias? (a la MISMA precisión publicada; ningún umbral nuevo)
   const moved = s.pts.slice(1, -1).some(p => val(p.v) !== val(a.v));
-  return { a, b, start: val(a.v), now: val(b.v), delta, moved, slight: dp === 2 };
+  return { a, b, start: val(a.v), now: val(b.v), delta, moved };
 }
 // El titular RESUME y los KPIs llevan las cifras: sin repetir Inicio/Último dato/
 // Cambio ni paréntesis. La dirección sale de las MISMAS cifras que se pintan (a la
@@ -73735,7 +73642,6 @@ function _intv22Stats(metric, s) {
 function _intv22Dir(metric, st) {
   // Lo que se PINTA decide: si Inicio y Último dato se leen igual (en la moneda y
   // precisión mostradas), es «se mantuvo».
-  if (st.slight) return 'slight';   // diferencia real por debajo de la resolución habitual
   if (st.start === st.now) return 'flat';
   return st.b.v > st.a.v ? 'up' : (st.b.v < st.a.v ? 'down' : 'flat');
 }
@@ -73756,8 +73662,6 @@ function _intv22Headline(sel) {
   let dir = _intv22Dir(m, st);
   // V7 · «se mantuvo» sólo si NO se movió entre medias: comparar extremos no basta.
   if (dir === 'flat' && st.moved) dir = 'back';
-  // CIERRE FINAL · «apenas cambió» tampoco: si entre medias se movió, se dice.
-  if (dir === 'slight' && st.moved) dir = 'nearback';
   if (m === 'top') {
     const na = st.a.note, nb = st.b.note;
     if (na && nb && na !== nb) return _intv4T('intv22_h_top_changed', lead, na, nb);
@@ -73978,12 +73882,8 @@ function _intv22EvoModuleHtml(esc) {
   // distintas: se explica una vez, accesible (lectores de pantalla y puntero).
   const peakHelp = (sel.metric === 'top' && st.a.note && st.b.note && st.a.note !== st.b.note) ? _intv4T('intv7_k_top_peak_help', st.a.note, st.b.note) : '';
   const held = !_intv22HistoryPublishable();
-  // Liquidez ausente: su causa queda en el marcado (QA) y, si es el linaje aún no leído,
-  // el refresco la incorpora al llegar SIN cambiar la métrica elegida.
-  const liqWhy = (sel.metrics.indexOf('liquidity') === -1) ? _intv11LiqReason() : '';
-  if (liqWhy) _aurixIntelTrace('liq_' + liqWhy, 'evolution');
   const html = `
-    <div class="intv21-evo intv22-evo"${liqWhy ? ` data-liq-why="${esc(liqWhy)}"` : ''}${liqWhy === 'lineage_not_account_wide' ? ' data-liq-wait="1"' : ''} data-metric="${esc(sel.metric)}" data-win="${esc(sel.win)}" data-kind="${sparse ? 'observations' : 'line'}"
+    <div class="intv21-evo intv22-evo" data-metric="${esc(sel.metric)}" data-win="${esc(sel.win)}" data-kind="${sparse ? 'observations' : 'line'}"
          data-points="${g.pts.length}" data-gaps="${g.gaps || 0}" data-dir="${esc(dir)}" data-evo-fact="${esc('evo_' + sel.metric + '_' + sel.win)}"${held ? ' data-hist-held="1"' : ''}>
       <p class="intv15-stable-head intv22-head" data-evo-family="${esc(sel.metric)}" data-evo-key="${esc('evo_' + sel.metric + '_' + sel.win)}" data-period="${esc(sel.win)}"><span class="intv4-mem-what">${esc(head)}</span></p>
       <div class="intv21-evo-ctrl">
@@ -74035,11 +73935,6 @@ const _INTV22_EXPLORE_COOLDOWN = 7 * 864e5;
 // principal con el MISMO conversor de la app antes de formatear. Formatear un importe
 // USD con `formatBase` en una cuenta EUR publicaba dólares con el símbolo del euro.
 // «aumentó un 7,7 %» / «bajó un 2,4 %» / «se mantuvo» (a la precisión publicada).
-function _intv11List(arr, lg) {
-  const a = (arr || []).filter(Boolean);
-  if (a.length <= 1) return a.join('');
-  return a.slice(0, -1).join(', ') + (lg === 'en' ? ' and ' : ' y ') + a[a.length - 1];
-}
 function _intv9Mv(chg, lg) {
   const n = Number(chg) || 0, abs = _intv21Pct(Math.abs(n), 1);
   const zero = abs === _intv21Pct(0, 1);
@@ -74183,15 +74078,10 @@ function _intv22ExploreCandidates(W, esc) {
     const tot = R.reduce((a, r) => a + r.usd, 0);
     if (R.length >= 4 && C.length >= 2 && tot > 0) {
       const top = R.slice(0, 3), u3 = top.reduce((a, r) => a + r.usd, 0), w3 = _intv21Pct(top.reduce((a, r) => a + r.w, 0) * 100, 0);
-      // CIERRE FINAL · la respuesta cubre las DOS dimensiones de la pregunta (clases y
-      // posiciones) y su evidencia son NOMBRES, no las cifras de Factores.
-      const conc11 = u3 >= tot - u3;
-      const ans11 = [_intv4T('intv11_xa_cp_' + (C.length === 2 ? 'two' : 'many') + '_' + (conc11 ? 'conc' : 'spread'), C.length),
-        _intv4T('intv11_xa_cp_ev', C.map(c => _intv21ClassLabel(c.bucket)), top.map(r => r.name))];
       const key = C.length === 2 ? 'intv3_xa_cp_two' : (u3 >= tot - u3 ? 'intv3_xa_cp_both' : 'intv3_xa_cp_spread');
       out.push({ id: 'x3_class_pos', family: 'class_position', priority: 2, period: 'now', evidence: 'weights', assets: top.map(r => r.id), materiality: u3 / tot, root: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
         label: _intv4T('intv3_xq_cp'),
-        answer: p(ans11) });
+        answer: p([_intv4T(key, C.length, w3, C.slice(0, 2).map(c => _intv21ClassLabel(c.bucket)))]) });
     }
   } catch (_) {}
   // 7 · REPARTO ENTRE LAS DOS CLASES PRINCIPALES (sin liquidez): la etiqueta del hero
@@ -74280,9 +74170,7 @@ function _intv22HeroTags(ctx) {
       const top = rows.slice(0, 3);
       const said = ctx.heroTitle && ctx.heroTitle === _intv4T('intel_h_apparent_top3', rows.length, top.map(r => r.name), rows.length - 3);
       const pct = _intv21Pct(top.reduce((a, r) => a + r.w, 0) * 100, 0);
-      // CIERRE · composición actual SIN evidencia visible propia (Factores no repite esta
-      // cifra y el escenario no es lo que la etiqueta anuncia): etiqueta INFORMATIVA.
-      if (!said) tags.push({ id: 'tag_top3', dim: 'positions', sig: top.map(r => r.id).join(',') + ':' + pct, target: null, tone: 'calm',
+      if (!said) tags.push({ id: 'tag_top3', dim: 'positions', sig: top.map(r => r.id).join(',') + ':' + pct, target: 'scenarios:top3', tone: 'calm',
         label: _intv4T('intv3_tag_top3', pct) });
     }
     // 2 · Clases (no posiciones): la mayor, o las dos mayores si juntas son mayoría.
@@ -74290,7 +74178,7 @@ function _intv22HeroTags(ctx) {
     if (cls.length >= 2) {
       const a = cls[0], b = cls[1];
       const two = a.w < 0.5 && a.w + b.w >= 0.5;
-      tags.push({ id: 'tag_class', dim: 'classes', sig: a.bucket + (two ? '+' + b.bucket : '') , target: null, tone: 'calm',
+      tags.push({ id: 'tag_class', dim: 'classes', sig: a.bucket + (two ? '+' + b.bucket : '') , target: 'scenarios:class', tone: 'calm',
         label: two ? _intv4T('intv3_tag_class2', _intv21ClassLabel(a.bucket), _intv21ClassLabel(b.bucket), _intv21Pct((a.w + b.w) * 100, 0))
                    : _intv4T('intv3_tag_class1', _intv21ClassLabel(a.bucket), _intv21Pct(a.w * 100, 0)) });
     }
@@ -74312,7 +74200,6 @@ function _intv22HeroTags(ctx) {
         const st = _intv22Stats('liquidity', av.series[win]);
         let dir = _intv22Dir('liquidity', st);
         if (dir === 'flat' && st.moved) dir = 'back';   // V7 · «estable» no se deduce de los extremos
-        if (dir === 'slight' && st.moved) dir = 'nearback';
         tags.push({ id: 'tag_liq', dim: 'liquidity', sig: win + ':' + dir, target: 'evolution:liquidity:' + win, tone: 'calm',
           label: _intv4T('intv3_tag_liq_' + dir, _intv4T('intv3_win_' + win)) });
       }
@@ -75702,17 +75589,6 @@ function _intv10XApply(card) {
     card.style.setProperty('--x-top', (list ? list.offsetTop : 0) + 'px');
     card.style.setProperty('--x-pl', cs.paddingLeft); card.style.setProperty('--x-pr', cs.paddingRight); card.style.setProperty('--x-pb', cs.paddingBottom);
     open.scrollTop = 0;
-    // Móvil: el cuerpo enseña al menos TRES líneas completas antes de pedir scroll; si
-    // la altura fija no llega, la card crece lo mínimo (en escritorio no crece nunca).
-    try {
-      if ((window.innerWidth || 0) < 1024 && list && activeItem) {
-        const btn = activeItem.querySelector('.intcc-x-q'), p0 = open.querySelector('p');
-        const lh = p0 ? parseFloat(getComputedStyle(p0).lineHeight) || 20 : 20;
-        const need = (btn ? btn.getBoundingClientRect().height : 44) + Math.min(open.scrollHeight, 3 * lh + 24) + 2;
-        const have = activeItem.getBoundingClientRect().height;
-        if (need > have + 0.5) list.style.minHeight = (parseFloat(list.style.minHeight) + (need - have)) + 'px';
-      }
-    } catch (_) {}
     _intv10XFade(open);
   }
 }
@@ -75782,12 +75658,7 @@ function _intv7GoldQuiet(ms) { _intv7QuietUntil = Date.now() + (ms || 900); }
 // COLA: un destello cada vez (dos cards de una fila nunca a la vez; en móvil, ninguno
 // se pierde por coincidir con otro). Cada uno, una vez por entrada real.
 let _intv9GoldQ = [], _intv9GoldRunning = false, _intv9GoldLevel = 0;
-function _intv9GoldEnqueue(el) {
-  if (_intv9GoldQ.indexOf(el) === -1) _intv9GoldQ.push(el);
-  // Sin ráfagas: como mucho dos pendientes (las más recientes, que son las que se ven).
-  if (_intv9GoldQ.length > 2) _intv9GoldQ = _intv9GoldQ.slice(-2);
-  _intv9GoldNext();
-}
+function _intv9GoldEnqueue(el) { if (_intv9GoldQ.indexOf(el) === -1) _intv9GoldQ.push(el); _intv9GoldNext(); }
 function _intv9GoldNext() {
   if (_intv9GoldRunning) return;
   let el = null;
@@ -75796,15 +75667,11 @@ function _intv9GoldNext() {
   _intv9GoldRunning = true;
   _intv9GoldWatch();
   if (el.classList.contains('is-gold-in')) { el.classList.remove('is-gold-in'); void el.offsetWidth; }
-  // Duración acorde al recorrido: misma velocidad aparente en cards pequeñas y grandes.
-  const rr = el.getBoundingClientRect(), per = 2 * (rr.width + rr.height);
-  const dur = Math.round(Math.max(760, Math.min(1500, per * 0.42)));
-  el.style.setProperty('--g9-dur', dur + 'ms');
   el.classList.add('is-gold-in');
   let done = false;
-  const end = () => { if (done) return; done = true; el.classList.remove('is-gold-in'); el.style.removeProperty('--g9-dur'); if (!el.getAttribute('style')) el.removeAttribute('style'); _intv9GoldRunning = false; setTimeout(_intv9GoldNext, 260); };
+  const end = () => { if (done) return; done = true; el.classList.remove('is-gold-in'); _intv9GoldRunning = false; setTimeout(_intv9GoldNext, 60); };
   el.addEventListener('animationend', function f(ev) { if (ev.animationName === 'intv9GoldIn') { el.removeEventListener('animationend', f); end(); } });
-  setTimeout(end, dur + 400);   // red de seguridad: nunca queda una clase ni una cola atascada
+  setTimeout(end, 1200);   // red de seguridad: nunca queda una clase ni una cola atascada
 }
 // Fluidez: se miden los frames de un destello; si se pierden (>25 % por encima de 40 ms),
 // primero se rebaja el brillo y, si vuelve a ocurrir, queda sólo el Hero.

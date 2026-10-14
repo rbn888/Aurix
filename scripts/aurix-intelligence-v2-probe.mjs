@@ -111,7 +111,7 @@ const READ = `(function(){
     healthVal: health ? txt(health.querySelector('.intcc-score-val')) : null, healthBadge: txt(pick('.intcc-health-badge')),
     radarHash: radar ? hash(radar.outerHTML.replace(/\\s+/g,' ')) : 0, driversHash: drv ? hash(drv.outerHTML.replace(/\\s+/g,' ')) : 0,
     drvText: txt(drv),
-    tags: tagsBox ? [].slice.call(tagsBox.querySelectorAll('.intv21-tag')).map(function(t){ return { id: t.getAttribute('data-tag'), dim: t.getAttribute('data-dim'), label: txt(t.querySelector('.intv21-tag-go, .intv21-tag-info')), go: t.querySelector('.intv21-tag-go') ? t.querySelector('.intv21-tag-go').getAttribute('data-intv21-go') : null, fit: t.scrollWidth <= t.clientWidth + 1 && t.getBoundingClientRect().right <= tagsBox.getBoundingClientRect().right + 1 }; }) : [],
+    tags: tagsBox ? [].slice.call(tagsBox.querySelectorAll('.intv21-tag')).map(function(t){ return { id: t.getAttribute('data-tag'), dim: t.getAttribute('data-dim'), label: txt(t.querySelector('.intv21-tag-go')), go: t.querySelector('.intv21-tag-go').getAttribute('data-intv21-go'), fit: t.scrollWidth <= t.clientWidth + 1 && t.getBoundingClientRect().right <= tagsBox.getBoundingClientRect().right + 1 }; }) : [],
     hoy: hoy ? { items: Number(hoy.getAttribute('data-items')), rows: [].slice.call(hoy.querySelectorAll('.intv4-story')).map(function(s){ return { k: s.getAttribute('data-kind') || 'core', f: s.getAttribute('data-fact'), t: txt(s) }; }), text: txt(hoy) } : null,
     evo: evo ? { metric: evo.getAttribute('data-metric'), win: evo.getAttribute('data-win'), kind: evo.getAttribute('data-kind'), pts: Number(evo.getAttribute('data-points')),
       metrics: [].slice.call(evo.querySelectorAll('[data-intv21-evo-metric]')).map(function(b){ return b.getAttribute('data-intv21-evo-metric'); }),
@@ -192,7 +192,7 @@ for (const E of ENGINES) {
         && r.tags.every(t => t.fit && !/Concentración elevada|High concentration/.test(t.label)), JSON.stringify(r.tags));
       const ux = await page.evaluate(`(function(){ var vis=function(e){ return e && e.getBoundingClientRect().width>0; };
         var mh=document.querySelector('.intcc-m-health'); var hl=mh && vis(mh) ? [].slice.call(mh.querySelectorAll('.intcc-m-health-tag')).map(function(e){ return e.textContent.trim().toLowerCase(); }) : [];
-        var tl=[].slice.call(document.querySelectorAll('.intv21-tag')).filter(vis).map(function(e){ return e.querySelector('.intv21-tag-go, .intv21-tag-info').textContent.trim().toLowerCase(); });
+        var tl=[].slice.call(document.querySelectorAll('.intv21-tag')).filter(vis).map(function(e){ return e.querySelector('.intv21-tag-go').textContent.trim().toLowerCase(); });
         var links=[].slice.call(document.querySelectorAll('[data-intel-see-changes]')).filter(vis).map(function(a){ return !!document.getElementById(String(a.getAttribute('href')).replace('#','')); });
         return { dup: tl.filter(function(x){ return hl.indexOf(x) !== -1; }), links: links }; })()`);
       ok(`${T} ninguna etiqueta del hero repite una etiqueta visible de Salud; todo enlace del hero tiene destino`, ux.dup.length === 0 && ux.links.every(Boolean), JSON.stringify(ux));
