@@ -613,6 +613,50 @@ for (const E of ENGINES) {
     await ctx.close();
   }
 
+  // ── COHERENCIA · Explora y Evolución concluyen lo mismo con la misma evidencia; Hoy tardío ──
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const kind of (process.env.COH_PERSONAS || 'real,flows,cash,qa14,volatile').split(',')) {
+    if (kind === 'none') continue;
+    for (const lng of ['es', 'en']) {
+      const T = `[${E} COH ${kind} ${lng}]`;
+      const P = persona(kind);
+      const { ctx, page, errs } = await newPage(390);
+      await boot(page, P, lng);
+      await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+      await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
+      const C = JSON.parse(await page.evaluate(`(function(){ var it=document.querySelector('[data-intcc-q="x22_spread"]'); if (!it) return JSON.stringify({ none: true });
+        var per=it.closest('.intcc-x-item').getAttribute('data-x-period'); var s=_intv22Series('effective', per); var st=_intv22Stats('effective', s); var d=_intv22Dir('effective', st);
+        if ((d==='flat'||d==='slight') && st.moved) d='same';
+        var ans=document.getElementById(it.getAttribute('aria-controls')).textContent.replace(/\\s+/g,' ').trim();
+        return JSON.stringify({ per: per, dir: d, ans: ans, label: it.textContent.trim() }); })()`));
+      if (!C.none) {
+        const want = C.dir === 'up' ? /^(Sí|Yes):/ : (C.dir === 'down' ? /^No:/ : /parecido|similar/);
+        ok(`${T} Explora concluye lo mismo que Evolución sobre el reparto (mismo periodo ${C.per})`, want.test(C.ans) && !/Sobre todo tienes más posiciones|Mostly you hold more positions/.test(C.ans), JSON.stringify(C));
+      }
+      // Ninguna respuesta atribuye causa a flujos sin intención ni usa «¿Por qué…?» sin poder demostrarlo.
+      const X = JSON.parse(await page.evaluate(`JSON.stringify([].slice.call(document.querySelectorAll('.intcc-x-item')).map(function(i){ return i.textContent.replace(/\\s+/g,' ').trim(); }))`));
+      ok(`${T} Explora: sin preguntas «¿Por qué…?» y sin «aportaciones o retiradas» no declaradas`, !X.some(t => /¿Por qué|^Why /.test(t)) && !X.some(t => /aportaciones o retiradas registradas|recorded contributions or withdrawals/.test(t)), JSON.stringify(X).slice(0, 400));
+      ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+      await ctx.close();
+    }
+  }
+  // Hoy: la rentabilidad 24 h que llega TARDE se incorpora sin salir de la pestaña.
+  if (!process.env.P0_ONLY && !process.env.P1_ONLY && process.env.COH_PERSONAS !== 'none') {
+    const T = `[${E} COH Hoy tardío]`;
+    const P = persona('real');
+    const { ctx, page, errs } = await newPage(390);
+    await boot(page, P, 'es');
+    await page.evaluate(SESSION(P, 'uA', { delay: 0 }));
+    await page.evaluate(`(function(){ _aurixCapitalFlowsIncomplete = false; _aurixHydrateAssetMemory(); switchTab('intelligence'); })()`); await page.waitForTimeout(1900);
+    const w0 = await page.evaluate(`document.querySelector('.aurix-intcc').getAttribute('data-ret-wait')`);
+    const h0 = await page.evaluate(`document.querySelector('.intcc-watch').textContent`);
+    await page.evaluate(`(function(){ var orig=_aurixInvestablePerformance; window._aurixInvestablePerformance = _aurixInvestablePerformance = function(r){ var p=orig(r); if (r==='24h' && p) { p=Object.assign({}, p, { valid: true, returnPct: 0.42, fallbackReason: null }); } return p; }; })()`);
+    await page.waitForTimeout(4300); await page.evaluate(`_aurixIntelScheduleRefresh()`); await page.waitForTimeout(1300);
+    const h1 = await page.evaluate(`document.querySelector('.intcc-watch').textContent.replace(/\\s+/g,' ')`);
+    ok(`${T} con la fuente pendiente Hoy queda en espera y, al llegar, publica la rentabilidad 24 h`, w0 === '1' && !/0,42/.test(h0) && /0,42\s?%/.test(h1) && /24\s?h/.test(h1), JSON.stringify({ w0, h1: h1.slice(0, 200) }));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ── RESP · INVARIANTE HORIZONTAL (360/375/390): nada amplía el documento en ningún estado ──
   if (!process.env.P0_ONLY && !process.env.P1_ONLY) for (const W of (process.env.RESP_W || '360,375,390').split(',').map(Number)) {
     if (!W) continue;
