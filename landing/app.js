@@ -119,8 +119,8 @@
 
       'cred.1': 'Una sola plataforma.', 'cred.2': 'Todo tu patrimonio.', 'cred.3': 'Visibilidad completa.',
 
-      'meta.title': 'Aurix — El sistema operativo de tu patrimonio',
-      'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
+      'meta.title': 'Aurix — Inteligencia patrimonial para entender y planificar tu patrimonio',
+      'meta.desc': 'Aurix es una plataforma de inteligencia patrimonial para quienes invierten: reúne acciones, ETFs, fondos, cripto y más, entiende qué está cambiando en tu cartera y planifica con tus propios números.'
     },
     en: {
 
@@ -221,8 +221,8 @@
 
       'cred.1': 'One platform.', 'cred.2': 'All your wealth.', 'cred.3': 'Complete visibility.',
 
-      'meta.title': 'Aurix — The operating system for your wealth',
-      'meta.desc': 'Track, understand and manage your entire wealth — stocks, funds, crypto, real estate, metals and cash — from one platform.'
+      'meta.title': 'Aurix — Wealth intelligence to understand and plan your wealth',
+      'meta.desc': 'Aurix is a wealth intelligence platform for people who invest: bring stocks, ETFs, funds, crypto and more together, understand what is changing in your portfolio and plan with your own numbers.'
     }
   };
 
@@ -238,8 +238,7 @@
       'hero.sub': "Reúne tus inversiones, entiende qué está cambiando y planifica tus próximos pasos. Acciones, ETFs, fondos, cripto y más, en un solo lugar.",
       'cta.start': "Crear cuenta gratis",
       'cta.see': "Explorar Aurix",
-      'cta.premium': "Empezar y descubrir Premium",
-      'hero.note': "Sin tarjeta para empezar.",
+      'cta.premium': "Crear cuenta y descubrir Premium",
       'shot.tag': "Vista de Aurix · datos de ejemplo",
       'alt.dashboard': "Dashboard de Aurix con datos de ejemplo",
       'alt.positions': "Posiciones de una categoría en Aurix, con datos de ejemplo",
@@ -250,16 +249,14 @@
       'how.lead': "Tú registras tus posiciones: Aurix no se conecta a tu banco ni te pide credenciales bancarias.",
       'how.1.t': "Reúne todo tu patrimonio",
       'how.1.d': "Consulta cuánto tienes, cómo se distribuye y cómo evoluciona. Organiza acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez en una sola visión.",
-      'how.1.note': "Añade tus posiciones manualmente y mantén tu información al día.",
       'how.2.t': "Descubre qué merece tu atención",
       'how.2.d': "Intelligence pone tu patrimonio en contexto: dónde se concentra, qué ha cambiado y cómo evoluciona su estructura. Una lectura de tus datos para entender mejor tu cartera.",
       'how.3.t': "Convierte tus números en planes",
-      'how.3.d': "Organiza tu presupuesto, controla cobros pendientes, explora préstamos y proyecta tus objetivos y el interés compuesto. Herramientas y plantillas para planificar con tus propios números.",
-      'how.3.ex': "Plantillas como Presupuesto mensual, Control de cobros, Objetivos financieros o Portfolio inmobiliario; herramientas como Interés compuesto, Simulador de préstamos o Simulador de escenarios.",
+      'how.3.d': "Planifica con tus propios números: organiza tu presupuesto, fija objetivos y comprueba cómo les afectaría un préstamo o el interés compuesto.",
+      'how.3.ex': "Por ejemplo: Presupuesto mensual, Objetivos financieros, Simulador de préstamos e Interés compuesto.",
       'plans.title': "Empieza gratis. Pasa a Premium cuando quieras más.",
       'free.price': "0 €",
       'free.per': "sin coste",
-      'free.sub': "Sin tarjeta para empezar.",
       'free.intro': "Incluye:",
       'free.1': "Todas tus posiciones, sin límite de activos",
       'free.2': "Dashboard con total, reparto y evolución",
@@ -269,8 +266,8 @@
       'price.month.per': "al mes",
       'price.year.note': "O 69,99 € al año, cobrados anualmente: 5,83 € al mes, ahorras un 27 %.",
       'prem.intro': "Todo lo incluido en Free, más:",
-      'prem.1': "Intelligence completa: concentración, estructura y cambios de tu patrimonio",
-      'prem.2': "Todas las herramientas y plantillas de Workspace",
+      'prem.1': "Intelligence completa: entiende dónde se concentra tu patrimonio, qué ha cambiado y cómo evoluciona su estructura",
+      'prem.2': "Todas las herramientas de planificación de Workspace: presupuesto, objetivos, préstamos, interés compuesto y más",
       'prem.3': "Guarda tus planes para retomarlos más tarde",
       'price.terms': "Suscripción renovable. Cancela desde Gestionar mi plan.",
       'faq.title': "Preguntas frecuentes",
@@ -299,8 +296,7 @@
       'hero.sub': "Bring your investments together, understand what is changing and plan your next steps. Stocks, ETFs, funds, crypto and more, in one place.",
       'cta.start': "Create a free account",
       'cta.see': "Explore Aurix",
-      'cta.premium': "Start and discover Premium",
-      'hero.note': "No card needed to start.",
+      'cta.premium': "Create an account and explore Premium",
       'shot.tag': "Aurix view · sample data",
       'alt.dashboard': "Aurix Dashboard with sample data",
       'alt.positions': "Positions in a category in Aurix, with sample data",
@@ -311,16 +307,14 @@
       'how.lead': "You record your positions yourself: Aurix does not connect to your bank or ask for your banking credentials.",
       'how.1.t': "Bring all your wealth together",
       'how.1.d': "See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view.",
-      'how.1.note': "Add your positions manually and keep your information up to date.",
       'how.2.t': "Find out what deserves your attention",
       'how.2.d': "Intelligence puts your wealth in context: where it is concentrated, what has changed and how its structure evolves. A reading of your data to better understand your portfolio.",
       'how.3.t': "Turn your numbers into plans",
-      'how.3.d': "Organise your budget, keep track of pending collections, explore loans and project your goals and compound interest. Tools and templates to plan with your own numbers.",
-      'how.3.ex': "Templates such as Monthly budget, Payment control, Financial goals or Real estate portfolio; tools such as Compound interest, Loan simulator or Scenario builder.",
+      'how.3.d': "Plan with your own numbers: organise your budget, set goals and see how a loan or compound interest would affect them.",
+      'how.3.ex': "For example: Monthly budget, Financial goals, Loan simulator and Compound interest.",
       'plans.title': "Start free. Go Premium when you want more.",
       'free.price': "€0",
       'free.per': "no cost",
-      'free.sub': "No card needed to start.",
       'free.intro': "Includes:",
       'free.1': "All your positions, with no asset limit",
       'free.2': "Dashboard with total, split and evolution",
@@ -330,8 +324,8 @@
       'price.month.per': "per month",
       'price.year.note': "Or €69.99 a year, billed annually: €5.83 a month, you save 27%.",
       'prem.intro': "Everything in Free, plus:",
-      'prem.1': "Full Intelligence: concentration, structure and changes in your wealth",
-      'prem.2': "All Workspace tools and templates",
+      'prem.1': "Full Intelligence: understand where your wealth is concentrated, what has changed and how its structure evolves",
+      'prem.2': "Every Workspace planning tool: budget, goals, loans, compound interest and more",
       'prem.3': "Save your plans to pick them up later",
       'price.terms': "Renewing subscription. Cancel from Manage my plan.",
       'faq.title': "Frequently asked questions",

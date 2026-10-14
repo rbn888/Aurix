@@ -38,6 +38,11 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
         premStarts: /Todo lo incluido en Free, más:|Everything in Free, plus:/.test(prem),
         prices: /7,99|7\.99/.test(prem) && /69,99|69\.99/.test(prem) && /5,83|5\.83/.test(prem) && /27/.test(prem),
         renew: /Suscripción renovable\. Cancela desde Gestionar mi plan\.|Renewing subscription\. Cancel from Manage my plan\./.test(prem),
+        noCard: !/Sin tarjeta para empezar|No card needed to start/i.test(document.body.innerText),
+        premCta: (q('.plan--premium .btn').textContent.trim() === (document.documentElement.lang === 'es' ? 'Crear cuenta y descubrir Premium' : 'Create an account and explore Premium')),
+        ctaDest: qa('[data-app-link]').every(a => a.href.startsWith('https://app.aurixsystem.io/') && a.href.includes('lang=' + document.documentElement.lang)),
+        noDemo: !qa('a').some(a => /demo/i.test(a.href)),
+        meta: !/operating system|sistema operativo/i.test(document.title + document.querySelector('meta[name=description]').content) && /inteligencia patrimonial|wealth intelligence/i.test(document.title),
       };
     });
     chk(!m.overflow, tag + ' sin desbordamiento'); chk(m.ctaFold, tag + ' CTA en el primer pliegue'); chk(m.empty === 0, tag + ' 0 claves vacías');
@@ -45,7 +50,7 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
     chk(m.explore, tag + ' Explorar → #how'); chk(m.heroEager && m.restLazy && m.dims, tag + ' carga eager/lazy y dimensiones');
     chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.caps, tag + ' pie fuera de la imagen');
     chk(m.allVisible, tag + ' todo visible tras recorrer'); chk(m.planAligned, tag + ' CTA de planes alineados');
-    chk(m.premStarts && m.prices && m.renew, tag + ' Premium: intro, precios y renovación'); chk(errs.length === 0, tag + ' sin errores ' + errs[0]);
+    chk(m.premStarts && m.prices && m.renew, tag + ' Premium: intro, precios y renovación'); chk(m.noCard, tag + ' sin «sin tarjeta»'); chk(m.premCta, tag + ' CTA Premium'); chk(m.ctaDest, tag + ' CTA → app con idioma'); chk(m.noDemo, tag + ' sin demos'); chk(m.meta, tag + ' título/descr. vigentes'); chk(errs.length === 0, tag + ' sin errores ' + errs[0]);
     await p.close();
   }
   // Sin JS: nada queda oculto por la animación de entrada.
