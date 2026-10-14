@@ -25336,7 +25336,7 @@ function _renderDashboardDiscover() {
   const esc = _intccEsc;
   const card = (kind, icon, title, body, cta, nav) => `
     <article class="wsdisc-card is-${kind}">
-      <div class="wsdisc-viz" aria-hidden="true">${icon}</div>
+      <div class="wsdisc-viz" aria-hidden="true">${icon}${kind === 'int' ? MOTIF_INT : MOTIF_WS}</div>
       <div class="wsdisc-body">
         <h3 class="wsdisc-t">${esc(title)}</h3>
         <p class="wsdisc-b">${esc(body)}</p>
@@ -25348,6 +25348,25 @@ function _renderDashboardDiscover() {
   // Intelligence: un halo, no un dato. Es CSS puro (sin imagen, sin animación
   // permanente) para no competir con las cifras del patrimonio que hay arriba.
   const orb = `<span class="wsdisc-orb"></span>`;
+  // MOTIVOS ABSTRACTOS (sin cifras, sin ejes, sin datos de nadie): dicen QUÉ CLASE de cosa hace
+  // cada superficie, no un resultado. Intelligence = análisis (concentración y un cambio marcado
+  // sobre una retícula); Workspace = operación (reparto, plan y progreso, con los acentos de sus
+  // herramientas). Decorativos: van dentro de la banda `aria-hidden`.
+  const MOTIF_INT = `<svg class="wsdisc-motif" viewBox="0 0 132 64" focusable="false">
+      <g class="m-grid"><line x1="0" y1="16" x2="132" y2="16"/><line x1="0" y1="32" x2="132" y2="32"/><line x1="0" y1="48" x2="132" y2="48"/></g>
+      <rect class="m-bar m-b1" x="0" y="10" width="112" height="9" rx="4.5"/>
+      <rect class="m-bar m-b2" x="0" y="27" width="72" height="9" rx="4.5"/>
+      <rect class="m-bar m-b3" x="0" y="44" width="40" height="9" rx="4.5"/>
+      <circle class="m-mark" cx="112" cy="14.5" r="4"/><circle class="m-mark-ring" cx="112" cy="14.5" r="8.5"/>
+    </svg>`;
+  const MOTIF_WS = `<svg class="wsdisc-motif" viewBox="0 0 132 64" focusable="false">
+      <g transform="translate(26 32)"><circle class="m-ring" r="20"/>
+        <circle class="m-arc m-a1" r="20" pathLength="100" stroke-dasharray="44 56"/>
+        <circle class="m-arc m-a2" r="20" pathLength="100" stroke-dasharray="30 70" stroke-dashoffset="-46"/>
+        <circle class="m-arc m-a3" r="20" pathLength="100" stroke-dasharray="20 80" stroke-dashoffset="-78"/></g>
+      <path class="m-curve" d="M60 46 C 78 44, 90 34, 104 24 S 124 12, 130 10"/>
+      <rect class="m-track" x="60" y="54" width="70" height="5" rx="2.5"/><rect class="m-fill" x="60" y="54" width="44" height="5" rx="2.5"/>
+    </svg>`;
   // §18 — Workspace: TRES iconos de su propia familia, no el catálogo entero, y CADA UNO CON EL
   // ACENTO DE SU CAPACIDAD. Eran tres azules idénticos, así que la promo de la superficie
   // «operativa» se leía igual de monocroma que la analítica — justo lo que el §19 pide evitar.
@@ -54010,7 +54029,7 @@ function _aurixMobileLiteFallback(reason, err, opts) {
     if (opts && opts.quiet) { if (host) host.innerHTML = ''; return; }
     let title = 'Histórico en construcción';
     try { if (typeof t === 'function') title = t('wscQualityGateTitle') || title; } catch (_) {}
-    if (host) host.innerHTML = '<div class="wsc wsc--empty" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;text-align:center;padding:14px"><div class="wsc-empty-title" style="color:#5e7bb0;font:600 13px/1.4 -apple-system,system-ui">' + title + '</div></div>';
+    if (host) host.innerHTML = '<div class="wsc wsc--empty" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;text-align:center;padding:14px"><div class="wsc-empty-title" style="color:var(--text-tertiary,#9097a6);font:600 13px/1.4 -apple-system,system-ui">' + title + '</div></div>';
   } catch (_) {}
   if (st.failed) { try { _reportSafe('mobile-lite-chart', reason + (st.lastError ? ': ' + st.lastError : '')); } catch (_) {} }
 }
@@ -54522,7 +54541,7 @@ function renderAurixMobileDonutLite() {
     let dist = null;
     try { dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution() : null; } catch (_) { dist = null; }
     if (!Array.isArray(dist) || !dist.length) {
-      host.innerHTML = '<div style="color:#5e7bb0;font:500 12px/1.4 -apple-system,system-ui;text-align:center;padding:12px">Distribución no disponible</div>';
+      host.innerHTML = '<div style="color:var(--text-tertiary,#9097a6);font:500 12px/1.4 -apple-system,system-ui;text-align:center;padding:12px">Distribución no disponible</div>';
       return;
     }
     const totalPct = dist.reduce(function (s, d) { return s + (d.pct > 0 ? d.pct : 0); }, 0) || 100;
@@ -82276,7 +82295,7 @@ function _aurixPreloadBootIcons() {
       try {
         ['perfSnapshot', 'wealthCurveMobile'].forEach(function (id) {
           var el = document.getElementById(id);
-          if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#5e7bb0;font:13px/1.4 -apple-system,system-ui;text-align:center;padding:16px">Gráfico temporalmente desactivado en móvil</div>';
+          if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:var(--text-tertiary,#9097a6);font:13px/1.4 -apple-system,system-ui;text-align:center;padding:16px">Gráfico temporalmente desactivado en móvil</div>';
         });
       } catch (_) {}
       _bm('charts_skipped_mobile_safe');

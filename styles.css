@@ -31460,3 +31460,235 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 @media (prefers-reduced-motion: reduce) {
   .aurix-premium-plans.is-checking .aurix-premium-plan.is-skel { animation: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AURIX · SISTEMA GLOBAL DE LEGIBILIDAD, CONTRASTE Y PROFUNDIDAD
+   ════════════════════════════════════════════════════════════════════════════
+   UNA capa semántica sobre la escala que ya existe (--elev-0…3, --text*, --border*):
+   los nombres dicen FUNCIÓN, los valores salen de esa escala o se miden aquí.
+   Referencia de calidad: el material de Intelligence (.intcc-card) — degradado
+   azul-negro que se separa del lienzo y borde azul visible —, extraído a token y
+   aplicado a las superficies que se quedaban a 1,05–1,10 del lienzo (cards de
+   categoría, Market, Workspace) y se fundían con brillo bajo.
+   Contraste medido (WCAG, sobre el plano donde vive cada uso):
+     --text-primary   ≥ 15:1 · --text-secondary ≥ 9:1 · --text-tertiary ≥ 4,7:1 en --elev-2
+     --accent-primary-fill con texto blanco 4,9:1 (el azul de marca daba 3,7:1)
+     --border-default 1,37:1 sobre el lienzo / 1,5:1 sobre una card (era 1,13–1,16)
+   Verde/rojo SÓLO para resultado financiero; turquesa/violeta no significan ganancia
+   ni pérdida; dorado = Premium/descubrimiento. */
+:root {
+  /* Superficies */
+  --surface-app:            var(--elev-0);
+  --surface-nav:            rgba(14, 19, 31, 0.94);
+  --surface-card:           radial-gradient(140% 120% at 12% 0%, rgba(74,130,240,0.10), rgba(0,0,0,0) 58%),
+                            linear-gradient(165deg, rgba(32,44,72,0.50), rgba(28,36,58,0.62));
+  --surface-card-elevated:  var(--elev-2);
+  --surface-panel:          rgba(165,196,255,0.06);
+  --surface-panel-hover:    rgba(165,196,255,0.10);
+  --surface-input:          rgba(165,196,255,0.07);
+  --surface-tooltip:        #121a2b;
+  --surface-modal:          linear-gradient(165deg, #1a2642, #0c1222);
+  --surface-scrim:          rgba(6,10,20,0.72);
+  /* Texto */
+  --text-primary:    var(--text-bright);
+  --text-secondary:  var(--text-muted);
+  --text-tertiary:   var(--text-dim);
+  --text-disabled:   #6b7282;
+  --text-inverse:    #0b1220;
+  --text-link:       #8db4ff;   /* 8,2:1 sobre el lienzo, 6,6:1 sobre una card */
+  /* Bordes */
+  --border-subtle:      rgba(165,196,255,0.10);
+  --border-default:     rgba(165,196,255,0.18);
+  --border-strong:      rgba(165,196,255,0.28);
+  --border-interactive: rgba(74,130,240,0.48);
+  --border-focus:       #8db4ff;
+  --border-premium:     rgba(212,175,93,0.45);
+  /* Acentos */
+  --accent-primary:       var(--aurix-blue);
+  --accent-primary-fill:  #356CDA;   /* relleno de CTA: blanco 4,87:1 */
+  --accent-primary-fill-hi: #3A72E0; /* parada clara del degradado: blanco 4,50:1 */
+  --accent-primary-soft:  rgba(74,130,240,0.16);
+  --accent-cyan:       #4fc3f7;
+  --accent-turquoise:  #2ec4b6;
+  --accent-violet:     #a78bfa;
+  --accent-gold:       #d4af5d;
+  /* Estados (verde/rojo = resultado financiero) */
+  --status-positive:      var(--aurix-success);
+  --status-positive-soft: rgba(63,191,127,0.14);
+  --status-negative:      var(--aurix-danger);
+  --status-negative-soft: rgba(224,90,90,0.14);
+  --status-warning:       #e9b04f;
+  --status-warning-soft:  rgba(233,176,79,0.14);
+  --status-info:          #8db4ff;
+  --status-info-soft:     rgba(74,130,240,0.14);
+  --status-neutral:       var(--text-muted);
+  /* Gráficos */
+  --chart-grid:      rgba(165,196,255,0.10);
+  --chart-axis:      rgba(165,196,255,0.22);
+  --chart-label:     var(--text-dim);
+  --chart-tooltip:   var(--surface-tooltip);
+  --chart-selection: rgba(141,180,255,0.55);
+  --chart-gap:       rgba(165,196,255,0.28);
+  --chart-series-1:  var(--aurix-blue);
+  --chart-series-2:  var(--accent-cyan);
+  --chart-series-3:  var(--accent-turquoise);
+  --chart-series-4:  var(--accent-violet);
+  --chart-series-5:  var(--status-warning);
+  /* Interacción */
+  --focus-ring:        0 0 0 2px var(--elev-0), 0 0 0 4px var(--border-focus);
+  --hover-overlay:     rgba(165,196,255,0.06);
+  --pressed-overlay:   rgba(165,196,255,0.10);
+  --selected-surface:  rgba(74,130,240,0.20);
+  --disabled-opacity:  0.5;
+  --skeleton-base:     rgba(165,196,255,0.06);
+  --skeleton-highlight: rgba(165,196,255,0.13);
+  /* Profundidad */
+  --shadow-card:     inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 28px -18px rgba(0,0,0,0.7);
+  --shadow-elevated: inset 0 1px 0 rgba(255,255,255,0.06), 0 24px 60px -24px rgba(0,0,0,0.8);
+  --glow-primary:    0 0 24px -8px rgba(74,130,240,0.45);
+  --glow-premium:    0 0 24px -8px rgba(212,175,93,0.40);
+  /* ADJUST de la escala existente: el terciario no llegaba a 4,5:1 sobre --elev-2 (3,69). */
+  --text-dim: #9097A6;
+}
+
+/* ── Foco inequívoco en TODO control (teclado), sin tocar el ratón ni el toque ── */
+html body :is(button, a[href], [role="button"], [role="tab"], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--border-focus) !important;
+  outline-offset: 2px !important;
+}
+
+/* ── Superficies de contenido con el material de Intelligence ─────────────── */
+.cat-card, .wsh-card, .market-section {
+  background: var(--surface-card);
+  border-color: var(--border-default);
+}
+.wsh-tabs { border-color: var(--border-default); background: var(--surface-panel); }
+
+/* ── CTA primario relleno: texto blanco ≥ 4,5:1 (el azul de marca queda para trazo, foco y enlace) ── */
+html body :is(.onb-cta--primary, .wsfc-cta, .intprev-cta, .auth-btn, .aurix-premium-cta.is-premium) {
+  background: linear-gradient(180deg, var(--accent-primary-fill-hi), var(--accent-primary-fill));
+  color: #fff;
+}
+
+/* ── Textos que no llegaban a AA ──────────────────────────────────────────── */
+html body .aurix-premium-microcopy { color: var(--text-tertiary) !important; }
+.aurix-signal-cta, #aurixSignalCtaLabel { color: var(--text-link); }
+/* Estado de mercado: no es ganancia ni pérdida, así que no usa verde/rojo; legible sin opacidad. */
+.market-status { opacity: 1; }
+.market-status.closed { color: var(--text-tertiary); }
+.market-status.closed .dot { background: var(--text-tertiary); }
+.market-status.open { color: var(--text-secondary); }
+.market-status.open .dot { background: var(--accent-turquoise); }
+
+/* ── Navegación inferior móvil: inactivos legibles, activo por icono + color + indicador,
+      sin verde financiero, sin halo y sin bucle ─────────────────────────────── */
+.bottom-nav { background: var(--surface-nav); border-top-color: var(--border-default); }
+.bottom-nav .item { opacity: 1; }
+.bottom-nav .item svg, .bottom-nav .item[data-tab="search"] svg { stroke: #a9b5c9; filter: none; }
+.bottom-nav .item.active::before { display: none; }
+.bottom-nav .item.active svg { stroke: #ffffff; filter: none; animation: none; }
+.bottom-nav .item.active::after { background: var(--aurix-blue); box-shadow: none; width: 16px; height: 3px; border-radius: 2px; }
+
+/* ── Objetivos táctiles ≥ 44 px SIN mover la geometría certificada: área de toque
+      invisible alrededor del control (sólo los que no usan ya ::after). ───────── */
+:is(.range-btn, .perf-btn, .menu-toggle, .fab-trigger, .header-search, .market-tab, .intv21-chip, .intv8-dep-btn) { position: relative; }
+:is(.range-btn, .perf-btn, .menu-toggle, .fab-trigger, .header-search, .market-tab, .intv21-chip, .intv8-dep-btn)::after {
+  content: ''; position: absolute; left: 50%; top: 50%; pointer-events: auto;
+  width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+}
+/* En la fila de rangos/unidades los botones van pegados: el área crece en ALTO y en ancho
+   sólo hasta el hueco disponible, para que dos áreas no se pisen. */
+:is(.range-btn, .perf-btn)::after { width: calc(100% - 2px); }
+@media (pointer: coarse) {
+  :is(.header-tab, .intcc-chip, .onb-langtoggle-btn, .lg-lang-btn, .empty-watchlist-cta, .intv8-intel-pause) { min-height: 44px; }
+}
+/* Deshabilitado: inequívoco (sin relleno de marca, borde de contorno) pero LEGIBLE — antes la
+   opacidad .35 dejaba «Enviar código de acceso» a 2:1. */
+html body .auth-btn:disabled {
+  opacity: 1; background: var(--surface-panel); color: var(--text-tertiary);
+  border: 1px solid var(--border-default); box-shadow: none;
+}
+/* Más objetivos por debajo de 44 px (medidos): mismo patrón de área invisible o alto mínimo. */
+:is(#logoHome, .aurix-signal-cta) { position: relative; }
+:is(#logoHome, .aurix-signal-cta)::after {
+  content: ''; position: absolute; left: 50%; top: 50%; pointer-events: auto;
+  width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+}
+.menu-item { min-height: 44px; }
+#marketSearchInput { min-height: 44px; }
+.aurix-premium-close { width: 44px; height: 44px; }
+@media (pointer: coarse) {
+  :is(.btn-summary-action) { min-height: 44px; }
+}
+
+/* ── PROMOCIONES FREE · motivo propio de cada superficie (abstracto, sin datos) ───────
+   Mismo par: la banda superior reserva el mismo alto en las dos, el motivo se alinea a la
+   derecha y el título/CTA no se mueven. Sin animación permanente; un realce de 180 ms al
+   pasar por encima, y nada con movimiento reducido. En móvil la versión compacta no lo lleva. */
+.wsdisc-viz { gap: 16px; }
+.wsdisc-motif { margin-left: auto; width: 132px; height: 64px; flex: 0 0 auto; overflow: visible; }
+.wsdisc-motif .m-grid line { stroke: var(--chart-grid); stroke-width: 1; }
+.wsdisc-motif .m-bar { fill: rgba(74,130,240,0.30); transform-origin: 0 50%; transform-box: fill-box; transition: fill .18s ease; }
+.wsdisc-motif .m-b1 { fill: rgba(141,180,255,0.62); }
+.wsdisc-motif .m-b2 { fill: rgba(74,130,240,0.48); }
+.wsdisc-motif .m-mark { fill: #cfe0ff; }
+.wsdisc-motif .m-mark-ring { fill: none; stroke: rgba(141,180,255,0.45); stroke-width: 1.2; }
+.wsdisc-motif .m-ring { fill: none; stroke: rgba(165,196,255,0.12); stroke-width: 7; }
+.wsdisc-motif .m-arc { fill: none; stroke-width: 7; transform: rotate(-90deg); }
+.wsdisc-motif .m-a1 { stroke: var(--accent-turquoise); }
+.wsdisc-motif .m-a2 { stroke: var(--aurix-blue); }
+.wsdisc-motif .m-a3 { stroke: var(--accent-violet); }
+.wsdisc-motif .m-curve { fill: none; stroke: var(--text-link); stroke-width: 2; stroke-linecap: round; }
+.wsdisc-motif .m-track { fill: rgba(165,196,255,0.12); }
+.wsdisc-motif .m-fill { fill: var(--accent-turquoise); }
+.wsdisc-card:hover .wsdisc-motif .m-b1 { fill: rgba(141,180,255,0.80); }
+.wsdisc-card { border-color: var(--border-default); }
+.wsdisc-card:hover { border-color: var(--border-interactive); }
+@media (max-width: 700px) { .wsdisc-motif { display: none; } }
+@media (prefers-reduced-motion: reduce) { .wsdisc-motif .m-bar { transition: none; } }
+/* Teselas de herramienta de Workspace: borde de la escala (su identidad de capacidad no cambia). */
+.wsh-tool { border-color: var(--border-default); }
+
+/* ── Market: cabeceras de tabla, estrella de seguimiento y «—» legibles (medidos 3,5:1 y < 3:1) ── */
+#marketList.is-v3 .market-table-header, #marketList.is-v4 .market-table-header,
+#marketList.is-v3 .market-table-header *, #marketList.is-v4 .market-table-header * { color: var(--text-tertiary); }
+#marketList.is-v3 .watchlist-btn, #marketList.is-v4 .watchlist-btn { color: var(--text-tertiary); }
+#marketList.is-v3 .watchlist-btn.active, #marketList.is-v4 .watchlist-btn.active { color: #f4c44a; }
+#marketList.market-section { border-color: var(--border-default); }
+
+/* ── Dashboard móvil: el hero y su «+» con el borde y el texto de la escala (sólo color; la
+      geometría certificada no cambia) ─────────────────────────────────────────────── */
+.dashboard-top { border-color: var(--border-default); }
+.fab-trigger { color: var(--text-link); border-color: var(--border-interactive); }
+
+/* ── Paywall: eyebrow con el azul de enlace (el de marca quedaba al límite sobre el modal) ── */
+.aurix-premium-eyebrow, .aurix-premium-sub, .aurix-premium-value-lead { color: var(--text-link); }
+
+/* ── Ajustes · info técnica y «Próximamente» del alta: legibles (medidos 3,1 y 2,7:1) ── */
+.settings-techinfo-label, .settings-techinfo-value { color: var(--text-tertiary); }
+.add-v2-sub.add-v2-soon { color: var(--text-secondary); }
+/* Opción del alta «próximamente»: inequívoca (borde discontinuo, título terciario, su etiqueta)
+   sin la opacidad global que la dejaba a 2,7:1. Sigue sin hover ni acción. */
+.add-v2-card.is-disabled { opacity: 1; border-style: dashed; border-color: var(--border-default); }
+.add-v2-card.is-disabled .add-v2-title { color: var(--text-tertiary); }
+/* Cierres de modal y edición de nombre: área de toque de 44 px sin cambiar su dibujo. */
+/* #compositionClose ya es absolute (y por tanto contenedor de su ::after): no se le toca la posición. */
+:is(.modal-close:not(#compositionClose), .settings-name-edit) { position: relative; }
+:is(.modal-close, .settings-name-edit)::after {
+  content: ''; position: absolute; left: 50%; top: 50%; pointer-events: auto;
+  width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+}
+.settings-nav-item { min-height: 44px; }
+@media (pointer: coarse) { .settings-name-input { min-height: 44px; } }
+
+/* ── Gráfico móvil: etiquetas del eje Y con el color de etiqueta de gráfico (eran fill al 55 %,
+      3,4:1). Sólo color: el renderer, la escala y la posición certificados no cambian. ── */
+.mob-ylab { fill: var(--chart-label); }
+
+/* ── Fallos previos de toque/tamaño en sondas existentes (onboarding y Presupuesto): mismo sistema ── */
+.onb-langtoggle-btn, .onb-skip { min-height: 44px; }
+.wsbud-controls .wsbud-perchip-sel { min-height: 44px; }
+.wsbud-controls .wsbud-perchip-lbl { font-size: 12px; }
+/* Market en tablet: allí su borde es `none` por diseño de layout; la separación del lienzo se da con
+   un anillo interior del mismo token, que no ocupa espacio (geometría intacta). */
+#marketList.market-section { box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 30px -20px rgba(0,0,0,0.5); }
