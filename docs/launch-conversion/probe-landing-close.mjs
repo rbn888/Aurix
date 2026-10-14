@@ -33,25 +33,28 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
         dims: imgs.every(i => +i.getAttribute('width') > 0 && +i.getAttribute('height') > 0),
         loaded: imgs.every(i => i.complete && i.naturalWidth > 0),
         lang: imgs.filter(i => i.hasAttribute('data-i18n-src')).every(i => i.getAttribute('src').endsWith('-' + document.documentElement.lang + '.jpg')),
-        // Capturas nuevas en su sitio exacto; posiciones y presupuesto conservados; sin «datos de ejemplo» en las reales.
-        // Dashboard en el hero, Intelligence en su bloque, posiciones y presupuesto conservados; Market sólo como frase en «Reúne».
+        // Dashboard en el hero; cuatro filas Reúne · Market · Intelligence · Planifica con su captura; Market con texto propio y sin duplicado en Reúne.
         placed: qa('main img').map(i => i.getAttribute('src')).join() === 'assets/dashboard.jpg,assets/positions-' + document.documentElement.lang + '.jpg,assets/market.jpg,assets/intelligence.jpg,assets/workspace-' + document.documentElement.lang + '.jpg'
-          && !q('.how-market') && !/Tus mercados, a la vista|Your markets, at a glance/.test(document.body.innerText)
-          && /Sigue los mercados y los activos que te interesan desde Market\.|Follow the markets and assets that interest you in Market\./.test(q('#how .how-row').innerText)
-          && !!q('#how .how-row + .how-aside + .how-row--rev') && !q('.how-aside h2, .how-aside h3, .how-aside .btn, .how-aside p') && !!q('.hero .hero-visual img[src="assets/dashboard.jpg"]')
-          && /Descubre qué merece tu atención|Find out what deserves your attention/.test(q('img[src="assets/intelligence.jpg"]').closest('.how-row').innerText)
+          && qa('#how .how-row').length === 4 && !q('.how-aside') && !!q('.hero .hero-visual img[src="assets/dashboard.jpg"]')
+          && [/Reúne todo tu patrimonio|Bring all your wealth together/, /Sigue los mercados que te interesan\.|Follow the markets that interest you\./, /Descubre qué merece tu atención|Find out what deserves your attention/, /Convierte tus números en planes|Turn your numbers into plans/]
+               .every((re, k) => re.test(qa('#how .how-row')[k].querySelector('.how-copy').innerText))
+          && [/positions-/, /market\.jpg/, /intelligence\.jpg/, /workspace-/].every((re, k) => re.test(qa('#how .how-row')[k].querySelector('img').getAttribute('src')))
+          && !/desde Market\.|in Market\./.test(qa('#how .how-row')[0].innerText) && !qa('#how .how-row')[1].querySelector('.btn')
+          && /Explora acciones, ETFs, criptomonedas, índices y materias primas|Explore stocks, ETFs, crypto, indices and commodities/.test(qa('#how .how-row')[1].innerText)
           && ['assets/dashboard.jpg', 'assets/intelligence.jpg'].every(s => !/ejemplo|sample/i.test(q('img[src="' + s + '"]').alt))
           && ['positions', 'workspace'].every(k => /ejemplo|sample/i.test(q('img[data-i18n-src="' + k + '"]').alt)),
+        // Alternancia: escritorio texto|img, img|texto, texto|img, img|texto (≈40/60, centrados en vertical); móvil título → descripción → imagen. Mismo ancho de imagen en las cuatro.
+        rows: (() => { const R = qa('#how .how-row').map(r => ({ r: r.getBoundingClientRect(), c: r.querySelector('.how-copy').getBoundingClientRect(), f: r.querySelector('.shot-fig').getBoundingClientRect() }));
+          const sameW = R.every(x => Math.abs(x.f.width - R[0].f.width) <= 1);
+          if (innerWidth < 861) return sameW && R.every(x => x.f.top >= x.c.bottom - 1 && Math.abs(x.f.width - x.r.width) <= 1);
+          return sameW && R.every((x, k) => (k % 2 === 0 ? x.c.right <= x.f.left : x.f.right <= x.c.left) && x.f.width / x.r.width > 0.55 && x.f.width / x.r.width < 0.65 && Math.abs((x.c.top + x.c.bottom) / 2 - (x.f.top + x.f.bottom) / 2) <= 2); })(),
         // Hero compacto (900 px, centrado) en escritorio; ancho completo en móvil. Intelligence ≈ 60 % de su fila.
         hero: innerWidth < 861 ? Math.abs(q('.hero-visual').getBoundingClientRect().width - q('.hero-inner').getBoundingClientRect().width + 0) <= 40
           : (() => { const r = q('.hero-visual').getBoundingClientRect(), c = q('.hero-visual').parentElement.getBoundingClientRect(); return Math.abs(r.width - 900) <= 1 && Math.abs((r.left - c.left) - (c.right - r.right)) <= 1; })(),
-        // Market: apoyo dentro de «Reúne» — ≤680 px, centrado y claramente menor en escritorio, ancho disponible en móvil, menor que Dashboard e Intelligence, enlace a la resolución completa.
-        market: (() => { const f = q('.how-aside').getBoundingClientRect(), c = q('.how-aside').parentElement.getBoundingClientRect(), i = q('.how-aside img'), a = q('.how-aside a');
-          const intel = q('.how-row--focus .shot-fig').getBoundingClientRect(), hero = q('.hero-visual').getBoundingClientRect();
-          const lang = document.documentElement.lang;
-          return f.height > 0 && a.getAttribute('href') === 'assets/market-full.jpg' && a.target === '_blank' && a.rel === 'noopener noreferrer' && /Market/.test(a.getAttribute('aria-label'))
-            && (lang === 'en' ? /interface in Spanish/.test(i.alt) : /Market de Aurix/.test(i.alt))
-            && (innerWidth < 861 ? Math.abs(f.width - intel.width) <= 1 : f.width <= 680 && f.width < intel.width * 0.9 && f.width < hero.width * 0.7 && Math.abs((f.left - c.left) - (c.right - f.right)) <= 1); })(),
+        // Market: enlace a la resolución completa, rel seguro, alt veraz sobre el idioma de la interfaz.
+        market: (() => { const i = q('.how-market-fig img'), a = q('.how-market-fig a'), lang = document.documentElement.lang;
+          return a.getAttribute('href') === 'assets/market-full.jpg' && a.target === '_blank' && a.rel === 'noopener noreferrer' && /Market/.test(a.getAttribute('aria-label'))
+            && (lang === 'en' ? /interface in Spanish/.test(i.alt) : /Market de Aurix/.test(i.alt)); })(),
         intel: (() => { const f = q('.how-row--focus .shot-fig').getBoundingClientRect(), row = q('.how-row--focus').getBoundingClientRect(); return innerWidth < 861 ? f.width >= row.width - 1 && f.top > q('.how-row--focus .how-copy').getBoundingClientRect().bottom - 1 : f.width / row.width > 0.55 && f.width / row.width < 0.65; })(),
         ratio: imgs.every(i => Math.abs(i.getBoundingClientRect().width / i.getBoundingClientRect().height - i.naturalWidth / i.naturalHeight) < 0.02 && Math.abs(i.naturalWidth / i.naturalHeight - i.getAttribute('width') / i.getAttribute('height')) < 0.01),
         caps: !q('figcaption, .shot-cap') && !/Vista de Aurix|Aurix view|datos de ejemplo|sample data/i.test(document.body.innerText),
@@ -70,7 +73,7 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
     chk(!m.overflow, tag + ' sin desbordamiento'); chk(m.ctaFold, tag + ' CTA en el primer pliegue'); chk(m.empty === 0, tag + ' 0 claves vacías');
     chk(m.order === 'hero,section--bridge,how,plans,faq,start', tag + ' estructura ' + m.order); chk(m.removed, tag + ' secciones retiradas');
     chk(m.explore, tag + ' Explorar → #how'); chk(m.heroEager && m.restLazy && m.dims, tag + ' carga eager/lazy y dimensiones');
-    chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.placed, tag + ' capturas en su ubicación'); chk(m.ratio, tag + ' proporción y dimensiones reservadas'); chk(m.caps, tag + ' sin pies de imagen'); chk(m.hero && heroNow, tag + ' hero compacto y visible al instante'); chk(m.intel, tag + ' Intelligence ≈60 % / texto→imagen'); chk(m.market, tag + ' Market: ubicación, tamaño, alt y ampliación');
+    chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.placed, tag + ' capturas en su ubicación'); chk(m.ratio, tag + ' proporción y dimensiones reservadas'); chk(m.caps, tag + ' sin pies de imagen'); chk(m.hero && heroNow, tag + ' hero compacto y visible al instante'); chk(m.intel, tag + ' Intelligence ≈60 % / texto→imagen'); chk(m.market, tag + ' Market: alt y ampliación'); chk(m.rows, tag + ' cuatro filas alternas, mismo ancho, texto→imagen en móvil');
     chk(m.allVisible, tag + ' todo visible tras recorrer'); chk(m.planAligned, tag + ' CTA de planes alineados');
     chk(m.premStarts && m.prices && m.renew, tag + ' Premium: intro, precios y renovación'); chk(m.noCard, tag + ' sin «sin tarjeta»'); chk(m.premCta, tag + ' CTA Premium'); chk(m.ctaDest, tag + ' CTA → app con idioma'); chk(m.noDemo, tag + ' sin demos'); chk(m.meta, tag + ' título/descr. vigentes'); chk(errs.length === 0, tag + ' sin errores ' + errs[0]);
     const sset = await p.evaluate(async () => { const out = [];

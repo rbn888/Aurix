@@ -1310,12 +1310,9 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
 .shot-fig img{ display:block; width:100%; height:auto; border-radius:var(--radius); border:1px solid var(--border-hi);
   background:#0a0f1a; box-shadow:0 16px 40px rgba(0,0,0,.36); }
 /* Intelligence: el bloque principal tras «Reúne» — más escala y aire, sin elementos nuevos. */
-/* Market: apoyo visual de «Reúne», menor que Dashboard e Intelligence. */
-.how-aside{ max-width:560px; margin:40px auto 0; }
-.how-aside a{ display:block; border-radius:var(--radius); cursor:zoom-in; }
-.how-aside a:focus-visible{ outline:2px solid var(--accent, #4f8ef7); outline-offset:3px; }
-@media (max-width:860px){ .how-aside{ margin-top:28px; } }
-.how-row--focus{ margin-top:72px; }
+/* Market: el enlace de ampliación ocupa la figura entera. */
+.how-market-fig a{ display:block; border-radius:var(--radius); cursor:zoom-in; }
+.how-market-fig a:focus-visible{ outline:2px solid var(--accent, #4f8ef7); outline-offset:3px; }
 .how-row--focus .how-copy h3{ font-size:28px; }
 .how-row--focus .how-copy p{ color:var(--text); opacity:.82; }
 
