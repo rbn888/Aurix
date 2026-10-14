@@ -657,6 +657,17 @@
       return 'es';
     })();
     document.documentElement.lang = LOGIN_LANG;
+    // INTENCIÓN PREMIUM (landing) — misma regla que index.html: la entrada desde la landing la fija o
+    // la borra, y el parámetro sale de la URL. Viaja en sesión hasta que app.js la consume.
+    (function () {
+      try {
+        const q = new URLSearchParams(location.search);
+        if (!(q.has('intent') || q.has('lang') || q.has('langhint'))) return;
+        if (q.get('intent') === 'premium') sessionStorage.setItem('aurix_intent', 'premium');
+        else sessionStorage.removeItem('aurix_intent');
+        if (q.has('intent')) { q.delete('intent'); const r = q.toString(); history.replaceState(history.state, '', location.pathname + (r ? '?' + r : '') + location.hash); }
+      } catch (_) {}
+    })();
 
     // ── AURIX-AFFILIATES-V1 · TOQUES DE RECOMENDACIÓN DESDE LA LANDING ──────────
     // Llegan como `?aref=<code>-<seg36>.…` (los arma `refEncode` de landing/app.js),

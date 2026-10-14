@@ -234,13 +234,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         r.text.slice(0, 120));
 
       // ── §8 · LO QUE SE AFIRMA TIENE QUE SER CIERTO ─────────────────────────
-      // El recuento escrito tiene que ser el del CATÁLOGO. Se lee el número que
-      // aparece junto a «capacidades»/«capabilities», sea cifra o palabra.
-      const WORD = { 8: /\bocho\b|\beight\b/i, 9: /\bnueve\b|\bnine\b/i, 10: /\bdiez\b|\bten\b/i };
-      const wrong = Object.keys(WORD).map(Number).filter(n => n !== nCaps && WORD[n].test(r.text));
-      ok(`${tag} el recuento de capacidades coincide con el catálogo (${nCaps})`,
-        wrong.length === 0 && (new RegExp('\\b' + nCaps + '\\b').test(r.text) || WORD[nCaps].test(r.text)),
-        JSON.stringify({ nCaps, wrong, has: r.text.slice(0, 160) }));
+      // CONTRATO RE-DECIDIDO (cierre Free → Premium): el paywall ya no escribe un
+      // recuento («Las 9 capacidades…») sino ejemplos del catálogo + «y más». Lo que
+      // se protege sigue siendo lo mismo: ninguna cifra de capacidades que pueda
+      // desincronizarse del catálogo, y si se muestran menos de las publicadas, se dice.
+      const WORD = /\b(ocho|nueve|diez|eight|nine|ten)\b/i;
+      const countClaim = /\b\d+\s+(capacidades|capabilities|published capabilities)\b/i.test(r.text) || WORD.test(r.text);
+      ok(`${tag} sin recuento de capacidades; ejemplos del catálogo${nCaps > 4 ? ' + «y más»' : ''} (${nCaps})`,
+        !countClaim && (nCaps <= 4 || /y más|and more/i.test(r.text)),
+        JSON.stringify({ nCaps, countClaim, has: r.text.slice(0, 160) }));
 
       // ── LO COMERCIAL, INTACTO ──────────────────────────────────────────────
       ok(`${tag} anual primero y destacado`,

@@ -872,12 +872,18 @@ console.log('\nF · precios canónicos y paywall');
   // nueve publicadas, y una promesa abierta sobre producto futuro). El contrato
   // nuevo es más fuerte: el recuento y los NOMBRES no pueden estar escritos en
   // el paywall, tienen que salir del catálogo.
-  ok('F.9 el recuento y los nombres de las capacidades salen del CATÁLOGO, no del paywall',
+  // CONTRATO RE-DECIDIDO (cierre Free → Premium): el bloque ya no pinta el RECUENTO («Las 9
+  // capacidades…») sino ejemplos representativos + «y más». Lo que protegía F.9 sigue en pie: los
+  // NOMBRES salen del catálogo publicado (las claves elegidas son identificadores, no nombres), no
+  // hay ni una cifra ni un nombre escrito a mano, y sin catálogo el bloque se omite.
+  ok('F.9 los nombres de las capacidades salen del CATÁLOGO, sin recuento ni nombres a mano',
     (() => { const b = fnSrc(app, '_valueBlocks');
-      return /_capsPub\(\)/.test(b) && /t\('pw_v2_b'\)\(caps\.length\)/.test(b)
+      return /_capsPub\(\)/.test(b) && /\.map\(_capName\)/.test(b) && /t\('pw_v2_b'\)/.test(b)
+        && !/t\('pw_v2_b'\)\(/.test(b)
         // Ni una cifra ni un nombre de capacidad escritos a mano en el bloque.
         && !/\b(ocho|nueve|diez|eight|nine|ten)\b/i.test(b)
-        && !/Presupuesto|Interés compuesto|Préstamo|Budget|Compound/i.test(b)
+        && !/Presupuesto|Interés compuesto|Préstamo|Budget|Compound/.test(b)
+        && !/pw_v2_b:\s*[^\n]*\d/.test(app)
         // Y sin catálogo NO se afirma un número: el bloque entero se omite.
         && /caps\.length \? item\('pw_v2_t'/.test(b); })(),
     'el bloque de valor tiene que derivar de _wsfcPublishedCaps()');

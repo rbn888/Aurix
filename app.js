@@ -4265,6 +4265,7 @@ async function initPortfolioData(userId) {
 // button (app.js:22401) depends on it.
 
 async function signOut() {
+  try { sessionStorage.removeItem('aurix_intent'); } catch (_) {}   // la intención Premium no pasa a otra cuenta
   _explicitSignOut = true;   // SPEC POST-LOGIN-BOUNCE.03 — mark so the listener force-redirects (no guard)
   await supabaseClient.auth.signOut();
 }
@@ -7942,6 +7943,12 @@ const T = {
     pw_terms:          'Se renueva automáticamente al final de cada periodo. Puedes cancelar cuando quieras desde «Gestionar mi plan».',
     pw_trial:          (d) => `Incluye ${d} días de prueba`,
     pw_cta:            'Continuar',
+    pw_cta_year:       'Continuar con anual',
+    pw_cta_month:      'Continuar con mensual',
+    pw_checking:       'Comprobando disponibilidad…',
+    pw_load_error:     'No hemos podido cargar los planes. Comprueba tu conexión e inténtalo de nuevo.',
+    pw_retry:          'Reintentar',
+    pw_stay_free:      'Seguir con el plan gratuito',
     pw_opening:        'Abriendo…',
     pw_manage:         'Gestionar mi plan',
     pw_active_title:   'Tu plan Premium está activo',
@@ -7966,7 +7973,8 @@ const T = {
     pw_v1_b:           'La lectura entera de tu patrimonio: cómo está construido, dónde se concentra y qué ha cambiado desde la última vez que miraste.',
     pw_v1_eg:          'Por ejemplo: ver que un solo activo pesa más de la mitad de tu cartera — y desde cuándo.',
     pw_v2_t:           'Workspace completo',
-    pw_v2_b:           (n) => `Las ${n} capacidades publicadas, para calcular, comparar y organizar:`,
+    pw_v2_b:           'Herramientas y plantillas para calcular, comparar y organizar. Entre ellas:',
+    pw_v2_more:        'y más',
     pw_v2_eg:          'Por ejemplo: calcular la cuota de una hipoteca y ver cuánto acabas pagando en intereses.',
     pw_v3_t:           'Tus planes y documentos',
     pw_v3_b:           'Guarda lo que calculas con el nombre que elijas y tenlo a mano en el Resumen.',
@@ -11100,6 +11108,12 @@ const T = {
     pw_terms:          'Renews automatically at the end of each period. You can cancel whenever you want from “Manage my plan”.',
     pw_trial:          (d) => `Includes a ${d}-day trial`,
     pw_cta:            'Continue',
+    pw_cta_year:       'Continue with annual',
+    pw_cta_month:      'Continue with monthly',
+    pw_checking:       'Checking availability…',
+    pw_load_error:     'We could not load the plans. Check your connection and try again.',
+    pw_retry:          'Try again',
+    pw_stay_free:      'Continue with the free plan',
     pw_opening:        'Opening…',
     pw_manage:         'Manage my plan',
     pw_active_title:   'Your Premium plan is active',
@@ -11116,7 +11130,8 @@ const T = {
     pw_v1_b:           'The whole reading of your wealth: how it is built, where it concentrates, and what has changed since you last looked.',
     pw_v1_eg:          'For example: seeing that a single asset is more than half your portfolio — and since when.',
     pw_v2_t:           'The whole Workspace',
-    pw_v2_b:           (n) => `The ${n} published capabilities, to calculate, compare and organise:`,
+    pw_v2_b:           'Tools and templates to calculate, compare and organise. Among them:',
+    pw_v2_more:        'and more',
     pw_v2_eg:          'For example: working out a mortgage payment and how much interest you end up paying.',
     pw_v3_t:           'Your plans and documents',
     pw_v3_b:           'Save what you calculate under the name you choose and keep it at hand on the Dashboard.',
@@ -25355,7 +25370,11 @@ function updateDashboardDiscover() {
   try { drill = (typeof activeCategory !== 'undefined') && activeCategory !== null; } catch (_) {}
   // Premium ve sus documentos; 'pending' no ve nada; en el detalle de una
   // categoría el Resumen cede su sitio a la lista filtrada, igual que el resto.
-  if (shell !== false || drill) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
+  // Cartera vacía: lo primero es crear patrimonio (el estado vacío ya lleva su CTA), no descubrir
+  // superficies que todavía no tendrían nada que leer.
+  let empty = false;
+  try { empty = (typeof activeAssets === 'function') && activeAssets().length === 0; } catch (_) {}
+  if (shell !== false || drill || empty) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
   sec.innerHTML = _renderDashboardDiscover();
   sec.style.display = '';
 }
@@ -82161,6 +82180,7 @@ function _aurixPreloadBootIcons() {
           // getter y no repintaba nada. Todo eso vive ahora en un solo owner.
           _aurixEntApplyToUi(_aurixEnt.features);
         } catch (_) {}
+        try { _aurixPremiumIntentTryConsume('entitlements'); } catch (_) {}
         // M.04 — VUELTA DEL CHECKOUT. Se engancha DESPUÉS de la primera lectura del
         // servidor, porque el flujo consiste precisamente en volver a preguntarle:
         // el `?billing=success` no concede nada, sólo dice "vuelve a mirar". Si el
@@ -88627,6 +88647,34 @@ try { if (typeof window !== 'undefined') window._aurixRecordUpgradeIntent = _aur
 // bloqueadas llegan al paywall por el camino real del producto y no por uno
 // simulado. No hay escritor de tier ni de entitlement aquí: eso sigue retirado.
 try { if (typeof window !== 'undefined') window.openUpgradeIntent = openUpgradeIntent; } catch (_) {}
+// ── INTENCIÓN PREMIUM DESDE LA LANDING ──────────────────────────────────────
+// «Crear cuenta y descubrir Premium» deja `aurix_intent=premium` en la sesión de la pestaña (lo
+// capturan index.html/login.html). Aquí se CONSUME una sola vez: se borra antes de abrir los planes,
+// así que ni una recarga, ni otra pestaña, ni volver al Dashboard los reabre. Sólo navega: no concede
+// nada, no elige plan y no inicia el cobro. Espera a lo que decide qué es correcto mostrar:
+//   · sesión y permisos resueltos — un Premium (también por concesión) la descarta sin ver nada;
+//   · el onboarding asentado — no se muestra, se aplazó o se completó; nunca encima de él;
+//   · ningún modal abierto.
+// Si algo de eso falta, se queda en la sesión y la intenta el siguiente disparador.
+let _aurixOnbSettled = false;
+function _aurixPremiumIntentTryConsume(reason) {
+  try {
+    let v = null; try { v = sessionStorage.getItem('aurix_intent'); } catch (_) {}
+    if (v !== 'premium') return false;
+    if (!(typeof currentUser !== 'undefined' && currentUser && currentUser.id)) return false;
+    if (!_aurixEntLoaded()) return false;
+    if (hasAurixPremiumAccess()) { try { sessionStorage.removeItem('aurix_intent'); } catch (_) {} return false; }
+    if (!_aurixOnbSettled) return false;
+    const bc = document.body && document.body.classList;
+    if (!bc || bc.contains('modal-open') || bc.contains('aurix-premium-lock')) return false;
+    try { sessionStorage.removeItem('aurix_intent'); } catch (_) {}
+    if (typeof window.openAurixPremiumModal !== 'function') return false;
+    window.openAurixPremiumModal({ source: 'landing-premium' });
+    if (IS_DEV) console.log('[PREMIUM-INTENT] consumed', reason);
+    return true;
+  } catch (_) { return false; }
+}
+try { if (typeof window !== 'undefined') window._aurixPremiumIntentTryConsume = _aurixPremiumIntentTryConsume; } catch (_) {}
 function openUpgradeIntent(opts) {
   const featureKey = String((opts && opts.featureKey) || '').trim();
   const source     = String((opts && opts.source) || 'unknown').trim();
@@ -88869,9 +88917,8 @@ try {
   // decir nada que decir «las 0 capacidades» o un número adivinado.
   function _valueBlocks() {
     const caps = _capsPub().map(_capName).filter(Boolean);
-    // `body` ya viene RESUELTO, no es una clave: el bloque de Workspace necesita
-    // pasar por `t('pw_v2_b')(n)` antes de llegar aquí, y un parámetro que a
-    // veces es clave y a veces texto acaba llamando `t()` sobre una frase.
+    // `body` ya viene RESUELTO, no es una clave: un parámetro que a veces es
+    // clave y a veces texto acaba llamando `t()` sobre una frase.
     const item = (tk, body, egk, extra) => `
       <article class="aurix-premium-value-item">
         <h3 class="aurix-premium-value-t">${esc(t(tk))}</h3>
@@ -88879,15 +88926,21 @@ try {
         ${extra || ''}
         <p class="aurix-premium-value-eg">${esc(t(egk))}</p>
       </article>`;
+    // Ejemplos REPRESENTATIVOS del catálogo publicado (no el inventario entero ni un recuento): los
+    // que el resto del producto nombra primero, y sólo si están publicados.
+    const _pref = ['budget', 'loan', 'scenario', 'goals'];
+    const _all = _capsPub();
+    const _eg = _pref.map(k => _all.find(c => c.k === k)).filter(Boolean).map(_capName).filter(Boolean);
+    const _shown = _eg.length ? _eg : caps.slice(0, 4);
     const chips = caps.length
-      ? `<ul class="aurix-premium-caps">${caps.map(n => `<li class="aurix-premium-ind">${esc(n)}</li>`).join('')}</ul>`
+      ? `<ul class="aurix-premium-caps">${_shown.map(n => `<li class="aurix-premium-ind">${esc(n)}</li>`).join('')}${caps.length > _shown.length ? `<li class="aurix-premium-ind is-more">${esc(t('pw_v2_more'))}</li>` : ''}</ul>`
       : '';
     return `
       <section class="aurix-premium-value" aria-label="${esc(t('pw_v_lead'))}">
         <h3 class="aurix-premium-value-lead">${esc(t('pw_v_lead'))}</h3>
         <div class="aurix-premium-value-grid">
           ${item('pw_v1_t', t('pw_v1_b'), 'pw_v1_eg')}
-          ${caps.length ? item('pw_v2_t', t('pw_v2_b')(caps.length), 'pw_v2_eg', chips) : ''}
+          ${caps.length ? item('pw_v2_t', t('pw_v2_b'), 'pw_v2_eg', chips) : ''}
           ${item('pw_v3_t', t('pw_v3_b'), 'pw_v3_eg')}
         </div>
       </section>`;
@@ -88913,7 +88966,7 @@ try {
         ${Number(row.trial_days) > 0
           ? `<p class="aurix-premium-plan-note">${esc(t('pw_trial')(Math.floor(Number(row.trial_days))))}</p>` : ''}
         <button type="button" class="aurix-premium-cta${featured ? ' is-premium' : ' is-monthly'}"
-                data-premium-buy="${esc(row.billing_interval)}">${esc(t('pw_cta'))}</button>
+                data-premium-buy="${esc(row.billing_interval)}">${esc(isYear ? t('pw_cta_year') : t('pw_cta_month'))}</button>
       </div>`;
   }
 
@@ -88963,6 +89016,19 @@ try {
              ${month ? _planCard(month, !year) : ''}
            </div>
            <p class="aurix-premium-terms">${esc(t('pw_terms'))}</p>`
+        // CUATRO estados, no dos: «todavía no lo sé» (catálogo en camino) no es «no se puede
+        // comprar», y un fallo de red tampoco — ése se puede reintentar. Mientras se comprueba, el
+        // hueco de las tarjetas queda reservado y no hay ningún botón de compra.
+        : (!_aurixBillingPrices.loaded || (_aurixBillingPrices.loading && !(_aurixBillingPrices.rows || []).length))
+        ? `<div class="aurix-premium-plans is-checking" aria-busy="true">
+             <div class="aurix-premium-plan aurix-premium-standard is-featured is-skel"><p class="aurix-premium-plan-note" role="status">${esc(t('pw_checking'))}</p></div>
+             <div class="aurix-premium-plan aurix-premium-standard is-skel" aria-hidden="true"></div>
+           </div>`
+        : _aurixBillingPrices.error
+        ? `<div class="aurix-premium-plans is-empty is-error">
+             <p class="aurix-premium-plan-note" role="alert">${esc(t('pw_load_error'))}</p>
+             <button type="button" class="aurix-premium-retry" data-premium-retry="1">${esc(t('pw_retry'))}</button>
+           </div>`
         : `<div class="aurix-premium-plans is-empty">
              <p class="aurix-premium-plan-note">${esc(t('pw_unavailable'))}</p>
            </div>`;
@@ -88990,6 +89056,7 @@ try {
         <footer class="aurix-premium-footer">
           <p class="aurix-premium-trust-1">${esc(t('pw_trust'))}</p>
           <p class="aurix-premium-microcopy">${esc(t('pw_micro'))}</p>
+          ${managed ? '' : `<button type="button" class="aurix-premium-stayfree">${esc(t('pw_stay_free'))}</button>`}
         </footer>
       </div>`;
   }
@@ -89005,6 +89072,11 @@ try {
     btn.classList.add('is-done');
     return true;
   }
+  // Tras repintar por un reintento, el foco va al primer plan (o al cierre): el nodo pulsado ya no existe.
+  function _focusCloseIn(root) {
+    const b = root && (root.querySelector('[data-premium-buy]') || root.querySelector('[data-premium-retry]') || root.querySelector('.aurix-premium-close'));
+    if (b) { try { b.focus(); } catch (_) {} }
+  }
   function _ctaRelease(btn) {
     if (!btn) return;
     btn.disabled = false;
@@ -89015,7 +89087,18 @@ try {
   function _wire(el) {
     el.addEventListener('click', e => {
       if (e.target === el) { closeAurixPremiumModal(); return; }                 // outside click
-      if (e.target.closest('.aurix-premium-close')) { closeAurixPremiumModal(); return; }
+      if (e.target.closest('.aurix-premium-close') || e.target.closest('.aurix-premium-stayfree')) { closeAurixPremiumModal(); return; }
+      // Reintento CONTROLADO: una sola carga en vuelo (el loader ya lo garantiza) y el modal vuelve
+      // a «comprobando» mientras tanto; la respuesta sólo pinta si el modal sigue abierto.
+      if (e.target.closest('[data-premium-retry]')) {
+        log('prices_retry');
+        try {
+          const p = _aurixBillingPricesLoad({ force: true });
+          _el.innerHTML = _buildHtml();
+          p.then(() => { if (_open && _el) { _el.innerHTML = _buildHtml(); _focusCloseIn(_el); } });
+        } catch (_) {}
+        return;
+      }
       // M.04 — el CTA ahora COMPRA de verdad. `_aurixBillingCheckout` devuelve
       // siempre false y no concede nada: si algo va mal, el botón se libera y la
       // app sigue diciendo Free, que es la verdad hasta que lo diga el servidor.
@@ -89437,6 +89520,7 @@ try {
       if (typeof Eng.deferOnboarding === 'function') Eng.deferOnboarding();
       else Eng.skipOnboarding();
       _hideOnboardingOverlay();
+      _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-deferred');
       return;
     }
 
@@ -89465,6 +89549,7 @@ try {
     if (e.target.closest && e.target.closest('#onbGoDashboardBtn') && _ov()?.classList.contains('open')) {
       Eng.completeOnboarding();
       _hideOnboardingOverlay();
+      _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-completed');
       // Llegada arriba del Dashboard: el alta pudo dejar el documento desplazado.
       // Y otra vez en el siguiente frame: el cierre del modal restaura su bloqueo de scroll
       // después de este handler (WebKit), y la posición restaurada no es la de llegada.
@@ -89615,6 +89700,7 @@ try {
         // Hydrate (so debug helper has truth) then mark complete silently.
         await Eng.hydrateOnboardingState();
         if (!Eng.getSnapshot().completed) Eng.completeOnboarding({ silent: true });
+        _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-existing');
         return;
       }
 
@@ -89623,7 +89709,7 @@ try {
         ? { authenticated: true, id: currentUser.id }
         : null;
       if (!user) return;
-      if (!Eng.shouldShowOnboarding(user, assets)) return;
+      if (!Eng.shouldShowOnboarding(user, assets)) { _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-none'); return; }
 
       // ONBOARDING-1B §5: LANGUAGE is always the first onboarding
       // screen, even if the app already has a language set. We

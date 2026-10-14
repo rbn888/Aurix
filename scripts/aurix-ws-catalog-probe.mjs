@@ -303,10 +303,17 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await page.waitForTimeout(800);
     await page.evaluate(`(function(){ var bl=document.getElementById('bootLoader'); if(bl) bl.remove();
       var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1'; return true; })()`);
-    // FREE de verdad: es quien ve estas promos.
-    await page.evaluate(`(function(){ lang='es';
+    // FREE de verdad: es quien ve estas promos. Con cartera VACÍA ceden el sitio a crear
+    // patrimonio (cierre Free → Premium), así que primero se comprueba eso y luego se mide
+    // el par sobre un Free CON un activo, que es quien las ve.
+    const _emptyHidden = await page.evaluate(`(function(){ lang='es';
       _aurixEnt={loaded:true,loading:false,error:null,plan:'free',status:'none',source:'default',validUntil:null,features:Object.create(null),sources:Object.create(null),fetchedAt:Date.now()};
-      switchTab('dashboard'); updateDashboardDiscover(); return true; })()`);
+      assets=[]; switchTab('dashboard'); updateDashboardDiscover();
+      var s=document.getElementById('dashDiscoverSection'); return !s || s.style.display==='none'; })()`);
+    ok(PTAG + ' promos · con cartera vacía ceden el sitio a crear patrimonio', _emptyHidden === true);
+    await page.evaluate(`(function(){
+      assets=[{ id:'probe_1', ticker:'AAPL', name:'Apple', type:'stock', qty:1, price:100, assetCurrency:'USD' }];
+      updateDashboardDiscover(); return true; })()`);
     await page.waitForTimeout(700);
     const g = await page.evaluate(`(function(){
       var cards=[].slice.call(document.querySelectorAll('.wsdisc-card'));

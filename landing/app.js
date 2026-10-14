@@ -589,9 +589,15 @@
     var v = (lang === 'en' ? 'en' : 'es');
     return APP_URL + '?' + (langExplicit ? 'lang=' : 'langhint=') + v;
   }
+  // INTENCIÓN PREMIUM — el CTA «descubrir Premium» lo dice en el enlace (`intent=premium`) y la app
+  // abre los planes UNA vez al llegar; los demás CTA no llevan intención, y su entrada la borra.
+  // Sólo navegación: no concede nada ni elige compra.
   function updateAppLinks() {
     var links = document.querySelectorAll('[data-app-link]');
-    for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlWithRef());
+    for (var i = 0; i < links.length; i++) {
+      links[i].setAttribute('href', appUrlWithRef());
+      if (links[i].getAttribute('data-app-intent') === 'premium') links[i].setAttribute('href', links[i].getAttribute('href') + '&intent=premium');
+    }
   }
   // Soporte y legales: páginas PÚBLICAS servidas por el dominio de la app. El
   // idioma viaja en `?lang=` (elección explícita, no una pista): quien está

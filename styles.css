@@ -31341,3 +31341,122 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 @media (max-width: 767px) { .aurix-intcc .intv22-scen .intv5-sim-money { font-size: 18px; } }
 .intv5-sim .intv22-scn-block[data-dir="down"] [data-sim-money] { color: rgba(var(--sim-neg), 0.86); }
 .intv5-sim .intv22-scn-block[data-dir="up"] [data-sim-money] { color: rgba(var(--sim-pos), 0.86); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CIERRE FREE → PREMIUM · DESCUBRIMIENTO DEL RESUMEN Y PAYWALL
+   ════════════════════════════════════════════════════════════════════════════
+   Sólo presentación sobre las clases existentes: mismas dos tarjetas, mismos
+   destinos, mismo paywall y mismas acciones de cobro. */
+
+/* Las dos tarjetas Free: familia negro/azul con profundidad sutil — un degradado
+   que se apaga hacia abajo, un filo de luz arriba y el acento de cada superficie
+   como hilo superior. Siguen siendo hermanas (misma rejilla, mismo CTA abajo). */
+.wsdisc-card {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(var(--aurix-blue-rgb), 0.12), transparent 60%),
+    linear-gradient(180deg, rgba(19, 28, 50, 0.96), rgba(10, 15, 28, 0.98));
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 40px -30px rgba(0, 0, 0, 0.8);
+  transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.wsdisc-card::before {
+  content: ''; position: absolute; left: 20px; right: 20px; top: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(120, 170, 255, 0.55), transparent);
+}
+.wsdisc-card.is-ws::before { background: linear-gradient(90deg, transparent, rgba(110, 200, 220, 0.45), rgba(160, 130, 255, 0.40), transparent); }
+.wsdisc-card:hover { border-color: rgba(var(--aurix-blue-rgb), 0.34); transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 44px -28px rgba(0, 0, 0, 0.85); }
+.wsdisc-card:focus-within { border-color: rgba(var(--aurix-blue-rgb), 0.42); }
+.wsdisc-b { color: #aab6cb; }
+.wsdisc-cta {
+  background: linear-gradient(180deg, rgba(var(--aurix-blue-rgb), 0.26), rgba(var(--aurix-blue-rgb), 0.16));
+  border-color: rgba(var(--aurix-blue-rgb), 0.46); color: #e2ecff;
+  transition: background .15s ease, border-color .15s ease;
+}
+.wsdisc-cta:hover { background: linear-gradient(180deg, rgba(var(--aurix-blue-rgb), 0.36), rgba(var(--aurix-blue-rgb), 0.22)); border-color: rgba(var(--aurix-blue-rgb), 0.62); }
+.wsdisc-cta:hover .wsdisc-chev { transform: translateX(2px); }
+.wsdisc-chev { transition: transform .15s ease; }
+/* Móvil: compactas — el detalle gráfico a la izquierda del título, el CTA a todo
+   el ancho debajo. Misma jerarquía, la mitad de alto. */
+@media (max-width: 700px) {
+  /* Contenido anclado ARRIBA y CTA ABAJO: título y texto empiezan a la misma altura en las dos
+     tarjetas, y el sobrante del par igualado cae entre el texto y el botón (que no se estira). */
+  .wsdisc-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto;
+    column-gap: 14px; row-gap: 12px; align-items: start; }
+  .wsdisc-card .wsdisc-cta { align-self: end; height: 44px; }
+  .wsdisc-card .wsdisc-viz { min-height: 0; padding-left: 0; }
+  .wsdisc-card.is-int .wsdisc-viz { width: 52px; justify-content: center; padding-left: 0; }
+  .wsdisc-card.is-int .wsdisc-orb { width: 34px; height: 34px; }
+  .wsdisc-card.is-int .wsdisc-orb::after { width: 52px; height: 52px; }
+  .wsdisc-card.is-ws .wsdisc-ic { width: 30px; height: 30px; border-radius: 9px; }
+  .wsdisc-card.is-ws .wsdisc-ic .wsfc-cap-svg { width: 16px; height: 16px; }
+  .wsdisc-card.is-ws .wsdisc-viz { width: 52px; justify-content: flex-start; }
+  .wsdisc-card.is-ws .wsdisc-icons { flex-direction: row; gap: 0; position: relative; width: 52px; height: 40px; }
+  .wsdisc-card.is-ws .wsdisc-ic { position: absolute; }
+  .wsdisc-card.is-ws .wsdisc-ic:nth-child(1) { left: 0; top: 0; }
+  .wsdisc-card.is-ws .wsdisc-ic:nth-child(2) { left: 11px; top: 5px; }
+  .wsdisc-card.is-ws .wsdisc-ic:nth-child(3) { left: 22px; top: 10px; }
+  .wsdisc-cta { grid-column: 1 / -1; margin-top: 0; }
+  .wsdisc-t { font-size: 15.5px; margin-bottom: 4px; }
+  .wsdisc-b { font-size: 13px; line-height: 1.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsdisc-card, .wsdisc-chev { transition: none; }
+  .wsdisc-card:hover { transform: none; }
+  .wsdisc-cta:hover .wsdisc-chev { transform: none; }
+}
+
+/* Paywall — tarjetas de plan con la MISMA estructura: el botón anclado abajo en
+   las dos, así precios, periodicidad y botones quedan alineados aunque una lleve
+   una línea más. */
+.aurix-premium-plans { align-items: stretch; }
+.aurix-premium-plans .aurix-premium-plan .aurix-premium-cta { margin-top: auto; }
+.aurix-premium-plans .aurix-premium-plan .aurix-premium-cta.is-premium,
+.aurix-premium-plans .aurix-premium-plan .aurix-premium-cta.is-monthly {
+  min-height: 48px; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; justify-content: center;
+}
+/* El cierre SIEMPRE a mano: el modal es quien desplaza (escritorio y móvil), así que la ✕ es
+   `sticky` dentro de él y flota a la derecha sin ocupar línea; los márgenes negativos la dejan
+   donde estaba antes (14 px del borde en escritorio, 12 px en móvil). */
+.aurix-premium-close { position: sticky; top: 10px; float: right; z-index: 2; margin: -8px -12px 0 8px;
+  background: rgba(12, 18, 34, .92); }
+.aurix-premium-plan .aurix-premium-plan-billed { margin-bottom: 12px; }
+/* «Comprobando disponibilidad»: el hueco de las dos tarjetas queda reservado
+   (sin salto al llegar los precios) y sin ningún botón de compra. */
+.aurix-premium-plans.is-checking .aurix-premium-plan.is-skel {
+  min-height: 186px; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(90deg, rgba(255,255,255,.025) 25%, rgba(255,255,255,.06) 37%, rgba(255,255,255,.025) 63%);
+  background-size: 300% 100%; animation: aurixSkelShimmer 1.4s ease-in-out infinite;
+}
+.aurix-premium-plans.is-checking .aurix-premium-plan-note { margin: 0; color: #9fb0c7; font-size: 13px; }
+.aurix-premium-plans.is-error { justify-items: center; gap: 10px; }
+.aurix-premium-retry, .aurix-premium-stayfree {
+  min-height: 44px; padding: 0 18px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 700;
+}
+.aurix-premium-retry { color: #e2ecff; background: rgba(77,141,255,.16); border: 1px solid rgba(77,141,255,.45); }
+.aurix-premium-retry:hover { background: rgba(77,141,255,.26); }
+.aurix-premium-stayfree { margin-top: 10px; color: #aeb9cc; background: transparent; border: 0; text-decoration: underline; text-underline-offset: 3px; }
+.aurix-premium-stayfree:hover { color: #fff; }
+.aurix-premium-retry:focus-visible, .aurix-premium-stayfree:focus-visible, .aurix-premium-close:focus-visible, .aurix-premium-cta:focus-visible {
+  outline: 2px solid rgba(77,141,255,.9); outline-offset: 2px;
+}
+.aurix-premium-ind.is-more { background: transparent; border-style: dashed; }
+/* Fondo OPACO con los mismos tonos: el translúcido dejaba leer el Dashboard a través de los precios
+   (WebKit, escritorio y móvil). */
+.aurix-premium-modal { background: linear-gradient(165deg, #1a2642, #0c1222); }
+/* Móvil: el modal ocupa la pantalla y es él quien desplaza; el cierre deja de
+   viajar con el contenido y queda siempre a mano (con el notch respetado). */
+@media (max-width: 720px) {
+  /* Franja superior RESERVADA para el cierre (una regla posterior del modal bajaba el relleno a
+     22 px y la ✕ caía sobre el título): 60 px arriba, la ✕ a 10 px y fija al desplazar. */
+  .aurix-premium-modal { padding-top: calc(60px + env(safe-area-inset-top, 0px)); }
+  /* Aquí la ✕ es FIJA, no `sticky`: el float con márgenes negativos no es fiable en WebKit. Sin el
+     `transform` del modal abierto, la referencia es el overlay, que ocupa la pantalla y no desplaza. */
+  .aurix-premium-overlay.is-open .aurix-premium-modal { transform: none; }
+  .aurix-premium-close { position: fixed; float: none; margin: 0; top: calc(10px + env(safe-area-inset-top, 0px)); right: 12px; width: 40px; height: 40px; }
+  .aurix-premium-modal { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurix-premium-plans.is-checking .aurix-premium-plan.is-skel { animation: none; }
+}

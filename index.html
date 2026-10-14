@@ -547,6 +547,16 @@
         if (_p === 'en' || _p === 'es') sessionStorage.setItem('aurix_lang_choice', _p);
         else if ((_h === 'en' || _h === 'es') && _s !== 'en' && _s !== 'es') sessionStorage.setItem('aurix_lang_hint', _h);
       } catch (_) {}
+      // INTENCIÓN PREMIUM (landing) — una entrada DESDE la landing (trae lang/langhint/intent) fija o
+      // BORRA la intención: el CTA gratuito pulsado después sustituye al Premium de antes. Se quita de
+      // la URL para que una recarga no la recupere. La consume app.js UNA vez; sólo navega.
+      try {
+        if (_qs.has('intent') || _qs.has('lang') || _qs.has('langhint')) {
+          if (_qs.get('intent') === 'premium') sessionStorage.setItem('aurix_intent', 'premium');
+          else sessionStorage.removeItem('aurix_intent');
+          if (_qs.has('intent')) { _qs.delete('intent'); var _qq = _qs.toString(); history.replaceState(history.state, '', location.pathname + (_qq ? '?' + _qq : '') + location.hash); }
+        }
+      } catch (_) {}
       // Misma precedencia que app.js (`let lang`): elección de esta sesión → guardada →
       // pista/navegador dejados por el acceso → navegador.
       var _ok = function (v) { return (v === 'es' || v === 'en') ? v : null; };
