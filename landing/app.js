@@ -248,6 +248,8 @@
       'how.lead': "Tú registras tus posiciones: Aurix no se conecta a tu banco ni te pide credenciales bancarias.",
       'how.1.t': "Reúne todo tu patrimonio",
       'how.1.d': "Consulta cuánto tienes, cómo se distribuye y cómo evoluciona. Organiza acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez en una sola visión. Sigue los mercados y los activos que te interesan desde Market.",
+      'alt.market': "Market de Aurix: lista de cripto, acciones y ETFs con precio, variación en 24 horas, tendencia y activos guardados",
+      'alt.market.open': "Abrir la captura de Market a tamaño completo",
       'how.2.t': "Descubre qué merece tu atención",
       'how.2.d': "Intelligence pone tu patrimonio en contexto: dónde se concentra, qué ha cambiado y cómo evoluciona su estructura. Una lectura de tus datos para entender mejor tu cartera.",
       'how.3.t': "Convierte tus números en planes",
@@ -305,6 +307,8 @@
       'how.lead': "You record your positions yourself: Aurix does not connect to your bank or ask for your banking credentials.",
       'how.1.t': "Bring all your wealth together",
       'how.1.d': "See how much you have, how it is distributed and how it evolves. Organise stocks, ETFs, funds, crypto, metals, real estate and cash in a single view. Follow the markets and assets that interest you in Market.",
+      'alt.market': "Aurix Market (interface in Spanish): list of crypto, stocks and ETFs with price, 24-hour change, trend and saved assets",
+      'alt.market.open': "Open the Market screenshot at full size",
       'how.2.t': "Find out what deserves your attention",
       'how.2.d': "Intelligence puts your wealth in context: where it is concentrated, what has changed and how its structure evolves. A reading of your data to better understand your portfolio.",
       'how.3.t': "Turn your numbers into plans",
@@ -414,6 +418,8 @@
       if (sk) imgs[m].setAttribute('src', 'assets/' + sk + '-' + lang + '.jpg');
       var ak = imgs[m].getAttribute('data-i18n-alt'); if (ak && dict[ak] != null) imgs[m].setAttribute('alt', dict[ak]);
     }
+    var arias = document.querySelectorAll('[data-i18n-aria]');
+    for (var n = 0; n < arias.length; n++) { var rk = arias[n].getAttribute('data-i18n-aria'); if (dict[rk] != null) arias[n].setAttribute('aria-label', dict[rk]); }
     // Reflect active state on every language toggle (header + mobile)
     var btns = document.querySelectorAll('.lang-btn');
     for (var j = 0; j < btns.length; j++) {

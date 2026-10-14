@@ -35,16 +35,23 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
         lang: imgs.filter(i => i.hasAttribute('data-i18n-src')).every(i => i.getAttribute('src').endsWith('-' + document.documentElement.lang + '.jpg')),
         // Capturas nuevas en su sitio exacto; posiciones y presupuesto conservados; sin «datos de ejemplo» en las reales.
         // Dashboard en el hero, Intelligence en su bloque, posiciones y presupuesto conservados; Market sólo como frase en «Reúne».
-        placed: qa('main img').map(i => i.getAttribute('src')).join() === 'assets/dashboard.jpg,assets/positions-' + document.documentElement.lang + '.jpg,assets/intelligence.jpg,assets/workspace-' + document.documentElement.lang + '.jpg'
+        placed: qa('main img').map(i => i.getAttribute('src')).join() === 'assets/dashboard.jpg,assets/positions-' + document.documentElement.lang + '.jpg,assets/market.jpg,assets/intelligence.jpg,assets/workspace-' + document.documentElement.lang + '.jpg'
           && !q('.how-market') && !/Tus mercados, a la vista|Your markets, at a glance/.test(document.body.innerText)
           && /Sigue los mercados y los activos que te interesan desde Market\.|Follow the markets and assets that interest you in Market\./.test(q('#how .how-row').innerText)
-          && !!q('#how .how-row + .how-row--rev') && !!q('.hero .hero-visual img[src="assets/dashboard.jpg"]')
+          && !!q('#how .how-row + .how-aside + .how-row--rev') && !q('.how-aside h2, .how-aside h3, .how-aside .btn, .how-aside p') && !!q('.hero .hero-visual img[src="assets/dashboard.jpg"]')
           && /Descubre qué merece tu atención|Find out what deserves your attention/.test(q('img[src="assets/intelligence.jpg"]').closest('.how-row').innerText)
           && ['assets/dashboard.jpg', 'assets/intelligence.jpg'].every(s => !/ejemplo|sample/i.test(q('img[src="' + s + '"]').alt))
           && ['positions', 'workspace'].every(k => /ejemplo|sample/i.test(q('img[data-i18n-src="' + k + '"]').alt)),
         // Hero compacto (900 px, centrado) en escritorio; ancho completo en móvil. Intelligence ≈ 60 % de su fila.
         hero: innerWidth < 861 ? Math.abs(q('.hero-visual').getBoundingClientRect().width - q('.hero-inner').getBoundingClientRect().width + 0) <= 40
           : (() => { const r = q('.hero-visual').getBoundingClientRect(), c = q('.hero-visual').parentElement.getBoundingClientRect(); return Math.abs(r.width - 900) <= 1 && Math.abs((r.left - c.left) - (c.right - r.right)) <= 1; })(),
+        // Market: apoyo dentro de «Reúne» — ≤680 px, centrado y claramente menor en escritorio, ancho disponible en móvil, menor que Dashboard e Intelligence, enlace a la resolución completa.
+        market: (() => { const f = q('.how-aside').getBoundingClientRect(), c = q('.how-aside').parentElement.getBoundingClientRect(), i = q('.how-aside img'), a = q('.how-aside a');
+          const intel = q('.how-row--focus .shot-fig').getBoundingClientRect(), hero = q('.hero-visual').getBoundingClientRect();
+          const lang = document.documentElement.lang;
+          return f.height > 0 && a.getAttribute('href') === 'assets/market-full.jpg' && a.target === '_blank' && /Market/.test(a.getAttribute('aria-label'))
+            && (lang === 'en' ? /interface in Spanish/.test(i.alt) : /Market de Aurix/.test(i.alt))
+            && (innerWidth < 861 ? Math.abs(f.width - intel.width) <= 1 : f.width <= 680 && f.width < intel.width * 0.9 && f.width < hero.width * 0.7 && Math.abs((f.left - c.left) - (c.right - f.right)) <= 1); })(),
         intel: (() => { const f = q('.how-row--focus .shot-fig').getBoundingClientRect(), row = q('.how-row--focus').getBoundingClientRect(); return innerWidth < 861 ? f.width >= row.width - 1 && f.top > q('.how-row--focus .how-copy').getBoundingClientRect().bottom - 1 : f.width / row.width > 0.55 && f.width / row.width < 0.65; })(),
         ratio: imgs.every(i => Math.abs(i.getBoundingClientRect().width / i.getBoundingClientRect().height - i.naturalWidth / i.naturalHeight) < 0.02 && Math.abs(i.naturalWidth / i.naturalHeight - i.getAttribute('width') / i.getAttribute('height')) < 0.01),
         caps: !q('figcaption, .shot-cap') && !/Vista de Aurix|Aurix view|datos de ejemplo|sample data/i.test(document.body.innerText),
@@ -63,7 +70,7 @@ for (const [en, eng] of [['CR', chromium], ['WK', webkit]]) {
     chk(!m.overflow, tag + ' sin desbordamiento'); chk(m.ctaFold, tag + ' CTA en el primer pliegue'); chk(m.empty === 0, tag + ' 0 claves vacías');
     chk(m.order === 'hero,section--bridge,how,plans,faq,start', tag + ' estructura ' + m.order); chk(m.removed, tag + ' secciones retiradas');
     chk(m.explore, tag + ' Explorar → #how'); chk(m.heroEager && m.restLazy && m.dims, tag + ' carga eager/lazy y dimensiones');
-    chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.placed, tag + ' capturas en su ubicación'); chk(m.ratio, tag + ' proporción y dimensiones reservadas'); chk(m.caps, tag + ' sin pies de imagen'); chk(m.hero && heroNow, tag + ' hero compacto y visible al instante'); chk(m.intel, tag + ' Intelligence ≈60 % / texto→imagen');
+    chk(m.loaded && m.lang, tag + ' capturas cargadas en el idioma'); chk(m.placed, tag + ' capturas en su ubicación'); chk(m.ratio, tag + ' proporción y dimensiones reservadas'); chk(m.caps, tag + ' sin pies de imagen'); chk(m.hero && heroNow, tag + ' hero compacto y visible al instante'); chk(m.intel, tag + ' Intelligence ≈60 % / texto→imagen'); chk(m.market, tag + ' Market: ubicación, tamaño, alt y ampliación');
     chk(m.allVisible, tag + ' todo visible tras recorrer'); chk(m.planAligned, tag + ' CTA de planes alineados');
     chk(m.premStarts && m.prices && m.renew, tag + ' Premium: intro, precios y renovación'); chk(m.noCard, tag + ' sin «sin tarjeta»'); chk(m.premCta, tag + ' CTA Premium'); chk(m.ctaDest, tag + ' CTA → app con idioma'); chk(m.noDemo, tag + ' sin demos'); chk(m.meta, tag + ' título/descr. vigentes'); chk(errs.length === 0, tag + ' sin errores ' + errs[0]);
     const sset = await p.evaluate(async () => { const out = [];
