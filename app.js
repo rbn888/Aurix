@@ -5951,10 +5951,15 @@ const T = {
     intv22_ago_7d: 'hace 7 días', intv22_ago_30d: 'hace 30 días', intv22_ago_all: 'al principio',
     intv22_xq_conc_down: (n, ago) => `¿Por qué ${n} pesa menos que ${ago}?`,
     intv22_xq_conc_up: (n, ago) => `¿Por qué ${n} pesa más que ${ago}?`,
-    intv22_xa_conc: (v, t) => `Su valor en tu cartera cambió un ${v}, frente a un ${t} del total.`,
+    intv22_xa_conc: (v, t) => `Su valor en tu cartera ${_intv9Mv(v, 'es')}; el total de tu cartera ${_intv9Mv(t, 'es')}.`,
     intv3_xq_lead: n => `¿Qué cambió para que ${n} pasara a ser mi mayor inversión?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Desde ${ago}, el valor de ${na} en tu cartera cambió un ${va} y el de ${nb} un ${vb}: hoy ${nb} vale más.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} es una posición nueva que hoy vale más que ${na}, cuyo valor en tu cartera cambió un ${va} desde ${ago}.`,
+    intv9_xa_lead_new: (nb, ago) => `${nb} no figuraba en tu cartera ${ago} y hoy es tu mayor inversión.`,
+    intv9_xa_lead_old: (na, chg) => `${na} sigue en tu cartera; su valor ${_intv9Mv(chg, 'es')} durante el periodo.`,
+    intv9_xa_lead_gone: na => `${na} ya no figura en tu cartera.`,
+    intv9_xa_lead_both: (ago, na, nb, wb) => `${ago.charAt(0).toUpperCase() + ago.slice(1)} tu mayor inversión era ${na}; hoy es ${nb}.`,
+    intv9_xa_lead_ev: (na, ca, nb, cb) => `Durante el periodo, el valor de ${na} en tu cartera ${_intv9Mv(ca, 'es')} y el de ${nb} ${_intv9Mv(cb, 'es')}.`,
     intv22_xq_spread: ago => `¿Mi dinero está mejor repartido que ${ago} o solo tengo más posiciones?`,
     intv22_xa_spread_better: 'Está mejor repartido: el peso se ha equilibrado entre tus posiciones.',
     intv22_xa_spread_more: 'Sobre todo tienes más posiciones: el peso sigue recayendo en unas pocas.',
@@ -5976,11 +5981,11 @@ const T = {
     intv22_scn_shock: 'Caída simulada del 10 %',
     intv22_scn_bar_aria: 'Peso de tu cartera afectado por el escenario',
     // ── INTELLIGENCE V2 (intv21) ──
-    intv21_today_ret: p => `Rentabilidad de las últimas 24 h: ${p}, sin contar aportaciones ni retiradas.`,
-    intv21_today_driver_up: (n, pp) => `${n} sumó ${pp} a tu cartera en 24 h.`,
-    intv21_today_driver_down: (n, pp) => `${n} restó ${pp} a tu cartera en 24 h.`,
-    intv21_today_mover_up: (n, p) => `La cotización de ${n} subió un ${p} en 24 h.`,
-    intv21_today_mover_down: (n, p) => `La cotización de ${n} bajó un ${p} en 24 h.`,
+    intv21_today_ret: p => `Rentabilidad de las últimas 24 h: ${p}, sin contar aportaciones ni retiradas.`,
+    intv21_today_driver_up: (n, pp) => `${n} sumó ${pp} a tu cartera en 24 h.`,
+    intv21_today_driver_down: (n, pp) => `${n} restó ${pp} a tu cartera en 24 h.`,
+    intv21_today_mover_up: (n, p) => `La cotización de ${n} subió un ${p} en 24 h.`,
+    intv21_today_mover_down: (n, p) => `La cotización de ${n} bajó un ${p} en 24 h.`,
     intv21_today_mover_session_up: (n, p) => `La cotización de ${n} subió un ${p} en la última sesión disponible.`,
     intv21_today_mover_session_down: (n, p) => `La cotización de ${n} bajó un ${p} en la última sesión disponible.`,
     intv21_today_liq: p => `La liquidez es el ${p} de tu patrimonio invertible.`,
@@ -5990,8 +5995,8 @@ const T = {
     intv3_tag_top3: p => `Tres mayores inversiones: ${p}`,
     intv3_tag_class1: (c, p) => `${c}: ${p} de tu cartera`,
     intv3_tag_class2: (a, b, p) => `${a} y ${b}: ${p}`,
-    intv3_tag_driver: n => `${n}, principal movimiento de tu cartera en 24 h`,
-    intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'última sesión',
+    intv3_tag_driver: n => `${n}, principal movimiento de tu cartera en 24 h`,
+    intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'última sesión',
     intv51_today_weight: p => `${p} de tu cartera financiera.`,
     intv51_today_weight_tiny: 'Menos del 0,1 % de tu cartera financiera.',
     intv3_tag_quote: n => `Cotización de ${n}`,
@@ -6187,7 +6192,7 @@ const T = {
     cmp_g_crypto: 'Criptomonedas', cmp_g_metal: 'Metales',
     cmp_kind_index: 'índice', cmp_kind_etf: 'ETF', cmp_kind_stock: 'acción',
     cmp_kind_crypto: 'cripto', cmp_kind_metal: 'metal',
-    intv4_r_24h: 'las últimas 24 h', intv4_r_7d: 'los últimos 7 días', intv4_r_30d: 'los últimos 30 días',
+    intv4_r_24h: 'las últimas 24 h', intv4_r_7d: 'los últimos 7 días', intv4_r_30d: 'los últimos 30 días',
     intv4_r_90d: 'los últimos 90 días',
     intv4_r_all: 'todo el periodo registrado', intv4_r_now: 'ahora mismo',
     // categorías del lector certificado
@@ -9387,10 +9392,15 @@ const T = {
     intv22_ago_7d: '7 days ago', intv22_ago_30d: '30 days ago', intv22_ago_all: 'at the start',
     intv22_xq_conc_down: (n, ago) => `Why does ${n} weigh less than ${ago}?`,
     intv22_xq_conc_up: (n, ago) => `Why does ${n} weigh more than ${ago}?`,
-    intv22_xa_conc: (v, t) => `Its value in your portfolio changed ${v}, against ${t} for the total.`,
+    intv22_xa_conc: (v, t) => `Its value in your portfolio ${_intv9Mv(v, 'en')}; your portfolio as a whole ${_intv9Mv(t, 'en')}.`,
     intv3_xq_lead: n => `What changed for ${n} to become my largest investment?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Compared with ${ago}, the value of ${na} in your portfolio changed ${va} and that of ${nb} ${vb}: today ${nb} is worth more.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} is a new position that is now worth more than ${na}, whose value in your portfolio changed ${va} compared with ${ago}.`,
+    intv9_xa_lead_new: (nb, ago) => `${nb} was not in your portfolio ${ago} and is now your largest investment.`,
+    intv9_xa_lead_old: (na, chg) => `${na} is still in your portfolio; its value ${_intv9Mv(chg, 'en')} over the period.`,
+    intv9_xa_lead_gone: na => `${na} is no longer in your portfolio.`,
+    intv9_xa_lead_both: (ago, na, nb, wb) => `${ago.charAt(0).toUpperCase() + ago.slice(1)}, your largest investment was ${na}; today it is ${nb}.`,
+    intv9_xa_lead_ev: (na, ca, nb, cb) => `Over the period, the value of ${na} in your portfolio ${_intv9Mv(ca, 'en')} and that of ${nb} ${_intv9Mv(cb, 'en')}.`,
     intv22_xq_spread: ago => `Is my money better spread than ${ago}, or do I just hold more positions?`,
     intv22_xa_spread_better: 'It is better spread: the weight is more balanced across your positions.',
     intv22_xa_spread_more: 'Mostly you hold more positions: the weight still sits in a few of them.',
@@ -9412,11 +9422,11 @@ const T = {
     intv22_scn_shock: 'Simulated 10% fall',
     intv22_scn_bar_aria: 'Share of your portfolio affected by the scenario',
     // ── INTELLIGENCE V2 (intv21) ──
-    intv21_today_ret: p => `Return over the last 24 h: ${p}, excluding contributions and withdrawals.`,
-    intv21_today_driver_up: (n, pp) => `${n} added ${pp} to your portfolio in 24 h.`,
-    intv21_today_driver_down: (n, pp) => `${n} took ${pp} off your portfolio in 24 h.`,
-    intv21_today_mover_up: (n, p) => `${n}'s price rose ${p} in 24 h.`,
-    intv21_today_mover_down: (n, p) => `${n}'s price fell ${p} in 24 h.`,
+    intv21_today_ret: p => `Return over the last 24 h: ${p}, excluding contributions and withdrawals.`,
+    intv21_today_driver_up: (n, pp) => `${n} added ${pp} to your portfolio in 24 h.`,
+    intv21_today_driver_down: (n, pp) => `${n} took ${pp} off your portfolio in 24 h.`,
+    intv21_today_mover_up: (n, p) => `${n}'s price rose ${p} in 24 h.`,
+    intv21_today_mover_down: (n, p) => `${n}'s price fell ${p} in 24 h.`,
     intv21_today_mover_session_up: (n, p) => `${n}'s price rose ${p} in the last available session.`,
     intv21_today_mover_session_down: (n, p) => `${n}'s price fell ${p} in the last available session.`,
     intv21_today_liq: p => `Cash is ${p} of your investable wealth.`,
@@ -9426,8 +9436,8 @@ const T = {
     intv3_tag_top3: p => `Top three investments: ${p}`,
     intv3_tag_class1: (c, p) => `${c}: ${p} of your portfolio`,
     intv3_tag_class2: (a, b, p) => `${a} and ${b}: ${p}`,
-    intv3_tag_driver: n => `${n}, your portfolio's main move in 24 h`,
-    intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'last session',
+    intv3_tag_driver: n => `${n}, your portfolio's main move in 24 h`,
+    intv51_tag_quote: (n, p, per) => `${n}: ${p} · ${per}`, intv51_p_24h: '24 h', intv51_p_session: 'last session',
     intv51_today_weight: p => `${p} of your financial portfolio.`,
     intv51_today_weight_tiny: 'Less than 0.1% of your financial portfolio.',
     intv3_tag_quote: n => `${n} price`,
@@ -72612,7 +72622,7 @@ function _intv21TodayItems(core, stories, W) {
       items.push({ factId: 'contrib_24h:' + best.id, family: 'contribution', period: '24H', kind: 'driver', priority: 2,
         value: +best.c.toFixed(4), unit: 'pp', dir: best.c > 0 ? 'up' : 'down', assetId: best.id, assetName: best.name,
         evidence: 'asset_values_24h', freshness: att.endAt,
-        text: _intv4T(best.c > 0 ? 'intv21_today_driver_up' : 'intv21_today_driver_down', best.name, _intv21Fixed(Math.abs(best.c), 2) + ' pp') });
+        text: _intv4T(best.c > 0 ? 'intv21_today_driver_up' : 'intv21_today_driver_down', best.name, _intv21Fixed(Math.abs(best.c), 2) + '\u00a0pp') });
     }
   }
   // MOVIMIENTO DE PRECIO: la variación que publica la cotización. Sólo con el dato
@@ -73309,8 +73319,20 @@ function _intv8DepOpen(btn) {
   list.hidden = false;
   block.classList.add('is-dep-open');
   btn.setAttribute('aria-expanded', 'true');
-  // Si no cabe por debajo dentro de la pantalla (nav inferior incluida), se abre hacia arriba.
-  try { const r = list.getBoundingClientRect(); if (r.bottom > (window.innerHeight || 0) - 84) block.classList.add('is-dep-up'); } catch (_) {}
+  // Dirección: en escritorio hacia ARRIBA si cabe; en móvil, hacia el lado con más
+  // espacio (descontando la navegación fija inferior). Nunca fuera de la pantalla.
+  try {
+    list.style.left = '';
+    const vh = window.innerHeight || 0, vw = window.innerWidth || 0, nav = vw < 1024 ? 84 : 12;
+    const br = btn.getBoundingClientRect(), lh = list.getBoundingClientRect().height;
+    const above = br.top - 12, below = vh - nav - br.bottom;
+    const up = vw >= 1024 ? (above >= lh + 8 || above > below) : (above > below);
+    block.classList.toggle('is-dep-up', up);
+    list.style.maxHeight = Math.max(132, (up ? above : below) - 8) + 'px';
+    const r = list.getBoundingClientRect();
+    if (r.right > vw - 8) list.style.left = (parseFloat(getComputedStyle(list).left) - (r.right - (vw - 8))) + 'px';
+    else if (r.left < 8) list.style.left = (parseFloat(getComputedStyle(list).left) + (8 - r.left)) + 'px';
+  } catch (_) {}
   const on = list.querySelector('[aria-selected="true"]') || list.firstElementChild;
   _intv8DepActive(list, on);
   try { list.setAttribute('tabindex', '-1'); list.focus({ preventScroll: true }); } catch (_) {}
@@ -73912,6 +73934,13 @@ const _INTV22_EXPLORE_COOLDOWN = 7 * 864e5;
 // Las filas de servidor (`asset_values`) están en USD: se convierten a la moneda
 // principal con el MISMO conversor de la app antes de formatear. Formatear un importe
 // USD con `formatBase` en una cuenta EUR publicaba dólares con el símbolo del euro.
+// «aumentó un 7,7 %» / «bajó un 2,4 %» / «se mantuvo» (a la precisión publicada).
+function _intv9Mv(chg, lg) {
+  const n = Number(chg) || 0, abs = _intv21Pct(Math.abs(n), 1);
+  const zero = abs === _intv21Pct(0, 1);
+  if (lg === 'en') return zero ? 'held steady' : (n > 0 ? 'rose ' : 'fell ') + abs;
+  return zero ? 'se mantuvo' : (n > 0 ? 'aumentó un ' : 'bajó un ') + abs;
+}
 function _intv22UsdMoney(usd) {
   const v = (typeof toBase === 'function') ? toBase(usd, 'USD') : usd;
   return Number.isFinite(v) ? _intv4Money(v) : '—';
@@ -73952,11 +73981,20 @@ function _intv22ExploreCandidates(W, esc) {
         if (lost) {
           // Cómo cambió el valor de CADA una (filas de servidor): demostrable y sin
           // atribuirlo a precio, compra o venta.
+          // CIERRE VISUAL · conclusión con los pesos de HOY; después, una evidencia con
+          // verbos («aumentó/bajó un X %»), nunca «cambió un +X %» ni una causa.
           const endStart = ws.pos.find(x => x.id === domEnd.id);
-          lines.push(endStart
-            ? _intv4T('intv3_xa_lead_both', ago, nm, _intv21Pct(valChg, 1, true), _intv21Name(domEnd.a), _intv21Pct((domEnd.v / endStart.v - 1) * 100, 1, true))
-            : _intv4T('intv3_xa_lead_new', _intv21Name(domEnd.a), nm, _intv21Pct(valChg, 1, true), ago));
-        } else lines.push(_intv4T('intv22_xa_conc', _intv21Pct(valChg, 1, true), _intv21Pct(totChg, 1, true)));
+          // Sin pesos de hoy: son las cifras de Factores y Explora no las repite.
+          const nb = _intv21Name(domEnd.a);
+          if (!endStart) {
+            lines.push(_intv4T('intv9_xa_lead_new', nb, ago));
+            lines.push(sameEnd ? _intv4T('intv9_xa_lead_old', nm, valChg) : _intv4T('intv9_xa_lead_gone', nm));
+          } else {
+            lines.push(_intv4T('intv9_xa_lead_both', ago, nm, nb));
+            // Si la antigua líder ya no está, se dice eso (nunca «bajó un 100 %»: no es mercado).
+            lines.push(sameEnd ? _intv4T('intv9_xa_lead_ev', nm, valChg, nb, (domEnd.v / endStart.v - 1) * 100) : _intv4T('intv9_xa_lead_gone', nm));
+          }
+        } else lines.push(_intv4T('intv22_xa_conc', valChg, totChg));
         out.push({ id: 'x22_conc_why', family: lost ? 'leader_change' : 'dependency', priority: lost ? 1 : 5, period: s.win, evidence: 'memory',
           assets: [domStart.id, domEnd.id].filter((v, i, a) => a.indexOf(v) === i), materiality: Math.abs(b.v - a.v), root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
           label: lost ? _intv4T('intv3_xq_lead', _intv21Name(domEnd.a)) : _intv4T(down ? 'intv22_xq_conc_down' : 'intv22_xq_conc_up', nm, ago), answer: p(lines) });
@@ -75517,6 +75555,50 @@ function _intv5ExploreMeasure(card) {
 }
 // Escritorio: con una respuesta abierta, Radar y Factores CONSERVAN su altura (no se
 // estiran con la fila); sólo crece Explora. Se libera al cerrar.
+// CIERRE VISUAL · EXPLORA EN MODO RESPUESTA SUPERPUESTO. La card NO cambia de altura:
+// las preguntas no activas siguen en su sitio pero ocultas e `inert` (ni visibles, ni
+// pulsables, ni alcanzables con teclado) y la activa se superpone como cabecera, con su
+// respuesta debajo y desplazamiento SÓLO en el cuerpo. Mismo control para abrir y cerrar.
+function _intv10XApply(card) {
+  if (!card) return;
+  const open = card.querySelector('.intcc-x-answer.is-open');
+  const activeItem = open ? open.closest('.intcc-x-item') : null;
+  const list = card.querySelector('.intcc-explore-list');
+  // La lista conserva su altura CERRADA mientras la activa se superpone (no sale del flujo
+  // sin dejar su hueco): la card mide exactamente lo mismo abierta y cerrada.
+  if (list) {
+    if (open && !list.style.minHeight) {
+      // Se mide la lista CERRADA (la respuesta ya marcada abierta inflaría la medida).
+      const wasOpen = card.classList.contains('is-x-open');
+      open.classList.remove('is-open'); card.classList.remove('is-x-open'); list.style.minHeight = '';
+      const h = list.getBoundingClientRect().height;
+      open.classList.add('is-open'); if (wasOpen) card.classList.add('is-x-open');
+      list.style.minHeight = h + 'px';
+    }
+    if (!open) { list.style.minHeight = ''; if (!list.getAttribute('style')) list.removeAttribute('style'); }
+  }
+  card.classList.toggle('is-x-open', !!open);
+  card.querySelectorAll('.intcc-x-item').forEach(i => {
+    const off = !!open && i !== activeItem;
+    i.classList.toggle('is-x-hidden', off);
+    i.classList.toggle('is-active', !!open && i === activeItem);
+    if (off) i.setAttribute('inert', ''); else i.removeAttribute('inert');
+  });
+  if (open) {
+    const cs = getComputedStyle(card);
+    card.style.setProperty('--x-top', (list ? list.offsetTop : 0) + 'px');
+    card.style.setProperty('--x-pl', cs.paddingLeft); card.style.setProperty('--x-pr', cs.paddingRight); card.style.setProperty('--x-pb', cs.paddingBottom);
+    open.scrollTop = 0;
+    _intv10XFade(open);
+  }
+}
+function _intv10XFade(ans) {
+  const item = ans && ans.closest('.intcc-x-item');
+  if (!item) return;
+  const more = ans.scrollHeight - ans.clientHeight - ans.scrollTop > 2;
+  item.classList.toggle('is-more', more);
+  if (!ans.__intv10Fade) { ans.__intv10Fade = true; ans.addEventListener('scroll', () => _intv10XFade(ans), { passive: true }); }
+}
 let _intv9LockH = null;
 function _intv9LockRow(card, on) {
   try {
@@ -75554,7 +75636,7 @@ function _intv51ApplyXState(root) {
     if (btn) { btn.classList.toggle('is-active', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false'); }
     if (ans) ans.classList.toggle('is-open', on);
   });
-  try { _intv9LockRow(card, !!card.querySelector('.intcc-x-answer.is-open')); } catch (_) {}
+  try { _intv10XApply(card); } catch (_) {}
 }
 function _intv5ExploreFade(list) {
   if (!list) return;
@@ -75568,21 +75650,39 @@ function _intv5ExploreFade(list) {
 // desplazamiento real (no al pintar, no en pequeños vaivenes: tiene que haber salido
 // antes). IntersectionObserver + una clase; el oyente de scroll sólo apunta la hora
 // (pasivo, sin pintar). Sin movimiento reducido no existe.
-const _INTV7_GOLD_SEL = '.aurix-intv21 > .intcc-hero, .aurix-intv21 > .intcc-m-hero, .aurix-intv21 > .intcc-radar, .aurix-intv21 > .intcc-drivers, .aurix-intv21 > .intcc-explore, .aurix-intv21 > .intcc-timeline, .aurix-intv21 > .intcc-watch, .aurix-intv21 > .intv21-scen';
-let _intv7GoldIO = null, _intv7ScrollAt = 0, _intv7QuietUntil = 0, _intv9GoldLite = false;
+const _INTV7_GOLD_SEL = '.aurix-intv21 > .intcc-hero, .aurix-intv21 > .intcc-m-hero, .aurix-intv21 > .intcc-m-health, .aurix-intv21 > .intcc-radar, .aurix-intv21 > .intcc-drivers, .aurix-intv21 > .intcc-explore, .aurix-intv21 > .intcc-timeline, .aurix-intv21 > .intcc-watch, .aurix-intv21 > .intv21-scen';
+let _intv7GoldIO = null, _intv7ScrollAt = 0, _intv7QuietUntil = 0;
 // Interacciones internas (preguntas, métricas, simulador, selector, compensación de
 // scroll) silencian el destello un momento: sólo una ENTRADA real por scroll lo dispara.
 function _intv7GoldQuiet(ms) { _intv7QuietUntil = Date.now() + (ms || 900); }
-// Fluidez: se miden los frames del primer destello; si se pierden (>20 % por encima de
-// 34 ms), se rebaja el brillo y después queda sólo el Hero.
+// COLA: un destello cada vez (dos cards de una fila nunca a la vez; en móvil, ninguno
+// se pierde por coincidir con otro). Cada uno, una vez por entrada real.
+let _intv9GoldQ = [], _intv9GoldRunning = false, _intv9GoldLevel = 0;
+function _intv9GoldEnqueue(el) { if (_intv9GoldQ.indexOf(el) === -1) _intv9GoldQ.push(el); _intv9GoldNext(); }
+function _intv9GoldNext() {
+  if (_intv9GoldRunning) return;
+  let el = null;
+  while (_intv9GoldQ.length && !el) { const c = _intv9GoldQ.shift(); const r = c.isConnected ? c.getBoundingClientRect() : null; if (r && r.bottom > 0 && r.top < (window.innerHeight || 0)) el = c; }
+  if (!el) return;
+  _intv9GoldRunning = true;
+  _intv9GoldWatch();
+  if (el.classList.contains('is-gold-in')) { el.classList.remove('is-gold-in'); void el.offsetWidth; }
+  el.classList.add('is-gold-in');
+  let done = false;
+  const end = () => { if (done) return; done = true; el.classList.remove('is-gold-in'); _intv9GoldRunning = false; setTimeout(_intv9GoldNext, 60); };
+  el.addEventListener('animationend', function f(ev) { if (ev.animationName === 'intv9GoldIn') { el.removeEventListener('animationend', f); end(); } });
+  setTimeout(end, 1200);   // red de seguridad: nunca queda una clase ni una cola atascada
+}
+// Fluidez: se miden los frames de un destello; si se pierden (>25 % por encima de 40 ms),
+// primero se rebaja el brillo y, si vuelve a ocurrir, queda sólo el Hero.
 let _intv9GoldWatching = false;
 function _intv9GoldWatch() {
-  if (_intv9GoldWatching || _intv9GoldLite || typeof requestAnimationFrame !== 'function') return;
+  if (_intv9GoldWatching || _intv9GoldLevel >= 2 || typeof requestAnimationFrame !== 'function') return;
   _intv9GoldWatching = true;
   let last = 0, n = 0, slow = 0; const t0 = performance.now();
-  const f = (t) => { if (last) { n++; if (t - last > 34) slow++; } last = t;
+  const f = (t) => { if (last) { n++; if (t - last > 40) slow++; } last = t;
     if (t - t0 < 800) requestAnimationFrame(f);
-    else { _intv9GoldWatching = false; if (n > 8 && slow / n > 0.2) { _intv9GoldLite = true; const r = document.querySelector('.aurix-intv21'); if (r) r.classList.add('is-gold-lite'); } } };
+    else { _intv9GoldWatching = false; if (n > 8 && slow / n > 0.25) { _intv9GoldLevel++; const r = document.querySelector('.aurix-intv21'); if (r) r.classList.add('is-gold-lite'); } } };
   requestAnimationFrame(f);
 }
 function _intv7GoldWire() {
@@ -75591,29 +75691,30 @@ function _intv7GoldWire() {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (!_intv7GoldIO) {
       window.addEventListener('scroll', () => { _intv7ScrollAt = Date.now(); }, { passive: true, capture: true });
+      // Visibilidad PARCIAL razonable: una card alta (Evolución, Hoy) no tiene que entrar
+      // entera; basta con el 30 % de su alto o el 35 % de la pantalla, lo que sea menor.
       _intv7GoldIO = new IntersectionObserver(es => es.forEach(en => {
         const el = en.target;
-        if (en.intersectionRatio < 0.05) { el.__g7Out = true; return; }
-        if (en.intersectionRatio >= 0.3 && el.__g7Out && Date.now() - _intv7ScrollAt < 600) {
+        if (en.intersectionRect.height < 4) { el.__g7Out = true; return; }
+        const need = Math.min(0.3 * en.boundingClientRect.height, 0.35 * (window.innerHeight || 0));
+        if (en.intersectionRect.height >= need && el.__g7Out && Date.now() - _intv7ScrollAt < 600) {
           el.__g7Out = false;
           if (Date.now() < _intv7QuietUntil) return;
           const hero = el.classList.contains('intcc-hero') || el.classList.contains('intcc-m-hero');
-          if (_intv9GoldLite && !hero) return;   // degradado: sólo el Hero
-          // Móvil: un único destello a la vez.
-          if ((window.innerWidth || 0) < 768 && document.querySelector('.aurix-intv21 > .is-gold-in')) return;
-          _intv9GoldWatch();
-          if (el.classList.contains('is-gold-in')) { el.classList.remove('is-gold-in'); void el.offsetWidth; }
-          el.classList.add('is-gold-in');
-          el.addEventListener('animationend', function f(ev) { if (ev.animationName === 'intv9GoldIn') { el.classList.remove('is-gold-in'); el.removeEventListener('animationend', f); } });
+          if (_intv9GoldLevel >= 2 && !hero) return;   // degradado: sólo el Hero
+          _intv9GoldEnqueue(el);
         }
-      }), { threshold: [0, 0.05, 0.3] });
+      }), { threshold: [0, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.45] });
     }
     _intv7GoldIO.disconnect();
-    if (_intv9GoldLite) { const r = document.querySelector('.aurix-intv21'); if (r) r.classList.add('is-gold-lite'); }
+    if (_intv9GoldLevel >= 1) { const r = document.querySelector('.aurix-intv21'); if (r) r.classList.add('is-gold-lite'); }
     const vh = window.innerHeight || 0;
     document.querySelectorAll(_INTV7_GOLD_SEL).forEach(el => {
       const r = el.getBoundingClientRect();
-      el.__g7Out = !(r.bottom > 0 && r.top < vh);   // lo que ya se ve al pintar no destella
+      // Lo que ya se VE al pintar no destella; asomar unos píxeles por el borde inferior
+      // no es «verse» (causa de que Evolución y Hoy, justo bajo el pliegue, nunca destellaran).
+      const visH = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+      el.__g7Out = !(visH >= Math.min(0.3 * r.height, 0.35 * vh));
       _intv7GoldIO.observe(el);
     });
   } catch (_) {}
@@ -75890,26 +75991,12 @@ function _initIntelligenceCommandCenter() {
       if (!ans || !card) return;
       const willOpen = !ans.classList.contains('is-open');
       try { if (typeof _intv7GoldQuiet === 'function') _intv7GoldQuiet(); } catch (_) {}
-      // V5.1 · la elección del usuario manda en los repintados de esta sesión.
+      // V5.1 · la elección del usuario manda en los repintados de esta sesión (y por cuenta).
       try { if (typeof _intv51XState !== 'undefined') _intv51XState = { id: (typeof _intv22Ident === 'function') ? _intv22Ident() : '', open: willOpen ? btn.getAttribute('data-intcc-q') : null, user: true }; } catch (_) {}
-      const top0 = btn.getBoundingClientRect().top;
-      if (willOpen) _intv9LockRow(card, true);
-      // Una sola abierta: la anterior se cierra AL INSTANTE (si estaba encima, el control
-      // pulsado subiría a mitad de animación); la nueva se abre con su transición.
-      card.querySelectorAll('.intcc-x-answer.is-open').forEach(a => { if (a !== ans) { a.classList.add('is-instant'); a.classList.remove('is-open'); } });
-      card.querySelectorAll('.intcc-x-q.is-active').forEach(b => { if (b !== btn) { b.classList.remove('is-active'); b.setAttribute('aria-expanded', 'false'); } });
-      card.querySelectorAll('.intcc-x-item.is-active').forEach(i => { if (i !== btn.closest('.intcc-x-item')) i.classList.remove('is-active'); });
-      ans.classList.remove('is-instant');
+      card.querySelectorAll('.intcc-x-answer.is-open').forEach(a => { if (a !== ans) a.classList.remove('is-open'); });
+      card.querySelectorAll('.intcc-x-q').forEach(b => { const on = willOpen && b === btn; b.classList.toggle('is-active', on); b.setAttribute('aria-expanded', on ? 'true' : 'false'); });
       ans.classList.toggle('is-open', willOpen);
-      btn.classList.toggle('is-active', willOpen);
-      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      const item = btn.closest('.intcc-x-item'); if (item) item.classList.toggle('is-active', willOpen);
-      card.classList.toggle('is-x-open', willOpen);
-      // El control se queda bajo el dedo/puntero: se compensa lo que se haya movido.
-      const dy = btn.getBoundingClientRect().top - top0;
-      if (Math.abs(dy) > 0.5) { try { window.scrollBy({ top: dy, left: 0, behavior: 'instant' }); } catch (_) { window.scrollBy(0, dy); } }
-      requestAnimationFrame(() => card.querySelectorAll('.intcc-x-answer.is-instant').forEach(a => a.classList.remove('is-instant')));
-      if (!willOpen) setTimeout(() => { if (!card.querySelector('.intcc-x-answer.is-open')) _intv9LockRow(card, false); }, 280);
+      _intv10XApply(card);
     };
     document.addEventListener('click', e => {
       const btn = e.target && e.target.closest ? e.target.closest('[data-intcc-q]') : null;

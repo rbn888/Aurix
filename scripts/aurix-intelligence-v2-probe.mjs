@@ -210,7 +210,7 @@ for (const E of ENGINES) {
         ok(`${T} QA · Hoy: rentabilidad, contribución en pp y cotizaciones materiales, distinguidas`, r.hoy.rows.length <= 3 && r.hoy.rows.some(x => x.k === 'return')
           && r.hoy.rows.some(x => x.k === 'driver' && /(restó|sumó|took|added) \d+[.,]\d+ pp/.test(x.t))
           && r.hoy.rows.filter(x => x.k === 'mover').every(x => /cotización|price/i.test(x.t)
-            && (/Solana|Bitcoin|Ethereum|Cardano|Chainlink/.test(x.t) ? /24 h/.test(x.t) : /última sesión disponible|last available session/.test(x.t)))
+            && (/Solana|Bitcoin|Ethereum|Cardano|Chainlink/.test(x.t) ? /24[ \u00a0]h/.test(x.t) : /última sesión disponible|last available session/.test(x.t)))
           && !/Solana/.test(r.hoy.text), JSON.stringify(r.hoy.rows));
         ok(`${T} QA · Escenarios: Microsoft −10 % ≈ −2,9 %, Top 3 ≈ −6,9 %, Acciones ≈ −5,1 %`, r.scn && Math.abs(r.scn.find(s => s.id === 'top1').impact + 2.9) < 0.01
           && Math.abs(r.scn.find(s => s.id === 'top3').impact + 6.9) < 0.01 && Math.abs(r.scn.find(s => s.id === 'class').impact + 5.1) < 0.01
