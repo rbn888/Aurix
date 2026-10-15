@@ -121,6 +121,9 @@ const read = page => page.evaluate(`(function(){
     hasTemplatesLink: !!sec.querySelector('[data-wspl-templates]'),
     hasRetry: !!sec.querySelector('[data-ws-sync-retry]'),
     title: (sec.querySelector('.wspl-title')||{}).textContent || '',
+    spillWho: (function(){ var out=[]; cards.forEach(function(c){ var cb=c.getBoundingClientRect();
+      [].slice.call(c.querySelectorAll('*')).forEach(function(e){ var b=e.getBoundingClientRect();
+        if (b.width && (b.right > cb.right + 1 || b.left < cb.left - 1)) out.push(e.tagName + '<' + String(e.parentNode.className && e.parentNode.className.baseVal !== undefined ? e.parentNode.className.baseVal : e.parentNode.className).slice(0, 30) + ' +' + Math.round(b.right - cb.right)); }); }); return out.slice(0, 4); })(),
     spill: cards.some(function(c){ var cb=c.getBoundingClientRect();
       return [].slice.call(c.querySelectorAll('*')).some(function(e){ var b=e.getBoundingClientRect();
         return b.width && (b.right > cb.right + 1 || b.left < cb.left - 1); }); }),
@@ -175,10 +178,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       g.metrics.every(m => m.length <= 3) && g.metrics.slice(2).every(m => m.length <= 2) && g.metrics[4].length === 1
       && /^Disponible/.test(g.metrics[0][0] || ''),
       JSON.stringify(g.metrics));
+    // Hotfix Tus planes: con 3+ planes la rejilla es auto-fit (cards de ≥320 px): 3 a 1024 y 1440.
     ok(`${tag} rejilla ${w >= 1024 ? '3' : '1'} columna(s)`,
       g.cols === (w >= 1024 ? 3 : 1), 'columnas=' + g.cols);
     ok(`${tag} nada se pinta fuera de su card y «Continuar» es táctil`,
-      g.spill === false && g.taps.every(x => x >= 44), JSON.stringify({ spill: g.spill, taps: g.taps }));
+      g.spill === false && g.taps.every(x => x >= 44), JSON.stringify({ spill: g.spill, who: g.spillWho, taps: g.taps }));
     // ── §3 · TÍTULO Y SUBTÍTULO NO PUEDEN DECIR LO MISMO ────────────────────
     // La tarjeta publica el nombre del usuario y CALLA el subtítulo cuando
     // repetiría; las demás, que sí aportan información, lo conservan. El nombre
@@ -408,7 +412,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await seed(page, DOCS); await persona(page, true); await paint(page);
 
     // §18 — 1 / 2 / 3 columnas REALES, medidas por el motor de layout.
-    const want = [[360, 1], [375, 1], [390, 1], [768, 2], [1024, 3], [1440, 3]];
+    const want = [[360, 1], [375, 1], [390, 1], [768, 2], [1024, 3], [1440, 3]];   // auto-fit (≥320 px) con 5 planes
     for (const [w, cols] of want) {
       await page.setViewportSize({ width: w, height: 900 });
       await page.waitForTimeout(90);

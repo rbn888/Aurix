@@ -379,15 +379,17 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var plans=[].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')), pins=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-card'));
       var rows={}; plans.forEach(function(c){ var k=Math.round(R(c).top); (rows[k]=rows[k]||[]).push(c); });
       var misalign=0; Object.keys(rows).forEach(function(k){ var r=rows[k]; if(r.length<2) return; var n0=R(r[0].querySelector('.wspl-name')).top, g0=R(r[0].querySelector('.wspl-go')).top;
-        r.forEach(function(c){ if (Math.abs(R(c.querySelector('.wspl-name')).top-n0)>1 || Math.abs(R(c.querySelector('.wspl-go')).top-g0)>1) misalign++; }); });
+        r.forEach(function(c){ if (Math.abs(R(c.querySelector('.wspl-name')).top-n0)>1) misalign++; }); });
+      // Hotfix Tus planes: altura NATURAL (sin huecos para igualar): el nombre se alinea por fila; el CTA va donde acaba cada card.
+      var dead=plans.some(function(c){ var go=R(c.querySelector('.wspl-go')), cr=R(c); return cr.bottom - go.bottom > 20; });
       var cols=function(list){ var xs={}; list.forEach(function(c){ xs[Math.round(R(c).left)]=1; }); return Object.keys(xs).length; };
       var taps=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-card .wspl-menu, #wsPlansSection .wspin-go, #wsPlansSection .wspl-go')).map(function(b){ var r=R(b); return Math.min(r.width,r.height); });
       var nameCut=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-name')).some(function(e){ return e.scrollWidth>e.clientWidth+1 || getComputedStyle(e).textOverflow==='ellipsis'; });
       var maxPlanH=Math.max.apply(null, plans.map(function(c){return R(c).height;})), maxPinH=Math.max.apply(null, pins.map(function(c){return R(c).height;}));
-      return { planCols: cols(plans), pinCols: cols(pins), misalign: misalign, minTap: Math.min.apply(null, taps), nameCut: nameCut, maxPlanH: Math.round(maxPlanH), maxPinH: Math.round(maxPinH),
+      return { planCols: cols(plans), pinCols: cols(pins), misalign: misalign, dead: dead, minTap: Math.min.apply(null, taps), nameCut: nameCut, maxPlanH: Math.round(maxPlanH), maxPinH: Math.round(maxPinH),
         pinCover: pins.every(function(c){ var r=R(c.querySelector('.wspin-cover')); return r.height >= 60; }), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
     const wantPlan = W >= 1024 ? 3 : (W >= 640 ? 2 : 1), wantPin = W >= 1024 ? 3 : 2;
-    ok(`${T} Tus planes: ${wantPlan} columna(s), nombre y CTA alineados por fila`, d.planCols === wantPlan && d.misalign === 0, JSON.stringify(d));
+    ok(`${T} Tus planes: ${wantPlan} columna(s), nombres alineados por fila, sin espacio muerto bajo el CTA`, d.planCols === wantPlan && d.misalign === 0 && !d.dead, JSON.stringify(d));
     ok(`${T} accesos: ${wantPin} columnas, portada reconocible (≥60 px), nombre sin recortar y más compactos que un plan`, d.pinCols === wantPin && d.pinCover && !d.nameCut && d.maxPinH < d.maxPlanH, JSON.stringify(d));
     ok(`${T} controles ≥44 px y sin desbordamiento horizontal`, d.minTap >= 43.5 && d.sw, JSON.stringify(d));
     if (SHOTS) await shot(p, 'remate-dash-' + W + L);
@@ -508,12 +510,44 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // ── Portadas de Tus planes
     await p.evaluate(`switchTab('home')`); await p.waitForTimeout(900); await p.evaluate(`updateDashboardPlans(); document.getElementById('wsPlansSection').scrollIntoView()`); await p.waitForTimeout(1200);
     const pc = await J(p, `return [].slice.call(document.querySelectorAll('#wsPlansSection .wspl-cover')).map(function(c){ var r=c.getBoundingClientRect(); var img=c.querySelector('img.ws-asset-img'); return { ratio: +(r.width/r.height).toFixed(2), h: Math.round(r.height), fit: img ? getComputedStyle(img).objectFit : 'svg' }; })`);
-    ok(`${T} portadas de Tus planes: completas (contain), proporción 16:9, ≤96 px de alto`, pc.length > 0 && pc.every(x => (x.fit === 'contain' || x.fit === 'svg') && x.ratio > 1.7 && x.ratio < 1.85 && x.h <= 96), JSON.stringify(pc));
+    const cw = await J(p, `return [].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){ var cv=c.querySelector('.wspl-cover'); return +(cv.getBoundingClientRect().width / (c.getBoundingClientRect().width - 24)).toFixed(2); })`);
+    ok(`${T} portadas de Tus planes: completas (contain), a lo ancho de la card, sin recorte`, pc.length > 0 && pc.every(x => (x.fit === 'contain' || x.fit === 'svg') && x.h <= 220) && cw.every(r => r >= 0.97), JSON.stringify({ pc, cw }));
     await p.evaluate(`switchTab('workspace'); _wsTab='tools'; _wshView='home'; _wshRepaintHome();`); await p.waitForTimeout(700);
     const cat = await J(p, `var img=document.querySelector('.wsh-toolcard img.ws-asset-img'); return img ? getComputedStyle(img).objectFit : null`);
     ok(`${T} catálogo intacto (sus portadas siguen en cover)`, cat === 'cover', String(cat));
     if (SHOTS) await shot(p, 'polish-' + W + L);
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
+  // ═════════════════ §J · HOTFIX TUS PLANES COMPACTOS ═════════════════
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    await boot(p, { seed: SEED_A });
+    const BASE = `[{"t":"monthly_budget","n":"Rubén mensual","in":{"currency":"EUR","rows":[{"id":"s","type":"income","label":"Nómina","amount":"2500"},{"id":"h","type":"expense","label":"Housing","amount":"800","color":"#4A82F0"},{"id":"f","type":"expense","label":"Comida","amount":"805","color":"#2BB3A3"}]}},{"t":"receivables_app","n":"Clientes","in":{"currency":"EUR","items":[{"id":"a","personOrCompany":"A","concept":"x","units":1,"unitPrice":1000,"paidAmount":400}]}},{"t":"compound_growth","n":"Jubilación","dp":1,"in":{"currency":"EUR"},"res":{"final":139238.73,"contributed":73000,"interest":66238.73,"years":20,"precision":2}}]`;
+    for (const N of [1, 2, 3, 6]) {
+      await p.evaluate(`(function(){ var b=${BASE}; var out=[]; for (var i=0;i<${N};i++){ var x=b[i%b.length]; out.push({ id:'ws4_j'+i, type:x.t, customName:x.n+(i>=b.length?' '+(i+1):''), inputs:x.in, results:x.res||null, dashPinned: x.dp?true:undefined, revision:1, createdAt:1, updatedAt:100-i, currency:'EUR' }); } localStorage.setItem('aurix_ws_projects_v1', JSON.stringify(out)); localStorage.setItem('aurix_ws_dash_tools_v1','[]'); switchTab('home'); })()`);
+      await p.waitForTimeout(700);
+      for (const W of [360, 390, 430, 768, 1024, 1440]) {
+        await p.setViewportSize({ width: W, height: 900 }); await p.waitForTimeout(120);
+        await p.evaluate(`updateDashboardPlans()`); await p.waitForTimeout(60);
+        const d = await J(p, `var g=document.getElementById('wsPlansGrid'); var cards=[].slice.call(g.querySelectorAll('.wspl-card')); var sec=document.getElementById('wsPlansSection').getBoundingClientRect();
+          var xs={}; cards.forEach(function(c){ xs[Math.round(c.getBoundingClientRect().left)]=1; });
+          var cov=cards.map(function(c){ var cv=c.querySelector('.wspl-cover').getBoundingClientRect(), cb=c.getBoundingClientRect(); return +(cv.width/(cb.width-24)).toFixed(2); });
+          var spill=cards.some(function(c){ var cb=c.getBoundingClientRect(); return [].slice.call(c.querySelectorAll('*')).some(function(e){ var b=e.getBoundingClientRect(); return b.width && (b.right>cb.right+1 || b.left<cb.left-1); }); });
+          var right=Math.max.apply(null, cards.map(function(c){return c.getBoundingClientRect().right;}));
+          return { n: cards.length, cols: Object.keys(xs).length, maxH: Math.round(Math.max.apply(null, cards.map(function(c){return c.getBoundingClientRect().height - c.querySelector('.wspl-cover').getBoundingClientRect().height;}))), cov: Math.min.apply(null, cov), spill: spill,
+            fill: +((right - sec.left) / sec.width).toFixed(2), w1: Math.round(cards[0].getBoundingClientRect().width), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
+        const T = `${ENG}.§J.${N}p.${W}`;
+        const wantCols = W < 640 ? 1 : (N === 1 ? 1 : N === 2 ? 2 : null);
+        const colsOk = wantCols ? d.cols === wantCols : d.cols >= 2;
+        // 1 plan: ancho controlado (≤440). 2+: la rejilla llena el ancho (sin medio dashboard vacío).
+        const fillOk = W < 640 || (N === 1 ? d.w1 <= 441 : d.fill >= 0.97);
+        ok(`${T} columnas ${d.cols}, portada a lo ancho, datos ≤ 260 px bajo la portada, sin desbordes ni media pantalla vacía`, colsOk && fillOk && d.cov >= 0.97 && d.maxH <= 260 && !d.spill && d.sw, JSON.stringify(d));
+      }
+    }
+    ok(`${ENG}.§J sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }
 

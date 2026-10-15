@@ -333,9 +333,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         Object.keys(rows).forEach(function(k){ var rs=rows[k]; if(rs.length<2) return;
           var hs=rs.map(function(c){return Math.round(c.getBoundingClientRect().height);});
           var go=rs.map(function(c){return Math.round(c.querySelector('.wspl-go').getBoundingClientRect().bottom);});
-          var hero=rs.map(function(c){return Math.round(c.querySelector('.wspl-slot-hero').getBoundingClientRect().top);});
-          if (Math.max.apply(0,hs)-Math.min.apply(0,hs)>1) rowBad.push('h:'+hs);
-          if (Math.max.apply(0,go)-Math.min.apply(0,go)>1) rowBad.push('cta:'+go);
+          // La cifra va a la MISMA distancia de su título en cada card (un nombre largo puede ocupar dos
+          // líneas y empujarla; eso es contenido, no desalineación de estructura).
+          var hero=rs.map(function(c){return Math.round(c.querySelector('.wspl-slot-hero').getBoundingClientRect().top - c.querySelector('.wspl-card-id').getBoundingClientRect().bottom);});
+          // Hotfix Tus planes: altura NATURAL (igualarla exigía huecos muertos); se mantiene alineada
+          // la cifra principal de cada fila.
+          void hs; void go;
           if (Math.max.apply(0,hero)-Math.min.apply(0,hero)>1) rowBad.push('hero:'+hero);
         });
         var spill=cards.some(function(c){ var cb=c.getBoundingClientRect(); return [].slice.call(c.querySelectorAll('*')).some(function(e){ var b=e.getBoundingClientRect(); return b.width && (b.right>cb.right+1||b.left<cb.left-1||b.bottom>cb.bottom+1); }); });
@@ -347,7 +350,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
           recvPct: /\\d+\\s?%/.test(recvTxt), recvOver: /Vencido|Overdue/.test(recvTxt),
           spend: !!document.querySelector('#wsPlansGrid [data-wspl-id="b1"] svg.wspl-spend'),
           empty: !!document.querySelector('#wsPlansGrid [data-wspl-id="e1"] .wspl-empty') }); })()`).then(JSON.parse);
-      ok(`${T} misma altura, cifra y CTA alineados en cada fila; nada fuera; sin subtítulo; sin NaN`,
+      ok(`${T} cifra principal alineada en cada fila; nada fuera; sin subtítulo; sin NaN`,
         g.n === 4 && g.rowBad.length === 0 && !g.spill && g.types === 0 && !g.nan, JSON.stringify(g));
       if (w === 1440) ok(`${T} Cobros: % cobrado y vencido; Presupuesto: reparto; vacío: estado explícito`, g.recvPct && g.recvOver && g.spend && g.empty, JSON.stringify(g));
       await page.evaluate(`document.getElementById('wsPlansSection').scrollIntoView({block:'start', behavior:'instant'}); window.scrollBy({top:-260, behavior:'instant'})`);

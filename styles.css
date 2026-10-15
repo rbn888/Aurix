@@ -32371,3 +32371,86 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
   .aurix-wsh .wsrecv-summary-card { padding: 10px 12px; }
   .aurix-wsh .wsrecv-summary .wsrecv-sumbar { margin-top: 8px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   HOTFIX · TUS PLANES COMPACTOS
+   Portada a lo ancho (completa, contain, proporción de la imagen) → título + ⋯ → KPI → lectura
+   (donut/barra en una franja) → secundarios en una fila → Continuar discreto. Altura natural
+   (sin subrejilla de franjas ni min-height) y rejilla según cuántos planes hay.
+   ══════════════════════════════════════════════════════════════════════════════ */
+#wsPlansGrid.wspl-grid { display: grid; gap: 12px; align-items: start; row-gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+#wsPlansGrid.wspl-grid[data-wspl-n="1"] { grid-template-columns: minmax(0, 440px); }
+#wsPlansGrid.wspl-grid[data-wspl-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 639px) {
+  #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+#wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover {
+  display: flex !important; flex-direction: column; gap: 8px; grid-row: auto !important; margin: 0 !important;
+  padding: 10px 12px 12px; min-height: 0; height: auto;
+}
+#wsPlansGrid .wspl-card > * { grid-row: auto !important; }
+#wsPlansGrid .wspl-card .wspl-cover {
+  width: 100%; height: auto; aspect-ratio: 16 / 9; max-height: 220px; border-radius: 10px; justify-self: stretch;
+  border: 1px solid rgba(var(--ws-a, 74,130,240), 0.16); background: rgba(6,10,22,0.6);
+}
+#wsPlansGrid .wspl-card .wspl-card-id { align-items: center; gap: 6px; margin: 0; }
+#wsPlansGrid .wspl-card .wspl-card-txt { min-height: 0; }
+#wsPlansGrid .wspl-card .wspl-period:empty { display: none; height: 0; }
+#wsPlansGrid .wspl-slot { min-height: 0 !important; margin: 0; padding: 0; }
+#wsPlansGrid .wspl-slot:empty { display: none; }
+#wsPlansGrid .wspl-hero i { font-size: 12px; }
+#wsPlansGrid .wspl-hero b { font-size: 24px; line-height: 1.15; }
+#wsPlansGrid .wspl-slot-viz .wspl-ring-row .wspl-ring { width: 40px; height: 40px; flex-basis: 40px; }
+#wsPlansGrid .wspl-slot-m { padding-top: 8px; border-top: 1px solid rgba(165,196,255,0.08); display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+#wsPlansGrid .wspl-metrics { display: flex; flex-wrap: nowrap; gap: 6px 18px; }
+#wsPlansGrid .wspl-m i { font-size: 12px; }
+#wsPlansGrid .wspl-m b { font-size: 14px; }
+#wsPlansGrid .wspl-go { align-self: flex-start; min-height: 44px; padding: 0 14px; font-size: 13px; margin: 2px 0 0 !important; }
+#wsPlansGrid.wspl-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+#wsPlansGrid.wspl-grid[data-wspl-n="1"] { grid-template-columns: minmax(0, 440px); }
+#wsPlansGrid.wspl-grid[data-wspl-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr); } }
+#wsPlansGrid .wspl-slot-m { border-top: 0; padding-top: 0; }
+#wsPlansGrid .wspl-card .wspl-cover { max-height: none; }
+@media (max-width: 639px) { #wsPlansGrid .wspl-hero b { font-size: 22px; } }
+/* La línea del periodo se reserva (vacía si no hay) para que el KPI quede a la misma altura en la fila;
+   las métricas secundarias van en una fila y sólo envuelven si no caben. */
+#wsPlansGrid .wspl-card .wspl-period:empty { display: block; height: 1.3em; }
+#wsPlansGrid .wspl-metrics { flex-wrap: wrap; }
+#wsPlansGrid .wspl-slot-m { flex-wrap: wrap; min-width: 0; }
+#wsPlansGrid .wspl-ring-row { min-width: 0; }
+#wsPlansGrid .wspl-ring-row .wspl-share-t { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+/* Cards anchas (1–2 planes, o columnas amplias): la portada se limita en alto y la caja toma el
+   ancho de la imagen a esa altura, sin bandas laterales ni crecer la card. */
+
+/* Compactación final: rejilla de áreas — portada / título+periodo+⋯ / KPI / lectura /
+   secundarios + Continuar en la MISMA fila. El CTA visible mide 36 px; su zona táctil, 44. */
+#wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover {
+  display: grid !important; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 6px;
+  grid-template-areas: "cover cover" "id id" "hero hero" "viz viz" "m go"; align-content: start;
+}
+#wsPlansGrid .wspl-card > .wspl-cover { grid-area: cover; margin-bottom: 2px; }
+#wsPlansGrid .wspl-card > .wspl-card-id { grid-area: id; }
+#wsPlansGrid .wspl-card > .wspl-slot-hero { grid-area: hero; }
+#wsPlansGrid .wspl-card > .wspl-slot-viz { grid-area: viz; }
+#wsPlansGrid .wspl-card > .wspl-slot-m { grid-area: m; align-self: end; }
+#wsPlansGrid .wspl-card > .wspl-go { grid-area: go; align-self: end; justify-self: end; }
+#wsPlansGrid .wspl-card > .wspl-slot-viz:empty, #wsPlansGrid .wspl-card > .wspl-slot-m:empty { display: block; }
+#wsPlansGrid .wspl-card > .wspl-slot-viz:empty { display: none; }
+#wsPlansGrid .wspl-card .wspl-card-txt { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+#wsPlansGrid .wspl-card .wspl-period:empty { display: none; }
+#wsPlansGrid .wspl-card .wspl-card-id .wspl-menu { width: 36px; height: 36px; }
+#wsPlansGrid .wspl-go { position: relative; min-height: 36px; height: 36px; padding: 0 12px; font-size: 13px; margin: 0 !important; }
+#wsPlansGrid .wspl-go::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%); }
+#wsPlansGrid .wspl-hero { gap: 0; }
+#wsPlansGrid .wspl-hero b { font-size: 22px; line-height: 1.2; }
+@media (min-width: 640px) { #wsPlansGrid .wspl-hero b { font-size: 24px; } }
+#wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover { grid-template-rows: none !important; }
+/* El CTA conserva 44 px reales (objetivo táctil del sistema); comparte fila con las métricas,
+   así que no añade altura, y se lee secundario por tamaño de texto y relleno. */
+#wsPlansGrid .wspl-go { min-height: 44px; height: 44px; }
+#wsPlansGrid .wspl-go::after { content: none; }
+#wsPlansGrid .wspl-card .wspl-card-id .wspl-menu { width: 44px; height: 44px; }
+#wsPlansGrid.wspl-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); } #wsPlansGrid.wspl-grid[data-wspl-n="1"] { grid-template-columns: minmax(0, 440px); } #wsPlansGrid.wspl-grid[data-wspl-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } @media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr); } }
+#wsPlansGrid.wspl-grid:not([data-wspl-n="1"]):not([data-wspl-n="2"]) { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); } @media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr) !important; } }
