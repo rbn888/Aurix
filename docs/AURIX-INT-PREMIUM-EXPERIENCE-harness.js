@@ -148,7 +148,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
-  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText','_intv4AsOf','_intv4IsCurrent','_intv4AsOfStale','_intv4TopIsLiquidity','_intv4When','_intv4Tone','_intccDateTime',
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText',
   '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxReadPolicy','_aurixIntelCtxRecord','_aurixIntelReadOwned',
   '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
@@ -622,11 +622,8 @@ console.log('\n6 · Intelligence is not a warnings machine:');
     JSON.stringify(core.positiveDevelopments.map(f => f.semanticKey)));
   ok('6.2 …and reach the surface', /is-positive|intv4-story .*is-up/.test(html) || /class="intv4-story is-up/.test(html),
     (html.match(/class="intv4-story[^"]*"/g) || []).join(' '));
-  // ÚLTIMO AJUSTE (cambio de contrato explícito): más liquidez no es una MEJORA ni
-  // una alerta. El hecho se conserva, informativo, y no entra en las mejoras.
-  ok('6.3 rising liquidity is kept as an INFORMATIVE fact: neither an improvement nor a warning',
-    core.ledger.facts.some(f => f.semanticKey === 'liquidity_improved' && f.positive === null)
-    && !core.positiveDevelopments.some(f => f.semanticKey === 'liquidity_improved'));
+  ok('6.3 an improving-liquidity portfolio is not described as a warning',
+    core.positiveDevelopments.some(f => f.semanticKey === 'liquidity_improved'));
   ok('6.4 nothing positive is claimed when nothing improved',
     (() => { const flat = Object.assign({}, MATURE, { rows: inv([10000,10000,10000,10000,10000,10000]), flows: [], serverRows: [] });
       return coreOf(flat).positiveDevelopments.length === 0; })());

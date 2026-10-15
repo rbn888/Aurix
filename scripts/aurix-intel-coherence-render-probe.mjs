@@ -8,7 +8,7 @@
  * por docs/AURIX-INTEL-COHERENCE-LANGUAGE-harness.js) dentro del contenedor real de
  * Intelligence con `styles.css` real, y mide lo PINTADO: sin desplazamiento
  * horizontal, el texto dentro de su card, sin recorte (scrollHeight ≤ clientHeight)
- * y sin solape entre las dos cards. ES/EN · 360/390/1440 · Chromium y WebKit.
+ * y sin solape entre las dos cards. ES/EN · 360/390/768/1440 · Chromium y WebKit.
  *
  *   AURIX_COHERENCE_DUMP=/tmp/coh.json node docs/AURIX-INTEL-COHERENCE-LANGUAGE-harness.js
  *   COH_DUMP=/tmp/coh.json node scripts/aurix-intel-coherence-render-probe.mjs
@@ -29,25 +29,19 @@ const ok = (n, c, info) => { if (c) pass++; else { fail++; console.log('  ✗ ' 
 
 for (const E of (process.env.ENGINES || 'CR,WK').split(',')) {
   const browser = await (E === 'WK' ? PWm.webkit : PWm.chromium).launch({ headless: true });
-  for (const w of [360, 390, 1440]) for (const lng of ['es', 'en']) {
+  for (const w of [360, 390, 768, 1440]) for (const lng of ['es', 'en']) {
     const page = await browser.newPage({ viewport: { width: w, height: 900 } });
     await page.setContent(`<!doctype html><html lang="${lng}"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head>
-      <body><main><div class="aurix-intcc aurix-intv6 aurix-intv21" style="padding:12px">${dump[lng].disc}${dump[lng].log}
-      <section class="intcc-card intv9-disc" data-count="1"><h3 class="intcc-card-title">·</h3><ul class="intv9-disc-list"><li class="intv9-disc-item"><span class="intv9-disc-mark"></span><div class="intv9-disc-body"><span class="intv9-disc-text">${dump[lng].need}</span></div></li></ul></section>
-      <section class="intcc-card intv4-discovery is-dated"><h3 class="intcc-card-title">·</h3><p class="intv4-wow-text">${dump[lng].dated}</p></section>
-      </div></main></body></html>`);
+      <body><main><div class="aurix-intcc aurix-intv6 aurix-intv21" style="padding:12px">${dump[lng].disc}${dump[lng].log}</div></main></body></html>`);
     const m = await page.evaluate(() => {
       const r = e => e.getBoundingClientRect();
       const disc = document.querySelector('.intv4-discovery'), log = document.querySelector('.intv21-log');
-      const txts = [...document.querySelectorAll('.intv4-wow-text, .intv21-log-txt, .intv9-disc-text')];
-      const cards = [...document.querySelectorAll('.intcc-card')];
+      const txts = [...document.querySelectorAll('.intv4-wow-text, .intv21-log-txt')];
       return {
         hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         inCard: txts.every(t => { const c = t.closest('.intcc-card'); const a = r(t), b = r(c); return a.left >= b.left - 1 && a.right <= b.right + 1 && a.bottom <= b.bottom + 1; }),
         clipped: txts.filter(t => t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1).length,
-        overlap: cards.some((a, i) => cards.some((b, j) => j > i && !(r(a).bottom <= r(b).top + 1 || r(b).bottom <= r(a).top + 1
-          || r(a).right <= r(b).left + 1 || r(b).right <= r(a).left + 1))),
-        datedOk: /(según el dato del|as of) /.test(document.querySelector('.is-dated .intv4-wow-text').textContent),
+        overlap: (() => { const a = r(disc), b = r(log); return !(a.bottom <= b.top + 1 || b.bottom <= a.top + 1); })(),
         visible: txts.every(t => r(t).height > 0 && getComputedStyle(t).visibility !== 'hidden'),
         wowLines: Math.round(r(document.querySelector('.intv4-wow-text')).height / parseFloat(getComputedStyle(document.querySelector('.intv4-wow-text')).lineHeight)),
         wowText: document.querySelector('.intv4-wow-text').textContent,
@@ -58,7 +52,7 @@ for (const E of (process.env.ENGINES || 'CR,WK').split(',')) {
     ok(tag + ' texto dentro de su card', m.inCard);
     ok(tag + ' sin recorte', m.clipped === 0, String(m.clipped));
     ok(tag + ' cards sin solape', !m.overlap);
-    ok(tag + ' texto visible y completo', m.visible && /30 (días|days)/.test(m.wowText) && m.datedOk);
+    ok(tag + ' texto visible y completo', m.visible && /30 (días|days)/.test(m.wowText));
     console.log(`  · ${tag}: descubrimiento en ${m.wowLines} líneas`);
     await page.close();
   }

@@ -123,7 +123,7 @@ function makeCtx(lang) {
    '_intv15StableRows','_intv15MemoryIsStable','_intv15ExploreLabel',
    '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv19Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
-   '_intv4MemoryHtml','_intv4WowText','_intv4AsOf','_intv4IsCurrent','_intv4AsOfStale','_intv4TopIsLiquidity','_intv4When','_intv4Tone','_intccDateTime','_intccDate','_intv4DiscoveryHtml','_aurixIntelQuestions',
+   '_intv4MemoryHtml','_intv4WowText','_intv4DiscoveryHtml','_aurixIntelQuestions',
    '_intv4PctPair','_intv21Fixed','_intv21Pct','_intv4WindowLabel','_intv4RangeLabel','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded',
    '_intccIsMonetary','_intccPctLabel','_intv5DriversHtml','_intv5MattersHtml','_intv5Chips',
    '_intccScoreRingHtml','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore',

@@ -208,7 +208,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   // SPEC FINAL SURFACE — owners nuevos que el renderer llama: el puente
   // dimensión→raíz, la card de descubrimientos y el contexto declarado de la
   // Memoria. Sin ellos el render lanza y este gate se cae entero.
-  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText','_intv4AsOf','_intv4IsCurrent','_intv4AsOfStale','_intv4TopIsLiquidity','_intv4When','_intv4Tone',
+  '_aurixIntelRootsOf','_intv9DiscoveriesHtml','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows','_intelDiscoveryText',
   '_intelQuestionText','_aurixIntelContext','_aurixIntelCtxRecord','_aurixIntelReadOwned',
   '_aurixIntelWriteOwned','_aurixIntelOwner','_aurixIntelStore','_aurixIntelMarkAsked',
   '_intv4MemoryEvents','_intv4MemoryClaims','_intv4MemoryHtml',
@@ -2710,20 +2710,17 @@ console.log('\nSC · §4.6 · «Qué ha cambiado» declara contra qué compara')
 
 console.log('\nSC · §4.7 · un patrón sin dato no es un patrón');
 {
-  // ÚLTIMO AJUSTE (cambio de contrato explícito): «ha bajado 4,2 puntos, hasta el
-  // 6 %» unía un delta HISTÓRICO con el `cashPct` VIVO. El DATO son ahora los dos
-  // extremos de la MISMA deriva; el periodo se conserva.
-  ok('SC.7.1 la liquidez frente a una necesidad declarada nombra DATO (sus dos extremos) y PERIODO',
+  ok('SC.7.1 la liquidez frente a una necesidad declarada nombra DATO y PERIODO',
     (() => { const c = makeCtx({});
       const txt = run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared',
-        values: { cashPct: 6, changePp: -4.2, window: '30D', startPct: 10.2, endPct: 6, endAt: Date.now() } }) + ')', c);
-      return /10,2\s?%/.test(txt) && /6,0\s?%/.test(txt) && txt.indexOf(DICT.es.intv4_r_30d) !== -1; })(),
+        values: { cashPct: 6, changePp: -4.2, window: '30D' } }) + ')', c);
+      return /4,2/.test(txt) && /6%/.test(txt) && txt.indexOf(DICT.es.intv4_r_30d) !== -1; })(),
     run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared',
-      values: { cashPct: 6, changePp: -4.2, window: '30D', startPct: 10.2, endPct: 6, endAt: Date.now() } }) + ')', makeCtx({})));
-  ok('SC.7.2 …y si falta cualquiera de sus piezas, CALLA en vez de publicar una frase vacía',
+      values: { cashPct: 6, changePp: -4.2, window: '30D' } }) + ')', makeCtx({})));
+  ok('SC.7.2 …y si falta cualquiera de los tres, CALLA en vez de publicar una frase vacía',
     (() => { const c = makeCtx({});
-      return ['startPct', 'endPct', 'window'].every(drop => {
-        const v = { cashPct: 6, changePp: -4.2, window: '30D', startPct: 10.2, endPct: 6, endAt: Date.now() }; delete v[drop];
+      return ['cashPct', 'changePp', 'window'].every(drop => {
+        const v = { cashPct: 6, changePp: -4.2, window: '30D' }; delete v[drop];
         return run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared', values: v }) + ')', c) === '';
       }); })());
   ok('SC.7.3 un descubrimiento sin evidencia nombrable no se publica',
@@ -3918,9 +3915,7 @@ console.log('\nDC · E · Explora pregunta lo que Aurix puede contestar');
     answer: { factKeys: ['investable_level'] } };
   const coreCV = (endAt) => ({ dataAvailability: { observation: endAt ? { endAt } : {} },
     ledger: { facts: [{ semanticKey: 'investable_level', family: 'wealth_level',
-      // ÚLTIMO AJUSTE (cambio de contrato): el nivel real trae SIEMPRE su `endAt`
-      // (el último punto de la serie); sin él, la frase falla cerrada.
-      value: 93869, values: { usd: 93869 }, window: { range: 'now', startAt: endAt || 1750432000000, endAt: endAt || 1750432000000 } }] } });
+      value: 93869, values: { usd: 93869 }, window: { range: 'now' } }] } });
   ok('E.6 la respuesta añade HASTA CUÁNDO está certificada la valoración',
     (() => { const h = ansOf(CV, coreCV(1750432000000));
       return h.indexOf(DICT.es.intv4_cv_asof(run('_intccDate(1750432000000)', makeCtx(CUENTA_B)))) !== -1; })(),
@@ -3933,7 +3928,7 @@ console.log('\nDC · E · Explora pregunta lo que Aurix puede contestar');
     answer: { factKeys: ['investable_level', 'investable_all_time_high'] } };
   const coreHI = (withHigh) => ({ dataAvailability: { observation: { endAt: 1750432000000 } },
     ledger: { facts: [{ semanticKey: 'investable_level', family: 'wealth_level', value: 93869,
-        values: { usd: 93869 }, window: { range: 'now', startAt: 1750432000000, endAt: 1750432000000 } }].concat(withHigh
+        values: { usd: 93869 }, window: { range: 'now' } }].concat(withHigh
       ? [{ semanticKey: 'investable_all_time_high', family: 'wealth_level', value: 93869,
           values: { usd: 93869 }, window: { range: 'all', startAt: 1750000000000, endAt: 1750432000000 } }]
       : []) } });

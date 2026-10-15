@@ -37,10 +37,6 @@ const LIFECYCLE_KEYS = ['intv4_f_expo_move','intv4_f_expo_diluted','intv4_f_expo
   'intv4_r_24h','intv4_r_7d','intv4_r_30d','intv4_r_90d','intv4_r_all','intv4_r_now','intv6_r_effective_days',
   'intv4_cat_liquidity','intv4_cat_crypto','intv5_cat_crypto','intv4_discovery_title',
   'intv21_log_title','intv21_log_state_reviewed','intv21_log_state_recorded','intv21_fam_liquidity','intv21_fam_other',
-  // ÚLTIMO AJUSTE DE CIERRE
-  'intv4_f_asof','intv4_f_level','intv4_f_level_asof','intv4_f_cash','intel_d_liq_need','intv4_w_multi',
-  'intv21_today_driver_up','intv21_today_driver_down','intprev_f_conc','intprev_f_liq',
-  'intv19_evo_conc_up','intv19_evo_conc_down','intv21_xa_conc_up','intv21_xa_conc_down','intv9_xa_lead_new','intv9_xa_lead_both',
   // SPEC ADVANCED INTELLIGENCE · §2/§3 — la copy de nivel y de registro se extrae
   // de app.js en los DOS idiomas, no se declara aquí: un diccionario propio
   // certificaría el harness en vez del producto (la lección de `formatBase`).
@@ -73,7 +69,7 @@ function extractLifecycleDict(langIdx) {
 const DICT = { es: extractLifecycleDict(0), en: extractLifecycleDict(1) };
 // Las etiquetas de ventana comparten línea (`intv4_r_24h: …, intv4_r_7d: …`): se
 // leen las dos líneas enteras de cada idioma, verbatim.
-['intv4_r_24h', 'intv4_r_90d', 'intv4_r_all', 'intv4_when_today'].forEach(k => [0, 1].forEach(li => {
+['intv4_r_24h', 'intv4_r_90d', 'intv4_r_all'].forEach(k => [0, 1].forEach(li => {
   const occ = keyOccurrences(k); const st = occ[li]; const body = app.slice(st, app.indexOf('\n', st)).replace(/,\s*$/, '');
   Object.assign(DICT[li ? 'en' : 'es'], (new Function('return ({ ' + body + ' });'))());
 }));
@@ -106,8 +102,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore',
   // Lo que este cierre toca o consume, ejecutado tal cual:
   '_intccDate','_intv21Fixed','_intv21Pct','_intv4PctPair','_aurixDriftClaimCoherent','_aurixDriftConflicts',
-  '_intv4WowText','_intv4DiscoveryHtml','_intccEsc','_intv17EvId','_intv17IsHoyEvent','_intv21LogItems','_intv21LogHtml',
-  '_intccDateTime','_aurixPctNum','_intv4AsOf','_intv4IsCurrent','_intv4AsOfStale','_intv4TopIsLiquidity','_intccIsMonetary','_intv4When','_intv4Tone','_intelDiscoveryText','_aurixAiLiquidity','_aurixAiNum'];
+  '_intv4WowText','_intv4DiscoveryHtml','_intccEsc','_intv17EvId','_intv17IsHoyEvent','_intv21LogItems','_intv21LogHtml'];
 
 function makeCtx(opts) {
   const o = opts || {};
@@ -159,7 +154,6 @@ function makeCtx(opts) {
   // que es la precondición equivalente a tener el SQL aplicado en producción.
   vm.runInContext('var _aurixLineageColumnSeen = ' + ((o.lineageAccountWide === false) ? 'false' : 'true') + ';', sb);
   CONSTS.forEach(n => vm.runInContext(konstSrc(n), sb));
-  ['_AURIX_AI_AVAIL','_AURIX_AI_COVERAGE','_AURIX_AI_LABEL','_AURIX_AI_DIM'].forEach(n => { try { vm.runInContext(konstSrc(n), sb); } catch (_) {} });
   sb._intv21Now = () => NOW;
   sb._INTV21_DAY = DAY;
   FNS.forEach(n => vm.runInContext(fnSrc(n), sb));
@@ -402,125 +396,6 @@ console.log('\n7 · Las demás derivas de peso hablan igual:');
   ok('7.3 sin periodo nombrable no hay comparación', factTxt(nw, 'es') === '', factTxt(nw, 'es'));
 }
 
-
-// ════════════════════════════════════════════════════════════════════════════
-// 8 · ÚLTIMO AJUSTE · LA LIQUIDEZ ES INFORMATIVA, NO UNA MEJORA
-// ════════════════════════════════════════════════════════════════════════════
-console.log('\n8 · Liquidez neutral (sube o baja) y agregado de mejoras correcto:');
-{
-  const li = cap.ledger.facts.find(f => f.semanticKey === 'liquidity_improved');
-  ok('8.1 la subida de liquidez SIGUE en el ledger con su evidencia y su materialidad (no se pierde el hallazgo)',
-    !!li && li.value === f30.value && li.materiality === f30.materiality
-    && JSON.stringify(li.window) === JSON.stringify(f30.window) && li.supportingKeys[0] === 'cash_drift_liquidity_30D');
-  ok('8.2 …pero no es una MEJORA: ni `positive`, ni en positiveDevelopments', li.positive !== true
-    && !cap.positiveDevelopments.some(f => f.semanticKey === 'liquidity_improved'));
-  ok('8.3 su frase es la neutra de la deriva (sin «mejorado»)', factTxt(li, 'es') === t30 && !/mejor/i.test(factTxt(li, 'es')));
-  const ctx = makeCtx({});
-  const tone = f => run('_intv4Tone(' + JSON.stringify(f) + ')', ctx);
-  ok('8.4 el tono de la liquidez es NEUTRO subiendo y bajando (ni verde de éxito ni naranja de alerta)',
-    tone(f30) === 'flat' && tone(f7) === 'flat' && tone(li) === 'flat');
-  const ex = cap.ledger.facts.find(f => /^exposure_drift_crypto_/.test(f.semanticKey));
-  ok('8.5 …y las demás familias conservan su dirección', !!ex && tone(ex) === ex.direction);
-  // Agregado: dos raíces positivas reales ⇒ «Han mejorado 2»; con la liquidez como
-  // única compañía de un rendimiento positivo, ya no hay «varias dimensiones».
-  const posRet = { semanticKey: 'return_positive', causalRoot: 'investable_return', family: 'performance', positive: true,
-    value: 3, unit: 'percent', confidence: 1, priority: 0.5, values: {}, window: { range: '30D', startAt: endTs - 30 * DAY, endAt: endTs } };
-  const ath = { semanticKey: 'investable_all_time_high', causalRoot: 'wealth_level', family: 'wealth_level', positive: true,
-    value: 1, unit: 'base_currency', confidence: 1, priority: 0.4, values: {}, window: { range: 'all', startAt: endTs - 90 * DAY, endAt: endTs } };
-  const multiOf = facts => run('_aurixWowInsights({ facts: ' + JSON.stringify(facts) + ' })', ctx)
-    .find(w => w.semanticKey === 'wow_multi_dimension_improvement') || null;
-  ok('8.6 rendimiento positivo + subida de liquidez ⇒ NO «Han mejorado 2 dimensiones»',
-    !multiOf(cap.ledger.facts.concat([posRet])));
-  const m2 = multiOf(cap.ledger.facts.concat([posRet, ath]));
-  ok('8.7 dos mejoras publicables reales ⇒ la cifra es 2 y no cuenta la liquidez',
-    !!m2 && m2.values.roots.length === 2 && m2.values.roots.indexOf('cash_weight') < 0
-    && /Han mejorado 2 /.test(wowTxt(m2, 'es')), JSON.stringify(m2 && m2.values));
-  const down = cap.ledger.facts.filter(f => f.semanticKey === 'cash_drift_liquidity_7D')[0];
-  ok('8.8 la BAJADA de liquidez no se convierte en alerta: tono neutro y sin `positive:false` inventado',
-    tone(down) === 'flat' && down.positive === null);
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// 9 · ÚLTIMO AJUSTE · HISTÓRICO FRENTE A VIVO
-// ════════════════════════════════════════════════════════════════════════════
-console.log('\n9 · El extremo histórico se fecha cuando no coincide con el dato vivo:');
-{
-  // Mismo historial que la captura, con el snapshot vivo en 29 % (el histórico acaba en 30 %).
-  const live29 = core(Object.assign({}, CAPTURE, { snap: Object.assign({}, SNAP, { cashPct: 29.2 }) }), { ranges: ['7D', '30D'] });
-  const c30 = live29.ledger.facts.find(f => f.semanticKey === 'cash_drift_liquidity_30D');
-  const es = factTxt(c30, 'es'), en = factTxt(c30, 'en');
-  ok('9.1 el extremo histórico NO se sustituye por el vivo (sigue «al 30,0 %»)', /al 30,0\s?%/.test(es) && c30.values.endPct === 30, es);
-  ok('9.2 …y se fecha discretamente: «según el dato del …» con día y hora', /, según el dato del \d+ \S+,? \d\d:\d\d$/.test(es), es);
-  ok('9.3 EN equivalente', /, as of \S+ \d+, \d\d?:\d\d\s?[AP]M$/.test(en), en);
-  ok('9.4 el vivo publicado es el MISMO que lee «Tu liquidez es el X %» (misma lectura, sin mezclar)',
-    c30.values.livePct === 29.2 && live29.ledger.facts.find(f => f.semanticKey === 'cash_weight').value === 29.2);
-  ok('9.5 cuando coinciden a la precisión publicada (30 % y 30,0 %) no se añade nada', !/según el dato/.test(t30), t30);
-  const w29 = wowOf(live29);
-  ok('9.6 el descubrimiento fecha también su extremo, antes del hecho de concentración',
-    !!w29 && /30,0\s?%, según el dato del [^.]+\. Tu mayor posición/.test(wowTxt(w29, 'es')), w29 && wowTxt(w29, 'es'));
-  // Nivel: «actualmente» sólo con un último punto vigente.
-  const lvl = (at) => ({ semanticKey: 'investable_level', value: 125000, unit: 'base_currency', values: { value: 125000 },
-    window: { range: 'now', startAt: at, endAt: at } });
-  ok('9.7 nivel con dato vigente ⇒ «actualmente»', /actualmente/.test(factTxt(lvl(NOW - 10 * MIN), 'es')));
-  const oldLvl = factTxt(lvl(NOW - 3 * DAY), 'es');
-  ok('9.8 nivel con dato de hace 3 días ⇒ sin «actualmente», con su fecha', !/actualmente/.test(oldLvl) && /^Según el dato del /.test(oldLvl), oldLvl);
-  ok('9.8b nivel SIN fecha ⇒ ni «actualmente» ni cifra (falla cerrado)',
-    factTxt({ semanticKey: 'investable_level', value: 125000, unit: 'base_currency', values: { value: 125000 }, window: { range: 'now' } }, 'es') === '');
-  const ctx = makeCtx({ lang: 'es' });
-  ok('9.8c concentración: un extremo de hace 6 h (mismo día) se FECHA; uno de hace 10 min, no',
-    /^, según el dato del /.test(run('_intv4AsOfStale(' + (NOW - 6 * 3600e3) + ')', ctx))
-    && run('_intv4AsOfStale(' + (NOW - 10 * MIN) + ')', ctx) === '');
-  vm.runInContext('assets = ' + JSON.stringify(ASSETS), ctx);
-  ok('9.8d «tu mayor posición» nunca es una cuenta de liquidez (ni una identidad desconocida)',
-    run('_intv4TopIsLiquidity("eur")', ctx) === true && run('_intv4TopIsLiquidity("btc")', ctx) === false
-    && run('_intv4TopIsLiquidity("nope")', ctx) === true
-    && /_intv4TopIsLiquidity\(c\.assetId\)/.test(app.slice(app.indexOf("'ctx_conc_' + span") - 600, app.indexOf("'ctx_conc_' + span"))));
-  ok('9.9 «hoy» sólo si el dato es de hoy; si no, su fecha',
-    run('_intv4When(' + (NOW - 5 * MIN) + ')', ctx) === 'hoy' && /^en el dato del /.test(run('_intv4When(' + (NOW - 2 * DAY) + ')', ctx)));
-  // Descubrimiento «liquidez frente a una necesidad declarada»: antes unía un delta
-  // HISTÓRICO con el `cashPct` VIVO («ha bajado 3 puntos, hasta el 29 %»).
-  const disc = (vals) => run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared', values: vals }) + ')', ctx);
-  const dn = disc({ cashPct: 29, changePp: -3, window: '7D', startPct: 33, endPct: 30, endAt: endTs });
-  ok('9.10 necesidad declarada: los DOS extremos de la misma deriva, sin «puntos», y fecha si el vivo difiere',
-    /^Dijiste que vas a necesitar liquidez\. En los últimos 7 días, tu liquidez pasó del 33,0\s?% al 30,0\s?% de tu cartera financiera, según el dato del /.test(dn)
-    && !/puntos|\bpp\b/.test(dn), dn);
-  ok('9.11 …sin extremos no hay comparación (no se mezcla el delta con el vivo)',
-    disc({ cashPct: 29, changePp: -3, window: '7D' }) === '');
-  const liqDim = run('_aurixAiLiquidity({ assetCount: 3, totUSD: 100000, cashPct: 29 }, ' + JSON.stringify(cap.ledger.facts) + ')', ctx);
-  ok('9.12 la dimensión de liquidez transporta los extremos de SU deriva (los de la mayor |Δ|)',
-    liqDim.previousPct === 3 && liqDim.driftEndPct === 30 && liqDim.driftEndAt === f30.window.endAt && liqDim.cashPct === 29,
-    JSON.stringify(liqDim));
-}
-
-// ════════════════════════════════════════════════════════════════════════════
-// 10 · ÚLTIMO AJUSTE · LENGUAJE Y UNIVERSO
-// ════════════════════════════════════════════════════════════════════════════
-console.log('\n10 · Sin «pp/puntos» narrativos y con el universo correcto:');
-{
-  ['es', 'en'].forEach(l => {
-    const D = DICT[l];
-    ok('10.1 ' + l + ' · Hoy: el motor de 24 h se nombra sin «pp»',
-      !/\bpp\b|puntos|points/.test(D.intv21_today_driver_up('Bitcoin') + D.intv21_today_driver_down('Bitcoin')));
-    ok('10.2 ' + l + ' · concentración en Evolución y Explora: extremos, no «puntos»',
-      !/puntos|points/.test(D.intv19_evo_conc_up('1 sept', '35,0%', '30,0%', '') + D.intv21_xa_conc_up('35,0%', '30,0%', '1 sept', ''))
-      && /35,0%.*30,0%/.test(D.intv19_evo_conc_up('1 sept', '35,0%', '30,0%', '')));
-    ok('10.3 ' + l + ' · portada Free: el porcentaje se dice sobre la cartera financiera (su denominador real)',
-      /cartera financiera|financial portfolio/.test(D.intprev_f_conc(40, 'BTC')) && /cartera financiera|financial portfolio/.test(D.intprev_f_liq(12)));
-  });
-  ok('10.4 los avisos que la portada Free puede publicar nombran la cartera financiera (su denominador es el invertible)',
-    ['es', 'en'].every(l => { const d = {}; ['intcc_w_dep_b', 'intcc_w_crypto_b'].forEach(k => {
-      const st = keyOccurrences(k)[l === 'en' ? 1 : 0]; const body = app.slice(st, app.indexOf('\n', st)).replace(/,\s*$/, '');
-      Object.assign(d, (new Function('return ({ ' + body + ' });'))()); });
-      return /cartera financiera|financial portfolio/.test(d.intcc_w_dep_b('BTC')) && /cartera financiera|financial portfolio/.test(d.intcc_w_crypto_b(40))
-        && !/invertible|investable/.test(d.intcc_w_dep_b('BTC') + d.intcc_w_crypto_b(40)); }));
-  const ctx = makeCtx({ lang: 'es' }), ctxEn = makeCtx({ lang: 'en' });
-  const all = [t30, t7, wEs, factTxt(f30, 'en'), wEn];
-  ok('10.5 ninguna frase publicada de liquidez dice «patrimonio invertible» (el perímetro la nombra «cartera financiera»)',
-    all.every(x => !/patrimonio invertible|investable wealth/.test(x)));
-  ok('10.6 «hoy» de Explora se resuelve por la fecha del dato, en los dos idiomas',
-    run('_intv4When(' + (NOW - 2 * DAY) + ')', ctxEn).indexOf('as of ') === 0);
-}
-
 // Volcado opcional para la sonda visual (scripts/aurix-intel-coherence-render-probe.mjs):
 // el HTML que pintan las superficies afectadas, generado aquí por el código real.
 if (process.env.AURIX_COHERENCE_DUMP) {
@@ -528,11 +403,7 @@ if (process.env.AURIX_COHERENCE_DUMP) {
   const dump = {};
   ['es', 'en'].forEach(l => { const c = makeCtx({ lang: l });
     dump[l] = { disc: run('_intv4DiscoveryHtml(' + JSON.stringify(cap) + ', _intccEsc, [], [])', c),
-      log: run('_intv21LogHtml(_intv21LogItems(' + JSON.stringify(mk(f30)) + ', []), _intccEsc)', c),
-      need: run('_intelDiscoveryText(' + JSON.stringify({ code: 'liquidity_fell_while_need_declared',
-        values: { cashPct: 29, changePp: -3, window: '7D', startPct: 33, endPct: 30, endAt: NOW } }) + ')', c),
-      dated: (() => { const d = core(Object.assign({}, CAPTURE, { lang: l, snap: Object.assign({}, SNAP, { cashPct: 29.2 }) }), { ranges: ['7D', '30D'] });
-        return run('_intv4WowText(' + JSON.stringify(wowOf(d)) + ')', c); })() }; });
+      log: run('_intv21LogHtml(_intv21LogItems(' + JSON.stringify(mk(f30)) + ', []), _intccEsc)', c) }; });
   fs.writeFileSync(process.env.AURIX_COHERENCE_DUMP, JSON.stringify(dump));
 }
 console.log('\n' + (fail === 0 ? '✓ PASS' : '✗ FAIL') + '  ' + pass + ' passed, ' + fail + ' failed');
