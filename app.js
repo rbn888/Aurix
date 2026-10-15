@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '790'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '791'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6972,6 +6972,8 @@ const T = {
     wsx_pinned_open:      'Abrir',
     wsx_pinned_unpin:     'Quitar del Dashboard',
     wscap_dash_add:       'Mostrar en Dashboard',
+    wscap_pin_add:        'Fijar acceso en Dashboard',
+    wscap_pin_remove:     'Quitar acceso del Dashboard',
     wscap_dash_remove:    'Quitar del Dashboard',
     wscap_fav_add:        'Marcar favorito',
     wscap_fav_remove:     'Quitar favorito',
@@ -10243,6 +10245,8 @@ const T = {
     wsx_pinned_open:      'Open',
     wsx_pinned_unpin:     'Remove from Dashboard',
     wscap_dash_add:       'Show on Dashboard',
+    wscap_pin_add:        'Pin shortcut to Dashboard',
+    wscap_pin_remove:     'Remove shortcut from Dashboard',
     wscap_dash_remove:    'Remove from Dashboard',
     wscap_fav_add:        'Mark as favourite',
     wscap_fav_remove:     'Remove favourite',
@@ -23064,11 +23068,19 @@ function _wshWireOnce() {
   try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash],[data-wsdoc-dash]')
       : null;
     if (!t) return;
     const capMenu = t.getAttribute('data-wscap-menu');
     if (capMenu) { e.preventDefault(); e.stopPropagation(); _wsCapMenu(t, capMenu); return; }
+    const docDash = t.getAttribute('data-wsdoc-dash');
+    if (docDash) {
+      let d = null; try { d = _ws4Projects().find(x => x && x.id === docDash) || null; } catch (_) { d = null; }
+      if (d) _wsPlanDashSet(d.id, _wsPlanOnDash(d), 'workspace');
+      const mn = t.closest('details'); if (mn) mn.open = false;
+      const bar = document.querySelector('.wsh-tool-view [data-wstool-savebar]'); if (bar) { bar._wsHtml = ''; _wsToolSaveBarSync(bar); }
+      return;
+    }
     const capDash = t.getAttribute('data-wscap-dash');
     if (capDash) { _wsToggleDashTool(capDash); const bar = document.querySelector('.wsh-tool-view [data-wstool-savebar]'); if (bar) { bar._wsHtml = ''; _wsToolSaveBarSync(bar); } return; }
     const capOpen = t.getAttribute('data-wsmse-capopen');
@@ -25957,7 +25969,7 @@ function _wsCapMenu(anchor, ref) {
   _wsPopoverMenu(anchor, 'wsCapMenu', [
     { k: 'open', label: t('wsh_proj_open') },
     { k: 'fav', label: t(fav ? 'wscap_fav_remove' : 'wscap_fav_add') },
-    { k: 'dash', label: t(dash ? 'wscap_dash_remove' : 'wscap_dash_add') },
+    { k: 'dash', label: t(dash ? 'wscap_pin_remove' : 'wscap_pin_add') },
   ], act => {
     if (act === 'open') { if (card) card.click(); }
     else if (act === 'fav') { _wsTogglePin(ref); _wshRepaintHome(); }
@@ -29622,8 +29634,20 @@ function _wsToolSaveBarHtml() {
         <button type="button" class="wsg-menu-item" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
         <button type="button" class="wsg-menu-item is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>` : '';
   // El acceso a ESTA capacidad en el Dashboard, como acto explícito (no lo implica guardar).
+  // ── UN SOLO CONTRATO DE «MOSTRAR EN DASHBOARD» (P0 Portfolio inmobiliario) ─────────────────
+  // Esta opción publicaba SIEMPRE el ACCESO a la capacidad (Herramientas fijadas), también con un
+  // documento abierto: el usuario pedía ver SU documento en el Dashboard, el toggle cambiaba de
+  // estado y el documento no aparecía nunca en «Tus planes». Ahora, con un documento abierto cuyo
+  // tipo el Dashboard sabe representar (`_WSPL_TYPES`), la opción publica o retira ESE documento
+  // por el owner de siempre (`_wsPlanDashSet`, el mismo de «Mis documentos» y del Resumen); sin
+  // documento, es explícitamente «Fijar acceso» a la herramienta. Nunca se ofrece un estado
+  // «en Dashboard» que el Dashboard no pueda pintar.
   const _capRef = _wsCanonRef('tool', _wsToolActive);
-  const _dashItem = _capRef ? `<button type="button" class="wsg-menu-item" data-wscap-dash="${esc(_capRef)}">${esc(t(_wsIsDashTool(_capRef) ? 'wscap_dash_remove' : 'wscap_dash_add'))}</button>` : '';
+  let _openDoc = null;
+  try { _openDoc = _wsToolEditId ? (_ws4Projects().find(x => x && x.id === _wsToolEditId) || null) : null; } catch (_) { _openDoc = null; }
+  const _dashItem = (_openDoc && _WSPL_TYPES[_openDoc.type])
+    ? `<button type="button" class="wsg-menu-item" data-wsdoc-dash="${esc(_openDoc.id)}">${esc(t(_wsPlanOnDash(_openDoc) ? 'wsmse_dash_remove' : 'wscap_dash_add'))}</button>`
+    : (_capRef ? `<button type="button" class="wsg-menu-item" data-wscap-dash="${esc(_capRef)}">${esc(t(_wsIsDashTool(_capRef) ? 'wscap_pin_remove' : 'wscap_pin_add'))}</button>` : '');
   const lifecycle = (_openItem || _lifeItems || _dashItem) ? `
     <details class="wsg-menu">
       <summary class="wsg-menu-sum" aria-label="${esc(t('wsg_more_aria'))}"><span aria-hidden="true">···</span></summary>

@@ -44,9 +44,9 @@ function ctx(langCode) {
   vm.runInContext('var _wsReturnTab = "tools", _wsToolEditId = null, _wsToolActive = "compound", _wsToolDirty = false;', sb);
   vm.runInContext('var __PROJ = []; function _ws4Projects(){ return __PROJ; }', sb);
   vm.runInContext('function _wsCanPersist(){ return true; }', sb);
-  ['_WS_TABS', '_WS_BACK_ORIGINS', '_WSH_DASH_TOOLS_KEY'].forEach(n => vm.runInContext(konstSrc(n), sb));
+  ['_WS_TABS', '_WS_BACK_ORIGINS', '_WSH_DASH_TOOLS_KEY', '_WSPL_TYPES'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsTabOk', '_wsBackOrigin', '_wsBackLabel', '_wsBackShort', '_wsToolDocName',
-   '_wsSurfaceHeadHtml', '_wsToolSaveBarHtml', '_wsSubIfDistinct', '_wsBarSubHtml', '_wsToolSaveState', '_wsCanonRef', '_wsIsDashTool', '_wsDashTools', '_wshReadStore'].forEach(n => vm.runInContext(fnSrc(n), sb));
+   '_wsSurfaceHeadHtml', '_wsToolSaveBarHtml', '_wsSubIfDistinct', '_wsBarSubHtml', '_wsToolSaveState', '_wsCanonRef', '_wsIsDashTool', '_wsDashTools', '_wshReadStore', '_wsPlanOnDash'].forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
 const R = (c, e) => vm.runInContext(e, c);

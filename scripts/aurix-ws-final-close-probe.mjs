@@ -390,7 +390,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         pinCover: pins.every(function(c){ var r=R(c.querySelector('.wspin-cover')); return r.height >= 60; }), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
     const wantPlan = W >= 1024 ? 3 : (W >= 640 ? 2 : 1), wantPin = W >= 1024 ? 3 : 2;
     ok(`${T} Tus planes: ${wantPlan} columna(s), nombres alineados por fila, sin espacio muerto bajo el CTA`, d.planCols === wantPlan && d.misalign === 0 && !d.dead, JSON.stringify(d));
-    ok(`${T} accesos: ${wantPin} columnas, portada reconocible (≥60 px), nombre sin recortar y más compactos que un plan`, d.pinCols === wantPin && d.pinCover && !d.nameCut && d.maxPinH < d.maxPlanH, JSON.stringify(d));
+    // Cierre Dashboard: los accesos van en columnas fijas de ≥220 px (auto-fill), alineadas entre sí.
+    void wantPin;
+    ok(`${T} accesos: columnas fijas (≥2), portada reconocible (≥60 px), nombre sin recortar y más compactos que un plan`, d.pinCols >= 2 && d.pinCover && !d.nameCut && d.maxPinH < d.maxPlanH, JSON.stringify(d));
     ok(`${T} controles ≥44 px y sin desbordamiento horizontal`, d.minTap >= 43.5 && d.sw, JSON.stringify(d));
     if (SHOTS) await shot(p, 'remate-dash-' + W + L);
     // Menú de un acceso: abre su menú, NO la herramienta.
@@ -543,11 +545,58 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         const wantCols = W < 640 ? 1 : (N === 1 ? 1 : N === 2 ? 2 : null);
         const colsOk = wantCols ? d.cols === wantCols : d.cols >= 2;
         // 1 plan: ancho controlado (≤440). 2+: la rejilla llena el ancho (sin medio dashboard vacío).
-        const fillOk = W < 640 || (N === 1 ? d.w1 <= 441 : d.fill >= 0.97);
+        const fillOk = W < 640 || (N === 1 ? d.w1 <= 481 : d.fill >= 0.97);
         ok(`${T} columnas ${d.cols}, portada a lo ancho, datos ≤ 260 px bajo la portada, sin desbordes ni media pantalla vacía`, colsOk && fillOk && d.cov >= 0.97 && d.maxH <= 260 && !d.spill && d.sw, JSON.stringify(d));
       }
     }
     ok(`${ENG}.§J sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
+  // ═════════════════ §K · «MOSTRAR EN DASHBOARD» DESDE LA HERRAMIENTA (P0 inmobiliario) ═════════════════
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    const SK = { aurix_ws_projects_v1: [
+      DOC('k_bud', 'monthly_budget', 'Casa', { inputs: BUDGET_IN, dashHidden: true }),
+      DOC('k_rcv', 'receivables_app', 'Clientes', { inputs: { currency: 'EUR', items: [{ id: 'a', personOrCompany: 'A', concept: 'x', units: 1, unitPrice: 1000, paidAmount: 400 }] }, dashHidden: true }),
+      DOC('k_re', 'real_estate_portfolio', 'Mis pisos', { inputs: { currency: 'EUR', properties: [{ id: 'p1', name: 'Piso', ptype: 'flat', buy: 200000, value: 250000 }] }, dashHidden: true }),
+      DOC('k_cmp', 'compound_growth', 'Plan', { inputs: { currency: 'EUR', initial: '1000', monthly: '300', ret: '6', years: '20' }, results: { final: 139238.73, contributed: 73000, interest: 66238.73, precision: 2 } }) ] };
+    await boot(p, { seed: SK });
+    const T = ENG + '.§K';
+    const dash = () => J(p, `switchTab('home'); updateDashboardPlans(); return { plans: [].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){return c.getAttribute('data-wspl-id')}), pins: _wsDashTools().length }`);
+    for (const [tool, id] of [['budget', 'k_bud'], ['receivables', 'k_rcv'], ['realestate', 'k_re'], ['compound', 'k_cmp']]) {
+      await p.evaluate(`switchTab('workspace')`); await p.waitForTimeout(250);
+      await p.evaluate(`_wsOpenTool('${tool}','${id}')`); await p.waitForTimeout(300);
+      await p.locator('.wsh-bar-actions .wsg-menu-sum').click(); await p.waitForTimeout(120);
+      const item = await J(p, `var b=document.querySelector('.wsh-bar-actions [data-wsdoc-dash]'); var r=b&&b.getBoundingClientRect(); return b ? { label: b.textContent.trim(), cap: !!document.querySelector('.wsh-bar-actions [data-wscap-dash]'), onScreen: r.top >= 0 && r.bottom <= innerHeight } : null`);
+      ok(`${T} ${tool}: con documento abierto, el ⋯ publica EL DOCUMENTO (no el acceso) y el menú se ve en pantalla`, item && !item.cap && item.onScreen && /Mostrar en Dashboard|Show on Dashboard/.test(item.label), JSON.stringify(item));
+      await p.locator('.wsh-bar-actions [data-wsdoc-dash]').click(); await p.waitForTimeout(150);
+      let d = await dash(); await p.waitForTimeout(500); d = await dash();
+      ok(`${T} ${tool}: aparece en Tus planes al momento, una vez y sin crear un acceso`, d.plans.filter(x => x === id).length === 1 && d.pins === 0, JSON.stringify(d));
+    }
+    await p.reload(); await p.waitForFunction("typeof _wsOpenTool==='function' && typeof _AURIX_ENT_CANON !== 'undefined'"); await p.waitForTimeout(800); await p.evaluate(PREMIUM('probe-a')); await p.waitForTimeout(300);
+    let d = await dash(); await p.waitForTimeout(600); d = await dash();
+    ok(`${T} tras recargar siguen los cuatro, sin duplicados`, ['k_bud', 'k_rcv', 'k_re', 'k_cmp'].every(id => d.plans.filter(x => x === id).length === 1), JSON.stringify(d));
+    await p.evaluate(`switchTab('workspace')`); await p.waitForTimeout(250);
+    await p.evaluate(`_wsOpenTool('realestate','k_re')`); await p.waitForTimeout(300);
+    await p.locator('.wsh-bar-actions .wsg-menu-sum').click(); await p.waitForTimeout(120);
+    const lbl = await J(p, `return document.querySelector('.wsh-bar-actions [data-wsdoc-dash]').textContent.trim()`);
+    await p.locator('.wsh-bar-actions [data-wsdoc-dash]').click(); await p.waitForTimeout(150);
+    d = await dash();
+    const kept = await J(p, `return _ws4Projects().some(function(x){return x.id==='k_re'})`);
+    ok(`${T} inmobiliario: «Quitar del Dashboard» lo retira y el documento sigue`, /Quitar del Dashboard|Remove from Dashboard/.test(lbl) && d.plans.indexOf('k_re') < 0 && kept, JSON.stringify({ lbl, d, kept }));
+    await p.evaluate(`switchTab('workspace'); _wsOpenTool('realestate','k_re')`); await p.waitForTimeout(300);
+    await p.locator('.wsh-bar-actions .wsg-menu-sum').click(); await p.waitForTimeout(120);
+    await p.locator('.wsh-bar-actions [data-wsdoc-dash]').click(); await p.waitForTimeout(150);
+    d = await dash();
+    ok(`${T} inmobiliario: volver a mostrarlo lo devuelve una vez`, d.plans.filter(x => x === 'k_re').length === 1, JSON.stringify(d));
+    // Sin documento abierto, la opción es explícitamente un ACCESO (no promete un plan).
+    await p.evaluate(`switchTab('workspace'); _wsOpenTool('realestate')`); await p.waitForTimeout(300);
+    await p.locator('.wsh-bar-actions .wsg-menu-sum').click(); await p.waitForTimeout(120);
+    const cap = await J(p, `var b=document.querySelector('.wsh-bar-actions [data-wscap-dash]'); return b ? b.textContent.trim() : null`);
+    ok(`${T} sin documento abierto, la opción dice «Fijar acceso», no «Mostrar en Dashboard»`, /Fijar acceso|Pin shortcut/.test(cap || ''), String(cap));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }
 

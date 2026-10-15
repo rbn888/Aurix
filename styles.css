@@ -32454,3 +32454,47 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
 #wsPlansGrid .wspl-card .wspl-card-id .wspl-menu { width: 44px; height: 44px; }
 #wsPlansGrid.wspl-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); } #wsPlansGrid.wspl-grid[data-wspl-n="1"] { grid-template-columns: minmax(0, 440px); } #wsPlansGrid.wspl-grid[data-wspl-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } @media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr); } }
 #wsPlansGrid.wspl-grid:not([data-wspl-n="1"]):not([data-wspl-n="2"]) { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); } @media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr) !important; } }
+/* El menú ⋯ de la barra local se abría hacia ARRIBA (regla del pie de página) y quedaba fuera de
+   la pantalla: en la barra se abre hacia abajo, alineado a la derecha. */
+.aurix-wsh .wsh-bar-actions .wsg-menu { position: relative; }
+.aurix-wsh .wsh-bar-actions .wsg-menu-body { top: calc(100% + 6px) !important; bottom: auto !important; right: 0; left: auto; z-index: 60; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CIERRE DASHBOARD · TUS PLANES MÁS PEQUEÑOS Y ACCESOS MÁS LIGEROS
+   ══════════════════════════════════════════════════════════════════════════════ */
+/* Planes: la portada sigue completa (contain) pero con altura acotada; el marco oscuro integra
+   las franjas laterales en la card. Bloque inferior más apretado. */
+#wsPlansGrid .wspl-card .wspl-cover { aspect-ratio: auto; height: 150px; max-height: none;
+  background: radial-gradient(90% 120% at 50% 40%, rgba(28,52,110,0.30), rgba(5,8,18,0.95) 75%); }
+@media (max-width: 639px) { #wsPlansGrid .wspl-card .wspl-cover { height: 150px; } }
+#wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover { padding: 8px 10px 10px; row-gap: 4px; }
+#wsPlansGrid .wspl-card > .wspl-cover { margin-bottom: 4px; }
+#wsPlansGrid .wspl-hero b { font-size: 21px; }
+@media (min-width: 640px) { #wsPlansGrid .wspl-hero b { font-size: 22px; } }
+#wsPlansGrid.wspl-grid[data-wspl-n="1"] { grid-template-columns: minmax(0, 480px); }
+
+/* Accesos fijados: superficie negro/azul profunda con borde fino; portada 16:9 más pequeña;
+   nombre y acciones en UNA fila; «Abrir» como acción secundaria (fantasma, compacta, 44 px). */
+.wspin-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; gap: 10px; }
+@media (max-width: 479px) { .wspin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; } }
+.wspin-card {
+  display: grid !important; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "cover cover cover" "id go menu";
+  align-items: center; gap: 6px 2px; padding: 6px 4px 4px 6px;
+  background: linear-gradient(180deg, rgba(12,20,40,0.95), rgba(5,9,20,0.98)); border: 1px solid rgba(var(--ws-a, 74,130,240), 0.18);
+  box-shadow: inset 0 1px 0 rgba(165,196,255,0.05), 0 8px 22px -18px rgba(0,0,0,0.8);
+}
+.wspin-card:hover { border-color: rgba(var(--ws-a, 74,130,240), 0.38); }
+.wspin-card > .wspin-cover { grid-area: cover; aspect-ratio: 16 / 9; border-radius: 9px; border-color: rgba(var(--ws-a, 74,130,240), 0.14); }
+.wspin-card > .wspin-id { grid-area: id; min-height: 44px; grid-template-columns: 16px minmax(0, 1fr); }
+.wspin-card > .wspin-foot { display: contents; }
+.wspin-card .wspin-go { grid-area: go; width: auto; min-height: 44px; padding: 0 8px; margin: 0;
+  background: transparent; border: 0; border-radius: 10px; font-size: 13px; font-weight: 600; color: #9fc2ff; }
+.wspin-card .wspin-go:hover { background: rgba(74,130,240,0.12); color: #cfe0ff; }
+.wspin-card .wspin-go svg { width: 13px; height: 13px; }
+.wspin-card .wspl-menu { grid-area: menu; width: 36px; height: 44px; }
+.wspin-card .wspin-name { font-size: 13.5px; }
+@media (max-width: 479px) {
+  .wspin-card { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "cover cover" "id menu" "go go"; }
+  .wspin-card .wspin-go { justify-self: start; }
+}
+.wspin-card .wspl-menu { width: 44px; }
