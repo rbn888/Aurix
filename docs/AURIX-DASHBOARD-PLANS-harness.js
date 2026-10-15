@@ -47,7 +47,7 @@ function ctx(opts) {
   vm.runInContext('var __UP = []; function openUpgradeIntent(o){ __UP.push(o); return false; }', sb);
   vm.runInContext('var _wsToolActive=null, _wsToolInputs=null, _wsToolEditId=null, _wsToolDirty=false, _wsReturnTab="tools", _wshView="home";', sb);
   ['_WSH_PROJECTS_KEY','_WSH_GOALS_KEY','_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WSPL_TYPES','_WSPL_GOAL',
-   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS','PLAN_ORDER_KEY','_WS_ROW_CCY_TYPES'].forEach(n => vm.runInContext(konstSrc(n), sb));
+   '_WSBUD_INCOME','_WSBUD_EXPENSES','_WSBUD_PALETTE','_WSBUD_LEGACY_KEYS','_WSRECV_EPS','PLAN_ORDER_KEY','_WS_ROW_CCY_TYPES','_WS_TOOL_PHOTO','_WS_TOOL_COVER','_WS_TPL_ASSET','_WSFC_CAPS','_WS_SURFACE_ICON_EXTRA','_WS_ASSET_BASE'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wshReadStore','_ws4ProjectsRaw','_ws4Projects','_wsCatalogEntry','_wsSurfaceEntry','_wsEntryOpenable',
    '_wsToolAccess','_wsCatalogSurfaceKey','_wsLabel','_wsTypeLabel','_wsNum','_wsCapIconHtml','_wsGlyph',
    // §3 del cierre v789 — la tarjeta CALLA el subtítulo cuando repetiría el título
@@ -63,6 +63,8 @@ function ctx(opts) {
    // MONEDA DEL DOCUMENTO — las cifras salen en la moneda que el documento declara, no en la base.
    'formatCurrency','_wsJrnMoney','_wsCcyCode','_wsBaseCcy','_wsDocCurrencyOf','_wsMoneyIn','_wsgCcy','_wsgMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState','_wsPlanOnDash','_wsPinnedCaps','_renderDashboardPinned',
+   // Remate visual: la portada de cada plan sale del owner canónico (real, no un stub).
+   '_wsCapCoverHtml','_wsToolCoverHtml','_wsCatPreviewHtml','_wsCatPreviewBaseHtml','_wsAssetImg','_wsCapIconHtml','_wsSurfaceIcon','_wsGlyph',
    // SPRINT WORKSPACE PREMIUM V2 §17/§21 — la tarjeta publica ahora su proporción medida y su
    // menú, así que sus owners entran al sandbox: si faltaran, el render lanzaría y este
    // harness sería el primero en decirlo (es lo que pasó al añadirlos).
@@ -388,7 +390,7 @@ console.log('\n6 · Tus planes se diferencia, se ordena y se gobierna:');
   // de siempre: que la identidad se DECLARE y no se pinte inline, y que cada acento tenga tono
   // propio. Se mide el contrato nuevo, no se relaja el viejo.
   ok('6.7 la tarjeta declara su acento por la API compartida, no como color en el HTML',
-    /class="wspl-card(?: is-enter)?" [^>]*data-ws-accent="[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h),
+    /class="wspl-card(?: has-cover)?(?: is-enter)?" [^>]*data-ws-accent="[a-z]+"/.test(h) && !/style="[^"]*(background|color):/.test(h),
     (h.match(/data-ws-accent="[a-z]+"/) || [])[0]);
   // Se ancla en el marcador ÚNICO del bloque: `indexOf('[data-ws-accent]')` caía en la regla del
   // Presupuesto, que va antes en el fichero, y la rebanada no contenía la tabla.

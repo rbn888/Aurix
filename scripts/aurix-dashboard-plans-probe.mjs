@@ -453,9 +453,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const acc = await page.evaluate(`(function(){
       return JSON.stringify([].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card'))
         .map(function(c){ return [c.getAttribute('data-ws-accent'),
-          getComputedStyle(c.querySelector('.wspl-ico')).color]; }));})()`).then(JSON.parse);
+          // Remate visual: el icono grande se retiró (la portada identifica); el acento se mide en el
+          // filete de la tarjeta, que sigue saliendo de SU capacidad.
+          getComputedStyle(c).borderTopColor]; }));})()`).then(JSON.parse);
     ok(`${ENG}.v2.acento · cada tarjeta declara el suyo`, acc.every(a => !!a[0]), JSON.stringify(acc));
-    ok(`${ENG}.v2.acento · el color del icono cambia de verdad entre capacidades`,
+    ok(`${ENG}.v2.acento · el color del filete cambia de verdad entre capacidades`,
       new Set(acc.map(a => a[1])).size >= 3, JSON.stringify(acc.map(a => a[1])));
 
     // §21 — el menú se abre, se cierra con Escape y devuelve el foco.

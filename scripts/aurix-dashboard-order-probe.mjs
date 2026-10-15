@@ -286,9 +286,13 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       const y1 = await page.evaluate('window.scrollY');
       ok(`${T} deslizar sobre la tarjeta hace scroll y no reordena ni abre`,
         y1 > y0 && JSON.stringify(await catOrder(page)) === before && await page.evaluate('activeCategory === null'), JSON.stringify({ y0, y1 }));
-      await touchDrag(cdp, page, '#wsPlansGrid .wspl-card[data-wspl-id="j1"] .dash-grip', '#wsPlansGrid .wspl-card[data-wspl-id="b1"]');
+      // Con portada, dos planes pueden estar más separados que la pantalla: se arrastra sobre el
+      // plan INMEDIATAMENTE anterior (siempre a la vista) y se exige que pase delante y no se abra.
+      const p0 = await planOrder(page); const iJ = p0.indexOf('j1'); const prev = p0[iJ - 1];
+      await page.evaluate(`document.querySelector('#wsPlansGrid .wspl-card[data-wspl-id="${prev}"]').scrollIntoView({ block: 'start' }); window.scrollBy(0, 120);`); await page.waitForTimeout(150);
+      await touchDrag(cdp, page, '#wsPlansGrid .wspl-card[data-wspl-id="j1"] .dash-grip', '#wsPlansGrid .wspl-card[data-wspl-id="' + prev + '"] .wspl-hero');
       const p = await planOrder(page);
-      ok(`${T} arrastre TÁCTIL de un plan, sin abrirlo`, p[0] === 'j1' && await page.evaluate(`currentTab === 'home'`), JSON.stringify(p));
+      ok(`${T} arrastre TÁCTIL de un plan, sin abrirlo`, p.indexOf('j1') === iJ - 1 && await page.evaluate(`currentTab === 'home'`), JSON.stringify({ p0, p }));
     } else {
       await page.tap('#wsPlansGrid .wspl-card[data-wspl-id="b1"] .dash-grip'); await page.waitForTimeout(150);
       const has = await page.evaluate(`!!document.querySelector('#dashReorderMenu [data-wsmenu-act="after"]')`);

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '787'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '788'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -25586,13 +25586,15 @@ function _renderDashboardPlans() {
     // subrejilla compartida, así que cabecera, cifra, visual, métricas y CTA quedan a la misma
     // altura en toda la fila sin estirar ninguna tarjeta con huecos.
     return `
-      <article class="wspl-card${enter ? ' is-enter' : ''}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-wspl-ref="${esc(ref)}" data-ws-accent="${esc(spec.accent || 'blue')}">
+      <article class="wspl-card has-cover${enter ? ' is-enter' : ''}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-wspl-ref="${esc(ref)}" data-ws-accent="${esc(spec.accent || 'blue')}">
+        ${/* Remate visual — la portada de su capacidad COMPLEMENTA (decorativa, sin cifras); los
+              datos del documento siguen mandando debajo. Sustituye al icono grande. */''}
+        <div class="wspl-cover" aria-hidden="true">${_wsCapCoverHtml(spec.tool)}</div>
         <div class="wspl-card-id">
           <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + nm)}" aria-describedby="dashReorderHintPlans">
             <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
           </button>
-          <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
-          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(nm)}">${esc(nm)}</span>${(!goal && p.inputs && /^\d{4}-\d{2}$/.test(String(p.inputs.periodKey || ''))) ? `<span class="wspl-period">${esc(_wsPeriodLabelShort(p.inputs.periodKey))}</span>` : ''}</span>
+          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(nm)}">${esc(nm)}</span>${(!goal && p.inputs && /^\d{4}-\d{2}$/.test(String(p.inputs.periodKey || ''))) ? `<span class="wspl-period">${esc(_wsPeriodLabelShort(p.inputs.periodKey))}</span>` : '<span class="wspl-period" aria-hidden="true"></span>'}</span>
           <button type="button" class="wspl-menu" data-wspl-menu="${esc(p.id)}" data-wspl-mkind="${esc(it.kind)}"
             aria-haspopup="true" aria-expanded="false"
             title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + nm)}">
@@ -25644,25 +25646,36 @@ function _wsPinnedCaps() {
   pins.forEach(p => { if (p && byRef[p.ref]) { out.push(byRef[p.ref]); delete byRef[p.ref]; } });
   return out;
 }
+// LA PORTADA CANÓNICA DE UNA CAPACIDAD, en un sitio: la fotografía de herramienta, la de plantilla
+// o, si no hay, su glifo. La usan los accesos y los planes del Dashboard (Mi espacio conserva su
+// owner anclado, que hace lo mismo).
+function _wsCapCoverHtml(cat) {
+  try {
+    const h = _wsToolCoverHtml(cat); if (h) return h;
+    if (_WS_TPL_ASSET[cat]) return _wsCatPreviewHtml(cat);
+  } catch (_) {}
+  return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(cat))}</span>`;
+}
 function _renderDashboardPinned(pins) {
   const esc = _intccEsc;
-  const cover = c => {
-    try { const h = _wsToolCoverHtml(c.cat); if (h) return h; if (_WS_TPL_ASSET[c.cat]) return _wsCatPreviewHtml(c.cat); } catch (_) {}
-    return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(c.icon)}</span>`;
-  };
-  // Cierre quirúrgico §D — un ACCESO, no un plan: una fila compacta (agarre, miniatura, nombre,
-  // menú y Abrir). Sin la frase «Acceso directo · sin documento»: el encabezado del grupo y la
-  // forma ya lo dicen. La miniatura es la portada canónica de la capacidad, reducida.
+  const cover = c => _wsCapCoverHtml(c.cat);
+  // Remate visual — un ACCESO es una card INTERMEDIA: portada reconocible, nombre (con el agarre
+  // de reordenación, discreto) y menú, y «Abrir» al pie. Más ligera que un plan (sin cifras), y ya
+  // no la fila de 64 px. Sin «Acceso directo · sin documento»: el encabezado del grupo lo dice.
   const cards = pins.map(c => `
       <article class="wspin-card" data-wspin-ref="${esc(c.ref)}" data-ws-accent="${esc(c.accent)}">
-        <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + c.name)}" aria-describedby="dashReorderHintPins">
-          <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
-        </button>
         <span class="wspin-cover" aria-hidden="true">${cover(c)}</span>
-        <span class="wspl-name wspin-name" title="${esc(c.name)}">${esc(c.name)}</span>
-        <button type="button" class="wspl-menu" data-wspin-menu="${esc(c.ref)}" aria-haspopup="true" aria-expanded="false"
-          title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + c.name)}"><span aria-hidden="true">&#8943;</span></button>
-        <button type="button" class="wspin-go" data-wspin-dopen="${esc(c.ref)}" aria-label="${esc(t('wsx_pinned_open') + ' — ' + c.name)}">${esc(t('wsx_pinned_open'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+        <div class="wspin-id">
+          <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + c.name)}" aria-describedby="dashReorderHintPins">
+            <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
+          </button>
+          <span class="wspl-name wspin-name" title="${esc(c.name)}">${esc(c.name)}</span>
+        </div>
+        <div class="wspin-foot">
+          <button type="button" class="wspin-go" data-wspin-dopen="${esc(c.ref)}" aria-label="${esc(t('wsx_pinned_open') + ' — ' + c.name)}">${esc(t('wsx_pinned_open'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button type="button" class="wspl-menu" data-wspin-menu="${esc(c.ref)}" aria-haspopup="true" aria-expanded="false"
+            title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + c.name)}"><span aria-hidden="true">&#8943;</span></button>
+        </div>
       </article>`).join('');
   return `<section class="wsx-grp" data-wsx-grp="pinned"><h3 class="wsx-gtitle">${esc(t('wsx_pinned_title'))}</h3>
     <div class="wspin-grid" id="wsPinGrid" data-wspl-n="${pins.length}">${cards}</div>
@@ -26215,7 +26228,7 @@ function _renderWorkspaceHome(metrics) {
         <div class="wsh-mse2-pv" aria-hidden="true">${mseCover(it)}</div>
         <div class="wsh-mse2-body">
           <p class="wsh-mse2-name">${esc(it.name)}</p>
-          <span class="wsh-mse2-meta">${it.fav ? `<span class="wsh-mse2-favmark" aria-hidden="true">★</span>` : ''}${esc(mseMeta(it))}${it.ref && _wsIsDashTool(it.ref) ? ` · ${esc(t('wsmse2_on_dash'))}` : ''}</span>
+          <span class="wsh-mse2-meta">${it.fav ? `<span class="wsh-mse2-favmark" aria-hidden="true">★</span>` : ''}${esc(mseMeta(it))}</span>
         </div>
         ${it.ref ? `<button type="button" class="wsh-mse2-menu" data-wscap-menu="${esc(it.ref)}" aria-haspopup="true" aria-label="${esc(t('wscap_menu') + ' — ' + it.name)}"><span aria-hidden="true">&#8943;</span></button>` : ''}
       </div>`;
@@ -85407,7 +85420,15 @@ function _aurixSuppressClick() { justDragged = true; setTimeout(() => { justDrag
   }
   function onUp(e) {
     if (!d || e.pointerId !== d.pid) return;
-    if (d.moved) { e.preventDefault(); e.stopPropagation(); end(true); return; }
+    // Soltar FUERA del propio grupo no es un destino: se devuelve el orden inicial. Sin esto, un
+    // trayecto que cruzaba la tarjeta de un vecino (la vista previa reordena en vivo) dejaba ese
+    // orden al soltar sobre el patrimonio — lo destapó la portada de Tus planes, que baja el agarre.
+    if (d.moved) {
+      e.preventDefault(); e.stopPropagation();
+      const cr = d.c.getBoundingClientRect();
+      const inside = e.clientX >= cr.left - 8 && e.clientX <= cr.right + 8 && e.clientY >= cr.top - 8 && e.clientY <= cr.bottom + 8;
+      end(inside); return;
+    }
     // Un toque sin arrastre: alternativa táctil y de ratón al arrastre.
     const s = d; end(false);
     _aurixSuppressClick();

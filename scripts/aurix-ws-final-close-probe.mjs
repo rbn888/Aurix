@@ -351,9 +351,84 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     if (SHOTS && !FAIL) await shot(p, 'covers-space-' + W);
     await p.evaluate(`switchTab('home')`); await p.waitForTimeout(1200); await p.evaluate(`updateDashboardPlans(); document.getElementById('wsPlansSection').scrollIntoView()`); await p.waitForTimeout(900);
     const pin = await covers('.wspin-card .wsh-toolcover.has-photo');
-    const planCover = await J(p, `return document.querySelectorAll('#wsPlansSection .wspl-card .wsh-toolcover, #wsPlansSection .wspl-card img.ws-asset-img').length`);
-    if (!FAIL) ok(`${T} Dashboard: accesos fijados con la portada nueva; los documentos NO llevan portada (sus datos mandan)`, pin.length === 2 && pin.every(c => c.loaded) && planCover === 0, JSON.stringify({ pin, planCover }));
+    // Remate visual: cada plan lleva la portada de su capacidad ARRIBA, y sus datos siguen debajo.
+    const plan = await J(p, `return [].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')).map(function(c){ var cv=c.querySelector('.wspl-cover'); var hero=c.querySelector('.wspl-hero'); var go=c.querySelector('.wspl-go');
+      return { id: c.getAttribute('data-wspl-id'), cover: !!cv && cv.getBoundingClientRect().height > 40, ico: !!c.querySelector('.wspl-ico'), hero: hero ? hero.textContent.replace(/\s+/g,'') : '', coverAbove: !!cv && !!hero && cv.getBoundingClientRect().bottom <= hero.getBoundingClientRect().top, go: !!go }; })`);
+    if (!FAIL) ok(`${T} Dashboard: accesos con la portada nueva; cada plan con su portada encima de sus datos reales, sin icono redundante`,
+      pin.length === 2 && pin.every(c => c.loaded) && plan.length >= 2 && plan.every(x => x.cover && !x.ico && x.hero && x.coverAbove && x.go), JSON.stringify({ pin, plan }));
     if (SHOTS && !FAIL) await shot(p, 'covers-dash-' + W);
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
+  // ═════════════════ §H · REMATE VISUAL DE CARDS ═════════════════
+  for (const [W, H, L] of [[360, 740, 'en'], [390, 844, 'es'], [768, 1024, 'es'], [1024, 768, 'en'], [1440, 900, 'es']]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: W < 800 });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    const SH = JSON.parse(JSON.stringify(SEED_A));
+    SH.aurix_ws_projects_v1[1].dashPinned = true;
+    SH.aurix_ws_projects_v1[1].customName = 'Jubilación anticipada con un nombre bastante largo';
+    SH.aurix_ws_projects_v1.push(DOC('ws4_rcv1', 'receivables_app', 'Clientes', { inputs: { currency: 'EUR', items: [{ id: 'a', personOrCompany: 'A', concept: 'x', units: 1, unitPrice: 1234567, paidAmount: 400, dueDate: '' }] } }));
+    SH.aurix_ws_pinned_v1 = [{ ref: 'tool:compound', ts: 3 }, { ref: 'tool:loan', ts: 2 }, { ref: 'tpl:mbudget', ts: 1 }];
+    SH.aurix_ws_dash_tools_v1 = [{ ref: 'tool:compound', ts: 4 }, { ref: 'tool:loan', ts: 3 }, { ref: 'tpl:scenario', ts: 2 }];
+    await boot(p, { seed: SH, lang: L });
+    const T = ENG + '.§H' + W + L;
+    await p.evaluate(`switchTab('home')`); await p.waitForTimeout(1000);
+    await p.evaluate(`updateDashboardPlans(); document.getElementById('wsPlansSection').scrollIntoView()`); await p.waitForTimeout(400);
+    const d = await J(p, `var R=function(e){ return e ? e.getBoundingClientRect() : null; };
+      var plans=[].slice.call(document.querySelectorAll('#wsPlansSection .wspl-card')), pins=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-card'));
+      var rows={}; plans.forEach(function(c){ var k=Math.round(R(c).top); (rows[k]=rows[k]||[]).push(c); });
+      var misalign=0; Object.keys(rows).forEach(function(k){ var r=rows[k]; if(r.length<2) return; var n0=R(r[0].querySelector('.wspl-name')).top, g0=R(r[0].querySelector('.wspl-go')).top;
+        r.forEach(function(c){ if (Math.abs(R(c.querySelector('.wspl-name')).top-n0)>1 || Math.abs(R(c.querySelector('.wspl-go')).top-g0)>1) misalign++; }); });
+      var cols=function(list){ var xs={}; list.forEach(function(c){ xs[Math.round(R(c).left)]=1; }); return Object.keys(xs).length; };
+      var taps=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-card .wspl-menu, #wsPlansSection .wspin-go, #wsPlansSection .wspl-go')).map(function(b){ var r=R(b); return Math.min(r.width,r.height); });
+      var nameCut=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-name')).some(function(e){ return e.scrollWidth>e.clientWidth+1 || getComputedStyle(e).textOverflow==='ellipsis'; });
+      var maxPlanH=Math.max.apply(null, plans.map(function(c){return R(c).height;})), maxPinH=Math.max.apply(null, pins.map(function(c){return R(c).height;}));
+      return { planCols: cols(plans), pinCols: cols(pins), misalign: misalign, minTap: Math.min.apply(null, taps), nameCut: nameCut, maxPlanH: Math.round(maxPlanH), maxPinH: Math.round(maxPinH),
+        pinCover: pins.every(function(c){ var r=R(c.querySelector('.wspin-cover')); return r.height >= 60; }), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
+    const wantPlan = W >= 1024 ? 3 : (W >= 640 ? 2 : 1), wantPin = W >= 1024 ? 3 : 2;
+    ok(`${T} Tus planes: ${wantPlan} columna(s), nombre y CTA alineados por fila`, d.planCols === wantPlan && d.misalign === 0, JSON.stringify(d));
+    ok(`${T} accesos: ${wantPin} columnas, portada reconocible (≥60 px), nombre sin recortar y más compactos que un plan`, d.pinCols === wantPin && d.pinCover && !d.nameCut && d.maxPinH < d.maxPlanH, JSON.stringify(d));
+    ok(`${T} controles ≥44 px y sin desbordamiento horizontal`, d.minTap >= 43.5 && d.sw, JSON.stringify(d));
+    if (SHOTS) await shot(p, 'remate-dash-' + W + L);
+    // Menú de un acceso: abre su menú, NO la herramienta.
+    await p.locator('.wspin-card [data-wspin-menu]').first().click(); await p.waitForTimeout(150);
+    const mn = await J(p, `return { menu: !!document.getElementById('wsPinDashMenu'), tab: currentTab }`);
+    ok(`${T} pulsar el menú de un acceso no abre la card`, mn.menu && mn.tab === 'home', JSON.stringify(mn));
+    await p.keyboard.press('Escape');
+    // Mi espacio y catálogo.
+    await p.evaluate(`switchTab('workspace'); _wsDocsPulledFor = _wsDocsSession(); _wsTab='space'; _wshView='home'; _wshRepaintHome();`); await p.waitForTimeout(900);
+    const m = await J(p, `var R=function(e){ return e.getBoundingClientRect(); }; var lists=[].slice.call(document.querySelectorAll('.wsh-mse2-list'));
+      var maxCols=Math.max.apply(null, lists.map(function(l){ var xs={}; [].slice.call(l.children).forEach(function(c){ xs[Math.round(R(c).left)]=1; }); return Object.keys(xs).length; }));
+      var cards=[].slice.call(document.querySelectorAll('.wsh-mse2-card'));
+      var menuOver=cards.some(function(c){ var mb=c.querySelector('.wsh-mse2-menu'), b=c.querySelector('.wsh-mse2-body'); if(!mb||!b) return false; var a=R(mb), t=R(b); return a.left < t.right-1 && t.left < a.right-1 && a.top < t.bottom-1 && t.top < a.bottom-1; });
+      var minMenu=Math.min.apply(null, cards.map(function(c){ var r=R(c.querySelector('.wsh-mse2-menu')); return Math.min(r.width, r.height); }));
+      var cols=[].slice.call(document.querySelectorAll('.wsh-mse2-col')).map(function(c){return Math.round(R(c).height);});
+      return { maxCols: maxCols, menuOver: menuOver, minMenu: minMenu, cols: cols, dashBadge: /En Dashboard|On Dashboard/.test(document.querySelector('.wsh-mse2').textContent) }`);
+    ok(`${T} Mi espacio: ≤2 columnas por panel, menú ≥44 px sin invadir el texto, sin «En Dashboard» acumulado`, m.maxCols <= 2 && !m.menuOver && m.minMenu >= 43.5 && !m.dashBadge, JSON.stringify(m));
+    // El ⋯ de una card de Mi espacio abre su menú, no la capacidad.
+    await p.locator('.wsh-mse2-card [data-wscap-menu]').first().click(); await p.waitForTimeout(150);
+    const cm = await J(p, `return { menu: !!document.getElementById('wsCapMenu'), view: _wshView }`);
+    ok(`${T} el menú de Mi espacio no abre la card`, cm.menu && cm.view === 'home', JSON.stringify(cm));
+    await p.keyboard.press('Escape');
+    for (const tab of ['tools', 'templates']) {
+      await p.evaluate(`_wsTab='${tab}'; _wshRepaintHome();`); await p.waitForTimeout(700);
+      const c = await J(p, `var R=function(e){ return e.getBoundingClientRect(); };
+        var covers=[].slice.call(document.querySelectorAll('.wsh-toolcard > .wsh-toolcover, .wsh-cardv > .wsh-pv-wrap')).map(function(e){ var r=R(e); return +(r.width/r.height).toFixed(2); });
+        var pins=[].slice.call(document.querySelectorAll('[data-wspin]')).map(function(b){ var r=R(b); return Math.min(r.width,r.height); });
+        var pinOnImg=[].slice.call(document.querySelectorAll('[data-wspin]')).some(function(b){ var card=b.closest('.wsh-toolcard,.wsh-cardv'); var cv=card&&card.querySelector('.wsh-toolcover,.wsh-pv-wrap'); if(!cv) return false; var a=R(b), t=R(cv); return a.top < t.bottom-1 && t.top < a.bottom-1 && a.left < t.right-1 && t.left < a.right-1; });
+        var cards=[].slice.call(document.querySelectorAll('.wsh-toolcard, .wsh-cardv')); var rows={}; cards.forEach(function(e){ var k=Math.round(R(e).top); (rows[k]=rows[k]||[]).push(e); });
+        var footMis=0; Object.keys(rows).forEach(function(k){ var r=rows[k]; var f0=R(r[0].querySelector('[data-wspin]')).top; r.forEach(function(e){ if(Math.abs(R(e.querySelector('[data-wspin]')).top-f0)>1) footMis++; }); });
+        return { covers: covers, minPin: Math.min.apply(null,pins), pinOnImg: pinOnImg, footMis: footMis, sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
+      ok(`${T} catálogo ${tab}: portadas ≈16:9, favorito ≥44 px fuera de la imagen, acciones alineadas por fila`, c.covers.length > 0 && c.covers.every(r => r > 1.6 && r < 1.95) && c.minPin >= 43.5 && !c.pinOnImg && c.footMis === 0 && c.sw, JSON.stringify(c));
+      if (SHOTS) await shot(p, 'remate-' + tab + '-' + W + L);
+    }
+    // Favorito desde el catálogo: cambia la estrella y NO abre la herramienta.
+    await p.evaluate(`_wsTab='tools'; _wshRepaintHome();`); await p.waitForTimeout(500);
+    const before = await J(p, `return _wsPinned().length`);
+    await p.locator('[data-wspin="tool:loan"]').click(); await p.waitForTimeout(200);
+    const fav = await J(p, `return { n: _wsPinned().length, view: _wshView }`);
+    ok(`${T} pulsar el favorito no abre la card`, fav.n === before - 1 && fav.view === 'home', JSON.stringify({ before, fav }));
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }
