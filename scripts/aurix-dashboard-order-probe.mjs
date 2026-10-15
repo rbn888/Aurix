@@ -375,7 +375,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var bar=document.querySelector('#aurixWorkspace .wsh-bar'); var b=bar?bar.getBoundingClientRect():null;
       var ae=document.activeElement;
       return JSON.stringify({ tab: currentTab, tool: _wsToolActive, edit: _wsToolEditId, y: Math.round(window.scrollY),
-        doc: (document.querySelector('#aurixWorkspace .wsh-bar-doc')||{}).textContent||'',
+        doc: (document.querySelector('#aurixWorkspace .wsh-bar-title')||{}).textContent||'',
         barVisible: !!b && b.top >= 0 && b.top < innerHeight,
         top: !!document.querySelector('#aurixWorkspace [data-wsbud-top]') && document.querySelector('#aurixWorkspace [data-wsbud-top]').getBoundingClientRect().top < innerHeight,
         focusInput: !!(ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) }); })()`).then(JSON.parse);

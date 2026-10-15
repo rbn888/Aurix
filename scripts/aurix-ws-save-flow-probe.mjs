@@ -253,10 +253,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       _wsbParamsSet({ baseManual: '' });
       var out = document.querySelector('[data-wsb2-out]');
       out.innerHTML = _wsbTwoWayOutHtml(_wsbTwoWay());
-      return JSON.stringify({ warn: !!out.querySelector('.is-warn'), chart: out.querySelectorAll('.wsb2-line').length,
-        txt: out.textContent.trim().slice(0, 60) });})()`).then(JSON.parse);
-    ok(`${ENG}.scn · sin patrimonio de partida NO se publican resultados, y se dice qué falta`,
-      inv.warn === true && inv.chart === 0 && /Faltan datos|Missing data/i.test(inv.txt), JSON.stringify(inv));
+      // Cierre Workspace §8 — UN mensaje: si lo único que falta es la base, lo dice la tarjeta
+      // de parámetros junto a su campo (data-wsb-basenote) y la salida no lo repite.
+      _wsbRepaintSurface();
+      var note = document.querySelector('[data-wsb-basenote]');
+      var warns = [].slice.call(document.querySelectorAll('.wsh-sb .wsb-note.is-warn')).filter(function(e){ return e.offsetParent !== null; }).length;
+      return JSON.stringify({ warn: !!(note && note.querySelector('.is-warn')), warns: warns, chart: out.querySelectorAll('.wsb2-line').length,
+        out: out.textContent.trim(), txt: note ? note.textContent.trim().slice(0, 60) : '' });})()`).then(JSON.parse);
+    ok(`${ENG}.scn · sin patrimonio de partida NO se publican resultados, y se dice UNA vez qué falta`,
+      inv.warn === true && inv.warns === 1 && inv.chart === 0 && inv.out === '' && /patrimonio de partida|starting wealth/i.test(inv.txt), JSON.stringify(inv));
     // Y una rentabilidad NEGATIVA es una entrada válida: no se recorta a cero.
     const neg = await page.evaluate(`(function(){
       _wsbParamsSet({ baseManual: '100000', altMonthly: '0', altRet: '-3' });

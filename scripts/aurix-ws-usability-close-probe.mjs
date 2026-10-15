@@ -231,11 +231,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const T = ENG + '.§4';
     const r = await J(p, `return { kpis: [].slice.call(document.querySelectorAll('.wsbud-kpi b')).map(function(b){return b.textContent}), sub: (document.querySelector('.wsbud-kpi-sub')||{}).textContent,
       legend: [].slice.call(document.querySelectorAll('.wsbud-leg-n')).map(function(e){return e.textContent}), basis: (document.querySelector('.wsbud-leg-basis')||{}).textContent,
-      free: (document.querySelector('.wsbud-free-note')||{}).textContent, arcs: document.querySelectorAll('.wsbud-arc').length,
+      free: (document.querySelector('.wsbud-free-note')||{}).textContent || '', readings: [].slice.call(document.querySelectorAll('.wsbud-reading')).map(function(e){return e.textContent}),
+      basisAcc: (document.querySelector('.wsbud-basis')||{}).textContent || '', arcs: document.querySelectorAll('.wsbud-arc').length,
       pctSum: [].slice.call(document.querySelectorAll('.wsbud-leg em')).reduce(function(s,e){ return s + parseInt(e.textContent,10); }, 0) }`);
     ok(`${T} importes intactos: 2500 / 1580 / 920`, r.kpis[0].indexOf('2500,00') === 0 && r.kpis[1].indexOf('1580,00') === 0 && r.kpis[2].indexOf('920,00') === 0, r.kpis.join());
     ok(`${T} «Dinero libre» ya no es una fila de la leyenda (no es un segmento del anillo)`, r.legend.indexOf('Dinero libre') < 0 && r.legend.length === r.arcs, JSON.stringify(r.legend));
-    ok(`${T} …y se explica con importe, proporción sobre ingresos y su tratamiento`, /920,00/.test(r.free) && /37%/.test(r.free) && /No forma parte del reparto/.test(r.free), r.free);
+    // Cierre Workspace §7 — UNA conclusión: la nota «Dinero libre…» repetía la lectura; queda la
+    // lectura (con su proporción sobre ingresos) y el «no es un gasto» va al acordeón.
+    ok(`${T} …una sola conclusión con su proporción sobre ingresos; el tratamiento, en el acordeón`, r.free === '' && r.readings.length === 1 && /37%/.test(r.readings[0]) && /no aparece en el reparto/.test(r.basisAcc), JSON.stringify([r.free, r.readings, r.basisAcc.slice(0, 80)]));
     ok(`${T} la leyenda dice sobre qué se calcula el %, y suma ≈ 100`, /total de gastos/.test(r.basis) && r.pctSum >= 98 && r.pctSum <= 102, r.basis + ' / ' + r.pctSum);
     ok(`${T} el disponible no se rotula como «ahorro»`, /de tus ingresos/.test(r.sub) && !/ahorro/.test(r.sub), r.sub);
     await ctx.close();
@@ -304,9 +307,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         hero: (c.querySelector('.wspl-hero')||{}).textContent || '', share: (c.querySelector('.wspl-share-t')||{}).textContent || '', text: c.textContent,
         clash: over(m, n) || over(m, g), goH: Math.round(g.height), spill: g.right > cb.right + 1 || n.right > cb.right + 1 }; })`);
     const by = id => r.find(x => x.id === id) || {};
-    ok(`${T} el nombre del usuario es el título; el tipo, secundario y más pequeño`, by('d1').name === 'Casa' && by('d1').type === 'Presupuesto mensual' && by('d1').typeFs < by('d1').nameFs, JSON.stringify(by('d1')));
+    // RE-DECIDIDO antes de este cierre (la tarjeta publica SÓLO el nombre; tipo = icono + acento).
+    ok(`${T} el nombre del usuario es el título (el tipo lo dicen icono y acento)`, by('d1').name === 'Casa' && by('d1').type === '', JSON.stringify(by('d1')));
     ok(`${T} si nombre y tipo coinciden, no se repite`, by('d6').name === 'Presupuesto mensual' && by('d6').type === '', JSON.stringify(by('d6')));
-    ok(`${T} ningún «% ingresos» ni barra en el presupuesto`, r.every(x => !/% ingresos/.test(x.text)) && by('d1').share === '', by('d1').text);
+    // Cierre Workspace §4 — el presupuesto lleva su MINIDONUT de gastos (partida que manda y su
+    // peso sobre el total de gastos); sigue prohibida la proporción «% ingresos».
+    ok(`${T} ningún «% ingresos»; el presupuesto enseña su reparto de gastos real`, r.every(x => !/% ingresos/.test(x.text)) && /^Reparto de gastos · Vivienda 70%$/.test(by('d1').share), by('d1').share);
     ok(`${T} el presupuesto abre con su disponible real (2500 − 1000 = 1500)`, /^Disponible1500,00/.test(by('d1').hero.replace(/\s+/g, '')), by('d1').hero);
     ok(`${T} cobros: barra con significado explícito (40 % cobrado del total)`, /40% cobrado del total/.test(by('d3').share) && /^Cobrado400,00/.test(by('d3').hero.replace(/\s+/g, '')), by('d3').share + ' / ' + by('d3').hero);
     ok(`${T} ⋯ y la acción principal no se solapan con nada; nada sale de la tarjeta`, r.every(x => !x.clash && !x.spill && x.goH >= 44), JSON.stringify(r.map(x => [x.id, x.clash, x.spill, x.goH])));
@@ -317,7 +323,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await (await p.$('#wsPlansSection')).screenshot({ path: join(OUT, `usab-${ENG}-plans-${w}.png`) });
     if (w === 390) {
       await p.locator('.wspl-card[data-wspl-id="d1"] .wspl-go').click(); await p.waitForTimeout(500);
-      const o = await J(p, `return { tool:_wsToolActive, id:_wsToolEditId, doc:(document.querySelector('.wsh-bar-doc')||{}).textContent }`);
+      const o = await J(p, `return { tool:_wsToolActive, id:_wsToolEditId, doc:(document.querySelector('.wsh-bar-title')||{}).textContent }`);
       ok(`${T} abrir desde el Dashboard conserva el nombre en la herramienta`, o.tool === 'budget' && o.id === 'd1' && /Casa nueva/.test(o.doc || ''), JSON.stringify(o));
       const saved = await J(p, `return /Casa nueva/.test((document.querySelector('.wsh-tool-view').textContent))`);
       ok(`${T} …y en «Mis documentos» de la capacidad`, saved === true);

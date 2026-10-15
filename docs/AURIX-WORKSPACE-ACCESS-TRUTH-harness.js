@@ -111,7 +111,7 @@ function ctx(persona, langCode) {
   vm.runInContext('function _escapeWorkspaceText(x){ return _intccEsc(x); }', sb);
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
-   '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
+   '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_SPACE_HIDDEN_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
    // `_WS_TOOL_ACCENT` lo consume la portada Free para que sus nueve celdas no sean nueve
    // azules. Este harness ejercita ese render en un sandbox, así que la dependencia se declara
    // aquí también: es la SEGUNDA vez en la sesión que un gate caza una dependencia nueva de una
@@ -127,7 +127,7 @@ function ctx(persona, langCode) {
    '_wsIsPinned','_wshReadStore','_wsGlyph','_wsTplViz','_wsAssetImg','_wsCatPreviewBaseHtml',
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType',
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
-   '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover',
+   '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsSpaceIsHidden','_wsSpaceHidden','_wsPlanOnDash',
    '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon','_wsBudgetCurrentPeriod',
    // La portada ilustrada de las tres herramientas: se ejecuta la REAL, no un
    // stub, porque es la que decide qué pinta cada tarjeta del catálogo.
@@ -479,8 +479,12 @@ console.log('\n5 · Mi espacio:');
   // que alimenta «Abrir guardado» y el Resumen.
   R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: Date.now(), results: {} }]))');
   const both = home(c, 'space');
-  ok('5.5 un documento guardado NO entra en Mi Espacio: allí sólo hay favoritos',
-    both.indexOf('data-wsmse-type="doc"') === -1 && both.indexOf('data-wsmse-tpl="0"') !== -1,
+  // RE-DECIDIDO (cierre Workspace, 2026-10-15): era el P0 de reentrada — con documentos y sin
+  // estrellas Mi espacio decía «vacío». El documento vuelve, DENTRO del grupo de su capacidad
+  // (una capacidad = un grupo, nunca una tarjeta por documento) y sin tocar los favoritos.
+  ok('5.5 un documento guardado aparece en el grupo de su capacidad, sin crear un favorito',
+    (both.match(/data-wsmse-type="doc"/g) || []).length === 1 && both.indexOf('data-wsmse-tpl="1"') !== -1
+    && both.indexOf('Presupuesto empresa') !== -1,
     both.slice(both.indexOf('data-wsmse-cols'), both.indexOf('data-wsmse-cols') + 70));
   ok('5.5b …y el favorito que SÍ hay sigue estando, intacto',
     (both.match(/data-wsmse-type="fav"/g) || []).length === 1
@@ -516,7 +520,8 @@ console.log('\n5 · Mi espacio:');
       R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 5, results: {} }]))');
       const h = home(c, 'space');
       const cd = cards(h).filter(x => /wsh-mse2-card/.test(x.cls));
-      return cd.length === 1 && cd.every(x => destination(c, x).kind === 'opened');
+      // Dos capacidades: la fijada (sin documento) y la del presupuesto guardado. Las dos abren.
+      return cd.length === 2 && cd.every(x => destination(c, x).kind === 'opened');
     })(),
     JSON.stringify(cards(home(c, 'space')).filter(x => /wsh-mse2-card/.test(x.cls)).map(x => destination(c, x))));
   // Y un usuario Free no puede ver en Mi Espacio algo que no puede abrir.
@@ -612,7 +617,7 @@ console.log('\n6 · Persistencia: sin plan no se escribe, y no se finge:');
     /if \(!_wsCanPersist\(\)\) \{ _wsDocSyncSet\(key, 'local_only'\); return false; \}/.test(app)
     && /if \(!_wsCanPersist\(\)\) return false;/.test(fnSrc('_wsDocsPull')));
   ok('6.6 el botón Guardar de una cuenta sin plan lleva su etiqueta Premium',
-    /is-lock" data-wstool-save>\$\{esc\(saveLabel\)\}<span class="wsh-tier is-premium">/.test(fnSrc('_wsToolSaveBarHtml')));
+    /is-lock" data-wstool-save aria-label="\$\{esc\(saveLabel \+ ' · ' \+ t\('wstier_premium'\)\)\}">\$\{esc\(t\('wsbar_save'\)\)\}<span class="wsh-tier is-premium">/.test(fnSrc('_wsToolSaveBarHtml')));
 }
 
 // ════════════════════════════════════════════════════════════════════════════

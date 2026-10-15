@@ -139,7 +139,7 @@ const MEASURE = `(function(SPEC){
   var starts = SPEC.starts.map(function(sel){ var e = pick(sel); if (!e) return { sel: sel, found:false };
     var x = R(e); return { sel: sel, found:true, top:x.t, ok: x.t >= 0 && x.t <= floor - 24 }; });
   // ── LA CABECERA: BARRA, NO TARJETA ───────────────────────────────────────
-  var bar = wsh.querySelector(':scope > .wsh-bar');
+  var bar = wsh.querySelector(':scope > .wsh-bar, :scope > .wsh-barwrap > .wsh-bar');
   var barR = bar ? R(bar) : null;
   var title = bar ? bar.querySelector('.wsh-bar-title') : null;
   var back = bar ? bar.querySelector('.wsh-bar-back') : null;
@@ -479,13 +479,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       renderWorkspaceHome();
       out.reopened = _wsToolEditId === out.id1;
       out.reopenedValue = String(_wsToolInputs.initial);
-      var bar2 = document.querySelector('#aurixWorkspace .wsh-bar-doc');
+      // Cierre Workspace §2: el nombre del usuario es el TÍTULO de la barra.
+      var bar2 = document.querySelector('#aurixWorkspace .wsh-bar-title');
       out.reopenedDoc = bar2 && bar2.textContent.trim();
       return JSON.stringify(out);
     })()`);
     const d = JSON.parse(r);
     ok(`${ENG}.documento · la barra publica su nombre y no lo confunde con la plantilla`,
-      !!d.id1 && d.doc === 'Mi plan 2030' && !!d.title && d.distinct === true, r);
+      !!d.id1 && d.title === 'Mi plan 2030' && /^Interés compuesto/.test(d.doc || '') && d.distinct === true, r);
     ok(`${ENG}.documento · «Guardar» ACTUALIZA: mismo id, sin duplicar`,
       d.sameId === true && d.noClone === true && d.updated === '20.000', r);
     ok(`${ENG}.documento · «Guardar como» crea otra instancia y no toca la original`,

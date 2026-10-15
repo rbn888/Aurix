@@ -62,7 +62,7 @@ function ctx(opts) {
    '_wsPlanMoney',
    // MONEDA DEL DOCUMENTO — las cifras salen en la moneda que el documento declara, no en la base.
    'formatCurrency','_wsJrnMoney','_wsCcyCode','_wsBaseCcy','_wsDocCurrencyOf','_wsMoneyIn','_wsgCcy','_wsgMoney',
-   '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState',
+   '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState','_wsPlanOnDash','_wsPinnedCaps','_renderDashboardPinned',
    // SPRINT WORKSPACE PREMIUM V2 §17/§21 — la tarjeta publica ahora su proporción medida y su
    // menú, así que sus owners entran al sandbox: si faltaran, el render lanzaría y este
    // harness sería el primero en decirlo (es lo que pasó al añadirlos).
@@ -295,7 +295,8 @@ console.log('\n4 · Sin Premium confirmado no hay sección:');
   ok('4.7 …y sólo ofrece upgrade cuando la razón ES comercial',
     /acc\.reason === 'entitlement'/.test(open));
   ok('4.8 el retorno usa el owner preparado del bloque anterior',
-    /_wsReturnTab = 'dashboard';/.test(open));
+    // Cierre Workspace: el origen se marca en UN owner compartido por las dos puertas del Dashboard.
+    /_wsDashOriginMark\(\);/.test(open) && /_wsReturnTab = 'dashboard';/.test(fnSrc('_wsDashOriginMark')));
   // Y el Dashboard no se convierte en una segunda puerta a lo no publicado.
   const c = ctx({ docs: DOCS, grant: false });
   ok('4.9 sin derecho, ni un documento entra en el conjunto publicado',
@@ -547,7 +548,10 @@ console.log('\n7 · Objetivos, en el sistema común:');
 
   // §45 — la asimetría está declarada y es la que preserva lo que cada usuario ya veía.
   ok('7.17 plantillas opt-OUT y objetivos opt-IN, cada una preservando su estado previo',
-    /dashHidden !== true/.test(fnSrc('_wsPlansDocs')) && /dashPinned === true/.test(fnSrc('_wsPlansGoals')));
+    // Cierre Workspace §2: la marca se lee en UN owner (`_wsPlanOnDash`), que además admite las
+    // herramientas con persistencia como opt-IN (nunca estuvieron en el Resumen).
+    /\.filter\(_wsPlanOnDash\)/.test(fnSrc('_wsPlansDocs')) && /p\.dashHidden !== true/.test(fnSrc('_wsPlanOnDash'))
+    && /spec\.optIn \? p\.dashPinned === true/.test(fnSrc('_wsPlanOnDash')) && /dashPinned === true/.test(fnSrc('_wsPlansGoals')));
 
   // El vacío sigue siendo honesto cuando no hay NI plantillas NI objetivos.
   const empty = R(ctx({ docs: [], goals: [] }), '_renderDashboardPlans()');

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '785'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '786'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6927,6 +6927,8 @@ const T = {
     wspl_m_pending:       'Pendiente',
     wspl_m_collected:     'Cobrado',
     wspl_m_units:         'Inmuebles',
+    wspl_m_cashflow:      'Cashflow',
+    wspl_m_equity:        'Patrimonio propio',
     wspl_m_value:         'Valor',
     wspl_m_trades:        'Operaciones',
     // ── §11 · BASE Y ALTERNATIVA ─────────────────────────────────────────────
@@ -6957,6 +6959,15 @@ const T = {
     wspl_sim:             'Proyección',
     wspl_m_overdue:       'Vencido',
     wspl_spend:           'Reparto de gastos',
+    wspl_share_contrib:   'aportado',
+    wspl_share_growth:    'crecimiento',
+    wspl_share_principal: 'capital',
+    wspl_share_interest:  'intereses',
+    wsx_title:            'Tu espacio',
+    wsx_pinned_title:     'Herramientas fijadas',
+    wsx_pinned_open:      'Abrir',
+    wsx_pinned_unpin:     'Quitar de fijadas',
+    wsx_pinned_hint:      'Acceso directo · sin documento',
     wspl_nodata:          'Sin datos todavía',
     dash_grip:            'Reordenar',
     dash_move_before:     'Mover antes',
@@ -7002,6 +7013,9 @@ const T = {
     // §B — es una SIMULACIÓN, no un proyecto: lo que se guarda son unos supuestos y
     // su resultado, no un trabajo en curso con estado.
     wstool_save:          'Guardar simulación',
+    // Cierre Workspace §5 — el rótulo VISIBLE en la barra local es corto; el completo
+    // («Guardar control de cobros»…) queda como nombre accesible del botón.
+    wsbar_save:           'Guardar',
     // WS.7 — Monthly Budget tool
     wstool_budget_sec_income:   'Ingresos',
     wstool_budget_sec_expenses: 'Gastos',
@@ -7118,7 +7132,10 @@ const T = {
     wsmse2_tool_title:  'Mis herramientas',
     wsmse2_last:        'Última apertura',
     wsmse2_updated:     'actualizado',
-    wsmse2_fav:         'Favorito',
+    wsmse2_fav:         'Fijada',
+    wsmse2_docs_one:    '1 documento',
+    wsmse2_docs_n:      '{n} documentos',
+    wsmse2_on_dash:     'En Dashboard',
     wsmse2_saved:       'Guardado',
     wsmse2_empty_t:     'Tu espacio lo eliges tú.',
     wsmse2_empty_b:     'Aquí aparece lo que marcas con la estrella y lo que guardas con nombre',
@@ -7232,7 +7249,8 @@ const T = {
     // §G — «un punto porcentual», no «un 1 %»: la simulación suma 1 pp al tipo
     // (3,5 → 4,5), no lo multiplica por 1,01. Son dos cosas distintas y la frase
     // anterior decía la que NO se calcula.
-    wsloan_ins_rate:    amt => `Un punto porcentual más de tipo (por ejemplo 3,5 → 4,5) incrementa la cuota en ${amt}/mes.`,
+    // Cierre Workspace §8 — el ejemplo usa el TIPO ACTUAL del préstamo, no un 3,5 fijo.
+    wsloan_ins_rate:    (amt, a, b) => `Un punto porcentual más de tipo (${a} → ${b}) incrementa la cuota en ${amt}/mes.`,
     // §G — el contrato, y lo que NO entra en la cuota.
     wsloan_ct_title:    'Qué préstamo se está simulando',
     wsloan_ct_fixed:    'Cuota constante y tipo fijo durante todo el plazo.',
@@ -10170,6 +10188,8 @@ const T = {
     wspl_m_pending:       'Pending',
     wspl_m_collected:     'Collected',
     wspl_m_units:         'Properties',
+    wspl_m_cashflow:      'Cash flow',
+    wspl_m_equity:        'Own equity',
     wspl_m_value:         'Value',
     wspl_m_trades:        'Trades',
     wsb2_title:           'Compare two assumptions',
@@ -10199,6 +10219,15 @@ const T = {
     wspl_sim:             'Projection',
     wspl_m_overdue:       'Overdue',
     wspl_spend:           'Spending breakdown',
+    wspl_share_contrib:   'contributed',
+    wspl_share_growth:    'growth',
+    wspl_share_principal: 'principal',
+    wspl_share_interest:  'interest',
+    wsx_title:            'Your space',
+    wsx_pinned_title:     'Pinned tools',
+    wsx_pinned_open:      'Open',
+    wsx_pinned_unpin:     'Unpin',
+    wsx_pinned_hint:      'Shortcut · no document',
     wspl_nodata:          'No data yet',
     dash_grip:            'Reorder',
     dash_move_before:     'Move earlier',
@@ -10241,6 +10270,7 @@ const T = {
     wstool_ms_cross:      (amt, y) => `You pass ${amt} in year ${y}`,
     wstool_ms_crossover:  y => `Growth generated exceeds your contributions in year ${y}`,
     wstool_save:          'Save simulation',
+    wsbar_save:           'Save',
     // WS.7 — Monthly Budget tool
     wstool_budget_sec_income:   'Income',
     wstool_budget_sec_expenses: 'Expenses',
@@ -10347,7 +10377,10 @@ const T = {
     wsmse2_tool_title:  'My tools',
     wsmse2_last:        'Last opened',
     wsmse2_updated:     'updated',
-    wsmse2_fav:         'Favourite',
+    wsmse2_fav:         'Pinned',
+    wsmse2_docs_one:    '1 document',
+    wsmse2_docs_n:      '{n} documents',
+    wsmse2_on_dash:     'On Dashboard',
     wsmse2_saved:       'Saved',
     wsmse2_empty_t:     'Your space is yours to choose.',
     wsmse2_empty_b:     'What you star and what you save with a name shows up here',
@@ -10446,7 +10479,7 @@ const T = {
     wsloan_insights_title: 'Aurix quick read',
     wsloan_ins_interest: pct => `More than ${pct}% of the total cost will be interest.`,
     wsloan_ins_term:    (y, amt) => `Cutting ${y} years off the term saves about ${amt}.`,
-    wsloan_ins_rate:    amt => `One percentage point more on the rate (e.g. 3.5 → 4.5) raises the payment by ${amt}/mo.`,
+    wsloan_ins_rate:    (amt, a, b) => `One percentage point more on the rate (${a} → ${b}) raises the payment by ${amt}/mo.`,
     wsloan_ct_title:    'Which loan is being simulated',
     wsloan_ct_fixed:    'Constant payment and fixed rate for the whole term.',
     wsloan_ct_nominal:  'The rate you enter is a NOMINAL annual rate, not an APR.',
@@ -22413,6 +22446,25 @@ async function _wsDocsPull() {
         touched++;
       } catch (_) {}
     }
+    // ── LOS FIJADOS, SÓLO DONDE ESTE DISPOSITIVO NO TIENE NINGUNO (cierre Workspace §3) ──
+    // Las preferencias no se aplican al leer (arriba, y su razón sigue en pie para el borrador de
+    // las herramientas). Pero eso dejaba a un navegador nuevo —o a uno cuyo almacenamiento purgó el
+    // sistema— sin ninguna capacidad fijada aunque el servidor las tenga, mientras los documentos
+    // sí volvían. Hidratar SÓLO cuando la clave NO EXISTE en local no pisa nada: un dispositivo
+    // que ya decidió (aunque sea «ninguno», que es `[]`) conserva su decisión; y una clave ausente
+    // nunca se sube (ver `_wsDocRows`), así que tampoco puede haber vaciado el remoto.
+    try {
+      const pr = rows.find(x => x && x.kind === 'ws_pref' && x.body && x.body.key === _WSH_PINNED_KEY && !x.deleted_at);
+      // Escritura DIRECTA, como los documentos de arriba: es el lector de la sincronización, y
+      // pasar por `_wshWriteStore` re-encolaría una subida de lo que acaba de bajar.
+      const pk = pr && pr.body.key;
+      if (pr && Array.isArray(pr.body.value) && localStorage.getItem(pk) == null) {
+        const v = pr.body.value.filter(x => x && typeof x.ref === 'string');
+        localStorage.setItem(pk, JSON.stringify(v));
+        localStorage.setItem(_WS_PREF_REV_PREFIX + pk, String(Number(pr.revision) || 0));
+        touched++;
+      }
+    } catch (_) {}
     if (touched) { _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now(); }
     return true;
   } catch (_) { _wsDocsPullFailed = true; return false; }
@@ -22461,6 +22513,7 @@ function _wsSyncBadgeRefresh() {
   try {
     // Cada hueco declara DE QUÉ documento habla, así que se repinta con su propio
     // estado. Un hueco sin clave cae al peor estado conocido, nunca al mejor.
+    try { _wsBarStateSync(); } catch (_) {}
     document.querySelectorAll('[data-ws-sync-slot]').forEach(el => {
       const k = el.getAttribute('data-ws-sync-slot');
       el.innerHTML = _wsSyncBadgeHtml(k && k !== '1' ? k : null);
@@ -22584,20 +22637,78 @@ function _wsSurfaceHeadHtml(o) {
   const backAttr = o.backAttr || 'data-wsh-nav="back"';
   const backTxt  = o.backText || _wsBackShort();
   const backAria = o.backAria || _wsBackLabel();
-  return `
-    <header class="wsh-bar">
+  // ── CIERRE WORKSPACE §2/§5 · EL NOMBRE DEL USUARIO ES EL TÍTULO ───────────────────────────
+  // Con un documento abierto, lo que se lee primero es el nombre que el usuario le puso; la
+  // capacidad baja a la segunda línea y sólo si no repite el título (`_wsSubIfDistinct`). Sin
+  // documento, el título es la capacidad. En las herramientas que guardan (`o.save`), la misma
+  // segunda línea publica el ESTADO real del documento y la barra lleva «Guardar» y su menú:
+  // guardar vive junto al trabajo, no al pie de la página.
+  // Una vista ANIDADA declara su propio subtítulo (`o.sub`): ahí el título es el del objeto.
+  const title = o.sub != null ? String(o.title || '') : (doc || String(o.title || ''));
+  const sub = o.sub != null ? String(o.sub) : (doc ? _wsSubIfDistinct(doc, o.title || '') : '');
+  const save = o.save === true;
+  // En las que guardan, barra y acciones van en un ENVOLTORIO: en escritorio es UNA fila pegajosa
+  // (≤56 px); en móvil el envoltorio desaparece (`display: contents`), la barra sigue pegada arriba
+  // con el título entero y las acciones quedan en su fila, justo debajo, junto al trabajo.
+  const actions = save ? `<div class="wsh-bar-actions">${_wsBarCcyHtml()}<div class="wsg-savebar wsh-bar-save" data-wstool-savebar>${_wsToolSaveBarHtml()}</div></div>` : '';
+  return `${save ? '<div class="wsh-barwrap" data-wsh-barwrap>' : ''}
+    <header class="wsh-bar${save ? ' has-save' : ''}" data-wsh-bar>
       <button type="button" class="wsh-bar-back" ${backAttr} aria-label="${esc(backAria)}">
         <span class="wsh-bar-chev" aria-hidden="true">‹</span><span class="wsh-bar-backtxt">${esc(backTxt)}</span>
       </button>
       <div class="wsh-bar-id">
-        <h2 class="wsh-bar-title">${esc(o.title || '')}</h2>
-        ${doc ? `<p class="wsh-bar-doc">${esc(doc)}</p>` : ''}
+        <h2 class="wsh-bar-title"${doc ? ' data-wsbar-doc="1"' : ''}>${esc(title)}</h2>
+        ${(sub || save) ? `<p class="wsh-bar-doc"${save ? ' data-wsbar-sub role="status" aria-live="polite"' : ''}>${_wsBarSubHtml(sub, save)}</p>` : ''}
       </div>
       ${help.length ? `<details class="wsh-bar-help">
         <summary class="wsh-bar-helpsum" aria-label="${esc(t('wsh_help_aria'))}"><span aria-hidden="true">?</span></summary>
         <div class="wsh-bar-helpbody" role="note">${help.map(h => `<p>${esc(h)}</p>`).join('')}</div>
       </details>` : ''}
-    </header>`;
+    </header>${actions}${save ? '</div>' : ''}`;
+}
+// ── EL ESTADO QUE PUBLICA LA BARRA, Y SÓLO EL DEMOSTRABLE ──────────────────────────────────
+// «Guardado» exige que el almacén haya aceptado la escritura (`_wsToolEditId` sólo se fija tras
+// un `_ws4Persist` correcto) y que no haya cambios desde entonces. Si la subida remota de ese
+// almacén está en vuelo o falló, se dice — nunca «Guardado» encima de un error.
+// La MONEDA del documento, compacta en la barra (§5) — en escritorio sustituye a la fila de
+// moneda que ocupaba un ancho entero casi vacío. Mismo control y mismo manejador
+// (`data-wsccy-scope="tool"`, vía `_wsBudgetCcyCtlHtml`); un documento ANTIGUO sin moneda
+// conserva su aviso completo en el cuerpo, porque necesita explicación y confirmación. El
+// Presupuesto ya la lleva en su cabecera de cifras.
+function _wsBarCcyHtml() {
+  try {
+    if (_WS_CCY_TOOLS.indexOf(_wsToolActive) < 0 || _wsToolActive === 'budget' || !_wsDocCcy()) return '';
+    return `<div class="wsh-bar-ccy">${_wsBudgetCcyCtlHtml()}</div>`;
+  } catch (_) { return ''; }
+}
+function _wsToolSaveState() {
+  let canPersist = false; try { canPersist = _wsCanPersist(); } catch (_) {}
+  if (!canPersist) return { state: 'local', key: 'wstool_save_session' };
+  if (!_wsToolEditId) return { state: 'unsaved', key: 'wsg_save_unsaved' };
+  if (_wsToolDirty) return { state: 'dirty', key: 'wsg_save_pending' };
+  let st = null; try { st = _wsSyncStatus('aurix_ws_projects_v1'); } catch (_) { st = null; }
+  if (st && st.state === 'saving') return { state: 'saving', key: 'ws_sync_saving' };
+  if (st && st.state === 'error') return { state: 'error', key: 'ws_sync_error', retry: true };
+  return { state: 'saved', key: 'wsg_save_done' };
+}
+function _wsBarSubHtml(sub, withState) {
+  const esc = _intccEsc;
+  const st = withState ? _wsToolSaveState() : null;
+  return (sub ? `<span class="wsh-bar-type">${esc(sub)}</span>` : '')
+    + (st ? `<span class="wsh-bar-state is-${st.state}" data-wsbar-state="${st.state}">${esc(t(st.key))}</span>`
+      + (st.retry ? `<button type="button" class="wsh-bar-retry" data-ws-sync-retry="1">${esc(t('ws_sync_retry'))}</button>` : '') : '');
+}
+// Repinta SÓLO el estado (la línea es una región `status`: se actualiza su contenido, no se
+// sustituye el nodo, así que el lector de pantalla lo anuncia).
+function _wsBarStateSync() {
+  if (typeof document === 'undefined') return;
+  const line = document.querySelector('.wsh-tool-view [data-wsbar-sub]');
+  if (!line) return;
+  const st = _wsToolSaveState();
+  const cur = line.querySelector('[data-wsbar-state]');
+  if (cur && cur.getAttribute('data-wsbar-state') === st.state) return;
+  const type = line.querySelector('.wsh-bar-type');
+  line.innerHTML = _wsBarSubHtml(type ? type.textContent : '', true);
 }
 // WS.6 — Compound Growth tool working state.
 // WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
@@ -22650,6 +22761,85 @@ let _ws4Dirty   = false;   // WS.4 pending changes flag
 
 function _wshReveal(container) {
   try { const r = container.querySelector('.aurix-wsh'); if (r) requestAnimationFrame(() => r.classList.add('is-revealed')); } catch (_) {}
+  try { _wsWorkModeSync(); } catch (_) {}
+}
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// CIERRE WORKSPACE §5 · MODO DE TRABAJO DEDICADO
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// Dentro de una capacidad (herramienta, plantilla o documento) la cabecera global, la búsqueda,
+// el menú y la navegación inferior desaparecen y queda la barra local (`_wsSurfaceHeadHtml`):
+// volver, nombre, estado y guardar. No es el fullscreen del navegador: es una marca en el body
+// (`ws-work`) que el CSS acota. Se decide en UN sitio, aquí, y lo llama `_wshReveal`, que corre
+// tras CADA montaje de una vista de Workspace, y `_applyTab` al salir de la pestaña.
+//
+// EL ATRÁS DEL NAVEGADOR ES «VOLVER». La app no tenía historial propio: el gesto atrás dentro de
+// un documento sacaba al usuario de Aurix. Al ENTRAR en modo de trabajo se apila UNA entrada
+// (misma URL, sólo estado); el atrás del navegador la consume y hace lo mismo que «Volver»
+// (`_wsNavBack`, el owner único del retorno). Salir por «Volver» consume esa entrada para que el
+// siguiente atrás no tenga que pulsarse dos veces. Los borradores no se pierden al salir: cada
+// herramienta ya escribe el suyo en `aurix_ws_tool_state_v1` con cada edición, así que no hay
+// aviso de salida — no hay riesgo real que avisar.
+const _WS_WORK_VIEWS = Object.freeze(['tool', 'goals', 'scenario', 'planning', 'workspace']);
+var _wsWorkOn = false, _wsWorkHist = false, _wsWorkPopping = false, _wsWorkIgnorePop = 0, _wsWorkWired = false;
+function _wsWorkModeOn() {
+  try {
+    return (typeof currentTab !== 'undefined' && currentTab === 'workspace')
+      && _WS_WORK_VIEWS.indexOf(_wshView) !== -1 && _wsPremiumShell() === true;
+  } catch (_) { return false; }
+}
+function _wsWorkModeSync() {
+  if (typeof document === 'undefined' || !document.body) return;
+  const on = _wsWorkModeOn();
+  if (on === _wsWorkOn) return;
+  _wsWorkOn = on;
+  document.body.classList.toggle('ws-work', on);
+  _wsWorkWire();
+  if (on) {
+    // Primero la entrada de historial (el navegador guarda en la ANTERIOR el scroll del
+    // origen) y después el inicio del espacio de trabajo.
+    try {
+      if (!(history.state && history.state.aurixWork)) {
+        history.pushState(Object.assign({}, history.state || {}, { aurixWork: 1 }), '');
+        _wsWorkHist = true;
+      }
+    } catch (_) {}
+    _wsDocTopPending = true; _wsDocTopConsume();
+    return;
+  }
+  if (_wsWorkHist && !_wsWorkPopping) {
+    try { if (history.state && history.state.aurixWork) { _wsWorkIgnorePop++; history.back(); } } catch (_) {}
+  }
+  _wsWorkHist = false;
+}
+function _wsWorkWire() {
+  if (_wsWorkWired || typeof window === 'undefined' || !window.addEventListener) return;
+  _wsWorkWired = true;
+  window.addEventListener('popstate', () => {
+    if (_wsWorkIgnorePop > 0) { _wsWorkIgnorePop--; return; }
+    if (!_wsWorkOn) return;
+    _wsWorkHist = false; _wsWorkPopping = true;
+    try {
+      // Una vista ANIDADA (el detalle de un inmueble) vuelve primero a su capacidad, igual que su
+      // propio botón; y como se sigue en modo de trabajo, se re-apila la entrada.
+      if (_wshView === 'tool' && _wsToolActive === 'realestate' && _wsReDetailId) {
+        _wsReBack();
+        try { history.pushState(Object.assign({}, history.state || {}, { aurixWork: 1 }), ''); _wsWorkHist = true; } catch (_) {}
+        return;
+      }
+      _wsNavBack();
+    } finally { _wsWorkPopping = false; }
+  });
+}
+// El retorno, en UN sitio: lo usan «Volver» de la barra y el atrás del navegador.
+function _wsNavBack() {
+  _wshView = 'home'; _ws4ActiveId = null;
+  // El retorno al DASHBOARD está preparado y es el mismo owner: no hay un
+  // segundo camino de vuelta que mantener.
+  // `'home'` es el id REAL de la pestaña del Resumen (el alias se normaliza
+  // igualmente en `switchTab`, pero el llamador no tiene por qué depender
+  // de esa traducción).
+  if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; _wsDashRestorePending = _wsDashReturnY != null; try { switchTab('home'); } catch (_) { _wshRepaintHome(); } return; }
+  _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome();
 }
 
 // Workspace entry / view dispatcher. Idempotent per view: price-tick re-renders
@@ -22840,9 +23030,11 @@ function _wshWireOnce() {
   try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus]')
       : null;
     if (!t) return;
+    const nf = t.getAttribute('data-wsnew-focus');
+    if (nf) { _wsFocusInView(nf, t.getAttribute('data-wsnew-input')); return; }
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
     const tab = t.getAttribute('data-wstab');
     if (tab) { _wsTab = tab; _wshView = 'home'; _wshRepaintHome(); return; }
@@ -22912,16 +23104,7 @@ function _wshWireOnce() {
       return;
     }
     // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
-    if (nav === 'back') {
-      _wshView = 'home'; _ws4ActiveId = null;
-      // El retorno al DASHBOARD está preparado y es el mismo owner: no hay un
-      // segundo camino de vuelta que mantener. Hoy nadie fija este origen.
-      // `'home'` es el id REAL de la pestaña del Resumen (el alias se normaliza
-      // igualmente en `switchTab`, pero el llamador no tiene por qué depender
-      // de esa traducción).
-      if (_wsBackOrigin() === 'dashboard') { _wsReturnTab = 'tools'; _wsDashRestorePending = _wsDashReturnY != null; try { switchTab('home'); } catch (_) { _wshRepaintHome(); } return; }
-      _wsTab = _wsTabOk(_wsReturnTab) ? _wsReturnTab : 'tools'; _wshRepaintHome(); return;
-    }
+    if (nav === 'back') { _wsNavBack(); return; }
     if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; _wshRepaintHome(); return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
     if (t.hasAttribute('data-wstool-saveas')) { _wsToolSaveAs(); return; }
@@ -23665,7 +23848,7 @@ function _wsSpaceMenu(ref, anchor) {
     try {
       if (ref.indexOf('workspace:') === 0) {
         const d = _ws4Projects().find(x => x && x.id === ref.slice(10));
-        return (d && _WSPL_TYPES[d.type]) ? { kind: 'workspace', id: d.id, on: d.dashHidden !== true } : null;
+        return (d && _WSPL_TYPES[d.type]) ? { kind: 'workspace', id: d.id, on: _wsPlanOnDash(d) } : null;
       }
       if (ref.indexOf('goal:') === 0) {
         const g = _wsgGoals().find(x => x && x.id === ref.slice(5));
@@ -24718,7 +24901,27 @@ const _WSPL_TYPES = Object.freeze({
   // almacén, misma identidad, misma tarjeta. Su `tool` es la superficie
   // `scenario`, así que el gate que ya decide si esta cuenta puede abrir el
   // simulador es el MISMO que decide si la tarjeta se publica.
+  // ── RE-DECIDIDO (cierre Workspace §2): LAS HERRAMIENTAS CON PERSISTENCIA VUELVEN, POR OPT-IN ──
+  // El contrato es «Mostrar en Dashboard» como acción PROPIA sobre una instancia concreta. Las
+  // herramientas que ya guardan documentos (interés compuesto, préstamos, comparación de
+  // escenarios) ofrecían el interruptor en su menú pero su tipo no estaba aquí, así que el menú
+  // decía «Quitar del Dashboard» de algo que nunca estuvo y pulsarlo no hacía nada. Vuelven con
+  // `optIn`: nunca han llegado al Resumen, así que la AUSENCIA de marca significa NO publicado
+  // (`dashPinned === true` lo publica), la misma asimetría deliberada que Objetivos. Ningún
+  // Dashboard existente cambia por esto. Sus cifras salen de `_wsPlanMetrics`, que ya las lee de
+  // lo GUARDADO (`results`), y `sim` las declara proyección.
+  compound_growth:       { tool: 'compound',    nameKey: 'wstool_compound_n',   icon: 'growth',  accent: 'teal',   optIn: true, sim: true, share: 'compound' },
+  loan_simulation:       { tool: 'loan',        nameKey: 'wsloan_n',            icon: 'calc',    accent: 'blue',   optIn: true, sim: true, share: 'loan' },
+  scenario_compare:      { tool: 'scenario',    nameKey: 'wsh_scenario_title',  icon: 'paths',   accent: 'plum',   optIn: true, sim: true },
 });
+// ¿Está ESTE documento en el Dashboard? Una sola respuesta para el Resumen, Mi espacio y los
+// menús: dos lecturas de la misma marca son la forma en que el menú acabó contradiciendo a la
+// sección. Plantillas: opt-out (`dashHidden`). Herramientas: opt-in (`dashPinned`).
+function _wsPlanOnDash(p) {
+  const spec = p && _WSPL_TYPES[p.type];
+  if (!spec) return false;
+  return spec.optIn ? p.dashPinned === true : p.dashHidden !== true;
+}
 // Los documentos que se publican: plantilla, guardada de verdad y con su
 // capacidad todavía ABIERTA para esta cuenta. Ofrecer «Continuar» sobre algo que
 // el gate va a denegar sería la misma mentira que una tarjeta que dice «Abrir» y
@@ -24782,7 +24985,7 @@ function _wsPlansDocs() {
     // PROPIO documento (mismo almacén, mismo id, misma sincronización), así que esta sección
     // sigue sin tener estado propio y hereda el aislamiento por cuenta y el cross-device.
     // AUSENCIA = VISIBLE: ningún usuario existente pierde de vista un plan por este cambio.
-    .filter(p => p.dashHidden !== true)
+    .filter(_wsPlanOnDash)
     .filter(p => { try { return _wsToolAccess(_WSPL_TYPES[p.type].tool).ok === true; } catch (_) { return false; } })
     .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
 }
@@ -24837,6 +25040,13 @@ function _wsPlanMetrics(p) {
       // El VALOR sólo si alguien lo ha declarado: sin valoraciones, `valueTotal`
       // es cero y publicar «0» diría que la cartera no vale nada.
       const out = [m('wspl_m_units', String(r.count))];
+      // §4 — el cashflow mensual del MISMO motor, sólo si hay algo declarado que lo mueva: un
+      // cero sin rentas ni costes no es un cashflow, es la ausencia de datos.
+      const cf = Number(r.cashflowMonthly);
+      if (Number.isFinite(cf) && cf !== 0) { const c = m('wspl_m_cashflow', (cf > 0 ? '+' : '−') + _wsMoneyIn(Math.abs(cf), _PCCY) + t('wsre_permonth')); c.tone = cf < 0 ? 'neg' : 'pos'; out.unshift(c); }
+      // Patrimonio propio (valor − deuda) del mismo motor: sólo con valoración y deuda (sin deuda
+      // repetiría el valor).
+      if (r.valueTotal > 0 && Number.isFinite(Number(r.equityTotal)) && Number(r.equityTotal) < Number(r.valueTotal)) out.unshift(m('wspl_m_equity', _wsMoneyIn(r.equityTotal, _PCCY)));
       if (r.valueTotal > 0) out.unshift(m('wspl_m_value', _wsMoneyIn(r.valueTotal, _PCCY)));
       return out;
     }
@@ -24959,6 +25169,23 @@ function _wsPlanShare(p) {
       if (!Number.isFinite(a) || !Number.isFinite(b) || !((a + b) > 0)) return null;
       return { a: a, b: b, ka: 'wspl_share_done_of', kb: 'wspl_share_due' };
     }
+    // ── CIERRE WORKSPACE §4 · LAS PREVIEWS DE LAS SIMULACIONES, DE LO GUARDADO ─────────────
+    // Dos magnitudes que el MISMO motor guardó en `results` y que suman el total que la tarjeta
+    // publica: lo aportado (inicial + aportaciones) frente al crecimiento, y el capital frente a
+    // los intereses. No se recalcula nada y no se proyecta nada nuevo: si falta una de las dos,
+    // o no cuadran con el total guardado, no hay barra.
+    const res = (p && p.results) || {};
+    const fin = v => (v != null && v !== '' && Number.isFinite(Number(v))) ? Number(v) : null;
+    if (spec.share === 'compound') {
+      const a = fin(res.contributed), b = fin(res.interest), f = fin(res.final);
+      if (a == null || b == null || f == null || a < 0 || b < 0 || !((a + b) > 0) || Math.abs(a + b - f) > 2) return null;
+      return { a: a, b: b, ka: 'wspl_share_contrib', kb: 'wspl_share_growth' };
+    }
+    if (spec.share === 'loan') {
+      const a = fin(res.principal), b = fin(res.totalInterest);
+      if (a == null || b == null || a < 0 || b < 0 || !((a + b) > 0)) return null;
+      return { a: a, b: b, ka: 'wspl_share_principal', kb: 'wspl_share_interest' };
+    }
   } catch (_) { return null; }
   return null;
 }
@@ -24975,18 +25202,23 @@ function _wsPlanSpendHtml(p) {
   const esc = _intccEsc;
   const top = items.slice().sort((a, b) => b.value - a.value);
   const lbl = t('wspl_spend') + ': ' + top.map(x => x.name + ' ' + formatBase(x.value)).join(', ');
-  // SVG con `fill` por partida, como el anillo de la herramienta: el color de un DATO viene del
-  // motor y va en el elemento, nunca como `style` (eso es lo que la API de acento prohíbe).
-  const gap = 0.6, n = top.length, w = 100 - gap * (n - 1);
-  let x0 = 0;
-  const rects = top.map(x => {
-    const wd = Math.max(1.2, x.value / tot * w);
-    const r = '<rect x="' + x0.toFixed(2) + '" y="0" width="' + wd.toFixed(2) + '" height="6" fill="' + esc(x.color || '#5cc8ff') + '"/>';
-    x0 += wd + gap; return r;
+  // §4 · MINIDONUT, el MISMO reparto que el anillo de la herramienta (mismas partidas, mismos
+  // colores, mismo denominador: el total de gastos). Al lado, la partida que manda y su peso.
+  // El color de un DATO viene del motor y va en el elemento, nunca como `style`.
+  const R = 15, C = 2 * Math.PI * R;
+  let off = 0;
+  const arcs = top.map(x => {
+    const len = x.value / tot * C;
+    const a = '<circle cx="20" cy="20" r="' + R + '" fill="none" stroke="' + esc(x.color || '#5cc8ff') + '" stroke-width="6"'
+      + ' stroke-dasharray="' + len.toFixed(3) + ' ' + (C - len).toFixed(3) + '" stroke-dashoffset="' + (-off).toFixed(3) + '"/>';
+    off += len; return a;
   }).join('');
-  return '<span class="wspl-viz">'
-    + '<svg class="wspl-spend" viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="' + esc(lbl) + '">' + rects + '</svg>'
-    + '<span class="wspl-share-t" aria-hidden="true">' + esc(t('wspl_spend')) + '</span>'
+  const lead = top[0], leadPct = Math.round(lead.value / tot * 100);
+  return '<span class="wspl-viz wspl-ring-row">'
+    + '<svg class="wspl-spend wspl-ring" viewBox="0 0 40 40" role="img" aria-label="' + esc(lbl) + '">'
+    +   '<circle cx="20" cy="20" r="' + R + '" fill="none" stroke="rgba(120,160,255,0.14)" stroke-width="6"/>'
+    +   '<g transform="rotate(-90 20 20)">' + arcs + '</g></svg>'
+    + '<span class="wspl-share-t" aria-hidden="true">' + esc(t('wspl_spend')) + ' · <b>' + esc(lead.name) + ' ' + leadPct + '%</b></span>'
     + '</span>';
 }
 // La barra es SVG-menos: dos cajas con su ancho en porcentaje. Sin librería, sin canvas y sin
@@ -25074,11 +25306,14 @@ function _wsPopoverMenu(anchor, id, items, onPick) {
 function _wsSavedMenuOpen(anchor, ref, opts) {
   opts = opts || {};
   const i = ref.indexOf(':'), kind = ref.slice(0, i), id = ref.slice(i + 1);
-  let pinned = false;
+  let pinned = false, dashable = true;
   try {
-    pinned = (kind === 'goal')
-      ? (_wsgGoals().find(x => x && x.id === id) || {}).dashPinned === true
-      : (_ws4Projects().find(x => x && x.id === id) || {}).dashHidden !== true;
+    if (kind === 'goal') pinned = (_wsgGoals().find(x => x && x.id === id) || {}).dashPinned === true;
+    else {
+      const d = _ws4Projects().find(x => x && x.id === id) || null;
+      dashable = !!(d && _WSPL_TYPES[d.type]);
+      pinned = _wsPlanOnDash(d);
+    }
   } catch (_) {}
   const items = [];
   // «ABRIR» APLICA O NO SEGÚN LA FORMA DE LA CAPACIDAD, y eso lo decide el llamador. En Objetivos
@@ -25088,7 +25323,7 @@ function _wsSavedMenuOpen(anchor, ref, opts) {
   if (opts.canOpen) items.push({ k: 'open', label: t('wspl_a_open') });
   items.push({ k: 'rename', label: t('wspl_a_rename') });
   items.push({ k: 'dup',    label: t('wspl_a_dup') });
-  if (opts.canDash !== false) items.push({ k: pinned ? 'unpin' : 'pin', label: t(pinned ? 'wsmse_dash_remove' : 'wsmse_dash_add') });
+  if (opts.canDash !== false && dashable) items.push({ k: pinned ? 'unpin' : 'pin', label: t(pinned ? 'wsmse_dash_remove' : 'wsmse_dash_add') });
   items.push({ k: 'del',    label: t('wspl_a_del'), cls: 'is-danger' });
   _wsPopoverMenu(anchor, 'wsSavedMenu', items, act => _wsSavedAct(act, ref, {
     onOpen: opts.onOpen,
@@ -25227,7 +25462,8 @@ function _wsPlanDashSet(id, hidden, kind) {
     }
     const d = _ws4Projects().find(x => x && x.id === id);
     if (!d) return false;
-    if (hidden) d.dashHidden = true; else delete d.dashHidden;
+    if ((_WSPL_TYPES[d.type] || {}).optIn) { if (hidden) delete d.dashPinned; else d.dashPinned = true; }
+    else if (hidden) d.dashHidden = true; else delete d.dashHidden;
     _ws4Persist(d);
   } catch (_) { return false; }
   _wsPlansRepaint();
@@ -25241,6 +25477,13 @@ function _renderDashboardPlans() {
   const esc = _intccEsc;
   const _wsplSigs = (_renderDashboardPlans._sigs = _renderDashboardPlans._sigs || Object.create(null));
   const docs = _wsPlansAll();
+  // ── CIERRE WORKSPACE §4 · «TU ESPACIO»: DOS GRUPOS, DOS REJILLAS ─────────────────────────
+  // Tus planes (instancias guardadas) y Herramientas fijadas (accesos directos) son grupos
+  // distintos: cada uno su rejilla y su orden, sin camino para arrastrar de uno a otro, y los dos
+  // DEBAJO del patrimonio, que no alimentan.
+  const pins = _wsPinnedCaps();
+  const pinnedHtml = pins.length ? _renderDashboardPinned(pins) : '';
+  const head = `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wsx_title'))}</h2></header>`;
   if (!docs.length) {
     const st = _wsPlansEmptyState();
     const body = st === 'loading'
@@ -25250,7 +25493,8 @@ function _renderDashboardPlans() {
       : st === 'error'
         ? `<p class="wspl-note is-warn">${esc(t('wspl_error'))} <button type="button" class="wspl-link" data-ws-sync-retry>${esc(t('ws_sync_retry'))}</button></p>`
         : `<p class="wspl-note">${esc(t('wspl_empty'))} <button type="button" class="wspl-link" data-wspl-templates>${esc(t('wspl_empty_cta'))}</button></p>`;
-    return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>${body}`;
+    if (!pinnedHtml) return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wsx_title'))}</h2></header>${body}`;
+    return `${head}<section class="wsx-grp" data-wsx-grp="plans"><h3 class="wsx-gtitle">${esc(t('wspl_title'))}</h3>${body}</section>${pinnedHtml}`;
   }
   const cards = docs.map(it => {
     // UNA sola forma de tarjeta para las dos clases de documento: lo COMPARTIDO es la
@@ -25297,10 +25541,104 @@ function _renderDashboardPlans() {
   }).join('');
   const _rec = (typeof _wsDocsPullSkippedAbsent === 'number' && _wsDocsPullSkippedAbsent > 0)
     ? `<p class="wspl-note is-warn">${esc(t('wspl_recover_note')(_wsDocsPullSkippedAbsent))} <button type="button" class="wspl-link" data-ws-recover>${esc(t('wspl_recover_btn'))}</button></p>` : '';
-  return `<header class="wspl-head"><h2 class="wspl-title">${esc(t('wspl_title'))}</h2></header>${_rec}
-    <div class="wspl-grid" id="wsPlansGrid" data-wspl-n="${docs.length}">${cards}</div>
+  return `${head}<section class="wsx-grp" data-wsx-grp="plans"><h3 class="wsx-gtitle">${esc(t('wspl_title'))}</h3>${_rec}
+    <div class="wspl-grid" id="wsPlansGrid" data-wspl-n="${docs.length}">${cards}</div></section>${pinnedHtml}
     <span id="dashReorderHintPlans" class="intcc-sr-only">${esc(t('dash_reorder_hint_plans'))}</span>`;
 }
+// ── LAS CAPACIDADES FIJADAS QUE ESTA CUENTA PUEDE ABRIR, EN SU ORDEN ─────────────────────────
+// El orden es el del propio almacén de fijados (`aurix_ws_pinned_v1`), que ya se sincroniza como
+// preferencia: reordenar en el Dashboard reescribe esa lista, sin una clave nueva. Una estrella
+// sobre algo no publicado o sin derecho no aparece: fijar nunca concede lo que el gate deniega.
+function _wsPinnedCaps() {
+  const out = [];
+  let pins = [];
+  try { pins = _wsPinned(); } catch (_) { return out; }
+  if (!pins.length) return out;
+  const byRef = Object.create(null);
+  [['template', _WS_TPL_RENDER], ['tool', _WS_TOOL_RENDER]].forEach(([kind, map]) => {
+    let list = [];
+    try { list = _wsCatalogFor(kind); } catch (_) { list = []; }
+    list.forEach(e => {
+      const r = map[e.id] || {};
+      if (e.published !== true) return;
+      const openKind = r.tool ? 'tool' : (r.ws4 ? 'workspace' : (r.cta || ''));
+      if (!openKind) return;
+      let acc = { ok: false };
+      try { acc = r.ws4 ? _wsWs4Access(r.ws4) : _wsToolAccess(r.tool || r.cta); } catch (_) { acc = { ok: false }; }
+      if (!acc.ok) return;
+      const ref = _wsCanonRef(openKind, r.tool || r.ws4 || '');
+      if (!ref || byRef[ref]) return;
+      const cat = r.cat || e.id;
+      byRef[ref] = { ref, cat, name: r.nameKey ? t(r.nameKey) : e.id, accent: _WS_TOOL_ACCENT[cat] || 'blue', icon: _wsSurfaceIcon(cat) };
+    });
+  });
+  pins.forEach(p => { if (p && byRef[p.ref]) { out.push(byRef[p.ref]); delete byRef[p.ref]; } });
+  return out;
+}
+function _renderDashboardPinned(pins) {
+  const esc = _intccEsc;
+  const cover = c => {
+    try { const h = _wsToolCoverHtml(c.cat); if (h) return h; if (_WS_TPL_ASSET[c.cat]) return _wsCatPreviewHtml(c.cat); } catch (_) {}
+    return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(c.icon)}</span>`;
+  };
+  const cards = pins.map(c => `
+      <article class="wspl-card wspin-card" data-wspin-ref="${esc(c.ref)}" data-ws-accent="${esc(c.accent)}">
+        <div class="wspl-card-id">
+          <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + c.name)}" aria-describedby="dashReorderHintPins">
+            <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
+          </button>
+          <span class="wspl-ico">${_wsCapIconHtml(c.icon)}</span>
+          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(c.name)}">${esc(c.name)}</span></span>
+          <button type="button" class="wspl-menu" data-wspin-menu="${esc(c.ref)}" aria-haspopup="true" aria-expanded="false"
+            title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + c.name)}"><span aria-hidden="true">&#8943;</span></button>
+        </div>
+        <div class="wspin-cover" aria-hidden="true">${cover(c)}</div>
+        <span class="wspin-hint">${esc(t('wsx_pinned_hint'))}</span>
+        <button type="button" class="wspl-go" data-wspin-dopen="${esc(c.ref)}" aria-label="${esc(t('wsx_pinned_open') + ' — ' + c.name)}">${esc(t('wsx_pinned_open'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      </article>`).join('');
+  return `<section class="wsx-grp" data-wsx-grp="pinned"><h3 class="wsx-gtitle">${esc(t('wsx_pinned_title'))}</h3>
+    <div class="wspl-grid wspin-grid" id="wsPinGrid" data-wspl-n="${pins.length}">${cards}</div>
+    <span id="dashReorderHintPins" class="intcc-sr-only">${esc(t('dash_reorder_hint_plans'))}</span></section>`;
+}
+// Abrir una capacidad fijada DESDE EL DASHBOARD: el mismo despacho que su estrella en Mi espacio
+// (`_wsPinOpen`), con el retorno al Dashboard y su scroll, como «Continuar» de un plan.
+function _wsDashPinOpen(ref) {
+  if (!ref) return;
+  _wsDashOriginMark();
+  try { switchTab('workspace'); } catch (_) {}
+  const i = ref.indexOf(':'), kind = ref.slice(0, i), key = ref.slice(i + 1);
+  if (kind === 'tool') { _wsOpenTool(key); }
+  else if (_WS_VIEW_SURFACES.indexOf(key) !== -1) { _wsOpenSurface(key); }
+  else if (key === 'mbudget') { _wsOpenTool('budget'); }
+  else if (['realestate', 'receivables', 'journal', 'assets'].indexOf(key) !== -1) { _wsOpenTool(key); }
+  else { _ws4OpenOrCreate(key); }
+}
+function _wsDashPinMenu(anchor, ref) {
+  _wsPopoverMenu(anchor, 'wsPinDashMenu', [
+    { k: 'open', label: t('wsx_pinned_open') },
+    { k: 'unpin', label: t('wsx_pinned_unpin') },
+  ], act => {
+    if (act === 'open') _wsDashPinOpen(ref);
+    else if (act === 'unpin') { if (_wsIsPinned(ref)) _wsTogglePin(ref); _wsPlansRepaint(); }
+  });
+}
+// GRUPO 3 · HERRAMIENTAS FIJADAS. Su orden ES el del almacén de fijados: se reescribe esa lista
+// (mismas entradas, mismo `ts`) en el orden nuevo; lo que no se ve conserva su hueco.
+_aurixReorderRegister('wsPinGrid', {
+  item: '.wspin-card[data-wspin-ref]',
+  key: el => el.getAttribute('data-wspin-ref'),
+  label: el => ((el.querySelector('.wspl-name') || {}).textContent || '').trim(),
+  commit: visible => {
+    try {
+      const list = _wsPinned();
+      const refs = list.map(p => p && p.ref);
+      const merged = _aurixOrderMerge(refs, visible);
+      const byRef = new Map(list.map(p => [p && p.ref, p]));
+      _wshWriteStore(_WSH_PINNED_KEY, merged.map(r => byRef.get(r)).filter(Boolean));
+    } catch (_) {}
+    try { const sec = document.getElementById('wsPlansSection'); if (sec) sec._wsplHtml = ''; } catch (_) {}
+  },
+});
 // EL GUARD DE LA SECCIÓN, Y FALLA CERRADO. Sin Premium CONFIRMADO no se pinta
 // nada: ni la sección, ni un hueco reservado, ni un candado, ni un teaser. Y
 // perder Premium la OCULTA — no borra un solo documento, que siguen en su
@@ -25318,7 +25656,7 @@ function updateDashboardPlans() {
   // Mientras el usuario arrastra una tarjeta, repintar se la arrancaría de la mano; el gesto
   // termina en un repintado propio. Y un repintado idéntico no toca el DOM: ni foco perdido,
   // ni menú cerrado, ni animación repetida.
-  if (_aurixReorderBusy === 'wsPlansGrid') return;
+  if (_aurixReorderBusy === 'wsPlansGrid' || _aurixReorderBusy === 'wsPinGrid') return;
   const html = _renderDashboardPlans();
   if (sec._wsplHtml !== html || !sec.firstChild) { sec.innerHTML = html; sec._wsplHtml = html; }
   sec.style.display = '';
@@ -25429,6 +25767,16 @@ function _wsPlansWireOnce() {
       try { switchTab(dest === 'workspace' ? 'workspace' : 'intelligence'); } catch (_) {}
       return;
     }
+    const pin = e.target && e.target.closest ? e.target.closest('#wsPlansSection [data-wspin-dopen],#wsPlansSection [data-wspin-menu],#wsPlansSection .wspin-card[data-wspin-ref]') : null;
+    if (pin) {
+      if (justDragged) return;
+      const pm = pin.getAttribute('data-wspin-menu');
+      if (pm) { e.preventDefault(); e.stopPropagation(); _wsDashPinMenu(pin, pm); return; }
+      if (pin.hasAttribute('data-wspin-dopen')) { _wsDashPinOpen(pin.getAttribute('data-wspin-dopen')); return; }
+      if (e.target.closest('button, a, .dash-grip')) return;
+      _wsDashPinOpen(pin.getAttribute('data-wspin-ref'));
+      return;
+    }
     const el = e.target && e.target.closest ? e.target.closest('[data-wspl-open],[data-wspl-menu],[data-wspl-templates],[data-ws-sync-retry],[data-ws-recover]') : null;
     // Pulsar la tarjeta abre el documento igual que «Continuar» (salvo sus propios controles, y
     // salvo el clic que sigue a un arrastre).
@@ -25457,6 +25805,13 @@ function _wsPlansWireOnce() {
 // gate se vuelve a preguntar aquí, así que un derecho revocado entre el pintado y
 // el clic no cuela. Y el retorno es el que el bloque anterior dejó preparado —
 // `_wsReturnTab = 'dashboard'`—, que hasta hoy no tenía quien lo escribiera.
+// EL ORIGEN «dashboard» LO ESCRIBE UN SOLO SITIO: éste. Lo usan las dos puertas del Dashboard
+// («Continuar» de un plan y «Abrir» de una herramienta fijada). Con él va el sitio del Dashboard
+// desde el que se abrió: «Volver» lo recupera (la apertura sube al inicio del documento).
+function _wsDashOriginMark() {
+  _wsReturnTab = 'dashboard';
+  try { _wsDashReturnY = window.scrollY || 0; } catch (_) { _wsDashReturnY = null; }
+}
 function _wsPlansOpen(id, kind) {
   // Un objetivo se abre por SU superficie, y el derecho se vuelve a preguntar aquí igual que
   // para una plantilla: ofrecer «Continuar» sobre algo que el gate va a denegar sería la misma
@@ -25484,10 +25839,7 @@ function _wsPlansOpen(id, kind) {
       return;
     }
   }
-  _wsReturnTab = 'dashboard';
-  // El sitio del Dashboard desde el que se abrió: «Volver» lo recupera (antes se conservaba sólo
-  // porque nadie tocaba el scroll; ahora la apertura sube al inicio del documento).
-  try { _wsDashReturnY = window.scrollY || 0; } catch (_) { _wsDashReturnY = null; }
+  _wsDashOriginMark();
   if (goalOpen) {
     try { switchTab('workspace'); } catch (_) {}
     try { _wsOpenSurface('goals'); } catch (_) {}
@@ -25525,8 +25877,9 @@ function _wsxAct(act, ref) {
   };
   if (act === 'del') { _wsConfirm(doDelete); return; }
   if (act === 'dup') {
-    if (kind === 'goal') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
-    else if (kind === 'workspace') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), customName: (s.customName ? s.customName + ' ' + t('wsg_copy_suffix') : undefined), createdAt: now, updatedAt: now })); }
+    if (kind === 'goal') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), dashPinned: undefined, createdAt: now, updatedAt: now })); }
+    // Duplicar NO publica en el Dashboard: el opt-in es un acto sobre UNA instancia (cierre §2).
+    else if (kind === 'workspace') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), customName: (s.customName ? s.customName + ' ' + t('wsg_copy_suffix') : undefined), dashPinned: undefined, createdAt: now, updatedAt: now })); }
     else if (kind === 'scenario') { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); _wshWriteStore(_WSH_SCENARIOS_KEY, arr); } }
     rerender();
   }
@@ -25684,74 +26037,68 @@ function _renderWorkspaceHome(metrics) {
     // y el documento lleva el nombre que el usuario le puso, no el de la plantilla.
     const pinTs = ref => { const p = _wsPinned().find(x => x && x.ref === ref); return p ? (p.ts || 1) : 0; };
 
-    // ── 1 · FAVORITOS ────────────────────────────────────────────────────────
-    // Se resuelven contra el CATÁLOGO y contra el acceso real (`_wsCardModel` ya
-    // usa `_wsToolAccess`), así que una estrella antigua sobre una capacidad que
-    // dejó de publicarse o de estar concedida no aparece: un favorito no puede
-    // conceder lo que el gate deniega.
-    const favItems = (map, kind) => _wsCatalogFor(kind)
+    // ── RE-DECIDIDO (cierre Workspace §3): MI ESPACIO = FAVORITOS ∪ DOCUMENTOS ─────
+    // La pasada anterior dejó aquí SÓLO favoritos y el copy vacío seguía prometiendo «guarda un
+    // documento y aparecerá aquí». Ése era el P0: una cuenta con documentos guardados —visibles
+    // en el Dashboard y en «Mis documentos»— y ninguna estrella veía «Sin plantillas todavía» al
+    // volver a entrar. Ahora la unidad es la CAPACIDAD: un grupo por capacidad, que existe si
+    // está fijada O si tiene documentos, y dentro sus documentos con el nombre del usuario.
+    // Fijar + guardar no duplica nada (es el mismo grupo) y guardar NO fija (la estrella sigue
+    // siendo un acto aparte). Los documentos salen de los TRES lectores filtrados de siempre
+    // (`_wshAllProjects`), así que tombstones, aislamiento por cuenta y sincronización son los
+    // del almacén: aquí no hay estado propio. Un documento «quitado de Mi espacio» (§WS.12) sigue
+    // fuera; su capacidad no se esconde por eso.
+    const _docsBySurface = (function () {
+      const m = Object.create(null);
+      const surfOfType = { compound_growth: 'tool:compound', loan_simulation: 'tool:loan', monthly_budget: 'tool:budget',
+        receivables_app: 'tool:receivables', trade_journal: 'tool:journal', real_estate_portfolio: 'tool:realestate',
+        asset_prices: 'tool:assets', scenario_compare: 'scenario' };
+      let all = [];
+      try { all = _wshAllProjects(); } catch (_) { all = []; }
+      all.forEach(d => {
+        if (!d || !d.ref || _wsSpaceIsHidden(d.ref)) return;
+        const k = d.kind === 'goal' ? 'goals' : d.kind === 'scenario' ? 'scenario'
+          : (surfOfType[d.type] || ('ws4:' + d.type));
+        (m[k] = m[k] || []).push(d);
+      });
+      Object.keys(m).forEach(k => m[k].sort((x, y) => (y.ts || 0) - (x.ts || 0)));
+      return m;
+    })();
+    const _surfKey = mdl => mdl.openKind === 'tool' ? 'tool:' + mdl.openArg
+      : mdl.openKind === 'workspace' ? 'ws4:' + mdl.openArg : String(mdl.openKind || '');
+    const _claimed = new Set();
+    const _onDash = d => {
+      try {
+        if (d.kind === 'goal') return (_wsgGoals().find(x => x && x.id === d.id) || {}).dashPinned === true;
+        if (d.kind !== 'workspace') return false;
+        const p = _ws4Projects().find(x => x && x.id === d.id);
+        return !!p && _wsPlanOnDash(p);
+      } catch (_) { return false; }
+    };
+    const colItems = (map, kind) => _wsCatalogFor(kind)
       .map(e => _wsCardModel(e, map[e.id] || {}))
-      .filter(m => m.state === 'open' && m.pinRef && _wsIsPinned(m.pinRef))
-      .map(m => ({
-        mtype: 'fav', ref: m.pinRef, model: m, name: m.name, cat: m.cat,
-        entryId: m.entryId, viz: m.viz, used: _wsRecentTs(m.pinRef),
-        ts: Math.max(pinTs(m.pinRef), _wsRecentTs(m.pinRef)),
-      }));
-
-    // ── MI ESPACIO SON FAVORITOS. Y NADA MÁS. ──────────────────────────────
-    // Aquí se concatenaban favoritos Y documentos guardados, y de ahí venía la
-    // mezcla: una tarjeta era «una capacidad que fijé» y la de al lado «un
-    // presupuesto que guardé» —dos cosas distintas con la misma forma—, y una
-    // capacidad con tres documentos aparecía cuatro veces. Son tres entidades
-    // separadas: capacidad, favorito y documento. Mi espacio publica la
-    // segunda; el Resumen, la tercera de las plantillas; y cada herramienta, la
-    // tercera de la suya.
-    const colItems = (map, kind) => favItems(map, kind)
+      .filter(mdl => mdl.state === 'open')
+      .map(mdl => {
+        const sk = _surfKey(mdl);
+        // Una superficie publicada en los dos catálogos se agrupa UNA vez: la primera la reclama.
+        const docs = (!_claimed.has(sk) && _docsBySurface[sk]) ? _docsBySurface[sk] : [];
+        if (docs.length) _claimed.add(sk);
+        const fav = !!(mdl.pinRef && _wsIsPinned(mdl.pinRef));
+        if (!fav && !docs.length) return null;
+        return {
+          mtype: docs.length ? 'doc' : 'fav', fav, docs, ref: mdl.pinRef, model: mdl, name: mdl.name, cat: mdl.cat,
+          ts: Math.max(fav ? pinTs(mdl.pinRef) : 0, docs.length ? (docs[0].ts || 0) : 0),
+        };
+      })
+      .filter(Boolean)
       .sort((a, b) => (b.ts - a.ts) || String(a.name).localeCompare(String(b.name)));
     const tplList = colItems(_WS_TPL_RENDER, 'template');
     const toolList = colItems(_WS_TOOL_RENDER, 'tool');
 
-    // El metadato, y sólo lo que se puede demostrar. Un favorito dice cuándo se
-    // abrió por última vez SI se abrió; un documento dice de qué capacidad es y
-    // cuándo se actualizó. Nunca «guardado» sobre algo que no está guardado.
-    // §8 — se retira «último uso» de los favoritos. Es el metadato más largo de
-    // la tarjeta y describe un criterio que el producto YA abandonó: la
-    // pertenencia a Mi espacio es intencional, no por uso. Un documento sí dice
-    // de qué capacidad es y cuándo se actualizó, que es lo que lo distingue de
-    // otro documento del mismo tipo.
-    const mseMeta = it => it.mtype === 'doc'
-      ? [it.typeLabel, it.ts ? (t('wsmse2_updated') + ' ' + _wsRelTime(it.ts)) : ''].filter(Boolean).join(' · ')
-      : t('wsmse2_fav');
-    // Abrir: un favorito abre la CAPACIDAD (por su ref fijada), un documento abre
-    // SU instancia (por su ref de documento). Los dos por owners que ya existen.
-    const openAttrs = it => it.mtype === 'doc'
-      ? ` role="button" tabindex="0" data-wsx-open="${esc(it.ref)}"`
-      : _wsCardAttrs(it.model);
-    // ── §8 · UN ICONO SEMÁNTICO, NO UNA FOTO DIMINUTA NI UN RECORTE ─────────
-    // LO QUE HABÍA, y es lo que el fundador fotografió: la miniatura de un
-    // documento era un RECORTE DE SU CONTENIDO a 34 px, así que una tarjeta de
-    // Mi espacio se ilustraba con «25…» —el principio de una cifra cortada— y
-    // las de al lado con fotografías minúsculas o glifos de otro peso. Tres
-    // lenguajes visuales en una rejilla de dos columnas.
-    //
-    // Ahora las dos clases de tarjeta usan el MISMO icono de la MISMA familia
-    // (`_wsGlyph`, 24×24, trazo 1.7), elegido por la superficie a la que
-    // pertenecen. La distinción entre documento guardado y capacidad favorita no
-    // la hace la miniatura —no puede, son la misma capacidad— sino el filete de
-    // color de la tarjeta y su metadato, que es donde se lee.
-    // ── §11/§13 · LA PREVIEW ES LA DEL CATÁLOGO, NO UN GLIFO DE 24 px ────────
-    // Mi espacio pintaba una fila de 66 px con un icono genérico de 24 en una caja de 52: una
-    // LISTA ADMINISTRATIVA, no una biblioteca. Y la misma capacidad tenía dos caras según por
-    // dónde la mirases. Aquí no se crea ningún asset: se llama a los DOS owners que ya visten
-    // el catálogo, y de ahí sale gratis la personalidad que el §13 pide —fotografía para las
-    // plantillas, que son organización y documento; trazo para las herramientas, que son
-    // cálculo— con una sola arquitectura. El glifo se queda como último recurso, para una
-    // capacidad sin portada declarada: la caja es la misma, así que no hay salto.
-    // El `try` no es decorativo: esta función pasó de depender de un glifo a depender de los dos
-    // owners de portada del catálogo, y eso amplía la superficie de fallo de una ruta de render
-    // de una superficie PAGADA. Una portada es cosmética; Mi espacio no. Si algo faltara, se
-    // cae al glifo y la lista sigue en pie. Lo destapó un gate P0 que ejercita este render en un
-    // sandbox: allí las dependencias nuevas no estaban cargadas y el render entero reventaba.
+    // El metadato de la CAPACIDAD dice lo demostrable: si está fijada y cuántos documentos tiene.
+    const mseMeta = it => [it.fav ? t('wsmse2_fav') : '',
+      it.docs.length ? String(t(it.docs.length === 1 ? 'wsmse2_docs_one' : 'wsmse2_docs_n')).replace('{n}', String(it.docs.length)) : '']
+      .filter(Boolean).join(' · ');
     const mseCover = it => {
       try {
         const cover = _wsToolCoverHtml(it.cat);
@@ -25760,33 +26107,50 @@ function _renderWorkspaceHome(metrics) {
       } catch (_) {}
       return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(it.cat))}</span>`;
     };
-    // `aria-hidden` en la miniatura: es una ILUSTRACIÓN de 34 px en móvil, con
-    // etiquetas de 7,5 px que nadie lee y que un lector de pantalla no debe
-    // dictar. El nombre accesible de la tarjeta es el del documento, que ya está.
+    // La capacidad abre la CAPACIDAD (owner del catálogo, mismo gate); cada documento abre SU
+    // instancia (`_wsxOpen`). El ⋯ del documento es el menú de Mi espacio de siempre.
+    const docRow = d => {
+      const dash = _onDash(d);
+      const meta = [d.ts ? (t('wsmse2_updated') + ' ' + _wsRelTime(d.ts)) : '', dash ? t('wsmse2_on_dash') : ''].filter(Boolean).join(' · ');
+      return `
+        <li class="wsh-mse2-doc${dash ? ' is-dash' : ''}" data-wsmse-type="doc" data-wsmse-ref="${esc(d.ref)}">
+          <button type="button" class="wsh-mse2-doc-open" data-wsx-open="${esc(d.ref)}" aria-label="${esc(d.name + ' · ' + t('wsh_proj_open'))}">
+            <span class="wsh-mse2-doc-n">${esc(d.name)}</span>
+            ${meta ? `<span class="wsh-mse2-doc-m">${esc(meta)}</span>` : ''}
+          </button>
+          <button type="button" class="wsh-mse2-doc-menu" data-wsmenu="${esc(d.ref)}" aria-haspopup="true" aria-label="${esc(t('wspl_menu') + ' — ' + d.name)}"><span aria-hidden="true">&#8943;</span></button>
+        </li>`;
+    };
     const card = it => `
-      <div class="wsh-mse2-card is-${it.mtype}" data-wsmse-type="${it.mtype}"${openAttrs(it)} aria-label="${esc(it.name)}">
-        <div class="wsh-mse2-pv" aria-hidden="true">${mseCover(it)}</div>
-        <div class="wsh-mse2-body">
-          <p class="wsh-mse2-name">${esc(it.name)}</p>
-          <span class="wsh-mse2-meta">${esc(mseMeta(it))}</span>
+      <div class="wsh-mse2-grp${it.fav ? ' is-fav' : ''}${it.docs.length ? ' has-docs' : ''}" data-wsmse-cap="${esc(it.cat)}">
+        <div class="wsh-mse2-card is-${it.mtype}${it.fav ? ' is-saved' : ''}" data-wsmse-type="${it.docs.length ? 'cap' : 'fav'}"${_wsCardAttrs(it.model)} aria-label="${esc(it.name)}">
+          <div class="wsh-mse2-pv" aria-hidden="true">${mseCover(it)}</div>
+          <div class="wsh-mse2-body">
+            <p class="wsh-mse2-name">${esc(it.name)}</p>
+            <span class="wsh-mse2-meta">${esc(mseMeta(it))}</span>
+          </div>
         </div>
+        ${it.docs.length ? `<ul class="wsh-mse2-docs" aria-label="${esc(it.name)}">${it.docs.map(docRow).join('')}</ul>` : ''}
       </div>`;
-    // El vacío es COMPACTO y SIMÉTRICO: mismo alto mínimo, misma tipografía, y no
-    // inventa elementos para rellenar. Y su copy ya no promete que el espacio se
-    // llena solo, porque ya no se llena solo.
-    const emptyState = (tk, bk, ck, gotoTab) => `
-      <div class="wsh-mse2-empty">
+    // ── NO SE DECIDE «VACÍO» ANTES DE SABERLO ───────────────────────────────
+    // Con sesión y la lectura de documentos de ESTA cuenta todavía en vuelo (o sin lanzar), cero
+    // documentos locales no significa cero documentos: se pinta una espera neutra, y el pull
+    // repinta Home al terminar (`_wsPlansRepaint`). Si la lectura falló, se dice — nunca «no
+    // tienes nada». El mismo owner de tres estados que ya gobierna «Tus planes».
+    const _hydr = (function () { try { return _wsPlansEmptyState(); } catch (_) { return 'empty'; } })();
+    const _pending = (function () {
+      try { const uid = _wsDocsSession(); return !!uid && _wsCanPersist() && _wsDocsPulledFor !== uid && _wsDocTableState !== 'no'; } catch (_) { return false; }
+    })();
+    const _unknown = _hydr === 'error' ? 'error' : ((_hydr === 'loading' || _pending) ? 'loading' : '');
+    const emptyState = (tk, bk, ck, gotoTab) => _unknown === 'loading'
+      ? `<div class="wsh-mse2-empty is-loading" aria-busy="true"><span class="wsh-mse2-skel"></span><span class="wsh-mse2-skel is-short"></span><span class="intcc-sr-only">${esc(t('wspl_loading'))}</span></div>`
+      : _unknown === 'error'
+        ? `<div class="wsh-mse2-empty is-error"><p class="wsh-mse2-empty-b">${esc(t('wspl_error'))}</p><button type="button" class="wsh-cta" data-ws-sync-retry="1">${esc(t('ws_sync_retry'))}</button></div>`
+        : `<div class="wsh-mse2-empty">
         <p class="wsh-mse2-empty-t">${esc(t(tk))}</p>
         <p class="wsh-mse2-empty-b">${esc(t(bk))}</p>
         <button type="button" class="wsh-cta is-primary" data-wstab="${gotoTab}">${esc(t(ck))}</button>
       </div>`;
-    // ── LAS DOS COLUMNAS SON LA MISMA COLUMNA DOS VECES ──────────────────────
-    // Se retira el SUBTÍTULO de la cabecera: era «Plantillas utilizadas
-    // recientemente» / «Herramientas utilizadas recientemente», así que (a)
-    // describía la regla de pertenencia que acaba de desaparecer y (b) al ocupar
-    // dos líneas en una columna y una en la otra desplazaba verticalmente todo el
-    // contenido de una respecto de la otra. Sin él las dos cabeceras son
-    // idénticas y las dos listas empiezan a la misma altura.
     const column = (titleK, list, emptyArgs) => `
       <section class="wsh-card wsh-mse2-col">
         <header class="wsh-mse2-head">
@@ -25794,8 +26158,9 @@ function _renderWorkspaceHome(metrics) {
         </header>
         ${list.length ? `<div class="wsh-mse2-list">${list.map(card).join('')}</div>` : emptyState.apply(null, emptyArgs)}
       </section>`;
+    const _nDocs = tplList.concat(toolList).reduce((n, it) => n + it.docs.length, 0);
 
-    panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}">
+    panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}" data-wsmse-docs="${_nDocs}"${_unknown ? ` data-wsmse-state="${_unknown}"` : ''}>
       ${column('wsmse2_tpl_title', tplList, ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
       ${column('wsmse2_tool_title', toolList, ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
     </div>`;
@@ -26251,7 +26616,9 @@ function _wsbCardsHtml(cmp) {
 // aportación más alta, identificada por su importe y no por un juicio.
 function _wsbImpactInnerHtml(cmp) {
   const esc = _intccEsc;
-  if (!cmp.publishable) return `<p class="wsb-note">${esc(t('wsb_need_inputs'))}</p>`;
+  // §8 · UN ÚNICO MENSAJE. Sin patrimonio de partida ya lo dice, una vez y junto al campo que
+  // falta, la tarjeta de parámetros (`data-wsb-basenote`); aquí no se repite.
+  if (!cmp.publishable) return (cmp.base && cmp.base.known === false) ? '' : `<p class="wsb-note">${esc(t('wsb_need_inputs'))}</p>`;
   const baseProj = cmp.reference.final;
   const rows = cmp.rows || [];
   const top = rows.length ? rows.reduce((a, b) => (b.projected > a.projected ? b : a), rows[0])
@@ -26385,6 +26752,8 @@ function _wsbTwoWayInnerHtml() {
 function _wsbTwoWayOutHtml(cmp) {
   const esc = _intccEsc;
   if (!cmp.ok) {
+    // Si lo ÚNICO que falta es la base, el aviso ya está arriba, junto a su campo (§8).
+    if (cmp.missing.length === 1 && cmp.missing[0] === 'base') return '';
     const what = cmp.missing.map(k => t(k === 'base' ? 'wsb2_need_base' : 'wsb2_need_years')).join(' · ');
     return `<p class="wsb-note is-warn">${esc(String(t('wsb2_suspended') || '').replace('{w}', what))}</p>`;
   }
@@ -26548,6 +26917,11 @@ function _wsbCommit(name, forceNew, targetId) {
     createdAt: existing ? (existing.createdAt || now) : now,
     updatedAt: now,
   };
+  // «Mostrar en Dashboard» es una decisión sobre ESTA instancia y `_ws4Persist` sustituye el
+  // documento entero: volver a guardar la conservaba sólo si se arrastra aquí. «Guardar como»
+  // (sin `existing`) crea otra instancia y no la hereda, igual que duplicar.
+  if (existing && existing.dashPinned === true) proj.dashPinned = true;
+  if (existing && existing.dashHidden === true) proj.dashHidden = true;
   // Si el almacén rechaza la escritura NO se marca «Guardado»: la comparación sigue
   // pendiente en pantalla y el motivo se dice junto al botón (como en las herramientas).
   if (_ws4Persist(proj) === false) { try { _wsbSaveError(t('wssave_failed')); } catch (_) {} return; }
@@ -26635,8 +27009,7 @@ function _renderScenarioBuilder() {
   const spread = top.projected - baseProj;
   const spreadPct = cmp.pctApplicable && baseProj > 0 ? Math.round(spread / baseProj * 100) : null;
   const impactHtml = `
-    <section class="wsh-card wsb-impact is-feature" data-wsb-impact>${_wsbImpactInnerHtml(cmp)}
-    </section>`;
+    <section class="wsh-card wsb-impact is-feature" data-wsb-impact>${_wsbImpactInnerHtml(cmp)}</section>`;
   // §C — LOS CONTROLES, VISIBLES AL ENTRAR. Base, horizonte y tasa son comunes a
   // la comparación, así que viven arriba y no dentro de cada tarjeta. Ahora,
   // además, van ANTES del impacto: el editor es lo primero que se alcanza.
@@ -27584,7 +27957,7 @@ function _wsgSaveGoal(id) {
 function _wsgDuplicate(id) {
   const s = _wsgGet(id); if (!s) return;
   const now = Date.now();
-  const copy = Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now });
+  const copy = Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), dashPinned: undefined, createdAt: now, updatedAt: now });
   _wsgPersist(copy);
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
 }
@@ -28547,6 +28920,7 @@ function _wsToolSaveBarSync(bar) {
   const stale = !!(bar.querySelector && bar.querySelector('.wsg-reqerr'));
   if (!stale && bar._wsHtml === h && bar._wsNode && bar._wsNode === bar.firstElementChild) return;
   bar.innerHTML = h; bar._wsHtml = h; bar._wsNode = bar.firstElementChild;
+  try { _wsBarStateSync(); } catch (_) {}
 }
 // ── EL SELECTOR DE PERIODO EDITA EL BORRADOR, Y NADA MÁS ──────────────────
 // No guarda, no duplica, no mueve el documento y no abre otro. Cambiar el mes
@@ -28560,7 +28934,7 @@ function _wsBudgetPeriodChange(el) {
   try { _wsToolStateSet(_wsToolActive, _wsToolInputs); } catch (_) {}
   const root = document.querySelector('.wsh-tool-view');
   const bar = root && root.querySelector('[data-wstool-savebar]');
-  if (bar) bar.innerHTML = _wsToolSaveBarHtml();
+  _wsToolSaveBarSync(bar);
 }
 
 // ── LOS CUATRO FORMULARIOS DE FILA NO PUEDEN FALLAR EN SILENCIO ────────────
@@ -28576,6 +28950,14 @@ function _wsBudgetPeriodChange(el) {
 // foco: en móvil el formulario quedaba 800 px más abajo y el toque parecía no
 // hacer nada. Tras repintar, se lleva la vista al bloque y el foco al primer
 // campo (o al bloque, si no hay campo). Sin animación con reduced motion.
+// §8 — «NUEVO …» ARRIBA, junto al título de la lista, en las capacidades cuyo formulario de alta
+// vive debajo de lo que se consulta (Cobros, Inmobiliario). No mueve el formulario —consulta y
+// alta siguen separadas—: lo lleva a la vista y enfoca su primer campo, por el mismo owner que
+// ya usa el lápiz de editar (`_wsFocusInView`).
+function _wsNewBtnHtml(label, blockSel, focusSel) {
+  const esc = _intccEsc;
+  return `<button type="button" class="wsh-cta wsh-newbtn" data-wsnew-focus="${esc(blockSel)}" data-wsnew-input="${esc(focusSel)}"><span aria-hidden="true">+</span> ${esc(label)}</button>`;
+}
 function _wsFocusInView(blockSel, focusSel) {
   try {
     const root = document.querySelector('.wsh-tool-view');
@@ -29005,6 +29387,11 @@ function _wsToolCommit(name, forceNew, targetId) {
     createdAt: existing ? (existing.createdAt || now) : now,
     updatedAt: now,
   };
+  // «Mostrar en Dashboard» es una decisión sobre ESTA instancia y `_ws4Persist` sustituye el
+  // documento entero: volver a guardar la conservaba sólo si se arrastra aquí. «Guardar como»
+  // (sin `existing`) crea otra instancia y no la hereda, igual que duplicar.
+  if (existing && existing.dashPinned === true) proj.dashPinned = true;
+  if (existing && existing.dashHidden === true) proj.dashHidden = true;
   // Si el almacén rechaza la escritura (cuota, modo privado), NO se finge: el
   // borrador sigue sucio en pantalla y el motivo se dice junto al botón.
   if (_ws4Persist(proj) === false) { try { _wsToolSaveError(t('wssave_failed')); } catch (_) {} return; }
@@ -29042,7 +29429,7 @@ function _wsToolSaveBarHtml() {
   if (!_wsCanPersist()) {
     return `
     <span class="wsg-savestate is-local">${esc(t('wstool_save_session'))}</span>
-    <button type="button" class="wsh-cta wsg-savebtn is-lock" data-wstool-save>${esc(saveLabel)}<span class="wsh-tier is-premium">${esc(t('wstier_premium'))}</span></button>`;
+    <button type="button" class="wsh-cta wsg-savebtn is-lock" data-wstool-save aria-label="${esc(saveLabel + ' · ' + t('wstier_premium'))}">${esc(t('wsbar_save'))}<span class="wsh-tier is-premium">${esc(t('wstier_premium'))}</span></button>`;
   }
   // ── EL CICLO DE VIDA DE LA INSTANCIA ABIERTA ──────────────────────────────
   // Con un documento abierto, `Guardar` ACTUALIZA. Las otras tres acciones existen
@@ -29081,7 +29468,7 @@ function _wsToolSaveBarHtml() {
     </details>` : '';
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
-    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>
+    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'} aria-label="${esc(saveLabel)}">${esc(t('wsbar_save'))}</button>
     ${lifecycle}`;
 }
 
@@ -29220,7 +29607,7 @@ function _renderCompoundTool() {
     </label>`;
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="teal">
-      ${_wsSurfaceHeadHtml({ title: t('wstool_compound_n'), doc: _wsToolDocName(), help: [t('wstool_compound_d')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wstool_compound_n'), doc: _wsToolDocName(), save: true, help: [t('wstool_compound_d')] })}
       ${_wsToolCcyRowHtml()}
       ${/* «DATOS DE ENTRADA» debajo de «Interés compuesto» no informaba de nada:
             los campos ya son visiblemente los datos de entrada. Se retira el
@@ -29245,15 +29632,12 @@ function _renderCompoundTool() {
             <div class="wstool-out" data-wstool-out>${_wsToolOutHtml(inp)}</div>
           </section>
         </div>
+        ${/* §6 · los documentos y el aviso, en la franja auxiliar (ver Préstamos). */''}
+        <div class="ws2col-aux">
+          ${_wsToolSavedListHtml()}
+          <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+        </div>
       </div>
-      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
-            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
-            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
-      ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
-      <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
 }
 
@@ -29443,7 +29827,14 @@ function _wsBudgetChartHtml(res, sel) {
   // la lista y se dice qué es: lo no asignado, su proporción sobre INGRESOS y que no
   // entra en el reparto. No se interpreta como «ahorro»: el usuario puede tener sus
   // propias categorías de ahorro dentro de los gastos.
-  const freeLeg = res.free > 0 ? `<p class="wsbud-free-note"><b>${esc(t('wstool_bud_free'))}</b> ${esc(String(t(res.saveRate == null ? 'wsbud_free_note_nr' : 'wsbud_free_note')).replace('{a}', _wsMoney(res.free)).replace('{r}', String(Math.round(res.saveRate || 0))))}</p>` : '';
+  // ── CIERRE WORKSPACE §7 · UNA SOLA CONCLUSIÓN ──────────────────────────────────────────
+  // Esta nota («Dinero libre … % de tus ingresos») y la lectura de debajo («Según tu presupuesto,
+  // te queda el … %») decían lo mismo con dos frases, y el KPI «Disponible» lo decía una tercera
+  // vez. Se queda la lectura (es la conclusión, y cubre déficit, cero y sin ingresos); que el
+  // disponible NO es un gasto lo dicen el rótulo del reparto («% sobre el total de gastos») y,
+  // extendido, el acordeón «Cómo se calcula» (`wstool_bud_basis_notcat`).
+  const freeLeg = '';
+  void (res.free > 0 ? `<p class="wsbud-free-note"><b>${esc(t('wstool_bud_free'))}</b> ${esc(String(t(res.saveRate == null ? 'wsbud_free_note_nr' : 'wsbud_free_note')).replace('{a}', _wsMoney(res.free)).replace('{r}', String(Math.round(res.saveRate || 0))))}</p>` : '');
   return `
     <div class="wsbud-chart-wrap">
       ${/* §18 — LA BARRA DE REPARTO SE RETIRA, y se auditó antes de decidirlo. Contaba lo MISMO
@@ -29654,13 +30045,20 @@ function _wsBudgetRowHtml(r) {
       </span>
     </div>`;
 }
+// §7 — «AÑADIR» VA EN LA CABECERA DE SU BLOQUE. Al pie de la lista obligaba a recorrer todas
+// las filas para añadir una; ahora está donde se lee el nombre del bloque. Su estado (lleno)
+// se repinta con la lista, por el mismo owner.
+function _wsBudgetAddBtnHtml(inp, type) {
+  const esc = _intccEsc;
+  const full = _wsBudgetRows(inp).filter(r => r.type === type).length >= _WSBUD_ROW_MAX;
+  return `<button type="button" class="wsbud-add" data-wsbud-add="${type}"${full ? ' disabled aria-describedby="wsbudLim-' + type + '"' : ''}>
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>${esc(t(type === 'income' ? 'wsbud_add_income' : 'wsbud_add_expense'))}</button>`;
+}
 function _wsBudgetListHtml(inp, type) {
   const esc = _intccEsc;
   const rows = _wsBudgetRows(inp).filter(r => r.type === type);
   const full = rows.length >= _WSBUD_ROW_MAX;
   return `<div class="wsbud-rows">${rows.map(_wsBudgetRowHtml).join('')}</div>
-    <button type="button" class="wsbud-add" data-wsbud-add="${type}"${full ? ' disabled aria-describedby="wsbudLim-' + type + '"' : ''}>
-      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>${esc(t(type === 'income' ? 'wsbud_add_income' : 'wsbud_add_expense'))}</button>
     ${full ? `<p class="wsbud-limit" id="wsbudLim-${type}">${esc(String(t('wsbud_limit')).replace('{m}', String(_WSBUD_ROW_MAX)))}</p>` : ''}`;
 }
 // Un borrador sin filas (documento antiguo o recién creado) las ADOPTA al pintarse,
@@ -29698,6 +30096,12 @@ function _wsBudgetRepaintList(type) {
   const root = _wsBudgetRoot(); if (!root) return;
   const host = root.querySelector('[data-wsbud-list="' + type + '"]');
   if (host) host.innerHTML = _wsBudgetListHtml(_wsToolInputs, type);
+  const slot = root.querySelector('[data-wsbud-addslot="' + type + '"]');
+  if (slot) {
+    const had = document.activeElement && slot.contains(document.activeElement);
+    slot.innerHTML = _wsBudgetAddBtnHtml(_wsToolInputs, type);
+    if (had) { const b = slot.querySelector('button'); if (b) b.focus(); }
+  }
 }
 function _wsBudgetOnAmount(el) {
   const id = el.getAttribute('data-wsbud-amt');
@@ -29863,7 +30267,7 @@ function _renderBudgetTool() {
   _wsBudSel = null;   // un repintado completo (abrir, guardar) vuelve al estado general
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-wsbud-view>
-      ${_wsSurfaceHeadHtml({ title: t('wstool_budget_n'), doc: _wsToolDocName(), help: [t('wstool_budget_d')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wstool_budget_n'), doc: _wsToolDocName(), save: true, help: [t('wstool_budget_d')] })}
       ${/* La moneda va en la cabecera compacta del resumen; sólo un documento ANTIGUO sin moneda
             conserva aquí su aviso completo, porque necesita explicación y confirmación. */''}
       ${_wsDocCcy() ? '' : _wsToolCcyRowHtml()}
@@ -29883,20 +30287,17 @@ function _renderBudgetTool() {
         </div>
         <div class="wsbud-col-edit">
           <section class="wsh-card wstool-inputs-card" data-wsbud-block="income">
-            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
+            <header class="wsh-head wsbud-blockhead"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3><span data-wsbud-addslot="income">${_wsBudgetAddBtnHtml(inp, 'income')}</span></header>
             <div class="wsbud-list" data-wsbud-list="income">${_wsBudgetListHtml(inp, 'income')}</div>
           </section>
           <section class="wsh-card wstool-inputs-card" data-wsbud-block="expense">
-            <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3></header>
+            <header class="wsh-head wsbud-blockhead"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3><span data-wsbud-addslot="expense">${_wsBudgetAddBtnHtml(inp, 'expense')}</span></header>
             <div class="wsbud-list" data-wsbud-list="expense">${_wsBudgetListHtml(inp, 'expense')}</div>
           </section>
         </div>
         <div class="wsbud-col-help" data-wsbud-help>${_wsBudgetHelpHtml(inp)}</div>
       </div>
       ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
     </div>`;
 }
 
@@ -30260,7 +30661,7 @@ function _renderJournalTool() {
   const res = calculateTradeJournal(_wsToolInputs.trades);
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="${esc(_WS_TOOL_ACCENT.journal)}">
-      ${_wsSurfaceHeadHtml({ title: t('wstool_journal_n'), doc: _wsToolDocName(), help: [t('wstool_journal_d')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wstool_journal_n'), doc: _wsToolDocName(), save: true, help: [t('wstool_journal_d')] })}
       ${/* ── UN RESUMEN DE NADA NO ES UN RESUMEN ──────────────────────────────
             Con el diario vacío esta tarjeta publicaba cuatro guiones y empujaba
             el formulario 300 px hacia abajo: lo primero que veía el usuario era
@@ -30292,9 +30693,6 @@ function _renderJournalTool() {
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
             usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
       ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
     </div>`;
 }
 
@@ -30732,7 +31130,7 @@ function _wsReDetailHtml(p) {
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       ${_wsSurfaceHeadHtml({
         title: p.name,
-        doc: (p.city ? p.city + ' · ' : '') + t('wsre_t_' + p.ptype),
+        sub: (p.city ? p.city + ' · ' : '') + t('wsre_t_' + p.ptype),
         backAttr: 'data-wsre-back', backText: t('wsre_back_s_portfolio'), backAria: t('wsre_back_portfolio'),
       })}
       <section class="wsh-card wsre-detail-hero">
@@ -30787,13 +31185,13 @@ function _renderRealEstateTool() {
             la capacidad ya tiene el derecho, así que el chip no informa — sólo
             ocupaba una línea. La nota de permanencia local no se pierde: viaja a
             la ayuda, junto al subtítulo. */''}
-      ${_wsSurfaceHeadHtml({ title: t('wsre_n'), doc: _wsToolDocName(), help: [t('wsre_d'), t('wsre_local_note')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wsre_n'), doc: _wsToolDocName(), save: true, help: [t('wsre_d'), t('wsre_local_note')] })}
       ${_wsToolCcyRowHtml()}
       ${/* Sin inmuebles, el resumen serían seis ceros y una rejilla de capas
             vacía. No se pinta: lo primero es la acción de añadir el primero. */''}
       ${r.count ? `<section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>` : ''}
       <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_grid_title'))}</h3></header>
+        <header class="wsh-head wsh-head-act"><h3 class="wsh-title">${esc(t('wsre_grid_title'))}</h3>${_wsNewBtnHtml(t('wsre_add'), '.wsre-form-card', '[data-wsre-input="name"]')}</header>
         ${gridOrEmpty}
       </section>
       ${r.count ? `<section class="wsh-card wsre-more-card"><header class="wsh-head wsre-more-head"><h3 class="wsh-title">${esc(t('wsre_more_title'))}</h3></header>${_wsReMoreHtml(r)}</section>` : ''}
@@ -30802,9 +31200,6 @@ function _renderRealEstateTool() {
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
             usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
       ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
     </div>`;
 }
 
@@ -31215,11 +31610,11 @@ function _renderReceivablesTool() {
   const r = calculateReceivables(items);
   return `
     <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
-      ${_wsSurfaceHeadHtml({ title: t('wsapp_receivables_n'), doc: _wsToolDocName(), help: [t('wsrecv_sub'), t('wsrecv_manual_note')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wsapp_receivables_n'), doc: _wsToolDocName(), save: true, help: [t('wsrecv_sub'), t('wsrecv_manual_note')] })}
       ${_wsToolCcyRowHtml()}
       ${r.list.length ? `<section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>` : ''}
       <section class="wsh-card wsrecv-list-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
+        <header class="wsh-head wsh-head-act"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3>${r.list.length ? _wsNewBtnHtml(t('wsrecv_add'), '.wsrecv-form-card', '[data-wsrecv-input="personOrCompany"]') : ''}</header>
         ${r.list.length ? `<div class="wsrecv-listbar">${_wsRecvFilterHtml(r)}<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search aria-label="${esc(t('wsrecv_search'))}" placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}"></div>` : ''}
         <div data-wsrecv-list>${_wsRecvListHtml(r)}</div>
       </section>
@@ -31228,9 +31623,6 @@ function _renderReceivablesTool() {
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
             usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
       ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
     </div>`;
 }
 
@@ -31296,7 +31688,10 @@ function _wsLoanInsights(res) {
   const costInterestPct = res.totalPaid > 0 ? Math.round(res.totalInterest / (res.principal + res.totalInterest) * 100) : 0;
   if (costInterestPct >= 30) out.push(t('wsloan_ins_interest')(costInterestPct));
   if (res.years > 5) { const less = calculateLoan({ principal: res.principal, rate: res.annual, years: res.years - 5 }); const saved = res.totalInterest - less.totalInterest; if (saved > 0) out.push(t('wsloan_ins_term')(5, _wsMoney(saved))); }
-  const up = calculateLoan({ principal: res.principal, rate: res.annual + 1, years: res.years }); const diff = up.base - res.base; if (diff > 0) out.push(t('wsloan_ins_rate')(_wsMoney(diff)));
+  const up = calculateLoan({ principal: res.principal, rate: res.annual + 1, years: res.years }); const diff = up.base - res.base; if (diff > 0) {
+    const pct = v => { try { return new Intl.NumberFormat((typeof lang !== 'undefined' && lang === 'en') ? 'en-GB' : 'es-ES', { maximumFractionDigits: 2 }).format(v) + '%'; } catch (_) { return String(v) + '%'; } };
+    out.push(t('wsloan_ins_rate')(_wsMoney(diff), pct(res.annual), pct(res.annual + 1)));
+  }
   return out.slice(0, 3);
 }
 // ── EL CONTRATO QUE SE ESTÁ SIMULANDO, DECLARADO (§G) ───────────────────────
@@ -31485,7 +31880,7 @@ function _renderLoanTool() {
   const field = (k, label, unit, wide) => `<label class="ws4-field"${wide ? ' data-ws-field="wide"' : ''}><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}">${_wsFieldUnitHtml(unit)}</span></label>`;
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool" data-ws-accent="blue">
-      ${_wsSurfaceHeadHtml({ title: t('wsloan_n'), doc: _wsToolDocName(), help: [t('wsloan_sub')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wsloan_n'), doc: _wsToolDocName(), save: true, help: [t('wsloan_sub')] })}
       ${_wsToolCcyRowHtml()}
       ${/* §26 — SOBRE EL ARMAZÓN COMPARTIDO, tercer consumidor. La legibilidad de esta
             herramienta ya era la mejor de Workspace y NO se toca: lo que cambia es el reparto de
@@ -31510,15 +31905,15 @@ function _renderLoanTool() {
             <div class="wsloan-out" data-wstool-out>${_wsLoanOutHtml(inp)}</div>
           </section>
         </div>
+        ${/* §6 · SIN COLUMNA VACÍA. El comparador y los documentos van a una TERCERA franja
+              (`ws2col-aux`): en escritorio llena el hueco bajo un formulario corto, a la izquierda
+              de la respuesta; en móvil sigue DESPUÉS del resultado, como antes. El comparador
+              conserva su propia tarjeta fuera de `[data-wstool-out]` (no pierde el foco). */''}
+        <div class="ws2col-aux">
+          <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
+          ${_wsToolSavedListHtml()}
+        </div>
       </div>
-      <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
-      ${/* §22 — los documentos de esta capacidad, DEBAJO del trabajo (bloque 5 del §6), así que
-            el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
-            usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
-      ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
     </div>`;
 }
 
@@ -31739,11 +32134,7 @@ function _renderAssetPricesTool() {
   const r = calculateAssetPrices(rows);
   return `
     <div class="aurix-wsh wsh-tool-view wsh-ap-view is-revealed" data-wsh-view="tool">
-      <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(_wsBackLabel())}</button>
-        <h2 class="wsb-title">${esc(t('wsapp_assets_n'))}</h2>
-        <p class="wsb-subtitle">${esc(t('wsap_sub'))}</p>
-      </section>
+      ${_wsSurfaceHeadHtml({ title: t('wsapp_assets_n'), doc: _wsToolDocName(), save: true, help: [t('wsap_sub')] })}
       <section class="wsh-card wsap-summary-card">${_wsApSummaryHtml(r)}</section>
       ${r.count - r.openCount > 0 ? `<section class="wsh-card">${_wsApRankingHtml(r)}</section>` : ''}
       <section class="wsh-card">
@@ -31755,9 +32146,6 @@ function _renderAssetPricesTool() {
             el primer control útil que v740 certificó no se mueve. La misma primitiva plegada que
             usa Objetivos: un patrón, dos formas muy distintas de cuerpo. */''}
       ${_wsToolSavedListHtml()}
-      <section class="wsh-card wsg-foot-card">
-        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
-      </section>
     </div>`;
 }
 
@@ -66043,6 +66431,8 @@ function _applyTab(tab) {
   // Fuera de Workspace no hay portada que marcar: se limpia con su hermana para
   // que ninguna regla acotada sobreviva a la navegación.
   if (!_wsFullBleed) { try { document.body.classList.remove('ws-cover'); } catch (_) {} }
+  // Y el modo de trabajo se decide con la pestaña ya fijada: fuera de Workspace, se apaga.
+  try { if (typeof _wsWorkModeSync === 'function') _wsWorkModeSync(); } catch (_) {}
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');
   const workspaceEl = document.getElementById('aurixWorkspace');

@@ -31692,3 +31692,270 @@ html body .auth-btn:disabled {
 /* Market en tablet: allí su borde es `none` por diseño de layout; la separación del lienzo se da con
    un anillo interior del mismo token, que no ocupa espacio (geometría intacta). */
 #marketList.market-section { box-shadow: inset 0 0 0 1px var(--border-default), inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 30px -20px rgba(0,0,0,0.5); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CIERRE WORKSPACE · §3 MI ESPACIO = CAPACIDADES FIJADAS ∪ DOCUMENTOS
+   Un grupo por capacidad: su portada (abre la capacidad) y, debajo, sus documentos con el
+   nombre del usuario (abren la instancia). Fijada / documento / en Dashboard se distinguen por
+   TEXTO además de por forma: el metadato lo dice y la fila «en Dashboard» lleva su marca.
+   ══════════════════════════════════════════════════════════════════════════════ */
+.wsh-mse2-grp { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wsh-mse2-grp.has-docs > .wsh-mse2-card { border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.wsh-mse2-docs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wsh-mse2-doc {
+  display: flex; align-items: stretch; min-width: 0;
+  border: 1px solid var(--border-subtle); border-radius: 10px;
+  background: var(--surface-panel);
+}
+.wsh-mse2-doc:hover { border-color: var(--border-interactive); background: var(--surface-panel-hover); }
+.wsh-mse2-doc-open {
+  flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 7px 4px 7px 11px;
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit;
+}
+.wsh-mse2-doc-n { font-size: 13px; font-weight: 650; color: var(--text-primary); line-height: 1.3; overflow-wrap: anywhere; }
+.wsh-mse2-doc-m { font-size: 12px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.wsh-mse2-doc.is-dash .wsh-mse2-doc-m::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; vertical-align: 1px;
+  border-radius: 1.5px; background: var(--aurix-blue, #4A82F0);
+}
+.wsh-mse2-doc-menu {
+  flex: 0 0 44px; min-height: 44px; display: grid; place-items: center;
+  background: none; border: 0; color: var(--text-secondary); cursor: pointer; font-size: 18px; border-radius: 10px;
+}
+.wsh-mse2-doc-menu:hover { color: var(--text-primary); }
+.wsh-mse2-doc-open:focus-visible, .wsh-mse2-doc-menu:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; border-radius: 9px; }
+/* La espera: dos barras neutras del tamaño de una tarjeta, sin afirmar vacío ni contenido. */
+.wsh-mse2-empty.is-loading { gap: 8px; padding: 14px 4px 8px; }
+.wsh-mse2-skel { display: block; width: 100%; height: 74px; border-radius: 10px; background: var(--surface-panel); }
+.wsh-mse2-skel.is-short { width: 60%; height: 14px; }
+@media (prefers-reduced-motion: no-preference) {
+  .wsh-mse2-skel { animation: wshSkel 1.4s ease-in-out 3; }
+  @keyframes wshSkel { 50% { opacity: .55; } }
+}
+/* Con documentos, dos columnas de ~157 px a 360 no dejan sitio a un nombre propio: se apilan.
+   Sin documentos se conserva la simetría de dos columnas que ya estaba certificada. */
+@media (max-width: 560px) {
+  .wsh-mse2[data-wsmse-cols="2"]:not([data-wsmse-docs="0"]) { grid-template-columns: minmax(0, 1fr); }
+  .wsh-mse2:not([data-wsmse-docs="0"]) .wsh-mse2-list { display: grid; grid-template-columns: minmax(0, 1fr); overflow: visible; }
+  .wsh-mse2:not([data-wsmse-docs="0"]) .wsh-mse2-card { flex: 1 1 auto; max-width: none; flex-direction: row; align-items: center; }
+  .wsh-mse2:not([data-wsmse-docs="0"]) .wsh-mse2-pv { width: 64px; height: 44px; flex: 0 0 64px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CIERRE WORKSPACE · §5 MODO DE TRABAJO (`body.ws-work`)
+   Dentro de una capacidad no hay cabecera global, búsqueda, menú ni navegación inferior:
+   la barra local es la única navegación y se queda pegada arriba sin tapar contenido
+   (es parte del flujo, no un overlay) y respetando el área segura superior.
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.ws-work .header,
+body.ws-work #bottomNav,
+body.ws-work .bottom-nav { display: none !important; }
+body.ws-work.workspace-active .aurix-workspace { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+body.ws-work .app { padding-bottom: 0; }
+body.ws-work .aurix-wsh .wsh-bar {
+  position: sticky; top: 0; z-index: 40;
+  margin: 0 0 4px; flex-wrap: nowrap;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 0 6px;
+  background: var(--bg-main, #040507);
+  /* El lienzo sigue a los lados de la barra al pegarse, sin desbordar la página. */
+  box-shadow: 0 1px 0 var(--border-subtle), -40px 0 0 var(--bg-main, #040507), 40px 0 0 var(--bg-main, #040507);
+}
+@media (min-width: 1024px) {
+  body.ws-work .aurix-wsh .wsh-bar { padding: 6px 0; min-height: 56px; box-sizing: border-box; }
+  body.ws-work.workspace-active .aurix-workspace { padding-top: 0; }
+}
+/* La barra en una línea en escritorio: el título baja a 18 px y la segunda línea (tipo · estado)
+   a 12,5 px para que el conjunto quede en ≤56 px. */
+body.ws-work .aurix-wsh .wsh-bar-title { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 1024px) { body.ws-work .aurix-wsh .wsh-bar-title { font-size: 21px; line-height: 1.2; } body.ws-work .aurix-wsh .wsh-bar-doc { margin-top: 0; } }
+.aurix-wsh .wsh-bar-doc .wsh-bar-type + .wsh-bar-state::before { content: '·'; margin: 0 6px 0 0; color: var(--text-tertiary); }
+.aurix-wsh .wsh-bar-doc[data-wsbar-sub]::before { display: none; }
+.aurix-wsh .wsh-bar-type { color: var(--text-secondary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.aurix-wsh .wsh-bar-state { font-weight: 650; white-space: nowrap; }
+.aurix-wsh .wsh-bar-state.is-saved   { color: rgba(143,230,182,0.92); }
+.aurix-wsh .wsh-bar-state.is-dirty   { color: #f3cf9a; }
+.aurix-wsh .wsh-bar-state.is-saving  { color: var(--text-link); }
+.aurix-wsh .wsh-bar-state.is-error   { color: #f0a3a3; }
+.aurix-wsh .wsh-bar-state.is-unsaved,
+.aurix-wsh .wsh-bar-state.is-local   { color: var(--text-tertiary); white-space: normal; }
+.aurix-wsh .wsh-bar-retry { margin-left: 8px; background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--text-link); text-decoration: underline; cursor: pointer; min-height: 24px; }
+/* Guardar y su menú, dentro de la barra: la acción primaria junto al trabajo. El estado ya se
+   publica en la segunda línea, así que el rótulo de la barra de guardado no se repite. */
+.aurix-wsh .wsh-bar-actions .wsh-bar-save { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin: 0; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save > .wsg-savestate { display: none; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save .wsg-savebtn { min-height: 44px; padding: 0 16px; white-space: nowrap; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save .wsg-menu { position: relative; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save .wsg-menu-sum { min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save .wsg-menu-body { right: 0; left: auto; z-index: 45; }
+.aurix-wsh .wsh-bar-actions .wsg-reqerr { flex: 1 1 100%; order: 9; margin: 4px 0 0; }
+.aurix-wsh .wsh-bar.has-save { flex-wrap: wrap; row-gap: 4px; }
+body.ws-work .aurix-wsh .wsh-bar.has-save { flex-wrap: nowrap; }
+body.ws-work .aurix-wsh .wsh-bar.has-save:has(.wsg-reqerr) { flex-wrap: wrap; }
+@media (max-width: 420px) {
+  .aurix-wsh .wsh-bar { gap: 6px; }
+  .aurix-wsh .wsh-bar-actions .wsh-bar-save .wsg-savebtn { padding: 0 12px; }
+}
+
+/* ══ CIERRE WORKSPACE · §7 PRESUPUESTO COMPACTO ══════════════════════════════════
+   Cabecera de cifras en UNA fila: moneda y periodo como chips pequeños a la izquierda y los tres
+   KPIs bajos (ingresos, gastos, disponible) a la derecha; en móvil los chips van en línea y los
+   tres KPIs en tres columnas. El donut y el comienzo del reparto entran así en la primera
+   pantalla de un móvil. «Añadir» vive en la cabecera de cada bloque. */
+.aurix-wsh .wsbud-top-card { padding: 12px 14px; }
+.aurix-wsh .wsbud-top-card .wsbud-top { display: flex; flex-direction: column; gap: 8px; }
+.aurix-wsh .wsbud-top-card .wsbud-controls { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.aurix-wsh .wsbud-top-card .wsbud-controls .wsbud-perchip { flex-direction: row; align-items: center; gap: 6px; }
+.aurix-wsh .wsbud-top-card .wsbud-controls .wsbud-perchip-lbl { font-size: 12px; letter-spacing: .02em; text-transform: none; color: var(--text-secondary); }
+.aurix-wsh .wsbud-top-card .wsbud-controls .wsbud-perchip-sel { min-height: 44px; padding-top: 0; padding-bottom: 0; font-size: 16px; }
+.aurix-wsh .wsbud-top-card .wsbud-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.aurix-wsh .wsbud-top-card .wsbud-kpi.is-main { grid-column: auto; }
+.aurix-wsh .wsbud-top-card .wsbud-kpi { padding: 7px 9px; min-width: 0; }
+.aurix-wsh .wsbud-top-card .wsbud-kpi i { font-size: 12px; line-height: 1.25; }
+.aurix-wsh .wsbud-top-card .wsbud-kpi b { font-size: 15px; line-height: 1.3; }
+.aurix-wsh .wsbud-top-card .wsbud-kpi-sub { font-size: 12px; line-height: 1.25; }
+@media (min-width: 768px) {
+  .aurix-wsh .wsbud-top-card .wsbud-top { flex-direction: row; align-items: center; gap: 14px; }
+  .aurix-wsh .wsbud-top-card .wsbud-controls { flex: 0 0 auto; flex-direction: column; align-items: stretch; }
+  .aurix-wsh .wsbud-top-card .wsbud-kpis { flex: 1 1 auto; }
+  .aurix-wsh .wsbud-top-card .wsbud-kpi b { font-size: 18px; }
+}
+.aurix-wsh .wsbud-blockhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.aurix-wsh .wsbud-blockhead .wsbud-add { margin: 0; min-height: 44px; }
+@media (max-width: 519px) {
+  .aurix-wsh .wsbud-top-card .wsbud-controls .wsbud-perchip-lbl { display: none; }
+  .aurix-wsh .wsh-bar-doc[data-wsbar-sub] .wsh-bar-type { display: none; }
+  .aurix-wsh .wsh-bar-doc[data-wsbar-sub] .wsh-bar-type + .wsh-bar-state::before { content: none; }
+}
+.aurix-wsh .wsbud-top-card .wsbud-kpi-sub { display: block; white-space: normal; overflow-wrap: anywhere; }
+
+/* ══ CIERRE WORKSPACE · §4 DASHBOARD «TU ESPACIO» ═════════════════════════════════
+   Un bloque, dos grupos: Tus planes (documentos) y Herramientas fijadas (accesos directos).
+   Cada grupo su rejilla (3 / 2 / 1 columnas, la misma que ya usan los planes) y su orden. */
+.wsx-grp { margin: 0 0 18px; }
+.wsx-grp:last-of-type { margin-bottom: 0; }
+.wsx-gtitle {
+  margin: 0 0 10px; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.wspin-cover {
+  position: relative; overflow: hidden; height: 92px; border-radius: 12px;
+  background: rgba(74,130,240,0.08); border: 1px solid rgba(var(--ws-a, 74,130,240), 0.18);
+  display: block;
+}
+.wspin-cover > * { width: 100%; height: 100%; display: block; }
+.wspin-cover > .wsh-mse2-ic2 { display: grid; place-items: center; width: 100%; }
+.wspin-hint { font-size: 12px; color: var(--text-tertiary); }
+@media (min-width: 640px) {
+  @supports (grid-template-rows: subgrid) {
+    .wspin-card > .wspin-cover { grid-row: span 2; height: auto; min-height: 92px; }
+  }
+}
+/* Minidonut del Presupuesto: el reparto real a 40 px, con la partida que manda al lado. */
+.wspl-ring-row { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+.wspl-ring-row .wspl-ring { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 0; overflow: visible; opacity: 1; }
+.wspl-ring-row .wspl-share-t { margin: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .wspl-card.is-enter .wspl-ring g circle { animation: wsplRing .6s var(--ease-out, ease-out) both; }
+  @keyframes wsplRing { from { stroke-opacity: 0; } to { stroke-opacity: 1; } }
+}
+/* La tarjeta fijada no usa la subrejilla de cinco franjas de los planes (no tiene cifras que
+   alinear): altura natural, misma caja externa. */
+@media (min-width: 640px) {
+  @supports (grid-template-rows: subgrid) {
+    .wspin-grid { row-gap: 14px; }
+    .wspin-card { display: flex; grid-row: auto; margin: 0; }
+    .wspin-card > .wspin-cover { grid-row: auto; height: 92px; min-height: 0; }
+  }
+}
+.wspl-slot-viz .wspl-ring-row { justify-content: flex-start; width: 100%; text-align: left; }
+#wsPlansSection .wspl-head { margin-bottom: 8px; }
+
+/* ══ CIERRE WORKSPACE · §8 ESCENARIOS ══════════════════════════════════════════
+   Moneda en línea (sin columna vacía), Base | Alternativa lado a lado en escritorio y
+   secuenciales en móvil; el resultado debajo, a lo ancho. La tarjeta de impacto vacía
+   (sin base declarada) no ocupa sitio: el único aviso vive junto al campo que falta. */
+.wsb-impact:empty { display: none; }
+.wsb2 .wsccy-row:not(.is-pending) .ws4-field { flex-direction: row; align-items: center; gap: 8px; }
+.wsb2 .wsccy-row:not(.is-pending) .ws4-field-input { max-width: 160px; }
+@media (min-width: 1024px) {
+  .wsb2 { display: block; }
+  .wsb2 .wsb2-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
+  .wsb2 .wsb2-out { margin-top: 14px; }
+}
+@media (max-width: 767px) {
+  .wsb2 .wsb2-cols { grid-template-columns: minmax(0, 1fr); }
+}
+.aurix-wsh .wsh-head-act { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.aurix-wsh .wsh-newbtn { min-height: 44px; padding: 0 14px; white-space: nowrap; }
+body.ws-work .aurix-wsh .wsh-card { scroll-margin-top: 72px; }
+
+/* ══ CIERRE WORKSPACE · §6 SIN COLUMNA VACÍA BAJO FORMULARIOS CORTOS ═════════════
+   Tercera franja del armazón de dos columnas: en móvil va después del resultado (orden 3); en
+   escritorio ocupa la columna de edición bajo el formulario, junto a la respuesta. */
+.ws2col-aux { order: 3; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ws2col-aux:empty { display: none; }
+@media (min-width: 1024px) {
+  .ws2col:has(> .ws2col-aux) { grid-template-areas: "edit view" "aux view"; grid-template-rows: auto 1fr; }
+  .ws2col:has(> .ws2col-aux) > .ws2col-edit { grid-area: edit; }
+  .ws2col:has(> .ws2col-aux) > .ws2col-view { grid-area: view; }
+  .ws2col:has(> .ws2col-aux) > .ws2col-aux { grid-area: aux; align-self: start; }
+}
+
+/* Moneda en la barra (≥1024): chip compacto; debajo de 1024 se conserva su fila. */
+.aurix-wsh .wsh-bar-ccy { display: none; flex: 0 0 auto; }
+.aurix-wsh .wsh-bar-ccy .wsbud-perchip { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.aurix-wsh .wsh-bar-ccy .wsbud-perchip-lbl { display: inline; font-size: 12px; color: var(--text-secondary); text-transform: none; letter-spacing: 0; }
+.aurix-wsh .wsh-bar-ccy .wsbud-perchip-sel { min-height: 44px; }
+@media (min-width: 1024px) {
+  .aurix-wsh .wsh-bar-ccy { display: block; }
+  .aurix-wsh.wsh-tool-view:has(.wsh-bar-ccy) > .wsccy-row:not(.is-pending) { display: none; }
+}
+/* El `sticky` de la barra local necesita que el body NO sea contenedor de scroll: `clip` sigue
+   impidiendo el desbordamiento horizontal sin crearlo. Sólo en modo de trabajo. */
+body.ws-work { overflow-x: clip; overflow-y: visible; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save { padding: 0; border: 0; background: none; min-height: 0; }
+.aurix-wsh .wsh-bar-actions .wsh-bar-save .wsg-savebtn { margin: 0; }
+
+/* ── Barra + acciones (herramientas que guardan) ─────────────────────────────── */
+.aurix-wsh .wsh-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.aurix-wsh .wsh-barwrap { display: contents; }
+.aurix-wsh .wsh-barwrap > .wsh-bar-actions { margin: 0 0 6px; }
+body.ws-work .aurix-wsh .wsh-barwrap > .wsh-bar { flex-wrap: nowrap; }
+/* El título entero en móvil: puede ir a dos líneas antes que recortarse. */
+@media (max-width: 1023px) {
+  body.ws-work .aurix-wsh .wsh-bar-title { white-space: normal; overflow: visible; text-overflow: clip; font-size: 17px; line-height: 1.2; }
+}
+@media (min-width: 768px) {
+  .aurix-wsh .wsh-barwrap { display: flex; align-items: center; gap: 12px; }
+  .aurix-wsh .wsh-barwrap > .wsh-bar { flex: 1 1 auto; min-width: 0; }
+  .aurix-wsh .wsh-barwrap > .wsh-bar-actions { flex: 0 0 auto; margin: 0; flex-wrap: nowrap; }
+  body.ws-work .aurix-wsh .wsh-barwrap {
+    position: sticky; top: 0; z-index: 40; min-height: 56px; box-sizing: border-box; margin: 0 0 6px;
+    background: var(--bg-main, #040507); box-shadow: 0 1px 0 var(--border-subtle), -40px 0 0 var(--bg-main, #040507), 40px 0 0 var(--bg-main, #040507);
+  }
+  body.ws-work .aurix-wsh .wsh-barwrap > .wsh-bar { position: static; box-shadow: none; margin: 0; }
+  .aurix-wsh .wsh-barwrap .wsg-reqerr { position: absolute; right: 0; top: 100%; margin: 4px 0 0; max-width: 420px; background: var(--bg-main, #040507); padding: 6px 10px; border-radius: 8px; }
+}
+/* KPIs del Presupuesto a ≤519 px: 2 + 1 (el disponible a lo ancho). Tres columnas recortaban
+   la cifra entera a 360–390, y una cifra crítica no se recorta. */
+@media (max-width: 519px) {
+  .aurix-wsh .wsbud-top-card .wsbud-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aurix-wsh .wsbud-top-card .wsbud-kpi.is-main { grid-column: 1 / -1; }
+}
+/* ══ CIERRE WORKSPACE · §8 COBROS: resumen compacto ═══════════════════════════════
+   Total / cobrado / pendiente en UNA fila también en móvil (cifras a 17 px, completas), para
+   que la lista empiece en la primera pantalla. Estados con texto, no sólo color (ya lo eran). */
+@media (max-width: 767px) {
+  .aurix-wsh .wsrecv-summary-card { padding: 12px; }
+  .aurix-wsh .wsrecv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 6px; }
+  .aurix-wsh .wsrecv-kpi { grid-column: auto !important; padding: 8px 9px; min-width: 0; }
+  .aurix-wsh .wsrecv-kpis > .wsrecv-kpi .wsrecv-kpi-v, .aurix-wsh .wsrecv-kpis > .wsrecv-kpi.is-total .wsrecv-kpi-v { font-size: 16px; line-height: 1.25; }
+  .aurix-wsh .wsrecv-kpi-k { font-size: 12px; letter-spacing: .02em; }
+}
+/* La fila de acciones bajo la barra, en móvil, sin altura de más. */
+@media (max-width: 767px) { .aurix-wsh .wsh-barwrap > .wsh-bar-actions { margin: -2px 0 6px; } }
+/* Fila de moneda de las herramientas, en línea (rótulo + selector), sin una franja entera. */
+.aurix-wsh.wsh-tool-view > .wsccy-row:not(.is-pending) { margin: 0 0 8px; }
+.aurix-wsh.wsh-tool-view > .wsccy-row:not(.is-pending) .ws4-field { flex-direction: row; align-items: center; gap: 8px; }
+.aurix-wsh.wsh-tool-view > .wsccy-row:not(.is-pending) .ws4-field-input { max-width: 150px; }

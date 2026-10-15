@@ -556,7 +556,9 @@ function catalog() {
   OK('L15 Mi Espacio no puede ofrecer una capacidad que el usuario no puede abrir',
      /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
      /const toolList = colItems\(_WS_TOOL_RENDER, 'tool'\);/.test(app) &&
-     /\.filter\(m => m\.state === 'open' && m\.pinRef && _wsIsPinned\(m\.pinRef\)\)/.test(app));
+     // Cierre Workspace: el grupo existe por estrella O documentos, pero SIEMPRE con la capacidad
+     // abierta para esta cuenta (un documento de algo denegado no ofrece su capacidad).
+     /\.filter\(mdl => mdl\.state === 'open'\)/.test(app));
   OK('L15b …y la última apertura ya NO es condición de pertenencia',
      !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
      !/\.filter\(x => x\.ts > 0\)/.test(app));

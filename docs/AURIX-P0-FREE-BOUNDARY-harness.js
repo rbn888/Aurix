@@ -136,7 +136,7 @@ function ctx(persona, langCode) {
    '_wsPinned','_wsIsPinned','_wshReadStore','_wsGlyph','_wsTplViz','_wsAssetImg','_wsCatPreviewBaseHtml',
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType','_wsGlyphTile',
    '_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml','_wsLabel','_wsTypeLabel',
-   '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsCanPersist','_wsPersistUpsell','_wshReveal',
+   '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsSpaceIsHidden','_wsSpaceHidden','_wsPlanOnDash','_wsCanPersist','_wsPersistUpsell','_wshReveal',
    '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon',
    // §11 — Mi espacio reutiliza la portada del catálogo, así que su render depende de este
    // owner. Sin cargarlo aquí el sandbox ejercitaba el FALLBACK y no el camino real.
@@ -644,15 +644,15 @@ console.log('\n6 · Mi espacio:');
   ok('6.4 quitar la estrella lo saca', h.indexOf('wsh-mse2-card') === -1);
   R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id:"p1", type:"monthly_budget", customName:"Presupuesto empresa", revision:1, updatedAt:7, results:{} }]));');
   h = space();
-  // RE-DECIDIDO (2026-09-24): Mi Espacio son FAVORITOS. Este assert exigía lo
-  // contrario —que un documento guardado apareciera aquí— y esa mezcla era el
-  // defecto: capacidad, favorito y documento son tres cosas distintas y se
-  // pintaban como dos. El documento no desaparece: se abre desde el Resumen (si
-  // es de plantilla) o desde «Abrir guardado» de su herramienta. Lo que aquí se
-  // exige ahora es que guardar NO ensucie la lista de favoritos.
-  ok('6.5 guardar un documento NO lo mete en Mi espacio (ni toca los favoritos)',
-    (h.match(/data-wsmse-type="doc"/g) || []).length === 0
-    && h.indexOf('Presupuesto empresa') === -1 && /data-wsmse-tpl="0"/.test(h));
+  // RE-DECIDIDO OTRA VEZ (cierre Workspace, 2026-10-15) — y es el P0 de la reentrada: con
+  // «Mi espacio = sólo favoritos», una cuenta con documentos y sin estrellas veía «Sin
+  // plantillas todavía» al volver, mientras el Dashboard y «Mis documentos» los conservaban.
+  // Contrato nuevo: el documento aparece en el GRUPO de su capacidad, con el nombre del
+  // usuario, y guardar sigue SIN tocar los favoritos (guardar ≠ fijar).
+  ok('6.5 un documento guardado aparece en su grupo, con su nombre, y NO crea un favorito',
+    (h.match(/data-wsmse-type="doc"/g) || []).length === 1
+    && h.indexOf('Presupuesto empresa') !== -1 && /data-wsmse-tpl="1"/.test(h)
+    && R(c, '_wsPinned().length') === 0);
   // RE-DECIDIDO (§8), Y MÁS FUERTE. Esto exigía que la miniatura del documento
   // se construyera desde SUS `results`, porque la versión anterior leía el
   // borrador local de la herramienta y la tarjeta de un presupuesto podía
@@ -666,12 +666,11 @@ console.log('\n6 · Mi espacio:');
     && !/_wsProjPreviewHtml/.test(app.replace(/^\s*\/\/.*$/gm, '')));
   ok('6.5c y la miniatura es una ilustración: no la dicta un lector de pantalla',
     /class="wsh-mse2-pv" aria-hidden="true"/.test(app));
-  // Y no se fusionan porque ya ni siquiera conviven: Mi Espacio tiene UNA
-  // fuente. El tipo se sigue declarando en el DOM —es lo que permite afirmar
-  // que ahí sólo hay favoritos— y la composición ya no concatena documentos.
-  ok('6.6 el favorito y el documento NO se fusionan: Mi espacio tiene UNA fuente',
-    /mtype: 'fav'/.test(app) && /data-wsmse-type="\$\{it\.mtype\}"/.test(app)
-    && !/favItems\([^)]*\)\s*\n?\s*\.concat\(docItems/.test(app));
+  // Fijar la capacidad que ya tiene documento: UN grupo (no se duplica), marcado fijado.
+  R(c, '_wsTogglePin("tpl:mbudget");'); const h6 = space();
+  ok('6.6 fijada + documento = UN solo grupo de la capacidad, marcado fijado',
+    (h6.match(/data-wsmse-cap="budget"/g) || []).length === 1 && /wsh-mse2-grp is-fav has-docs/.test(h6));
+  R(c, '_wsTogglePin("tpl:mbudget"); localStorage.setItem(_WSH_PROJECTS_KEY, "[]");'); h = space();
   ok('6.7 «actualizado hace…» sobrevive sólo como metadato, no como pertenencia',
     /t\('wsmse2_updated'\)/.test(app) && /t\('wsmse2_fav'\)/.test(app)
     && !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app));

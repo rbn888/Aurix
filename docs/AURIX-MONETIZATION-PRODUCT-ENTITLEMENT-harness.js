@@ -871,7 +871,7 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     // Lo que este assert protege sigue en pie y es lo que importa: la columna se
     // deriva del CATÁLOGO, no de una lista escrita a mano.
     ok('M3.7 la columna "Mis plantillas" de Mi Espacio se DERIVA del catálogo',
-      /const favItems = \(map, kind\) => _wsCatalogFor\(kind\)/.test(app) &&
+      /const colItems = \(map, kind\) => _wsCatalogFor\(kind\)/.test(app) &&
       /const tplList = colItems\(_WS_TPL_RENDER, 'template'\);/.test(app) &&
       !/const TPL_CAT = \[\];/.test(app));
     ok('M3.8 el cover reutiliza un asset YA existente de esa plantilla (no se añade ninguno)',
@@ -914,16 +914,20 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     // capacidad con tres documentos apareciera cuatro veces. Mi Espacio publica
     // favoritos; el trabajo guardado se abre desde el Resumen (plantillas) o
     // desde «Abrir guardado» de su herramienta.
-    ok('M3.13 Mi Espacio publica FAVORITOS, y el documento tiene su propia casa',
-      /mtype: 'fav'/.test(app) &&
-      /data-wsmse-type="\$\{it\.mtype\}"/.test(app) &&
-      !/favItems\([^)]*\)\s*\n?\s*\.concat\(docItems/.test(app) &&
+    // RE-DECIDIDO (cierre Workspace, 2026-10-15 — P0 de reentrada): Mi espacio vuelve a
+    // publicar los documentos, pero AGRUPADOS por capacidad (un grupo, nunca una tarjeta por
+    // documento), así que capacidad, favorito y documento siguen siendo tres cosas distintas.
+    ok('M3.13 Mi Espacio agrupa por CAPACIDAD (fijada ∪ documentos), y el documento conserva su casa',
+      /mtype: docs\.length \? 'doc' : 'fav'/.test(app) &&
+      /data-wsmse-cap="\$\{esc\(it\.cat\)\}"/.test(app) &&
+      /data-wsmse-type="doc" data-wsmse-ref=/.test(app) &&
       // Y la casa existe de verdad: la puerta dentro de la herramienta.
       /function _wsToolOpenSaved\(\)/.test(app) && /data-wstool-open/.test(app) &&
       (app.match(/wsmse2_fav:/g) || []).length === 2);
     ok('M3.13b y la última apertura ya NO decide la pertenencia, sólo acompaña',
       !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
-      /used: _wsRecentTs\(m\.pinRef\)/.test(app));
+      // La pertenencia la deciden SÓLO la estrella y los documentos; abrir no cuenta.
+      /if \(!fav && !docs\.length\) return null;/.test(app));
     // RE-DECIDIDO POR DECISIÓN DE PRODUCTO. «Espacio vacío = UNA portada» era la
     // respuesta correcta a dos estados vacíos en paralelo, pero la SPEC de cierre
     // pide lo contrario y con razón: las DOS columnas tienen que verse desde el

@@ -213,7 +213,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       return JSON.stringify({ tab: currentTab, view: (document.querySelector('#aurixWorkspace .aurix-wsh')||{}).getAttribute
         ? document.querySelector('#aurixWorkspace .aurix-wsh').getAttribute('data-wsh-view') : null,
         tool: _wsToolActive, editId: _wsToolEditId, back: _wsReturnTab,
-        doc: (document.querySelector('#aurixWorkspace .wsh-bar-doc')||{}).textContent || '' });
+        doc: (document.querySelector('#aurixWorkspace .wsh-bar-title')||{}).textContent || '' });
     })()`).then(JSON.parse);
     ok(`${ENG}.abrir · «Continuar» lleva a LA MISMA instancia`,
       r.tab === 'workspace' && r.view === 'tool' && r.tool === 'budget' && r.editId === 'd1'

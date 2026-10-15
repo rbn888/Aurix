@@ -96,8 +96,10 @@ console.log('\n2 · Escenarios sin base declarada no publican proyecciones:');
   ok('2.2 …las tarjetas no publican cifra ni botón de guardar',
     !/data-wsh-save/.test(vm.runInContext('_wsbCardsHtml(_wsbCompare(' + scen + '))', none))
     && /<b>—<\/b>/.test(vm.runInContext('_wsbCardsHtml(_wsbCompare(' + scen + '))', none)));
-  ok('2.3 …el impacto dice qué falta en vez de un rango desde cero',
-    /wsb_need_inputs/.test(vm.runInContext('_wsbImpactInnerHtml(_wsbCompare(' + scen + '))', none)));
+  // Cierre Workspace §8 — un único mensaje: sin base lo dice la tarjeta de parámetros, junto al
+  // campo; el impacto no publica un rango desde cero NI repite el aviso.
+  ok('2.3 …el impacto no publica un rango desde cero ni repite el aviso de la base',
+    vm.runInContext('_wsbImpactInnerHtml(_wsbCompare(' + scen + '))', none) === '');
   ok('2.4 …y no hay gráfico ni conclusión', vm.runInContext('_wsbTailHtml(_wsbCompare(' + scen + '))', none) === '');
   const noYears = mk({ baseManual: '1000', years: '0', ret: '5' });
   ok('2.5 sin horizonte, tampoco', vm.runInContext('_wsbCompare(' + scen + ').publishable', noYears) === false);

@@ -46,7 +46,7 @@ function ctx(langCode) {
   vm.runInContext('function _wsCanPersist(){ return true; }', sb);
   ['_WS_TABS', '_WS_BACK_ORIGINS'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsTabOk', '_wsBackOrigin', '_wsBackLabel', '_wsBackShort', '_wsToolDocName',
-   '_wsSurfaceHeadHtml', '_wsToolSaveBarHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
+   '_wsSurfaceHeadHtml', '_wsToolSaveBarHtml', '_wsSubIfDistinct', '_wsBarSubHtml', '_wsToolSaveState'].forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
 const R = (c, e) => vm.runInContext(e, c);
@@ -75,8 +75,10 @@ console.log('1 · Las ocho capacidades comparten cabecera:');
     'el detalle debe volver a la cartera, no a Herramientas');
   // Y lo que NO es alcance sigue como estaba: si esto se volviera verde por su
   // cuenta, alguien habría tocado superficies internas sin pedirlo.
-  ok('1.3 las superficies internas conservan su cabecera (fuera de alcance)',
-    /wsb-header/.test(fnSrc('_renderWealthProjection')) && /wsb-header/.test(fnSrc('_renderAssetPricesTool')));
+  // Cierre Workspace §5: «Guardar» pasa a la barra local, así que la herramienta interna de
+  // precios (que guarda) entra a la barra compartida; la proyección (no guarda) sigue igual.
+  ok('1.3 la proyección interna conserva su cabecera; la de precios usa la barra con guardado',
+    /wsb-header/.test(fnSrc('_renderWealthProjection')) && /_wsSurfaceHeadHtml\(\{[^}]*save: true/.test(fnSrc('_renderAssetPricesTool')));
   ok('1.4 la barra NO es una tarjeta: no lleva la clase del panel de cristal',
     !/class="wsh-card[^"]*wsh-bar|class="wsh-bar[^"]*wsh-card/.test(fnSrc('_wsSurfaceHeadHtml')));
   ok('1.5 ningún chip de plan dentro de la cabecera de una capacidad abierta',
@@ -134,18 +136,21 @@ console.log('\n2 · Volver a donde se venía:');
   // Ahora se exige el id REAL, y además que el despachador normalice el alias
   // para que el siguiente que escriba el nombre natural no repita el defecto.
   ok('2.3 el retorno al Dashboard usa el id REAL de la pestaña (`home`)',
-    /_wsBackOrigin\(\) === 'dashboard'/.test(fnSrc('_wshWireOnce'))
-    && /switchTab\('home'\)/.test(fnSrc('_wshWireOnce'))
-    && !/switchTab\('dashboard'\)/.test(fnSrc('_wshWireOnce')));
+    // El retorno vive ahora en UN owner (`_wsNavBack`), que usan «Volver» y el atrás del navegador.
+    /nav === 'back'\) \{ _wsNavBack\(\)/.test(fnSrc('_wshWireOnce'))
+    && /_wsBackOrigin\(\) === 'dashboard'/.test(fnSrc('_wsNavBack'))
+    && /switchTab\('home'\)/.test(fnSrc('_wsNavBack'))
+    && !/switchTab\('dashboard'\)/.test(fnSrc('_wsNavBack')));
   ok('2.3b …y «dashboard» se normaliza en la ENTRADA del despachador',
     /if \(tab === 'dashboard'\) tab = 'home';/.test(fnSrc('switchTab')));
   // 2.4 SE ACTUALIZA: el punto de enganche YA TIENE quien lo escriba. «Tus
   // planes» (§B del cierre visual) abre una plantilla desde el Dashboard, así
   // que el retorno tiene que volver ahí. Lo que se sigue vigilando es que haya
   // UN solo escritor y que sea ése — no que no haya ninguno.
-  ok('2.4 el origen `dashboard` lo escribe EXACTAMENTE un sitio: «Continuar»',
+  ok('2.4 el origen `dashboard` lo escribe EXACTAMENTE un sitio, y lo usan las dos puertas del Dashboard',
     (app.replace(/^\s*\/\/.*$/gm, '').match(/_wsReturnTab = 'dashboard'/g) || []).length === 1
-    && /_wsReturnTab = 'dashboard';/.test(fnSrc('_wsPlansOpen')));
+    && /_wsReturnTab = 'dashboard';/.test(fnSrc('_wsDashOriginMark'))
+    && /_wsDashOriginMark\(\)/.test(fnSrc('_wsPlansOpen')) && /_wsDashOriginMark\(\)/.test(fnSrc('_wsDashPinOpen')));
   // El `aria-label` lleva el destino COMPLETO aunque la barra enseñe la corta:
   // un usuario de lector de pantalla oye «Volver a Plantillas», no «Plantillas».
   {
@@ -168,8 +173,9 @@ console.log('\n3 · Nombre del documento:');
   ok('3.2 con documento abierto, la barra publica SU nombre',
     R(c, '_wsToolDocName()') === 'Mi plan 2030');
   const html = R(c, '_wsSurfaceHeadHtml({ title: "Interés compuesto", doc: _wsToolDocName() })');
-  ok('3.3 y es distinguible del tipo de plantilla: dos elementos, dos clases',
-    /wsh-bar-title">Interés compuesto</.test(html) && /wsh-bar-doc">Mi plan 2030</.test(html));
+  // Cierre Workspace §2: el nombre del USUARIO es el título; la capacidad, la segunda línea.
+  ok('3.3 y es distinguible del tipo de plantilla: dos elementos, dos clases (nombre propio arriba)',
+    /wsh-bar-title" data-wsbar-doc="1">Mi plan 2030</.test(html) && /wsh-bar-doc"><span class="wsh-bar-type">Interés compuesto</.test(html));
   // Un documento sin nombre propio no puede publicar una cadena vacía como si
   // fuera un nombre: el hueco desaparece y queda sólo el tipo.
   R(c, '__PROJ = [{ id: "p1", customName: "" }];');
