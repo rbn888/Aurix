@@ -57,7 +57,7 @@ const FNS = ['_aurixLoadCapitalFlowsRaw','_aurixLoadCapitalFlowsLive','_aurixFlo
   '_aurixLoadCapitalFlows','_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain',
   '_aurixFlowCounterpartObserved','_aurixInvestablePerformance','_aurixCatHistRows','_aurixCatHistValidatePoint','_aurixCatExposurePct',
   '_aurixCatHistWindow','_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification',
-  '_aurixFactLedger','_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions',
+  '_aurixFactLedger','_aurixIntelligenceStories','_aurixWowInsights','_aurixDriftClaimCoherent','_aurixDriftConflicts','_aurixContextualQuestions',
   '_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore'];
 
 function makeCtx(opts) {

@@ -79,6 +79,13 @@ function extractLifecycleDict(langIdx) {
   return d;
 }
 const DICT = { es: extractLifecycleDict(0), en: extractLifecycleDict(1) };
+// CIERRE · COHERENCIA Y LENGUAJE — la dilución lleva ahora su PERIODO en la frase,
+// y sin periodo no se publica. Las etiquetas de ventana comparten línea
+// (`intv4_r_24h: …, intv4_r_7d: …`), así que se leen las líneas enteras, verbatim.
+['intv4_r_24h', 'intv4_r_90d', 'intv4_r_all'].forEach(k => [0, 1].forEach(li => {
+  const st = keyOccurrences(k)[li]; const body = app.slice(st, app.indexOf('\n', st)).replace(/,\s*$/, '');
+  Object.assign(DICT[li ? 'en' : 'es'], (new Function('return ({ ' + body + ' });'))());
+}));
 const DAY = 864e5, MIN = 60000;
 const NOW = Date.now();
 const T0 = NOW - 60 * DAY;
@@ -105,7 +112,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_aurixEvidence',
   '_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth',
   '_aurixEventIdentity','_aurixCanonicalFindings','_aurixFactLedger','_aurixIntelligenceStories',
-  '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore'];
+  '_aurixWowInsights','_aurixDriftClaimCoherent','_aurixDriftConflicts','_intv4PctPair','_intv21Fixed','_intv21Pct','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore'];
 
 function makeCtx(opts) {
   const o = opts || {};

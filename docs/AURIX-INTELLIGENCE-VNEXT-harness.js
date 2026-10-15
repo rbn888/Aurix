@@ -70,7 +70,7 @@ function dictOf(langIdx) {
     'intcc_chip_limit_spread','intcc_chip_ctx_intent',
     'intv4_q_q_concentration','intv4_q_q_liquidity','intv4_q_q_diversification',
     'intv4_q_q_what_changed','intv4_q_q_performance','intv4_q_q_current_value',
-    'intv4_w_eff','intv4_w_capital','intv4_w_liqconc','intv4_discovery_title',
+    'intv4_w_eff','intv4_w_capital','intv4_w_liqconc','intv4_w_liqconc_ctx','intv4_r_24h','intv4_discovery_title',
     'intcc_drivers_title','intcc_drv_explain_asset','intcc_drv_explain_cash',
     'intcc_drv_kind_eng','intcc_drv_kind_liq','intcc_drv_none',
     'intv15_drv_dependency','intv15_drv_category',
@@ -124,6 +124,7 @@ function makeCtx(lang) {
    '_intv16EvidenceDays','_intv16StabilityByRoot','_intv17Evolution','_intv19Evolution','_intv17EvId','_intv17HoyEvents','_intv17IsHoyEvent','_intv16StableDays','_intv16EvDates','_intv16StableWindow',
    '_intv4MemoryEvents','_intv4MemoryDeclared','_intv4MemoryDiversify','_intv4MemoryRows',
    '_intv4MemoryHtml','_intv4WowText','_intv4DiscoveryHtml','_aurixIntelQuestions',
+   '_intv4PctPair','_intv21Fixed','_intv21Pct','_intv4WindowLabel','_intv4RangeLabel','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded',
    '_intccIsMonetary','_intccPctLabel','_intv5DriversHtml','_intv5MattersHtml','_intv5Chips',
    '_intccScoreRingHtml','_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore',
    '_aurixIntelOwner','_aurixIntelCtxMerge','_aurixIntelContext','_aurixIntelRecordAnswer',
@@ -1021,7 +1022,10 @@ console.log('\n§18 · «Puede que no hayas visto esto» no repite lo de arriba:
   const WOW = (keys) => ({ wowInsights: keys.map(k => k === 'eff'
     ? { semanticKey: 'wow_nominal_vs_effective', values: { positions: 9, effectiveN: 4.3 } }
     : { semanticKey: 'wow_liquidity_down_while_concentrated',
-        values: { cashDeltaPp: -4.2, topPositionPct: 31 } }) });
+        // CIERRE · COHERENCIA Y LENGUAJE (cambio de contrato explícito): el
+        // descubrimiento viaja con su ventana y sus dos extremos; sin ellos se omite.
+        values: { cashDeltaPp: -4.2, topPositionPct: 31, startPct: 34.2, endPct: 30,
+          window: { range: '7D', startAt: T0 - 7 * DAY, endAt: T0 }, context: null } }) });
   const D = (core, texts, skip) => run('_intv4DiscoveryHtml(' + JSON.stringify(core)
     + ', s => String(s == null ? "" : s), ' + JSON.stringify(texts || [])
     + ', ' + JSON.stringify(skip || []) + ')');
@@ -1037,7 +1041,9 @@ console.log('\n§18 · «Puede que no hayas visto esto» no repite lo de arriba:
   ok('18.4 sin nada distinto que decir el bloque se OCULTA, no se rellena',
     D({ wowInsights: [] }, [], []) === '');
   ok('18.5 el filtro de TEXTO se conserva: una conclusión ya publicada no se repite',
-    D(WOW(['liq']), ['Tu liquidez bajó 4,2 pp mientras tu posición principal ya pesa el 31%'], []) === '');
+    // La frase publicada se toma de la PROPIA superficie (no de un literal de copy).
+    (() => { const m = /<p class="intv4-wow-text">([^<]*)<\/p>/.exec(D(WOW(['liq']), [], []));
+      return !!m && m[1].length > 20 && D(WOW(['liq']), [m[1]], []) === ''; })());
   ok('18.6 la exclusión es por OWNER DE LA MAGNITUD, no por parecido de frase',
     /score && score\.score != null\) \? \['wow_nominal_vs_effective'\]/.test(app)
     && /skip\.has\(x\.semanticKey\)/.test(fnSrc('_intv4DiscoveryHtml')));
