@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '791'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '792'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -24532,6 +24532,8 @@ function _wsDashTools() { return _wshReadStore(_WSH_DASH_TOOLS_KEY); }
 function _wsIsDashTool(ref) { return _wsDashTools().some(p => p && p.ref === ref); }
 function _wsToggleDashTool(ref) {
   if (!ref) return;
+  // Sólo herramientas; quitar siempre se permite (limpia marcas antiguas de plantilla).
+  if (!_wsIsDashTool(ref) && !_wsIsToolCapRef(ref)) return;
   const list = _wsDashTools();
   const i = list.findIndex(p => p && p.ref === ref);
   const _warn = () => { try { _wsPinFailed(); } catch (_) {} };
@@ -25006,10 +25008,17 @@ const _WSPL_TYPES = Object.freeze({
 // ¿Está ESTE documento en el Dashboard? Una sola respuesta para el Resumen, Mi espacio y los
 // menús: dos lecturas de la misma marca son la forma en que el menú acabó contradiciendo a la
 // sección. Plantillas: opt-out (`dashHidden`). Herramientas: opt-in (`dashPinned`).
+// CIERRE DE ESTADOS — GUARDAR NUNCA PUBLICA. Sólo «Mostrar en Dashboard» (`dashPinned`) publica un
+// documento. Todo documento CREADO desde este cambio nace con `dashHidden: true` (ver los dos
+// escritores, `_wsToolCommit` y `_wsbCommit`, y duplicar). Un documento de plantilla ANTERIOR, sin
+// ninguna de las dos marcas, se publicaba por omisión y conserva esa publicación heredada para no
+// vaciar Dashboards existentes; quitarlo deja la marca y ya no vuelve solo.
 function _wsPlanOnDash(p) {
   const spec = p && _WSPL_TYPES[p.type];
   if (!spec) return false;
-  return spec.optIn ? p.dashPinned === true : p.dashHidden !== true;
+  if (p.dashPinned === true) return true;
+  if (p.dashHidden === true || spec.optIn) return false;
+  return true;   // documento de plantilla heredado, sin marcas
 }
 // Los documentos que se publican: plantilla, guardada de verdad y con su
 // capacidad todavía ABIERTA para esta cuenta. Ofrecer «Continuar» sobre algo que
@@ -25552,8 +25561,9 @@ function _wsPlanDashSet(id, hidden, kind) {
     }
     const d = _ws4Projects().find(x => x && x.id === id);
     if (!d) return false;
-    if ((_WSPL_TYPES[d.type] || {}).optIn) { if (hidden) delete d.dashPinned; else d.dashPinned = true; }
-    else if (hidden) d.dashHidden = true; else delete d.dashHidden;
+    // Un solo par de marcas para todos los tipos: mostrar = `dashPinned`, quitar = `dashHidden`
+    // (que además anula la publicación heredada de los documentos antiguos).
+    if (hidden) { delete d.dashPinned; d.dashHidden = true; } else { d.dashPinned = true; delete d.dashHidden; }
     _ws4Persist(d);
   } catch (_) { return false; }
   _wsPlansRepaint();
@@ -25647,7 +25657,9 @@ function _wsPinnedCaps() {
   try { pins = _wsDashTools(); } catch (_) { return out; }
   if (!pins.length) return out;
   const byRef = Object.create(null);
-  [['template', _WS_TPL_RENDER], ['tool', _WS_TOOL_RENDER]].forEach(([kind, map]) => {
+  // CIERRE DE ESTADOS — un ACCESO es de una HERRAMIENTA. Una plantilla se publica por sus
+  // DOCUMENTOS (Tus planes), nunca como acceso: sus marcas antiguas se ignoran (no se borran).
+  [['tool', _WS_TOOL_RENDER]].forEach(([kind, map]) => {
     let list = [];
     try { list = _wsCatalogFor(kind); } catch (_) { list = []; }
     list.forEach(e => {
@@ -25963,14 +25975,20 @@ const _WS_NEW_DOC = '__new__';
 // Abrir una capacidad CON documentos desde Mi espacio: sus documentos, el más reciente primero,
 // y «Crear nuevo», en el selector común. El gate se vuelve a preguntar en cada apertura.
 // El ⋯ de una capacidad en Mi espacio: abrir, favorito y Dashboard — tres actos distintos.
+// ¿Es `ref` el acceso a una HERRAMIENTA (y no a una plantilla)? Mismo criterio que el resolver.
+function _wsIsToolCapRef(ref) {
+  try { return _wsCatalogFor('tool').some(e => { const r = _WS_TOOL_RENDER[e.id] || {}; const k = r.tool ? 'tool' : (r.cta || ''); return k && _wsCanonRef(k, r.tool || '') === ref; }); }
+  catch (_) { return false; }
+}
 function _wsCapMenu(anchor, ref) {
   const fav = _wsIsPinned(ref), dash = _wsIsDashTool(ref);
   const card = anchor.closest ? anchor.closest('.wsh-mse2-card') : null;
-  _wsPopoverMenu(anchor, 'wsCapMenu', [
+  const items = [
     { k: 'open', label: t('wsh_proj_open') },
     { k: 'fav', label: t(fav ? 'wscap_fav_remove' : 'wscap_fav_add') },
-    { k: 'dash', label: t(dash ? 'wscap_pin_remove' : 'wscap_pin_add') },
-  ], act => {
+  ];
+  if (_wsIsToolCapRef(ref)) items.push({ k: 'dash', label: t(dash ? 'wscap_pin_remove' : 'wscap_pin_add') });
+  _wsPopoverMenu(anchor, 'wsCapMenu', items, act => {
     if (act === 'open') { if (card) card.click(); }
     else if (act === 'fav') { _wsTogglePin(ref); _wshRepaintHome(); }
     else if (act === 'dash') { _wsToggleDashTool(ref); _wshRepaintHome(); }
@@ -26016,7 +26034,7 @@ function _wsxAct(act, ref) {
   if (act === 'dup') {
     if (kind === 'goal') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), dashPinned: undefined, createdAt: now, updatedAt: now })); }
     // Duplicar NO publica en el Dashboard: el opt-in es un acto sobre UNA instancia (cierre §2).
-    else if (kind === 'workspace') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), customName: (s.customName ? s.customName + ' ' + t('wsg_copy_suffix') : undefined), dashPinned: undefined, createdAt: now, updatedAt: now })); }
+    else if (kind === 'workspace') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), customName: (s.customName ? s.customName + ' ' + t('wsg_copy_suffix') : undefined), dashPinned: undefined, dashHidden: true, createdAt: now, updatedAt: now })); }
     else if (kind === 'scenario') { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); _wshWriteStore(_WSH_SCENARIOS_KEY, arr); } }
     rerender();
   }
@@ -26213,7 +26231,10 @@ function _renderWorkspaceHome(metrics) {
         const docs = (!_claimed.has(sk) && _docsBySurface[sk]) ? _docsBySurface[sk] : [];
         if (docs.length) _claimed.add(sk);
         const fav = !!(mdl.pinRef && _wsIsPinned(mdl.pinRef));
-        if (!fav && !docs.length) return null;
+        // CIERRE DE ESTADOS: Mi espacio = FAVORITOS. Con documentos y sin estrella la capacidad NO
+        // aparece aquí (sus documentos siguen en su parent, en el catálogo); quitar la estrella la
+        // retira al momento. El contador sigue diciendo cuántos documentos tiene.
+        if (!fav) return null;
         return {
           mtype: docs.length ? 'doc' : 'fav', fav, docs, ref: mdl.pinRef, model: mdl, name: mdl.name, cat: mdl.cat,
           ts: Math.max(fav ? pinTs(mdl.pinRef) : 0, docs.length ? (docs[0].ts || 0) : 0),
@@ -27044,6 +27065,8 @@ function _wsbCommit(name, forceNew, targetId) {
   // (sin `existing`) crea otra instancia y no la hereda, igual que duplicar.
   if (existing && existing.dashPinned === true) proj.dashPinned = true;
   if (existing && existing.dashHidden === true) proj.dashHidden = true;
+  // Un documento NUEVO (o «Guardar como») nace fuera del Dashboard: guardar no publica.
+  if (!existing) proj.dashHidden = true;
   // Si el almacén rechaza la escritura NO se marca «Guardado»: la comparación sigue
   // pendiente en pantalla y el motivo se dice junto al botón (como en las herramientas).
   if (_ws4Persist(proj) === false) { try { _wsbSaveError(t('wssave_failed')); } catch (_) {} return; }
@@ -29566,6 +29589,8 @@ function _wsToolCommit(name, forceNew, targetId) {
   // (sin `existing`) crea otra instancia y no la hereda, igual que duplicar.
   if (existing && existing.dashPinned === true) proj.dashPinned = true;
   if (existing && existing.dashHidden === true) proj.dashHidden = true;
+  // Un documento NUEVO (o «Guardar como») nace fuera del Dashboard: guardar no publica.
+  if (!existing) proj.dashHidden = true;
   // Si el almacén rechaza la escritura (cuota, modo privado), NO se finge: el
   // borrador sigue sucio en pantalla y el motivo se dice junto al botón.
   if (_ws4Persist(proj) === false) { try { _wsToolSaveError(t('wssave_failed')); } catch (_) {} return; }
@@ -29647,7 +29672,7 @@ function _wsToolSaveBarHtml() {
   try { _openDoc = _wsToolEditId ? (_ws4Projects().find(x => x && x.id === _wsToolEditId) || null) : null; } catch (_) { _openDoc = null; }
   const _dashItem = (_openDoc && _WSPL_TYPES[_openDoc.type])
     ? `<button type="button" class="wsg-menu-item" data-wsdoc-dash="${esc(_openDoc.id)}">${esc(t(_wsPlanOnDash(_openDoc) ? 'wsmse_dash_remove' : 'wscap_dash_add'))}</button>`
-    : (_capRef ? `<button type="button" class="wsg-menu-item" data-wscap-dash="${esc(_capRef)}">${esc(t(_wsIsDashTool(_capRef) ? 'wscap_pin_remove' : 'wscap_pin_add'))}</button>` : '');
+    : ((_capRef && _wsIsToolCapRef(_capRef)) ? `<button type="button" class="wsg-menu-item" data-wscap-dash="${esc(_capRef)}">${esc(t(_wsIsDashTool(_capRef) ? 'wscap_pin_remove' : 'wscap_pin_add'))}</button>` : '');
   const lifecycle = (_openItem || _lifeItems || _dashItem) ? `
     <details class="wsg-menu">
       <summary class="wsg-menu-sum" aria-label="${esc(t('wsg_more_aria'))}"><span aria-hidden="true">···</span></summary>

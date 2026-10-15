@@ -928,8 +928,8 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
       (app.match(/wsmse2_fav:/g) || []).length === 2);
     ok('M3.13b y la última apertura ya NO decide la pertenencia, sólo acompaña',
       !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app) &&
-      // La pertenencia la deciden SÓLO la estrella y los documentos; abrir no cuenta.
-      /if \(!fav && !docs\.length\) return null;/.test(app));
+      // Cierre de estados: la pertenencia la decide SÓLO la estrella (ni abrir ni guardar).
+      /if \(!fav\) return null;/.test(app));
     // RE-DECIDIDO POR DECISIÓN DE PRODUCTO. «Espacio vacío = UNA portada» era la
     // respuesta correcta a dos estados vacíos en paralelo, pero la SPEC de cierre
     // pide lo contrario y con razón: las DOS columnas tienen que verse desde el

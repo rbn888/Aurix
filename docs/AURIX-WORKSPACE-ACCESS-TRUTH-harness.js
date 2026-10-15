@@ -485,8 +485,10 @@ console.log('\n5 · Mi espacio:');
   // RE-DECIDIDO (cierre Workspace, 2026-10-15): era el P0 de reentrada — con documentos y sin
   // estrellas Mi espacio decía «vacío». El documento vuelve, DENTRO del grupo de su capacidad
   // (una capacidad = un grupo, nunca una tarjeta por documento) y sin tocar los favoritos.
-  ok('5.5 un documento guardado: UNA card de su capacidad con contador, sin crear un favorito',
-    (both.match(/data-wsmse-cap="budget"[^>]*data-wsmse-docs="1"/g) || []).length === 1 && both.indexOf('data-wsmse-tpl="1"') !== -1
+  // CIERRE DE ESTADOS (SPEC final): Mi espacio = FAVORITOS. Guardar no mete la capacidad aquí;
+  // el documento vive en su parent (5.6) y la estrella sigue siendo el único acto de pertenencia.
+  ok('5.5 un documento guardado NO mete su capacidad en Mi espacio ni crea un favorito',
+    both.indexOf('data-wsmse-cap="budget"') === -1 && both.indexOf('data-wsmse-tpl="0"') !== -1
     && both.indexOf('wsh-mse2-doc') === -1,
     both.slice(both.indexOf('data-wsmse-cols'), both.indexOf('data-wsmse-cols') + 70));
   ok('5.5b …y el favorito que SÍ hay sigue estando, intacto',
@@ -523,8 +525,8 @@ console.log('\n5 · Mi espacio:');
       R(c, 'localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify([{ id: "p1", type: "monthly_budget", customName: "Presupuesto empresa", revision: 1, updatedAt: 5, results: {} }]))');
       const h = home(c, 'space');
       const cd = cards(h).filter(x => /wsh-mse2-card/.test(x.cls));
-      // Dos capacidades: la fijada (sin documento) y la del presupuesto guardado. Las dos abren.
-      return cd.length === 2 && cd.every(x => destination(c, x).kind === 'opened');
+      // Sólo la capacidad FAVORITA (el presupuesto guardado no entra sin estrella). Y abre.
+      return cd.length === 1 && cd.every(x => destination(c, x).kind === 'opened');
     })(),
     JSON.stringify(cards(home(c, 'space')).filter(x => /wsh-mse2-card/.test(x.cls)).map(x => destination(c, x))));
   // Y un usuario Free no puede ver en Mi Espacio algo que no puede abrir.

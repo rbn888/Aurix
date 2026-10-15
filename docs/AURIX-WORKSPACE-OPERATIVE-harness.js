@@ -46,7 +46,7 @@ function ctx(langCode) {
   vm.runInContext('function _wsCanPersist(){ return true; }', sb);
   ['_WS_TABS', '_WS_BACK_ORIGINS', '_WSH_DASH_TOOLS_KEY', '_WSPL_TYPES'].forEach(n => vm.runInContext(konstSrc(n), sb));
   ['_wsTabOk', '_wsBackOrigin', '_wsBackLabel', '_wsBackShort', '_wsToolDocName',
-   '_wsSurfaceHeadHtml', '_wsToolSaveBarHtml', '_wsSubIfDistinct', '_wsBarSubHtml', '_wsToolSaveState', '_wsCanonRef', '_wsIsDashTool', '_wsDashTools', '_wshReadStore', '_wsPlanOnDash'].forEach(n => vm.runInContext(fnSrc(n), sb));
+   '_wsSurfaceHeadHtml', '_wsToolSaveBarHtml', '_wsSubIfDistinct', '_wsBarSubHtml', '_wsToolSaveState', '_wsCanonRef', '_wsIsDashTool', '_wsDashTools', '_wshReadStore', '_wsPlanOnDash', '_wsIsToolCapRef'].forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
 const R = (c, e) => vm.runInContext(e, c);

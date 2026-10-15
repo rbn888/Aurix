@@ -112,9 +112,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       empty: [].slice.call(r.querySelectorAll('.wsh-mse2-empty-t')).map(function(e){return e.textContent}) }`);
     let m = await ms();
     const g = cap => (m.groups || []).find(x => x.cap === cap);
-    ok(`${T} P0: con documentos y SIN fijados, Mi espacio no dice «Sin plantillas»`, m && !m.empty.some(x => /Sin plantillas/.test(x)), JSON.stringify(m));
-    ok(`${T} el presupuesto guardado: UNA card de su capacidad con contador, sin filas de documento`, g('budget') && g('budget').n === 1 && m.rows === 0, JSON.stringify(m && m.groups));
-    ok(`${T} el documento de una HERRAMIENTA también aparece (card de su capacidad)`, g('compound') && g('compound').n === 1);
+    // CIERRE DE ESTADOS: Mi espacio = FAVORITOS. Guardar no mete la capacidad; la estrella sí.
+    ok(`${T} con documentos y SIN favoritos, Mi espacio no muestra capacidades (guardar ≠ favorito)`, m && !g('budget') && !g('compound') && m.empty.length === 2, JSON.stringify(m));
+    await p.evaluate(`_wsTogglePin('tpl:mbudget'); _wsTogglePin('tool:compound'); _wshRepaintHome();`); await p.waitForTimeout(150);
+    m = await ms();
+    ok(`${T} favorito → aparece: UNA card con su contador, sin filas de documento`, g('budget') && g('budget').n === 1 && g('budget').fav && m.rows === 0, JSON.stringify(m && m.groups));
+    ok(`${T} …también una HERRAMIENTA favorita con documento`, g('compound') && g('compound').n === 1);
     ok(`${T} cada card tiene su menú fuera de la portada`, m.groups.every(x => x.menu), JSON.stringify(m.groups));
     // Abrir una capacidad con documentos: el selector común con SUS documentos y «Crear nuevo».
     await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"]').click(); await p.waitForTimeout(200);
@@ -124,10 +127,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const nw = await J(p, `return { view: _wshView, tool: _wsToolActive, edit: _wsToolEditId, rows: _wsBudgetRows(_wsToolInputs).length, origin: _wsBackOrigin() }`);
     ok(`${T} «Crear nuevo» abre un documento NUEVO (sin id) con retorno a Mi espacio`, nw.view === 'tool' && nw.tool === 'budget' && nw.edit === null && nw.origin === 'space', JSON.stringify(nw));
     await p.evaluate(`_wsNavBack()`); await space(p);
-    ok(`${T} guardar NO fija: el grupo no lleva marca de fijado`, g('budget') && !g('budget').fav);
     ok(`${T} metadato textual: «1 documento»`, g('budget') && /1 documento/.test(g('budget').meta), g('budget') && g('budget').meta);
-    // Fijar la capacidad que ya tiene documento: UN grupo, no dos.
-    await p.evaluate(`_wsTogglePin(_wsCanonRef('tool','budget')); _wshRepaintHome();`); await p.waitForTimeout(150);
+    // Quitar el favorito la retira al momento; volver a marcarlo la devuelve (UNA vez).
+    await p.evaluate(`_wsTogglePin('tool:compound'); _wshRepaintHome();`); await p.waitForTimeout(120);
+    m = await ms();
+    ok(`${T} quitar favorito → desaparece de Mi espacio al momento (sin card fantasma)`, !g('compound'), JSON.stringify(m.groups));
+    await p.evaluate(`_wsTogglePin('tool:compound'); _wshRepaintHome();`); await p.waitForTimeout(120);
     m = await ms();
     ok(`${T} fijada + documento = UN solo grupo, marcado fijada`, (m.groups.filter(x => x.cap === 'budget').length === 1) && g('budget').fav && /Favorito/.test(g('budget').meta), JSON.stringify(m.groups));
     const allBudgetDocs = await J(p, `return _ws4Projects().filter(function(x){return x.type==='monthly_budget'}).length`);
@@ -144,8 +149,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     dr = await dashRefs();
     ok(`${T} «Mostrar en Dashboard» publica la instancia de la HERRAMIENTA`, dr.indexOf('workspace:ws4_cmp1') >= 0, dr.join());
     await space(p); m = await ms();
-    const pinsAfterDash = await J(p, `return _wsPinned().map(function(x){return x.ref})`);
-    ok(`${T} mostrar en Dashboard NO fija la capacidad`, pinsAfterDash.indexOf(_ref('compound')) < 0, pinsAfterDash.join());
+    const pinsAfterDash = await J(p, `return { fav: _wsPinned().map(function(x){return x.ref}), tools: _wsDashTools().length }`);
+    ok(`${T} mostrar un documento en Dashboard NO toca favoritos ni crea un acceso`, pinsAfterDash.tools === 0 && pinsAfterDash.fav.join() === 'tpl:mbudget,tool:compound,tool:loan', JSON.stringify(pinsAfterDash));
+    void _ref;
     function _ref(k) { return 'tool:' + k; }
     // Volver a guardar la instancia publicada CONSERVA la publicación; «Guardar como» no la hereda.
     const resave = await J(p, `switchTab('workspace'); _wsOpenTool('compound','ws4_cmp1'); _wsToolInputs.monthly='250'; _wsToolDirty=true; _wsToolCommit(null,false);
@@ -172,14 +178,18 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await space(p); m = await ms();
     ok(`${T} eliminar lo retira del Dashboard y actualiza el contador; la capacidad favorita sigue`, planAfterDel.indexOf('Casa noviembre') < 0 && g('budget') && g('budget').n === 0 && g('budget').fav, JSON.stringify({ planAfterDel, b: g('budget') }));
     // Favorito ≠ Dashboard: marcar favorito NO publica un acceso; publicarlo es su propio acto.
-    const favDash = await J(p, `return { fav: _wsIsPinned('tpl:mbudget'), caps: _wsPinnedCaps().length }`);
+    const favDash = await J(p, `return { fav: _wsIsPinned('tool:loan'), caps: _wsPinnedCaps().length }`);
     ok(`${T} un favorito NO publica nada en el Dashboard`, favDash.fav === true && favDash.caps === 0, JSON.stringify(favDash));
+    await p.evaluate(`_wsToggleDashTool('tool:loan')`);
+    const dashOn = await J(p, `return { caps: _wsPinnedCaps().map(function(c){return c.ref}), fav: _wsIsPinned('tool:loan') }`);
+    await p.evaluate(`_wsTogglePin('tool:loan')`);
+    const afterUnfav = await J(p, `return { caps: _wsPinnedCaps().map(function(c){return c.ref}), fav: _wsIsPinned('tool:loan') }`);
+    ok(`${T} «Fijar acceso» publica la HERRAMIENTA; quitar el favorito no lo retira`, dashOn.caps.join() === 'tool:loan' && afterUnfav.caps.join() === 'tool:loan' && !afterUnfav.fav, JSON.stringify({ dashOn, afterUnfav }));
+    // Clasificación: una PLANTILLA nunca es un acceso (ni por API).
     await p.evaluate(`_wsToggleDashTool('tpl:mbudget')`);
-    const dashOn = await J(p, `return { caps: _wsPinnedCaps().map(function(c){return c.ref}), fav: _wsIsPinned('tpl:mbudget') }`);
-    await p.evaluate(`_wsTogglePin('tpl:mbudget')`);
-    const afterUnfav = await J(p, `return { caps: _wsPinnedCaps().map(function(c){return c.ref}), fav: _wsIsPinned('tpl:mbudget') }`);
-    ok(`${T} «Mostrar en Dashboard» publica el acceso; quitar el favorito no lo retira`, dashOn.caps.join() === 'tpl:mbudget' && afterUnfav.caps.join() === 'tpl:mbudget' && !afterUnfav.fav, JSON.stringify({ dashOn, afterUnfav }));
-    await p.evaluate(`_wsToggleDashTool('tpl:mbudget'); _wsTogglePin('tpl:mbudget')`);
+    const tplAcc = await J(p, `return { store: _wsDashTools().map(function(x){return x.ref}), caps: _wsPinnedCaps().map(function(c){return c.ref}) }`);
+    ok(`${T} una plantilla no puede quedar en Herramientas fijadas`, tplAcc.store.indexOf('tpl:mbudget') < 0 && tplAcc.caps.indexOf('tpl:mbudget') < 0, JSON.stringify(tplAcc));
+    await p.evaluate(`_wsToggleDashTool('tool:loan'); _wsTogglePin('tool:loan')`);
     // Muchos documentos: 10 → una sola card con contador 10; 100 → la biblioteca los tiene todos, Mi espacio sigue en UNA card.
     for (const N of [10, 100]) {
       await p.evaluate(`(function(){ var l=_ws4Projects().filter(function(x){return x.type!=='monthly_budget'}); for (var i=0;i<${N};i++) l.push({ id:'ws4_m'+i, type:'monthly_budget', customName:'Presupuesto prueba '+i, inputs:{ currency:'EUR' }, revision:1, createdAt:1000+i, updatedAt:2000+i, currency:'EUR' }); localStorage.setItem('aurix_ws_projects_v1', JSON.stringify(l)); _wshRepaintHome(); })()`);
@@ -592,10 +602,49 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     d = await dash();
     ok(`${T} inmobiliario: volver a mostrarlo lo devuelve una vez`, d.plans.filter(x => x === 'k_re').length === 1, JSON.stringify(d));
     // Sin documento abierto, la opción es explícitamente un ACCESO (no promete un plan).
-    await p.evaluate(`switchTab('workspace'); _wsOpenTool('realestate')`); await p.waitForTimeout(300);
+    await p.evaluate(`switchTab('workspace'); _wsOpenTool('compound')`); await p.waitForTimeout(300);
     await p.locator('.wsh-bar-actions .wsg-menu-sum').click(); await p.waitForTimeout(120);
     const cap = await J(p, `var b=document.querySelector('.wsh-bar-actions [data-wscap-dash]'); return b ? b.textContent.trim() : null`);
-    ok(`${T} sin documento abierto, la opción dice «Fijar acceso», no «Mostrar en Dashboard»`, /Fijar acceso|Pin shortcut/.test(cap || ''), String(cap));
+    ok(`${T} herramienta sin documento abierto: la opción dice «Fijar acceso», no «Mostrar en Dashboard»`, /Fijar acceso|Pin shortcut/.test(cap || ''), String(cap));
+    await p.locator('.wsh-bar-actions [data-wscap-dash]').click(); await p.waitForTimeout(150);
+    const tpin = await dash();
+    ok(`${T} fijar el acceso de Interés compuesto → Herramientas fijadas, nunca Tus planes`, tpin.pins === 1 && tpin.plans.filter(x => x === 'k_cmp').length === 1, JSON.stringify(tpin));
+    await p.evaluate(`switchTab('workspace'); _wsOpenTool('realestate')`); await p.waitForTimeout(300);
+    await p.locator('.wsh-bar-actions .wsg-menu-sum').click(); await p.waitForTimeout(120);
+    const capTpl = await J(p, `return !!document.querySelector('.wsh-bar-actions [data-wscap-dash]')`);
+    ok(`${T} plantilla sin documento abierto: NO ofrece fijar acceso (se publica por sus documentos)`, capTpl === false, String(capTpl));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
+  // ═════════════════ §L · CIERRE DE ESTADOS ═════════════════
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    await boot(p, { seed: { aurix_ws_projects_v1: [ Object.assign(DOC('l_old', 'monthly_budget', 'Antiguo', { inputs: BUDGET_IN }), { createdAt: Date.parse('2026-09-01T00:00:00Z') }) ] } });
+    const T = ENG + '.§L';
+    const st = () => J(p, `return { plans: _wsPlansAll().map(function(x){return x.id}), tools: _wsDashTools().length, fav: _wsPinned().length, docs: _wsSaveCandidates('monthly_budget', null).map(function(d){return d.name}) }`);
+    let a = await st();
+    ok(`${T} documento de plantilla anterior al cambio: conserva su publicación heredada`, a.plans.indexOf('l_old') >= 0, JSON.stringify(a));
+    await p.evaluate(`switchTab('workspace'); _wsOpenTool('budget', '${'__new__'}'); _wsToolCommit('Nuevo A', true); _wsOpenTool('budget', '__new__'); _wsToolCommit('Nuevo B', true);`); await p.waitForTimeout(200);
+    a = await st();
+    ok(`${T} guardar dos presupuestos: ambos en su parent, ninguno publicado, sin acceso ni favorito, sin duplicados`,
+      a.docs.filter(x => x === 'Nuevo A').length === 1 && a.docs.filter(x => x === 'Nuevo B').length === 1 && a.plans.length === 1 && a.tools === 0 && a.fav === 0, JSON.stringify(a));
+    await p.evaluate(`var d=_ws4Projects().find(function(x){return x.customName==='Nuevo A'}); _wsPlanDashSet(d.id, false, 'workspace');`);
+    a = await st();
+    ok(`${T} fijar «Nuevo A» → Tus planes, y SÓLO ése (no se auto-elige el último guardado)`, a.plans.length === 2 && a.plans.indexOf(await J(p, `return _ws4Projects().find(function(x){return x.customName==='Nuevo B'}).id`)) < 0, JSON.stringify(a));
+    await p.evaluate(`_wsPlanDashSet('l_old', true, 'workspace')`);
+    a = await st();
+    ok(`${T} quitar el antiguo lo retira (y el documento sigue)`, a.plans.indexOf('l_old') < 0 && a.docs.indexOf('Antiguo') >= 0, JSON.stringify(a));
+    // Objetivo: fijar → Tus planes; quitar → fuera; el objetivo sigue.
+    await p.evaluate(`localStorage.setItem('aurix_ws_goals_v1', JSON.stringify([{ id:'g1', type:'emergency', name:'Colchón', target:'12000', current:'4500', monthly:'300', mode:'manual', currency:'EUR', createdAt:1, updatedAt:2, revision:1 }]))`);
+    a = await st();
+    ok(`${T} objetivo guardado: no aparece en Dashboard sin fijarlo`, a.plans.indexOf('g1') < 0, JSON.stringify(a));
+    await p.evaluate(`_wsPlanDashSet('g1', false, 'goal')`); a = await st();
+    const g1 = await J(p, `return _wsPlansAll().filter(function(x){return x.id==='g1' && x.kind==='goal'}).length`);
+    await p.evaluate(`_wsPlanDashSet('g1', true, 'goal')`); const a2 = await st();
+    const kept = await J(p, `return _wsgGoals().length`);
+    ok(`${T} objetivo: fijar → Tus planes (una vez), quitar → fuera, el objetivo sigue`, g1 === 1 && a2.plans.indexOf('g1') < 0 && kept === 1, JSON.stringify({ g1, a2, kept }));
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }
@@ -663,7 +712,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     SD.aurix_ws_projects_v1[1].dashPinned = true;
     SD.aurix_ws_projects_v1[1].results.interest = 72000;
     SD.aurix_ws_projects_v1.push(DOC('ws4_rcv1', 'receivables_app', 'Clientes 2026', { inputs: { currency: 'EUR', items: [{ id: 'a', personOrCompany: 'A', concept: 'x', units: 1, unitPrice: 1000, paidAmount: 400, dueDate: '' }] } }));
-    SD.aurix_ws_dash_tools_v1 = [{ ref: 'tool:loan', ts: 2 }, { ref: 'tpl:mbudget', ts: 1 }];
+    SD.aurix_ws_dash_tools_v1 = [{ ref: 'tool:loan', ts: 2 }, { ref: 'tool:compound', ts: 1 }];
     await boot(p, { seed: SD });
     const T = ENG + '.§D' + W;
     await p.evaluate(`switchTab('home')`); await p.waitForTimeout(1200);
@@ -676,13 +725,13 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         notInCats: !sec.closest('.categories-grid'), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
     ok(`${T} un bloque «Tu espacio» con dos grupos: Tus planes y Herramientas fijadas`, d.title === 'Tu espacio' && d.groups.join('|') === 'Tus planes|Herramientas fijadas', JSON.stringify(d));
     ok(`${T} planes en ${COLS} columna(s)`, d.plans && d.plans.cols === Math.min(COLS, d.plans.n), JSON.stringify(d.plans));
-    ok(`${T} accesos en su PROPIA rejilla, en el orden de su lista`, d.pins && d.pinNames.join('|') === 'Simulador de préstamos|Presupuesto mensual', JSON.stringify(d.pinNames));
+    ok(`${T} accesos en su PROPIA rejilla, en el orden de su lista`, d.pins && d.pinNames.join('|') === 'Simulador de préstamos|Interés compuesto', JSON.stringify(d.pinNames));
     ok(`${T} previews reales: minidonut del presupuesto y aportado/crecimiento de la simulación`, d.ring && d.cmpShare, JSON.stringify(d));
     ok(`${T} el bloque no está dentro de la rejilla patrimonial y no desborda`, d.notInCats && d.sw);
     // Reordenar las fijadas reescribe el almacén (mismo mecanismo de orden, otro grupo).
-    await p.evaluate(`_AURIX_REORDER['wsPinGrid'].commit(['tpl:mbudget','tool:loan']); updateDashboardPlans();`); await p.waitForTimeout(150);
+    await p.evaluate(`_AURIX_REORDER['wsPinGrid'].commit(['tool:compound','tool:loan']); updateDashboardPlans();`); await p.waitForTimeout(150);
     const ord = await J(p, `return { store: _wsDashTools().map(function(x){return x.ref}), names: [].slice.call(document.querySelectorAll('.wspin-card .wspl-name')).map(function(e){return e.textContent}) }`);
-    ok(`${T} reordenar accesos persiste en su lista y repinta`, ord.store.join() === 'tpl:mbudget,tool:loan' && ord.names[0] === 'Presupuesto mensual', JSON.stringify(ord));
+    ok(`${T} reordenar accesos persiste en su lista y repinta`, ord.store.join() === 'tool:compound,tool:loan' && ord.names[0] === 'Interés compuesto', JSON.stringify(ord));
     // Abrir una fijada desde el Dashboard: work mode y Volver = Dashboard.
     await p.locator('.wspin-card [data-wspin-dopen="tool:loan"]').click(); await p.waitForTimeout(900);
     const op = await J(p, `return { work: document.body.classList.contains('ws-work'), tool: _wsToolActive, origin: _wsBackOrigin() }`);

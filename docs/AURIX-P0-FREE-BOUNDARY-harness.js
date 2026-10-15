@@ -651,9 +651,9 @@ console.log('\n6 · Mi espacio:');
   // usuario, y guardar sigue SIN tocar los favoritos (guardar ≠ fijar).
   // Cierre quirúrgico: UNA card de la capacidad con su contador (los documentos se eligen al
   // abrirla), sin filas de documento, y guardar sigue sin crear un favorito.
-  ok('6.5 un documento guardado aparece como UNA card de su capacidad con contador, y NO crea un favorito',
-    (h.match(/data-wsmse-cap="budget"[^>]*data-wsmse-docs="1"/g) || []).length === 1
-    && h.indexOf('wsh-mse2-doc') === -1 && /data-wsmse-tpl="1"/.test(h)
+  // CIERRE DE ESTADOS: guardar no mete la capacidad en Mi espacio (= favoritos) ni crea favorito.
+  ok('6.5 un documento guardado NO aparece en Mi espacio sin estrella, y NO crea un favorito',
+    h.indexOf('data-wsmse-cap="budget"') === -1 && /data-wsmse-tpl="0"/.test(h)
     && R(c, '_wsPinned().length') === 0);
   // RE-DECIDIDO (§8), Y MÁS FUERTE. Esto exigía que la miniatura del documento
   // se construyera desde SUS `results`, porque la versión anterior leía el

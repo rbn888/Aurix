@@ -76,7 +76,11 @@ function ctx(opts) {
    '_aurixPlanOrderRead','_aurixOrderNormalize','_aurixOrderMerge','_wsPlanSpendHtml',
    '_renderDashboardPlans']
     .forEach(n => { try { vm.runInContext(fnSrc(n), sb); } catch (e) { throw new Error('ctx ' + n + ': ' + e.message); } });
-  if (opts.docs) vm.runInContext('localStorage.setItem(_WSH_PROJECTS_KEY, ' + JSON.stringify(JSON.stringify(opts.docs)) + ');', sb);
+  // CIERRE DE ESTADOS: guardar ya NO publica; los fixtures de esta sonda son documentos que el
+  // usuario PUBLICÓ (`dashPinned`), salvo los que declaran su estado (dashHidden/dashPinned) o piden
+  // probar el estado sin publicar (`opts.raw`).
+  const _docs = opts.docs && !opts.raw ? opts.docs.map(d => (d && d.dashHidden !== true && d.dashPinned === undefined && ['compound_growth','loan_simulation','scenario_compare'].indexOf(d.type) === -1) ? Object.assign({}, d, { dashPinned: true }) : d) : opts.docs;
+  if (_docs) vm.runInContext('localStorage.setItem(_WSH_PROJECTS_KEY, ' + JSON.stringify(JSON.stringify(_docs)) + ');', sb);
   if (opts.goals) vm.runInContext('localStorage.setItem(_WSH_GOALS_KEY, ' + JSON.stringify(JSON.stringify(opts.goals)) + ');', sb);
   return sb;
 }
@@ -552,8 +556,10 @@ console.log('\n7 · Objetivos, en el sistema común:');
   ok('7.17 plantillas opt-OUT y objetivos opt-IN, cada una preservando su estado previo',
     // Cierre Workspace §2: la marca se lee en UN owner (`_wsPlanOnDash`), que además admite las
     // herramientas con persistencia como opt-IN (nunca estuvieron en el Resumen).
-    /\.filter\(_wsPlanOnDash\)/.test(fnSrc('_wsPlansDocs')) && /p\.dashHidden !== true/.test(fnSrc('_wsPlanOnDash'))
-    && /spec\.optIn \? p\.dashPinned === true/.test(fnSrc('_wsPlanOnDash')) && /dashPinned === true/.test(fnSrc('_wsPlansGoals')));
+    // Cierre de estados: GUARDAR NO PUBLICA para ningún tipo (opt-in `dashPinned`); los documentos de
+    // plantilla anteriores al cambio conservan su publicación heredada (sin `dashHidden`).
+    /\.filter\(_wsPlanOnDash\)/.test(fnSrc('_wsPlansDocs')) && /if \(p\.dashPinned === true\) return true;/.test(fnSrc('_wsPlanOnDash'))
+    && /return true;   \/\/ documento de plantilla heredado/.test(fnSrc('_wsPlanOnDash')) && /if \(!existing\) proj\.dashHidden = true;/.test(app) && /dashPinned === true/.test(fnSrc('_wsPlansGoals')));
 
   // El vacío sigue siendo honesto cuando no hay NI plantillas NI objetivos.
   const empty = R(ctx({ docs: [], goals: [] }), '_renderDashboardPlans()');
