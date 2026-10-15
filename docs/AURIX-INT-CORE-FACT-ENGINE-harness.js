@@ -410,8 +410,11 @@ console.log('\n7 · Positive facts exist when they are observable:');
                       serverRows: srvHistory(endTs, 10, { crypto: 40000, stock: 40000, liquidity: 20000 },
                                                          { crypto: 32000, stock: 40000, liquidity: 28000 }),
                       assets: LOPSIDED, snap: SNAP, drivers: DRIVERS }, { now: endTs + MIN });
-  ok('7.1 improving liquidity is detected as a positive fact',
-    good.positiveDevelopments.some(f => f.semanticKey === 'liquidity_improved'),
+  // ÚLTIMO AJUSTE (cambio de contrato explícito): la subida de liquidez se DETECTA
+  // y se conserva, pero es informativa: no es una mejora objetiva.
+  ok('7.1 rising liquidity is detected and kept, but NOT as a positive fact',
+    good.ledger.facts.some(f => f.semanticKey === 'liquidity_improved' && f.positive === null)
+    && !good.positiveDevelopments.some(f => f.semanticKey === 'liquidity_improved'),
     JSON.stringify(good.positiveDevelopments.map(f => f.semanticKey)));
   ok('7.2 a real positive return is detected as a positive fact',
     good.positiveDevelopments.some(f => f.semanticKey === 'return_positive'));

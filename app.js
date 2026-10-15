@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '784'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '785'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2497,6 +2497,7 @@ function _aurixAssetMemoryTopWeight(nowTs) {
       if (!wStart.id || wStart.id !== wEnd.id) continue;
       const d = wEnd.pct - wStart.pct;
       return { range: w.range, startAt: start.ts, endAt: end.ts, deltaPp: +d.toFixed(2), assetId: wEnd.id,
+        startPct: wStart.pct, endPct: wEnd.pct,
         material: Math.abs(d) >= _AURIX_FACT_MATERIAL.exposureDeltaPp, source: 'portfolio_snapshots.asset_values' };
     }
     return null;
@@ -5633,7 +5634,7 @@ const T = {
     // que ya tenías. Se dice lo que se sabe: se registró liquidez.
     intel_d_capital:       'Tu patrimonio ha subido por la liquidez que registraste, no por rendimiento del mercado.',
     intel_d_intent:        pct => `Dijiste que tu prioridad es preservar, y hoy una sola posición pesa el ${pct}%.`,
-    intel_d_liq_need:      (pp, pct, win) => `Dijiste que vas a necesitar liquidez y tu peso en liquidez ha bajado ${pp} puntos, hasta el ${pct}%, en ${win}.`,
+    intel_d_liq_need:      (win, a, b, asof) => `Dijiste que vas a necesitar liquidez. En ${win}, tu liquidez pasó del ${a} al ${b} de tu cartera financiera${asof}.`,
     intel_d_combined:      n => `${n} lecturas se han movido a la vez. Por separado ninguna destacaba.`,
     // Preguntas: sólo cuando un hecho real las necesita, y siempre con su porqué.
     intel_q_conc_intent:   name => `¿Tu posición en ${name} es una exposición que has elegido a propósito?`,
@@ -5870,11 +5871,11 @@ const T = {
     intcc_watch_clean: 'No se observan señales prioritarias. Aurix seguirá vigilando liquidez, concentración y diversificación.',
     intcc_watch_foot:  n => `${n} ${n === 1 ? 'área detectada' : 'áreas detectadas'} por Aurix Intelligence`,
     intcc_w_dep_t:    'Dependencia de activo principal',
-    intcc_w_dep_b:    name => `Buena parte de tu patrimonio invertible se apoya en ${name}.`,
+    intcc_w_dep_b:    name => `Buena parte de tu cartera financiera se apoya en ${name}.`,
     intcc_w_liq_t:    'Liquidez reducida',
     intcc_w_liq_b:    'Tu liquidez inmediata es baja frente al resto del patrimonio.',
     intcc_w_crypto_t: 'Exposición cripto',
-    intcc_w_crypto_b: pct => `La cripto representa cerca del ${pct}% de tu patrimonio invertible.`,
+    intcc_w_crypto_b: pct => `La cripto representa cerca del ${pct}% de tu cartera financiera.`,
     intcc_w_sector_t: 'Exposición sectorial',
     intcc_w_sector_b: label => `${label} concentra una parte relevante de tu patrimonio invertible.`,
     intcc_w_div_t:    'Diversificación limitada',
@@ -5970,10 +5971,10 @@ const T = {
     intv3_xq_lead: n => `¿Qué cambió para que ${n} pasara a ser mi mayor inversión?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Desde ${ago}, el valor de ${na} en tu cartera cambió un ${va} y el de ${nb} un ${vb}: hoy ${nb} vale más.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} es una posición nueva que hoy vale más que ${na}, cuyo valor en tu cartera cambió un ${va} desde ${ago}.`,
-    intv9_xa_lead_new: (nb, ago) => `${nb} no figuraba en tu cartera ${ago} y hoy es tu mayor inversión.`,
+    intv9_xa_lead_new: (nb, ago, when) => `${nb} no figuraba en tu cartera ${ago} y ${when} es tu mayor inversión.`,
     intv9_xa_lead_old: (na, chg) => `${na} sigue en tu cartera; el valor de tu posición ${_intv9Mv(chg, 'es')} durante el periodo.`,
     intv9_xa_lead_gone: na => `${na} ya no figura en tu cartera.`,
-    intv9_xa_lead_both: (ago, na, nb, wb) => `${ago.charAt(0).toUpperCase() + ago.slice(1)} tu mayor inversión era ${na}; hoy es ${nb}.`,
+    intv9_xa_lead_both: (ago, na, nb, wb, when) => `${ago.charAt(0).toUpperCase() + ago.slice(1)} tu mayor inversión era ${na}; ${when} es ${nb}.`,
     intv9_xa_lead_ev: (na, ca, nb, cb) => `Durante el periodo, el valor de tu posición en ${na} ${_intv9Mv(ca, 'es')} y el de tu posición en ${nb} ${_intv9Mv(cb, 'es')}.`,
     intv22_xq_spread: ago => `¿Mi dinero está mejor repartido que ${ago} o solo tengo más posiciones?`,
     intv22_xa_spread_better: 'Está mejor repartido: el peso se ha equilibrado entre tus posiciones.',
@@ -6006,8 +6007,8 @@ const T = {
     intv11_today_flows_in: (i) => `En las últimas 24 h registraste aportaciones por ${i}.`,
     intv11_today_flows_out: (i, o) => `En las últimas 24 h registraste retiradas por ${o}.`,
     intv11_today_flows_both: (i, o, n) => `En las últimas 24 h registraste aportaciones por ${i} y retiradas por ${o} (neto ${n}).`,
-    intv21_today_driver_up: (n, pp) => `${n} sumó ${pp} a tu cartera en 24 h.`,
-    intv21_today_driver_down: (n, pp) => `${n} restó ${pp} a tu cartera en 24 h.`,
+    intv21_today_driver_up: (n) => `${n} fue lo que más sumó a tu cartera en 24 h.`,
+    intv21_today_driver_down: (n) => `${n} fue lo que más restó a tu cartera en 24 h.`,
     intv21_today_mover_up: (n, p) => `La cotización de ${n} subió un ${p} en 24 h.`,
     intv21_today_mover_down: (n, p) => `La cotización de ${n} bajó un ${p} en 24 h.`,
     intv21_today_mover_session_up: (n, p) => `La cotización de ${n} subió un ${p} en la última sesión disponible.`,
@@ -6080,8 +6081,8 @@ const T = {
     intv21_xa_conc_owned_up: 'Sí: tu mayor posición pesa más que al principio del periodo.',
     intv21_xa_conc_owned_down: 'No: tu mayor posición pesa menos que al principio del periodo.',
     intv21_xa_conc_owned_flat: 'No de forma material: el peso de tu mayor posición se mantiene.',
-    intv21_xa_conc_up: (pp, d) => `Sí: tu mayor posición pesa ${pp} puntos más que el ${d}.`,
-    intv21_xa_conc_down: (pp, d) => `No: tu mayor posición pesa ${pp} puntos menos que el ${d}.`,
+    intv21_xa_conc_up: (a, b, d, asof) => `Sí: el peso de tu mayor posición pasó del ${a} el ${d} al ${b}${asof}.`,
+    intv21_xa_conc_down: (a, b, d, asof) => `No: el peso de tu mayor posición pasó del ${a} el ${d} al ${b}${asof}.`,
     intv21_xa_conc_flat: (pp, d) => `No de forma material desde el ${d}.`,
     intv21_xq_top3: '¿Qué ocurriría si mis tres mayores posiciones cayeran un 10 %?',
     intv21_xa_top3: 'Aurix lo calcula con tus pesos actuales en «Dependencias y escenarios», sin suponer que nada más caería con ellas.',
@@ -6232,6 +6233,8 @@ const T = {
     // contrato palabra por palabra, y no pasa por la tabla de perímetro porque ya
     // nombra el perímetro financiero correcto sin decir «patrimonio invertible».
     intv4_f_level: amt => `Tu cartera financiera tiene actualmente un valor de ${amt}`,
+    // Sin vigencia demostrada no hay «actualmente»: se fecha el dato.
+    intv4_f_level_asof: (amt, at) => `Según el dato del ${at}, tu cartera financiera valía ${amt}`,
     intv4_f_ath: amt => `Tu patrimonio invertible está en su máximo: ${amt}`,
     // ── §2 · «CAMBIO DEL VALOR REGISTRADO», NUNCA UNA SUBIDA ─────────────────
     // «Tus inversiones han subido X» QUEDA RETIRADA. En producción publicó una
@@ -6318,7 +6321,11 @@ const T = {
     // CIERRE · COHERENCIA Y LENGUAJE — la deriva de liquidez es un cambio de PESO:
     // periodo + los dos extremos certificados, sin «pp» (no es «%», y casi nadie lo
     // lee) y sin «subió/bajó», que sugieren dinero que entró o salió.
-    intv4_f_cash_move: (win, a, b) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible`,
+    intv4_f_cash_move: (win, a, b, asof) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible${asof || ''}`,
+    // HISTÓRICO FRENTE A VIVO: el extremo histórico se FECHA cuando no coincide con
+    // la lectura viva publicada; nunca se sustituye por ella.
+    intv4_f_asof: at => `, según el dato del ${at}`,
+    intv4_when_today: 'hoy', intv4_when_asof: at => `en el dato del ${at}`,
     // A1 — VERDAD DE LA TRANSICIÓN vs ATRIBUCIÓN DE CAUSA. `subió`/`bajó` describe
     // la MAGNITUD y se usa cuando un evento del usuario corrobora el movimiento.
     // Sin corroboración la forma es NEUTRAL: se dice que pasó de X a Y y no se
@@ -6382,8 +6389,8 @@ const T = {
     // Dos hechos INDEPENDIENTES, en dos frases: ningún «mientras» ni «ya» que
     // sugiera causa o alarma. Con la otra ventana certificada en dirección opuesta,
     // se dan las dos con sus extremos: no se deduce continuidad de dos puntos.
-    intv4_w_liqconc: (win, a, b, top) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible. Tu mayor posición pesa el ${top}%`,
-    intv4_w_liqconc_ctx: (win, a, b, win2, c, d, top) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible; en ${win2}, del ${c} al ${d}. Tu mayor posición pesa el ${top}%`,
+    intv4_w_liqconc: (win, a, b, top, asof) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible${asof || ''}. Tu mayor posición pesa el ${top}%`,
+    intv4_w_liqconc_ctx: (win, a, b, win2, c, d, top, asof) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible; en ${win2}, del ${c} al ${d}${asof || ''}. Tu mayor posición pesa el ${top}%`,
     intv4_w_multi: n => `Han mejorado ${n} dimensiones independientes de tu patrimonio a la vez`,
     // preguntas
     intv4_q_q_performance: '¿Cuánto han rendido realmente mis inversiones?',
@@ -6502,8 +6509,8 @@ const T = {
     intv17_ev_mix:     (thr) => `El reparto entre clases de activo cambió menos de ${thr} puntos porcentuales.`,
     intv17_longer:     'Las comparaciones de mayor plazo aparecerán a medida que crezca tu historial.',
     intv19_evo_ret:       (pct, a) => `Desde el ${a}, tus inversiones han rendido un ${pct}.`,
-    intv19_evo_conc_up:   (pp, a) => `Desde el ${a}, el peso de tu mayor posición ha subido ${pp} puntos.`,
-    intv19_evo_conc_down: (pp, a) => `Desde el ${a}, el peso de tu mayor posición ha bajado ${pp} puntos.`,
+    intv19_evo_conc_up:   (d, a, b, asof) => `Desde el ${d}, el peso de tu mayor posición pasó del ${a} al ${b}${asof}.`,
+    intv19_evo_conc_down: (d, a, b, asof) => `Desde el ${d}, el peso de tu mayor posición pasó del ${a} al ${b}${asof}.`,
     intv19_evo_conc_flat: (a) => `Desde el ${a}, el peso de tu mayor posición apenas ha cambiado.`,
     intv17_in_today:   'El cambio de tu estructura en este periodo ya aparece en «Lo que importa hoy».',
     intv16_stable_flows: 'No has registrado aportaciones ni retiradas en este periodo, así que lo que ves no viene de dinero nuevo.',
@@ -6530,8 +6537,8 @@ const T = {
     // de numerador y denominador). La frase es por tanto más amplia que el cálculo
     // para un usuario con inmuebles. La cifra no se toca; la precisión la recupera
     // el análisis completo, que es donde vive el desglose.
-    intprev_f_conc:     (pct, name) => `El ${pct}% de tu patrimonio depende de ${name}.`,
-    intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu patrimonio.`,
+    intprev_f_conc:     (pct, name) => `El ${pct}% de tu cartera financiera depende de ${name}.`,
+    intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu cartera financiera.`,
     // §1 — los bloqueados no revelan NADA: ni título, ni categoría, ni cifra, ni
     // activo, ni juicio. Sólo CUÁNTOS hay, que es verificable y no es una promesa.
     // Y sin la palabra «Premium» en ningún sitio visible antes del clic.
@@ -9172,7 +9179,7 @@ const T = {
     intel_d_conc_rising:   pct => `Your main position now weighs ${pct}% and has crossed the concentration threshold.`,
     intel_d_capital:       'Your wealth rose on the cash you recorded, not on market return.',
     intel_d_intent:        pct => `You said preserving is your priority, and today one position weighs ${pct}%.`,
-    intel_d_liq_need:      (pp, pct, win) => `You said you will need liquidity and your liquidity weight has fallen ${pp} points, to ${pct}%, over ${win}.`,
+    intel_d_liq_need:      (win, a, b, asof) => `You said you will need liquidity. Over ${win}, your cash went from ${a} to ${b} of your financial portfolio${asof}.`,
     intel_d_combined:      n => `${n} readings moved at the same time. Individually none stood out.`,
     intel_q_conc_intent:   name => `Is your position in ${name} an exposure you chose on purpose?`,
     intel_q_conc_why:      'The figure does not change. What changes is Aurix no longer flagging it as an oversight.',
@@ -9351,11 +9358,11 @@ const T = {
     intcc_watch_clean: 'No priority signals right now. Aurix will keep watching liquidity, concentration and diversification.',
     intcc_watch_foot:  n => `${n} ${n === 1 ? 'area' : 'areas'} detected by Aurix Intelligence`,
     intcc_w_dep_t:    'Dependence on the main asset',
-    intcc_w_dep_b:    name => `A large part of your investable wealth rests on ${name}.`,
+    intcc_w_dep_b:    name => `A large part of your financial portfolio rests on ${name}.`,
     intcc_w_liq_t:    'Reduced liquidity',
     intcc_w_liq_b:    'Your immediate liquidity is low relative to the rest of your wealth.',
     intcc_w_crypto_t: 'Crypto exposure',
-    intcc_w_crypto_b: pct => `Crypto is around ${pct}% of your investable wealth.`,
+    intcc_w_crypto_b: pct => `Crypto is around ${pct}% of your financial portfolio.`,
     intcc_w_sector_t: 'Sector exposure',
     intcc_w_sector_b: label => `${label} holds a relevant part of your investable wealth.`,
     intcc_w_div_t:    'Limited diversification',
@@ -9448,10 +9455,10 @@ const T = {
     intv3_xq_lead: n => `What changed for ${n} to become my largest investment?`,
     intv3_xa_lead_both: (ago, na, va, nb, vb) => `Compared with ${ago}, the value of ${na} in your portfolio changed ${va} and that of ${nb} ${vb}: today ${nb} is worth more.`,
     intv3_xa_lead_new: (nb, na, va, ago) => `${nb} is a new position that is now worth more than ${na}, whose value in your portfolio changed ${va} compared with ${ago}.`,
-    intv9_xa_lead_new: (nb, ago) => `${nb} was not in your portfolio ${ago} and is now your largest investment.`,
+    intv9_xa_lead_new: (nb, ago, when) => `${nb} was not in your portfolio ${ago} and ${when} it is your largest investment.`,
     intv9_xa_lead_old: (na, chg) => `${na} is still in your portfolio; the value of your position ${_intv9Mv(chg, 'en')} over the period.`,
     intv9_xa_lead_gone: na => `${na} is no longer in your portfolio.`,
-    intv9_xa_lead_both: (ago, na, nb, wb) => `${ago.charAt(0).toUpperCase() + ago.slice(1)}, your largest investment was ${na}; today it is ${nb}.`,
+    intv9_xa_lead_both: (ago, na, nb, wb, when) => `${ago.charAt(0).toUpperCase() + ago.slice(1)}, your largest investment was ${na}; ${when} it is ${nb}.`,
     intv9_xa_lead_ev: (na, ca, nb, cb) => `Over the period, the value of your ${na} position ${_intv9Mv(ca, 'en')} and that of your ${nb} position ${_intv9Mv(cb, 'en')}.`,
     intv22_xq_spread: ago => `Is my money better spread than ${ago}, or do I just hold more positions?`,
     intv22_xa_spread_better: 'It is better spread: the weight is more balanced across your positions.',
@@ -9484,8 +9491,8 @@ const T = {
     intv11_today_flows_in: (i) => `Over the last 24 h you recorded contributions of ${i}.`,
     intv11_today_flows_out: (i, o) => `Over the last 24 h you recorded withdrawals of ${o}.`,
     intv11_today_flows_both: (i, o, n) => `Over the last 24 h you recorded contributions of ${i} and withdrawals of ${o} (net ${n}).`,
-    intv21_today_driver_up: (n, pp) => `${n} added ${pp} to your portfolio in 24 h.`,
-    intv21_today_driver_down: (n, pp) => `${n} took ${pp} off your portfolio in 24 h.`,
+    intv21_today_driver_up: (n) => `${n} added the most to your portfolio in 24 h.`,
+    intv21_today_driver_down: (n) => `${n} took the most off your portfolio in 24 h.`,
     intv21_today_mover_up: (n, p) => `${n}'s price rose ${p} in 24 h.`,
     intv21_today_mover_down: (n, p) => `${n}'s price fell ${p} in 24 h.`,
     intv21_today_mover_session_up: (n, p) => `${n}'s price rose ${p} in the last available session.`,
@@ -9558,8 +9565,8 @@ const T = {
     intv21_xa_conc_owned_up: 'Yes: your largest position weighs more than at the start of the period.',
     intv21_xa_conc_owned_down: 'No: your largest position weighs less than at the start of the period.',
     intv21_xa_conc_owned_flat: 'Not materially: your largest position\'s weight is holding steady.',
-    intv21_xa_conc_up: (pp, d) => `Yes: your largest position weighs ${pp} points more than on ${d}.`,
-    intv21_xa_conc_down: (pp, d) => `No: your largest position weighs ${pp} points less than on ${d}.`,
+    intv21_xa_conc_up: (a, b, d, asof) => `Yes: the weight of your largest position went from ${a} on ${d} to ${b}${asof}.`,
+    intv21_xa_conc_down: (a, b, d, asof) => `No: the weight of your largest position went from ${a} on ${d} to ${b}${asof}.`,
     intv21_xa_conc_flat: (pp, d) => `Not materially since ${d}.`,
     intv21_xq_top3: 'What would happen if my three largest positions fell 10%?',
     intv21_xa_top3: 'Aurix works it out with your current weights in “Dependencies and scenarios”, without assuming anything else would fall with them.',
@@ -9668,6 +9675,7 @@ const T = {
     intv4_f_return: (pct, win) => `Your investable return was ${pct}% over ${win}`,
     intv4_f_return_pos: (pct, win) => `Your investments have generated a ${pct}% return over ${win}`,
     intv4_f_level: amt => `Your financial portfolio is currently worth ${amt}`,
+    intv4_f_level_asof: (amt, at) => `As of ${at}, your financial portfolio was worth ${amt}`,
     intv4_f_ath: amt => `Your investable wealth is at its high: ${amt}`,
     intv4_f_level_up:   (amt, since) => `Change in your financial portfolio's recorded value since ${since}: +${amt}`,
     intv4_f_level_down: (amt, since) => `Change in your financial portfolio's recorded value since ${since}: −${amt}`,
@@ -9702,7 +9710,9 @@ const T = {
     intv4_f_cashmov_both: (inAmt, outAmt) => `You recorded cash inflows of ${inAmt} and outflows of ${outAmt}`,
     intv4_f_cashmov_nc: n => `You recorded ${n} cash ${n === 1 ? 'movement' : 'movements'}`,
     intv4_f_cash: pct => `Cash is ${pct}% of your investable wealth`,
-    intv4_f_cash_move: (win, a, b) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth`,
+    intv4_f_cash_move: (win, a, b, asof) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth${asof || ''}`,
+    intv4_f_asof: at => `, as of ${at}`,
+    intv4_when_today: 'today', intv4_when_asof: at => `as of ${at}`,
     intv4_f_expo_up: (cat, a, b, win) => `Over ${win}, your exposure to ${cat} rose from ${a} to ${b}`,
     intv4_f_expo_down: (cat, a, b, win) => `Over ${win}, your exposure to ${cat} fell from ${a} to ${b}`,
     intv4_f_expo_move: (cat, start, end, win) => `Your exposure to ${cat} went from ${start}% to ${end}% over ${win}`,
@@ -9733,8 +9743,8 @@ const T = {
     intv4_why_data_coverage: 'Aurix would rather explain a limit than give you a figure it cannot prove.',
     intv4_w_eff: (n, eff) => `You hold ${n} positions, but your effective diversification is about ${eff}`,
     intv4_w_capital: (amt, pct) => `Your wealth grew, but not from return: you recorded ${amt} of cash and your investments returned ${pct}%`,
-    intv4_w_liqconc: (win, a, b, top) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth. Your largest position weighs ${top}%`,
-    intv4_w_liqconc_ctx: (win, a, b, win2, c, d, top) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth; over ${win2}, from ${c} to ${d}. Your largest position weighs ${top}%`,
+    intv4_w_liqconc: (win, a, b, top, asof) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth${asof || ''}. Your largest position weighs ${top}%`,
+    intv4_w_liqconc_ctx: (win, a, b, win2, c, d, top, asof) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth; over ${win2}, from ${c} to ${d}${asof || ''}. Your largest position weighs ${top}%`,
     intv4_w_multi: n => `${n} independent dimensions of your wealth improved at the same time`,
     intv4_q_q_performance: 'How much have my investments actually returned?',
     intv4_q_q_what_changed: 'What changed in my structure?',
@@ -9790,8 +9800,8 @@ const T = {
     intv17_ev_mix:     (thr) => `Your asset-class mix moved by less than ${thr} percentage points.`,
     intv17_longer:     'Longer-range comparisons will appear as your history grows.',
     intv19_evo_ret:       (pct, a) => `Since ${a}, your investments have returned ${pct}.`,
-    intv19_evo_conc_up:   (pp, a) => `Since ${a}, the weight of your largest position has risen ${pp} points.`,
-    intv19_evo_conc_down: (pp, a) => `Since ${a}, the weight of your largest position has fallen ${pp} points.`,
+    intv19_evo_conc_up:   (d, a, b, asof) => `Since ${d}, the weight of your largest position went from ${a} to ${b}${asof}.`,
+    intv19_evo_conc_down: (d, a, b, asof) => `Since ${d}, the weight of your largest position went from ${a} to ${b}${asof}.`,
     intv19_evo_conc_flat: (a) => `Since ${a}, the weight of your largest position has barely changed.`,
     intv17_in_today:   'The change in your structure over this period is already shown in “What matters today”.',
     intv16_stable_flows: 'You have recorded no contributions or withdrawals in this period, so what you see does not come from new money.',
@@ -9809,8 +9819,8 @@ const T = {
     intprev_bridge_b:   'See how your wealth is built, how it is evolving, and what deserves your attention.',
     // §1 — the natural equivalent WITHOUT «investable» (see the ES note: same
     // trade-off, same reason, and these two keys are preview-only).
-    intprev_f_conc:     (pct, name) => `${pct}% of your wealth depends on ${name}.`,
-    intprev_f_liq:      pct => `Liquidity represents ${pct}% of your wealth.`,
+    intprev_f_conc:     (pct, name) => `${pct}% of your financial portfolio depends on ${name}.`,
+    intprev_f_liq:      pct => `Liquidity represents ${pct}% of your financial portfolio.`,
     intprev_cta:        'Back to Dashboard',
     intprev_cta_full:   'View my full analysis',
     intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
@@ -38929,7 +38939,12 @@ function _aurixFactLedger(opts) {
         value: +d.deltaPp.toFixed(2), unit: 'percentage_points',
         values: Object.assign({ startPct: d.startPct, endPct: d.endPct, deltaPp: +d.deltaPp.toFixed(2), category: cat,
                   causeKnown: !!_cause, cause: _cause ? _cause.kind : null,
-                  classificationValidity: _cls.validity }, _abs),
+                  classificationValidity: _cls.validity,
+                  // ÚLTIMO AJUSTE · HISTÓRICO FRENTE A VIVO — el extremo final es el
+                  // último snapshot certificado; «Tu liquidez es el X %» lee el vivo.
+                  // Se transporta el vivo de ESTA lectura (no se sustituye nada) para
+                  // que la copy pueda fechar el extremo si los dos no coinciden.
+                  livePct: (isCash && haveSnap && Number.isFinite(Number(snap.cashPct))) ? Number(snap.cashPct) : null }, _abs),
         evidence: _ev,
         // Deriva pasiva = OBSERVACIÓN de estado, no evento discreto: su identidad
         // es sólo la raíz y la ventana viaja como dato, que es lo que colapsa 7D y
@@ -39174,7 +39189,10 @@ function _aurixFactLedger(opts) {
       family: _AURIX_FACT_FAMILY.LIQUIDITY, causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
       value: best.value, unit: 'percentage_points',
       values: Object.assign({}, best.values), window: Object.assign({}, best.window),
-      source: 'aurixCatExposureDelta', direction: 'up', positive: true,
+      // ÚLTIMO AJUSTE DE CIERRE · más liquidez no es una mejora objetiva: el hecho
+      // se conserva (evidencia, materialidad, elegibilidad) pero es INFORMATIVO, así
+      // que ni se pinta como éxito ni suma a «Han mejorado N dimensiones».
+      source: 'aurixCatExposureDelta', direction: 'up', positive: null,
       supportingKeys: [best.semanticKey],
       materiality: best.materiality, magnitude: best.magnitude, confidence: 1, utility: 0.8, rarity: 0.4,
     });
@@ -39703,6 +39721,7 @@ function _aurixWowInsights(ledger) {
     out.push({ semanticKey: 'wow_liquidity_down_while_concentrated', causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
       values: { cashDeltaPp: worst.value, topPositionPct: top1.value,
         startPct: worst.values.startPct, endPct: worst.values.endPct, window: winOf(worst),
+        livePct: (worst.values.livePct != null) ? worst.values.livePct : null,
         context: ctx ? { startPct: ctx.values.startPct, endPct: ctx.values.endPct, window: winOf(ctx) } : null },
       supportingKeys: [worst.semanticKey, top1.semanticKey],
       confidence: Math.min(worst.confidence, top1.confidence),
@@ -40448,6 +40467,9 @@ function _aurixAiLiquidity(snap, facts) {
     out.window = (drift.window && drift.window.range) || null;
     out.previousPct = (drift.values && Number.isFinite(drift.values.startPct))
       ? _aurixAiNum(drift.values.startPct) : null;
+    // Los dos extremos de la MISMA deriva: la copy no mezcla su delta con el `cashPct` vivo.
+    out.driftEndPct = (drift.values && Number.isFinite(drift.values.endPct)) ? _aurixAiNum(drift.values.endPct) : null;
+    out.driftEndAt = (drift.window && Number.isFinite(drift.window.endAt)) ? drift.window.endAt : null;
     out.coverage = _AURIX_AI_COVERAGE.SUFFICIENT;
     out.reason = '';
     out.semanticLabel = drift.value > 0 ? _AURIX_AI_LABEL.INCREASING : _AURIX_AI_LABEL.DECREASING;
@@ -41890,7 +41912,8 @@ function _aurixIntelDiscoveries(model, memory, ctx) {
       && l.semanticLabel === _AURIX_AI_LABEL.DECREASING) {
     add({ id: 'disc_liquidity_vs_need', dimension: _AURIX_AI_DIM.LIQUIDITY,
       code: 'liquidity_fell_while_need_declared',
-      values: { cashPct: l.cashPct, changePp: l.changePp, window: l.window },
+      values: { cashPct: l.cashPct, changePp: l.changePp, window: l.window,
+                startPct: l.previousPct, endPct: l.driftEndPct, endAt: l.driftEndAt },
       evidence: ['cash_weight'], contextDependent: true, materiality: 0.82 });
   }
   // ── 6 · LO QUE PERSISTE — RETIRADO DE LA PUBLICACIÓN (§17) ───────────────
@@ -68254,6 +68277,42 @@ function _intv4PctPair(a, b) {
   const pa = _intv21Pct(x, dp), pb = _intv21Pct(y, dp);
   return (pa === pb) ? null : { a: pa, b: pb };
 }
+// ── ÚLTIMO AJUSTE · HISTÓRICO FRENTE A VIVO ─────────────────────────────────
+// Una comparación termina en su snapshot CERTIFICADO; la lectura actual sale de
+// su fuente vigente. Si a la precisión con que se publica la lectura viva
+// (`_aurixPctNum`, la de «Tu liquidez es el X %») no coinciden, el extremo
+// histórico se FECHA. Nunca se sustituye uno por otro para cuadrar cifras.
+function _intv4AsOf(endAt, histPct, livePct) {
+  if (!Number.isFinite(endAt) || histPct == null || livePct == null) return '';
+  const h = Number(histPct), l = Number(livePct);
+  if (!Number.isFinite(h) || !Number.isFinite(l) || _aurixPctNum(h) === _aurixPctNum(l)) return '';
+  return _intv4T('intv4_f_asof', _intccDateTime(endAt));
+}
+// Vigencia: el mismo contrato de frescura que el lector de ventanas (cadencia ×
+// factor de STALE). Sin poder demostrarla, falla hacia FECHAR.
+function _intv4IsCurrent(ts) {
+  try { return Number.isFinite(ts) && (_aurixNow() - ts) <= _AURIX_BACKEND_CADENCE_MS * _AURIX_BACKEND_STALE_FACTOR; }
+  catch (_) { return false; }
+}
+// Sufijo «, según el dato del …» para un extremo cuya vigencia no se demuestra.
+function _intv4AsOfStale(ts) {
+  return (!Number.isFinite(ts) || _intv4IsCurrent(ts)) ? '' : _intv4T('intv4_f_asof', _intccDateTime(ts));
+}
+// La memoria por posición elige la mayor fila SIN excluir la liquidez; una cuenta
+// de efectivo no es «tu mayor posición» en el sentido de concentración.
+function _intv4TopIsLiquidity(assetId) {
+  try {
+    const a = ((typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []).find(x => x && String(x.id) === String(assetId));
+    if (!a) return true;                                   // identidad no demostrable ⇒ no se afirma
+    return _intccIsMonetary(a.type) || (typeof _intv6IsLiquidity === 'function' && _intv6IsLiquidity(a));
+  } catch (_) { return true; }
+}
+// «hoy» sólo si el dato es de hoy; si no, su fecha.
+function _intv4When(ts) {
+  if (!Number.isFinite(ts)) return '';
+  const now = (typeof _aurixNow === 'function') ? _aurixNow() : Date.now();
+  return (_intccDate(ts) === _intccDate(now)) ? _intv4T('intv4_when_today') : _intv4T('intv4_when_asof', _intccDate(ts));
+}
 function _intv4CatLabel(cat) {
   const k = 'intv4_cat_' + String(cat || '');
   const v = _intv4T(k);
@@ -68283,7 +68342,13 @@ function _intv4FactText(fact) {
   // FAIL-CLOSED: sin periodo nombrable no hay frase. Publicar el porcentaje
   // solo sería exactamente el defecto que esto corrige.
   if (k === 'return_positive')         return win ? _intv4T('intv4_f_return_pos', _intv4Num(fact.value, 2), win) : '';
-  if (k === 'investable_level')        return _intv4T('intv4_f_level', _intv4Money(fact.value));
+  if (k === 'investable_level') {
+    // «actualmente» exige que el último punto represente el presente, con el mismo
+    // contrato de frescura que el lector de ventanas (cadencia × factor de STALE).
+    const at = fact.window && fact.window.endAt;
+    if (_intv4IsCurrent(at)) return _intv4T('intv4_f_level', _intv4Money(fact.value));
+    return Number.isFinite(at) ? _intv4T('intv4_f_level_asof', _intv4Money(fact.value), _intccDateTime(at)) : '';
+  }
   if (k === 'investable_all_time_high') return _intv4T('intv4_f_ath', _intv4Money(fact.value));
   // M.03 D — TRAYECTORIA. El cambio de nivel se dice en dinero y con su fecha de
   // inicio real, y la copy nombra la causa que el hecho NO descarta (aportaciones),
@@ -68403,7 +68468,8 @@ function _intv4FactText(fact) {
   // deriva, así que dice exactamente lo mismo que ella.
   if (k === 'liquidity_improved' || /^cash_drift_liquidity_/.test(k)) {
     const pr = _aurixDriftClaimCoherent(fact) ? _intv4PctPair(v.startPct, v.endPct) : null;
-    return (pr && win) ? _intv4T('intv4_f_cash_move', win, pr.a, pr.b) : '';
+    return (pr && win) ? _intv4T('intv4_f_cash_move', win, pr.a, pr.b,
+      _intv4AsOf(fact.window && fact.window.endAt, v.endPct, v.livePct)) : '';
   }
   if (/^exposure_drift_/.test(k)) {
     const cat = _intv4CatLabel(v.category);
@@ -68486,8 +68552,9 @@ function _intv4WowText(w) {
     if (!pr || !win || !top) return '';
     const c = v.context || null;
     const pc = c ? _intv4PctPair(c.startPct, c.endPct) : null, wc = c ? _intv4WindowLabel(c.window) : '';
-    return (pc && wc) ? _intv4T('intv4_w_liqconc_ctx', win, pr.a, pr.b, wc, pc.a, pc.b, top)
-                      : _intv4T('intv4_w_liqconc', win, pr.a, pr.b, top);
+    const asof = _intv4AsOf(v.window && v.window.endAt, v.endPct, v.livePct);
+    return (pc && wc) ? _intv4T('intv4_w_liqconc_ctx', win, pr.a, pr.b, wc, pc.a, pc.b, top, asof)
+                      : _intv4T('intv4_w_liqconc', win, pr.a, pr.b, top, asof);
   }
   if (w.semanticKey === 'wow_multi_dimension_improvement')     return _intv4T('intv4_w_multi', (v.roots || []).length);
   return '';
@@ -68506,6 +68573,13 @@ function _intv4WowText(w) {
 // «por qué importa» y el hecho pasa a ser su evidencia de apoyo.
 // Si no hay significado que publicar, se conserva el hecho como titular: mejor
 // repetir una vez que dejar una card muda.
+// ÚLTIMO AJUSTE · el PESO de la liquidez no tiene una dirección buena: subir no es
+// éxito (verde) ni bajar alerta (naranja). Tono neutro; la frase dice la dirección.
+function _intv4Tone(f) {
+  if (!f) return 'flat';
+  if (f.family === _AURIX_FACT_FAMILY.LIQUIDITY && f.unit === 'percentage_points') return 'flat';
+  return f.direction || 'flat';
+}
 function _intv4StoryHtml(story, esc, depth, publishedKeys) {
   const factTxt = _intv4FactText(story);
   if (!factTxt) return '';                                       // no copy ⇒ no card
@@ -68553,7 +68627,7 @@ function _intv4StoryHtml(story, esc, depth, publishedKeys) {
   const conf = story.confidence >= 1 ? 'intv4_confidence_high' : 'intv4_confidence_medium';
   const advanced = (depth === _INTV4_DEPTH.ADVANCED) || support.length > 0;
   return `
-    <article class="intv4-story is-${esc(story.direction || 'flat')}${story.positive === true ? ' is-positive' : ''}"
+    <article class="intv4-story is-${esc(_intv4Tone(story))}${story.positive === true ? ' is-positive' : ''}"
              data-root="${esc(story.causalRoot)}" data-fact="${esc(story.semanticKey)}"
              data-support="${support.length}" data-window="${esc(winRange)}"
              data-coverage="${esc(winCovers)}"
@@ -68796,7 +68870,7 @@ function _intv4ChangedHtml(core, esc, alreadyPublished, memoryClaims, hoy) {
                                        : _intv4T('intv4_changed_ref_since', _intccDate(ref.at));
         return txt ? `<p class="intv4-chg-ref" data-ref="${esc(ref.kind)}">${esc(txt)}</p>` : ''; })()}
       <ul class="intv4-chg-list">${rows.map(x => `
-        <li class="intv4-chg is-${esc((x.f && x.f.direction) || 'flat')}${x.reviewed ? ' is-reviewed' : ''}"
+        <li class="intv4-chg is-${esc(_intv4Tone(x.f))}${x.reviewed ? ' is-reviewed' : ''}"
             data-root="${esc(x.fd.rootCause)}" data-finding="${esc(x.fd.findingId)}"
             data-fact="${esc(x.fd.semanticKey)}"
             data-reviewed="${x.reviewed ? '1' : '0'}"
@@ -69774,9 +69848,10 @@ function _intv19Evolution(core, alreadyPublished, hoyKeys) {
   try {
     const c = (typeof _aurixAssetMemoryTopWeight === 'function') ? _aurixAssetMemoryTopWeight() : null;
     if (c && Number.isFinite(c.deltaPp) && Number.isFinite(c.startAt)) {
-      const a = _intccDate(c.startAt), pp = _intv4Num(Math.abs(c.deltaPp), 1);
-      const txt = c.material ? _intv4T(c.deltaPp > 0 ? 'intv19_evo_conc_up' : 'intv19_evo_conc_down', pp, a)
-                             : _intv4T('intv19_evo_conc_flat', a);
+      const a = _intccDate(c.startAt), pr = _intv4PctPair(c.startPct, c.endPct);
+      const asof = _intv4AsOfStale(c.endAt);
+      const txt = _intv4TopIsLiquidity(c.assetId) ? '' : !c.material ? _intv4T('intv19_evo_conc_flat', a)
+        : (pr ? _intv4T(c.deltaPp > 0 ? 'intv19_evo_conc_up' : 'intv19_evo_conc_down', a, pr.a, pr.b, asof) : '');
       if (txt) items.push({ family: 'position', key: 'top_position_weight_' + c.range, period: c.range, txt: txt });
     }
   } catch (_) {}
@@ -69995,10 +70070,14 @@ function _intelDiscoveryText(d) {
       // simplemente no las usaba. Ahora las usa, y si alguna falta la sección se
       // calla en vez de publicar una frase sin contenido: es la misma regla que
       // el §4.7 aplica a «Esta lectura sigue igual».
+      // ÚLTIMO AJUSTE · «ha bajado N puntos, hasta el X %» unía el delta de una
+      // ventana HISTÓRICA con el `cashPct` VIVO: dos fuentes en una cifra. Ahora los
+      // dos extremos son los de la misma deriva, y el final se fecha si no coincide
+      // con la lectura viva. Sin extremos, no hay comparación.
       const win = _intv4RangeLabel(v.window);
-      if (!Number.isFinite(v.changePp) || !Number.isFinite(v.cashPct) || !win) return '';
-      return _intv4T('intel_d_liq_need', _intv4Num(Math.abs(v.changePp), 1),
-        _intv4Num(v.cashPct, 0), win);
+      const pr = _intv4PctPair(v.startPct, v.endPct);
+      if (!pr || !win || !(Number(v.endPct) < Number(v.startPct))) return '';
+      return _intv4T('intel_d_liq_need', win, pr.a, pr.b, _intv4AsOf(v.endAt, v.endPct, v.cashPct));
     }
     case 'several_readings_moved_together':  return _intv4T('intel_d_combined', v.count);
     default: return '';
@@ -72804,7 +72883,9 @@ function _intv21TodayItems(core, stories, W) {
       items.push({ factId: 'contrib_24h:' + best.id, family: 'contribution', period: '24H', kind: 'driver', priority: 2,
         value: +best.c.toFixed(4), unit: 'pp', dir: best.c > 0 ? 'up' : 'down', assetId: best.id, assetName: best.name,
         evidence: 'asset_values_24h', freshness: att.endAt,
-        text: _intv4T(best.c > 0 ? 'intv21_today_driver_up' : 'intv21_today_driver_down', best.name, _intv21Fixed(Math.abs(best.c), 2) + '\u00a0pp') });
+        // La magnitud en pp vive en el KPI compacto de «Qué movió» (con su nota); la
+        // frase conserva sólo lo que respalda: quién sumó o restó más.
+        text: _intv4T(best.c > 0 ? 'intv21_today_driver_up' : 'intv21_today_driver_down', best.name) });
     }
   }
   // CIERRE FINAL · FLUJOS DEL DÍA (familia distinta de precio y contribución): sólo los
@@ -73320,14 +73401,17 @@ function _intv21ExploreQs(W, claims, esc) {
   try {
     const c = (typeof _aurixAssetMemoryTopWeight === 'function') ? _aurixAssetMemoryTopWeight() : null;
     const claimed = (claims.evoKeys || []).some(k => /^top_position_weight_/.test(String(k)));
-    if (c && Number.isFinite(c.deltaPp)) {
+    if (c && Number.isFinite(c.deltaPp) && !_intv4TopIsLiquidity(c.assetId)) {
       const span = c.range === '7D' ? 'week' : (c.range === '30D' ? 'month' : 'start');
       const dirKey = !c.material ? 'flat' : (c.deltaPp > 0 ? 'up' : 'down');
       qs.push({ id: 'ctx_conc_' + span, root: _AURIX_CAUSAL_ROOT.TOP_POSITION,
         label: _intv4T('intv21_xq_conc_' + span),
         answer: claimed
           ? `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_conc_owned_' + dirKey))}</p><button type="button" class="intv21-link" data-intv21-go="evolution" data-intv21-evo-metric="top">${esc(_intv4T('intv21_go_evo'))}</button>`
-          : `<p class="intcc-x-a-lead">${esc(_intv4T('intv21_xa_conc_' + dirKey, _intv4Num(Math.abs(c.deltaPp), 1), _intccDate(c.startAt)))}</p>`,
+          : `<p class="intcc-x-a-lead">${esc(dirKey === 'flat' ? _intv4T('intv21_xa_conc_flat', '', _intccDate(c.startAt))
+              : (() => { const pr = _intv4PctPair(c.startPct, c.endPct);
+                  const asof = _intv4AsOfStale(c.endAt);
+                  return pr ? _intv4T('intv21_xa_conc_' + dirKey, pr.a, pr.b, _intccDate(c.startAt), asof) : ''; })())}</p>`,
         fact: claimed ? null : { factId: 'top_weight_change_' + c.range, family: 'concentration', period: c.range, value: c.deltaPp, unit: 'pp' } });
     }
   } catch (_) {}
@@ -74237,10 +74321,10 @@ function _intv22ExploreCandidates(W, esc) {
           // Sin pesos de hoy: son las cifras de Factores y Explora no las repite.
           const nb = _intv21Name(domEnd.a);
           if (!endStart) {
-            lines.push(_intv4T('intv9_xa_lead_new', nb, ago));
+            lines.push(_intv4T('intv9_xa_lead_new', nb, ago, _intv4When(end.ts)));
             lines.push(sameEnd ? _intv4T('intv9_xa_lead_old', nm, valChg) : _intv4T('intv9_xa_lead_gone', nm));
           } else {
-            lines.push(_intv4T('intv9_xa_lead_both', ago, nm, nb));
+            lines.push(_intv4T('intv9_xa_lead_both', ago, nm, nb, undefined, _intv4When(end.ts)));
             // Si la antigua líder ya no está, se dice eso (nunca «bajó un 100 %»: no es mercado).
             lines.push(sameEnd ? _intv4T('intv9_xa_lead_ev', nm, valChg, nb, (domEnd.v / endStart.v - 1) * 100) : _intv4T('intv9_xa_lead_gone', nm));
           }

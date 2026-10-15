@@ -898,6 +898,8 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
     // renderer necesita el mapa de periodos. Se carga el owner REAL: stubearlo
     // dejaría pasar exactamente el defecto que este assert busca.
     + fnSrc('_intv4RangeLabel') + '\n'
+    // ÚLTIMO AJUSTE · los dos extremos de la deriva y su fecha: owners REALES.
+    + ['_intv4PctPair', '_intv21Fixed', '_intv21Pct', '_aurixPctNum', '_intv4AsOf','_intv4IsCurrent','_intv4AsOfStale','_intv4TopIsLiquidity','_intccIsMonetary', '_intccDateTime'].map(n => fnSrc(n)).join('\n') + '\n'
     + fnSrc('_intelDiscoveryText') + '\n' + fnSrc('_intelQuestionText') + '\n'
     + fnSrc('_intv5Reading') + '\n'
     + 'globalThis.READ = _intv5Reading; globalThis.DT = _intelDiscoveryText;'
@@ -934,7 +936,9 @@ group('O · presentación · ejecutada de verdad, en ES y EN');
     DISCOVERY_CODES.forEach(code => {
       let txt = null;
       try { txt = sb2.DT({ code, values: { positions: 7, effectiveN: 2.5, topWeightPct: 68,
-        observations: 4, count: 3, cashPct: 6, changePp: -4.2, window: '30D' } }); }
+        observations: 4, count: 3, cashPct: 6, changePp: -4.2, window: '30D',
+        // ÚLTIMO AJUSTE (cambio de contrato): la comparación exige los dos extremos de SU deriva.
+        startPct: 10.2, endPct: 6, endAt: Date.now() } }); }
       catch (e) { badDisc.push([lang, code, 'THROW ' + e.message]); return; }
       if (!txt || /undefined|\[object/.test(txt)) badDisc.push([lang, code, txt]);
     });

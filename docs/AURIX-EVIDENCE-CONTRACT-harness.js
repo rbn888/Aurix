@@ -112,7 +112,7 @@ const FNS = ['_intv4ExploreRotation','_intv4ExploreSeed','_intv4Perimeter','_int
   '_aurixLineageRead','_aurixClassificationValidity','_aurixAssetBucketById','_aurixEvidence',
   '_aurixCashLedgerAuthority','_aurixRegisteredOperations','_aurixStrictInvestableBucket','_aurixRegisteredCategoryBreadth',
   '_aurixEventIdentity','_aurixCanonicalFindings','_aurixFactLedger','_aurixIntelligenceStories',
-  '_aurixWowInsights','_aurixDriftClaimCoherent','_aurixDriftConflicts','_intv4PctPair','_intv21Fixed','_intv21Pct','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore'];
+  '_aurixWowInsights','_aurixDriftClaimCoherent','_intv4AsOf','_intv4IsCurrent','_intv4AsOfStale','_intccDateTime','_intv4When','_aurixDriftConflicts','_intv4PctPair','_intv21Fixed','_intv21Pct','_aurixContextualQuestions','_aurixWhatChanged','_aurixFactPeriodNamedAs','_aurixFactPeriodDegraded','_aurixFactEnvelope','_aurixIntelligenceCore'];
 
 function makeCtx(opts) {
   const o = opts || {};
@@ -1747,7 +1747,9 @@ console.log('\nADV · Registro y nivel se dicen por su nombre (ES/EN):');
   ok('ADV.3 y sigue sin publicar ningún porcentaje',
     !/%/.test(esUp) && !/%/.test(enUp), JSON.stringify([esUp, enUp]));
   // §2 — cuando sólo se conoce un nivel, se dice un nivel.
-  const lvl = { semanticKey: 'investable_level', value: 75432.67, values: {}, window: { range: 'now' } };
+  // ÚLTIMO AJUSTE (cambio de contrato): «actualmente» exige que el último punto sea
+  // VIGENTE; el hecho real siempre trae su `endAt` (el último punto de la serie).
+  const lvl = { semanticKey: 'investable_level', value: 75432.67, values: {}, window: { range: 'now', startAt: NOW - 5 * MIN, endAt: NOW - 5 * MIN } };
   ok('ADV.4 un nivel solo se publica como valor actual de la cartera financiera',
     /cartera financiera tiene actualmente un valor de/i.test(txt(lvl, 'es'))
     && /currently worth/i.test(txt(lvl, 'en')),
