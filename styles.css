@@ -31959,3 +31959,135 @@ body.ws-work .aurix-wsh .wsh-barwrap > .wsh-bar { flex-wrap: nowrap; }
 .aurix-wsh.wsh-tool-view > .wsccy-row:not(.is-pending) { margin: 0 0 8px; }
 .aurix-wsh.wsh-tool-view > .wsccy-row:not(.is-pending) .ws4-field { flex-direction: row; align-items: center; gap: 8px; }
 .aurix-wsh.wsh-tool-view > .wsccy-row:not(.is-pending) .ws4-field-input { max-width: 150px; }
+
+/* ══ CIERRE QUIRÚRGICO · B · moneda en la fila de acciones (todas las anchuras) ══ */
+.aurix-wsh .wsh-bar-ccy { display: block; }
+.aurix-wsh.wsh-tool-view:has(.wsh-bar-ccy) > .wsccy-row:not(.is-pending) { display: none; }
+@media (max-width: 767px) {
+  .aurix-wsh .wsh-barwrap > .wsh-bar-actions { justify-content: flex-end; }
+  .aurix-wsh .wsh-barwrap > .wsh-bar-actions > .wsh-bar-ccy { margin-right: auto; }
+}
+/* Aviso de moneda legacy, breve: texto arriba y selector + Confirmar en la misma línea. */
+.wsccy-row.is-pending { padding: 10px 12px; gap: 8px 10px; align-items: center; }
+.wsccy-row.is-pending .wsccy-note { flex: 1 1 100%; margin: 0; font-size: 13px; line-height: 1.4; }
+.wsccy-row.is-pending .ws4-field { flex: 1 1 140px; flex-direction: row; align-items: center; gap: 8px; }
+.wsccy-row.is-pending .ws4-field-name { font-size: 12px; }
+.wsccy-row.is-pending .wsccy-confirm { flex: 0 0 auto; min-height: 44px; }
+
+/* ══ CIERRE QUIRÚRGICO · C · PRESUPUESTO: UNA FILA POR PARTIDA ═══════════════════
+   Nombre (editable al tocarlo) · importe · eliminar, en una línea. Se retira el hueco
+   nombre→importe y la rejilla de dos columnas de filas apiladas. El nombre largo envuelve
+   dentro de su celda; el importe conserva 44 px y 16 px de texto. */
+.aurix-wsh .wsbud-rows { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.aurix-wsh .wsbud-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(112px, 38%) 44px; align-items: center;
+  column-gap: 8px; padding: 0 0 0 4px; border-radius: 10px;
+}
+.aurix-wsh .wsbud-row-head { display: contents; }
+.aurix-wsh .wsbud-row .wsbud-name, .aurix-wsh .wsbud-row .wsbud-name-in { grid-column: 1; grid-row: 1; }
+.aurix-wsh .wsbud-row > .ws4-field-input { grid-column: 2; grid-row: 1; min-width: 0; }
+.aurix-wsh .wsbud-row .wsbud-del { grid-column: 3; grid-row: 1; margin: 0; }
+.aurix-wsh .wsbud-row .wsbud-name { font-size: 14px; }
+.aurix-wsh .wstool-inputs-card[data-wsbud-block] { padding: 10px 12px 12px; }
+.aurix-wsh .wstool-inputs-card[data-wsbud-block] .wsbud-blockhead { margin-bottom: 4px; }
+.aurix-wsh .wsbud-col-edit { gap: 10px; }
+
+.aurix-wsh .wsh-bar-ccy.is-budget { display: none; }
+.aurix-wsh .wsh-bar-ccy.is-budget { gap: 6px; }
+.aurix-wsh .wsh-bar-ccy .wsbud-perchip-sel { font-size: 16px; }
+@media (max-width: 767px) {
+  .aurix-wsh .wsh-bar-ccy.is-budget { display: flex; align-items: center; }
+  .aurix-wsh .wsh-bar-ccy.is-budget .wsbud-perchip-lbl { display: none; }
+  .aurix-wsh .wsbud-top-card .wsbud-controls { display: none; }
+}
+
+/* ══ CIERRE QUIRÚRGICO · C · COBROS ════════════════════════════════════════════
+   El progreso es lo COBRADO: verde de lo que entra, no el rosa de deuda/pérdida (lo vencido
+   conserva su aviso propio). Fichas a su altura natural (`align-items:start`): un historial
+   abierto no estira a la vecina. El historial es un <details> plegado. */
+.aurix-wsh .wsrecv-sumbar-fill { background: linear-gradient(90deg, rgba(58,170,120,0.85), #5fd9a0); }
+.aurix-wsh .wsrecv-grid { align-items: start; }
+.aurix-wsh details.wsrecv-hist > summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; gap: 6px; }
+.aurix-wsh details.wsrecv-hist > summary::-webkit-details-marker { display: none; }
+.aurix-wsh details.wsrecv-hist > summary::after { content: '›'; margin-left: auto; transform: rotate(90deg); transition: transform 160ms ease; color: var(--text-tertiary); }
+.aurix-wsh details.wsrecv-hist[open] > summary::after { transform: rotate(-90deg); }
+.aurix-wsh details.wsrecv-hist > summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { .aurix-wsh details.wsrecv-hist > summary::after { transition: none; } }
+.aurix-wsh .wsrecv-listbar { gap: 8px; }
+
+/* ══ CIERRE QUIRÚRGICO · C · ESCENARIOS: parámetros comunes en un bloque compacto ══ */
+.aurix-wsh .wsb-params .wsccy-row:not(.is-pending) { margin: 8px 0 0; }
+.aurix-wsh .wsb-params .wsccy-row:not(.is-pending) .ws4-field { flex-direction: row; align-items: center; gap: 8px; }
+.aurix-wsh .wsb-params .wsccy-row:not(.is-pending) .ws4-field-input { max-width: 150px; }
+.aurix-wsh .wsb-params .wsb-note { margin: 8px 0 0; padding: 8px 10px; }
+.aurix-wsh .wsb2 .wsb2-col { gap: 6px; }
+.wsccy-row.is-pending .ws4-field { flex: 0 1 auto; }
+.aurix-wsh .wsh-newbtn { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ══ CIERRE QUIRÚRGICO · D · ACCESOS FIJADOS COMPACTOS ══════════════════════════
+   Una fila por acceso (≈64–72 px), claramente más ligera que un plan; 1/2/3 columnas. */
+.wspin-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+@media (min-width: 640px)  { .wspin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+@media (min-width: 1024px) { .wspin-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } }
+.wspin-card {
+  display: grid; grid-template-columns: auto 64px minmax(0, 1fr) 44px auto; align-items: center; gap: 8px;
+  min-height: 64px; padding: 8px 10px 8px 4px; border-radius: 14px; position: relative; cursor: pointer;
+  border: 1px solid rgba(var(--ws-a, 74,130,240), 0.20); background: var(--elev-1);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.wspin-card:hover { border-color: rgba(var(--ws-a, 74,130,240), 0.45); }
+.wspin-card .wspin-cover { width: 64px; height: 44px; border-radius: 9px; overflow: hidden; display: block; position: relative;
+  background: rgba(74,130,240,0.10); border: 1px solid rgba(var(--ws-a, 74,130,240), 0.18); }
+.wspin-card .wspin-cover > * { width: 100%; height: 100%; display: block; }
+.wspin-card .wspin-cover .wsh-mse2-ic2 { display: grid; place-items: center; width: 100%; }
+.wspin-card .wspin-name { font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.25; overflow-wrap: anywhere; }
+.wspin-card .wspl-menu { width: 44px; height: 44px; position: static; }
+.wspin-go {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border-radius: 999px;
+  font: inherit; font-size: 13px; font-weight: 700; color: #cfe0ff; cursor: pointer;
+  background: rgba(74,130,240,0.14); border: 1px solid rgba(74,130,240,0.40);
+}
+.wspin-go svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
+.wspin-go:hover { background: rgba(74,130,240,0.24); }
+.wspin-go:focus-visible, .wspin-card .wspl-menu:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .wspin-card { transition: none; } }
+.wspl-card-txt { display: flex; flex-direction: column; min-width: 0; }
+.wspl-period { font-size: 12px; color: var(--text-tertiary); font-weight: 600; line-height: 1.3; }
+/* La segunda magnitud de una simulación (crecimiento, intereses) no es una pérdida: tono del
+   propio acento, no el secundario cálido. */
+.wspl-card[data-ws-accent="teal"] .wspl-share-b, .wspl-card[data-ws-accent="blue"] .wspl-share-b { background: rgba(var(--ws-a), 0.32); }
+.wspl-ring-row .wspl-ring { width: 52px; height: 52px; flex: 0 0 52px; }
+
+/* Menú de la capacidad en Mi espacio: fuera de la portada, en la fila del nombre. */
+.wsh-mse2-card { position: relative; }
+.wsh-mse2-menu {
+  position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; display: grid; place-items: center;
+  background: none; border: 0; border-radius: 10px; color: var(--text-secondary); font-size: 18px; cursor: pointer;
+}
+.wsh-mse2-menu:hover { color: var(--text-primary); background: var(--surface-panel); }
+.wsh-mse2-menu:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.wsh-mse2-card .wsh-mse2-body { padding-right: 40px; }
+.wsh-mse2-favmark { color: var(--aurix-blue, #4A82F0); margin-right: 4px; }
+/* Mi espacio en móvil: la portada manda más que en el acceso del Dashboard (96×64 frente a 64×44). */
+@media (max-width: 560px) {
+  .wsh-mse2 .wsh-mse2-card .wsh-mse2-pv { width: 96px; height: 64px; flex: 0 0 96px; }
+}
+/* Barra + controles comunes en móvil dentro de ~120 px. */
+@media (max-width: 767px) {
+  body.ws-work .aurix-wsh .wsh-barwrap > .wsh-bar { padding-bottom: 4px; }
+  .aurix-wsh .wsh-barwrap > .wsh-bar-actions { margin: 0 0 4px; }
+}
+
+/* Portadas fotográficas de herramientas: mismo anfitrión que las plantillas, recorte centrado. */
+.wsh-toolcover.has-photo { position: relative; padding: 0; }
+.wsh-toolcover.has-photo > .wspv-asset-host { width: 100%; height: 100%; }
+.wsh-toolcover.has-photo .wspv-toolsvg { display: block; width: 100%; height: 100%; }
+.wsh-toolcover.has-photo .ws-asset-img { object-fit: cover; object-position: 50% 50%; }
+/* Corrección: con importes grandes tres columnas recortaban la cifra. Total a lo ancho y
+   Cobrado | Pendiente debajo; la compactación (padding, 16 px) se mantiene. */
+@media (max-width: 767px) {
+  .aurix-wsh .wsrecv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .aurix-wsh .wsrecv-kpis > .wsrecv-kpi.is-total { grid-column: 1 / -1 !important; }
+}
+.aurix-wsh details.wsrecv-hist > summary { position: relative; padding-right: 22px; }
+.aurix-wsh details.wsrecv-hist > summary::after { position: absolute; right: 4px; top: 50%; margin: -0.6em 0 0; line-height: 1.2; }

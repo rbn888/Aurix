@@ -219,7 +219,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${T} las nueve portadas pintan contenido dentro de su caja (ningún cuadro vacío)`, r.length === 9 && bad.length === 0, JSON.stringify(bad));
     ok(`${T} todas las cajas reservan el mismo tamaño (sin saltos al cargar)`, new Set(r.map(x => x.wh)).size === 1, r.map(x => x.wh).join());
     await shot(p, `${ENG}-myspace-${w}${fail ? '-fail' : ''}`);
-    await p.locator('.wsh-mse2-card[aria-label="Simulador de préstamos"]').click(); await p.waitForTimeout(400);
+    await p.locator('.wsh-mse2-card[data-wsmse-cap="loan"]').click(); await p.waitForTimeout(400);
     ok(`${T} abrir desde Mi espacio sigue llevando a la herramienta`, (await J(p, `return _wsToolActive`)) === 'loan');
     await ctx.close();
   }

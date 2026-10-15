@@ -136,7 +136,9 @@ const MEASURE = `(function(){
   var ellipsis=qa('.wsfc-cap-name').filter(function(e){ return getComputedStyle(e).textOverflow==='ellipsis' || e.scrollWidth>e.clientWidth+1; }).length;
   // El HUECO más grande entre dos bloques consecutivos del panel: §A prohíbe los
   // grandes vacíos, y un reparto automático los produce sin que nada «falle».
-  var blocks=[head,R(title),sub,R(capsUl),wrap].filter(Boolean).sort(function(a,b){return a.t-b.t;});
+  // .wsfc-eg (el ejemplo que añadió el paywall) es un BLOQUE del panel: sin medirlo, su altura
+  // contaba como hueco entre el subtítulo y la rejilla (83 px «vacíos» que no lo eran).
+  var blocks=[head,R(title),sub,R(q('.wsfc-eg')),R(capsUl),wrap].filter(function(x){ return x && x.b > x.t; }).sort(function(a,b){return a.t-b.t;});
   var maxGap=0; for(var i=1;i<blocks.length;i++) maxGap=Math.max(maxGap, +(blocks[i].t-blocks[i-1].b).toFixed(1));
   return {
     mounted:true, caps:caps.length, cols:cols,

@@ -111,7 +111,7 @@ function ctx(persona, langCode) {
   vm.runInContext('function _escapeWorkspaceText(x){ return _intccEsc(x); }', sb);
   ['_WS_CATALOG','_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER',
    '_WS4TYPE_TO_ID','_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH',
-   '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_SPACE_HIDDEN_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
+   '_WS_ASSET_BASE','_WSH_PINNED_KEY','_WSH_DASH_TOOLS_KEY','_WS_TOOL_PHOTO','_WSH_SPACE_HIDDEN_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY',
    // `_WS_TOOL_ACCENT` lo consume la portada Free para que sus nueve celdas no sean nueve
    // azules. Este harness ejercita ese render en un sandbox, así que la dependencia se declara
    // aquí también: es la SEGUNDA vez en la sesión que un gate caza una dependencia nueva de una
@@ -127,7 +127,7 @@ function ctx(persona, langCode) {
    '_wsIsPinned','_wshReadStore','_wsGlyph','_wsTplViz','_wsAssetImg','_wsCatPreviewBaseHtml',
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType',
    '_wsGlyphTile','_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml',
-   '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsSpaceIsHidden','_wsSpaceHidden','_wsPlanOnDash',
+   '_wsLabel','_wsTypeLabel','_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsSpaceIsHidden','_wsSpaceHidden','_wsPlanOnDash','_wsIsDashTool','_wsDashTools',
    '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon','_wsBudgetCurrentPeriod',
    // La portada ilustrada de las tres herramientas: se ejecuta la REAL, no un
    // stub, porque es la que decide qué pinta cada tarjeta del catálogo.
@@ -176,7 +176,7 @@ function cards(html) {
     const g = k => { const r = new RegExp(k + '="([^"]*)"').exec(attrs); return r ? r[1] : null; };
     out.push({
       cls: m[1], attrs,
-      role: g('role'), cta: g('data-wsh-cta'), tool: g('data-wstool'),
+      role: g('role'), cta: g('data-wsh-cta'), tool: g('data-wstool'), capopen: g('data-wsmse-capopen'),
       ws4: g('data-ws4-type'), lock: g('data-wsh-lock'), aria: g('aria-label'),
       // SPEC P0 §4 — Mi espacio ya no es sólo accesos a capacidades: un DOCUMENTO
       // guardado se abre por su ref propia (`data-wsx-open`), no por la capacidad.
@@ -196,6 +196,9 @@ function destination(c, card) {
   R(c, '__opened.length = 0; __upsell.length = 0;');
   if (card.lock !== null) { R(c, 'openUpgradeIntent({ featureKey: ' + JSON.stringify(card.lock) + ' })'); }
   else if (card.xopen) { R(c, '_wsxOpen(' + JSON.stringify(card.xopen) + ')'); }
+  // Card de capacidad CON documentos: su selector abre un documento o uno nuevo por el owner de
+  // siempre (`_wsOpenTool`), con su gate: aquí se ejerce esa apertura.
+  else if (card.capopen) { const k = card.capopen.indexOf('tool:') === 0 ? card.capopen.slice(5) : null; if (k) R(c, '_wsOpenTool(' + JSON.stringify(k) + ')'); else R(c, '_wsOpenSurface("scenario")'); }
   else if (card.cta === 'tool') { R(c, '_wsOpenTool(' + JSON.stringify(card.tool || 'compound') + ')'); }
   else if (card.cta === 'workspace') { R(c, '_ws4OpenOrCreate(' + JSON.stringify(card.ws4 || '') + ')'); }
   else if (card.cta === 'goals' || card.cta === 'scenario' || card.cta === 'planning') { R(c, '_wsOpenSurface(' + JSON.stringify(card.cta) + ')'); }
@@ -482,9 +485,9 @@ console.log('\n5 · Mi espacio:');
   // RE-DECIDIDO (cierre Workspace, 2026-10-15): era el P0 de reentrada — con documentos y sin
   // estrellas Mi espacio decía «vacío». El documento vuelve, DENTRO del grupo de su capacidad
   // (una capacidad = un grupo, nunca una tarjeta por documento) y sin tocar los favoritos.
-  ok('5.5 un documento guardado aparece en el grupo de su capacidad, sin crear un favorito',
-    (both.match(/data-wsmse-type="doc"/g) || []).length === 1 && both.indexOf('data-wsmse-tpl="1"') !== -1
-    && both.indexOf('Presupuesto empresa') !== -1,
+  ok('5.5 un documento guardado: UNA card de su capacidad con contador, sin crear un favorito',
+    (both.match(/data-wsmse-cap="budget"[^>]*data-wsmse-docs="1"/g) || []).length === 1 && both.indexOf('data-wsmse-tpl="1"') !== -1
+    && both.indexOf('wsh-mse2-doc') === -1,
     both.slice(both.indexOf('data-wsmse-cols'), both.indexOf('data-wsmse-cols') + 70));
   ok('5.5b …y el favorito que SÍ hay sigue estando, intacto',
     (both.match(/data-wsmse-type="fav"/g) || []).length === 1

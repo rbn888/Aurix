@@ -112,7 +112,7 @@ function ctx(persona, langCode) {
   vm.runInContext(konstSrc('_WS_CATALOG'), sb);
   ['_WS_TOOLKEY_TO_ID','_WS_VIEW_SURFACES','_WS_TOOL_RENDER','_WS_TPL_RENDER','_WS4TYPE_TO_ID',
    '_WS_TABS','_WS_TOOL_ASSET','_WS_TPL_ASSET','_WS_APP_IDENTITY','_WS_ARCH','_WS_ASSET_BASE',
-   '_WSH_PINNED_KEY','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY','_WSH_SCENARIOS_KEY',
+   '_WSH_PINNED_KEY','_WSH_DASH_TOOLS_KEY','_WS_TOOL_PHOTO','_WSH_RECENT_KEY','_WSH_GOALS_KEY','_WSH_PROJECTS_KEY','_WSH_SCENARIOS_KEY',
    '_WSH_TOOL_STATE_KEY','_WS_PROJTYPE_TO_TOOL','_WS_FOUNDER_VIEW_KEY','_AURIX_ENT_CANON_EXTRA',
    '_AURIX_ENT_CANON','_WSBUD_INCOME','_WSBUD_EXPENSES','_WS_TOOL_REQUIRED','_WS_PROJ_CONV',
    '_WSH_SPACE_HIDDEN_KEY','_WSH_SPACE_TOP_KEY',
@@ -136,7 +136,7 @@ function ctx(persona, langCode) {
    '_wsPinned','_wsIsPinned','_wshReadStore','_wsGlyph','_wsTplViz','_wsAssetImg','_wsCatPreviewBaseHtml',
    '_wsCatPreviewHtml','_wsMseToolPreview','_wshAllProjects','_wsToolKeyForProjectType','_wsGlyphTile',
    '_wsSceneHtml','_wsReceivablesPreview','_wsAssetsPreview','_wsToolPreviewHtml','_wsLabel','_wsTypeLabel',
-   '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsSpaceIsHidden','_wsSpaceHidden','_wsPlanOnDash','_wsCanPersist','_wsPersistUpsell','_wshReveal',
+   '_renderWorkspaceHome','_renderWorkspaceFreeCover','_wsSpaceIsHidden','_wsSpaceHidden','_wsPlanOnDash','_wsIsDashTool','_wsDashTools','_wsCanPersist','_wsPersistUpsell','_wshReveal',
    '_wsfcPublishedCaps','_wsEntryNameKey','_wsCapIconHtml','_wsSurfaceIcon',
    // §11 — Mi espacio reutiliza la portada del catálogo, así que su render depende de este
    // owner. Sin cargarlo aquí el sandbox ejercitaba el FALLBACK y no el camino real.
@@ -649,9 +649,11 @@ console.log('\n6 · Mi espacio:');
   // plantillas todavía» al volver, mientras el Dashboard y «Mis documentos» los conservaban.
   // Contrato nuevo: el documento aparece en el GRUPO de su capacidad, con el nombre del
   // usuario, y guardar sigue SIN tocar los favoritos (guardar ≠ fijar).
-  ok('6.5 un documento guardado aparece en su grupo, con su nombre, y NO crea un favorito',
-    (h.match(/data-wsmse-type="doc"/g) || []).length === 1
-    && h.indexOf('Presupuesto empresa') !== -1 && /data-wsmse-tpl="1"/.test(h)
+  // Cierre quirúrgico: UNA card de la capacidad con su contador (los documentos se eligen al
+  // abrirla), sin filas de documento, y guardar sigue sin crear un favorito.
+  ok('6.5 un documento guardado aparece como UNA card de su capacidad con contador, y NO crea un favorito',
+    (h.match(/data-wsmse-cap="budget"[^>]*data-wsmse-docs="1"/g) || []).length === 1
+    && h.indexOf('wsh-mse2-doc') === -1 && /data-wsmse-tpl="1"/.test(h)
     && R(c, '_wsPinned().length') === 0);
   // RE-DECIDIDO (§8), Y MÁS FUERTE. Esto exigía que la miniatura del documento
   // se construyera desde SUS `results`, porque la versión anterior leía el
@@ -669,10 +671,11 @@ console.log('\n6 · Mi espacio:');
   // Fijar la capacidad que ya tiene documento: UN grupo (no se duplica), marcado fijado.
   R(c, '_wsTogglePin("tpl:mbudget");'); const h6 = space();
   ok('6.6 fijada + documento = UN solo grupo de la capacidad, marcado fijado',
-    (h6.match(/data-wsmse-cap="budget"/g) || []).length === 1 && /wsh-mse2-grp is-fav has-docs/.test(h6));
+    (h6.match(/data-wsmse-cap="budget"/g) || []).length === 1 && /wsh-mse2-card is-doc is-saved"[^>]*data-wsmse-cap="budget"/.test(h6));
   R(c, '_wsTogglePin("tpl:mbudget"); localStorage.setItem(_WSH_PROJECTS_KEY, "[]");'); h = space();
   ok('6.7 «actualizado hace…» sobrevive sólo como metadato, no como pertenencia',
-    /t\('wsmse2_updated'\)/.test(app) && /t\('wsmse2_fav'\)/.test(app)
+    // La última edición vive en el selector de documentos de la capacidad (`_wsSaveCandidates`).
+    /_wsRelTime\(ts\)/.test(app) && /t\('wsmse2_fav'\)/.test(app)
     && !/ts: Math\.max\(used, pinned, sv\.ts\)/.test(app));
   ok('6.8 los subtítulos «… utilizadas recientemente» desaparecieron del diccionario',
     app.indexOf('wsmse2_tpl_sub') === -1 && app.indexOf('wsmse2_tool_sub') === -1

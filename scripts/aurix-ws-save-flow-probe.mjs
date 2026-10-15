@@ -83,7 +83,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
   await click(page, '[data-wstool-save]');
   const aModal = await modalText(page);
   ok(`${ENG}.A sin documentos del tipo, Guardar pide el NOMBRE directamente`,
-    /Guardar en Mi espacio|Save to My Space/i.test(aModal) && !!(await page.$('#wsRenameInput')), aModal.slice(0, 90));
+    /Guardar documento|Save document/i.test(aModal) && !!(await page.$('#wsRenameInput')), aModal.slice(0, 90));
   await page.fill('#wsRenameInput', 'Plan A');
   await click(page, '[data-wsmodal="ok"]');
   let st = await store(page);
@@ -298,14 +298,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${ENG}.scn · el borrador ofrece guardar, y dice que todavía no lo está`,
       s0.has && s0.dis === false && /Guardar|Save/i.test(s0.lbl), JSON.stringify(s0));
 
-    console.log('DBG', await page.evaluate(`(function(){return JSON.stringify({persist:_wsCanPersist(),ok:_wsbTwoWay().ok,n:document.querySelectorAll('[data-wsb2-save]').length,view:_wshView,modals:document.querySelectorAll('#wsConfirmModal').length});})()`));
     await click(page, '[data-wsb2-save]');
-    console.log('DBG1b', await page.evaluate(`(function(){try{ _wsbSaveInstance(); return 'called'; }catch(e){ return 'ERR '+e.message; }})()`));
     const sm = await modalText(page);
     ok(`${ENG}.scn · guardar funciona al PRIMER toque, sin salir antes del campo`,
       !!(await page.$('#wsRenameInput')), 'el botón no puede desaparecer bajo el dedo');
     ok(`${ENG}.scn · sin comparaciones guardadas, Guardar pide el NOMBRE directamente`,
-      /Guardar en Mi espacio|Save to My Space/i.test(sm) && !!(await page.$('#wsRenameInput')), sm.slice(0, 90));
+      /Guardar documento|Save document/i.test(sm) && !!(await page.$('#wsRenameInput')), sm.slice(0, 90));
     await page.fill('#wsRenameInput', 'Comparación A');
     await click(page, '[data-wsmodal="ok"]');
     await page.waitForTimeout(320);

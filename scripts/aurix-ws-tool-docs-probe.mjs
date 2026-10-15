@@ -38,6 +38,8 @@ const DOCS=[
 for (const [ENG,launcher] of [['CR',chromium],['WK',webkit]]) {
   const b=await launcher.launch(); const c=await b.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
   const pg=await c.newPage(); pg.on('pageerror',e=>console.log('  [pageerror]',e.message));
+  // Aserciones en español: el idioma se fija (sin esto Chromium arrancaba en inglés).
+  await pg.addInitScript(`try{ if(!localStorage.getItem('portfolio_lang')) localStorage.setItem('portfolio_lang','es'); }catch(_){}`);
   await pg.goto(O+'/index.html',{waitUntil:'domcontentloaded'});
   await pg.waitForFunction("typeof _wsOpenTool==='function' && typeof _AURIX_ENT_CANON!=='undefined'",null,{timeout:60000});
   await pg.waitForTimeout(900);

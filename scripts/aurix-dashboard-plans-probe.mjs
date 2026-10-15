@@ -84,6 +84,9 @@ const DOCS = [
 const DOC_SAME_NAME = { id: 'd6', type: 'monthly_budget', customName: 'Presupuesto mensual', updatedAt: 90, revision: 1, inputs: { salary: 1800, housing: 600 } };
 
 async function mount(page) {
+  // Las aserciones de esta sonda son en español: el idioma se FIJA (sin esto Chromium arrancaba
+  // en inglés y todo el bloque de textos fallaba antes incluso de v826).
+  await page.addInitScript(`try{ if(!localStorage.getItem('portfolio_lang')) localStorage.setItem('portfolio_lang','es'); }catch(_){}`);
   await page.goto(ORIGIN + '/index.html', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(`typeof updateDashboardPlans === 'function' && typeof switchTab === 'function'`, null, { timeout: 60000 });
   await page.waitForTimeout(700);
@@ -443,7 +446,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var h=document.querySelector('#wsPlansSection .wspl-title');
       return JSON.stringify({ txt:h.textContent, tt:getComputedStyle(h).textTransform });})()`).then(JSON.parse);
     ok(`${ENG}.v2.título en mayúsculas de presentación, no en el DOM`,
-      ttl.tt === 'uppercase' && ttl.txt === 'Tus planes', JSON.stringify(ttl));
+      // Cierre Workspace: el bloque se titula «Tu espacio» (y su grupo de documentos, «Tus planes»).
+      ttl.tt === 'uppercase' && ttl.txt === 'Tu espacio', JSON.stringify(ttl));
 
     // §17 — cada tarjeta trae el acento de SU capacidad, y no todas el mismo.
     const acc = await page.evaluate(`(function(){

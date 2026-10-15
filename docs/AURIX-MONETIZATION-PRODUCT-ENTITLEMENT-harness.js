@@ -920,7 +920,9 @@ console.log('\nB · FAIL-CLOSED — ejecutado');
     ok('M3.13 Mi Espacio agrupa por CAPACIDAD (fijada ∪ documentos), y el documento conserva su casa',
       /mtype: docs\.length \? 'doc' : 'fav'/.test(app) &&
       /data-wsmse-cap="\$\{esc\(it\.cat\)\}"/.test(app) &&
-      /data-wsmse-type="doc" data-wsmse-ref=/.test(app) &&
+      // Cierre quirúrgico: UNA card por capacidad con su contador; sus documentos se ofrecen al
+      // abrirla (selector común), no como filas debajo.
+      /data-wsmse-docs="\$\{it\.docs\.length\}"/.test(app) && /function _wsCapDocsOpen\(/.test(app) &&
       // Y la casa existe de verdad: la puerta dentro de la herramienta.
       /function _wsToolOpenSaved\(\)/.test(app) && /data-wstool-open/.test(app) &&
       (app.match(/wsmse2_fav:/g) || []).length === 2);

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '786'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '787'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4411,6 +4411,8 @@ const USER_SCOPED_WORK_KEYS = [
   'aurix_ws_projects_v1', 'aurix_ws_planning_v1', 'aurix_ws_tool_state_v1',
   'aurix_ws_pinned_v1', 'aurix_ws_recent_v1', 'aurix_ws_space_hidden_v1',
   'aurix_ws_space_top_v1', 'aurix_workspace_mode',
+  // Accesos a capacidades publicados en el Dashboard (acto explícito, distinto del favorito).
+  'aurix_ws_dash_tools_v1',
   // Los parámetros de Escenarios guardan el patrimonio DECLARADO como base: tras cambiar de
   // cuenta, el siguiente usuario los leía (reproducido en la demo con dos cuentas sintéticas).
   'aurix_ws_scn_params_v1',
@@ -6632,7 +6634,7 @@ const T = {
     wsb_p_years:       'Horizonte',
     wsb_p_ret:         'Rentabilidad supuesta',
     wsb_need_inputs:   'Los resultados aparecen cuando declares el patrimonio de partida y el horizonte.',
-    wsb_base_missing:  'Declara tu patrimonio de partida: sin él Aurix no proyecta desde cero, porque cero sería un dato y no lo tiene.',
+    wsb_base_missing:  'Indica tu patrimonio de partida para comparar.',
     wsb_by_contrib:    'De lo que aportas',
     wsb_by_growth:     'Del crecimiento estimado',
     wsb_impact_nocontrib: 'Sin aportar nada',
@@ -6966,7 +6968,12 @@ const T = {
     wsx_title:            'Tu espacio',
     wsx_pinned_title:     'Herramientas fijadas',
     wsx_pinned_open:      'Abrir',
-    wsx_pinned_unpin:     'Quitar de fijadas',
+    wsx_pinned_unpin:     'Quitar del Dashboard',
+    wscap_dash_add:       'Mostrar en Dashboard',
+    wscap_dash_remove:    'Quitar del Dashboard',
+    wscap_fav_add:        'Marcar favorito',
+    wscap_fav_remove:     'Quitar favorito',
+    wscap_menu:           'Opciones',
     wsx_pinned_hint:      'Acceso directo · sin documento',
     wspl_nodata:          'Sin datos todavía',
     dash_grip:            'Reordenar',
@@ -7132,10 +7139,12 @@ const T = {
     wsmse2_tool_title:  'Mis herramientas',
     wsmse2_last:        'Última apertura',
     wsmse2_updated:     'actualizado',
-    wsmse2_fav:         'Fijada',
+    wsmse2_fav:         'Favorito',
     wsmse2_docs_one:    '1 documento',
     wsmse2_docs_n:      '{n} documentos',
     wsmse2_on_dash:     'En Dashboard',
+    wscap_pick_text:    'Elige un documento o crea uno nuevo.',
+    wscap_new:          'Crear nuevo',
     wsmse2_saved:       'Guardado',
     wsmse2_empty_t:     'Tu espacio lo eliges tú.',
     wsmse2_empty_b:     'Aquí aparece lo que marcas con la estrella y lo que guardas con nombre',
@@ -7162,7 +7171,7 @@ const T = {
     // campo busca dentro de los cobros, y por quién o por qué concepto ya se ve al escribir.
     wsrecv_search:      'Buscar cobro…',
     wsrecv_no_results:  'Sin resultados.',
-    wsrecv_overdue_badge: n => `${n} vencidos`,
+    wsrecv_overdue_badge: n => n === 1 ? '1 vencido' : `${n} vencidos`,
     wsrecv_unit:        'registros',
     wsrecv_kpi_pending: 'Pendiente total',
     wsrecv_kpi_collected:'Cobrado',
@@ -7409,7 +7418,7 @@ const T = {
     wsccy_choose:       'Elige…',
     wsccy_confirm:      'Confirmar moneda',
     wsccy_pending_t:    'Moneda sin confirmar.',
-    wsccy_pending_d:    'Este documento se guardó sin registrar su moneda. Los importes se conservan tal cual; indica en qué moneda están para verlos con su símbolo.',
+    wsccy_pending_d:    'Los importes se conservan tal cual. Indica en qué moneda están.',
     wsname_saveas_title:'Guardar como…',
     wsname_field:       'Nombre',
     // ── §4 · LA DECISIÓN DE GUARDADO ─────────────────────────────────────────
@@ -9922,7 +9931,7 @@ const T = {
     wsb_p_years:       'Horizon',
     wsb_p_ret:         'Assumed return',
     wsb_need_inputs:   'Results appear once you declare your starting wealth and the horizon.',
-    wsb_base_missing:  'Declare your starting wealth: without it Aurix does not project from zero, because zero would be a figure it does not have.',
+    wsb_base_missing:  'Enter your starting wealth to compare.',
     wsb_by_contrib:    'From what you contribute',
     wsb_by_growth:     'From estimated growth',
     wsb_impact_nocontrib: 'Contributing nothing',
@@ -10226,7 +10235,12 @@ const T = {
     wsx_title:            'Your space',
     wsx_pinned_title:     'Pinned tools',
     wsx_pinned_open:      'Open',
-    wsx_pinned_unpin:     'Unpin',
+    wsx_pinned_unpin:     'Remove from Dashboard',
+    wscap_dash_add:       'Show on Dashboard',
+    wscap_dash_remove:    'Remove from Dashboard',
+    wscap_fav_add:        'Mark as favourite',
+    wscap_fav_remove:     'Remove favourite',
+    wscap_menu:           'Options',
     wsx_pinned_hint:      'Shortcut · no document',
     wspl_nodata:          'No data yet',
     dash_grip:            'Reorder',
@@ -10377,10 +10391,12 @@ const T = {
     wsmse2_tool_title:  'My tools',
     wsmse2_last:        'Last opened',
     wsmse2_updated:     'updated',
-    wsmse2_fav:         'Pinned',
+    wsmse2_fav:         'Favourite',
     wsmse2_docs_one:    '1 document',
     wsmse2_docs_n:      '{n} documents',
     wsmse2_on_dash:     'On Dashboard',
+    wscap_pick_text:    'Pick a document or create a new one.',
+    wscap_new:          'Create new',
     wsmse2_saved:       'Saved',
     wsmse2_empty_t:     'Your space is yours to choose.',
     wsmse2_empty_b:     'What you star and what you save with a name shows up here',
@@ -10628,7 +10644,7 @@ const T = {
     wsccy_choose:       'Choose…',
     wsccy_confirm:      'Confirm currency',
     wsccy_pending_t:    'Currency not confirmed.',
-    wsccy_pending_d:    'This document was saved without recording its currency. The amounts are kept as they are; tell us which currency they are in to show them with their symbol.',
+    wsccy_pending_d:    'Amounts are kept as they are. Tell us which currency they are in.',
     wsname_saveas_title:'Save as…',
     wsname_field:       'Name',
     wssave_title:         'Save',
@@ -22051,6 +22067,7 @@ const _WS_PREF_REV_PREFIX = 'aurix_ws_prefrev_';
 const _WS_PREF_KEYS = Object.freeze([
   'aurix_ws_tool_state_v1', 'aurix_ws_pinned_v1', 'aurix_ws_recent_v1',
   'aurix_ws_space_hidden_v1', 'aurix_ws_space_top_v1', 'aurix_ws_planning_v1',
+  'aurix_ws_dash_tools_v1',
 ]);
 // ¿PUEDE ESTA CUENTA GUARDAR TRABAJO EN WORKSPACE?
 //
@@ -22446,25 +22463,31 @@ async function _wsDocsPull() {
         touched++;
       } catch (_) {}
     }
-    // ── LOS FIJADOS, SÓLO DONDE ESTE DISPOSITIVO NO TIENE NINGUNO (cierre Workspace §3) ──
-    // Las preferencias no se aplican al leer (arriba, y su razón sigue en pie para el borrador de
-    // las herramientas). Pero eso dejaba a un navegador nuevo —o a uno cuyo almacenamiento purgó el
-    // sistema— sin ninguna capacidad fijada aunque el servidor las tenga, mientras los documentos
-    // sí volvían. Hidratar SÓLO cuando la clave NO EXISTE en local no pisa nada: un dispositivo
-    // que ya decidió (aunque sea «ninguno», que es `[]`) conserva su decisión; y una clave ausente
-    // nunca se sube (ver `_wsDocRows`), así que tampoco puede haber vaciado el remoto.
-    try {
-      const pr = rows.find(x => x && x.kind === 'ws_pref' && x.body && x.body.key === _WSH_PINNED_KEY && !x.deleted_at);
-      // Escritura DIRECTA, como los documentos de arriba: es el lector de la sincronización, y
-      // pasar por `_wshWriteStore` re-encolaría una subida de lo que acaba de bajar.
-      const pk = pr && pr.body.key;
-      if (pr && Array.isArray(pr.body.value) && localStorage.getItem(pk) == null) {
-        const v = pr.body.value.filter(x => x && typeof x.ref === 'string');
-        localStorage.setItem(pk, JSON.stringify(v));
-        localStorage.setItem(_WS_PREF_REV_PREFIX + pk, String(Number(pr.revision) || 0));
-        touched++;
+    // ── LOS FAVORITOS CONVERGEN POR REVISIÓN (cierre quirúrgico) ─────────────────────────────
+    // v826 hidrataba sólo si la clave NO existía en local. Eso arreglaba el navegador nuevo pero
+    // dejaba divergir dos dispositivos que ya tenían lista: el que no cambió conservaba para
+    // siempre una lista obsoleta, y quitar el ÚLTIMO favorito (`[]`) en uno no llegaba al otro.
+    // Ahora es el contrato de las preferencias: cada subida sella su revisión en
+    // `aurix_ws_prefrev_<clave>`, y al leer se aplica la remota sólo si es MÁS NUEVA que la última
+    // aplicada aquí. La longitud de la lista no decide nada: `[]` con revisión nueva gana. Y una
+    // subida local PENDIENTE o FALLIDA de esa clave no se pisa (el usuario acaba de decidir aquí).
+    // Escritura directa, como los documentos: es el lector de la sincronización y pasar por
+    // `_wshWriteStore` re-encolaría una subida de lo que acaba de bajar.
+    [_WSH_PINNED_KEY, _WSH_DASH_TOOLS_KEY].forEach(pk => { try {
+      const pr = rows.find(x => x && x.kind === 'ws_pref' && x.body && x.body.key === pk && !x.deleted_at);
+      const _pst = _wsDocSync[pk] && _wsDocSync[pk].state;
+      if (pr && Array.isArray(pr.body.value) && _pst !== 'saving' && _pst !== 'error') {
+        const remoteRev = Number(pr.revision) || 0;
+        let localRev = 0;
+        try { localRev = Number(localStorage.getItem(_WS_PREF_REV_PREFIX + pk)) || 0; } catch (_) { localRev = 0; }
+        if (remoteRev > localRev) {
+          const v = pr.body.value.filter(x => x && typeof x.ref === 'string');
+          localStorage.setItem(pk, JSON.stringify(v));
+          localStorage.setItem(_WS_PREF_REV_PREFIX + pk, String(remoteRev));
+          touched++;
+        }
       }
-    } catch (_) {}
+    } catch (_) {} });
     if (touched) { _wsDocSyncState = 'saved'; _wsDocSyncAt = Date.now(); }
     return true;
   } catch (_) { _wsDocsPullFailed = true; return false; }
@@ -22677,7 +22700,10 @@ function _wsSurfaceHeadHtml(o) {
 // Presupuesto ya la lleva en su cabecera de cifras.
 function _wsBarCcyHtml() {
   try {
-    if (_WS_CCY_TOOLS.indexOf(_wsToolActive) < 0 || _wsToolActive === 'budget' || !_wsDocCcy()) return '';
+    // Presupuesto: moneda y periodo; en escritorio viven en su cabecera de cifras y aquí sólo se
+    // ven en móvil (CSS), para que la fila de Guardar no quede aislada.
+    if (_wsToolActive === 'budget') return `<div class="wsh-bar-ccy is-budget">${_wsBudgetCcyCtlHtml()}${_wsBudgetPeriodHtml(_wsToolInputs)}</div>`;
+    if (_WS_CCY_TOOLS.indexOf(_wsToolActive) < 0 || !_wsDocCcy()) return '';
     return `<div class="wsh-bar-ccy">${_wsBudgetCcyCtlHtml()}</div>`;
   } catch (_) { return ''; }
 }
@@ -23030,9 +23056,15 @@ function _wshWireOnce() {
   try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash]')
       : null;
     if (!t) return;
+    const capMenu = t.getAttribute('data-wscap-menu');
+    if (capMenu) { e.preventDefault(); e.stopPropagation(); _wsCapMenu(t, capMenu); return; }
+    const capDash = t.getAttribute('data-wscap-dash');
+    if (capDash) { _wsToggleDashTool(capDash); const bar = document.querySelector('.wsh-tool-view [data-wstool-savebar]'); if (bar) { bar._wsHtml = ''; _wsToolSaveBarSync(bar); } return; }
+    const capOpen = t.getAttribute('data-wsmse-capopen');
+    if (capOpen) { _wsCapDocsOpen(capOpen, t); return; }
     const nf = t.getAttribute('data-wsnew-focus');
     if (nf) { _wsFocusInView(nf, t.getAttribute('data-wsnew-input')); return; }
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -23644,6 +23676,7 @@ function _wsPickDocModal(o) {
       </div>
       <div class="ws-modal-actions">
         <button type="button" class="ws-modal-btn is-cancel" data-wspick="cancel">${esc(t('wsmodal_cancel'))}</button>
+        ${o.extraLabel ? `<button type="button" class="ws-modal-btn is-extra" data-wspick="extra">${esc(o.extraLabel)}</button>` : ''}
         <button type="button" class="ws-modal-btn is-primary" data-wspick="ok" disabled>${esc(o.okLabel || t('wsname_ok'))}</button>
       </div>
     </div>`;
@@ -23660,6 +23693,8 @@ function _wsPickDocModal(o) {
     const b = e.target.closest ? e.target.closest('[data-wspick]') : null; if (!b) return;
     const k = b.getAttribute('data-wspick');
     if (k === 'cancel') { close(); return; }
+    // Una segunda salida opcional del mismo selector («Crear nuevo»): sin elegir documento.
+    if (k === 'extra') { close(); if (typeof o.onExtra === 'function') { try { o.onExtra(); } catch (_) {} } return; }
     if (k === 'ok') {
       if (chosen < 0 || done) return;                 // sin elección no hay destino
       const d = docs[chosen]; close();
@@ -24467,6 +24502,27 @@ function _wsTogglePin(ref) {
   list.push({ ref, ts: Date.now() });
   if (!_wshWriteStore(_WSH_PINNED_KEY, list)) _warn();
 }
+// ── ACCESOS EN EL DASHBOARD: UN ACTO PROPIO (cierre quirúrgico §A) ─────────────────────────
+// En v826 el grupo «Herramientas fijadas» del Dashboard salía de los FAVORITOS, así que marcar
+// la estrella publicaba en el Dashboard: dos acciones fundidas en una. El favorito organiza Mi
+// espacio; publicar un acceso en el Dashboard es otra decisión, con su propia lista (ordenada,
+// por cuenta, sincronizada como preferencia). Ninguna de las dos implica la otra.
+const _WSH_DASH_TOOLS_KEY = 'aurix_ws_dash_tools_v1';
+function _wsDashTools() { return _wshReadStore(_WSH_DASH_TOOLS_KEY); }
+function _wsIsDashTool(ref) { return _wsDashTools().some(p => p && p.ref === ref); }
+function _wsToggleDashTool(ref) {
+  if (!ref) return;
+  const list = _wsDashTools();
+  const i = list.findIndex(p => p && p.ref === ref);
+  const _warn = () => { try { _wsPinFailed(); } catch (_) {} };
+  if (i >= 0) { list.splice(i, 1); if (!_wshWriteStore(_WSH_DASH_TOOLS_KEY, list)) _warn(); }
+  else {
+    if (!_wsCanPersist()) return _wsPersistUpsell('pin');
+    list.push({ ref, ts: Date.now() });
+    if (!_wshWriteStore(_WSH_DASH_TOOLS_KEY, list)) _warn();
+  }
+  try { _wsPlansRepaint(); } catch (_) {}
+}
 // Un aviso breve, por el canal que ya existe para los avisos de Workspace.
 function _wsPinFailed() {
   try { _aurixBillingToast(t('wspin_failed'), 'error'); } catch (_) {}
@@ -24657,14 +24713,27 @@ const _WS_TOOL_COVER = Object.freeze({
     + '<path class="wsc-line is-alt" d="M14 26 H106"/>'
     + '<circle class="wsc-dot" cx="38" cy="12" r="3.2"/>',
 });
+// ── PORTADAS FOTOGRÁFICAS DE LAS HERRAMIENTAS (cierre quirúrgico) ────────────────────────────
+// Las cuatro herramientas de cálculo tenían un dibujo vectorial genérico. Ahora llevan su portada
+// propia, por el MISMO mecanismo que las plantillas (`_wsAssetImg` dentro de `wspv-asset-host`):
+// mientras la imagen llega se ve una superficie neutra con la caja ya reservada, y el dibujo
+// vectorial queda como alternativa que SÓLO aparece si la imagen falla (sin flash). Nombres con
+// versión para que ningún navegador sirva la ilustración anterior desde su caché.
+const _WS_TOOL_PHOTO = Object.freeze({
+  compound: 'tool_compound_v2', loan: 'tool_loans_v2', scenario: 'tool_scenarios', comparator: 'tool_comparator',
+});
 function _wsToolCoverHtml(key) {
-  const body = _WS_TOOL_COVER[String(key || '')];
+  const k = String(key || '');
+  const body = _WS_TOOL_COVER[k];
   if (!body) return '';
   // `viewBox` fijo: la caja la reserva el CSS, así que la tarjeta no salta
   // cuando la ilustración entra, y no hay descarga que esperar ni que falle.
-  return '<span class="wsh-toolcover" aria-hidden="true">'
-    + '<svg viewBox="0 0 120 56" preserveAspectRatio="xMidYMid meet" fill="none" '
-    + 'stroke-linecap="round" stroke-linejoin="round">' + body + '</svg></span>';
+  const svg = '<svg viewBox="0 0 120 56" preserveAspectRatio="xMidYMid meet" fill="none" '
+    + 'stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
+  const photo = _WS_TOOL_PHOTO[k];
+  if (!photo) return '<span class="wsh-toolcover" aria-hidden="true">' + svg + '</span>';
+  return '<span class="wsh-toolcover has-photo" aria-hidden="true"><span class="wspv-asset-host">'
+    + '<span class="wspv wspv-toolsvg">' + svg + '</span>' + _wsAssetImg(photo, '') + '</span></span>';
 }
 function _wsCapIconHtml(k) {
   return `<svg class="wsfc-cap-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(k)}</svg>`;
@@ -25523,7 +25592,7 @@ function _renderDashboardPlans() {
             <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
           </button>
           <span class="wspl-ico">${_wsCapIconHtml(spec.icon)}</span>
-          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(nm)}">${esc(nm)}</span></span>
+          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(nm)}">${esc(nm)}</span>${(!goal && p.inputs && /^\d{4}-\d{2}$/.test(String(p.inputs.periodKey || ''))) ? `<span class="wspl-period">${esc(_wsPeriodLabelShort(p.inputs.periodKey))}</span>` : ''}</span>
           <button type="button" class="wspl-menu" data-wspl-menu="${esc(p.id)}" data-wspl-mkind="${esc(it.kind)}"
             aria-haspopup="true" aria-expanded="false"
             title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + nm)}">
@@ -25552,7 +25621,7 @@ function _renderDashboardPlans() {
 function _wsPinnedCaps() {
   const out = [];
   let pins = [];
-  try { pins = _wsPinned(); } catch (_) { return out; }
+  try { pins = _wsDashTools(); } catch (_) { return out; }
   if (!pins.length) return out;
   const byRef = Object.create(null);
   [['template', _WS_TPL_RENDER], ['tool', _WS_TOOL_RENDER]].forEach(([kind, map]) => {
@@ -25581,23 +25650,22 @@ function _renderDashboardPinned(pins) {
     try { const h = _wsToolCoverHtml(c.cat); if (h) return h; if (_WS_TPL_ASSET[c.cat]) return _wsCatPreviewHtml(c.cat); } catch (_) {}
     return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(c.icon)}</span>`;
   };
+  // Cierre quirúrgico §D — un ACCESO, no un plan: una fila compacta (agarre, miniatura, nombre,
+  // menú y Abrir). Sin la frase «Acceso directo · sin documento»: el encabezado del grupo y la
+  // forma ya lo dicen. La miniatura es la portada canónica de la capacidad, reducida.
   const cards = pins.map(c => `
-      <article class="wspl-card wspin-card" data-wspin-ref="${esc(c.ref)}" data-ws-accent="${esc(c.accent)}">
-        <div class="wspl-card-id">
-          <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + c.name)}" aria-describedby="dashReorderHintPins">
-            <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
-          </button>
-          <span class="wspl-ico">${_wsCapIconHtml(c.icon)}</span>
-          <span class="wspl-card-txt"><span class="wspl-name" title="${esc(c.name)}">${esc(c.name)}</span></span>
-          <button type="button" class="wspl-menu" data-wspin-menu="${esc(c.ref)}" aria-haspopup="true" aria-expanded="false"
-            title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + c.name)}"><span aria-hidden="true">&#8943;</span></button>
-        </div>
-        <div class="wspin-cover" aria-hidden="true">${cover(c)}</div>
-        <span class="wspin-hint">${esc(t('wsx_pinned_hint'))}</span>
-        <button type="button" class="wspl-go" data-wspin-dopen="${esc(c.ref)}" aria-label="${esc(t('wsx_pinned_open') + ' — ' + c.name)}">${esc(t('wsx_pinned_open'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      <article class="wspin-card" data-wspin-ref="${esc(c.ref)}" data-ws-accent="${esc(c.accent)}">
+        <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + c.name)}" aria-describedby="dashReorderHintPins">
+          <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
+        </button>
+        <span class="wspin-cover" aria-hidden="true">${cover(c)}</span>
+        <span class="wspl-name wspin-name" title="${esc(c.name)}">${esc(c.name)}</span>
+        <button type="button" class="wspl-menu" data-wspin-menu="${esc(c.ref)}" aria-haspopup="true" aria-expanded="false"
+          title="${esc(t('wspl_menu'))}" aria-label="${esc(t('wspl_menu') + ' — ' + c.name)}"><span aria-hidden="true">&#8943;</span></button>
+        <button type="button" class="wspin-go" data-wspin-dopen="${esc(c.ref)}" aria-label="${esc(t('wsx_pinned_open') + ' — ' + c.name)}">${esc(t('wsx_pinned_open'))}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
       </article>`).join('');
   return `<section class="wsx-grp" data-wsx-grp="pinned"><h3 class="wsx-gtitle">${esc(t('wsx_pinned_title'))}</h3>
-    <div class="wspl-grid wspin-grid" id="wsPinGrid" data-wspl-n="${pins.length}">${cards}</div>
+    <div class="wspin-grid" id="wsPinGrid" data-wspl-n="${pins.length}">${cards}</div>
     <span id="dashReorderHintPins" class="intcc-sr-only">${esc(t('dash_reorder_hint_plans'))}</span></section>`;
 }
 // Abrir una capacidad fijada DESDE EL DASHBOARD: el mismo despacho que su estrella en Mi espacio
@@ -25619,7 +25687,7 @@ function _wsDashPinMenu(anchor, ref) {
     { k: 'unpin', label: t('wsx_pinned_unpin') },
   ], act => {
     if (act === 'open') _wsDashPinOpen(ref);
-    else if (act === 'unpin') { if (_wsIsPinned(ref)) _wsTogglePin(ref); _wsPlansRepaint(); }
+    else if (act === 'unpin') { if (_wsIsDashTool(ref)) _wsToggleDashTool(ref); }
   });
 }
 // GRUPO 3 · HERRAMIENTAS FIJADAS. Su orden ES el del almacén de fijados: se reescribe esa lista
@@ -25630,11 +25698,11 @@ _aurixReorderRegister('wsPinGrid', {
   label: el => ((el.querySelector('.wspl-name') || {}).textContent || '').trim(),
   commit: visible => {
     try {
-      const list = _wsPinned();
+      const list = _wsDashTools();
       const refs = list.map(p => p && p.ref);
       const merged = _aurixOrderMerge(refs, visible);
       const byRef = new Map(list.map(p => [p && p.ref, p]));
-      _wshWriteStore(_WSH_PINNED_KEY, merged.map(r => byRef.get(r)).filter(Boolean));
+      _wshWriteStore(_WSH_DASH_TOOLS_KEY, merged.map(r => byRef.get(r)).filter(Boolean));
     } catch (_) {}
     try { const sec = document.getElementById('wsPlansSection'); if (sec) sec._wsplHtml = ''; } catch (_) {}
   },
@@ -25854,6 +25922,41 @@ function _wsPlansOpen(id, kind) {
   _wsOpenTool(spec.tool, id);
 }
 
+// «Crear nuevo» abre la herramienta con un documento NUEVO (valores por defecto, sin id), por la
+// rama de `_wsOpenTool` que ya resuelve un id inexistente así. No reutiliza el borrador rápido:
+// partir de los números de otro documento no es «nuevo».
+const _WS_NEW_DOC = '__new__';
+// Abrir una capacidad CON documentos desde Mi espacio: sus documentos, el más reciente primero,
+// y «Crear nuevo», en el selector común. El gate se vuelve a preguntar en cada apertura.
+// El ⋯ de una capacidad en Mi espacio: abrir, favorito y Dashboard — tres actos distintos.
+function _wsCapMenu(anchor, ref) {
+  const fav = _wsIsPinned(ref), dash = _wsIsDashTool(ref);
+  const card = anchor.closest ? anchor.closest('.wsh-mse2-card') : null;
+  _wsPopoverMenu(anchor, 'wsCapMenu', [
+    { k: 'open', label: t('wsh_proj_open') },
+    { k: 'fav', label: t(fav ? 'wscap_fav_remove' : 'wscap_fav_add') },
+    { k: 'dash', label: t(dash ? 'wscap_dash_remove' : 'wscap_dash_add') },
+  ], act => {
+    if (act === 'open') { if (card) card.click(); }
+    else if (act === 'fav') { _wsTogglePin(ref); _wshRepaintHome(); }
+    else if (act === 'dash') { _wsToggleDashTool(ref); _wshRepaintHome(); }
+  });
+}
+function _wsCapDocsOpen(sk, anchor) {
+  const isScn = sk === 'scenario';
+  const key = isScn ? '' : String(sk).slice(5);
+  const type = isScn ? 'scenario_compare' : _wsToolStateType(key);
+  let docs = [];
+  try { docs = _wsSaveCandidates(type, null); } catch (_) { docs = []; }
+  const name = isScn ? t('wsh_scenario_title') : (_wsTypeLabel(type) || '');
+  const openNew = () => { _wsReturnTab = 'space'; if (isScn) _wsOpenSurface('scenario'); else _wsOpenTool(key, _WS_NEW_DOC); };
+  if (!docs.length) { openNew(); return; }
+  _wsPickDocModal({
+    title: name, text: t('wscap_pick_text'), docs: docs, okLabel: t('wstool_open_saved'),
+    extraLabel: t('wscap_new'), onExtra: openNew,
+    onPick: d => { if (!d || !d.id) return; _wsReturnTab = 'space'; if (isScn) _wsbOpenDoc(d.id); else _wsOpenTool(key, d.id); },
+  });
+}
 function _wsxOpen(ref) {
   _wsReturnTab = 'space';   // WS.14A — opened from Mi Espacio → "Volver" returns there
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
@@ -26067,14 +26170,6 @@ function _renderWorkspaceHome(metrics) {
     const _surfKey = mdl => mdl.openKind === 'tool' ? 'tool:' + mdl.openArg
       : mdl.openKind === 'workspace' ? 'ws4:' + mdl.openArg : String(mdl.openKind || '');
     const _claimed = new Set();
-    const _onDash = d => {
-      try {
-        if (d.kind === 'goal') return (_wsgGoals().find(x => x && x.id === d.id) || {}).dashPinned === true;
-        if (d.kind !== 'workspace') return false;
-        const p = _ws4Projects().find(x => x && x.id === d.id);
-        return !!p && _wsPlanOnDash(p);
-      } catch (_) { return false; }
-    };
     const colItems = (map, kind) => _wsCatalogFor(kind)
       .map(e => _wsCardModel(e, map[e.id] || {}))
       .filter(mdl => mdl.state === 'open')
@@ -26107,30 +26202,22 @@ function _renderWorkspaceHome(metrics) {
       } catch (_) {}
       return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(it.cat))}</span>`;
     };
-    // La capacidad abre la CAPACIDAD (owner del catálogo, mismo gate); cada documento abre SU
-    // instancia (`_wsxOpen`). El ⋯ del documento es el menú de Mi espacio de siempre.
-    const docRow = d => {
-      const dash = _onDash(d);
-      const meta = [d.ts ? (t('wsmse2_updated') + ' ' + _wsRelTime(d.ts)) : '', dash ? t('wsmse2_on_dash') : ''].filter(Boolean).join(' · ');
-      return `
-        <li class="wsh-mse2-doc${dash ? ' is-dash' : ''}" data-wsmse-type="doc" data-wsmse-ref="${esc(d.ref)}">
-          <button type="button" class="wsh-mse2-doc-open" data-wsx-open="${esc(d.ref)}" aria-label="${esc(d.name + ' · ' + t('wsh_proj_open'))}">
-            <span class="wsh-mse2-doc-n">${esc(d.name)}</span>
-            ${meta ? `<span class="wsh-mse2-doc-m">${esc(meta)}</span>` : ''}
-          </button>
-          <button type="button" class="wsh-mse2-doc-menu" data-wsmenu="${esc(d.ref)}" aria-haspopup="true" aria-label="${esc(t('wspl_menu') + ' — ' + d.name)}"><span aria-hidden="true">&#8943;</span></button>
-        </li>`;
-    };
+    // ── RE-DECIDIDO (cierre quirúrgico): UNA card por capacidad, SIN filas de documento ─────
+    // Listar cada documento debajo de su card convertía Mi espacio en un archivo (10 presupuestos =
+    // 10 filas). La card dice cuántos hay; abrirla ofrece SUS documentos y «Crear nuevo» en el
+    // selector común (`_wsCapDocsOpen`). Sin documentos abre la capacidad directamente, como antes.
+    // Objetivos no pasa por el selector: su propia superficie YA es la lista de sus instancias.
+    const capAttrs = it => (it.docs.length && it.model.state === 'open' && (it.model.openKind === 'tool' || it.model.openKind === 'scenario'))
+      ? ` role="button" tabindex="0" data-wsmse-capopen="${esc(it.model.openKind === 'tool' ? 'tool:' + it.model.openArg : 'scenario')}"`
+      : _wsCardAttrs(it.model);
     const card = it => `
-      <div class="wsh-mse2-grp${it.fav ? ' is-fav' : ''}${it.docs.length ? ' has-docs' : ''}" data-wsmse-cap="${esc(it.cat)}">
-        <div class="wsh-mse2-card is-${it.mtype}${it.fav ? ' is-saved' : ''}" data-wsmse-type="${it.docs.length ? 'cap' : 'fav'}"${_wsCardAttrs(it.model)} aria-label="${esc(it.name)}">
-          <div class="wsh-mse2-pv" aria-hidden="true">${mseCover(it)}</div>
-          <div class="wsh-mse2-body">
-            <p class="wsh-mse2-name">${esc(it.name)}</p>
-            <span class="wsh-mse2-meta">${esc(mseMeta(it))}</span>
-          </div>
+      <div class="wsh-mse2-card is-${it.mtype}${it.fav ? ' is-saved' : ''}" data-wsmse-type="${it.docs.length ? 'cap' : 'fav'}" data-wsmse-cap="${esc(it.cat)}" data-wsmse-docs="${it.docs.length}"${capAttrs(it)} aria-label="${esc(it.name + (mseMeta(it) ? ' · ' + mseMeta(it) : ''))}">
+        <div class="wsh-mse2-pv" aria-hidden="true">${mseCover(it)}</div>
+        <div class="wsh-mse2-body">
+          <p class="wsh-mse2-name">${esc(it.name)}</p>
+          <span class="wsh-mse2-meta">${it.fav ? `<span class="wsh-mse2-favmark" aria-hidden="true">★</span>` : ''}${esc(mseMeta(it))}${it.ref && _wsIsDashTool(it.ref) ? ` · ${esc(t('wsmse2_on_dash'))}` : ''}</span>
         </div>
-        ${it.docs.length ? `<ul class="wsh-mse2-docs" aria-label="${esc(it.name)}">${it.docs.map(docRow).join('')}</ul>` : ''}
+        ${it.ref ? `<button type="button" class="wsh-mse2-menu" data-wscap-menu="${esc(it.ref)}" aria-haspopup="true" aria-label="${esc(t('wscap_menu') + ' — ' + it.name)}"><span aria-hidden="true">&#8943;</span></button>` : ''}
       </div>`;
     // ── NO SE DECIDE «VACÍO» ANTES DE SABERLO ───────────────────────────────
     // Con sesión y la lectura de documentos de ESTA cuenta todavía en vuelo (o sin lanzar), cero
@@ -26160,7 +26247,7 @@ function _renderWorkspaceHome(metrics) {
       </section>`;
     const _nDocs = tplList.concat(toolList).reduce((n, it) => n + it.docs.length, 0);
 
-    panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}" data-wsmse-docs="${_nDocs}"${_unknown ? ` data-wsmse-state="${_unknown}"` : ''}>
+    panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}" data-wsmse-ndocs="${_nDocs}"${_unknown ? ` data-wsmse-state="${_unknown}"` : ''}>
       ${column('wsmse2_tpl_title', tplList, ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
       ${column('wsmse2_tool_title', toolList, ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
     </div>`;
@@ -26745,7 +26832,8 @@ function _wsbTwoWayInnerHtml() {
   // tecla igual que el resultado, pero en su propio contenedor, y así el estado
   // («sin guardar» / «cambios pendientes») no puede quedarse contando una
   // historia vieja junto a una cifra nueva.
-  return `${head}${_wsCcyRowHtml('scenario', _wsbEditId || '', _wsbDocCcy(), _wsbCcyEditable())}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div><div data-wsb2-savebar>${_wsbSaveBarHtml()}</div>`;
+  // §C — la moneda vive con los demás parámetros COMUNES (tarjeta de parámetros), no sola aquí.
+  return `${head}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div><div data-wsb2-savebar>${_wsbSaveBarHtml()}</div>`;
 }
 // La SALIDA, aparte: es lo único que se repinta mientras se teclea, así que el
 // campo enfocado nunca puede ser el nodo reemplazado.
@@ -27026,6 +27114,7 @@ function _renderScenarioBuilder() {
             la vista — lo encontró la QA visual. Se reserva el contenedor siempre y
             se rellena (o se vacía) desde el mismo owner que recompone la
             comparación, así que no puede quedar desincronizado. */''}
+      ${_wsCcyRowHtml('scenario', _wsbEditId || '', _wsbDocCcy(), _wsbCcyEditable())}
       <div data-wsb-basenote>${!cmp.base.known ? `<p class="wsb-note is-warn">${esc(t('wsb_base_missing'))}</p>` : ''}</div>
       <details class="wstool-asm">
         <summary class="wstool-asm-sum">${esc(t('wstool_asm_title'))}</summary>
@@ -28984,6 +29073,13 @@ function _wsEditKeysWireOnce() {
     // La tarjeta de inmueble es role=button: Enter y Espacio la abren como un botón.
     if (el.classList && el.classList.contains('wsre-card') && el.getAttribute('data-wsre-act') === 'detail' && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault(); _wsReAct('detail', el.getAttribute('data-wsre-id'));
+      return;
+    }
+    // Las tarjetas de Mi espacio y del catálogo son `role="button"` sobre un <div>: Enter y
+    // Espacio las activan como un botón (el clic delegado hace el resto, mismo owner).
+    if ((e.key === 'Enter' || e.key === ' ') && el.getAttribute && el.getAttribute('role') === 'button' && el.tagName !== 'BUTTON'
+        && el.closest && el.closest('#aurixWorkspace') && (el.hasAttribute('data-wsmse-capopen') || el.hasAttribute('data-wsh-cta') || el.hasAttribute('data-wsh-lock') || el.hasAttribute('data-wsx-open'))) {
+      e.preventDefault(); el.click();
     }
   });
   document.addEventListener('input', e => {
@@ -29459,11 +29555,14 @@ function _wsToolSaveBarHtml() {
         <button type="button" class="wsg-menu-item" data-wstool-saveas>${esc(t('wstool_saveas'))}</button>
         <button type="button" class="wsg-menu-item" data-wstool-rename>${esc(t('wsg_act_rename'))}</button>
         <button type="button" class="wsg-menu-item is-danger" data-wstool-delete>${esc(t('wstool_delete'))}</button>` : '';
-  const lifecycle = (_openItem || _lifeItems) ? `
+  // El acceso a ESTA capacidad en el Dashboard, como acto explícito (no lo implica guardar).
+  const _capRef = _wsCanonRef('tool', _wsToolActive);
+  const _dashItem = _capRef ? `<button type="button" class="wsg-menu-item" data-wscap-dash="${esc(_capRef)}">${esc(t(_wsIsDashTool(_capRef) ? 'wscap_dash_remove' : 'wscap_dash_add'))}</button>` : '';
+  const lifecycle = (_openItem || _lifeItems || _dashItem) ? `
     <details class="wsg-menu">
       <summary class="wsg-menu-sum" aria-label="${esc(t('wsg_more_aria'))}"><span aria-hidden="true">···</span></summary>
       <div class="wsg-menu-body" role="group" aria-label="${esc(t('wsg_more_aria'))}">
-        ${_openItem}${_lifeItems}
+        ${_openItem}${_lifeItems}${_dashItem}
       </div>
     </details>` : '';
   return `
@@ -31304,7 +31403,15 @@ function _wsRecvDemo() {
 }
 function _wsReceivablesDefaults() { return { items: _wsRecvDemo() }; }
 function _wsRecvProps() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.items)) _wsToolInputs = _wsReceivablesDefaults(); return _wsToolInputs.items; }
-function _wsRecvRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderReceivablesTool(); _wshReveal(c); } }
+// §C · el historial de cobros va PLEGADO en la consulta habitual; el que el usuario abrió (o el
+// del registro al que acaba de añadir un cobro) sigue abierto tras repintar.
+var _wsRecvHistOpen = new Set();
+function _wsRecvRerender() {
+  const c = document.getElementById('aurixWorkspace');
+  if (!c) return;
+  try { c.querySelectorAll('details[data-wsrecv-hist]').forEach(d => { const id = d.getAttribute('data-wsrecv-hist'); if (d.open) _wsRecvHistOpen.add(id); else _wsRecvHistOpen.delete(id); }); } catch (_) {}
+  c.innerHTML = _renderReceivablesTool(); _wshReveal(c);
+}
 function _wsRecvCommit() { _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); }
 function _wsRecvOnInput(el) {
   if (!_wsRecvDraft) _wsRecvDraft = _wsRecvNewDraft();
@@ -31422,6 +31529,8 @@ function _wsRecvPaySave() {
   it.payments = next; it.paidAmount = next.reduce((s, p) => s + p.amount, 0); it.updatedAt = Date.now();
   _wsRecvPayId = null; _wsRecvPayToken = null;
   _wsRecvCommit(); _wsRecvRerender();
+  // El cobro recién registrado se VE: su historial queda abierto.
+  try { const d = document.querySelector('details[data-wsrecv-hist="' + id + '"]'); if (d) { d.open = true; _wsRecvHistOpen.add(id); } } catch (_) {}
   _wsFocusInView('[data-wsrecv-card="' + id + '"]', null);
   return true;
 }
@@ -31507,7 +31616,7 @@ function _wsRecvHistHtml(it) {
   const rows = it.payments.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || (a.at - b.at)).map(p => `
           <li class="wsrecv-hist-row"><span class="wsrecv-hist-d">${esc(p.date ? _wsRecvDateText(p.date) : t('wsrecv_hist_nodate'))}</span><b>${esc(_wsMoney(p.amount))}</b>
             <button type="button" class="wsrecv-hist-x" data-wsrecv-paydel="${esc(p.id)}" data-wsrecv-id="${esc(it.id)}" aria-label="${esc(String(t('wsrecv_hist_del')).replace('{a}', _wsMoney(p.amount)))}" title="${esc(t('wsrecv_hist_del_t'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></li>`).join('');
-  return `<div class="wsrecv-hist"><p class="wsrecv-hist-t">${esc(t('wsrecv_hist_title'))} · ${it.payments.length}</p><ul class="wsrecv-hist-list">${rows}</ul></div>`;
+  return `<details class="wsrecv-hist" data-wsrecv-hist="${esc(it.id)}"${_wsRecvHistOpen.has(it.id) ? ' open' : ''}><summary class="wsrecv-hist-t">${esc(t('wsrecv_hist_title'))} · ${it.payments.length}</summary><ul class="wsrecv-hist-list">${rows}</ul></details>`;
 }
 function _wsRecvCardHtml(it) {
   const esc = _intccEsc;
@@ -31737,8 +31846,8 @@ function _wsLoanOutHtml(inp) {
     <div class="wsloan-kpis">
       <div class="wsloan-kpi" data-ws-accent="out"><span class="wsloan-kpi-v">${esc(_wsMoney(res.totalInterest))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_interest'))}</span></div>
       <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(_wsMoney(res.totalPaid))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_total'))}</span></div>
-      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${_wsLoanPct(res.annual)}%</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_rate'))}</span></div>
-      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${res.years}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_years'))}</span></div>
+      ${/* §C · tipo y duración ya están a la vista en sus propios campos: repetirlos en dos
+            tarjetas grandes era altura sin información. Quedan cuota, intereses y total. */''}
     </div>
     <div class="wsloan-split">
       ${_wsLoanDonutHtml(res)}
