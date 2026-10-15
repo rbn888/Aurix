@@ -240,7 +240,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // lectura (con su proporción sobre ingresos) y el «no es un gasto» va al acordeón.
     ok(`${T} …una sola conclusión con su proporción sobre ingresos; el tratamiento, en el acordeón`, r.free === '' && r.readings.length === 1 && /37%/.test(r.readings[0]) && /no aparece en el reparto/.test(r.basisAcc), JSON.stringify([r.free, r.readings, r.basisAcc.slice(0, 80)]));
     ok(`${T} la leyenda dice sobre qué se calcula el %, y suma ≈ 100`, /total de gastos/.test(r.basis) && r.pctSum >= 98 && r.pctSum <= 102, r.basis + ' / ' + r.pctSum);
-    ok(`${T} el disponible no se rotula como «ahorro»`, /de tus ingresos/.test(r.sub) && !/ahorro/.test(r.sub), r.sub);
+    // Final polish: la proporción vive sólo en la lectura; el KPI no la repite ni la llama «ahorro».
+    ok(`${T} el disponible no se rotula como «ahorro» y su % no se repite bajo el KPI`, !r.sub && r.readings.length === 1 && !/ahorro/.test(r.readings[0]), JSON.stringify([r.sub, r.readings]));
     await ctx.close();
   }
 

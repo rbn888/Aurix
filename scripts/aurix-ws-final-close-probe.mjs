@@ -433,6 +433,90 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await ctx.close();
   }
 
+  // ═════════════════ §I · WORKSPACE FINAL POLISH ═════════════════
+  for (const [W, H, L] of [[390, 844, 'es'], [1440, 900, 'en']]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: W < 800 });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    const SI = JSON.parse(JSON.stringify(SEED_A));
+    SI.aurix_ws_projects_v1.push(DOC('ws4_rcv1', 'receivables_app', 'Clientes', { inputs: { currency: 'EUR', items: [
+      { id: 'a', personOrCompany: 'Norte', concept: 'Web', units: 1, unitPrice: 1800, paidAmount: 0, payments: [], dueDate: '' },
+      { id: 'b', personOrCompany: 'Alba', concept: 'Logo', units: 1, unitPrice: 450, paidAmount: 450, payments: [{ id: 'p0', amount: 450, date: '2026-10-01', at: 1 }], dueDate: '' } ] } }));
+    SI.aurix_ws_projects_v1.push(DOC('ws4_jrn1', 'trade_journal', 'Trading', { inputs: { currency: 'EUR', trades: [
+      { id: 't1', asset: 'NVDA', atype: 'stock', buy: 90, sell: 119, qty: 20, fee: 5, currency: 'EUR' },
+      { id: 't2', asset: 'NVDA', atype: 'stock', buy: 130, sell: 121, qty: 10, fee: 5, currency: 'EUR' },
+      { id: 't3', asset: 'BTC', atype: 'crypto', buy: 52000, sell: 61000, qty: 0.5, fee: 20, currency: 'EUR' } ] } }));
+    SI.aurix_ws_goals_v1 = [{ id: 'wsg_1', type: 'emergency', name: 'Colchón', target: '12000', current: '4500', monthly: '300', targetYear: '2030', mode: 'manual', currency: 'EUR', createdAt: 1, updatedAt: 2, revision: 1 }];
+    await boot(p, { seed: SI, lang: L });
+    const T = ENG + '.§I' + W + L;
+    await p.evaluate(`switchTab('workspace')`); await p.waitForTimeout(400);
+    // ── Cobros
+    await p.evaluate(`_wsOpenTool('receivables','ws4_rcv1')`); await p.waitForTimeout(400);
+    const rv = await J(p, `var lb=document.querySelector('.wsrecv-listbar'); var cards=[].slice.call(document.querySelectorAll('[data-wsrecv-card]')); var xs={}; cards.forEach(function(c){ xs[Math.round(c.getBoundingClientRect().left)]=1; });
+      var pend=document.querySelector('[data-wsrecv-card="a"] .wsrecv-amt.is-pending b'); var zero=document.querySelector('[data-wsrecv-card="b"] .wsrecv-amt.is-pending b');
+      return { newInBar: !!(lb && lb.querySelector('[data-wsnew-focus]')), cols: Object.keys(xs).length, pend: getComputedStyle(pend).color, zero: getComputedStyle(zero).color, txt: getComputedStyle(document.querySelector('.wsrecv-who')).color, sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
+    ok(`${T} Cobros: Nuevo cobro junto a filtros/búsqueda, una columna, pendiente (normal y 0) en tono neutro`, rv.newInBar && rv.cols === 1 && rv.pend === rv.zero && rv.sw, JSON.stringify(rv));
+    await p.locator('[data-wsrecv-act="pay"][data-wsrecv-id="a"]').click(); await p.waitForTimeout(250);
+    const f1 = await J(p, `return document.activeElement && document.activeElement.hasAttribute('data-wsrecv-pay-amt')`);
+    ok(`${T} Cobros: registrar pago enfoca el importe`, f1 === true);
+    await p.fill('[data-wsrecv-pay-amt]', '300'); await p.locator('[data-wsrecv-pay-cancel]').click(); await p.waitForTimeout(250);
+    const c1 = await J(p, `var it=_wsToolInputs.items.find(function(x){return x.id==='a'}); return { pays: (it.payments||[]).length, focus: !!(document.activeElement && document.activeElement.getAttribute('data-wsrecv-act')==='pay') }`);
+    ok(`${T} Cobros: cancelar no muta y devuelve el foco al disparador`, c1.pays === 0 && c1.focus, JSON.stringify(c1));
+    await p.locator('[data-wsrecv-act="pay"][data-wsrecv-id="a"]').click(); await p.waitForTimeout(200);
+    await p.fill('[data-wsrecv-pay-amt]', '500');
+    await p.evaluate(`var b=document.querySelector('[data-wsrecv-pay-save]'); b.click(); _wsRecvPaySave(); b && b.click();`); await p.waitForTimeout(250);
+    const c2 = await J(p, `var it=_wsToolInputs.items.find(function(x){return x.id==='a'}); var card=document.querySelector('[data-wsrecv-card="a"]'); return { pays: it.payments.length, paid: it.paidAmount, open: !!card.querySelector('details.wsrecv-hist[open]'), hb: Math.round(document.querySelector('[data-wsrecv-card="b"]').getBoundingClientRect().height) }`);
+    ok(`${T} Cobros: pago parcial sin duplicar (doble toque) y su historial abierto bajo su registro`, c2.pays === 1 && c2.paid === 500 && c2.open, JSON.stringify(c2));
+    await p.evaluate(`_wsToolCommit(null,false); _wsOpenTool('receivables','ws4_rcv1')`); await p.waitForTimeout(300);
+    const c3 = await J(p, `var it=_wsToolInputs.items.find(function(x){return x.id==='a'}); return it.paidAmount`);
+    ok(`${T} Cobros: guardar y reabrir conserva el pago`, c3 === 500, String(c3));
+    // ── Diario
+    await p.evaluate(`_wsOpenTool('journal','ws4_jrn1')`); await p.waitForTimeout(300);
+    const jr = await J(p, `var lbl=[].slice.call(document.querySelectorAll('.wsjrn-bar-lbl')).map(function(e){return e.textContent}); var val=[].slice.call(document.querySelectorAll('.wsjrn-bar-val')).map(function(e){return e.textContent});
+      var rows=[].slice.call(document.querySelectorAll('.wsjrn-card .wsjrn-ret')).map(function(e){return e.textContent}); var sc=document.querySelector('.wsjrn-sumcard'), fm=document.querySelector('.wsjrn-2col');
+      return { lbl: lbl, val: val, rows: rows, sumFirst: !!(sc && fm && sc.getBoundingClientRect().top < fm.getBoundingClientRect().top) }`);
+    ok(`${T} Diario: resumen arriba; una barra por operación cerrada, tickers repetidos distinguidos y valores = los de la lista`, jr.sumFirst && jr.lbl.join() === 'NVDA·1,NVDA·2,BTC' && jr.val.join() === jr.rows.join(), JSON.stringify(jr));
+    await p.evaluate(`_wsJrnDraft = Object.assign(_wsJrnNewDraft(), { asset: 'ETH', buy: '2000', sell: '2400', qty: '1', fee: '0' }); _wsJrnAdd();`); await p.waitForTimeout(200);
+    const j2 = await J(p, `return { n: _wsToolInputs.trades.length, bars: document.querySelectorAll('.wsjrn-bar').length }`);
+    ok(`${T} Diario: crear operación actualiza lista y gráfico (gráfico = registros)`, j2.n === 4 && j2.bars === 4, JSON.stringify(j2));
+    // ── Préstamos e interés compuesto: mismos inputs → mismos resultados; precisión coherente
+    await p.evaluate(`_wsOpenTool('loan'); Object.assign(_wsToolInputs, { principal: '180000', rate: '3,25', years: '30', fees: '0', insurance: '0' }); _wsToolRepaint();`); await p.waitForTimeout(250);
+    const ln = await J(p, `var r=calculateLoan(_wsToolInputs); _wsToolCommit('Hipoteca', true); var d=_ws4Projects().find(function(x){return x.customName==='Hipoteca'}); var doc=_wsToolDocSummary(d);
+      return { pay: Math.round(r.monthlyPayment*100)/100, saved: d.results.monthlyPayment, doc: doc[0] && doc[0].v, hero: document.querySelector('.wsloan-hero-v').textContent, cmpIn: !!document.querySelector('.wsloan-inputs-card [data-wsloan-cmp-card]'), emptyCard: !!document.querySelector('.wsloan-cmp-card') }`);
+    ok(`${T} Préstamos: cuota idéntica (783,37), guardada al céntimo y el documento dice la misma cifra; Comparar junto a los parámetros`, ln.pay === 783.37 && ln.saved === 783.37 && /783[.,]37/.test(ln.doc) && /783[.,]37/.test(ln.hero) && ln.cmpIn && !ln.emptyCard, JSON.stringify(ln));
+    await p.evaluate(`_wsOpenTool('compound'); Object.assign(_wsToolInputs, { initial: '1000', monthly: '300', ret: '6', years: '20' }); _wsToolRepaint();`); await p.waitForTimeout(250);
+    const cp = await J(p, `var cells=[].slice.call(document.querySelectorAll('.wstool-res-cell')).map(function(c){return c.textContent.replace(/\\s+/g,' ').trim()}); _wsToolCommit('Plan', true); var d=_ws4Projects().find(function(x){return x.customName==='Plan'}); var doc=_wsToolDocSummary(d).map(function(x){return x.k+'='+x.v});
+      return { cells: cells, contrib: d.results.contributedOnly, invested: d.results.contributed, doc: doc, legend: (document.querySelector('.wsp-leg.is-cons')||{}).textContent }`);
+    const contribLbl = L === 'es' ? 'Aportaciones periódicas' : 'Periodic contributions', invLbl = L === 'es' ? 'Capital invertido total' : 'Total invested capital';
+    ok(`${T} Interés compuesto: 72.000 = aportaciones periódicas, 73.000 = capital invertido total (resultado y documento)`,
+      cp.contrib === 72000 && cp.invested === 73000 && cp.cells.some(c => c.indexOf(contribLbl) >= 0 && /72[.,]000/.test(c)) && cp.doc.some(x => x.indexOf(invLbl) === 0 && /73[.,]000/.test(x)), JSON.stringify(cp));
+    // ── Objetivos
+    await p.evaluate(`_wsOpenSurface('goals')`); await p.waitForTimeout(300);
+    const g1 = await J(p, `var c=document.querySelector('.wssi.wsg-card'); var k=[].slice.call(c.querySelectorAll('.wssi-sum .wssi-kpi')).map(function(e){return e.textContent.replace(/\\s+/g,' ').trim()});
+      var nd=document.querySelector('details.wsg-newgoal'); return { k: k, collapsed: !!nd && !nd.open, bg: getComputedStyle(c).backgroundImage.indexOf('gradient') >= 0 }`);
+    ok(`${T} Objetivos: cerrada con actual/meta, % y fecha estimada; creación plegada bajo «Nuevo objetivo»; fondo azul profundo`, g1.k.length === 3 && /12[.,]000/.test(g1.k[0]) && /38%/.test(g1.k[1]) && /~ \d{4}/.test(g1.k[2]) && g1.collapsed && g1.bg, JSON.stringify(g1));
+    await p.evaluate(`document.querySelector('.wssi.wsg-card').open = true`); await p.waitForTimeout(100);
+    const g2 = await J(p, `var c=document.querySelector('.wssi.wsg-card'); var labels=[].slice.call(c.querySelectorAll('.ws4-row-label')).map(function(e){return e.textContent}); return { labels: labels, fund: !!c.querySelector('.wsfund-block.is-compact') }`);
+    const etaLbl = L === 'es' ? 'Fecha estimada' : 'Estimated date', desLbl = L === 'es' ? 'Fecha deseada' : 'Desired date';
+    ok(`${T} Objetivos: filas al abrir = restante + fecha deseada (+ ritmo), sin «${etaLbl}» repetida`, g2.labels.indexOf(etaLbl) < 0 && g2.labels.indexOf(desLbl) >= 0 && g2.fund, JSON.stringify(g2));
+    await p.evaluate(`var d=document.querySelector('details.wsg-newgoal'); d.open=true; d.querySelector('[data-wsg-form="name"]').value='Borrador'; d.open=false; d.open=true;`);
+    const g3 = await J(p, `return document.querySelector('details.wsg-newgoal [data-wsg-form="name"]').value`);
+    ok(`${T} Objetivos: plegar «Nuevo objetivo» no borra el borrador`, g3 === 'Borrador', g3);
+    // ── Presupuesto
+    await p.evaluate(`_wsOpenTool('budget','ws4_bud1')`); await p.waitForTimeout(300);
+    const b1 = await J(p, `return { sub: !!document.querySelector('.wsbud-kpi-sub'), reading: document.querySelectorAll('.wsbud-reading').length, add: document.querySelectorAll('.wsbud-blockhead [data-wsbud-add]').length }`);
+    ok(`${T} Presupuesto: sin % repetido bajo el KPI, una lectura, Añadir en cabeceras`, !b1.sub && b1.reading === 1 && b1.add === 2, JSON.stringify(b1));
+    // ── Portadas de Tus planes
+    await p.evaluate(`switchTab('home')`); await p.waitForTimeout(900); await p.evaluate(`updateDashboardPlans(); document.getElementById('wsPlansSection').scrollIntoView()`); await p.waitForTimeout(1200);
+    const pc = await J(p, `return [].slice.call(document.querySelectorAll('#wsPlansSection .wspl-cover')).map(function(c){ var r=c.getBoundingClientRect(); var img=c.querySelector('img.ws-asset-img'); return { ratio: +(r.width/r.height).toFixed(2), h: Math.round(r.height), fit: img ? getComputedStyle(img).objectFit : 'svg' }; })`);
+    ok(`${T} portadas de Tus planes: completas (contain), proporción 16:9, ≤96 px de alto`, pc.length > 0 && pc.every(x => (x.fit === 'contain' || x.fit === 'svg') && x.ratio > 1.7 && x.ratio < 1.85 && x.h <= 96), JSON.stringify(pc));
+    await p.evaluate(`switchTab('workspace'); _wsTab='tools'; _wshView='home'; _wshRepaintHome();`); await p.waitForTimeout(700);
+    const cat = await J(p, `var img=document.querySelector('.wsh-toolcard img.ws-asset-img'); return img ? getComputedStyle(img).objectFit : null`);
+    ok(`${T} catálogo intacto (sus portadas siguen en cover)`, cat === 'cover', String(cat));
+    if (SHOTS) await shot(p, 'polish-' + W + L);
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ═════════════════ §F · DOCUMENTO LEGACY SIN MONEDA ═════════════════
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });

@@ -513,7 +513,8 @@ section('12 · Cierre V2 · el título identifica y el Diario entra en el armaz�
   // Cuarto consumidor del armazón. Y la condición: sin resumen NO se usa, porque una rejilla de
   // dos columnas con una vacía es un hueco.
   ok('12.2 el Diario usa el armazón compartido cuando hay algo que resumir',
-    /res\.list\.length \? `<div class="ws2col">/.test(jrn) &&
+    // Final polish: el RESUMEN sube a lo ancho; registro y gráfico comparten el armazón.
+    /res\.closedCount \? `<div class="ws2col wsjrn-2col">/.test(jrn) && /wsjrn-sumcard/.test(jrn) &&
     /ws2col-edit">\$\{_wsJrnFormHtml\(\)\}/.test(jrn) && /ws2col-view/.test(jrn));
   ok('12.3 …y sin resumen no lo usa: el formulario va a ancho completo',
     /` : _wsJrnFormHtml\(\)\}/.test(jrn));

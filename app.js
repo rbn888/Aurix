@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '788'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '789'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6742,6 +6742,7 @@ const T = {
     wsg_type_home: 'Vivienda', wsg_type_fire: 'FIRE', wsg_type_free: 'Objetivo libre',
     wsg_r_target: 'Cantidad objetivo', wsg_r_current: 'Cantidad actual', wsg_r_remaining: 'Distancia restante',
     wsg_r_eta: 'Fecha estimada', wsg_r_required: 'Ritmo necesario',
+    wsg_r_desired: 'Fecha deseada', wsg_k_progress: 'Actual / meta', wsg_new_goal: 'Nuevo objetivo',
     // `wsg_r_years` se USABA y no estaba DEFINIDA: `t()` devolvía `undefined` y el resultado
     // publicaba «28 años» SIN ROTULO — una cifra sin decir de qué es, en una superficie Premium
     // publicada. Lo destapó la captura, no un assert. Es el tercer caso de este linaje en la
@@ -6962,6 +6963,7 @@ const T = {
     wspl_m_overdue:       'Vencido',
     wspl_spend:           'Reparto de gastos',
     wspl_share_contrib:   'aportado',
+    wspl_share_invested:  'invertido',
     wspl_share_growth:    'crecimiento',
     wspl_share_principal: 'capital',
     wspl_share_interest:  'intereses',
@@ -6996,7 +6998,9 @@ const T = {
     wstool_in_years:      'Tiempo',
     wstool_unit_years:    'años',
     wstool_res_final:     'Capital final estimado',
-    wstool_res_contrib:   'Capital aportado',
+    wstool_res_contrib:   'Aportaciones periódicas',
+    wstool_res_invested:  'Capital invertido total',
+    wstool_legend_invested: 'Capital invertido',
     // §A/§B — los supuestos de una proyección, dichos por su nombre.
     wstool_res_initial:        'Capital inicial',
     wstool_asm_title:          'Supuestos de este cálculo',
@@ -10038,6 +10042,7 @@ const T = {
     wsg_type_home: 'Home', wsg_type_fire: 'FIRE', wsg_type_free: 'Custom goal',
     wsg_r_target: 'Target amount', wsg_r_current: 'Current amount', wsg_r_remaining: 'Remaining distance',
     wsg_r_eta: 'Estimated date', wsg_r_required: 'Required pace',
+    wsg_r_desired: 'Desired date', wsg_k_progress: 'Current / target', wsg_new_goal: 'New goal',
     wsg_r_years: 'Estimated time',
     wsg_sync_on: w => `Current amount synced with your real wealth (${w}).`,
     wsg_read_reached: 'Goal reached.',
@@ -10229,6 +10234,7 @@ const T = {
     wspl_m_overdue:       'Overdue',
     wspl_spend:           'Spending breakdown',
     wspl_share_contrib:   'contributed',
+    wspl_share_invested:  'invested',
     wspl_share_growth:    'growth',
     wspl_share_principal: 'principal',
     wspl_share_interest:  'interest',
@@ -10263,7 +10269,9 @@ const T = {
     wstool_in_years:      'Time',
     wstool_unit_years:    'years',
     wstool_res_final:     'Estimated final capital',
-    wstool_res_contrib:   'Capital contributed',
+    wstool_res_contrib:   'Periodic contributions',
+    wstool_res_invested:  'Total invested capital',
+    wstool_legend_invested: 'Invested capital',
     wstool_res_initial:        'Initial capital',
     wstool_asm_title:          'Assumptions behind this figure',
     wstool_asm_rate:           'Assumed return: {r}% a year',
@@ -25141,7 +25149,8 @@ function _wsPlanMetrics(p) {
     if (p.type === 'loan_simulation') {
       const r = p.results || {};
       if (!Number.isFinite(Number(r.monthlyPayment))) return [];
-      const out = [m('wspl_m_payment', _wsPlanMoney(r.monthlyPayment, _PCCY))];
+      // La cuota con céntimos cuando el documento los guardó (misma cifra que la herramienta).
+      const out = [m('wspl_m_payment', r.precision === 2 ? _wsMoneyIn(Number(r.monthlyPayment), _PCCY) : _wsPlanMoney(r.monthlyPayment, _PCCY))];
       if (Number.isFinite(Number(r.totalInterest))) out.push(m('wspl_m_interest', _wsPlanMoney(r.totalInterest, _PCCY)));
       return out;
     }
@@ -25248,7 +25257,7 @@ function _wsPlanShare(p) {
     if (spec.share === 'compound') {
       const a = fin(res.contributed), b = fin(res.interest), f = fin(res.final);
       if (a == null || b == null || f == null || a < 0 || b < 0 || !((a + b) > 0) || Math.abs(a + b - f) > 2) return null;
-      return { a: a, b: b, ka: 'wspl_share_contrib', kb: 'wspl_share_growth' };
+      return { a: a, b: b, ka: 'wspl_share_invested', kb: 'wspl_share_growth' };
     }
     if (spec.share === 'loan') {
       const a = fin(res.principal), b = fin(res.totalInterest);
@@ -28127,12 +28136,13 @@ function _wsgCardOutHtml(g, prog) {
   // que es peor. Un importe ausente se escribe con el guion, que es la convención
   // declarada del producto para un dato que no existe.
   const money = v => (v == null || !Number.isFinite(Number(v))) ? '—' : _wsgMoney(g, v);
+  // Final polish — meta, actual y fecha estimada ya están en la fila de la tarjeta: aquí sólo lo
+  // que NO está ahí (restante, la fecha DESEADA si se declaró —distinta de la estimada— y el ritmo).
   const rows = [
-    { label: t('wsg_r_target'),    value: money(prog.target) },
-    { label: t('wsg_r_current'),   value: money(prog.current) },
     { label: t('wsg_r_remaining'), value: money(prog.remaining) },
-    { label: t('wsg_r_eta'),       value: prog.etaYear ? '~ ' + prog.etaYear : t('wsh_none') },
   ];
+  if (!prog.etaYear) rows.push({ label: t('wsg_r_eta'), value: t('wsh_none') });
+  if (hasDate && g.targetYear) rows.push({ label: t('wsg_r_desired'), value: String(g.targetYear) });
   if (hasDate && prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: money(prog.requiredMonthly) + t('ws4_permonth') });
   return `
     <div class="wsg-state-row">
@@ -28201,6 +28211,19 @@ function _wsFundBlockHtml(g) {
   const lastHtml = last
     ? `<div class="wsfund-last"><span class="wsfund-last-lbl">${esc(t('wsfund_last_lbl'))}</span><span class="wsfund-last-amt is-${last.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(last, g)}</span><span class="wsfund-last-meta">${esc(_wsFundAgo(last.createdAt))}${last.note ? ' · ' + esc(last.note) : ''}</span></div>`
     : `<div class="wsfund-last is-empty">${esc(t('wsfund_none'))}</div>`;
+  // Final polish — sin movimientos, un bloque COMPACTO (importe asignado + Asignar fondos); el
+  // detalle (barra, último movimiento, lista) sólo cuando hay algo que detallar. Los fondos
+  // asignados siguen siendo un dato SEPARADO de la cantidad declarada: no se suman.
+  if (!f.movementCount) {
+    return `
+    <div class="wsfund-block is-compact">
+      <div class="wsfund-head">
+        <span class="wsfund-title">${esc(t('wsfund_assigned'))}</span>
+        <span class="wsfund-amount">${esc(_wsgMoney(g, f.totalAssigned))}</span>
+      </div>
+      <button type="button" class="wsh-cta wsfund-btn" data-wsfund-open="${esc(g.id)}">${esc(t('wsfund_assign'))}</button>
+    </div>`;
+  }
   const hist = f.movements.slice(0, 3).map(m => `<li class="wsfund-mv"><span class="wsfund-mv-amt is-${m.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(m, g)}</span><span class="wsfund-mv-note">${esc(m.note || t('wsfund_mv_default'))}</span></li>`).join('');
   const more = f.movementCount > 3 ? `<li class="wsfund-more">${esc(t('wsfund_more')(f.movementCount - 3))}</li>` : '';
   return `
@@ -28267,7 +28290,10 @@ function _wsFundModal(goalId) {
   requestAnimationFrame(() => ov.classList.add('is-open'));
 }
 
+var _wsgNewOpen = false;
 function _renderGoals() {
+  // El estado del desplegable «Nuevo objetivo» sobrevive a un repintado.
+  try { const d = document.querySelector('.wsh-wsg details.wsg-newgoal'); if (d) _wsgNewOpen = d.open; } catch (_) {}
   const esc = _intccEsc;
   const goals = _wsgGoals();
   const real = _ws4Real();
@@ -28312,7 +28338,14 @@ function _renderGoals() {
     // ningún assert de cálculo se enterara.
     // ABIERTA la que se acaba de crear —para que su pregunta de Dashboard se vea— y la que tiene
     // cambios sin guardar, porque plegar trabajo a medias lo esconde.
-    const kpis = [{ k: t('wspl_m_target'), v: Number.isFinite(Number(g.target)) && Number(g.target) > 0 ? _wsgMoney(g, g.target) : '' }];
+    // Final polish — la tarjeta CERRADA dice lo que importa: actual / meta, progreso y la fecha
+    // ESTIMADA sólo si el motor la da. Al abrirla no se repite (ver `_wsgCardOutHtml`).
+    const _okT = Number.isFinite(Number(prog.target)) && Number(prog.target) > 0;
+    const kpis = [
+      { k: t('wsg_k_progress'), v: _okT ? (_wsgMoney(g, prog.current) + ' / ' + _wsgMoney(g, prog.target)) : '' },
+      { k: '', v: _okT ? (prog.pct + '%') : '' },
+      { k: t('wsg_r_eta'), v: prog.etaYear ? '~ ' + prog.etaYear : '' },
+    ];
     const inner = `
         <div class="wsg-card-head">
           ${AURIX_WS_USE_REAL_DATA ? `<div class="ws4-modes wsg-modes">
@@ -28369,11 +28402,16 @@ function _renderGoals() {
               56 px quedaba como una caja de 750 px vacía. Lo destapó la captura. */''}
         <div class="wsg-stack">${listInner}</div>
       </section>` : '';
+  // Final polish — con objetivos, la creación va plegada bajo «Nuevo objetivo» (<details> nativo:
+  // plegar no borra lo escrito, el formulario sigue en el DOM). Sin objetivos, formulario directo.
+  const createBlock = goals.length
+    ? `<details class="wsg-newgoal"${_wsgNewOpen ? ' open' : ''}><summary class="wsh-cta wsg-newgoal-sum">+ ${esc(t('wsg_new_goal'))}</summary>${createCard}</details>`
+    : createCard;
   return `
     <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">
       ${_wsSurfaceHeadHtml({ title: t('wsg_title'), help: [t('wsg_subtitle')] })}
       ${listCard}
-      ${createCard}
+      ${createBlock}
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
 }
@@ -29268,11 +29306,17 @@ function _wsToolDocSummary(p) {
       // CLAVES REALES, no inventadas. La primera versión usaba `wstool_r_final` y
       // `wsloan_r_monthly`, que no existen: `t()` devolvía `undefined` y la métrica salía SIN
       // etiqueta —una cifra sin decir de qué es—. Lo destapó la captura, no el assert.
-      push('wspl_m_final', money(r.final));
-      push('wstool_res_contrib', money(r.contributed));
+      // `contributed` es inicial + aportaciones: CAPITAL INVERTIDO TOTAL (73.000 con 1.000 + 300/mes
+      // × 20 años), no «aportado» (72.000), que es lo que la herramienta llama así. Precisión: la
+      // guardada (antiguos redondeados al euro, sin «,00» inventados).
+      const cm = v => (r.precision === 2 ? money(v) : ((v != null && Number.isFinite(Number(v))) ? _wsPlanMoney(v, _ccy) : null));
+      push('wspl_m_final', cm(r.final));
+      push('wstool_res_invested', cm(r.contributed));
     } else if (p.type === 'loan_simulation') {
-      push('wsloan_kpi_monthly', money(r.monthlyPayment));
-      push('wsloan_kpi_interest', money(r.totalInterest));
+      // Al céntimo si el documento lo guardó así; si es antiguo (redondeado al euro), sin decimales.
+      const lm = v => (r.precision === 2 ? money(v) : ((v != null && Number.isFinite(Number(v))) ? _wsPlanMoney(v, _ccy) : null));
+      push('wsloan_kpi_monthly', lm(r.monthlyPayment));
+      push('wsloan_kpi_interest', lm(r.totalInterest));
     } else if (p.type === 'monthly_budget') {
       push('wspl_m_income', money(r.income));
       push('wspl_m_expenses', money(r.expenses));
@@ -29429,7 +29473,12 @@ function _wsToolCommit(name, forceNew, targetId) {
   } else if (_wsToolActive === 'loan') {
     const r = calculateLoan(_wsToolInputs);
     type = 'loan_simulation';
-    results = { monthlyPayment: Math.round(r.monthlyPayment), totalInterest: Math.round(r.totalInterest), totalPaid: Math.round(r.totalPaid), principal: Math.round(r.principal), annual: r.annual, years: r.years };
+    // Final polish — la cuota se guardaba redondeada al euro (783) y la herramienta la enseña con
+    // céntimos (783,37): el documento decía «783,00 €», una precisión que no tenía. Se guarda al
+    // céntimo y se marca (`precision: 2`); los documentos antiguos se muestran redondeados de forma
+    // explícita (sin decimales), nunca con «,00» inventados. El cálculo no cambia.
+    const c2 = v => Math.round(Number(v) * 100) / 100;
+    results = { monthlyPayment: c2(r.monthlyPayment), totalInterest: c2(r.totalInterest), totalPaid: c2(r.totalPaid), principal: c2(r.principal), annual: r.annual, years: r.years, precision: 2 };
   } else if (_wsToolActive === 'receivables') {
     const r = calculateReceivables(_wsToolInputs.items);
     type = 'receivables_app';
@@ -29463,15 +29512,19 @@ function _wsToolCommit(name, forceNew, targetId) {
     // distinta de la que se está mostrando publica dos cifras para un documento.
     const pr = _wsCompoundProjection(_wsToolInputs);
     type = 'compound_growth';
+    // Final polish — al céntimo, como lo enseña la herramienta (ver Préstamos): el documento decía
+    // «139.239,00 €» frente a «139.238,73 €». `precision: 2` lo marca; los antiguos, sin decimales.
+    const c2 = v => Math.round(Number(v) * 100) / 100;
     results = {
-      final: Math.round(pr.final),
+      precision: 2,
+      final: c2(pr.final),
       // §B — los cuatro componentes SEPARADOS también en lo guardado. `contributed`
       // conserva su clave y su significado histórico (inicial + aportaciones) para
       // los consumidores que ya la leían, y el inicial se añade aparte.
-      initial: Math.round(pr.initial),
-      contributed: Math.round(pr.initial + pr.contributed),
-      contributedOnly: Math.round(pr.contributed),
-      interest: Math.round(pr.growth),
+      initial: c2(pr.initial),
+      contributed: c2(pr.initial + pr.contributed),
+      contributedOnly: c2(pr.contributed),
+      interest: c2(pr.growth),
       // Y la CONVENCIÓN con la que se calculó: sin ella, reabrir el documento otro
       // día lo recomputaría con la vigente y movería el resultado en silencio.
       convention: pr.assumptions.convention,
@@ -29698,7 +29751,7 @@ function _wsToolOutHtml(inp) {
       ${_wsToolChartHtml(res, Math.max(1, Math.round(inp.years || 0)))}
       <div class="wsp-legend">
         <span class="wsp-leg is-base">${esc(t('wstool_legend_total'))}</span>
-        <span class="wsp-leg is-cons">${esc(t('wstool_legend_contrib'))}</span>
+        <span class="wsp-leg is-cons">${esc(t('wstool_legend_invested'))}</span>
       </div>
     </div>
     ${_wsAssumptionsHtml(p)}
@@ -29718,7 +29771,7 @@ function _renderCompoundTool() {
       </span>
     </label>`;
   return `
-    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool" data-ws-accent="teal">
+    <div class="aurix-wsh wsh-tool-view wsh-cmpd-view is-revealed" data-wsh-view="tool" data-ws-accent="teal">
       ${_wsSurfaceHeadHtml({ title: t('wstool_compound_n'), doc: _wsToolDocName(), save: true, help: [t('wstool_compound_d')] })}
       ${_wsToolCcyRowHtml()}
       ${/* «DATOS DE ENTRADA» debajo de «Interés compuesto» no informaba de nada:
@@ -30081,8 +30134,9 @@ function _wsBudgetTopHtml(inp) {
               para una cifra secundaria. Aquí va pegada al disponible, que es su denominador
               natural, y se dice sobre qué se calcula. Cuando no hay ingresos no se publica un
               0 %: el motor devuelve `null` y aquí no se pinta el sufijo. */''}
-        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(_wsMoney(res.free))}</b>${
-          (res.saveRate == null || res.saveRate < 0) ? '' : `<em class="wsbud-kpi-sub">${esc(Math.round(res.saveRate) + '% ' + t('wsbud_kpi_save'))}</em>`}</span>
+        <span class="wsbud-kpi is-main" data-ws-accent="info"><i>${esc(t('wstool_bud_avail'))}</i><b class="${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(_wsMoney(res.free))}</b></span>
+        ${/* Final polish — el «40 % de tus ingresos» lo dice la lectura del reparto (la única
+              conclusión); repetirlo bajo el KPI no añadía nada. */''}
         ${/* §11 — EL PERIODO, CUARTA CELDA DEL RESUMEN. Estuvo en la línea del título y la CAPTURA
               lo tumbó: a 360 el chip dejaba «Presupuesto mensual» en una columna de 30 px —una
               letra por línea, 254 px de cabecera— y encima el mes salía truncado («sept …»), que
@@ -30631,14 +30685,24 @@ function _wsJrnChartHtml(res) {
   const W = 360, H = 140, padX = 16, midY = H / 2;
   const maxAbs = Math.max.apply(null, closed.map(x => Math.abs(x.ret)).concat([1]));
   const n = closed.length, slot = (W - 2 * padX) / n, bw = Math.min(30, slot * 0.55);
+  // Final polish — cada barra se IDENTIFICA y dice su valor exacto (el mismo `_wsJrnPct` de la
+  // lista). Un ticker repetido lleva su ordinal (NVDA·1, NVDA·2) en el orden de la lista, para
+  // que dos operaciones distintas no se lean como la misma.
+  const seen = Object.create(null), totals = Object.create(null);
+  closed.forEach(x => { const k = String(x.asset || '').slice(0, 6); totals[k] = (totals[k] || 0) + 1; });
+  const labels = closed.map(x => { const k = String(x.asset || '').slice(0, 6); seen[k] = (seen[k] || 0) + 1; return totals[k] > 1 ? k + '·' + seen[k] : k; });
   const bars = closed.map((x, i) => {
     const cx = padX + slot * i + slot / 2;
-    const h = Math.max(2, (Math.abs(x.ret) / maxAbs) * (H / 2 - 20));
+    const h = Math.max(2, (Math.abs(x.ret) / maxAbs) * (H / 2 - 26));
     const y = x.pl >= 0 ? midY - h : midY;
     const cls = x.pl >= 0 ? 'is-win' : 'is-loss';
-    return `<rect class="wsjrn-bar ${cls}" x="${(cx - bw / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3"/><text class="wsjrn-bar-lbl" x="${cx.toFixed(1)}" y="${H - 3}" text-anchor="middle">${esc(String(x.asset || '').slice(0, 4))}</text>`;
+    const vy = x.pl >= 0 ? y - 4 : y + h + 11;
+    return `<rect class="wsjrn-bar ${cls}" x="${(cx - bw / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3"/>`
+      + `<text class="wsjrn-bar-val ${cls}" x="${cx.toFixed(1)}" y="${vy.toFixed(1)}" text-anchor="middle">${esc(_wsJrnPct(x.ret))}</text>`
+      + `<text class="wsjrn-bar-lbl" x="${cx.toFixed(1)}" y="${H - 3}" text-anchor="middle">${esc(labels[i])}</text>`;
   }).join('');
-  return `<svg class="wsjrn-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wsjrn_chart_title'))}"><line class="wsjrn-axis" x1="${padX}" y1="${midY}" x2="${W - padX}" y2="${midY}"/>${bars}</svg>`;
+  const words = closed.map((x, i) => labels[i] + ' ' + _wsJrnPct(x.ret)).join(' · ');
+  return `<svg class="wsjrn-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wsjrn_chart_title') + ': ' + words)}"><line class="wsjrn-axis" x1="${padX}" y1="${midY}" x2="${W - padX}" y2="${midY}"/>${bars}</svg>`;
 }
 
 function _wsJrnSummaryHtml(res) {
@@ -30791,12 +30855,14 @@ function _renderJournalTool() {
             ahora vale igual cuando está lleno.
             SIN RESUMEN NO SE USA EL ARMAZÓN: una rejilla de dos columnas con una vacía es un
             hueco, y el formulario a ancho completo es mejor que media tarjeta al aire. */''}
-      ${res.list.length ? `<div class="ws2col">
+      ${/* Final polish — el RESUMEN arriba y a lo ancho (resultado primero); debajo, registro y
+            gráfico a la par. Sin operaciones cerradas no hay gráfico: el formulario va a lo ancho. */''}
+      ${res.list.length ? `<section class="wsh-card wstool-out-card wsjrn-sumcard">${_wsJrnSummaryHtml(res)}</section>` : ''}
+      ${res.closedCount ? `<div class="ws2col wsjrn-2col">
         <div class="ws2col-edit">${_wsJrnFormHtml()}</div>
         <div class="ws2col-view">
-          <section class="wsh-card wstool-out-card">
-            ${_wsJrnSummaryHtml(res)}
-            ${res.closedCount ? `<div class="wstool-chart wsjrn-chartbox"><span class="wsbud-chart-title">${esc(t('wsjrn_chart_title'))}</span>${_wsJrnChartHtml(res)}</div>` : ''}
+          <section class="wsh-card wsjrn-chartcard">
+            <div class="wstool-chart wsjrn-chartbox"><span class="wsbud-chart-title">${esc(t('wsjrn_chart_title'))}</span>${_wsJrnChartHtml(res)}</div>
           </section>
         </div>
       </div>` : _wsJrnFormHtml()}
@@ -31736,8 +31802,9 @@ function _renderReceivablesTool() {
       ${_wsToolCcyRowHtml()}
       ${r.list.length ? `<section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>` : ''}
       <section class="wsh-card wsrecv-list-card">
-        <header class="wsh-head wsh-head-act"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3>${r.list.length ? _wsNewBtnHtml(t('wsrecv_add'), '.wsrecv-form-card', '[data-wsrecv-input="personOrCompany"]') : ''}</header>
-        ${r.list.length ? `<div class="wsrecv-listbar">${_wsRecvFilterHtml(r)}<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search aria-label="${esc(t('wsrecv_search'))}" placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}"></div>` : ''}
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
+        ${/* Final polish — filtros, búsqueda y «Nuevo cobro» en UNA barra. */''}
+        ${r.list.length ? `<div class="wsrecv-listbar">${_wsRecvFilterHtml(r)}<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search aria-label="${esc(t('wsrecv_search'))}" placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}">${_wsNewBtnHtml(t('wsrecv_add'), '.wsrecv-form-card', '[data-wsrecv-input="personOrCompany"]')}</div>` : ''}
         <div data-wsrecv-list>${_wsRecvListHtml(r)}</div>
       </section>
       ${_wsRecvFormHtml()}
@@ -32020,6 +32087,9 @@ function _renderLoanTool() {
               ${field('fees', t('wsloan_in_fees'), _wsToolCcy())}
               ${field('insurance', t('wsloan_in_insurance'), _wsToolCcy())}
             </div>
+            ${/* Final polish — «Comparar escenario» vive con los parámetros que compara; era una
+                  tarjeta propia casi vacía. Sigue fuera de [data-wstool-out] (no pierde el foco). */''}
+            <div class="wsloan-cmp-inline" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</div>
           </section>
         </div>
         <div class="ws2col-view">
@@ -32031,11 +32101,8 @@ function _renderLoanTool() {
               (`ws2col-aux`): en escritorio llena el hueco bajo un formulario corto, a la izquierda
               de la respuesta; en móvil sigue DESPUÉS del resultado, como antes. El comparador
               conserva su propia tarjeta fuera de `[data-wstool-out]` (no pierde el foco). */''}
-        <div class="ws2col-aux">
-          <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
-          ${_wsToolSavedListHtml()}
-        </div>
       </div>
+      ${_wsToolSavedListHtml()}
     </div>`;
 }
 

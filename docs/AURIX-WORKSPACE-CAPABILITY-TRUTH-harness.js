@@ -309,8 +309,9 @@ console.log('\n8 · Regresión de la revisión financiera:');
     /convention: pr\.assumptions\.convention/.test(app)
     && /annualRatePct: pr\.assumptions\.annualRatePct/.test(app));
   ok('8.4 el capital inicial se guarda SEPARADO de las aportaciones',
-    /initial: Math\.round\(pr\.initial\)/.test(app)
-    && /contributedOnly: Math\.round\(pr\.contributed\)/.test(app));
+    // Final polish: se guardan al céntimo (`c2`, mismo valor que la pantalla), separados igual.
+    /initial: c2\(pr\.initial\)/.test(app)
+    && /contributedOnly: c2\(pr\.contributed\)/.test(app));
 
   // ── [alto] UN RATIO, UN CONJUNTO ──────────────────────────────────────────
   const mixed = RE([{ buy: 240000, rent: 1250, expenses: 180 }, { rent: 900, expenses: 100 }]);
@@ -405,7 +406,9 @@ console.log('\n8 · Regresión de la revisión financiera:');
     // RE-DECIDIDO (SPEC 1 · moneda del documento): el importe sale en la moneda del OBJETIVO
     // (`_wsgMoney`), no en la base; el guion para lo ausente es el mismo.
     /const money = v => \(v == null \|\| !Number\.isFinite\(Number\(v\)\)\) \? '—' : _wsgMoney\(g, v\);/.test(app)
-    && /value: money\(prog\.target\)/.test(app) && /value: money\(prog\.remaining\)/.test(app));
+    // Final polish: la meta pasó a la fila cerrada, y allí lo ausente tampoco es 0 (`_okT`).
+    && /const _okT = Number\.isFinite\(Number\(prog\.target\)\) && Number\(prog\.target\) > 0;/.test(app)
+    && /value: money\(prog\.remaining\)/.test(app));
   ok('8.15c y «tiene plazo» se deriva UNA vez, desde el motor',
     /const hasDate = prog\.hasDate === true;/.test(fnSrc('_wsgCardOutHtml'))
     && !/const hasDate = g\.targetYear && g\.targetYear > _wsgThisYear\(\);/.test(app));
