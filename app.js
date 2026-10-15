@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '784'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '783'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6315,30 +6315,29 @@ const T = {
     // verdad, y una cifra precisa equivocada con caveat sigue siendo equivocada.
     intv4_f_cashmov_nc: n => `Has registrado ${n} ${n === 1 ? 'movimiento' : 'movimientos'} de liquidez`,
     intv4_f_cash: pct => `Tu liquidez es el ${pct}% del patrimonio invertible`,
-    // CIERRE · COHERENCIA Y LENGUAJE — la deriva de liquidez es un cambio de PESO:
-    // periodo + los dos extremos certificados, sin «pp» (no es «%», y casi nadie lo
-    // lee) y sin «subió/bajó», que sugieren dinero que entró o salió.
-    intv4_f_cash_move: (win, a, b) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible`,
+    intv4_f_cash_up: (pp, win) => `Tu liquidez subió ${pp} pp en ${win}`,
+    intv4_f_cash_down: (pp, win) => `Tu liquidez bajó ${pp} pp en ${win}`,
+    intv4_f_liq_better: pp => `Tu liquidez ha mejorado ${pp} pp`,
     // A1 — VERDAD DE LA TRANSICIÓN vs ATRIBUCIÓN DE CAUSA. `subió`/`bajó` describe
     // la MAGNITUD y se usa cuando un evento del usuario corrobora el movimiento.
     // Sin corroboración la forma es NEUTRAL: se dice que pasó de X a Y y no se
     // insinúa ninguna acción suya. Ninguna de las dos afirma que vendiera.
-    intv4_f_expo_up: (cat, a, b, win) => `En ${win}, tu exposición a ${cat} subió del ${a} al ${b}`,
-    intv4_f_expo_down: (cat, a, b, win) => `En ${win}, tu exposición a ${cat} bajó del ${a} al ${b}`,
+    intv4_f_expo_up: (cat, pp, end, win) => `Tu exposición a ${cat} subió ${pp} pp en ${win}, hasta el ${end}%`,
+    intv4_f_expo_down: (cat, pp, end, win) => `Tu exposición a ${cat} bajó ${pp} pp en ${win}, hasta el ${end}%`,
     intv4_f_expo_move: (cat, start, end, win) => `Tu exposición a ${cat} pasó del ${start}% al ${end}% en ${win}`,
     // SPEC LIFECYCLE · A3 — DILUCIÓN, no descenso. El importe no se movió: lo que
     // cambió es su PESO, porque otra parte del patrimonio creció. Decir «bajó»
     // afirma un hecho que no ocurrió y sugiere una decisión que nadie tomó.
     // A3 · CON CAUSA LICENCIADA. Nombrar el motor exige ledger completo, motor
     // inequívoco y cero movimientos materiales tuyos en la ventana.
-    intv4_f_expo_diluted: (cat, start, end, driver, win) => `Tu ${cat} no ha bajado: sigue igual en importe, pero en ${win} ha pasado del ${start}% al ${end}% de tu patrimonio invertible porque ${driver} ha crecido`,
+    intv4_f_expo_diluted: (cat, start, end, driver) => `Tu ${cat} no ha bajado: sigue igual en importe, pero ha pasado del ${start}% al ${end}% de tu patrimonio porque ${driver} ha crecido`,
     // SIN LICENCIA. Los dos componentes son observados y se publican; la causa no
     // se nombra. Mover capital entre categorías es una tercera causa que Aurix no
     // puede descartar, así que aquí no hay «porque» ni «no es una decisión tuya».
-    intv4_f_expo_diluted_nc: (cat, start, end, win) => `Tu ${cat} no ha bajado: sigue igual en importe, pero en ${win} ha pasado del ${start}% al ${end}% de tu patrimonio invertible`,
+    intv4_f_expo_diluted_nc: (cat, start, end) => `Tu ${cat} no ha bajado: sigue igual en importe, pero ha pasado del ${start}% al ${end}% de tu patrimonio`,
     // MIXTO. Bajó Y se diluyó, y separar las dos mitades exigiría una atribución
     // que no existe: se enuncian los dos hechos sin repartir la culpa entre ellos.
-    intv4_f_expo_diluted_mixed: (cat, start, end, win) => `En ${win}, tu ${cat} pasó del ${start}% al ${end}% de tu patrimonio invertible, y su importe también ha bajado`,
+    intv4_f_expo_diluted_mixed: (cat, start, end) => `Tu ${cat} pesa ahora el ${end}% en vez del ${start}%, y su importe también ha bajado`,
     intv4_why_dilution: 'Cuando una parte del patrimonio crece, el resto pesa menos aunque no se toque. Cambia cuánto influye cada parte en tu resultado, no lo que tienes en ella.',
     intv4_why_dilution_nc: 'Cambia cuánto influye cada parte en tu resultado, no lo que tienes en ella. Aurix no puede determinar qué lo ha movido con la evidencia disponible.',
     // SPEC LIFECYCLE · A3 — PÉRDIDA CONTRA COSTE. Dice contra QUÉ se mide, que es
@@ -6379,11 +6378,7 @@ const T = {
     // descubrimientos
     intv4_w_eff: (n, eff) => `Tienes ${n} posiciones, pero tu diversificación efectiva equivale a unas ${eff}`,
     intv4_w_capital: (amt, pct) => `Tu patrimonio creció, pero no por rendimiento: registraste ${amt} de liquidez y tus inversiones rindieron un ${pct}%`,
-    // Dos hechos INDEPENDIENTES, en dos frases: ningún «mientras» ni «ya» que
-    // sugiera causa o alarma. Con la otra ventana certificada en dirección opuesta,
-    // se dan las dos con sus extremos: no se deduce continuidad de dos puntos.
-    intv4_w_liqconc: (win, a, b, top) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible. Tu mayor posición pesa el ${top}%`,
-    intv4_w_liqconc_ctx: (win, a, b, win2, c, d, top) => `En ${win}, la liquidez pasó del ${a} al ${b} de tu patrimonio invertible; en ${win2}, del ${c} al ${d}. Tu mayor posición pesa el ${top}%`,
+    intv4_w_liqconc: (pp, top) => `Tu liquidez bajó ${pp} pp mientras tu posición principal ya pesa el ${top}%`,
     intv4_w_multi: n => `Han mejorado ${n} dimensiones independientes de tu patrimonio a la vez`,
     // preguntas
     intv4_q_q_performance: '¿Cuánto han rendido realmente mis inversiones?',
@@ -9702,13 +9697,15 @@ const T = {
     intv4_f_cashmov_both: (inAmt, outAmt) => `You recorded cash inflows of ${inAmt} and outflows of ${outAmt}`,
     intv4_f_cashmov_nc: n => `You recorded ${n} cash ${n === 1 ? 'movement' : 'movements'}`,
     intv4_f_cash: pct => `Cash is ${pct}% of your investable wealth`,
-    intv4_f_cash_move: (win, a, b) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth`,
-    intv4_f_expo_up: (cat, a, b, win) => `Over ${win}, your exposure to ${cat} rose from ${a} to ${b}`,
-    intv4_f_expo_down: (cat, a, b, win) => `Over ${win}, your exposure to ${cat} fell from ${a} to ${b}`,
+    intv4_f_cash_up: (pp, win) => `Your cash weight rose ${pp} pp over ${win}`,
+    intv4_f_cash_down: (pp, win) => `Your cash weight fell ${pp} pp over ${win}`,
+    intv4_f_liq_better: pp => `Your liquidity has improved ${pp} pp`,
+    intv4_f_expo_up: (cat, pp, end, win) => `Your exposure to ${cat} rose ${pp} pp over ${win}, to ${end}%`,
+    intv4_f_expo_down: (cat, pp, end, win) => `Your exposure to ${cat} fell ${pp} pp over ${win}, to ${end}%`,
     intv4_f_expo_move: (cat, start, end, win) => `Your exposure to ${cat} went from ${start}% to ${end}% over ${win}`,
-    intv4_f_expo_diluted: (cat, start, end, driver, win) => `Your ${cat} has not fallen: the amount is unchanged, but over ${win} it went from ${start}% to ${end}% of your investable wealth because ${driver} grew`,
-    intv4_f_expo_diluted_nc: (cat, start, end, win) => `Your ${cat} has not fallen: the amount is unchanged, but over ${win} it went from ${start}% to ${end}% of your investable wealth`,
-    intv4_f_expo_diluted_mixed: (cat, start, end, win) => `Over ${win}, your ${cat} went from ${start}% to ${end}% of your investable wealth, and its amount has fallen too`,
+    intv4_f_expo_diluted: (cat, start, end, driver) => `Your ${cat} has not fallen: the amount is unchanged, but it went from ${start}% to ${end}% of your wealth because ${driver} grew`,
+    intv4_f_expo_diluted_nc: (cat, start, end) => `Your ${cat} has not fallen: the amount is unchanged, but it went from ${start}% to ${end}% of your wealth`,
+    intv4_f_expo_diluted_mixed: (cat, start, end) => `Your ${cat} now weighs ${end}% instead of ${start}%, and its amount has fallen too`,
     intv4_why_dilution: 'When one part of your wealth grows, the rest weighs less even if untouched. What changes is how much each part influences your result, not what you hold in it.',
     intv4_why_dilution_nc: 'What changes is how much each part influences your result, not what you hold in it. Aurix cannot determine what moved it with the evidence available.',
     intv4_f_pos_below_cost: (name, pct, w) => `${name} is ${pct}% below the cost you recorded and represents ${w}% of your wealth`,
@@ -9733,8 +9730,7 @@ const T = {
     intv4_why_data_coverage: 'Aurix would rather explain a limit than give you a figure it cannot prove.',
     intv4_w_eff: (n, eff) => `You hold ${n} positions, but your effective diversification is about ${eff}`,
     intv4_w_capital: (amt, pct) => `Your wealth grew, but not from return: you recorded ${amt} of cash and your investments returned ${pct}%`,
-    intv4_w_liqconc: (win, a, b, top) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth. Your largest position weighs ${top}%`,
-    intv4_w_liqconc_ctx: (win, a, b, win2, c, d, top) => `Over ${win}, cash went from ${a} to ${b} of your investable wealth; over ${win2}, from ${c} to ${d}. Your largest position weighs ${top}%`,
+    intv4_w_liqconc: (pp, top) => `Your cash fell ${pp} pp while your main position already weighs ${top}%`,
     intv4_w_multi: n => `${n} independent dimensions of your wealth improved at the same time`,
     intv4_q_q_performance: 'How much have my investments actually returned?',
     intv4_q_q_what_changed: 'What changed in my structure?',
@@ -39617,36 +39613,6 @@ function _aurixIntelligenceStories(ledger, opts) {
 // unlikely to have connected. Every one decomposes into the facts that support
 // it, and any conclusion that would need an unknown cause is degraded to the
 // observation Aurix can actually demonstrate.
-// ── CIERRE · COHERENCIA — UNA COMPROBACIÓN LIGERA, SOBRE LA EVIDENCIA ──────
-// No mira frases: mira el hecho. Una deriva de peso es coherente si trae sus dos
-// extremos y su ventana y si el delta publicado ES la resta de esos extremos (se
-// guarda a 2 decimales, de ahí la tolerancia de medio céntimo de punto).
-function _aurixDriftClaimCoherent(f) {
-  const v = (f && f.values) || {}, w = (f && f.window) || {};
-  if (v.startPct == null || v.endPct == null) return false;
-  const s = Number(v.startPct), e = Number(v.endPct), d = Number(f && f.value);
-  if (!Number.isFinite(s) || !Number.isFinite(e) || !Number.isFinite(d)) return false;
-  if (!Number.isFinite(w.startAt) || !Number.isFinite(w.endAt) || !(w.endAt > w.startAt)) return false;
-  return Math.abs((e - s) - d) <= 0.0051;
-}
-// Misma métrica (raíz + categoría), mismo universo (la unidad) y mismo periodo
-// (los dos extremos): las direcciones tienen que coincidir. Devuelve las claves
-// en conflicto; periodos DISTINTOS nunca lo están, aunque vayan en sentidos opuestos.
-function _aurixDriftConflicts(facts) {
-  const groups = new Map(), out = new Set();
-  (facts || []).forEach(f => {
-    const w = (f && f.window) || {};
-    if (!f || f.unit !== 'percentage_points' || !Number.isFinite(w.startAt) || !Number.isFinite(w.endAt)) return;
-    const g = [f.causalRoot, (f.values && f.values.category) || '', w.startAt, w.endAt].join('|');
-    if (!groups.has(g)) groups.set(g, []);
-    groups.get(g).push(f);
-  });
-  groups.forEach(list => {
-    const dirs = new Set(list.map(f => Math.sign(Number(f.value) || 0)));
-    if (dirs.size > 1) list.forEach(f => out.add(f.semanticKey));
-  });
-  return out;
-}
 function _aurixWowInsights(ledger) {
   const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
   const byKey = k => facts.find(f => f.semanticKey === k) || null;
@@ -39682,28 +39648,13 @@ function _aurixWowInsights(ledger) {
   // alcanzables cuando exista intención declarada por el usuario.
   // 3 · Liquidity falling while concentration is already material — two
   //     independent dimensions moving the same way.
-  // CIERRE · COHERENCIA Y LENGUAJE — elegía la peor caída entre 24H/7D/30D/90D y
-  // TIRABA su ventana: «bajó 3 pp» (7D) convivía con «subió 39,9 pp en 30 días».
-  // Ahora viaja la ventana con sus extremos y, si otra ventana certificada va en
-  // dirección opuesta, también ella (la más larga), para nombrar las dos. Y si
-  // alguna deriva de liquidez es incoherente —consigo misma o con otra del mismo
-  // periodo—, el derivado no se publica: no se sabe cuál de las dos es la buena.
-  const cashAll = facts.filter(f => f.causalRoot === _AURIX_CAUSAL_ROOT.CASH_WEIGHT &&
-    f.unit === 'percentage_points');
-  const cashConflicts = _aurixDriftConflicts(cashAll);
-  const cashCertified = cashAll.every(f => _aurixDriftClaimCoherent(f) && !cashConflicts.has(f.semanticKey));
-  const cashDown = cashCertified ? cashAll.filter(f => f.value < 0) : [];
+  const cashDown = facts.filter(f => f.causalRoot === _AURIX_CAUSAL_ROOT.CASH_WEIGHT &&
+    f.unit === 'percentage_points' && f.value < 0);
   const top1 = byKey('top_position_weight');
   if (cashDown.length && top1) {
     const worst = cashDown.reduce((a, b) => (b.value < a.value ? b : a));
-    const span = f => f.window.endAt - f.window.startAt;
-    const opposite = cashAll.filter(f => f.value > 0 && f.window.range !== worst.window.range);
-    const ctx = opposite.length ? opposite.reduce((a, b) => (span(b) > span(a) ? b : a)) : null;
-    const winOf = f => ({ range: f.window.range, startAt: f.window.startAt, endAt: f.window.endAt });
     out.push({ semanticKey: 'wow_liquidity_down_while_concentrated', causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
-      values: { cashDeltaPp: worst.value, topPositionPct: top1.value,
-        startPct: worst.values.startPct, endPct: worst.values.endPct, window: winOf(worst),
-        context: ctx ? { startPct: ctx.values.startPct, endPct: ctx.values.endPct, window: winOf(ctx) } : null },
+      values: { cashDeltaPp: worst.value, topPositionPct: top1.value },
       supportingKeys: [worst.semanticKey, top1.semanticKey],
       confidence: Math.min(worst.confidence, top1.confidence),
       priority: Math.max(worst.priority, top1.priority) + 0.04 });
@@ -68242,18 +68193,6 @@ function _intv4WindowLabel(win) {
   }
   return _intv4RangeLabel(named);
 }
-// ── CIERRE · COHERENCIA Y LENGUAJE — LOS DOS EXTREMOS, A UNA PRECISIÓN COMPATIBLE ──
-// Una comparación de peso se publica con sus extremos CERTIFICADOS (nunca
-// reconstruidos desde un delta redondeado) y con la MISMA regla de redondeo que
-// «Tu evolución» (`_intv22Stats`): un decimal, dos si a uno se leen iguales. Si ni
-// a dos decimales se distinguen, no hay comparación que publicar: `null`.
-function _intv4PctPair(a, b) {
-  const x = Number(a), y = Number(b);
-  if (a == null || b == null || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const dp = (_intv21Pct(x, 1) === _intv21Pct(y, 1)) ? 2 : 1;
-  const pa = _intv21Pct(x, dp), pb = _intv21Pct(y, dp);
-  return (pa === pb) ? null : { a: pa, b: pb };
-}
 function _intv4CatLabel(cat) {
   const k = 'intv4_cat_' + String(cat || '');
   const v = _intv4T(k);
@@ -68384,38 +68323,30 @@ function _intv4FactText(fact) {
   if (v.dilutedBy && (/^cash_drift_/.test(k) || /^exposure_drift_/.test(k))) {
     const dcat = _intv4CatLabel(v.category);
     const dst = _intv4Num(v.startPct, 0), den = _intv4Num(v.endPct, 0);
-    if (!win) return '';                                         // una comparación sin periodo no se publica
-    if (v.dilutionKind !== 'pure') return _intv4T('intv4_f_expo_diluted_mixed', dcat, dst, den, win);
+    if (v.dilutionKind !== 'pure') return _intv4T('intv4_f_expo_diluted_mixed', dcat, dst, den);
     // NOMBRAR EL MOTOR EXIGE LICENCIA. Sin ella se publican los dos componentes
     // observados —el importe quieto y el peso nuevo— y no se nombra la causa.
-    if (v.causeLicensed !== true) return _intv4T('intv4_f_expo_diluted_nc', dcat, dst, den, win);
+    if (v.causeLicensed !== true) return _intv4T('intv4_f_expo_diluted_nc', dcat, dst, den);
     const drv = _intv5CatLabel(v.dilutedBy) || _intv4CatLabel(v.dilutedBy);
-    return _intv4T('intv4_f_expo_diluted', dcat, dst, den, drv, win);
+    return _intv4T('intv4_f_expo_diluted', dcat, dst, den, drv);
   }
   // §12 — un peso positivo por debajo del 1 % no puede imprimirse como «0 %»: eso
   // afirma que no hay nada. El hecho transporta el peso CRUDO del owner (que ya no
   // redondea) y el formato es el mismo que usa el Dashboard.
   if (k === 'cash_weight')             return _intv4T('intv4_f_cash', _aurixPctNum(fact.value));
-  // CIERRE · COHERENCIA Y LENGUAJE — «Tu liquidez bajó 3 pp» no decía cuándo, y
-  // «ha mejorado» valoraba un peso. Ahora: periodo + extremos certificados, y si
-  // los extremos desmienten el propio delta (`_aurixDriftClaimCoherent`) o falta
-  // el periodo, no hay frase. `liquidity_improved` copia valores y ventana de su
-  // deriva, así que dice exactamente lo mismo que ella.
-  if (k === 'liquidity_improved' || /^cash_drift_liquidity_/.test(k)) {
-    const pr = _aurixDriftClaimCoherent(fact) ? _intv4PctPair(v.startPct, v.endPct) : null;
-    return (pr && win) ? _intv4T('intv4_f_cash_move', win, pr.a, pr.b) : '';
-  }
+  if (k === 'liquidity_improved')      return _intv4T('intv4_f_liq_better', _intv4Num(Math.abs(fact.value), 1));
+  if (/^cash_drift_liquidity_/.test(k)) return fact.value > 0
+    ? _intv4T('intv4_f_cash_up',   _intv4Num(Math.abs(fact.value), 1), win)
+    : _intv4T('intv4_f_cash_down', _intv4Num(Math.abs(fact.value), 1), win);
   if (/^exposure_drift_/.test(k)) {
     const cat = _intv4CatLabel(v.category);
     const end = _intv4Num(v.endPct, 0);
     // A1 — sin causa corroborada, forma NEUTRAL. `subió`/`bajó` sólo cuando un
     // evento del usuario dentro de la ventana lo respalda.
     if (v.causeKnown !== true) return _intv4T('intv4_f_expo_move', cat, _intv4Num(v.startPct, 0), end, win);
-    const pr = _aurixDriftClaimCoherent(fact) ? _intv4PctPair(v.startPct, v.endPct) : null;
-    if (!pr || !win) return '';
     return fact.value > 0
-      ? _intv4T('intv4_f_expo_up',   cat, pr.a, pr.b, win)
-      : _intv4T('intv4_f_expo_down', cat, pr.a, pr.b, win);
+      ? _intv4T('intv4_f_expo_up',   cat, _intv4Num(Math.abs(fact.value), 1), end, win)
+      : _intv4T('intv4_f_expo_down', cat, _intv4Num(Math.abs(fact.value), 1), end, win);
   }
   // A3 — la pérdida contra coste. El IMPORTE sólo cuando es certificable, y la
   // profundidad decide si se enseña: en Guiado la cifra relativa y el peso ya
@@ -68478,17 +68409,7 @@ function _intv4WowText(w) {
   const v = w.values || {};
   if (w.semanticKey === 'wow_nominal_vs_effective')            return _intv4T('intv4_w_eff', v.positions, _intv4Num(v.effectiveN, 1));
   if (w.semanticKey === 'wow_growth_from_capital_not_return')  return _intv4T('intv4_w_capital', _intv4Money(Math.abs(v.capitalNet)), _intv4Num(v.returnPct, 2));
-  if (w.semanticKey === 'wow_liquidity_down_while_concentrated') {
-    // Sin ventana o sin extremos (un registro anterior a este contrato) no se
-    // reconstruye nada: se omite.
-    const pr = _intv4PctPair(v.startPct, v.endPct), win = _intv4WindowLabel(v.window);
-    const top = _intv4Num(v.topPositionPct, 0);
-    if (!pr || !win || !top) return '';
-    const c = v.context || null;
-    const pc = c ? _intv4PctPair(c.startPct, c.endPct) : null, wc = c ? _intv4WindowLabel(c.window) : '';
-    return (pc && wc) ? _intv4T('intv4_w_liqconc_ctx', win, pr.a, pr.b, wc, pc.a, pc.b, top)
-                      : _intv4T('intv4_w_liqconc', win, pr.a, pr.b, top);
-  }
+  if (w.semanticKey === 'wow_liquidity_down_while_concentrated') return _intv4T('intv4_w_liqconc', _intv4Num(Math.abs(v.cashDeltaPp), 1), _intv4Num(v.topPositionPct, 0));
   if (w.semanticKey === 'wow_multi_dimension_improvement')     return _intv4T('intv4_w_multi', (v.roots || []).length);
   return '';
 }
