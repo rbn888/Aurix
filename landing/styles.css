@@ -1402,4 +1402,7 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
   .intel-caps{ grid-template-columns:1fr; gap:12px; margin-top:24px; }
   .intel-cap{ padding:18px; }
   .intel-note{ text-align:left; margin-left:0; }
+  /* Capturas recortadas a ras de sus tarjetas: sin aire interior el radio del marco corta sus esquinas.
+     El relleno usa el negro del borde de la propia captura (#040507) para que no se vea costura. */
+  .intel-fig img, .section--how2 .shot-fig img{ padding:clamp(8px, 2.4vw, 14px); background:#040507; }
 }
