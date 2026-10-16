@@ -327,7 +327,9 @@ export default async function handler(req, res) {
   const unresolved = [];
   for (const s of requested) {
     const r = resolveSymbol(s);
-    if (r) resolved.push(r);
+    // Cierre P1 de cotizaciones · el símbolo PEDIDO viaja con su respuesta (additivo): un cliente que
+    // pidió «MSFT.TO» puede saber que se le sirvió la entrada canónica «MSFT» y no aceptarla.
+    if (r) resolved.push(Object.assign({ requested: s }, r));
     else unresolved.push(s);
   }
 
@@ -455,9 +457,12 @@ export default async function handler(req, res) {
   const now      = Date.now();
   const snapshot = [];
 
-  for (const { canonical, entry } of resolved) {
+  for (const { canonical, entry, requested: _req } of resolved) {
     const freshHit = fresh.get(canonical);
     const cacheHit = cachedHits.get(canonical);
+    // …y la identidad EXACTA del proveedor que la sirvió (id de CoinGecko o símbolo de Yahoo).
+    // Campos ADITIVOS: ningún precio cambia y los consumidores existentes los ignoran.
+    const _pid = src => { const pv = (entry.providers || []).find(x => x && x.provider === src); return pv ? pv.providerId : null; };
 
     if (freshHit) {
       snapshot.push({
@@ -475,6 +480,8 @@ export default async function handler(req, res) {
         source:     freshHit.source,
         stale:      false,
         confidence: 1.0,
+        requested:  _req,
+        providerId: _pid(freshHit.source),
       });
     } else if (cacheHit) {
       const ttl = ttlFor(entry.assetType);
@@ -489,6 +496,8 @@ export default async function handler(req, res) {
         source:     cacheHit.source,
         stale:      age > ttl,
         confidence: 0.7,
+        requested:  _req,
+        providerId: _pid(cacheHit.source),
       });
     }
     // else: omitted; contributes to partial=true

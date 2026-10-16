@@ -418,9 +418,11 @@ console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
   ok('14.2 la fila no fabrica ninguna serie de mercado; sin histórico pinta el provisional',
      !!rowFn && !/<svg/.test(rowFn) &&
      /col col-chart \$\{_chartCls\}"/.test(rowFn) &&
-     /data-spark-key="\$\{normSym\}"[^>]*>\$\{_chartHtml\}<\/div>/.test(rowFn) &&
-     /_chartCls\s+= _histHasSeries \? '' : 'col-chart--preview'/.test(rowFn) &&
-     /_chartHtml = _histHasSeries \? '' : _mktSparkPreviewSvg\(normSym\)/.test(rowFn));
+     // Cierre P1 de cotizaciones: la clave del histórico es la de la IDENTIDAD de la fila y un resultado
+     // de búsqueda sin cotización no pinta gráfico; sin histórico, el provisional de siempre.
+     /data-spark-key="\$\{_sparkKey\}"[^>]*>\$\{_chartHtml\}<\/div>/.test(rowFn) &&
+     /_chartCls\s+= _quoteNA \? 'col-chart--none' : \(_histHasSeries \? '' : 'col-chart--preview'\)/.test(rowFn) &&
+     /_chartHtml = _quoteNA \? [^\n]*: \(_histHasSeries \? '' : _mktSparkPreviewSvg\(normSym\)\)/.test(rowFn));
   // MARKET-CRYPTO-PREVIEW-P0 — la guarda sigue siendo la misma (sin serie real no se monta el
   // motor), pero ya no sale con un `return` pelado: repinta el provisional, porque el barrido de
   // arriba pudo acabar de vaciar la celda al destruir su controlador.

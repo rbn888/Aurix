@@ -87,7 +87,7 @@ const FNS = ['_aurixDetectContractFamily', '_aurixLooksLikeContract', '_aurixSho
   '_aurixCanonicalAssetKey', '_aurixContractLookupState', '_aurixContractResultToItem',
   '_aurixMarkCryptoAmbiguity', '_aurixSearchProject', '_aurixSearchTypeWeight', '_aurixSearchProviderWeight', '_aurixSearchAliasHit', '_aurixSearchPopularity',
   '_aurixSearchMatchScore', '_aurixRankSearchResults', '_aurixSearchSubtitle', '_searchResultToMarketItem',
-  '_aurixStripLegalSuffix', '_aurixInstitutionalDisplayName', 'getDisplayName', 'searchMetalsLocal'];
+  '_aurixStripLegalSuffix', '_aurixInstitutionalDisplayName', 'getDisplayName', 'searchMetalsLocal', '_aurixMktQuoteFamily', '_aurixMktQuoteMatches'];
 const ASYNC_FNS = ['_aurixSearchByContract', 'searchAllAssets', 'searchByFilter', '_aurixMktHydrateQuotes'];
 
 const W = { yahooCalls: 0, cryptoCalls: 0, contractCalls: 0, snapshotCalls: 0, snapshot: [], failContract: false };
@@ -285,7 +285,9 @@ const OFF = buildCtx({ _AURIX_DISCOVERY_IDENTITY_V1: false });
 
   // ── 9) never another asset's price ──
   console.log('\n9) shared-symbol pricing honesty (Market hydration):');
-  W.snapshot = [{ symbol: 'USDC', price: 1.0001, change24h: 0.01, currency: 'USD' }];
+  // Cierre P1 de cotizaciones: la respuesta declara qué se pidió y qué identidad del proveedor la sirvió
+  // (contrato aditivo de /api/prices/snapshot); sin esa identidad una cripto no se cotiza.
+  W.snapshot = [{ symbol: 'USDC', requested: 'USDC', assetType: 'crypto', providerId: 'usd-coin', price: 1.0001, change24h: 0.01, currency: 'USD' }];
   ON.__rows = rows.map(r => Object.assign({}, r));
   const hydrated = await run(ON, '_aurixMktHydrateQuotes(__rows, undefined)');
   const major = hydrated.find(r => r.coinId === 'usd-coin'), bridged = hydrated.find(r => r.coinId === 'bridged-usdc-base');

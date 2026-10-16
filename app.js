@@ -5161,6 +5161,7 @@ const T = {
     estimatedVal:    'Valor estimado:',
     addToPortfolio:  'Añadir a cartera',
     mkt_owned_add:   'En cartera · Registrar compra',
+    mkt_quote_na:    'Cotización no disponible',
     mkt_owned_open:  'Ver posición',
     acProfile:            'Perfil',
     acNotifications:      'Notificaciones',
@@ -8844,6 +8845,7 @@ const T = {
     estimatedVal:    'Estimated value:',
     addToPortfolio:  'Add to portfolio',
     mkt_owned_add:   'In portfolio · Record a buy',
+    mkt_quote_na:    'Quote not available',
     mkt_owned_open:  'View position',
     acProfile:            'Profile',
     acNotifications:      'Notifications',
@@ -65586,6 +65588,31 @@ const _MKT_DISC_CACHE_MAX = 40;
 // el MISMO endpoint de snapshot que ya usa toda la app (PRICES_PROXY): ni proveedor
 // nuevo ni contrato nuevo. Falla en silencio → la fila se pinta sin precio ("—"),
 // que es el estado honesto previsto en §10.
+// El juez de «¿esta cotización es la de ESTE instrumento?» (Market). Familia de clase obligatoria;
+// cripto por el id del proveedor (= coinId de la fila); valores, metales e índices por el símbolo
+// EXACTO que el proveedor sirvió (no el canónico recortado). Sin prueba suficiente → no es suya.
+function _aurixMktQuoteFamily(t) {
+  const v = String(t || '').toLowerCase();
+  if (v === 'crypto' || v === 'cryptos') return 'crypto';
+  if (v === 'stock' || v === 'stocks' || v === 'etf' || v === 'etfs' || v === 'fund' || v === 'funds') return 'security';
+  if (v === 'metal' || v === 'commodity' || v === 'commodities') return 'commodity';
+  if (v === 'index' || v === 'indices') return 'index';
+  return v || 'other';
+}
+function _aurixMktQuoteMatches(it, hit, req) {
+  if (!it || !hit) return false;
+  if (_aurixMktQuoteFamily(it.type) !== _aurixMktQuoteFamily(hit.assetType)) return false;
+  const pid = hit.providerId != null ? String(hit.providerId) : '';
+  if (_aurixMktQuoteFamily(it.type) === 'crypto') {
+    return !!(it.coinId && pid && pid === String(it.coinId));
+  }
+  const want = String(req || '').toUpperCase();
+  if (!want) return false;
+  if (String(hit.requested || '').toUpperCase() && String(hit.requested).toUpperCase() !== want) return false;
+  // El símbolo que DE VERDAD sirvió el proveedor; un servidor anterior sin `providerId` sólo vale si
+  // devolvió exactamente el símbolo pedido (nunca la entrada canónica recortada).
+  return pid ? pid.toUpperCase() === want : String(hit.symbol || '').toUpperCase() === want;
+}
 async function _aurixMktHydrateQuotes(items, signal) {
   if (!Array.isArray(items) || !items.length) return items;
   if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return items;
@@ -65628,14 +65655,21 @@ async function _aurixMktHydrateQuotes(items, signal) {
     const res = await fetch(url, { signal });
     if (!res.ok) return items;
     const json = await res.json();
+    // ── CIERRE P1 · IDENTIDAD DE COTIZACIONES ────────────────────────────────────────────────
+    // Antes la respuesta se indexaba por `normalizeSymbol`, que QUITA el sufijo de bolsa: el servidor
+    // sirve «MSFT» para «MSFT.TO»/«MSFT.NE» (converge a su entrada canónica) y «USDC» es la cripto
+    // usd-coin, así que USDATA (acción, ticker USDC) recibía 0,9997 $ y los tokens «AAPL» el precio
+    // de la acción. Ahora la respuesta se empareja por el símbolo PEDIDO, exacto, y sólo se acepta si
+    // `_aurixMktQuoteMatches` demuestra que es la cotización de ESTE instrumento. Si no → «—».
     const by = new Map();
     for (const s of (json && Array.isArray(json.snapshot) ? json.snapshot : [])) {
-      if (s && s.symbol) by.set(normalizeSymbol(s.symbol), s);
+      if (s && (s.requested || s.symbol)) by.set(String(s.requested || s.symbol).toUpperCase(), s);
     }
     items.forEach(it => {
       if (_blockedBySymbolAmbiguity.has(it)) return;   // §7: nunca el precio de OTRO activo con el mismo símbolo
-      const hit = by.get(normalizeSymbol(it.marketSymbol || it.symbol));
-      if (!hit) return;
+      const req = String(it.marketSymbol || it.symbol || '').toUpperCase();
+      const hit = by.get(req);
+      if (!hit || typeof _aurixMktQuoteMatches !== 'function' || !_aurixMktQuoteMatches(it, hit, req)) return;   // sin juez → «—»
       const p = Number(hit.price);
       if (Number.isFinite(p) && p > 0) { it.current_price = p; it.price = p; }
       if (Number.isFinite(hit.change24h)) { it.change24h = hit.change24h; it.price_change_percentage_24h = hit.change24h; }
@@ -65676,6 +65710,7 @@ async function _aurixMktDiscover(query, opts) {
         row.exchange = r.exchange || null;
         row.isin     = r.isin || null;
         row.displayName = (typeof getDisplayName === 'function') ? getDisplayName(r) : (r.name || row.symbol);
+        row._fromSearch = true;   // resultado de búsqueda: sin cotización propia → «—», sin gráfico
         return row;
       })
       .filter(Boolean);
@@ -66994,8 +67029,12 @@ function renderMarketItem(item, idx) {
   // del primer paint, cero esqueletos, cero aparición progresiva. Si luego llega histórico real,
   // el motor lo sustituye dentro de esta misma celda (mismo hueco → sin reflow); si no llega, el
   // placeholder se queda.
-  const _chartCls  = _histHasSeries ? '' : 'col-chart--preview';
-  const _chartHtml = _histHasSeries ? '' : _mktSparkPreviewSvg(normSym);
+  // Cierre P1 — un RESULTADO DE BÚSQUEDA sin cotización de su propia identidad no pinta tendencia ni
+  // gráfico (ni el de otro instrumento con su símbolo): celda vacía declarada y texto accesible.
+  const _quoteNA   = !!item._fromSearch && _noPrice;
+  const _sparkKey  = (typeof _aurixMktQuoteKey === 'function') ? _aurixMktQuoteKey(item) : normSym;
+  const _chartCls  = _quoteNA ? 'col-chart--none' : (_histHasSeries ? '' : 'col-chart--preview');
+  const _chartHtml = _quoteNA ? `<span class="intcc-sr-only">${escHtml(t('mkt_quote_na'))}</span>` : (_histHasSeries ? '' : _mktSparkPreviewSvg(normSym));
   const idTitle = (name && name !== item.symbol) ? name : item.symbol;
   // MARKET-EXCELLENCE-B3 — ÚNICO delta real que quedaba entre la búsqueda de Market y
   // la de Add Asset. El motor, el retrieval, la dedupe canónica y el ranking ya son los
@@ -67045,7 +67084,7 @@ function renderMarketItem(item, idx) {
                 ? '<span class="col-change-empty">—</span>'
                 : safeChange(chg))}
       </div>
-      <div class="col col-chart ${_chartCls}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}">${_chartHtml}</div>
+      <div class="col col-chart ${_chartCls}" ${_quoteNA ? '' : `data-spark-key="${_sparkKey}" `}data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}">${_chartHtml}</div>
       <div class="col col-action">
         <button type="button" class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-pressed="${watched ? 'true' : 'false'}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${escHtml(item.symbol)}">${watched ? '★' : '☆'}</button>
       </div>
@@ -87282,9 +87321,23 @@ function _mktHistoryCacheKey(item, range) {
   // entries directly via data-spark-key without re-deriving the
   // adapter shape. Adapter shape is still computed at fetch time.
   if (!item) return '';
-  const sym = normalizeSymbol(item.symbol || item.ticker || '');
+  const sym = (typeof _aurixMktQuoteKey === 'function') ? _aurixMktQuoteKey(item) : normalizeSymbol(item.symbol || item.ticker || '');
   if (!sym) return '';
   return `${sym}|${range}`;
+}
+// Cierre P1 — la clave del histórico de una fila (mini gráfico y variación de periodo) por IDENTIDAD:
+// una cripto de búsqueda por su coinId; un valor cotizado con sufijo de bolsa por su símbolo EXACTO
+// (MSFT.TO ≠ MSFT). El resto de filas conserva su clave de siempre, así que el Seguimiento no cambia.
+function _aurixMktQuoteKey(item) {
+  if (!item) return '';
+  const base = normalizeSymbol(item.symbol || item.ticker || '');
+  const tp = String(item.type || '').toLowerCase();
+  if ((tp === 'crypto' || tp === 'cryptos') && item.coinId && item.canonicalKey) return 'C:' + String(item.coinId);
+  if (/^(stock|stocks|etf|etfs|fund|funds)$/.test(tp)) {
+    const exact = String(item.marketSymbol || item.symbol || '').toUpperCase();
+    if (exact && /\.[A-Z]{1,3}$/.test(exact)) return exact;
+  }
+  return base;
 }
 // MARKET-FIRST-PAINT-P0 — DOS DECISIONES DISTINTAS SOBRE LA MISMA ENTRADA.
 //
@@ -87646,7 +87699,7 @@ function _aurixMktSnapshotCapture(item, range, entry) {
     const rec = {
       schemaVersion: _AURIX_MKT_SNAP_SCHEMA,
       identityKey,
-      cacheSymbol: normalizeSymbol(item.symbol || item.ticker || ''),
+      cacheSymbol: (typeof _aurixMktQuoteKey === 'function') ? _aurixMktQuoteKey(item) : normalizeSymbol(item.symbol || item.ticker || ''),   // misma clave que el lector (`_mktHistoryCacheKey`)
       assetType: String((item && item.type) || '') || null,
       range,
       price: Number.isFinite(price) ? price : null,

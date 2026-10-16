@@ -318,10 +318,11 @@ section('D — navegación, refresco silencioso y fallo del proveedor:');
 // ══════════════════════════════════════════════════════════════════════════
 {
   ok('D.1 la restauración corre en CADA render de Market y ANTES de construir el HTML',
-     app.indexOf('_aurixMktSnapshotRestore(data)') < app.indexOf('const _chartCls  = _histHasSeries'),
+     // Cierre P1 de cotizaciones: la línea añade el estado «sin cotización» de la búsqueda delante.
+     app.indexOf('_aurixMktSnapshotRestore(data)') < app.indexOf('const _chartCls  = _quoteNA'),
      'el orden decide si la fila nace en su estado final');
   ok('D.2 la fila NACE con su estado final cuando la serie ya está en memoria',
-     /const _chartCls  = _histHasSeries \? '' : 'col-chart--preview';/.test(app));
+     /const _chartCls  = _quoteNA \? 'col-chart--none' : \(_histHasSeries \? '' : 'col-chart--preview'\);/.test(app));
   ok('D.3 el barrido de gráficos es SELECTIVO: una serie idéntica no se repinta',
      /if \(stamp !== 'none' && cell\.dataset\.sparkStamp === stamp && _mktSparkCellHasChart\(cell\)\) keep\.add\(k\);/.test(app) &&
      /if \(keep\.has\(cell\.dataset\.sparkKey \|\| ''\)\) return;/.test(app));
