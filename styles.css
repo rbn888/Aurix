@@ -32527,3 +32527,52 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
 #wsPlansGrid .wspl-card .wspl-cover { height: auto; aspect-ratio: 16 / 9; max-height: 168px; border-radius: 9px; }
 #wsPlansGrid .wspl-card > .wspl-card-id, #wsPlansGrid .wspl-card > .wspl-slot-hero, #wsPlansGrid .wspl-card > .wspl-slot-viz, #wsPlansGrid .wspl-card > .wspl-slot-m { padding-left: 2px; }
 #wsPlansGrid .wspl-card .wspl-cover { max-height: none; }
+
+/* ══ CIERRE WORKSPACE UX · menú ⋯ como hoja inferior en móvil ═══════════════════ */
+.wsmse-scrim { position: fixed; inset: 0; z-index: 1305; background: rgba(2,4,10,0.55); }
+.wsmse-menu.is-sheet {
+  position: fixed; left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 1310;
+  width: auto; max-height: 70vh; overflow: auto; padding: 6px; border-radius: 16px;
+  background: #0d1426; border: 1px solid rgba(120,160,255,0.22); box-shadow: 0 -12px 40px rgba(0,0,0,0.55);
+}
+.wsmse-menu.is-sheet .wsmse-menu-item { min-height: 48px; font-size: 15px; padding: 0 14px; border-radius: 10px; }
+.wsmse-menu.is-sheet .wsmse-menu-item.is-danger { margin-top: 6px; border-top: 1px solid rgba(240,137,127,0.18); border-radius: 0 0 10px 10px; padding-top: 4px; }
+@media (prefers-reduced-motion: no-preference) { .wsmse-menu.is-sheet { animation: wsSheetIn 160ms ease-out; } @keyframes wsSheetIn { from { transform: translateY(12px); opacity: 0; } } }
+.wsh-tpl-hint { margin: 10px 2px 0; font-size: 12.5px; color: var(--text-tertiary); }
+.ws-modal-actions.is-stack { display: flex; flex-direction: column; gap: 8px; }
+.ws-modal-actions.is-stack .ws-modal-btn { width: 100%; min-height: 44px; }
+.ws-modal-more { margin: 6px 0 0; min-height: 44px; background: none; border: 0; color: var(--text-link); font: inherit; font-weight: 600; cursor: pointer; }
+
+/* ══ CIERRE WORKSPACE UX · TUS PLANES Y ACCESOS COMPACTOS ════════════════════════
+   Portada baja: imagen COMPLETA (contain) sobre su propia versión difuminada, sin bandas ni crop.
+   Cards con ancho máximo estable (1–2 planes no crecen como hero). */
+#wsPlansGrid .wspl-card .wspl-cover { position: relative; aspect-ratio: auto !important; height: 128px; max-height: none; overflow: hidden; background: #05080f; }
+@media (min-width: 640px) { #wsPlansGrid .wspl-card .wspl-cover { height: 140px; } }
+#wsPlansGrid .wspl-cover > .wspl-cover-bg { position: absolute; inset: -12px; width: calc(100% + 24px); height: calc(100% + 24px); object-fit: cover; filter: blur(14px) brightness(0.45) saturate(1.1); }
+#wsPlansGrid .wspl-cover > :not(.wspl-cover-bg) { position: relative; z-index: 1; background: transparent !important; }
+#wsPlansGrid .wspl-cover .wspv-asset-host { background: transparent !important; }
+#wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n], #wsPlansGrid.wspl-grid:not([data-wspl-n="1"]):not([data-wspl-n="2"]) {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 380px)) !important; justify-content: start; }
+@media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr) !important; } }
+#wsPlansGrid .wspl-hero b { font-size: 20px; }
+#wsPlansGrid .wspl-slot-viz .wspl-ring-row .wspl-ring { width: 34px; height: 34px; flex-basis: 34px; }
+/* Vacío: una línea, sin hueco grande antes de los accesos. */
+#wsPlansSection .wsx-grp[data-wsx-grp="plans"] > .wspl-note { margin: 0 0 4px; }
+#wsPlansSection .wsx-grp { margin-bottom: 14px; }
+/* Accesos en móvil: 2 columnas, portada más baja y «Abrir» + ⋯ en la misma fila. */
+.wspin-card .wspin-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 479px) {
+  .wspin-card { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "cover cover" "id id" "go menu"; gap: 2px 0; padding: 5px 2px 2px 5px; }
+  .wspin-card > .wspin-cover { aspect-ratio: 2 / 1; }
+  .wspin-card .wspin-go { justify-self: start; padding: 0 6px; }
+  .wspin-card > .wspin-id { min-height: 0; padding: 2px 0 0; }
+}
+/* Área segura: la última fila del Dashboard nunca queda bajo la navegación inferior. */
+@media (max-width: 767px) { #wsPlansSection { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); } }
+#wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n], #wsPlansGrid.wspl-grid:not([data-wspl-n="1"]):not([data-wspl-n="2"]) {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important; }
+#wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover { max-width: 400px; width: 100%; justify-self: start; }
+@media (max-width: 639px) { #wsPlansGrid.wspl-grid, #wsPlansGrid.wspl-grid[data-wspl-n] { grid-template-columns: minmax(0, 1fr) !important; }
+  #wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover { max-width: none; } }
+#wsPlansGrid .wspl-cover > .wspl-cover-bg { inset: 0; width: 100%; height: 100%; transform: scale(1.15); transform-origin: center; }
+#wsPlansGrid .wspl-cover > .wspl-cover-bg { transform: none; }

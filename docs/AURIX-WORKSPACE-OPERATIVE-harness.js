@@ -137,7 +137,8 @@ console.log('\n2 · Volver a donde se venía:');
   // para que el siguiente que escriba el nombre natural no repita el defecto.
   ok('2.3 el retorno al Dashboard usa el id REAL de la pestaña (`home`)',
     // El retorno vive ahora en UN owner (`_wsNavBack`), que usan «Volver» y el atrás del navegador.
-    /nav === 'back'\) \{ _wsNavBack\(\)/.test(fnSrc('_wshWireOnce'))
+    // Cierre UX: «Volver» pasa por la guarda de cambios sin guardar, que delega en `_wsNavBack`.
+    /nav === 'back'\) \{ _wsNavBackGuarded\(false\)/.test(fnSrc('_wshWireOnce')) && /_wsNavBack\(\)/.test(fnSrc('_wsNavBackGuarded'))
     && /_wsBackOrigin\(\) === 'dashboard'/.test(fnSrc('_wsNavBack'))
     && /switchTab\('home'\)/.test(fnSrc('_wsNavBack'))
     && !/switchTab\('dashboard'\)/.test(fnSrc('_wsNavBack')));

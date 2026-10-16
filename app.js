@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '792'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '793'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4413,6 +4413,8 @@ const USER_SCOPED_WORK_KEYS = [
   'aurix_ws_space_top_v1', 'aurix_workspace_mode',
   // Accesos a capacidades publicados en el Dashboard (acto explícito, distinto del favorito).
   'aurix_ws_dash_tools_v1',
+  // El último documento usado por capacidad (abrir desde Mi espacio).
+  'aurix_ws_lastdoc_v1',
   // Los parámetros de Escenarios guardan el patrimonio DECLARADO como base: tras cambiar de
   // cuenta, el siguiente usuario los leía (reproducido en la demo con dos cuentas sintéticas).
   'aurix_ws_scn_params_v1',
@@ -6973,6 +6975,16 @@ const T = {
     wsx_pinned_unpin:     'Quitar del Dashboard',
     wscap_dash_add:       'Mostrar en Dashboard',
     wscap_pin_add:        'Fijar acceso en Dashboard',
+    wscap_has_docs:       'Tienes {n} guardado(s). ¿Qué quieres hacer?',
+    wscap_open_saved:     'Abrir guardado',
+    wscap_see_all:        'Ver todos ({n})',
+    wscap_pick_publish:   'Elige qué documento mostrar.',
+    wscap_published:      'Publicado en Tus planes',
+    wstpl_fav_hint:       'Márcala como favorita para volver rápidamente desde Mi espacio.',
+    wsexit_title:         'Tienes cambios sin guardar',
+    wsexit_text:          'Si sales ahora, este documento no los conservará.',
+    wsexit_save:          'Guardar',
+    wsexit_discard:       'Salir sin guardar',
     wscap_pin_remove:     'Quitar acceso del Dashboard',
     wscap_dash_remove:    'Quitar del Dashboard',
     wscap_fav_add:        'Marcar favorito',
@@ -10246,6 +10258,16 @@ const T = {
     wsx_pinned_unpin:     'Remove from Dashboard',
     wscap_dash_add:       'Show on Dashboard',
     wscap_pin_add:        'Pin shortcut to Dashboard',
+    wscap_has_docs:       'You have {n} saved. What would you like to do?',
+    wscap_open_saved:     'Open saved',
+    wscap_see_all:        'See all ({n})',
+    wscap_pick_publish:   'Choose which document to show.',
+    wscap_published:      'Shown in Your plans',
+    wstpl_fav_hint:       'Star it to come back quickly from My space.',
+    wsexit_title:         'You have unsaved changes',
+    wsexit_text:          'If you leave now, this document will not keep them.',
+    wsexit_save:          'Save',
+    wsexit_discard:       'Leave without saving',
     wscap_pin_remove:     'Remove shortcut from Dashboard',
     wscap_dash_remove:    'Remove from Dashboard',
     wscap_fav_add:        'Mark as favourite',
@@ -22852,7 +22874,8 @@ function _wsWorkModeSync() {
 function _wsWorkWire() {
   if (_wsWorkWired || typeof window === 'undefined' || !window.addEventListener) return;
   _wsWorkWired = true;
-  window.addEventListener('popstate', () => {
+  window.addEventListener('popstate', e => {
+    if (e && e.__wsSheet) return;          // lo consumió la hoja inferior
     if (_wsWorkIgnorePop > 0) { _wsWorkIgnorePop--; return; }
     if (!_wsWorkOn) return;
     _wsWorkHist = false; _wsWorkPopping = true;
@@ -22864,11 +22887,30 @@ function _wsWorkWire() {
         try { history.pushState(Object.assign({}, history.state || {}, { aurixWork: 1 }), ''); _wsWorkHist = true; } catch (_) {}
         return;
       }
-      _wsNavBack();
+      _wsNavBackGuarded(true);
     } finally { _wsWorkPopping = false; }
   });
 }
 // El retorno, en UN sitio: lo usan «Volver» de la barra y el atrás del navegador.
+// SALIR CON CAMBIOS SIN GUARDAR: Guardar / Salir sin guardar / Cancelar. Sólo con cambios reales
+// (`_wsToolDirty`) y en una cuenta que puede guardar; sin cambios, se sale sin preguntar.
+function _wsNavBackGuarded(fromPop) {
+  let dirty = false;
+  try { dirty = _wshView === 'tool' && _wsToolDirty === true && _wsCanPersist(); } catch (_) { dirty = false; }
+  if (!dirty) { _wsNavBack(); return; }
+  const restore = () => { if (fromPop) { try { history.pushState(Object.assign({}, history.state || {}, { aurixWork: 1 }), ''); _wsWorkHist = true; } catch (_) {} } };
+  _wsChoiceModal({
+    title: t('wsexit_title'), text: t('wsexit_text'),
+    options: [
+      { label: t('wsexit_save'), primary: true, run: () => {
+        if (_wsToolEditId) { _wsToolCommit(null, false); if (!_wsToolDirty) { _wsNavBack(); return; } restore(); }
+        else { restore(); _wsToolSave(); }               // nuevo: pide el nombre y se queda
+      } },
+      { label: t('wsexit_discard'), danger: true, run: () => { _wsToolDirty = false; _wsNavBack(); } },
+    ],
+    onCancel: restore,
+  });
+}
 function _wsNavBack() {
   _wshView = 'home'; _ws4ActiveId = null;
   // El retorno al DASHBOARD está preparado y es el mismo owner: no hay un
@@ -23084,7 +23126,13 @@ function _wshWireOnce() {
     const capDash = t.getAttribute('data-wscap-dash');
     if (capDash) { _wsToggleDashTool(capDash); const bar = document.querySelector('.wsh-tool-view [data-wstool-savebar]'); if (bar) { bar._wsHtml = ''; _wsToolSaveBarSync(bar); } return; }
     const capOpen = t.getAttribute('data-wsmse-capopen');
-    if (capOpen) { _wsCapDocsOpen(capOpen, t); return; }
+    if (capOpen) {
+      // Mi espacio = volver rápido: el último documento usado (o el más reciente) directamente.
+      const _cat = (t.getAttribute('data-wsmse-cap') || '');
+      const last = _wsLastDocOf(_cat);
+      _wsCapOpenDoc(_cat, last ? last.id : _WS_NEW_DOC, 'space');
+      return;
+    }
     const nf = t.getAttribute('data-wsnew-focus');
     if (nf) { _wsFocusInView(nf, t.getAttribute('data-wsnew-input')); return; }
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -23145,6 +23193,8 @@ function _wshWireOnce() {
     // portada de un solo uso.
     if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); _wsOpenSurface('goals', { before: () => { if (ty) _wsgPrefill = ty; } }); return; }
     if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
+    // Plantillas: crear / abrir guardado (nunca uno antiguo por su cuenta).
+    if (cta === 'tool' && t.closest && t.closest('.wsh-gallery')) { _wsTplEntry(t.getAttribute('data-wstool') || ''); return; }
     if (cta === 'tool') { _wsOpenTool(t.getAttribute('data-wstool') || 'compound'); return; }
     // ── UNA TARJETA BLOQUEADA TIENE DESTINO ───────────────────────────────────
     // No «Abrir» y luego silencio: la tarjeta que el usuario no puede abrir lleva al
@@ -23156,7 +23206,7 @@ function _wshWireOnce() {
       return;
     }
     // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
-    if (nav === 'back') { _wsNavBack(); return; }
+    if (nav === 'back') { _wsNavBackGuarded(false); return; }
     if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; _wshRepaintHome(); return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
     if (t.hasAttribute('data-wstool-saveas')) { _wsToolSaveAs(); return; }
@@ -23682,6 +23732,8 @@ function _wsPickDocModal(o) {
   const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
   const opener = (typeof document !== 'undefined') ? document.activeElement : null;
   const docs = (o.docs || []).filter(Boolean);
+  // Con `limit`, sólo los N más recientes y «Ver todos» para desplegar el resto en el sitio.
+  const lim = (o.limit && docs.length > o.limit) ? o.limit : 0;
   const ov = document.createElement('div');
   ov.id = 'wsConfirmModal'; ov.className = 'ws-modal-overlay';
   ov.innerHTML = `
@@ -23689,11 +23741,12 @@ function _wsPickDocModal(o) {
       <h3 class="ws-modal-title" id="wsModalTitle">${esc(o.title)}</h3>
       ${o.text ? `<p class="ws-modal-text">${esc(o.text)}</p>` : ''}
       <div class="ws-modal-picklist" role="radiogroup" aria-labelledby="wsModalTitle">
-        ${docs.map((d, i) => `<button type="button" class="ws-modal-pick" role="radio" aria-checked="false" data-wspick="${i}">
+        ${docs.map((d, i) => `<button type="button" class="ws-modal-pick" role="radio" aria-checked="false" data-wspick="${i}"${lim && i >= lim ? ' hidden' : ''}>
           <span class="ws-modal-pick-n">${esc(d.name)}</span>
           <span class="ws-modal-pick-m">${esc(d.meta || '')}</span>
         </button>`).join('')}
       </div>
+      ${lim ? `<button type="button" class="ws-modal-more" data-wspick="more">${esc(String(t('wscap_see_all')).replace('{n}', String(docs.length)))}</button>` : ''}
       <div class="ws-modal-actions">
         <button type="button" class="ws-modal-btn is-cancel" data-wspick="cancel">${esc(t('wsmodal_cancel'))}</button>
         ${o.extraLabel ? `<button type="button" class="ws-modal-btn is-extra" data-wspick="extra">${esc(o.extraLabel)}</button>` : ''}
@@ -23713,6 +23766,7 @@ function _wsPickDocModal(o) {
     const b = e.target.closest ? e.target.closest('[data-wspick]') : null; if (!b) return;
     const k = b.getAttribute('data-wspick');
     if (k === 'cancel') { close(); return; }
+    if (k === 'more') { ov.querySelectorAll('.ws-modal-pick[hidden]').forEach(x => x.removeAttribute('hidden')); b.remove(); return; }
     // Una segunda salida opcional del mismo selector («Crear nuevo»): sin elegir documento.
     if (k === 'extra') { close(); if (typeof o.onExtra === 'function') { try { o.onExtra(); } catch (_) {} } return; }
     if (k === 'ok') {
@@ -25357,6 +25411,15 @@ function _wsPlanShareHtml(sh) {
 // que es justo lo que no debería divergir.
 // Devuelve el foco al ancla al cerrar (§45): un menú que se abre con teclado y suelta el foco al
 // body deja al usuario perdido.
+// La hoja inferior y el atrás del navegador: un único oyente, registrado al cargar (antes que el del
+// modo de trabajo), que cierra la hoja y MARCA el evento para que ningún otro oyente navegue.
+var _wsSheetClose = null, _wsSheetSkip = 0;
+try {
+  window.addEventListener('popstate', e => {
+    if (_wsSheetSkip > 0) { _wsSheetSkip--; e.__wsSheet = true; return; }
+    if (_wsSheetClose) { const c = _wsSheetClose; _wsSheetClose = null; e.__wsSheet = true; try { history.replaceState(history.state, ''); } catch (_) {} c(); }
+  });
+} catch (_) {}
 function _wsPopoverMenu(anchor, id, items, onPick) {
   const esc = _intccEsc;
   const prev = document.getElementById(id);
@@ -25366,11 +25429,18 @@ function _wsPopoverMenu(anchor, id, items, onPick) {
   menu.setAttribute('role', 'menu');
   menu.innerHTML = items.map(it => '<button type="button" role="menuitem" class="wsmse-menu-item '
     + (it.cls || '') + '" data-wsmenu-act="' + esc(it.k) + '">' + esc(it.label) + '</button>').join('');
+  // MÓVIL: hoja inferior compacta (altura según contenido, área segura, fondo que cierra al tocar,
+  // y el ATRÁS del navegador la cierra en vez de salir). Escritorio: menú contextual de siempre.
+  let sheet = false;
+  try { sheet = window.matchMedia('(max-width: 639px)').matches; } catch (_) { sheet = false; }
+  let scrim = null;
   const close = back => {
-    menu.remove();
+    if (!menu.isConnected) return;
+    menu.remove(); if (scrim) scrim.remove();
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('click', onDoc, true);
-    if (back) { try { anchor.focus(); } catch (_) {} }
+    if (sheet) { _wsSheetClose = null; try { if (history.state && history.state.aurixSheet) { _wsSheetSkip++; history.back(); } } catch (_) {} }
+    if (back || sheet) { try { anchor.focus(); } catch (_) {} }
   };
   const onKey = e => { if (e.key === 'Escape') close(true); };
   const onDoc = e => { if (!menu.contains(e.target)) close(false); };
@@ -25381,6 +25451,18 @@ function _wsPopoverMenu(anchor, id, items, onPick) {
     close(false);
     try { onPick(act); } catch (_) {}
   });
+  if (sheet) {
+    menu.classList.add('is-sheet');
+    scrim = document.createElement('div'); scrim.className = 'wsmse-scrim';
+    scrim.addEventListener('click', () => close(false));
+    document.body.appendChild(scrim);
+    document.body.appendChild(menu);
+    _wsSheetClose = () => close(false);
+    try { history.pushState(Object.assign({}, history.state || {}, { aurixSheet: 1 }), ''); } catch (_) {}
+    document.addEventListener('keydown', onKey);
+    try { const f = menu.querySelector('.wsmse-menu-item'); if (f) f.focus(); } catch (_) {}
+    return menu;
+  }
   document.body.appendChild(menu);
   // Colocación: pegado al ancla por la derecha, y si no cabe abajo se va arriba. Nunca fuera de
   // la ventana, que es la única forma de que un menú sea inalcanzable.
@@ -25620,7 +25702,7 @@ function _renderDashboardPlans() {
       <article class="wspl-card has-cover${enter ? ' is-enter' : ''}" data-wspl-id="${esc(p.id)}" data-wspl-kind="${esc(it.kind)}" data-wspl-ref="${esc(ref)}" data-ws-accent="${esc(spec.accent || 'blue')}">
         ${/* Remate visual — la portada de su capacidad COMPLEMENTA (decorativa, sin cifras); los
               datos del documento siguen mandando debajo. Sustituye al icono grande. */''}
-        <div class="wspl-cover" aria-hidden="true">${_wsCapCoverHtml(spec.tool)}</div>
+        <div class="wspl-cover" aria-hidden="true">${_wsCapCoverBgHtml(spec.tool)}${_wsCapCoverHtml(spec.tool)}</div>
         <div class="wspl-card-id">
           <button type="button" class="dash-grip" title="${esc(t('dash_grip'))}" aria-label="${esc(t('dash_grip') + ' — ' + nm)}" aria-describedby="dashReorderHintPlans">
             <svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
@@ -25688,6 +25770,12 @@ function _wsCapCoverHtml(cat) {
     if (_WS_TPL_ASSET[cat]) return _wsCatPreviewHtml(cat);
   } catch (_) {}
   return `<span class="wsh-mse2-ic2">${_wsCapIconHtml(_wsSurfaceIcon(cat))}</span>`;
+}
+// Fondo de la portada de un plan: la MISMA imagen, difuminada y oscurecida, rellena los laterales
+// que deja `contain`. La portada se ve completa en una caja baja y sin bandas vacías.
+function _wsCapCoverBgHtml(cat) {
+  const n = (typeof _WS_TOOL_PHOTO !== 'undefined' && _WS_TOOL_PHOTO[cat]) || _WS_TPL_ASSET[cat];
+  return n ? `<img class="wspl-cover-bg" src="${_WS_ASSET_BASE}${n}.webp" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : '';
 }
 function _renderDashboardPinned(pins) {
   const esc = _intccEsc;
@@ -25980,16 +26068,77 @@ function _wsIsToolCapRef(ref) {
   try { return _wsCatalogFor('tool').some(e => { const r = _WS_TOOL_RENDER[e.id] || {}; const k = r.tool ? 'tool' : (r.cta || ''); return k && _wsCanonRef(k, r.tool || '') === ref; }); }
   catch (_) { return false; }
 }
+// ── CAPACIDAD → SUS DOCUMENTOS, POR TIPO REAL (un owner para catálogo, Mi espacio y su ⋯) ────
+const _WS_CAT_DOCTYPE = Object.freeze({ budget: 'monthly_budget', receivables: 'receivables_app', journal: 'trade_journal',
+  realestate: 'real_estate_portfolio', compound: 'compound_growth', loan: 'loan_simulation', scenario: 'scenario_compare', assets: 'asset_prices' });
+function _wsCapDocs(cat) {
+  if (cat === 'goals') {
+    let g = []; try { g = _wsgGoals(); } catch (_) { g = []; }
+    return g.filter(x => x && x.id).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .map(x => ({ id: x.id, kind: 'goal', name: x.name || t('wsg_title'), meta: '', onDash: x.dashPinned === true }));
+  }
+  const type = _WS_CAT_DOCTYPE[cat]; if (!type) return [];
+  let c = []; try { c = _wsSaveCandidates(type, null); } catch (_) { c = []; }
+  let raw = []; try { raw = _ws4Projects(); } catch (_) { raw = []; }
+  return c.map(d => { const p = raw.find(x => x && x.id === d.id) || null; return Object.assign({}, d, { kind: 'workspace', onDash: !!p && _wsPlanOnDash(p), dashable: !!(p && _WSPL_TYPES[p.type]) }); });
+}
+// Abrir UN documento de una capacidad (o uno nuevo con `id === _WS_NEW_DOC`), por su owner.
+function _wsCapOpenDoc(cat, id, origin) {
+  _wsReturnTab = origin || 'space';
+  if (cat === 'goals') { _wsOpenSurface('goals'); return; }
+  if (cat === 'scenario') { if (id && id !== _WS_NEW_DOC) _wsbOpenDoc(id); else _wsOpenSurface('scenario'); return; }
+  _wsOpenTool(cat, id || _WS_NEW_DOC);
+  _wsReturnTab = origin || 'space';
+}
+// El último documento USADO de una capacidad (se recuerda al abrirlo), o el más reciente.
+const _WSH_LASTDOC_KEY = 'aurix_ws_lastdoc_v1';
+function _wsLastDocRemember(cat, id) {
+  if (!cat || !id || id === _WS_NEW_DOC) return;
+  try { const m = JSON.parse(localStorage.getItem(_WSH_LASTDOC_KEY) || '{}') || {}; m[cat] = id; _wshWriteStore(_WSH_LASTDOC_KEY, m); } catch (_) {}
+}
+function _wsLastDocOf(cat) {
+  const docs = _wsCapDocs(cat); if (!docs.length) return null;
+  let last = null; try { last = (JSON.parse(localStorage.getItem(_WSH_LASTDOC_KEY) || '{}') || {})[cat] || null; } catch (_) { last = null; }
+  return docs.find(d => d.id === last) || docs[0];
+}
+// ENTRADA DESDE PLANTILLAS: sin documentos, uno nuevo directo; con documentos, la elección
+// «Crear nuevo / Abrir guardado» (y la lista de los recientes con «Ver todos»). Nunca abre uno
+// antiguo por su cuenta.
+function _wsTplEntry(cat) {
+  const docs = _wsCapDocs(cat);
+  if (!docs.length || cat === 'goals') { _wsCapOpenDoc(cat, _WS_NEW_DOC, 'templates'); return; }
+  // El modal de ELECCIÓN que ya existe (`_wsChoiceModal`): mismas opciones, Cancelar incluido.
+  _wsChoiceModal({
+    title: _wsTypeLabel(_WS_CAT_DOCTYPE[cat]) || '', text: String(t('wscap_has_docs')).replace('{n}', String(docs.length)),
+    options: [
+      { label: t('wscap_new'), primary: true, run: () => _wsCapOpenDoc(cat, _WS_NEW_DOC, 'templates') },
+      { label: t('wscap_open_saved'), run: () => _wsPickDocModal({ title: t('wscap_open_saved'), docs: docs, limit: 5, okLabel: t('wstool_open_saved'),
+          onPick: d => { if (d && d.id) _wsCapOpenDoc(cat, d.id, 'templates'); } }) },
+    ],
+  });
+}
+// «Mostrar en Dashboard» desde Mi espacio: un documento → ése; varios → elegir cuál. Nunca la
+// plantilla vacía; sin documentos representables no se ofrece.
+function _wsCapPublish(cat) {
+  const docs = _wsCapDocs(cat).filter(d => d.kind === 'goal' || d.dashable);
+  const pub = d => { _wsPlanDashSet(d.id, false, d.kind); _wshRepaintHome(); try { _aurixBillingToast(t('wscap_published'), 'ok'); } catch (_) {} };
+  const off = docs.filter(d => !d.onDash);
+  if (!off.length) return;
+  if (off.length === 1) { pub(off[0]); return; }
+  _wsPickDocModal({ title: t('wscap_dash_add'), text: t('wscap_pick_publish'), docs: off, okLabel: t('wscap_dash_add'), onPick: d => { if (d) pub(d); } });
+}
 function _wsCapMenu(anchor, ref) {
   const fav = _wsIsPinned(ref), dash = _wsIsDashTool(ref);
   const card = anchor.closest ? anchor.closest('.wsh-mse2-card') : null;
-  const items = [
-    { k: 'open', label: t('wsh_proj_open') },
-    { k: 'fav', label: t(fav ? 'wscap_fav_remove' : 'wscap_fav_add') },
-  ];
+  const cat = card ? card.getAttribute('data-wsmse-cap') : '';
+  const pubable = _wsCapDocs(cat).filter(d => (d.kind === 'goal' || d.dashable) && !d.onDash).length > 0;
+  const items = [{ k: 'open', label: t('wsh_proj_open') }];
+  if (pubable) items.push({ k: 'pub', label: t('wscap_dash_add') });
   if (_wsIsToolCapRef(ref)) items.push({ k: 'dash', label: t(dash ? 'wscap_pin_remove' : 'wscap_pin_add') });
+  items.push({ k: 'fav', label: t(fav ? 'wscap_fav_remove' : 'wscap_fav_add') });
   _wsPopoverMenu(anchor, 'wsCapMenu', items, act => {
     if (act === 'open') { if (card) card.click(); }
+    else if (act === 'pub') { _wsCapPublish(cat); }
     else if (act === 'fav') { _wsTogglePin(ref); _wshRepaintHome(); }
     else if (act === 'dash') { _wsToggleDashTool(ref); _wshRepaintHome(); }
   });
@@ -26348,7 +26497,7 @@ function _renderWorkspaceHome(metrics) {
           <p class="wsh-tplarch-b">${esc(t('wstpl_arch_b'))}</p>
           <button type="button" class="wsh-cta wsh-tplarch-cta" data-wstab="tools">${esc(t('wstpl_arch_cta'))}</button>
         </div>`;
-    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t(kind === 'template' ? 'wstab_templates' : 'wstab_tools'))}</h3></header>${body}</section>`;
+    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t(kind === 'template' ? 'wstab_templates' : 'wstab_tools'))}</h3></header>${body}${kind === 'template' ? `<p class="wsh-tpl-hint">${esc(t('wstpl_fav_hint'))}</p>` : ''}</section>`;
   } else {
     // ── LA VISTA FUNDADOR EXPLÍCITA ──────────────────────────────────────────
     // Aquí —y SÓLO aquí— vive el inventario interno, con su etiqueta y con el aviso
@@ -28997,6 +29146,7 @@ function _wsOpenTool(toolKey, projectId) {
   _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
   _wsRecvDraft = (key === 'receivables') ? _wsRecvNewDraft() : null; _wsRecvEditId = null; if (key === 'receivables') _wsRecvQuery = '';  // reset receivable form
   _wsApDraft = (key === 'assets') ? _wsApNewDraft() : null; _wsApEditId = null;  // reset asset form
+  if (projectId && projectId !== _WS_NEW_DOC) _wsLastDocRemember(key, projectId);
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);

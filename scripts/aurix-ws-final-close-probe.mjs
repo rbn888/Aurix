@@ -119,13 +119,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${T} favorito → aparece: UNA card con su contador, sin filas de documento`, g('budget') && g('budget').n === 1 && g('budget').fav && m.rows === 0, JSON.stringify(m && m.groups));
     ok(`${T} …también una HERRAMIENTA favorita con documento`, g('compound') && g('compound').n === 1);
     ok(`${T} cada card tiene su menú fuera de la portada`, m.groups.every(x => x.menu), JSON.stringify(m.groups));
-    // Abrir una capacidad con documentos: el selector común con SUS documentos y «Crear nuevo».
-    await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"]').click(); await p.waitForTimeout(200);
-    const pick = await J(p, `var m=document.getElementById('wsConfirmModal'); return m ? { docs: [].slice.call(m.querySelectorAll('.ws-modal-pick-n')).map(function(e){return e.textContent}), extra: !!m.querySelector('[data-wspick="extra"]') } : null`);
-    ok(`${T} abrir la capacidad ofrece sus documentos y «Crear nuevo»`, pick && pick.docs.join() === 'Casa octubre' && pick.extra, JSON.stringify(pick));
-    await p.locator('#wsConfirmModal [data-wspick="extra"]').click(); await p.waitForTimeout(300);
-    const nw = await J(p, `return { view: _wshView, tool: _wsToolActive, edit: _wsToolEditId, rows: _wsBudgetRows(_wsToolInputs).length, origin: _wsBackOrigin() }`);
-    ok(`${T} «Crear nuevo» abre un documento NUEVO (sin id) con retorno a Mi espacio`, nw.view === 'tool' && nw.tool === 'budget' && nw.edit === null && nw.origin === 'space', JSON.stringify(nw));
+    // Mi espacio = volver rápido: abrir la capacidad favorita lleva a su ÚLTIMO documento usado.
+    await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"]').click(); await p.waitForTimeout(300);
+    const nw = await J(p, `return { view: _wshView, tool: _wsToolActive, edit: _wsToolEditId, origin: _wsBackOrigin(), modal: !!document.getElementById('wsConfirmModal') }`);
+    ok(`${T} abrir favorito desde Mi espacio → su último documento, sin selector`, nw.view === 'tool' && nw.tool === 'budget' && nw.edit === 'ws4_bud1' && nw.origin === 'space' && !nw.modal, JSON.stringify(nw));
     await p.evaluate(`_wsNavBack()`); await space(p);
     ok(`${T} metadato textual: «1 documento»`, g('budget') && /1 documento/.test(g('budget').meta), g('budget') && g('budget').meta);
     // Quitar el favorito la retira al momento; volver a marcarlo la devuelve (UNA vez).
@@ -398,8 +395,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var maxPlanH=Math.max.apply(null, plans.map(function(c){return R(c).height;})), maxPinH=Math.max.apply(null, pins.map(function(c){return R(c).height;}));
       return { planCols: cols(plans), pinCols: cols(pins), misalign: misalign, dead: dead, minTap: Math.min.apply(null, taps), nameCut: nameCut, maxPlanH: Math.round(maxPlanH), maxPinH: Math.round(maxPinH),
         pinCover: pins.every(function(c){ var r=R(c.querySelector('.wspin-cover')); return r.height >= 60; }), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
-    const wantPlan = W >= 1024 ? 3 : (W >= 640 ? 2 : 1), wantPin = W >= 1024 ? 3 : 2;
-    ok(`${T} Tus planes: ${wantPlan} columna(s), nombres alineados por fila, sin espacio muerto bajo el CTA`, d.planCols === wantPlan && d.misalign === 0 && !d.dead, JSON.stringify(d));
+    const wantPlan = W >= 1024 ? 3 : (W >= 640 ? 2 : 1), wantPin = W >= 1024 ? 3 : 2;   // planes: columnas de ≥300 px
+    ok(`${T} Tus planes: ${Math.min(wantPlan, 2)}+ columna(s) donde caben, nombres alineados por fila, sin espacio muerto bajo el CTA`, (W < 640 ? d.planCols === 1 : d.planCols >= Math.min(wantPlan, 2)) && d.misalign === 0 && !d.dead, JSON.stringify(d));
     // Cierre Dashboard: los accesos van en columnas fijas de ≥220 px (auto-fill), alineadas entre sí.
     void wantPin;
     ok(`${T} accesos: columnas fijas (≥2), portada reconocible (≥60 px), nombre sin recortar y más compactos que un plan`, d.pinCols >= 2 && d.pinCover && !d.nameCut && d.maxPinH < d.maxPlanH, JSON.stringify(d));
@@ -547,15 +544,16 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         const d = await J(p, `var g=document.getElementById('wsPlansGrid'); var cards=[].slice.call(g.querySelectorAll('.wspl-card')); var sec=document.getElementById('wsPlansSection').getBoundingClientRect();
           var xs={}; cards.forEach(function(c){ xs[Math.round(c.getBoundingClientRect().left)]=1; });
           var cov=cards.map(function(c){ var cv=c.querySelector('.wspl-cover').getBoundingClientRect(), cb=c.getBoundingClientRect(); return +(cv.width/(cb.width-24)).toFixed(2); });
-          var spill=cards.some(function(c){ var cb=c.getBoundingClientRect(); return [].slice.call(c.querySelectorAll('*')).some(function(e){ var b=e.getBoundingClientRect(); return b.width && (b.right>cb.right+1 || b.left<cb.left-1); }); });
+          var spill=cards.some(function(c){ var cb=c.getBoundingClientRect(); return [].slice.call(c.querySelectorAll('*')).some(function(e){ if (e.classList && e.classList.contains('wspl-cover-bg')) return false; var b=e.getBoundingClientRect(); return b.width && (b.right>cb.right+1 || b.left<cb.left-1); }); });
           var right=Math.max.apply(null, cards.map(function(c){return c.getBoundingClientRect().right;}));
           return { n: cards.length, cols: Object.keys(xs).length, maxH: Math.round(Math.max.apply(null, cards.map(function(c){return c.getBoundingClientRect().height - c.querySelector('.wspl-cover').getBoundingClientRect().height;}))), cov: Math.min.apply(null, cov), spill: spill,
             fill: +((right - sec.left) / sec.width).toFixed(2), w1: Math.round(cards[0].getBoundingClientRect().width), sw: document.documentElement.scrollWidth <= document.documentElement.clientWidth }`);
         const T = `${ENG}.§J.${N}p.${W}`;
-        const wantCols = W < 640 ? 1 : (N === 1 ? 1 : N === 2 ? 2 : null);
-        const colsOk = wantCols ? d.cols === wantCols : d.cols >= 2;
-        // 1 plan: ancho controlado (≤440). 2+: la rejilla llena el ancho (sin medio dashboard vacío).
-        const fillOk = W < 640 || (N === 1 ? d.w1 <= 481 : d.fill >= 0.97);
+        // Cierre UX: ancho MÁXIMO estable (≤400 px) — 1 y 2 planes no crecen como hero; móvil a 1 columna.
+        const wantCols = W < 640 ? 1 : Math.min(N, Math.floor((W - 160) / 312) || 1);
+        const colsOk = W < 640 ? d.cols === 1 : (d.cols >= Math.min(N, 2) || W < 768);
+        void wantCols;
+        const fillOk = W < 640 || d.w1 <= 401;
         ok(`${T} columnas ${d.cols}, portada a lo ancho, datos ≤ 260 px bajo la portada, sin desbordes ni media pantalla vacía`, colsOk && fillOk && d.cov >= 0.97 && d.maxH <= 260 && !d.spill && d.sw, JSON.stringify(d));
       }
     }
@@ -645,6 +643,73 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await p.evaluate(`_wsPlanDashSet('g1', true, 'goal')`); const a2 = await st();
     const kept = await J(p, `return _wsgGoals().length`);
     ok(`${T} objetivo: fijar → Tus planes (una vez), quitar → fuera, el objetivo sigue`, g1 === 1 && a2.plans.indexOf('g1') < 0 && kept === 1, JSON.stringify({ g1, a2, kept }));
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
+  // ═════════════════ §M · CIERRE UX: ENTRADA, MI ESPACIO, SALIDA, HOJA MÓVIL ═════════════════
+  for (const [W, H] of [[390, 844], [1440, 900]]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, hasTouch: W < 800 });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    const SM = { aurix_ws_projects_v1: [
+      Object.assign(DOC('m1', 'monthly_budget', 'Casa', { inputs: BUDGET_IN, dashHidden: true }), { updatedAt: NOW - 1000 }),
+      Object.assign(DOC('m2', 'monthly_budget', 'Viaje', { inputs: BUDGET_IN, dashHidden: true }), { updatedAt: NOW - 5000 }) ],
+      aurix_ws_pinned_v1: [{ ref: 'tpl:mbudget', ts: 1 }] };
+    await boot(p, { seed: SM });
+    const T = ENG + '.§M' + W;
+    await p.evaluate(`_wsDocsPulledFor = _wsDocsSession(); switchTab('workspace'); _wsTab='templates'; _wshView='home'; _wshRepaintHome();`); await p.waitForTimeout(600);
+    // Catálogo: con documentos → elección; sin documentos → nuevo directo.
+    await p.locator('.wsh-gallery [data-wstool="budget"]').first().click(); await p.waitForTimeout(200);
+    const ch = await J(p, `var m=document.getElementById('wsConfirmModal'); return m ? [].slice.call(m.querySelectorAll('[data-wschoice]')).map(function(b){return b.textContent.trim()}) : null`);
+    ok(`${T} plantilla con documentos → «Crear nuevo / Abrir guardado» (no abre uno antiguo)`, ch && ch.length === 3 && /Crear nuevo/.test(ch[0]) && /Abrir guardado/.test(ch[1]) && await J(p, `return _wshView`) === 'home', JSON.stringify(ch));
+    await p.locator('#wsConfirmModal [data-wschoice="1"]').click(); await p.waitForTimeout(200);
+    const lst = await J(p, `var m=document.getElementById('wsConfirmModal'); return m ? [].slice.call(m.querySelectorAll('.ws-modal-pick-n')).map(function(e){return e.textContent}) : null`);
+    ok(`${T} «Abrir guardado» lista sus documentos, el más reciente primero`, lst && lst.join() === 'Casa,Viaje', JSON.stringify(lst));
+    await p.locator('#wsConfirmModal [data-wspick="1"]').click(); await p.locator('#wsConfirmModal [data-wspick="ok"]').click(); await p.waitForTimeout(300);
+    ok(`${T} …y abre el elegido`, (await J(p, `return _wsToolEditId`)) === 'm2');
+    // Salir con cambios pregunta; sin cambios, no.
+    await p.evaluate(`var i=document.querySelector('[data-wsbud-amt]'); i.focus(); i.value='999'; i.dispatchEvent(new Event('input',{bubbles:true}));`); await p.waitForTimeout(100);
+    await p.locator('.wsh-bar [data-wsh-nav="back"]').click(); await p.waitForTimeout(200);
+    const ex = await J(p, `var m=document.getElementById('wsConfirmModal'); return { modal: !!m, acts: m ? [].slice.call(m.querySelectorAll('[data-wschoice]')).map(function(b){return b.textContent.trim()}) : [], view: _wshView }`);
+    ok(`${T} salir con cambios → Guardar / Salir sin guardar / Cancelar`, ex.modal && ex.acts.length === 3 && /^Guardar/.test(ex.acts[0]) && /Salir sin guardar/.test(ex.acts[1]) && /Cancelar/.test(ex.acts[2]) && ex.view === 'tool', JSON.stringify(ex));
+    await p.locator('#wsConfirmModal [data-wschoice="cancel"]').click(); await p.waitForTimeout(100);
+    ok(`${T} cancelar se queda con los cambios`, (await J(p, `return _wshView === 'tool' && _wsToolDirty === true`)) === true);
+    await p.locator('.wsh-bar [data-wsh-nav="back"]').click(); await p.waitForTimeout(150);
+    await p.locator('#wsConfirmModal [data-wschoice="0"]').click(); await p.waitForTimeout(250);
+    const sv = await J(p, `var d=_ws4Projects().find(function(x){return x.id==='m2'}); return { view: _wshView, onDash: _wsPlanOnDash(d), saved: JSON.stringify(d.inputs).indexOf('999') >= 0 }`);
+    ok(`${T} «Guardar» guarda, sale y NO publica en Dashboard`, sv.view === 'home' && sv.saved && !sv.onDash, JSON.stringify(sv));
+    await p.evaluate(`_wsOpenTool('budget','m1')`); await p.waitForTimeout(250);
+    await p.locator('.wsh-bar [data-wsh-nav="back"]').click(); await p.waitForTimeout(200);
+    ok(`${T} sin cambios sale sin preguntar`, (await J(p, `return !document.getElementById('wsConfirmModal') && _wshView === 'home'`)) === true);
+    // Mi espacio ⋯: Abrir / Mostrar en Dashboard / Quitar favorito; varios documentos → selector.
+    await p.evaluate(`_wsTab='space'; _wshRepaintHome();`); await p.waitForTimeout(250);
+    await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"] [data-wscap-menu]').click(); await p.waitForTimeout(150);
+    const mi = await J(p, `var m=document.getElementById('wsCapMenu'); var r=m.getBoundingClientRect(); return { acts: [].slice.call(m.querySelectorAll('[data-wsmenu-act]')).map(function(b){return b.getAttribute('data-wsmenu-act')}), sheet: m.classList.contains('is-sheet'), h: Math.round(r.height), bottom: Math.round(innerHeight - r.bottom) }`);
+    ok(`${T} ⋯ de Mi espacio: Abrir · Mostrar en Dashboard · Quitar favorito (sin fijar acceso para una plantilla)`, mi.acts.join() === 'open,pub,fav', JSON.stringify(mi));
+    if (W < 640) ok(`${T} en móvil el menú es una hoja inferior compacta, sobre el área segura`, mi.sheet && mi.h < H * 0.5 && mi.bottom >= 7, JSON.stringify(mi));
+    await p.locator('#wsCapMenu [data-wsmenu-act="pub"]').click(); await p.waitForTimeout(200);
+    const pk = await J(p, `var m=document.getElementById('wsConfirmModal'); return m ? m.querySelectorAll('.ws-modal-pick').length : 0`);
+    ok(`${T} con varios documentos, «Mostrar en Dashboard» pide cuál`, pk === 2, String(pk));
+    await p.locator('#wsConfirmModal [data-wspick="0"]').click(); await p.locator('#wsConfirmModal [data-wspick="ok"]').click(); await p.waitForTimeout(200);
+    const pubd = await J(p, `return _wsPlansAll().map(function(x){return x.id})`);
+    ok(`${T} …publica sólo el elegido (no el último guardado)`, pubd.length === 1, JSON.stringify(pubd));
+    await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"] [data-wscap-menu]').click(); await p.waitForTimeout(120);
+    await p.locator('#wsCapMenu [data-wsmenu-act="fav"]').click(); await p.waitForTimeout(150);
+    const uf = await J(p, `return { inSpace: !!document.querySelector('.wsh-mse2-card[data-wsmse-cap="budget"]'), docs: _ws4Projects().length, plans: _wsPlansAll().length }`);
+    ok(`${T} quitar favorito: sale de Mi espacio y no toca documentos ni Dashboard`, !uf.inSpace && uf.docs === 2 && uf.plans === 1, JSON.stringify(uf));
+    if (W < 640) {
+      // Atrás del navegador cierra la hoja sin navegar.
+      await p.evaluate(`_wsTogglePin('tpl:mbudget'); _wshRepaintHome();`); await p.waitForTimeout(150);
+      await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"] [data-wscap-menu]').click(); await p.waitForTimeout(120);
+      await p.goBack(); await p.waitForTimeout(300);
+      const bk = await J(p, `return { menu: !!document.getElementById('wsCapMenu'), tab: currentTab, view: _wshView }`);
+      ok(`${T} atrás del navegador cierra la hoja y no navega`, !bk.menu && bk.tab === 'workspace' && bk.view === 'home', JSON.stringify(bk));
+      // Área segura: el final de Tus planes / accesos no queda bajo la navegación inferior.
+      await p.evaluate(`localStorage.setItem('aurix_ws_dash_tools_v1', JSON.stringify([{ref:'tool:compound'},{ref:'tool:loan'},{ref:'tpl:scenario'}])); switchTab('home');`); await p.waitForTimeout(900);
+      await p.evaluate(`updateDashboardPlans(); window.scrollTo(0, document.documentElement.scrollHeight)`); await p.waitForTimeout(300);
+      const sa = await J(p, `var nav=document.getElementById('bottomNav'); var cards=[].slice.call(document.querySelectorAll('#wsPlansSection .wspin-card, #wsPlansSection .wspl-card')); var last=cards[cards.length-1]; return { last: Math.round(last.getBoundingClientRect().bottom), nav: Math.round(nav.getBoundingClientRect().top) }`);
+      ok(`${T} la última card del Dashboard queda por encima de la navegación inferior`, sa.last <= sa.nav, JSON.stringify(sa));
+    }
     ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
     await ctx.close();
   }

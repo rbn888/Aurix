@@ -64,7 +64,7 @@ function ctx(opts) {
    'formatCurrency','_wsJrnMoney','_wsCcyCode','_wsBaseCcy','_wsDocCurrencyOf','_wsMoneyIn','_wsgCcy','_wsgMoney',
    '_wsPlansDocs','_wsPlanMetrics','_wsPlansEmptyState','_wsPlanOnDash','_wsPinnedCaps','_renderDashboardPinned',
    // Remate visual: la portada de cada plan sale del owner canónico (real, no un stub).
-   '_wsCapCoverHtml','_wsToolCoverHtml','_wsCatPreviewHtml','_wsCatPreviewBaseHtml','_wsAssetImg','_wsCapIconHtml','_wsSurfaceIcon','_wsGlyph',
+   '_wsCapCoverHtml','_wsCapCoverBgHtml','_wsToolCoverHtml','_wsCatPreviewHtml','_wsCatPreviewBaseHtml','_wsAssetImg','_wsCapIconHtml','_wsSurfaceIcon','_wsGlyph',
    // SPRINT WORKSPACE PREMIUM V2 §17/§21 — la tarjeta publica ahora su proporción medida y su
    // menú, así que sus owners entran al sandbox: si faltaran, el render lanzaría y este
    // harness sería el primero en decirlo (es lo que pasó al añadirlos).

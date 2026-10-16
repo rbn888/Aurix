@@ -403,6 +403,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${T} editar un campo no devuelve arriba`, ed.found && ed.y1 > 0 && ed.y2 > ed.y1 - 40 && ed.y2 > 100, JSON.stringify(ed));
     // Volver recupera la posición de origen.
     await page.evaluate(`document.querySelector('#aurixWorkspace .wsh-bar-back').click()`);
+    // Cierre UX: con cambios sin guardar, «Volver» pregunta; aquí se sale sin guardar (opción 2).
+    await page.evaluate(`(function(){ var b=document.querySelector('#wsConfirmModal [data-wschoice="1"]'); if (b) b.click(); })()`);
     await page.waitForTimeout(rm === 'reduce' ? 250 : 600);
     // Se mide lo que el usuario VE —dónde queda la tarjeta de la que salió—, no `scrollY`: si el
     // Dashboard crece por encima al repintarse, el anclaje de scroll del navegador mueve `scrollY`
