@@ -5160,6 +5160,8 @@ const T = {
     qtyGold:         u => `Cantidad (${u})`,
     estimatedVal:    'Valor estimado:',
     addToPortfolio:  'Añadir a cartera',
+    mkt_owned_add:   'En cartera · Registrar compra',
+    mkt_owned_open:  'Ver posición',
     acProfile:            'Perfil',
     acNotifications:      'Notificaciones',
     acPreferences:        'Preferencias',
@@ -6194,6 +6196,12 @@ const T = {
     cmp_disc_price:  'La comparación utiliza la variación del precio.',
     cmp_ends: (d) => `La comparación llega hasta el ${d}.`,
     cmp_no_return: 'Aurix todavía no puede certificar una rentabilidad para este periodo, así que no hay nada que comparar. La comparación es entre rentabilidades, no entre importes.',
+    cmp_nr_history: 'Falta historial registrado de tu cartera en este periodo para certificar su rentabilidad. Se completa solo con el tiempo; mientras, prueba un periodo más corto.',
+    cmp_nr_flows:   'En este periodo hay aportaciones, retiradas u operaciones que Aurix todavía no puede separar del rendimiento. Registra cada compra, venta o movimiento de liquidez con su fecha para que pueda certificarlo.',
+    cmp_nr_fx:      'Falta un tipo de cambio vigente para tus posiciones en otra moneda. Se resolverá cuando se actualicen los precios.',
+    cmp_nr_data:    'Los datos de este periodo no son comparables entre sí, y Aurix no publica una rentabilidad que no pueda certificar.',
+    cmp_nr_avail:   (l) => `Con rentabilidad certificada ahora: ${l}.`,
+    cmp_nr_none:    'Ahora mismo ningún periodo tiene una rentabilidad certificada.',
     cmp_price_return: 'Los comparadores usan la variación de precio del índice o del activo; no incorporan dividendos.',
     cmp_range_aria: 'Periodo de la comparación',
     cmp_range_24h: '24H', cmp_range_7d: '7D', cmp_range_30d: '30D',
@@ -7163,6 +7171,7 @@ const T = {
     wsmse2_last:        'Última apertura',
     wsmse2_updated:     'actualizado',
     wsmse2_fav:         'Favorito',
+    search_token_label: 'Token derivado',
     wsmse2_docs_one:    '1 documento',
     wsmse2_docs_n:      '{n} documentos',
     wsmse2_on_dash:     'En Dashboard',
@@ -8821,6 +8830,8 @@ const T = {
     qtyGold:         u => `Quantity (${u})`,
     estimatedVal:    'Estimated value:',
     addToPortfolio:  'Add to portfolio',
+    mkt_owned_add:   'In portfolio · Record a buy',
+    mkt_owned_open:  'View position',
     acProfile:            'Profile',
     acNotifications:      'Notifications',
     acPreferences:        'Preferences',
@@ -9696,6 +9707,12 @@ const T = {
     cmp_diff_flat:   'Over this period, both returns were equivalent.',
     cmp_ends: (d) => `The comparison runs up to ${d}.`,
     cmp_no_return: 'Aurix cannot certify a return for this period yet, so there is nothing to compare. The comparison is between returns, not between amounts.',
+    cmp_nr_history: 'There is not enough recorded history of your portfolio in this period to certify its return. It fills in over time; meanwhile, try a shorter period.',
+    cmp_nr_flows:   'This period contains contributions, withdrawals or trades that Aurix cannot yet separate from performance. Record each buy, sale or cash movement with its date so it can be certified.',
+    cmp_nr_fx:      'A current exchange rate is missing for your positions in another currency. It will resolve when prices refresh.',
+    cmp_nr_data:    'The data for this period is not comparable with itself, and Aurix does not publish a return it cannot certify.',
+    cmp_nr_avail:   (l) => `Periods with a certified return right now: ${l}.`,
+    cmp_nr_none:    'No period has a certified return right now.',
     cmp_price_return: 'Comparators use the price change of the index or asset; they do not include dividends.',
     cmp_range_aria: 'Comparison period',
     cmp_range_24h: '24H', cmp_range_7d: '7D', cmp_range_30d: '30D',
@@ -10436,6 +10453,7 @@ const T = {
     wsmse2_last:        'Last opened',
     wsmse2_updated:     'updated',
     wsmse2_fav:         'Favourite',
+    search_token_label: 'Derivative token',
     wsmse2_docs_one:    '1 document',
     wsmse2_docs_n:      '{n} documents',
     wsmse2_on_dash:     'On Dashboard',
@@ -58998,8 +59016,12 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
       const addable = (typeof _aurixMktAddableType === 'function') ? _aurixMktAddableType(item) : null;
       addBtn.disabled = !addable;
       addBtn.classList.toggle('btn-submit--disabled', !addable);
+      const owned = addable ? _aurixMktOwnedAsset(item) : null;
+      const posBtn = document.getElementById('mktPrvPosBtn');
+      if (posBtn) { posBtn.hidden = !owned; posBtn.setAttribute('data-asset-id', owned ? owned.id : ''); posBtn.textContent = t('mkt_owned_open'); }
       if (addable) {
-        addBtn.textContent = t('addToPortfolio');
+        // Ya en cartera: el mismo alta, que SUMA una compra a esa posición (nunca duplica); se dice.
+        addBtn.textContent = owned ? t('mkt_owned_add') : t('addToPortfolio');
         addBtn.removeAttribute('title');
       } else {
         addBtn.textContent = t('mkt_not_addable');
@@ -59147,6 +59169,17 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
           b.classList.toggle('active', isAdded);
         });
       } catch (_) {}
+      return;
+    }
+    // C2 — abrir la posición que ya se tiene.
+    if (e.target.closest && e.target.closest('#mktPrvPosBtn')) {
+      const id = e.target.closest('#mktPrvPosBtn').getAttribute('data-asset-id');
+      if (!id) return;
+      _aurixMktClose();
+      // `switchTab` aplica la pestaña tras su fundido y al aplicarla LIMPIA la ficha abierta
+      // (`_applyTab` → activeAssetId = null): la posición se abre cuando la pestaña ya está puesta.
+      try { switchTab('home'); } catch (_) {}
+      setTimeout(() => { try { openAssetDetail(id); } catch (_) {} }, reducedMotion ? 0 : (_TAB_OUT_MS + 40));
       return;
     }
     // Add to portfolio CTA.
@@ -65273,6 +65306,21 @@ function _aurixMktAddableType(item) {
 
 // Fila de Market → entrada canónica de selectAsset. Sólo copia lo que existe:
 // no inventa ticker, gestora ni moneda.
+// Cierre de utilidad · C2 — ¿esta ficha es un activo que YA tengo? Misma identidad que el alta usa
+// para fusionar (coinId · marketSymbol · ticker+tipo), sobre posiciones ABIERTAS. Un token derivado
+// tiene su propio coinId y nunca coincide con la acción.
+function _aurixMktOwnedAsset(item) {
+  try {
+    const sel = _aurixMktToSelection(item); if (!sel) return null;
+    const list = (typeof activeAssets === 'function') ? activeAssets() : [];
+    return list.find(a => {
+      if (!a) return false;
+      if (sel.coinId || a.coinId) return !!(sel.coinId && a.coinId && a.coinId === sel.coinId);
+      if (a.marketSymbol && sel.marketSymbol) return String(a.marketSymbol).toUpperCase() === String(sel.marketSymbol).toUpperCase();
+      return String(a.ticker || '').toUpperCase() === sel.ticker && a.type === sel.type;
+    }) || null;
+  } catch (_) { return null; }
+}
 function _aurixMktToSelection(item) {
   const type = _aurixMktAddableType(item);
   if (!type) return null;
@@ -66741,8 +66789,11 @@ function renderMarketItem(item, idx) {
   const cachedChg = isPeriodSelected
     ? _mktHistoryChangeForRow(item)
     : null;
-  const chg = isPeriodSelected ? cachedChg : live24;
-  const isLoading = isPeriodSelected && (cachedChg == null);
+  // Cierre de utilidad · C3 — sin PRECIO no hay base para una variación: se pinta «—», nunca un % que
+  // parezca un movimiento real. Un cambio extremo CON precio se muestra tal cual (no se oculta un dato).
+  const _noPrice = !(Number(price) > 0);
+  const chg = _noPrice ? null : (isPeriodSelected ? cachedChg : live24);
+  const isLoading = !_noPrice && isPeriodSelected && (cachedChg == null);
   const normSym = normalizeSymbol(item.symbol);
   // MK.F7 §4 — prefer a real feed name; if it's missing or just the ticker, fall
   // back to the curated display name. Empty when neither exists → no subline (§3).
@@ -73129,6 +73180,27 @@ function _intv14CmpAxisHtml(mine, other, esc) {
 // después: el §6.3 exige que un fallo o una carga del comparador NUNCA borre la
 // serie principal, y la única forma estructural de garantizarlo es que la
 // principal no dependa de la red.
+// Cierre de utilidad · C4 — EL ESTADO PENDIENTE DICE POR QUÉ Y QUÉ TIENE QUE PASAR. El motor ya
+// devolvía la causa (`cmp.reason` = `fallbackReason` del índice invertible) y la tarjeta la callaba
+// tras un texto genérico. Se agrupa por lo que el usuario puede hacer, sin tocar el motor, y se
+// listan los periodos que SÍ tienen rentabilidad certificada (la misma llamada, por rango).
+function _intv14CmpReasonKey(reason) {
+  const r = String(reason || '');
+  if (/^(insufficient_snapshots|insufficient_observations|index_too_short|window_too_short|chain_empty|awaiting_canonical_history)$/.test(r)) return 'cmp_nr_history';
+  if (/^(pending_flow_reconciliation|unexplained_capital_event|flow_coverage_insufficient)$/.test(r)) return 'cmp_nr_flows';
+  if (/^fx_/.test(r)) return 'cmp_nr_fx';
+  if (r) return 'cmp_nr_data';
+  return '';
+}
+function _intv14CmpWhyHtml(esc, cmp) {
+  const k = _intv14CmpReasonKey(cmp && cmp.reason);
+  let avail = [];
+  try { avail = _AURIX_CMP_RANGES.filter(r => r !== (cmp && cmp.range) && _aurixComparisonSync(r).state === _AURIX_CMP_STATE.READY); } catch (_) { avail = []; }
+  const lbl = avail.map(r => _intv4T('cmp_range_' + r)).join(' · ');
+  const availTxt = avail.length ? _intv4T('cmp_nr_avail', lbl) : _intv4T('cmp_nr_none');
+  return `${k ? `<p class="intcc-empty-body" data-cmp-why="${esc(k)}">${esc(_intv4T(k))}</p>` : ''}
+        <p class="intcc-empty-body" data-cmp-avail="${esc(avail.join(','))}">${esc(availTxt)}</p>`;
+}
 function _intv14ComparatorHtml(esc, cmp) {
   if (!_aurixCmpEnabled()) return '';
   if (!cmp || cmp.state === _AURIX_CMP_STATE.OFF) return '';
@@ -73180,6 +73252,7 @@ function _intv14ComparatorHtml(esc, cmp) {
           <div class="intv14-cmp-ranges" role="group" aria-label="${esc(_intv4T('cmp_range_aria'))}">${rangeBtns}</div>
         </div>
         <p class="intcc-empty-body">${esc(_intv4T('cmp_no_return'))}</p>
+        ${_intv14CmpWhyHtml(esc, cmp)}
       </section>`;
   }
   const bm = _aurixCmpBenchmark(st.benchmarkId);
@@ -78490,6 +78563,8 @@ function _aurixSearchMatchScore(a, q) {
   const is = String(a.isin || '').toLowerCase();
   if (!q) return 0;
   if (tk === q || is === q || nm === q) return 1000;
+  // C1 — la clase de acción se escribe «BRK.B» o «BRK-B» según el proveedor: es el MISMO ticker.
+  if (tk && /^[a-z0-9]+[.\-][a-z0-9]{1,2}$/.test(q) && tk.replace(/[.\-]/g, '') === q.replace(/[.\-]/g, '')) return 950;
   if (typeof _AURIX_SEARCH_PROVIDER_SLUG_MATCH !== 'undefined' && _AURIX_SEARCH_PROVIDER_SLUG_MATCH
       && a.coinId && _aurixSearchIdentifierKey(a.coinId) === _aurixSearchIdentifierKey(q)) return 1000;
   if (nm.indexOf(q) === 0) return 700;
@@ -78500,13 +78575,24 @@ function _aurixSearchMatchScore(a, q) {
   if (tk.indexOf(q) >= 0) return 200;
   return 0;
 }
+// Cierre de utilidad · C1 — REPRESENTACIONES TOKENIZADAS / PUENTEADAS. CoinGecko publica tokens que
+// replican una acción o un ETF con su MISMO ticker («MSFT · Microsoft • Robinhood Token»): con el
+// ticker exacto puntuaban como la acción y quedaban por delante de sus otras cotizaciones (MSFT.TO).
+// Se reconocen por lo que el propio proveedor declara —tipo cripto y un nombre que dice que es un
+// token/puente de otro activo— y bajan un escalón entero, detrás de cualquier instrumento principal
+// que también coincida. No se quita ninguno: siguen en la lista, etiquetados (`_aurixSearchSubtitle`).
+// El patrón vive DENTRO de los dos owners que lo usan (marcador y subtítulo) para no crear otra pieza.
 function _aurixRankSearchResults(items, query) {
   const q = String(query || '').toLowerCase().trim();
   const score = a => _aurixSearchMatchScore(a, q)
                    + _aurixSearchAliasHit(a, q)
                    + _aurixSearchPopularity(a)
                    + _aurixSearchProviderWeight(a)
-                   + _aurixSearchTypeWeight(a);
+                   + _aurixSearchTypeWeight(a)
+                   + (String(a.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bondo\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')) ? -600 : 0)
+                   // …y una cripto SIN rango de capitalización (sin listar por el proveedor: memecoins,
+                   // contratos sueltos) no adelanta a un instrumento principal por compartir el ticker.
+                   + (String(a.type || '').toLowerCase() === 'crypto' && !(Number(a.marketCapRank) > 0) ? -300 : 0);
   return items.map((a, i) => ({ a, i, s: score(a) }))
               .sort((x, y) => (y.s - x.s) || (x.i - y.i))
               .map(o => o.a);
@@ -78541,6 +78627,8 @@ function _aurixSearchSubtitle(a) {
     const parts = [];
     if (a.ticker) parts.push(a.ticker);
     if (needsId && a.chain) parts.push(a.chain);
+    else if (/tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bondo\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')))
+      parts.push((typeof t === 'function' && t('search_token_label')) || 'TOKEN');   // C1: no es el original
     else if (_label) parts.push(_label);
     if (needsId && a.contract && typeof _aurixShortContract === 'function') parts.push(_aurixShortContract(a.contract));
     return parts.join(' · ');

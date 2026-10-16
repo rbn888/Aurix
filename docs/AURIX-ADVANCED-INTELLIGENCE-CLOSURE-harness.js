@@ -2802,7 +2802,7 @@ console.log('\nSC · §6 · comparador de rentabilidad');
   const cmpFns = ['_aurixCmpEnabled','_aurixCmpResolvableUSD','_aurixCmpFromRegistry','_aurixCmpProviderRange','_aurixCmpLabel','_aurixCmpRecent','_aurixCmpPushRecent','_aurixCmpFxFor','_aurixCmpBenchmark','_aurixCmpMedianStep','_aurixCmpBucketize',
                   '_aurixCmpConvert',
                   '_aurixCmpAlign','_aurixComparisonSync','_intv14CmpState','_intv14CmpSetState',
-                  '_intv14CmpAxisHtml','_intv14CmpSvg','_intv14ComparatorHtml','_intv4T','_intv4Num','_intccEsc','_intccDate','_intccDateTime',
+                  '_intv14CmpAxisHtml','_intv14CmpSvg','_intv14ComparatorHtml','_intv14CmpWhyHtml','_intv14CmpReasonKey','_intv4T','_intv4Num','_intccEsc','_intccDate','_intccDateTime',
                   '_aurixIntelReadOwned','_aurixIntelWriteOwned','_aurixIntelStore','_aurixIntelOwner'];
   const cmpAsync = ['_aurixCmpFxSeries','_aurixCmpBenchmarkSeries','_aurixComparison'];
   const cmpConsts = ['_AURIX_CMP_FLAG_KEY','_AURIX_CMP_FLAT_PP','_AURIX_CMP_NOMINAL_MS','_AURIX_CMP_COVERAGE_MIN','_AURIX_CMP_MIN_POINTS','_AURIX_CMP_INTRADAY','_AURIX_CMP_DISCLOSURE','ASSET_DB','_AURIX_CMP_KIND_OF','_AURIX_CMP_US_ETFS','_AURIX_CMP_USD_INDICES','_AURIX_CMP_GROUPS','_AURIX_CMP_RECENT_KEY','_AURIX_CMP_RECENT_MAX','_AURIX_CMP_CATALOG','_AURIX_CMP_FX_PAIR','_AURIX_CMP_STATE','_AURIX_CMP_PROVIDER_REASONS','_AURIX_CMP_PROVIDER_RANGE',
