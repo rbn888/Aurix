@@ -86,7 +86,7 @@ console.log('\n2 · Escenarios sin base declarada no publican proyecciones:');
       + 'function _wsProject(o){ const c = o.monthly * 12 * o.years; const f = o.initial + c; return { final: f, contributed: c, growth: 0, series: [], assumptions: [] }; }'
       + 'function _wsScenarios(){ return []; }'
       + 'function _wsbChartHtml(){ return "<svg data-chart></svg>"; } function _wsbConclusion(){ return "conclusión"; }', sb);
-    load(sb, ['_wsbBase', '_wsbCompare', '_wsbCardsHtml', '_wsbImpactInnerHtml', '_wsbTailHtml']);
+    load(sb, ['_wsbBase', '_wsbCompare', '_wsbCardsHtml', '_wsbImpactInnerHtml', '_wsbTailHtml', '_wsbYl']);
     return sb;
   };
   const scen = '[{ id: "A", name: "A", monthly: 200 }]';

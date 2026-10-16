@@ -6628,7 +6628,7 @@ const T = {
     wsb_stab_dynamic:  'Dinámico',
     wsb_stab_balanced: 'Equilibrado',
     // §C — la conclusión, sin veredicto y sin umbral.
-    wsb_concl_spread:  'Aportar {m} al mes en vez de nada proyecta {amt} más al final de los {y} años.',
+    wsb_concl_spread:  'Aportar {m} al mes en vez de nada proyecta {amt} más al cabo de {yl}.',
     wsb_concl_flat:    'Con estos parámetros los escenarios no se separan de forma apreciable.',
     // §C — los parámetros comunes, las dos causas de la diferencia y el rango.
     wsb_params_title:  'Parámetros de la comparación',
@@ -6643,7 +6643,7 @@ const T = {
     wsb_impact_highest:   'Aportación más alta',
     wsb_impact_spread:    'Rango de la comparación al final del horizonte',
     wsb_pct_na:        'porcentaje no aplicable',
-    wsb_asm_common:    'Los tres escenarios comparten horizonte ({y} años), rentabilidad y convención: si no, no serían comparables.',
+    wsb_asm_common:    'Los tres escenarios comparten horizonte ({yl}), rentabilidad y convención: si no, no serían comparables.',
     wsb_asm_base_declared: 'El patrimonio de partida es el que TÚ has declarado.',
     wsb_asm_base_imported: 'El patrimonio de partida se importó el {d}.',
     wsb_asm_base_unknown:  'Sin patrimonio de partida declarado: la comparación mide sólo el efecto de aportar.',
@@ -6654,7 +6654,7 @@ const T = {
     wsb_read_a: 'Una aportación constante suma de forma sólida a largo plazo.',
     wsb_read_b: 'Aportar más acelera notablemente tu patrimonio proyectado.',
     wsb_read_c: 'Crecimiento similar al acelerado, con una evolución más estable.',
-    wsb_chart_title: 'Comparativa a 10 años',
+    wsb_chart_title: 'Comparativa a {yl}',
     wsb_axis_now: 'Actual',
     wsb_concl_title: 'Lectura de Aurix',
     wsb_concl_balanced: 'El escenario equilibrado combina crecimiento y estabilidad.',
@@ -6928,6 +6928,8 @@ const T = {
     wspl_m_deficit:       'Déficit',
     wspl_share_done_of:   'cobrado del total',
     wspl_share_goal:      'acumulado de la meta',
+    wspl_share_reached:   'de la meta · objetivo alcanzado',
+    wspl_m_surplus:       'Excedente',
     wspl_m_expenses:      'Gastos',
     wspl_m_pending:       'Pendiente',
     wspl_m_collected:     'Cobrado',
@@ -6949,7 +6951,7 @@ const T = {
     wsb2_save:            'Guardar comparación',
     wsb2_update:          'Actualizar comparación',
     wsb2_diff_short:      'Diferencia',
-    wsb_chart_alt:        'Proyección a {y} años. Base: {a}. Alternativa: {b}.',
+    wsb_chart_alt:        'Proyección a {yl}. Base: {a}. Alternativa: {b}.',
     wsbud_period:         'Periodo',
     wsbud_period_none:    'Sin periodo',
     wstool_bud_rate_basis:'Sobre los ingresos del plan',
@@ -8368,7 +8370,7 @@ const T = {
     // CATEGORY-HERO-PREMIUM-FINAL: institutional metadata rail labels.
     // The new caption+value structure replaces the flat chips so the
     // hero reads like a Bloomberg-style identity card.
-    catHeroLabelPct:   'Exposición',
+    catHeroLabelPct:   'Del patrimonio total',
     catHeroLabelCount: 'Posiciones',
     catHeroLabelTop:   'Principal',
     catHeroValueCount: n => String(n),
@@ -8377,7 +8379,7 @@ const T = {
     // a single inline phrase ("13% cartera", "2 activos") that
     // reads less like a dashboard and more like a premium investing
     // product. Desktop keeps the formal caption above the value.
-    catHeroChipPctUnit:   'cartera',
+    catHeroChipPctUnit:   'del patrimonio total',
     catHeroChipCountUnit: n => (n === 1 ? 'activo' : 'activos'),
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `Rendimiento de ${name}`,
@@ -9944,7 +9946,7 @@ const T = {
     wsb_stab_steady:   'Steady',
     wsb_stab_dynamic:  'Dynamic',
     wsb_stab_balanced: 'Balanced',
-    wsb_concl_spread:  'Contributing {m} a month instead of nothing projects {amt} more at the end of the {y} years.',
+    wsb_concl_spread:  'Contributing {m} a month instead of nothing projects {amt} more after {yl}.',
     wsb_concl_flat:    'With these parameters the scenarios do not separate appreciably.',
     wsb_params_title:  'Comparison parameters',
     wsb_p_base:        'Starting wealth',
@@ -9958,7 +9960,7 @@ const T = {
     wsb_impact_highest:   'Highest contribution',
     wsb_impact_spread:    'Comparison range at the end of the horizon',
     wsb_pct_na:        'percentage not applicable',
-    wsb_asm_common:    'All three scenarios share horizon ({y} years), return and convention: otherwise they would not be comparable.',
+    wsb_asm_common:    'All three scenarios share horizon ({yl}), return and convention: otherwise they would not be comparable.',
     wsb_asm_base_declared: 'The starting wealth is the one YOU declared.',
     wsb_asm_base_imported: 'The starting wealth was imported on {d}.',
     wsb_asm_base_unknown:  'No starting wealth declared: the comparison measures only the effect of contributing.',
@@ -9969,7 +9971,7 @@ const T = {
     wsb_read_a: 'A steady contribution adds up solidly over the long run.',
     wsb_read_b: 'Contributing more notably accelerates your projected wealth.',
     wsb_read_c: 'Growth similar to accelerated, with a more stable trajectory.',
-    wsb_chart_title: '10-year comparison',
+    wsb_chart_title: 'Comparison over {yl}',
     wsb_axis_now: 'Current',
     wsb_concl_title: 'Aurix reading',
     wsb_concl_balanced: 'The balanced scenario combines growth and stability.',
@@ -10214,6 +10216,8 @@ const T = {
     wspl_m_deficit:       'Deficit',
     wspl_share_done_of:   'collected of the total',
     wspl_share_goal:      'saved of the goal',
+    wspl_share_reached:   'of the goal · goal reached',
+    wspl_m_surplus:       'Surplus',
     wspl_m_expenses:      'Expenses',
     wspl_m_pending:       'Pending',
     wspl_m_collected:     'Collected',
@@ -10234,7 +10238,7 @@ const T = {
     wsb2_save:            'Save comparison',
     wsb2_update:          'Update comparison',
     wsb2_diff_short:      'Difference',
-    wsb_chart_alt:        'Projection over {y} years. Base: {a}. Alternative: {b}.',
+    wsb_chart_alt:        'Projection over {yl}. Base: {a}. Alternative: {b}.',
     wsbud_period:         'Period',
     wsbud_period_none:    'No period',
     wstool_bud_rate_basis:'Of the plan income',
@@ -11533,12 +11537,12 @@ const T = {
     catHeroPctChip:   pct => `${pct}% portfolio`,
     catHeroTopChip:   name => `Top: ${name}`,
     // CATEGORY-HERO-PREMIUM-FINAL: institutional metadata rail labels.
-    catHeroLabelPct:   'Exposure',
+    catHeroLabelPct:   'Of total wealth',
     catHeroLabelCount: 'Positions',
     catHeroLabelTop:   'Primary',
     catHeroValueCount: n => String(n),
     // FINAL-MOBILE-POLISH-1 — consumer-premium chip units, mobile only.
-    catHeroChipPctUnit:   'portfolio',
+    catHeroChipPctUnit:   'of total wealth',
     catHeroChipCountUnit: n => (n === 1 ? 'asset' : 'assets'),
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `${name} performance`,
@@ -12977,7 +12981,7 @@ let _dd = null;          // active drag state (asset cards)
 let justDragged = false; // blocks post-drag click from opening a card
 
 // Show skeleton on total value while initial prices load
-if (assets.length > 0) totalValueEl.classList.add('skeleton');
+if (assets.length > 0) { totalValueEl.classList.add('skeleton'); totalValueEl.setAttribute('aria-hidden', 'true'); }
 
 // Gold form groups
 const karatGroupEl    = document.getElementById('karatGroup');
@@ -25319,13 +25323,15 @@ function _wsGoalShare(g) {
   if (!Number.isFinite(tgt) || !(tgt > 0)) return null;
   const acc = Number.isFinite(cur) ? Math.max(0, Math.min(cur, tgt)) : 0;
   if (!Number.isFinite(cur)) return null;
-  return { a: acc, b: Math.max(0, tgt - acc), ka: 'wspl_share_goal', kb: 'wspl_share_left' };
+  // Alcanzado o superado: la barra se queda en el 100 % y lo DICE (el importe real va en las métricas).
+  return { a: acc, b: Math.max(0, tgt - acc), ka: cur >= tgt ? 'wspl_share_reached' : 'wspl_share_goal', kb: 'wspl_share_left' };
 }
 function _wsGoalMetrics(g) {
   const out = [];
   const tgt = Number(g && g.target), cur = Number(g && g.current);
   if (Number.isFinite(cur)) out.push({ k: t('wspl_m_saved'), v: _wsgMoney(g, cur) });
   if (Number.isFinite(tgt) && tgt > 0) out.push({ k: t('wspl_m_target'), v: _wsgMoney(g, tgt) });
+  if (Number.isFinite(tgt) && tgt > 0 && Number.isFinite(cur) && cur > tgt) out.push({ k: t('wspl_m_surplus'), v: '+' + _wsgMoney(g, cur - tgt) });
   return out;
 }
 function _wsPlanShare(p) {
@@ -25382,7 +25388,11 @@ function _wsPlanSpendHtml(p) {
   if (!(tot > 0)) return '';
   const esc = _intccEsc;
   const top = items.slice().sort((a, b) => b.value - a.value);
-  const lbl = t('wspl_spend') + ': ' + top.map(x => x.name + ' ' + formatBase(x.value)).join(', ');
+  // La moneda del DOCUMENTO, la misma que las cifras visibles (antes `formatBase` anunciaba la de
+  // visualización: «900 US$» sobre una tarjeta en euros). Un documento antiguo sin moneda declarada
+  // se anuncia sin símbolo, igual que se pinta.
+  const _sccy = _wsDocCurrencyOf(p);
+  const lbl = t('wspl_spend') + ': ' + top.map(x => x.name + ' ' + _wsMoneyIn(Number(x.value), _sccy)).join(', ');
   // §4 · MINIDONUT, el MISMO reparto que el anillo de la herramienta (mismas partidas, mismos
   // colores, mismo denominador: el total de gastos). Al lado, la partida que manda y su peso.
   // El color de un DATO viene del motor y va en el elemento, nunca como `style`.
@@ -26810,7 +26820,7 @@ function _wsbTwoLineChartHtml(cmp) {
   const pts = arr => arr.map((x, i) => xF(i).toFixed(1) + ',' + yF(x.value).toFixed(1)).join(' ');
   const endA = sa[sa.length - 1], endB = sb[sb.length - 1];
   const alt = String(t('wsb_chart_alt') || '')
-    .replace('{y}', String(cmp.years))
+    .replace('{yl}', _wsbYl(cmp.years))
     .replace('{a}', _wsbMoney(endA ? endA.value : 0))
     .replace('{b}', _wsbMoney(endB ? endB.value : 0));
   return `
@@ -26858,11 +26868,24 @@ function _wsbConclusion(cmp) {
   return String(t('wsb_concl_spread') || '')
     .replace('{amt}', _wsbMoney(Math.abs(spread)))
     .replace('{m}', _wsbMoney(top.monthly))
-    .replace('{y}', String((cmp && cmp.years) || 0));
+    .replace('{yl}', _wsbYl((cmp && cmp.years) || 0));
 }
 
+// El horizonte con su número gramatical: «1 año» / «15 años» · «1 year» / «15 years». Todos los
+// textos del simulador lo toman del estado activo (antes el título decía «10 años» siempre).
+function _wsbYl(y) {
+  const en = (typeof lang !== 'undefined' && lang === 'en');
+  const n = Number(String(y).replace(',', '.'));
+  const v = Number.isFinite(n) ? n.toLocaleString(en ? 'en-US' : 'es-ES', { maximumFractionDigits: 2 }) : String(y || 0);
+  const one = Number.isFinite(n) && n === 1;
+  return en ? `${v} ${one ? 'year' : 'years'}` : `${v} ${one ? 'año' : 'años'}`;
+}
+// La rentabilidad que la BASE hereda, un solo owner para el render y el repintado al teclear.
+function _wsbInheritText(p) {
+  return `${_intccEsc(t('wsb_p_ret'))}: ${_intccEsc(_wsFormatInputNumber(p.ret))}% · ${_intccEsc(t('wsb2_common'))}`;
+}
 // Simple pure-SVG comparative bar chart (baseline + 3 scenarios). No libraries.
-function _wsbChartHtml(baselineProj, results) {
+function _wsbChartHtml(baselineProj, results, years) {
   const esc = _intccEsc;
   const bars = [{ label: t('wsb_axis_now'), v: baselineProj, base: true }]
     .concat(results.map(s => ({ label: s.id, v: s.projected, base: false })));
@@ -26878,7 +26901,7 @@ function _wsbChartHtml(baselineProj, results) {
     rects += `<text class="wsb-bar-x" x="${(x + bw / 2).toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="middle">${esc(b.label)}</text>`;
   });
   return `
-    <svg class="wsb-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wsb_chart_title'))}">
+    <svg class="wsb-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(String(t('wsb_chart_title') || '').replace('{yl}', _wsbYl(years)))}">
       <line class="wsb-chart-base" x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}"/>
       ${rects}
     </svg>`;
@@ -26897,8 +26920,8 @@ function _wsbTailHtml(cmp) {
   const esc = _intccEsc;
   return `
       <section class="wsh-card wsb-compare">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_chart_title'))}</h3></header>
-        <div class="wsb-chart">${_wsbChartHtml(cmp.reference.final, cmp.rows)}</div>
+        <header class="wsh-head"><h3 class="wsh-title">${esc(String(t('wsb_chart_title') || '').replace('{yl}', _wsbYl(cmp.years)))}</h3></header>
+        <div class="wsb-chart">${_wsbChartHtml(cmp.reference.final, cmp.rows, cmp.years)}</div>
       </section>
 
       <section class="wsh-card wsb-concl is-feature">
@@ -27015,6 +27038,16 @@ function _wsbParamInput(el) {
   // el campo que se está editando nunca es el nodo reemplazado.
   const twoOut = root.querySelector('[data-wsb2-out]');
   if (twoOut) twoOut.innerHTML = _wsbTwoWayOutHtml(_wsbTwoWay());
+  // La rentabilidad HEREDADA se pinta en dos sitios que no son el campo editado: la línea de la base
+  // y el valor de la alternativa mientras nadie la haya tocado. Sin esto mostraban el supuesto viejo
+  // hasta guardar, junto a un resultado que ya usaba el nuevo.
+  if (k === 'ret') {
+    const pNow = _wsbParams();
+    const inh = root.querySelector('[data-wsb2-inherit]');
+    if (inh) inh.innerHTML = _wsbInheritText(pNow);
+    const alt = root.querySelector('[data-wsb-param="altRet"]');
+    if (alt && alt !== document.activeElement && (pNow.altRet == null || String(pNow.altRet) === '')) alt.value = _wsFormatInputNumber(pNow.ret);
+  }
   // Tocar un supuesto deja la instancia abierta DESALINEADA con lo que se ve, y
   // la barra lo dice en el mismo gesto: nada de un «Guardado ✓» que describa
   // unos números que ya no están en pantalla.
@@ -27029,7 +27062,7 @@ function _wsbAssumptionsListHtml(cmp) {
     String(t('wstool_asm_rate') || '').replace('{r}', _intv4Num(cmp.ratePct, 2)),
     t(cmp.convention === _WS_PROJ_CONV.NOMINAL12 ? 'wstool_asm_conv_nominal' : 'wstool_asm_conv_effective'),
     t('wstool_asm_timing_end'),
-    String(t('wsb_asm_common') || '').replace('{y}', String(cmp.years)),
+    String(t('wsb_asm_common') || '').replace('{yl}', _wsbYl(cmp.years)),
     cmp.base.source === 'imported' ? String(t('wsb_asm_base_imported') || '').replace('{d}', _intccDate(cmp.base.at))
       : cmp.base.known ? t('wsb_asm_base_declared') : t('wsb_asm_base_unknown'),
   ];
@@ -27061,7 +27094,7 @@ function _wsbTwoWayInnerHtml() {
       <div class="wsb2-col is-a">
         <span class="wsb2-col-t"><i class="wsb2-dot is-a" aria-hidden="true"></i>${esc(t('wsb2_base'))}</span>
         ${num('baseMonthly', t('wsb2_monthly'), _wsToolCcy(), p.baseMonthly)}
-        <p class="wsb2-inherit">${esc(t('wsb_p_ret'))}: ${esc(_wsFormatInputNumber(p.ret))}% · ${esc(t('wsb2_common'))}</p>
+        <p class="wsb2-inherit" data-wsb2-inherit>${_wsbInheritText(p)}</p>
       </div>
       <div class="wsb2-col is-b">
         <span class="wsb2-col-t"><i class="wsb2-dot is-b" aria-hidden="true"></i>${esc(t('wsb2_alt'))}</span>
@@ -28365,9 +28398,9 @@ function _wsgCardOutHtml(g, prog) {
   const money = v => (v == null || !Number.isFinite(Number(v))) ? '—' : _wsgMoney(g, v);
   // Final polish — meta, actual y fecha estimada ya están en la fila de la tarjeta: aquí sólo lo
   // que NO está ahí (restante, la fecha DESEADA si se declaró —distinta de la estimada— y el ritmo).
-  const rows = [
-    { label: t('wsg_r_remaining'), value: money(prog.remaining) },
-  ];
+  const rows = prog.state === 'reached'
+    ? (Number(prog.gapAtDate) > 0 ? [{ label: t('wspl_m_surplus'), value: '+' + money(prog.gapAtDate) }] : [])
+    : [{ label: t('wsg_r_remaining'), value: money(prog.remaining) }];
   if (!prog.etaYear) rows.push({ label: t('wsg_r_eta'), value: t('wsh_none') });
   if (hasDate && g.targetYear) rows.push({ label: t('wsg_r_desired'), value: String(g.targetYear) });
   if (hasDate && prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: money(prog.requiredMonthly) + t('ws4_permonth') });
@@ -28571,7 +28604,11 @@ function _renderGoals() {
     const kpis = [
       { k: t('wsg_k_progress'), v: _okT ? (_wsgMoney(g, prog.current) + ' / ' + _wsgMoney(g, prog.target)) : '' },
       { k: '', v: _okT ? (prog.pct + '%') : '' },
-      { k: t('wsg_r_eta'), v: prog.etaYear ? '~ ' + prog.etaYear : '' },
+      // Alcanzado: no hay fecha que estimar (el motor devuelve el año en curso como relleno). Se dice
+      // el estado y, si lo hay, el excedente; una fecha de consecución real no existe en el documento.
+      prog.state === 'reached'
+        ? { k: t('wsg_state_reached'), v: (Number(prog.gapAtDate) > 0 ? '+' + _wsgMoney(g, prog.gapAtDate) : '✓') }
+        : { k: t('wsg_r_eta'), v: prog.etaYear ? '~ ' + prog.etaYear : '' },
     ];
     const inner = `
         <div class="wsg-card-head">
@@ -60729,7 +60766,7 @@ function _applyValueSizeClass() {
 }
 
 function countUpTotalValue(targetBase) {
-  totalValueEl.classList.remove('skeleton');
+  totalValueEl.classList.remove('skeleton'); totalValueEl.removeAttribute('aria-hidden');
 
   // First load: count up from 0 (gives the "live numbers waking up" feel)
   if (_countUpCurrent === null) {
@@ -77323,7 +77360,7 @@ function render(animate = false) {
   updatePerformance();
   assetCountEl.textContent = t('assetCount')(activeAssets().length);
   // El marcador estático de index.html llega como skeleton (nunca un «0 activos» antes de leer la cartera).
-  assetCountEl.classList.remove('skeleton');
+  assetCountEl.classList.remove('skeleton'); assetCountEl.removeAttribute('aria-hidden');
 
   // AURIX-EMPTY-1: hero empty mode. Single source of truth: assets.length.
   // Applied AFTER the regular value updates so the premium copy is the
@@ -77335,7 +77372,7 @@ function render(animate = false) {
   if (_dashEmpty && !activeCategory) {
     if (totalValueEl) {
       totalValueEl.textContent = '—';
-      totalValueEl.classList.remove('skeleton');
+      totalValueEl.classList.remove('skeleton'); totalValueEl.removeAttribute('aria-hidden');
       totalValueEl.classList.remove('summary-total--compact');
     }
     if (assetCountEl)   assetCountEl.textContent = t('emptyAssetCount');
