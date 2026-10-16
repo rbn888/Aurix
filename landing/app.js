@@ -352,6 +352,61 @@
       'launch.count': 'Launching in {h} h',
   });
 
+  // LANDING MASTER · Intelligence con sección propia, Workspace completo y FAQ ampliada.
+  // Mismo patrón que SPEC 2: se aplica después, así que `how.3.d` sustituye al copy anterior.
+  Object.assign(I18N.es, {
+      'intel.eyebrow': 'Aurix Intelligence',
+      'intel.title': 'Tu patrimonio tiene una historia. Aurix te ayuda a leerla.',
+      'intel.lead': 'Hacer seguimiento te dice qué tienes. Intelligence te ayuda a entender qué significa.',
+      'intel.c1.t': 'Concentración',
+      'intel.c1.d': 'Descubre qué posiciones y categorías pesan más en tu patrimonio y cuánto depende de ellas.',
+      'intel.c2.t': 'Evolución',
+      'intel.c2.d': 'Sigue cómo cambia la estructura de tu patrimonio con el tiempo, no solo su total.',
+      'intel.c3.t': 'Cambios clave',
+      'intel.c3.d': 'Detecta qué ha cambiado de forma relevante en tu cartera, sin ruido por movimientos menores.',
+      'intel.note': 'Intelligence lee tus propios datos y te los explica. No te dice qué comprar ni qué vender.',
+      'how.3.d': 'Workspace reúne herramientas para planificar con tus propios números. Guarda cada plan como un documento, retómalo más tarde y elige cuáles mostrar en tu Dashboard.',
+      'ws.c.budget': 'Presupuestos', 'ws.c.goals': 'Objetivos', 'ws.c.re': 'Inmuebles', 'ws.c.recv': 'Cobros',
+      'ws.c.compound': 'Interés compuesto', 'ws.c.loan': 'Préstamos', 'ws.c.scen': 'Escenarios',
+      'ws.c.cmp': 'Comparador de rentabilidad', 'ws.c.jrn': 'Diario de inversiones',
+      'faq.0.q': '¿Qué es Aurix?',
+      'faq.0.a': 'Una plataforma de inteligencia patrimonial para quienes invierten. Reúnes tus posiciones en un solo lugar, Intelligence te ayuda a entender qué está cambiando y Workspace te permite planificar con tus propios números.',
+      'faq.6.q': '¿Qué activos puedo registrar?',
+      'faq.6.a': 'Acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez. Aurix actualiza los precios de los activos cotizados; el valor del resto lo introduces tú.',
+      'faq.7.q': '¿Qué hace Intelligence?',
+      'faq.7.a': 'Lee tu cartera y te la explica: dónde se concentra tu patrimonio, cómo evoluciona su estructura y qué ha cambiado de forma relevante. Free incluye una primera lectura; Premium desbloquea el análisis completo.',
+      'faq.8.q': '¿Qué es Workspace?',
+      'faq.8.a': 'El espacio para planificar: presupuestos, objetivos, inmuebles, cobros, interés compuesto, préstamos, escenarios, comparador de rentabilidad y diario de inversiones. Forma parte de Premium.',
+      'faq.9.q': '¿Se guardan mis planes?',
+      'faq.9.a': 'Con Premium, cada plan se guarda como un documento en tu cuenta para que puedas retomarlo más tarde. En tu Dashboard no aparece nada que no hayas elegido mostrar.',
+  });
+  Object.assign(I18N.en, {
+      'intel.eyebrow': 'Aurix Intelligence',
+      'intel.title': 'Your wealth has a story. Aurix helps you read it.',
+      'intel.lead': 'Tracking tells you what you own. Intelligence helps you understand what it means.',
+      'intel.c1.t': 'Concentration',
+      'intel.c1.d': 'See which positions and categories carry the most weight in your wealth, and how much of it depends on them.',
+      'intel.c2.t': 'Evolution',
+      'intel.c2.d': 'Follow how the structure of your wealth changes over time, not just its total.',
+      'intel.c3.t': 'Key changes',
+      'intel.c3.d': 'Spot what has changed in a meaningful way in your portfolio, without noise from minor moves.',
+      'intel.note': 'Intelligence reads your own data and explains it. It does not tell you what to buy or sell.',
+      'how.3.d': 'Workspace brings together tools to plan with your own numbers. Save each plan as a document, pick it up later and choose which ones to show on your Dashboard.',
+      'ws.c.budget': 'Budgets', 'ws.c.goals': 'Goals', 'ws.c.re': 'Real estate', 'ws.c.recv': 'Receivables',
+      'ws.c.compound': 'Compound interest', 'ws.c.loan': 'Loans', 'ws.c.scen': 'Scenarios',
+      'ws.c.cmp': 'Return comparison', 'ws.c.jrn': 'Investment journal',
+      'faq.0.q': 'What is Aurix?',
+      'faq.0.a': 'A wealth intelligence platform for people who invest. You bring your positions together in one place, Intelligence helps you understand what is changing, and Workspace lets you plan with your own numbers.',
+      'faq.6.q': 'Which assets can I add?',
+      'faq.6.a': 'Stocks, ETFs, funds, crypto, metals, real estate and cash. Aurix updates the prices of listed assets; you enter the value of the rest yourself.',
+      'faq.7.q': 'What does Intelligence do?',
+      'faq.7.a': 'It reads your portfolio and explains it: where your wealth is concentrated, how its structure evolves and what has changed in a meaningful way. Free includes a first reading; Premium unlocks the full analysis.',
+      'faq.8.q': 'What is Workspace?',
+      'faq.8.a': 'The space to plan: budgets, goals, real estate, receivables, compound interest, loans, scenarios, return comparison and an investment journal. It is part of Premium.',
+      'faq.9.q': 'Are my plans saved?',
+      'faq.9.a': 'With Premium, each plan is saved as a document in your account so you can pick it up later. Nothing appears on your Dashboard unless you choose to show it there.',
+  });
+
   // AURIX-AFFILIATES-V1 · aviso de recomendación (sólo aparece con un `?ref=`).
   Object.assign(I18N.es, {
       'ref.title': 'Has llegado por una recomendación',
