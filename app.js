@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '794'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '795'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -22433,7 +22433,7 @@ async function _wsDocsPull() {
       const localPending = (_st === 'saving' || _st === 'error');
       const byId = new Map();
       local.forEach(item => { const id = spec.idOf(item); if (id) byId.set(String(id), item); });
-      let changed = false;
+      let changed = false, repush = false;
       for (const r of mine) {
         const cur = byId.get(String(r.doc_id));
         const remoteRev = Number(r.revision) || 1;
@@ -22451,7 +22451,13 @@ async function _wsDocsPull() {
           tombstoned.push(key + '|' + String(r.doc_id));   // lo apartado como ambiguo deja de estarlo
           if (!cur) continue;                              // nunca lo tuvimos: nada que borrar
           if (cur.deletedAt) continue;                      // ya estaba marcado
-          if (!(remoteRev > (Number(cur.revision) || 1))) continue;   // nuestra copia es más nueva
+          // A igual revisión, el mismo desempate por `updatedAt` que las ediciones (más abajo): sin él,
+          // un borrado más reciente en otro dispositivo no ganaba nunca a esta copia viva.
+          const _lr = Number(cur.revision) || 1, _ra = Number(r.body && r.body.updatedAt) || 0, _la = Number(cur.updatedAt) || 0;
+          if (!(remoteRev > _lr || (remoteRev === _lr && _ra > _la))) {
+            if (remoteRev === _lr && _la > _ra && _ra > 0) repush = true;   // nuestra edición es posterior
+            continue;
+          }
           cur.deletedAt = Date.parse(r.deleted_at) || Date.now();
           cur.revision = remoteRev;
           changed = true;
@@ -22468,9 +22474,26 @@ async function _wsDocsPull() {
           else if (spec.kind !== 'ws_funding') ambiguous.push({ key: key, kind: spec.kind, docId: String(r.doc_id), revision: remoteRev, body: body });
           continue;
         }
-        else if (remoteRev > (Number(cur.revision) || 1)) { Object.assign(cur, body); changed = true; }
+        // ── EL REMOTO MÁS NUEVO SUSTITUYE EL CUERPO, NO LO MEZCLA (cierre de sincronización) ──
+        // `Object.assign` sólo añadía y pisaba claves: lo que el otro dispositivo QUITÓ seguía aquí.
+        // «Quitar del Dashboard» borra `dashPinned`, así que el retiro no llegaba nunca y la siguiente
+        // edición de este dispositivo lo volvía a publicar en el otro. Se conserva la identidad del
+        // objeto (está en `local`) y se sustituye su contenido.
+        // Y A IGUAL REVISIÓN decide `updatedAt`: dos dispositivos que editan desde la misma revisión
+        // sin leer entre medias acaban con la misma revisión y cuerpos distintos; sin desempate cada
+        // uno conservaba el suyo para siempre y el servidor el del último en subir. Ahora gana la
+        // edición más reciente en los dos: si es la remota se adopta, si es la local se vuelve a subir.
+        else {
+          const localRev = Number(cur.revision) || 1;
+          const rAt = Number(body.updatedAt) || 0, lAt = Number(cur.updatedAt) || 0;
+          if (remoteRev > localRev || (remoteRev === localRev && rAt > lAt)) {
+            Object.keys(cur).forEach(k => { if (!(k in body)) delete cur[k]; });
+            Object.assign(cur, body); changed = true;
+          } else if (remoteRev === localRev && lAt > rAt && rAt > 0) repush = true;
+        }
       }
       if (changed) { try { localStorage.setItem(key, JSON.stringify(local)); touched++; } catch (_) {} }
+      if (repush) { try { _wsDocsQueue(key); } catch (_) {} }
     }
     // Los ambiguos se CONSERVAN aparte (por cuenta), nunca se restauran solos ni se borran.
     try { _wsRecoverableMerge(ambiguous, tombstoned); } catch (_) {}

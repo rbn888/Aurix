@@ -390,7 +390,9 @@ console.log('\n4 · Guardar, y decir la verdad sobre dónde:');
   });
   ok('4.12 la lectura remota AÑADE y ACTUALIZA, nunca sustituye la lista local',
     (() => { const src = fnSrc('_wsDocsPull');
-      return /remoteRev > \(Number\(cur\.revision\) \|\| 1\)/.test(src)
+      // Cierre de sincronización: la revisión local se nombra (`localRev`/`_lr`) para el desempate por
+      // `updatedAt`; la regla sigue siendo comparar por revisión, documento a documento.
+      return /remoteRev > (\(Number\(cur\.revision\) \|\| 1\)|localRev|_lr)/.test(src) && /const localRev = Number\(cur\.revision\) \|\| 1/.test(src)
         && !/localStorage\.setItem\(key, JSON\.stringify\(mine/.test(src)
         && /if \(r\.deleted_at\) continue;/.test(src); })());
   ok('4.13 un documento sin id estable NO se sube (subirlo duplicaría en cada guardado)',

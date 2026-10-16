@@ -507,7 +507,9 @@ console.log('\n3 · Guardado nombrado y ciclo de vida:');
     (function () { const pull = fnSrc('_wsDocsPull');
       return /if \(r\.deleted_at\) \{/.test(pull)
         && /cur\.deletedAt = Date\.parse\(r\.deleted_at\) \|\| Date\.now\(\);/.test(pull)
-        && /if \(!\(remoteRev > \(Number\(cur\.revision\) \|\| 1\)\)\) continue;/.test(pull)
+        // Cierre de sincronización: misma regla de revisión y, a igual revisión, desempate por `updatedAt`.
+        && /const _lr = Number\(cur\.revision\) \|\| 1/.test(pull)
+        && /if \(!\(remoteRev > _lr \|\| \(remoteRev === _lr && _ra > _la\)\)\) \{/.test(pull)
         && /if \(!cur\) continue;/.test(pull); })());
   ok('3.19b los dos sitios que borran usan el tombstone, no el recorte del array',
     /_ws4Tombstone\(id\)/.test(fnSrc('_wsxAct')) && /_wsgTombstone\(id\)/.test(fnSrc('_wsxAct'))
