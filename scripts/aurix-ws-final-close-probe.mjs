@@ -714,6 +714,35 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await ctx.close();
   }
 
+  // ═════════════════ §N · MENÚ DE MI ESPACIO: MISMO CONTRATO CON 0 / 1 / VARIOS / TODOS PUBLICADOS ═════════════════
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });
+    const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => { if (!/access control checks|Load failed|Failed to fetch/.test(e.message)) errs.push(e.message); });
+    await boot(p, { seed: { aurix_ws_pinned_v1: [{ ref: 'tpl:mbudget', ts: 3 }, { ref: 'tpl:realestate', ts: 2 }],
+      aurix_ws_projects_v1: [ DOC('n1', 'monthly_budget', 'Uno', { inputs: BUDGET_IN, dashHidden: true }) ] } });
+    const T = ENG + '.§N';
+    const acts = async cap => { await p.evaluate(`_wsDocsPulledFor = _wsDocsSession(); switchTab('workspace'); _wsTab='space'; _wshView='home'; _wshRepaintHome();`); await p.waitForTimeout(250);
+      await p.locator(`.wsh-mse2-card[data-wsmse-cap="${cap}"] [data-wscap-menu]`).click(); await p.waitForTimeout(120);
+      const a = await J(p, `return [].slice.call(document.querySelectorAll('#wsCapMenu [data-wsmenu-act]')).map(function(b){return b.getAttribute('data-wsmenu-act')})`); return a; };
+    let a = await acts('realestate');
+    ok(`${T} sin documentos: ofrece crear, nunca publicar la plantilla vacía`, a.join() === 'open,new,fav', a.join());
+    await p.keyboard.press('Escape'); await p.evaluate(`document.querySelector('.wsmse-scrim') && document.querySelector('.wsmse-scrim').click()`);
+    a = await acts('budget');
+    ok(`${T} un documento sin publicar: Mostrar en Dashboard`, a.join() === 'open,pub,fav', a.join());
+    await p.locator('#wsCapMenu [data-wsmenu-act="pub"]').click(); await p.waitForTimeout(150);
+    a = await acts('budget');
+    ok(`${T} todos publicados: ofrece «Quitar del Dashboard» (antes no había ninguna acción)`, a.join() === 'open,unpub,fav', a.join());
+    await p.locator('#wsCapMenu [data-wsmenu-act="unpub"]').click(); await p.waitForTimeout(150);
+    const r = await J(p, `return { plans: _wsPlansAll().length, docs: _ws4Projects().length }`);
+    ok(`${T} quitar del Dashboard desde Mi espacio no borra el documento`, r.plans === 0 && r.docs === 1, JSON.stringify(r));
+    // Aviso de documentos remotos apartados: visible también en Mi espacio, con «Recuperar».
+    await p.evaluate(`_wsDocsPullSkippedAbsent = 2; _wshRepaintHome();`); await p.waitForTimeout(100);
+    const rec = await J(p, `return !!document.querySelector('.wsh-mse2-recover [data-ws-recover]')`);
+    ok(`${T} documentos remotos sin recuperar: Mi espacio lo dice y ofrece Recuperar`, rec === true);
+    ok(`${T} sin errores de página`, errs.length === 0, errs.join(' | '));
+    await ctx.close();
+  }
+
   // ═════════════════ §F · DOCUMENTO LEGACY SIN MONEDA ═════════════════
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true });

@@ -32576,3 +32576,25 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
   #wsPlansGrid .wspl-card, #wsPlansGrid .wspl-card.has-cover { max-width: none; } }
 #wsPlansGrid .wspl-cover > .wspl-cover-bg { inset: 0; width: 100%; height: 100%; transform: scale(1.15); transform-origin: center; }
 #wsPlansGrid .wspl-cover > .wspl-cover-bg { transform: none; }
+
+/* ══ CIERRE FINAL · microacabados ═══════════════════════════════════════════════
+   Portada de plan: el fondo difuminado más oscuro y difuso (sin objetos reconocibles duplicados),
+   imagen completa intacta. Continuar ~10 % más ligero en móvil (44 px táctiles). Bordes algo más
+   definidos y coherentes con las cards patrimoniales. */
+.aurix-wsh .wsh-mse2-recover { margin: 0 0 10px; }
+#wsPlansGrid .wspl-cover > .wspl-cover-bg { filter: blur(26px) brightness(0.32) saturate(1.05); }
+#wsPlansGrid .wspl-cover::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(5,8,15,0.55), rgba(5,8,15,0) 22%, rgba(5,8,15,0) 78%, rgba(5,8,15,0.55)); }
+@media (max-width: 639px) {
+  #wsPlansGrid .wspl-go { padding: 0 11px; font-size: 12.5px; font-weight: 600; }
+  #wsPlansGrid .wspl-card > .wspl-card-id { column-gap: 8px; }
+  #wsPlansGrid .wspl-card > .wspl-slot-hero { margin-top: 2px; }
+}
+#wsPlansGrid .wspl-card, .wspin-card { border-color: rgba(var(--ws-a, 74,130,240), 0.24); }
+.wspin-card { align-items: center; }
+.wspin-card > .wspin-id { align-self: center; }
+/* La regla global de seguridad de imágenes (`img { filter: none !important }`) anulaba el difuminado: sólo el fondo de la portada de un plan lo recupera. */
+#wsPlansGrid .wspl-cover > img.wspl-cover-bg { filter: blur(26px) brightness(0.32) saturate(1.05) !important; transform: none !important; }
+#wsPlansGrid .wspl-cover { isolation: isolate; }
+#wsPlansGrid .wspl-cover > img.wspl-cover-bg { filter: blur(22px) brightness(0.46) saturate(1.1) !important; }
+#wsPlansGrid .wspl-cover::after { background: linear-gradient(90deg, rgba(5,8,15,0.35), rgba(5,8,15,0) 18%, rgba(5,8,15,0) 82%, rgba(5,8,15,0.35)); }

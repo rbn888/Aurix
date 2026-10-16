@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '793'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '794'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6980,6 +6980,8 @@ const T = {
     wscap_see_all:        'Ver todos ({n})',
     wscap_pick_publish:   'Elige qué documento mostrar.',
     wscap_published:      'Publicado en Tus planes',
+    wscap_unpublished:    'Quitado de Tus planes',
+    wscap_pick_unpublish: 'Elige qué documento quitar.',
     wstpl_fav_hint:       'Márcala como favorita para volver rápidamente desde Mi espacio.',
     wsexit_title:         'Tienes cambios sin guardar',
     wsexit_text:          'Si sales ahora, este documento no los conservará.',
@@ -10263,6 +10265,8 @@ const T = {
     wscap_see_all:        'See all ({n})',
     wscap_pick_publish:   'Choose which document to show.',
     wscap_published:      'Shown in Your plans',
+    wscap_unpublished:    'Removed from Your plans',
+    wscap_pick_unpublish: 'Choose which document to remove.',
     wstpl_fav_hint:       'Star it to come back quickly from My space.',
     wsexit_title:         'You have unsaved changes',
     wsexit_text:          'If you leave now, this document will not keep them.',
@@ -23110,11 +23114,12 @@ function _wshWireOnce() {
   try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash],[data-wsdoc-dash]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash],[data-wsdoc-dash],[data-ws-recover]')
       : null;
     if (!t) return;
     const capMenu = t.getAttribute('data-wscap-menu');
     if (capMenu) { e.preventDefault(); e.stopPropagation(); _wsCapMenu(t, capMenu); return; }
+    if (t.hasAttribute('data-ws-recover') && t.closest && t.closest('#aurixWorkspace')) { try { _wsRecoverOpen(); } catch (_) {} return; }
     const docDash = t.getAttribute('data-wsdoc-dash');
     if (docDash) {
       let d = null; try { d = _ws4Projects().find(x => x && x.id === docDash) || null; } catch (_) { d = null; }
@@ -26119,26 +26124,35 @@ function _wsTplEntry(cat) {
 }
 // «Mostrar en Dashboard» desde Mi espacio: un documento → ése; varios → elegir cuál. Nunca la
 // plantilla vacía; sin documentos representables no se ofrece.
-function _wsCapPublish(cat) {
+function _wsCapPublish(cat, remove) {
   const docs = _wsCapDocs(cat).filter(d => d.kind === 'goal' || d.dashable);
-  const pub = d => { _wsPlanDashSet(d.id, false, d.kind); _wshRepaintHome(); try { _aurixBillingToast(t('wscap_published'), 'ok'); } catch (_) {} };
-  const off = docs.filter(d => !d.onDash);
-  if (!off.length) return;
-  if (off.length === 1) { pub(off[0]); return; }
-  _wsPickDocModal({ title: t('wscap_dash_add'), text: t('wscap_pick_publish'), docs: off, okLabel: t('wscap_dash_add'), onPick: d => { if (d) pub(d); } });
+  const act = d => { _wsPlanDashSet(d.id, !!remove, d.kind); _wshRepaintHome(); try { _aurixBillingToast(t(remove ? 'wscap_unpublished' : 'wscap_published'), 'ok'); } catch (_) {} };
+  const cand = docs.filter(d => remove ? d.onDash : !d.onDash);
+  if (!cand.length) return;
+  if (cand.length === 1) { act(cand[0]); return; }
+  const lbl = t(remove ? 'wsmse_dash_remove' : 'wscap_dash_add');
+  _wsPickDocModal({ title: lbl, text: t(remove ? 'wscap_pick_unpublish' : 'wscap_pick_publish'), docs: cand, okLabel: lbl, onPick: d => { if (d) act(d); } });
 }
 function _wsCapMenu(anchor, ref) {
   const fav = _wsIsPinned(ref), dash = _wsIsDashTool(ref);
   const card = anchor.closest ? anchor.closest('.wsh-mse2-card') : null;
   const cat = card ? card.getAttribute('data-wsmse-cap') : '';
-  const pubable = _wsCapDocs(cat).filter(d => (d.kind === 'goal' || d.dashable) && !d.onDash).length > 0;
+  // MISMO MENÚ EN TODOS LOS DISPOSITIVOS, decidido por los documentos que HAY: publicar si alguno
+  // no está publicado, quitar si alguno lo está, y —sin documentos— crear uno (nunca publicar la
+  // plantilla vacía). Antes, con todos ya publicados o sin documentos en ese dispositivo, el ⋯ se
+  // quedaba en «Abrir / Quitar favorito» sin ninguna acción de Dashboard.
+  const repr = _wsCapDocs(cat).filter(d => d.kind === 'goal' || d.dashable);
   const items = [{ k: 'open', label: t('wsh_proj_open') }];
-  if (pubable) items.push({ k: 'pub', label: t('wscap_dash_add') });
+  if (repr.some(d => !d.onDash)) items.push({ k: 'pub', label: t('wscap_dash_add') });
+  if (repr.some(d => d.onDash)) items.push({ k: 'unpub', label: t('wsmse_dash_remove') });
+  if (!repr.length && _WS_CAT_DOCTYPE[cat] && _WSPL_TYPES[_WS_CAT_DOCTYPE[cat]]) items.push({ k: 'new', label: t('wscap_new') });
   if (_wsIsToolCapRef(ref)) items.push({ k: 'dash', label: t(dash ? 'wscap_pin_remove' : 'wscap_pin_add') });
   items.push({ k: 'fav', label: t(fav ? 'wscap_fav_remove' : 'wscap_fav_add') });
   _wsPopoverMenu(anchor, 'wsCapMenu', items, act => {
     if (act === 'open') { if (card) card.click(); }
     else if (act === 'pub') { _wsCapPublish(cat); }
+    else if (act === 'unpub') { _wsCapPublish(cat, true); }
+    else if (act === 'new') { _wsCapOpenDoc(cat, _WS_NEW_DOC, 'space'); }
     else if (act === 'fav') { _wsTogglePin(ref); _wshRepaintHome(); }
     else if (act === 'dash') { _wsToggleDashTool(ref); _wshRepaintHome(); }
   });
@@ -26451,10 +26465,16 @@ function _renderWorkspaceHome(metrics) {
       </section>`;
     const _nDocs = tplList.concat(toolList).reduce((n, it) => n + it.docs.length, 0);
 
+    // Documentos de ESTA cuenta en el servidor que este dispositivo apartó por ambiguos: se dice en
+    // Mi espacio igual que en Tus planes (mismo aviso y mismo «Recuperar»), para que un dispositivo
+    // no parezca «tener menos documentos» en silencio.
+    const _recN = (typeof _wsDocsPullSkippedAbsent === 'number') ? _wsDocsPullSkippedAbsent : 0;
+    const _recNote = _recN > 0 ? `<p class="wspl-note is-warn wsh-mse2-recover">${esc(t('wspl_recover_note')(_recN))} <button type="button" class="wspl-link" data-ws-recover>${esc(t('wspl_recover_btn'))}</button></p>` : '';
     panel = `<div class="wsh-mse2" data-wsmse-cols="2" data-wsmse-tpl="${tplList.length}" data-wsmse-tool="${toolList.length}" data-wsmse-ndocs="${_nDocs}"${_unknown ? ` data-wsmse-state="${_unknown}"` : ''}>
       ${column('wsmse2_tpl_title', tplList, ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
       ${column('wsmse2_tool_title', toolList, ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
     </div>`;
+    if (_recNote) panel = _recNote + panel;
   } else if (tab === 'templates' || tab === 'tools') {
     const kind = tab === 'templates' ? 'template' : 'tool';
     const map = kind === 'template' ? _WS_TPL_RENDER : _WS_TOOL_RENDER;
