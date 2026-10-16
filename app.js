@@ -65417,21 +65417,53 @@ function _aurixMktAddableType(item) {
 
 // Fila de Market → entrada canónica de selectAsset. Sólo copia lo que existe:
 // no inventa ticker, gestora ni moneda.
-// Cierre de utilidad · C2 — ¿esta ficha es un activo que YA tengo? Misma identidad que el alta usa
-// para fusionar (coinId · marketSymbol · ticker+tipo), sobre posiciones ABIERTAS. Un token derivado
-// tiene su propio coinId y nunca coincide con la acción.
+// ── P1 · CONTRATO CANÓNICO DE IDENTIDAD DE ACTIVOS ─────────────────────────────────────────────
+// UN solo juez de «¿es el MISMO activo?», para el alta (fusión en una posición existente) y para
+// «En cartera» en Market. El defecto que cierra: el alta comparaba `marketSymbol` + moneda SIN mirar la
+// clase, y las cripto guardan `marketSymbol = ticker` (api/search/crypto.js) — una acción MSFT sin
+// coinId se sumaba a un token cripto «MSFT» (y al revés), mezclando unidades, coste y P&L.
+// Orden: clase de activo (obligatoria) → identificador del proveedor (coinId · red+contrato · ISIN)
+// → fallback tipado (ticker normalizado de mercado + moneda). El nombre visible NUNCA es identidad
+// primaria: sólo confirma el caso antiguo de una cripto sin coinId. Ante la duda, NO es el mismo
+// (posición separada antes que mezclar). No enriquece ni reescribe posiciones guardadas.
+function _aurixAssetClass(t) {
+  const v = String(t || '').toLowerCase().trim();
+  return v === 'stocks' ? 'stock' : v === 'etfs' ? 'etf' : v === 'funds' ? 'fund' : v === 'cryptos' ? 'crypto' : v;
+}
+// BRK.B y BRK-B son el MISMO ticker de mercado (cada proveedor escribe la clase a su manera).
+function _aurixTickerKey(x) { return String(x || '').toUpperCase().trim().replace(/-/g, '.'); }
+function _aurixSameAssetIdentity(a, sel, opts) {
+  if (!a || !sel) return false;
+  const ca = _aurixAssetClass(a.type), cs = _aurixAssetClass(sel.type);
+  // Valores cotizados (acción · ETF · fondo) con el MISMO símbolo de mercado y moneda son el mismo
+  // listado aunque una fila antigua lo tipara distinto; cripto y metales nunca entran en esa familia.
+  const SEC = { stock: 1, etf: 1, fund: 1 };
+  const sameSecListing = !!(SEC[ca] && SEC[cs] && a.marketSymbol && sel.marketSymbol);
+  if (!ca || (ca !== cs && !sameSecListing)) return false;               // nunca entre clases
+  const nm = x => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (ca === 'crypto') {
+    if (a.coinId && sel.coinId) return a.coinId === sel.coinId;
+    if (a.chain && sel.chain && a.contract && sel.contract)
+      return nm(a.chain) === nm(sel.chain) && String(a.contract).toLowerCase() === String(sel.contract).toLowerCase();
+    if (!a.coinId && !sel.coinId) return _aurixTickerKey(a.ticker) === _aurixTickerKey(sel.ticker);
+    // Una de las dos sin coinId (posición antigua): sólo si ticker Y nombre coinciden; si no, separada.
+    return _aurixTickerKey(a.ticker) === _aurixTickerKey(sel.ticker) && !!nm(a.name) && nm(a.name) === nm(sel.name);
+  }
+  const aCcy = String(a.assetCurrency || 'USD').toUpperCase();
+  const sRaw = sel.assetCurrency || sel.currency || '';
+  if (!(opts && opts.lenientCcy && !sRaw) && aCcy !== String(sRaw || 'USD').toUpperCase()) return false;
+  const ai = String(a.isin || '').toUpperCase().trim(), si = String(sel.isin || '').toUpperCase().trim();
+  if (ai && si) return ai === si;                                        // ISIN distinto = instrumento distinto
+  if (a.marketSymbol && sel.marketSymbol) return _aurixTickerKey(a.marketSymbol) === _aurixTickerKey(sel.marketSymbol);
+  return _aurixTickerKey(a.ticker) === _aurixTickerKey(sel.ticker);
+}
+// ¿Esta ficha de Market es un activo que YA tengo (posición ABIERTA)? El mismo juez que el alta; la
+// ficha puede no traer moneda, y entonces la moneda no decide (sólo se muestra).
 function _aurixMktOwnedAsset(item) {
   try {
     const sel = _aurixMktToSelection(item); if (!sel) return null;
     const list = (typeof activeAssets === 'function') ? activeAssets() : [];
-    return list.find(a => {
-      if (!a) return false;
-      if (sel.coinId || a.coinId) return !!(sel.coinId && a.coinId && a.coinId === sel.coinId);
-      // La moneda cuenta igual que en el alta: SAN en EUR y SAN en USD son filas distintas.
-      const ccyOk = !sel.assetCurrency || String(a.assetCurrency || 'USD').toUpperCase() === String(sel.assetCurrency).toUpperCase();
-      if (a.marketSymbol && sel.marketSymbol) return ccyOk && String(a.marketSymbol).toUpperCase() === String(sel.marketSymbol).toUpperCase();
-      return ccyOk && String(a.ticker || '').toUpperCase() === sel.ticker && a.type === sel.type;
-    }) || null;
+    return list.find(a => _aurixSameAssetIdentity(a, sel, { lenientCcy: true })) || null;
   } catch (_) { return null; }
 }
 function _aurixMktToSelection(item) {
@@ -78703,13 +78735,18 @@ function _aurixRankSearchResults(items, query) {
                    + _aurixSearchProviderWeight(a)
                    + _aurixSearchTypeWeight(a)
                    + (String(a.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')) ? -600 : 0)
-                   // …y una cripto SIN rango de capitalización (sin listar por el proveedor: memecoins,
-                   // contratos sueltos) no adelanta a un instrumento principal por compartir el ticker.
-                   // (no cuando coincide un IDENTIFICADOR exacto —slug o nombre—: así entra el canónico que
-                   // añade el catálogo, que llega sin rango a propósito).
-                   + (String(a.type || '').toLowerCase() === 'crypto' && !(Number(a.marketCapRank) > 0)
-                      && !(a.coinId && String(a.coinId).toLowerCase().replace(/[^a-z0-9]+/g, '') === q.replace(/[^a-z0-9]+/g, ''))
-                      && String(a.name || '').toLowerCase() !== q ? -300 : 0);
+                   // P1 · IDENTIDAD COMPLETA: ticker Y nombre exactos (o slug) es una coincidencia más fuerte que
+                   // sólo el ticker — «USDC» (USDC · USDC) antes que «USDATA Corp.» (ticker USDC).
+                   // En cripto la identidad completa exige además un listing real (rango ≤ 2000): una memecoin
+                   // sin rango llamada «Gold» con ticker GOLD no adelanta a Gold.com por ese bonus.
+                   + ((String(a.ticker || '').toLowerCase() === q && (String(a.name || '').toLowerCase() === q
+                       || (a.coinId && String(a.coinId).toLowerCase().replace(/[^a-z0-9]+/g, '') === q.replace(/[^a-z0-9]+/g, '')))
+                       && !(String(a.type || '').toLowerCase() === 'crypto' && !(Number(a.marketCapRank) > 0 && Number(a.marketCapRank) <= 2000))) ? 100 : 0)
+                   // P1 · CALIDAD DEL LISTING: una cripto de capitalización marginal (rango > 2000 del propio
+                   // proveedor) no adelanta a un instrumento principal sólo por llevar su ticker o su nombre
+                   // («APPLE» memecoins frente a Apple Inc.). Sin rango NO se penaliza: el catálogo canónico
+                   // llega sin rango a propósito (stablecoins incluidas) y el contrato del proxy lo declara neutral.
+                   + (String(a.type || '').toLowerCase() === 'crypto' && Number(a.marketCapRank) > 2000 ? -400 : 0);
   return items.map((a, i) => ({ a, i, s: score(a) }))
               .sort((x, y) => (y.s - x.s) || (x.i - y.i))
               .map(o => o.a);
@@ -81125,12 +81162,14 @@ assetForm.addEventListener('submit', e => {
   // gold paths are always USD-denominated, so the currency check is
   // unnecessary for those branches.
   const newCurrency = (pendingCurrency || 'USD').toUpperCase();
+  // P1 · IDENTIDAD — el oro conserva su regla física; el resto pasa por el juez único
+  // (`_aurixSameAssetIdentity`): misma CLASE siempre, luego identificador del proveedor, luego ticker de
+  // mercado + moneda. Antes la rama `marketSymbol` no miraba la clase y fusionaba acción y cripto homónimas.
+  const _selId = Object.assign({}, selectedDbAsset, { type, ticker, coinId, marketSymbol, assetCurrency: newCurrency });
   const existing = assets.find(a => {
-    const aCurrency = (a.assetCurrency || 'USD').toUpperCase();
-    if (coinId && a.coinId) return a.coinId === coinId;
-    if (isGoldAsset)        return a.ticker === 'XAU' && a.karat === karat && a.goldUnit === goldUnit && (a.visualType || 'bullion') === goldVisualType;
-    if (marketSymbol && a.marketSymbol) return a.marketSymbol === marketSymbol && aCurrency === newCurrency;
-    return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type && aCurrency === newCurrency;
+    if (isGoldAsset) return a.ticker === 'XAU' && a.karat === karat && a.goldUnit === goldUnit && (a.visualType || 'bullion') === goldVisualType;
+    if (a && a.ticker === 'XAU' && a.karat != null) return false;
+    return _aurixSameAssetIdentity(a, _selId);
   });
 
   // Cost basis for this purchase (in asset's native USD). Uses the effective purchase
