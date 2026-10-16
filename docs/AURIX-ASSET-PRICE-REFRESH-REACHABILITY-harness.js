@@ -17,7 +17,10 @@ const ok = (n, c, i) => { if (c) { pass++; console.log('  ✓ ' + n + (i ? '  ['
 // Extract the FC-2 pricer block (batch fallback + per-symbol snapshot + getUnifiedMarketPrice).
 const S = 'const _fc2FallbackCache';
 const E = '// FC-4: crypto portfolio pricing';
-const src = app.slice(app.indexOf(S), app.indexOf(E));
+// Cierre de listados con bolsa: el pricer acepta sólo la cotización EXACTA del listado, juzgada por
+// `_aurixListingQuoteOk` (vive fuera de este bloque): se extrae y se antepone.
+const LQ = app.slice(app.indexOf('function _aurixListingQuoteOk('), app.indexOf('function _aurixMktQuoteMatches('));
+const src = LQ + '\n' + app.slice(app.indexOf(S), app.indexOf(E));
 if (!src || app.indexOf(S) < 0 || app.indexOf(E) < 0) { console.log('1 failed'); console.error('extraction failed'); process.exit(1); }
 
 // Source contract: the fix (step 3 per-symbol snapshot) is present.

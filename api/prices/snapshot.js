@@ -274,7 +274,11 @@ function resolveSymbol(raw) {
   // that entry. Restricted to 1-3 uppercase letters so we don't strip
   // anything from index tickers (^GSPC) or futures (GC=F).
   const stripped = upper.replace(/\.[A-Z]{1,3}$/, '');
-  if (stripped !== upper && REGISTRY[stripped]) {
+  // Cierre de listados con bolsa: la entrada canónica sólo sirve un símbolo con sufijo si ES ese
+  // listado (IWDA.AS → IWDA, cuyo proveedor es IWDA.AS). «MSFT.TO» no es MSFT (NASDAQ) ni «IWDA.L» es
+  // IWDA.AS: esos se cotizan con su símbolo EXACTO por el passthrough de abajo, nunca con otro listado.
+  if (stripped !== upper && REGISTRY[stripped]
+      && (REGISTRY[stripped].providers || []).some(p => String(p.providerId || '').toUpperCase() === upper)) {
     return { canonical: stripped, entry: REGISTRY[stripped] };
   }
   // MC-7B: generic Yahoo passthrough. Only symbols that pass the tight

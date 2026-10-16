@@ -20607,6 +20607,10 @@ async function _wp6dHydrateMarketDataFor(symbols) {
     if (!item || !item.symbol) continue;
     const price = Number(item.price);
     if (!Number.isFinite(price) || price <= 0) continue;
+    // Cierre de listados con bolsa: MARKET_DATA se indexa por símbolo SIN sufijo. Un listado con sufijo
+    // servido con su identidad exacta («MSFT.TO», en CAD) nunca se guarda bajo «MSFT»: pisaría la
+    // cotización de NASDAQ que leen Market y la cartera. (Las entradas canónicas llegan sin sufijo.)
+    if (/\.[A-Z]{1,3}$/.test(String(item.symbol).toUpperCase())) continue;
     const canonical = (typeof resolveAsset === 'function') ? resolveAsset(item.symbol) : null;
     const type      = canonical?.type || 'stock';
     const norm      = (typeof normalizeSymbol === 'function') ? normalizeSymbol(item.symbol) : String(item.symbol);
@@ -58747,9 +58751,10 @@ function _aurixMktRenderHead(vm, opts) {
   // ── PRECIO (nivel 1) ───────────────────────────────────────────────────────
   const priceEl = document.getElementById('mktPrvPrice');
   if (priceEl) {
-    priceEl.textContent = (pr.current.state !== 'unavailable' && typeof safePrice === 'function')
-      ? safePrice(pr.current.value)
-      : '—';
+    const _pxOk = (pr.current.state !== 'unavailable' && typeof safePrice === 'function');
+    // Sin cotización: el «—» se acompaña de su significado para lectores de pantalla.
+    if (_pxOk) priceEl.textContent = safePrice(pr.current.value);
+    else priceEl.innerHTML = '—<span class="intcc-sr-only">' + _intccEsc(t('mkt_quote_na')) + '</span>';
   }
 
   // ── VARIACIÓN (nivel 2) ────────────────────────────────────────────────────
@@ -60260,16 +60265,10 @@ async function resolveSymbolQuote(symbol) {
     // (Fidelity MSCI World mutual fund vs iShares Core MSCI World ETF)
     // have different tickers entirely, so they never collide here; only
     // alternate exchange listings of the *same* product converge.
-    const wantStripped = want.replace(/\.[A-Z]{1,3}$/, '');
-    const hit = (json?.snapshot ?? []).find(p => {
-      if (!p || !p.symbol) return false;
-      const ps  = String(p.symbol);
-      if (ps === symbol) return true;
-      const psu = ps.toUpperCase();
-      if (psu === want || psu === wantStripped) return true;
-      const psStripped = psu.replace(/\.[A-Z]{1,3}$/, '');
-      return psStripped === want || psStripped === wantStripped;
-    });
+    // Cierre de listados con bolsa: sólo la cotización EXACTA del listado pedido. Antes se aceptaba
+    // el símbolo recortado («MSFT» para «MSFT.TO»), y la posición nacía con el precio y la moneda de
+    // otro listado. Sin cotización exacta, el alta dice que no hay cotización (estado existente).
+    const hit = (json?.snapshot ?? []).find(p => _aurixListingQuoteOk(p, want));
     if (!Number.isFinite(hit?.price)) return null;
     // Validate to strict ISO-4217 shape (3 uppercase letters) so we never
     // stamp something like Yahoo's "GBp" pence form onto an asset.
@@ -60727,9 +60726,10 @@ async function _fetchSymbolSnapshotFC2(symbol) {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
     const json = await res.json();
-    const p = (json?.snapshot ?? []).find(x => Number.isFinite(x.price));
+    // Sólo la cotización EXACTA de este listado (ver `_aurixListingQuoteOk`).
+    const p = (json?.snapshot ?? []).find(x => Number.isFinite(x.price) && _aurixListingQuoteOk(x, symbol));
     if (!p) return null;
-    const rec = { price: Number(p.price), change24h: p.change24h ?? null, ts: now };
+    const rec = { price: Number(p.price), change24h: p.change24h ?? null, currency: p.currency || null, ts: now };
     _fc2SymbolCache.set(symbol, rec);
     return rec;
   } catch { return null; }
@@ -60737,9 +60737,13 @@ async function _fetchSymbolSnapshotFC2(symbol) {
 
 async function getUnifiedMarketPrice(symbol) {
   const norm = normalizeSymbol(symbol);
+  // Cierre de listados con bolsa: MARKET_DATA y el lote del universo guardan símbolos CANÓNICOS sin
+  // sufijo. Un listado con sufijo («MSFT.TO») nunca se resuelve contra ellos —recortado sería otro
+  // listado—: va directo a su propia cotización exacta.
+  const exactOnly = norm !== String(symbol || '').toUpperCase();
 
   // 1. Check MARKET_DATA first — already-fetched data, no network cost
-  const item = MARKET_DATA.find(d => normalizeSymbol(d.symbol) === norm);
+  const item = exactOnly ? null : MARKET_DATA.find(d => normalizeSymbol(d.symbol) === norm);
   if (item?.price > 0) {
     if (IS_DEV) console.log('[FC2] source: MARKET_DATA', symbol);
     return { price: item.price, change24h: item.change24h ?? null };
@@ -60747,7 +60751,7 @@ async function getUnifiedMarketPrice(symbol) {
 
   // 2. Fallback: single cached batch snapshot for the stocks universe
   if (IS_DEV) console.log('[FC2] fallback triggered for', symbol);
-  const data  = await _fetchStocksFallbackFC2();
+  const data  = exactOnly ? null : await _fetchStocksFallbackFC2();
   const found = data && data.find(d => normalizeSymbol(d.symbol) === norm);
   if (found?.price > 0) return { price: Number(found.price), change24h: found.change24h ?? null };
 
@@ -60756,7 +60760,7 @@ async function getUnifiedMarketPrice(symbol) {
   //    (resolveSymbolQuote). This is what unfreezes funds: the refresh loop now asks the
   //    backend for the exact symbol instead of searching a fixed batch it can never contain.
   const direct = await _fetchSymbolSnapshotFC2(symbol);
-  if (direct?.price > 0) return { price: direct.price, change24h: direct.change24h ?? null };
+  if (direct?.price > 0) return { price: direct.price, change24h: direct.change24h ?? null, currency: direct.currency || null };
 
   return null;
 }
@@ -60803,6 +60807,10 @@ async function collectMarketPriceData(marketAssets) {
           const data = await getUnifiedMarketPrice(a.marketSymbol);
           price     = data?.price     ?? null;
           change24h = data?.change24h ?? null;
+          // La moneda forma parte de la identidad del listado: una cotización en otra moneda no es
+          // la de esta posición (se queda con su último precio, el estado existente).
+          if (price != null && data && data.currency && a.assetCurrency
+              && String(data.currency).toUpperCase() !== String(a.assetCurrency).toUpperCase()) { price = null; change24h = null; }
         }
         if (change24h === null) {
           const fb = getFallbackData(a.marketSymbol);
@@ -65599,6 +65607,17 @@ function _aurixMktQuoteFamily(t) {
   if (v === 'index' || v === 'indices') return 'index';
   return v || 'other';
 }
+// ¿Esta respuesta de /snapshot es la cotización EXACTA del listado pedido? La petición tiene que ser
+// la misma y el proveedor tiene que haber servido ese símbolo (o la respuesta ser esa misma entrada
+// canónica). «MSFT» servido para «MSFT.TO» NO lo es. Un único criterio para Market, alta y cartera.
+function _aurixListingQuoteOk(hit, want) {
+  const w = String(want || '').toUpperCase();
+  if (!hit || !w) return false;
+  const rq = String(hit.requested || '').toUpperCase();
+  if (rq && rq !== w) return false;
+  const pid = hit.providerId != null ? String(hit.providerId).toUpperCase() : '';
+  return pid === w || String(hit.symbol || '').toUpperCase() === w;
+}
 function _aurixMktQuoteMatches(it, hit, req) {
   if (!it || !hit) return false;
   if (_aurixMktQuoteFamily(it.type) !== _aurixMktQuoteFamily(hit.assetType)) return false;
@@ -65609,9 +65628,8 @@ function _aurixMktQuoteMatches(it, hit, req) {
   const want = String(req || '').toUpperCase();
   if (!want) return false;
   if (String(hit.requested || '').toUpperCase() && String(hit.requested).toUpperCase() !== want) return false;
-  // El símbolo que DE VERDAD sirvió el proveedor; un servidor anterior sin `providerId` sólo vale si
-  // devolvió exactamente el símbolo pedido (nunca la entrada canónica recortada).
-  return pid ? pid.toUpperCase() === want : String(hit.symbol || '').toUpperCase() === want;
+  // El símbolo que DE VERDAD sirvió el proveedor, o la misma entrada pedida (nunca la recortada).
+  return _aurixListingQuoteOk(hit, want);
 }
 async function _aurixMktHydrateQuotes(items, signal) {
   if (!Array.isArray(items) || !items.length) return items;
