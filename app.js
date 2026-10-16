@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '795'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '796'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -31037,7 +31037,7 @@ function _wsJrnAdd() {
   { const sd = String(d.sellDate || '').trim();
     if (sd && /^\d{4}-\d{2}-\d{2}$/.test(sd)) {
       const ts = Date.parse(sd + 'T00:00:00');
-      if (!Number.isFinite(ts) || sd > new Date().toISOString().slice(0, 10)) return _wsDraftRequired('wsjrn-input', [{ k: 'sellDate', label: 'wsjrn_f_date' }]);
+      if (!Number.isFinite(ts) || sd > _wsJrnToday()) return _wsDraftRequired('wsjrn-input', [{ k: 'sellDate', label: 'wsjrn_f_date' }]);
     } }
   const asset = (d.asset || '').trim();
   const buy = _wsNum(d.buy), qty = _wsNum(d.qty);
@@ -31165,6 +31165,8 @@ function _wsJrnSummaryHtml(res) {
     </div>`;
 }
 
+// «Hoy» en la fecha LOCAL del usuario (toISOString es UTC: en Madrid a las 00:30 rechazaba el día de hoy).
+function _wsJrnToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 function _wsJrnFormHtml() {
   const esc = _intccEsc;
   const d = _wsJrnDraft || _wsJrnNewDraft();
@@ -31199,7 +31201,7 @@ function _wsJrnFormHtml() {
         ${/* D2 — UNA fecha: la de CIERRE (venta). Selector nativo (accesible, localizado por el
               sistema); vacía es «Sin fecha», nunca una inventada. Un valor antiguo en otro formato
               se conserva tal cual mientras no se toque. */''}
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsjrn_f_date'))}</span><span class="ws4-field-input"><input class="ws4-num" type="date" autocomplete="off" data-wsjrn-input="sellDate" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(String(d.sellDate || '')) ? d.sellDate : '')}" max="${esc(new Date().toISOString().slice(0, 10))}"></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsjrn_f_date'))}</span><span class="ws4-field-input"><input class="ws4-num" type="date" autocomplete="off" data-wsjrn-input="sellDate" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(String(d.sellDate || '')) ? d.sellDate : '')}" max="${esc(_wsJrnToday())}"></span></label>
         ${txt('notes', t('wsjrn_f_notes'))}
       </div>
       <div class="wsjrn-form-foot">
@@ -65425,8 +65427,10 @@ function _aurixMktOwnedAsset(item) {
     return list.find(a => {
       if (!a) return false;
       if (sel.coinId || a.coinId) return !!(sel.coinId && a.coinId && a.coinId === sel.coinId);
-      if (a.marketSymbol && sel.marketSymbol) return String(a.marketSymbol).toUpperCase() === String(sel.marketSymbol).toUpperCase();
-      return String(a.ticker || '').toUpperCase() === sel.ticker && a.type === sel.type;
+      // La moneda cuenta igual que en el alta: SAN en EUR y SAN en USD son filas distintas.
+      const ccyOk = !sel.assetCurrency || String(a.assetCurrency || 'USD').toUpperCase() === String(sel.assetCurrency).toUpperCase();
+      if (a.marketSymbol && sel.marketSymbol) return ccyOk && String(a.marketSymbol).toUpperCase() === String(sel.marketSymbol).toUpperCase();
+      return ccyOk && String(a.ticker || '').toUpperCase() === sel.ticker && a.type === sel.type;
     }) || null;
   } catch (_) { return null; }
 }
@@ -78698,10 +78702,14 @@ function _aurixRankSearchResults(items, query) {
                    + _aurixSearchPopularity(a)
                    + _aurixSearchProviderWeight(a)
                    + _aurixSearchTypeWeight(a)
-                   + (String(a.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bondo\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')) ? -600 : 0)
+                   + (String(a.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')) ? -600 : 0)
                    // …y una cripto SIN rango de capitalización (sin listar por el proveedor: memecoins,
                    // contratos sueltos) no adelanta a un instrumento principal por compartir el ticker.
-                   + (String(a.type || '').toLowerCase() === 'crypto' && !(Number(a.marketCapRank) > 0) ? -300 : 0);
+                   // (no cuando coincide un IDENTIFICADOR exacto —slug o nombre—: así entra el canónico que
+                   // añade el catálogo, que llega sin rango a propósito).
+                   + (String(a.type || '').toLowerCase() === 'crypto' && !(Number(a.marketCapRank) > 0)
+                      && !(a.coinId && String(a.coinId).toLowerCase().replace(/[^a-z0-9]+/g, '') === q.replace(/[^a-z0-9]+/g, ''))
+                      && String(a.name || '').toLowerCase() !== q ? -300 : 0);
   return items.map((a, i) => ({ a, i, s: score(a) }))
               .sort((x, y) => (y.s - x.s) || (x.i - y.i))
               .map(o => o.a);
@@ -78736,7 +78744,7 @@ function _aurixSearchSubtitle(a) {
     const parts = [];
     if (a.ticker) parts.push(a.ticker);
     if (needsId && a.chain) parts.push(a.chain);
-    else if (/tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bondo\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')))
+    else if (/tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')))
       parts.push((typeof t === 'function' && t('search_token_label')) || 'TOKEN');   // C1: no es el original
     else if (_label) parts.push(_label);
     if (needsId && a.contract && typeof _aurixShortContract === 'function') parts.push(_aurixShortContract(a.contract));

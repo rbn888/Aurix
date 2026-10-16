@@ -32621,3 +32621,9 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
 @media (max-width: 1023px), (pointer: coarse) {
   .aurix-wsh .wsjrn-card-acts .wsh-scard-x { width: 44px; height: 44px; min-width: 44px; }
 }
+/* Cierre de utilidad · C2 — «Ver posición» es un botón de TEXTO junto a la ★ (que es de icono):
+   ancho por su contenido, una línea, y la acción principal cede el sitio. */
+.mkt-prv-cta #mktPrvPosBtn { width: auto; min-width: 0; flex: 0 0 auto; padding: 0 14px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.mkt-prv-cta #mktPrvPosBtn[hidden] { display: none; }
+.mkt-prv-cta #mktPrvAddBtn { min-width: 0; }
+@media (max-width: 420px) { .mkt-prv-cta #mktPrvAddBtn { font-size: 14px; padding-left: 10px; padding-right: 10px; } }
