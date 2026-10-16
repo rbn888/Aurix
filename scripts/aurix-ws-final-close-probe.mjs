@@ -112,8 +112,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       empty: [].slice.call(r.querySelectorAll('.wsh-mse2-empty-t')).map(function(e){return e.textContent}) }`);
     let m = await ms();
     const g = cap => (m.groups || []).find(x => x.cap === cap);
-    // CIERRE DE ESTADOS: Mi espacio = FAVORITOS. Guardar no mete la capacidad; la estrella sí.
-    ok(`${T} con documentos y SIN favoritos, Mi espacio no muestra capacidades (guardar ≠ favorito)`, m && !g('budget') && !g('compound') && m.empty.length === 2, JSON.stringify(m));
+    // CIERRE DE UTILIDAD · B2 (re-decide «Mi espacio = favoritos»): una capacidad con documentos SÍ está
+    // aquí sin estrella —UNA card con su contador— y guardar sigue sin crear el favorito.
+    ok(`${T} con documentos y SIN favoritos, Mi espacio muestra su capacidad (una card, sin estrella)`, m && g('budget') && !g('budget').fav && g('budget').n === 1 && g('compound') && !g('compound').fav && m.rows === 0, JSON.stringify(m));
     await p.evaluate(`_wsTogglePin('tpl:mbudget'); _wsTogglePin('tool:compound'); _wshRepaintHome();`); await p.waitForTimeout(150);
     m = await ms();
     ok(`${T} favorito → aparece: UNA card con su contador, sin filas de documento`, g('budget') && g('budget').n === 1 && g('budget').fav && m.rows === 0, JSON.stringify(m && m.groups));
@@ -128,7 +129,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // Quitar el favorito la retira al momento; volver a marcarlo la devuelve (UNA vez).
     await p.evaluate(`_wsTogglePin('tool:compound'); _wshRepaintHome();`); await p.waitForTimeout(120);
     m = await ms();
-    ok(`${T} quitar favorito → desaparece de Mi espacio al momento (sin card fantasma)`, !g('compound'), JSON.stringify(m.groups));
+    // B2 — desfijar NO oculta los documentos: la capacidad sigue (por su documento) y pierde la estrella al momento.
+    ok(`${T} quitar favorito → la estrella se va al momento; la capacidad sigue por su documento`, g('compound') && !g('compound').fav && g('compound').n === 1, JSON.stringify(m.groups));
     await p.evaluate(`_wsTogglePin('tool:compound'); _wshRepaintHome();`); await p.waitForTimeout(120);
     m = await ms();
     ok(`${T} fijada + documento = UN solo grupo, marcado fijada`, (m.groups.filter(x => x.cap === 'budget').length === 1) && g('budget').fav && /Favorito/.test(g('budget').meta), JSON.stringify(m.groups));
@@ -696,7 +698,8 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await p.locator('.wsh-mse2-card[data-wsmse-cap="budget"] [data-wscap-menu]').click(); await p.waitForTimeout(120);
     await p.locator('#wsCapMenu [data-wsmenu-act="fav"]').click(); await p.waitForTimeout(150);
     const uf = await J(p, `return { inSpace: !!document.querySelector('.wsh-mse2-card[data-wsmse-cap="budget"]'), docs: _ws4Projects().length, plans: _wsPlansAll().length }`);
-    ok(`${T} quitar favorito: sale de Mi espacio y no toca documentos ni Dashboard`, !uf.inSpace && uf.docs === 2 && uf.plans === 1, JSON.stringify(uf));
+    // B2 — desfijar no oculta ni borra: la capacidad sigue (tiene documentos) y Dashboard intacto.
+    ok(`${T} quitar favorito: no toca documentos ni Dashboard (la capacidad sigue por sus documentos)`, uf.inSpace && uf.docs === 2 && uf.plans === 1, JSON.stringify(uf));
     if (W < 640) {
       // Atrás del navegador cierra la hoja sin navegar.
       await p.evaluate(`_wsTogglePin('tpl:mbudget'); _wshRepaintHome();`); await p.waitForTimeout(150);

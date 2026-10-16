@@ -32598,3 +32598,6 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
 #wsPlansGrid .wspl-cover { isolation: isolate; }
 #wsPlansGrid .wspl-cover > img.wspl-cover-bg { filter: blur(22px) brightness(0.46) saturate(1.1) !important; }
 #wsPlansGrid .wspl-cover::after { background: linear-gradient(90deg, rgba(5,8,15,0.35), rgba(5,8,15,0) 18%, rgba(5,8,15,0) 82%, rgba(5,8,15,0.35)); }
+/* Cierre de utilidad · B6 — el guardado de Escenarios vive en la barra común: sin el filete ni el
+   aire que tenía dentro de su tarjeta, y con la misma alineación que el de las herramientas. */
+.wsh-bar-actions .wsb2-savebar { margin-top: 0; padding-top: 0; border-top: 0; flex-wrap: nowrap; justify-content: flex-end; }

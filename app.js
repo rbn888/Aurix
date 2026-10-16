@@ -6905,6 +6905,7 @@ const T = {
     wspl_share_left:      'por ahorrar',
     wsg_dash_q:           '¿Lo quieres en tu Dashboard?',
     wsg_dash_yes:         'Añadir al Dashboard',
+    wsg_created:          'Objetivo creado',
     wsg_dash_no:          'Ahora no',
     wspl_share_in:        'ingresos',
     wspl_share_out:       'gastos',
@@ -10193,6 +10194,7 @@ const T = {
     wspl_share_left:      'to go',
     wsg_dash_q:           'Want it on your Dashboard?',
     wsg_dash_yes:         'Add to Dashboard',
+    wsg_created:          'Goal created',
     wsg_dash_no:          'Not now',
     wspl_share_in:        'income',
     wspl_share_out:       'expenses',
@@ -22735,12 +22737,16 @@ function _wsSurfaceHeadHtml(o) {
   const title = o.sub != null ? String(o.title || '') : (doc || String(o.title || ''));
   const sub = o.sub != null ? String(o.sub) : (doc ? _wsSubIfDistinct(doc, o.title || '') : '');
   const save = o.save === true;
+  // Una superficie con guardado PROPIO (Escenarios) lo lleva en la misma barra común (`o.actions`).
+  const own = !save && typeof o.actions === 'string' && o.actions ? o.actions : '';
   // En las que guardan, barra y acciones van en un ENVOLTORIO: en escritorio es UNA fila pegajosa
   // (≤56 px); en móvil el envoltorio desaparece (`display: contents`), la barra sigue pegada arriba
   // con el título entero y las acciones quedan en su fila, justo debajo, junto al trabajo.
-  const actions = save ? `<div class="wsh-bar-actions">${_wsBarCcyHtml()}<div class="wsg-savebar wsh-bar-save" data-wstool-savebar>${_wsToolSaveBarHtml()}</div></div>` : '';
-  return `${save ? '<div class="wsh-barwrap" data-wsh-barwrap>' : ''}
-    <header class="wsh-bar${save ? ' has-save' : ''}" data-wsh-bar>
+  const actions = save ? `<div class="wsh-bar-actions">${_wsBarCcyHtml()}<div class="wsg-savebar wsh-bar-save" data-wstool-savebar>${_wsToolSaveBarHtml()}</div></div>`
+    : own ? `<div class="wsh-bar-actions">${own}</div>` : '';
+  const wrap = save || !!own;
+  return `${wrap ? '<div class="wsh-barwrap" data-wsh-barwrap>' : ''}
+    <header class="wsh-bar${wrap ? ' has-save' : ''}" data-wsh-bar>
       <button type="button" class="wsh-bar-back" ${backAttr} aria-label="${esc(backAria)}">
         <span class="wsh-bar-chev" aria-hidden="true">‹</span><span class="wsh-bar-backtxt">${esc(backTxt)}</span>
       </button>
@@ -22752,7 +22758,7 @@ function _wsSurfaceHeadHtml(o) {
         <summary class="wsh-bar-helpsum" aria-label="${esc(t('wsh_help_aria'))}"><span aria-hidden="true">?</span></summary>
         <div class="wsh-bar-helpbody" role="note">${help.map(h => `<p>${esc(h)}</p>`).join('')}</div>
       </details>` : ''}
-    </header>${actions}${save ? '</div>' : ''}`;
+    </header>${actions}${wrap ? '</div>' : ''}`;
 }
 // ── EL ESTADO QUE PUBLICA LA BARRA, Y SÓLO EL DEMOSTRABLE ──────────────────────────────────
 // «Guardado» exige que el almacén haya aceptado la escritura (`_wsToolEditId` sólo se fija tras
@@ -22878,9 +22884,50 @@ function _wsWorkModeOn() {
       && _WS_WORK_VIEWS.indexOf(_wshView) !== -1 && _wsPremiumShell() === true;
   } catch (_) { return false; }
 }
+// ── RECARGAR DENTRO DE UN DOCUMENTO (cierre de utilidad · B1) ─────────────────────────────
+// Recargar devolvía al Dashboard aunque el documento siguiera guardado. La entrada de historial del
+// modo de trabajo ya existe (`aurixWork`) y `history.state` sobrevive a la recarga, así que la vista
+// abierta viaja EN ELLA: vista, capacidad, id del documento, origen del «Volver» y la cuenta. Nada en
+// la URL. Al arrancar se reabre UNA vez, cuando el derecho está resuelto, y sólo si la capacidad está
+// abierta para esta cuenta y el documento existe en ella; si no, se cae a Workspace.
+function _wsWorkSnap() {
+  return { v: _wshView, tool: _wsToolActive, id: _wsToolEditId || null, sb: (typeof _wsbEditId !== 'undefined' ? _wsbEditId : null) || null,
+    back: _wsReturnTab || null, u: (typeof _wsDocsSession === 'function' ? _wsDocsSession() : null) };
+}
+function _wsWorkSnapWrite() {
+  try { if (history.state && history.state.aurixWork && _wsWorkOn) history.replaceState(Object.assign({}, history.state, { aurixWs: _wsWorkSnap() }), ''); } catch (_) {}
+}
+let _wsWorkRestoreDone = false;
+function _wsWorkRestoreOnce() {
+  if (_wsWorkRestoreDone) return;
+  let snap = null; try { snap = history.state && history.state.aurixWork ? history.state.aurixWs : null; } catch (_) { snap = null; }
+  if (!snap || typeof snap !== 'object') { _wsWorkRestoreDone = true; return; }
+  if (_wsWorkOn) { _wsWorkRestoreDone = true; return; }          // el usuario ya está trabajando
+  if (_wsPremiumShell() !== true) return;                          // sin derecho resuelto todavía: se reintenta
+  _wsWorkRestoreDone = true;
+  const uid = (typeof _wsDocsSession === 'function') ? _wsDocsSession() : null;
+  if (snap.u && uid && snap.u !== uid) return;                     // otra cuenta: nada que reabrir
+  try {
+    if (_WS_BACK_ORIGINS.indexOf(String(snap.back || '')) !== -1) _wsReturnTab = snap.back;
+    switchTab('workspace');
+    if (snap.v === 'tool' && snap.tool) {
+      if (!_wsToolAccess(snap.tool).ok) return;
+      const exists = snap.id ? _ws4Projects().some(x => x && x.id === snap.id) : false;
+      if (snap.id && !exists) return;                              // borrado o ajeno: Workspace
+      _wsOpenTool(snap.tool, snap.id || undefined);
+    } else if (snap.v === 'goals' || snap.v === 'scenario' || snap.v === 'planning') {
+      const k = snap.v === 'planning' ? 'projection' : snap.v;
+      if (!_wsToolAccess(k).ok) return;
+      // Un escenario GUARDADO se reabre por su owner (restaura sus supuestos); si ya no existe, el simulador.
+      if (k === 'scenario' && snap.sb && _ws4Projects().some(x => x && x.id === snap.sb)) _wsbOpenDoc(snap.sb);
+      else _wsOpenSurface(k, k === 'scenario' ? undefined : { keepDoc: true });
+    }
+  } catch (_) {}
+}
 function _wsWorkModeSync() {
   if (typeof document === 'undefined' || !document.body) return;
   const on = _wsWorkModeOn();
+  if (on && on === _wsWorkOn) { _wsWorkSnapWrite(); return; }
   if (on === _wsWorkOn) return;
   _wsWorkOn = on;
   document.body.classList.toggle('ws-work', on);
@@ -22891,9 +22938,11 @@ function _wsWorkModeSync() {
     try {
       if (!(history.state && history.state.aurixWork)) {
         history.pushState(Object.assign({}, history.state || {}, { aurixWork: 1 }), '');
-        _wsWorkHist = true;
       }
+      // Tras una recarga la entrada de trabajo YA es la actual: también es nuestra, y salir la consume.
+      _wsWorkHist = true;
     } catch (_) {}
+    _wsWorkSnapWrite();
     _wsDocTopPending = true; _wsDocTopConsume();
     return;
   }
@@ -23141,7 +23190,7 @@ function _wshWireOnce() {
   try { _wsEditKeysWireOnce(); } catch (_) {}
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash],[data-wsdoc-dash],[data-ws-recover]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-dash],[data-wsg-dashno],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wstool-open],[data-wstool-saveas],[data-wstool-rename],[data-wstool-delete],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wssi-menu],[data-wsdoc-open],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsrecv-pay-save],[data-wsrecv-pay-cancel],[data-wsrecv-pay-full],[data-wsrecv-paydel],[data-wsrecv-filter],[data-wsloan-cmp],[data-wsb2-save],[data-wsb2-open],[data-wsre-more-toggle],[data-wsap-add],[data-wsap-act],[data-wsap-cancel],[data-wsh-lock],[data-ws-sync-retry],[data-wsccy-confirm],[data-wsnew-focus],[data-wsmse-capopen],[data-wscap-menu],[data-wscap-dash],[data-wsdoc-dash],[data-ws-recover]')
       : null;
     if (!t) return;
     const capMenu = t.getAttribute('data-wscap-menu');
@@ -23294,8 +23343,12 @@ function _wshWireOnce() {
     if (docOpen) { _wsOpenTool(_wsToolActive, docOpen); return; }
     if (t.hasAttribute('data-wsg-create')) { _wsgCreate(); return; }
     const dq = t.getAttribute('data-wsg-dash');
-    if (dq) { _wsgAskDash = null; _wsPlanDashSet(dq, false, 'goal');
-      const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); } return; }
+    // Cierre de utilidad · B3 — estos dos botones NO estaban en el selector delegado de arriba, así que
+    // «Añadir al Dashboard» y «Ahora no» no hacían nada. Y publicar dice lo que ha pasado.
+    if (dq) { _wsgAskDash = null; const okd = _wsPlanDashSet(dq, false, 'goal');
+      const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+      try { _aurixBillingToast(t(okd ? 'wscap_published' : 'wssave_failed'), okd ? 'ok' : 'error'); } catch (_) {}
+      return; }
     if (t.hasAttribute('data-wsg-dashno')) { _wsgAskDash = null;
       const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); } return; }
     const saveId = t.getAttribute('data-wsh-save');
@@ -25478,9 +25531,23 @@ function _wsPopoverMenu(anchor, id, items, onPick) {
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('click', onDoc, true);
     if (sheet) { _wsSheetClose = null; try { if (history.state && history.state.aurixSheet) { _wsSheetSkip++; history.back(); } } catch (_) {} }
+    try { anchor.setAttribute('aria-expanded', 'false'); } catch (_) {}
     if (back || sheet) { try { anchor.focus(); } catch (_) {} }
   };
-  const onKey = e => { if (e.key === 'Escape') close(true); };
+  // Cierre de utilidad · B4 — el disparador anuncia que abre un menú y si está abierto, y el menú se
+  // recorre con flechas / Inicio / Fin (patrón de menú ARIA). Tab sale del menú y lo cierra.
+  try { anchor.setAttribute('aria-haspopup', 'menu'); anchor.setAttribute('aria-expanded', 'true'); anchor.setAttribute('aria-controls', id); } catch (_) {}
+  const onKey = e => {
+    if (e.key === 'Escape') { close(true); return; }
+    if (e.key === 'Tab') { close(false); return; }
+    const its = Array.prototype.slice.call(menu.querySelectorAll('.wsmse-menu-item'));
+    if (!its.length || ['ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(e.key) === -1) return;
+    e.preventDefault();
+    const i = its.indexOf(document.activeElement);
+    const n = e.key === 'Home' ? 0 : e.key === 'End' ? its.length - 1
+      : e.key === 'ArrowDown' ? (i + 1) % its.length : (i <= 0 ? its.length - 1 : i - 1);
+    try { its[n].focus(); } catch (_) {}
+  };
   const onDoc = e => { if (!menu.contains(e.target)) close(false); };
   menu.addEventListener('click', e => {
     const b = e.target.closest ? e.target.closest('[data-wsmenu-act]') : null;
@@ -26427,10 +26494,11 @@ function _renderWorkspaceHome(metrics) {
         const docs = (!_claimed.has(sk) && _docsBySurface[sk]) ? _docsBySurface[sk] : [];
         if (docs.length) _claimed.add(sk);
         const fav = !!(mdl.pinRef && _wsIsPinned(mdl.pinRef));
-        // CIERRE DE ESTADOS: Mi espacio = FAVORITOS. Con documentos y sin estrella la capacidad NO
-        // aparece aquí (sus documentos siguen en su parent, en el catálogo); quitar la estrella la
-        // retira al momento. El contador sigue diciendo cuántos documentos tiene.
-        if (!fav) return null;
+        // RE-DECIDIDO (cierre de utilidad · B2): una capacidad está en Mi espacio si está FIJADA o si
+        // TIENE DOCUMENTOS. «Sólo favoritos» dejaba un Diario guardado sin estrella fuera de aquí,
+        // alcanzable sólo desde Plantillas → Abrir guardado. Favorito, documento y publicación siguen
+        // siendo tres estados: desfijar no oculta documentos y guardar no fija.
+        if (!fav && !docs.length) return null;
         return {
           mtype: docs.length ? 'doc' : 'fav', fav, docs, ref: mdl.pinRef, model: mdl, name: mdl.name, cat: mdl.cat,
           ts: Math.max(fav ? pinTs(mdl.pinRef) : 0, docs.length ? (docs[0].ts || 0) : 0),
@@ -27113,7 +27181,9 @@ function _wsbTwoWayInnerHtml() {
   // («sin guardar» / «cambios pendientes») no puede quedarse contando una
   // historia vieja junto a una cifra nueva.
   // §C — la moneda vive con los demás parámetros COMUNES (tarjeta de parámetros), no sola aquí.
-  return `${head}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div><div data-wsb2-savebar>${_wsbSaveBarHtml()}</div>`;
+  // Cierre de utilidad · B6 — el guardado de la comparación vive en la BARRA COMÚN (ver la cabecera
+  // del simulador), como en el resto de herramientas; aquí ya no se repite.
+  return `${head}${cols}<div data-wsb2-out>${_wsbTwoWayOutHtml(cmp)}</div>`;
 }
 // La SALIDA, aparte: es lo único que se repinta mientras se teclea, así que el
 // campo enfocado nunca puede ser el nodo reemplazado.
@@ -27406,7 +27476,7 @@ function _renderScenarioBuilder() {
 
   return `
     <div class="aurix-wsh wsh-sb is-revealed" data-wsh-view="scenario">
-      ${_wsSurfaceHeadHtml({ title: t('wsb_title'), help: [t('wsb_subtitle')] })}
+      ${_wsSurfaceHeadHtml({ title: t('wsb_title'), help: [t('wsb_subtitle')], actions: '<div class="wsh-bar-save" data-wsb2-savebar>' + _wsbSaveBarHtml() + '</div>' })}
 
       ${/* ── EL EDITOR PRIMERO, LA LECTURA DESPUÉS ────────────────────────────
             Los parámetros comunes (base, horizonte, tasa) son lo que el usuario
@@ -28251,7 +28321,11 @@ function _wsgCreate() {
   // sería desproporcionado, y el §23 lo dice. Si el usuario la ignora, no pasa nada: el objetivo
   // sigue guardado y el interruptor sigue en su ⋯ para siempre.
   _wsgAskDash = g.id;
+  _wsgNewCollapse = true;
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+  // El foco va al objetivo recién creado (su pregunta de Dashboard) y la creación se anuncia.
+  try { const q = c && c.querySelector('[data-wsg-dash="' + g.id + '"]'); if (q) q.focus(); } catch (_) {}
+  try { _aurixBillingToast(t('wsg_created'), 'ok'); } catch (_) {}
 }
 // Vive UN repintado: es una pregunta, no un estado. No se persiste —una preferencia de «ya te lo
 // pregunté» que sobreviviera a la sesión sería un dato nuevo sobre el usuario para no volver a
@@ -28550,10 +28624,12 @@ function _wsFundModal(goalId) {
   requestAnimationFrame(() => ov.classList.add('is-open'));
 }
 
-var _wsgNewOpen = false;
+var _wsgNewOpen = false, _wsgNewCollapse = false;
 function _renderGoals() {
-  // El estado del desplegable «Nuevo objetivo» sobrevive a un repintado.
-  try { const d = document.querySelector('.wsh-wsg details.wsg-newgoal'); if (d) _wsgNewOpen = d.open; } catch (_) {}
+  // El estado del desplegable «Nuevo objetivo» sobrevive a un repintado… salvo justo después de crear:
+  // un formulario vacío abierto no aporta nada (cierre de utilidad · B7), se vuelve a «+ Nuevo».
+  if (_wsgNewCollapse) { _wsgNewCollapse = false; _wsgNewOpen = false; }
+  else { try { const d = document.querySelector('.wsh-wsg details.wsg-newgoal'); if (d) _wsgNewOpen = d.open; } catch (_) {} }
   const esc = _intccEsc;
   const goals = _wsgGoals();
   const real = _ws4Real();
@@ -29765,6 +29841,8 @@ function _wsToolCommit(name, forceNew, targetId) {
     type = 'trade_journal';
     results = { netProfit: r.netProfit == null ? null : Math.round(r.netProfit), currency: r.currency, avgReturn: r.avgReturn == null ? null : Math.round(r.avgReturn * 10) / 10, avgReturnBasis: r.avgReturnBasis, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
   } else if (_wsToolActive === 'budget') {
+    // Lo vacío no se persiste (no altera totales: no tiene importe). El resto de filas, intactas.
+    try { const _rows = _wsBudgetRows(_wsToolInputs); if (_rows.some(_wsBudRowEmpty)) _wsBudgetSetRows(_rows.filter(x => !_wsBudRowEmpty(x)), true); } catch (_) {}
     const r = calculateMonthlyBudget(_wsToolInputs);
     type = 'monthly_budget';
     // §F — `Math.round(null)` es 0, así que el «no aplicable» de la pantalla se
@@ -30568,8 +30646,18 @@ function _wsBudgetSelect(id) {
   _wsBudSel = (id && _wsBudSel !== id) ? id : null;
   _wsBudgetRepaint();
 }
+// Cierre de utilidad · B5 — una fila COMPLETAMENTE VACÍA es la que el usuario añadió y nunca nombró ni
+// rellenó: rótulo por defecto («Nuevo gasto»), sin nombre propio y sin importe. Las filas de plantilla
+// o heredadas (con su `labelKey` de categoría) NO son borradores aunque estén a cero.
+function _wsBudRowEmpty(r) {
+  return !!r && (r.labelKey === 'wsbud_new_income' || r.labelKey === 'wsbud_new_expense')
+    && (r.label == null || String(r.label).trim() === '') && _wsNum(r.amount) === 0;
+}
 function _wsBudgetAdd(type) {
   const rows = _wsBudgetRows(_wsToolInputs);
+  // Ya hay una fila vacía de este tipo: se reutiliza en vez de apilar otra.
+  const blank = rows.find(r => r.type === type && _wsBudRowEmpty(r));
+  if (blank) { _wsBudgetRenameStart(blank.id); return; }
   if (rows.filter(r => r.type === type).length >= _WSBUD_ROW_MAX) return;
   const used = new Set(rows.filter(r => r.type === 'expense').map(r => String(r.color).toLowerCase()));
   const free = _WSBUD_PALETTE.find(c => !used.has(c.toLowerCase()));
@@ -88033,6 +88121,8 @@ function _aurixEntApplyToUi(features) {
   try { _aurixEntLastSig = JSON.stringify(features); } catch (_) {}
   // Con el derecho resuelto, la lectura de los documentos guardados de ESTA cuenta.
   try { _wsDocsPullOnce(); } catch (_) {}
+  // Y, si se recargó dentro de un documento, se reabre (una vez, con el derecho ya resuelto).
+  try { _wsWorkRestoreOnce(); } catch (_) {}
   // La pestaña activa, si su contenido depende del derecho.
   try {
     const tab = (typeof currentTab !== 'undefined') ? currentTab : null;
