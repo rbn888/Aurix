@@ -48,6 +48,7 @@
       <a class="brand" href="#top" aria-label="Aurix">AURIX</a>
       <nav class="nav-center" aria-label="Primary">
         <a href="#how" data-i18n="nav.how">Product</a>
+        <a href="#intelligence">Intelligence</a>
         <a href="#plans" data-i18n="nav.plans">Plans</a>
         <a href="#faq" data-i18n="nav.faq">FAQ</a>
       </nav>
@@ -69,6 +70,7 @@
   <div class="mobile-menu" id="mobileMenu" aria-hidden="true">
     <nav class="mobile-nav" aria-label="Mobile">
       <a href="#how" data-i18n="nav.how">Product</a>
+      <a href="#intelligence">Intelligence</a>
       <a href="#plans" data-i18n="nav.plans">Plans</a>
       <a href="#faq" data-i18n="nav.faq">FAQ</a>
     </nav>
@@ -123,8 +125,32 @@
           </div>
           <figure class="shot-fig"><img src="assets/positions-en.jpg" data-i18n-src="positions" width="1560" height="900" loading="lazy" decoding="async" alt="Positions in a category in Aurix, with sample data" data-i18n-alt="alt.positions"></figure>
         </div>
-        <!-- Cuatro filas alternas (escritorio): texto|imagen, imagen|texto, texto|imagen, imagen|texto.
-             Market: captura sólo en español; el enlace abre la resolución completa. -->
+      </div>
+    </section>
+
+    <!-- ─────────────── INTELLIGENCE: el diferencial, con sección propia ─────────────── -->
+    <!-- Captura original del founder (interfaz en inglés). Las tres capacidades son las que
+         Intelligence publica hoy: concentración, evolución de la estructura y cambios materiales. -->
+    <section class="section section--intel" id="intelligence">
+      <div class="container">
+        <div class="intel-head reveal">
+          <span class="eyebrow" data-i18n="intel.eyebrow">Aurix Intelligence</span>
+          <h2 class="section-title intel-title" data-i18n="intel.title">Your wealth has a story. Aurix helps you read it.</h2>
+          <p class="section-lead intel-lead" data-i18n="intel.lead">Tracking tells you what you own. Intelligence helps you understand what it means.</p>
+        </div>
+        <figure class="shot-fig intel-fig reveal"><img src="assets/intelligence.jpg" width="1600" height="839" loading="lazy" decoding="async" alt="Aurix Intelligence: portfolio health, concentration reading, radar, key drivers and questions to explore your wealth" data-i18n-alt="alt.intelligence"></figure>
+        <ul class="intel-caps">
+          <li class="intel-cap reveal"><h3 data-i18n="intel.c1.t">Concentration</h3><p data-i18n="intel.c1.d">See which positions and categories carry the most weight in your wealth, and how much of it depends on them.</p></li>
+          <li class="intel-cap reveal"><h3 data-i18n="intel.c2.t">Evolution</h3><p data-i18n="intel.c2.d">Follow how the structure of your wealth changes over time, not just its total.</p></li>
+          <li class="intel-cap reveal"><h3 data-i18n="intel.c3.t">Key changes</h3><p data-i18n="intel.c3.d">Spot what has changed in a meaningful way in your portfolio, without noise from minor moves.</p></li>
+        </ul>
+        <p class="intel-note reveal" data-i18n="intel.note">Intelligence reads your own data and explains it. It does not tell you what to buy or sell.</p>
+      </div>
+    </section>
+
+    <section class="section section--how section--how2">
+      <div class="container">
+        <!-- Market: captura sólo en español; el enlace abre la resolución completa. -->
         <div class="how-row how-row--rev reveal">
           <div class="how-copy">
             <h3 data-i18n="how.mkt.t">Follow the markets that interest you.</h3>
@@ -132,20 +158,15 @@
           </div>
           <figure class="shot-fig how-market-fig"><a href="assets/market-full.jpg" target="_blank" rel="noopener noreferrer" data-i18n-aria="alt.market.open" aria-label="Open the Market screenshot at full size"><img src="assets/market.jpg" srcset="assets/market.jpg 1360w, assets/market-full.jpg 2448w" sizes="(min-width:1200px) 663px, (min-width:861px) calc(60vw - 58px), calc(100vw - 36px)" width="1360" height="663" loading="lazy" decoding="async" alt="Aurix Market (interface in Spanish): list of crypto, stocks and ETFs with price, 24-hour change, trend and saved assets" data-i18n-alt="alt.market"></a></figure>
         </div>
-        <div class="how-row how-row--focus reveal">
-          <div class="how-copy">
-            <h3 data-i18n="how.2.t">Find out what deserves your attention</h3>
-            <p data-i18n="how.2.d">Intelligence puts your wealth in context: where it is concentrated, what has changed and how its structure evolves. A reading of your data to better understand your portfolio.</p>
-          </div>
-          <figure class="shot-fig"><img src="assets/intelligence.jpg" width="1600" height="839" loading="lazy" decoding="async" alt="Aurix Intelligence: portfolio health, concentration reading, radar, key drivers and questions to explore your wealth" data-i18n-alt="alt.intelligence"></figure>
-        </div>
-        <div class="how-row how-row--rev reveal">
+        <div class="how-row reveal">
           <div class="how-copy">
             <h3 data-i18n="how.3.t">Turn your numbers into plans</h3>
-            <p data-i18n="how.3.d">Plan with your own numbers: organise your budget, set goals and see how a loan or compound interest would affect them.</p>
-            <p class="how-note" data-i18n="how.3.ex">For example: Monthly budget, Financial goals, Loan simulator and Compound interest.</p>
+            <p data-i18n="how.3.d">Workspace brings together tools to plan with your own numbers. Save each plan as a document, pick it up later and choose which ones to show on your Dashboard.</p>
+            <ul class="ws-chips" aria-label="Workspace">
+              <li data-i18n="ws.c.budget">Budgets</li><li data-i18n="ws.c.goals">Goals</li><li data-i18n="ws.c.re">Real estate</li><li data-i18n="ws.c.recv">Receivables</li><li data-i18n="ws.c.compound">Compound interest</li><li data-i18n="ws.c.loan">Loans</li><li data-i18n="ws.c.scen">Scenarios</li><li data-i18n="ws.c.cmp">Return comparison</li><li data-i18n="ws.c.jrn">Investment journal</li>
+            </ul>
           </div>
-          <figure class="shot-fig"><img src="assets/workspace-en.jpg" data-i18n-src="workspace" width="1600" height="1000" loading="lazy" decoding="async" alt="Aurix monthly budget with sample data" data-i18n-alt="alt.workspace"></figure>
+          <figure class="shot-fig"><img src="assets/workspace-en.jpg" data-i18n-src="workspace" width="1200" height="648" loading="lazy" decoding="async" alt="Aurix monthly budget with sample data" data-i18n-alt="alt.workspace"></figure>
         </div>
       </div>
     </section>
@@ -190,6 +211,11 @@
     <section class="section section--faq" id="faq">
       <div class="container faq-inner">
         <h2 class="section-title reveal" data-i18n="faq.title">Frequently asked questions</h2>
+        <details class="faq reveal"><summary data-i18n="faq.0.q">What is Aurix?</summary><p data-i18n="faq.0.a">A wealth intelligence platform for people who invest. You bring your positions together in one place, Intelligence helps you understand what is changing, and Workspace lets you plan with your own numbers.</p></details>
+        <details class="faq reveal"><summary data-i18n="faq.6.q">Which assets can I add?</summary><p data-i18n="faq.6.a">Stocks, ETFs, funds, crypto, metals, real estate and cash. Aurix updates the prices of listed assets; you enter the value of the rest yourself.</p></details>
+        <details class="faq reveal"><summary data-i18n="faq.7.q">What does Intelligence do?</summary><p data-i18n="faq.7.a">It reads your portfolio and explains it: where your wealth is concentrated, how its structure evolves and what has changed in a meaningful way. Free includes a first reading; Premium unlocks the full analysis.</p></details>
+        <details class="faq reveal"><summary data-i18n="faq.8.q">What is Workspace?</summary><p data-i18n="faq.8.a">The space to plan: budgets, goals, real estate, receivables, compound interest, loans, scenarios, return comparison and an investment journal. It is part of Premium.</p></details>
+        <details class="faq reveal"><summary data-i18n="faq.9.q">Are my plans saved?</summary><p data-i18n="faq.9.a">With Premium, each plan is saved as a document in your account so you can pick it up later. Nothing appears on your Dashboard unless you choose to show it there.</p></details>
         <details class="faq reveal"><summary data-i18n="faq.1.q">What can I do for free?</summary><p data-i18n="faq.1.a">Record all your positions, see your wealth, its split and evolution, follow the market and get a first Intelligence reading. Premium adds full Intelligence, all Workspace tools and templates, and saving your plans.</p></details>
         <details class="faq reveal"><summary data-i18n="faq.2.q">Does Aurix connect to my bank or broker?</summary><p data-i18n="faq.2.a">No. You record your positions by hand and Aurix updates the prices of listed assets. It does not need your banking credentials and cannot move your money.</p></details>
         <details class="faq reveal"><summary data-i18n="faq.3.q">How is Premium charged and how do I cancel?</summary><p data-i18n="faq.3.a">Monthly (€7.99 a month) or annual (€69.99, in a single yearly charge). The subscription renews automatically at the end of each period until you cancel it from “Manage my plan” in the app. Payments are processed by Stripe; Aurix does not store your card.</p></details>

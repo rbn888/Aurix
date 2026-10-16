@@ -1375,3 +1375,31 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
 .ref-btn:focus-visible,.ref-more:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; }
 .ref-more{ color:var(--accent-3); margin-left:auto; }
 @media (max-width:860px){ .ref-notice{ left:16px; right:16px; bottom:16px; max-width:none; } }
+
+/* LANDING MASTER — Intelligence como sección propia (el diferencial): titular centrado,
+   captura a lo ancho y tres capacidades. Market y Workspace vuelven a filas alternas. */
+.section--intel{ padding:96px 0 88px; border-top:1px solid var(--divider); border-bottom:1px solid var(--divider);
+  background:radial-gradient(70% 55% at 50% 0%, rgba(79,142,247,.10), transparent 70%); }
+.intel-head{ text-align:center; max-width:820px; margin:0 auto; }
+.intel-title{ max-width:22ch; margin:14px auto 0; }
+.intel-lead{ margin:18px auto 0; color:var(--text); opacity:.84; max-width:46ch; }
+.intel-fig{ max-width:1040px; margin:44px auto 0; }
+.intel-fig img{ box-shadow:0 24px 70px rgba(20,60,160,.28), 0 16px 40px rgba(0,0,0,.4); }
+.intel-caps{ list-style:none; margin:40px auto 0; padding:0; max-width:1040px; display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+.intel-cap{ padding:22px 22px 24px; border-radius:var(--radius); background:var(--surface); border:1px solid var(--border); }
+.intel-cap h3{ margin:0 0 8px; font-size:18px; font-weight:750; letter-spacing:-.01em; color:var(--accent-3); }
+.intel-cap p{ margin:0; color:var(--muted); font-size:15px; line-height:1.55; }
+.intel-note{ margin:26px auto 0; max-width:60ch; text-align:center; font-size:14px; color:var(--dim); }
+.section--how2{ padding-top:16px; }
+.ws-chips{ list-style:none; margin:16px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:8px; }
+.ws-chips li{ font-size:13px; font-weight:600; padding:6px 12px; border-radius:var(--radius-pill);
+  border:1px solid var(--border-hi); color:var(--accent-3); background:rgba(79,142,247,.07); }
+@media (max-width:860px){
+  .section--intel{ padding:72px 0 64px; }
+  .intel-head{ text-align:left; }
+  .intel-title, .intel-lead{ margin-left:0; }
+  .intel-fig{ margin-top:30px; }
+  .intel-caps{ grid-template-columns:1fr; gap:12px; margin-top:24px; }
+  .intel-cap{ padding:18px; }
+  .intel-note{ text-align:left; margin-left:0; }
+}
