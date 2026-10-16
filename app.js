@@ -64414,6 +64414,14 @@ function _aurixMktFmtCap(row) {
   return String(Math.round(v));
 }
 
+// v838 — RESULTADOS DE BÚSQUEDA: el orden por defecto («featured») agrupa por tipo con cripto
+// primero (`_AURIX_TYPE_PRIORITY`), y sobre una búsqueda eso ponía el token «AAPL» por delante de
+// Apple Inc. aunque el ranker canónico los ordenara al revés. Con el orden por defecto, una búsqueda
+// conserva el orden canónico (= «Relevancia»); un orden ELEGIDO (precio, variación, nombre) se respeta.
+function _aurixMktDiscSort(items) {
+  if (_aurixMktSortBy === 'featured') return Array.isArray(items) ? items : [];
+  return _aurixMktExpSortItems(items);
+}
 function _aurixMktExpSortItems(items) {
   if (!Array.isArray(items)) return [];
   if (!_aurixMktExpFlag()) return items;
@@ -64696,7 +64704,7 @@ function renderCurrentMarketView() {
     } else {
       // El orden lo decide el selector; "Relevancia" respeta el ranking canónico
       // tal y como llega de _aurixRankSearchResults (no se reordena).
-      const results = _aurixMktExpSortItems(_aurixMktFilterTraditional(_mktDiscResults));
+      const results = _aurixMktDiscSort(_aurixMktFilterTraditional(_mktDiscResults));
       html = results.length
         ? results.map(renderMarketItem).join('')
         : `<div class="market-empty">${t('market_no_results')}</div>`;
@@ -65435,27 +65443,33 @@ function _aurixTickerKey(x) { return String(x || '').toUpperCase().trim().replac
 function _aurixSameAssetIdentity(a, sel, opts) {
   if (!a || !sel) return false;
   const ca = _aurixAssetClass(a.type), cs = _aurixAssetClass(sel.type);
-  // Valores cotizados (acción · ETF · fondo) con el MISMO símbolo de mercado y moneda son el mismo
-  // listado aunque una fila antigua lo tipara distinto; cripto y metales nunca entran en esa familia.
-  const SEC = { stock: 1, etf: 1, fund: 1 };
-  const sameSecListing = !!(SEC[ca] && SEC[cs] && a.marketSymbol && sel.marketSymbol);
-  if (!ca || (ca !== cs && !sameSecListing)) return false;               // nunca entre clases
+  if (!ca || ca !== cs) return false;                                    // v838: nunca entre clases (ni acción/ETF/fondo)
   const nm = x => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
   if (ca === 'crypto') {
     if (a.coinId && sel.coinId) return a.coinId === sel.coinId;
     if (a.chain && sel.chain && a.contract && sel.contract)
       return nm(a.chain) === nm(sel.chain) && String(a.contract).toLowerCase() === String(sel.contract).toLowerCase();
-    if (!a.coinId && !sel.coinId) return _aurixTickerKey(a.ticker) === _aurixTickerKey(sel.ticker);
-    // Una de las dos sin coinId (posición antigua): sólo si ticker Y nombre coinciden; si no, separada.
+    // Sin coinId en alguna de las dos (posición antigua): sólo si ticker Y nombre coinciden; si no, separada.
     return _aurixTickerKey(a.ticker) === _aurixTickerKey(sel.ticker) && !!nm(a.name) && nm(a.name) === nm(sel.name);
   }
   const aCcy = String(a.assetCurrency || 'USD').toUpperCase();
   const sRaw = sel.assetCurrency || sel.currency || '';
   if (!(opts && opts.lenientCcy && !sRaw) && aCcy !== String(sRaw || 'USD').toUpperCase()) return false;
-  const ai = String(a.isin || '').toUpperCase().trim(), si = String(sel.isin || '').toUpperCase().trim();
+  // Un FONDO del catálogo curado se guarda sin `marketSymbol` y sin ISIN: su ISIN se lee del catálogo
+  // por ticker (sólo para comparar; la fila guardada no se toca).
+  const isinOf = x => {
+    if (x.isin) return String(x.isin).toUpperCase().trim();
+    if (ca !== 'fund') return '';
+    try { const r = (typeof _AURIX_FUND_DB !== 'undefined' && Array.isArray(_AURIX_FUND_DB)) ? _AURIX_FUND_DB.find(f => f && String(f.ticker || '').toUpperCase() === String(x.ticker || '').toUpperCase()) : null; return r && r.isin ? String(r.isin).toUpperCase().trim() : ''; } catch (_) { return ''; }
+  };
+  const ai = isinOf(a), si = isinOf(sel);
   if (ai && si) return ai === si;                                        // ISIN distinto = instrumento distinto
+  // v838 — ticker + moneda NO basta: un valor cotizado se reconoce por su SÍMBOLO DE MERCADO (que lleva
+  // la bolsa) en las dos filas, y si ambas declaran bolsa, la misma. Faltan datos → posición separada.
+  const ax = String(a.exchange || '').toUpperCase().trim(), sx = String(sel.exchange || '').toUpperCase().trim();
+  if (ax && sx && ax !== sx) return false;
   if (a.marketSymbol && sel.marketSymbol) return _aurixTickerKey(a.marketSymbol) === _aurixTickerKey(sel.marketSymbol);
-  return _aurixTickerKey(a.ticker) === _aurixTickerKey(sel.ticker);
+  return false;
 }
 // ¿Esta ficha de Market es un activo que YA tengo (posición ABIERTA)? El mismo juez que el alta; la
 // ficha puede no traer moneda, y entonces la moneda no decide (sólo se muestra).
@@ -65821,7 +65835,7 @@ function _aurixMktChipListHtml(type, data) {
   if (_mktDiscQuery !== tag) { _aurixMktDiscover(cq, { silent: true }); return _aurixMktSkeletonHtml(6); }
   if (_mktDiscState === 'loading') return _aurixMktSkeletonHtml(6);
   if (_mktDiscState === 'error') return `<div class="market-empty">${t('market_no_results')}</div>`;
-  const rows = _aurixMktExpSortItems(_aurixMktFilterTraditional(_mktDiscResults));
+  const rows = _aurixMktDiscSort(_aurixMktFilterTraditional(_mktDiscResults));
   if (!rows.length) return `<div class="market-empty">${t('market_no_results')}</div>`;
   return _aurixMktTableHeaderHtml() + rows.map(renderMarketItem).join('');
 }
@@ -67001,6 +67015,9 @@ function renderMarketItem(item, idx) {
     ? _aurixShortContract(item.contract) : '';
   const idMeta = [
     `<span class="mkt-id-ticker">${escHtml(item.symbol)}</span>`,
+    // v838 — la representación tokenizada se etiqueta JUSTO tras el ticker (en móvil la línea se trunca).
+    (String(item.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stocks?\b|\bbacked\b|robinhood token|\bsecurities\)|\bdinari\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(item.name || '')))
+      ? `<span class="mkt-id-deriv">${escHtml(t('search_token_label'))}</span>` : '',
     _idChain
       ? `<span>${escHtml(_idChain)}</span>`
       : (item.type ? `<span>${escHtml(_aurixMktShortType(item.type))}</span>` : ''),
@@ -78729,19 +78746,36 @@ function _aurixSearchMatchScore(a, q) {
 // El patrón vive DENTRO de los dos owners que lo usan (marcador y subtítulo) para no crear otra pieza.
 function _aurixRankSearchResults(items, query) {
   const q = String(query || '').toLowerCase().trim();
+  // v838 — NOMBRE CANÓNICO de un valor cotizado: su nombre sin el sufijo societario («Apple Inc.» →
+  // «apple», «Microsoft Corporation» → «microsoft»). Si es la consulta, la coincidencia es EXACTA (1000),
+  // la misma categoría que un ticker exacto: una cripto que sólo comparte el ticker o imita el nombre no
+  // adelanta a la entidad. Regla general (clase + nombre raíz), sin excepciones por empresa.
+  const _canonLift = a => {
+    if (!/^(stock|etf|fund)$/.test(String(a.type || '').toLowerCase())) return 0;
+    let n = String(a.name || '').toLowerCase().trim();
+    for (let i = 0; i < 3; i++) n = n.replace(/[\s,]+(inc|incorporated|corp|corporation|company|plc|ltd|limited|s\.?a|ag|n\.?v|s\.?p\.?a)\.?$/, '').trim();
+    if (!n || n !== q) return 0;
+    const m = _aurixSearchMatchScore(a, q);
+    return m < 1000 ? 1000 - m : 0;
+  };
   const score = a => _aurixSearchMatchScore(a, q)
+                   + _canonLift(a)
                    + _aurixSearchAliasHit(a, q)
                    + _aurixSearchPopularity(a)
                    + _aurixSearchProviderWeight(a)
                    + _aurixSearchTypeWeight(a)
-                   + (String(a.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')) ? -600 : 0)
+                   + (String(a.type || '').toLowerCase() === 'crypto' && /tokeni[sz]ed|\b[abx]stocks?\b|\bbacked\b|robinhood token|\bsecurities\)|\bdinari\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')) ? -600 : 0)
                    // P1 · IDENTIDAD COMPLETA: ticker Y nombre exactos (o slug) es una coincidencia más fuerte que
                    // sólo el ticker — «USDC» (USDC · USDC) antes que «USDATA Corp.» (ticker USDC).
                    // En cripto la identidad completa exige además un listing real (rango ≤ 2000): una memecoin
                    // sin rango llamada «Gold» con ticker GOLD no adelanta a Gold.com por ese bonus.
                    + ((String(a.ticker || '').toLowerCase() === q && (String(a.name || '').toLowerCase() === q
                        || (a.coinId && String(a.coinId).toLowerCase().replace(/[^a-z0-9]+/g, '') === q.replace(/[^a-z0-9]+/g, '')))
-                       && !(String(a.type || '').toLowerCase() === 'crypto' && !(Number(a.marketCapRank) > 0 && Number(a.marketCapRank) <= 2000))) ? 100 : 0)
+                       // v838 — en cripto la entidad canónica la da el ID RAÍZ del proveedor, no el rango:
+                       // CoinGecko marca los homónimos posteriores con sufijo «-N» («apple-2», «gold-10»).
+                       // El rango sólo puede quitar el bonus (> 2000), nunca es necesario para tenerlo.
+                       && !(String(a.type || '').toLowerCase() === 'crypto' && (Number(a.marketCapRank) > 2000
+                          || (/-\d+$/.test(String(a.coinId || '')) && !(Number(a.marketCapRank) > 0))))) ? 150 : 0)
                    // P1 · CALIDAD DEL LISTING: una cripto de capitalización marginal (rango > 2000 del propio
                    // proveedor) no adelanta a un instrumento principal sólo por llevar su ticker o su nombre
                    // («APPLE» memecoins frente a Apple Inc.). Sin rango NO se penaliza: el catálogo canónico
@@ -78780,8 +78814,12 @@ function _aurixSearchSubtitle(a) {
     const needsId = !!(a.matchedBy === 'contract' || a.symbolCollision);
     const parts = [];
     if (a.ticker) parts.push(a.ticker);
+    // v838 — un token derivado se DICE aunque se muestre su red (antes la red sustituía a la etiqueta).
+    const _deriv = /tokeni[sz]ed|\b[abx]stocks?\b|\bbacked\b|robinhood token|\bsecurities\)|\bdinari\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || ''));
+    if (_deriv) parts.push((typeof t === 'function' && t('search_token_label')) || 'TOKEN');
     if (needsId && a.chain) parts.push(a.chain);
-    else if (/tokeni[sz]ed|\b[abx]stock\b|\bbacked\b|robinhood token|backpack securities|\bdinari\b|bstocks|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')))
+    else if (_deriv) { /* ya etiquetado */ }
+    else if (/tokeni[sz]ed|\b[abx]stocks?\b|\bbacked\b|robinhood token|\bsecurities\)|\bdinari\b|\bbridged\b|binance-peg|\bwrapped\b|\(wormhole\)/i.test(String(a.name || '')))
       parts.push((typeof t === 'function' && t('search_token_label')) || 'TOKEN');   // C1: no es el original
     else if (_label) parts.push(_label);
     if (needsId && a.contract && typeof _aurixShortContract === 'function') parts.push(_aurixShortContract(a.contract));

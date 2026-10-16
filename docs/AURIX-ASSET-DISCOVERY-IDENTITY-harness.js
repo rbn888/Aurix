@@ -254,7 +254,7 @@ const OFF = buildCtx({ _AURIX_DISCOVERY_IDENTITY_V1: false });
   const sub = a => { ON.__a = a; return run(ON, '_aurixSearchSubtitle(__a)'); };
   ok('7.1 an unambiguous crypto keeps the previous subtitle (no noise)',
     sub({ type: 'crypto', ticker: 'BTC', name: 'Bitcoin' }) === 'BTC · CRYPTO', sub({ type: 'crypto', ticker: 'BTC', name: 'Bitcoin' }));
-  ok('7.2 a symbol collision shows the network', sub(usdc.find(r => r.coinId === 'bridged-usdc-base')) === 'USDC · Base · 0xAAA0…0001',
+  ok('7.2 a symbol collision shows the network', /* v838: un bridged se etiqueta como derivado también con red visible (sin i18n en el sandbox → «TOKEN») */ sub(usdc.find(r => r.coinId === 'bridged-usdc-base')) === 'USDC · TOKEN · Base · 0xAAA0…0001',
     sub(usdc.find(r => r.coinId === 'bridged-usdc-base')));
   ok('7.3 a contract match shows network + abbreviated contract',
     sub(byContract[0]) === 'USDC · Ethereum · 0xA0b8…eB48', sub(byContract[0]));

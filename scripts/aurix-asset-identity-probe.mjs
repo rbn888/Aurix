@@ -24,7 +24,9 @@ const TOK = { id: 'a_tok', type: 'crypto', ticker: 'MSFT', marketSymbol: 'MSFT',
 const BRK = { id: 'a_brk', type: 'stock', ticker: 'BRK-B', marketSymbol: 'BRK-B', name: 'Berkshire Hathaway Inc.', qty: 1, price: 450, costBasis: 400, assetCurrency: 'USD', transactions: [{ type: 'buy', qty: 1, price: 400, ts: 2 }] };
 const OLDBTC = { id: 'a_oldbtc', type: 'crypto', ticker: 'BTC', marketSymbol: 'BTC', name: 'Bitcoin', qty: 0.1, price: 60000, costBasis: 5000, assetCurrency: 'USD', transactions: [{ type: 'buy', qty: 0.1, price: 50000, ts: 3 }] };
 const SAN = { id: 'a_san', type: 'stock', ticker: 'SAN', marketSymbol: 'SAN.MC', name: 'Banco Santander', qty: 100, price: 6, costBasis: 500, assetCurrency: 'EUR', transactions: [{ type: 'buy', qty: 100, price: 5, ts: 4 }] };
-const POP = [TOK, BRK, OLDBTC, SAN];
+const IBE = { id: 'a_ibe', type: 'stock', ticker: 'IBE', name: 'Iberdrola', qty: 10, price: 12, costBasis: 100, assetCurrency: 'EUR', transactions: [{ type: 'buy', qty: 10, price: 10, ts: 5 }] };
+const VGW = { id: 'a_vgw', type: 'fund', ticker: 'VG-WLD', name: 'Vanguard Global Stock Index', marketSymbol: null, qty: 4, price: 50, costBasis: 180, assetCurrency: 'EUR', transactions: [{ type: 'buy', qty: 4, price: 45, ts: 6 }] };
+const POP = [TOK, BRK, OLDBTC, SAN, IBE, VGW];
 
 async function page(browser, root, { w, h, lang, premium = true, assets = POP }) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: w < 800 });
@@ -58,7 +60,13 @@ async function run(ENG, browser, root, w, lang, premium) {
   // ── cartera POBLADA
   const P = await page(browser, root, { w, h: w < 800 ? 844 : 900, lang, premium });
   const r0 = await P.rows();
-  ok(`${T} carga intacta: 4 posiciones con sus cantidades, coste e historial`, r0.length === 4 && JSON.stringify(r0.map(x => [x.id, x.q, x.cb, x.n])) === JSON.stringify([['a_tok', 2, 700, 1], ['a_brk', 1, 400, 1], ['a_oldbtc', 0.1, 5000, 1], ['a_san', 100, 500, 1]]), JSON.stringify(r0));
+  ok(`${T} carga intacta: 6 posiciones con sus cantidades, coste e historial`, r0.length === 6 && JSON.stringify(r0.map(x => [x.id, x.q, x.cb, x.n])) === JSON.stringify([['a_tok', 2, 700, 1], ['a_brk', 1, 400, 1], ['a_oldbtc', 0.1, 5000, 1], ['a_san', 100, 500, 1], ['a_ibe', 10, 100, 1], ['a_vgw', 4, 180, 1]]), JSON.stringify(r0));
+  // fondo del catálogo curado (guardado sin marketSymbol ni ISIN): recompra desde la búsqueda (trae ISIN)
+  // y desde Market (trae símbolo) → su MISMA fila, por el ISIN del catálogo.
+  let rf = await P.add({ ticker: 'VG-WLD', name: 'Vanguard Global Stock Index', type: 'fund', marketSymbol: null, isin: 'IE00B03HD191', assetCurrency: 'EUR' }, 1, 50);
+  ok(`${T} fondo curado recomprado desde la búsqueda: su fila (ISIN del catálogo), sin duplicar`, rf.find(x => x.id === 'a_vgw').q === 5 && by(rf, x => x.t === 'VG-WLD').length === 1, JSON.stringify(by(rf, x => x.t === 'VG-WLD')));
+  rf = await P.add({ ticker: 'VG-WLD', name: 'Vanguard Global Stock Index', type: 'fund', marketSymbol: 'VG-WLD', assetCurrency: 'EUR' }, 1, 50);
+  ok(`${T} fondo curado recomprado desde Market: su fila, sin duplicar`, rf.find(x => x.id === 'a_vgw').q === 6 && by(rf, x => x.t === 'VG-WLD').length === 1, JSON.stringify(by(rf, x => x.t === 'VG-WLD')));
   // 1/2 · acción MSFT (sin coinId) junto a un token cripto «MSFT»
   let r = await P.add({ ticker: 'MSFT', name: 'Microsoft Corporation', type: 'stock', marketSymbol: 'MSFT' }, 3, 400);
   const tok = r.find(x => x.id === 'a_tok'), st = r.find(x => x.type === 'stock' && x.t === 'MSFT');
@@ -86,12 +94,14 @@ async function run(ENG, browser, root, w, lang, premium) {
   ok(`${T} antigua sin coinId + Bitcoin (mismo ticker Y nombre): se suma a la existente, sin reescribir su identidad`, r.find(x => x.id === 'a_oldbtc').q === 1.1 && r.find(x => x.id === 'a_oldbtc').c === null && by(r, x => x.t === 'BTC').length === 1, JSON.stringify(by(r, x => x.t === 'BTC')));
   r = await P.add({ ticker: 'BTC', name: 'batcat', type: 'crypto', coinId: 'batcat', marketSymbol: 'BTC' }, 1000, 0.01);
   ok(`${T} antigua sin coinId + otra cripto «BTC» de distinto nombre: posición separada (ambigua → conservador)`, r.find(x => x.id === 'a_oldbtc').q === 1.1 && by(r, x => x.t === 'BTC').length === 2, JSON.stringify(by(r, x => x.t === 'BTC')));
-  // listado de valores tipado distinto en una fila antigua (stock) y la compra nueva como ETF: mismo
-  // símbolo de mercado y moneda = mismo listado → su fila; nunca entre valores y cripto.
+  // v838 — acción y ETF con el mismo ticker y moneda NO se fusionan sin un identificador canónico común.
   r = await P.add({ ticker: 'SAN', name: 'Banco Santander', type: 'etf', marketSymbol: 'SAN.MC', assetCurrency: 'EUR' }, 5, 6);
-  ok(`${T} mismo listado (SAN.MC · EUR) tipado stock/ETF: se suma a su fila, sin duplicar`, r.find(x => x.id === 'a_san').q === 105 && by(r, x => x.t === 'SAN').length === 1, JSON.stringify(by(r, x => x.t === 'SAN')));
+  ok(`${T} acción y ETF con igual ticker/moneda sin ID canónico común: posiciones separadas`, r.find(x => x.id === 'a_san').q === 100 && by(r, x => x.t === 'SAN').length === 2, JSON.stringify(by(r, x => x.t === 'SAN')));
+  // v838 — una fila antigua SIN símbolo de mercado: ticker + moneda no basta → separada.
+  r = await P.add({ ticker: 'IBE', name: 'Iberdrola', type: 'stock', marketSymbol: 'IBE.MC', assetCurrency: 'EUR' }, 3, 12);
+  ok(`${T} fila antigua sin símbolo de mercado: ticker + moneda no basta, posición separada`, r.find(x => x.id === 'a_ibe').q === 10 && by(r, x => x.t === 'IBE').length === 2, JSON.stringify(by(r, x => x.t === 'IBE')));
   // 14 · doble toque / reintento
-  const before = by(await P.rows(), x => x.id === 'a_san')[0].q;
+  const before = by(await P.rows(), x => x.id === 'a_san')[0].q;   // (la fila SAN.MC · acción)
   r = await P.add({ ticker: 'SAN', name: 'Banco Santander', type: 'stock', marketSymbol: 'SAN.MC', assetCurrency: 'EUR' }, 10, 6, true);
   ok(`${T} 14 doble envío del alta suma UNA vez`, r.find(x => x.id === 'a_san').q === before + 10, String(r.find(x => x.id === 'a_san').q));
   // 12/13 · «En cartera» en Market
@@ -130,6 +140,11 @@ async function runSearch(browser, root) {
   ok('7 MSFT: la acción canónica primero y sus tokens detrás de las cotizaciones de la acción', msft[0].t === 'MSFT' && msft[0].ty === 'stock' && (iTok === -1 || iTok > msft.findIndex(x => x.t === 'MSFT.TO')), JSON.stringify(msft.map(x => x.t + '/' + x.ty)));
   const apple = await q('apple'); const iInc = apple.findIndex(x => /^Apple Inc\.?$/.test(x.n)), iMeme = apple.findIndex(x => x.ty === 'crypto' && x.t === 'APPLE');
   ok('8 apple: Apple Inc. antes que las memecoins APPLE', iInc === 0 && (iMeme === -1 || iMeme > iInc), JSON.stringify(apple.map(x => x.t + '/' + x.n.slice(0, 18))));
+  const aapl = await q('AAPL');
+  ok('AAPL: Apple Inc. primero', aapl[0] && aapl[0].t === 'AAPL' && aapl[0].ty === 'stock', JSON.stringify(aapl.slice(0, 3)));
+  const appleAll = JSON.parse(await P.ev(`(async function(){ var r = await searchAllAssets('apple'); return JSON.stringify((r||[]).map(function(a){ return { t: a.ticker, n: a.name, ty: a.type, sub: _aurixSearchSubtitle(a) }; })); })()`));
+  const bp = appleAll.findIndex(x => /Backpack Securities/i.test(x.n));
+  ok('Apple (Backpack Securities): detrás de Apple Inc. y etiquetada «Token derivado»', bp === -1 || (bp > 0 && /Token derivado/.test(appleAll[bp].sub)), JSON.stringify(appleAll[bp] || null));
   const usdc = await q('USDC'); const iU = usdc.findIndex(x => x.ty === 'crypto' && x.t === 'USDC'), iD = usdc.findIndex(x => /USDATA/i.test(x.n));
   ok('9 USDC: el USDC canónico antes que USDATA', iU === 0 && (iD === -1 || iD > iU), JSON.stringify(usdc.slice(0, 3).map(x => x.t + '/' + x.n)));
   const ondo = await q('ondo');
@@ -142,8 +157,33 @@ async function runSearch(browser, root) {
   ok('6 búsqueda BRK.B: la acción BRK-B primero', brk[0] && brk[0].ty === 'stock' && /Berkshire/.test(brk[0].n), JSON.stringify(brk[0]));
   for (const [s, rx] of [['BTC', /^Bitcoin$/], ['ETH', /^Ethereum$/]]) { const r = await q(s); ok(`búsqueda ${s}: el canónico primero`, r[0] && rx.test(r[0].n), JSON.stringify(r[0])); }
   const spy = await q('SPY'); ok('búsqueda SPY: el ETF primero', spy[0] && spy[0].ty === 'etf', JSON.stringify(spy[0]));
+  const bri = usdc.findIndex(x => /bridged/i.test(x.n));
+  ok('USDC: las versiones bridged detrás del USDC raíz', bri === -1 || bri > 0, JSON.stringify(usdc.map(x => x.n.slice(0, 20))));
   ok('búsqueda sin errores de página', !P.errs.length, P.errs.join(' | '));
   await P.ctx.close();
+  // ── La pestaña MARKET (donde v837 fallaba: el orden «featured» ponía la cripto primero), con y sin rango.
+  for (const norank of [false, true]) {
+    const M = await page(browser, root, { w: 390, h: 844, lang: 'es', assets: [] });
+    await M.p.route(/isa-portfolio-ten\.vercel\.app\/api\//, async route => { try { const r = await fetch(route.request().url(), { headers: { Origin: 'https://app.aurixsystem.io', Accept: 'application/json' } }); let body = await r.text();
+      if (norank && /search\/crypto/.test(route.request().url())) { const j = JSON.parse(body); (j.results || []).forEach(x => { x.marketCapRank = null; }); body = JSON.stringify(j); }
+      route.fulfill({ status: r.status, headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' }, body }); } catch (_) { route.abort(); } });
+    await M.ev(`switchTab('market')`); await M.p.waitForTimeout(1200);
+    const mrows1 = async qq => { const inp = M.p.locator('#marketSearchInput'); await inp.fill(''); await inp.fill(qq);
+      await M.p.waitForFunction(() => document.querySelectorAll('#marketList .market-row').length > 2, null, { timeout: 20000 }).catch(() => {}); await M.p.waitForTimeout(2200);
+      return M.p.evaluate(() => [...document.querySelectorAll('#marketList .market-row')].map(r => ({ n: (r.querySelector('.mkt-id-name') || {}).textContent || '', m: (r.querySelector('.mkt-id-meta') || {}).textContent || '' }))); };
+    // El proxy limita ráfagas: si una búsqueda llega sin NINGUNA fila cripto, se reintenta una vez tras
+    // vaciar la caché de búsqueda de Market (disponibilidad del dato, no el criterio de orden).
+    const mrows = async qq => { let r = await mrows1(qq); if (!r.some(x => /Cripto|Crypto|Token/.test(x.m))) { await M.p.waitForTimeout(2500); await M.ev(`try{ _mktDiscCache.clear(); }catch(_){}`); r = await mrows1(qq); } return r; };
+    const tag = norank ? 'Market sin rango' : 'Market';
+    const ma = await mrows('apple'); ok(`${tag} · apple → Apple Inc. primero`, ma[0] && /^Apple Inc\.?$/.test(ma[0].n), JSON.stringify(ma.slice(0, 3)));
+    const mb = ma.findIndex(x => /Backpack Securities/i.test(x.n)); ok(`${tag} · Backpack detrás y «Token derivado»`, mb === -1 || (mb > 0 && /Token derivado/.test(ma[mb].m)), JSON.stringify(ma[mb] || null));
+    const mA = await mrows('AAPL'); ok(`${tag} · AAPL → Apple Inc. primero`, mA[0] && /^Apple Inc\.?$/.test(mA[0].n), JSON.stringify(mA.slice(0, 3)));
+    const mm = await mrows('MSFT'); ok(`${tag} · MSFT → Microsoft Corporation primero`, mm[0] && /^Microsoft Corporation$/.test(mm[0].n), JSON.stringify(mm.slice(0, 2)));
+    const mu = await mrows('USDC'); const iUD = mu.findIndex(x => /USDATA/i.test(x.n)), iBr = mu.findIndex(x => /bridged/i.test(x.n));
+    ok(`${tag} · USDC → USD Coin primero; USDATA y bridged detrás`, mu[0] && /^(USD Coin|USDC)$/.test(mu[0].n) && iUD !== 0 && iBr !== 0, JSON.stringify(mu.slice(0, 3)));
+    ok(`${tag} · sin errores de página`, !M.errs.length, M.errs.join(' | '));
+    await M.ctx.close();
+  }
 }
 
 async function invariants(browser) {
