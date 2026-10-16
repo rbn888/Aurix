@@ -218,7 +218,8 @@ ok('5.7 se reutiliza el contrato de procedencia de v665, sin semántica nueva',
 console.log('\n6 — G/H · Sin regresión fuera del precio:');
 const rowSrc = fnSource('renderMarketItem');
 ok('6.1 la fila sigue pintando la ausencia con el formateador existente',
-   /<div class="col col-price">\$\{safePrice\(price\)\}<\/div>/.test(rowSrc)
+   // Cierre de moneda: misma ausencia («—» de safePrice/safePriceIn), en la moneda real de la cotización.
+   /<div class="col col-price">\$\{\(typeof safePriceIn === 'function'\) \? safePriceIn\(price, item\.currency\) : safePrice\(price\)\}<\/div>/.test(rowSrc)
    && /if \(typeof val !== 'number' \|\| isNaN\(val\)\) return '—';/.test(app));
 ok('6.2 icono, watchlist y navegación intactos en la fila',
    /_assetIconHtml\(item, item\.symbol/.test(rowSrc) && /role="button" tabindex="0"/.test(rowSrc)

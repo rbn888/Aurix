@@ -5162,6 +5162,8 @@ const T = {
     addToPortfolio:  'Añadir a cartera',
     mkt_owned_add:   'En cartera · Registrar compra',
     mkt_quote_na:    'Cotización no disponible',
+    ccyNotSupported: 'Esta moneda todavía no es compatible con la valoración total',
+    ccyRatePending:  'Obteniendo el tipo de cambio de esta moneda. Inténtalo de nuevo en unos segundos.',
     mkt_owned_open:  'Ver posición',
     acProfile:            'Perfil',
     acNotifications:      'Notificaciones',
@@ -8846,6 +8848,8 @@ const T = {
     addToPortfolio:  'Add to portfolio',
     mkt_owned_add:   'In portfolio · Record a buy',
     mkt_quote_na:    'Quote not available',
+    ccyNotSupported: 'This currency is not yet supported in the total valuation',
+    ccyRatePending:  'Fetching the exchange rate for this currency. Try again in a few seconds.',
     mkt_owned_open:  'View position',
     acProfile:            'Profile',
     acNotifications:      'Notifications',
@@ -15259,7 +15263,7 @@ function formatChartTooltip(amount) {
 // is byte-identical to pre-F2.
 const _AURIX_FX_TTL      = 12 * 60 * 60 * 1000;   // 12h — FX drifts slowly vs. portfolio-valuation needs
 const _AURIX_FX_KEY      = 'aurix_fx_rates_v1';
-const _AURIX_FX_PAIRS    = { EUR: 'EURUSD=X', GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X' };
+const _AURIX_FX_PAIRS    = { EUR: 'EURUSD=X', GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X', CAD: 'CADUSD=X' };
 // ── EUR/USD DEJA DE SER UN NÚMERO FIJO (SPEC 1) ──────────────────────────────
 // `usdToEur = 0.92` llevaba fijo desde 2026-04-27 (el fetch a Frankfurter se retiró por la
 // CSP) con un comentario «updated from API» falso. El 2026-10-08 el tipo real era 1,1197
@@ -15320,6 +15324,10 @@ function _aurixFxLookup(ccy) {
   }
   const fb = _AURIX_FX_FALLBACK[c];
   if (Number.isFinite(fb) && fb > 0) return { rate: fb, status: 'approx' };
+  // Un par SIN fijo de respaldo (CAD): el último tipo REAL conocido, declarado aproximado (como EUR
+  // caducado). Nunca un tipo inventado; si nunca se obtuvo ninguno → desconocido (no cubierto).
+  const last = _aurixFxLoad() && _aurixFxCache.rates ? Number(_aurixFxCache.rates[c]) : NaN;
+  if (Number.isFinite(last) && last > 0) return { rate: last, status: 'approx' };
   return { rate: null, status: 'unknown' };
 }
 function _aurixFxRate(ccy)   { return _aurixFxLookup(ccy).rate; }     // number | null
@@ -15556,7 +15564,9 @@ function _aurixFxApproxUsed(list) { return _aurixFxCurrencies(list).some(c => _a
 // the cached or static fallback. Does NOT fetch EUR (anchored on usdToEur).
 async function _aurixFxRefresh() {
   // Una caché fresca SIN EUR (anterior a este cambio) no puede ahorrar la petición.
-  if (_aurixFxFresh() && _aurixFxEurState().status === 'live') return;
+  // …ni una caché a la que le falte un PAR soportado (CAD se añadió después): se vuelve a pedir.
+  if (_aurixFxFresh() && _aurixFxEurState().status === 'live'
+      && Object.keys(_AURIX_FX_PAIRS).every(c => Number.isFinite(Number((_aurixFxCache.rates || {})[c])))) return;
   if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return;
   try {
     const syms = Object.values(_AURIX_FX_PAIRS).join(',');
@@ -58753,7 +58763,7 @@ function _aurixMktRenderHead(vm, opts) {
   if (priceEl) {
     const _pxOk = (pr.current.state !== 'unavailable' && typeof safePrice === 'function');
     // Sin cotización: el «—» se acompaña de su significado para lectores de pantalla.
-    if (_pxOk) priceEl.textContent = safePrice(pr.current.value);
+    if (_pxOk) priceEl.textContent = (typeof safePriceIn === 'function') ? safePriceIn(pr.current.value, (_aurixMktItem || {}).currency) : safePrice(pr.current.value);
     else priceEl.innerHTML = '—<span class="intcc-sr-only">' + _intccEsc(t('mkt_quote_na')) + '</span>';
   }
 
@@ -67094,7 +67104,7 @@ function renderMarketItem(item, idx) {
           </div>
         </div>
       </div>
-      <div class="col col-price">${safePrice(price)}</div>
+      <div class="col col-price">${(typeof safePriceIn === 'function') ? safePriceIn(price, item.currency) : safePrice(price)}</div>
       <div class="col col-change ${isLoading ? 'is-loading' : (chg > 0 ? 'is-up' : chg < 0 ? 'is-down' : '')}" data-mkt-tf="${selectedTf}">
         ${isLoading
             ? '<span class="col-change-skeleton" aria-label="Loading"></span>'
@@ -67113,13 +67123,25 @@ function renderMarketItem(item, idx) {
 function safeNumber(val, fallback = '—') {
   return (typeof val === 'number' && !isNaN(val)) ? val : fallback;
 }
+// Cierre de moneda — el precio de una fila de Market en la MONEDA REAL de su cotización. Una
+// cotización en USD conserva el contrato de siempre (respeta la moneda base, `safePrice`); una en
+// otra moneda (APC.DE en EUR, MSFT.TO en CAD) se muestra tal cual con su símbolo inequívoco: antes
+// `safePrice` la trataba como USD y la pintaba con «$» (o la «convertía» como si fuera USD).
+const _AURIX_MKT_CCY_SIGN = { EUR: '€', GBP: '£', CAD: 'CA$', CHF: 'CHF\u00a0', JPY: 'JP¥', AUD: 'A$', HKD: 'HK$' };
+function safePriceIn(val, ccy) {
+  const c = String(ccy || '').toUpperCase();
+  if (!c || c === 'USD') return safePrice(val);
+  if (typeof val !== 'number' || isNaN(val)) return '—';
+  const sign = _AURIX_MKT_CCY_SIGN[c] || (c + '\u00a0');
+  return `${sign}${fmtMktPrice(val)}`;
+}
 function safePrice(val) {
   if (typeof val !== 'number' || isNaN(val)) return '—';
   // PR-7 hotfix C-1: market list / featured cards must honor the global
   // baseCurrency toggle. Value is USD-canonical (source: snapshot gateway);
   // route through toBase + dynamic symbol so EUR mode shows €, not mixed $.
   // fmtMktPrice precision behavior preserved (4-decimals for sub-$1 prices).
-  const sym = baseCurrency === 'EUR' ? '€' : '$';
+  const sym = baseCurrency === 'EUR' ? '€' : 'US$';   // nunca un «$» genérico
   return `${sym}${fmtMktPrice(toBase(val, 'USD'))}`;
 }
 function safeChange(val) {
@@ -81219,6 +81241,18 @@ assetForm.addEventListener('submit', e => {
     setLookupStatus('error', t('lookupError'));
     return;
   }
+  // Cierre de moneda — una posición en una moneda que el motor de cambio no sabe convertir quedaría
+  // fuera del patrimonio total sin decirlo: el alta se bloquea ANTES de guardar, con el motivo.
+  { const _c = String(pendingCurrency || 'USD').toUpperCase();
+    if (_c !== 'USD' && _c !== 'EUR' && !(typeof _aurixFxRate === 'function' && Number(_aurixFxRate(_c)) > 0)) {
+      // Moneda CON par en el motor pero cuyo tipo aún no ha llegado (arranque, sin red): se pide ya y
+      // se dice que se reintente; sólo una moneda SIN par es «no compatible».
+      if (typeof _AURIX_FX_PAIRS !== 'undefined' && _AURIX_FX_PAIRS[_c]) {
+        try { _aurixFxRefresh(); } catch (_) {}
+        setLookupStatus('error', t('ccyRatePending'));
+      } else setLookupStatus('error', t('ccyNotSupported'));
+      return;
+    } }
 
   const qty = parseLocalFloat(qtyInput.value);
   if (isNaN(qty) || qty <= 0) { qtyInput.focus(); return; }

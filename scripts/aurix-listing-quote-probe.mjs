@@ -52,6 +52,8 @@ async function page(browser, root, snap, { w = 1440, h = 900, lang = 'es', asset
     await p.waitForFunction("typeof _openAddAssetWithFund==='function' && typeof _AURIX_ENT_CANON!=='undefined'", null, { timeout: 60000 });
     await p.waitForTimeout(800);
     await p.evaluate(`(function(){ try{_aurixCancelLoginRedirect('p');_aurixMarkSessionConfirmed();}catch(_){} var bl=document.getElementById('bootLoader'); if(bl) bl.remove(); var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1'; })()`);
+    // Como al arrancar la app: el tipo de cambio ya está pedido antes de operar (CAD entra por el motor FX).
+    await p.evaluate(`(async function(){ try { await _aurixFxRefresh(); } catch(_){} })()`);
   };
   await p.goto(root.url, { waitUntil: 'domcontentloaded' }); await setup();
   const ev = s => p.evaluate(s);
@@ -102,11 +104,12 @@ async function run(ENG, browser, root, snap, lang) {
   // Valoración: en una moneda que cubre el motor de cambio (AURIX-FX-1: USD·EUR·GBP·CHF·JPY) el valor
   // es cantidad × precio de SU listado; en otra (CAD) la política EXISTENTE es «no cubierto» (NaN →
   // null): la posición sigue visible, nunca 0, nunca un cambio inventado ni el precio de otro listado.
-  const FX = { USD: 1, EUR: 1, GBP: 1, CHF: 1, JPY: 1 };
+  // Cierre de moneda: CAD entra por el motor FX (CADUSD=X), así que también se valora convertida.
+  const FX = { USD: 1, EUR: 1, GBP: 1, CHF: 1, JPY: 1, CAD: 1 };
   ok(`${T} valoración: monedas cubiertas = cantidad × precio de su listado; CAD «no cubierto» (no 0, no precio ajeno)`, r.every(x => FX[x.ccy] ? (Number.isFinite(x.val) && x.val > 0) : (x.val === null && x.q > 0 && x.px > 0)), JSON.stringify(r));
   const total = await P.ev('Math.round(totalValueBase() * 100) / 100');
   const covered = Math.round(r.filter(x => FX[x.ccy]).reduce((a, x) => a + x.val, 0) * 100) / 100;
-  ok(`${T} total = suma de las posiciones cubiertas (la no cubierta no entra como 0 ni con precio ajeno)`, Number.isFinite(total) && Math.abs(total - (await P.ev('Math.round(totalValueUSD()*100)/100 === ' + covered + ' ? ' + total + ' : -1'))) < 0.01, JSON.stringify({ total, covered }));
+  ok(`${T} total = suma de las posiciones cubiertas (la no cubierta no entra como 0 ni con precio ajeno)`, Number.isFinite(total) && Math.abs(total - covered) < 0.05, JSON.stringify({ total, covered }));   // suma de valores ya redondeados
   ok(`${T} sin errores de página`, !P.errs.length, P.errs.join(' | '));
   await P.ctx.close();
 }

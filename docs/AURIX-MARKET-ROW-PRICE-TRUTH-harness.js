@@ -173,7 +173,8 @@ ok('5.4 los mapas estáticos siguen existiendo (compatibilidad), sin crecer',
 }
 ok('5.6 la fila pinta ausencia con el formateador que ya existía',
    /function safePrice\(val\) \{\s*\n\s*if \(typeof val !== 'number' \|\| isNaN\(val\)\) return '—';/.test(app)
-   && /<div class="col col-price">\$\{safePrice\(price\)\}<\/div>/.test(app));
+   // Cierre de moneda: la fila formatea en la moneda REAL de su cotización (USD sigue en safePrice).
+   && /<div class="col col-price">\$\{\(typeof safePriceIn === 'function'\) \? safePriceIn\(price, item\.currency\) : safePrice\(price\)\}<\/div>/.test(app));
 
 // ── 6. F/G · sin regresión de identidad, navegación ni red ───────────────
 console.log('\n6 — F/G · Identidad, navegación y presupuesto de red:');
