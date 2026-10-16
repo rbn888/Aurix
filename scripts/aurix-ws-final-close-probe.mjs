@@ -487,7 +487,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const jr = await J(p, `var lbl=[].slice.call(document.querySelectorAll('.wsjrn-bar-lbl')).map(function(e){return e.textContent}); var val=[].slice.call(document.querySelectorAll('.wsjrn-bar-val')).map(function(e){return e.textContent});
       var rows=[].slice.call(document.querySelectorAll('.wsjrn-card .wsjrn-ret')).map(function(e){return e.textContent}); var sc=document.querySelector('.wsjrn-sumcard'), fm=document.querySelector('.wsjrn-2col');
       return { lbl: lbl, val: val, rows: rows, sumFirst: !!(sc && fm && sc.getBoundingClientRect().top < fm.getBoundingClientRect().top) }`);
-    ok(`${T} Diario: resumen arriba; una barra por operación cerrada, tickers repetidos distinguidos y valores = los de la lista`, jr.sumFirst && jr.lbl.join() === 'NVDA·1,NVDA·2,BTC' && jr.val.join() === jr.rows.join(), JSON.stringify(jr));
+    ok(`${T} Diario: resumen arriba; una barra por operación cerrada, tickers repetidos distinguidos y valores = los de la lista`, jr.sumFirst && jr.lbl.join() === 'NVDA·1,NVDA·2,BTC'
+      // Cierre de utilidad · D3: la lista se ordena (por fecha, por defecto) y el gráfico sigue el orden de
+      // registro; lo que se ancla es que los VALORES son los mismos, uno a uno.
+      && jr.val.slice().sort().join() === jr.rows.slice().sort().join() && jr.val.length === jr.rows.length, JSON.stringify(jr));
     await p.evaluate(`_wsJrnDraft = Object.assign(_wsJrnNewDraft(), { asset: 'ETH', buy: '2000', sell: '2400', qty: '1', fee: '0' }); _wsJrnAdd();`); await p.waitForTimeout(200);
     const j2 = await J(p, `return { n: _wsToolInputs.trades.length, bars: document.querySelectorAll('.wsjrn-bar').length }`);
     ok(`${T} Diario: crear operación actualiza lista y gráfico (gráfico = registros)`, j2.n === 4 && j2.bars === 4, JSON.stringify(j2));

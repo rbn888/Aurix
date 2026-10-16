@@ -7210,6 +7210,19 @@ const T = {
     wsrecv_kpi_overdue: 'Vencido',
     wsrecv_list_title:  'Tus cobros',
     wsjrn_list_title:   'Operaciones',
+    wsjrn_f_date:       'Fecha de cierre',
+    wsjrn_nodate:       'Sin fecha',
+    wsjrn_dup_hint:     'Copia en el formulario: pulsa «Añadir» para registrarla',
+    wsjrn_sep_note:     'El Diario registra operaciones para analizarlas: no compra, no vende ni cambia tu cartera.',
+    wsjrn_q_label:      'Buscar operaciones', wsjrn_q_ph: 'Buscar por activo o nota',
+    wsjrn_all_types:    'Todos los tipos',
+    wsjrn_res_label:    'Resultado', wsjrn_res_all: 'Todas', wsjrn_res_win: 'Ganadoras', wsjrn_res_loss: 'Perdedoras',
+    wsjrn_sort_label:   'Ordenar', wsjrn_sort_date: 'Más recientes', wsjrn_sort_ret: 'Mayor rentabilidad', wsjrn_sort_pl: 'Mayor resultado',
+    wsjrn_count:        '{n} de {m}',
+    wsjrn_empty_q:      'Ninguna operación coincide con «{q}».',
+    wsjrn_empty_win:    'No hay operaciones ganadoras con estos filtros.',
+    wsjrn_empty_loss:   'No hay operaciones perdedoras con estos filtros.',
+    wsjrn_empty_type:   'No hay operaciones de este tipo.',
     wsrecv_total:       'Total',
     wsrecv_paid:        'Pagado',
     wsrecv_pending:     'Pendiente',
@@ -10488,6 +10501,19 @@ const T = {
     wsrecv_kpi_overdue: 'Overdue',
     wsrecv_list_title:  'Your receivables',
     wsjrn_list_title:   'Trades',
+    wsjrn_f_date:       'Close date',
+    wsjrn_nodate:       'No date',
+    wsjrn_dup_hint:     'Copy in the form: press “Add” to record it',
+    wsjrn_sep_note:     'The Journal records trades to analyse them: it does not buy, sell or change your portfolio.',
+    wsjrn_q_label:      'Search trades', wsjrn_q_ph: 'Search by asset or note',
+    wsjrn_all_types:    'All types',
+    wsjrn_res_label:    'Result', wsjrn_res_all: 'All', wsjrn_res_win: 'Winners', wsjrn_res_loss: 'Losers',
+    wsjrn_sort_label:   'Sort', wsjrn_sort_date: 'Most recent', wsjrn_sort_ret: 'Highest return', wsjrn_sort_pl: 'Highest result',
+    wsjrn_count:        '{n} of {m}',
+    wsjrn_empty_q:      'No trade matches “{q}”.',
+    wsjrn_empty_win:    'No winning trades with these filters.',
+    wsjrn_empty_loss:   'No losing trades with these filters.',
+    wsjrn_empty_type:   'No trades of this type.',
     wsrecv_total:       'Total',
     wsrecv_paid:        'Paid',
     wsrecv_pending:     'Pending',
@@ -23403,6 +23429,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsg-form')) { _wsgFormPreview(); return; }
     if (el.getAttribute('data-wstool-input')) { _wsToolOnInput(el); return; }
     if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
+    if (el.getAttribute('data-wsjrn-filter')) { _wsJrnFilterInput(el); return; }
     if (el.getAttribute('data-wsre-input')) { _wsReOnInput(el); return; }
     if (el.getAttribute('data-wsrecv-input')) { _wsRecvOnInput(el); return; }
     if (el.hasAttribute('data-wsrecv-search')) { _wsRecvSearch(el); return; }
@@ -31006,6 +31033,12 @@ function _wsJrnAdd() {
     { k: 'qty', label: 'wsjrn_f_qty', num: true },
   ]);
   if (miss.length) return _wsDraftRequired('wsjrn-input', miss);
+  // D2 — una fecha de cierre, si se da, tiene que existir y no ser futura (un cierre no ha ocurrido aún).
+  { const sd = String(d.sellDate || '').trim();
+    if (sd && /^\d{4}-\d{2}-\d{2}$/.test(sd)) {
+      const ts = Date.parse(sd + 'T00:00:00');
+      if (!Number.isFinite(ts) || sd > new Date().toISOString().slice(0, 10)) return _wsDraftRequired('wsjrn-input', [{ k: 'sellDate', label: 'wsjrn_f_date' }]);
+    } }
   const asset = (d.asset || '').trim();
   const buy = _wsNum(d.buy), qty = _wsNum(d.qty);
   const sellRaw = (d.sell == null ? '' : String(d.sell)).trim();
@@ -31049,8 +31082,13 @@ function _wsJrnAct(act, id) {
     _wsJrnRerender();
     _wsFocusInView('.wsjrn-form-card', '[data-wsjrn-input]');
   } else if (act === 'dup') {
-    list.push(Object.assign({}, tr, { id: 'tr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) }));
-    _wsToolDirty = true; _wsToolStateSet('journal', _wsToolInputs); _wsJrnRerender();
+    // D2 — duplicar NO crea una segunda operación contabilizada: deja la copia en el formulario y
+    // sólo cuenta cuando el usuario pulsa «Añadir» (confirmación explícita). La fecha no se copia.
+    _wsJrnEditId = null;
+    _wsJrnDraft = { asset: tr.asset, atype: tr.atype, buy: tr.buy, sell: tr.sell, qty: tr.qty, fee: tr.fee, currency: tr.currency, notes: tr.notes || '', buyDate: '', sellDate: '' };
+    _wsJrnRerender();
+    _wsFocusInView('.wsjrn-form-card', '[data-wsjrn-input]');
+    try { _aurixBillingToast(t('wsjrn_dup_hint'), 'ok'); } catch (_) {}
   } else if (act === 'del') {
     _wsConfirm(() => {
       const i = list.findIndex(x => x && x.id === id); if (i >= 0) list.splice(i, 1);
@@ -31158,6 +31196,10 @@ function _wsJrnFormHtml() {
         ${/* La divisa YA NO se elige por operación: es del DOCUMENTO, y el campo
               nuevo hereda la del diario. Elegirla por fila era lo que permitía
               construir un diario cuyos totales no eran de ninguna moneda. */''}
+        ${/* D2 — UNA fecha: la de CIERRE (venta). Selector nativo (accesible, localizado por el
+              sistema); vacía es «Sin fecha», nunca una inventada. Un valor antiguo en otro formato
+              se conserva tal cual mientras no se toque. */''}
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsjrn_f_date'))}</span><span class="ws4-field-input"><input class="ws4-num" type="date" autocomplete="off" data-wsjrn-input="sellDate" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(String(d.sellDate || '')) ? d.sellDate : '')}" max="${esc(new Date().toISOString().slice(0, 10))}"></span></label>
         ${txt('notes', t('wsjrn_f_notes'))}
       </div>
       <div class="wsjrn-form-foot">
@@ -31170,14 +31212,82 @@ function _wsJrnFormHtml() {
     </section>`;
 }
 
+// D3 — VISTA DE LA LISTA (en memoria: es una forma de mirar, no un dato del documento).
+var _wsJrnView = { q: '', type: 'all', res: 'all', sort: 'date' };
+function _wsJrnV() { return (typeof _wsJrnView !== 'undefined' && _wsJrnView) || { q: '', type: 'all', res: 'all', sort: 'date' }; }
+function _wsJrnDateTs(tr) {
+  const sd = String((tr && tr.sellDate) || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(sd)) { const ts = Date.parse(sd + 'T00:00:00'); return Number.isFinite(ts) ? ts : null; }
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(sd);   // documentos antiguos: dd/mm/aaaa
+  if (m) { const ts = Date.parse(`${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}T00:00:00`); return Number.isFinite(ts) ? ts : null; }
+  return null;
+}
+function _wsJrnDateLabel(tr) {
+  const ts = _wsJrnDateTs(tr);
+  if (ts != null) return (typeof _intccDate === 'function') ? _intccDate(ts) : new Date(ts).toISOString().slice(0, 10);
+  const raw = String((tr && tr.sellDate) || '').trim();
+  return raw || t('wsjrn_nodate');
+}
+function _wsJrnFiltered(res) {
+  const v = _wsJrnV(), q = String(v.q || '').trim().toLowerCase();
+  const out = res.list.map((x, i) => ({ x, i })).filter(({ x }) =>
+    (v.type === 'all' || (x.atype || 'other') === v.type)
+    && (v.res === 'all' || (v.res === 'win' ? (!x.open && x.pl >= 0) : (!x.open && x.pl < 0)))
+    && (!q || String(x.asset || '').toLowerCase().indexOf(q) >= 0 || String(x.notes || '').toLowerCase().indexOf(q) >= 0));
+  const num = (a) => (a == null || !Number.isFinite(Number(a))) ? -Infinity : Number(a);
+  out.sort((A, B) => {
+    if (v.sort === 'ret') return (num(B.x.ret) - num(A.x.ret)) || (B.i - A.i);
+    if (v.sort === 'pl') return (num(B.x.pl) - num(A.x.pl)) || (B.i - A.i);
+    const a = _wsJrnDateTs(A.x), b = _wsJrnDateTs(B.x);          // fecha: recientes primero, sin fecha al final
+    if (a == null && b == null) return B.i - A.i;
+    if (a == null) return 1; if (b == null) return -1;
+    return (b - a) || (B.i - A.i);
+  });
+  return out.map(o => o.x);
+}
+function _wsJrnFilterBarHtml(res, shown) {
+  const esc = _intccEsc, v = _wsJrnV();
+  const opt = (val, lk, cur) => `<option value="${val}"${cur === val ? ' selected' : ''}>${esc(t(lk))}</option>`;
+  return `<div class="wsjrn-filters" role="search">
+      <label class="wsjrn-fl wsjrn-fl-q"><span class="intcc-sr-only">${esc(t('wsjrn_q_label'))}</span><input type="search" class="ws4-num" data-wsjrn-filter="q" value="${esc(v.q)}" placeholder="${esc(t('wsjrn_q_ph'))}" autocomplete="off"></label>
+      <label class="wsjrn-fl"><span class="intcc-sr-only">${esc(t('wsjrn_f_type'))}</span><select class="ws4-num wsjrn-select" data-wsjrn-filter="type">${opt('all', 'wsjrn_all_types', v.type)}${opt('stock', 'wsjrn_type_stock', v.type)}${opt('etf', 'wsjrn_type_etf', v.type)}${opt('crypto', 'wsjrn_type_crypto', v.type)}${opt('other', 'wsjrn_type_other', v.type)}</select></label>
+      <label class="wsjrn-fl"><span class="intcc-sr-only">${esc(t('wsjrn_res_label'))}</span><select class="ws4-num wsjrn-select" data-wsjrn-filter="res">${opt('all', 'wsjrn_res_all', v.res)}${opt('win', 'wsjrn_res_win', v.res)}${opt('loss', 'wsjrn_res_loss', v.res)}</select></label>
+      <label class="wsjrn-fl"><span class="intcc-sr-only">${esc(t('wsjrn_sort_label'))}</span><select class="ws4-num wsjrn-select" data-wsjrn-filter="sort">${opt('date', 'wsjrn_sort_date', v.sort)}${opt('ret', 'wsjrn_sort_ret', v.sort)}${opt('pl', 'wsjrn_sort_pl', v.sort)}</select></label>
+      <span class="wsjrn-count" role="status" aria-live="polite">${esc(String(t('wsjrn_count')).replace('{n}', String(shown)).replace('{m}', String(res.list.length)))}</span>
+    </div>`;
+}
+function _wsJrnFilterInput(el) {
+  const k = el.getAttribute('data-wsjrn-filter'); if (!k) return;
+  _wsJrnView = Object.assign({}, _wsJrnView, { [k]: el.value });
+  const host = document.querySelector('.wsh-tool-view [data-wsjrn-listbody]');
+  if (!host || !_wsToolInputs) return;
+  const res = calculateTradeJournal(_wsToolInputs.trades);
+  host.innerHTML = _wsJrnCardsHtml(res, _wsJrnFiltered(res));
+  const cnt = document.querySelector('.wsh-tool-view .wsjrn-count');
+  if (cnt) cnt.textContent = String(t('wsjrn_count')).replace('{n}', String(host.querySelectorAll('.wsjrn-card').length)).replace('{m}', String(res.list.length));
+}
 function _wsJrnListHtml(res) {
   const esc = _intccEsc;
   if (!res.list.length) return `<section class="wsh-card"><p class="wsh-empty">${esc(t('wsjrn_empty'))}</p></section>`;
+  const shown = _wsJrnFiltered(res);
+  // D4 — UNA vez, no en cada operación: el Diario analiza; no opera ni toca la cartera.
+  return `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wsjrn_list_title'))}</h3></header>
+    <p class="wsjrn-sep-note">${esc(t('wsjrn_sep_note'))}</p>
+    ${_wsJrnFilterBarHtml(res, shown.length)}
+    <div class="wsjrn-list" data-wsjrn-listbody>${_wsJrnCardsHtml(res, shown)}</div></section>`;
+}
+function _wsJrnCardsHtml(res, shown) {
+  const esc = _intccEsc;
+  if (!shown.length) {
+    const v = _wsJrnV();
+    const k = String(v.q || '').trim() ? 'wsjrn_empty_q' : v.res === 'win' ? 'wsjrn_empty_win' : v.res === 'loss' ? 'wsjrn_empty_loss' : 'wsjrn_empty_type';
+    return `<p class="wsh-empty wsjrn-empty-f">${esc(String(t(k)).replace('{q}', String(v.q || '').trim()))}</p>`;
+  }
   const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>';
   const ICON_DUP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>';
   const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>';
   const typeKey = a => ({ stock: 'wsjrn_type_stock', etf: 'wsjrn_type_etf', crypto: 'wsjrn_type_crypto', other: 'wsjrn_type_other' })[a] || 'wsjrn_type_other';
-  const cards = res.list.map(tr => {
+  const cards = shown.map(tr => {
     const st = tr.open ? 'open' : (tr.pl >= 0 ? 'win' : 'loss');
     const stLbl = tr.open ? t('wsjrn_st_open') : (tr.pl >= 0 ? t('wsjrn_st_win') : t('wsjrn_st_loss'));
     const ccyChip = (tr.currency && tr.currency !== 'EUR') ? `<span class="wsjrn-ccy">${esc(tr.currency)}</span>` : '';
@@ -31187,6 +31297,7 @@ function _wsJrnListHtml(res) {
           <span class="wsjrn-asset">${esc(tr.asset || '—')}</span>
           <span class="wsjrn-type-chip">${esc(t(typeKey(tr.atype)))}</span>
           ${ccyChip}
+          <span class="wsjrn-date${_wsJrnDateTs(tr) == null && !String(tr.sellDate || '').trim() ? ' is-none' : ''}">${esc(_wsJrnDateLabel(tr))}</span>
         </div>
         <div class="wsjrn-card-rows">
           <span class="wsjrn-row"><i>${esc(t('wsjrn_buy'))}</i><b>${esc(_wsJrnMoney(tr.buy, tr.currency))}</b></span>
@@ -31205,10 +31316,8 @@ function _wsJrnListHtml(res) {
         </div>
       </div>`;
   }).join('');
-  // El título de esta sección era `wstool_journal_n`, es decir EL MISMO que el de
-  // la herramienta: «Diario de operaciones» encima de «Diario de operaciones».
-  // La sección no es el diario, es su LISTA.
-  return `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wsjrn_list_title'))}</h3></header><div class="wsjrn-list">${cards}</div></section>`;
+  // El título de la sección (`wsjrn_list_title`) lo pone `_wsJrnListHtml`: aquí sólo las filas.
+  return cards;
 }
 
 function _renderJournalTool() {

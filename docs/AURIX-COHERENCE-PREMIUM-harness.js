@@ -126,7 +126,7 @@ console.log('\n3 · Diario: la misma operación se lee en una sola moneda:');
     + 'var _wsJrnEditId = null, _wsJrnDraft = null;'
     + 'var _wsToolInputs = { currency: "USD", trades: [{ id: "t1", asset: "AAPL", atype: "stock", buy: 100, sell: 135, qty: 1, fee: 0, currency: "USD" }] };', sb);
   load(sb, ['formatCurrency', '_wsJrnMoney', '_wsJrnPct', 'calculateTradeJournal', '_wsJrnNewDraft', '_wsJrnPreviewHtml',
-            '_wsFieldUnitHtml', '_wsJrnFormHtml', '_wsJrnListHtml', '_wsJrnSummaryHtml']);
+            '_wsFieldUnitHtml', '_wsJrnFormHtml', '_wsJrnListHtml', '_wsJrnV', '_wsJrnDateTs', '_wsJrnDateLabel', '_wsJrnFiltered', '_wsJrnFilterBarHtml', '_wsJrnCardsHtml', '_wsJrnSummaryHtml']);
   const res = vm.runInContext('calculateTradeJournal(_wsToolInputs.trades)', sb);
   const list = vm.runInContext('_wsJrnListHtml(calculateTradeJournal(_wsToolInputs.trades))', sb);
   const sum = vm.runInContext('_wsJrnSummaryHtml(calculateTradeJournal(_wsToolInputs.trades))', sb);
@@ -151,7 +151,7 @@ console.log('\n3 · Diario: la misma operación se lee en una sola moneda:');
       + 'var _WS_TOOL_ACCENT = { journal: "x" }, _wsJrnEditId = null, _wsJrnDraft = { currency: "USD", buy: "", qty: "", sell: "", fee: "" };'
       + 'var _wsToolInputs = { currency: "EUR", trades: [{ id: "t1", asset: "BTC", atype: "crypto", buy: 52000, sell: 61000, qty: 0.5, fee: 20, currency: "EUR" }] };', c2);
     load(c2, ['formatCurrency', '_wsJrnMoney', '_wsJrnPct', 'calculateTradeJournal', '_wsJrnNewDraft', '_wsJrnPreviewHtml', '_wsFieldUnitHtml',
-              '_wsJrnFormHtml', '_wsJrnListHtml', '_wsJrnSummaryHtml', '_wsJrnChartHtml', '_wsJournalDefaults', '_renderJournalTool']);
+              '_wsJrnFormHtml', '_wsJrnListHtml', '_wsJrnV', '_wsJrnDateTs', '_wsJrnDateLabel', '_wsJrnFiltered', '_wsJrnFilterBarHtml', '_wsJrnCardsHtml', '_wsJrnSummaryHtml', '_wsJrnChartHtml', '_wsJournalDefaults', '_renderJournalTool']);
     const html = vm.runInContext('_renderJournalTool()', c2);
     const units = [...html.matchAll(/class="ws4-field-unit"[^>]*>([^<]*)</g)].map(m => m[1]);
     ok('3.7 un borrador creado con la base (USD) se alinea con el diario en EUR al abrirlo',
