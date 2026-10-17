@@ -327,14 +327,20 @@ section('D — navegación, refresco silencioso y fallo del proveedor:');
      /if \(stamp !== 'none' && cell\.dataset\.sparkStamp === stamp && _mktSparkCellHasChart\(cell\)\) keep\.add\(k\);/.test(app) &&
      /if \(keep\.has\(cell\.dataset\.sparkKey \|\| ''\)\) return;/.test(app));
   ok('D.4 un fallo temporal del proveedor CONSERVA el dato válido anterior',
-     /_AURIX_MKT_DS\.STALE/.test(app) && /_mktHistoryApplyToRow\(item, range, prevEntry, gen\);/.test(app));
+     /_AURIX_MKT_DS\.STALE/.test(app) && /_mktHistoryApplyToRow\(item, range, prevEntry, (?:gen|applyGen)\);/.test(app));   // PERF dedupe: generación de pintado
   ok('D.5 y sólo se persiste tras un dato REAL recién llegado (un único punto de escritura)',
      (bare.match(/(?<!function )_aurixMktSnapshotCapture\(item, range, entry\)/g) || []).length === 1);
   ok('D.6 el refresco silencioso sólo toca el DOM si el texto cambia',
      /if \(cell\.innerHTML !== emptyHtml\) cell\.innerHTML = emptyHtml;/.test(app));
+  // RE-DECIDIDO (PERF · MARKET-HISTORY-DEDUPE). Antes la respuesta de otra generación se TIRABA
+  // entera (segundo `return`) y el render siguiente la volvía a pedir: ~1/3 de las peticiones de
+  // Market eran duplicados. Ahora se GUARDA (es dato real de esa clave y rango) y sólo se pinta si
+  // la fila sigue en el render vigente; si no, va con generación -1 y el guard de pintado la
+  // rechaza. El contrato —una respuesta obsoleta no se pinta sobre un render nuevo— se mantiene, y
+  // lo prueba ejecutándolo docs/AURIX-MARKET-HISTORY-DEDUPE-harness.js.
   ok('D.7 una respuesta obsoleta no gana a un render nuevo (guard de generación)',
-     /if \(gen !== _marketHistoryGen\) return;/.test(app) &&
-     (app.match(/if \(gen !== _marketHistoryGen\) return;/g) || []).length >= 2);
+     /function _mktHistoryApplyToRow\(item, range, entry, gen\) \{\s*if \(gen !== _marketHistoryGen\) return;\s*if \(range !== _mktHistoryAdapterRange\(\)\) return;/.test(app) &&
+     /if \(gen !== _marketHistoryGen\) \{[\s\S]{0,240}_mktHistoryVisible\.items\.get\(key\)[\s\S]{0,120}else applyGen = -1;/.test(fnSrc('_mktHistoryFetchOne')));
   ok('D.8 la escritura se agrupa y además se vuelca al ocultar la pestaña (no se pierde)',
      /addEventListener\('pagehide', _flush\)/.test(app) && /visibilityState === 'hidden'/.test(app));
   ok('D.9 un almacén corrupto o de esquema viejo se descarta SOLO (nunca un clear global)',

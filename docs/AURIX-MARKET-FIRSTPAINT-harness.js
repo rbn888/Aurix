@@ -256,7 +256,8 @@ console.log('\n6 — Orden del SPEC: último snapshot → render inmediato → r
   ok('6.1 una entrada FRESCA se aplica y no se vuelve a pedir',
      /_mktHistoryCacheFresh\(cached, range\)[\s\S]{0,200}_mktHistoryApplyToRow\(item, range, cached, gen\);[\s\S]{0,60}continue;/.test(fv));
   ok('6.2 una entrada caducada pero REAL se aplica YA y ADEMÁS se refresca',
-     /_mktHistoryCacheUsable\(cached\)\) _mktHistoryApplyToRow\(item, range, cached, gen\);[\s\S]{0,160}_mktHistoryEnqueue/.test(fv));
+     // PERF dedupe: entre aplicar y encolar va ahora la comprobación de «ya pedida» (no cambia el contrato).
+     /_mktHistoryCacheUsable\(cached\)\) _mktHistoryApplyToRow\(item, range, cached, gen\);[\s\S]{0,600}_mktHistoryEnqueue/.test(fv));
   ok('6.3 el refetch lo sigue gobernando FRESCO, no USABLE (no hay llamadas nuevas)',
      /_mktHistoryCacheFresh/.test(fv) && !/if \(!_mktHistoryCacheUsable\(cached\)\)[\s\S]{0,40}_mktHistoryEnqueue/.test(fv));
   ok('6.4 la cola de concurrencia sigue acotada a 3 en vuelo',

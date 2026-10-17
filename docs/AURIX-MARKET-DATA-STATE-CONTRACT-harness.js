@@ -284,7 +284,7 @@ console.log('\n2 — Adaptador de cripto real (ETH): respuesta válida / vacía 
   // ── 6. D/E en la lista: el dato válido sobrevive al fallo transitorio ──
   console.log('\n6 — Lista de Market: un fallo temporal ya no borra ni congela el dato bueno:');
   ok('6.1 en STALE se repinta la entrada previa, no una ausencia',
-     /_AURIX_MKT_DS\.STALE\)? \{[\s\S]{0,400}?_mktHistoryApplyToRow\(item, range, prevEntry, gen\)/.test(fetchOne));
+     /_AURIX_MKT_DS\.STALE\)? \{[\s\S]{0,400}?_mktHistoryApplyToRow\(item, range, prevEntry, (?:gen|applyGen)\)/.test(fetchOne));   // PERF dedupe: generación de pintado
   ok('6.2 en STALE no se reescribe la caché (el `ts` no se toca ⇒ se reintenta)',
      (() => {
        const i = fetchOne.indexOf('_AURIX_MKT_DS.STALE');

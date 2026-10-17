@@ -87568,6 +87568,13 @@ const _MKT_HISTORY_UNAVAIL_TTL = 60 * 1000;
 const _marketHistoryCache  = new Map();          // key → entry
 const _marketHistoryQueue  = { running: 0, max: 3, pending: [] };
 let   _marketHistoryGen    = 0;                  // bumped on each render
+// PERF · MARKET-HISTORY-DEDUPE — claves con un trabajo YA en cola o en curso, y las filas del
+// render vigente (clave → item). Medido antes: cada render de Market volvía a encolar TODAS las
+// filas caducadas aunque ya estuvieran pedidas, y la respuesta que llegaba tras otro render se
+// tiraba sin guardarse. Entrar en Market costaba 296–504 peticiones para 156 series únicas, y tres
+// cambios de pestaña ~460 más (≈1/3 duplicados puros, 15 % de 502 por la ráfaga contra Yahoo).
+const _mktHistoryInflight  = new Set();
+let   _mktHistoryVisible   = { gen: 0, items: new Map() };
 let   _marketHistoryErrors = 0;
 
 function _mktHistoryAdapterRange() {
@@ -88039,6 +88046,10 @@ async function _mktHistoryFetchOne(item, range, gen) {
   if (!key) return;
   // Guard against double-fire when render runs back-to-back.
   if (_mktHistoryCacheFresh(_marketHistoryCache.get(key), range)) return;
+  // PERF · MARKET-HISTORY-DEDUPE — un trabajo que aún NO ha salido a la red y cuya fila ya no está
+  // en el render vigente (otra pestaña / otra temporalidad) no se ejecuta: nadie lo va a ver, y si
+  // el usuario vuelve, ese render lo pedirá. No se cancela nada que ya esté en vuelo.
+  if (gen !== _marketHistoryGen && !(_mktHistoryVisible.gen === _marketHistoryGen && _mktHistoryVisible.items.has(key))) return;
   const fn = adapter.kind === 'crypto'
     ? window.AurixChartAdapters.cryptoHistoryAdapter
     : window.AurixChartAdapters.yahooHistoryAdapter;
@@ -88046,7 +88057,15 @@ async function _mktHistoryFetchOne(item, range, gen) {
   let result = null;
   try { result = await fn(args); }
   catch (_) { _marketHistoryErrors++; }
-  if (gen !== _marketHistoryGen) return; // stale — user moved on
+  // PERF · MARKET-HISTORY-DEDUPE — si hubo otro render mientras se esperaba, el dato SIGUE siendo
+  // real para esta clave y este rango: se guarda en caché igual (antes se tiraba y el render
+  // siguiente lo volvía a pedir). Sólo se PINTA si la fila sigue en el render vigente, y se pinta
+  // con el item de ese render; si no, `_mktHistoryApplyToRow` lo ignora (generación -1).
+  let applyGen = gen;
+  if (gen !== _marketHistoryGen) {
+    const cur = (_mktHistoryVisible.gen === _marketHistoryGen) ? _mktHistoryVisible.items.get(key) : null;
+    if (cur) { item = cur; applyGen = _marketHistoryGen; } else applyGen = -1;
+  }
   // MARKET-EXCELLENCE-B1 — el MISMO contrato que la ficha, con el MISMO intérprete.
   // Antes, un fallo temporal del proveedor escribía en caché una ausencia
   // (`series: []`) que (a) pisaba una serie válida ya descargada o restaurada del
@@ -88058,14 +88077,14 @@ async function _mktHistoryFetchOne(item, range, gen) {
   if (dstate === _AURIX_MKT_DS.STALE) {
     // Se conserva el dato válido anterior intacto y sin tocar su `ts`: sigue siendo
     // no-fresco, así que el siguiente render vuelve a intentar la actualización.
-    _mktHistoryApplyToRow(item, range, prevEntry, gen);
+    _mktHistoryApplyToRow(item, range, prevEntry, applyGen);
     return;
   }
   if (dstate === _AURIX_MKT_DS.UNAVAILABLE) {
     // No se sabe nada del activo: se registra el INTENTO, no una ausencia.
     const attempt = { ts: Date.now(), series: [], meta: (result && result.meta) || null, changePct: null, unavailable: true };
     _marketHistoryCache.set(key, attempt);
-    _mktHistoryApplyToRow(item, range, attempt, gen);
+    _mktHistoryApplyToRow(item, range, attempt, applyGen);
     return;
   }
   const ok = result && Array.isArray(result.series) && result.series.length >= 2;
@@ -88091,7 +88110,7 @@ async function _mktHistoryFetchOne(item, range, gen) {
   _marketHistoryCache.set(key, entry);
   // MARKET-SNAPSHOT-PERSIST-P1 — único punto de escritura: sólo tras un dato REAL recién llegado.
   try { _aurixMktSnapshotCapture(item, range, entry); } catch (_) {}
-  _mktHistoryApplyToRow(item, range, entry, gen);
+  _mktHistoryApplyToRow(item, range, entry, applyGen);
 }
 function _mktHistoryApplyToRow(item, range, entry, gen) {
   if (gen !== _marketHistoryGen) return;
@@ -88197,6 +88216,9 @@ function _mktHistoryFetchVisible(dataset) {
   // currently visible universe (filtered by tab + search). For aggregate
   // tabs (all/watchlist) it's the composed dataset.
   const items = Array.isArray(dataset) ? dataset : [];
+  const visible = new Map();
+  for (const it of items) { const k = it && it.symbol ? _mktHistoryCacheKey(it, range) : ''; if (k && !visible.has(k)) visible.set(k, it); }
+  _mktHistoryVisible = { gen, items: visible };
   if (!items.length) return;
   // MARKET-EXCELLENCE-B5 — se cuenta el trabajo REALMENTE encolado para saber si el
   // ranking por periodo está publicándose con cobertura incompleta.
@@ -88218,7 +88240,11 @@ function _mktHistoryFetchVisible(dataset) {
     // mismo turno) y el refresco sale detrás. El orden es el del SPEC: último snapshot válido →
     // render inmediato → refresh silencioso → actualizar sólo si hay diferencia.
     if (_mktHistoryCacheUsable(cached)) _mktHistoryApplyToRow(item, range, cached, gen);
-    _mktHistoryEnqueue(() => _mktHistoryFetchOne(item, range, gen));
+    // PERF · MARKET-HISTORY-DEDUPE — ya pedida: no se pide otra vez. Cuenta como pendiente para el
+    // re-ranking (B5) porque su resultado todavía no ha llegado; al llegar se pinta en esta fila.
+    if (_mktHistoryInflight.has(key)) { enqueued++; continue; }
+    _mktHistoryInflight.add(key);
+    _mktHistoryEnqueue(() => _mktHistoryFetchOne(item, range, gen).finally(() => _mktHistoryInflight.delete(key)));
     enqueued++;
   }
   // Si la ordenación activa se resuelve con histórico de periodo y ha quedado trabajo

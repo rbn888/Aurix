@@ -79,7 +79,9 @@ function build() {
 
   const decls = ['_MKT_HISTORY_RANGE_MAP', '_MKT_HISTORY_TTL', '_MKT_HISTORY_UNAVAIL_TTL',
                  '_marketHistoryCache', '_marketHistoryQueue', '_marketHistoryGen',
-                 '_marketHistoryErrors', '_mktRankPendingGen', '_aurixMktTimeframe', '_aurixMktSortBy']
+                 '_marketHistoryErrors', '_mktRankPendingGen', '_aurixMktTimeframe', '_aurixMktSortBy',
+                 // PERF · MARKET-HISTORY-DEDUPE — estado nuevo de la cola (claves en vuelo y render vigente).
+                 '_mktHistoryInflight', '_mktHistoryVisible']
     // `const`/`let` en el ámbito de un script de vm NO se exponen como propiedades del
     // contexto, así que la declaración se reescribe a `var`. El VALOR es el real del bundle.
     .map(n => declSource(n).replace(/^(?:const|let)\s+/, 'var ')).join('\n');
