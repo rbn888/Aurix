@@ -4856,7 +4856,7 @@ let lang = (function () {
 const T = {
   es: {
     // Summary
-    totalValue:      'Patrimonio invertible',
+    totalValue:      'Patrimonio',
     addAsset:        '+ Añadir activo',
     addLiquidity:    '+ Añadir liquidez',
     noPrices:        'precios no cargados',
@@ -4941,12 +4941,12 @@ const T = {
     fxRateLine:      (r, src, d) => `Cambio EUR/USD: 1 € = ${r} $ · ${src} · ${d}`,
     fxRateStale:     (r, d) => `Cambio EUR/USD no actual: último conocido 1 € = ${r} $ (${d}). Los totales convertidos son aproximados.`,
     fxRateNone:      'Sin tipo de cambio EUR/USD disponible: los totales convertidos son aproximados.',
-    fxHeroApprox:    ' · cambio no actual',   // corto: el «≈» marca el total; el detalle está en Ajustes
-    fxBadgeApprox:   'Variación aproximada: el cambio EUR/USD no es actual, así que la valoración de hoy no es comparable con certeza.',
+    fxHeroApprox:    ' · valor aproximado',   // estado breve y neutro (≥768 px); el detalle está en Ajustes
+    fxBadgeApprox:   'Variación aproximada mientras se actualiza el tipo de cambio.',
     chartReturnSince: d => `desde ${d}`,
-    chartReturnSinceNote: d => `Rentabilidad desde el ${d}: antes de esa fecha Aurix valoraba los euros con un cambio fijo (0,92) y no es comparable. La curva conserva toda tu historia.`,
+    chartReturnSinceNote: d => `Rentabilidad desde el ${d}, primera fecha con valoración comparable. La curva conserva toda tu historia.`,
     chartReturnFlowNote: 'La curva muestra tu patrimonio, que también sube o baja con lo que añades o retiras. El porcentaje es la rentabilidad sin esas aportaciones ni retiradas.',
-    fxBadgeBasis:    d => `Sin variación comparable: hasta el ${d} Aurix valoraba los euros con un cambio fijo (0,92) y desde entonces con el tipo fechado. Comparar ambos puntos daría una rentabilidad que no existe.`,
+    fxBadgeBasis:    d => `Sin variación comparable en este periodo: la valoración en euros es homogénea desde el ${d}.`,
     fxApproxShort:   'aproximado: cambio EUR/USD no actual',
     // Ventana que se está construyendo con datos comparables; TOTAL declara su puerta real (21 días).
     // Sin fecha de llegada: el porcentaje depende también de las demás comprobaciones.
@@ -8563,7 +8563,7 @@ const T = {
   },
   en: {
     // Summary
-    totalValue:      'Investable wealth',
+    totalValue:      'Portfolio value',   // no «Net worth»: la cifra excluye inmuebles (patrimonio invertible)
     addAsset:        '+ Add asset',
     addLiquidity:    '+ Add liquidity',
     noPrices:        'prices not loaded',
@@ -8642,12 +8642,12 @@ const T = {
     fxRateLine:      (r, src, d) => `EUR/USD rate: €1 = $${r} · ${src} · ${d}`,
     fxRateStale:     (r, d) => `EUR/USD rate not current: last known €1 = $${r} (${d}). Converted totals are approximate.`,
     fxRateNone:      'No EUR/USD exchange rate available: converted totals are approximate.',
-    fxHeroApprox:    ' · FX not current',
-    fxBadgeApprox:   'Approximate change: the EUR/USD rate is not current, so today\'s valuation cannot be compared with certainty.',
+    fxHeroApprox:    ' · approximate value',
+    fxBadgeApprox:   'Approximate change while the exchange rate updates.',
     chartReturnSince: d => `since ${d}`,
-    chartReturnSinceNote: d => `Return since ${d}: before that date Aurix valued euros at a fixed rate (0.92), which is not comparable. The chart keeps your full history.`,
+    chartReturnSinceNote: d => `Return since ${d}, the first date with a comparable valuation. The chart keeps your full history.`,
     chartReturnFlowNote: 'The chart shows your wealth, which also rises or falls with what you add or withdraw. The percentage is the return excluding those contributions and withdrawals.',
-    fxBadgeBasis:    d => `No comparable change: until ${d} Aurix valued euros at a fixed rate (0.92) and since then at the dated rate. Comparing both points would show a return that does not exist.`,
+    fxBadgeBasis:    d => `No comparable change for this period: euro valuations are consistent from ${d}.`,
     fxApproxShort:   'approximate: EUR/USD rate not current',
     chartReturnPreparingNote: (span, d) => `We are building ${span} comparable with updated exchange rates since ${d}. Your earlier history is kept. The return will appear once there is enough reliable data.`,
     chartReturnPreparingSpan: r => ({ '24h': 'a 24-hour period', '7d': 'a 7-day period', '30d': 'a 30-day period', '1y': 'a one-year period' })[r] || 'a period of at least 21 days',
@@ -15526,7 +15526,7 @@ function _aurixFxMarkBadge(el, published) {
     if (ctx && el.getAttribute('data-return-painted') !== '1') note = '';
     _aurixFxExplainBind(el, note);
     if (ctx && note && note === t('chartReturnFlowNote')) el.setAttribute('data-explain-kind', 'info'); else el.removeAttribute('data-explain-kind');
-    if (note) el.setAttribute('data-fx-mark', '1'); else el.removeAttribute('data-fx-mark');
+    if (note) el.setAttribute('data-fx-mark', note === t('fxBadgeApprox') ? 'approx' : '1'); else el.removeAttribute('data-fx-mark');   // «≈» atenuado sólo si el % es estimación
   } catch (_) {}
 }
 // Categorías: «≈» sólo en las que contienen una conversión EUR con tipo no actual.
@@ -60780,8 +60780,10 @@ function setUpdateStatus(state) {
     const tv = document.getElementById('totalValue');
     if (tv) {
       _aurixFxBubbleWire();
-      if (_fxSuffix) { tv.setAttribute('data-fx-approx', st.status); _aurixFxExplainBind(tv, st.status === 'none' ? t('fxRateNone') : _aurixFxNoteText(st)); }
-      else { tv.removeAttribute('data-fx-approx'); _aurixFxExplainBind(tv, ''); }
+      // HERO PREMIUM — la cifra no lleva «≈» ni burbuja técnica; el estado queda en data-fx-approx y en el
+      // sufijo breve de la fila meta. El detalle del tipo vive en Ajustes.
+      if (_fxSuffix) tv.setAttribute('data-fx-approx', st.status); else tv.removeAttribute('data-fx-approx');
+      _aurixFxExplainBind(tv, '');
     }
   } catch (_) {}
   updateTextEl.textContent = msg[state] ?? '';
@@ -61116,7 +61118,27 @@ let _heroValueShown  = null;   // last value rendered in detail hero (null = not
 // Apply compact class when formatted value is long (> 12 chars)
 function _applyValueSizeClass() {
   totalValueEl.classList.toggle('summary-total--compact', totalValueEl.textContent.length > 12);
+  _aurixFitHeroValue();
 }
+// HERO PREMIUM — la cifra y su moneda SIEMPRE completas. El tamaño de cada breakpoint es el techo; sólo
+// si el texto no cabe en su columna (en escritorio la regla de 48 px gana a --compact) se reduce lo justo,
+// con suelo de 20 px. `probe` = el texto más largo que se va a mostrar (el final de un count-up), para que
+// la animación no se recorte ni salte de tamaño al terminar. Presentación pura: el valor no se toca.
+function _aurixFitHeroValue(probe) {
+  try {
+    const el = totalValueEl; if (!el) return;
+    el.style.fontSize = '';
+    const avail = el.clientWidth; if (!(avail > 0)) return;
+    const shown = el.textContent;
+    if (probe && probe.length > shown.length) el.textContent = probe;
+    const need = el.scrollWidth;
+    el.textContent = shown;
+    if (need <= avail) return;
+    const cur = parseFloat(getComputedStyle(el).fontSize) || 32;
+    el.style.fontSize = Math.max(20, Math.floor(cur * (avail / need) * 0.97)) + 'px';
+  } catch (_) {}
+}
+try { if (typeof window !== 'undefined') { let _fitRaf = 0; window.addEventListener('resize', () => { cancelAnimationFrame(_fitRaf); _fitRaf = requestAnimationFrame(() => _aurixFitHeroValue()); }, { passive: true }); } } catch (_) {}
 
 function countUpTotalValue(targetBase) {
   totalValueEl.classList.remove('skeleton'); totalValueEl.removeAttribute('aria-hidden');
@@ -61131,6 +61153,7 @@ function countUpTotalValue(targetBase) {
       return;
     }
     const end      = targetBase;
+    _aurixFitHeroValue(formatBase(end));   // tamaño del texto FINAL desde el primer frame
     const dur      = 1200;
     const t0       = performance.now();
     function easeOutFirst(t) { return 1 - Math.pow(1 - t, 2.5); }
@@ -61167,6 +61190,7 @@ function countUpTotalValue(targetBase) {
 
   const start     = _countUpCurrent;
   const end       = targetBase;
+  { const a = formatBase(start), b = formatBase(end); _aurixFitHeroValue(a.length > b.length ? a : b); }   // sin recorte durante la animación
   const duration  = 500; // ms
   const startTime = performance.now();
 

@@ -806,7 +806,7 @@ button[aria-busy="true"] {
   animation: summaryFadeUp 0.6s ease forwards;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;   /* HERO PREMIUM — nunca «U…»: el tamaño lo ajusta _aurixFitHeroValue (JS) */
   word-break: keep-all;
 }
 /* Compact size when value string exceeds ~12 characters */
@@ -24717,8 +24717,6 @@ body.aurix-skeleton #totalValue::after {
      en vez de salirse de la caja. Sólo existe cuando hay subperiodo publicado. */
   .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-since { display: block; font-size: 10px; line-height: 1.25; letter-spacing: 0; }
   .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-since-sep { display: none; }
-  .mobile-slide-chart .perf-unit-block .chart-change[data-fx-mark] .wsc-metric-val:has(.wsc-metric-since)::after { content: none; }
-  .mobile-slide-chart .perf-unit-block .chart-change[data-fx-mark] .wsc-metric-since::after { content: ' *'; }
   .mobile-slide-chart .range-toggle { flex: 1; min-width: 0; }
 
   /* PART 6 — give the plot breathing room (slightly taller).
@@ -30560,22 +30558,21 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 /* Procedencia del tipo EUR/USD (Ajustes). */
 .settings-fx-note { margin: 2px 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
 .settings-fx-note.is-warn { color: var(--aurix-warning); }
-#totalValue[data-fx-approx]::before { content: '≈ '; opacity: .7; }
 @media (max-width: 767px) { .update-fx-note { display: none; } }
 
 /* Explicación accesible de una cifra afectada por el tipo EUR/USD (toque, clic o teclado). */
 [data-fx-explain] { cursor: help; }
 [data-fx-explain]:focus-visible { outline: 2px solid var(--aurix-warning); outline-offset: 3px; border-radius: 6px; }
-.chart-change[data-fx-mark] .wsc-metric-val::after,
 .cat-card-value[data-fx-approx]::before { content: '≈ '; opacity: .7; }
-.chart-change[data-fx-mark] .wsc-metric-val::after { content: ' *'; }
+/* HERO PREMIUM — sin asterisco: sólo un % ESTIMADO (tipo no actual) lleva un «≈» neutro y atenuado. */
+.chart-change[data-fx-mark="approx"] .wsc-metric-val::before { content: '≈ '; color: var(--text-muted); font-weight: 500; }
 /* Explicación de contexto (curva = patrimonio, % = rentabilidad): neutra, no el ámbar del aviso de tipo. */
 .aurix-fx-bubble.is-info { border-color: rgba(255,255,255,.18); }
 [data-explain-kind="info"]:focus-visible { outline-color: #8fb6ff; }
 /* TOTAL «desde fecha fiable»: la fecha acompaña al %, en tono neutro (no hereda verde/rojo). */
 .wsc-metric-since { color: var(--text-muted); font-weight: 500; white-space: nowrap; }
 .aurix-fx-bubble { position: fixed; z-index: 2147482000; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45;
-  color: var(--text-muted); background: rgba(10, 14, 24, .97); border: 1px solid rgba(233, 168, 87, .45); box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+  color: var(--text-muted); background: rgba(10, 14, 24, .97); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 8px 24px rgba(0,0,0,.45); }   /* neutro: sin ámbar de alarma */
 
 /* ════════════════════════════════════════════════════════════════════════════
    AURIX INTELLIGENCE V2 · PROFUNDIDAD SIN REPETICIÓN (intv21)
