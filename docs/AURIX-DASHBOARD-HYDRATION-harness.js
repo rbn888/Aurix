@@ -85,7 +85,7 @@ console.log('\nLIVE FILE — app.js hydration wiring:');
   ck('window.AURIX_MOBILE_SAFE flag defined', /window\.AURIX_MOBILE_SAFE = /.test(app));
   const guards = (app.match(/AURIX_MOBILE_SAFE\) return;/g) || []).length;
   ck('all chart functions mobile-gated (>=7 entry guards)', guards >= 7, guards + ' guards');
-  ck('mobile boot shows chart placeholder + skips init', app.indexOf('Gráfico temporalmente desactivado en móvil') >= 0 && /if \(window\.AURIX_MOBILE_SAFE\) \{[\s\S]*?charts_skipped_mobile_safe/.test(app)); }
+  ck('mobile boot shows chart placeholder + skips init', /\['perfSnapshot', 'wealthCurveMobile'\]\.forEach\(function \(id\) \{[\s\S]{0,400}_aurixChartHoldSkeleton\(el\)/.test(app)   /* v843: el placeholder es el skin de carga */ && /if \(window\.AURIX_MOBILE_SAFE\) \{[\s\S]*?charts_skipped_mobile_safe/.test(app)); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — dashboard stays interactive regardless of chart/pricing/secondary failures' : 'FAIL ✗');
 process.exit(ok ? 0 : 1);

@@ -133,7 +133,8 @@ console.log('AURIX-CHART-SHORT-HISTORY-PREMIUM-PRESENTATION — SPEC.28');
 {
   const f = frc(allShort(), 'all', 'desktop'), el = paint(allShort(), 'desktop');
   ok('6 ALL short → AVAILABLE_HISTORY', f.historyPresentationState === 'AVAILABLE_HISTORY' && f.badgeEligible === false, f.historyPresentationState);
-  ok('6 badge → "Historial disponible", no %/lifetime return', /Historial disponible/.test(el.innerHTML) && !/%/.test(el.innerHTML) && !/Calculando/.test(el.innerHTML));
+  // v843 CHART CLOSURE — mismo estado (AVAILABLE_HISTORY), texto claro: «Rentabilidad no calculable».
+  ok('6 badge → "Rentabilidad no calculable", no %/lifetime return', /Rentabilidad no calculable/.test(el.innerHTML) && !/%/.test(el.innerHTML) && !/Calculando/.test(el.innerHTML));
 }
 
 // 7 — actively loading (chart not ready) → still "Calculando…".
@@ -180,7 +181,7 @@ console.log('AURIX-CHART-SHORT-HISTORY-PREMIUM-PRESENTATION — SPEC.28');
 // ── source-level invariants ──
 console.log('\nSource-level:');
 ok('S1 SPEC.28 marker present', /SHORT_HISTORY_PREMIUM_PRESENTATION\.28/.test(app));
-ok('S2 premium labels + presentation state defined', /Historial parcial/.test(app) && /Historial disponible/.test(app) && /historyPresentationState/.test(app));
+ok('S2 premium labels + presentation state defined', /Historial parcial/.test(app) && /Rentabilidad no calculable/.test(app) && /historyPresentationState/.test(app));
 ok('S3 badge painter uses the presentation helper (both branches)', (app.match(/_aurixHistoryPresentationBadge\(emg, surface\)/g) || []).length >= 2);
 ok('S4 SPEC.19 sole final render chokepoint', (app.match(/function _aurixResolveFinalRenderSeriesContract\(/g) || []).length === 1);
 ok('S5 exactly ONE return formula + ONE deadlock resolver', (app.match(/function _aurixComputePeriodReturn\(/g) || []).length === 1 && (app.match(/function _aurixResolveReliabilityDeadlock\(/g) || []).length === 1);

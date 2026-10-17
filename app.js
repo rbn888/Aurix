@@ -4878,11 +4878,12 @@ const T = {
     chartCalculating:    'Calculando…',
     chartCalculatingAria:'Calculando rendimiento',
     chartPartialHistory: 'Historial parcial',
-    chartAvailableHistory:'Historial disponible',
+    chartAvailableHistory:'Rentabilidad no calculable',   // v843 — antes «Historial disponible» (no explicaba la limitación)
     chartInsufficientHistory: 'Historial insuficiente',
-    chartReturnUnavailable:   'Rendimiento no disponible',
+    chartReturnUnavailable:   'Rentabilidad no calculable',   // v843 — mismo significado ⇒ mismo texto
     // Sólo cuando la causa CERTIFICADA es el cambio de base del tipo (EUR a 0,92 → tipo fechado).
     chartReturnPreparing:     'Rentabilidad en preparación',
+    chartHoldSlow:            'Tu evolución está tardando más de lo habitual',
     chartTipValue:   'Valor cartera',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
@@ -8585,10 +8586,11 @@ const T = {
     chartCalculating:    'Calculating…',
     chartCalculatingAria:'Calculating performance',
     chartPartialHistory: 'Partial history',
-    chartAvailableHistory:'Available history',
+    chartAvailableHistory:'Return not calculable',
     chartInsufficientHistory: 'Insufficient history',
-    chartReturnUnavailable:   'Return unavailable',
+    chartReturnUnavailable:   'Return not calculable',
     chartReturnPreparing:     'Return being prepared',
+    chartHoldSlow:            'Your history is taking longer than usual',
     chartTipValue:   'Portfolio value',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
@@ -43897,6 +43899,25 @@ function _aurixDashboardFirstRenderPending() {
     return true;
   } catch (_) { return false; }
 }
+// ── v843 CHART CLOSURE · LA RETENCIÓN SE VE COMO CARGA, NO COMO UN HUECO ─────────────────────────
+// Las dos retenciones de primera publicación (escritorio `_wscPaintEmergency`, móvil
+// `_aurixMobileLiteFallback` en modo quiet) vaciaban el host contando con que «se viera el
+// .chart-loading-skin del markup». En ninguna superficie llegaba: en móvil ese skin está oculto por
+// CSS (`.mobile-chart-wrap > .chart-loading-skin`) y en escritorio el host visible es #perfSnapshot,
+// fuera de .chart-wrap. Medido: 5,6 s de rectángulo vacío con el patrimonio ya pintado.
+// Ahora el MISMO skin (mismas clases, misma línea fantasma) se pinta DENTRO del host visible. No es un
+// estado nuevo ni publica nada: ni curva, ni %, ni copy de estado. Se escribe una sola vez (un repintado
+// de la retención no lo reinicia ni parpadea) y lo sustituye el primer frame definitivo.
+// Si la espera se alarga, una nota discreta aparece SOLO por CSS (sin timer ni estado): la retención se
+// libera sola cuando las fuentes asientan (ver `_aurixChartPublicationSourcesPending`).
+const _AURIX_CHART_HOLD_SVG = '<svg class="chart-loading-skin__line" viewBox="0 0 100 40" preserveAspectRatio="none"><path class="chart-loading-skin__area" d="M0,30 C14,26 24,31 38,23 C52,15 66,20 80,15 C88,12 94,14 100,13 L100,40 L0,40 Z"/><path class="chart-loading-skin__stroke" d="M0,30 C14,26 24,31 38,23 C52,15 66,20 80,15 C88,12 94,14 100,13"/></svg>';
+function _aurixChartHoldSkeleton(hostEl) {
+  if (!hostEl) return;
+  try { if (hostEl.querySelector('.chart-loading-skin.wsc-hold')) return; } catch (_) {}
+  let slow = 'Tu evolución está tardando más de lo habitual';
+  try { if (typeof _aurixChartStateI18n === 'function') slow = _aurixChartStateI18n('chartHoldSlow', slow); } catch (_) {}
+  try { hostEl.innerHTML = '<div class="chart-loading-skin wsc-hold" aria-hidden="true">' + _AURIX_CHART_HOLD_SVG + '<div class="wsc-hold-slow">' + slow + '</div></div>'; } catch (_) {}
+}
 function _aurixReturnPendingHTML() {
   const _txt  = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculating', _AURIX_RETURN_PENDING_TEXT) : _AURIX_RETURN_PENDING_TEXT;
   const _aria = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculatingAria', 'Calculando rendimiento') : 'Calculando rendimiento';
@@ -43911,7 +43932,7 @@ function _aurixReturnPendingHTML() {
 // (ver la proyección `historyCoverage` del FRC). OFF ⇒ proyección previa byte a byte.
 const _AURIX_ALL_TRUNCATED_COVERAGE_HONESTY = true;
 const _AURIX_HIST_PARTIAL_TEXT = 'Historial parcial';
-const _AURIX_HIST_AVAILABLE_TEXT = 'Historial disponible';
+const _AURIX_HIST_AVAILABLE_TEXT = 'Rentabilidad no calculable';   // v843 CHART CLOSURE
 // ════════════════════════════════════════════════════════════════════════════
 // M.06 · CHART INTEGRATION — «CALCULANDO…» NO PUEDE SER UN ESTADO TERMINAL
 // ════════════════════════════════════════════════════════════════════════════
@@ -43942,7 +43963,7 @@ const _AURIX_HIST_AVAILABLE_TEXT = 'Historial disponible';
 // Sin códigos NO se declara nada terminal (contexto de unidad o contrato parcial): se conserva
 // exactamente el comportamiento certificado.
 const _AURIX_RETURN_INSUFFICIENT_HISTORY_TEXT = 'Historial insuficiente';
-const _AURIX_RETURN_UNAVAILABLE_TEXT = 'Rendimiento no disponible';
+const _AURIX_RETURN_UNAVAILABLE_TEXT = 'Rentabilidad no calculable';   // v843 CHART CLOSURE
 // Se resuelven solos: algo está en vuelo y el número definitivo es inminente.
 const _AURIX_RETURN_TRANSIENT_CODES = ['CANONICAL_NOT_READY', 'CURRENT_VALUE_UNAVAILABLE'];
 // Atados a la HISTORIA: no se resuelven esperando en la pantalla, sólo con el paso del tiempo.
@@ -44041,6 +44062,18 @@ function _aurixHistoryPresentationBadge(emg, surface) {
       pres = _aurixResolveReturnPresentation(fp);
     }
   } catch (_) { pres = 'CALCULATING'; }
+  // v843 CHART CLOSURE — «CALCULANDO…» PERPETUO EN 1A. La ventana pide más historia de la que existe
+  // (1A con menos de un año): el productor lo DECLARA (`returnState: 'insufficient_return_history'`) y el
+  // contrato de retorno lo rechaza (`insufficient_requested_range_history`). Esperar no lo resuelve. Pero
+  // la FRC sí certifica la CURVA (TRUSTED_RETURN), y ese estado no tiene texto propio aquí, así que caía en
+  // el de por defecto: «Calculando…» para siempre. Medido: 61 días de historia ⇒ 1A nunca salía de ahí.
+  // Con las fuentes asentadas es TERMINAL y honesto: «Historial insuficiente». Ni %, ni color, ni curva
+  // cambian; el contrato y el productor quedan intactos.
+  if ((pres === 'CALCULATING' || pres === 'TRUSTED_RETURN') && emg && emg.state === 'ready' && emg.returnState === 'insufficient_return_history') {
+    let _pend = false;
+    try { _pend = (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending; } catch (_) {}
+    if (!_pend) pres = 'INSUFFICIENT_HISTORY';
+  }
   if (pres === 'CALCULATING') {
     return { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating', pres: 'CALCULATING' };
   }
@@ -54700,7 +54733,7 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
       } else {
         _aurixLastVisualSig[surface] = null;
         try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'loading'); } catch (_) {}
-        try { hostEl.innerHTML = ''; } catch (_) {}
+        _aurixChartHoldSkeleton(hostEl);   // v843 CHART CLOSURE — antes `innerHTML = ''`: hueco vacío
         return true;
       }
     }
@@ -55270,6 +55303,9 @@ function _aurixMobileLiteHost() {
       host = document.createElement('div');
       host.id = 'mobileChartLiteHost';
       host.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;';
+      // v843 CHART CLOSURE — el host nace con el skin de carga: el bucle de abajo retira el del markup y,
+      // sin esto, quedaba un frame vacío (~60 ms medidos) hasta la primera pintura de la retención.
+      try { _aurixChartHoldSkeleton(host); } catch (_) {}
       area.appendChild(host);
       // Remove ONLY the boot placeholder text node(s) that are siblings of the host —
       // a targeted removeChild loop, NOT an innerHTML rewrite of the area.
@@ -55299,7 +55335,7 @@ function _aurixMobileLiteFallback(reason, err, opts) {
     // publishes NO copy (an empty host lets .chart-loading-skin through). The debug contract is unchanged:
     // placeholderReason/lastError are still set above, so the placeholder is never silent to diagnostics —
     // only to the user, and only until the state is terminal. Every terminal caller keeps the copy verbatim.
-    if (opts && opts.quiet) { if (host) host.innerHTML = ''; return; }
+    if (opts && opts.quiet) { _aurixChartHoldSkeleton(host); return; }   // v843 CHART CLOSURE — antes un host vacío
     let title = 'Histórico en construcción';
     try { if (typeof t === 'function') title = t('wscQualityGateTitle') || title; } catch (_) {}
     if (host) host.innerHTML = '<div class="wsc wsc--empty" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;text-align:center;padding:14px"><div class="wsc-empty-title" style="color:var(--text-tertiary,#9097a6);font:600 13px/1.4 -apple-system,system-ui">' + title + '</div></div>';
@@ -83983,7 +84019,9 @@ function _aurixPreloadBootIcons() {
       try {
         ['perfSnapshot', 'wealthCurveMobile'].forEach(function (id) {
           var el = document.getElementById(id);
-          if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:var(--text-tertiary,#9097a6);font:13px/1.4 -apple-system,system-ui;text-align:center;padding:16px">Gráfico temporalmente desactivado en móvil</div>';
+          // v843 CHART CLOSURE — antes «Gráfico temporalmente desactivado en móvil»: falso (el lite pinta a
+          // continuación) y visible ~60 ms entre el skeleton del markup y el del host. Mismo skin de carga.
+          if (el) _aurixChartHoldSkeleton(el);
         });
       } catch (_) {}
       _bm('charts_skipped_mobile_safe');

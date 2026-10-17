@@ -3903,6 +3903,21 @@ body:not(.hero-active) #orb-canvas {
   vector-effect: non-scaling-stroke;
 }
 .chart-loading-skin__area { fill: rgba(138,166,255,0.08); }   /* AURIX-DASH-V1: deeper gradient fill */
+/* v843 CHART CLOSURE — el MISMO skin, pintado DENTRO del host visible mientras la primera publicación
+   espera fuentes (antes el host se vaciaba y el skin del markup no llegaba a verse). En escritorio el
+   host (#perfSnapshot) es un bloque sin posicionar: el skin ocupa su alto en flujo. En móvil hereda el
+   absoluto a pantalla completa del lite host. Si la espera se alarga aparece una nota discreta, sólo
+   por CSS; con reduced-motion aparece sin transición. */
+.perf-snapshot > .chart-loading-skin.wsc-hold { position: relative; height: 100%; }
+.wsc-hold-slow {
+  position: absolute; left: 0; right: 0; bottom: 10%;
+  text-align: center; font-size: 12px; line-height: 1.4; padding: 0 16px;
+  color: var(--text-tertiary, #9097a6);
+  opacity: 0; pointer-events: none;
+  animation: wscHoldSlow .4s var(--ease-out, ease) 12s forwards;
+}
+@keyframes wscHoldSlow { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .wsc-hold-slow { animation-duration: 0s; } }
 
 /* Very calm breathing so it feels alive without an aggressive shimmer. */
 @keyframes chart-ghost-breathe {

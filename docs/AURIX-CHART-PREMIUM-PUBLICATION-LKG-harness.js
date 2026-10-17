@@ -162,7 +162,8 @@ console.log('\nCASO E — partial hydration cannot overwrite a valid LKG');
   const gate = fnSrc('_wscPaintEmergency');
   ok('the publication gate keeps the LKG instead of blanking',
      /_aurixChartLkgRestore\(emg\.range\)[\s\S]{0,120}?if \(_lkg\) \{[\s\S]{0,40}?emg = _lkg;/.test(gate));
-  ok('and only blanks when no LKG exists', /\} else \{[\s\S]{0,220}?hostEl\.innerHTML = '';[\s\S]{0,40}?return true;/.test(gate));
+  // v843 CHART CLOSURE — sin LKG la puerta pinta el skin de carga en el host (antes lo vaciaba: hueco visible).
+  ok('and only holds (loading skin) when no LKG exists', /\} else \{[\s\S]{0,220}?_aurixChartHoldSkeleton\(hostEl\);[\s\S]{0,80}?return true;/.test(gate));
 }
 
 // ── CASO F — new account: no LKG is ever fabricated ────────────────────────

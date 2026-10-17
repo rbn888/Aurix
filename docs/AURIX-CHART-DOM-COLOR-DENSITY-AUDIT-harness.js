@@ -146,8 +146,9 @@ console.log('\nAURIX-CHART-DOM-COLOR-DENSITY-AUDIT — SPEC.30');
 (function () {
   const f = { badgeEligible: false, historyPresentationState: 'AVAILABLE_HISTORY', badgeLabel: 'Calculando…', colorClass: 'flat' };
   const exp = expectedLabel(f);
-  ok('4 expected AVAILABLE text', exp.kind === 'AVAILABLE' && exp.text === 'Historial disponible', exp.text);
-  ok('4 DOM match', classDom(exp, 'Historial disponible', true) === 'DOM_PRESENTATION_MATCH');
+  // v843 CHART CLOSURE — mismo estado, texto claro (antes «Historial disponible»).
+  ok('4 expected AVAILABLE text', exp.kind === 'AVAILABLE' && exp.text === 'Rentabilidad no calculable', exp.text);
+  ok('4 DOM match', classDom(exp, 'Rentabilidad no calculable', true) === 'DOM_PRESENTATION_MATCH');
 })();
 
 // ── 5) PARTIAL_HISTORY + visible "Calculando…" → DOM mismatch ────────────────

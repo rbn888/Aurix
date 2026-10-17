@@ -94,7 +94,7 @@ console.log('\nLIVE FILE — app.js boot restructure (hide-before-charts + bisec
   ck('desktop chart init detached (setTimeout)', iInitChart > 0 && /setTimeout\(function \(\) \{\s*try \{ initChart\(\)/.test(app));
   // P0 mobile-safe: chart functions are gated; the mobile chart init is not run at all
   ck('mobile-safe gates chart functions', (app.match(/AURIX_MOBILE_SAFE\) return;/g) || []).length >= 7);
-  ck('mobile boot skips charts + placeholder', app.indexOf('charts_skipped_mobile_safe') >= 0 && app.indexOf('Gráfico temporalmente desactivado en móvil') >= 0);
+  ck('mobile boot skips charts + placeholder', app.indexOf('charts_skipped_mobile_safe') >= 0 && /\['perfSnapshot', 'wealthCurveMobile'\]\.forEach\(function \(id\) \{[\s\S]{0,400}_aurixChartHoldSkeleton\(el\)/.test(app)   /* v843: el placeholder es el skin de carga */);
   ck('render(true) is guarded (shell render can fail safely)', /try \{ render\(true\); \}/.test(app)); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — shell-first boot; heavy/mobile chart work deferred after splash hide' : 'FAIL ✗');

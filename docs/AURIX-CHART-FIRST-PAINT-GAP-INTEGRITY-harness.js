@@ -314,8 +314,17 @@ const gateRe = /_aurixChartPublicationSourcesPending\(\)\.pending\)\s*\{[\s\S]{0
 const gate = gateRe.exec(paintBare) || [''];
 ok('4.1 escritorio: existe UNA puerta de publicación y no publica copia terminal',
   !!gate[0] && !/_wscRenderInsufficient/.test(gate[0]), 'la puerta no se encontró o sigue pintando la superficie terminal');
-ok('4.2 escritorio: la puerta deja el host VACÍO (pasa el placeholder premium existente)',
-  /innerHTML\s*=\s*''/.test(gate[0]));
+// RE-DECIDIDO (v843 CHART CLOSURE). «Vacío para que pase el placeholder premium» era falso en las dos
+// superficies: el .chart-loading-skin del markup está oculto en móvil y fuera del host en escritorio
+// (#perfSnapshot). Medido: 5,6 s de rectángulo vacío. La puerta pinta ahora ESE MISMO skin dentro del
+// host, y el skin no publica nada: ni curva, ni %, ni copy de estado (4.2b).
+ok('4.2 escritorio: la puerta pinta el skin de carga en el host (no un hueco vacío)',
+  /_aurixChartHoldSkeleton\(hostEl\)/.test(gate[0]) && !/innerHTML\s*=\s*''/.test(gate[0]));
+{ const sk = (function () { try { return fnSrc('_aurixChartHoldSkeleton'); } catch (_) { return ''; } })();
+  const svg = (/const _AURIX_CHART_HOLD_SVG = '([^']*)'/.exec(app) || [])[1] || '';
+  ok('4.2b el skin de la retención no publica curva, % ni copy de estado (sólo carga)',
+    !!sk && /chart-loading-skin wsc-hold/.test(sk) && !/wsc-line|wsc-metric|%'|Calculando|wscQualityGateTitle/.test(sk + svg)
+    && /if \(hostEl\.querySelector\('\.chart-loading-skin\.wsc-hold'\)\) return;/.test(sk)); }
 ok('4.3 escritorio: la puerta usa el estado de skin ya existente `loading`, no `building`',
   /_aurixSetChartSkin\([^)]*'loading'\)/.test(gate[0]));
 // la puerta precede a los CINCO sitios de _wscRenderInsufficient y al pintado del badge
@@ -339,8 +348,8 @@ ok('4.4c móvil: sin lógica de retención duplicada',
   (mobileBare.match(/_aurixChartPublicationSourcesPending\(\)\.pending/g) || []).length === 1,
   (mobileBare.match(/_aurixChartPublicationSourcesPending\(\)\.pending/g) || []).length + ' consultas');
 const fbFn = (function () { try { return fnSrc('_aurixMobileLiteFallback').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
-ok('4.5 móvil: quiet vacía el host y los llamantes TERMINALES conservan la copia',
-  /opts && opts\.quiet[\s\S]{0,120}innerHTML\s*=\s*''/.test(fbFn) && /wscQualityGateTitle/.test(fbFn));
+ok('4.5 móvil: quiet pinta el skin de carga y los llamantes TERMINALES conservan la copia',   // v843: ver 4.2
+  /opts && opts\.quiet\)\s*\{\s*_aurixChartHoldSkeleton\(host\);\s*return;/.test(fbFn) && /wscQualityGateTitle/.test(fbFn));
 ok('4.6 móvil: quiet no rompe el contrato de diagnóstico (placeholderReason se sigue fijando)',
   fbFn.indexOf('placeholderReason') < fbFn.indexOf('opts.quiet'));
 
@@ -365,6 +374,7 @@ function mkBadgeCtx(holdOn) {
     '_AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT', '_AURIX_CHART_CANONICAL_REFRESH_DETERMINISM',
     '_AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION', '_AURIX_PARTIAL_RETURN_MIN_PCT',
     '_AURIX_RETURN_PENDING_TEXT', '_AURIX_HIST_PARTIAL_TEXT', '_AURIX_HIST_AVAILABLE_TEXT',
+    '_AURIX_RETURN_INSUFFICIENT_HISTORY_TEXT', '_AURIX_RETURN_UNAVAILABLE_TEXT',   // v843: textos terminales
     '_AURIX_CHART_CONTINUITY_UNIFICATION', '_AURIX_ALL_MIN_TRUST_POINTS', '_AURIX_ORPHAN_CLEANUP_ENABLED',
     '_AURIX_ORPHAN_MAX_PTS', '_AURIX_BRIDGE_SEG_ENABLED', '_AURIX_BRIDGE_SEG_FRAC',
     '_AURIX_CAPITAL_STEP_SEG_ENABLED', '_AURIX_SPARSE_RAMP_SEG_ENABLED', '_AURIX_VJUMP_MIN_FRAC',
@@ -382,6 +392,7 @@ function mkBadgeCtx(holdOn) {
     '_aurixCanonicalReturnAnchorIndex', '_aurixResolveReliabilityDeadlock',
     '_aurixResolveFinalRenderSeriesContract', '_aurixChartPublicationSourcesPending',
     '_aurixReturnPendingHTML', '_aurixHistoryPresentationBadge', '_aurixEmergencyPaintBadgeNode',
+    '_aurixReturnPresentationText',   // v843: el badge ya puede publicar un estado TERMINAL (1A con < 1 año)
   ].forEach(n => { try { vm.runInContext(fnSrc(n), c); } catch (_) {} });
   return c;
 }
@@ -431,7 +442,9 @@ if (has('_aurixEmergencyPaintBadgeNode')) {
   // CUENTA NUEVA / cobertura real insuficiente, YA reconciliada ⇒ el estado FINAL sí se publica
   const finalPartial = paintBadge(durable, SETTLED);
   ok('4.9 [reconciliado] el estado honesto FINAL sí se publica (no se pierde)',
-    finalPartial.innerHTML !== '' && /Historial parcial|Calculando/.test(finalPartial.innerHTML),
+    // v843 CHART CLOSURE — «Historial insuficiente» es el estado FINAL honesto cuando el productor declara
+    // `insufficient_return_history` con las fuentes asentadas (antes podía quedar en «Calculando…» para siempre).
+    finalPartial.innerHTML !== '' && /Historial parcial|Historial insuficiente|Calculando/.test(finalPartial.innerHTML),
     JSON.stringify(finalPartial.innerHTML.slice(0, 60)));
   // OFFLINE: RE-DECIDIDO por SPEC P0 CHART RELIABILITY (ver la nota extensa en 1.6). Con el canónico
   // ilegible Y sin historia canónica en memoria, el badge tampoco publica: el gráfico y el retorno
