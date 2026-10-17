@@ -67820,6 +67820,7 @@ function _aurixIntelScheduleRefresh() {
         // al ser publicable la historia; Explora al asentarse historia y memoria. Un fallo
         // no transitorio no repinta en cada tick de precio.
         || (!!screen.querySelector('.intv21-evo[data-hist-held="1"]') && typeof _intv22HistoryPublishable === 'function' && _intv22HistoryPublishable())
+        || (!!screen.querySelector('.intv21-evo[data-mem-held="1"]') && typeof _intv22MemSettled === 'function' && _intv22MemSettled())
         || (!!screen.querySelector('.intcc-explore[data-hist-held="1"]') && typeof _intv7ExploreUnsettled === 'function' && !_intv7ExploreUnsettled())
         || (!!screen.querySelector('.intv21-evo[data-liq-wait="1"]') && typeof _aurixLineageColumnSeen !== 'undefined' && !!_aurixLineageColumnSeen)
         || (!!screen.querySelector('[data-ret-wait="1"]') && typeof _intv12RetReady === 'function' && _intv12RetReady());
@@ -75426,6 +75427,66 @@ function _intv3EvoSkeleton() {
     <div class="intv21-evo-plot intv3-sk"></div>
     <div class="intv21-evo-axis"><span>&nbsp;</span></div></div>`;
 }
+// CAUSA DEL P0 «sólo Valor»: el conjunto de métricas se derivaba ENTERO en cada render
+// fuera de `pending`, y Mayor inversión, Reparto y Liquidez dependen todas de la memoria
+// por posición: una lectura posterior parcial, fallida o vencida, o una época/cuenta que
+// aún no casa, las retiraba a la vez y la card quedaba en Valor. Ahora cada métrica
+// conserva su última evidencia válida (por cuenta · idioma · reset · moneda · época, y
+// sólo mientras existan las posiciones que vio) y sólo una fuente DEFINITIVA la
+// sustituye o la retira. No cambia ningún cálculo: las series son las del owner.
+let _intv22AvailMemo = null;
+function _intv22AvailKey() {
+  let ep = 0; try { ep = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0; } catch (_) {}
+  return _intv22Ident() + '|' + ep;
+}
+// ¿Dice la fuente de la métrica algo definitivo HOY? Valor y rentabilidad: sólo se
+// retienen mientras el bloqueo de la historia es TRANSITORIO (uno no transitorio los
+// retira, como en el Dashboard). Resto: memoria por posición válida de esta cuenta cuyas
+// filas se leen TODAS con las posiciones conocidas (un activo aún no sincronizado no es
+// evidencia) y, para liquidez, el linaje leído. Una cartera sin inversiones es definitiva.
+function _intv22SourceSettled(m, noInvest) {
+  if (m === 'value' || m === 'return') return _intv22HistoryPublishable() || !_intv22HistoryTransient();
+  if (noInvest) return true;
+  if (!_intv22MemSettled()) return false;
+  return m !== 'liquidity' || (typeof _aurixLineageColumnSeen !== 'undefined' && !!_aurixLineageColumnSeen);
+}
+function _intv22MemSettled() {
+  const rows = _intv21MemRows();
+  return !!rows && rows.every(r => !!_intv21RowWeights(r));
+}
+function _intv22LastTs(entry) {
+  try { return Math.max.apply(null, Object.keys(entry.series).map(w => { const p = entry.series[w].pts; return p[p.length - 1].ts; })); } catch (_) { return 0; }
+}
+// Una serie de memoria retenida caduca con la MISMA regla de frescura del owner (36 h).
+function _intv22MemoFresh(entry) {
+  try { const n = _intv21Now(); return Object.keys(entry.series).every(w => { const p = entry.series[w].pts; return n - p[p.length - 1].ts <= 36 * 3600e3; }); }
+  catch (_) { return false; }
+}
+function _intv22StableAvail(avail) {
+  const key = _intv22AvailKey();
+  let memo = _intv22AvailMemo;
+  if (memo && (memo.key !== key || !_intv3MemoAssetsAlive(memo.ids))) memo = _intv22AvailMemo = null;
+  let noInvest = false;
+  try { const U = _intv6Universe(); noInvest = !!(U && Array.isArray(U.invested) && U.invested.length === 0 && U.liquidity && U.liquidity.w > 0); } catch (_) {}
+  const out = {}, held = [], retired = [];
+  _INTV22_METRICS.forEach(m => {
+    const isHist = (m === 'value' || m === 'return');
+    if (_intv22SourceSettled(m, noInvest)) {
+      if (avail[m]) out[m] = avail[m];
+      // Retirar la métrica ELEGIDA (y fijar su sustituta) exige una respuesta definitiva y
+      // válida: para valor/rentabilidad, historia publicable que ya no la calcula.
+      else if (memo && memo.avail[m] && (!isHist || _intv22HistoryPublishable())) retired.push(m);
+      return;
+    }
+    // Sin fuente asentada, lo fresco sólo gana si es al menos tan reciente como lo guardado.
+    if (avail[m] && memo && memo.avail[m] && _intv22LastTs(avail[m]) >= _intv22LastTs(memo.avail[m])) out[m] = avail[m];
+    else if (memo && memo.avail[m] && (isHist || _intv22MemoFresh(memo.avail[m]))) { out[m] = memo.avail[m]; if (!avail[m]) held.push(m); }
+    else if (avail[m]) out[m] = avail[m];
+  });
+  if (held.length) _aurixIntelTrace('metric_held_' + held.join('_'), 'evolution');
+  if (Object.keys(out).length) _intv22AvailMemo = { key, avail: out, ids: _intv3AssetIds() };
+  return { avail: out, held, retired };
+}
 function _intv22EvoModuleHtml(esc) {
   const stSel = (() => { const st = _intv21Read(); return String(st.evoMetric || '') + '|' + String(st.evoWin || ''); })();
   if (_intv22Pending()) {
@@ -75439,9 +75500,14 @@ function _intv22EvoModuleHtml(esc) {
     _aurixIntelTrace('pending_first', 'evolution');
     return _intv3EvoSkeleton();
   }
-  const avail = _intv22Availability();
+  const stable = _intv22StableAvail(_intv22Availability());
+  const avail = stable.avail;
   const sel = _intv22Selection(avail);
   if (!sel) return '';
+  // La métrica elegida se retiró con evidencia definitiva: la sustituta se fija UNA vez,
+  // así el foco no vuelve a saltar si la retirada se deshace después.
+  { const st0 = _intv21Read(); const stored = st0.evoMetric === 'diversification' ? 'effective' : st0.evoMetric;
+    if (stored && stable.retired.indexOf(stored) !== -1 && sel.metric !== stored) _intv21Write({ evoMetric: sel.metric, evoWin: sel.win }); }
   const s = sel.series, g = _intv22Svg(s, sel.metric), st = _intv22Stats(sel.metric, s);
   const head = _intv22Headline(sel);
   const sig = sel.metric + '|' + sel.win + '|' + s.pts[0].ts + '|' + s.pts[s.pts.length - 1].ts + '|' + s.pts.length;
@@ -75473,7 +75539,7 @@ function _intv22EvoModuleHtml(esc) {
   if (liqWhy) _aurixIntelTrace('liq_' + liqWhy, 'evolution');
   const html = `
     <div class="intv21-evo intv22-evo"${liqWhy ? ` data-liq-why="${esc(liqWhy)}"` : ''}${liqWhy === 'lineage_not_account_wide' ? ' data-liq-wait="1"' : ''} data-metric="${esc(sel.metric)}" data-win="${esc(sel.win)}" data-kind="${sparse ? 'observations' : 'line'}"
-         data-points="${g.pts.length}" data-gaps="${g.gaps || 0}" data-dir="${esc(dir)}" data-evo-fact="${esc('evo_' + sel.metric + '_' + sel.win)}"${held ? ' data-hist-held="1"' : ''}>
+         data-points="${g.pts.length}" data-gaps="${g.gaps || 0}" data-dir="${esc(dir)}" data-evo-fact="${esc('evo_' + sel.metric + '_' + sel.win)}"${held ? ' data-hist-held="1"' : ''}${stable.held.some(m => m !== 'value' && m !== 'return') ? ' data-mem-held="1"' : ''}>
       <p class="intv15-stable-head intv22-head" data-evo-family="${esc(sel.metric)}" data-evo-key="${esc('evo_' + sel.metric + '_' + sel.win)}" data-period="${esc(sel.win)}"><span class="intv4-mem-what">${esc(head)}</span></p>
       <div class="intv21-evo-ctrl">
         <div class="intv21-seg" role="group" aria-label="${esc(_intv4T('intv21_evo_metric_aria'))}">${sel.metrics.map(m => `
