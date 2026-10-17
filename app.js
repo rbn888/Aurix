@@ -48968,6 +48968,47 @@ function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
 }
 try { if (typeof window !== 'undefined') window._aurixAuditLongRangeSnapshotContinuityCore = _aurixAuditLongRangeSnapshotContinuityCore; } catch (_) {}
 
+// FASE 3 · CONTINUIDAD VISUAL — el «pegote» de 24H. 24H está exento de la reducción por buckets de tiempo
+// (su semántica está certificada), así que cuando una sesión del cliente escribe puntos cada minuto —lo
+// normal al volver a la app tras un rato— la serie supera el presupuesto y cae en LTTB + extremos locales,
+// que reparten por ÍNDICE: el racimo denso se queda casi entero y la proyección fill-blend le da además una
+// cuota de anchura por punto. Medido sobre este renderer (móvil, sesión de 1 min con la alternancia de
+// cotización observada): 234 vértices y 26 cambios de dirección en 20 px CSS, frente a 4 sin sesión.
+// REGLA: en 24H el reductor de RENDER pasa a ser la ENVOLVENTE DE COLUMNA (sustituye a LTTB, que ya
+// descartaría extremos de columna antes): el eje X se parte en columnas
+// del espaciado ya calibrado para 24H (`_AURIX_RENDER_SPACING_BY_RANGE['24h']`, unidades viewBox) medidas
+// en TIEMPO REAL —para que el racimo no gane anchura por ser denso— y de cada columna se dibujan sólo su
+// mínimo y su máximo reales, en orden temporal. Primero, último y extremos globales, siempre. No depende
+// de la amplitud: ningún movimiento pierde su altura (la envolvente de cada columna es la real), sólo
+// desaparecen las idas y vueltas que caben dentro de una misma columna. Con la cadencia normal de 15 min
+// hay ≤1 punto por columna ⇒ geometría byte-idéntica. Un punto descartado es real y no se dibuja, nunca
+// uno inventado; el tooltip ancla a los puntos dibujados. Sólo 24H; serie, % y resto de rangos intactos.
+// (El ARR no sirve aquí: su prominencia es relativa al rango, y en una ventana 24H tranquila marca cada
+// oscilación de la sesión como extremo significativo.) ROLLBACK: false ⇒ exactamente la geometría anterior.
+const _AURIX_24H_DRAWN_THINNING = true;
+function _aurixThinDrawn24h(run, tScale, range) {
+  if (!_AURIX_24H_DRAWN_THINNING || String(range || '').toLowerCase() !== '24h') return run;
+  run = (Array.isArray(run) ? run : []).filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value)).sort((a, b) => a.time - b.time);   // mismo saneado que el reductor al que sustituye
+  const n = run.length;
+  const col = (typeof _AURIX_RENDER_SPACING_BY_RANGE === 'object' && _AURIX_RENDER_SPACING_BY_RANGE) ? Number(_AURIX_RENDER_SPACING_BY_RANGE['24h']) : 0;
+  if (n <= 2 || !(col > 0) || !tScale || typeof tScale.x !== 'function') return run;
+  let mi = 0, ma = 0;
+  for (let i = 1; i < n; i++) { if (run[i].value < run[mi].value) mi = i; if (run[i].value > run[ma].value) ma = i; }
+  const keep = new Set([0, n - 1, mi, ma]);
+  for (let bs = 0; bs < n; ) {
+    const c = Math.floor(tScale.x(run[bs].time) / col);
+    let be = bs, cmi = bs, cma = bs;
+    while (be + 1 < n && Math.floor(tScale.x(run[be + 1].time) / col) === c) {
+      be++;
+      if (run[be].value < run[cmi].value) cmi = be;
+      if (run[be].value > run[cma].value) cma = be;
+    }
+    keep.add(cmi); keep.add(cma);
+    bs = be + 1;
+  }
+  return Array.from(keep).sort((a, b) => a - b).map(i => run[i]);
+}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -48990,6 +49031,11 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     // byte-identical. Breaks are range-invariant (the real-gap floor is cadence-relative, not per-range).
     const _orphanOn = (typeof _AURIX_ORPHAN_CLEANUP_ENABLED !== 'undefined') ? _AURIX_ORPHAN_CLEANUP_ENABLED : true;
     const _orphanMax = (typeof _AURIX_ORPHAN_MAX_PTS === 'number') ? _AURIX_ORPHAN_MAX_PTS : 2;
+    // FASE 3 — en 24H la envolvente por columna SUSTITUYE a LTTB (ver cabecera de _aurixThinDrawn24h): LTTB
+    // primero ya descartaría extremos de columna. typeof por el aislamiento de harnesses; flag OFF ⇒ LTTB.
+    const thin24 = (r === '24h' && typeof _AURIX_24H_DRAWN_THINNING !== 'undefined' && _AURIX_24H_DRAWN_THINNING
+      && typeof _aurixThinDrawn24h === 'function' && typeof computeAurixTimeScale === 'function')
+      ? (function (tScale) { return run => _aurixThinDrawn24h(run, tScale, r); })(computeAurixTimeScale(src, vw, box)) : null;
     const sbrk = _aurixStructuralBreaks(src, r);
     const breaks = sbrk.breaks;
     let visiblePoints, segments = null;
@@ -49002,17 +49048,17 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
         kept.push(rawRuns[ri]);
       }
       const totalKept = kept.reduce((s, run) => s + run.length, 0) || 1;
-      segments = kept.map(run => (run.length <= 2) ? run.slice() : downsampleAurixAdaptive(run, Math.max(2, Math.round(target * run.length / totalKept)), r));
+      segments = kept.map(run => thin24 ? thin24(run) : (run.length <= 2) ? run.slice() : downsampleAurixAdaptive(run, Math.max(2, Math.round(target * run.length / totalKept)), r));
       visiblePoints = [].concat.apply([], segments);
     } else {
-      visiblePoints = downsampleAurixAdaptive(src, target, r);                         // densidad adaptativa al rango (24H y llamadores sin rango: LTTB intacto)
+      visiblePoints = thin24 ? thin24(src) : downsampleAurixAdaptive(src, target, r);   // densidad adaptativa al rango; 24H: envolvente por columna (FASE 3)
     }
     const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, box, r);             // perceptual X
     const yScale = computeAurixValueScale(visiblePoints, vh, box);                    // regime-relative Y
     const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax, x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
     // SPEC BRIDGE-SEGMENTATION.01 + DATA-TRUTH.01 + RANGE_INVARIANT_GAP — one path/fill per segment; never
     // a curve command between segment endpoints. No breaks ⇒ the single continuous premium curve (v-prior).
-    let linePath = '', areaPath = '';
+    let linePath = '', areaPath = '', gapLinkPath = '', gapAreaPath = '';
     if (segments) {
       const lineParts = [], areaParts = [];
       for (const run of segments) {
@@ -49022,13 +49068,27 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
       }
       linePath = lineParts.join(' ');                                                  // multiple 'M…' subpaths ⇒ visible break at each structural discontinuity
       areaPath = areaParts.join(' ');
+      // FASE 3 — la laguna deja de leerse como gráfico roto: un enlace RECTO y discontinuo (lo pinta el
+      // host, tenue) entre el último punto real de un tramo y el primero del siguiente, y bajo él un relleno
+      // atenuado para que el área no quede con muescas. Recto porque no se conoce la trayectoria; sin
+      // puntos ⇒ el tooltip sigue anclando sólo a observaciones.
+      const links = [], linkAreas = [];
+      for (let si = 1; si < segments.length; si++) {
+        const a = segments[si - 1], b = segments[si];
+        if (!a || !a.length || !b || !b.length) continue;
+        const p = a[a.length - 1], q = b[0];
+        const x0 = xScale.x(p.time).toFixed(2), y0 = yScale.y(p.value).toFixed(2), x1 = xScale.x(q.time).toFixed(2), y1 = yScale.y(q.value).toFixed(2), yb = scale.bottom.toFixed(2);
+        links.push('M ' + x0 + ' ' + y0 + ' L ' + x1 + ' ' + y1);
+        linkAreas.push('M ' + x0 + ' ' + y0 + ' L ' + x1 + ' ' + y1 + ' L ' + x1 + ' ' + yb + ' L ' + x0 + ' ' + yb + ' Z');
+      }
+      gapLinkPath = links.join(' '); gapAreaPath = linkAreas.join(' ');
     } else {
       const mp = _aurixMonotonePath(visiblePoints, xScale, yScale);                    // monotone-cubic (unchanged path)
       linePath = (mp && mp.d) ? mp.d : '';
       areaPath = (typeof buildAurixAreaPath === 'function' && linePath) ? buildAurixAreaPath(linePath, visiblePoints, scale) : '';
     }
     const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(2), y: +yScale.y(p.value).toFixed(2) }));
-    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale,
+    return { linePath: linePath, areaPath: areaPath, gapLinkPath: gapLinkPath, gapAreaPath: gapAreaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale,
       segmentedBridgeCount: sbrk.bridgeCount, capitalStepSegmentCount: sbrk.capitalStepCount, sparseRampSegmentCount: sbrk.sparseRampCount,
       structuralBreakCount: breaks.length, bridgeGaps: breaks, segmentCount: segments ? segments.length : 1, ok: !!(linePath && areaPath) };
   } catch (e) { return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false, error: (e && e.message) || 'err' }; }
@@ -54719,6 +54779,8 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
           '</filter></defs>' +
           '<g class="wsc-grid-layer" pointer-events="none">' + _grid + '</g>' +
           '<path class="wsc-area" d="' + _areaD + '" fill="url(#wscArea-' + uid + ')" shape-rendering="geometricPrecision" style="opacity:' + _polish.areaOpacity + '" pointer-events="none"/>' +
+          ((rc.ok && rc.gapAreaPath) ? '<path class="wsc-gap-area" d="' + rc.gapAreaPath + '" fill="url(#wscArea-' + uid + ')" pointer-events="none"/>' : '') +
+          ((rc.ok && rc.gapLinkPath) ? '<path class="wsc-gap-link" d="' + rc.gapLinkPath + '" fill="none" vector-effect="non-scaling-stroke" pointer-events="none"/>' : '') +   // FASE 3 — enlace de laguna
           '<path class="wsc-line" d="' + _lineD + '" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:' + _polish.strokeWidth + 'px" filter="url(#wscGlow-' + uid + ')" pointer-events="none"/>' +
         '</svg>' +
         '<div class="wsc-ylabs">' + _yLabels + '</div>' +
@@ -55347,6 +55409,8 @@ function renderAurixMobileLiteChart(range, token) {
               '<line class="v" x1="257" y1="24" x2="257" y2="236"/><line class="v" x1="500" y1="24" x2="500" y2="236"/><line class="v" x1="743" y1="24" x2="743" y2="236"/>' +
             '</g>' +
             '<path class="aurix-lite-area" d="' + built.areaPath + '" fill="url(#' + gid + ')" stroke="none" pointer-events="none"/>' +
+            ((_rc.ok && _rc.gapAreaPath) ? '<path class="aurix-lite-gap-area" d="' + _rc.gapAreaPath + '" fill="url(#' + gid + ')" stroke="none" pointer-events="none"/>' : '') +
+            ((_rc.ok && _rc.gapLinkPath) ? '<path class="aurix-lite-gap-link" d="' + _rc.gapLinkPath + '" fill="none" stroke="' + stroke + '" vector-effect="non-scaling-stroke" pointer-events="none"/>' : '') +   // FASE 3 — enlace de laguna
             '<path class="aurix-lite-line" pathLength="1" d="' + built.linePath + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"/>' +
             _mYlabels +
           '</svg>';

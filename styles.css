@@ -24514,11 +24514,22 @@ body.gs-open { overflow: hidden; }
   animation: aurixLineDraw .4s cubic-bezier(.4, 0, .2, 1) forwards;
 }
 .aurix-lite-in.aurix-pm .aurix-lite-area { animation: aurixAreaReveal .2s var(--ease-out, ease) .1s backwards; }
+/* FASE 3 — enlace de laguna: recto, discontinuo y tenue (trayectoria desconocida, no observada).
+   Mismo tono que la línea; aparece con el área, nunca antes que el trazo. Bajo él, el mismo degradado
+   del área atenuado: sin muescas en el relleno y sin aparentar una trayectoria observada. */
+.wsc-gap-link, .aurix-lite-gap-link { stroke-width: 1.25px; stroke-dasharray: 3 4; stroke-linecap: round; opacity: .42; }
+.wsc-gap-area, .aurix-lite-gap-area { opacity: .6; }
+.wsc-gap-link { stroke: var(--accent, #4a82f0); }
+.wsc-up   .wsc-gap-link { stroke: #2ebd85; }
+.wsc-down .wsc-gap-link { stroke: #e25563; }
+.wsc-flat .wsc-gap-link { stroke: #9fb0c7; }
+.wsc-in.aurix-pm .wsc-gap-link, .wsc-in.aurix-pm .wsc-gap-area,
+.aurix-lite-in.aurix-pm .aurix-lite-gap-link, .aurix-lite-in.aurix-pm .aurix-lite-gap-area { animation: aurixAreaReveal .2s var(--ease-out, ease) .11s backwards; }
 @media (prefers-reduced-motion: reduce) {
   .wsc-in.aurix-pm .wsc-line,
   .aurix-lite-in.aurix-pm .aurix-lite-line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
-  .wsc-in.aurix-pm .wsc-area, .wsc-in.aurix-pm .wsc-last-dot,
-  .aurix-lite-in.aurix-pm .aurix-lite-area { animation: none; }
+  .wsc-in.aurix-pm .wsc-area, .wsc-in.aurix-pm .wsc-last-dot, .wsc-in.aurix-pm .wsc-gap-link, .wsc-in.aurix-pm .wsc-gap-area,
+  .aurix-lite-in.aurix-pm .aurix-lite-area, .aurix-lite-in.aurix-pm .aurix-lite-gap-link, .aurix-lite-in.aurix-pm .aurix-lite-gap-area { animation: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════
