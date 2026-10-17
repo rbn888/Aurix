@@ -8,7 +8,7 @@
        the only third parties are jsDelivr (supabase-js) and Google Fonts. Keeping
        this policy separate from the app shell is deliberate — the auth page must not
        inherit the app's wider image/API allow-list. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://isa-portfolio-ten.vercel.app https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://isa-portfolio-ten.vercel.app https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <script>
     // SECURITY-HARDENING-V1 · clickjacking guard. The access page is the highest-value
@@ -398,7 +398,7 @@
 
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.0"></script>
+  <script src="vendor/supabase-js-2.108.0/supabase.js" integrity="sha384-HlsOyqKcggCMG1je+4eTJKCduyUJxXpuVzI5SmMPXdo9VfJf/fKS57J3/z9EeaE+"></script>
   <script src="config.js"></script>
   <script src="services/ux.js"></script>
   <script>

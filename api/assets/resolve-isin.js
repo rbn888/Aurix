@@ -7,6 +7,8 @@
 // the frontend caller (getAssetFromISIN) can keep its existing parser:
 // exch suffix mapping, asset type inference, US-preferred ticker selection.
 
+import { clientKey, createRateLimiter, createTtlCache } from '../_abuse-guard.js';
+
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
 // origin. M.06 — el host histórico de GitHub Pages (rbn888.github.io) SALIÓ de la
 // allowlist: el dominio canónico es app.aurixsystem.io y el antiguo redirige. El futuro
@@ -24,6 +26,12 @@ function corsOrigin(req) {
 }
 const ISIN_REGEX     = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 
+// SECURITY V3 — OpenFIGI sin clave tiene un cupo por IP de salida compartido por todos los usuarios.
+// Un ISIN no cambia de mapeo en horas: caché de 24 h (también de la respuesta vacía, que es una
+// respuesta correcta del proveedor) y cupo por cliente. Un fallo de red nunca se memoriza.
+const perClient  = createRateLimiter({ limit: 20, windowMs: 60_000 });
+const ISIN_CACHE = createTtlCache({ max: 2000, ttlMs: 24 * 60 * 60_000 });
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  corsOrigin(req));
   res.setHeader('Vary', 'Origin');
@@ -35,6 +43,10 @@ export default async function handler(req, res) {
 
   const isin = String(req.body?.isin ?? '').trim().toUpperCase();
   if (!ISIN_REGEX.test(isin)) return res.status(400).json({ error: 'invalid_isin' });
+
+  const cached = ISIN_CACHE.get(isin);
+  if (cached) return res.status(200).json({ data: cached });
+  if (!perClient.take(clientKey(req))) return res.status(429).json({ error: 'rate_limit', data: [] });
 
   try {
     const upstream = await fetch('https://api.openfigi.com/v3/mapping', {
@@ -48,6 +60,7 @@ export default async function handler(req, res) {
     }
     const json = await upstream.json();
     const data = Array.isArray(json?.[0]?.data) ? json[0].data : [];
+    ISIN_CACHE.set(isin, data);
     return res.status(200).json({ data });
   } catch (err) {
     console.error('[API][isin] upstream failure:', err?.message);

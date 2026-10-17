@@ -27,6 +27,8 @@
 // services/chart-adapters.js owns calls. Cache is in-memory per
 // serverless instance (best-effort) to mute provider rate pressure.
 
+import { safeErrorCode } from '../_abuse-guard.js';
+
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
 // origin. M.06 — el host histórico de GitHub Pages (rbn888.github.io) SALIÓ de la
 // allowlist: el dominio canónico es app.aurixsystem.io y el antiguo redirige. El futuro
@@ -96,8 +98,34 @@ function _readCache(key) {
   return hit.value;
 }
 
+// SECURITY V3 — la caché no tenía tope: símbolos válidos pero arbitrarios la hacían crecer sin
+// límite en la instancia. Se acota expulsando la entrada más antigua. SIN cupo por cliente a
+// propósito: una sola carga de Market pide ~1.000 series legítimas desde la misma IP.
+const HISTORY_CACHE_MAX = 1500;
 function _writeCache(key, value, ttlMs) {
+  if (HISTORY_CACHE.has(key)) HISTORY_CACHE.delete(key);
   HISTORY_CACHE.set(key, { value, expiresAt: _now() + ttlMs });
+  while (HISTORY_CACHE.size > HISTORY_CACHE_MAX) HISTORY_CACHE.delete(HISTORY_CACHE.keys().next().value);
+}
+
+// Caché negativa SÓLO para respuestas deterministas del proveedor (símbolo inexistente o sin
+// resultado). Un 429/5xx/timeout NUNCA se memoriza: sería convertir una caída en "no existe".
+const NEGATIVE_TTL_MS = 10 * 60 * 1000;
+const NEGATIVE_MAX    = 2000;
+const HISTORY_NEGATIVE = new Map(); // key → { error, expiresAt }
+function _isDeterministic(code) {
+  return code === 'yahoo_no_result' || code === 'yahoo_http_404' || /^yahoo_app_error_/.test(code);
+}
+function _readNegative(key) {
+  const hit = HISTORY_NEGATIVE.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt < _now()) { HISTORY_NEGATIVE.delete(key); return null; }
+  return hit.error;
+}
+function _writeNegative(key, error) {
+  if (HISTORY_NEGATIVE.has(key)) HISTORY_NEGATIVE.delete(key);
+  HISTORY_NEGATIVE.set(key, { error, expiresAt: _now() + NEGATIVE_TTL_MS });
+  while (HISTORY_NEGATIVE.size > NEGATIVE_MAX) HISTORY_NEGATIVE.delete(HISTORY_NEGATIVE.keys().next().value);
 }
 
 // ── Normalization ─────────────────────────────────────────────────
@@ -219,6 +247,10 @@ export default async function handler(req, res) {
     ? intervalRaw
     : rangeCfg.interval;
 
+  const negKey = _cacheKey(symbol, rangeCfg.range, interval);
+  const negative = _readNegative(negKey);
+  if (negative) return res.status(502).json({ ok: false, error: negative });
+
   try {
     const value = await _getOrFetch(symbol, rangeCfg.range, interval,
       AbortSignal.timeout(10000));
@@ -226,8 +258,13 @@ export default async function handler(req, res) {
     // `points` array as "no history available" without forcing an error UI.
     return res.status(200).json(value);
   } catch (err) {
-    const msg = err?.message || 'unknown';
-    _warn('upstream', symbol, msg);
+    // Sólo códigos internos (`yahoo_*`, `upstream_timeout`, `upstream_error`) llegan al cliente.
+    // El código de Yahoo puede traer texto libre (`yahoo_app_error_Not Found`): se reduce a su familia.
+    const raw = err?.message || 'unknown';
+    let msg = safeErrorCode(err, 'yahoo_');
+    if (msg === 'upstream_error' && raw.startsWith('yahoo_app_error_')) msg = 'yahoo_app_error';
+    _warn('upstream', symbol, raw);
+    if (_isDeterministic(raw)) _writeNegative(negKey, msg);
     // 502 only on genuine upstream failures so the client can choose to
     // render an error state. Empty data is NOT an error.
     return res.status(502).json({ ok: false, error: msg });

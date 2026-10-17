@@ -2,6 +2,8 @@
 // Body:     { providers: ["coingecko:bitcoin", "twelvedata:AAPL", ...] }
 // Response: { prices: { [provider_id]: { price: number, change24h: number|null } } }
 
+import { clientKey, createRateLimiter, createTtlCache } from './_abuse-guard.js';
+
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
 // origin. M.06 — el host histórico de GitHub Pages (rbn888.github.io) SALIÓ de la
 // allowlist: el dominio canónico es app.aurixsystem.io y el antiguo redirige. El futuro
@@ -83,14 +85,37 @@ function getCached(providerId) {
   return entry.value;
 }
 
+// SECURITY V3 — la caché es compartida con snapshot.js y estaba SIN tope: claves arbitrarias
+// (`yahoo: AAPL`, `yahoo:AAPL `…) la hacían crecer sin límite. Se acota expulsando la más antigua;
+// la forma de cada entrada ({ value, timestamp, ttl }) no cambia porque snapshot.js la lee directa.
+const MAX_PRICE_CACHE = 5000;
 function setCache(providerId, value, ttl) {
+  if (PRICE_CACHE.has(providerId)) PRICE_CACHE.delete(providerId);
   PRICE_CACHE.set(providerId, { value, timestamp: Date.now(), ttl });
+  while (PRICE_CACHE.size > MAX_PRICE_CACHE) PRICE_CACHE.delete(PRICE_CACHE.keys().next().value);
 }
 
 // ── Rate limit ─────────────────────────────────────────────
-const rateLimits   = new Map(); // ip → [timestamps]
+// Mismo cupo que antes (10 peticiones / 10 s por cliente), ahora con mapa acotado.
 const RATE_LIMIT   = 10;
 const RATE_WINDOW  = 10_000; // 10 s
+const rateLimiter  = createRateLimiter({ limit: RATE_LIMIT, windowMs: RATE_WINDOW });
+
+// ── Límites de entrada (SECURITY V3) ─────────────────────────
+// El cliente real sólo envía `coingecko:<id>` (fetchLivePrices, ids únicos de la cartera) y
+// `coingecko:bitcoin` (services/market.js); acciones/ETF/metales van por /api/prices/snapshot.
+// Los topes dejan muchísimo margen a ese uso y cortan la amplificación: antes N entradas `yahoo:`
+// eran N peticiones paralelas a Yahoo y N símbolos de TwelveData eran N créditos de la clave.
+const MAX_PROVIDERS_RAW   = 1000;  // por encima: petición abusiva → 413
+const MAX_PROVIDERS       = 200;   // tras deduplicar (mismo techo que snapshot.js)
+const MAX_TWELVEDATA      = 25;    // créditos por petición
+const MAX_YAHOO           = 25;    // fan-out por petición
+const COINGECKO_ID_RE     = /^[a-z0-9][a-z0-9._-]{0,99}$/i;
+const MARKET_SYMBOL_RE    = /^[A-Za-z0-9.^=\/:-]{1,32}$/;   // AAPL, BRK-B, ^GSPC, GC=F, XAU/USD, 7203.T
+
+// Caché negativa: un id que CoinGecko no conoce (respuesta 200 sin él) no se vuelve a pedir en 60 s.
+// Sólo ante una respuesta CORRECTA del proveedor; un fallo de red nunca se memoriza como "no existe".
+const NEGATIVE_CACHE = createTtlCache({ max: 2000, ttlMs: 60_000 });
 
 // ── Parsing ────────────────────────────────────────────────
 
@@ -99,16 +124,28 @@ function parseProviders(providers) {
   const twelvedata = [];
   const yahoo      = [];
 
+  const seen = new Set();
   for (const p of providers) {
-    if (typeof p !== 'string') continue;
+    if (typeof p !== 'string' || p.length > 128) continue;
+    if (seen.has(p)) continue;
     const sep = p.indexOf(':');
     if (sep < 1) continue;
     const ns = p.slice(0, sep);
     const id = p.slice(sep + 1).trim();
     if (!id) continue;
+    // Forma estricta por proveedor: lo que no encaja no se pide (antes viajaba tal cual).
+    if (ns === 'coingecko') {
+      if (!COINGECKO_ID_RE.test(id)) continue;
+    } else if (ns === 'twelvedata') {
+      if (!MARKET_SYMBOL_RE.test(id) || twelvedata.length >= MAX_TWELVEDATA) continue;
+    } else if (ns === 'yahoo') {
+      if (!MARKET_SYMBOL_RE.test(id) || yahoo.length >= MAX_YAHOO) continue;
+    } else continue;
+    if (seen.size >= MAX_PROVIDERS) break;
+    seen.add(p);
     if (ns === 'coingecko')       coingecko.push({ provider: p, id });
     else if (ns === 'twelvedata') twelvedata.push({ provider: p, symbol: id });
-    else if (ns === 'yahoo')      yahoo.push({ provider: p, symbol: id });
+    else                          yahoo.push({ provider: p, symbol: id });
   }
 
   return { coingecko, twelvedata, yahoo };
@@ -117,7 +154,7 @@ function parseProviders(providers) {
 // ── Fetchers ───────────────────────────────────────────────
 
 async function fetchCoinGecko(items) {
-  const ids = items.map(i => i.id).join(',');
+  const ids = items.map(i => encodeURIComponent(i.id)).join(',');
   log('coingecko ids:', ids);
   const t0 = Date.now();
   OBSERVABILITY.pricing.providerRequests.coingecko++;
@@ -153,12 +190,14 @@ async function fetchCoinGecko(items) {
 }
 
 async function fetchTwelveData(items, apiKey) {
-  const symbols = items.map(i => i.symbol).join(',');
+  // SECURITY V3 — cada símbolo se codifica: antes se concatenaban crudos y un símbolo con `&`
+  // inyectaba parámetros en la URL que lleva la clave.
+  const symbols = items.map(i => encodeURIComponent(i.symbol)).join(',');
   log('twelvedata symbols:', symbols);
   const t0 = Date.now();
   OBSERVABILITY.pricing.providerRequests.twelvedata++;
 
-  const url = `https://api.twelvedata.com/price?symbol=${symbols}&apikey=${apiKey}`;
+  const url = `https://api.twelvedata.com/price?symbol=${symbols}&apikey=${encodeURIComponent(apiKey)}`;
 
   let res;
   try {
@@ -311,21 +350,17 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')   return res.status(405).json({ error: 'method_not_allowed' });
 
   // ── Rate limit ─────────────────────────────────────────
-  const ip  = req.headers['x-forwarded-for']?.split(',')[0].trim()
-              || req.socket?.remoteAddress
-              || 'unknown';
-  const now = Date.now();
-  const hits = (rateLimits.get(ip) || []).filter(t => now - t < RATE_WINDOW);
-  if (hits.length >= RATE_LIMIT) {
+  if (!rateLimiter.take(clientKey(req))) {
     OBSERVABILITY.pricing.rateLimitHits++;
     return res.status(429).json({ error: 'rate_limit' });
   }
-  hits.push(now);
-  rateLimits.set(ip, hits);
 
   const { providers } = req.body ?? {};
   if (!Array.isArray(providers) || providers.length === 0) {
     return res.status(400).json({ error: 'providers_required' });
+  }
+  if (providers.length > MAX_PROVIDERS_RAW) {
+    return res.status(413).json({ error: 'too_many_providers' });
   }
 
   log('request start · providers:', providers.length);
@@ -343,7 +378,7 @@ export default async function handler(req, res) {
   for (const item of coingecko) {
     const hit = getCached(item.provider);
     if (hit) prices[item.provider] = hit;
-    else uncachedCG.push(item);
+    else if (!NEGATIVE_CACHE.get(item.provider)) uncachedCG.push(item);
   }
 
   for (const item of twelvedata) {
@@ -367,6 +402,7 @@ export default async function handler(req, res) {
             setCache(id, val, TTL.crypto);
             prices[id] = val;
           }
+          for (const { provider } of uncachedCG) if (!r[provider]) NEGATIVE_CACHE.set(provider, true);
         })
         .catch(err => logError('coingecko', err.message))
     );

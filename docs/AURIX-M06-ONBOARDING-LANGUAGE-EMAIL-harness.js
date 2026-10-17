@@ -162,20 +162,27 @@ function loadCron(src, epochIso) {
   }
   return s;
 }
+// SECURITY V3 — el cron es FAIL-CLOSED: sin CRON_SECRET no corre. Antes este runner lo llamaba sin
+// secreto ni cabecera y sólo funcionaba porque la ruta quedaba ABIERTA en ese caso. Ahora simula al
+// llamante legítimo (pg_cron / Vercel Cron: secreto + Bearer). Si una prueba fija su propio
+// CRON_SECRET, no se envía cabecera — así A.10c sigue probando el rechazo sin Bearer.
+const HARNESS_CRON_SECRET = 'harness-cron-secret';
 function runCron(src, w, env, query) {
+  const ownSecret = !!(env && Object.prototype.hasOwnProperty.call(env, 'CRON_SECRET'));
   const ctx = vm.createContext({
     fs: { readFileSync: (p2, enc) => fs.readFileSync(p2, enc) },
     path,
     process: { env: Object.assign({
       WELCOME_CRON_ENABLED: 'true', SUPABASE_SERVICE_ROLE_KEY: 'svc', RESEND_API_KEY: 'rs',
-      SUPABASE_URL: 'https://sb.test',
+      SUPABASE_URL: 'https://sb.test', CRON_SECRET: HARNESS_CRON_SECRET,
     }, env || {}), cwd: () => root },
     console: { log() {}, warn() {}, error() {} },
     fetch: w.fetch,
   });
   vm.runInContext(src + '\n;globalThis.__h = handler;', ctx);
   const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
-  return ctx.__h({ method: 'GET', headers: {}, query: query || {} }, res).then(() => res);
+  const headers = ownSecret ? {} : { authorization: 'Bearer ' + HARNESS_CRON_SECRET };
+  return ctx.__h({ method: 'GET', headers, query: query || {} }, res).then(() => res);
 }
 
 const CRON = loadCron(cronSrc);

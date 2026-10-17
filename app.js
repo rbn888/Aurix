@@ -22333,8 +22333,22 @@ async function _wsDocsPush(key) {
   // cuenta a la que el producto no le promete permanencia.
   if (!_wsCanPersist()) { _wsDocSyncSet(key, 'local_only'); return false; }
   if (_wsDocTableState === 'no') { _wsDocSyncSet(key, 'local_only'); return false; }
-  const rows = _wsDocRows(key, userId);
-  if (!rows.length) return false;
+  // SECURITY V3 · CUOTA. Un cuerpo que supera el límite no se sube: el servidor lo rechazaría
+  // (db/workspace_documents_quota_1.sql, 512 KB medidos como texto jsonb) y el reintento sería
+  // inútil. El documento NO se pierde: sigue guardado en este dispositivo y el estado lo dice.
+  // Un borrado (tombstone) se sube siempre, mida lo que mida. El tope del cliente queda por
+  // debajo de los 512 KB del servidor porque `jsonb::text` añade espacios que JSON.stringify no pone.
+  const MAX_BODY_BYTES = 460 * 1024;
+  const bodyBytes = (body) => {
+    try {
+      const json = JSON.stringify(body == null ? {} : body);
+      return (typeof TextEncoder === 'function') ? new TextEncoder().encode(json).length : json.length;
+    } catch (_) { return Infinity; }
+  };
+  const allRows = _wsDocRows(key, userId);
+  if (!allRows.length) return false;
+  const rows = allRows.filter(r => r && (r.deleted_at || bodyBytes(r.body) <= MAX_BODY_BYTES));
+  if (!rows.length) { _wsDocSyncSet(key, 'local_only'); return false; }
   _wsDocSyncSet(key, 'saving');
   try {
     const { error } = await supabaseClient.from(_WS_DOC_TABLE)

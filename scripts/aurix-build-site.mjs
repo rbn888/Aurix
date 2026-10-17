@@ -41,7 +41,11 @@ const FILES = [
   'icon.svg', 'icon-maskable.svg', 'apple-touch-icon.png',
   'icon-192.png', 'icon-512.png', 'icon-512-maskable.png',
 ];
-const DIRS = ['ai', 'services', 'splash', 'assets'];
+// SECURITY V3 — `vendor/` aloja las librerías que antes venían de jsDelivr (mismas versiones,
+// verificadas contra el tarball de npm). Y la documentación (`*.md`) de los directorios
+// publicados NO se publica: `ai/*.md` son especificaciones internas que ningún código carga.
+const DIRS = ['ai', 'services', 'splash', 'assets', 'vendor'];
+const SKIP_IN_DIRS = (p) => !/\.md$/i.test(p);
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -56,7 +60,7 @@ for (const f of FILES) {
 for (const d of DIRS) {
   const src = join(root, d);
   if (!existsSync(src)) { missing.push(d + '/'); continue; }
-  cpSync(src, join(out, d), { recursive: true });
+  cpSync(src, join(out, d), { recursive: true, filter: SKIP_IN_DIRS });
 }
 if (missing.length) {
   console.error('FALLO: faltan en el repo entradas declaradas del sitio: ' + missing.join(', '));
@@ -96,6 +100,9 @@ const FORBIDDEN = ['docs', 'db', 'api', 'scripts', 'supabase', 'email', 'landing
   'audit.html', 'boot-check.html', 'index-app-probe.html', 'index-no-app.html',
   'timer-proof.html', 'app-load-test.html', 'brand-aurix.html', '.env.local', '.gitignore'];
 const leaked = FORBIDDEN.filter(f => existsSync(join(out, f)));
+// Ningún Markdown publicado: es documentación, nunca código de la app.
+(function walkMd(d) { for (const e of readdirSync(d)) { const p = join(d, e);
+  if (statSync(p).isDirectory()) walkMd(p); else if (/\.md$/i.test(e)) leaked.push(posix.relative(out, p) || e); } })(out);
 
 let count = 0, bytes = 0;
 (function walk(d) { for (const e of readdirSync(d)) { const p = join(d, e); const st = statSync(p);

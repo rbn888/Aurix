@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <!-- SECURITY-HARDENING-V1 · credential-entry page: strictest policy of the set.
        No remote images, no API calls beyond Supabase Auth, no framing allowed. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <script>
     // SECURITY-HARDENING-V1 · clickjacking guard (password entry must never be framed).
@@ -198,7 +198,7 @@
 
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.0"></script>
+  <script src="vendor/supabase-js-2.108.0/supabase.js" integrity="sha384-HlsOyqKcggCMG1je+4eTJKCduyUJxXpuVzI5SmMPXdo9VfJf/fKS57J3/z9EeaE+"></script>
   <script src="config.js"></script>
   <script>
     'use strict';

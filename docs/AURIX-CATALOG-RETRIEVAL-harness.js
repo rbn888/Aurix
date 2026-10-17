@@ -95,9 +95,11 @@ const MIRROR = path.join(os.tmpdir(), 'aurix-catalog-retrieval-mirror');
 function mirror(name) {
   const src = fs.readFileSync(path.join(root, 'api/search', name + '.js'), 'utf8')
     .replace(/from '\.\/_cg-catalog\.js'/g, "from './_cg-catalog.mjs'")
-    .replace(/from '\.\/_contract-discovery\.js'/g, "from './_contract-discovery.mjs'");
+    .replace(/from '\.\/_contract-discovery\.js'/g, "from './_contract-discovery.mjs'")
+    .replace(/from '\.\.\/_abuse-guard\.js'/g, "from './_abuse-guard.mjs'");   // SECURITY V3: helper compartido de api/
   const out = path.join(MIRROR, name + '.mjs');
   fs.writeFileSync(out, src);
+  fs.copyFileSync(path.join(root, 'api/_abuse-guard.js'), path.join(MIRROR, '_abuse-guard.mjs'));
   return out;
 }
 

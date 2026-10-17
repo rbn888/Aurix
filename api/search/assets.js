@@ -16,6 +16,8 @@
 // (0P*) — the symbol is passed through verbatim; the snapshot router
 // recognises the 0P* shape and routes to Yahoo with daily-NAV TTL.
 
+import { clientKey, createRateLimiter, createTtlCache } from '../_abuse-guard.js';
+
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
 // origin. M.06 — el host histórico de GitHub Pages (rbn888.github.io) SALIÓ de la
 // allowlist: el dominio canónico es app.aurixsystem.io y el antiguo redirige. El futuro
@@ -32,6 +34,11 @@ function corsOrigin(req) {
   return ALLOWED_ORIGINS[0];
 }
 const MAX_RESULTS    = 7;
+
+// SECURITY V3 — cupo por cliente y caché acotada de respuestas (Yahoo limita por IP de salida: una
+// ráfaga anónima degradaba la búsqueda de todos). La caché sólo guarda respuestas correctas.
+const perClient    = createRateLimiter({ limit: 60, windowMs: 60_000 });
+const SEARCH_CACHE = createTtlCache({ max: 1000, ttlMs: 10 * 60_000 });
 
 // ── MARKET-EXCELLENCE · BRK.B SEARCH ALIAS ──────────────────────────────────
 // La consulta se enviaba VERBATIM a Yahoo y Yahoo indexa las clases de acción
@@ -78,6 +85,11 @@ export default async function handler(req, res) {
   const q = String(req.query?.q ?? '').trim();
   if (!q || q.length > 64) return res.status(400).json({ error: 'invalid_query' });
 
+  const cacheKey = aliasQuery(q).toLowerCase();
+  const cached = SEARCH_CACHE.get(cacheKey);
+  if (cached) return res.status(200).json({ results: cached });
+  if (!perClient.take(clientKey(req))) return res.status(429).json({ error: 'rate_limit', results: [] });
+
   try {
     // Sólo la consulta se traduce (clases de acción US). Una sola petición, como antes.
     const url = `https://query1.finance.yahoo.com/v1/finance/search` +
@@ -117,6 +129,7 @@ export default async function handler(req, res) {
                        : (typeof qt.exchange === 'string' && qt.exchange) ? qt.exchange : null,
         };
       });
+    SEARCH_CACHE.set(cacheKey, results);
     return res.status(200).json({ results });
   } catch (err) {
     console.error('[API][search] upstream failure:', err?.message);

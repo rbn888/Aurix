@@ -12,7 +12,7 @@
        one that the shipped bundle actually uses (verified by
        docs/AURIX-SECURITY-BASELINE-harness.js, which fails the deploy gate if any
        shipped URL falls outside this allow-list).
-         · script-src  → jsDelivr only (chart.js, lightweight-charts, supabase-js).
+         · script-src  → self only: chart.js, lightweight-charts y supabase-js se sirven desde vendor/ (SECURITY V3).
                          'unsafe-inline' is REQUIRED (the shell boots from inline
                          scripts); no 'unsafe-eval' — nothing in the bundle evals.
          · connect-src → own origin + Aurix API + Supabase (https + wss realtime).
@@ -24,7 +24,7 @@
                          embedding, framing, <base> hijack and form re-targeting.
        frame-ancestors / X-Frame-Options are IGNORED in a <meta> CSP, so clickjacking
        is covered by the frame guard script below instead. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.coingecko.com https://cdn.jsdelivr.net https://financialmodelingprep.com; connect-src 'self' https://isa-portfolio-ten.vercel.app https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.coingecko.com https://cdn.jsdelivr.net https://financialmodelingprep.com; connect-src 'self' https://isa-portfolio-ten.vercel.app https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
   <!-- Never leak the full app URL (path/query) to a third-party origin; same-origin
        navigation keeps the full referrer, so nothing internal changes. -->
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -1758,20 +1758,20 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+  <script src="vendor/chart.js-4.5.1/chart.umd.min.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ"></script>
   <!-- CHART-2: TradingView Lightweight Charts — engine library for the
        isolated AurixChartCore prototype. Not yet wired to any production
        surface; legacy Chart.js charts continue rendering unchanged.
        `defer` so its absence (e.g. CDN miss) never blocks app boot;
        AurixChartCore checks readiness before using it. -->
-  <script defer src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script defer src="vendor/lightweight-charts-4.2.0/lightweight-charts.standalone.production.js" integrity="sha384-OK7vELvjHdhUFi31JYioPIcRHTROLdcDa6ZsNWgvgLaKj+9JqhU0Ad8g4wz3CXjA"></script>
   <script defer src="services/aurix-chart-core.js?v=24"></script>
   <!-- CHART-3: historical data adapter layer. Pure infra — no UI consumer.
        Loads `defer` so boot stays uninterrupted; safe even if absent. -->
   <script defer src="services/chart-adapters.js?v=4"></script>
   <script src="services/market.js"></script>
   <script src="ai/insightEngine.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.0"></script>
+  <script src="vendor/supabase-js-2.108.0/supabase.js" integrity="sha384-HlsOyqKcggCMG1je+4eTJKCduyUJxXpuVzI5SmMPXdo9VfJf/fKS57J3/z9EeaE+"></script>
   <script src="config.js"></script>
   <script src="services/ux.js"></script>
   <script src="services/onboarding-engine.js?v=3"></script>

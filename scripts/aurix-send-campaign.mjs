@@ -19,6 +19,16 @@
 // ONLY after Resend returns an id; batched with a rate limit; aborts if the provider error rate is
 // abnormal; an immediate STOP is available by creating the file email/.campaign-stop.
 //
+// SECURITY V3 · CONSENTIMIENTO (P2-10). La tabla de correos guarda a TODO el que escribe un email
+// en el login (persist_access_email, ANTES del OTP y ejecutable por anon) y en la landing: ni prueba
+// que el destinatario sea dueño del buzón ni que haya aceptado comunicaciones comerciales. Por eso
+// el envío masivo (--send) exige ahora, para cada destinatario:
+//   1. que el email sea de una cuenta de Auth CONFIRMADA (dueño del buzón demostrado), y
+//   2. una prueba de consentimiento comercial registrada (`marketing_consent_at`).
+// Hoy esa columna NO existe (db/email_marketing_consent_1.sql la prepara, sin aplicar) y no se
+// inventa: sin ella el envío masivo se BLOQUEA. --dry-run informa del recuento; --test sigue
+// enviando sólo a AURIX_TEST_EMAILS; las bajas y supresiones se siguen respetando.
+//
 // Usage:  node scripts/aurix-send-campaign.mjs --dry-run
 //         node scripts/aurix-send-campaign.mjs --test
 //         node scripts/aurix-send-campaign.mjs --send
@@ -95,9 +105,37 @@ async function sb(pathq, opts = {}) {
   return res;
 }
 async function fetchWaitlist() {
+  // Con la columna de consentimiento si existe; si PostgREST la rechaza (400/42703), sin ella y
+  // marcando que NO hay prueba de consentimiento para nadie.
+  const withConsent = await sb(`${WAITLIST_TABLE_PATH}?select=email,status,notes,marketing_consent_at&limit=100000`);
+  if (withConsent.ok) return { rows: await withConsent.json(), consentColumn: true };
+  if (withConsent.status !== 400) throw new Error('waitlist read failed: ' + withConsent.status);
   const res = await sb(`${WAITLIST_TABLE_PATH}?select=email,status,notes&limit=100000`);
   if (!res.ok) throw new Error('waitlist read failed: ' + res.status);
-  return res.json();
+  return { rows: await res.json(), consentColumn: false };
+}
+// Emails de cuentas de Auth con el correo CONFIRMADO (mismo listado admin que el cron de bienvenida).
+async function fetchConfirmedEmails() {
+  const confirmed = new Set();
+  for (let page = 1; page <= 200; page++) {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=${page}&per_page=200`,
+      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+    if (!res.ok) throw new Error('auth users read failed: ' + res.status);
+    const j = await res.json();
+    const users = Array.isArray(j?.users) ? j.users : [];
+    for (const u of users) if (u && u.email && u.email_confirmed_at) confirmed.add(normalizeEmail(u.email));
+    if (users.length < 200) break;
+  }
+  return confirmed;
+}
+// Regla de elegibilidad comercial, pura (la prueba el harness de seguridad V3).
+export function campaignEligibility(row, { confirmed, consentColumn }) {
+  const email = normalizeEmail(row && row.email);
+  if (!EMAIL_RE.test(email)) return 'invalid';
+  if (SUPPRESSED_STATUS.has(String((row && row.status) || '').toLowerCase())) return 'suppressed';
+  if (!confirmed || !confirmed.has(email)) return 'unverified';
+  if (!consentColumn || !(row && row.marketing_consent_at)) return 'no_consent';
+  return 'eligible';
 }
 async function alreadySent(email) {
   const res = await sb(`email_campaign_sends?select=email&campaign_id=eq.${encodeURIComponent(CAMPAIGN_ID)}&email=eq.${encodeURIComponent(email)}&status=eq.sent&limit=1`);
@@ -145,14 +183,15 @@ async function main() {
   if (MODE !== 'dry-run' && !RESEND_KEY) { console.error('RESEND_API_KEY not set — refusing to send. Aborting.'); process.exit(2); }
 
   // ── build the eligible, deduped recipient set ──
-  const rows = await fetchWaitlist();
+  const { rows, consentColumn } = await fetchWaitlist();
+  const confirmed = await fetchConfirmedEmails();
   const seen = new Set();
   const eligible = [];
-  const counts = { found: rows.length, invalid: 0, suppressed: 0, internal: 0, duplicate: 0 };
+  const counts = { found: rows.length, invalid: 0, suppressed: 0, internal: 0, duplicate: 0, unverified: 0, no_consent: 0 };
   for (const r of rows) {
     const email = normalizeEmail(r.email);
-    if (!EMAIL_RE.test(email)) { counts.invalid++; continue; }
-    if (SUPPRESSED_STATUS.has(String(r.status || '').toLowerCase())) { counts.suppressed++; continue; }
+    const verdict = campaignEligibility(r, { confirmed, consentColumn });
+    if (verdict !== 'eligible') { counts[verdict]++; continue; }
     if (MODE !== 'test' && INTERNAL_RE.test(email)) { counts.internal++; continue; }
     if (seen.has(email)) { counts.duplicate++; continue; }
     seen.add(email);
@@ -171,6 +210,8 @@ async function main() {
   console.log('excluded suppressed :', counts.suppressed);
   console.log('excluded internal   :', counts.internal);
   console.log('excluded duplicate  :', counts.duplicate);
+  console.log('excluded unverified :', counts.unverified, '(sin cuenta de Auth confirmada)');
+  console.log('excluded no consent :', counts.no_consent, consentColumn ? '' : '(NO existe columna de consentimiento)');
   console.log('eligible (deduped)  :', eligible.length);
 
   if (MODE === 'dry-run') {
@@ -181,6 +222,13 @@ async function main() {
     console.log('would send now      :', eligible.length - already);
     console.log('\nDRY RUN — no email sent, no rows written. Re-run with --test then --send.');
     process.exit(0);
+  }
+
+  // Sin prueba de consentimiento no hay envío comercial masivo. No se inventa.
+  if (MODE === 'send' && !consentColumn) {
+    console.error('\nBLOQUEADO — no existe prueba de consentimiento comercial (marketing_consent_at).');
+    console.error('Ver db/email_marketing_consent_1.sql y docs/AURIX-SECURITY-V3-RUNBOOK.md. Nada enviado.');
+    process.exit(3);
   }
 
   // ── controlled send ──
@@ -212,4 +260,6 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(e => { console.error('FATAL:', e && e.message); process.exit(1); });
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(e => { console.error('FATAL:', e && e.message); process.exit(1); });
+}

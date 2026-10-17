@@ -110,8 +110,12 @@ const uncovered = bundleOrigins.filter(o => !originAllowed(o, appAllowed) && !or
 ok('2.1 no shipped-JS origin falls outside the app CSP', uncovered.length === 0, uncovered.join(', '));
 // The three exempted origins above are the app's OWN deploy hosts — covered by 'self'
 // at runtime, and they appear in the bundle as navigation targets, not as fetches.
-ok("2.2 app CSP still allows the origins the bundle depends on (jsDelivr / CoinGecko / FMP / API / Supabase)",
-   originAllowed('https://cdn.jsdelivr.net', appCsp['script-src']) &&
+// SECURITY V3 — RE-DECIDIDO. chart.js, lightweight-charts y supabase-js se sirven ahora desde vendor/
+// (mismas versiones, verificadas contra npm): jsDelivr YA NO es un origen de SCRIPT, y exigirlo aquí
+// fosilizaba como contrato una dependencia de terceros. Sigue siendo origen de IMAGEN (iconos cripto).
+ok("2.2 app CSP still allows the origins the bundle depends on (jsDelivr icons / CoinGecko / FMP / API / Supabase)",
+   !originAllowed('https://cdn.jsdelivr.net', appCsp['script-src']) &&
+   originAllowed('https://cdn.jsdelivr.net', appCsp['img-src']) &&
    originAllowed('https://assets.coingecko.com', appCsp['img-src']) &&
    originAllowed('https://financialmodelingprep.com', appCsp['img-src']) &&
    originAllowed('https://isa-portfolio-ten.vercel.app', appCsp['connect-src']) &&

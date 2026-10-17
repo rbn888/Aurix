@@ -14,6 +14,7 @@
 //     never reaches the browser.
 
 import { chainsFor, catalogState, ensure, lookupByText } from './_cg-catalog.js';
+import { clientKey, createRateLimiter } from '../_abuse-guard.js';
 import { resolveContract } from './_contract-discovery.js';
 
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
@@ -46,6 +47,15 @@ const CATALOG_RETRIEVAL = IDENTITY_V1 && process.env.AURIX_CATALOG_RETRIEVAL !==
 const CATALOG_BUDGET_MS = 400;
 const CATALOG_CANDIDATES = 4;
 
+// SECURITY V3 — cupos de instancia. El modo contrato hace hasta 3 llamadas a CoinGecko (con la
+// clave DEMO) y 3 a GeckoTerminal por cada dirección NUEVA: un bucle de direcciones aleatorias bien
+// formadas agotaba la cuota. Pegar un contrato es un gesto raro; escribir en el buscador no tanto.
+// Al superar el cupo el modo contrato responde `provider_unavailable` (el cliente no lo memoriza
+// como "no existe") y el modo texto responde 429 con `results: []`.
+const contractPerClient = createRateLimiter({ limit: 10, windowMs: 60_000 });
+const contractBudget    = createRateLimiter({ limit: 30, windowMs: 60_000 });
+const textPerClient     = createRateLimiter({ limit: 60, windowMs: 60_000 });
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  corsOrigin(req));
   res.setHeader('Vary', 'Origin');
@@ -62,6 +72,12 @@ export default async function handler(req, res) {
   if (IDENTITY_V1) {
     const address = String(req.query?.address ?? '').trim();
     if (address) {
+      if (address.length > 128) {
+        return res.status(400).json({ found: false, result: null, reason: 'unsupported_address_shape', meta: {} });
+      }
+      if (!contractPerClient.take(clientKey(req)) || !contractBudget.take('global')) {
+        return res.status(429).json({ found: false, result: null, reason: 'provider_unavailable', meta: { rateLimited: true } });
+      }
       const out = await resolveContract(address, req.query?.network);
       return res.status(out.status).json(out.payload);
     }
@@ -70,6 +86,9 @@ export default async function handler(req, res) {
   const q = String(req.query?.q ?? '').trim();
   if (!q || q.length < MIN_Q || q.length > MAX_Q) {
     return res.status(400).json({ error: 'invalid_query', results: [] });
+  }
+  if (!textPerClient.take(clientKey(req))) {
+    return res.status(429).json({ error: 'rate_limit', results: [] });
   }
 
   try {

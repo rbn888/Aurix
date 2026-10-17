@@ -68,6 +68,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// SECURITY V3 — FAIL-CLOSED. Antes `if (secret && …)`: con CRON_SECRET ausente o vacío la ruta quedaba
+// ABIERTA a cualquiera (escaneo de hasta 4.000 usuarios con la service role y, con `?dry=1`, el
+// recuento de altas). Ahora sin secreto configurado no se ejecuta nunca, y la comparación es de
+// tiempo constante. Vercel Cron y el pg_cron de db/welcome_email_cron_1.sql envían
+// `Authorization: Bearer <CRON_SECRET>`, así que el camino legítimo no cambia.
+// Comparación de tiempo constante sin dependencias (misma técnica que `safeEqual` del webhook).
+function cronAuthorized(authorization, secret) {
+  if (typeof secret !== 'string' || secret.trim() === '') return false;
+  if (typeof authorization !== 'string') return false;
+  const expected = `Bearer ${secret}`;
+  if (authorization.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= authorization.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ozcasyufbknnuemllwso.supabase.co';
 const CAMPAIGN_ID  = 'aurix_welcome_v1';
 const DELAY_MS     = 30 * 60 * 1000;                 // ~30 minutes after first access
@@ -84,8 +100,7 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
 
   // Auth: Vercel Cron sends Authorization: Bearer <CRON_SECRET> when configured.
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.authorization !== `Bearer ${secret}`) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  if (!cronAuthorized(req.headers.authorization, process.env.CRON_SECRET)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
   const dry = String(req.query?.dry || '') === '1';
   if (process.env.WELCOME_CRON_ENABLED !== 'true') return res.status(200).json({ ok: true, disabled: true, note: 'set WELCOME_CRON_ENABLED=true to arm' });

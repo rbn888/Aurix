@@ -10,11 +10,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Least-privilege token scopes required by actions/deploy-pages.
+# SECURITY V3 — mínimo privilegio POR JOB. A nivel de workflow sólo lectura; `pages: write` e
+# `id-token: write` (los que exige actions/deploy-pages) los recibe únicamente `deploy`. Antes los
+# tenía también `gate`, que ejecuta código del repo (los harnesses) y no publica nada.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One Pages deployment at a time; let an in-flight run finish (don't cancel a live deploy).
 concurrency:
@@ -27,31 +27,40 @@ jobs:
   # failing suite blocks the publish. No continue-on-error, no ignored exit codes.
   gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+      # SECURITY V3 — el repo es público: una credencial en el árbol bloquea el deploy.
+      - name: Secret scan (fail-closed)
+        run: node scripts/aurix-secret-scan.mjs
       - name: Chart-integrity certification gate
         run: node scripts/aurix-ci-gate.mjs
 
   deploy:
     needs: gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       # M.06 · SUPERFICIE DE RELEASE — P0. Esto subía `path: '.'`, y como `.nojekyll` desactiva el
       # filtrado de Jekyll, el REPO ENTERO quedaba publicado en el dominio del cliente. Verificado en
       # vivo con HTTP 200 sobre CLAUDE.md, db/supabase_rls.sql, el checklist pre-LIVE de M.04 (con una
@@ -65,9 +74,9 @@ jobs:
       - name: Assemble publishable site (allowlist, fail-closed)
         run: node scripts/aurix-build-site.mjs _site
       - name: Upload artifact (publishable site only)
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: '_site'
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
