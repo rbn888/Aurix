@@ -34,7 +34,9 @@ let passed = 0; const failures = [];
 const t0 = Date.now();
 
 for (const f of ordered) {
-  const res = spawnSync('node', [join(docs, f)], { encoding: 'utf8', timeout: 120000 });
+  // 300 s por harness: los de chart/Intelligence tardan ~85 s en local y superaban los 120 s en el
+  // runner de GitHub (exit null). Sigue siendo fail-closed: un harness que no termina, falla.
+  const res = spawnSync('node', [join(docs, f)], { encoding: 'utf8', timeout: 300000 });
   const out = (res.stdout || '') + (res.stderr || '');
   const tail = out.split('\n').filter(Boolean).slice(-4).join('\n');
   const bad = res.status !== 0 || FAIL_RE.test(tail);

@@ -424,8 +424,8 @@ console.log('— 10 · Frontend y publicación');
   // Los iconos cripto son <img> de jsDelivr: quitarlo de script-src no puede tocar img-src.
   const idxCsp = (idx.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
   const imgSrc = (idxCsp.match(/img-src([^;]*)/) || [])[1] || '';
-  const prodIdx = require('child_process').execFileSync('git', ['show', '50dce0d:index.html'], { cwd: root, encoding: 'utf8' });
-  const prodImg = ((prodIdx.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '').match(/img-src([^;]*)/)[1];
+  // Valor de producción v842 (50dce0d) como literal: CI hace checkout superficial y no tiene historial.
+  const prodImg = " 'self' data: blob: https://*.coingecko.com https://cdn.jsdelivr.net https://financialmodelingprep.com";
   ok('regresión: img-src idéntico al de producción (iconos cripto intactos)', imgSrc === prodImg, imgSrc);
 }
 
