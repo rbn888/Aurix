@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '805'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '804'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26035,7 +26035,7 @@ function updateDashboardPlans() {
   // En el detalle de una categoría el Dashboard sustituye su contenido por la
   // lista filtrada: esta sección se comporta igual que las categorías.
   let drill = false;
-  try { drill = ((typeof activeCategory !== 'undefined') && activeCategory !== null) || !!activeAssetId; } catch (_) {}
+  try { drill = (typeof activeCategory !== 'undefined') && activeCategory !== null; } catch (_) {}
   if (!prem || drill) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
   // Mientras el usuario arrastra una tarjeta, repintar se la arrancaría de la mano; el gesto
   // termina en un repintado propio. Y un repintado idéntico no toca el DOM: ni foco perdido,
@@ -26122,7 +26122,7 @@ function updateDashboardDiscover() {
   let shell = 'pending';
   try { shell = _wsPremiumShell(); } catch (_) { shell = 'pending'; }
   let drill = false;
-  try { drill = ((typeof activeCategory !== 'undefined') && activeCategory !== null) || !!activeAssetId; } catch (_) {}
+  try { drill = (typeof activeCategory !== 'undefined') && activeCategory !== null; } catch (_) {}
   // Premium ve sus documentos; 'pending' no ve nada; en el detalle de una
   // categoría el Resumen cede su sitio a la lista filtrada, igual que el resto.
   // Cartera vacía: lo primero es crear patrimonio (el estado vacío ya lleva su CTA), no descubrir
@@ -59454,17 +59454,11 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
     if (e.target.closest && e.target.closest('#mktPrvPosBtn')) {
       const id = e.target.closest('#mktPrvPosBtn').getAttribute('data-asset-id');
       if (!id) return;
-      // Market se recuerda tal cual (búsqueda y scroll; pestaña, periodo y orden ya viven en el módulo)
-      // y Atrás vuelve a él: una entrada de historial SIN cambiar la URL.
-      const _ml = document.getElementById('marketList'), _mi = document.getElementById('marketSearchInput');
-      _mktPosReturn = { raw: _mi ? _mi.value : '', y: window.scrollY || 0, ly: _ml ? _ml.scrollTop : 0 };
-      _mktPosOpenId = id;
       _aurixMktClose();
-      try { history.pushState(Object.assign({}, history.state || {}, { aurixMktPos: 1 }), ''); } catch (_) {}
       // `switchTab` aplica la pestaña tras su fundido y al aplicarla LIMPIA la ficha abierta
-      // (`_applyTab` → activeAssetId = null): por eso la posición la abre `_applyTab` en cuanto monta
-      // el Resumen, antes del fundido de entrada — nunca se pinta el Dashboard primero.
+      // (`_applyTab` → activeAssetId = null): la posición se abre cuando la pestaña ya está puesta.
       try { switchTab('home'); } catch (_) {}
+      setTimeout(() => { try { openAssetDetail(id); } catch (_) {} }, reducedMotion ? 0 : (_TAB_OUT_MS + 40));
       return;
     }
     // Add to portfolio CTA.
@@ -65672,34 +65666,6 @@ function _aurixSameAssetIdentity(a, sel, opts) {
   if (a.marketSymbol && sel.marketSymbol) return _aurixTickerKey(a.marketSymbol) === _aurixTickerKey(sel.marketSymbol);
   return false;
 }
-// «Ver posición» desde Market: la posición a abrir (la consume `_applyTab('home')`), el estado de
-// Market al que se vuelve y el que `_applyTab('market')` restaura. `var`: `_applyTab` los lee.
-var _mktPosOpenId = null, _mktPosReturn = null, _mktPosRestore = null;
-function _mktPosBack() {
-  if (!_mktPosReturn) return false;
-  _mktPosRestore = _mktPosReturn; _mktPosReturn = null;
-  try { switchTab('market'); } catch (_) {}
-  return true;
-}
-function _mktPosRestoreConsume() {
-  const r = _mktPosRestore; if (!r) return;
-  _mktPosRestore = null;
-  const input = document.getElementById('marketSearchInput');
-  if (r.raw && input) {
-    input.value = r.raw;
-    const q = r.raw.trim().toLowerCase();
-    // Los resultados de esa consulta siguen en memoria: se repintan sin pedirlos otra vez.
-    if (_mktDiscQuery === q && _mktDiscState === 'ready') { _marketSearchQuery = q; renderCurrentMarketView(); }
-    else input.dispatchEvent(new Event('input', { bubbles: true }));
-  }
-  const list = document.getElementById('marketList');
-  if (list) list.scrollTop = r.ly;
-  _aurixScrollWindowTo(r.y);
-}
-if (typeof window !== 'undefined') window.addEventListener('popstate', e => {
-  // Atrás desde la posición abierta en Market: se sale de SU entrada y se vuelve a Market.
-  if (!(e.state && e.state.aurixMktPos)) _mktPosBack();
-});
 // ¿Esta ficha de Market es un activo que YA tengo (posición ABIERTA)? El mismo juez que el alta; la
 // ficha puede no traer moneda, y entonces la moneda no decide (sólo se muestra).
 function _aurixMktOwnedAsset(item) {
@@ -67462,9 +67428,6 @@ function _applyTab(tab) {
   document.body.classList.remove('is-detail-view');
   const _adsSec = document.getElementById('assetDetailSection');
   if (_adsSec) _adsSec.style.display = 'none';
-  if (typeof _adsShowSlider === 'function') _adsShowSlider();
-  // Salir de la posición por otra pestaña cancela la vuelta pendiente a Market.
-  if (typeof _mktPosReturn !== 'undefined' && tab !== 'market' && !(tab === 'home' && _mktPosOpenId)) _mktPosReturn = null;
   currentTab = tab;
   if (_loopInterval)   { clearInterval(_loopInterval);   _loopInterval   = null; }
   if (_marketInterval) { clearInterval(_marketInterval); _marketInterval = null; }
@@ -67521,8 +67484,6 @@ function _applyTab(tab) {
     // user returns home via the logo / nav Dashboard — not the back button —
     // we must rebuild it explicitly, or the lower cards stay hidden.
     if (typeof updateCategoryCards === 'function') updateCategoryCards();
-    // «Ver posición» desde Market: la posición se abre aquí, con el Resumen ya montado y aún invisible.
-    if (typeof _mktPosOpenId !== 'undefined' && _mktPosOpenId) { const id = _mktPosOpenId; _mktPosOpenId = null; try { openAssetDetail(id); } catch (_) {} }
     // Vuelta desde un documento abierto en «Tus planes»: al sitio de origen, una vez.
     if (typeof _wsDashRestorePending !== 'undefined' && _wsDashRestorePending) { _wsDashRestorePending = false; const y = _wsDashReturnY; _wsDashReturnY = null; if (y != null) _aurixScrollWindowTo(y); }
     updateBottomNavActive();
@@ -67544,7 +67505,6 @@ function _applyTab(tab) {
       try { if (typeof _monsterStart === 'function') _monsterStart(); } catch (_) {}
     } else if (tab === 'market') {
       renderMarket();
-      if (typeof _mktPosRestoreConsume === 'function') _mktPosRestoreConsume();
     } else if (tab === 'intelligence') {
       // INT.2 — Aurix Intelligence Command Center. Read-only patrimonial reading;
       // init wires reveal animations + the inline explore delegation.
@@ -82959,14 +82919,6 @@ function _adsHideMain() {
   hide(document.getElementById('distributionSection'));
   hide(document.getElementById('categoriesSection'));
   hide(document.getElementById('assetsSection'));
-  hide(document.getElementById('wsPlansSection'));
-  hide(document.getElementById('dashDiscoverSection'));
-  hide(document.querySelector('.portfolio-slider-card'));
-}
-// El slider móvil lo gobierna el CSS: sólo se retira el `display` en línea que puso el detalle.
-function _adsShowSlider() {
-  const el = document.querySelector('.portfolio-slider-card');
-  if (el) el.style.display = '';
 }
 function _closeAdsMenu() {
   const m = document.getElementById('adsManageMenu');
@@ -82982,14 +82934,13 @@ function openAssetDetail(id) {
   _adsHideMain();
   sec.style.display = '';
   renderAssetDetail();
-  _aurixScrollWindowTo(0);
+  try { window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' }); } catch (_) { try { window.scrollTo(0, 0); } catch (__) {} }
 }
 function closeAssetDetail() {
   activeAssetId = null;
   _closeAdsMenu();
   const sec = document.getElementById('assetDetailSection');
   if (sec) sec.style.display = 'none';
-  _adsShowSlider();
   render(); // repaints the category drill-down (activeCategory still set) or dashboard
 }
 function _adsHistoryRow(ev) {
@@ -83075,11 +83026,7 @@ async function _adsDeleteActive() {
   onPortfolioChange(true);
 }
 (function _wireAssetDetail() {
-  // Abierta desde Market, «Volver» es Atrás (sale de su entrada de historial y vuelve a Market).
-  document.getElementById('adsBack')?.addEventListener('click', () => {
-    if (_mktPosReturn) { if (history.state && history.state.aurixMktPos) history.back(); else _mktPosBack(); return; }
-    closeAssetDetail();
-  });
+  document.getElementById('adsBack')?.addEventListener('click', closeAssetDetail);
   const mb = document.getElementById('adsManageBtn');
   mb?.addEventListener('click', e => {
     e.stopPropagation();
