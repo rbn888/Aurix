@@ -13,7 +13,7 @@
 const O = String(process.env.AURIX_DEMO_URL || 'http://127.0.0.1:8776/').replace(/\/?$/, '/');
 const { chromium } = await import(process.env.AURIX_PW || '/tmp/aurix-pw/node_modules/playwright/index.mjs');
 const VWS = (process.env.VWS || '390,1440').split(',').map(Number);
-const SEL = '.dashboard-top, .cat-card, .wsdisc-card, .intcc-card, .intcc-hero, .wsh-card, .wsh-tool, .market-section, .bottom-nav, .aurix-premium-modal, .wspl-card, .intprev-card';
+const SEL = '.dashboard-top, .cat-card, .pgw-card, .intcc-card, .intcc-hero, .wsh-card, .wsh-tool, .market-section, .bottom-nav, .aurix-premium-modal, .wspl-card, .intprev-card';
 const MEASURE = (SEL) => {
   const parse = c => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
   const over = (t, s) => ({ r: t.r * t.a + s.r * (1 - t.a), g: t.g * t.a + s.g * (1 - t.a), b: t.b * t.a + s.b * (1 - t.a), a: 1 });

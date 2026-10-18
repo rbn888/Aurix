@@ -16,6 +16,9 @@
 //     reached by exactly the same gate as before.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+// El armazón de la portada (escenario, tarjeta, CTA, movimiento) vive en la plantilla
+// compartida `.cvr-*` de styles.css; la hoja inyectada sólo conserva lo de los hechos.
+const stylesCss = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
 function fnSrc(name){ const s='function '+name+'('; const i=app.indexOf(s); if(i<0) throw new Error('missing '+name);
   let p=app.indexOf('(',i), pd=0; for(;p<app.length;p++){ if(app[p]==='(')pd++; else if(app[p]===')'){pd--; if(!pd){p++;break;}}}
   let k=app.indexOf('{',p), d=0; for(;k<app.length;k++){ if(app[k]==='{')d++; else if(app[k]==='}'){d--; if(!d){k++;break;}}}
@@ -62,6 +65,8 @@ sb.t = k => ({
     ? 'Aurix ha encontrado 1 análisis más sobre tu patrimonio.'
     : `Aurix ha encontrado ${n} análisis más sobre tu patrimonio.`,
   intprev_locked_aria: 'Análisis todavía sin desbloquear',
+  intprev_locked_t:   'Análisis bloqueado',
+  intprev_locked_s:   'Se desbloquea con tu análisis completo',
   intprev_hold_none_t: 'Aurix está leyendo tu estructura patrimonial',
   intprev_hold_none_b: 'Todavía no hay un hecho que Aurix pueda afirmar con la precisión suficiente sobre tu cartera actual.',
   intcc_w_dep_t:'Dependencia de activo principal', intcc_w_dep_b:name=>`Buena parte de tu patrimonio invertible se apoya en ${name}.`,
@@ -142,12 +147,12 @@ console.log('\n2 · Real portfolio data:');
   // se exige ahora es la secuencia PROMESA → PRUEBA → PUENTE → CTA, con el puente
   // como texto FIJO (no derivado del hecho) y sin rastro de la pregunta.
   ok('2.4 puente fijo presente y CERO pregunta promocional',
-    /class="intprev-bridge"/.test(h) && /class="intprev-bridge-b"/.test(h)
+    /class="intprev-bridge[ "]/.test(h) && /class="intprev-bridge-b[ "]/.test(h)
     && !/class="intprev-q(-label)?"/.test(h) && !/class="intprev-locked-n"/.test(h),
     JSON.stringify([/intprev-bridge/.test(h), /intprev-q/.test(h)]));
   ok('2.4b la portada abre con la promesa: eyebrow + título + subtítulo',
-    /class="intprev-badge"/.test(h) && /INTELLIGENCE/i.test(h)
-    && /class="intprev-title"/.test(h) && /class="intprev-sub"/.test(h));
+    /class="intprev-badge[ "]/.test(h) && /INTELLIGENCE/i.test(h)
+    && /class="intprev-title[ "]/.test(h) && /class="intprev-sub[ "]/.test(h));
   ok('2.5 facts carry stable instrumentation hooks',
     /data-preview-fact="concentration"/.test(h) && /data-preview-fact="locked"/.test(h)
     // El gancho `preview_cta_click` era el del botón «Volver al Dashboard», retirado
@@ -293,12 +298,12 @@ console.log('\n7 · No commercial or entitlement change:');
   // —que aquí no se reimplemente checkout ni se cuele una página comercial
   // retirada— sigue intacto y ahora es lo ÚNICO que dice.
   ok('7.1 hay UN solo CTA y va al paywall canónico — sin checkout ni página founder',
-    (h.match(/class="intprev-cta"/g) || []).length === 1
+    (h.match(/class="intprev-cta[ "]/g) || []).length === 1
     && (h.match(/intprev-cta--ghost/g) || []).length === 0
     && /data-premium-cta="intelligence\.full"/.test(h)
     && !/switchTab\('home'\)/.test(h)
     && !/openFounderPage|openUpgradeModal|checkout|stripe/i.test(h),
-    String((h.match(/class="intprev-cta"/g) || []).length));
+    String((h.match(/class="intprev-cta[ "]/g) || []).length));
   ok('7.2 no price anywhere in the preview', !/14,99|14\.99|59\s?€|8,99|€\s?\d/.test(h));
   // RE-DECIDIDO por M.02 B3. Antes: "el gate no cambia, hasAurixPremiumAccess sigue
   // decidiendo". Ahora decide el resolver server-side y ese helper ya no es
@@ -334,11 +339,12 @@ console.log('\n8 · Layout contract:');
     !/\.premium-preview/.test(h));
   ok('8.2 mobile-first: base rules unconditioned, desktop behind min-width',
     /@media \(min-width:768px\)/.test(h) && !/@media \(max-width/.test(h));
-  ok('8.3 reduced-motion respected', /prefers-reduced-motion/.test(h));
+  ok('8.3 reduced-motion respected',
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.cvr-card \{ animation: none; \}/.test(stylesCss) && /class="intprev-card cvr-card"/.test(h));
   ok('8.4 host container neutralised via :has, no global override',
     /\.tab-placeholder:has\(\.intprev-stage\)/.test(h));
   ok('8.5 single card, no scroll trap (no fixed height on the stage)',
-    (h.match(/class="intprev-card"/g) || []).length === 1 && !/\.intprev-stage\{[^}]*height:\d/.test(h));
+    (h.match(/class="intprev-card[ "]/g) || []).length === 1 && !/\.intprev-stage\{[^}]*height:\d/.test(h));
   ok('8.6 output is well-formed (tags balanced)',
     (h.match(/<div/g)||[]).length === (h.match(/<\/div>/g)||[]).length
     && (h.match(/<section/g)||[]).length === (h.match(/<\/section>/g)||[]).length
@@ -413,18 +419,23 @@ console.log('\n10 · Dos visibles y un bloque oculto, y del oculto no se emite n
         .filter(n => visibleText.indexOf(n) === -1)
         .every(n => h.indexOf('>' + n) === -1));
     })());
-  ok('10.7 dentro del bloque oculto sólo hay el skeleton, decorativo',
+  // 10.7/10.8 SE RE-DECIDEN (SPEC CIERRE PREMIUM DEL EMBUDO FREE): las barras «parecían un
+  // skeleton de carga». El bloque oculto pasa a decir QUÉ es —candado y un rótulo genérico—,
+  // y por eso deja de ser aria-hidden. Lo que NO cambia es lo que importa: dentro sólo hay
+  // las dos frases FIJAS del diccionario, idénticas para cualquier cartera (10.4–10.6 siguen
+  // prohibiendo texto, título y cifras del hecho oculto).
+  ok('10.7 dentro del bloque oculto sólo hay el candado y el rótulo genérico del diccionario',
     (function () {
       const li = h.slice(h.indexOf('<li class="intprev-fact is-locked"'));
       const one = li.slice(0, li.indexOf('</li>') + 5);
-      return /class="intprev-redact"/.test(one)
-        && !/intprev-lock-tag/.test(one)
-        && one.replace(/<[^>]*>/g, '').trim() === '';
+      return /class="intprev-lock"/.test(one)
+        && one.replace(/<[^>]*>/g, '').trim() === 'Análisis bloqueado' + 'Se desbloquea con tu análisis completo'
+        && !/intprev-fact-label|intprev-fact-text/.test(one);
     })());
-  ok('10.8 el bloque oculto no existe para accesibilidad: aria-hidden y SIN aria-label',
+  ok('10.8 el bloque oculto se lee como bloqueado: sin aria-hidden ni aria-label propios',
     (function () {
       const m = /<li class="intprev-fact is-locked"([^>]*)>/.exec(h);
-      return !!m && /aria-hidden="true"/.test(m[1]) && !/aria-label/.test(m[1]);
+      return !!m && !/aria-hidden/.test(m[1]) && !/aria-label/.test(m[1]);
     })(),
     (/<li class="intprev-fact is-locked"([^>]*)>/.exec(h) || [])[1]);
   ok('10.9 el skeleton NO es un dato real emborronado (sin blur) y mide como los visibles',

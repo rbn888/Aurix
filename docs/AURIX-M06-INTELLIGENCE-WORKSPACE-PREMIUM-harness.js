@@ -41,7 +41,7 @@ const fs = require('fs'), path = require('path');
 const { execFileSync } = require('child_process');
 const root = path.join(__dirname, '..');
 const R = f => fs.readFileSync(path.join(root, f), 'utf8');
-const app = R('app.js'), idx = R('index.html');
+const app = R('app.js'), idx = R('index.html'), css = R('styles.css');
 // Código sin comentarios: las aserciones «esto ya no existe» no pueden dar falso
 // positivo leyendo el comentario que documenta justo lo retirado.
 const bare = s => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !/^\s*(\/\/|<!--)/.test(l)).join('\n');
@@ -196,9 +196,10 @@ section('E — Intelligence: CTA Free y verdad semántica:');
      })());
   // 52 px, no 46: la SPEC de portadas de conversión sube el suelo táctil del CTA.
   ok('E.2c el CTA es táctil y no se sale de pantalla en móvil (ancho completo, ≥52 px)',
-     /\.intprev-cta\{width:100%;[\s\S]{0,200}?min-height:52px/.test(app) &&
-     /\.intprev-ctas\{display:flex;flex-direction:column/.test(app) &&
-     /@media \(min-width:768px\)\{[\s\S]{0,400}?\.intprev-cta\{width:auto/.test(app));
+     // El CTA vive en la plantilla compartida de portadas (`.cvr-*`, styles.css).
+     /\.cvr-cta \{\s*width: 100%; min-height: 52px;/.test(css) && /class="intprev-cta cvr-cta"/.test(app) &&
+     /\.cvr-cta-zone \{[^}]*flex-direction: column/.test(css) &&
+     /@media \(min-width: 768px\) \{[\s\S]{0,1400}?\.cvr-cta \{ width: auto;/.test(css));
   ok('E.3 el preview muestra hechos CIERTOS del propio patrimonio, no promesas',
      // SPEC PORTADAS FREE DE CONVERSIÓN — el reparto vuelve a DOS visibles y UNO
      // oculto (la SPEC P0 lo había invertido a 1+2). Lo que este assert protege no

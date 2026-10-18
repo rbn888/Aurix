@@ -139,7 +139,7 @@ const measure = page => page.evaluate(`(function(){
     clipped: Array.from(new Set(clipped)), spill: Array.from(new Set(spill)),
     docX: document.documentElement.scrollWidth > window.innerWidth + 1,
     disc: { shown: vis(disc), html: disc ? disc.innerHTML.length : -1,
-            cards: disc ? disc.querySelectorAll('.wsdisc-card').length : 0,
+            cards: disc ? disc.querySelectorAll('.pgw-card').length : 0,
             ctas: disc ? [].slice.call(disc.querySelectorAll('[data-dsc-go]')).map(function(b){ return b.getAttribute('data-dsc-go'); }) : [] },
     plans: { shown: vis(plans), html: plans ? plans.innerHTML.length : -1,
              open: plans ? plans.querySelectorAll('[data-wspl-open]').length : 0,
@@ -237,10 +237,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       JSON.stringify(g.plans));
     // Las dos hermanas, medidas: mismo ancho y el CTA a la misma altura.
     const sib = await page.evaluate(`(function(){
-      var c = [].slice.call(document.querySelectorAll('#dashDiscoverSection .wsdisc-card'));
+      var c = [].slice.call(document.querySelectorAll('#dashDiscoverSection .pgw-card'));
       if (c.length !== 2) return JSON.stringify({ n: c.length });
       var r = c.map(function(x){ return x.getBoundingClientRect(); });
-      var b = c.map(function(x){ return x.querySelector('.wsdisc-cta').getBoundingClientRect(); });
+      var b = c.map(function(x){ return x.querySelector('.pgw-cta').getBoundingClientRect(); });
       var pad = c.map(function(x){ return getComputedStyle(x).padding; });
       return JSON.stringify({ n: 2, dw: Math.abs(r[0].width - r[1].width),
         dTop: Math.abs(r[0].top - r[1].top), dCta: Math.abs(b[0].top - b[1].top),

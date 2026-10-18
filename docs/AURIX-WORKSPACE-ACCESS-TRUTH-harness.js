@@ -764,7 +764,7 @@ console.log('\n8 · Portada Free: una card, ocho capacidades, un CTA y ningún a
     ok('8.12 y no queda lógica del aviso en el bundle',
       !/_wsfcNoticeDue|_wsfcHasPriorWork|_WSFC_NOTICE_KEY|data-wsfc-notice-close/.test(app.replace(/^\s*\/\/.*$/gm, '')));
     ok('8.13 ni se ha sustituido por otro cartel: la portada son cuatro piezas',
-      (html.match(/class="wsfc-(eyebrow|title|sub|caps|cta-wrap)"/g) || []).length === 5
+      (html.match(/class="wsfc-(eyebrow|title|sub|caps|cta-wrap)[ "]/g) || []).length === 5
       && html.indexOf('role="status"') === -1 && html.indexOf('role="alert"') === -1);
   }
   // ── §4 · LA RENDIJA DEL GUARD, CERRADA ────────────────────────────────────

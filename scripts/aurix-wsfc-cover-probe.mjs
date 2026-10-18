@@ -138,10 +138,13 @@ const MEASURE = `(function(){
   // grandes vacíos, y un reparto automático los produce sin que nada «falle».
   // .wsfc-eg (el ejemplo que añadió el paywall) es un BLOQUE del panel: sin medirlo, su altura
   // contaba como hueco entre el subtítulo y la rejilla (83 px «vacíos» que no lo eran).
-  var blocks=[head,R(title),sub,R(q('.wsfc-eg')),R(capsUl),wrap].filter(function(x){ return x && x.b > x.t; }).sort(function(a,b){return a.t-b.t;});
-  var maxGap=0; for(var i=1;i<blocks.length;i++) maxGap=Math.max(maxGap, +(blocks[i].t-blocks[i-1].b).toFixed(1));
+  var blocks=[head,R(title),sub,R(q('.wsfc-eg')),R(q('.cvr-sep')),R(capsUl),wrap].filter(function(x){ return x && x.b > x.t; }).sort(function(a,b){return a.t-b.t;});
+  // EMBUDO FREE — las dos portadas comparten un alto mínimo y el CTA se ancla abajo, en la misma
+  // zona: el sobrante de la más baja cae ENCIMA del CTA a propósito. Ese hueco se mide aparte
+  // (acotado), y entre los bloques de CONTENIDO sigue sin admitirse un vacío.
+  var maxGap=0, ctaGap=0; for(var i=1;i<blocks.length;i++){ var g0=+(blocks[i].t-blocks[i-1].b).toFixed(1); if (blocks[i]===wrap) ctaGap=g0; else maxGap=Math.max(maxGap, g0); }
   return {
-    mounted:true, caps:caps.length, cols:cols,
+    mounted:true, caps:caps.length, cols:cols, ctaGap:ctaGap,
     capsInPanel: capEls.every(function(e){ return ins(R(e), panelR); }),
     ctaInPanel: ins(wrap, panelR),
     panelInStage: !!panelR && panelR.t>=sr.t-0.5 && panelR.b<=sr.b+0.5,
@@ -239,8 +242,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         g.titleTxt === EXPECTED_TITLE[L], JSON.stringify(g.titleTxt));
       // §A fija la rejilla: 2×4 en móvil y en anchos intermedios, 4×2 sólo cuando
       // los nombres caben cómodamente (escritorio).
-      ok(`${tag} rejilla ${w >= 1024 ? '4×2' : '2×4'}`,
-        g.cols === (w >= 1024 ? 4 : 2), 'columnas=' + g.cols);
+      // SE RE-DECIDE (EMBUDO FREE): nueve capacidades nunca fueron 4×2 —la novena quedaba huérfana—.
+      // 3×3 desde 768 px (los nombres caben en dos líneas) y dos columnas en móvil.
+      ok(`${tag} rejilla ${w >= 768 ? '3×3' : '2 columnas'}`,
+        g.cols === (w >= 768 ? 3 : 2), 'columnas=' + g.cols);
       ok(`${tag} celdas iguales por fila, iconos alineados y padding consistente`,
         g.ragged === false && g.misaligned === false,
         JSON.stringify({ desiguales: g.ragged, iconos: g.misaligned }));
@@ -256,7 +261,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
         JSON.stringify({ capsCaben: g.capsFits, enPanel: g.capsInPanel, cta: g.ctaInPanel, solape: g.neighbourHit }));
       // ── SIN GRANDES VACÍOS, Y SIN PEGAR EL CTA A LA NAVEGACIÓN ────────────
       ok(`${tag} espaciado controlado: ningún hueco desproporcionado entre bloques`,
-        g.maxGap <= 34, 'mayor hueco=' + g.maxGap);
+        g.maxGap <= 34 && g.ctaGap <= 80, 'mayor hueco=' + g.maxGap + ' · encima del CTA=' + g.ctaGap);
       ok(`${tag} el CTA está entero, en el flujo, y no pegado a la navegación`,
         g.ctaWhole && g.ctaInFlow && g.ctaAboveNav && g.ctaH >= 52
         && (g.ctaGapToNav === null || g.ctaGapToNav >= 8),
