@@ -9,6 +9,10 @@
     {
       "source": "/api/control/affiliate-codes",
       "destination": "/api/read/control-affiliate-codes"
+    },
+    {
+      "source": "/api/control/premium-access",
+      "destination": "/api/read/control-premium-access"
     }
   ]
 }
