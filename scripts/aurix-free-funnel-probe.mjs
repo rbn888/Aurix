@@ -23,22 +23,16 @@ const DASH = `(function(){
   var facts=null; try{ facts=_aurixIntelligencePreviewFacts(); }catch(_){}
   var pub=[]; try{ pub=_wsfcPublishedCaps(); }catch(_){}
   return JSON.stringify({ shown: !!sec && sec.style.display!=='none', n: cards.length,
-    cls: sec ? sec.className : '',
-    cards: cards.map(function(c){ var cb=R(c), cta=c.querySelector('.pgw-cta'), t=c.querySelector('.pgw-t'), tier=c.querySelector('.pgw-tier,.cvr-tier');
-      var vz=R(c.querySelector('.pgw-viz')), orb=c.querySelector('.pgw-orb'), inV=function(r,m){ return r.l>=vz.l-0.5+m && r.r<=vz.r+0.5-m && r.t>=vz.t-0.5+m && r.b<=vz.b+0.5-m; };
-      var orbIn=true; if(orb){ var ob=R(orb), hw=parseFloat(getComputedStyle(orb,'::after').width)||0, cx=(ob.l+ob.r)/2, cy=(ob.t+ob.b)/2; orbIn=inV({l:cx-hw/2,r:cx+hw/2,t:cy-hw/2,b:cy+hw/2},0); }
-      var tilesIn=[].every.call(c.querySelectorAll('.pgw-tile'), function(e){ return inV(R(e), 10); });
+    cards: cards.map(function(c){ var cb=R(c), cta=c.querySelector('.pgw-cta'), t=c.querySelector('.pgw-t'), tier=c.querySelector('.pgw-tier');
       return { box: cb, titleDy: Math.round(R(t).t-cb.t), ctaFromBottom: Math.round(cb.b-R(cta).b), ctaH: Math.round(R(cta).h), ctaW: Math.round(R(cta).w),
-        tier: tier ? tier.textContent.trim() : '', dest: cta.getAttribute('data-dsc-go'), txt: c.textContent, body: c.querySelector('.pgw-b').textContent.trim(),
-        orbIn: orbIn, tilesIn: tilesIn, border: getComputedStyle(c).borderTopColor, lift: getComputedStyle(c).transform,
+        tier: tier ? tier.textContent.trim() : '', dest: cta.getAttribute('data-dsc-go'),
         real: [].map.call(c.querySelectorAll('.pgw-row.is-real .pgw-row-t'), function(e){ return e.textContent.trim(); }),
         locked: [].map.call(c.querySelectorAll('.pgw-row.is-locked'), function(e){ return e.textContent.trim(); }),
         tiles: c.querySelectorAll('.pgw-tile').length, verbs: [].map.call(c.querySelectorAll('.pgw-row:not(.is-real):not(.is-locked) .pgw-row-t'), function(e){ return e.textContent.trim(); }),
         anim: getComputedStyle(c).animationName, dur: getComputedStyle(c).animationDuration, iter: getComputedStyle(c).animationIterationCount,
         orbAnim: c.querySelector('.pgw-orb') ? getComputedStyle(c.querySelector('.pgw-orb')).animationName : null,
-        tileAnim: c.querySelector('.pgw-tile') ? getComputedStyle(c.querySelector('.pgw-tile'),'::after').animationName : null,
         inView: cb.l >= -0.5 && cb.r <= innerWidth + 0.5 }; }),
-    facts: facts ? { state: facts.state, first: facts.visible && facts.visible[0] ? _aurixIntPreviewFactText(facts.visible[0]) : null } : null,
+    facts: facts ? { state: facts.state, first: facts.visible && facts.visible[0] ? facts.visible[0].text : null } : null,
     pub: pub.map(function(c){ return t(c.nameKey); }),
     overX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 }); })()`;
 const COVER = `(function(){
@@ -55,7 +49,7 @@ const COVER = `(function(){
     caps: c.querySelectorAll('.wsfc-cap').length, cardInStage: c.getBoundingClientRect().bottom <= st.getBoundingClientRect().bottom + 0.5,
     stageScroll: st.scrollHeight > st.clientHeight + 1,
     overX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-    anim: getComputedStyle(c).animationName, dur: getComputedStyle(c).animationDuration, stageBg: getComputedStyle(st).backgroundColor + '|' + getComputedStyle(st).backgroundImage }); })()`;
+    anim: getComputedStyle(c).animationName, dur: getComputedStyle(c).animationDuration }); })()`;
 const toCards = P => P.ev(`(function(){ var e=document.getElementById('dashDiscoverSection'); if(e && e.firstChild) e.scrollIntoView({block:'center'}); })()`);
 const pwOpen = P => P.ev(`!!document.querySelector('.aurix-premium-overlay.is-open')`);
 
@@ -65,8 +59,6 @@ async function run(ENG, browser, w, lang) {
   // CLS a lo largo de todo el recorrido (sólo Chromium expone layout-shift).
   await P.ev(`(function(){ window.__cls=0; try{ new PerformanceObserver(function(l){ l.getEntries().forEach(function(e){ if(!e.hadRecentInput) window.__cls+=e.value; }); }).observe({type:'layout-shift', buffered:false}); }catch(_){ window.__cls=-1; } })()`);
   await toCards(P); await P.p.waitForTimeout(400);
-  // La entrada dura ~0,7 s (pulso + encendido escalonado): se mide cuando ya se ha cerrado.
-  await P.p.waitForFunction(`/pgw-done/.test(document.getElementById('dashDiscoverSection').className)`, null, { timeout: 2500 }).catch(() => {});
   const d = JSON.parse(await P.ev(DASH));
   const [ci, cw] = d.cards;
   ok(`${T} Gateway: dos tarjetas Free, Intelligence y Workspace`, d.shown && d.n === 2 && ci.dest === 'intelligence' && cw.dest === 'workspace', JSON.stringify([d.shown, d.n]));
@@ -74,24 +66,17 @@ async function run(ENG, browser, w, lang) {
   ok(`${T} misma altura, título y CTA a la misma altura en las dos`, Math.abs(ci.box.h - cw.box.h) <= 1 && Math.abs(ci.titleDy - cw.titleDy) <= 1 && Math.abs(ci.ctaFromBottom - cw.ctaFromBottom) <= 1, JSON.stringify([ci.box.h, cw.box.h, ci.titleDy, cw.titleDy, ci.ctaFromBottom, cw.ctaFromBottom]));
   const twoCols = Math.abs(ci.box.t - cw.box.t) <= 1 && ci.box.r <= cw.box.l;
   ok(`${T} ${w > 700 ? 'dos columnas' : 'una columna'}`, w > 700 ? twoCols : (cw.box.t >= ci.box.b), JSON.stringify([ci.box, cw.box]));
-  // v847 SE RE-DECIDE: las tarjetas ya no llevan etiqueta de plan ni dicen «Premium» en ningún sitio.
-  ok(`${T} sin etiqueta ni palabra «Premium» en las tarjetas`, !ci.tier && !cw.tier && !/premium/i.test(ci.txt + cw.txt), JSON.stringify([ci.tier, cw.tier]));
+  ok(`${T} etiqueta Premium discreta en las dos`, ci.tier === 'Premium' && cw.tier === 'Premium');
   ok(`${T} CTA primario táctil (≥44 px) y dentro de la tarjeta`, ci.ctaH >= 44 && cw.ctaH >= 44 && ci.inView && cw.inView);
   ok(`${T} Intelligence: la ÚNICA lectura es el primer hecho certificado de su portada`, d.facts && d.facts.state === 'ok' && ci.real.length === 1 && ci.real[0] === d.facts.first, JSON.stringify([ci.real, d.facts]));
-  ok(`${T} Intelligence: dos capas bloqueadas inequívocas, sin cifras`, ci.locked.length === 2 && ci.locked.every(x => !/\d/.test(x) && (en ? /locked/ : /bloqueado/).test(x)), JSON.stringify(ci.locked));
-  // v847 SE RE-DECIDE: a la izquierda los nueve iconos, a la derecha SÓLO los tres verbos (los nombres de
-  // herramienta ya no se repiten), y el texto inferior deja de enumerar capacidades.
-  ok(`${T} Workspace: los nueve iconos publicados, 3×3`, cw.tiles === Math.min(9, d.pub.length) && cw.tiles === 9, String(cw.tiles));
-  ok(`${T} Workspace: a la derecha sólo «calcula, organiza y planifica»`, JSON.stringify(cw.verbs) === JSON.stringify(en ? ['Calculate', 'Organise', 'Plan'] : ['Calcula', 'Organiza', 'Planifica']), cw.verbs.join(' | '));
-  ok(`${T} Workspace: copy inferior nuevo y sin repetir herramientas`, cw.body === (en ? 'Work on your finances in one place and continue whenever you want.' : 'Trabaja tus finanzas en un solo espacio y continúa cuando quieras.') && !d.pub.some(n => cw.txt.indexOf(n) !== -1), cw.body);
-  ok(`${T} esfera (con su halo) e iconos dentro de su pozo`, ci.orbIn && cw.tilesIn, JSON.stringify([ci.orbIn, cw.tilesIn]));
-  // v847: la entrada es SÓLO luz y corre al entrar en el viewport; la tarjeta no anima opacidad ni geometría.
-  ok(`${T} la tarjeta no anima (la entrada es luz interior), sin bucle`, [ci, cw].every(c => c.anim === 'none' && c.lift === 'none'), JSON.stringify([ci.anim, ci.lift]));
-  ok(`${T} la entrada corrió UNA vez al verse y quedó cerrada`, /\bpgw-done\b/.test(d.cls) && !/\bpgw-live\b/.test(d.cls), d.cls);
+  ok(`${T} Intelligence: dos capas bloqueadas inequívocas, sin cifras`, ci.locked.length === 2 && ci.locked.every(x => !/\d/.test(x) && /Premium/.test(x)), JSON.stringify(ci.locked));
+  ok(`${T} Workspace: la caja son las capacidades PUBLICADAS y los verbos usan sus nombres`, cw.tiles === Math.min(9, d.pub.length) && cw.verbs.length === 3 && cw.verbs.every(v => d.pub.some(n => v.endsWith(n))), JSON.stringify([cw.tiles, cw.verbs]));
+  ok(`${T} Workspace: «calcula, organiza y planifica»`, en ? /^Calculate .*Organise .*Plan /.test(cw.verbs.join(' ')) : /^Calcula .*Organiza .*Planifica /.test(cw.verbs.join(' ')), cw.verbs.join(' | '));
+  ok(`${T} entrada única de 180–220 ms, sin bucle`, [ci, cw].every(c => (c.anim === 'none' || c.anim === 'pgwIn') && c.iter !== 'infinite' && (c.anim === 'none' || (parseFloat(c.dur) >= 0.18 && parseFloat(c.dur) <= 0.22))), JSON.stringify([ci.anim, ci.dur, ci.iter]));
   ok(`${T} Resumen sin desbordamiento horizontal`, !d.overX);
   // Un repintado (precio nuevo, vuelta de categoría) no repite la entrada.
-  const settled = await P.ev(`(function(){ var s=document.getElementById('dashDiscoverSection'); s._pgwHtml=''; updateDashboardDiscover(); var o=document.querySelector('.pgw-orb'); return JSON.stringify([s.classList.contains('pgw-done'), o ? getComputedStyle(o).animationName : 'none', s.getAnimations ? s.getAnimations({subtree:true}).filter(function(a){ return typeof a.animationName === 'string'; }).length : 0]); })()`);
-  ok(`${T} un repintado no vuelve a animar la entrada`, settled === '[true,"none",0]', settled);
+  const settled = await P.ev(`(function(){ updateDashboardDiscover(); return document.getElementById('dashDiscoverSection').classList.contains('pgw-settled'); })()`);
+  ok(`${T} un repintado no vuelve a animar la entrada`, settled === true);
   if (process.env.SHOTS && (w === 390 || w === 1440)) await P.p.screenshot({ path: join(OUT, `dash-${ENG}-${w}-${lang}.png`) });
 
   // ── EMBUDO: tarjeta entera → portada → CTA → paywall → cerrar → Atrás
@@ -125,9 +110,6 @@ async function run(ENG, browser, w, lang) {
   ok(`${T} portadas: CTA visible sin scroll, dentro del área útil y ≥44 px`, a.ctaVisible && b.ctaVisible && a.cta.h >= 44 && b.cta.h >= 44 && !a.stageScroll && !b.stageScroll, JSON.stringify([a.cta, b.cta, a.stageScroll, b.stageScroll]));
   ok(`${T} portadas: la tarjeta cabe en su escenario y sin desbordamiento horizontal`, a.cardInStage && b.cardInStage && !a.overX && !b.overX);
   ok(`${T} portadas: no nombran el plan (sin distintivo Premium)`, !a.tier && !b.tier);
-  ok(`${T} portadas: el escenario se funde con el negro global (sin superficie propia)`, [a, b].every(x => /^rgba\(0, 0, 0, 0\)\|none$/.test(x.stageBg)), JSON.stringify([a.stageBg, b.stageBg]));
-  // v847 · copy de la exposición cripto en la portada: «Cripto representa…» (nunca «La cripto…»); EN intacto.
-  ok(`${T} Intelligence: copy de cripto correcto`, a.visibleFacts.some(x => en ? /^Crypto is around \d+% of your financial portfolio\.$/.test(x) : /^Cripto representa cerca del \d+% de tu cartera financiera\.$/.test(x)) && !a.visibleFacts.some(x => /La cripto/.test(x)), JSON.stringify(a.visibleFacts));
   ok(`${T} Intelligence: los hechos visibles se conservan`, a.visibleFacts.length >= 1 && a.visibleFacts[0] === ci.real[0], JSON.stringify(a.visibleFacts));
   ok(`${T} Intelligence: la capa bloqueada tiene candado y rótulo, sin barras de skeleton`, !a.redact && a.locked.length >= 1 && a.lockIcon === a.locked.length && a.locked.every(x => x.replace(/\s+/g, '') === (en ? 'Locked analysisUnlocks with your full analysis' : 'Análisis bloqueadoSe desbloquea con tu análisis completo').replace(/\s+/g, '')), JSON.stringify(a.locked));
   ok(`${T} Workspace: conserva sus capacidades reales`, b.caps === d.pub.length, String(b.caps));
@@ -142,29 +124,12 @@ async function personas(ENG, browser) {
     // Free con valoración INCOMPLETA: ninguna lectura en el Gateway, estado de espera en la portada.
     let P = await page(browser, P_URL, { w, h: H(w), assets: INCOMPLETE });
     let d = JSON.parse(await P.ev(DASH));
-    // La entrada no se consume fuera de pantalla. Al cargar, las tarjetas SÍ llegan a verse (se montan
-    // antes que las categorías), así que el mecanismo se prueba armándolo con ellas bajo el pliegue.
-    if (w < 768) {
-      const arm = await P.ev(`(async function(){ var s=document.getElementById('dashDiscoverSection'); _pgwEntry='idle'; s.classList.remove('pgw-live','pgw-done'); window.scrollTo(0,0);
-        var below = s.getBoundingClientRect().top > innerHeight; updateDashboardDiscover(); await new Promise(function(r){ setTimeout(r, 600); });
-        var waited = !/pgw-(live|done)/.test(s.className); s.scrollIntoView({block:'center'}); await new Promise(function(r){ setTimeout(r, 1200); });
-        return JSON.stringify([below, waited, s.className]); })()`);
-      ok(`${ENG}.${w} la entrada espera a que las tarjetas se vean y después se cierra`, /^\[true,true,"[^"]*pgw-done/.test(arm), arm);
-    }
     ok(`${ENG}.${w} incompleta: el Gateway no afirma ninguna lectura`, d.n === 2 && d.facts.state !== 'ok' && d.cards[0].real.length === 0 && d.cards[0].locked.length === 2, JSON.stringify([d.facts, d.cards[0] && d.cards[0].real]));
     ok(`${ENG}.${w} incompleta: tarjetas iguales igualmente`, Math.abs(d.cards[0].box.h - d.cards[1].box.h) <= 1 && Math.abs(d.cards[0].titleDy - d.cards[1].titleDy) <= 1);
     await P.ev(`switchTab('intelligence')`); await P.p.waitForTimeout(700);
     const c = JSON.parse(await P.ev(COVER));
     ok(`${ENG}.${w} incompleta: la portada dice qué falta, sin hechos ni capas inventadas`, !c.none && c.visibleFacts.length === 0 && c.locked.length === 0 && c.ctaVisible, JSON.stringify(c));
     ok(`${ENG}.${w} incompleta: sin errores`, !P.errs.length, P.errs.join(' | '));
-    // Táctil: un toque en la zona visual de la tarjeta lleva a su portada, sin depender del hover.
-    if (w < 768) {
-      await P.ev(`switchTab('home')`); await P.p.waitForTimeout(500);
-      await P.ev(`document.querySelector('.pgw-card.is-ws').scrollIntoView({ block: 'center' })`); await P.p.waitForTimeout(300);
-      const tp = JSON.parse(await P.ev(`(function(){ var r=document.querySelector('.pgw-card.is-ws .pgw-viz').getBoundingClientRect(); return JSON.stringify({ x: r.left + 40, y: r.top + 30 }); })()`));
-      await P.p.touchscreen.tap(tp.x, tp.y); await P.p.waitForTimeout(700);
-      ok(`${ENG}.${w} táctil: tocar la tarjeta lleva a la portada`, (await P.ev('currentTab')) === 'workspace');
-    }
     await P.ctx.close();
     // Premium: ni promos ni portadas Free, desde el primer frame observado.
     P = await page(browser, P_URL, { w, h: H(w), premium: true });
@@ -181,18 +146,15 @@ async function personas(ENG, browser) {
     // Movimiento reducido: nada decorativo se anima.
     P = await page(browser, P_URL, { w, h: H(w), reduced: true });
     d = JSON.parse(await P.ev(DASH));
-    await P.ev(`document.getElementById('dashDiscoverSection').scrollIntoView({block:'center'})`); await P.p.waitForTimeout(150);
-    d = JSON.parse(await P.ev(DASH));
-    ok(`${ENG}.${w} reduced-motion: ni pulso de la esfera ni encendido de herramientas`, d.cards.every(x => x.anim === 'none' && (x.orbAnim === null || x.orbAnim === 'none') && (x.tileAnim === null || x.tileAnim === 'none')), JSON.stringify(d.cards.map(x => [x.anim, x.orbAnim, x.tileAnim])));
+    ok(`${ENG}.${w} reduced-motion: Gateway sin animación`, d.cards.every(x => x.anim === 'none' && (x.orbAnim === null || x.orbAnim === 'none')), JSON.stringify(d.cards.map(x => [x.anim, x.orbAnim])));
     await P.ev(`switchTab('workspace')`); await P.p.waitForTimeout(500);
     const rc = JSON.parse(await P.ev(COVER));
     ok(`${ENG}.${w} reduced-motion: portada sin animación`, rc.anim === 'none', rc.anim);
     await P.ctx.close();
     // Teclado: una parada de foco por tarjeta, foco visible, Enter navega.
     P = await page(browser, P_URL, { w, h: H(w) });
-    await P.p.bringToFront();   // :focus/:focus-within sólo aplican en la página con el foco de la ventana
     await P.ev(`(function(){ var b=document.querySelector('.pgw-card.is-ws .pgw-cta'); b.focus(); })()`); await P.p.waitForTimeout(500);
-    const kf = JSON.parse(await P.ev(`(function(){ var b=document.activeElement; var cs=getComputedStyle(b); var card=b.closest('.pgw-card'); return JSON.stringify({ is: b.classList.contains('pgw-cta'), outline: cs.outlineStyle, ring: cs.outlineWidth, lift: getComputedStyle(card).transform, border: getComputedStyle(card).borderTopColor, name: (b.textContent||'').trim(), desc: b.getAttribute('aria-describedby') }); })()`));
+    const kf = JSON.parse(await P.ev(`(function(){ var b=document.activeElement; var cs=getComputedStyle(b); var card=b.closest('.pgw-card'); return JSON.stringify({ is: b.classList.contains('pgw-cta'), outline: cs.outlineStyle, ring: cs.outlineWidth, lift: getComputedStyle(card).transform, name: (b.textContent||'').trim(), desc: b.getAttribute('aria-describedby') }); })()`));
     // WebKit, como Safari en macOS, no lleva Tab a los botones por defecto (preferencia del
     // sistema): ahí se comprueba el orden de tabulación declarado, no el recorrido real.
     const FOC = `(function(){ return JSON.stringify([].map.call(document.querySelectorAll('.pgw-card'), function(c){ return [].filter.call(c.querySelectorAll('a,button,input,select,textarea,[tabindex]'), function(e){ return e.tabIndex >= 0; }).map(function(e){ return e.className; }); })); })()`;
@@ -202,12 +164,7 @@ async function personas(ENG, browser) {
       prev = await P.ev(`(function(){ var a=document.activeElement; return a && a.classList.contains('pgw-cta') ? a.getAttribute('data-dsc-go') : (a && a.closest && a.closest('.pgw-card') ? 'otro-dentro' : 'fuera'); })()`); }
     ok(`${ENG}.${w} teclado: el CTA es la única parada de foco de cada tarjeta`, foc.length === 2 && foc.every(l => l.length === 1 && l[0] === 'pgw-cta') && (ENG !== 'CR' || prev === 'intelligence'), JSON.stringify([foc, prev]));
     await P.ev(`document.querySelector('.pgw-card.is-ws .pgw-cta').focus()`);
-    // v847 SE RE-DECIDE: el foco/hover enciende el borde azul y NO desplaza la tarjeta.
-    // Reposo medido en la MISMA tarjeta, sin foco y con el puntero fuera (el hover también la enciende).
-    await P.ev(`document.activeElement && document.activeElement.blur()`); await P.p.mouse.move(1, 1); await P.p.waitForTimeout(400);
-    const rest = await P.ev(`getComputedStyle(document.querySelector('.pgw-card.is-ws')).borderTopColor`);
-    await P.ev(`document.querySelector('.pgw-card.is-ws .pgw-cta').focus()`);
-    ok(`${ENG}.${w} teclado: foco visible, borde encendido y sin desplazar la tarjeta`, kf.is && kf.outline !== 'none' && kf.lift === 'none' && kf.border !== rest, JSON.stringify([kf, rest]));
+    ok(`${ENG}.${w} teclado: foco visible y la tarjeta se eleva (≤3 px)`, kf.is && kf.outline !== 'none' && (function(m){ return !!m && -m[1] >= 2 && -m[1] <= 3; })(/matrix\(1, 0, 0, 1, 0, (-?[\d.]+)\)/.exec(kf.lift)), JSON.stringify(kf));
     ok(`${ENG}.${w} teclado: nombre y descripción accesibles`, /Workspace/.test(kf.name) && /pgw-ws-t/.test(kf.desc || ''));
     await P.p.keyboard.press('Enter'); await P.p.waitForTimeout(700);
     ok(`${ENG}.${w} teclado: Enter lleva a la portada`, (await P.ev('currentTab')) === 'workspace');

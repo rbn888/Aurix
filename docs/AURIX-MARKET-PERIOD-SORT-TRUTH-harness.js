@@ -132,15 +132,12 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
   // ── 1. Estructura: el orden no puede depender del scroll ────────────────
   console.log('1 — A · El orden no depende del scroll (por construcción):');
   // RE-DECIDIDO (Intelligence V7 §9): el invariante es que el ORDEN de Market no dependa
-  // del scroll. Sólo se permiten IntersectionObserver DECORATIVOS que no tocan datos ni Market:
-  // el destello dorado de Intelligence (`_intv7GoldWire`) y, desde v847 (SPEC REMATE DEL EMBUDO
-  // FREE: «entrada única al aparecer en viewport»), la luz de entrada del Premium Gateway del
-  // Resumen (`_pgwArmEntrance`). Cada uno con la MISMA condición; cualquier otro rompe.
-  ok('1.1 ningún IntersectionObserver fuera de los decorativos que no tocan Market',
+  // del scroll. El único IntersectionObserver permitido es el destello dorado decorativo de
+  // Intelligence (`_intv7GoldWire`), que no toca datos ni Market; cualquier otro rompe.
+  ok('1.1 ningún IntersectionObserver fuera del destello decorativo de Intelligence (que no toca Market)',
      (() => { const strip = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
-       const gold = strip(fnSource('_intv7GoldWire')), pgw = strip(fnSource('_pgwArmEntrance'));
-       return !!gold && !!pgw && !/IntersectionObserver/.test(appCode.replace(gold, '').replace(pgw, ''))
-         && !/_mkt|MARKET_|market/i.test(gold) && !/_mkt|MARKET_|market/i.test(pgw); })());
+       const gold = strip(fnSource('_intv7GoldWire'));
+       return !!gold && !/IntersectionObserver/.test(appCode.replace(gold, '')) && !/_mkt|MARKET_|market/i.test(gold); })());
   ok('1.2 la precarga recibe el universo COMPLETO de la pestaña, no una porción del viewport',
      /try \{ _mktHistoryFetchVisible\(data\); \}/.test(app)
      && /const data = isAggregate[\s\S]{0,160}Object\.freeze\(\[\.\.\.MARKET_DATA\]\)/.test(app));

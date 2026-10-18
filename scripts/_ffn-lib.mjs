@@ -26,7 +26,6 @@ export async function page(browser, url, { w, h, lang = 'es', premium = false, a
   await p.route(/vercel\.app\/api\//, r => r.fulfill({ status: 503, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: '{}' }));
   await p.addInitScript(`try{ localStorage.setItem('portfolio_lang', ${JSON.stringify(lang)}); if(!sessionStorage.getItem('__s')){ localStorage.setItem('aurix_assets', ${JSON.stringify(JSON.stringify(assets))}); localStorage.setItem('portfolio_assets', ${JSON.stringify(JSON.stringify(assets))}); sessionStorage.setItem('__s','1'); } }catch(_){}`);
   await p.goto(url, { waitUntil: 'domcontentloaded' });
-  await p.bringToFront();   // una página en segundo plano no avanza su reloj de animaciones (WebKit) ni recibe :focus
   await p.waitForFunction("typeof _renderDashboardDiscover==='function' && typeof _AURIX_ENT_CANON!=='undefined'", null, { timeout: 60000 });
   await p.waitForTimeout(700);
   await p.evaluate(`(function(){ try{_aurixCancelLoginRedirect('p');_aurixMarkSessionConfirmed();}catch(_){} var bl=document.getElementById('bootLoader'); if(bl) bl.remove(); var ar=document.getElementById('appRoot'); if(ar) ar.style.opacity='1';

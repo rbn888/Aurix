@@ -27921,9 +27921,7 @@ button.intv14-cmp-clear {
   max-height: calc(100dvh - var(--aurix-cover-chrome));
   overflow: auto; -webkit-overflow-scrolling: touch;   /* zoom / texto ampliado: scroll accesible */
   padding: 14px 14px calc(12px + env(safe-area-inset-bottom, 0px));
-  /* Sin superficie propia: el escenario se funde con el negro global y la única
-     superficie, borde y profundidad son los de la tarjeta. */
-  background: transparent;
+  background: radial-gradient(circle at 50% 22%, rgba(70,120,255,0.10), transparent 60%), #05070e;
 }
 .cvr-card {
   position: relative; box-sizing: border-box;
@@ -29626,19 +29624,15 @@ input.ws4-num.is-invalid {
 /* ════════════════════════════════════════════════════════════════════════════
    RESUMEN · PREMIUM GATEWAY — las promos de Intelligence y Workspace (sólo Free)
    ════════════════════════════════════════════════════════════════════════════
-   UN componente para las dos: visual protagonista, título, beneficio y CTA, en
-   ese orden y a la misma altura. Sin etiqueta de plan: despiertan curiosidad por
-   el producto y el paywall es quien nombra el plan. Cada una con su objeto (la
-   esfera / la caja de herramientas) dentro de un pozo oscuro que hace de
-   «pantalla» de la demostración. Profundidad Aurix: negro azulado, un filete
-   eléctrico LOCALIZADO en el borde superior y el halo sólo en la esfera.
+   UN componente para las dos: etiqueta Premium, visual protagonista, título,
+   beneficio y CTA, en ese orden y a la misma altura. Cada una con su objeto
+   (la esfera / la caja de herramientas) dentro de un pozo oscuro que hace de
+   «pantalla» de la demostración, para que se lean como productos y no como
+   cards patrimoniales. Profundidad Aurix: negro azulado, un filete eléctrico
+   LOCALIZADO en el borde superior y el halo sólo en la esfera.
    Iguales por fila por ESTRUCTURA (`grid-auto-rows:1fr` + CTA con
-   `margin-top:auto`, y subgrid en dos columnas), sin fijar alturas que rompan
-   una traducción larga o el zoom.
-   MOVIMIENTO: sólo luz (opacity/transform), nunca geometría. La entrada corre
-   UNA vez al entrar en el viewport (`.pgw-live`, la arma `_pgwArmEntrance`) y
-   después `.pgw-done`; el hover/focus sólo enciende borde y luces. Nada depende
-   del hover en táctil y el movimiento reducido deja el estado final. */
+   `margin-top:auto`), también apiladas, sin fijar alturas que rompan una
+   traducción larga o el zoom. */
 .wsdisc-sec { margin-top: var(--space-3, 16px); }
 .pgw-sr {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
@@ -29654,68 +29648,54 @@ input.ws4-num.is-invalid {
   /* Con brillo bajo la tarjeta tiene que seguir separándose del lienzo (≥ 4,5 ΔL*). */
   border: 1px solid rgba(var(--aurix-blue-rgb), 0.34);
   box-shadow: 0 18px 40px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.05);
-  transition: border-color .2s ease, box-shadow .2s ease;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  animation: pgwIn .2s ease-out both;
 }
 /* El borde eléctrico, LOCALIZADO: un filete en el tercio superior izquierdo. */
 .pgw-card::before {
   content: ''; position: absolute; top: -1px; left: 22px; width: 42%; height: 1px; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(130,180,255,0.85), transparent);
-  opacity: .75; transition: opacity .2s ease;
 }
-/* Interactiva sin moverse: el borde y una luz interior MUY sutil, siempre azules. */
 .pgw-card:hover, .pgw-card:focus-within {
-  border-color: rgba(var(--aurix-blue-rgb), 0.52);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 0 28px rgba(var(--aurix-blue-rgb), 0.07);
+  transform: translateY(-2px);
+  border-color: rgba(var(--aurix-blue-rgb), 0.45);
+  box-shadow: 0 22px 46px rgba(0,0,0,0.40), 0 0 0 1px rgba(var(--aurix-blue-rgb), 0.10), inset 0 1px 0 rgba(255,255,255,0.06);
 }
-.pgw-card:hover::before, .pgw-card:focus-within::before { opacity: 1; }
+.pgw-head { display: flex; margin: 0 0 12px; }
+.pgw-tier { margin-left: 0; }
 .pgw-viz {
-  display: flex; align-items: center; gap: 14px; min-width: 0;
+  display: flex; align-items: center; gap: 18px; min-width: 0;
   /* Alto mínimo con HOLGURA para las dos demostraciones: es lo que deja título, texto y
      CTA en la misma posición en las dos tarjetas aunque una fila parta en dos líneas
-     (WebKit parte antes que Chromium). Mínimo, no fijo: un texto ampliado crece. Hereda
-     el alto de la etiqueta retirada, así que la tarjeta conserva sus medidas. */
-  min-height: 164px; margin: 0 0 16px; padding: 14px 16px; box-sizing: border-box;
+     (WebKit parte antes que Chromium). Mínimo, no fijo: un texto ampliado crece. */
+  min-height: 132px; margin: 0 0 16px; padding: 14px 16px; box-sizing: border-box;
   border-radius: 14px; background: rgba(4,8,18,0.55); border: 1px solid rgba(var(--aurix-blue-rgb), 0.12);
 }
-/* La esfera Aurix, protagonista y cerca de su lectura. El halo vive en un pseudoelemento
-   centrado y el pozo le reserva sitio (el gotcha del orbe: su halo no acaba en su caja).
-   La luz interior (::before) es lo único que vive: un pulso al entrar y un encendido
-   discreto con el hover/focus de la tarjeta. */
+/* La esfera Aurix, protagonista. El halo vive en un pseudoelemento centrado y el
+   pozo le reserva sitio (el gotcha del orbe: su halo no acaba en su caja). */
 .pgw-orb {
-  position: relative; flex: 0 0 auto; width: 60px; height: 60px; border-radius: 50%;
+  position: relative; flex: 0 0 auto; width: 58px; height: 58px; border-radius: 50%;
   background:
     radial-gradient(circle at 32% 30%, rgba(200,222,255,0.98), rgba(90,150,255,0.6) 38%, rgba(40,80,190,0.32) 62%, transparent 72%),
     radial-gradient(circle at 50% 50%, rgba(74,130,240,0.32), transparent 70%);
   box-shadow: 0 0 26px rgba(74,130,240,0.36);
-}
-.pgw-orb::before {
-  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle at 40% 36%, rgba(235,244,255,0.85), rgba(120,175,255,0.35) 42%, transparent 70%);
-  opacity: 0; transition: opacity .24s ease;
+  animation: pgwOrb .22s ease-out both;
 }
 .pgw-orb::after {
   content: ''; position: absolute; left: 50%; top: 50%; width: 84px; height: 84px;
   transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
   border: 1px solid rgba(120,170,255,0.22);
   background: radial-gradient(circle, rgba(74,130,240,0.12), transparent 68%);
-  transition: opacity .24s ease;
 }
-.pgw-card:hover .pgw-orb::before, .pgw-card:focus-within .pgw-orb::before { opacity: .55; }
-/* La caja de herramientas: los nueve iconos publicados, 3×3, cada uno con su acento.
-   Su luz (::after) se enciende en secuencia al entrar y se templa con el hover/focus. */
-.pgw-mosaic { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, 28px); gap: 7px; }
+/* La caja de herramientas: las capacidades publicadas, con su acento. */
+.pgw-mosaic { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, 20px); gap: 5px; }
 .pgw-tile {
-  position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px;
   color: var(--aurix-blue, #4A82F0); background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.22);
+  animation: pgwIn .2s ease-out both;
 }
 .pgw-tile[data-ws-accent] { color: rgb(var(--ws-a)); background: rgba(var(--ws-a), 0.13); border-color: rgba(var(--ws-a), 0.26); }
-.pgw-tile .wsfc-cap-svg { width: 17px; height: 17px; }
-.pgw-tile::after {
-  content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(var(--ws-a, 120,170,255), 0.6), 0 0 10px rgba(var(--ws-a, 120,170,255), 0.35);
-  opacity: 0; transition: opacity .24s ease;
-}
-.pgw-card:hover .pgw-tile::after, .pgw-card:focus-within .pgw-tile::after { opacity: .4; }
+.pgw-tile .wsfc-cap-svg { width: 13px; height: 13px; }
 .pgw-rows { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .pgw-row { display: flex; align-items: flex-start; gap: 9px; min-width: 0; font-size: 13px; line-height: 1.4; color: rgba(228,236,252,0.94); }
 .pgw-row-t { min-width: 0; overflow-wrap: anywhere; }
@@ -29729,9 +29709,6 @@ input.ws4-num.is-invalid {
 .pgw-row.is-locked { color: rgba(176,196,232,0.82); }
 .pgw-row-ic.is-lock { color: rgba(160,192,255,0.85); }
 .pgw-row-ic.is-lock .wsfc-cap-svg { width: 14px; height: 14px; }
-/* Los tres verbos de Workspace, solos: más cuerpo, y el acento de la herramienta que lo hace. */
-.pgw-rows:has(.is-verb) { gap: 12px; }
-.pgw-row.is-verb { font-size: 15px; line-height: 1.3; align-items: center; }
 .pgw-verb { font-weight: 700; color: rgb(var(--ws-a, 120,170,255)); }
 .pgw-t { margin: 0 0 6px; font-size: 17px; font-weight: 750; color: var(--text-bright); letter-spacing: -0.005em; }
 .pgw-b { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
@@ -29754,46 +29731,35 @@ input.ws4-num.is-invalid {
 .pgw-card .pgw-cta::after { border-radius: 20px; }
 .pgw-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.95); outline-offset: 3px; }
 .pgw-chev { font-size: 16px; line-height: 1; opacity: 0.85; }
+/* Entrada ÚNICA: opacidad (y la esfera, una escala mínima). Nada se mueve sobre el
+   texto y nada ocupa sitio distinto al final: cero desplazamiento de maquetación. */
 /* En dos columnas las tarjetas COMPARTEN filas (subgrid): la banda visual mide lo que mida
    la más alta de las dos, así que título, texto y CTA quedan a la misma altura por
    ESTRUCTURA aunque una lectura parta en más líneas (inglés, 768 px, WebKit). Sin subgrid,
    el alto mínimo de la banda y el CTA anclado abajo siguen igualándolas. */
 @supports (grid-template-rows: subgrid) {
   @media (min-width: 701px) {
-    .pgw-grid { grid-auto-rows: auto; grid-template-rows: auto auto 1fr auto; row-gap: 0; }
-    .pgw-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; }
+    .pgw-grid { grid-auto-rows: auto; grid-template-rows: auto auto auto 1fr auto; row-gap: 0; }
+    .pgw-card { display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 0; }
     .pgw-cta { align-self: end; justify-self: start; }
+    .pgw-head { justify-self: start; }
   }
 }
-/* LA ENTRADA, UNA VEZ: el pulso de la esfera (escala mínima + su luz interior) y el
-   encendido escalonado de las nueve herramientas. Ninguna anima geometría ni texto. */
-@keyframes pgwOrbPulse { 0% { transform: scale(1); } 45% { transform: scale(1.045); } 100% { transform: scale(1); } }
-@keyframes pgwGlow     { 0% { opacity: 0; } 45% { opacity: .9; } 100% { opacity: 0; } }
-.pgw-live .pgw-orb { animation: pgwOrbPulse .52s ease-out 1; }
-.pgw-live .pgw-orb::before { animation: pgwGlow .52s ease-out 1; }
-.pgw-live .pgw-tile::after { animation: pgwGlow .36s ease-out 1; }
-.pgw-live .pgw-tile:nth-child(2)::after { animation-delay: .04s; }
-.pgw-live .pgw-tile:nth-child(3)::after { animation-delay: .08s; }
-.pgw-live .pgw-tile:nth-child(4)::after { animation-delay: .12s; }
-.pgw-live .pgw-tile:nth-child(5)::after { animation-delay: .16s; }
-.pgw-live .pgw-tile:nth-child(6)::after { animation-delay: .20s; }
-.pgw-live .pgw-tile:nth-child(7)::after { animation-delay: .24s; }
-.pgw-live .pgw-tile:nth-child(8)::after { animation-delay: .28s; }
-.pgw-live .pgw-tile:nth-child(9)::after { animation-delay: .32s; }
-/* Dos columnas estrechas (701–1023): v846 medía aquí lo que medían las filas de Workspace
-   partidas en dos líneas; sin esa repetición, el pozo conserva ese alto por mínimo. */
-@media (min-width: 701px) and (max-width: 1023px) { .pgw-viz { min-height: 187px; } }
+@keyframes pgwIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pgwOrb { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
+.pgw-settled .pgw-card, .pgw-settled .pgw-orb, .pgw-settled .pgw-tile { animation: none; }
 @media (max-width: 700px) {
   .pgw-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .pgw-card { padding: 16px; }
-  .pgw-viz { gap: 14px; padding: 14px; min-height: 192px; }
-  .pgw-orb { width: 54px; height: 54px; }
-  .pgw-orb::after { width: 76px; height: 76px; }
+  .pgw-viz { gap: 16px; padding: 14px; min-height: 160px; }
+  .pgw-orb { width: 50px; height: 50px; }
+  .pgw-orb::after { width: 74px; height: 74px; }
   .pgw-cta { align-self: stretch; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pgw-live .pgw-orb, .pgw-live .pgw-orb::before, .pgw-live .pgw-tile::after { animation: none; }
-  .pgw-card, .pgw-card::before, .pgw-orb::before, .pgw-orb::after, .pgw-tile::after { transition: none; }
+  .pgw-card, .pgw-orb, .pgw-tile { animation: none; }
+  .pgw-card { transition: none; }
+  .pgw-card:hover, .pgw-card:focus-within { transform: none; }
 }
 
 

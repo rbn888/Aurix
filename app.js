@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '807'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '806'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6560,7 +6560,6 @@ const T = {
     // Y sin la palabra «Premium» en ningún sitio visible antes del clic.
     intprev_cta:        'Volver al Dashboard',
     intprev_cta_full:   'Ver mi análisis completo',
-    intprev_f_crypto:   pct => `Cripto representa cerca del ${pct}% de tu cartera financiera.`,
     intprev_locked_t:   'Análisis bloqueado',
     intprev_locked_s:   'Se desbloquea con tu análisis completo',
     intprev_hold_empty_t: 'Aurix todavía no tiene con qué leer tu patrimonio',
@@ -7400,11 +7399,12 @@ const T = {
     dsc_int_b:        'Entiende qué está moviendo tu patrimonio: estructura, concentraciones y lo que ha cambiado.',
     dsc_int_cta:      'Explorar Intelligence',
     dsc_ws_t:         'Aurix Workspace',
-    dsc_ws_b:         'Trabaja tus finanzas en un solo espacio y continúa cuando quieras.',
+    dsc_ws_b:         'Calcula, organiza y planifica: presupuesto, préstamos, escenarios, objetivos y más.',
     dsc_ws_cta:       'Explorar Workspace',
+    pgw_tier:         'Premium',
     pgw_int_l2:       'Cómo evoluciona tu patrimonio',
     pgw_int_l3:       'Qué merece tu atención',
-    pgw_locked_sr:    'bloqueado',
+    pgw_locked_sr:    'disponible con Premium',
     pgw_ws_v1:        'Calcula',
     pgw_ws_v2:        'Organiza',
     pgw_ws_v3:        'Planifica',
@@ -9920,7 +9920,6 @@ const T = {
     intprev_f_liq:      pct => `Liquidity represents ${pct}% of your financial portfolio.`,
     intprev_cta:        'Back to Dashboard',
     intprev_cta_full:   'View my full analysis',
-    intprev_f_crypto:   pct => `Crypto is around ${pct}% of your financial portfolio.`,
     intprev_locked_t:   'Locked analysis',
     intprev_locked_s:   'Unlocks with your full analysis',
     intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
@@ -10688,11 +10687,12 @@ const T = {
     dsc_int_b:        'Understand what is moving your wealth: structure, concentrations and what changed.',
     dsc_int_cta:      'Explore Intelligence',
     dsc_ws_t:         'Aurix Workspace',
-    dsc_ws_b:         'Work on your finances in one place and continue whenever you want.',
+    dsc_ws_b:         'Calculate, organise and plan: budget, loans, scenarios, goals and more.',
     dsc_ws_cta:       'Explore Workspace',
+    pgw_tier:         'Premium',
     pgw_int_l2:       'How your wealth is evolving',
     pgw_int_l3:       'What deserves your attention',
-    pgw_locked_sr:    'locked',
+    pgw_locked_sr:    'available with Premium',
     pgw_ws_v1:        'Calculate',
     pgw_ws_v2:        'Organise',
     pgw_ws_v3:        'Plan',
@@ -26089,15 +26089,13 @@ _aurixReorderRegister('wsPlansGrid', {
 // decisión la toma `_wsPremiumShell()`, el MISMO owner de tres estados que ya
 // gobierna el shell de Workspace: 'pending' no pinta nada.
 // ── PREMIUM GATEWAY · LAS DOS PROMOS FREE DEL RESUMEN, UN SOLO COMPONENTE ─────────
-// Misma estructura para las dos —visual, título, beneficio, CTA— y cada una con su objeto
-// protagonista. No dicen «Premium»: despiertan curiosidad por el producto, y el plan lo
-// nombra el paywall. Lo que enseñan es REAL o no se enseña:
+// Misma estructura para las dos —etiqueta, visual, título, beneficio, CTA— y cada una con
+// su objeto protagonista. Lo que enseñan es REAL o no se enseña:
 //   · Intelligence: la esfera y, como única lectura, el PRIMER hecho visible de su portada
 //     Free (`_aurixIntelligencePreviewFacts`, fail-closed: sin valoración completa no hay
 //     lectura). Las capas bloqueadas nombran secciones del producto, nunca la categoría ni
 //     la cifra de un hecho oculto.
-//   · Workspace: las capacidades PUBLICADAS del catálogo (sus nueve iconos) y lo que se hace
-//     con ellas —calcula, organiza, planifica—, sin repetir nombres de herramientas.
+//   · Workspace: las capacidades PUBLICADAS del catálogo, con sus iconos y sus nombres.
 // La tarjeta entera es clicable (el ::after del CTA la cubre) y hay UNA parada de foco, el
 // botón, que lleva a la portada del producto — nunca al checkout.
 function _renderDashboardDiscover() {
@@ -26105,6 +26103,7 @@ function _renderDashboardDiscover() {
   const sr = s => `<span class="pgw-sr">${esc(s)}</span>`;
   const card = (kind, viz, title, body, cta, nav) => `
     <article class="pgw-card is-${kind}">
+      <div class="pgw-head"><span class="cvr-tier pgw-tier">${esc(t('pgw_tier'))}</span></div>
       <div class="pgw-viz">${viz}</div>
       <h3 class="pgw-t" id="pgw-${kind}-t">${esc(title)}</h3>
       <p class="pgw-b" id="pgw-${kind}-b">${esc(body)}</p>
@@ -26121,7 +26120,7 @@ function _renderDashboardDiscover() {
   const lock = `<span class="pgw-row-ic is-lock" aria-hidden="true">${_wsCapIconHtml('lock')}</span>`;
   const intViz = `<span class="pgw-orb" aria-hidden="true"></span>
       <ul class="pgw-rows">
-        ${reading ? `<li class="pgw-row is-real"><span class="pgw-row-ic is-dot" aria-hidden="true"></span><span class="pgw-row-t">${esc(_aurixIntPreviewFactText(reading))}</span></li>` : ''}
+        ${reading ? `<li class="pgw-row is-real"><span class="pgw-row-ic is-dot" aria-hidden="true"></span><span class="pgw-row-t">${esc(reading.text)}</span></li>` : ''}
         <li class="pgw-row is-locked">${lock}<span class="pgw-row-t">${esc(t('pgw_int_l2'))}${sr(' · ' + t('pgw_locked_sr'))}</span></li>
         <li class="pgw-row is-locked">${lock}<span class="pgw-row-t">${esc(t('pgw_int_l3'))}${sr(' · ' + t('pgw_locked_sr'))}</span></li>
       </ul>`;
@@ -26130,10 +26129,9 @@ function _renderDashboardDiscover() {
   const acc = k => esc(_WS_TOOL_ACCENT[k] || 'blue');
   const mosaic = `<span class="pgw-mosaic" aria-hidden="true">${caps.slice(0, 9)
     .map(c => `<span class="pgw-tile" data-ws-accent="${acc(c.k)}">${_wsCapIconHtml(c.icon)}</span>`).join('')}</span>`;
-  // Calcula · Organiza · Planifica: cada verbo sólo si hay una herramienta publicada que lo
-  // hace, y con su acento; el nombre ya lo dice el icono de la izquierda.
+  // Calcula · Organiza · Planifica, cada verbo con una herramienta publicada que lo hace.
   const verbs = [['pgw_ws_v1', 'loan'], ['pgw_ws_v2', 'budget'], ['pgw_ws_v3', 'goals']]
-    .map(([vk, k]) => caps.some(x => x.k === k) ? `<li class="pgw-row is-verb" data-ws-accent="${acc(k)}"><span class="pgw-row-ic is-dot" aria-hidden="true"></span><span class="pgw-row-t"><span class="pgw-verb">${esc(t(vk))}</span></span></li>` : '')
+    .map(([vk, k]) => { const c = caps.find(x => x.k === k); return c ? `<li class="pgw-row" data-ws-accent="${acc(k)}"><span class="pgw-row-ic is-dot" aria-hidden="true"></span><span class="pgw-row-t"><span class="pgw-verb">${esc(t(vk))}</span> ${esc(t(c.nameKey))}</span></li>` : ''; })
     .join('');
   const wsViz = `${mosaic}<ul class="pgw-rows">${verbs}</ul>`;
   return `
@@ -26142,33 +26140,10 @@ function _renderDashboardDiscover() {
       ${card('ws',  wsViz,  t('dsc_ws_t'),  t('dsc_ws_b'),  t('dsc_ws_cta'),  'workspace')}
     </div>`;
 }
-// LA ENTRADA: SÓLO LUZ, UNA VEZ, AL ENTRAR EN EL VIEWPORT ───────────────────────────────
-// Un pulso de la esfera y el encendido secuencial de las herramientas, cuando las tarjetas se
-// ven por primera vez —no al montarse fuera de pantalla—; después `pgw-done` y ningún
-// repintado (un precio que mueve la lectura, volver de una categoría) la repite. Es luz sobre
-// un contenido visible desde el primer frame: si el observador no llega a disparar, no se
-// esconde nada. Movimiento reducido: el CSS deja el estado final sin animar.
-let _pgwEntry = 'idle';   // idle → waiting → live → done
-function _pgwArmEntrance(sec) {
-  if (_pgwEntry !== 'idle' || !sec) return;
-  if (typeof IntersectionObserver !== 'function') { _pgwEntry = 'done'; sec.classList.add('pgw-done'); return; }
-  _pgwEntry = 'waiting';
-  const io = new IntersectionObserver(entries => {
-    if (!entries.some(e => e.isIntersecting)) return;
-    io.disconnect();
-    _pgwEntry = 'live';
-    sec.classList.add('pgw-live');
-    // Se cierra cuando TODAS sus animaciones CSS han terminado —o se han cancelado porque un
-    // repintado cambió los nodos—: con `pgw-done` ningún repintado posterior la repite. Las
-    // transiciones del hover no cuentan (no tienen `animationName`).
-    const close = () => { if (_pgwEntry !== 'live') return; _pgwEntry = 'done'; sec.classList.replace('pgw-live', 'pgw-done'); };
-    requestAnimationFrame(() => {
-      const anims = sec.getAnimations ? sec.getAnimations({ subtree: true }).filter(a => typeof a.animationName === 'string') : [];
-      Promise.all(anims.map(a => a.finished)).then(close, close);
-    });
-  }, { threshold: 0.25 });
-  io.observe(sec);
-}
+// La entrada se anima UNA vez por carga: los repintados posteriores (un precio que mueve la
+// lectura, volver de una categoría) no la repiten — una promo que reaparece animada cada pocos
+// segundos compite con las cifras del patrimonio.
+let _pgwEntered = false;
 // Atrás desde la portada a la que llevó una promo: al Resumen y a la misma altura (el retorno
 // que ya usa «Tus planes»). `var`: `_applyTab` los lee.
 var _pgwReturnY = null, _pgwDest = null;
@@ -26194,9 +26169,10 @@ function updateDashboardDiscover() {
   try { empty = (typeof activeAssets === 'function') && activeAssets().length === 0; } catch (_) {}
   if (shell !== false || drill || empty) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
   const html = _renderDashboardDiscover();
+  if (_pgwEntered) sec.classList.add('pgw-settled');
   if (sec._pgwHtml !== html || !sec.firstChild) { sec.innerHTML = html; sec._pgwHtml = html; }
   sec.style.display = '';
-  _pgwArmEntrance(sec);
+  _pgwEntered = true;
 }
 // Los dos controles de la sección, en el mismo despachador delegado y armado una
 // sola vez. `data-ws-sync-retry` ya lo despacha Workspace, así que aquí sólo
@@ -67883,22 +67859,6 @@ function _aurixIntelligencePreviewFacts() {
 // justo antes del único botón. La secuencia de conversión es promesa → prueba → puente →
 // CTA, y no admite un cuarto mensaje entre el puente y el clic.
 
-// EL TEXTO QUE PUBLICAN LAS SUPERFICIES FREE (portada y Premium Gateway). El motor de hechos
-// (`_aurixIntelligencePreviewFacts`) está congelado y sigue devolviendo la frase compartida
-// con Intelligence Premium; aquí sólo se corrige el COPY de la exposición cripto («Cripto
-// representa…», sin artículo) con la cifra que ese mismo texto certificado ya trae.
-// Ni un cálculo nuevo: si la cifra no aparece tal cual, se publica el texto original.
-function _aurixIntPreviewFactText(f) {
-  const text = f && f.text ? String(f.text) : '';
-  if (!f || f.kind !== 'watch:crypto') return text;
-  try {
-    const tpl = t('intprev_f_crypto');
-    const m = /(\d+(?:[.,]\d+)?)\s*%/.exec(text);
-    if (typeof tpl !== 'function' || !m) return text;
-    const out = tpl(m[1]);
-    return (typeof out === 'string' && out.indexOf(m[1] + '%') !== -1) ? out : text;
-  } catch (_) { return text; }
-}
 function _aurixIntelligencePreviewHTML() {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : fb; } catch (_) { return fb; } };
@@ -67996,7 +67956,7 @@ function _aurixIntelligencePreviewHTML() {
       +   '<span class="intprev-fact-dot" aria-hidden="true"></span>'
       +   '<span class="intprev-fact-body">'
       +     (f.title ? '<span class="intprev-fact-label">' + esc(f.title) + '</span>' : '')
-      +     '<span class="intprev-fact-text">' + esc(typeof _aurixIntPreviewFactText === 'function' ? _aurixIntPreviewFactText(f) : f.text) + '</span>'
+      +     '<span class="intprev-fact-text">' + esc(f.text) + '</span>'
       +   '</span>'
       + '</li>').join('');
     // ── LOS BLOQUEADOS, BLOQUEADOS DE VERDAD ─────────────────────────────────
