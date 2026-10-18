@@ -316,22 +316,22 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       updateDashboardDiscover(); return true; })()`);
     await page.waitForTimeout(700);
     const g = await page.evaluate(`(function(){
-      var cards=[].slice.call(document.querySelectorAll('.pgw-card'));
+      var cards=[].slice.call(document.querySelectorAll('.wsdisc-card'));
       if (cards.length < 2) return { n: cards.length };
       var R=function(e){ var b=e.getBoundingClientRect(); return { w:Math.round(b.width), h:Math.round(b.height), l:b.left, r:b.right, t:b.top, b:b.bottom }; };
       var a=R(cards[0]), b2=R(cards[1]);
-      var orb=document.querySelector('.pgw-orb');
+      var orb=document.querySelector('.wsdisc-orb');
       var halo=orb ? (parseFloat(getComputedStyle(orb,'::after').width)||0) : 0;
       var ob=orb ? orb.getBoundingClientRect() : null;
-      var card=orb ? orb.closest('.pgw-card').getBoundingClientRect() : null;
+      var card=orb ? orb.closest('.wsdisc-card').getBoundingClientRect() : null;
       var dentro=null, margen=null;
       if (ob && card && halo) {
         var cx=ob.left+ob.width/2, cy=ob.top+ob.height/2;
         dentro = (cx-halo/2 >= card.left-0.5) && (cx+halo/2 <= card.right+0.5) && (cy-halo/2 >= card.top-0.5) && (cy+halo/2 <= card.bottom+0.5);
         margen = Math.round(cx-halo/2-card.left);
       }
-      var ics=[].slice.call(document.querySelectorAll('.pgw-tile')).map(function(e){ return getComputedStyle(e).color; });
-      var ctas=cards.map(function(c){ return !!c.querySelector('.pgw-cta'); });
+      var ics=[].slice.call(document.querySelectorAll('.wsdisc-ic')).map(function(e){ return getComputedStyle(e).color; });
+      var ctas=cards.map(function(c){ return !!c.querySelector('.wsdisc-cta'); });
       // ── PARIDAD COMPLETA, NO SÓLO LA CAJA ──────────────────────────────
       // El encargo enumera qué tiene que coincidir: anchura y altura, padding,
       // radio y borde, posición de título/texto/CTA y alineación vertical. Se
@@ -344,16 +344,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
                    w:Math.round(r.width), h:Math.round(r.height) }; };
         return { w:Math.round(cb.width), h:Math.round(cb.height),
           pad: cs.padding, radius: cs.borderRadius, border: cs.borderWidth+' '+cs.borderStyle,
-          title: q('.pgw-t'), body: q('.pgw-b'), cta: q('.pgw-cta'),
+          title: q('.wsdisc-t'), body: q('.wsdisc-b'), cta: q('.wsdisc-cta'),
           // El CTA medido desde ABAJO: es lo que hace que los dos botones se
           // lean a la misma altura aunque el texto de encima mida distinto.
-          ctaFromBottom: (function(){ var e=c.querySelector('.pgw-cta'); if(!e) return null;
+          ctaFromBottom: (function(){ var e=c.querySelector('.wsdisc-cta'); if(!e) return null;
             return Math.round(cb.bottom - e.getBoundingClientRect().bottom); })() }; };
       return { n: cards.length, a: a, b: b2, halo: halo, haloDentro: dentro, margen: margen,
         iconos: ics.length, distintos: new Set(ics).size, ctas: ctas,
         boxA: boxOf(cards[0]), boxB: boxOf(cards[1]),
-        publicadas: (typeof _wsfcPublishedCaps === 'function' ? Math.min(9, _wsfcPublishedCaps().length) : -1),
-        anims: (orb ? getComputedStyle(orb).animationIterationCount : '0') }; })()`);
+        anims: (orb ? getComputedStyle(orb).animationName : 'none') }; })()`);
     ok(PTAG + ' promos · las dos existen para un usuario Free', g.n === 2, JSON.stringify(g.n));
     ok(PTAG + ' promos · misma caja: son un par, no dos piezas sueltas',
       g.a && g.b && g.a.w === g.b.w && Math.abs(g.a.h - g.b.h) <= 1, JSON.stringify([g.a, g.b]));
@@ -380,13 +379,10 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(PTAG + ' promos · las dos ofrecen su acción', Array.isArray(g.ctas) && g.ctas.every(Boolean), JSON.stringify(g.ctas));
     ok(PTAG + ' promos · el halo del orbe CABE en su tarjeta',
       g.haloDentro === true && g.margen >= 8, JSON.stringify([g.halo, g.haloDentro, g.margen]));
-    // SE RE-DECIDE (PREMIUM GATEWAY): la promo operativa enseña la caja de herramientas entera —las
-    // capacidades PUBLICADAS del catálogo, cada una con su acento—, no tres iconos sueltos.
-    ok(PTAG + ' promos · la operativa trae las capacidades publicadas, con acentos DISTINTOS',
-      g.iconos === g.publicadas && g.iconos >= 3 && g.distintos >= 3, JSON.stringify([g.iconos, g.publicadas, g.distintos]));
+    ok(PTAG + ' promos · la operativa trae tres capacidades con acento DISTINTO',
+      g.iconos === 3 && g.distintos === 3, JSON.stringify([g.iconos, g.distintos]));
     // Sin bucle: una promo que late permanentemente compite con las cifras del patrimonio.
-    // Una entrada única está permitida (≤ 220 ms); lo que no puede haber es un bucle.
-    ok(PTAG + ' promos · el orbe no late en bucle', g.anims !== 'infinite', String(g.anims));
+    ok(PTAG + ' promos · el orbe no late en bucle', g.anims === 'none', String(g.anims));
     await ctx.close();
   }
   await browser.close();

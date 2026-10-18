@@ -171,16 +171,13 @@ for (const [ENG, L] of [['CR', chromium], ['WK', webkit]].filter(e => (process.e
       await p.goto(O + 'demo.html'); await p.check('input[value="free"]'); await p.click('[data-demo=empty]'); await p.waitForURL(/index\.html/); await p.waitForTimeout(3500);
       ok('cartera vacía · sin tarjetas de descubrimiento', await p.evaluate(() => { const s = document.getElementById('dashDiscoverSection'); return !s || s.style.display === 'none'; }));
       await p.goto(O + 'demo.html'); await p.check('input[value="free"]'); await p.click('[data-demo=wealth]'); await p.waitForURL(/index\.html/); await p.waitForTimeout(3500);
-      const d = await p.evaluate(() => { const cs = [...document.querySelectorAll('.pgw-card')].map(c => c.getBoundingClientRect()); const ctas = [...document.querySelectorAll('.pgw-cta')].map(c => c.textContent.trim().replace(/\s*›$/, ''));
+      const d = await p.evaluate(() => { const cs = [...document.querySelectorAll('.wsdisc-card')].map(c => c.getBoundingClientRect()); const ctas = [...document.querySelectorAll('.wsdisc-cta')].map(c => c.textContent.trim().replace(/\s*›$/, ''));
         return { n: cs.length, eqH: cs.length === 2 && Math.abs(cs[0].height - cs[1].height) < 1, h: cs.map(c => Math.round(c.height)), ctas, over: cs.some(c => c.right > innerWidth + 0.5) }; });
       ok('con datos · dos tarjetas de igual altura', d.n === 2 && d.eqH, JSON.stringify(d.h));
       ok('con datos · CTA «Explorar Intelligence» / «Explorar Workspace»', /Explorar Intelligence|Explore Intelligence/.test(d.ctas[0] || '') && /Explorar Workspace|Explore Workspace/.test(d.ctas[1] || ''), d.ctas.join(' | '));
       ok('con datos · dentro del viewport', !d.over);
-      // SE RE-DECIDE (CIERRE PREMIUM DEL EMBUDO FREE): la promo compacta (≤ 190 px) se sustituye por el
-      // Premium Gateway, con visual protagonista. Lo que se exige en móvil es que sean un par que no
-      // desborda: el ancho del viewport y el CTA dentro de la tarjeta.
-      if (VW < 768) ok('móvil · gateway apilado, sin desbordar y con el CTA dentro', !d.over && d.n === 2, JSON.stringify(d.h));
-      await p.click('.pgw-cta[data-dsc-go="workspace"]'); await p.waitForTimeout(700);
+      if (VW < 768) ok('móvil · compactas (≤ 190 px)', d.h.every(h => h <= 190), JSON.stringify(d.h));
+      await p.click('.wsdisc-cta[data-dsc-go="workspace"]'); await p.waitForTimeout(700);
       ok('el CTA conserva su destino contextual (no abre el paywall)', !(await pwOpen(p)) && await p.evaluate(() => (typeof currentTab !== 'undefined' ? currentTab : '') === 'workspace'), await p.evaluate(() => typeof currentTab !== 'undefined' ? currentTab : '?'));
       await ctx.close(); }
   }

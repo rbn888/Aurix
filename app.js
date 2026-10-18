@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '806'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '805'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -6560,8 +6560,6 @@ const T = {
     // Y sin la palabra «Premium» en ningún sitio visible antes del clic.
     intprev_cta:        'Volver al Dashboard',
     intprev_cta_full:   'Ver mi análisis completo',
-    intprev_locked_t:   'Análisis bloqueado',
-    intprev_locked_s:   'Se desbloquea con tu análisis completo',
     intprev_hold_empty_t: 'Aurix todavía no tiene con qué leer tu patrimonio',
     intprev_hold_empty_b: 'Registra tu primer activo y esta lectura aparecerá aquí, calculada sobre tus datos reales.',
     intprev_hold_inc_t:   'Aurix no puede confirmar ahora la valoración completa de tu cartera',
@@ -7401,13 +7399,6 @@ const T = {
     dsc_ws_t:         'Aurix Workspace',
     dsc_ws_b:         'Calcula, organiza y planifica: presupuesto, préstamos, escenarios, objetivos y más.',
     dsc_ws_cta:       'Explorar Workspace',
-    pgw_tier:         'Premium',
-    pgw_int_l2:       'Cómo evoluciona tu patrimonio',
-    pgw_int_l3:       'Qué merece tu atención',
-    pgw_locked_sr:    'disponible con Premium',
-    pgw_ws_v1:        'Calcula',
-    pgw_ws_v2:        'Organiza',
-    pgw_ws_v3:        'Planifica',
     wsre_basis_yield: 'La rentabilidad del conjunto es Σ(resultado operativo anual) / Σ(coste de compra), no la media de las rentabilidades de cada inmueble.',
     wsre_basis_debt:  'La cuota incluye la parte que amortiza capital, que NO es un gasto operativo: construye equity. Por eso el resultado operativo se publica antes de la deuda.',
     wsre_basis_appr:  'La apreciación es LATENTE: es la diferencia entre el valor que has declarado y lo que pagaste, y no entra en el flujo de caja porque no se ha cobrado.',
@@ -9920,8 +9911,6 @@ const T = {
     intprev_f_liq:      pct => `Liquidity represents ${pct}% of your financial portfolio.`,
     intprev_cta:        'Back to Dashboard',
     intprev_cta_full:   'View my full analysis',
-    intprev_locked_t:   'Locked analysis',
-    intprev_locked_s:   'Unlocks with your full analysis',
     intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
     intprev_hold_empty_b: 'Add your first asset and this reading will appear here, computed on your real data.',
     intprev_hold_inc_t:   'Aurix cannot confirm a complete valuation of your portfolio right now',
@@ -10689,13 +10678,6 @@ const T = {
     dsc_ws_t:         'Aurix Workspace',
     dsc_ws_b:         'Calculate, organise and plan: budget, loans, scenarios, goals and more.',
     dsc_ws_cta:       'Explore Workspace',
-    pgw_tier:         'Premium',
-    pgw_int_l2:       'How your wealth is evolving',
-    pgw_int_l3:       'What deserves your attention',
-    pgw_locked_sr:    'available with Premium',
-    pgw_ws_v1:        'Calculate',
-    pgw_ws_v2:        'Organise',
-    pgw_ws_v3:        'Plan',
     wsre_basis_yield: 'The portfolio yield is Σ(annual operating result) / Σ(purchase cost), not the average of each property\'s yield.',
     wsre_basis_debt:  'The payment includes the part that repays capital, which is NOT an operating expense: it builds equity. That is why the operating result is shown before debt.',
     wsre_basis_appr:  'Appreciation is UNREALISED: it is the difference between the value you declared and what you paid, and it does not enter cash flow because it has not been received.',
@@ -24921,8 +24903,6 @@ function _wsGlyph(k) {
     // (`.intv14-cmp-line.is-other` va con `stroke-dasharray`). Se AMPLÍA la
     // familia, que es la regla de esta rejilla: ni un icono de otra biblioteca.
     compare:  '<path d="M4 4v16h16"/><path d="M7 16l3.5-4 2.5 1.8L19 7"/><path d="M7 18.5c4 0 8.5-2.2 12-6.5" stroke-dasharray="2.6 2.6"/>',
-    // Capa Premium bloqueada (embudo Free): misma caja óptica y mismo trazo que el resto.
-    lock:     '<rect x="5" y="10.5" width="14" height="10" rx="2.4"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/>',
   };
   return G[k] || G.target;
 }
@@ -26088,72 +26068,54 @@ _aurixReorderRegister('wsPlansGrid', {
 // exactamente el destello que este producto no puede permitirse. Así que la
 // decisión la toma `_wsPremiumShell()`, el MISMO owner de tres estados que ya
 // gobierna el shell de Workspace: 'pending' no pinta nada.
-// ── PREMIUM GATEWAY · LAS DOS PROMOS FREE DEL RESUMEN, UN SOLO COMPONENTE ─────────
-// Misma estructura para las dos —etiqueta, visual, título, beneficio, CTA— y cada una con
-// su objeto protagonista. Lo que enseñan es REAL o no se enseña:
-//   · Intelligence: la esfera y, como única lectura, el PRIMER hecho visible de su portada
-//     Free (`_aurixIntelligencePreviewFacts`, fail-closed: sin valoración completa no hay
-//     lectura). Las capas bloqueadas nombran secciones del producto, nunca la categoría ni
-//     la cifra de un hecho oculto.
-//   · Workspace: las capacidades PUBLICADAS del catálogo, con sus iconos y sus nombres.
-// La tarjeta entera es clicable (el ::after del CTA la cubre) y hay UNA parada de foco, el
-// botón, que lleva a la portada del producto — nunca al checkout.
 function _renderDashboardDiscover() {
   const esc = _intccEsc;
-  const sr = s => `<span class="pgw-sr">${esc(s)}</span>`;
-  const card = (kind, viz, title, body, cta, nav) => `
-    <article class="pgw-card is-${kind}">
-      <div class="pgw-head"><span class="cvr-tier pgw-tier">${esc(t('pgw_tier'))}</span></div>
-      <div class="pgw-viz">${viz}</div>
-      <h3 class="pgw-t" id="pgw-${kind}-t">${esc(title)}</h3>
-      <p class="pgw-b" id="pgw-${kind}-b">${esc(body)}</p>
-      <button type="button" class="pgw-cta" data-dsc-go="${esc(nav)}" aria-describedby="pgw-${kind}-t pgw-${kind}-b">${esc(cta)}
-        <span class="pgw-chev" aria-hidden="true">›</span>
+  const card = (kind, icon, title, body, cta, nav) => `
+    <article class="wsdisc-card is-${kind}">
+      <div class="wsdisc-viz" aria-hidden="true">${icon}${kind === 'int' ? MOTIF_INT : MOTIF_WS}</div>
+      <div class="wsdisc-body">
+        <h3 class="wsdisc-t">${esc(title)}</h3>
+        <p class="wsdisc-b">${esc(body)}</p>
+      </div>
+      <button type="button" class="wsdisc-cta" data-dsc-go="${esc(nav)}">${esc(cta)}
+        <span class="wsdisc-chev" aria-hidden="true">›</span>
       </button>
     </article>`;
-  let reading = null;
-  try {
-    const r = _aurixIntelligencePreviewFacts();
-    const f = r && r.state === 'ok' && Array.isArray(r.visible) ? r.visible[0] : null;
-    if (f && f.text) reading = f;
-  } catch (_) { reading = null; }
-  const lock = `<span class="pgw-row-ic is-lock" aria-hidden="true">${_wsCapIconHtml('lock')}</span>`;
-  const intViz = `<span class="pgw-orb" aria-hidden="true"></span>
-      <ul class="pgw-rows">
-        ${reading ? `<li class="pgw-row is-real"><span class="pgw-row-ic is-dot" aria-hidden="true"></span><span class="pgw-row-t">${esc(reading.text)}</span></li>` : ''}
-        <li class="pgw-row is-locked">${lock}<span class="pgw-row-t">${esc(t('pgw_int_l2'))}${sr(' · ' + t('pgw_locked_sr'))}</span></li>
-        <li class="pgw-row is-locked">${lock}<span class="pgw-row-t">${esc(t('pgw_int_l3'))}${sr(' · ' + t('pgw_locked_sr'))}</span></li>
-      </ul>`;
-  let caps = [];
-  try { caps = _wsfcPublishedCaps(); } catch (_) { caps = []; }
-  const acc = k => esc(_WS_TOOL_ACCENT[k] || 'blue');
-  const mosaic = `<span class="pgw-mosaic" aria-hidden="true">${caps.slice(0, 9)
-    .map(c => `<span class="pgw-tile" data-ws-accent="${acc(c.k)}">${_wsCapIconHtml(c.icon)}</span>`).join('')}</span>`;
-  // Calcula · Organiza · Planifica, cada verbo con una herramienta publicada que lo hace.
-  const verbs = [['pgw_ws_v1', 'loan'], ['pgw_ws_v2', 'budget'], ['pgw_ws_v3', 'goals']]
-    .map(([vk, k]) => { const c = caps.find(x => x.k === k); return c ? `<li class="pgw-row" data-ws-accent="${acc(k)}"><span class="pgw-row-ic is-dot" aria-hidden="true"></span><span class="pgw-row-t"><span class="pgw-verb">${esc(t(vk))}</span> ${esc(t(c.nameKey))}</span></li>` : ''; })
-    .join('');
-  const wsViz = `${mosaic}<ul class="pgw-rows">${verbs}</ul>`;
+  // Intelligence: un halo, no un dato. Es CSS puro (sin imagen, sin animación
+  // permanente) para no competir con las cifras del patrimonio que hay arriba.
+  const orb = `<span class="wsdisc-orb"></span>`;
+  // MOTIVOS ABSTRACTOS (sin cifras, sin ejes, sin datos de nadie): dicen QUÉ CLASE de cosa hace
+  // cada superficie, no un resultado. Intelligence = análisis (concentración y un cambio marcado
+  // sobre una retícula); Workspace = operación (reparto, plan y progreso, con los acentos de sus
+  // herramientas). Decorativos: van dentro de la banda `aria-hidden`.
+  const MOTIF_INT = `<svg class="wsdisc-motif" viewBox="0 0 132 64" focusable="false">
+      <g class="m-grid"><line x1="0" y1="16" x2="132" y2="16"/><line x1="0" y1="32" x2="132" y2="32"/><line x1="0" y1="48" x2="132" y2="48"/></g>
+      <rect class="m-bar m-b1" x="0" y="10" width="112" height="9" rx="4.5"/>
+      <rect class="m-bar m-b2" x="0" y="27" width="72" height="9" rx="4.5"/>
+      <rect class="m-bar m-b3" x="0" y="44" width="40" height="9" rx="4.5"/>
+      <circle class="m-mark" cx="112" cy="14.5" r="4"/><circle class="m-mark-ring" cx="112" cy="14.5" r="8.5"/>
+    </svg>`;
+  const MOTIF_WS = `<svg class="wsdisc-motif" viewBox="0 0 132 64" focusable="false">
+      <g transform="translate(26 32)"><circle class="m-ring" r="20"/>
+        <circle class="m-arc m-a1" r="20" pathLength="100" stroke-dasharray="44 56"/>
+        <circle class="m-arc m-a2" r="20" pathLength="100" stroke-dasharray="30 70" stroke-dashoffset="-46"/>
+        <circle class="m-arc m-a3" r="20" pathLength="100" stroke-dasharray="20 80" stroke-dashoffset="-78"/></g>
+      <path class="m-curve" d="M60 46 C 78 44, 90 34, 104 24 S 124 12, 130 10"/>
+      <rect class="m-track" x="60" y="54" width="70" height="5" rx="2.5"/><rect class="m-fill" x="60" y="54" width="44" height="5" rx="2.5"/>
+    </svg>`;
+  // §18 — Workspace: TRES iconos de su propia familia, no el catálogo entero, y CADA UNO CON EL
+  // ACENTO DE SU CAPACIDAD. Eran tres azules idénticos, así que la promo de la superficie
+  // «operativa» se leía igual de monocroma que la analítica — justo lo que el §19 pide evitar.
+  // El acento sale del mapa compartido, no de una paleta nueva: presupuesto, préstamos y
+  // escenarios, que son las tres que el texto nombra.
+  const tools = `<span class="wsdisc-icons">${[['split', 'budget'], ['calc', 'loan'], ['paths', 'scenario']]
+    .map(([g, k]) => `<span class="wsdisc-ic" data-ws-accent="${esc(_WS_TOOL_ACCENT[k] || 'blue')}">${_wsCapIconHtml(g)}</span>`).join('')}</span>`;
   return `
-    <div class="pgw-grid">
-      ${card('int', intViz, t('dsc_int_t'), t('dsc_int_b'), t('dsc_int_cta'), 'intelligence')}
-      ${card('ws',  wsViz,  t('dsc_ws_t'),  t('dsc_ws_b'),  t('dsc_ws_cta'),  'workspace')}
+    <div class="wsdisc-grid">
+      ${card('int', orb,   t('dsc_int_t'), t('dsc_int_b'), t('dsc_int_cta'), 'intelligence')}
+      ${card('ws',  tools, t('dsc_ws_t'),  t('dsc_ws_b'),  t('dsc_ws_cta'),  'workspace')}
     </div>`;
 }
-// La entrada se anima UNA vez por carga: los repintados posteriores (un precio que mueve la
-// lectura, volver de una categoría) no la repiten — una promo que reaparece animada cada pocos
-// segundos compite con las cifras del patrimonio.
-let _pgwEntered = false;
-// Atrás desde la portada a la que llevó una promo: al Resumen y a la misma altura (el retorno
-// que ya usa «Tus planes»). `var`: `_applyTab` los lee.
-var _pgwReturnY = null, _pgwDest = null;
-if (typeof window !== 'undefined') window.addEventListener('popstate', e => {
-  if (_pgwReturnY == null || (e.state && e.state.aurixPromo)) return;
-  const y = _pgwReturnY; _pgwReturnY = null; _pgwDest = null;
-  try { if (typeof window.closeAurixPremiumModal === 'function') window.closeAurixPremiumModal(); } catch (_) {}
-  _wsDashReturnY = y; _wsDashRestorePending = true;
-  try { switchTab('home'); } catch (_) {}
-});
 function updateDashboardDiscover() {
   const sec = document.getElementById('dashDiscoverSection');
   if (!sec) return;
@@ -26168,11 +26130,8 @@ function updateDashboardDiscover() {
   let empty = false;
   try { empty = (typeof activeAssets === 'function') && activeAssets().length === 0; } catch (_) {}
   if (shell !== false || drill || empty) { sec.style.display = 'none'; sec.innerHTML = ''; return; }
-  const html = _renderDashboardDiscover();
-  if (_pgwEntered) sec.classList.add('pgw-settled');
-  if (sec._pgwHtml !== html || !sec.firstChild) { sec.innerHTML = html; sec._pgwHtml = html; }
+  sec.innerHTML = _renderDashboardDiscover();
   sec.style.display = '';
-  _pgwEntered = true;
 }
 // Los dos controles de la sección, en el mismo despachador delegado y armado una
 // sola vez. `data-ws-sync-retry` ya lo despacha Workspace, así que aquí sólo
@@ -26186,13 +26145,10 @@ function _wsPlansWireOnce() {
   document.addEventListener('click', e => {
     const go = e.target && e.target.closest ? e.target.closest('[data-dsc-go]') : null;
     if (go && go.closest('#dashDiscoverSection')) {
-      const dest = go.getAttribute('data-dsc-go') === 'workspace' ? 'workspace' : 'intelligence';
+      const dest = go.getAttribute('data-dsc-go');
       // Lleva a la PORTADA del producto, que es donde vive su flujo comercial.
       // No abre el checkout: comprar se decide allí, con el precio delante.
-      // Una entrada de historial (sin cambiar la URL) para que Atrás vuelva aquí.
-      _pgwReturnY = window.scrollY || 0; _pgwDest = dest;
-      try { history.pushState(Object.assign({}, history.state || {}, { aurixPromo: dest }), ''); } catch (_) {}
-      try { switchTab(dest); } catch (_) {}
+      try { switchTab(dest === 'workspace' ? 'workspace' : 'intelligence'); } catch (_) {}
       return;
     }
     const pin = e.target && e.target.closest ? e.target.closest('#wsPlansSection [data-wspin-dopen],#wsPlansSection [data-wspin-menu],#wsPlansSection .wspin-card[data-wspin-ref]') : null;
@@ -29339,20 +29295,20 @@ function _renderWorkspaceFreeCover() {
   const caps = _wsfcPublishedCaps();
   return `
     <div class="aurix-wsh wsfc" data-wsh-view="free_cover">
-      <section class="wsfc-stage cvr-stage">
-        <div class="wsfc-panel cvr-card">
-          <div class="cvr-label"><span class="wsfc-eyebrow cvr-pill">${esc(tx('wsfc_eyebrow', 'WORKSPACE'))}</span></div>
-          <h1 class="wsfc-title cvr-title">${esc(tx('wsfc_title', ''))}</h1>
-          <p class="wsfc-sub cvr-desc">${esc(tx('wsfc_sub', ''))}</p>
-          <ul class="wsfc-caps cvr-demo" data-wsfc-caps="${caps.length}">
+      <section class="wsfc-stage">
+        <div class="wsfc-panel">
+          <p class="wsfc-eyebrow">${esc(tx('wsfc_eyebrow', 'WORKSPACE'))}</p>
+          <h1 class="wsfc-title">${esc(tx('wsfc_title', ''))}</h1>
+          <p class="wsfc-sub">${esc(tx('wsfc_sub', ''))}</p>
+          <p class="wsfc-eg">${esc(tx('wsfc_eg', ''))}</p>
+          <ul class="wsfc-caps" data-wsfc-caps="${caps.length}">
             ${caps.map(c => `<li class="wsfc-cap" data-ws-accent="${esc(_WS_TOOL_ACCENT[c.k] || 'blue')}">
               <span class="wsfc-cap-ico">${_wsCapIconHtml(c.icon)}</span>
               <span class="wsfc-cap-name">${esc(tx(c.nameKey, ''))}</span>
             </li>`).join('')}
           </ul>
-          <div class="cvr-promise wsfc-promise"><div class="cvr-sep" aria-hidden="true"></div><p class="wsfc-eg cvr-promise-t">${esc(tx('wsfc_eg', ''))}</p></div>
-          <div class="wsfc-cta-wrap cvr-cta-zone">
-            <button type="button" class="wsfc-cta cvr-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
+          <div class="wsfc-cta-wrap">
+            <button type="button" class="wsfc-cta" data-premium-cta="workspace.full" data-premium-source="workspace:free_cover">${esc(tx('wsfc_cta', ''))}</button>
           </div>
         </div>
       </section>
@@ -67509,7 +67465,6 @@ function _applyTab(tab) {
   if (typeof _adsShowSlider === 'function') _adsShowSlider();
   // Salir de la posición por otra pestaña cancela la vuelta pendiente a Market.
   if (typeof _mktPosReturn !== 'undefined' && tab !== 'market' && !(tab === 'home' && _mktPosOpenId)) _mktPosReturn = null;
-  if (typeof _pgwReturnY !== 'undefined' && _pgwReturnY != null && tab !== _pgwDest) { _pgwReturnY = null; _pgwDest = null; }
   currentTab = tab;
   if (_loopInterval)   { clearInterval(_loopInterval);   _loopInterval   = null; }
   if (_marketInterval) { clearInterval(_marketInterval); _marketInterval = null; }
@@ -67874,6 +67829,7 @@ function _aurixIntelligencePreviewHTML() {
     // la deja del tamaño de lo que dice; el `max-height` sigue puesto, así
     // que con muchos hechos la tarjeta se topa y hace su scroll interno
     // como hasta ahora. En ≥768 px manda `align-items:center`, que ya estaba.
+    + '.intprev-stage{position:relative;width:100%;display:flex;align-items:flex-start;justify-content:center;padding:14px 14px calc(12px + env(safe-area-inset-bottom,0px));box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
     // SIN `min-height` EN MÓVIL. La medición encontró los últimos 24 px de scroll de
     // página en 360×740: el stage pedía `100dvh − 116px` (624 px) mientras `#appRoot`
     // YA reserva 68 px de padding para la navegación, así que el alto se contaba dos
@@ -67901,32 +67857,48 @@ function _aurixIntelligencePreviewHTML() {
     // Y va en la BASE, no detrás de un `max-width`: esta superficie es mobile-first
     // por contrato —su gate lo exige y tiene razón— así que el móvil es el punto de
     // partida y el escritorio RELAJA la restricción en su `min-width:768px`.
-    + '.intprev-facts{list-style:none;padding:0;margin:0;display:grid;grid-auto-rows:1fr;align-content:start;gap:9px;flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
+    + '.intprev-card{position:relative;display:flex;flex-direction:column;width:100%;max-width:620px;max-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))));border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:20px 18px 18px;animation:intprevIn .22s ease-out both;}'
+    + '.intprev-badge{display:inline-block;align-self:flex-start;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
+    + '.intprev-title{flex:0 0 auto;font-size:18px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 14px;letter-spacing:-.01em;line-height:1.25;}'
+    + '.intprev-facts{list-style:none;padding:0;margin:0 0 14px;display:grid;grid-auto-rows:1fr;align-content:start;gap:9px;flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}'
     + '.intprev-fact{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;flex:0 0 auto;min-height:62px;box-sizing:border-box;border:1px solid rgba(120,160,255,0.16);border-radius:14px;background:rgba(255,255,255,0.035);}'
     + '.intprev-fact-dot{width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;margin-top:7px;}'
     + '.intprev-fact-body{min-width:0;}'
     + '.intprev-fact-label{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(150,185,255,0.8);margin-bottom:4px;}'
     + '.intprev-fact-text{font-size:14.5px;line-height:1.5;color:rgba(255,255,255,0.9);}'
+    + '.intprev-sep{flex:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(120,170,255,0.28),transparent);margin:0 0 12px;}'
+    + '.intprev-sub{flex:0 0 auto;font-size:13.5px;line-height:1.5;color:rgba(198,214,246,0.76);margin:0 0 14px;}'
+    + '.intprev-bridge{flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.78);margin:0 0 6px;}'
+    + '.intprev-bridge-b{flex:0 0 auto;font-size:14px;line-height:1.45;color:rgba(214,228,250,0.9);margin:0 0 12px;}'
     // MISMO CTA que la portada de Workspace: el gesto es el mismo y no puede
     // pintarse en dos idiomas visuales. Azul Aurix sólido, el de «Continuar».
+    + '.intprev-cta{width:100%;font-size:15px;font-weight:700;color:#fff;background:linear-gradient(180deg,rgba(90,145,255,1),rgba(58,110,232,1));border:1px solid rgba(120,170,255,0.55);border-radius:14px;min-height:52px;padding:0 20px;cursor:pointer;box-shadow:0 6px 20px rgba(60,110,255,0.22);transition:filter .2s;}'
+    + '.intprev-cta:hover{filter:brightness(1.08);}'
+    + '.intprev-ctas{display:flex;flex-direction:column;gap:10px;flex:0 0 auto;margin-top:auto;}'
+    + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
+    + '.intprev-hold-body{flex:0 1 auto;min-height:0;overflow-y:auto;font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 14px;}'
     // §D — el tercer descubrimiento bloqueado. La barra redactada es DECORACIÓN
     // (`aria-hidden`), no un texto difuminado: el bloqueo está en que la conclusión
     // no se emite, así que quitar el filtro desde el inspector no revela nada.
     + '.intprev-fact.is-locked{border-color:rgba(150,185,255,0.22);background:rgba(90,140,255,0.055);position:relative;align-items:center;gap:10px;}'
     + '.intprev-fact.is-locked .intprev-fact-body{flex:1 1 auto;min-width:0;}'
     + '.intprev-fact-dot.is-locked{background:rgba(150,185,255,0.5);box-shadow:none;}'
+    + '.intprev-redact{display:flex;flex-direction:column;justify-content:center;gap:6px;margin:0;height:auto;flex:1 1 auto;opacity:.42;}'
     // `.intprev-fact-body` es un <span>: como caja INLINE añade el interlineado de su
     // línea alrededor del skeleton, y esos 2px sobrantes hacían el bloque oculto más
     // alto que los visibles en los seis viewports. Se neutraliza SOLO en el oculto.
-    + '.intprev-lock{flex:0 0 auto;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;color:rgba(160,192,255,0.92);background:rgba(90,140,255,0.12);border:1px solid rgba(120,170,255,0.26);}'
-    + '.intprev-lock svg{width:16px;height:16px;display:block;}'
-    + '.intprev-lock-t{display:block;font-size:13.5px;font-weight:700;line-height:1.3;color:rgba(214,228,250,0.92);}'
-    + '.intprev-lock-s{display:block;font-size:12.5px;line-height:1.4;color:rgba(170,192,230,0.8);margin-top:2px;}'
-    + '@media (min-width:768px){.intprev-facts{overflow:visible;gap:12px;}.intprev-fact{padding:16px 18px;min-height:74px;}}'
-    + '@media (min-width:1024px){.intprev-fact-text{font-size:15.5px;}}'
+    + '.intprev-fact.is-locked{align-items:stretch;}'
+    + '.intprev-fact.is-locked .intprev-fact-body{display:flex;line-height:0;}'
+    + '.intprev-redact i{display:block;height:8px;border-radius:4px;background:linear-gradient(90deg,rgba(190,215,255,0.55),rgba(190,215,255,0.16));}'
+    + '.intprev-redact i:nth-child(1){width:94%;}.intprev-redact i:nth-child(2){width:78%;}.intprev-redact i:nth-child(3){width:52%;}'
     // El recuento de bloqueados: una línea, tono secundario, sin etiqueta de plan.
     // El escritorio RELAJA (mismo patron que el resto de esta hoja: base movil,
     // `min-width` para lo demas). Nunca un `max-width`, que invertiria el contrato.
+    + '@media (min-width:768px){.intprev-redact i{height:9px;}}'
+    + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}}'
+    + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
+    + '@media (min-width:768px){.intprev-stage{min-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))));}.intprev-cta{width:auto;min-width:240px;}.intprev-ctas{flex-direction:row;align-items:center;gap:12px;}.intprev-stage{align-items:center;padding:clamp(32px,4vh,48px) 24px 40px;}.intprev-card{max-height:none;padding:38px 36px 30px;}.intprev-title{font-size:26px;margin:0 0 12px;}.intprev-sub{font-size:15px;margin:0 0 22px;}.intprev-facts{overflow:visible;gap:12px;margin:0 0 22px;}.intprev-fact{padding:16px 18px;min-height:74px;}.intprev-sep{margin:0 0 18px;}.intprev-bridge{font-size:11.5px;margin:0 0 8px;}.intprev-bridge-b{font-size:16px;margin:0 0 20px;}.intprev-hold-body{overflow:visible;margin:0 0 22px;}}@media (min-width:1024px){.intprev-stage{min-height:calc(100dvh - var(--aurix-cover-chrome, calc(118px + env(safe-area-inset-bottom,0px))));padding-top:clamp(32px,4vh,48px);}.intprev-card{max-width:860px;padding:44px 44px 34px;}.intprev-title{font-size:32px;}.intprev-sub{font-size:16px;max-width:74ch;}.intprev-fact-text{font-size:15.5px;}.intprev-bridge-b{font-size:17px;}.intprev-cta{min-height:54px;font-size:15.5px;}}'
+    + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
     + '</style>';
 
   // M.05 — el ÚNICO CTA de esta superficie mandaba al Dashboard justo en el momento
@@ -67941,8 +67913,8 @@ function _aurixIntelligencePreviewHTML() {
   // momento de máxima intención, y la que ganaba era la de irse. La salida no
   // desaparece —la navegación inferior está siempre ahí— pero deja de ser un
   // botón que compite con la única acción de esta superficie.
-  const cta = '<div class="intprev-ctas cvr-cta-zone">'
-    + '<button type="button" class="intprev-cta cvr-cta" data-preview-event="preview_cta_premium"'
+  const cta = '<div class="intprev-ctas">'
+    + '<button type="button" class="intprev-cta" data-preview-event="preview_cta_premium"'
     +   ' data-premium-cta="intelligence.full" data-premium-source="intelligence-preview">'
     +   esc(tx('intprev_cta_full', 'Ver el análisis completo')) + '</button>'
     + '</div>';
@@ -67972,17 +67944,11 @@ function _aurixIntelligencePreviewHTML() {
     // dimensiones que un bloque visible (misma clase base, mismo padding, mismo
     // borde, mismo punto), no un dato real emborronado: un blur se desactiva desde
     // el inspector y el texto seguiría ahí. Lo que no se envía no se puede leer.
-    // EMBUDO FREE · la capa bloqueada deja de parecer un skeleton de carga: candado y un rótulo
-    // GENÉRICO del diccionario («Análisis bloqueado»), idéntico para cualquier cartera y sin
-    // nombrar el plan (6.7). Sigue sin emitir NADA del hecho oculto —ni texto, ni título, ni
-    // categoría, ni cifra— y sin blur.
-    const lockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.4"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></svg>';
     const lockedHtml = _locked.map(() => ''
-      + '<li class="intprev-fact is-locked" data-preview-fact="locked">'
-      +   '<span class="intprev-lock" aria-hidden="true">' + lockSvg + '</span>'
+      + '<li class="intprev-fact is-locked" data-preview-fact="locked" aria-hidden="true">'
+      +   '<span class="intprev-fact-dot is-locked"></span>'
       +   '<span class="intprev-fact-body">'
-      +     '<span class="intprev-lock-t">' + esc(tx('intprev_locked_t', 'Análisis bloqueado')) + '</span>'
-      +     '<span class="intprev-lock-s">' + esc(tx('intprev_locked_s', '')) + '</span>'
+      +     '<span class="intprev-redact"><i></i><i></i><i></i></span>'
       +   '</span>'
       + '</li>').join('');
     // PROMESA → PRUEBA REAL → PUENTE → CTA. Se retiran, por SPEC: el contador de
@@ -67990,33 +67956,33 @@ function _aurixIntelligencePreviewHTML() {
     // promocional dinámica (no era un gancho, era una segunda voz compitiendo con
     // el puente justo antes del único botón de la superficie).
     body = ''
-      + '<h2 class="intprev-title cvr-title">' + esc(tx('intprev_title', 'Entiende qué está moviendo tu patrimonio')) + '</h2>'
-      + '<p class="intprev-sub cvr-desc">' + esc(tx('intprev_sub', '')) + '</p>'
-      + '<ul class="intprev-facts cvr-demo">' + items + lockedHtml + '</ul>'
-      + '<div class="cvr-promise"><div class="intprev-sep cvr-sep" aria-hidden="true"></div>'
-      + '<p class="intprev-bridge cvr-kicker">' + esc(tx('intprev_bridge', 'Esto es solo una primera lectura')) + '</p>'
-      + '<p class="intprev-bridge-b cvr-promise-t">' + esc(tx('intprev_bridge_b', '')) + '</p></div>'
+      + '<h2 class="intprev-title">' + esc(tx('intprev_title', 'Entiende qué está moviendo tu patrimonio')) + '</h2>'
+      + '<p class="intprev-sub">' + esc(tx('intprev_sub', '')) + '</p>'
+      + '<ul class="intprev-facts">' + items + lockedHtml + '</ul>'
+      + '<div class="intprev-sep" aria-hidden="true"></div>'
+      + '<p class="intprev-bridge">' + esc(tx('intprev_bridge', 'Esto es solo una primera lectura')) + '</p>'
+      + '<p class="intprev-bridge-b">' + esc(tx('intprev_bridge_b', '')) + '</p>'
       + cta;
   } else {
     // Hold states — say what is missing instead of promising anything.
     const k = (res.state === 'empty') ? 'empty' : (res.state === 'none' ? 'none' : 'inc');
     body = ''
-      + '<h2 class="intprev-hold-title cvr-title">' + esc(tx('intprev_hold_' + k + '_t', '')) + '</h2>'
-      + '<p class="intprev-hold-body cvr-desc">' + esc(tx('intprev_hold_' + k + '_b', '')) + '</p>'
-      + '<div class="cvr-promise"><div class="intprev-sep cvr-sep" aria-hidden="true"></div>'
-      + '<p class="intprev-bridge cvr-kicker">' + esc(tx('intprev_bridge', 'Esto es solo una primera lectura')) + '</p>'
-      + '<p class="intprev-bridge-b cvr-promise-t">' + esc(tx('intprev_bridge_b', '')) + '</p></div>'
+      + '<h2 class="intprev-hold-title">' + esc(tx('intprev_hold_' + k + '_t', '')) + '</h2>'
+      + '<p class="intprev-hold-body">' + esc(tx('intprev_hold_' + k + '_b', '')) + '</p>'
+      + '<div class="intprev-sep" aria-hidden="true"></div>'
+      + '<p class="intprev-bridge">' + esc(tx('intprev_bridge', 'Esto es solo una primera lectura')) + '</p>'
+      + '<p class="intprev-bridge-b">' + esc(tx('intprev_bridge_b', '')) + '</p>'
       + cta;
   }
 
   return ''
-    + '<div class="intprev-stage cvr-stage" data-aurix-preview="intelligence"'
+    + '<div class="intprev-stage" data-aurix-preview="intelligence"'
     +   ' data-preview-event="intelligence_preview_view"'
     +   ' data-preview-state="' + esc(res.state) + '"'
     +   ' data-preview-facts="' + _visible.length + '"'
     +   ' data-preview-locked="' + _locked.length + '">' + style
-    +   '<section class="intprev-card cvr-card" role="region" aria-label="' + esc(tx('intprev_badge', 'Intelligence')) + '">'
-    +     '<div class="cvr-label"><span class="intprev-badge cvr-pill">' + esc(tx('intprev_badge', 'Intelligence')) + '</span></div>'
+    +   '<section class="intprev-card" role="region" aria-label="' + esc(tx('intprev_badge', 'Intelligence')) + '">'
+    +     '<div class="intprev-badge">' + esc(tx('intprev_badge', 'Intelligence')) + '</div>'
     +     body
     +   '</section>'
     + '</div>';

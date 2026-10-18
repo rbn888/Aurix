@@ -1355,7 +1355,7 @@ console.log('\nM5 · conversión · superficies Free y medición del embudo');
     /data-premium-cta="intelligence\.full"/.test(prev) &&
     /data-premium-source="intelligence-preview"/.test(prev) &&
     /intprev_cta_full/.test(prev) &&
-    (prev.match(/class="intprev-cta[ "]/g) || []).length === 1 &&
+    (prev.match(/class="intprev-cta"/g) || []).length === 1 &&
     !/switchTab/.test(prev));
   ok('M5.2 …y no publica ningún precio: los precios viven en el catálogo',
     !/7[.,]99|59[.,]99|amount_cents/.test(prev));

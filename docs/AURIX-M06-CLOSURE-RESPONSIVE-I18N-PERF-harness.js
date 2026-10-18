@@ -290,8 +290,7 @@ section('E — responsive: invariantes transversales:');
   // ≥52 px: la SPEC de portadas de conversión sube el suelo táctil del CTA por
   // encima del mínimo general de 44 px.
   ok('E.8 y el CTA del preview de Intelligence es de ancho completo y táctil en móvil',
-     // El CTA vive en la plantilla compartida de portadas (`.cvr-cta`, styles.css).
-     /\.cvr-cta \{\s*width: 100%; min-height: 52px;/.test(css) && /class="intprev-cta cvr-cta"/.test(app));
+     /\.intprev-cta\{width:100%;[\s\S]{0,200}?min-height:52px/.test(app));
 }
 
 // ══════════════════════════════════════════════════════════════════════════

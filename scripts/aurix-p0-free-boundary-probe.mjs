@@ -269,14 +269,10 @@ ok('A.1d los tres bloques miden EXACTAMENTE igual', new Set(a.boxes).size === 1,
 ok('A.3 el análisis visible es el del caso observado',
   /El 47% de tu patrimonio depende de Bitcoin\./.test(a.visibleText.join(' ')), a.visibleText.join(' | '));
 ok('A.4 la palabra «invertible» no aparece en la portada', a.invertibleWord === false);
-// A.5/A.6 SE RE-DECIDEN (CIERRE PREMIUM DEL EMBUDO FREE): las barras parecían un skeleton de carga.
-// El bloque oculto dice ahora QUÉ es con un rótulo FIJO del diccionario —el mismo para cualquier
-// cartera— y por eso se lee (sin aria-hidden). Lo que no cambia: del hecho oculto no sale NADA.
-const LOCKED_TXT = ['Análisis bloqueado', 'Se desbloquea con tu análisis completo'];
-ok('A.5 los bloqueados sólo dicen su rótulo genérico: CERO texto del hecho oculto',
-  a.lockedText.every(x => x.split('|').every(t => t.replace(/\s+/g, '') === LOCKED_TXT.join('').replace(/\s+/g, ''))), JSON.stringify(a.lockedText));
-ok('A.6 el bloque oculto se lee como bloqueado: sin aria-hidden ni aria-label propios',
-  a.lockedHidden === false && a.lockedAria.every(x => x === null), JSON.stringify({ hidden: a.lockedHidden, aria: a.lockedAria }));
+ok('A.5 CERO texto filtrado por los bloqueados (ni innerText ni textContent)',
+  a.lockedText.every(x => x === '|'), JSON.stringify(a.lockedText));
+ok('A.6 el bloque oculto no existe para accesibilidad (aria-hidden, sin aria-label)',
+  a.lockedHidden === true && a.lockedAria.every(x => x === null), JSON.stringify({ hidden: a.lockedHidden, aria: a.lockedAria }));
 ok('A.7 CERO menciones a «Premium» antes del clic', a.premiumWord === false);
 ok('A.8 UN solo CTA, y es «Ver mi análisis completo»',
   a.ctas === 1 && /Ver mi análisis completo/.test(a.ctaLabel || ''), a.ctas + ' / ' + a.ctaLabel);

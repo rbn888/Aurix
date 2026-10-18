@@ -27895,146 +27895,66 @@ button.intv14-cmp-clear {
    por variable, que es cómo se comparte armazón entre dos hojas sin duplicarlo. */
 :root { --aurix-cover-chrome: calc(118px + env(safe-area-inset-bottom, 0px)); }
 .wsfc { display: block; }
-/* La portada Free no hereda el revelado del shell de Workspace (500 ms y 10 px de
-   desplazamiento): su entrada es la ÚNICA de la plantilla (`cvrIn`, 200 ms, sólo
-   opacidad), la misma que Intelligence, sin mover el texto ni la geometría. */
-.aurix-wsh.wsfc > * { opacity: 1; transform: none; transition: none; }
-/* ════════════════════════════════════════════════════════════════════════════
-   PORTADA FREE · PLANTILLA COMPARTIDA (`.cvr-*`) — Intelligence y Workspace
-   ════════════════════════════════════════════════════════════════════════════
-   Las dos portadas eran hermanas por imitación: cada una copiaba los valores de
-   la otra en su propia hoja y, al cambiar uno, la otra se quedaba atrás. Ahora
-   el armazón es UNO y cada portada sólo aporta su demostración:
-       etiqueta · título · descripción · DEMO · promesa · CTA
-   mismo ancho, mismo alto, mismo fondo, borde, radio, profundidad y espaciado,
-   y el CTA anclado abajo, en la misma zona. Intelligence conserva sus hechos y
-   Workspace su catálogo (`.intprev-fact*` / `.wsfc-cap*`).
-   Alto: las dos comparten un MÍNIMO (`--cvr-min-h`, acotado al escenario, que
-   ya descuenta cabecera, navegación y área segura) fijado por la más alta de
-   las dos en cada tramo; el sobrante de la más baja cae encima del CTA, que
-   así queda en la misma zona. No se llena el escenario: en un móvil alto eso
-   abría un vacío de 130 px entre la promesa y el botón. */
-.cvr-stage {
-  position: relative; width: 100%; box-sizing: border-box;
-  display: flex; flex-direction: column; align-items: center;
-  min-height: calc(100dvh - var(--aurix-cover-chrome));
-  max-height: calc(100dvh - var(--aurix-cover-chrome));
-  overflow: auto; -webkit-overflow-scrolling: touch;   /* zoom / texto ampliado: scroll accesible */
-  padding: 14px 14px calc(12px + env(safe-area-inset-bottom, 0px));
-  background: radial-gradient(circle at 50% 22%, rgba(70,120,255,0.10), transparent 60%), #05070e;
+.wsfc-stage {
+  /* `--aurix-ws-chrome` declara lo que ocupan cabecera + navegación inferior +
+     áreas seguras. Un número mágico repetido en tres sitios fue antes la causa de
+     que el CTA quedara tapado en un solo viewport. Hoy ese owner es compartido
+     con la portada de Intelligence (`--aurix-cover-chrome`). */
+  --aurix-ws-chrome: var(--aurix-cover-chrome);
+  min-height: calc(100dvh - var(--aurix-ws-chrome));
+  max-height: calc(100dvh - var(--aurix-ws-chrome));
+  overflow: auto;                      /* zoom / texto ampliado: scroll accesible */
+  -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
 }
-.cvr-card {
-  position: relative; box-sizing: border-box;
-  display: flex; flex-direction: column; flex: 0 0 auto;
-  width: 100%; max-width: 620px;
-  min-height: min(var(--cvr-min-h, 690px), calc(100dvh - var(--aurix-cover-chrome) - 26px - env(safe-area-inset-bottom, 0px)));
-  padding: 18px 16px 16px; border-radius: 24px;
-  border: 1px solid rgba(90,140,255,0.26);
+/* ── LA SUPERFICIE ÚNICA ────────────────────────────────────────────────────
+   Mismo lenguaje que `.intprev-card`, que es la referencia declarada. No se toca
+   Intelligence: se comparte su vocabulario, no su código. */
+.wsfc-panel {
+  flex: 0 0 auto;
+  width: 100%; box-sizing: border-box;
+  padding: clamp(16px, 3.2vw, 22px);
+  border-radius: 24px;
+  border: 1px solid rgba(90,140,255,0.28);
   background:
     radial-gradient(130% 110% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
     rgba(12,18,34,0.72);
   -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
-  box-shadow: 0 0 70px rgba(60,110,255,0.10), inset 0 1px 0 rgba(255,255,255,0.06);
-  animation: cvrIn .2s ease-out both;
+  box-shadow: 0 0 80px rgba(60,110,255,0.10), inset 0 1px 0 rgba(255,255,255,0.06);
 }
-@keyframes cvrIn { from { opacity: 0; } to { opacity: 1; } }
-.cvr-label { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
-.cvr-pill {
-  display: inline-block; margin: 0; padding: 5px 12px; border-radius: 999px;
-  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  color: rgba(150,185,255,0.95);
+/* ── EL RÓTULO, LA MISMA PÍLDORA QUE INTELLIGENCE ─────────────────────────
+   Era texto suelto en mayúsculas mientras Intelligence usaba una píldora con
+   borde: dos sistemas visuales distintos en dos portadas hermanas, y se nota al
+   cambiar de pestaña. Gana la píldora porque es la referencia declarada del
+   producto (`.intprev-card`). */
+.wsfc-eyebrow {
+  display: inline-block; align-self: flex-start;
+  margin: 0 0 12px; padding: 5px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: rgba(150,185,255,0.95);
   border: 1px solid rgba(120,170,255,0.35); background: rgba(90,140,255,0.08);
 }
-.cvr-title {
-  flex: 0 0 auto; margin: 0 0 8px;
-  font-size: clamp(18px, 4.9vw, 22px); font-weight: 800; line-height: 1.24; letter-spacing: -.01em;
-  color: rgba(255,255,255,0.985);
+.wsfc-title {
+  margin: 0 0 8px; font-size: clamp(20px, 5.2vw, 25px); font-weight: 800;
+  line-height: 1.22; letter-spacing: -.01em; color: var(--text-bright);
 }
-.cvr-desc {
-  flex: 0 0 auto; margin: 0 0 14px;
-  font-size: 13.5px; line-height: 1.5; color: rgba(198,214,246,0.78);
+.wsfc-sub {
+  margin: 0 0 clamp(14px, 2.4vh, 20px);
+  font-size: clamp(13px, 3.4vw, 14.5px); line-height: 1.5;
+  color: rgba(198,214,246,0.78);
 }
-.cvr-demo { margin: 0 0 14px; }
-.cvr-promise { flex: 0 0 auto; margin: 0 0 14px; }
-.cvr-sep { height: 1px; margin: 0 0 12px; background: linear-gradient(90deg, transparent, rgba(120,170,255,0.28), transparent); }
-.cvr-kicker {
-  margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
-  color: rgba(150,185,255,0.8);
-}
-.cvr-promise-t { margin: 0; font-size: 14px; line-height: 1.45; color: rgba(214,228,250,0.9); }
-.cvr-cta-zone { flex: 0 0 auto; margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
-.cvr-cta {
-  width: 100%; min-height: 52px; padding: 0 20px; cursor: pointer;
-  font-size: 15px; font-weight: 700; color: #fff;
-  border: 1px solid rgba(120,170,255,0.55); border-radius: 14px;
-  background: linear-gradient(180deg, rgba(90,145,255,1), rgba(58,110,232,1));
-  box-shadow: 0 6px 20px rgba(60,110,255,0.22);
-  transition: filter .18s, transform .18s;
-}
-.cvr-cta:hover { filter: brightness(1.08); }
-.cvr-cta:active { transform: translateY(1px); }
-.cvr-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.95); outline-offset: 3px; }
-/* El acento dorado, discreto: la etiqueta del Premium Gateway del Resumen. Dice
-   que lo de abajo es el producto de pago; no dice que la cuenta ya lo tenga. Las
-   portadas no lo llevan: no nombran el plan (el paywall es quien lo hace). */
-.cvr-tier {
-  display: inline-block; margin-left: 8px; padding: 3px 9px; border-radius: 999px;
-  font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
-  color: rgba(238,206,150,0.98);
-  border: 1px solid rgba(226,188,110,0.38); background: rgba(226,188,110,0.10);
-}
-@media (prefers-reduced-motion: reduce) {
-  .cvr-card { animation: none; }
-  .cvr-cta { transition: none; }
-  .cvr-cta:active { transform: none; }
-}
-@media (max-width: 374px) {
-  .cvr-card { padding: 14px 12px; }
-}
-@media (min-width: 768px) {
-  .cvr-stage { justify-content: center; max-height: none; overflow: visible; padding: clamp(28px, 4vh, 44px) 24px 36px; }
-  .cvr-card { --cvr-min-h: 612px; min-height: min(var(--cvr-min-h), calc(100dvh - var(--aurix-cover-chrome) - 80px)); padding: 30px 30px 26px; border-radius: 26px; }
-  .cvr-title { font-size: 26px; margin: 0 0 10px; }
-  .cvr-desc { font-size: 15px; margin: 0 0 20px; }
-  .cvr-demo { margin: 0 0 20px; }
-  .cvr-promise { margin: 0 0 20px; }
-  .cvr-sep { margin: 0 0 16px; }
-  .cvr-kicker { font-size: 11.5px; margin: 0 0 8px; }
-  .cvr-promise-t { font-size: 16px; }
-  .cvr-cta-zone { flex-direction: row; align-items: center; gap: 12px; }
-  .cvr-cta { width: auto; min-width: 280px; }
-}
-@media (min-width: 1024px) {
-  .cvr-card { --cvr-min-h: 620px; max-width: 860px; padding: 40px 40px 32px; border-radius: 28px; }
-  .cvr-title { font-size: 30px; }
-  .cvr-desc { font-size: 16px; max-width: 74ch; }
-  .cvr-promise-t { font-size: 17px; }
-  .cvr-cta { min-height: 54px; font-size: 15.5px; }
-}
-/* Pantallas BAJAS. La promesa es lo único prescindible: el CTA lleva al paywall,
-   que ya explica lo que se desbloquea; y el mínimo común baja con ella. */
-@media (max-height: 760px) {
-  .cvr-promise { display: none; }
-  .cvr-card { --cvr-min-h: 560px; }
-}
-/* Escritorio bajo (1024/1366 × 768): menos aire vertical antes que cortar contenido. */
-@media (min-width: 768px) and (max-height: 800px) {
-  .cvr-stage { padding-top: 20px; padding-bottom: 20px; }
-  .cvr-card { padding-top: 28px; padding-bottom: 24px; min-height: min(var(--cvr-min-h), calc(100dvh - var(--aurix-cover-chrome) - 40px)); }
-}
-/* ── LAS NUEVE CAPACIDADES (la demostración de Workspace) ─────────────────────
-   DOS columnas en móvil, TRES desde 768 px: nueve son 3×3 exactas, sin la celda
-   huérfana que dejaban cuatro columnas (y con 180 px de celda los nombres caben
-   en dos líneas sin partir palabras). En dos columnas una novena
-   impar ocupa la fila entera en vez de quedarse media fila vacía.
-   `minmax(0,1fr)` y no `1fr`: con el mínimo automático la celda se niega a
-   encoger por debajo de su contenido y se sale de su caja. */
+/* ── LAS OCHO CAPACIDADES ───────────────────────────────────────────────────
+   DOS columnas y CUATRO filas en móvil. `minmax(0,1fr)` y no `1fr`: con el mínimo
+   automático la celda se niega a encoger por debajo de su contenido y se sale de
+   su caja — la lección que costó una captura en el bloque anterior.
+   `align-items:stretch` por defecto deja todas las celdas de una fila iguales. */
 .wsfc-caps {
-  flex: 0 0 auto; list-style: none; padding: 0;
+  flex: 0 0 auto; list-style: none; margin: 0; padding: 0;
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
-.wsfc-cap:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .wsfc-cap {
   display: flex; align-items: center; gap: 9px; min-width: 0;
   min-height: 58px; padding: 10px 10px; border-radius: 13px;
@@ -28073,12 +27993,47 @@ button.intv14-cmp-clear {
   color: rgba(228,236,252,0.95);
   overflow-wrap: normal; word-break: normal; hyphens: none;
 }
+/* ── EL ÚNICO ELEMENTO ACCIONABLE ───────────────────────────────────────────
+   Dorado discreto, y sólo aquí: ocho marcos dorados habrían convertido el acento
+   en ruido. 52 px es el suelo táctil del CTA móvil. */
+.wsfc-cta-wrap { margin-top: clamp(14px, 2.4vh, 20px); display: flex; }
+/* ── EL CTA, AZUL AURIX EN LAS DOS PORTADAS ───────────────────────────────
+   Era una losa dorada a todo lo ancho mientras Intelligence usaba un botón azul:
+   el mismo gesto —«ir a ver el producto de pago»— pintado en dos idiomas
+   visuales. El azul eléctrico es la identidad principal y es el que ya usan el
+   paywall («Continuar») y las promos del Resumen, así que es el que se
+   comparte. El dorado no desaparece: baja a ACENTO, en el distintivo Premium
+   del rótulo, que es donde refuerza la jerarquía sin gritar. */
+.wsfc-cta {
+  width: 100%; min-height: 52px; font-size: 15px; font-weight: 700; cursor: pointer;
+  color: #fff; border: 1px solid rgba(120,170,255,0.55); border-radius: 14px;
+  background: linear-gradient(180deg, rgba(90,145,255,1), rgba(58,110,232,1));
+  box-shadow: 0 6px 20px rgba(60,110,255,0.22);
+  transition: filter .18s, transform .18s;
+}
+.wsfc-cta:hover { filter: brightness(1.08); }
+.wsfc-cta:active { transform: translateY(1px); }
+.wsfc-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.95); outline-offset: 3px; }
+/* El acento dorado, discreto y en el MISMO sitio en las dos portadas. Dice que
+   lo de abajo es el producto de pago; no dice que la cuenta ya lo tenga. */
+.cvr-tier {
+  display: inline-block; margin-left: 8px; padding: 3px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(238,206,150,0.98);
+  border: 1px solid rgba(226,188,110,0.38); background: rgba(226,188,110,0.10);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsfc-cta { transition: none; }
+  .wsfc-cta:active { transform: none; }
+}
 /* 360px: se baja el padding lateral antes que comprimir texto. */
 @media (max-width: 374px) {
   /* El escenario conserva los 14 px de Intelligence también aquí: con 10 las dos
      portadas empezaban su superficie en columnas distintas (22 px frente a 26)
      en los móviles más estrechos. Los 4 px se recuperan dentro del panel, que en
      esta anchura ya baja su propio relleno. */
+  .wsfc-stage { padding-left: 14px; padding-right: 14px; }
+  .wsfc-panel { padding: 14px 12px; }
   .wsfc-cap { gap: 8px; padding: 9px 8px; }
   .wsfc-cap-ico { width: 26px; height: 26px; border-radius: 8px; }
   .wsfc-cap-svg { width: 17px; height: 17px; }
@@ -28092,21 +28047,45 @@ button.intv14-cmp-clear {
   .wsfc-caps { gap: 5px; }
   .wsfc-cap { min-height: 48px; padding: 7px 8px; }
 }
-/* ── TABLET Y ESCRITORIO (≥768) · tres por tres ─────────────────────────────
-   Cuatro columnas no cabían a 768 px («Diario de operaciones» partía en tres
-   líneas en 170 px); tres sí, en dos líneas como mucho, y nueve capacidades
-   cierran la rejilla sin huérfana. El ancho del panel lo pone la plantilla. */
+/* ── ANCHOS INTERMEDIOS (768–1023) · dos por cuatro ────────────────────────
+   §A lo pide explícitamente: cuatro columnas sólo cuando los nombres caben
+   cómodamente, y a 768 px no caben —«Diario de operaciones» partiría en tres
+   líneas en una celda de 170 px—. La composición se centra y no reparte vacío. */
 @media (min-width: 768px) {
-  .wsfc-caps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .wsfc-cap:last-child:nth-child(odd) { grid-column: auto; }
+  .wsfc-stage { padding: 20px 24px; }
+  /* Tablet: `.intprev-card` corta en 620, así que aquí también — misma columna
+     en la misma anchura, que es lo que hace que se lean como una sola casa. */
+  .wsfc-panel { max-width: 620px; margin: 0 auto; padding: 28px 30px; border-radius: 26px; }
+  .wsfc-caps { gap: 10px; }
   .wsfc-cap { min-height: 62px; padding: 12px 14px; }
+  .wsfc-cta-wrap { justify-content: flex-start; }
+  .wsfc-cta { width: auto; min-width: 300px; }
 }
+/* ── ESCRITORIO (≥1024) · cuatro columnas y dos filas ──────────────────────
+   Mismo ancho visual y misma escala tipográfica que `.intprev-card`: 860 px de
+   panel, título de 28 px, subtítulo de 16 px a 74ch, CTA de 54 px. Sin
+   `max-height`: en escritorio la altura la pone el contenido y la composición se
+   centra, que es lo que evita el panel diminuto flotando en un vacío negro. */
 @media (min-width: 1024px) {
-  .wsfc-caps  { gap: 12px; }
+  .wsfc-stage {
+    /* 68 px era un CUARTO número para el mismo cromo, y el que producía los 48 px
+       de diferencia contra Intelligence en ≥1024. Se unifica. */
+    min-height: calc(100dvh - var(--aurix-cover-chrome)); max-height: none; overflow: visible;
+    padding: clamp(24px, 4vh, 40px) 24px;
+  }
+  /* 860 px, el MISMO ancho que `.intprev-card`, que es la referencia declarada
+     de esta familia. Con 900 las dos portadas Free tenían columnas distintas y
+     al cambiar de pestaña la superficie saltaba 40 px. */
+  .wsfc-panel { max-width: 860px; padding: 34px 36px 30px; border-radius: 28px; }
+  .wsfc-title { font-size: 28px; }
+  .wsfc-sub   { font-size: 16px; max-width: 74ch; margin-bottom: 22px; }
+  .wsfc-caps  { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .wsfc-cap   { min-height: 64px; padding: 12px 13px; }
   .wsfc-cap-name { font-size: 14px; }
   .wsfc-cap-ico { width: 32px; height: 32px; }
   .wsfc-cap-svg { width: 19px; height: 19px; }
+  .wsfc-cta-wrap { margin-top: 24px; }
+  .wsfc-cta { min-width: 320px; min-height: 54px; font-size: 15.5px; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -29083,6 +29062,7 @@ input.ws4-num.is-invalid {
 .wsh-tier { font-size: 11px; letter-spacing: 0.04em; }
 .wsre-type-chip { font-size: 11px; letter-spacing: 0.02em; }
 .wsre-form-sec-t { font-size: 11px; letter-spacing: 0.05em; }
+.wsfc-eyebrow { font-size: 11px; letter-spacing: 0.13em; }
 /* Las leyendas dentro de los SVG (ejes del gráfico de compound y del donut de
    préstamos) estaban entre 8 y 10px. En un SVG el tamaño escala con el viewBox,
    así que se sube al suelo legible y el `viewBox` las sigue acomodando. */
@@ -29379,6 +29359,9 @@ input.ws4-num.is-invalid {
 /* Objetivos táctiles: la barra de pestañas es navegación primaria. */
 .wsh-tab { min-height: 44px; }
 
+/* Con un solo CTA la columna sobra, pero se conserva para que el ancla inferior
+   (`margin-top:auto`) siga siendo la del contenedor y no la del botón. */
+.wsfc-cta-wrap { gap: 0; }
 
 /* El botón Guardar de una cuenta sin plan: mismo sitio, misma altura, etiqueta
    Premium dentro. No se atenúa ni se deshabilita —está vivo y lleva al paywall—
@@ -29622,144 +29605,96 @@ input.ws4-num.is-invalid {
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
-   RESUMEN · PREMIUM GATEWAY — las promos de Intelligence y Workspace (sólo Free)
+   RESUMEN · DESCUBRIMIENTO DE INTELLIGENCE Y WORKSPACE (sólo Free)
    ════════════════════════════════════════════════════════════════════════════
-   UN componente para las dos: etiqueta Premium, visual protagonista, título,
-   beneficio y CTA, en ese orden y a la misma altura. Cada una con su objeto
-   (la esfera / la caja de herramientas) dentro de un pozo oscuro que hace de
-   «pantalla» de la demostración, para que se lean como productos y no como
-   cards patrimoniales. Profundidad Aurix: negro azulado, un filete eléctrico
-   LOCALIZADO en el borde superior y el halo sólo en la esfera.
-   Iguales por fila por ESTRUCTURA (`grid-auto-rows:1fr` + CTA con
-   `margin-top:auto`), también apiladas, sin fijar alturas que rompan una
-   traducción larga o el zoom. */
+   Dos tarjetas HERMANAS: mismo ancho, mismo relleno, misma jerarquía y el CTA
+   siempre abajo, a la misma altura, aunque un texto ocupe una línea más (por eso
+   el cuerpo crece y el botón se empuja con `margin-top:auto`, en vez de fijar
+   alturas que romperían una traducción larga o el zoom). Densidad controlada:
+   sin banner, sin paywall y sin copiar las portadas. */
 .wsdisc-sec { margin-top: var(--space-3, 16px); }
-.pgw-sr {
-  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
-  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+/* ── LAS DOS PROMOS SON UN PAR, TAMBIÉN APILADAS ─────────────────────────
+   En dos columnas la rejilla ya las igualaba por fila. Apiladas (≤ 640 px) cada
+   una caía en su propia fila y medían distinto: 269 px frente a 249 px a 360,
+   porque el texto de Intelligence envuelve una línea más que el de Workspace.
+   Un par que deja de ser par se nota más que cualquier adorno.
+   `grid-auto-rows: 1fr` las iguala por ESTRUCTURA, no con relleno: los 20 px
+   caen entre el texto y el CTA, que ya está anclado abajo en las dos, así que
+   los dos botones siguen leyéndose a la misma altura desde el borde. */
+.wsdisc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr; gap: var(--space-3, 16px); }
+.wsdisc-card {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 18px 20px; border-radius: 16px;
+  background: var(--elev-1); border: 1px solid rgba(var(--aurix-blue-rgb), 0.16);
 }
-.pgw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--space-3, 16px); }
-.pgw-card {
-  position: relative; display: flex; flex-direction: column; min-width: 0;
-  padding: 18px 20px 20px; border-radius: 20px;
-  background:
-    radial-gradient(120% 90% at 0% 0%, rgba(74,130,240,0.14), transparent 55%),
-    linear-gradient(180deg, rgba(22,32,58,0.97), rgba(13,19,36,0.98));
-  /* Con brillo bajo la tarjeta tiene que seguir separándose del lienzo (≥ 4,5 ΔL*). */
-  border: 1px solid rgba(var(--aurix-blue-rgb), 0.34);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.05);
-  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-  animation: pgwIn .2s ease-out both;
-}
-/* El borde eléctrico, LOCALIZADO: un filete en el tercio superior izquierdo. */
-.pgw-card::before {
-  content: ''; position: absolute; top: -1px; left: 22px; width: 42%; height: 1px; pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(130,180,255,0.85), transparent);
-}
-.pgw-card:hover, .pgw-card:focus-within {
-  transform: translateY(-2px);
-  border-color: rgba(var(--aurix-blue-rgb), 0.45);
-  box-shadow: 0 22px 46px rgba(0,0,0,0.40), 0 0 0 1px rgba(var(--aurix-blue-rgb), 0.10), inset 0 1px 0 rgba(255,255,255,0.06);
-}
-.pgw-head { display: flex; margin: 0 0 12px; }
-.pgw-tier { margin-left: 0; }
-.pgw-viz {
-  display: flex; align-items: center; gap: 18px; min-width: 0;
-  /* Alto mínimo con HOLGURA para las dos demostraciones: es lo que deja título, texto y
-     CTA en la misma posición en las dos tarjetas aunque una fila parta en dos líneas
-     (WebKit parte antes que Chromium). Mínimo, no fijo: un texto ampliado crece. */
-  min-height: 132px; margin: 0 0 16px; padding: 14px 16px; box-sizing: border-box;
-  border-radius: 14px; background: rgba(4,8,18,0.55); border: 1px solid rgba(var(--aurix-blue-rgb), 0.12);
-}
-/* La esfera Aurix, protagonista. El halo vive en un pseudoelemento centrado y el
-   pozo le reserva sitio (el gotcha del orbe: su halo no acaba en su caja). */
-.pgw-orb {
-  position: relative; flex: 0 0 auto; width: 58px; height: 58px; border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 30%, rgba(200,222,255,0.98), rgba(90,150,255,0.6) 38%, rgba(40,80,190,0.32) 62%, transparent 72%),
-    radial-gradient(circle at 50% 50%, rgba(74,130,240,0.32), transparent 70%);
-  box-shadow: 0 0 26px rgba(74,130,240,0.36);
-  animation: pgwOrb .22s ease-out both;
-}
-.pgw-orb::after {
-  content: ''; position: absolute; left: 50%; top: 50%; width: 84px; height: 84px;
-  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
-  border: 1px solid rgba(120,170,255,0.22);
-  background: radial-gradient(circle, rgba(74,130,240,0.12), transparent 68%);
-}
-/* La caja de herramientas: las capacidades publicadas, con su acento. */
-.pgw-mosaic { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, 20px); gap: 5px; }
-.pgw-tile {
-  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px;
-  color: var(--aurix-blue, #4A82F0); background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.22);
-  animation: pgwIn .2s ease-out both;
-}
-.pgw-tile[data-ws-accent] { color: rgb(var(--ws-a)); background: rgba(var(--ws-a), 0.13); border-color: rgba(var(--ws-a), 0.26); }
-.pgw-tile .wsfc-cap-svg { width: 13px; height: 13px; }
-.pgw-rows { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.pgw-row { display: flex; align-items: flex-start; gap: 9px; min-width: 0; font-size: 13px; line-height: 1.4; color: rgba(228,236,252,0.94); }
-.pgw-row-t { min-width: 0; overflow-wrap: anywhere; }
-.pgw-row-ic { flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 18px; }
-.pgw-row-ic.is-dot::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(120,170,255,0.95); box-shadow: 0 0 8px rgba(90,140,255,0.7);
-}
-.pgw-row[data-ws-accent] .pgw-row-ic.is-dot::before { background: rgb(var(--ws-a)); box-shadow: 0 0 8px rgba(var(--ws-a), 0.6); }
-.pgw-row.is-real { font-weight: 600; color: rgba(255,255,255,0.96); }
-.pgw-row.is-locked { color: rgba(176,196,232,0.82); }
-.pgw-row-ic.is-lock { color: rgba(160,192,255,0.85); }
-.pgw-row-ic.is-lock .wsfc-cap-svg { width: 14px; height: 14px; }
-.pgw-verb { font-weight: 700; color: rgb(var(--ws-a, 120,170,255)); }
-.pgw-t { margin: 0 0 6px; font-size: 17px; font-weight: 750; color: var(--text-bright); letter-spacing: -0.005em; }
-.pgw-b { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
-.pgw-cta {
+.wsdisc-viz { display: flex; align-items: center; min-height: 44px; }
+.wsdisc-body { min-width: 0; }
+.wsdisc-t { margin: 0 0 6px; font-size: 16px; font-weight: 750; color: var(--text-bright); letter-spacing: -0.005em; }
+.wsdisc-b { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
+.wsdisc-cta {
   margin-top: auto; align-self: flex-start;
-  display: inline-flex; align-items: center; gap: 8px;
+  display: inline-flex; align-items: center; gap: 7px;
   min-height: 44px; padding: 0 18px; border-radius: 12px; cursor: pointer;
-  font-size: 14px; font-weight: 700; color: #fff;
-  border: 1px solid rgba(120,170,255,0.55);
-  background: linear-gradient(180deg, rgba(90,145,255,1), rgba(58,110,232,1));
-  box-shadow: 0 6px 18px rgba(60,110,255,0.22);
+  background: rgba(var(--aurix-blue-rgb), 0.14);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.34);
+  color: #cfe0ff; font-size: 14px; font-weight: 700;
 }
-/* La tarjeta entera es la zona de clic: el ::after del ÚNICO botón la cubre, así
-   que hay una parada de foco y un nombre accesible, no un <article> clicable. */
-.pgw-cta::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
-/* El `button:active { transform: scale(.96) }` global convertiría al CTA en bloque contenedor
-   de su propio ::after al pulsar: la zona de clic se encogería a la caja del botón entre
-   pulsar y soltar, y el clic acabaría en la tarjeta sin llevar a ninguna parte. */
-.pgw-cta:active { transform: none; }
-.pgw-card .pgw-cta::after { border-radius: 20px; }
-.pgw-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.95); outline-offset: 3px; }
-.pgw-chev { font-size: 16px; line-height: 1; opacity: 0.85; }
-/* Entrada ÚNICA: opacidad (y la esfera, una escala mínima). Nada se mueve sobre el
-   texto y nada ocupa sitio distinto al final: cero desplazamiento de maquetación. */
-/* En dos columnas las tarjetas COMPARTEN filas (subgrid): la banda visual mide lo que mida
-   la más alta de las dos, así que título, texto y CTA quedan a la misma altura por
-   ESTRUCTURA aunque una lectura parta en más líneas (inglés, 768 px, WebKit). Sin subgrid,
-   el alto mínimo de la banda y el CTA anclado abajo siguen igualándolas. */
-@supports (grid-template-rows: subgrid) {
-  @media (min-width: 701px) {
-    .pgw-grid { grid-auto-rows: auto; grid-template-rows: auto auto auto 1fr auto; row-gap: 0; }
-    .pgw-card { display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 0; }
-    .pgw-cta { align-self: end; justify-self: start; }
-    .pgw-head { justify-self: start; }
-  }
+.wsdisc-cta:hover { background: rgba(var(--aurix-blue-rgb), 0.22); }
+.wsdisc-cta:focus-visible { outline: 2px solid rgba(var(--aurix-blue-rgb), 0.9); outline-offset: 2px; }
+.wsdisc-chev { font-size: 16px; line-height: 1; opacity: 0.8; }
+
+/* El halo de Intelligence: gradiente, no imagen ni animación permanente. Está
+   para situar el producto, no para competir con las cifras de arriba. */
+/* §17 — EL ORBE CON SU HALO, y con SITIO para el halo. Este repositorio ya tiene escrito el
+   gotcha: «el orbe NO acaba en su caja: su halo exige ~19 px extra». Así que el anillo se dibuja
+   en un pseudoelemento CENTRADO y la banda visual reserva altura para él — si se añadiera sólo
+   una sombra más grande, el halo se recortaría contra la tarjeta. La señal es un anillo
+   estático: sin bucle, porque una promo que late permanentemente compite con las cifras del
+   patrimonio que hay justo encima (§6). */
+.wsdisc-orb {
+  position: relative;
+  width: 44px; height: 44px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 30%, rgba(190,215,255,0.95), rgba(90,150,255,0.55) 38%, rgba(40,80,190,0.30) 62%, transparent 72%),
+    radial-gradient(circle at 50% 50%, rgba(74,130,240,0.30), transparent 70%);
+  box-shadow: 0 0 22px rgba(74,130,240,0.30);
 }
-@keyframes pgwIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pgwOrb { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: none; } }
-.pgw-settled .pgw-card, .pgw-settled .pgw-orb, .pgw-settled .pgw-tile { animation: none; }
+.wsdisc-orb::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 76px; height: 76px; transform: translate(-50%, -50%);
+  border-radius: 50%; pointer-events: none;
+  border: 1px solid rgba(120,170,255,0.20);
+  background: radial-gradient(circle, rgba(74,130,240,0.10), transparent 68%);
+}
+/* La banda reserva el alto del halo: 76 px de anillo sobre 44 de orbe. */
+.wsdisc-card.is-int .wsdisc-viz { min-height: 80px; align-items: center; padding-left: 18px; }
+.wsdisc-card.is-int .wsdisc-orb { margin: 0; }
+/* §18/§19 — y la de Workspace consume el acento de cada capacidad por la API compartida: tres
+   azules idénticos hacían que la promo operativa se leyera igual de monocroma que la analítica. */
+.wsdisc-ic[data-ws-accent] {
+  color: rgb(var(--ws-a));
+  background: rgba(var(--ws-a), 0.12);
+  border-color: rgba(var(--ws-a), 0.24);
+}
+.wsdisc-card.is-ws .wsdisc-viz { min-height: 80px; align-items: center; }
+/* Los iconos de Workspace: tres de su propia familia, no el catálogo entero. */
+.wsdisc-icons { display: inline-flex; gap: 8px; }
+.wsdisc-ic {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
+  color: var(--aurix-blue, #4A82F0);
+  background: rgba(74,130,240,0.10); border: 1px solid rgba(74,130,240,0.20);
+}
+.wsdisc-ic .wsfc-cap-svg { width: 21px; height: 21px; }
+
 @media (max-width: 700px) {
-  .pgw-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .pgw-card { padding: 16px; }
-  .pgw-viz { gap: 16px; padding: 14px; min-height: 160px; }
-  .pgw-orb { width: 50px; height: 50px; }
-  .pgw-orb::after { width: 74px; height: 74px; }
-  .pgw-cta { align-self: stretch; justify-content: center; }
+  /* Apiladas, con la MISMA arquitectura: no cambia el orden ni la jerarquía. */
+  .wsdisc-grid { grid-template-columns: 1fr; gap: 12px; }
+  .wsdisc-card { padding: 16px 16px; }
+  .wsdisc-cta { align-self: stretch; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pgw-card, .pgw-orb, .pgw-tile { animation: none; }
-  .pgw-card { transition: none; }
-  .pgw-card:hover, .pgw-card:focus-within { transform: none; }
+  .wsdisc-cta { transition: none; }
 }
 
 
@@ -30602,10 +30537,12 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
 .market-status.crypto .dot { background: #c39bff; }
 .wsc-ylab { color: #b7c3d8; }                                   /* ejes: 3,22 → ≥ 4,5 */
 .mobile-chart-wrap .wsc-ylab { opacity: 1; }
-/* SPEC 2 · portada Free de Workspace: el ejemplo de uso es su PROMESA (plantilla `.cvr-*`, que
-   la omite en pantallas bajas para las dos portadas). El ejemplo NO puede comerse el encaje certificado de la portada (CTA sin scroll a 360×740): en
+/* SPEC 2 · portada Free de Workspace: un ejemplo de uso concreto bajo el subtítulo. */
+.wsfc-eg { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: #c2ccdd; }
+/* El ejemplo NO puede comerse el encaje certificado de la portada (CTA sin scroll a 360×740): en
    pantallas bajas se omite; el paywall al que lleva el CTA ya da ejemplos por capacidad. */
-
+.wsfc-sub + .wsfc-eg { margin-top: 4px; }
+@media (max-height: 760px) { .wsfc-eg { display: none; } }
 
 /* ══════════════════════════════════════════════════════════════════════════
    SPEC 2 · PRESUPUESTO — CABECERA COMPACTA (moneda + periodo) y TRES cifras debajo.
@@ -31434,6 +31371,65 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
    Sólo presentación sobre las clases existentes: mismas dos tarjetas, mismos
    destinos, mismo paywall y mismas acciones de cobro. */
 
+/* Las dos tarjetas Free: familia negro/azul con profundidad sutil — un degradado
+   que se apaga hacia abajo, un filo de luz arriba y el acento de cada superficie
+   como hilo superior. Siguen siendo hermanas (misma rejilla, mismo CTA abajo). */
+.wsdisc-card {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(var(--aurix-blue-rgb), 0.12), transparent 60%),
+    linear-gradient(180deg, rgba(19, 28, 50, 0.96), rgba(10, 15, 28, 0.98));
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 40px -30px rgba(0, 0, 0, 0.8);
+  transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.wsdisc-card::before {
+  content: ''; position: absolute; left: 20px; right: 20px; top: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(120, 170, 255, 0.55), transparent);
+}
+.wsdisc-card.is-ws::before { background: linear-gradient(90deg, transparent, rgba(110, 200, 220, 0.45), rgba(160, 130, 255, 0.40), transparent); }
+.wsdisc-card:hover { border-color: rgba(var(--aurix-blue-rgb), 0.34); transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 44px -28px rgba(0, 0, 0, 0.85); }
+.wsdisc-card:focus-within { border-color: rgba(var(--aurix-blue-rgb), 0.42); }
+.wsdisc-b { color: #aab6cb; }
+.wsdisc-cta {
+  background: linear-gradient(180deg, rgba(var(--aurix-blue-rgb), 0.26), rgba(var(--aurix-blue-rgb), 0.16));
+  border-color: rgba(var(--aurix-blue-rgb), 0.46); color: #e2ecff;
+  transition: background .15s ease, border-color .15s ease;
+}
+.wsdisc-cta:hover { background: linear-gradient(180deg, rgba(var(--aurix-blue-rgb), 0.36), rgba(var(--aurix-blue-rgb), 0.22)); border-color: rgba(var(--aurix-blue-rgb), 0.62); }
+.wsdisc-cta:hover .wsdisc-chev { transform: translateX(2px); }
+.wsdisc-chev { transition: transform .15s ease; }
+/* Móvil: compactas — el detalle gráfico a la izquierda del título, el CTA a todo
+   el ancho debajo. Misma jerarquía, la mitad de alto. */
+@media (max-width: 700px) {
+  /* Contenido anclado ARRIBA y CTA ABAJO: título y texto empiezan a la misma altura en las dos
+     tarjetas, y el sobrante del par igualado cae entre el texto y el botón (que no se estira). */
+  .wsdisc-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr auto;
+    column-gap: 14px; row-gap: 12px; align-items: start; }
+  .wsdisc-card .wsdisc-cta { align-self: end; height: 44px; }
+  .wsdisc-card .wsdisc-viz { min-height: 0; padding-left: 0; }
+  .wsdisc-card.is-int .wsdisc-viz { width: 52px; justify-content: center; padding-left: 0; }
+  .wsdisc-card.is-int .wsdisc-orb { width: 34px; height: 34px; }
+  .wsdisc-card.is-int .wsdisc-orb::after { width: 52px; height: 52px; }
+  .wsdisc-card.is-ws .wsdisc-ic { width: 30px; height: 30px; border-radius: 9px; }
+  .wsdisc-card.is-ws .wsdisc-ic .wsfc-cap-svg { width: 16px; height: 16px; }
+  .wsdisc-card.is-ws .wsdisc-viz { width: 52px; justify-content: flex-start; }
+  .wsdisc-card.is-ws .wsdisc-icons { flex-direction: row; gap: 0; position: relative; width: 52px; height: 40px; }
+  .wsdisc-card.is-ws .wsdisc-ic { position: absolute; }
+  .wsdisc-card.is-ws .wsdisc-ic:nth-child(1) { left: 0; top: 0; }
+  .wsdisc-card.is-ws .wsdisc-ic:nth-child(2) { left: 11px; top: 5px; }
+  .wsdisc-card.is-ws .wsdisc-ic:nth-child(3) { left: 22px; top: 10px; }
+  .wsdisc-cta { grid-column: 1 / -1; margin-top: 0; }
+  .wsdisc-t { font-size: 15.5px; margin-bottom: 4px; }
+  .wsdisc-b { font-size: 13px; line-height: 1.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsdisc-card, .wsdisc-chev { transition: none; }
+  .wsdisc-card:hover { transform: none; }
+  .wsdisc-cta:hover .wsdisc-chev { transform: none; }
+}
+
 /* Paywall — tarjetas de plan con la MISMA estructura: el botón anclado abajo en
    las dos, así precios, periodicidad y botones quedan alineados aunque una lleve
    una línea más. */
@@ -31648,6 +31644,31 @@ html body .auth-btn:disabled {
   :is(.btn-summary-action) { min-height: 44px; }
 }
 
+/* ── PROMOCIONES FREE · motivo propio de cada superficie (abstracto, sin datos) ───────
+   Mismo par: la banda superior reserva el mismo alto en las dos, el motivo se alinea a la
+   derecha y el título/CTA no se mueven. Sin animación permanente; un realce de 180 ms al
+   pasar por encima, y nada con movimiento reducido. En móvil la versión compacta no lo lleva. */
+.wsdisc-viz { gap: 16px; }
+.wsdisc-motif { margin-left: auto; width: 132px; height: 64px; flex: 0 0 auto; overflow: visible; }
+.wsdisc-motif .m-grid line { stroke: var(--chart-grid); stroke-width: 1; }
+.wsdisc-motif .m-bar { fill: rgba(74,130,240,0.30); transform-origin: 0 50%; transform-box: fill-box; transition: fill .18s ease; }
+.wsdisc-motif .m-b1 { fill: rgba(141,180,255,0.62); }
+.wsdisc-motif .m-b2 { fill: rgba(74,130,240,0.48); }
+.wsdisc-motif .m-mark { fill: #cfe0ff; }
+.wsdisc-motif .m-mark-ring { fill: none; stroke: rgba(141,180,255,0.45); stroke-width: 1.2; }
+.wsdisc-motif .m-ring { fill: none; stroke: rgba(165,196,255,0.12); stroke-width: 7; }
+.wsdisc-motif .m-arc { fill: none; stroke-width: 7; transform: rotate(-90deg); }
+.wsdisc-motif .m-a1 { stroke: var(--accent-turquoise); }
+.wsdisc-motif .m-a2 { stroke: var(--aurix-blue); }
+.wsdisc-motif .m-a3 { stroke: var(--accent-violet); }
+.wsdisc-motif .m-curve { fill: none; stroke: var(--text-link); stroke-width: 2; stroke-linecap: round; }
+.wsdisc-motif .m-track { fill: rgba(165,196,255,0.12); }
+.wsdisc-motif .m-fill { fill: var(--accent-turquoise); }
+.wsdisc-card:hover .wsdisc-motif .m-b1 { fill: rgba(141,180,255,0.80); }
+.wsdisc-card { border-color: var(--border-default); }
+.wsdisc-card:hover { border-color: var(--border-interactive); }
+@media (max-width: 700px) { .wsdisc-motif { display: none; } }
+@media (prefers-reduced-motion: reduce) { .wsdisc-motif .m-bar { transition: none; } }
 /* Teselas de herramienta de Workspace: borde de la escala (su identidad de capacidad no cambia). */
 .wsh-tool { border-color: var(--border-default); }
 
