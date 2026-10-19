@@ -40,6 +40,7 @@ const FOREIGN_SECRET_ENVS = [
   'CRON_SECRET',
   'PIN_HASH',
   'AURIX_AFFILIATE_CONTROL_TOKEN',   // AURIX-AFFILIATES-V1: leer no es controlar
+  'AURIX_PREMIUM_CONTROL_TOKEN',     // AURIX-PREMIUM-ACCESS-V1: ídem
 ];
 
 /** true si alguien ha reutilizado otro secreto del proyecto como token Founder. */
