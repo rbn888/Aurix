@@ -29635,10 +29635,12 @@ input.ws4-num.is-invalid {
    Iguales por fila por ESTRUCTURA (`grid-auto-rows:1fr` + CTA con
    `margin-top:auto`, y subgrid en dos columnas), sin fijar alturas que rompan
    una traducción larga o el zoom.
-   MOVIMIENTO: sólo luz (opacity/transform), nunca geometría. La entrada corre
-   UNA vez al entrar en el viewport (`.pgw-live`, la arma `_pgwArmEntrance`) y
-   después `.pgw-done`; el hover/focus sólo enciende borde y luces. Nada depende
-   del hover en táctil y el movimiento reducido deja el estado final. */
+   MOVIMIENTO: sólo luz (opacity/transform), nunca geometría. Una luz AMBIENTAL
+   lenta —la esfera respira (~6 s) y las herramientas se encienden en secuencia
+   (~8 s, con varios segundos de reposo)— que sólo corre mientras la sección se
+   ve y la pestaña está activa (`.pgw-on`, lo decide `_pgwArmEntrance`); fuera de
+   ahí queda en pausa. El hover/focus sólo aviva borde y luces. Nada depende del
+   hover en táctil y el movimiento reducido deja la composición estática. */
 .wsdisc-sec { margin-top: var(--space-3, 16px); }
 .pgw-sr {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
@@ -29674,7 +29676,9 @@ input.ws4-num.is-invalid {
      CTA en la misma posición en las dos tarjetas aunque una fila parta en dos líneas
      (WebKit parte antes que Chromium). Mínimo, no fijo: un texto ampliado crece. Hereda
      el alto de la etiqueta retirada, así que la tarjeta conserva sus medidas. */
-  min-height: 164px; margin: 0 0 16px; padding: 14px 16px; box-sizing: border-box;
+  /* 8 px del margen inferior pasan al alto del pozo (172 + 8 = 164 + 16): la caja de
+     herramientas gana sitio sin que la tarjeta ni su título se muevan. */
+  min-height: 172px; margin: 0 0 8px; padding: 14px 16px; box-sizing: border-box;
   border-radius: 14px; background: rgba(4,8,18,0.55); border: 1px solid rgba(var(--aurix-blue-rgb), 0.12);
 }
 /* La esfera Aurix, protagonista y cerca de su lectura. El halo vive en un pseudoelemento
@@ -29688,34 +29692,45 @@ input.ws4-num.is-invalid {
     radial-gradient(circle at 50% 50%, rgba(74,130,240,0.32), transparent 70%);
   box-shadow: 0 0 26px rgba(74,130,240,0.36);
 }
+.pgw-orb { transition: filter .3s ease; }
+/* La luz interior: un brillo más pequeño que la esfera (inset 14 %) que se desliza unos
+   píxeles DENTRO de ella; nunca asoma por el borde. */
 .pgw-orb::before {
-  content: ''; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle at 40% 36%, rgba(235,244,255,0.85), rgba(120,175,255,0.35) 42%, transparent 70%);
-  opacity: 0; transition: opacity .24s ease;
+  content: ''; position: absolute; inset: 14%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 40% 38%, rgba(235,244,255,0.9), rgba(140,185,255,0.35) 46%, transparent 72%);
+  opacity: .28;
 }
 .pgw-orb::after {
   content: ''; position: absolute; left: 50%; top: 50%; width: 84px; height: 84px;
   transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
   border: 1px solid rgba(120,170,255,0.22);
   background: radial-gradient(circle, rgba(74,130,240,0.12), transparent 68%);
-  transition: opacity .24s ease;
 }
-.pgw-card:hover .pgw-orb::before, .pgw-card:focus-within .pgw-orb::before { opacity: .55; }
-/* La caja de herramientas: los nueve iconos publicados, 3×3, cada uno con su acento.
-   Su luz (::after) se enciende en secuencia al entrar y se templa con el hover/focus. */
-.pgw-mosaic { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, 28px); gap: 7px; }
+/* Hover/focus: un poco más de luz, sin tocar geometría. */
+.pgw-card:hover .pgw-orb, .pgw-card:focus-within .pgw-orb { filter: brightness(1.12); }
+/* El halo (84 px sobre 60) sobresale 12 px de la esfera (13 con la respiración): el pozo le deja
+   24 al borde y 18 al texto, así que nunca toca ni uno ni otro. */
+.pgw-card.is-int .pgw-viz { gap: 18px; padding-left: 24px; }
+/* LA CAJA DE HERRAMIENTAS, UNA SOLA COMPOSICIÓN: rejilla 3×3 de los nueve iconos publicados
+   + los tres verbos, centrada en el pozo y con la MISMA altura total que la rejilla (cada verbo
+   frente a su fila). `--t` es el lado de la tesela y `--g` la separación; bajan con el ancho. */
+.pgw-card.is-ws .pgw-viz { --t: 46px; --g: 9px; justify-content: center; gap: 44px; padding-block: 7px; }
+.pgw-mosaic { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, var(--t, 28px)); grid-auto-rows: var(--t, 28px); gap: var(--g, 7px); }
 .pgw-tile {
-  position: relative; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  position: relative; display: grid; place-items: center; width: var(--t, 28px); height: var(--t, 28px); border-radius: 12px;
   color: var(--aurix-blue, #4A82F0); background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.22);
+  transition: border-color .3s ease;
 }
 .pgw-tile[data-ws-accent] { color: rgb(var(--ws-a)); background: rgba(var(--ws-a), 0.13); border-color: rgba(var(--ws-a), 0.26); }
-.pgw-tile .wsfc-cap-svg { width: 17px; height: 17px; }
+.pgw-tile .wsfc-cap-svg { width: calc(var(--t, 28px) * .5); height: calc(var(--t, 28px) * .5); }
+/* La luz de cada tesela es INTERIOR (no sangra fuera del pozo): se enciende por turnos. */
 .pgw-tile::after {
   content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
-  box-shadow: 0 0 0 1px rgba(var(--ws-a, 120,170,255), 0.6), 0 0 10px rgba(var(--ws-a, 120,170,255), 0.35);
-  opacity: 0; transition: opacity .24s ease;
+  box-shadow: inset 0 0 0 1px rgba(var(--ws-a, 120,170,255), 0.75), inset 0 0 16px rgba(var(--ws-a, 120,170,255), 0.42);
+  opacity: 0;
 }
-.pgw-card:hover .pgw-tile::after, .pgw-card:focus-within .pgw-tile::after { opacity: .4; }
+.pgw-card:hover .pgw-tile[data-ws-accent], .pgw-card:focus-within .pgw-tile[data-ws-accent] { border-color: rgba(var(--ws-a), 0.5); }
+.pgw-card.is-ws .pgw-rows { flex: 0 0 auto; display: grid; grid-template-rows: repeat(3, var(--t)); row-gap: var(--g); align-items: center; gap: var(--g) 0; }
 .pgw-rows { list-style: none; margin: 0; padding: 0; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .pgw-row { display: flex; align-items: flex-start; gap: 9px; min-width: 0; font-size: 13px; line-height: 1.4; color: rgba(228,236,252,0.94); }
 .pgw-row-t { min-width: 0; overflow-wrap: anywhere; }
@@ -29730,8 +29745,7 @@ input.ws4-num.is-invalid {
 .pgw-row-ic.is-lock { color: rgba(160,192,255,0.85); }
 .pgw-row-ic.is-lock .wsfc-cap-svg { width: 14px; height: 14px; }
 /* Los tres verbos de Workspace, solos: más cuerpo, y el acento de la herramienta que lo hace. */
-.pgw-rows:has(.is-verb) { gap: 12px; }
-.pgw-row.is-verb { font-size: 15px; line-height: 1.3; align-items: center; }
+.pgw-row.is-verb { font-size: 19px; line-height: 1.2; align-items: center; letter-spacing: -0.005em; }
 .pgw-verb { font-weight: 700; color: rgb(var(--ws-a, 120,170,255)); }
 .pgw-t { margin: 0 0 6px; font-size: 17px; font-weight: 750; color: var(--text-bright); letter-spacing: -0.005em; }
 .pgw-b { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
@@ -29765,35 +29779,54 @@ input.ws4-num.is-invalid {
     .pgw-cta { align-self: end; justify-self: start; }
   }
 }
-/* LA ENTRADA, UNA VEZ: el pulso de la esfera (escala mínima + su luz interior) y el
-   encendido escalonado de las nueve herramientas. Ninguna anima geometría ni texto. */
-@keyframes pgwOrbPulse { 0% { transform: scale(1); } 45% { transform: scale(1.045); } 100% { transform: scale(1); } }
-@keyframes pgwGlow     { 0% { opacity: 0; } 45% { opacity: .9; } 100% { opacity: 0; } }
-.pgw-live .pgw-orb { animation: pgwOrbPulse .52s ease-out 1; }
-.pgw-live .pgw-orb::before { animation: pgwGlow .52s ease-out 1; }
-.pgw-live .pgw-tile::after { animation: pgwGlow .36s ease-out 1; }
-.pgw-live .pgw-tile:nth-child(2)::after { animation-delay: .04s; }
-.pgw-live .pgw-tile:nth-child(3)::after { animation-delay: .08s; }
-.pgw-live .pgw-tile:nth-child(4)::after { animation-delay: .12s; }
-.pgw-live .pgw-tile:nth-child(5)::after { animation-delay: .16s; }
-.pgw-live .pgw-tile:nth-child(6)::after { animation-delay: .20s; }
-.pgw-live .pgw-tile:nth-child(7)::after { animation-delay: .24s; }
-.pgw-live .pgw-tile:nth-child(8)::after { animation-delay: .28s; }
-.pgw-live .pgw-tile:nth-child(9)::after { animation-delay: .32s; }
+/* LA LUZ AMBIENTAL. La esfera: su brillo interior se desliza unos píxeles y el halo respira
+   (≤ scale 1.02), 6 s ease-in-out. Las herramientas: se encienden por turnos en ~2 s y
+   descansan ~6 antes de repetir (ciclo de 8 s). Sólo transform/opacity; en PAUSA salvo con
+   `.pgw-on` (sección visible y pestaña activa). */
+@keyframes pgwOrbLight { 0%, 100% { transform: translate(-3px, -3px); opacity: .24; } 50% { transform: translate(4px, 3px); opacity: .5; } }
+@keyframes pgwHalo     { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .78; } 50% { transform: translate(-50%, -50%) scale(1.02); opacity: 1; } }
+@keyframes pgwCycle    { 0% { opacity: 0; } 3% { opacity: .9; } 9% { opacity: 0; } 100% { opacity: 0; } }
+.pgw-orb::before { animation: pgwOrbLight 6s ease-in-out infinite paused; }
+.pgw-orb::after  { animation: pgwHalo 6s ease-in-out infinite paused; }
+.pgw-tile::after { animation: pgwCycle 8s linear infinite paused; }
+.pgw-tile:nth-child(2)::after { animation-delay: .22s; }
+.pgw-tile:nth-child(3)::after { animation-delay: .44s; }
+.pgw-tile:nth-child(4)::after { animation-delay: .66s; }
+.pgw-tile:nth-child(5)::after { animation-delay: .88s; }
+.pgw-tile:nth-child(6)::after { animation-delay: 1.1s; }
+.pgw-tile:nth-child(7)::after { animation-delay: 1.32s; }
+.pgw-tile:nth-child(8)::after { animation-delay: 1.54s; }
+.pgw-tile:nth-child(9)::after { animation-delay: 1.76s; }
+.pgw-on .pgw-orb::before, .pgw-on .pgw-orb::after, .pgw-on .pgw-tile::after { animation-play-state: running; }
 /* Dos columnas estrechas (701–1023): v846 medía aquí lo que medían las filas de Workspace
    partidas en dos líneas; sin esa repetición, el pozo conserva ese alto por mínimo. */
-@media (min-width: 701px) and (max-width: 1023px) { .pgw-viz { min-height: 187px; } }
+@media (min-width: 701px) and (max-width: 1023px) {
+  .pgw-viz { min-height: 195px; }
+  .pgw-card.is-ws .pgw-viz { --t: 36px; --g: 8px; gap: 24px; }
+  .pgw-row.is-verb { font-size: 16px; }
+}
 @media (max-width: 700px) {
   .pgw-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .pgw-card { padding: 16px; }
-  .pgw-viz { gap: 14px; padding: 14px; min-height: 192px; }
+  .pgw-viz { gap: 14px; padding: 14px; min-height: 200px; }
+  .pgw-card.is-ws .pgw-viz { --t: 42px; --g: 9px; gap: 32px; }
+  .pgw-row.is-verb { font-size: 17px; }
   .pgw-orb { width: 54px; height: 54px; }
   .pgw-orb::after { width: 76px; height: 76px; }
   .pgw-cta { align-self: stretch; justify-content: center; }
 }
+/* Escritorio estrecho (1024–1279, tarjeta de ~470 px): la misma composición, proporcionalmente
+   menor, para seguir en ~60–70 % del ancho útil. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .pgw-card.is-ws .pgw-viz { --t: 42px; --g: 8px; gap: 32px; }
+  .pgw-row.is-verb { font-size: 18px; }
+}
+@media (max-width: 374px) {
+  .pgw-card.is-ws .pgw-viz { --t: 38px; --g: 8px; gap: 24px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .pgw-live .pgw-orb, .pgw-live .pgw-orb::before, .pgw-live .pgw-tile::after { animation: none; }
-  .pgw-card, .pgw-card::before, .pgw-orb::before, .pgw-orb::after, .pgw-tile::after { transition: none; }
+  .pgw-orb::before, .pgw-orb::after, .pgw-tile::after { animation: none; }
+  .pgw-card, .pgw-card::before, .pgw-orb, .pgw-tile { transition: none; }
 }
 
 
