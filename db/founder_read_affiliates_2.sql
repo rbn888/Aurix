@@ -17,6 +17,12 @@
 --   Las cuatro son null cuando el cobro no tiene desglose (cobros anteriores a
 --   V2, o un desglose rechazado): Founder lo trata como base NO certificable.
 --   Aurix no calcula la base, ni el IVA, ni la comisión: publica lo que Stripe dijo.
+--   Y una quinta, `paidBefore` (boolean): la cuenta ya había PAGADO Premium antes
+--   de este cobro —otro cobro pagado (a) o el Premium histórico sembrado al
+--   aplicar v1 (c)—. Es `premiumBefore` SIN la cláusula (b): un acceso gratuito
+--   administrativo (entitlement_overrides), vigente, caducado o revocado, no
+--   convierte a nadie en cliente pagador anterior. `premiumBefore` sigue
+--   publicándose idéntico para el programa clásico.
 --   Todo lo demás (filtros, premiumBefore, topes, registry, grants) es v1 byte a byte.
 --
 -- NO SE VUELVE A SEMBRAR affiliate_premium_backfill: v1 ya lo hizo al aplicarse,
@@ -56,6 +62,15 @@ as $$
              or exists (select 1 from public.affiliate_premium_backfill b
                          where b.user_id = p.user_id and b.seeded_at < p.paid_at)
            ) as premium_before,
+           -- V2: pagador anterior = (a) o (c). Un Premium gratuito no cuenta.
+           (
+             exists (select 1 from public.billing_payments e
+                      where e.provider = p.provider and e.user_id = p.user_id
+                        and e.invoice_id <> p.invoice_id
+                        and e.amount_paid_cents > 0 and e.paid_at < p.paid_at)
+             or exists (select 1 from public.affiliate_premium_backfill b
+                         where b.user_id = p.user_id and b.seeded_at < p.paid_at)
+           ) as paid_before,
            -- V2: desglose de Stripe, si existe (LEFT JOIN: un cobro sin desglose
            -- —anterior a V2— sale con las cuatro claves a null, nunca a 0).
            bd.subtotal_cents as bd_subtotal_cents,
@@ -113,6 +128,7 @@ as $$
                'paidAt',          pay.paid_at,
                'livemode',        pay.livemode,
                'premiumBefore',   pay.premium_before,
+               'paidBefore',      pay.paid_before,
                'subtotalCents',   pay.bd_subtotal_cents,
                'discountCents',   pay.bd_discount_cents,
                'taxCents',        pay.bd_tax_cents,

@@ -49,3 +49,11 @@ certificable.
 
 Pérdida de datos: los desgloses registrados (exportarlos antes si ya se usaron para pagar). No toca cobros,
 reembolsos, disputas, `billing_events`, suscripciones ni el acceso Premium.
+
+## Premium gratuito y primera compra
+
+La lectura v2 publica también `paidBefore`: la cuenta ya había PAGADO Premium
+antes de ese cobro (otro cobro pagado, o el Premium histórico sembrado al
+aplicar v1). Un acceso gratuito administrativo —vigente, caducado o revocado—
+no cuenta. El Programa Influencers usa `paidBefore`; el clásico sigue usando
+`premiumBefore`, idéntico a v1.

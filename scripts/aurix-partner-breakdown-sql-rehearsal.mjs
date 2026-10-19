@@ -142,15 +142,19 @@ await db.exec(`delete from public.billing_payment_breakdowns where invoice_id = 
 console.log('\nLECTURA v2');
 const OUT_V2 = (await q1(`select public.founder_read_affiliates() as r`)).r;
 const P = Object.fromEntries(OUT_V2.payments.map(p => [p.invoiceId, p]));
-const NEW = ['discountCents', 'subtotalCents', 'taxCents', 'taxStatus'];
-ok('cada cobro = las 12 claves de v1 + las 4 nuevas',
+const NEW = ['discountCents', 'paidBefore', 'subtotalCents', 'taxCents', 'taxStatus'];
+ok('cada cobro = las 12 claves de v1 + las 5 nuevas',
   OUT_V2.payments.every(p => eq(Object.keys(p).sort(), [...V1_KEYS, ...NEW].sort())), JSON.stringify(Object.keys(OUT_V2.payments[0])));
 const pick = (p) => ({ subtotalCents: p.subtotalCents, discountCents: p.discountCents, taxCents: p.taxCents, taxStatus: p.taxStatus });
 ok('cobro con desglose computed ⇒ cifras de Stripe', eq(pick(P.in_a), { subtotalCents: 6999, discountCents: 500, taxCents: 1128, taxStatus: 'computed' }), JSON.stringify(pick(P.in_a)));
 ok('cobro not_computed ⇒ taxCents null (no 0)', eq(pick(P.in_a2), { subtotalCents: 799, discountCents: 0, taxCents: null, taxStatus: 'not_computed' }), JSON.stringify(pick(P.in_a2)));
-ok('cobro sin desglose ⇒ las 4 claves PRESENTES y null', NEW.every(k => k in P.in_b && P.in_b[k] === null), JSON.stringify(P.in_b));
+ok('cobro sin desglose ⇒ las 4 claves del desglose PRESENTES y null', NEW.filter(k => k !== 'paidBefore').every(k => k in P.in_b && P.in_b[k] === null), JSON.stringify(P.in_b));
 const strip = (o) => ({ ...o, payments: o.payments.map(p => { const c = { ...p }; NEW.forEach(k => delete c[k]); return c; }) });
-ok('quitando las 4 claves, la salida v2 = la de v1 (attributions, refunds, premiumBefore, registry…)', eq(strip(OUT_V2), OUT_V1));
+ok('B: Premium gratuito ANTES del pago ⇒ premiumBefore (clásico) sí, paidBefore (influencers) NO',
+  P.in_b.premiumBefore === true && P.in_b.paidBefore === false, JSON.stringify(P.in_b));
+ok('A2: ya había PAGADO antes (cobro A) ⇒ paidBefore y premiumBefore', P.in_a2.paidBefore === true && P.in_a2.premiumBefore === true);
+ok('A: primera compra sin nada antes ⇒ ninguno de los dos', P.in_a.paidBefore === false && P.in_a.premiumBefore === false);
+ok('quitando las claves nuevas, la salida v2 = la de v1 (attributions, refunds, premiumBefore, registry…)', eq(strip(OUT_V2), OUT_V1));
 let rd = await as('authenticated', `select public.founder_read_affiliates() as r`);
 ok('authenticated sigue sin poder leer la superficie', !rd.ok && /permission denied/.test(rd.e));
 ok('el desglose no tocó cobros, suscripciones, overrides, ledger, reembolsos ni backfill', eq(await snap(), SNAP0));

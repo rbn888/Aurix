@@ -298,9 +298,14 @@ console.log('\nD · lectura Founder v2');
     /left join public\.billing_payment_breakdowns bd\s+on bd\.provider = p\.provider and bd\.invoice_id = p\.invoice_id/.test(f2));
   // Quitando lo añadido, v2 es v1 byte a byte.
   const stripped = f2
+    .replace(/\n\s+'paidBefore',\s+pay\.paid_before,/, '')
     .replace(/,\n\s+-- V2:[\s\S]*?bd\.tax_status\s+as bd_tax_status\n/, '\n')
     .replace(/\n\s+left join public\.billing_payment_breakdowns bd\n\s+on bd\.provider = p\.provider and bd\.invoice_id = p\.invoice_id/, '')
     .replace(/,\n\s+'subtotalCents'[\s\S]*?'taxStatus',\s+pay\.bd_tax_status/, '');
+  ok('D.1b paidBefore = premiumBefore SIN el Premium gratuito (entitlement_overrides): solo pagos anteriores y el histórico sembrado',
+    /'paidBefore',\s+pay\.paid_before/.test(f2) &&
+    /\(\s*exists \(select 1 from public\.billing_payments e[\s\S]*?or exists \(select 1 from public\.affiliate_premium_backfill b[\s\S]*?\) as paid_before/.test(f2) &&
+    !/entitlement_overrides[^;]*?\) as paid_before/.test(f2.slice(f2.indexOf('as premium_before'))));
   ok('D.3 todo lo demás es v1 byte a byte (filtros, premiumBefore, topes, registry)', stripped === f1);
   ok('D.4 NO se vuelve a sembrar el backfill (ni tabla ni insert)',
     !/affiliate_premium_backfill \(user_id\)|create table/.test(sqlCode(SQL_R2)) &&
