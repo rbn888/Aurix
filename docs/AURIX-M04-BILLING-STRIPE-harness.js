@@ -645,6 +645,18 @@ console.log('\nD · checkout · identidad y precio de record');
   const expStillOpen = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 400, sessionStatusAfter400: 'open' });
   ok('D.55b un 400 de /expire con la sesión TODAVÍA abierta ⇒ fail closed (503), sin sesión nueva',
     expStillOpen.res.code === 503 && !expStillOpen.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  // Segunda pasada de la revisión adversarial (2b): `complete` no es "ya no está abierta".
+  const expPaid = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 400, sessionStatusAfter400: 'complete' });
+  ok('D.55f la sesión listada se PAGÓ entre la lista y el expire (400 + complete) ⇒ 409 already_subscribed, sin sesión nueva',
+    expPaid.res.code === 409 && expPaid.res.payload.error === 'already_subscribed' && !expPaid.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  const expUnknown = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 400, sessionStatusAfter400: 'weird' });
+  ok('D.55g cualquier otro estado tras un 400 ⇒ fail closed (503)', expUnknown.res.code === 503 && !expUnknown.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  const convPaid = await callCheckout({ openSessionsSeq: [[], [
+    { id: 'cs_twin', status: 'open', created: 99, url: 'https://checkout.stripe.com/s/twin', metadata: { aurix_price: 'price_annual_real' } },
+    { id: 'cs_new', status: 'open', created: 100, url: 'https://checkout.stripe.com/s/new', metadata: { aurix_price: 'price_annual_real' } }]],
+    expireStatus: 400, sessionStatusAfter400: 'complete' });
+  ok('D.55h en la convergencia, si la gemela se acaba de PAGAR ⇒ 409 already_subscribed y sin URL',
+    convPaid.res.code === 409 && convPaid.res.payload.error === 'already_subscribed' && !convPaid.res.payload.url);
   const hasMore = await callCheckout({ listHasMore: true });
   ok('D.55c más de 100 sesiones abiertas (has_more) ⇒ fail closed', hasMore.res.code === 503 && !hasMore.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   ok('D.55d la sesión se crea con Idempotency-Key ligada a usuario, precio, idioma, minuto y lo visto',

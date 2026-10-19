@@ -392,13 +392,15 @@ export default async function handler(req, res) {
   const expireSession = async (id) => {
     const r = await stripe(`/checkout/sessions/${encodeURIComponent(id)}/expire`, {});
     if (r.ok) return;
-    // Un 400 puede ser "ya no estaba abierta" (se completó o caducó entre medias) o
-    // cualquier otra negativa. No se presupone: se lee su estado, y sólo vale si de
-    // verdad ya NO está abierta. Si sigue abierta, no se abre otra.
+    // Un 400 puede ser "ya no estaba abierta" o cualquier otra negativa. No se presupone:
+    // se lee su estado. Sólo `expired` deja seguir. `complete` significa que el usuario
+    // ACABA DE PAGAR esa sesión: abrir otra sería invitar al segundo cargo. Cualquier otro
+    // estado (sigue abierta, no se pudo leer) falla cerrado.
     if (r.status === 400) {
       const g = await stripeGet(`/checkout/sessions/${encodeURIComponent(id)}`);
       const gj = await g.json().catch(() => null);
-      if (g.ok && gj && gj.status && gj.status !== 'open') return;
+      if (g.ok && gj && gj.status === 'expired') return;
+      if (g.ok && gj && gj.status === 'complete') { const e = new Error('session complete'); e.complete = true; throw e; }
     }
     throw new Error(`expire ${r.status}`);
   };
@@ -407,6 +409,7 @@ export default async function handler(req, res) {
     seenOpen = await openSessions();
     for (const s of seenOpen) await expireSession(s.id);
   } catch (e) {
+    if (e && e.complete) return res.status(409).json({ ok: false, error: 'already_subscribed' });
     console.error('[billing/checkout] open session check failed', (e && e.message) || e);
     return res.status(503).json({ ok: false, error: 'check_failed' });
   }
@@ -469,7 +472,14 @@ export default async function handler(req, res) {
       if (open.length > 1) {
         open.sort((a, b) => (Number(b.created) - Number(a.created)) || (a.id < b.id ? 1 : -1));
         const keep = open[0];
-        for (const o of open.slice(1)) await expireSession(o.id);
+        try {
+          for (const o of open.slice(1)) await expireSession(o.id);
+        } catch (e) {
+          if (!(e && e.complete)) throw e;
+          // La sesión gemela se acaba de PAGAR: la recién creada no puede quedar abierta.
+          try { await stripe(`/checkout/sessions/${encodeURIComponent(s.id)}/expire`, {}); } catch (_) {}
+          return res.status(409).json({ ok: false, error: 'already_subscribed' });
+        }
         if (keep.id !== s.id) {
           // Sobrevive la de la petición gemela. Si es del MISMO precio, es la misma
           // compra: se devuelve su URL. Si es de OTRO precio (mensual y anual a la vez),
