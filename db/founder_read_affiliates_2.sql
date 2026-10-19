@@ -15,7 +15,9 @@
 --     · taxCents       — integer | null  (null si Stripe NO calculó impuesto)
 --     · taxStatus      — 'computed' | 'not_computed' | null
 --   Las cuatro son null cuando el cobro no tiene desglose (cobros anteriores a
---   V2, o un desglose rechazado): Founder lo trata como base NO certificable.
+--   V2, o un desglose rechazado): Founder muestra el impuesto como
+--   "desconocido". La comisión no depende de ellas: se calcula sobre lo
+--   cobrado (amountCents, IVA incluido y neto de descuentos).
 --   Aurix no calcula la base, ni el IVA, ni la comisión: publica lo que Stripe dijo.
 --   Y una quinta, `paidBefore` (boolean): la cuenta ya había PAGADO Premium antes
 --   de este cobro —otro cobro pagado (a) o el Premium histórico sembrado al
@@ -215,5 +217,6 @@ commit;
 -- ============================================================================
 -- VERIFICACIÓN (después del commit):
 --   select jsonb_pretty(public.founder_read_affiliates() -> 'payments' -> 0);
---   ⇒ incluye subtotalCents, discountCents, taxCents, taxStatus.
+--   ⇒ incluye paidBefore, subtotalCents, discountCents, taxCents, taxStatus
+--     (y premiumBefore, igual que en v1).
 -- ============================================================================
