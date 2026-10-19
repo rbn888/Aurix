@@ -6,9 +6,9 @@
 --
 --   update public.entitlement_overrides
 --      set expires_at = greatest(now(), starts_at + interval '1 millisecond'), updated_at = now()
---    where reason = 'comp' and granted_by = 'founder-platform' and expires_at > now();
+--    where reason = 'comp' and granted_by = 'founder-platform' and (expires_at is null or expires_at > now());
 begin;
-drop function if exists public.aurix_premium_access_apply(uuid, timestamptz, uuid, text, integer, timestamptz, text, text);
+drop function if exists public.aurix_premium_access_apply(uuid, timestamptz, uuid, text, integer, boolean, text, text, text);
 drop function if exists public.aurix_premium_access_lookup(text);
 drop function if exists public.aurix_premium_access_state(uuid);
 drop table    if exists public.premium_access_actions;

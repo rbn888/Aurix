@@ -7,7 +7,8 @@
 //   · `user.lookup`  — por correo (sólo criterio de búsqueda) devuelve el id
 //     autoritativo, si el correo está verificado, el estado Premium y su origen,
 //     y el historial de la persona. Sin efectos.
-//   · `access.apply` — grant | extend | replace | revoke sobre el id. La regla
+//   · `access.apply` — grant | extend | replace | revoke sobre el id, con
+//     `permanent: true` para un acceso SIN caducidad (solo grant y replace). La regla
 //     vive en la BD (`aurix_premium_access_apply`, db/premium_access_grants_1.sql):
 //     escribe SÓLO filas gestionadas de `entitlement_overrides`, que el resolver
 //     de siempre suma con OR al plan pagado. Nunca toca subscriptions ni Stripe.
@@ -75,7 +76,7 @@ function bearer(header) {
 // Huella de la operación: mismo actionId con otra huella ⇒ 409.
 export function applyFingerprint(v) {
   return createHash('sha256').update(JSON.stringify({
-    userId: v.userId, operation: v.operation, days: v.days,
+    userId: v.userId, operation: v.operation, days: v.days, permanent: v.permanent,
     expectedExpiresAt: v.expectedExpiresAt, reason: v.reason,
   }), 'utf8').digest('hex');
 }
@@ -103,12 +104,16 @@ export function validatePremiumBody(body) {
   }
   if (body.action === 'access.apply') {
     if (!exactKeys(body, ['contract', 'action', 'actionId', 'issuedAt', 'userId', 'operation', 'days',
-      'expectedExpiresAt', 'reason']) || !head(body)) return null;
+      'permanent', 'expectedExpiresAt', 'reason']) || !head(body)) return null;
     if (typeof body.userId !== 'string' || !UUID.test(body.userId)) return null;
     if (!OPERATIONS.includes(body.operation)) return null;
-    if (body.operation === 'revoke' ? body.days !== null
+    if (typeof body.permanent !== 'boolean') return null;
+    // Sin caducidad: solo al conceder o sustituir, y sin días.
+    if (body.permanent && !(body.operation === 'grant' || body.operation === 'replace')) return null;
+    if (body.operation === 'revoke' || body.permanent ? body.days !== null
       : !(Number.isInteger(body.days) && body.days >= 1 && body.days <= 365)) return null;
-    if (body.expectedExpiresAt !== null && !isIso(body.expectedExpiresAt)) return null;
+    // Lo que el fundador tenía delante: nada, un permanente o una fecha.
+    if (body.expectedExpiresAt !== null && body.expectedExpiresAt !== 'permanent' && !isIso(body.expectedExpiresAt)) return null;
     if (typeof body.reason !== 'string') return null;
     const reason = body.reason.trim();
     if (reason.length < 3 || reason.length > 200 || /[\u0000-\u001f\u007f]/.test(reason)) return null;
@@ -173,7 +178,7 @@ export async function premiumAccessControlHandler(req, res) {
       ? await rpc(key, 'aurix_premium_access_lookup', { p_email: v.email })
       : await rpc(key, 'aurix_premium_access_apply', {
           p_action_id: v.actionId, p_issued_at: v.issuedAt, p_user_id: v.userId,
-          p_operation: v.operation, p_days: v.days, p_expected_expires_at: v.expectedExpiresAt,
+          p_operation: v.operation, p_days: v.days, p_permanent: v.permanent, p_expected: v.expectedExpiresAt,
           p_reason: v.reason, p_fingerprint: applyFingerprint(v) });
   } catch {
     return fail(res, 502, 'SOURCE_ERROR');

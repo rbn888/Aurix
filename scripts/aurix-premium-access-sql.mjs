@@ -46,9 +46,9 @@ const user = async (email, verified = true) => {
   return id;
 };
 const fp = (o) => createHash('sha256').update(JSON.stringify(o)).digest('hex');
-const apply = async (userId, operation, days, expected, actionId = randomUUID(), reason = 'prueba interna') => {
-  const r = await one(`select public.aurix_premium_access_apply($1, now(), $2, $3, $4, $5, $6, $7) as r`,
-    [actionId, userId, operation, days, expected, reason, fp({ userId, operation, days, expected, reason })]);
+const apply = async (userId, operation, days, expected, actionId = randomUUID(), reason = 'prueba interna', permanent = false) => {
+  const r = await one(`select public.aurix_premium_access_apply($1, now(), $2, $3, $4, $5, $6, $7, $8) as r`,
+    [actionId, userId, operation, days, permanent, expected, reason, fp({ userId, operation, days, permanent, expected, reason })]);
   return { ...r.r, actionId };
 };
 const lookup = async (email) => (await one('select public.aurix_premium_access_lookup($1) as r', [email])).r;
@@ -158,7 +158,7 @@ ok('E.2 reintento de una ampliación ⇒ amplía UNA vez', again.outcome === 're
 const dbl = await apply(g, 'extend', 30, expG);
 ok('E.3 doble clic (otro actionId) con la fecha vieja ⇒ stale, sin ampliar',
   dbl.code === 'stale' && (await lookup('reintento@example.com')).state.grant.expiresAt === afterExt);
-const conflict = await one(`select public.aurix_premium_access_apply($1, now(), $2, 'grant', 7, null, 'otro', $3) as r`,
+const conflict = await one(`select public.aurix_premium_access_apply($1, now(), $2, 'grant', 7, false, null, 'otro', $3) as r`,
   [id1, g, 'f'.repeat(64)]);
 ok('E.4 mismo actionId con otro contenido ⇒ conflict', conflict.r.outcome === 'conflict');
 ok('E.5 conceder sobre una vigente ⇒ already_active (o stale si la fecha no cuadra)',
@@ -174,6 +174,8 @@ ok('F.2 el estado es de servidor: un lookup nuevo (otra sesión/dispositivo) ve 
   JSON.stringify((await lookup('reintento@example.com')).state) === JSON.stringify((await lookup('reintento@example.com')).state));
 const after = await counts();
 ok('F.3 cero filas nuevas en subscriptions y catálogo intacto', after.subs === before.subs + 1 && after.pf === before.pf);
+const permRow = await one(`select count(*)::int as n from public.premium_access_actions where permanent and (days is not null or operation not in ('grant','replace'))`);
+ok('F.6 la tabla impide un permanente con días o fuera de grant/replace', permRow.n === 0);
 const grants = await q(`select p.proname, r.rolname from pg_proc p
   join lateral aclexplode(p.proacl) a on true join pg_roles r on r.oid = a.grantee
   where p.proname like 'aurix_premium_access_%' and a.privilege_type = 'EXECUTE'`);
@@ -181,6 +183,41 @@ ok('F.4 sólo service_role ejecuta las funciones', grants.length > 0 && grants.e
   JSON.stringify(grants));
 const tbl = await q(`select grantee from information_schema.role_table_grants where table_name = 'premium_access_actions' and grantee in ('anon','authenticated')`);
 ok('F.5 el historial no es legible ni escribible por clientes', tbl.length === 0);
+
+console.log('\nH · 30 y 365 días, y SIN caducidad');
+const h = await user('permanente@example.com');
+r = await apply(h, 'grant', 30, null);
+ok('H.1 30 días', r.outcome === 'applied' && near(r.state.grant.expiresAt, 30 * DAY) && r.state.grant.permanent === false);
+r = await apply(h, 'replace', 365, r.state.grant.expiresAt);
+ok('H.2 sustituir por 365 días', r.outcome === 'applied' && near(r.state.grant.expiresAt, 365 * DAY));
+r = await apply(h, 'replace', null, r.state.grant.expiresAt, randomUUID(), 'prueba interna', true);
+const hRows = await q(`select expires_at from public.entitlement_overrides where user_id = $1`, [h]);
+ok('H.3 sustituir por SIN caducidad ⇒ expires_at NULL (la forma nativa), sin fecha artificial',
+  r.outcome === 'applied' && r.state.grant.permanent === true && r.state.grant.expiresAt === null && r.state.grant.active === true &&
+  hRows.length === premiumKeys.length && hRows.every(x => x.expires_at === null), JSON.stringify(r.state));
+ok('H.4 el resolver lo ve Premium', hasAllPremium(await ent(h)));
+await q(`update public.entitlement_overrides set starts_at = now() - interval '3000 days' where user_id = $1`, [h]);
+ok('H.5 sigue vigente pase el tiempo que pase', hasAllPremium(await ent(h)) && (await lookup('permanente@example.com')).state.grant.active === true);
+ok('H.6 ampliar un permanente ⇒ rechazado (permanent_grant)', (await apply(h, 'extend', 30, 'permanent')).code === 'permanent_grant');
+ok('H.7 con lo visto equivocado (una fecha) ⇒ stale', (await apply(h, 'revoke', null, new Date().toISOString())).code === 'stale');
+ok('H.8 la base rechaza permanente con días o al ampliar o revocar (invalid)',
+  (await apply(h, 'grant', 7, null, randomUUID(), 'prueba interna', true)).outcome === 'invalid' &&
+  (await apply(h, 'extend', null, 'permanent', randomUUID(), 'prueba interna', true)).outcome === 'invalid' &&
+  (await apply(h, 'revoke', null, 'permanent', randomUUID(), 'prueba interna', true)).outcome === 'invalid');
+L = await lookup('permanente@example.com');
+ok('H.9 el historial distingue el permanente', L.history.some(x => x.operation === 'replace' && x.permanent === true && x.outcome === 'applied' && x.newExpiresAt === null) &&
+  L.history.filter(x => x.operation === 'grant' || x.operation === 'extend').every(x => x.permanent === false));
+r = await apply(h, 'revoke', null, 'permanent');
+ok('H.10 revocar un permanente ⇒ Free al instante', r.outcome === 'applied' && r.state.grant.active === false && r.state.grant.permanent === false && noneTrue(await ent(h)));
+const hp = await user('permanente-pagado@example.com');
+await q(`insert into public.subscriptions (user_id, plan, status, provider, billing_interval, current_period_start, current_period_end, price_amount_cents, price_currency)
+         values ($1, 'premium', 'active', 'stripe', 'year', now() - interval '1 day', now() + interval '364 days', 6999, 'EUR')`, [hp]);
+r = await apply(hp, 'grant', null, null, randomUUID(), 'prueba interna', true);
+r = await apply(hp, 'revoke', null, 'permanent');
+e = await ent(hp);
+ok('H.11 revocar un permanente conserva el Premium pagado', r.outcome === 'applied' && e.plan === 'premium' && hasAllPremium(e));
+r = await apply(h, 'grant', null, null, randomUUID(), 'prueba interna', true);
+ok('H.12 conceder permanente desde cero', r.outcome === 'applied' && r.state.grant.permanent === true && hasAllPremium(await ent(h)));
 
 console.log('\nG · rollback');
 await db.exec(read('db/premium_access_grants_1_rollback.sql'));

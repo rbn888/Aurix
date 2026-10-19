@@ -44,7 +44,7 @@ console.log('\nP · control · accesos Premium');
     actionId: '7f1c2a90-1b2c-4d5e-8f90-0123456789ab', issuedAt: '2026-10-18T10:00:00.000Z', email: ' Ana@Example.com ' };
   const apply = { contract: 'aurix.premium-control.v1', action: 'access.apply',
     actionId: '8f1c2a90-1b2c-4d5e-8f90-0123456789ab', issuedAt: '2026-10-18T10:00:00.000Z',
-    userId: UID, operation: 'grant', days: 7, expectedExpiresAt: null, reason: 'Prueba de cortesía' };
+    userId: UID, operation: 'grant', days: 7, permanent: false, expectedExpiresAt: null, reason: 'Prueba de cortesía' };
 
   let calls = [];
   const db = (out, status) => { globalThis.fetch = async (url, init) => { calls.push({ url: String(url), body: JSON.parse(init.body) });
@@ -72,10 +72,11 @@ console.log('\nP · control · accesos Premium');
     r.body.replay === false && r.body.code === null && r.body.state.grant.expiresAt === STATE.grant.expiresAt);
   ok('P.6 la BD recibe actionId, operación, días, fecha esperada, motivo y la huella',
     /\/rpc\/aurix_premium_access_apply$/.test(calls[0].url) && calls[0].body.p_action_id === apply.actionId &&
-    calls[0].body.p_operation === 'grant' && calls[0].body.p_days === 7 && calls[0].body.p_expected_expires_at === null &&
+    calls[0].body.p_operation === 'grant' && calls[0].body.p_days === 7 && calls[0].body.p_permanent === false && calls[0].body.p_expected === null &&
     calls[0].body.p_fingerprint === C.applyFingerprint(apply) && /^[0-9a-f]{64}$/.test(calls[0].body.p_fingerprint));
   ok('P.7 la huella cambia si cambia cualquier campo de la operación',
     C.applyFingerprint(apply) !== C.applyFingerprint({ ...apply, days: 8 }) &&
+    C.applyFingerprint({ ...apply, days: null, permanent: true }) !== C.applyFingerprint({ ...apply, days: null, permanent: false }) &&
     C.applyFingerprint(apply) !== C.applyFingerprint({ ...apply, userId: '4f1c2a90-1b2c-4d5e-8f90-0123456789ab' }));
   db({ outcome: 'rejected', code: 'email_not_verified', at: '2026-10-18T10:00:01.000Z', state: STATE });
   r = await post(apply);
@@ -111,6 +112,12 @@ console.log('\nP · control · accesos Premium');
     ['días decimales', bad(apply, b => { b.days = 7.5; })],
     ['días como texto', bad(apply, b => { b.days = '7'; })],
     ['revoke con días', bad(apply, b => { b.operation = 'revoke'; })],
+    ['permanente con días', bad(apply, b => { b.permanent = true; })],
+    ['ampliar a permanente', bad(apply, b => { b.operation = 'extend'; b.days = null; b.permanent = true; })],
+    ['revocar como permanente', bad(apply, b => { b.operation = 'revoke'; b.days = null; b.permanent = true; })],
+    ['sin permanent', bad(apply, b => { delete b.permanent; })],
+    ['permanent como texto', bad(apply, b => { b.permanent = 'true'; })],
+    ['fecha esperada inventada', bad(apply, b => { b.expectedExpiresAt = 'forever'; })],
     ['userId no uuid', bad(apply, b => { b.userId = 'ana@example.com'; })],
     ['fecha esperada no ISO', bad(apply, b => { b.expectedExpiresAt = '2026-10-25'; })],
     ['motivo vacío', bad(apply, b => { b.reason = '  '; })],
@@ -125,6 +132,18 @@ console.log('\nP · control · accesos Premium');
   ];
   const bads = [];
   for (const [n, b] of cases) { const x = await post(b); if (x.statusCode !== 400) bads.push(n + '→' + x.statusCode); }
+  calls = [];
+  db({ outcome: 'applied', code: null, at: '2026-10-18T10:00:01.000Z',
+       state: { ...STATE, grant: { active: true, permanent: true, startsAt: STATE.grant.startsAt, expiresAt: null } } });
+  r = await post({ ...apply, actionId: '9f1c2a90-1b2c-4d5e-8f90-0123456789ab', days: null, permanent: true });
+  ok('P.19 sin caducidad ⇒ viaja como permanent=true y días null, sin fecha inventada',
+    r.statusCode === 200 && r.body.state.grant.permanent === true && r.body.state.grant.expiresAt === null &&
+    calls[0].body.p_permanent === true && calls[0].body.p_days === null, JSON.stringify(calls[0] && calls[0].body));
+  calls = [];
+  db({ outcome: 'applied', code: null, at: '2026-10-18T10:00:01.000Z', state: STATE });
+  r = await post({ ...apply, actionId: 'af1c2a90-1b2c-4d5e-8f90-0123456789ab', operation: 'revoke', days: null, expectedExpiresAt: 'permanent' });
+  ok('P.19b revocar un permanente declara lo visto como "permanent"', r.statusCode === 200 && calls[0].body.p_expected === 'permanent');
+  calls = [];
   ok('P.20 cualquier entrada inválida ⇒ 400 entero, sin tocar la BD', bads.length === 0 && calls.length === 0, bads.join(' | '));
   ok('P.21 cuerpo > 8 KB ⇒ 413', (await post('x'.repeat(9 * 1024))).statusCode === 413);
   const src = read('api/_premium-control.mjs');

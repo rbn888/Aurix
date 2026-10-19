@@ -26,11 +26,17 @@
 -- un '*' también daría las claves reservadas al fundador (catalog_preview,
 -- intelligence.comparator). Así no se puede conceder nada administrativo.
 --
+-- SIN CADUCIDAD = `expires_at` NULL, la forma nativa de la tabla ("null = no
+-- expiry") que el resolver ya cuenta como vigente. Nada de fechas extremas: un
+-- acceso permanente dura hasta que el fundador lo revoca. Solo se crea con
+-- grant o replace; ampliar un permanente no tiene sentido y se rechaza.
+--
 -- IDEMPOTENCIA. Cada operación lleva un actionId. Mismo actionId y misma huella
 -- ⇒ se devuelve el resultado guardado sin volver a aplicar ('replay'); misma
 -- clave con otra huella ⇒ 'conflict'. Además cada operación declara la fecha de
--- vencimiento que el fundador TENÍA DELANTE (`p_expected_expires_at`): si ya no
--- es la vigente se rechaza ('stale'). Dos clics con dos actionId distintos no
+-- vencimiento que el fundador TENÍA DELANTE (`p_expected`: null si no había
+-- acceso vigente, 'permanent' si era permanente, o la fecha ISO): si ya no es
+-- el vigente se rechaza ('stale'). Dos clics con dos actionId distintos no
 -- amplían dos veces.
 --
 -- TRAZABILIDAD. `premium_access_actions` guarda cada operación —aplicada o
@@ -47,14 +53,17 @@ create table if not exists public.premium_access_actions (
   user_id             uuid,
   operation           text        not null,
   days                integer,
+  permanent           boolean     not null default false,
   reason              text        not null,
   fingerprint         text        not null,
   outcome             text        not null,
   code                text,
   previous_expires_at timestamptz,
+  previous_permanent  boolean     not null default false,
   new_expires_at      timestamptz,
   constraint premium_access_actions_op_chk      check (operation in ('grant','extend','replace','revoke')),
   constraint premium_access_actions_days_chk    check (days is null or days between 1 and 365),
+  constraint premium_access_actions_perm_chk    check (not permanent or (days is null and operation in ('grant','replace'))),
   constraint premium_access_actions_reason_chk  check (length(reason) between 3 and 200),
   constraint premium_access_actions_fp_chk      check (fingerprint ~ '^[0-9a-f]{64}$'),
   constraint premium_access_actions_outcome_chk check (outcome in ('applied','rejected'))
@@ -82,7 +91,10 @@ as $$
   with s as (
     select * from public.subscriptions where user_id = p_user_id
   ), g as (
-    select min(o.starts_at) as starts_at, max(o.expires_at) as expires_at, max(o.updated_at) as updated_at
+    select count(*) as n,
+           min(o.starts_at) as starts_at,
+           bool_or(o.expires_at is null) as permanent,
+           max(o.expires_at) as expires_at
       from public.entitlement_overrides o
      where o.user_id = p_user_id and o.reason = 'comp' and o.granted_by = 'founder-platform'
   ), paid as (
@@ -101,10 +113,12 @@ as $$
       'active', paid.active,
       'until', case when paid.active and paid.until is not null
                     then to_char(paid.until at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end),
-    'grant', case when g.expires_at is null then null else jsonb_build_object(
-      'active', g.starts_at <= now() and g.expires_at > now(),
+    'grant', case when g.n = 0 then null else jsonb_build_object(
+      'active', g.starts_at <= now() and (g.permanent or g.expires_at > now()),
+      'permanent', g.permanent,
       'startsAt',  to_char(g.starts_at  at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-      'expiresAt', to_char(g.expires_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) end,
+      'expiresAt', case when g.permanent then null
+                        else to_char(g.expires_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end) end,
     'foreignOverride', exists (
       select 1 from public.entitlement_overrides o
        where o.user_id = p_user_id
@@ -148,7 +162,7 @@ begin
     'history', coalesce((
       select jsonb_agg(jsonb_build_object(
                'actionId', a.action_id, 'at', to_char(a.received_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-               'operation', a.operation, 'days', a.days, 'reason', a.reason,
+               'operation', a.operation, 'days', a.days, 'permanent', a.permanent, 'reason', a.reason,
                'outcome', a.outcome, 'code', a.code,
                'newExpiresAt', to_char(a.new_expires_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
              order by a.received_at desc)
@@ -167,7 +181,8 @@ create or replace function public.aurix_premium_access_apply(
   p_user_id             uuid,
   p_operation           text,
   p_days                integer,
-  p_expected_expires_at timestamptz,
+  p_permanent           boolean,
+  p_expected            text,
   p_reason              text,
   p_fingerprint         text
 )
@@ -179,7 +194,10 @@ as $$
 declare
   v_prev     public.premium_access_actions;
   v_verified boolean;
-  v_current  timestamptz;     -- vencimiento de la concesión VIGENTE (null si no hay)
+  v_current  timestamptz;     -- vencimiento de la concesión VIGENTE con fecha (null si no hay o es permanente)
+  v_active   boolean;         -- hay una concesión vigente
+  v_perm     boolean;         -- la vigente es permanente (sin caducidad)
+  v_seen     text;            -- lo vigente, en el idioma de p_expected
   v_now      timestamptz := date_trunc('milliseconds', now());
   v_new      timestamptz;
   v_code     text;
@@ -187,8 +205,13 @@ declare
 begin
   if p_action_id is null or p_user_id is null
      or p_operation is null or p_operation not in ('grant','extend','replace','revoke')
-     or (p_operation = 'revoke' and p_days is not null)
-     or (p_operation <> 'revoke' and (p_days is null or p_days not between 1 and 365))
+     or p_permanent is null
+     or (p_operation = 'revoke' and (p_days is not null or p_permanent))
+     or (p_operation = 'extend' and p_permanent)
+     or (p_permanent and p_days is not null)
+     or (p_operation <> 'revoke' and not p_permanent and (p_days is null or p_days not between 1 and 365))
+     or (p_expected is not null and p_expected <> 'permanent'
+         and p_expected !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$')
      or length(v_reason) not between 3 and 200
      or p_fingerprint is null or p_fingerprint !~ '^[0-9a-f]{64}$' then
     return jsonb_build_object('outcome', 'invalid');
@@ -211,22 +234,29 @@ begin
   select u.email_confirmed_at is not null into v_verified
     from auth.users u where u.id = p_user_id and u.deleted_at is null;
 
-  select max(o.expires_at) into v_current
+  select count(*) > 0, coalesce(bool_or(o.expires_at is null), false), max(o.expires_at)
+    into v_active, v_perm, v_current
     from public.entitlement_overrides o
    where o.user_id = p_user_id and o.reason = 'comp' and o.granted_by = 'founder-platform'
-     and o.starts_at <= now() and o.expires_at > now();
+     and o.starts_at <= now() and (o.expires_at is null or o.expires_at > now());
+  if v_perm then v_current := null; end if;
   v_current := date_trunc('milliseconds', v_current);
+  v_seen := case when not v_active then null
+                 when v_perm then 'permanent'
+                 else to_char(v_current at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end;
 
   if v_verified is null then
     v_code := 'user_not_found';
   elsif p_operation <> 'revoke' and not v_verified then
     v_code := 'email_not_verified';
-  elsif p_expected_expires_at is distinct from v_current then
+  elsif p_expected is distinct from v_seen then
     v_code := 'stale';
-  elsif p_operation = 'grant' and v_current is not null then
+  elsif p_operation = 'grant' and v_active then
     v_code := 'already_active';
-  elsif p_operation <> 'grant' and v_current is null then
+  elsif p_operation <> 'grant' and not v_active then
     v_code := 'no_active_grant';
+  elsif p_operation = 'extend' and v_perm then
+    v_code := 'permanent_grant';
   elsif p_operation <> 'revoke' and exists (
       select 1 from public.entitlement_overrides o
        where o.user_id = p_user_id
@@ -244,12 +274,12 @@ begin
       update public.entitlement_overrides o
          set expires_at = greatest(v_now, o.starts_at + interval '1 millisecond'), updated_at = now()
        where o.user_id = p_user_id and o.reason = 'comp' and o.granted_by = 'founder-platform'
-         and o.expires_at > now();
+         and (o.expires_at is null or o.expires_at > now());
       v_new := null;
     else
-      v_new := case p_operation
-                 when 'extend' then v_current + make_interval(days => p_days)
-                 else v_now + make_interval(days => p_days)
+      v_new := case when p_permanent then null
+                    when p_operation = 'extend' then v_current + make_interval(days => p_days)
+                    else v_now + make_interval(days => p_days)
                end;
       -- Las capacidades del plan premium de HOY. Ampliar o sustituir re-sincroniza
       -- el conjunto; lo que ya no esté en el catálogo se cierra.
@@ -259,7 +289,7 @@ begin
              case when p_operation = 'extend' then (select min(x.starts_at) from public.entitlement_overrides x
                                                      where x.user_id = p_user_id and x.reason = 'comp'
                                                        and x.granted_by = 'founder-platform'
-                                                       and x.expires_at > now())
+                                                       and (x.expires_at is null or x.expires_at > now()))
                   else v_now end,
              v_new
         from public.plan_features pf
@@ -274,19 +304,19 @@ begin
       update public.entitlement_overrides o
          set expires_at = greatest(v_now, o.starts_at + interval '1 millisecond'), updated_at = now()
        where o.user_id = p_user_id and o.reason = 'comp' and o.granted_by = 'founder-platform'
-         and o.expires_at > now()
+         and (o.expires_at is null or o.expires_at > now())
          and not exists (select 1 from public.plan_features pf
                           where pf.plan = 'premium' and pf.allowed and pf.feature_key = o.feature_key);
     end if;
   end if;
 
   insert into public.premium_access_actions
-    (action_id, issued_at, user_id, operation, days, reason, fingerprint, outcome, code,
-     previous_expires_at, new_expires_at)
+    (action_id, issued_at, user_id, operation, days, permanent, reason, fingerprint, outcome, code,
+     previous_expires_at, previous_permanent, new_expires_at)
   values
     (p_action_id, p_issued_at, case when v_verified is null then null else p_user_id end,
-     p_operation, p_days, v_reason, p_fingerprint,
-     case when v_code is null then 'applied' else 'rejected' end, v_code, v_current, v_new);
+     p_operation, p_days, p_permanent, v_reason, p_fingerprint,
+     case when v_code is null then 'applied' else 'rejected' end, v_code, v_current, coalesce(v_perm, false), v_new);
 
   return jsonb_build_object('outcome', case when v_code is null then 'applied' else 'rejected' end,
                             'code', v_code, 'at', now(),
@@ -294,12 +324,12 @@ begin
 end;
 $$;
 
-revoke all     on function public.aurix_premium_access_apply(uuid, timestamptz, uuid, text, integer, timestamptz, text, text) from public, anon, authenticated;
-grant  execute on function public.aurix_premium_access_apply(uuid, timestamptz, uuid, text, integer, timestamptz, text, text) to service_role;
+revoke all     on function public.aurix_premium_access_apply(uuid, timestamptz, uuid, text, integer, boolean, text, text, text) from public, anon, authenticated;
+grant  execute on function public.aurix_premium_access_apply(uuid, timestamptz, uuid, text, integer, boolean, text, text, text) to service_role;
 
 do $$ begin
   if to_regclass('public.premium_access_actions') is null
-     or to_regprocedure('public.aurix_premium_access_apply(uuid,timestamptz,uuid,text,integer,timestamptz,text,text)') is null
+     or to_regprocedure('public.aurix_premium_access_apply(uuid,timestamptz,uuid,text,integer,boolean,text,text,text)') is null
      or to_regprocedure('public.aurix_premium_access_lookup(text)') is null then
     raise exception 'PREMIUM-ACCESS SELF-CHECK FAIL';
   end if;
