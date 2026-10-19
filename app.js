@@ -8081,6 +8081,7 @@ const T = {
     pw_confirming:     'Confirmando tu pago…',
     pw_active:         '¡Premium activado!',
     pw_pending:        'El pago se está confirmando. Tu plan se activará en unos minutos.',
+    pw_recovery:       'No se pudo cobrar la renovación de tu plan. Actualiza tu método de pago para recuperar Premium.',
     pw_cancelled:      'Has salido del pago. No se ha cobrado nada.',
     pw_err_auth:       'Inicia sesión para continuar.',
     pw_err_soon:       'La compra todavía no está disponible.',
@@ -11318,6 +11319,7 @@ const T = {
     pw_confirming:     'Confirming your payment…',
     pw_active:         'Premium activated!',
     pw_pending:        'Your payment is being confirmed. Your plan will activate in a few minutes.',
+    pw_recovery:       'Your plan renewal could not be charged. Update your payment method to restore Premium.',
     pw_cancelled:      'You left the payment. Nothing was charged.',
     pw_err_auth:       'Sign in to continue.',
     pw_err_soon:       'Purchasing is not available yet.',
@@ -89065,6 +89067,16 @@ async function _aurixBillingCheckout(interval, source) {
       _aurixBillingToast(t('pw_err_price'), 'error');
       return false;
     }
+    // 409 `payment_recovery` — Stripe tiene la suscripción en past_due/unpaid: la
+    // renovación no se pudo cobrar. NO es «tu pago se está confirmando» (nadie está
+    // pagando) ni se abre una compra nueva: se lleva al portal a actualizar la
+    // tarjeta. El servidor acaba de comprobarlo en el proveedor, así que el portal
+    // se abre aunque el entitlement en memoria aún no refleje el past_due.
+    if (j && j.error === 'payment_recovery') {
+      _aurixBillingToast(t('pw_recovery'), 'info');
+      try { _aurixBillingPortal({ recovery: true }); } catch (_) {}
+      return false;
+    }
     // 409 — ya hay una suscripción viva (posiblemente creada hace segundos y
     // pendiente de webhook). NO se abre una segunda: eso es lo que evita el doble
     // cargo. Se revalida el entitlement y se repinta el paywall, de modo que si el
@@ -89124,8 +89136,9 @@ function _aurixBillingIsCustomer() {
 // Stripe le seguía reclamando, con un paywall que le prometía "cancelas cuando
 // quieras". El gate correcto es tener historia comercial; el servidor sigue
 // exigiendo un mapeo de customer real y responde 404 si no lo hay.
-async function _aurixBillingPortal() {
-  if (!_aurixBillingIsCustomer() && !hasFeature('premium.settings')) return false;
+async function _aurixBillingPortal(opts) {
+  const _recovery = !!(opts && opts.recovery === true);
+  if (!_recovery && !_aurixBillingIsCustomer() && !hasFeature('premium.settings')) return false;
   const token = await _aurixBillingAccessToken();
   if (!token) { _aurixBillingToast(t('pw_err_auth'), 'error'); return false; }
   try {

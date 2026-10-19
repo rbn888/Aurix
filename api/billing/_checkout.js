@@ -333,11 +333,21 @@ export default async function handler(req, res) {
   // exactamente lo que debe poder hacer.
   const liveStatuses = ['active', 'trialing', 'past_due', 'unpaid'];
   try {
-    const r = await sb(`/subscriptions?user_id=eq.${user.id}&select=plan,status`);
+    const r = await sb(`/subscriptions?user_id=eq.${user.id}&select=plan,status,billing_interval,current_period_end,trial_end`);
     if (r.ok) {
       const rows = await r.json().catch(() => []);
       const row = Array.isArray(rows) ? rows[0] : null;
-      if (row && row.plan === 'premium' && ['active', 'trialing'].includes(row.status)) {
+      // VIGENTE, con la MISMA condición que aurix_entitlements(). Una fila 'active'
+      // cuyo periodo ya venció —p. ej. una suscripción de TEST que dejó de recibir
+      // eventos tras el cutover— no es una suscripción que proteger: bloquear aquí
+      // dejaba a un usuario Free sin poder comprar nunca. Si no es vigente, decide
+      // el proveedor, abajo, que es quien ve lo que de verdad se está cobrando.
+      const until = row && row.current_period_end ? Date.parse(row.current_period_end) : NaN;
+      const trialUntil = row && row.trial_end ? Date.parse(row.trial_end) : NaN;
+      const vigente = !!row && row.plan === 'premium' && ['active', 'trialing'].includes(row.status) &&
+        (row.billing_interval === 'lifetime' || (Number.isFinite(until) && until > Date.now())) &&
+        (row.status !== 'trialing' || (Number.isFinite(trialUntil) && trialUntil > Date.now()));
+      if (vigente) {
         return res.status(409).json({ ok: false, error: 'already_subscribed' });
       }
     }
@@ -347,7 +357,12 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => null);
     if (r.ok && j && Array.isArray(j.data) &&
         j.data.some(su => su && liveStatuses.includes(String(su.status)))) {
-      return res.status(409).json({ ok: false, error: 'already_subscribed' });
+      // Una renovación fallida (past_due / unpaid) NO es "ya tienes Premium" ni "tu
+      // pago se está confirmando": es una tarjeta que actualizar en el portal. Sigue
+      // siendo 409 —no se abre una segunda suscripción—, pero con su propio código
+      // para que el cliente lleve al portal en vez de prometer una confirmación.
+      const recovery = !j.data.some(su => su && ['active', 'trialing'].includes(String(su.status)));
+      return res.status(409).json({ ok: false, error: recovery ? 'payment_recovery' : 'already_subscribed' });
     }
     if (!r.ok) {
       // FAIL CLOSED: si no se puede comprobar, no se abre una segunda sesión de
@@ -357,6 +372,32 @@ export default async function handler(req, res) {
     }
   } catch (e) {
     console.error('[billing/checkout] subscription check error', (e && e.message) || e);
+    return res.status(503).json({ ok: false, error: 'check_failed' });
+  }
+
+  // ── 3c · UNA SESIÓN DE PAGO ABIERTA, NO DOS. ──────────────────────────────
+  // El guard 3b mira SUSCRIPCIONES, y una sesión de Checkout no crea la suscripción
+  // hasta que se paga. Dos pestañas (o un doble clic) abrían dos sesiones válidas a
+  // la vez y las dos se podían pagar: el webhook dejaba bien el ACCESO (la segunda
+  // queda en `other_subscription`), pero el cliente pagaba dos veces. Antes de crear
+  // una sesión se caducan las abiertas de este customer; si no se puede comprobar,
+  // no se abre otra (fail closed, igual que 3b).
+  const openSessions = async () => {
+    const r = await stripeGet(`/checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=10`);
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !Array.isArray(j.data)) throw new Error(`list ${r.status}`);
+    return j.data.filter(s => s && s.id && s.status === 'open');
+  };
+  const expireSession = async (id) => {
+    const r = await stripe(`/checkout/sessions/${encodeURIComponent(id)}/expire`, {});
+    // Una sesión que ya no está abierta (se completó o caducó entre medias) no es un
+    // fallo: lo que importa es que no quede ABIERTA.
+    if (!r.ok && r.status !== 400) throw new Error(`expire ${r.status}`);
+  };
+  try {
+    for (const s of await openSessions()) await expireSession(s.id);
+  } catch (e) {
+    console.error('[billing/checkout] open session check failed', (e && e.message) || e);
     return res.status(503).json({ ok: false, error: 'check_failed' });
   }
 
@@ -390,9 +431,26 @@ export default async function handler(req, res) {
       console.error('[billing/checkout] session failed', r.status, (s && s.error && s.error.code) || '');
       return res.status(502).json(providerError('session', r.status, s));
     }
+    // CONVERGENCIA. Dos peticiones simultáneas pueden pasar 3c a la vez (ninguna ve
+    // la sesión de la otra) y crear dos. Tras crear, se vuelve a mirar: sobrevive UNA
+    // —la más reciente, desempate por id, el mismo criterio en las dos peticiones—,
+    // las demás se caducan y las dos respuestas devuelven la misma URL. Si esta
+    // relectura falla, la sesión recién creada sigue siendo válida: se devuelve.
+    let url = s.url;
+    try {
+      const open = await openSessions();
+      if (open.length > 1) {
+        open.sort((a, b) => (Number(b.created) - Number(a.created)) || (a.id < b.id ? 1 : -1));
+        const keep = open[0];
+        for (const o of open.slice(1)) await expireSession(o.id);
+        if (keep.url) url = keep.url;
+      }
+    } catch (e) {
+      console.error('[billing/checkout] post-create convergence skipped', (e && e.message) || e);
+    }
     // Only the redirect URL leaves this function. No keys, no customer id, no
     // price object: the client has no use for them and every one of them is a leak.
-    return res.status(200).json({ ok: true, url: s.url });
+    return res.status(200).json({ ok: true, url });
   } catch (e) {
     console.error('[billing/checkout] session error', (e && e.message) || e);
     return res.status(502).json({ ok: false, error: 'provider_error' });

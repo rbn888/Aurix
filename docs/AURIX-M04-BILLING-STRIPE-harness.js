@@ -184,7 +184,9 @@ console.log('A · el cliente no concede');
     !/sk_live|sk_test|whsec_/.test(idx));
   ok('A.7 el endpoint sólo devuelve la URL de redirección, nada más',
     (() => { const tail = CO.slice(CO.indexOf('return res.status(200)'));
-      return /res\.status\(200\)\.json\(\{ ok: true, url: s\.url \}\)/.test(tail)
+      // RE-DECIDIDO (2026-10-19): la URL puede ser la de la sesión superviviente de la
+      // convergencia (3c), así que sale como `url`; el contrato —sólo la URL— no cambia.
+      return /res\.status\(200\)\.json\(\{ ok: true, url \}\)/.test(tail)
         && !/customer:|price_|amount/.test(tail.split('\n')[0]); })());
 }
 
@@ -410,6 +412,20 @@ console.log('\nD · checkout · identidad y precio de record');
         return { ok: opts.linkFails ? false : true, status: opts.linkFails ? 409 : 200, json: async () => 'cus_new' };
       }
       if (u.includes('checkout/sessions')) {
+        // 3c · LISTA de sesiones abiertas del customer (GET) y CADUCIDAD (POST …/expire).
+        // La CREACIÓN es el POST exacto a /v1/checkout/sessions (rama de abajo).
+        calls.sessions = calls.sessions || { listed: 0, expired: [] };
+        if (((init && init.method) || 'GET').toUpperCase() === 'GET') {
+          calls.sessions.listed++;
+          if (opts.sessionListFails) return { ok: false, status: 500, json: async () => null };
+          const data = Array.isArray(opts.openSessionsSeq) ? (opts.openSessionsSeq.shift() || []) : (opts.openSessions || []);
+          return { ok: true, status: 200, json: async () => ({ data }) };
+        }
+        if (u.endsWith('/expire')) {
+          calls.sessions.expired.push(u.split('/').slice(-2, -1)[0]);
+          if (opts.expireStatus) return { ok: false, status: opts.expireStatus, json: async () => null };
+          return { ok: true, status: 200, json: async () => ({ status: 'expired' }) };
+        }
         return opts.sessionFails
           ? { ok: false, status: 400, json: async () => ({ error: { type: 'invalid_request_error',
               code: 'resource_missing',
@@ -433,15 +449,15 @@ console.log('\nD · checkout · identidad y precio de record');
     okCall.res.code === 200 && okCall.res.payload.ok === true &&
     /checkout\.stripe\.com/.test(okCall.res.payload.url));
   ok('D.2 el precio enviado a Stripe es el del CATÁLOGO, no el del body',
-    (() => { const sess = okCall.calls.find(c => c.url.includes('checkout/sessions'));
+    (() => { const sess = okCall.calls.find(c => c.url.endsWith('/v1/checkout/sessions'));
       const b = decodeBody(sess.init.body);
       return b.includes('line_items[0][price]=price_annual_real')
         && !/unit_amount|amount_cents|\bcurrency\b/.test(b); })(),
-    String((okCall.calls.find(c => c.url.includes('checkout/sessions')) || {}).init.body).slice(0, 300));
+    String((okCall.calls.find(c => c.url.endsWith('/v1/checkout/sessions')) || {}).init.body).slice(0, 300));
   const forged = await callCheckout({ body: { interval: 'year', price: 'price_evil',
     amount_cents: 1, currency: 'XXX', user_id: 'otro', plan: 'premium' } });
   ok('D.3 un body que intenta nombrar precio, importe, divisa o USUARIO se ignora por completo',
-    (() => { const sess = forged.calls.find(c => c.url.includes('checkout/sessions'));
+    (() => { const sess = forged.calls.find(c => c.url.endsWith('/v1/checkout/sessions'));
       const b = decodeBody(sess.init.body);
       return forged.res.code === 200 && b.includes('price_annual_real')
         && !b.includes('price_evil') && !b.includes('XXX')
@@ -460,13 +476,13 @@ console.log('\nD · checkout · identidad y precio de record');
   const noPrice = await callCheckout({ prices: [] });
   ok('D.8 sin precio en el catálogo ⇒ 503 y CERO sesiones creadas',
     noPrice.res.code === 503 && noPrice.res.payload.error === 'price_unavailable' &&
-    !noPrice.calls.some(c => c.url.includes('checkout/sessions')));
+    !noPrice.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   const monthly = await callCheckout({ body: { interval: 'month' },
     prices: [{ provider_price_id: 'price_monthly_real', amount_cents: 799, currency: 'EUR',
                trial_days: 0, billing_interval: 'month' }] });
   ok('D.9 mensual y anual son dos precios del catálogo, no dos ramas de código',
     monthly.res.code === 200 &&
-    decodeBody(monthly.calls.find(c => c.url.includes('checkout/sessions')).init.body)
+    decodeBody(monthly.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body)
       .includes('price_monthly_real') &&
     monthly.calls.some(c => c.url.includes('billing_interval=eq.month')));
   const junkInterval = await callCheckout({ body: { interval: 'decade' } });
@@ -492,7 +508,7 @@ console.log('\nD · checkout · identidad y precio de record');
           && stale.calls.some(c => c.url.includes('rpc/aurix_billing_link_customer')); })(),
       JSON.stringify(stale.calls.filter(c => c.url.includes('billing_customers')).map(c => ((c.init&&c.init.method)||'GET') + ' ' + c.url)));
     ok('D.21c …y la sesión se abre para el cliente NUEVO, nunca para el obsoleto',
-      (() => { const sess = stale.calls.find(c => c.url.includes('checkout/sessions'));
+      (() => { const sess = stale.calls.find(c => c.url.endsWith('/v1/checkout/sessions'));
         const b = decodeBody(sess.init.body);
         return b.includes('customer=cus_new') && !b.includes('cus_old'); })());
     const deleted = await callCheckout({ customers: MAPPED, customerLookup: 'deleted' });
@@ -515,7 +531,7 @@ console.log('\nD · checkout · identidad y precio de record');
     // el mapeo viejo intacto dejaría dos clientes para un usuario.
     const cantUnlink = await callCheckout({ customers: MAPPED, customerLookup: 'missing', unlinkFails: true });
     ok('D.23 si el mapeo obsoleto no se puede retirar, NO se crea un segundo cliente',
-      cantUnlink.res.code === 503 && !cantUnlink.calls.some(c => c.url.includes('checkout/sessions'))
+      cantUnlink.res.code === 503 && !cantUnlink.calls.some(c => c.url.endsWith('/v1/checkout/sessions'))
       && !cantUnlink.calls.some(c => c.url.includes('api.stripe.com/v1/customers') &&
            ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST'),
       JSON.stringify(cantUnlink.res.payload));
@@ -525,7 +541,7 @@ console.log('\nD · checkout · identidad y precio de record');
       fine.res.code === 200
       && !fine.calls.some(c => c.url.includes('/billing_customers') && ((c.init && c.init.method) || '').toUpperCase() === 'DELETE')
       && !fine.calls.some(c => c.url.includes('api.stripe.com/v1/customers') && ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST')
-      && decodeBody(fine.calls.find(c => c.url.includes('checkout/sessions')).init.body).includes('customer=cus_old'));
+      && decodeBody(fine.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body).includes('customer=cus_old'));
   }
 
   ok('D.11 la creación de cliente es idempotente por usuario (doble click ⇒ un cliente)',
@@ -538,15 +554,20 @@ console.log('\nD · checkout · identidad y precio de record');
   ok('D.12 con cliente ya mapeado NO se crea otro (la lectura de 3a no cuenta)',
     !existing.calls.some(c => c.url.includes('api.stripe.com/v1/customers') &&
       ((c.init && c.init.method) || 'GET').toUpperCase() === 'POST') &&
-    decodeBody(existing.calls.find(c => c.url.includes('checkout/sessions')).init.body).includes('customer=cus_old'));
+    decodeBody(existing.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body).includes('customer=cus_old'));
   // ── EL DOBLE CARGO ────────────────────────────────────────────────────────
-  const dupOwn = await callCheckout({ ownSub: [{ plan: 'premium', status: 'active' }] });
+  // RE-DECIDIDO (cierre de riesgos comerciales, 2026-10-19): el guard de BD exige ahora una
+  // fila VIGENTE (misma condición que aurix_entitlements()). Una fila premium/active real
+  // siempre lleva periodo (subscriptions_premium_bound_chk), así que el fixture lo declara.
+  const FUT = new Date(Date.now() + 30 * 86400000).toISOString();
+  const PAST = new Date(Date.now() - 30 * 86400000).toISOString();
+  const dupOwn = await callCheckout({ ownSub: [{ plan: 'premium', status: 'active', billing_interval: 'year', current_period_end: FUT }] });
   ok('D.18 con una suscripción ya vigente NO se abre otra sesión (409)',
     dupOwn.res.code === 409 && dupOwn.res.payload.error === 'already_subscribed' &&
-    !dupOwn.calls.some(c => c.url.includes('checkout/sessions')));
+    !dupOwn.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   const dupRace = await callCheckout({ ownSub: [], providerSubs: [{ status: 'active' }] });
   ok('D.19 …y también si la suscripción existe en el PROVEEDOR y el webhook aún no ha llegado',
-    dupRace.res.code === 409 && !dupRace.calls.some(c => c.url.includes('checkout/sessions')));
+    dupRace.res.code === 409 && !dupRace.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   // Y la excepción, que es lo contrario de lo que parece: un `incomplete` es una
   // suscripción creada cuyo primer pago NUNCA se cobró (3DS abandonado). Bloquear
   // ahí no evita un doble cargo y deja al usuario sin ruta ninguna —el paywall le
@@ -555,35 +576,132 @@ console.log('\nD · checkout · identidad y precio de record');
   const dupIncomplete = await callCheckout({ providerSubs: [{ status: 'incomplete' }] });
   ok('D.20 un 3DS fallido (incomplete) NO bloquea reintentar: nunca hubo cargo',
     dupIncomplete.res.code === 200 &&
-    dupIncomplete.calls.some(c => c.url.includes('checkout/sessions')));
+    dupIncomplete.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   const dupUnpaid = await callCheckout({ providerSubs: [{ status: 'unpaid' }] });
   ok('D.20b …pero un `unpaid` sí bloquea: ahí hay una suscripción que cobrar o cancelar',
     dupUnpaid.res.code === 409);
   const checkFail = await callCheckout({ providerSubsFail: true });
   ok('D.21 si NO se puede comprobar, se falla CERRADO: mejor reintentar que cobrar dos veces',
     checkFail.res.code === 503 && checkFail.res.payload.error === 'check_failed' &&
-    !checkFail.calls.some(c => c.url.includes('checkout/sessions')));
+    !checkFail.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   ok('D.21b y el cliente distingue "no se pudo comprobar" de "todavía no se puede comprar"',
     (() => { const src = fnSrc(app, '_aurixBillingCheckout');
       return src.indexOf("j.error === 'check_failed'") < src.indexOf("r.status === 503"); })());
+
+  // ── P1-1 · UNA FILA CADUCADA NO BLOQUEA LA COMPRA (cierre de riesgos 2026-10-19) ──
+  const staleRow = await callCheckout({ ownSub: [{ plan: 'premium', status: 'active', billing_interval: 'year', current_period_end: PAST }] });
+  ok('D.40 fila premium/active con el periodo VENCIDO (p. ej. TEST tras el cutover) NO bloquea: decide el proveedor',
+    staleRow.res.code === 200 && staleRow.calls.some(c => c.url.endsWith('/v1/checkout/sessions')), JSON.stringify(staleRow.res.payload));
+  const staleButLive = await callCheckout({ ownSub: [{ plan: 'premium', status: 'active', billing_interval: 'year', current_period_end: PAST }],
+                                            providerSubs: [{ status: 'active' }] });
+  ok('D.41 …pero si el PROVEEDOR tiene una viva, sigue siendo 409 already_subscribed (sin doble compra)',
+    staleButLive.res.code === 409 && staleButLive.res.payload.error === 'already_subscribed' &&
+    !staleButLive.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  const lifetimeRow = await callCheckout({ ownSub: [{ plan: 'premium', status: 'active', billing_interval: 'lifetime', current_period_end: null }] });
+  ok('D.42 una fila lifetime vigente bloquea (409)', lifetimeRow.res.code === 409 && lifetimeRow.res.payload.error === 'already_subscribed');
+  const staleTrial = await callCheckout({ ownSub: [{ plan: 'premium', status: 'trialing', billing_interval: 'year', current_period_end: FUT, trial_end: PAST }] });
+  ok('D.43 un trialing con el trial VENCIDO no es vigente (igual que el resolver): no bloquea por BD',
+    staleTrial.res.code === 200);
+  ok('D.44 el guard de BD lee periodo y trial (la consulta pide esas columnas)',
+    staleRow.calls.some(c => c.url.includes('/rest/v1/subscriptions') && /current_period_end/.test(c.url) && /trial_end/.test(c.url) && /billing_interval/.test(c.url)));
+
+  // ── P1-2 · RENOVACIÓN FALLIDA → PORTAL, NO "PAGO PENDIENTE" ─────────────────────
+  const pastDue = await callCheckout({ providerSubs: [{ status: 'past_due' }] });
+  ok('D.45 past_due en el proveedor ⇒ 409 payment_recovery (no se abre otra compra)',
+    pastDue.res.code === 409 && pastDue.res.payload.error === 'payment_recovery' &&
+    !pastDue.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  ok('D.46 unpaid ⇒ también payment_recovery', dupUnpaid.res.payload.error === 'payment_recovery');
+  const mixed = await callCheckout({ providerSubs: [{ status: 'past_due' }, { status: 'active' }] });
+  ok('D.47 si además hay una ACTIVA, manda already_subscribed (tiene Premium)', mixed.res.payload.error === 'already_subscribed');
+  ok('D.48 el cliente trata payment_recovery ANTES que el 409 genérico y abre el portal en modo recuperación',
+    (() => { const src = fnSrc(app, '_aurixBillingCheckout');
+      const i = src.indexOf("j.error === 'payment_recovery'"), g = src.indexOf("r.status === 409");
+      return i > 0 && i < g && /_aurixBillingPortal\(\{ recovery: true \}\)/.test(src) && /t\('pw_recovery'\)/.test(src)
+        && !/payment_recovery[\s\S]{0,200}pw_pending/.test(src); })());
+  ok('D.49 el portal admite el modo recuperación sin depender del entitlement en memoria',
+    /_recovery\s*&&|!_recovery\s*&&/.test(fnSrc(app, '_aurixBillingPortal')));
+  ok('D.50 pw_recovery existe en ES y EN',
+    (app.match(/pw_recovery:\s*'/g) || []).length === 2);
+
+  // ── DOBLE CHECKOUT · UNA SESIÓN ABIERTA, NO DOS ─────────────────────────────────
+  const withOpen = await callCheckout({ openSessionsSeq: [[{ id: 'cs_old1', status: 'open', created: 1 }, { id: 'cs_old2', status: 'open', created: 2 }], []] });
+  ok('D.51 antes de crear se CADUCAN las sesiones abiertas del customer',
+    withOpen.res.code === 200 && withOpen.calls.sessions.expired.join() === 'cs_old1,cs_old2' &&
+    withOpen.calls.findIndex(c => c.url.endsWith('/expire')) < withOpen.calls.findIndex(c => c.url.endsWith('/v1/checkout/sessions')));
+  ok('D.52 la lista se pide para ESTE customer y sólo abiertas',
+    withOpen.calls.some(c => /checkout\/sessions\?customer=cus_new&status=open/.test(c.url)));
+  const listFail = await callCheckout({ sessionListFails: true });
+  ok('D.53 si no se puede listar, se falla CERRADO (503, sin sesión nueva)',
+    listFail.res.code === 503 && listFail.res.payload.error === 'check_failed' && !listFail.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  const expFail = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 500 });
+  ok('D.54 si no se puede caducar una abierta, se falla CERRADO', expFail.res.code === 503 && !expFail.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  const expGone = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 400 });
+  ok('D.55 una sesión que dejó de estar abierta entre medias (400) no bloquea', expGone.res.code === 200);
+  const converge = await callCheckout({ openSessionsSeq: [[], [
+    { id: 'cs_a', status: 'open', created: 100, url: 'https://checkout.stripe.com/s/a' },
+    { id: 'cs_b', status: 'open', created: 101, url: 'https://checkout.stripe.com/s/b' }]] });
+  ok('D.56 si tras crear hay DOS abiertas (carrera), sobrevive la más reciente y se devuelve SU url',
+    converge.res.code === 200 && converge.res.payload.url === 'https://checkout.stripe.com/s/b' && converge.calls.sessions.expired.join() === 'cs_a');
+  const convFail = await callCheckout({ openSessionsSeq: [[]], sessionListFailsAfter: true });
+  ok('D.57 si la relectura posterior no devuelve nada, se entrega la sesión creada', convFail.res.code === 200 && /checkout\.stripe\.com/.test(convFail.res.payload.url));
+
+  // ── CONCURRENCIA REAL: dos peticiones a la vez contra UN Stripe con estado ─────
+  // Se ejecuta la versión ANTERIOR (origin/main) y la ACTUAL con el mismo doble.
+  async function race(src) {
+    const st = { open: [], seq: 0 };
+    const env = { STRIPE_SECRET_KEY: 'sk_test_x', SUPABASE_SERVICE_ROLE_KEY: 'service-key', SUPABASE_URL: 'https://db.test' };
+    const tick = () => new Promise(r => setTimeout(r, 1));
+    const stateful = async (url, init) => {
+      const u = String(url); const m = ((init && init.method) || 'GET').toUpperCase(); await tick();
+      if (u.includes('/auth/v1/user')) return { ok: true, status: 200, json: async () => ({ id: 'user-1', email: 'a@b.c' }) };
+      if (u.includes('/billing_prices')) return { ok: true, status: 200, json: async () => [{ provider_price_id: 'price_annual_real', amount_cents: 6999, currency: 'EUR', trial_days: 0, billing_interval: 'year' }] };
+      if (/v1\/prices\//.test(u)) return { ok: true, status: 200, json: async () => ({ id: 'price_annual_real', active: true, livemode: false, unit_amount: 6999, currency: 'eur', recurring: { interval: 'year', interval_count: 1 } }) };
+      if (u.includes('/billing_customers')) return { ok: true, status: 200, json: async () => [{ provider_customer_id: 'cus_1' }] };
+      if (u.includes('api.stripe.com/v1/customers')) return { ok: true, status: 200, json: async () => ({ id: 'cus_1' }) };
+      if (u.includes('/rest/v1/subscriptions')) return { ok: true, status: 200, json: async () => [] };
+      if (u.includes('api.stripe.com/v1/subscriptions')) return { ok: true, status: 200, json: async () => ({ data: [] }) };
+      if (u.includes('checkout/sessions')) {
+        if (m === 'GET') return { ok: true, status: 200, json: async () => ({ data: st.open.map(x => Object.assign({}, x)) }) };
+        if (u.endsWith('/expire')) { const id = u.split('/').slice(-2, -1)[0]; st.open = st.open.filter(x => x.id !== id); return { ok: true, status: 200, json: async () => ({}) }; }
+        const sess = { id: 'cs_' + (++st.seq), status: 'open', created: st.seq, url: 'https://checkout.stripe.com/s/' + st.seq };
+        st.open.push(sess); await tick();
+        return { ok: true, status: 200, json: async () => sess };
+      }
+      return { ok: false, status: 404, json: async () => null };
+    };
+    const call = async () => { const { handler } = loadHandler(src, { process: { env }, fetch: stateful });
+      const res = mkRes(); await handler({ method: 'POST', headers: { origin: 'https://app.aurixsystem.io', authorization: 'Bearer ' + 'x'.repeat(40) }, body: { interval: 'year' } }, res); return res; };
+    const [a, b] = await Promise.all([call(), call()]);
+    return { open: st.open.length, urls: [a.payload && a.payload.url, b.payload && b.payload.url], codes: [a.code, b.code] };
+  }
+  let PREV = null;
+  try { PREV = require('child_process').execSync('git show origin/main:api/billing/_checkout.js', { cwd: path.join(__dirname, '..'), stdio: ['ignore', 'pipe', 'ignore'] }).toString(); } catch (_) {}
+  if (PREV && PREV !== CO) {
+    const before = await race(PREV);
+    ok('D.58 REPRODUCIDO en la versión anterior: dos peticiones simultáneas dejan DOS sesiones pagables',
+      before.open === 2 && before.urls[0] !== before.urls[1], JSON.stringify(before));
+  }
+  const after = await race(CO);
+  ok('D.59 con la corrección: UNA sola sesión abierta y las dos respuestas apuntan a ella',
+    after.open === 1 && after.codes.every(c => c === 200) && after.urls[0] === after.urls[1], JSON.stringify(after));
   ok('D.22 la versión de API de nuestras llamadas está FIJADA',
-    (() => { const c = okCall.calls.find(x => x.url.includes('checkout/sessions'));
+    (() => { const c = okCall.calls.find(x => x.url.endsWith('/v1/checkout/sessions'));
       return !!(c.init.headers['Stripe-Version'] || '').match(/^\d{4}-\d{2}-\d{2}/); })());
   const conflict = await callCheckout({ linkFails: true });
   ok('D.13 si el cliente ya pertenece a OTRO usuario, se aborta (no se re-apunta)',
     conflict.res.code === 409 &&
-    !conflict.calls.some(c => c.url.includes('checkout/sessions')));
+    !conflict.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   ok('D.14 sin cupones ni códigos promocionales: no hay precio fuera del catálogo',
-    (() => { const b = decodeBody(okCall.calls.find(c => c.url.includes('checkout/sessions')).init.body);
+    (() => { const b = decodeBody(okCall.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body);
       return b.includes('allow_promotion_codes=false'); })());
   ok('D.15 el trial sale del catálogo (0 ⇒ no se envía), nunca de una constante del código',
-    (() => { const b = decodeBody(okCall.calls.find(c => c.url.includes('checkout/sessions')).init.body);
+    (() => { const b = decodeBody(okCall.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body);
       return !b.includes('trial_period_days') && /Number\(price\.trial_days\)/.test(CO)
         && !/trial_period_days: 14|trial_days = 14/.test(CO); })());
   const withTrial = await callCheckout({ prices: [{ provider_price_id: 'price_annual_real',
     amount_cents: 6999, currency: 'EUR', trial_days: 14, billing_interval: 'year' }] });
   ok('D.16 …y con 14 días en el catálogo, el trial viaja al proveedor',
-    decodeBody(withTrial.calls.find(c => c.url.includes('checkout/sessions')).init.body)
+    decodeBody(withTrial.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body)
       .includes('subscription_data[trial_period_days]=14'));
   // ══ LO QUE SE MUESTRA ES LO QUE SE COBRA, O NO SE COBRA ════════════════
   // El catálogo decide DOS cosas que hasta ahora nadie contrastaba entre sí: el
@@ -596,12 +714,12 @@ console.log('\nD · checkout · identidad y precio de record');
   ok('D.25 si Stripe cobraría OTRO importe, no se abre sesión (409, y cero sesiones)',
     badAmount.res.code === 409 && badAmount.res.payload.error === 'price_mismatch' &&
     badAmount.res.payload.fields.includes('amount') &&
-    !badAmount.calls.some(c => c.url.includes('checkout/sessions')),
+    !badAmount.calls.some(c => c.url.endsWith('/v1/checkout/sessions')),
     JSON.stringify(badAmount.res.payload));
   const badCur = await callCheckout({ stripePrice: { currency: 'usd' } });
   ok('D.26 una divisa distinta de la anunciada tampoco se cobra',
     badCur.res.code === 409 && badCur.res.payload.fields.includes('currency') &&
-    !badCur.calls.some(c => c.url.includes('checkout/sessions')));
+    !badCur.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   const badRec = await callCheckout({ stripePrice: { recurring: { interval: 'month', interval_count: 1 } } });
   ok('D.27 un precio ANUAL que en Stripe es mensual se rechaza (o se cobraría 12 veces)',
     badRec.res.code === 409 && badRec.res.payload.fields.includes('recurrence'));
@@ -618,7 +736,7 @@ console.log('\nD · checkout · identidad y precio de record');
   ok('D.30 no poder comprobar el precio NO es poder cobrarlo: 503 y cero sesiones',
     unreadable.res.code === 503 &&
     unreadable.res.payload.error === 'price_verification_unavailable' &&
-    !unreadable.calls.some(c => c.url.includes('checkout/sessions')));
+    !unreadable.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   const throwing = await callCheckout({ stripePrice: 'throw' });
   ok('D.31 …y un fallo de red en esa comprobación se trata igual, no se ignora',
     throwing.res.code === 503 && throwing.res.payload.error === 'price_verification_unavailable');
