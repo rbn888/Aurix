@@ -95,6 +95,10 @@
     completedAt:  null,
   };
   let _hydrated = false;
+  // Lo que se sabe del registro REMOTO de esta cuenta: 'ok' (hay fila), 'none' (no hay
+  // fila: cuenta sin onboarding remoto), 'error' (la lectura falló: NO se sabe) o null
+  // (sin cliente/usuario o aún sin leer). Un fallo de red no es "cuenta nueva".
+  let _remoteStatus = null;
 
   // ONBOARDING-1B: visible sync diagnostics. UX stays silent if the
   // user_onboarding table is missing, but `__aurixOnboardingDebug()` must
@@ -211,6 +215,14 @@
         _sync.lastError = 'no authenticated user';
         return;
       }
+      // NUNCA se escribe `completed:false` sin saber qué hay en remoto: si la lectura
+      // falló, esa fila puede decir completed=true (otro dispositivo) y el upsert la
+      // pisaría. Completar sí se escribe siempre: es monótono y no destruye nada.
+      if (!s.completed && _remoteStatus !== 'ok' && _remoteStatus !== 'none') {
+        _sync.success   = false;
+        _sync.lastError = 'remote state unknown: incomplete state not written';
+        return;
+      }
       const { error } = await supabaseClient
         .from('user_onboarding')
         .upsert({
@@ -239,14 +251,18 @@
 
   async function _readRemote() {
     try {
-      if (typeof supabaseClient === 'undefined' || !supabaseClient) return null;
-      if (typeof currentUser     === 'undefined' || !currentUser)   return null;
+      if (typeof supabaseClient === 'undefined' || !supabaseClient) { _remoteStatus = null; return null; }
+      if (typeof currentUser     === 'undefined' || !currentUser)   { _remoteStatus = null; return null; }
+      // `maybeSingle`: "no hay fila" llega como data=null SIN error, y un error es sólo
+      // un error. Con `.single()` las dos cosas eran el mismo null.
       const { data, error } = await supabaseClient
         .from('user_onboarding')
         .select('*')
         .eq('user_id', currentUser.id)
-        .single();
-      if (error || !data) return null;
+        .maybeSingle();
+      if (error) { _remoteStatus = 'error'; return null; }
+      if (!data) { _remoteStatus = 'none'; return null; }
+      _remoteStatus = 'ok';
       return {
         // Un paso retirado guardado en la cuenta (p. ej. LANGUAGE) se lee migrado.
         state:        data.onboarding_completed ? STATES.COMPLETED : _migrateRetiredStep(data.onboarding_step || STATES.NOT_STARTED),
@@ -256,7 +272,7 @@
         experience:   data.experience_level || null,
         completedAt:  data.onboarding_completed_at || null,
       };
-    } catch (_) { return null; }
+    } catch (_) { _remoteStatus = 'error'; return null; }
   }
 
   // ── Public: hydration ────────────────────────────────────────────
@@ -446,6 +462,7 @@
       ageBand:     _state.ageBand,
       completedAt: _state.completedAt,
       hydrated:    _hydrated,
+      remoteStatus: _remoteStatus,
     };
   }
 

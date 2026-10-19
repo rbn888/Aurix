@@ -91606,6 +91606,31 @@ try {
     _maybeShowRunning = _onbDomReady().then(_maybeShowOnboardingNow).finally(() => { _maybeShowRunning = null; });
     return _maybeShowRunning;
   }
+  // P1-3 · Un fallo de red al arrancar NO es "cuenta nueva". Si la lectura remota del
+  // onboarding o la de la cartera falló de forma explícita, no se decide: se reintenta
+  // (3 s, 10 s, 30 s y al recuperar la red). Agotados los reintentos se da por resuelto
+  // SIN mostrar el onboarding —un usuario existente no debe verlo por un corte— y la
+  // intención Premium pendiente puede seguir su curso.
+  let _onbUnknownRetries = 0, _onbUnknownTimer = null, _onbOnlineHooked = false;
+  function _onbRemoteUnknown() {
+    let engErr = false;
+    try { engErr = Eng.getSnapshot().remoteStatus === 'error'; } catch (_) {}
+    const loadFailed = (typeof _aurixRemoteLoadOutcome !== 'undefined') && _aurixRemoteLoadOutcome === 'failed';
+    return engErr || loadFailed;
+  }
+  function _onbScheduleUnknownRetry() {
+    if (!_onbOnlineHooked) {
+      _onbOnlineHooked = true;
+      window.addEventListener('online', () => { if (!_aurixOnbSettled) { try { maybeShowOnboarding(); } catch (_) {} } });
+    }
+    if (_onbUnknownTimer) return;
+    if (_onbUnknownRetries >= 3) {
+      _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-unknown');
+      return;
+    }
+    const delay = [3000, 10000, 30000][_onbUnknownRetries++];
+    _onbUnknownTimer = setTimeout(() => { _onbUnknownTimer = null; try { maybeShowOnboarding(); } catch (_) {} }, delay);
+  }
   async function _maybeShowOnboardingNow() {
     try {
       // ONBOARDING-1B §6: existing-user guarantee runs BEFORE we even
@@ -91635,6 +91660,7 @@ try {
         ? { authenticated: true, id: currentUser.id }
         : null;
       if (!user) return;
+      if (!Eng.getSnapshot().completed && _onbRemoteUnknown()) { _onbScheduleUnknownRetry(); return; }
       if (!Eng.shouldShowOnboarding(user, assets)) { _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-none'); return; }
 
       // ONBOARDING-1B §5: LANGUAGE is always the first onboarding

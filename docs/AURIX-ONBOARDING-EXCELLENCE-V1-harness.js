@@ -103,7 +103,10 @@ console.log('A — Un usuario nuevo recorre el flujo entero:');
 // ── B · IDIOMA ──────────────────────────────────────────────────────────────
 console.log('\nB — Idioma:');
 {
-  const { Eng, mem, upserts } = bootEngine();
+  // RE-DECIDIDO (P1-3, 2026-10-19): el motor ya no escribe un estado INCOMPLETO en remoto sin
+  // haber leído antes qué hay allí (podría pisar un completed=true de otro dispositivo). En la
+  // app todo cambio llega tras `hydrateOnboardingState()`, así que la prueba hidrata primero.
+  const { Eng, mem, upserts } = await bootHydrated();
   Eng.startOnboarding(); Eng.setLanguage('en');
   ok('B.1 el idioma persiste en el snapshot', Eng.getSnapshot().language === 'en');
   ok('B.2 y en el almacén local', /"language":"en"/.test(mem['aurix_onboarding_preferences'] || ''));
@@ -116,7 +119,10 @@ console.log('\nB — Idioma:');
 // ── C · INTERESES (conservan consumidor) ────────────────────────────────────
 console.log('\nC — Intereses:');
 {
-  const { Eng, mem, upserts } = bootEngine();
+  // RE-DECIDIDO (P1-3, 2026-10-19): el motor ya no escribe un estado INCOMPLETO en remoto sin
+  // haber leído antes qué hay allí (podría pisar un completed=true de otro dispositivo). En la
+  // app todo cambio llega tras `hydrateOnboardingState()`, así que la prueba hidrata primero.
+  const { Eng, mem, upserts } = await bootHydrated();
   Eng.startOnboarding();
   Eng.savePreferences({ interests: ['stocks', 'crypto'] });
   ok('C.1 los intereses persisten', JSON.stringify(Eng.getSnapshot().interests) === '["stocks","crypto"]');
@@ -229,7 +235,10 @@ console.log('\nL/M — Reentrada y refresh reanudan:');
   ok('M.3 [P1 cerrado] y también se SINCRONIZA (reanudación cross-device)',
      /function setStep\(step\)[\s\S]{0,1400}_syncRemote\(_state\);/.test(engSrc),
      'antes setStep sólo hacía _writeLocal ⇒ onboarding_step remoto quedaba desfasado');
-  const { Eng: E3, upserts } = bootEngine();
+  // RE-DECIDIDO (P1-3, 2026-10-19): el motor ya no escribe un estado INCOMPLETO en remoto sin
+  // haber leído antes qué hay allí (podría pisar un completed=true de otro dispositivo). En la
+  // app todo cambio llega tras `hydrateOnboardingState()`, así que la prueba hidrata primero.
+  const { Eng: E3, upserts } = await bootHydrated();
   E3.startOnboarding(); E3.nextStep();
   ok('M.4 el upsert lleva el paso actual', upserts.some(u => u.onboarding_step === 'ACTIVATION'),
      JSON.stringify(upserts.map(u => u.onboarding_step)));
@@ -316,6 +325,95 @@ console.log('\nFunnel — eventos semánticos sobre la infraestructura existente
   ok('F3 y se emiten de verdad al recorrer el flujo',
      seen.includes('onboarding_started') && seen.includes('language_selected') && seen.includes('onboarding_deferred'),
      seen.join(','));
+}
+
+// ── P · P1-3 · FALLO DE RED ≠ CUENTA NUEVA (cierre de riesgos 2026-10-19) ───────
+console.log('\nP — Fallo de red al arrancar:');
+{
+  // Motor real con un backend simulado cuya LECTURA se elige por caso.
+  function bootRemote(read) {
+    const mem = {}, upserts = [];
+    const sb = {
+      JSON, Array, Object, String, Boolean, Number, Date, isFinite, Promise, console: { log() {}, warn() {}, error() {} },
+      setTimeout, clearTimeout,
+      localStorage: { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } },
+      supabaseClient: { from: () => ({ upsert: async (row) => { upserts.push(row); return { error: null }; },
+        select: () => ({ eq: () => ({ maybeSingle: async () => {
+          if (read === 'throw') throw new Error('network');
+          if (read === 'error') return { data: null, error: { message: 'fetch failed' } };
+          if (read === 'none')  return { data: null, error: null };
+          return { data: read, error: null }; } }) }) }) },
+      currentUser: { id: 'u-test' }, _analyticsEvents: [],
+    };
+    const listeners = {};
+    sb.addEventListener = (ev, fn) => { (listeners[ev] = listeners[ev] || []).push(fn); };
+    sb.dispatchEvent = () => true; sb.CustomEvent = function () {}; sb.window = sb; sb.aurixAnalytics = () => {};
+    vm.createContext(sb); vm.runInContext(engSrc, sb);
+    return { Eng: sb.AurixOnboarding, upserts, mem };
+  }
+  const flush = () => new Promise(r => setTimeout(r, 0));
+
+  // P.1–P.4 · el motor distingue error / sin fila / fila
+  { const { Eng, upserts } = bootRemote('error'); await Eng.hydrateOnboardingState();
+    ok('P.1 lectura remota fallida ⇒ remoteStatus=error (no "sin fila")', Eng.getSnapshot().remoteStatus === 'error');
+    Eng.startOnboarding(); Eng.nextStep(); Eng.setLanguage('es'); await flush();
+    ok('P.2 con el remoto DESCONOCIDO nunca se sube completed:false', !upserts.some(u => u.onboarding_completed === false), JSON.stringify(upserts));
+    Eng.completeOnboarding(); await flush();
+    ok('P.3 …pero completar SÍ se sube (monótono, no destruye nada)', upserts.some(u => u.onboarding_completed === true)); }
+  { const { Eng } = bootRemote('throw'); await Eng.hydrateOnboardingState();
+    ok('P.4 una excepción de red también es error, no "sin fila"', Eng.getSnapshot().remoteStatus === 'error'); }
+  { const { Eng, upserts } = bootRemote('none'); await Eng.hydrateOnboardingState();
+    Eng.startOnboarding(); Eng.nextStep(); await flush();
+    ok('P.5 sin fila (cuenta nueva de verdad) ⇒ none, y los pasos SÍ se sincronizan',
+      Eng.getSnapshot().remoteStatus === 'none' && upserts.some(u => u.onboarding_completed === false && u.onboarding_step === 'ACTIVATION')); }
+  { const { Eng } = bootRemote({ onboarding_completed: true, onboarding_step: 'COMPLETED' }); await Eng.hydrateOnboardingState();
+    ok('P.6 fila remota completada ⇒ completado (cross-device intacto)', Eng.getSnapshot().completed === true && Eng.getSnapshot().remoteStatus === 'ok'); }
+  { const { Eng, upserts } = bootRemote({ onboarding_completed: true }); // SIN hidratar: switchLang() antes del arranque
+    Eng.setLanguage('en'); await flush();
+    ok('P.7 REPRODUCIDO y cerrado: cambiar de idioma ANTES de hidratar ya no pisa completed=true con false',
+      !upserts.some(u => u.onboarding_completed === false), JSON.stringify(upserts)); }
+
+  // P.8–P.12 · la DECISIÓN real de app.js (código extraído tal cual) contra el motor real
+  const a = app.indexOf('  // P1-3 · Un fallo de red al arrancar');
+  const b = app.indexOf('\n  window.maybeShowOnboarding = maybeShowOnboarding;', a);
+  const decisionSrc = a > 0 && b > a ? app.slice(a, b) : '';
+  ok('P.8 la decisión de app.js consulta el estado remoto ANTES de decidir mostrar',
+    decisionSrc.indexOf('_onbRemoteUnknown()') > 0 && decisionSrc.indexOf('_onbRemoteUnknown()') < decisionSrc.indexOf('Eng.shouldShowOnboarding('));
+  async function decide(read, loadOutcome) {
+    const { Eng } = bootRemote(read);
+    const timers = [], consumed = [];
+    const ctx = {
+      Eng, STATES: { NOT_STARTED: 'NOT_STARTED', COMPLETED: 'COMPLETED' }, console: { warn() {}, log() {} },
+      document: { readyState: 'complete' }, localStorage: { getItem: () => null },
+      currentUser: { id: 'u-test' }, assets: [], lang: 'es', pendingLang: null,
+      _aurixRemoteLoadOutcome: loadOutcome, _aurixOnbSettled: false,
+      _aurixPremiumIntentTryConsume: (why) => consumed.push(why),
+      _openOnboardingOverlay: () => { ctx.opened = (ctx.opened || 0) + 1; },
+      setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+      maybeShowOnboarding: () => ctx._maybeShowOnboardingNow(),
+      Array, JSON, Object, String, Number, Promise,
+    };
+    ctx.window = ctx; ctx.window.assets = []; ctx.addEventListener = () => {};
+    vm.createContext(ctx);
+    vm.runInContext(decisionSrc + '\nthis._maybeShowOnboardingNow = _maybeShowOnboardingNow;', ctx);
+    await ctx._maybeShowOnboardingNow();
+    return { ctx, timers, consumed };
+  }
+  { const r = await decide('error', 'ok-row');
+    ok('P.9 lectura de onboarding fallida ⇒ NO se muestra el onboarding y se programa un reintento',
+      !r.ctx.opened && r.timers.length === 1 && r.timers[0].ms === 3000 && r.ctx._aurixOnbSettled === false); }
+  { const r = await decide('none', 'failed');
+    ok('P.10 cartera fallida (aunque el onboarding diga "sin fila") ⇒ tampoco se muestra', !r.ctx.opened && r.timers.length === 1); }
+  { const r = await decide('error', 'ok-row');
+    for (let i = 0; i < 3 && r.timers.length; i++) { const t = r.timers.shift(); t.fn(); await new Promise(res => setTimeout(res, 10)); }
+    const fired = 3 - r.timers.length;
+    ok('P.11 agotados 3 reintentos (3 s, 10 s, 30 s) se resuelve SIN mostrar y la intención Premium sigue',
+      !r.ctx.opened && r.ctx._aurixOnbSettled === true && r.consumed.includes('onboarding-unknown'),
+      'reintentos disparados=' + fired); }
+  { const r = await decide('none', 'no-row');
+    ok('P.12 cuenta nueva de verdad (sin fila en los dos) ⇒ SÍ se muestra, como siempre', r.ctx.opened === 1 && !r.timers.length); }
+  { const r = await decide({ onboarding_completed: true }, 'failed');
+    ok('P.13 ya completado en remoto ⇒ no se muestra ni se reintenta', !r.ctx.opened && !r.timers.length && r.ctx._aurixOnbSettled === true); }
 }
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
