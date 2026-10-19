@@ -338,7 +338,8 @@ end $$;
 commit;
 
 -- Verificación (solo lectura):
---   select action_id, received_at, operation, days, outcome, code, new_expires_at
+--   select action_id, received_at, operation, days, permanent, outcome, code, new_expires_at
 --     from public.premium_access_actions order by received_at desc limit 20;
+--   (permanent = true y new_expires_at NULL: acceso sin caducidad)
 --   select user_id, feature_key, starts_at, expires_at from public.entitlement_overrides
 --    where reason = 'comp' and granted_by = 'founder-platform';
