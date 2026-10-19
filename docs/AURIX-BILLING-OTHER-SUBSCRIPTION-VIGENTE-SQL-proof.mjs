@@ -89,4 +89,39 @@ for (const phase of ['antes', 'después']) {
     await liveEvent(db, 'evt_dup'); const r2 = await liveEvent(db, 'evt_dup');
     if (phase === 'después') ok('DESPUÉS · reenviar el mismo evento es duplicate (idempotencia intacta)', r2.outcome === 'duplicate', JSON.stringify(r2)); }
 }
+
+console.log('── REVISIÓN ADVERSARIAL: renovación tardía + duplicada cancelada (con la migración)');
+{
+  const ev = (db, id, type, sub, status, at, periodEnd) => db.query(`select public.aurix_billing_apply_event(
+      'stripe',$1,$2,'cus_live',$3,'price_LIVE_Y',$4, $5::timestamptz - interval '365 days', $6::timestamptz, false, null, null, null, $5::timestamptz) r`,
+      [id, type, sub, status, at, periodEnd]).then(x => x.rows[0].r);
+  const db = await base(); await db.exec(MIG);
+  await db.exec(`insert into auth.users(id) values ('${U1}');
+    insert into public.billing_prices(provider,provider_price_id,plan,billing_interval,amount_cents,currency,active)
+      values ('stripe','price_LIVE_Y','premium','year',6999,'EUR',true);
+    insert into public.billing_customers(provider,user_id,provider_customer_id) values ('stripe','${U1}','cus_live');`);
+  // A gobierna; su periodo venció HACE 1 h y la renovación aún no ha llegado (webhook en reintentos).
+  await ev(db, 'evt_a1', 'customer.subscription.updated', 'sub_A', 'active', new Date(Date.now() - 400 * 86400000).toISOString(), new Date(Date.now() - 3600000).toISOString());
+  const rB = await ev(db, 'evt_b_del', 'customer.subscription.deleted', 'sub_B', 'canceled', new Date(Date.now() - 1800000).toISOString(), new Date(Date.now() - 3600000).toISOString());
+  ok('el `deleted` de la duplicada B NO toma la fila (other_subscription)', rB.outcome === 'other_subscription', JSON.stringify(rB));
+  const rA = await ev(db, 'evt_a_renew', 'customer.subscription.updated', 'sub_A', 'active', new Date(Date.now() - 3600000).toISOString(), new Date(Date.now() + 364 * 86400000).toISOString());
+  const s = await sub(db);
+  ok('…y la renovación tardía de A se aplica: sigue Premium con A', rA.outcome === 'applied' && s.plan === 'premium' && s.provider_subscription_id === 'sub_A', JSON.stringify(rA));
+}
+{
+  const db = await base(); await db.exec(MIG);
+  await seedUser(db, { periodEnd: '2026-09-01' });        // fila TEST caducada
+  const inc = await db.query(`select public.aurix_billing_apply_event('stripe','evt_l0','customer.subscription.created','cus_live','sub_LIVE','price_LIVE_Y','incomplete',
+      now(), now() + interval '365 days', false, null, null, null, now() - interval '1 minute') r`).then(x => x.rows[0].r);
+  const act = await liveEvent(db, 'evt_l1');
+  const s = await sub(db);
+  ok('flujo LIVE real (created incomplete → updated active): el incomplete se ignora y el active toma la fila',
+    inc.outcome === 'other_subscription' && act.outcome === 'applied' && s.provider_subscription_id === 'sub_LIVE' && s.plan === 'premium', JSON.stringify([inc, act]));
+}
+{
+  const db = await base(); await db.exec(MIG);
+  await seedUser(db, { periodEnd: '2026-09-01', status: 'past_due' }); // fila premium/past_due de A
+  const r = await liveEvent(db, 'evt_l2');
+  ok('sobre una fila past_due, una suscripción nueva activa toma el relevo (el usuario vuelve a pagar)', r.outcome === 'applied', JSON.stringify(r));
+}
 console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

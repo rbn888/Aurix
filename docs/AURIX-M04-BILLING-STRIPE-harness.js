@@ -415,8 +415,12 @@ console.log('\nD · checkout · identidad y precio de record');
         // 3c · LISTA de sesiones abiertas del customer (GET) y CADUCIDAD (POST …/expire).
         // La CREACIÓN es el POST exacto a /v1/checkout/sessions (rama de abajo).
         calls.sessions = calls.sessions || { listed: 0, expired: [] };
+        if (((init && init.method) || 'GET').toUpperCase() === 'GET' && /checkout\/sessions\/[^/?]+$/.test(u)) {
+          return { ok: true, status: 200, json: async () => ({ id: u.split('/').pop(), status: opts.sessionStatusAfter400 || 'expired' }) };
+        }
         if (((init && init.method) || 'GET').toUpperCase() === 'GET') {
           calls.sessions.listed++;
+          if (opts.listHasMore) return { ok: true, status: 200, json: async () => ({ data: [], has_more: true }) };
           if (opts.sessionListFails) return { ok: false, status: 500, json: async () => null };
           const data = Array.isArray(opts.openSessionsSeq) ? (opts.openSessionsSeq.shift() || []) : (opts.openSessions || []);
           return { ok: true, status: 200, json: async () => ({ data }) };
@@ -636,43 +640,81 @@ console.log('\nD · checkout · identidad y precio de record');
   const expFail = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 500 });
   ok('D.54 si no se puede caducar una abierta, se falla CERRADO', expFail.res.code === 503 && !expFail.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
   const expGone = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 400 });
-  ok('D.55 una sesión que dejó de estar abierta entre medias (400) no bloquea', expGone.res.code === 200);
+  ok('D.55 una sesión que dejó de estar abierta entre medias (400 y su estado ya no es open) no bloquea', expGone.res.code === 200);
+  // RE-DECIDIDO tras la revisión adversarial (2026-10-19): un 400 de /expire ya no se da por bueno a ciegas.
+  const expStillOpen = await callCheckout({ openSessions: [{ id: 'cs_x', status: 'open', created: 1 }], expireStatus: 400, sessionStatusAfter400: 'open' });
+  ok('D.55b un 400 de /expire con la sesión TODAVÍA abierta ⇒ fail closed (503), sin sesión nueva',
+    expStillOpen.res.code === 503 && !expStillOpen.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  const hasMore = await callCheckout({ listHasMore: true });
+  ok('D.55c más de 100 sesiones abiertas (has_more) ⇒ fail closed', hasMore.res.code === 503 && !hasMore.calls.some(c => c.url.endsWith('/v1/checkout/sessions')));
+  ok('D.55d la sesión se crea con Idempotency-Key ligada a usuario, precio, idioma, minuto y lo visto',
+    (() => { const c = okCall.calls.find(x => x.url.endsWith('/v1/checkout/sessions'));
+      const k = c && c.init.headers['Idempotency-Key'] || '';
+      return /^aurix_cs_user-1_price_annual_real_(es|en)_\d+_[0-9a-z]+$/.test(k); })(),
+    (okCall.calls.find(x => x.url.endsWith('/v1/checkout/sessions')) || { init: { headers: {} } }).init.headers['Idempotency-Key']);
+  ok('D.55e la sesión declara su precio en metadata (para converger sólo entre la misma compra)',
+    decodeBody(okCall.calls.find(c => c.url.endsWith('/v1/checkout/sessions')).init.body).includes('metadata[aurix_price]=price_annual_real'));
   const converge = await callCheckout({ openSessionsSeq: [[], [
-    { id: 'cs_a', status: 'open', created: 100, url: 'https://checkout.stripe.com/s/a' },
-    { id: 'cs_b', status: 'open', created: 101, url: 'https://checkout.stripe.com/s/b' }]] });
+    { id: 'cs_a', status: 'open', created: 100, url: 'https://checkout.stripe.com/s/a', metadata: { aurix_price: 'price_annual_real' } },
+    { id: 'cs_b', status: 'open', created: 101, url: 'https://checkout.stripe.com/s/b', metadata: { aurix_price: 'price_annual_real' } }]] });
   ok('D.56 si tras crear hay DOS abiertas (carrera), sobrevive la más reciente y se devuelve SU url',
     converge.res.code === 200 && converge.res.payload.url === 'https://checkout.stripe.com/s/b' && converge.calls.sessions.expired.join() === 'cs_a');
   const convFail = await callCheckout({ openSessionsSeq: [[]], sessionListFailsAfter: true });
   ok('D.57 si la relectura posterior no devuelve nada, se entrega la sesión creada', convFail.res.code === 200 && /checkout\.stripe\.com/.test(convFail.res.payload.url));
+  const otherPrice = await callCheckout({ openSessionsSeq: [[], [
+    { id: 'cs_mine', status: 'open', created: 100, url: 'https://checkout.stripe.com/s/mine', metadata: { aurix_price: 'price_annual_real' } },
+    { id: 'cs_month', status: 'open', created: 101, url: 'https://checkout.stripe.com/s/month', metadata: { aurix_price: 'price_month_real' } }]] });
+  ok('D.57b si sobrevive la sesión gemela de OTRO precio, 409 checkout_superseded y NUNCA su URL',
+    otherPrice.res.code === 409 && otherPrice.res.payload.error === 'checkout_superseded' && !otherPrice.res.payload.url);
+  ok('D.57c el cliente trata checkout_superseded como error explícito (no como «pago confirmándose»)',
+    (() => { const src = fnSrc(app, '_aurixBillingCheckout');
+      const i = src.indexOf("j.error === 'checkout_superseded'"), g = src.indexOf("r.status === 409");
+      return i > 0 && i < g; })());
 
   // ── CONCURRENCIA REAL: dos peticiones a la vez contra UN Stripe con estado ─────
   // Se ejecuta la versión ANTERIOR (origin/main) y la ACTUAL con el mismo doble.
-  async function race(src) {
-    const st = { open: [], seq: 0 };
+  async function race(src, o) {
+    const ro = o || {};
+    const st = { open: [], seq: 0, idem: new Map() };
     const env = { STRIPE_SECRET_KEY: 'sk_test_x', SUPABASE_SERVICE_ROLE_KEY: 'service-key', SUPABASE_URL: 'https://db.test' };
     const tick = () => new Promise(r => setTimeout(r, 1));
     const stateful = async (url, init) => {
       const u = String(url); const m = ((init && init.method) || 'GET').toUpperCase(); await tick();
       if (u.includes('/auth/v1/user')) return { ok: true, status: 200, json: async () => ({ id: 'user-1', email: 'a@b.c' }) };
-      if (u.includes('/billing_prices')) return { ok: true, status: 200, json: async () => [{ provider_price_id: 'price_annual_real', amount_cents: 6999, currency: 'EUR', trial_days: 0, billing_interval: 'year' }] };
-      if (/v1\/prices\//.test(u)) return { ok: true, status: 200, json: async () => ({ id: 'price_annual_real', active: true, livemode: false, unit_amount: 6999, currency: 'eur', recurring: { interval: 'year', interval_count: 1 } }) };
+      if (u.includes('/billing_prices')) return { ok: true, status: 200, json: async () => (/month/.test(u)
+        ? [{ provider_price_id: 'price_month_real', amount_cents: 799, currency: 'EUR', trial_days: 0, billing_interval: 'month' }]
+        : [{ provider_price_id: 'price_annual_real', amount_cents: 6999, currency: 'EUR', trial_days: 0, billing_interval: 'year' }]) };
+      if (/v1\/prices\//.test(u)) return { ok: true, status: 200, json: async () => (/price_month_real/.test(u)
+        ? { id: 'price_month_real', active: true, livemode: false, unit_amount: 799, currency: 'eur', recurring: { interval: 'month', interval_count: 1 } }
+        : { id: 'price_annual_real', active: true, livemode: false, unit_amount: 6999, currency: 'eur', recurring: { interval: 'year', interval_count: 1 } }) };
       if (u.includes('/billing_customers')) return { ok: true, status: 200, json: async () => [{ provider_customer_id: 'cus_1' }] };
       if (u.includes('api.stripe.com/v1/customers')) return { ok: true, status: 200, json: async () => ({ id: 'cus_1' }) };
       if (u.includes('/rest/v1/subscriptions')) return { ok: true, status: 200, json: async () => [] };
       if (u.includes('api.stripe.com/v1/subscriptions')) return { ok: true, status: 200, json: async () => ({ data: [] }) };
       if (u.includes('checkout/sessions')) {
-        if (m === 'GET') return { ok: true, status: 200, json: async () => ({ data: st.open.map(x => Object.assign({}, x)) }) };
+        if (m === 'GET') return { ok: true, status: 200, json: async () => ({ data: ro.blindList ? [] : st.open.map(x => Object.assign({}, x)) }) };
         if (u.endsWith('/expire')) { const id = u.split('/').slice(-2, -1)[0]; st.open = st.open.filter(x => x.id !== id); return { ok: true, status: 200, json: async () => ({}) }; }
-        const sess = { id: 'cs_' + (++st.seq), status: 'open', created: st.seq, url: 'https://checkout.stripe.com/s/' + st.seq };
-        st.open.push(sess); await tick();
+        // Idempotencia como la de Stripe: clave en vuelo ⇒ 409; clave terminada ⇒ misma respuesta.
+        const key = init && init.headers && init.headers['Idempotency-Key'];
+        if (key && st.idem.has(key)) {
+          const prev = st.idem.get(key);
+          if (prev === 'pending') return { ok: false, status: 409, json: async () => ({ error: { type: 'idempotency_error', code: 'idempotency_key_in_use' } }) };
+          return { ok: true, status: 200, json: async () => prev };
+        }
+        if (key) st.idem.set(key, 'pending');
+        const price = (decodeURIComponent(String(init.body)).match(/line_items\[0\]\[price\]=([^&]+)/) || [])[1];
+        const sess = { id: 'cs_' + (++st.seq), status: 'open', created: st.seq, url: 'https://checkout.stripe.com/s/' + st.seq, metadata: { aurix_price: price } };
+        st.open.push(sess); await tick(); await tick();
+        if (key) st.idem.set(key, sess);
         return { ok: true, status: 200, json: async () => sess };
       }
       return { ok: false, status: 404, json: async () => null };
     };
-    const call = async () => { const { handler } = loadHandler(src, { process: { env }, fetch: stateful });
-      const res = mkRes(); await handler({ method: 'POST', headers: { origin: 'https://app.aurixsystem.io', authorization: 'Bearer ' + 'x'.repeat(40) }, body: { interval: 'year' } }, res); return res; };
-    const [a, b] = await Promise.all([call(), call()]);
-    return { open: st.open.length, urls: [a.payload && a.payload.url, b.payload && b.payload.url], codes: [a.code, b.code] };
+    const call = async (interval) => { const { handler } = loadHandler(src, { process: { env }, fetch: stateful });
+      const res = mkRes(); await handler({ method: 'POST', headers: { origin: 'https://app.aurixsystem.io', authorization: 'Bearer ' + 'x'.repeat(40) }, body: { interval } }, res); return res; };
+    const [a, b] = await Promise.all([call(ro.i1 || 'year'), call(ro.i2 || 'year')]);
+    return { open: st.open.length, created: st.seq, urls: [a.payload && a.payload.url, b.payload && b.payload.url],
+             codes: [a.code, b.code], errors: [a.payload && a.payload.error, b.payload && b.payload.error] };
   }
   let PREV = null;
   try { PREV = require('child_process').execSync('git show origin/main:api/billing/_checkout.js', { cwd: path.join(__dirname, '..'), stdio: ['ignore', 'pipe', 'ignore'] }).toString(); } catch (_) {}
@@ -684,6 +726,17 @@ console.log('\nD · checkout · identidad y precio de record');
   const after = await race(CO);
   ok('D.59 con la corrección: UNA sola sesión abierta y las dos respuestas apuntan a ella',
     after.open === 1 && after.codes.every(c => c === 200) && after.urls[0] === after.urls[1], JSON.stringify(after));
+  const blind = await race(CO, { blindList: true });
+  ok('D.60 aunque la LISTA no vea la sesión gemela (consistencia eventual), la idempotencia crea UNA sola',
+    blind.created === 1 && blind.open === 1 && blind.urls[0] === blind.urls[1] && blind.codes.every(c => c === 200), JSON.stringify(blind));
+  if (PREV && PREV !== CO) {
+    const blindBefore = await race(PREV, { blindList: true });
+    ok('D.61 …y en la versión anterior, en ese mismo caso, se creaban DOS', blindBefore.created === 2 && blindBefore.open === 2, JSON.stringify(blindBefore));
+  }
+  const mixedPlans = await race(CO, { i1: 'month', i2: 'year' });
+  ok('D.62 mensual y anual a la vez: queda UNA sesión pagable y nadie recibe la URL de otro plan',
+    mixedPlans.open === 1 && mixedPlans.codes.filter(c => c === 200).length === 1 &&
+    mixedPlans.errors.includes('checkout_superseded'), JSON.stringify(mixedPlans));
   ok('D.22 la versión de API de nuestras llamadas está FIJADA',
     (() => { const c = okCall.calls.find(x => x.url.endsWith('/v1/checkout/sessions'));
       return !!(c.init.headers['Stripe-Version'] || '').match(/^\d{4}-\d{2}-\d{2}/); })());

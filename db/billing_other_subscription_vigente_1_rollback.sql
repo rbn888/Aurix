@@ -7,7 +7,7 @@
 -- HUELLA. Sólo se reemplaza una versión CONOCIDA de la función: si producción tiene
 -- otra (un hotfix no versionado), la transacción aborta sin tocar nada. Idempotente:
 -- volver a aplicarlo sobre la versión destino no cambia nada.
---   md5(prosrc) origen  = f42a238fa36b40bd7912d43004971088
+--   md5(prosrc) origen  = b90d9c7d14ea1b34c2a6a2fbabea803e
 --   md5(prosrc) destino = f0945dfbe3bfe15145c7ba515f5aa8ed
 -- `create or replace` conserva propietario y permisos (revoke/grant de M.04 intactos).
 -- ════════════════════════════════════════════════════════════════════════════
@@ -23,7 +23,7 @@ begin
   if v_n <> 1 then
     raise exception 'ABORTADO: se esperaba 1 función aurix_billing_apply_event y hay %', v_n;
   end if;
-  if v_md5 not in ('f42a238fa36b40bd7912d43004971088', 'f0945dfbe3bfe15145c7ba515f5aa8ed') then
+  if v_md5 not in ('b90d9c7d14ea1b34c2a6a2fbabea803e', 'f0945dfbe3bfe15145c7ba515f5aa8ed') then
     raise exception 'ABORTADO: versión desconocida de aurix_billing_apply_event en esta base (md5 %)', v_md5;
   end if;
 end $chk$;

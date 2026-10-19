@@ -383,19 +383,29 @@ export default async function handler(req, res) {
   // una sesión se caducan las abiertas de este customer; si no se puede comprobar,
   // no se abre otra (fail closed, igual que 3b).
   const openSessions = async () => {
-    const r = await stripeGet(`/checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=10`);
+    const r = await stripeGet(`/checkout/sessions?customer=${encodeURIComponent(customerId)}&status=open&limit=100`);
     const j = await r.json().catch(() => null);
-    if (!r.ok || !j || !Array.isArray(j.data)) throw new Error(`list ${r.status}`);
+    // Más de 100 abiertas no es un estado que este código haya creado: no se adivina.
+    if (!r.ok || !j || !Array.isArray(j.data) || j.has_more) throw new Error(`list ${r.status}`);
     return j.data.filter(s => s && s.id && s.status === 'open');
   };
   const expireSession = async (id) => {
     const r = await stripe(`/checkout/sessions/${encodeURIComponent(id)}/expire`, {});
-    // Una sesión que ya no está abierta (se completó o caducó entre medias) no es un
-    // fallo: lo que importa es que no quede ABIERTA.
-    if (!r.ok && r.status !== 400) throw new Error(`expire ${r.status}`);
+    if (r.ok) return;
+    // Un 400 puede ser "ya no estaba abierta" (se completó o caducó entre medias) o
+    // cualquier otra negativa. No se presupone: se lee su estado, y sólo vale si de
+    // verdad ya NO está abierta. Si sigue abierta, no se abre otra.
+    if (r.status === 400) {
+      const g = await stripeGet(`/checkout/sessions/${encodeURIComponent(id)}`);
+      const gj = await g.json().catch(() => null);
+      if (g.ok && gj && gj.status && gj.status !== 'open') return;
+    }
+    throw new Error(`expire ${r.status}`);
   };
+  let seenOpen = [];
   try {
-    for (const s of await openSessions()) await expireSession(s.id);
+    seenOpen = await openSessions();
+    for (const s of seenOpen) await expireSession(s.id);
   } catch (e) {
     console.error('[billing/checkout] open session check failed', (e && e.message) || e);
     return res.status(503).json({ ok: false, error: 'check_failed' });
@@ -424,8 +434,25 @@ export default async function handler(req, res) {
       // promo field is a way to be charged an amount this catalogue never declared.
       allow_promotion_codes: false,
       locale: (String(body.locale) === 'es') ? 'es' : 'en',
+      // Para la convergencia (3c): qué precio cobra esta sesión, sin expandir line_items.
+      metadata: { aurix_user_id: user.id, aurix_price: price.provider_price_id },
     };
-    const r = await stripe('/checkout/sessions', payload);
+    // SEGUNDA CAPA, ATÓMICA EN EL PROVEEDOR. La clave de idempotencia depende de lo que
+    // esta petición VIO (usuario, precio, idioma, minuto y las sesiones abiertas que
+    // encontró): dos peticiones simultáneas que vieron lo mismo envían la MISMA clave y
+    // Stripe devuelve una sola sesión, aunque la lista o la caducidad hubieran fallado
+    // en silencio. Una petición posterior ve otro conjunto (o otro minuto) y crea la suya.
+    const seenIds = seenOpen.map(x => x.id).sort().join(',');
+    let h = 0x811c9dc5;                       // FNV-1a 32 bits: sólo para acortar la clave
+    for (let i = 0; i < seenIds.length; i++) { h ^= seenIds.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    const idemKey = `aurix_cs_${user.id}_${price.provider_price_id}_${payload.locale}_${Math.floor(Date.now() / 60000)}_${h.toString(36)}`;
+    let r = await stripe('/checkout/sessions', payload, idemKey);
+    if (r.status === 409) {
+      // La petición gemela sigue en vuelo con la misma clave: se espera y se pide la
+      // respuesta que Stripe guardó para ella (la misma sesión).
+      await new Promise(res => setTimeout(res, 800));
+      r = await stripe('/checkout/sessions', payload, idemKey);
+    }
     const s = await r.json().catch(() => null);
     if (!r.ok || !s || !s.url) {
       console.error('[billing/checkout] session failed', r.status, (s && s.error && s.error.code) || '');
@@ -443,7 +470,14 @@ export default async function handler(req, res) {
         open.sort((a, b) => (Number(b.created) - Number(a.created)) || (a.id < b.id ? 1 : -1));
         const keep = open[0];
         for (const o of open.slice(1)) await expireSession(o.id);
-        if (keep.url) url = keep.url;
+        if (keep.id !== s.id) {
+          // Sobrevive la de la petición gemela. Si es del MISMO precio, es la misma
+          // compra: se devuelve su URL. Si es de OTRO precio (mensual y anual a la vez),
+          // nunca se manda a pagar un importe que el usuario no eligió: 409, sin URL.
+          const samePrice = keep.metadata && keep.metadata.aurix_price === price.provider_price_id;
+          if (!samePrice || !keep.url) return res.status(409).json({ ok: false, error: 'checkout_superseded' });
+          url = keep.url;
+        }
       }
     } catch (e) {
       console.error('[billing/checkout] post-create convergence skipped', (e && e.message) || e);

@@ -10,13 +10,15 @@
 -- típico: una suscripción de TEST tras el cutover a LIVE, cuyos eventos el webhook
 -- descarta como `ignored_testmode`) hacía que la compra LIVE nueva se registrara como
 -- `other_subscription` y NUNCA concediera Premium: cobro sin activación.
--- CAMBIO: una sola condición añadida al guard, idéntica a la de aurix_entitlements().
+-- CAMBIO: el guard pasa a (a) fila premium VIGENTE (misma condición que aurix_entitlements())
+-- o (b) fila premium y evento ajeno que NO concede (no active|trialing): una suscripción que no
+-- gobierna sólo toma el relevo con un evento que concede.
 -- Nada más del cuerpo cambia (generado desde db/monetization_m04_billing_stripe_1.sql).
 -- HUELLA. Sólo se reemplaza una versión CONOCIDA de la función: si producción tiene
 -- otra (un hotfix no versionado), la transacción aborta sin tocar nada. Idempotente:
 -- volver a aplicarlo sobre la versión destino no cambia nada.
 --   md5(prosrc) origen  = f0945dfbe3bfe15145c7ba515f5aa8ed
---   md5(prosrc) destino = f42a238fa36b40bd7912d43004971088
+--   md5(prosrc) destino = b90d9c7d14ea1b34c2a6a2fbabea803e
 -- `create or replace` conserva propietario y permisos (revoke/grant de M.04 intactos).
 -- ════════════════════════════════════════════════════════════════════════════
 
@@ -31,7 +33,7 @@ begin
   if v_n <> 1 then
     raise exception 'ABORTADO: se esperaba 1 función aurix_billing_apply_event y hay %', v_n;
   end if;
-  if v_md5 not in ('f0945dfbe3bfe15145c7ba515f5aa8ed', 'f42a238fa36b40bd7912d43004971088') then
+  if v_md5 not in ('f0945dfbe3bfe15145c7ba515f5aa8ed', 'b90d9c7d14ea1b34c2a6a2fbabea803e') then
     raise exception 'ABORTADO: versión desconocida de aurix_billing_apply_event en esta base (md5 %)', v_md5;
   end if;
 end $chk$;
@@ -175,15 +177,22 @@ begin
   if v_prev.user_id is not null and v_prev.provider_subscription_id is not null
      and p_subscription_id is not null
      and p_subscription_id <> v_prev.provider_subscription_id
-     and v_prev.plan = 'premium' and v_prev.status in ('active','trialing')
-     -- VIGENTE de verdad, con la MISMA condicion que aurix_entitlements(): una fila
-     -- 'active' cuyo periodo ya vencio (p. ej. una suscripcion de TEST que dejo de
-     -- recibir eventos tras el cutover) no gobierna nada y no puede bloquear el
-     -- relevo de la suscripcion que el usuario esta pagando ahora.
-     and (v_prev.billing_interval is not distinct from 'lifetime'
-          or (v_prev.current_period_end is not null and v_prev.current_period_end > now()))
-     and (v_prev.status <> 'trialing'
-          or (v_prev.trial_end is not null and v_prev.trial_end > now())) then
+     and (
+       -- (a) la fila esta premium VIGENTE, con la MISMA condicion que aurix_entitlements():
+       --     una fila 'active' cuyo periodo ya vencio (p. ej. una suscripcion de TEST que
+       --     dejo de recibir eventos tras el cutover) no gobierna nada por si sola;
+       (v_prev.plan = 'premium' and v_prev.status in ('active','trialing')
+        and (v_prev.billing_interval is not distinct from 'lifetime'
+             or (v_prev.current_period_end is not null and v_prev.current_period_end > now()))
+        and (v_prev.status <> 'trialing'
+             or (v_prev.trial_end is not null and v_prev.trial_end > now())))
+       -- (b) o, sobre una fila premium, el evento ajeno NO concede acceso: una suscripcion
+       --     que no gobierna solo toma el relevo con un evento active|trialing. Asi un
+       --     `deleted` de una duplicada no baja a Free a quien paga mientras la renovacion
+       --     de la suya llega tarde.
+       or (v_prev.plan = 'premium'
+           and lower(coalesce(p_status, '')) not in ('active','trialing'))
+     ) then
     update public.billing_events
        set outcome = 'other_subscription', applied = false, user_id = v_user
      where provider = p_provider and event_id = p_event_id;
@@ -330,7 +339,7 @@ begin
   select md5(p.prosrc) into v_md5
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'aurix_billing_apply_event';
-  if v_md5 <> 'f42a238fa36b40bd7912d43004971088' then
+  if v_md5 <> 'b90d9c7d14ea1b34c2a6a2fbabea803e' then
     raise exception 'ABORTADO: la función no quedó en la versión esperada (md5 %)', v_md5;
   end if;
 end $chk$;

@@ -89072,6 +89072,12 @@ async function _aurixBillingCheckout(interval, source) {
     // pagando) ni se abre una compra nueva: se lleva al portal a actualizar la
     // tarjeta. El servidor acaba de comprobarlo en el proveedor, así que el portal
     // se abre aunque el entitlement en memoria aún no refleje el past_due.
+    // 409 `checkout_superseded` — otra pestaña abrió a la vez un pago de OTRO plan y es
+    // la que queda vigente. No se ha cobrado nada aquí; se pide volver a intentarlo.
+    if (j && j.error === 'checkout_superseded') {
+      _aurixBillingToast(t('pw_err_generic'), 'error');
+      return false;
+    }
     if (j && j.error === 'payment_recovery') {
       _aurixBillingToast(t('pw_recovery'), 'info');
       try { _aurixBillingPortal({ recovery: true }); } catch (_) {}
