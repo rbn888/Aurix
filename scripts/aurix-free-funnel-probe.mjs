@@ -63,7 +63,7 @@ const WSCOMP = `(function(){ var c=document.querySelector('.pgw-card.is-ws'), v=
   var cs=getComputedStyle(c.querySelector('.pgw-viz')), inner=v.width-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-2;
   var i=document.querySelector('.pgw-card.is-int'), o=i.querySelector('.pgw-orb').getBoundingClientRect(), iv=i.querySelector('.pgw-viz').getBoundingClientRect(), ir=i.querySelector('.pgw-rows').getBoundingClientRect(), hw=parseFloat(getComputedStyle(i.querySelector('.pgw-orb'),'::after').width)*1.02, cx=(o.left+o.right)/2, cy=(o.top+o.bottom)/2;
   return JSON.stringify({ tile: Math.round(t.width), pct: Math.round((r.right-g.left)/inner*100), dl: Math.round(g.left-v.left), dr: Math.round(v.right-r.right), dt: Math.round(g.top-v.top), db: Math.round(v.bottom-g.bottom), gh: Math.round(g.height), rh: Math.round(r.height),
-    haloEdge: Math.round(Math.min(cx-hw/2-iv.left, iv.right-(cx+hw/2), cy-hw/2-iv.top, iv.bottom-(cy+hw/2))), haloText: Math.round(ir.left-(cx+hw/2)) }); })()`;
+    haloEdge: Math.round(Math.min(cx-hw/2-iv.left, iv.right-(cx+hw/2), cy-hw/2-iv.top, iv.bottom-(cy+hw/2))), haloText: +(ir.left-(cx+hw/2)).toFixed(1), vc: Math.round(Math.abs(cy-(ir.top+ir.bottom)/2)) }); })()`;
 const toCards = P => P.ev(`(function(){ var e=document.getElementById('dashDiscoverSection'); if(e && e.firstChild) e.scrollIntoView({block:'center'}); })()`);
 const pwOpen = P => P.ev(`!!document.querySelector('.aurix-premium-overlay.is-open')`);
 
@@ -87,7 +87,10 @@ async function run(ENG, browser, w, lang) {
   ok(`${T} Intelligence: dos capas bloqueadas inequívocas, sin cifras`, ci.locked.length === 2 && ci.locked.every(x => !/\d/.test(x) && (en ? /locked/ : /bloqueado/).test(x)), JSON.stringify(ci.locked));
   // v847 SE RE-DECIDE: a la izquierda los nueve iconos, a la derecha SÓLO los tres verbos (los nombres de
   // herramienta ya no se repiten), y el texto inferior deja de enumerar capacidades.
-  ok(`${T} Workspace: los nueve iconos publicados, 3×3`, cw.tiles === Math.min(9, d.pub.length) && cw.tiles === 9, String(cw.tiles));
+  // v849 SE RE-DECIDE (CORRECCIÓN WORKSPACE 4×2): la ilustración son OCHO iconos publicados en 4×2; el
+  // Diario de operaciones se omite sólo aquí. El catálogo sigue publicando las nueve (la portada las enseña).
+  const g42 = JSON.parse(await P.ev(`(function(){ var ts=[].map.call(document.querySelectorAll('.pgw-card.is-ws .pgw-tile'), function(e){ return e.getBoundingClientRect(); }); return JSON.stringify({ cols: new Set(ts.map(function(x){ return Math.round(x.left); })).size, rows: new Set(ts.map(function(x){ return Math.round(x.top); })).size, log: !!document.querySelector('.pgw-card.is-ws .pgw-tile path[d^="M4 7h9"]') }); })()`));
+  ok(`${T} Workspace: ocho iconos publicados en 4×2, sin el Diario y sin duplicados`, cw.tiles === 8 && g42.cols === 4 && g42.rows === 2 && !g42.log && d.pub.length === 9, JSON.stringify([cw.tiles, g42, d.pub.length]));
   ok(`${T} Workspace: a la derecha sólo «calcula, organiza y planifica»`, JSON.stringify(cw.verbs) === JSON.stringify(en ? ['Calculate', 'Organise', 'Plan'] : ['Calcula', 'Organiza', 'Planifica']), cw.verbs.join(' | '));
   ok(`${T} Workspace: copy inferior nuevo y sin repetir herramientas`, cw.body === (en ? 'Work on your finances in one place and continue whenever you want.' : 'Trabaja tus finanzas en un solo espacio y continúa cuando quieras.') && !d.pub.some(n => cw.txt.indexOf(n) !== -1), cw.body);
   ok(`${T} esfera (con su halo) e iconos dentro de su pozo`, ci.orbIn && cw.tilesIn, JSON.stringify([ci.orbIn, cw.tilesIn]));
@@ -99,10 +102,13 @@ async function run(ENG, browser, w, lang) {
   ok(`${T} herramientas: ciclo secuencial lento (7–9 s) en marcha`, am.tile.n === 'pgwCycle' && am.tile.d >= 7 && am.tile.d <= 9 && am.tile.ps === 'running', JSON.stringify(am.tile));
   const wc = JSON.parse(await P.ev(WSCOMP));
   ok(`${T} Workspace: una composición centrada, verbos a la altura de la rejilla`, Math.abs(wc.dl - wc.dr) <= 2 && Math.abs(wc.dt - wc.db) <= 2 && Math.abs(wc.gh - wc.rh) <= 1, JSON.stringify(wc));
-  if (w >= 1024) ok(`${T} Workspace: la composición ocupa ~60–70 % del ancho útil`, wc.pct >= 57 && wc.pct <= 72, JSON.stringify(wc));
-  if (w >= 1280) ok(`${T} Workspace escritorio: teselas ~46–52 px`, wc.tile >= 46 && wc.tile <= 52, JSON.stringify(wc));
+  // v849: teselas algo MENORES que en v848 (46 px) y con más aire; la composición sigue centrada y sin desbordar.
+  if (w >= 1280) ok(`${T} Workspace escritorio: teselas menores que v848 (36–44 px)`, wc.tile >= 36 && wc.tile <= 44, JSON.stringify(wc));
+  ok(`${T} Workspace: la composición cabe en el pozo con aire a ambos lados`, wc.dl >= 16 && wc.dr >= 16 && wc.pct <= 100, JSON.stringify(wc));
   ok(`${T} Workspace: aire alrededor de la composición (sin tocar el pozo)`, Math.min(wc.dl, wc.dr, wc.dt, wc.db) >= 6, JSON.stringify(wc));
-  ok(`${T} Intelligence: el halo (con su respiración) no toca el borde del pozo ni el texto`, wc.haloEdge >= 6 && wc.haloText >= 4, JSON.stringify(wc));
+  // v849 · el hecho y las capas bloqueadas, desplazados: separación REAL desde el borde visible del halo
+  // (con su respiración) hasta el texto, 24–28 px en escritorio/tablet y 16–20 px en móvil.
+  ok(`${T} Intelligence: halo contenido y a ${w > 700 ? '24–28' : '16–20'} px del texto`, wc.haloEdge >= 6 && (w > 700 ? (wc.haloText >= 24 && wc.haloText <= 28) : (wc.haloText >= 16 && wc.haloText <= 20)), JSON.stringify(wc));
   ok(`${T} Resumen sin desbordamiento horizontal`, !d.overX);
   // Un repintado (precio nuevo, vuelta de categoría) no repite la entrada.
   // Un repintado (precio nuevo, vuelta de categoría) no apaga ni reinicia la luz: el estado vive en la sección.
@@ -229,6 +235,11 @@ async function personas(ENG, browser) {
     const rest = await P.ev(`getComputedStyle(document.querySelector('.pgw-card.is-ws')).borderTopColor`);
     await P.ev(`document.querySelector('.pgw-card.is-ws .pgw-cta').focus()`);
     ok(`${ENG}.${w} teclado: foco visible, borde encendido y sin desplazar la tarjeta`, kf.is && kf.outline !== 'none' && kf.lift === 'none' && kf.border !== rest, JSON.stringify([kf, rest]));
+    const orbRest = await P.ev(`getComputedStyle(document.querySelector('.pgw-card.is-int .pgw-orb')).filter`);
+    await P.ev(`document.querySelector('.pgw-card.is-int .pgw-cta').focus()`); await P.p.waitForTimeout(450);
+    const orbFocus = await P.ev(`getComputedStyle(document.querySelector('.pgw-card.is-int .pgw-orb')).filter`);
+    ok(`${ENG}.${w} foco: la esfera se enciende claramente`, orbRest === 'none' && /brightness\(1\.2[0-9]/.test(orbFocus), JSON.stringify([orbRest, orbFocus]));
+    await P.ev(`document.querySelector('.pgw-card.is-ws .pgw-cta').focus()`);
     ok(`${ENG}.${w} teclado: nombre y descripción accesibles`, /Workspace/.test(kf.name) && /pgw-ws-t/.test(kf.desc || ''));
     await P.p.keyboard.press('Enter'); await P.p.waitForTimeout(700);
     ok(`${ENG}.${w} teclado: Enter lleva a la portada`, (await P.ev('currentTab')) === 'workspace');
