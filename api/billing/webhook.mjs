@@ -208,6 +208,52 @@ async function paymentIntentFromInvoicePayments(invoiceId, stripeKey) {
   }
 }
 
+// ── AURIX-PARTNER-ENGINE-V2 · DESGLOSE DEL COBRO (base de un porcentaje) ────
+// Un programa por PORCENTAJE necesita la base: lo cobrado SIN IVA y neto de
+// descuentos. Aquí sólo se LEE lo que Stripe pone en la factura, en las DOS
+// formas (antes de `basil`: `total_tax_amounts` y `tax`; desde `basil`:
+// `total_taxes`); no se calcula ni un impuesto ni un porcentaje.
+//   taxStatus 'computed' ⇔ automatic_tax habilitado y `complete`, o al menos
+//   una línea de impuesto. Si no, 'not_computed' y tax = null: "nadie calculó el
+//   IVA" NO es "0 € de IVA", y Founder deja la comisión en espera.
+//   Si Stripe dice que calculó pero no da la cifra, tampoco se inventa: queda
+//   'not_computed' (base no certificable), que es la lectura prudente.
+// Pura (sin red, sin env): el harness la evalúa tal cual entre los marcadores.
+// AURIX-BREAKDOWN:BEGIN
+const MAX_INT4 = 2147483647;
+const centsOf = (v) => (Number.isInteger(v) && v >= 0 && v <= MAX_INT4) ? v : null;
+// Suma de `[].amount`. Ausente ⇒ null. Vacío ⇒ 0. Una entrada ilegible ⇒ null
+// (una suma parcial sería una cifra falsa).
+function sumAmounts(list) {
+  if (!Array.isArray(list)) return null;
+  let s = 0;
+  for (const x of list) {
+    const a = centsOf(x && x.amount);
+    if (a === null) return null;
+    s += a;
+  }
+  return s <= MAX_INT4 ? s : null;
+}
+function paymentBreakdownOf(o) {
+  o = o || {};
+  const taxArr = Array.isArray(o.total_taxes) ? o.total_taxes                 // forma basil
+    : Array.isArray(o.total_tax_amounts) ? o.total_tax_amounts : null;      // forma antigua
+  let tax = taxArr ? sumAmounts(taxArr) : centsOf(o.tax);
+  const at = o.automatic_tax;
+  const computed = !!(at && at.enabled === true && at.status === 'complete')
+    || !!(taxArr && taxArr.length > 0);
+  const status = (computed && tax !== null) ? 'computed' : 'not_computed';
+  if (status === 'not_computed') tax = null;
+  return {
+    subtotal: centsOf(o.subtotal),
+    discount: sumAmounts(o.total_discount_amounts),
+    tax,
+    totalExcludingTax: centsOf(o.total_excluding_tax),
+    taxStatus: status,
+  };
+}
+// AURIX-BREAKDOWN:END
+
 async function recordPaymentEvent(event, rpc, stripeKey) {
   const o = (event.data && event.data.object) || {};
   const base = {
@@ -268,6 +314,29 @@ async function recordPaymentEvent(event, rpc, stripeKey) {
     // Cobro sin payment intent: la fila está guardada, el enlace no. 500 a
     // propósito para que Stripe reintente y el reintento lo complete.
     if (outcome === 'missing_link') return json({ ok: false, outcome }, 500);
+    // PARTNER-ENGINE-V2: el desglose, sólo de `invoice.paid` y sólo si el cobro
+    // quedó registrado (también si es `duplicate`: así el reintento de un desglose
+    // que falló lo completa). El escritor es de primera-escritura-gana, así que
+    // repetirlo es inocuo. Un fallo REAL ⇒ 500 y Stripe reintenta (el cobro ya es
+    // idempotente por billing_events). Un `rejected` es definitivo ⇒ 200.
+    if (event.type === 'invoice.paid' && (outcome === 'recorded' || outcome === 'duplicate')) {
+      const bd = paymentBreakdownOf(o);
+      const rb = await rpc('aurix_billing_record_payment_breakdown', {
+        p_provider: PROVIDER,
+        p_event_id: base.p_event_id,
+        p_invoice_id: base.p_invoice_id,
+        p_subtotal: bd.subtotal,
+        p_discount: bd.discount,
+        p_tax: bd.tax,
+        p_total_excluding_tax: bd.totalExcludingTax,
+        p_tax_status: bd.taxStatus,
+      });
+      if (!rb.ok) {
+        const detail = await rb.text().catch(() => '');
+        console.error('[billing/webhook] breakdown failed', rb.status, safeDetail(detail));
+        return json({ ok: false, error: 'breakdown_failed' }, 500);
+      }
+    }
     return json({ ok: true, outcome });
   } catch (e) {
     console.error('[billing/webhook] record error', (e && e.message) || e);

@@ -267,7 +267,8 @@ const INV_BASIL = { id: 'in_new', object: 'invoice', customer: 'cus_1', amount_p
   const a = await callWebhook(EV('invoice.paid', INV_OLD));
   const b = a.rpc[0] && a.rpc[0].body;
   ok('C.1 invoice.paid (forma ANTIGUA) va al escritor NUEVO con PI, suscripción y precio',
-    a.status === 200 && a.json.outcome === 'recorded' && a.rpc.length === 1 &&
+    // (+1 llamada: el desglose de PARTNER-ENGINE-V2, ver su propio harness)
+    a.status === 200 && a.json.outcome === 'recorded' && a.rpc.length === 2 &&
     /\/rpc\/aurix_billing_record_payment_event$/.test(a.rpc[0].url) &&
     b.p_payment_intent_id === 'pi_old' && b.p_subscription_id === 'sub_1' && b.p_price_id === 'price_year' &&
     b.p_amount === 6999 && b.p_invoice_id === 'in_old' && b.p_customer_id === 'cus_1' &&
@@ -577,7 +578,7 @@ console.log('\nF · SQL · forma de las garantías');
   ok('F.20 la evidencia de cobro no toca el acceso: ni subscriptions ni el escritor de M.04',
     !/public\.subscriptions|aurix_billing_apply_event|entitlement_overrides/.test(pay));
   ok('F.21 M.04 sigue verificándose si se reaplica (el escritor nuevo no es un overload sobrante)',
-    /and p\.proname <> 'aurix_billing_record_payment_event'/.test(read('db/monetization_m04_billing_stripe_1.sql')));
+    /and p\.proname not in \('aurix_billing_record_payment_event',/.test(read('db/monetization_m04_billing_stripe_1.sql')));
   const fr = sqlFn(SQL_READ, 'founder_read_affiliates');
   ok('F.22 lectura: stable + security definer + search_path, sólo service_role',
     /stable\s+security definer\s+set search_path = public, auth, pg_catalog/.test(fr) &&
