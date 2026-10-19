@@ -352,8 +352,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       return { n: cards.length, a: a, b: b2, halo: halo, haloDentro: dentro, margen: margen,
         iconos: ics.length, distintos: new Set(ics).size, ctas: ctas,
         boxA: boxOf(cards[0]), boxB: boxOf(cards[1]),
-        // v849: la ilustración omite el Diario de operaciones (sólo aquí) y enseña 8 en 4×2.
-        publicadas: (typeof _wsfcPublishedCaps === 'function' ? Math.min(8, _wsfcPublishedCaps().filter(function(c){ return c.k !== 'journal'; }).length) : -1),
+        publicadas: (typeof _wsfcPublishedCaps === 'function' ? Math.min(9, _wsfcPublishedCaps().length) : -1),
         anims: (orb ? getComputedStyle(orb).animationIterationCount : '0') }; })()`);
     ok(PTAG + ' promos · las dos existen para un usuario Free', g.n === 2, JSON.stringify(g.n));
     ok(PTAG + ' promos · misma caja: son un par, no dos piezas sueltas',

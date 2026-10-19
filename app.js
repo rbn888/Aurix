@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '809'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '808'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26096,7 +26096,7 @@ _aurixReorderRegister('wsPlansGrid', {
 //     Free (`_aurixIntelligencePreviewFacts`, fail-closed: sin valoración completa no hay
 //     lectura). Las capas bloqueadas nombran secciones del producto, nunca la categoría ni
 //     la cifra de un hecho oculto.
-//   · Workspace: las capacidades PUBLICADAS del catálogo (ocho de sus iconos) y lo que se hace
+//   · Workspace: las capacidades PUBLICADAS del catálogo (sus nueve iconos) y lo que se hace
 //     con ellas —calcula, organiza, planifica—, sin repetir nombres de herramientas.
 // La tarjeta entera es clicable (el ::after del CTA la cubre) y hay UNA parada de foco, el
 // botón, que lleva a la portada del producto — nunca al checkout.
@@ -26128,10 +26128,7 @@ function _renderDashboardDiscover() {
   let caps = [];
   try { caps = _wsfcPublishedCaps(); } catch (_) { caps = []; }
   const acc = k => esc(_WS_TOOL_ACCENT[k] || 'blue');
-  // La ILUSTRACIÓN es una rejilla 4×2: ocho capacidades publicadas, en su orden. El Diario de
-  // operaciones se omite SÓLO aquí (su icono es el menos reconocible a primera vista); la
-  // herramienta, el catálogo y sus permisos no cambian.
-  const mosaic = `<span class="pgw-mosaic" aria-hidden="true">${caps.filter(c => c.k !== 'journal').slice(0, 8)
+  const mosaic = `<span class="pgw-mosaic" aria-hidden="true">${caps.slice(0, 9)
     .map(c => `<span class="pgw-tile" data-ws-accent="${acc(c.k)}">${_wsCapIconHtml(c.icon)}</span>`).join('')}</span>`;
   // Calcula · Organiza · Planifica: cada verbo sólo si hay una herramienta publicada que lo
   // hace, y con su acento; el nombre ya lo dice el icono de la izquierda.
