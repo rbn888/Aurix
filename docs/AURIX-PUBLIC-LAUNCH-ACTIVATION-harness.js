@@ -7,6 +7,14 @@
 // single "Enter Aurix" CTA, disabled, with only the remaining HOURS; the app OTP
 // stays invite-gated (private). At the timestamp the CTA enables and the app OTP
 // opens to everyone — no reload, no deploy. Rollback: PUBLIC_LAUNCH_ENABLED=false.
+//
+// RE-DECIDIDO (RETIRADA DEL LAUNCH GATE, 2026-10-19). El lanzamiento ya ocurrió y el
+// gate seguía vivo decidido por el RELOJ DEL CLIENTE: un dispositivo con la fecha
+// anterior al 23-jul veía «Lanzamiento en N h», los 5 CTA bloqueados y el muro de
+// invitación en login.html. Ahora: la landing NO tiene gate (ni cuenta atrás, ni
+// bloqueo, ni toast, ni listeners) y en login.html el acceso público depende SÓLO
+// del flag `PUBLIC_LAUNCH_ENABLED`, nunca de una fecha. El camino de invitación
+// privada (§5) sigue intacto y se aplica si alguien vuelve a sólo-invitación.
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
 const lApp = fs.readFileSync(path.join(root, 'landing', 'app.js'), 'utf8');
@@ -19,44 +27,54 @@ const AT = '2026-07-23T17:00:00.000Z';
 
 console.log('AURIX-PUBLIC-LAUNCH-ACTIVATION — SPEC LANZAMIENTO 1\n');
 
-// ── 1. SINGLE FIXED TIMESTAMP, synced across both deploys ───────────────────
-ok('1 landing config: PUBLIC_LAUNCH_AT fixed UTC + ENABLED true',
-  lApp.includes("PUBLIC_LAUNCH_AT      = '" + AT + "'") && /PUBLIC_LAUNCH_ENABLED\s*=\s*true/.test(lApp));
-ok('1 app(login) config: same PUBLIC_LAUNCH_AT + ENABLED true (in sync)',
-  login.includes("PUBLIC_LAUNCH_AT       = '" + AT + "'") && /PUBLIC_LAUNCH_ENABLED\s*=\s*true/.test(login));
-ok('2 open logic is enabled && now>=AT in both surfaces',
-  /PUBLIC_LAUNCH_ENABLED === true && Date\.now\(\) >= PUBLIC_LAUNCH_AT_MS/.test(lApp) &&
-  /PUBLIC_LAUNCH_ENABLED === true && Date\.now\(\) >= PUBLIC_LAUNCH_AT_MS/.test(login));
+// ── 1. SIN FECHA — ninguna superficie depende de PUBLIC_LAUNCH_AT ni del reloj ─
+ok('1 landing: sin PUBLIC_LAUNCH_* ni isPublicLaunchOpen (el gate no existe)',
+  !/PUBLIC_LAUNCH|isPublicLaunchOpen|publicLaunchRemainingHours/.test(lApp));
+ok('1 app(login): PUBLIC_LAUNCH_ENABLED true y SIN PUBLIC_LAUNCH_AT',
+  /const PUBLIC_LAUNCH_ENABLED = true;/.test(login) && !/PUBLIC_LAUNCH_AT/.test(login));
+// Comportamiento, no regex: se ejecuta la función REAL de login.html con tres relojes.
+(function () {
+  const m = /function isPublicLaunchOpen\(\) \{[^\n]*\}/.exec(login);
+  const run = (enabled, nowMs) => {
+    if (!m) return null;
+    const FakeDate = { now: () => nowMs, parse: Date.parse };
+    return new Function('Date', 'PUBLIC_LAUNCH_ENABLED', m[0] + '; return isPublicLaunchOpen();')(FakeDate, enabled);
+  };
+  const atMs = Date.parse(AT);
+  ok('2 login: abierto con reloj normal, ATRASADO (antes del 23-jul) y ADELANTADO',
+    run(true, Date.now()) === true && run(true, atMs - 90 * 86400000) === true && run(true, Date.parse('2099-01-01T00:00:00Z')) === true,
+    m ? m[0] : 'función no encontrada');
+  ok('2b login: sólo-invitación sigue siendo un modo deliberado (flag false → cerrado, con cualquier reloj)',
+    run(false, Date.now()) === false && run(false, atMs - 90 * 86400000) === false);
+})();
 ok('3 launch time is NOT computed from deploy time and NOT stored in localStorage',
   !/24\s*\*\s*60\s*60\s*1000|Date\.now\(\)\s*\+\s*24/.test(lApp) && !/localStorage[^\n]*launch/i.test(lApp) && !/localStorage[^\n]*launch/i.test(login));
 
 // ── 2. LANDING — single "Enter Aurix" CTA, no public "Request Access" ───────
-ok('4 landing header CTA is a single Enter Aurix (cta.enter) with the launch gate hook',
-  /data-launch-cta[^>]*data-i18n="cta\.enter"|data-i18n="cta\.enter"[^>]*data-launch-cta/.test(lHtml));
+ok('4 landing header CTA is a single Enter Aurix (cta.enter) linked to the app',
+  /class="header-right">[\s\S]{0,600}<a class="btn btn-primary" href="https:\/\/app\.aurixsystem\.io\/" data-app-link data-i18n="cta\.enter">/.test(lHtml));
 ok('5 no "Request Access" (cta.request) remains as a header / hero / mobile-actions CTA',
   !/mobile-actions[\s\S]{0,160}cta\.request/.test(lHtml) && !/header-right[\s\S]{0,160}cta\.request/.test(lHtml) && !/hero-cta-mobile[\s\S]{0,160}cta\.request/.test(lHtml));
-ok('6 launch CTAs carry data-launch-cta (gate hook) — at least the header + hero + mobile',
-  (lHtml.match(/data-launch-cta/g) || []).length >= 3);
+ok('6 CTAs de registro sin hook de gate y apuntando a la app (≥ header + hero + mobile)',
+  !/data-launch-cta/.test(lHtml) && (lHtml.match(/href="https:\/\/app\.aurixsystem\.io\/[^"]*" data-app-link/g) || []).length >= 3);
 
-// ── 3. COUNTDOWN — hours only, ceil, discreet, i18n ES+EN ───────────────────
-ok('7 countdown element #launchCountdown exists (starts hidden)',
-  /id="launchCountdown"[^>]*hidden|hidden[^>]*id="launchCountdown"/.test(lHtml));
-ok('8 i18n launch.count present ES + EN and shows only hours (X h, no days/min/sec)',
-  /'launch\.count':\s*'Lanzamiento en \{h\} h'/.test(lApp) && /'launch\.count':\s*'Launching in \{h\} h'/.test(lApp));
-ok('9 remaining uses Math.ceil so it never shows 0 h while still closed',
-  /Math\.max\(0,\s*Math\.ceil\(\(PUBLIC_LAUNCH_AT_MS - Date\.now\(\)\) \/ 3600000\)\)/.test(lApp));
+// ── 3. SIN CUENTA ATRÁS — ni elemento, ni copy ES/EN ────────────────────────
+ok('7 no countdown element (#launchCountdown / .launch-count) in the landing',
+  !/launchCountdown|launch-count/.test(lHtml) && !/launchCountdown/.test(lApp));
+ok('8 no launch copy in i18n (launch.count / cta.joinLaunch) ES + EN',
+  !/'launch\.count'|'cta\.joinLaunch'|Lanzamiento en|Launching in/.test(lApp));
 ok('10 no days/minutes/seconds countdown unit introduced',
   !/\{d\}\s*d|\{m\}\s*min|\{s\}\s*s\b|days? remaining|d\s*:\s*h\s*:\s*m/i.test(lApp.replace(/getElementById\('[^']*'\)/g, '')));
 
-// ── 4. LANDING GATE — lock before, auto-enable after, robust recompute ──────
-ok('11 gate locks CTA before launch (aria-disabled + is-launch-locked + href neutralised)',
-  /setAttribute\('aria-disabled', 'true'\)/.test(lApp) && /classList\.add\('is-launch-locked'\)/.test(lApp) && /setAttribute\('href', '#'\)/.test(lApp));
-ok('12 capture-phase click guard cancels activation of a locked CTA (protection beyond visual)',
-  /addEventListener\('click', function \(e\) \{[\s\S]{0,200}data-launch-cta[\s\S]{0,120}!isPublicLaunchOpen\(\)[\s\S]{0,60}preventDefault/.test(lApp));
-ok('13 auto-enable: gate re-runs on a timer + visibility + focus + pageshow (no reload needed)',
-  /setTimeout\(applyLaunchGate/.test(lApp) && /visibilitychange[\s\S]{0,80}applyLaunchGate/.test(lApp) && /'focus', applyLaunchGate/.test(lApp) && /'pageshow', applyLaunchGate/.test(lApp));
-ok('14 locked-CTA CSS is real (pointer-events:none + disabled look)',
-  /\.btn\.is-launch-locked\s*\{[^}]*pointer-events:\s*none/.test(lCss));
+// ── 4. SIN GATE EN LA LANDING — ni bloqueo, ni guard de clic, ni re-cómputo ─
+ok('11 nothing locks a CTA (no is-launch-locked / href neutralised to #)',
+  !/is-launch-locked|launchHref/.test(lApp) && !/setAttribute\('href', '#'\)/.test(lApp));
+ok('12 no click guard cancels a CTA',
+  !/data-launch-cta/.test(lApp));
+ok('13 no gate timer / visibility / focus / pageshow recompute',
+  !/applyLaunchGate|_launchTimer/.test(lApp));
+ok('14 no locked-CTA CSS',
+  !/is-launch-locked/.test(lCss));
 
 // ── 5. APP OTP GATE (login.html) — public opens at launch, private preserved ─
 // RE-DECIDIDA 15 (M.06 · IDENTITY). Este guard comprobaba `authSection.classList.contains('locked')`,
@@ -83,9 +101,9 @@ ok('16 post-launch: el markup se SIRVE abierto (sin locked, sin disabled) y con 
   !/id="email"[^>]*disabled/.test(login) && !/id="auth-submit"[^>]*disabled/.test(login) &&
   /<div class="invite-section" style="display:none">/.test(login) &&
   /data-i18n="lg\.publicAccess"/.test(login) && /data-i18n="lg\.publicHint"/.test(login));
-ok('17 launch access re-checked on visibility/focus (device suspended across launch)',
+ok('17 access mode re-checked on visibility/focus',
   /visibilitychange[\s\S]{0,120}_applyPrivateBetaGate\(\)/.test(login) && /'focus', _applyPrivateBetaGate/.test(login));
-ok('18 PRIVATE path preserved: el muro sigue existiendo y lo aplica el JS antes del lanzamiento',
+ok('18 PRIVATE path preserved: el muro sigue existiendo y lo aplica el JS en modo sólo-invitación',
   /validate_invite_code/.test(login) && /function lockAuth\(\)/.test(login) &&
   /function _applyPrivateBetaGate\(\)[\s\S]{0,200}if \(isPublicLaunchOpen\(\)\)[\s\S]{0,200}lockAuth\(\)/.test(login));
 ok('18b la frontera real NO cambia: el muro nunca fue autorización, lo es el OTP del servidor',
@@ -97,34 +115,19 @@ ok('19 OTP engine reused unchanged (signInWithOtp shouldCreateUser + verifyOtp)'
 ok('20 public i18n copy present ES + EN (Bienvenido a Aurix / Welcome to Aurix)',
   /'lg\.publicAccess':\s*'Bienvenido a Aurix'/.test(login) && /'lg\.publicAccess':\s*'Welcome to Aurix'/.test(login));
 
-// ── 6. ROLLBACK — single flag ───────────────────────────────────────────────
-ok('21 rollback is a single flag (PUBLIC_LAUNCH_ENABLED) in each surface',
-  /PUBLIC_LAUNCH_ENABLED\s*=\s*true/.test(lApp) && /PUBLIC_LAUNCH_ENABLED\s*=\s*true/.test(login));
-
-// ── 7. PURE-LOGIC SIMULATIONS ───────────────────────────────────────────────
-(function () {
-  const atMs = Date.parse(AT);
-  const open = (enabled, now) => enabled === true && now >= atMs;
-  const hours = (now) => Math.max(0, Math.ceil((atMs - now) / 3600000));
-  ok('22 SIM before launch → closed, hours>0 (never 0 while closed)',
-    open(true, atMs - 3600000) === false && hours(atMs - 1) === 1 && hours(atMs - 3600000) === 1);
-  ok('23 SIM at/after launch → open, hours 0',
-    open(true, atMs) === true && open(true, atMs + 1) === true && hours(atMs) === 0);
-  ok('24 SIM disabled flag → closed even after AT (rollback)',
-    open(false, atMs + 999999) === false);
-})();
+// ── 6. MODO SÓLO-INVITACIÓN — un único flag, sólo en la app ──────────────────
+ok('21 invite-only mode is a single flag (PUBLIC_LAUNCH_ENABLED) in login.html only',
+  (login.match(/const PUBLIC_LAUNCH_ENABLED\s*=/g) || []).length === 1 && !/PUBLIC_LAUNCH_ENABLED/.test(lApp));
+// 22–24 (simulaciones de la fecha) retiradas: ya no hay fecha. Las sustituye el §1-2,
+// que ejecuta la función real con reloj normal, atrasado y adelantado.
 
 // ── 8. LANDING POLISH (final) — single desktop CTA, no Early Access, toast ──
 ok('25 desktop single CTA: Hero CTA is mobile-only (no duplicate Enter Aurix on desktop)',
   /\.hero-cta-mobile\s*\{\s*display:\s*none;\s*\}/.test(lCss));
 ok('26 "Early Access" removed from public nav (no nav.early link remains)',
   !/data-i18n="nav\.early"/.test(lHtml));
-ok('27 locked navbar CTA shows an elegant toast reusing launch.count (no alert/modal)',
-  /function showLaunchToast\(\)/.test(lApp) && /_launchToastEl[\s\S]{0,220}t\('launch\.count'\)/.test(lApp) && !/\balert\(/.test(lApp));
-ok('28 toast scoped to the navbar CTA (.header-right) — mobile Hero CTA behaviour unchanged',
-  /closest\('\.header-right'\)\)\s*showLaunchToast\(\)/.test(lApp));
-ok('29 toast is a small fixed pill, not a full-screen modal/overlay',
-  /\.launch-toast\s*\{[^}]*position:\s*fixed/.test(lCss) && !/\.launch-toast\s*\{[^}]*inset:\s*0/.test(lCss));
+ok('27 no launch toast (JS or CSS) and no alert()',
+  !/showLaunchToast|_launchToast|launch-toast/.test(lApp) && !/launch-toast/.test(lCss) && !/\balert\(/.test(lApp));
 // private/invite path still reachable in markup (section kept; only the nav link removed)
 ok('30 private access REMOVED from landing (HOTFIX LANDING — public launch complete, Aurix open to all: no Private Beta section, modal or Request-Access CTA)',
   !/id="early-access"/.test(lHtml) && !/id="accessModal"/.test(lHtml) && !/id="openModal"/.test(lHtml));

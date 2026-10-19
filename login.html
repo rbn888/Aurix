@@ -1054,16 +1054,14 @@
       });
     }
 
-    // ── Public launch (SPEC LANZAMIENTO 1) — SINGLE SOURCE OF TRUTH for the app
-    //    OTP gate. KEEP IN SYNC with landing/app.js. Fixed UTC (never deploy-time
-    //    / localStorage). 2026-07-23T17:00:00.000Z === Thu 23 Jul 2026 19:00
-    //    Europe/Madrid. Rollback: PUBLIC_LAUNCH_ENABLED = false. Before launch
-    //    the private invite gate is UNCHANGED (owner/testers/whitelist unaffected);
-    //    after launch, email/OTP opens to everyone (no invite required).
+    // ── Public access — SINGLE SOURCE OF TRUTH for the app OTP gate. The public
+    //    launch (SPEC LANZAMIENTO 1, 23 Jul 2026) already happened, so access no
+    //    longer depends on a date or on the client clock: a device with its clock
+    //    set in the past was shown the private-beta wall again. `true` = email/OTP
+    //    open to everyone. `false` = deliberate return to invite-only (the private
+    //    invite gate below is unchanged and still enforced in that mode).
     const PUBLIC_LAUNCH_ENABLED = true;
-    const PUBLIC_LAUNCH_AT       = '2026-07-23T17:00:00.000Z';
-    const PUBLIC_LAUNCH_AT_MS    = Date.parse(PUBLIC_LAUNCH_AT);
-    function isPublicLaunchOpen() { return PUBLIC_LAUNCH_ENABLED === true && Date.now() >= PUBLIC_LAUNCH_AT_MS; }
+    function isPublicLaunchOpen() { return PUBLIC_LAUNCH_ENABLED === true; }
 
     // ── DOM refs ───────────────────────────────────────────────
     const inviteInput  = document.getElementById('inviteCode');
@@ -1313,12 +1311,10 @@
     // de `_applyPrivateBetaGate()`, y sólo antes del lanzamiento público.
     updateSubmitState();
 
-    // SPEC LANZAMIENTO 1 — public launch access. After PUBLIC_LAUNCH_AT the email
-    // step opens for EVERYONE (no invite); the private-beta invite UI is hidden and
-    // the copy switches to the public flow. Before launch this is a no-op, so the
-    // invite gate (owner / testers / whitelist) stays byte-identical. Re-checked on
-    // visibility/focus so a device suspended across the launch instant converges —
-    // no reload, no new deploy. The OTP send/verify + profile flow are unchanged.
+    // SPEC LANZAMIENTO 1 — public access. With PUBLIC_LAUNCH_ENABLED the email step
+    // is open to EVERYONE (no invite) and this is a no-op; in invite-only mode it
+    // closes the form and shows the private-beta invite UI. Re-checked on
+    // visibility/focus. The OTP send/verify + profile flow are unchanged.
     // INVERTIDA (M.06 · identity). Antes esta función ABRÍA el formulario y el markup lo servía
     // cerrado, así que su fallo dejaba fuera a un cliente con derecho a entrar. Ahora el markup
     // sirve abierto y esto sólo CIERRA cuando el lanzamiento público NO está abierto. El modo de
@@ -1399,12 +1395,11 @@
     // ── Email submit → send OTP ────────────────────────────────
     submitBtn.onclick = async () => {
       if (isSubmitting) return;
-      // SPEC LANZAMIENTO 1 — second gate (beyond the disabled field): before the
-      // public launch, an OTP may be sent ONLY from an authorized private session
-      // (a valid invite unlocked the email step). Public callers with no invite
-      // are blocked until PUBLIC_LAUNCH_AT — no OTP, no account creation. After
-      // launch the email step is unlocked for everyone so this passes.
-      // Antes del lanzamiento público sólo pasa quien haya validado su invitación contra el RPC.
+      // SPEC LANZAMIENTO 1 — second gate (beyond the disabled field): in invite-only
+      // mode (PUBLIC_LAUNCH_ENABLED = false) an OTP may be sent ONLY from an
+      // authorized private session (a valid invite unlocked the email step) — no
+      // OTP, no account creation. With public access open this passes for everyone.
+      // En modo sólo-invitación sólo pasa quien haya validado su invitación contra el RPC.
       // Se comprueba el ESTADO, no la clase del DOM (ver la nota de `_inviteValidated`).
       if (!isPublicLaunchOpen() && !_inviteValidated) return;
       isSubmitting = true;

@@ -5,19 +5,6 @@
 (function () {
   'use strict';
 
-  /* ── Public launch (SPEC LANZAMIENTO 1) — SINGLE SOURCE OF TRUTH for the
-     landing. KEEP IN SYNC with login.html (the app deploy, which owns the real
-     OTP gate). Fixed UTC timestamp so an early/late deploy never shifts the
-     official launch, and never computed from deploy time or localStorage.
-       2026-07-23T17:00:00.000Z === Thu 23 Jul 2026, 19:00 Europe/Madrid
-     Rollback: set PUBLIC_LAUNCH_ENABLED = false → public access closed again. */
-  var PUBLIC_LAUNCH_ENABLED = true;
-  var PUBLIC_LAUNCH_AT      = '2026-07-23T17:00:00.000Z';
-  var PUBLIC_LAUNCH_AT_MS   = Date.parse(PUBLIC_LAUNCH_AT);
-  function isPublicLaunchOpen() { return PUBLIC_LAUNCH_ENABLED === true && Date.now() >= PUBLIC_LAUNCH_AT_MS; }
-  // ceil so it never shows "0 h" while still closed (0 only once truly open).
-  function publicLaunchRemainingHours() { return Math.max(0, Math.ceil((PUBLIC_LAUNCH_AT_MS - Date.now()) / 3600000)); }
-
   /* ── Translations ───────────────────────────────────── */
   var I18N = {
     es: {
@@ -287,8 +274,7 @@
       'final.title': "Tu patrimonio, con más claridad.",
       'final.note': "Empieza con Free. Descubre Premium desde la aplicación.",
       'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
-      'cta.enter': 'Comenzar', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
-      'launch.count': 'Lanzamiento en {h} h',
+      'cta.enter': 'Comenzar', 'cta.request': 'Solicitar acceso',
   });
   Object.assign(I18N.en, {
       'nav.how': "Product",
@@ -348,8 +334,7 @@
       'final.title': "Your wealth, with more clarity.",
       'final.note': "Start with Free. Discover Premium from the app.",
       'nav.product': 'Platform', 'nav.market': 'Market', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
-      'cta.enter': 'Get Started', 'cta.request': 'Request Access', 'cta.joinLaunch': 'Join before Launch 1',
-      'launch.count': 'Launching in {h} h',
+      'cta.enter': 'Get Started', 'cta.request': 'Request Access',
   });
 
   // LANDING MASTER · Intelligence con sección propia, Workspace completo y FAQ ampliada.
@@ -502,8 +487,6 @@
     // Y lo mismo con las legales: viven en el dominio de la app, así que sin
     // `?lang=` un lector en inglés abriría Privacidad en español.
     updateLegalLinks();
-    // Re-render the launch countdown copy in the active language.
-    if (typeof applyLaunchGate === 'function') applyLaunchGate();
   }
 
   // Fictional headline wealth figure (labelled "Product preview"). ES: 4,82 M€ · EN: $4.82M
@@ -867,77 +850,6 @@
     orb.addEventListener('pointerleave', function () { orb.classList.remove('is-sheen'); });
   }
 
-  /* ── Public-launch CTA gate + hours countdown ─────────
-     Locks every [data-launch-cta] until PUBLIC_LAUNCH_AT and shows only the
-     remaining hours; enables them automatically at the timestamp (no reload,
-     no new deploy). Recomputed on mount, language change, tab-visible, focus,
-     pageshow (bfcache) and via a light timer aligned to the next hour boundary. */
-  var _launchTimer = null;
-  function applyLaunchGate() {
-    var open = isPublicLaunchOpen();
-    var ctas = document.querySelectorAll('[data-launch-cta]');
-    for (var i = 0; i < ctas.length; i++) {
-      var el = ctas[i];
-      if (open) {
-        el.classList.remove('is-launch-locked');
-        el.removeAttribute('aria-disabled');
-        el.removeAttribute('tabindex');
-        if (el.dataset.launchHref) { el.setAttribute('href', el.dataset.launchHref); }
-        if ('disabled' in el) { try { el.disabled = false; } catch (_) {} }
-      } else {
-        el.classList.add('is-launch-locked');
-        el.setAttribute('aria-disabled', 'true');
-        el.setAttribute('tabindex', '-1');
-        if (el.tagName === 'A') {
-          if (el.getAttribute('href') && el.getAttribute('href') !== '#') { el.dataset.launchHref = el.getAttribute('href'); }
-          el.setAttribute('href', '#');
-        }
-        if ('disabled' in el) { try { el.disabled = true; } catch (_) {} }
-      }
-    }
-    var cd = document.getElementById('launchCountdown');
-    if (cd) {
-      if (open) { cd.hidden = true; cd.textContent = ''; }
-      else { cd.hidden = false; cd.textContent = t('launch.count').replace('{h}', String(publicLaunchRemainingHours())); }
-    }
-    if (_launchTimer) { clearTimeout(_launchTimer); _launchTimer = null; }
-    if (!open) {
-      var msToLaunch = PUBLIC_LAUNCH_AT_MS - Date.now();
-      var msToHourTick = (msToLaunch % 3600000) || 3600000;     // when remainingHours next decrements
-      var delay = Math.min(msToLaunch, msToHourTick) + 250;      // land just past the boundary
-      if (delay > 0 && delay < 2147483647) { _launchTimer = setTimeout(applyLaunchGate, delay); }
-    }
-  }
-  // Small, elegant launch-state toast (no modal / popup / alert) — shown when the
-  // locked DESKTOP navbar CTA is tapped before launch. Mobile is unchanged (its
-  // Hero CTA already shows the hours beneath it), so the toast is scoped to the
-  // navbar CTA (.header-right). Reuses the launch.count i18n string.
-  var _launchToastEl = null, _launchToastTimer = null;
-  function showLaunchToast() {
-    if (!_launchToastEl) {
-      _launchToastEl = document.createElement('div');
-      _launchToastEl.className = 'launch-toast';
-      _launchToastEl.setAttribute('role', 'status');
-      document.body.appendChild(_launchToastEl);
-    }
-    _launchToastEl.textContent = t('launch.count').replace('{h}', String(publicLaunchRemainingHours()));
-    void _launchToastEl.offsetWidth;                 // reflow so the transition plays
-    _launchToastEl.classList.add('is-visible');
-    if (_launchToastTimer) clearTimeout(_launchToastTimer);
-    _launchToastTimer = setTimeout(function () { if (_launchToastEl) _launchToastEl.classList.remove('is-visible'); }, 2600);
-  }
-
-  // Defence beyond the visual state: cancel any activation of a locked CTA.
-  document.addEventListener('click', function (e) {
-    var cta = (e.target && e.target.closest) ? e.target.closest('[data-launch-cta]') : null;
-    if (cta && !isPublicLaunchOpen()) {
-      e.preventDefault(); e.stopPropagation();
-      if (cta.closest('.header-right')) showLaunchToast();   // desktop navbar CTA → elegant state
-    }
-  }, true);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) applyLaunchGate(); });
-  window.addEventListener('focus', applyLaunchGate);
-  window.addEventListener('pageshow', applyLaunchGate);
 
   function init() {
     initReferral();   // AURIX-AFFILIATES-V1 — antes de pintar los CTA
