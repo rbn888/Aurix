@@ -27,7 +27,7 @@ const DASH = `(function(){
     cards: cards.map(function(c){ var cb=R(c), cta=c.querySelector('.pgw-cta'), t=c.querySelector('.pgw-t'), tier=c.querySelector('.pgw-tier,.cvr-tier');
       var vz=R(c.querySelector('.pgw-viz')), orb=c.querySelector('.pgw-orb'), inV=function(r,m){ return r.l>=vz.l-0.5+m && r.r<=vz.r+0.5-m && r.t>=vz.t-0.5+m && r.b<=vz.b+0.5-m; };
       var orbIn=true; if(orb){ var ob=R(orb), hw=parseFloat(getComputedStyle(orb,'::after').width)||0, cx=(ob.l+ob.r)/2, cy=(ob.t+ob.b)/2; orbIn=inV({l:cx-hw/2,r:cx+hw/2,t:cy-hw/2,b:cy+hw/2},0); }
-      var tilesIn=[].every.call(c.querySelectorAll('.pgw-tile'), function(e){ return inV(R(e), 6); });   // v848: la luz de la tesela es interior; 6 px de aire mínimo
+      var tilesIn=[].every.call(c.querySelectorAll('.pgw-tile'), function(e){ return inV(R(e), 10); });
       return { box: cb, titleDy: Math.round(R(t).t-cb.t), ctaFromBottom: Math.round(cb.b-R(cta).b), ctaH: Math.round(R(cta).h), ctaW: Math.round(R(cta).w),
         tier: tier ? tier.textContent.trim() : '', dest: cta.getAttribute('data-dsc-go'), txt: c.textContent, body: c.querySelector('.pgw-b').textContent.trim(),
         orbIn: orbIn, tilesIn: tilesIn, border: getComputedStyle(c).borderTopColor, lift: getComputedStyle(c).transform,
@@ -56,14 +56,6 @@ const COVER = `(function(){
     stageScroll: st.scrollHeight > st.clientHeight + 1,
     overX: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     anim: getComputedStyle(c).animationName, dur: getComputedStyle(c).animationDuration, stageBg: getComputedStyle(st).backgroundColor + '|' + getComputedStyle(st).backgroundImage }); })()`;
-// v848 · luz AMBIENTAL: estado de las animaciones de la esfera y de las herramientas.
-const AMB = `(function(){ var o=document.querySelector('.pgw-orb'), t=document.querySelector('.pgw-tile:nth-child(5)'); var A=function(e,ps){ if(!e) return null; var c=getComputedStyle(e,ps); return { n:c.animationName, d:parseFloat(c.animationDuration), i:c.animationIterationCount, ps:c.animationPlayState }; };
-  return JSON.stringify({ on: /\\bpgw-on\\b/.test(document.getElementById('dashDiscoverSection').className), light: A(o,'::before'), halo: A(o,'::after'), tile: A(t,'::after') }); })()`;
-const WSCOMP = `(function(){ var c=document.querySelector('.pgw-card.is-ws'), v=c.querySelector('.pgw-viz').getBoundingClientRect(), g=c.querySelector('.pgw-mosaic').getBoundingClientRect(), r=c.querySelector('.pgw-rows').getBoundingClientRect(), t=c.querySelector('.pgw-tile').getBoundingClientRect();
-  var cs=getComputedStyle(c.querySelector('.pgw-viz')), inner=v.width-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-2;
-  var i=document.querySelector('.pgw-card.is-int'), o=i.querySelector('.pgw-orb').getBoundingClientRect(), iv=i.querySelector('.pgw-viz').getBoundingClientRect(), ir=i.querySelector('.pgw-rows').getBoundingClientRect(), hw=parseFloat(getComputedStyle(i.querySelector('.pgw-orb'),'::after').width)*1.02, cx=(o.left+o.right)/2, cy=(o.top+o.bottom)/2;
-  return JSON.stringify({ tile: Math.round(t.width), pct: Math.round((r.right-g.left)/inner*100), dl: Math.round(g.left-v.left), dr: Math.round(v.right-r.right), dt: Math.round(g.top-v.top), db: Math.round(v.bottom-g.bottom), gh: Math.round(g.height), rh: Math.round(r.height),
-    haloEdge: Math.round(Math.min(cx-hw/2-iv.left, iv.right-(cx+hw/2), cy-hw/2-iv.top, iv.bottom-(cy+hw/2))), haloText: Math.round(ir.left-(cx+hw/2)) }); })()`;
 const toCards = P => P.ev(`(function(){ var e=document.getElementById('dashDiscoverSection'); if(e && e.firstChild) e.scrollIntoView({block:'center'}); })()`);
 const pwOpen = P => P.ev(`!!document.querySelector('.aurix-premium-overlay.is-open')`);
 
@@ -73,6 +65,8 @@ async function run(ENG, browser, w, lang) {
   // CLS a lo largo de todo el recorrido (sólo Chromium expone layout-shift).
   await P.ev(`(function(){ window.__cls=0; try{ new PerformanceObserver(function(l){ l.getEntries().forEach(function(e){ if(!e.hadRecentInput) window.__cls+=e.value; }); }).observe({type:'layout-shift', buffered:false}); }catch(_){ window.__cls=-1; } })()`);
   await toCards(P); await P.p.waitForTimeout(400);
+  // La entrada dura ~0,7 s (pulso + encendido escalonado): se mide cuando ya se ha cerrado.
+  await P.p.waitForFunction(`/pgw-done/.test(document.getElementById('dashDiscoverSection').className)`, null, { timeout: 2500 }).catch(() => {});
   const d = JSON.parse(await P.ev(DASH));
   const [ci, cw] = d.cards;
   ok(`${T} Gateway: dos tarjetas Free, Intelligence y Workspace`, d.shown && d.n === 2 && ci.dest === 'intelligence' && cw.dest === 'workspace', JSON.stringify([d.shown, d.n]));
@@ -91,24 +85,13 @@ async function run(ENG, browser, w, lang) {
   ok(`${T} Workspace: a la derecha sólo «calcula, organiza y planifica»`, JSON.stringify(cw.verbs) === JSON.stringify(en ? ['Calculate', 'Organise', 'Plan'] : ['Calcula', 'Organiza', 'Planifica']), cw.verbs.join(' | '));
   ok(`${T} Workspace: copy inferior nuevo y sin repetir herramientas`, cw.body === (en ? 'Work on your finances in one place and continue whenever you want.' : 'Trabaja tus finanzas en un solo espacio y continúa cuando quieras.') && !d.pub.some(n => cw.txt.indexOf(n) !== -1), cw.body);
   ok(`${T} esfera (con su halo) e iconos dentro de su pozo`, ci.orbIn && cw.tilesIn, JSON.stringify([ci.orbIn, cw.tilesIn]));
-  // v848 SE RE-DECIDE (SPEC AJUSTE VISUAL FINAL): la entrada única se sustituye por una luz AMBIENTAL lenta
-  // que sólo corre mientras se ve. La tarjeta en sí sigue sin animar opacidad ni geometría.
-  ok(`${T} la tarjeta no anima ni se desplaza`, [ci, cw].every(c => c.anim === 'none' && c.lift === 'none'), JSON.stringify([ci.anim, ci.lift]));
-  const am = JSON.parse(await P.ev(AMB));
-  ok(`${T} esfera viva mientras se ve: luz interior y halo, 5–7 s, en marcha`, am.on && am.light.n === 'pgwOrbLight' && am.halo.n === 'pgwHalo' && [am.light, am.halo].every(x => x.d >= 5 && x.d <= 7 && x.ps === 'running'), JSON.stringify(am));
-  ok(`${T} herramientas: ciclo secuencial lento (7–9 s) en marcha`, am.tile.n === 'pgwCycle' && am.tile.d >= 7 && am.tile.d <= 9 && am.tile.ps === 'running', JSON.stringify(am.tile));
-  const wc = JSON.parse(await P.ev(WSCOMP));
-  ok(`${T} Workspace: una composición centrada, verbos a la altura de la rejilla`, Math.abs(wc.dl - wc.dr) <= 2 && Math.abs(wc.dt - wc.db) <= 2 && Math.abs(wc.gh - wc.rh) <= 1, JSON.stringify(wc));
-  if (w >= 1024) ok(`${T} Workspace: la composición ocupa ~60–70 % del ancho útil`, wc.pct >= 57 && wc.pct <= 72, JSON.stringify(wc));
-  if (w >= 1280) ok(`${T} Workspace escritorio: teselas ~46–52 px`, wc.tile >= 46 && wc.tile <= 52, JSON.stringify(wc));
-  ok(`${T} Workspace: aire alrededor de la composición (sin tocar el pozo)`, Math.min(wc.dl, wc.dr, wc.dt, wc.db) >= 6, JSON.stringify(wc));
-  ok(`${T} Intelligence: el halo (con su respiración) no toca el borde del pozo ni el texto`, wc.haloEdge >= 6 && wc.haloText >= 4, JSON.stringify(wc));
+  // v847: la entrada es SÓLO luz y corre al entrar en el viewport; la tarjeta no anima opacidad ni geometría.
+  ok(`${T} la tarjeta no anima (la entrada es luz interior), sin bucle`, [ci, cw].every(c => c.anim === 'none' && c.lift === 'none'), JSON.stringify([ci.anim, ci.lift]));
+  ok(`${T} la entrada corrió UNA vez al verse y quedó cerrada`, /\bpgw-done\b/.test(d.cls) && !/\bpgw-live\b/.test(d.cls), d.cls);
   ok(`${T} Resumen sin desbordamiento horizontal`, !d.overX);
   // Un repintado (precio nuevo, vuelta de categoría) no repite la entrada.
-  // Un repintado (precio nuevo, vuelta de categoría) no apaga ni reinicia la luz: el estado vive en la sección.
-  await P.ev(`(function(){ var s=document.getElementById('dashDiscoverSection'); s._pgwHtml=''; updateDashboardDiscover(); })()`);
-  const am2 = JSON.parse(await P.ev(AMB));
-  ok(`${T} un repintado mantiene la luz ambiental en marcha`, am2.on && am2.light.ps === 'running' && am2.tile.ps === 'running', JSON.stringify(am2));
+  const settled = await P.ev(`(function(){ var s=document.getElementById('dashDiscoverSection'); s._pgwHtml=''; updateDashboardDiscover(); var o=document.querySelector('.pgw-orb'); return JSON.stringify([s.classList.contains('pgw-done'), o ? getComputedStyle(o).animationName : 'none', s.getAnimations ? s.getAnimations({subtree:true}).filter(function(a){ return typeof a.animationName === 'string'; }).length : 0]); })()`);
+  ok(`${T} un repintado no vuelve a animar la entrada`, settled === '[true,"none",0]', settled);
   if (process.env.SHOTS && (w === 390 || w === 1440)) await P.p.screenshot({ path: join(OUT, `dash-${ENG}-${w}-${lang}.png`) });
 
   // ── EMBUDO: tarjeta entera → portada → CTA → paywall → cerrar → Atrás
@@ -159,17 +142,14 @@ async function personas(ENG, browser) {
     // Free con valoración INCOMPLETA: ninguna lectura en el Gateway, estado de espera en la portada.
     let P = await page(browser, P_URL, { w, h: H(w), assets: INCOMPLETE });
     let d = JSON.parse(await P.ev(DASH));
-    // Pausa fuera del viewport y con la pestaña oculta; vuelve al verse.
+    // La entrada no se consume fuera de pantalla. Al cargar, las tarjetas SÍ llegan a verse (se montan
+    // antes que las categorías), así que el mecanismo se prueba armándolo con ellas bajo el pliegue.
     if (w < 768) {
-      const pz = await P.ev(`(async function(){ var s=document.getElementById('dashDiscoverSection'), w8=function(ms){ return new Promise(function(r){ setTimeout(r, ms); }); };
-        var st=function(){ var c=getComputedStyle(document.querySelector('.pgw-tile:nth-child(5)'),'::after').animationPlayState, l=getComputedStyle(document.querySelector('.pgw-orb'),'::before').animationPlayState; return (s.classList.contains('pgw-on')?'on':'off')+'/'+l+'/'+c; };
-        s.scrollIntoView({block:'center'}); await w8(500); var a=st();
-        window.scrollTo(0,0); await w8(500); var b=st();
-        s.scrollIntoView({block:'center'}); await w8(500); var c=st();
-        Object.defineProperty(document,'hidden',{configurable:true,get:function(){return true;}}); document.dispatchEvent(new Event('visibilitychange')); await w8(100); var h=st();
-        delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); await w8(100); var v=st();
-        return JSON.stringify([a,b,c,h,v]); })()`);
-      ok(`${ENG}.${w} luz ambiental: corre al verse, pausa fuera del viewport y con la pestaña oculta`, pz === JSON.stringify(['on/running/running', 'off/paused/paused', 'on/running/running', 'off/paused/paused', 'on/running/running']), pz);
+      const arm = await P.ev(`(async function(){ var s=document.getElementById('dashDiscoverSection'); _pgwEntry='idle'; s.classList.remove('pgw-live','pgw-done'); window.scrollTo(0,0);
+        var below = s.getBoundingClientRect().top > innerHeight; updateDashboardDiscover(); await new Promise(function(r){ setTimeout(r, 600); });
+        var waited = !/pgw-(live|done)/.test(s.className); s.scrollIntoView({block:'center'}); await new Promise(function(r){ setTimeout(r, 1200); });
+        return JSON.stringify([below, waited, s.className]); })()`);
+      ok(`${ENG}.${w} la entrada espera a que las tarjetas se vean y después se cierra`, /^\[true,true,"[^"]*pgw-done/.test(arm), arm);
     }
     ok(`${ENG}.${w} incompleta: el Gateway no afirma ninguna lectura`, d.n === 2 && d.facts.state !== 'ok' && d.cards[0].real.length === 0 && d.cards[0].locked.length === 2, JSON.stringify([d.facts, d.cards[0] && d.cards[0].real]));
     ok(`${ENG}.${w} incompleta: tarjetas iguales igualmente`, Math.abs(d.cards[0].box.h - d.cards[1].box.h) <= 1 && Math.abs(d.cards[0].titleDy - d.cards[1].titleDy) <= 1);
@@ -203,8 +183,7 @@ async function personas(ENG, browser) {
     d = JSON.parse(await P.ev(DASH));
     await P.ev(`document.getElementById('dashDiscoverSection').scrollIntoView({block:'center'})`); await P.p.waitForTimeout(150);
     d = JSON.parse(await P.ev(DASH));
-    const rm = JSON.parse(await P.ev(AMB));
-    ok(`${ENG}.${w} reduced-motion: esfera y herramientas estáticas, sin ciclo`, d.cards.every(x => x.anim === 'none') && rm.light.n === 'none' && rm.halo.n === 'none' && rm.tile.n === 'none', JSON.stringify(rm));
+    ok(`${ENG}.${w} reduced-motion: ni pulso de la esfera ni encendido de herramientas`, d.cards.every(x => x.anim === 'none' && (x.orbAnim === null || x.orbAnim === 'none') && (x.tileAnim === null || x.tileAnim === 'none')), JSON.stringify(d.cards.map(x => [x.anim, x.orbAnim, x.tileAnim])));
     await P.ev(`switchTab('workspace')`); await P.p.waitForTimeout(500);
     const rc = JSON.parse(await P.ev(COVER));
     ok(`${ENG}.${w} reduced-motion: portada sin animación`, rc.anim === 'none', rc.anim);

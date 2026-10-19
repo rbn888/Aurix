@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '808'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '807'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26142,20 +26142,32 @@ function _renderDashboardDiscover() {
       ${card('ws',  wsViz,  t('dsc_ws_t'),  t('dsc_ws_b'),  t('dsc_ws_cta'),  'workspace')}
     </div>`;
 }
-// LA LUZ AMBIENTAL: SÓLO MIENTRAS SE VE ──────────────────────────────────────────────────
-// La esfera respira y las herramientas se encienden en secuencia con un ciclo lento, todo en
-// CSS. Este observador sólo decide CUÁNDO corre: `pgw-on` mientras la sección está en el
-// viewport y la pestaña visible; fuera de ahí las animaciones quedan en pausa (conservan su
-// fase). Ni bucle en JS, ni escucha de scroll. Un repintado no lo reinicia: la clase vive en
-// la sección. Movimiento reducido: el CSS deja la composición estática.
+// LA ENTRADA: SÓLO LUZ, UNA VEZ, AL ENTRAR EN EL VIEWPORT ───────────────────────────────
+// Un pulso de la esfera y el encendido secuencial de las herramientas, cuando las tarjetas se
+// ven por primera vez —no al montarse fuera de pantalla—; después `pgw-done` y ningún
+// repintado (un precio que mueve la lectura, volver de una categoría) la repite. Es luz sobre
+// un contenido visible desde el primer frame: si el observador no llega a disparar, no se
+// esconde nada. Movimiento reducido: el CSS deja el estado final sin animar.
+let _pgwEntry = 'idle';   // idle → waiting → live → done
 function _pgwArmEntrance(sec) {
-  if (!sec || sec._pgwArmed) return;
-  sec._pgwArmed = true;
-  if (typeof IntersectionObserver !== 'function') return;
-  let seen = false;
-  const sync = () => sec.classList.toggle('pgw-on', seen && !document.hidden);
-  new IntersectionObserver(entries => { seen = entries[entries.length - 1].isIntersecting; sync(); }, { threshold: 0.25 }).observe(sec);
-  document.addEventListener('visibilitychange', sync);
+  if (_pgwEntry !== 'idle' || !sec) return;
+  if (typeof IntersectionObserver !== 'function') { _pgwEntry = 'done'; sec.classList.add('pgw-done'); return; }
+  _pgwEntry = 'waiting';
+  const io = new IntersectionObserver(entries => {
+    if (!entries.some(e => e.isIntersecting)) return;
+    io.disconnect();
+    _pgwEntry = 'live';
+    sec.classList.add('pgw-live');
+    // Se cierra cuando TODAS sus animaciones CSS han terminado —o se han cancelado porque un
+    // repintado cambió los nodos—: con `pgw-done` ningún repintado posterior la repite. Las
+    // transiciones del hover no cuentan (no tienen `animationName`).
+    const close = () => { if (_pgwEntry !== 'live') return; _pgwEntry = 'done'; sec.classList.replace('pgw-live', 'pgw-done'); };
+    requestAnimationFrame(() => {
+      const anims = sec.getAnimations ? sec.getAnimations({ subtree: true }).filter(a => typeof a.animationName === 'string') : [];
+      Promise.all(anims.map(a => a.finished)).then(close, close);
+    });
+  }, { threshold: 0.25 });
+  io.observe(sec);
 }
 // Atrás desde la portada a la que llevó una promo: al Resumen y a la misma altura (el retorno
 // que ya usa «Tus planes»). `var`: `_applyTab` los lee.
