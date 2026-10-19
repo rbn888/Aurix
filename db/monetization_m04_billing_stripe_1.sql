@@ -830,9 +830,11 @@ begin
   select count(*) into v_n from pg_proc p
    where p.pronamespace = 'public'::regnamespace
      and p.proname like 'aurix_billing%'
-     -- AURIX-AFFILIATES-V1 añade su propio escritor (db/billing_payments_1.sql),
-     -- con su propia verificación: no es un overload sobrante de M.04.
-     and p.proname <> 'aurix_billing_record_payment_event'
+     -- AURIX-AFFILIATES-V1 añade su propio escritor (db/billing_payments_1.sql) y
+     -- PARTNER-ENGINE-V2 el del desglose (db/billing_payment_breakdown_1.sql),
+     -- cada uno con su propia verificación: no son overloads sobrantes de M.04.
+     and p.proname not in ('aurix_billing_record_payment_event',
+                           'aurix_billing_record_payment_breakdown')
      and p.oid not in (v_fl, v_fa);
   if v_n <> 0 then
     raise exception 'M.04 APPLY FAIL: % unexpected aurix_billing* overloads', v_n;
