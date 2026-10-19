@@ -11,11 +11,13 @@
 -- Pareja: db/billing_payment_breakdown_1_rollback.sql
 --
 -- QUÉ ES
---   `billing_payments` guarda lo COBRADO (amount_paid). Un programa de
---   comisión por PORCENTAJE necesita además la BASE: lo cobrado SIN IVA y neto
---   de descuentos. Esta tabla guarda, por factura, el desglose TAL COMO LO
---   INFORMA STRIPE: subtotal, descuentos, impuesto, total sin impuesto y si
---   Stripe CALCULÓ el impuesto o no.
+--   `billing_payments` guarda lo COBRADO (amount_paid). La comisión por
+--   PORCENTAJE se calcula sobre ese importe —IVA incluido y ya neto de
+--   descuentos—, así que NO depende de esta tabla. Esta tabla guarda, por
+--   factura, el desglose TAL COMO LO INFORMA STRIPE: subtotal, descuentos,
+--   impuesto, total sin impuesto y si Stripe CALCULÓ el impuesto o no. Founder
+--   lo usa para el desglose económico (impuestos conocidos, margen
+--   provisional), nunca para retener ni recalcular una comisión.
 --   Aurix no calcula impuestos ni porcentajes ni comisiones: sólo registra.
 --
 -- tax_status — LA DIFERENCIA ENTRE "0 € DE IVA" Y "NADIE CALCULÓ EL IVA"
@@ -24,8 +26,9 @@
 --                      es lo que Stripe dice, también si es 0.
 --   · 'not_computed' → Stripe NO calculó impuesto (hoy el checkout no activa
 --                      automatic_tax). tax_cents es NULL a propósito: un 0 aquí
---                      parecería "exento" y Founder certificaría una base falsa.
---                      Founder deja en espera las comisiones por porcentaje.
+--                      parecería "exento" y Founder mostraría como conocido un
+--                      impuesto que nadie calculó. Founder lo enseña como
+--                      "desconocido"; la comisión no cambia.
 --   Lo impone un CHECK: computed ⇔ tax_cents no nulo.
 --
 -- INMUTABLE: LA PRIMERA ESCRITURA GANA
