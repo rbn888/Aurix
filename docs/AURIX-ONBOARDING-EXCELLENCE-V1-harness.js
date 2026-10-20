@@ -191,8 +191,11 @@ console.log('\nH/I/J — Primer activo, éxito y recompensa:');
   ok('I.2 con copy de patrimonio, no de "configuración completada"',
      // RE-DECIDIDO (ONBOARDING PREMIUM): «Tu patrimonio ya está en Aurix» afirmaba que TODO el
      // patrimonio estaba registrado tras una sola posición. El contrato pasa a ser el contrario.
-     /onbSuccessTitle:\s*'Tu primera posición, registrada'/.test(app)
-     && /onbSuccessTitle:\s*'Your first position, recorded'/.test(app)
+     // RE-DECIDIDO (SPEC ONBOARDING & FIRST INTELLIGENCE V1): el título confirma el REGISTRO de la
+     // inversión (singular/plural según el recuento), y la frase prohibida sigue prohibida.
+     /onbSuccessTitle:\s*'Tu inversión se ha registrado correctamente\.'/.test(app)
+     && /onbSuccessTitle:\s*'Your investment has been added successfully\.'/.test(app)
+     && /onbSuccessTitleN:\s*'Tus inversiones se han registrado correctamente\.'/.test(app)
      && !/ya está en Aurix|is now in Aurix/.test(app));
   ok('J.1 y permite añadir otro activo sin salir del flujo',
      /id="onbAddAnotherBtn"/.test(html) && /onbAddAnotherBtn[\s\S]{0,400}openModal\(\)/.test(app));

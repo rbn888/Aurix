@@ -1726,7 +1726,11 @@ function _collectUiState() {
   try { catOrder  = JSON.parse(localStorage.getItem('portfolio_cat_order')  || 'null') || []; } catch (_) {}
   // Orden de «Tus planes» (identidades «kind:id»). Mismo raíl LWW que el de categorías.
   try { planOrder = JSON.parse(localStorage.getItem('aurix_plan_order')  || 'null') || []; } catch (_) {}
-  return { workspace, cardOrder, catOrder, planOrder };
+  // Ventana del primer análisis de Intelligence: viaja con la cuenta para no repetirse en otro
+  // dispositivo. Sólo se envía si existe (una fila sin el campo no es «no elegible»).
+  let firstIntel = null;
+  try { firstIntel = _aurixFintelRead(); } catch (_) {}
+  return firstIntel ? { workspace, cardOrder, catOrder, planOrder, firstIntel } : { workspace, cardOrder, catOrder, planOrder };
 }
 // Apply remote UI state into localStorage + the in-memory order vars. The boot
 // render reads _cardOrder/_catOrder and the workspace mounts from localStorage,
@@ -1760,6 +1764,8 @@ function _applyRemoteUiState(ui) {
       localStorage.setItem('aurix_plan_order', JSON.stringify(ui.planOrder));
     }
   } catch (_) {}
+  // Ventana del primer análisis: fusión MONÓTONA (sólo adelanta pendiente → consumido).
+  try { _aurixFintelMergeRemote(ui); } catch (_) {}
   // Si el orden llegó cuando el Dashboard ya estaba pintado, se repinta UNA vez con él. En el
   // arranque normal la fila remota llega antes que las tarjetas y esto no cambia nada visible.
   if (reorder) { try { if (typeof updateCategoryCards === 'function') updateCategoryCards(); } catch (_) {} }
@@ -3892,6 +3898,9 @@ function _mergeRemoteState(remoteRow) {
     }
     const remoteUi   = (remoteRow && remoteRow.ui_state && typeof remoteRow.ui_state === 'object') ? remoteRow.ui_state : null;
     const remoteUiTs = (remoteRow && remoteRow.ui_state_updated_at) ? new Date(remoteRow.ui_state_updated_at).getTime() : 0;
+    // La ventana del primer análisis se fusiona aunque el ui_state remoto pierda el LWW: es
+    // monótona, así que adoptarla nunca deshace nada, y no sella ni pisa el resto del ui_state.
+    if (remoteUi) _aurixFintelMergeRemote(remoteUi);
     if (remoteUi && remoteUiTs > localUiTs) {
       _applyRemoteUiState(remoteUi);
       try { localStorage.setItem(UI_STATE_TS_KEY, String(remoteUiTs)); } catch (_) {}
@@ -4452,6 +4461,8 @@ const USER_SCOPED_LOCAL_KEYS = [
   // IDENTIDAD y rastro de navegación.
   'aurix_display_name', 'aurix.gs.recent.v1',
   'aurix_intv4_shown_v1', 'aurix_intcc_last_visit_v1',
+  // Ventana del primer análisis de Intelligence (sellada con su dueño).
+  'aurix_first_intel_v1',
   // Intelligence — contexto aprendido del usuario y memoria de observación. Van AQUÍ y no en
   // `PORTFOLIO_KEYS` porque no son estado recuperable del servidor: son locales, y lo
   // único inaceptable es que sobrevivan a un CAMBIO de usuario. Además cada registro
@@ -8362,8 +8373,8 @@ const T = {
     onbInterestsLead:     '¿Qué quieres controlar?',
     onbContinue:          'Continuar',
     onbBack:              'Atrás',
-    onbWelcomeTitle:      'Todo tu patrimonio. Una sola visión.',
-    onbWelcomeSub:        'Aurix reúne tus activos y transforma información dispersa en claridad patrimonial.',
+    onbWelcomeTitle:      'Empecemos por conocer tus inversiones.',
+    onbWelcomeSub:        'Registra las inversiones que ya tienes. AURIX te ayudará a comprender mejor tu patrimonio.',
     onbWelcomeRail1:      'Unificar',
     onbWelcomeRail2:      'Comprender',
     onbWelcomeRail3:      'Decidir',
@@ -8404,24 +8415,30 @@ const T = {
     onbAge45_60:          '45–60',
     onbAgeOver60:         '60+',
     onbAgePreferNotSay:   'Prefiero no decirlo',
-    onbActTitle:          'Añade tu primer activo',
-    onbActSub:            'Empieza a construir tu visión financiera.',
+    onbActTitle:          'Añade tu primer activo.',
+    onbActSub:            'Con tus datos, AURIX podrá ofrecerte una primera lectura de tu patrimonio.',
     onbAddAssetBtn:       '+ Añadir activo',
-    onbSuccessTitle:      'Tu primera posición, registrada',
-    onbSuccessTitleN:     'Posición registrada',
-    onbSuccessSub:        'Ya forma parte de tu visión patrimonial.',
+    onbSuccessTitle:      'Tu inversión se ha registrado correctamente.',
+    onbSuccessTitleN:     'Tus inversiones se han registrado correctamente.',
+    onbSuccessSub:        'Tu patrimonio ya está actualizado en AURIX.',
     onbSuccessBody1:      'Puedes añadir el resto de tu patrimonio cuando quieras.',
     onbSuccessBodyN:      n => `Llevas ${n} posiciones registradas. Puedes seguir añadiendo o ir a tu patrimonio.`,
     onbSuccessCount:      n => n === 1 ? '1 posición registrada' : `${n} posiciones registradas`,
-    onbAddAnother:        'Añadir otro activo',
+    onbAddAnother:        '+ Añadir otro activo',
     onbSumCategory:       'Categoría',
     onbSumAmount:         'Importe',
     onbSumCurrency:       'Moneda',
     onbSumFx:             'Registrado en {c}. Tu patrimonio se muestra en {b} (moneda base) con el tipo de cambio de Aurix. Cámbiala en Ajustes.',
     onbProgressStep:      'Paso {n} de {t}',
     onbCatExamplesAria:   'Aurix reúne, por ejemplo',
-    onbActNote:           'Registras información de tu patrimonio: Aurix no mueve dinero ni accede a tus cuentas.',
     onbGoDashboard:       'Ver mi patrimonio',
+    // PRIMER ANÁLISIS DE INTELLIGENCE — ventana única tras el onboarding (ver `_aurixFirstIntel`).
+    fintelEyebrow:        'AURIX INTELLIGENCE',
+    fintelTitle:          'Tu primer análisis está listo.',
+    fintelDesc:           'AURIX ya ha analizado tus inversiones. Descubre qué revelan sobre tu patrimonio y qué merece tu atención.',
+    fintelCta:            'Ver mi análisis',
+    fintelLater:          'Ahora no, ir a mi Dashboard',
+    fintelClose:          'Cerrar',
     onbWelcomeBullet1:    'Sigue tu evolución',
     onbWelcomeBullet2:    'Entiende tu exposición',
     onbWelcomeBullet3:    'Toma mejores decisiones',
@@ -11585,8 +11602,8 @@ const T = {
     onbInterestsLead:     'What do you want to track?',
     onbContinue:          'Continue',
     onbBack:              'Back',
-    onbWelcomeTitle:      'All your wealth. A single view.',
-    onbWelcomeSub:        'Aurix brings your assets together and turns scattered information into wealth clarity.',
+    onbWelcomeTitle:      "Let's start with your investments.",
+    onbWelcomeSub:        'Add the investments you already own. AURIX will help you better understand your wealth.',
     onbWelcomeRail1:      'Unify',
     onbWelcomeRail2:      'Understand',
     onbWelcomeRail3:      'Decide',
@@ -11624,24 +11641,29 @@ const T = {
     onbExpActiveDesc:     'I invest regularly',
     onbExpAdvanced:       'Advanced',
     onbExpAdvancedDesc:   'I know the markets',
-    onbActTitle:          'Add your first asset',
-    onbActSub:            'Start building your financial view.',
+    onbActTitle:          'Add your first asset.',
+    onbActSub:            'With your data, AURIX can offer you a first reading of your wealth.',
     onbAddAssetBtn:       '+ Add asset',
-    onbSuccessTitle:      'Your first position, recorded',
-    onbSuccessTitleN:     'Position recorded',
-    onbSuccessSub:        'It is now part of your wealth view.',
+    onbSuccessTitle:      'Your investment has been added successfully.',
+    onbSuccessTitleN:     'Your investments have been added successfully.',
+    onbSuccessSub:        'Your wealth information is now updated in AURIX.',
     onbSuccessBody1:      'You can add the rest of your wealth whenever you like.',
     onbSuccessBodyN:      n => `You have ${n} positions recorded. Keep adding or go to your wealth.`,
     onbSuccessCount:      n => n === 1 ? '1 position recorded' : `${n} positions recorded`,
-    onbAddAnother:        'Add another asset',
+    onbAddAnother:        '+ Add another asset',
     onbSumCategory:       'Category',
     onbSumAmount:         'Amount',
     onbSumCurrency:       'Currency',
     onbSumFx:             'Recorded in {c}. Your wealth is shown in {b} (base currency) using the Aurix exchange rate. Change it in Settings.',
     onbProgressStep:      'Step {n} of {t}',
     onbCatExamplesAria:   'Aurix brings together, for example',
-    onbActNote:           'You are recording information about your wealth: Aurix does not move money or access your accounts.',
-    onbGoDashboard:       'See my wealth',
+    onbGoDashboard:       'View my wealth',
+    fintelEyebrow:        'AURIX INTELLIGENCE',
+    fintelTitle:          'Your first analysis is ready.',
+    fintelDesc:           'AURIX has analyzed your investments. Discover what they reveal about your wealth and what deserves your attention.',
+    fintelCta:            'View my analysis',
+    fintelLater:          'Not now, go to my Dashboard',
+    fintelClose:          'Close',
     onbWelcomeBullet1:    'Track your evolution',
     onbWelcomeBullet2:    'Understand your exposure',
     onbWelcomeBullet3:    'Make better decisions',
@@ -91758,6 +91780,8 @@ try {
     // User opted out of the loop. completeOnboarding flips the engine
     // to COMPLETED; the state listener tears the overlay down.
     if (e.target.closest && e.target.closest('#onbGoDashboardBtn') && _ov()?.classList.contains('open')) {
+      try { _aurixRecordFunnelStep('onboarding_completed'); } catch (_) {}
+      try { _aurixFirstIntel.markPending(); } catch (_) {}
       Eng.completeOnboarding();
       _hideOnboardingOverlay();
       _aurixOnbSettled = true; _aurixPremiumIntentTryConsume('onboarding-completed');
@@ -91978,6 +92002,208 @@ try {
 
   window.maybeShowOnboarding = maybeShowOnboarding;
 })();
+
+// ── PRIMER ANÁLISIS DE INTELLIGENCE · VENTANA ÚNICA POR CUENTA NUEVA ────────────────────
+// Tras el onboarding, una sola ventana sobre el Dashboard anuncia que la primera lectura
+// existe y lleva a Intelligence, que es quien la DEMUESTRA (su portada Free, sin paywall
+// directo). La ventana no pinta cifras ni calcula nada: sólo pregunta al motor de la portada
+// (`_aurixIntelligencePreviewFacts`) si hay al menos un hecho publicable, y si no lo hay no
+// aparece — «tu primer análisis está listo» nunca se afirma sin un análisis que enseñar.
+//
+// ESTADOS, monótonos: ausente (no elegible) → `pending` → `consumed`. Nunca retroceden, ni
+// por una fila remota antigua. `pending` sólo nace de una transición real de cuenta nueva:
+//   · el usuario termina el onboarding («Ver mi patrimonio»), o
+//   · registra su PRIMER activo (0 → ≥1, guardado de usuario) con el onboarding a medias
+//     —también si lo aplazó y añade el activo después desde el Dashboard—.
+// Una cuenta existente (onboarding NOT_STARTED/COMPLETED) no pasa por ninguna, así que el
+// lanzamiento no la activa retroactivamente; y un guardado de sincronización o de precios
+// que vaya de 0 a N en un dispositivo nuevo tampoco cuenta como «primer activo».
+// `consumed` se escribe en el instante en que la ventana SE MUESTRA: si nunca llegó a verse
+// sigue pendiente, y una vez vista no vuelve (cerrar, «Ahora no» o el CTA dan igual).
+// Persistencia: clave local sellada con el dueño (y purgada al cambiar de usuario, ver
+// USER_SCOPED_LOCAL_KEYS) + el raíl `ui_state` que ya sincroniza la cuenta entre
+// dispositivos, con fusión monótona en la lectura.
+//
+// MOMENTO: 3 s de Dashboard VISIBLE y libre —splash retirado, pestaña Resumen, documento
+// visible, sin modal, paywall, alta en curso ni campo en edición—. El tiempo se acumula: si
+// el usuario se va antes, al volver sólo espera lo que faltaba, y si el retraso ya se cumplió
+// aparece en cuanto vuelve a ser seguro. El scroll no lo impide. No depende del gráfico ni
+// lo espera, y el reloj sólo existe mientras hay una ventana pendiente.
+var _FINTEL_KEY = 'aurix_first_intel_v1';
+var _FINTEL_RANK = { pending: 1, consumed: 2 };
+function _aurixFintelUid() {
+  try { return (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? String(currentUser.id) : ''; } catch (_) { return ''; }
+}
+function _aurixFintelRead() {
+  try {
+    const v = JSON.parse(localStorage.getItem(_FINTEL_KEY) || 'null');
+    const uid = _aurixFintelUid();
+    return (v && uid && v.uid === uid && _FINTEL_RANK[v.s]) ? v.s : null;
+  } catch (_) { return null; }
+}
+function _aurixFintelWrite(state, opts) {
+  const uid = _aurixFintelUid();
+  if (!uid || !_FINTEL_RANK[state]) return false;
+  const cur = _aurixFintelRead();
+  if (cur && _FINTEL_RANK[cur] >= _FINTEL_RANK[state]) return false;
+  try { localStorage.setItem(_FINTEL_KEY, JSON.stringify({ s: state, uid: uid, ts: Date.now() })); } catch (_) { return false; }
+  // Se sube con el siguiente flush SIN re-sellar `ui_state`: un sello nuevo haría ganar el LWW a
+  // TODO el ui_state local (también un Workspace más antiguo que el de otro dispositivo) por un
+  // cambio que el usuario ni ha tocado. La lectura remota lo fusiona aparte, sin mirar sellos.
+  if (!(opts && opts.fromRemote)) { try { if (typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {} }
+  return true;
+}
+// Fusión remota, MONÓTONA e independiente del sello LWW: sólo puede adelantar el estado.
+function _aurixFintelMergeRemote(ui) {
+  try {
+    const v = ui && ui.firstIntel;
+    if ((v === 'pending' || v === 'consumed') && _aurixFintelWrite(v, { fromRemote: true }) && typeof _aurixFirstIntel !== 'undefined') _aurixFirstIntel.kick();
+  } catch (_) {}
+}
+const _aurixFirstIntel = (function () {
+  const DELAY_MS = 3000, TICK_MS = 250, FACTS_EVERY_MS = 1500;
+  let timer = null, lastTick = 0, visibleMs = 0, lastFactsAt = 0, open = false, trigger = null, availLogged = false, wasFree = false;
+  const _ov = () => document.getElementById('firstIntelOverlay');
+  const _funnel = step => { try { _aurixRecordFunnelStep(step); } catch (_) {} };
+
+  function _blocked() {
+    if (!window.__AURIX_SPLASH_HIDDEN) return 'boot';
+    if (document.hidden) return 'hidden';
+    if (typeof currentTab === 'undefined' || currentTab !== 'home') return 'tab';
+    if (window._aurixResetInProgress) return 'reset';
+    const bc = document.body && document.body.classList;
+    if (!bc) return 'dom';
+    if (bc.contains('modal-open') || bc.contains('aurix-premium-lock') || bc.contains('onb-addflow')) return 'modal';
+    if (document.querySelector('.modal-overlay.open, .aurix-premium-overlay.is-open')) return 'modal';
+    // Edición: un campo ENFOCADO Y VISIBLE. Al cerrarse un formulario el foco puede quedarse en
+    // su input, pero el overlay cerrado sólo baja a opacidad 0 (`.modal-overlay` sin `.open`):
+    // ese campo ya no se está editando y no puede retener la ventana para siempre.
+    const ae = document.activeElement;
+    if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))
+        && ae.type !== 'hidden' && ae.getClientRects().length
+        && !ae.closest('.modal-overlay:not(.open), [hidden], [aria-hidden="true"]')) return 'editing';
+    return '';
+  }
+  function _readingAvailable() {
+    try {
+      const r = _aurixIntelligencePreviewFacts();
+      return !!(r && r.state === 'ok' && Array.isArray(r.visible) && r.visible.length > 0);
+    } catch (_) { return false; }
+  }
+  function _stop() { if (timer) { clearInterval(timer); timer = null; } lastTick = 0; wasFree = false; }
+  function _start() {
+    if (timer || open || _aurixFintelRead() !== 'pending') return;
+    lastTick = Date.now();
+    timer = setInterval(_tick, TICK_MS);
+  }
+  function _tick() {
+    const now = Date.now();
+    const dt = lastTick ? Math.min(now - lastTick, 1000) : 0;
+    lastTick = now;
+    if (open) return;
+    if (_aurixFintelRead() !== 'pending') { _stop(); return; }
+    // Sólo cuenta el intervalo entero de Dashboard libre: el tramo anterior a quedar libre no.
+    if (_blocked()) { wasFree = false; return; }
+    if (wasFree) visibleMs += dt;
+    wasFree = true;
+    if (visibleMs < DELAY_MS || now - lastFactsAt < FACTS_EVERY_MS) return;
+    lastFactsAt = now;
+    if (!_readingAvailable()) return;
+    if (!availLogged) { availLogged = true; _funnel('first_intel_available'); }
+    _show();
+  }
+  function _focusables() {
+    const ov = _ov();
+    return ov ? [...ov.querySelectorAll('button')].filter(b => !b.disabled && b.getClientRects().length) : [];
+  }
+  function _show() {
+    const ov = _ov();
+    if (!ov || open) return;
+    _stop();
+    const card = ov.querySelector('.fintel-card');
+    const set = (id, k) => { const el = document.getElementById(id); const v = t(k); if (el && typeof v === 'string') el.textContent = v; };
+    set('fintelTitle', 'fintelTitle'); set('fintelDesc', 'fintelDesc'); set('fintelCta', 'fintelCta'); set('fintelLater', 'fintelLater');
+    try { const eb = ov.querySelector('.fintel-eyebrow'); if (eb) eb.textContent = t('fintelEyebrow'); } catch (_) {}
+    try { const cl = document.getElementById('fintelClose'); if (cl) cl.setAttribute('aria-label', t('fintelClose')); } catch (_) {}
+    trigger = document.activeElement;
+    ov.hidden = false;
+    open = true;
+    _aurixFintelWrite('consumed');
+    document.body.classList.add('aurix-fintel-lock');
+    requestAnimationFrame(() => ov.classList.add('is-open'));
+    try { if (card) card.focus({ preventScroll: true }); } catch (_) {}
+    _funnel('first_intel_shown');
+  }
+  function _close(reason) {
+    const ov = _ov();
+    if (!ov || !open) return;
+    open = false;
+    ov.classList.remove('is-open');
+    document.body.classList.remove('aurix-fintel-lock');
+    setTimeout(() => { if (!open) ov.hidden = true; }, 200);
+    _funnel(reason === 'cta' ? 'first_intel_cta' : 'first_intel_dismiss_' + reason);
+    if (reason !== 'cta' && trigger && trigger.focus && document.contains(trigger) && trigger !== document.body) {
+      try { trigger.focus({ preventScroll: true }); } catch (_) {}
+    }
+    trigger = null;
+  }
+
+  document.addEventListener('click', e => {
+    if (!open) return;
+    const ov = _ov();
+    if (e.target === ov) { _close('backdrop'); return; }
+    const b = e.target.closest && e.target.closest('#fintelClose, #fintelLater, #fintelCta');
+    if (!b) return;
+    if (b.id === 'fintelClose') { _close('close'); return; }
+    if (b.id === 'fintelLater') { _close('later'); return; }
+    _close('cta');
+    try { switchTab('intelligence'); } catch (_) {}
+    // `switchTab` aplica la pestaña en diferido: la entrada se registra cuando ya es real.
+    const entered = n => {
+      if (typeof currentTab !== 'undefined' && currentTab === 'intelligence') { _funnel('first_intel_entered'); return; }
+      if (n < 20) setTimeout(() => entered(n + 1), 100);
+    };
+    entered(0);
+  });
+  document.addEventListener('keydown', e => {
+    if (!open) return;
+    if (e.key === 'Escape') { e.stopPropagation(); _close('escape'); return; }
+    if (e.key !== 'Tab') return;
+    // El foco circula SIEMPRE a mano entre las acciones del diálogo: Safari, por defecto, no
+    // tabula botones y dejaría escapar el foco a un campo de detrás.
+    const f = _focusables();
+    if (!f.length) return;
+    e.preventDefault();
+    const i = f.indexOf(document.activeElement);
+    const next = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === -1 || i === f.length - 1 ? 0 : i + 1);
+    try { f[next].focus(); } catch (_) {}
+  }, true);
+
+  // Primer activo de una cuenta nueva: guardado del USUARIO (no sincronización, arranque ni
+  // precios) y onboarding a medias. Cualquier otro 0 → N no es «primer activo».
+  window.addEventListener('aurix:asset-added', e => {
+    const d = (e && e.detail) || {};
+    if (d.prev !== 0) return;
+    let ctx = '';
+    try { ctx = (_aurixSyncState && _aurixSyncState.lastSaveContext) || ''; } catch (_) {}
+    if (ctx !== 'mutation') return;
+    const Eng = window.AurixOnboarding;
+    if (!Eng || typeof Eng.getSnapshot !== 'function') return;
+    const st = Eng.getSnapshot().state, S = Eng.STATES || {};
+    if (st !== S.WELCOME && st !== S.ACTIVATION && st !== S.SUCCESS) return;
+    markPending();
+  });
+  // Reanudación tras recargar o entrar desde otro dispositivo: la cuenta ya está cargada.
+  window.addEventListener('aurix:portfolio-ready', () => _start());
+
+  function markPending() { _aurixFintelWrite('pending'); _start(); }
+  return {
+    markPending: markPending,
+    kick: _start,
+    debug: () => ({ state: _aurixFintelRead(), open: open, ticking: !!timer, visibleMs: visibleMs, blocked: _blocked(), reading: _readingAvailable() }),
+  };
+})();
+try { if (typeof window !== 'undefined') window._aurixFirstIntel = _aurixFirstIntel; } catch (_) {}
 
 // ── AURIX-SIGNALS-1 / -3: lightweight dashboard smart signals ──────
 // Deterministic, local-only computation. No network, no observers, no

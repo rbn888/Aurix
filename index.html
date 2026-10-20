@@ -2296,8 +2296,8 @@
         <span class="onb-wh-dot"></span>
         <span class="onb-wh-dot"></span>
       </div>
-      <h2 id="onbTitle" class="onb-headline" data-i18n="onbWelcomeTitle">Todo tu patrimonio. Una sola visión.</h2>
-      <p class="onb-sub" data-i18n="onbWelcomeSub">Aurix reúne tus activos y transforma información dispersa en claridad patrimonial.</p>
+      <h2 id="onbTitle" class="onb-headline" data-i18n="onbWelcomeTitle">Empecemos por conocer tus inversiones.</h2>
+      <p class="onb-sub" data-i18n="onbWelcomeSub">Registra las inversiones que ya tienes. AURIX te ayudará a comprender mejor tu patrimonio.</p>
       <!-- ONBOARDING-EXCELLENCE-V1 — INTERESES FUSIONADOS EN LA BIENVENIDA.
            Antes eran dos pantallas: una que sólo se leía (WELCOME) y otra que sólo
            preguntaba (INTERESTS). La bienvenida sin decisión costaba un tap entero y
@@ -2423,9 +2423,8 @@
         <span class="onb-activation-ring onb-activation-ring--2"></span>
         <span class="onb-activation-icon">+</span>
       </div>
-      <h2 class="onb-headline" data-i18n="onbActTitle">Añade tu primer activo</h2>
-      <p class="onb-sub" data-i18n="onbActSub">Empieza a construir tu visión financiera.</p>
-      <p class="onb-note" data-i18n="onbActNote">Registras información de tu patrimonio: Aurix no mueve dinero ni accede a tus cuentas.</p>
+      <h2 class="onb-headline" data-i18n="onbActTitle">Añade tu primer activo.</h2>
+      <p class="onb-sub" data-i18n="onbActSub">Con tus datos, AURIX podrá ofrecerte una primera lectura de tu patrimonio.</p>
       <div class="onb-footer onb-footer--split">
         <button type="button" class="onb-cta onb-cta--ghost" data-onb-back data-i18n="onbBack">Atrás</button>
         <button type="button" class="onb-cta onb-cta--primary" id="onbAddAssetBtn" data-i18n="onbAddAssetBtn">+ Añadir activo</button>
@@ -2443,16 +2442,32 @@
           <path d="M5 12 L10 17 L19 7"/>
         </svg>
       </div>
-      <h2 class="onb-headline" id="onbSuccessTitle">Tu primera posición, registrada</h2>
-      <p class="onb-sub" data-i18n="onbSuccessSub">Ya forma parte de tu visión patrimonial.</p>
+      <h2 class="onb-headline" id="onbSuccessTitle">Tu inversión se ha registrado correctamente.</h2>
+      <p class="onb-sub" data-i18n="onbSuccessSub">Tu patrimonio ya está actualizado en AURIX.</p>
       <div class="onb-success-summary" id="onbSuccessSummary" hidden></div>
       <span class="onb-success-chip" id="onbSuccessChip"></span>
       <p class="onb-sub onb-success-body" id="onbSuccessBody"></p>
       <div class="onb-footer onb-footer--split">
-        <button type="button" class="onb-cta onb-cta--ghost" id="onbAddAnotherBtn" data-i18n="onbAddAnother">Añadir otro activo</button>
+        <button type="button" class="onb-cta onb-cta--ghost" id="onbAddAnotherBtn" data-i18n="onbAddAnother">+ Añadir otro activo</button>
         <button type="button" class="onb-cta onb-cta--primary" id="onbGoDashboardBtn" data-i18n="onbGoDashboard">Ver mi patrimonio</button>
       </div>
     </section>
+  </div>
+</div>
+
+<!-- PRIMER ANÁLISIS DE INTELLIGENCE — ventana única por cuenta nueva, sobre el Dashboard.
+     No pinta cifras: anuncia que la primera lectura existe y lleva a Intelligence, que es quien la
+     demuestra. Owner: `_aurixFirstIntel` (app.js). Se abre sólo con una lectura Free real. -->
+<div class="fintel-overlay" id="firstIntelOverlay" hidden>
+  <div class="fintel-card" role="dialog" aria-modal="true" aria-labelledby="fintelTitle" aria-describedby="fintelDesc" tabindex="-1">
+    <button type="button" class="fintel-close" id="fintelClose" data-i18n-aria="fintelClose" aria-label="Cerrar">✕</button>
+    <span class="fintel-eyebrow cvr-pill" data-i18n="fintelEyebrow">AURIX INTELLIGENCE</span>
+    <h2 class="fintel-title" id="fintelTitle" data-i18n="fintelTitle">Tu primer análisis está listo.</h2>
+    <p class="fintel-desc" id="fintelDesc" data-i18n="fintelDesc">AURIX ya ha analizado tus inversiones. Descubre qué revelan sobre tu patrimonio y qué merece tu atención.</p>
+    <div class="fintel-actions">
+      <button type="button" class="fintel-cta cvr-cta" id="fintelCta" data-i18n="fintelCta">Ver mi análisis</button>
+      <button type="button" class="fintel-later" id="fintelLater" data-i18n="fintelLater">Ahora no, ir a mi Dashboard</button>
+    </div>
   </div>
 </div>
 

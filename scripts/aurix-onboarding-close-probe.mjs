@@ -105,7 +105,7 @@ for (const [E, launcher] of [['CR', chromium], ['WK', webkit]]) {
       ok(`${T} bienvenida sin desbordamiento horizontal`, !(await hscroll(p)));
       await p.click('[data-onb-langswitch="es"]', { force: true }); await p.waitForTimeout(300);
       const g1 = await p.evaluate(() => ({ st: document.querySelector('.modal--onboarding').getAttribute('data-step'), lang, pl: document.getElementById('onbProgressLabel').textContent, t: document.getElementById('onbTitle').textContent }));
-      ok(`${T} el selector ES|EN del onboarding cambia el idioma y conserva el paso`, g1.st === 'WELCOME' && g1.lang === 'es' && /Paso 1 de 2/.test(g1.pl) && /Todo tu patrimonio\. Una sola visión/.test(g1.t), JSON.stringify(g1));
+      ok(`${T} el selector ES|EN del onboarding cambia el idioma y conserva el paso`, g1.st === 'WELCOME' && g1.lang === 'es' && /Paso 1 de 2/.test(g1.pl) && /Empecemos por conocer tus inversiones/.test(g1.t), JSON.stringify(g1));
       await p.locator('#onboardingOverlay [data-onb-next]:visible').first().click({ force: true }); await p.waitForTimeout(400);
       ok(`${T} avanza a PRIMER ACTIVO`, (await step(p)) === 'ACTIVATION');
       await p.locator('#onboardingOverlay [data-onb-back]:visible').first().click({ force: true }); await p.waitForTimeout(350);
@@ -121,7 +121,7 @@ for (const [E, launcher] of [['CR', chromium], ['WK', webkit]]) {
       await p.evaluate(() => { const b = document.querySelector('#liquidityOverlay .btn-submit'); b.click(); b.click(); });
       await p.waitForTimeout(1400);
       const s = await p.evaluate(() => ({ n: assets.length, st: document.querySelector('.modal--onboarding').getAttribute('data-step'), t: document.getElementById('onbSuccessTitle').textContent, sum: document.getElementById('onbSuccessSummary').textContent.replace(/\s+/g, ' '), prim: document.querySelector('[data-onb-step=SUCCESS] .onb-cta--primary').id }));
-      ok(`${T} doble pulsación ⇒ un registro; confirmación con resumen fiel y «Ver mi patrimonio» principal`, s.n === 1 && s.st === 'SUCCESS' && s.t === 'Tu primera posición, registrada' && /Liquidez/.test(s.sum) && /2500,00\s?€/.test(s.sum) && /EUR/.test(s.sum) && /USD/.test(s.sum) && s.prim === 'onbGoDashboardBtn', JSON.stringify(s));
+      ok(`${T} doble pulsación ⇒ un registro; confirmación con resumen fiel y «Ver mi patrimonio» principal`, s.n === 1 && s.st === 'SUCCESS' && s.t === 'Tu inversión se ha registrado correctamente.' && /Liquidez/.test(s.sum) && /2500,00\s?€/.test(s.sum) && /EUR/.test(s.sum) && /USD/.test(s.sum) && s.prim === 'onbGoDashboardBtn', JSON.stringify(s));
       const cut = await p.evaluate(() => [...document.querySelectorAll('[data-onb-step=SUCCESS] .onb-cta')].map(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > innerWidth));
       ok(`${T} acciones de la confirmación sin cortes`, cut.every(x => !x) && !(await hscroll(p)), JSON.stringify(cut));
       await p.evaluate(() => document.getElementById('onbGoDashboardBtn').click()); await p.waitForTimeout(900);

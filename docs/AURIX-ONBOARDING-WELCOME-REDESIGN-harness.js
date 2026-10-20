@@ -29,12 +29,14 @@ ok('1 the old 3-bullet feature list is gone from WELCOME', !/onb-bullet\b/.test(
 ok('1 headline + sub present', /class="onb-headline" data-i18n="onbWelcomeTitle"/.test(welcome) && /class="onb-sub" data-i18n="onbWelcomeSub"/.test(welcome));
 
 // ── 2 exact approved copy (ES) ───────────────────────────────────────────────
-ok('2 ES headline = approved', /onbWelcomeTitle:\s*'Todo tu patrimonio\. Una sola visión\.'/.test(app));
-ok('2 ES sub = approved', /onbWelcomeSub:\s*'Aurix reúne tus activos y transforma información dispersa en claridad patrimonial\.'/.test(app));
+// RE-DECIDIDO (SPEC ONBOARDING & FIRST INTELLIGENCE V1): la bienvenida deja de repetir el titular de
+// la landing («Todo tu patrimonio…») y abre con un mensaje contextual.
+ok('2 ES headline = approved', /onbWelcomeTitle:\s*'Empecemos por conocer tus inversiones\.'/.test(app));
+ok('2 ES sub = approved', /onbWelcomeSub:\s*'Registra las inversiones que ya tienes\. AURIX te ayudará a comprender mejor tu patrimonio\.'/.test(app));
 ok('2 ES rail = Unificar / Comprender / Decidir', /onbWelcomeRail1:\s*'Unificar'/.test(app) && /onbWelcomeRail2:\s*'Comprender'/.test(app) && /onbWelcomeRail3:\s*'Decidir'/.test(app));
 
 // ── 3 exact approved copy (EN) ───────────────────────────────────────────────
-ok('3 EN headline + sub + rail', /onbWelcomeTitle:\s*'All your wealth\. A single view\.'/.test(app) && /onbWelcomeSub:\s*'Aurix brings your assets together and turns scattered information into wealth clarity\.'/.test(app) && /onbWelcomeRail1:\s*'Unify'/.test(app) && /onbWelcomeRail2:\s*'Understand'/.test(app) && /onbWelcomeRail3:\s*'Decide'/.test(app));
+ok('3 EN headline + sub + rail', /onbWelcomeTitle:\s*"Let's start with your investments\."/.test(app) && /onbWelcomeSub:\s*'Add the investments you already own\. AURIX will help you better understand your wealth\.'/.test(app) && /onbWelcomeRail1:\s*'Unify'/.test(app) && /onbWelcomeRail2:\s*'Understand'/.test(app) && /onbWelcomeRail3:\s*'Decide'/.test(app));
 
 // ── 4 forbidden framings absent from the Welcome copy (ES + EN) ──────────────
 (function () {

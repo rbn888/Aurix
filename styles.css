@@ -1635,6 +1635,25 @@ body.modal-open {
   color: rgba(220,230,250,0.45);
   line-height: 1;
 }
+/* SELECTOR DE TIPOS · ACABADO PREMIUM. El mismo selector, la misma geometría y los mismos
+   iconos: sólo cambia la SUPERFICIE. El degradado de alfa BLANCO se leía gris sobre el
+   modal navy (alfa blanco = gris neutro); las filas pasan al charcoal azulado de los modales
+   premium, más oscuro que su panel, y el azul eléctrico queda para lo que responde al usuario
+   —hover, foco y chevron—, no para pintar las seis tarjetas. Ámbito: `#addV2Picker`, así que
+   el subselector de metales (que reutiliza `.add-v2-card`) no cambia. La tarjeta deshabilitada
+   conserva su borde discontinuo. */
+#addV2Picker .add-v2-card:not(.is-disabled) {
+  background: linear-gradient(180deg, rgba(14,20,36,0.94), rgba(8,12,24,0.94));
+  border-color: rgba(90,140,255,0.16);
+}
+#addV2Picker .add-v2-card:not(.is-disabled):hover {
+  background: linear-gradient(180deg, rgba(22,36,70,0.94), rgba(10,16,32,0.94));
+  border-color: rgba(91,140,255,0.55);
+  box-shadow: 0 0 0 4px rgba(74,130,240,0.10);
+}
+#addV2Picker .add-v2-card:not(.is-disabled):hover .add-v2-chevron { color: #8fb6ff; }
+#addV2Picker .add-v2-card:focus-visible { outline: 2px solid #8fb6ff; outline-offset: 2px; }
+#addV2Picker .add-v2-card.is-disabled { background: rgba(8,12,24,0.55); }
 
 /* Back button — shows only when Step 2 was entered via the picker. */
 .add-v2-back {
@@ -30593,13 +30612,6 @@ body.onb-addflow #liquidityOverlay > .modal { position: relative; z-index: 1; }
 #onbInterestsGrid [data-onb-interest="cash"]        { --onb-cat: #34d17e; }
 #onbInterestsGrid [data-onb-interest="real_estate"] { --onb-cat: #9b7dff; }
 
-/* ACTIVACIÓN: la aclaración de qué se hace (y qué no). */
-.onb-note {
-  margin: 6px auto 0; max-width: 380px; padding: 9px 12px; border-radius: 12px;
-  font-size: 12.5px; line-height: 1.45; text-align: center;
-  color: rgba(214,224,245,.78); background: rgba(74,130,240,.07); border: 1px solid rgba(90,140,255,.20);
-}
-
 /* ÉXITO: resumen fiel del registro. */
 .onb-success-summary { width: 100%; max-width: 360px; margin: 4px auto 0; }
 .onb-sum { margin: 0; padding: 10px 14px; border-radius: 14px; background: rgba(255,255,255,.03); border: 1px solid rgba(120,160,255,.16); }
@@ -32707,3 +32719,67 @@ img.ws-asset-img[src$="tool_comparator.webp"]  { object-position: 50% 45%; }
 .mkt-prv-cta #mktPrvPosBtn[hidden] { display: none; }
 .mkt-prv-cta #mktPrvAddBtn { min-width: 0; }
 @media (max-width: 420px) { .mkt-prv-cta #mktPrvAddBtn { font-size: 14px; padding-left: 10px; padding-right: 10px; } }
+
+/* ── PRIMER ANÁLISIS DE INTELLIGENCE · ventana única tras el onboarding ──────────────
+   Centrada en el viewport VISIBLE (fija, independiente del scroll del Dashboard), por
+   encima de él con un velo discreto que deja ver el contexto. Superficie del paywall
+   (charcoal azulado, borde azul de marca); badge y CTA reutilizan `.cvr-pill` / `.cvr-cta`
+   de las portadas, así que no hay un tercer estilo de botón. Sin cifras, ilustración ni
+   gráfico. El bloqueo de scroll es `overflow:hidden` y NO `body.modal-open`, que fija el
+   body y devolvería el Dashboard arriba. Si el alto no alcanza, la tarjeta desplaza por
+   dentro y las acciones nunca quedan cortadas. */
+.fintel-overlay {
+  position: fixed; inset: 0; z-index: 3900;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+           max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(4, 7, 15, 0.58);
+  opacity: 0; transition: opacity .2s ease;
+}
+.fintel-overlay[hidden] { display: none; }
+.fintel-overlay.is-open { opacity: 1; }
+body.aurix-fintel-lock { overflow: hidden; }
+.fintel-card {
+  position: relative; box-sizing: border-box;
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 26px 24px 20px; border-radius: 20px;
+  background: linear-gradient(165deg, rgba(26,38,66,.96), rgba(10,15,28,.98));
+  border: 1px solid rgba(77,141,255,.32);
+  box-shadow: 0 30px 80px -28px rgba(0,0,0,.75), 0 0 50px rgba(77,141,255,.12), inset 0 1px 0 rgba(255,255,255,.06);
+  color: #e7ecf5;
+  transform: scale(.97); transition: transform .2s cubic-bezier(.2,.8,.2,1);
+}
+.fintel-overlay.is-open .fintel-card { transform: scale(1); }
+.fintel-card:focus { outline: none; }
+.fintel-close {
+  position: absolute; top: 8px; right: 8px;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: transparent; border: 0; cursor: pointer;
+  color: rgba(205,214,230,.8); font-size: 15px; line-height: 1;
+}
+.fintel-close:hover { color: #fff; background: rgba(90,140,255,.10); }
+.fintel-close:focus-visible, .fintel-later:focus-visible { outline: 2px solid #8fb6ff; outline-offset: 2px; }
+.fintel-eyebrow { margin: 0 0 14px; }
+.fintel-title {
+  margin: 0 0 10px; padding-right: 28px;
+  font-size: 22px; font-weight: 800; line-height: 1.24; letter-spacing: -.01em; color: #fff;
+}
+.fintel-desc { margin: 0 0 22px; font-size: 15px; line-height: 1.55; color: rgba(214,224,245,.8); }
+.fintel-actions { display: flex; flex-direction: column; gap: 8px; }
+.fintel-later {
+  width: 100%; min-height: 44px; padding: 0 16px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; color: rgba(214,224,245,.82);
+  background: transparent; border: 0; border-radius: 12px;
+}
+.fintel-later:hover { color: #fff; background: rgba(255,255,255,.04); }
+@media (min-width: 768px) {
+  .fintel-card { padding: 32px 32px 24px; border-radius: 24px; }
+  .fintel-title { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fintel-overlay, .fintel-card { transition: none; }
+  .fintel-card { transform: none; }
+}
