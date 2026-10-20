@@ -54,7 +54,8 @@ function makeCtx(opts) {
   ctx._aurixMarkSynced = (ms) => { const m = ctx._aurixReadPortfolioMeta(); m.syncedAt = ms || Date.now(); if (!(m.updatedAt > m.syncedAt)) m.updatedAt = m.syncedAt; ctx._aurixWritePortfolioMeta(m); };
   ctx._aurixAssetsForBackend = () => { const c = ctx.convertToNewModel(ctx.assets); return { assets: c.assets, holdings: c.holdings, omit: false, reason: o.reason || 'live-data' }; };
   ctx.__lc = 'L';
-  ctx._aurixComputePerformanceStateCandidate = () => ({ userId: ctx.currentUser.id, lifecycleId: ctx.__lc, portfolioRevision: ctx.__perfRev, byRange: { '24h': { performanceHash: 'h' + ctx.__perfRev } } });
+  ctx.__pendingRange = false;
+  ctx._aurixComputePerformanceStateCandidate = () => ({ userId: ctx.currentUser.id, lifecycleId: ctx.__lc, portfolioRevision: ctx.__perfRev, byRange: { '24h': { performanceHash: 'h' + ctx.__perfRev, displayedColor: ctx.__pendingRange ? 'pending' : 'green', invalidReason: ctx.__pendingRange ? (ctx.__why || 'lag') : null } } });
   function builder(table) {
     const st = { table, op: 'select', obj: null, single: false };
     const b = {
@@ -203,6 +204,17 @@ const run = (ctx, code) => vm.runInContext(code, ctx);
     ok('B2.4 tras un RESET (otro lifecycleId) con el MISMO hash de rangos ⇒ se escribe', upd() === 4 && a.ok === true, a.failureReason);
     run(c, `currentUser = { id: 'u2' };`); a = await run(c, `_aurixFlushPerformanceState('lifecycle')`);
     ok('B2.5 un cambio de cuenta con el MISMO hash de rangos ⇒ se escribe', upd() === 5 && a.ok === true, a.failureReason);
+  }
+  {
+    const c = makeCtx(); c.__pendingRange = true;
+    const upd = () => c.__ops.filter(x => x.op === 'update').length;
+    await run(c, `_aurixFlushPerformanceState('lifecycle')`);
+    c.__why = 'invalidated';   // cambia la CAUSA del pendiente, no su hash
+    const a = await run(c, `_aurixFlushPerformanceState('lifecycle')`);
+    ok('B2.6 con algún rango PENDIENTE, ocultar la pestaña escribe aunque el hash coincida (su causa no está en el hash)', upd() === 2 && a.ok === true, a.failureReason);
+    run(c, '_aurixLastPerfFlushMs = 0;');
+    const b = await run(c, `_aurixFlushPerformanceState('debounced')`);
+    ok('B2.7 …y los demás motivos conservan el «sin cambios» de siempre (FIX 4)', upd() === 2 && b.failureReason === 'skipped_unchanged_payload', b.failureReason);
   }
   {
     const c = makeCtx(); c.__returnMismatch = true;

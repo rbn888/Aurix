@@ -4138,7 +4138,11 @@ async function _aurixFlushPerformanceState(reason) {
     // El hash sólo cubre byRange (y unos rangos pendientes dan el mismo en cualquier cuenta o ciclo de vida),
     // así que el «sin cambios» exige además el mismo usuario y el mismo lifecycleId que lo último escrito.
     const _perfScope = String(ps.userId || '') + '|' + String(ps.lifecycleId || '');
-    if (reason !== 'perf-now' && audit.payloadHash != null && _perfScope === _aurixLastWrittenPerfScope && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
+    // Y al ocultar la pestaña sólo se salta si TODOS los rangos están listos: el hash de un rango pendiente
+    // no incluye su causa (invalidReason/returnState), así que con alguno pendiente se escribe como siempre.
+    const _perfAllReady = !!(ps.byRange && Object.keys(ps.byRange).length &&
+      Object.keys(ps.byRange).every(k => ps.byRange[k] && ps.byRange[k].displayedColor && ps.byRange[k].displayedColor !== 'pending'));
+    if (reason !== 'perf-now' && (reason !== 'lifecycle' || _perfAllReady) && audit.payloadHash != null && _perfScope === _aurixLastWrittenPerfScope && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
       audit.skipped = true; audit.failureReason = 'skipped_unchanged_payload';   // NOT audit.ok — no real write happened
       try { if (typeof IS_DEV !== 'undefined' && IS_DEV) console.log('[PERF_STATE][SKIP] unchanged payload — no write', audit.payloadHash); } catch (_) {}
       _aurixPerfWriteAudit = audit; return audit;
