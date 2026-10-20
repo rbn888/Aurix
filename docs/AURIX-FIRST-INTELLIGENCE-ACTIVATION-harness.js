@@ -88,7 +88,13 @@ console.log('\nD — Cuándo nace `pending` y cuándo se muestra:');
   ok('D.3 retraso de 3 s acumulado sólo con Dashboard libre', /DELAY_MS = 3000/.test(ctrl) && /if \(wasFree\) visibleMs \+= dt;/.test(ctrl) && /visibleMs < DELAY_MS/.test(ctrl));
   ok('D.4 bloqueos: splash, pestaña, documento oculto, reset, modales, paywall, alta y edición visible',
      ['__AURIX_SPLASH_HIDDEN', "currentTab !== 'home'", 'document.hidden', '_aurixResetInProgress', "'modal-open'", "'aurix-premium-lock'", "'onb-addflow'", '.modal-overlay.open', '.aurix-premium-overlay.is-open', "'.modal-overlay:not(.open), [hidden], [aria-hidden=\"true\"]'"].every(x => ctrl.includes(x)));
-  ok('D.5 sólo con una lectura Free REAL del motor de la portada', /const r = _aurixIntelligencePreviewFacts\(\);\s*return !!\(r && r\.state === 'ok' && Array\.isArray\(r\.visible\) && r\.visible\.length > 0\)/.test(ctrl));
+  ok('D.5 sólo con una lectura Free REAL del motor de la portada', /const r = _aurixIntelligencePreviewFacts\(\);\s*if \(!\(r && r\.state === 'ok' && Array\.isArray\(r\.visible\) && r\.visible\.length > 0\)\) return false;/.test(ctrl));
+  // HOTFIX v854: la lectura debe describir una PARTE de la cartera (< 100 % publicado), leída de
+  // la misma primitiva que la produjo; sin cifra legible no cuenta.
+  ok('D.5b y útil: alguna lectura visible describe una parte (< 100 %), no la cartera entera',
+     /r\.visible\.some\(f => \{ const v = Number\(share\(f\)\); return Number\.isFinite\(v\) && Math\.round\(v\) < 100; \}\)/.test(ctrl) &&
+     /f\.kind === 'concentration' \|\| f\.kind === 'watch:dep'\) \? top/.test(ctrl) && /f\.kind === 'liquidity' \? \(liq && liq\.cashPct\)/.test(ctrl) &&
+     /f\.kind === 'watch:crypto' \? \(snap && snap\.cryptoPct\) : null/.test(ctrl));
   ok('D.6 se reanuda tras cargar la cuenta, sin reloj si no hay ventana pendiente',
      /addEventListener\('aurix:portfolio-ready', \(\) => _start\(\)\)/.test(ctrl) && /if \(timer \|\| open \|\| _aurixFintelRead\(\) !== 'pending'\) return;/.test(ctrl));
 }

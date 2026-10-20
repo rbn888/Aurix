@@ -92084,10 +92084,24 @@ const _aurixFirstIntel = (function () {
         && !ae.closest('.modal-overlay:not(.open), [hidden], [aria-hidden="true"]')) return 'editing';
     return '';
   }
+  // HOTFIX v854 — «TU PRIMER ANÁLISIS» EXIGE UNA LECTURA QUE DIGA ALGO NUEVO. Una lectura
+  // visible cuya cifra es el 100 % describe la cartera ENTERA («el 100 % depende de Apple», «la
+  // liquidez es el 100 %»): es lo que el usuario acaba de teclear, no una interpretación. Sólo
+  // cuenta la que describe una PARTE (< 100 % tal como se publica). Cada cifra se lee de la
+  // MISMA primitiva que produjo la frase en el motor de la portada (congelado, intacto); sin
+  // cifra legible no cuenta. Sin lectura útil la ventana sigue pendiente hasta que la haya.
   function _readingAvailable() {
     try {
       const r = _aurixIntelligencePreviewFacts();
-      return !!(r && r.state === 'ok' && Array.isArray(r.visible) && r.visible.length > 0);
+      if (!(r && r.state === 'ok' && Array.isArray(r.visible) && r.visible.length > 0)) return false;
+      let snap = null, liq = null;
+      try { snap = _aurixHealthSnapshot(); } catch (_) {}
+      try { liq = buildLiquidityView(); } catch (_) {}
+      const top = snap && snap.topInvestedAsset ? snap.topInvestedAsset.pctTotal : null;
+      const share = f => (f.kind === 'concentration' || f.kind === 'watch:dep') ? top
+        : f.kind === 'liquidity' ? (liq && liq.cashPct)
+        : f.kind === 'watch:crypto' ? (snap && snap.cryptoPct) : null;
+      return r.visible.some(f => { const v = Number(share(f)); return Number.isFinite(v) && Math.round(v) < 100; });
     } catch (_) { return false; }
   }
   function _stop() { if (timer) { clearInterval(timer); timer = null; } lastTick = 0; wasFree = false; }

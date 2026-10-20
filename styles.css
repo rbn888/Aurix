@@ -25728,30 +25728,42 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
    is set to "search" (query/results) or "form" (asset selected) by
    _updateSearchEmptyHint (the existing search-lifecycle owner) and back to
    "idle" at rest. Scope unchanged: asset + gold only. */
+/* HOTFIX v854 — EL TECLADO LO ABRE UN CAMPO, NO UN BOTÓN. `:focus-within` también saltaba
+   cuando el foco caía en una TARJETA: Chrome enfoca el botón al pulsarlo, la hoja subía de
+   golpe entre el toque y el clic, y el clic caía en el fondo ⇒ el alta se cerraba sin
+   registrar nada (sugerencias «Populares» y, al reabrir, el selector de tipos). WebKit no
+   enfoca botones al tocarlos y por eso allí no ocurría. El anclaje por foco exige ahora un
+   campo de texto enfocado. El anclaje por FLUJO (SPEC 63) va en su propia regla y sin
+   `:has()`: un motor que no lo soporte descarta sólo la regla del foco y conserva ésta. */
 @media (max-width: 768px) {
-  #modalOverlay > .modal[data-mode="asset"]:focus-within,
-  #modalOverlay > .modal[data-mode="gold"]:focus-within,
   #modalOverlay > .modal[data-mode="asset"][data-asset-flow="search"],
   #modalOverlay > .modal[data-mode="asset"][data-asset-flow="form"],
   #modalOverlay > .modal[data-mode="gold"][data-asset-flow="search"],
   #modalOverlay > .modal[data-mode="gold"][data-asset-flow="form"] {
-    /* top-anchor the sheet during input focus (overrides the overlay's
-       align-items:flex-end / center only for this item, only while focused). */
+    /* top-anchor the sheet while a search flow is active (overrides the overlay's
+       align-items:flex-end / center only for this item). */
     align-self: flex-start;
     /* fully-rounded card while it lives at the top (the resting bottom sheet is
        20px 20px 0 0); keeps the premium sheet chrome when top-anchored. */
+    border-radius: 20px;
+  }
+  #modalOverlay > .modal[data-mode="asset"]:has(:is(input, textarea, select):focus),
+  #modalOverlay > .modal[data-mode="gold"]:has(:is(input, textarea, select):focus) {
+    align-self: flex-start;
     border-radius: 20px;
   }
 }
 @media (max-width: 520px) {
   /* The ≤520 bottom-sheet family zeroes the overlay's padding-top; restore a
      safe-area top gap so the top-anchored sheet clears the notch / status bar. */
-  #modalOverlay > .modal[data-mode="asset"]:focus-within,
-  #modalOverlay > .modal[data-mode="gold"]:focus-within,
   #modalOverlay > .modal[data-mode="asset"][data-asset-flow="search"],
   #modalOverlay > .modal[data-mode="asset"][data-asset-flow="form"],
   #modalOverlay > .modal[data-mode="gold"][data-asset-flow="search"],
   #modalOverlay > .modal[data-mode="gold"][data-asset-flow="form"] {
+    margin-top: env(safe-area-inset-top, 0px);
+  }
+  #modalOverlay > .modal[data-mode="asset"]:has(:is(input, textarea, select):focus),
+  #modalOverlay > .modal[data-mode="gold"]:has(:is(input, textarea, select):focus) {
     margin-top: env(safe-area-inset-top, 0px);
   }
 }
@@ -30672,6 +30684,14 @@ body.onb-addflow #liquidityOverlay .btn-submit { background: linear-gradient(180
   .modal--onboarding .onb-footer--split .onb-cta { width: 100%; }
   .modal--onboarding .onb-progress { display: none; }
   .modal--onboarding .onb-skip { font-size: 12px; padding: 6px 8px; }
+}
+
+/* HOTFIX v854 · SUCCESS en móvil: «+ Añadir otro activo» y «Ver mi patrimonio» no caben en una
+   fila por debajo de ~430 px y la acción principal se partía en dos líneas. Se apilan como ya
+   hace el pie a ≤360 —la principal arriba—; los demás pasos conservan su fila. */
+@media (max-width: 430px) {
+  .modal--onboarding[data-step="SUCCESS"] .onb-footer--split { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+  .modal--onboarding[data-step="SUCCESS"] .onb-footer--split .onb-cta { width: 100%; }
 }
 
 /* SPEC 2 · paywall: periodicidad del cobro y condiciones, legibles (≥ 4,5:1) antes de pagar. */

@@ -51,12 +51,16 @@ ok('3 resting bottom-sheet anchor preserved (#modalOverlay align-items:flex-end 
   /#modalOverlay[\s\S]{0,240}align-items:\s*flex-end/.test(css));
 
 // 4. The fix top-anchors the sheet on focus via align-self:flex-start.
-ok('4 fix top-anchors on focus (align-self: flex-start under :focus-within)',
-  /:focus-within,[\s\S]{0,700}align-self:\s*flex-start/.test(specRegion));
+// RE-DECIDIDO (HOTFIX v854): el anclaje por foco exige un CAMPO enfocado. Con `:focus-within`
+// una tarjeta-botón enfocada al tocarla (Chrome) movía la hoja bajo el dedo y el clic caía en
+// el fondo. El anclaje por flujo (SPEC 63) vive en su propia regla, sin `:has()`.
+ok('4 fix top-anchors on FIELD focus (align-self: flex-start under :has(field:focus))',
+  /:has\(:is\(input, textarea, select\):focus\) \{\s*align-self:\s*flex-start/.test(specRegion) &&
+  !/\.modal\[data-mode="(asset|gold)"\]:focus-within/.test(css));
 
 // 5. Scoped to the asset (search) sheet AND gold (Metals) — the SPEC "Aplicar a" set.
 ok('5 scoped to asset + gold sheet (data-mode="asset" / "gold")',
-  /\.modal\[data-mode="asset"\]:focus-within/.test(spec) && /\.modal\[data-mode="gold"\]:focus-within/.test(spec));
+  /\.modal\[data-mode="asset"\]:has\(:is\(input, textarea, select\):focus\)/.test(specRegion) && /\.modal\[data-mode="gold"\]:has\(:is\(input, textarea, select\):focus\)/.test(specRegion));
 
 // 6. Real Estate excluded by construction — the fix never matches data-mode="real_estate".
 ok('6 Real Estate excluded (no data-mode="real_estate" in the SPEC 62 rules)',
@@ -70,7 +74,7 @@ ok('7 Cash/Liquidity excluded (#liquidityOverlay not referenced by the fix rules
 //    (There must be a ≤768 media query wrapping the focus-within rule, and no
 //     unguarded focus-within align-self leaking to desktop.)
 ok('8 desktop untouched (fix is inside @media ≤768 only)',
-  /@media\s*\(max-width:\s*768px\)\s*\{[\s\S]{0,400}#modalOverlay > \.modal\[data-mode="asset"\]:focus-within/.test(css));
+  /@media\s*\(max-width:\s*768px\)\s*\{[\s\S]{0,900}#modalOverlay > \.modal\[data-mode="asset"\]:has\(:is\(input, textarea, select\):focus\)/.test(css));
 
 // 9. Notch/safe-area top gap on the small-phone (≤520) top-anchored sheet.
 ok('9 ≤520 top-anchored sheet clears the notch (margin-top: safe-area-inset-top)',
