@@ -25623,6 +25623,40 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
 .mcd-ring { width: 54px; height: 54px; }   /* P0-HERO-PREMIUM-POLISH: +8% (50→54) in step with the 54→58 button; ring proportions unchanged */
 .mcd-segs circle { stroke-width: 9.5; }   /* solid financial ring, not a thin loader */
 
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.05 — EL DONUT NO SE EMPUJA: la cápsula es lo flexible.
+   Causa (medida): la fila reservaba 84 px FIJOS de aire (gap 60 + margin 24) y la cápsula,
+   flex con `min-width:auto` y mensaje `nowrap`, no podía bajar de su texto en una línea
+   (407 px en 1440 con «Health: Everything rests on two positions»). La fila se desbordaba y
+   el donut —que no encoge— acababa fuera de `.hero-left` (overflow:hidden): recortado y bajo
+   la columna del gráfico. Entre 769–1024 la cápsula, además, cortaba el mensaje con elipsis.
+   Ahora:
+   · la cápsula puede estrecharse y su contenido FLUYE como texto (mensaje · CTA), sin elipsis,
+     con la CTA indivisible; ocupa como mucho dos líneas;
+   · el espacio del donut se reserva: separación mínima 16 px y el sobrante a su izquierda
+     (`margin-left:auto`), así que siempre termina dentro de la fila;
+   · si la columna no deja ≥220 px a la cápsula junto al donut, el donut baja ENTERO a la línea
+     siguiente, a la derecha, en vez de estrujar la cápsula.
+   Tamaño, anillo, colores y clic del donut no cambian. Móvil (≤768): el micro-donut sigue
+   oculto por diseño (DSH.DONUT.01); allí sólo cambia que la cápsula ya no corta su texto. */
+.aurix-signal-row > #aurixSignal { min-width: 0; }
+.hero-left .aurix-signal--health { display: block; }
+.aurix-signal--health .aurix-signal-body { display: inline; }
+.aurix-signal--health .aurix-signal-msg { display: inline; white-space: normal; overflow: visible; text-overflow: clip; }
+.aurix-signal--health .aurix-signal-cta { display: inline-flex; vertical-align: baseline; }
+@media (min-width: 769px) {
+  .aurix-signal-row { gap: 12px 16px; flex-wrap: wrap; }
+  .aurix-signal-row > #aurixSignal { flex: 1 1 220px; max-width: max-content; }
+  .micro-composition-donut { margin-left: auto; }
+}
+/* Columna estrecha de escritorio: unos px de relleno, no de tipografía, para que el texto más
+   largo (EN) siga en dos líneas. */
+@media (min-width: 769px) and (max-width: 860px) {
+  .hero-left .aurix-signal--health { padding-left: 11px; padding-right: 11px; }
+  .aurix-signal--health .aurix-signal-msg::after { margin: 0 5px; }
+  .aurix-signal--health .aurix-signal-cta { padding-left: 2px; padding-right: 2px; }
+}
+
 /* Modal — wider compact executive panel; donut is the protagonist */
 .modal--composition { max-width: 720px; transform: scale(.96); transition: opacity .15s ease, transform .15s ease; }  /* open .96→1, close →.96; 150ms */
 .modal-overlay.open .modal--composition { transform: scale(1); }
