@@ -113,11 +113,42 @@ for (const id of ['manualPrice', 'assetPurchasePrice', 'reRent', 'txQty', 'txPri
 // La corrección legada ÷100 sigue para operaciones del parser antiguo y NO toca las escritas
 // con el contrato nuevo (marca pv). Se ejecuta el código real.
 { const c2 = { _AURIX_TX_PRICE_CONTRACT: 2 }; vm.createContext(c2);
-  vm.runInContext('const _AURIX_TX_PRICE_CONTRACT = 2;\n' + fnSrc('sanitizeTransactionPrices'), c2);
+  vm.runInContext('const _AURIX_TX_PRICE_CONTRACT = 2;\n' + fnSrc('_aurixLegacyClippedPrice') + '\n' + fnSrc('sanitizeTransactionPrices'), c2);
   const a = { transactions: [{ type: 'buy', qty: 1, price: 244677, ts: 1 }, { type: 'buy', qty: 1, price: 1234567.89, ts: 2, pv: 2 }, { type: 'buy', qty: 1, price: 700000, ts: 3, pv: 2 }] };
   c2.a = a; vm.runInContext('sanitizeTransactionPrices(a); sanitizeTransactionPrices(a);', c2);
   ok('3 legado sin marca: 244677 → 2446.77 (comportamiento de producción conservado)', a.transactions[0].price === 2446.77, String(a.transactions[0].price));
   ok('3 contrato nuevo: 1234567.89 y 700000 intactos tras dos renders', a.transactions[1].price === 1234567.89 && a.transactions[2].price === 700000); }
+// TRANSICIÓN — una pestaña con el app.js ≤ v851 aplica su ÷100 a ciegas (copia LITERAL de la
+// función de v851 como fixture del cliente antiguo) y el cliente nuevo debe deshacer sólo eso.
+{ const c3 = {}; vm.createContext(c3);
+  vm.runInContext(fnSrc('_aurixLegacyClippedPrice') + '\n' + fnSrc('sanitizeTransactionPrices').replace('function sanitizeTransactionPrices(', 'function newSanitize(') + `
+    const _AURIX_TX_PRICE_CONTRACT = 2;
+    function v851Sanitize(asset) {
+      if (!asset.transactions || !asset.transactions.length) return;
+      asset.transactions.forEach(tx => {
+        if (!tx.price) return;
+        if (tx.price > 100000) tx.price = tx.price / 100;
+      });
+    }`, c3);
+  const run = (txs, oldRenders) => { c3.a = { transactions: txs.map(t => Object.assign({}, t)) }; c3.k = oldRenders;
+    vm.runInContext('for (let i = 0; i < k; i++) v851Sanitize(a); newSanitize(a); newSanitize(a);', c3); return c3.a.transactions; };
+  let r = run([{ type: 'buy', qty: 1, price: 700000, ts: 1, pv: 2, pvPrice: 700000 }], 1);
+  ok('3 transición: BRK.A 700000 recortada a 7000 por una pestaña v851 → restituida', r[0].price === 700000, String(r[0].price));
+  r = run([{ type: 'buy', qty: 1, price: 1.5e7, ts: 1, pv: 2, pvPrice: 1.5e7 }], 3);
+  ok('3 transición: 1,5e7 recortada dos veces (150000 → 1500) → restituida', r[0].price === 1.5e7, String(r[0].price));
+  r = run([{ type: 'buy', qty: 1, price: 1234567.89, ts: 1, pv: 2, pvPrice: 1234567.89 }], 1);
+  ok('3 transición: 1234567.89 → 12345.6789 → restituida exacta', r[0].price === 1234567.89, String(r[0].price));
+  r = run([{ type: 'buy', qty: 1, price: 7001, ts: 1, pv: 2, pvPrice: 700000 }], 0);
+  ok('3 transición: un precio que NO es la huella exacta del ÷100 no se toca', r[0].price === 7001);
+  r = run([{ type: 'buy', qty: 1, price: 50000, ts: 1, pv: 2, pvPrice: 50000 }], 2);
+  ok('3 transición: una marcada ≤ 100.000 nunca cambia', r[0].price === 50000);
+  r = run([{ type: 'buy', qty: 1, price: 7000, ts: 1, pv: 2, pvPrice: 7000 }], 0);
+  ok('3 transición: una edición legítima (pvPrice reescrito) se respeta', r[0].price === 7000);
+  r = run([{ type: 'buy', qty: 1, price: 244677, ts: 1 }], 1);
+  ok('3 transición: legado sin marca sigue igual que en v851 (2446.77)', r[0].price === 2446.77, String(r[0].price));
+  r = run([{ type: 'buy', qty: 1, price: 244677, ts: 1 }], 0);
+  ok('3 transición: legado sin marca que llega crudo se corrige como en v851', r[0].price === 2446.77, String(r[0].price)); }
+ok('3 toda operación marcada lleva también su precio escrito (pvPrice)', (app.match(/pvPrice: /g) || []).length === 7, String((app.match(/pvPrice: /g) || []).length));
 ok('3 la corrección legada sigue en render()', /sanitizeTransactionPrices\(asset\);\s*\n\s*syncQtyFromTransactions\(asset\)/.test(app));
 const stamps = (app.match(/pv: _AURIX_TX_PRICE_CONTRACT/g) || []).length;
 ok('3 toda operación escrita con el contrato nuevo lleva la marca (7 sitios + comentario)', stamps >= 8, String(stamps));

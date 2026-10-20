@@ -16347,11 +16347,28 @@ function avgBuyPrice(asset) {
 // Lote 1 lleva `pv: _AURIX_TX_PRICE_CONTRACT` y queda fuera. No vale `ts < despliegue`:
 // editar una operación antigua conserva su `ts`. Los datos ya dañados por el parser
 // antiguo NO se reparan aquí (ver db/numeric_integrity_audit_readonly.sql).
+// TRANSICIÓN DEL DESPLIEGUE — una pestaña que aún ejecuta el app.js anterior (≤ v851)
+// sigue aplicando el ÷100 SIN mirar la marca, guarda y sube el precio recortado (conserva
+// el resto de campos de la operación: sólo reescribe `tx.price`). Por eso toda operación
+// marcada lleva también `pvPrice`, el precio TAL COMO SE ESCRIBIÓ. Si una marcada llega con
+// `price` igual a `pvPrice` dividido entre 100 una o más veces mientras superaba 100.000 —la
+// huella exacta de esa función antigua y de nada más—, se restituye `pvPrice`. Cualquier otra
+// diferencia (una edición legítima reescribe `pvPrice` con la operación) se respeta tal cual.
 const _AURIX_TX_PRICE_CONTRACT = 2;
+function _aurixLegacyClippedPrice(tx) {
+  const w = Number(tx.pvPrice), p = Number(tx.price);
+  if (!(w > 100000) || !(p > 0) || p === w) return false;
+  for (let v = w; v > 100000;) { v = v / 100; if (Math.abs(v - p) <= Math.abs(v) * 1e-12) return true; }
+  return false;
+}
 function sanitizeTransactionPrices(asset) {
   if (!asset.transactions || !asset.transactions.length) return;
   asset.transactions.forEach(tx => {
-    if (!tx || !tx.price || tx.pv === _AURIX_TX_PRICE_CONTRACT) return;
+    if (!tx || !tx.price) return;
+    if (tx.pv === _AURIX_TX_PRICE_CONTRACT) {
+      if (_aurixLegacyClippedPrice(tx)) tx.price = Number(tx.pvPrice);
+      return;
+    }
     if (tx.price > 100000) tx.price = tx.price / 100;
   });
 }
@@ -81828,7 +81845,7 @@ assetForm.addEventListener('submit', e => {
         prevPrice:     null,
         costBasis:     qty * (price > 0 ? price : 1),
         location:      _newLoc,            // WL.2: optional Wealth Location metadata
-        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: _mBuyTs, pv: _AURIX_TX_PRICE_CONTRACT }],
+        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: _mBuyTs, pv: _AURIX_TX_PRICE_CONTRACT, pvPrice: price > 0 ? price : 1 }],
       });
       _ledgerTrade(assets.find(a => a.id === manualFlashId), 'buy', qty, _mBuyPx, _mBuyTs);
     }
@@ -81925,7 +81942,7 @@ assetForm.addEventListener('submit', e => {
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
     if (!existing.transactions) existing.transactions = [];
-    existing.transactions.push({ type: 'buy', qty, price: _effectivePrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT });
+    existing.transactions.push({ type: 'buy', qty, price: _effectivePrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT, pvPrice: _effectivePrice });
     if (_newLoc) existing.location = _newLoc;   // WL.2: conserve unless user set one
     _ledgerTrade(existing, 'buy', qty, _effectivePrice, _buyTs);
   } else {
@@ -81983,7 +82000,7 @@ assetForm.addEventListener('submit', e => {
         resaleMargin:      pendingResaleMargin,
         resaleFactor:      +(Math.max(0, Math.min(1, 1 - pendingResaleMargin / 100))).toFixed(4),
       } : {}),
-      transactions:  [{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT }],
+      transactions:  [{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT, pvPrice: _effectivePrice }],
     });
     _ledgerTrade(assets.find(a => a.id === normalFlashId), 'buy', qty, _effectivePrice, _buyTs);
   }
@@ -82174,6 +82191,7 @@ reduceForm.addEventListener('submit', e => {
       price: _sellPrice,
       ts:    _sellTs,
       pv: _AURIX_TX_PRICE_CONTRACT,
+      pvPrice: _sellPrice,
     });
     asset.realizedPnL = Number(asset.realizedPnL || 0) + (Number.isFinite(realized) ? realized : 0);
   }
@@ -82348,7 +82366,7 @@ addForm.addEventListener('submit', e => {
     asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + addedCostNative;
     asset.qty = +(asset.qty + amount).toFixed(8);
     if (!Array.isArray(asset.transactions)) asset.transactions = [];
-    asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT });
+    asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT, pvPrice: _buyPrice });
     _ledgerTrade(asset, 'buy', amount, _buyPrice, _buyTs);
   }
   const addFlashId   = asset.id;
@@ -82886,7 +82904,7 @@ function addTransaction(assetId, type, qty, price) {
   const asset = assets.find(a => a.id === assetId);
   if (!asset) return;
   if (!asset.transactions) asset.transactions = [];
-  const tx = { type, qty, price, ts: Date.now(), assetName: asset.name, pv: _AURIX_TX_PRICE_CONTRACT };
+  const tx = { type, qty, price, ts: Date.now(), assetName: asset.name, pv: _AURIX_TX_PRICE_CONTRACT, pvPrice: price };
   asset.transactions.push(tx);
   if (type === 'buy') recordBuy(tx);
   save();
@@ -83001,6 +83019,7 @@ txForm.addEventListener('submit', e => {
         price,
         ts:    originalTs,
         pv: _AURIX_TX_PRICE_CONTRACT,   // reescrita con el contrato nuevo: el precio que se ve es el que se guarda
+        pvPrice: price,
       };
       syncCostBasisFromTransactions(asset);
       save();

@@ -176,7 +176,7 @@ console.log('8 — legacy holding (no transactions) — no regression / no dupli
 // ── 9 no duplicate holdings/transactions on add ─────────────────────────────────
 console.log('9 — no duplicate holdings or transactions:');
 {
-  ok('9.1 NEW-asset path creates exactly ONE transactions:[{buy}] entry', (app.match(/transactions:\s*\[\{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs(?:, pv: _AURIX_TX_PRICE_CONTRACT)? \}\]/g) || []).length === 1);
+  ok('9.1 NEW-asset path creates exactly ONE transactions:[{buy}] entry', (app.match(/transactions:\s*\[\{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs(?:, pv: _AURIX_TX_PRICE_CONTRACT, pvPrice: _effectivePrice)? \}\]/g) || []).length === 1);
   ok('9.2 re-buying an existing position PUSHES to existing.transactions (no new holding)', /existing\.transactions\.push\(\{ type: 'buy', qty, price: _effectivePrice/.test(app));
   ok('9.3 adding a tx is a NON-reducing save (destructive-save guard allows it)', /const drops = \(next\.assets < previous\.assets\)/.test(app) && /transactions < previous\.transactions/.test(app));
 }
