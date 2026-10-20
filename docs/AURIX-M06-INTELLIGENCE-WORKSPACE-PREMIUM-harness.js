@@ -152,7 +152,8 @@ section('C — paywall: un solo sitio con precios, y ninguno inventado:');
   // tres bloques de valor con su ejemplo de uso.
   ok('C.9 copy crítica del paywall en los DOS idiomas',
      ['pw_title', 'pw_sub', 'pw_cta', 'pw_manage', 'pw_unavailable',
-      'pw_v_lead', 'pw_v1_t', 'pw_v2_t', 'pw_v3_t', 'pw_v1_eg', 'pw_v2_eg', 'pw_v3_eg']
+      // RE-DECIDIDO (PREMIUM CONVERSION V2): los cuatro beneficios sustituyen a los tres bloques.
+      'pw_v_lead', 'pw_b1_t', 'pw_b1_b', 'pw_b2_t', 'pw_b2_b', 'pw_b3_t', 'pw_b3_b', 'pw_b4_t', 'pw_b4_b', 'pw_terms']
        .every(k => (app.match(new RegExp('\\b' + k + ':\\s*', 'g')) || []).length === 2));
 }
 

@@ -121,7 +121,7 @@ for (const [E, launcher] of [['CR', chromium], ['WK', webkit]]) {
       await p.evaluate(() => { const b = document.querySelector('#liquidityOverlay .btn-submit'); b.click(); b.click(); });
       await p.waitForTimeout(1400);
       const s = await p.evaluate(() => ({ n: assets.length, st: document.querySelector('.modal--onboarding').getAttribute('data-step'), t: document.getElementById('onbSuccessTitle').textContent, sum: document.getElementById('onbSuccessSummary').textContent.replace(/\s+/g, ' '), prim: document.querySelector('[data-onb-step=SUCCESS] .onb-cta--primary').id }));
-      ok(`${T} doble pulsación ⇒ un registro; confirmación con resumen fiel y «Ver mi patrimonio» principal`, s.n === 1 && s.st === 'SUCCESS' && s.t === 'Tu inversión se ha registrado correctamente.' && /Liquidez/.test(s.sum) && /2500,00\s?€/.test(s.sum) && /EUR/.test(s.sum) && /USD/.test(s.sum) && s.prim === 'onbGoDashboardBtn', JSON.stringify(s));
+      ok(`${T} doble pulsación ⇒ un registro; confirmación con resumen fiel y «+ Añadir otro activo» principal (ONBOARDING FINISH)`, s.n === 1 && s.st === 'SUCCESS' && s.t === 'Tu inversión se ha registrado correctamente.' && /Liquidez/.test(s.sum) && /2500,00\s?€/.test(s.sum) && /EUR/.test(s.sum) && /USD/.test(s.sum) && s.prim === 'onbAddAnotherBtn', JSON.stringify(s));
       const cut = await p.evaluate(() => [...document.querySelectorAll('[data-onb-step=SUCCESS] .onb-cta')].map(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > innerWidth));
       ok(`${T} acciones de la confirmación sin cortes`, cut.every(x => !x) && !(await hscroll(p)), JSON.stringify(cut));
       await p.evaluate(() => document.getElementById('onbGoDashboardBtn').click()); await p.waitForTimeout(900);

@@ -8131,8 +8131,8 @@ const T = {
     // Precios: no están aquí. Vienen de `billing_prices`, que es lo que se cobra.
     pw_open:           'Ver Aurix Premium',
     pw_eyebrow:        'AURIX PREMIUM',
-    pw_title:          'Toda la inteligencia de tu patrimonio',
-    pw_sub:            'Intelligence y Workspace completos, y tus planes guardados donde los dejaste.',
+    pw_title:          'Comprende mejor tu patrimonio. Decide con más información.',
+    pw_sub:            'Identifica concentraciones, comprende qué ha cambiado y descubre qué merece tu atención.',
     pw_annual:         'Anual',
     pw_monthly:        'Mensual',
     pw_per_year:       'al año',
@@ -8142,7 +8142,8 @@ const T = {
     pw_billed_year:    (amount) => `Un único cobro de ${amount} cada año.`,
     pw_context:        (name) => `«${name}» forma parte de Premium.`,
     pw_billed_month:   (amount) => `Un cobro de ${amount} cada mes.`,
-    pw_terms:          'Se renueva automáticamente al final de cada periodo. Puedes cancelar cuando quieras desde «Gestionar mi plan».',
+    // La etiqueta citada es la del botón REAL («Gestionar mi plan», `pw_manage`).
+    pw_terms:          'Renovación automática según el plan elegido. Cancela cuando quieras desde «Gestionar mi plan».',
     pw_trial:          (d) => `Incluye ${d} días de prueba`,
     pw_cta:            'Continuar',
     pw_cta_year:       'Continuar con anual',
@@ -8170,17 +8171,18 @@ const T = {
     // lo que Aurix publique «a partir de ahora»—. El recuento y los nombres
     // ahora los pone el CATÁLOGO, así que ninguna frase puede volver a
     // desincronizarse.
-    pw_v_lead:         'Qué incluye Premium',
-    pw_v1_t:           'Intelligence completa',
-    pw_v1_b:           'La lectura entera de tu patrimonio: cómo está construido, dónde se concentra y qué ha cambiado desde la última vez que miraste.',
-    pw_v1_eg:          'Por ejemplo: ver que un solo activo pesa más de la mitad de tu cartera — y desde cuándo.',
-    pw_v2_t:           'Workspace completo',
-    pw_v2_b:           'Herramientas y plantillas para calcular, comparar y organizar. Entre ellas:',
-    pw_v2_more:        'y más',
-    pw_v2_eg:          'Por ejemplo: calcular la cuota de una hipoteca y ver cuánto acabas pagando en intereses.',
-    pw_v3_t:           'Tus planes y documentos',
-    pw_v3_b:           'Guarda lo que calculas con el nombre que elijas y tenlo a mano en el Resumen.',
-    pw_v3_eg:          'Por ejemplo: abrir el presupuesto del mes pasado y actualizar sólo lo que ha cambiado.',
+    // PREMIUM CONVERSION V2 — cuatro beneficios, sin ejemplos ni chips. Cada uno está respaldado por
+    // capacidades que Free NO tiene: Intelligence completa (Free ve una lectura) y las nueve
+    // capacidades de Workspace (todas exigen Premium desde v739: objetivos, escenarios, planes).
+    pw_v_lead:         'Qué consigues con Premium',
+    pw_b1_t:           'Detecta lo que puede pasar desapercibido',
+    pw_b1_b:           'Comprende tus concentraciones y dependencias más allá de cada inversión individual.',
+    pw_b2_t:           'Entiende los cambios importantes',
+    pw_b2_b:           'Descubre cómo evoluciona tu patrimonio y qué movimientos merecen atención.',
+    pw_b3_t:           'Una lectura más profunda',
+    pw_b3_b:           'Intelligence relaciona tus datos para ayudarte a interpretar mejor tu situación patrimonial.',
+    pw_b4_t:           'Planifica tus próximos pasos',
+    pw_b4_b:           'Calcula objetivos, compara escenarios y organiza tus planes con Workspace.',
     pw_trust:          'Pago gestionado por Stripe. Aurix no almacena tu tarjeta.',
     pw_micro:          'Tu plan se activa cuando el pago se confirma, no antes.',
     pw_confirming:     'Confirmando tu pago…',
@@ -11388,8 +11390,8 @@ const T = {
     // WN.P1 refinement — Aurix Premium modal (fully localized)
     pw_open:           'See Aurix Premium',
     pw_eyebrow:        'AURIX PREMIUM',
-    pw_title:          'All the intelligence of your wealth',
-    pw_sub:            'Full Intelligence and Workspace, and your saved plans right where you left them.',
+    pw_title:          'Understand your wealth better. Make more informed decisions.',
+    pw_sub:            'Identify concentrations, understand what has changed, and discover what deserves your attention.',
     pw_annual:         'Annual',
     pw_monthly:        'Monthly',
     pw_per_year:       'per year',
@@ -11398,7 +11400,7 @@ const T = {
     pw_billed_year:    (amount) => `A single charge of ${amount} every year.`,
     pw_context:        (name) => `“${name}” is part of Premium.`,
     pw_billed_month:   (amount) => `A charge of ${amount} every month.`,
-    pw_terms:          'Renews automatically at the end of each period. You can cancel whenever you want from “Manage my plan”.',
+    pw_terms:          'Automatically renews according to your chosen plan. Cancel anytime from “Manage my plan”.',
     pw_trial:          (d) => `Includes a ${d}-day trial`,
     pw_cta:            'Continue',
     pw_cta_year:       'Continue with annual',
@@ -11418,17 +11420,15 @@ const T = {
     pw_past_due_note:  "We couldn't take your last payment. Update your payment method or cancel from the portal.",
     pw_canceled_note:  'Your subscription is cancelled. You can review or restart it from the portal.',
     pw_err_already:    'You already have an active subscription. Manage it from your plan.',
-    pw_v_lead:         'What Premium includes',
-    pw_v1_t:           'Full Intelligence',
-    pw_v1_b:           'The whole reading of your wealth: how it is built, where it concentrates, and what has changed since you last looked.',
-    pw_v1_eg:          'For example: seeing that a single asset is more than half your portfolio — and since when.',
-    pw_v2_t:           'The whole Workspace',
-    pw_v2_b:           'Tools and templates to calculate, compare and organise. Among them:',
-    pw_v2_more:        'and more',
-    pw_v2_eg:          'For example: working out a mortgage payment and how much interest you end up paying.',
-    pw_v3_t:           'Your plans and documents',
-    pw_v3_b:           'Save what you calculate under the name you choose and keep it at hand on the Dashboard.',
-    pw_v3_eg:          'For example: opening last month’s budget and updating only what changed.',
+    pw_v_lead:         'What you get with Premium',
+    pw_b1_t:           'Spot what you might otherwise miss',
+    pw_b1_b:           'Understand your concentrations and dependencies beyond each individual investment.',
+    pw_b2_t:           'Understand important changes',
+    pw_b2_b:           'See how your wealth evolves and which movements deserve attention.',
+    pw_b3_t:           'A deeper understanding',
+    pw_b3_b:           'Intelligence connects your data to help you interpret your overall financial position.',
+    pw_b4_t:           'Plan your next steps',
+    pw_b4_b:           'Calculate goals, compare scenarios, and organise your plans with Workspace.',
     pw_trust:          'Payments handled by Stripe. Aurix never stores your card.',
     pw_micro:          'Your plan activates when the payment is confirmed, not before.',
     pw_confirming:     'Confirming your payment…',
@@ -91144,38 +91144,19 @@ try {
   // —la misma fuente que la portada Free de Workspace, que a su vez lee el
   // catálogo—, así que publicar una décima capacidad actualiza esta pantalla sin
   // que nadie la toque. No hay ninguna cifra ni nombre escrito aquí.
-  const _capsPub = () => { try { return _wsfcPublishedCaps(); } catch (_) { return []; } };
-  const _capName = c => { try { const v = t(c.nameKey); return (typeof v === 'string' && v) ? v : ''; } catch (_) { return ''; } };
-  // Si el catálogo no se puede leer, el bloque de Workspace NO se pinta: mejor no
-  // decir nada que decir «las 0 capacidades» o un número adivinado.
+  // PREMIUM CONVERSION V2 — CUATRO BENEFICIOS, NADA MÁS. Sustituye a los tres bloques con
+  // ejemplo y chips de capacidades: título + una línea por beneficio, en rejilla 2×2 (1 columna en
+  // móvil). Sin cifras ni nombres escritos a mano que puedan quedarse atrás del catálogo.
   function _valueBlocks() {
-    const caps = _capsPub().map(_capName).filter(Boolean);
-    // `body` ya viene RESUELTO, no es una clave: un parámetro que a veces es
-    // clave y a veces texto acaba llamando `t()` sobre una frase.
-    const item = (tk, body, egk, extra) => `
+    const item = i => `
       <article class="aurix-premium-value-item">
-        <h3 class="aurix-premium-value-t">${esc(t(tk))}</h3>
-        <p class="aurix-premium-value-b">${esc(body)}</p>
-        ${extra || ''}
-        <p class="aurix-premium-value-eg">${esc(t(egk))}</p>
+        <h3 class="aurix-premium-value-t">${esc(t('pw_b' + i + '_t'))}</h3>
+        <p class="aurix-premium-value-b">${esc(t('pw_b' + i + '_b'))}</p>
       </article>`;
-    // Ejemplos REPRESENTATIVOS del catálogo publicado (no el inventario entero ni un recuento): los
-    // que el resto del producto nombra primero, y sólo si están publicados.
-    const _pref = ['budget', 'loan', 'scenario', 'goals'];
-    const _all = _capsPub();
-    const _eg = _pref.map(k => _all.find(c => c.k === k)).filter(Boolean).map(_capName).filter(Boolean);
-    const _shown = _eg.length ? _eg : caps.slice(0, 4);
-    const chips = caps.length
-      ? `<ul class="aurix-premium-caps">${_shown.map(n => `<li class="aurix-premium-ind">${esc(n)}</li>`).join('')}${caps.length > _shown.length ? `<li class="aurix-premium-ind is-more">${esc(t('pw_v2_more'))}</li>` : ''}</ul>`
-      : '';
     return `
       <section class="aurix-premium-value" aria-label="${esc(t('pw_v_lead'))}">
         <h3 class="aurix-premium-value-lead">${esc(t('pw_v_lead'))}</h3>
-        <div class="aurix-premium-value-grid">
-          ${item('pw_v1_t', t('pw_v1_b'), 'pw_v1_eg')}
-          ${caps.length ? item('pw_v2_t', t('pw_v2_b'), 'pw_v2_eg', chips) : ''}
-          ${item('pw_v3_t', t('pw_v3_b'), 'pw_v3_eg')}
-        </div>
+        <div class="aurix-premium-value-grid is-benefits">${[1, 2, 3, 4].map(item).join('')}</div>
       </section>`;
   }
 
@@ -91248,7 +91229,7 @@ try {
              ${year ? _planCard(year, true) : ''}
              ${month ? _planCard(month, !year) : ''}
            </div>
-           <p class="aurix-premium-terms">${esc(t('pw_terms'))}</p>`
+           <p class="aurix-premium-terms is-near-plans">${esc(t('pw_terms'))}</p>`
         // CUATRO estados, no dos: «todavía no lo sé» (catálogo en camino) no es «no se puede
         // comprar», y un fallo de red tampoco — ése se puede reintentar. Mientras se comprueba, el
         // hueco de las tarjetas queda reservado y no hay ningún botón de compra.
@@ -91287,6 +91268,7 @@ try {
         ${managed ? '' : _valueBlocks()}
 
         <footer class="aurix-premium-footer">
+          ${(!managed && (year || month)) ? `<p class="aurix-premium-terms is-after-benefits">${esc(t('pw_terms'))}</p>` : ''}
           <p class="aurix-premium-trust-1">${esc(t('pw_trust'))}</p>
           <p class="aurix-premium-microcopy">${esc(t('pw_micro'))}</p>
           ${managed ? '' : `<button type="button" class="aurix-premium-stayfree">${esc(t('pw_stay_free'))}</button>`}

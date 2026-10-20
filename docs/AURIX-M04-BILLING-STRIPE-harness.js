@@ -1059,17 +1059,21 @@ console.log('\nF · precios canónicos y paywall');
   // capacidades…») sino ejemplos representativos + «y más». Lo que protegía F.9 sigue en pie: los
   // NOMBRES salen del catálogo publicado (las claves elegidas son identificadores, no nombres), no
   // hay ni una cifra ni un nombre escrito a mano, y sin catálogo el bloque se omite.
-  ok('F.9 los nombres de las capacidades salen del CATÁLOGO, sin recuento ni nombres a mano',
+  // RE-DECIDIDO (PREMIUM CONVERSION V2): el bloque de valor pasa a CUATRO beneficios aprobados
+  // (título + una línea), sin ejemplos ni chips de capacidades. Lo que F.9 protegía sigue en pie:
+  // ni una cifra ni un nombre de capacidad escritos a mano en el bloque, y la promesa de Workspace
+  // («objetivos, escenarios») tiene que estar RESPALDADA por el catálogo: esas capacidades existen,
+  // están publicadas y son Premium.
+  ok('F.9 cuatro beneficios sin cifras ni nombres a mano, y la promesa de Workspace respaldada por el catálogo',
     (() => { const b = fnSrc(app, '_valueBlocks');
-      return /_capsPub\(\)/.test(b) && /\.map\(_capName\)/.test(b) && /t\('pw_v2_b'\)/.test(b)
-        && !/t\('pw_v2_b'\)\(/.test(b)
-        // Ni una cifra ni un nombre de capacidad escritos a mano en el bloque.
-        && !/\b(ocho|nueve|diez|eight|nine|ten)\b/i.test(b)
+      const _c0 = app.indexOf('const _WS_CATALOG'); const cat = app.slice(_c0, app.indexOf(']);', _c0));
+      const backed = k => new RegExp("\\{ id: '" + k + "',[^}]*published: true,[^}]*commercialTier: 'premium'").test(cat);
+      const copy = (app.match(/\n\s+pw_b[1-4]_[tb]:\s*'[^']*'/g) || []).map(x => x.slice(x.indexOf("'"))).join(' ');
+      return /\[1, 2, 3, 4\]\.map\(item\)/.test(b) && /t\('pw_b' \+ i \+ '_t'\)/.test(b) && /t\('pw_b' \+ i \+ '_b'\)/.test(b)
+        && !/\b(ocho|nueve|diez|eight|nine|ten)\b/i.test(b) && !/\d/.test(copy)
         && !/Presupuesto|Interés compuesto|Préstamo|Budget|Compound/.test(b)
-        && !/pw_v2_b:\s*[^\n]*\d/.test(app)
-        // Y sin catálogo NO se afirma un número: el bloque entero se omite.
-        && /caps\.length \? item\('pw_v2_t'/.test(b); })(),
-    'el bloque de valor tiene que derivar de _wsfcPublishedCaps()');
+        && backed('tpl_goals') && backed('scenario'); })(),
+    'el bloque de valor no es el aprobado o la promesa de Workspace no está respaldada');
   ok('F.9b la comparativa «Ya incluido en Free» se retira ENTERA: marcado, claves y estilos',
     // Se buscan DEFINICIONES y USOS, no prosa: el comentario que explica por qué
     // se retiró nombra las claves, y eso no es un resto.
@@ -1098,8 +1102,8 @@ console.log('\nF · precios canónicos y paywall');
     })(), 'publicadas que no son premium');
   ok('F.10 y las claves nuevas existen en ES y EN',
     ['pw_title', 'pw_cta', 'pw_annual', 'pw_monthly', 'pw_manage', 'pw_unavailable',
-     'pw_v_lead', 'pw_v1_t', 'pw_v2_t', 'pw_v3_t', 'pw_v1_eg', 'pw_v2_eg', 'pw_v3_eg',
-     'pw_trust', 'pw_active', 'pw_pending', 'pw_cancelled']
+     'pw_v_lead', 'pw_b1_t', 'pw_b1_b', 'pw_b2_t', 'pw_b2_b', 'pw_b3_t', 'pw_b3_b', 'pw_b4_t', 'pw_b4_b',
+     'pw_terms', 'pw_trust', 'pw_active', 'pw_pending', 'pw_cancelled']
       .every(k => (app.match(new RegExp('\\n\\s+' + k + ':', 'g')) || []).length === 2));
   // ── EL CLIENTE TIENE QUE SABER DISTINGUIR DOS 409 ──────────────────────
   // DEFECTO REAL (2026-09-24): el servidor devuelve 409 para «ya tienes una
