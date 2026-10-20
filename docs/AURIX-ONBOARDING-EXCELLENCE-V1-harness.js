@@ -344,6 +344,8 @@ console.log('\nP — Fallo de red al arrancar:');
         select: () => ({ eq: () => ({ maybeSingle: async () => {
           if (read === 'throw') throw new Error('network');
           if (read === 'error') return { data: null, error: { message: 'fetch failed' } };
+          // Producción v854: `public.user_onboarding` NO existe (PostgREST PGRST205).
+          if (read === 'missing') return { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.user_onboarding' in the schema cache" } };
           if (read === 'none')  return { data: null, error: null };
           return { data: read, error: null }; } }) }) }) },
       currentUser: { id: 'u-test' }, _analyticsEvents: [],
@@ -417,6 +419,17 @@ console.log('\nP — Fallo de red al arrancar:');
     ok('P.12 cuenta nueva de verdad (sin fila en los dos) ⇒ SÍ se muestra, como siempre', r.ctx.opened === 1 && !r.timers.length); }
   { const r = await decide({ onboarding_completed: true }, 'failed');
     ok('P.13 ya completado en remoto ⇒ no se muestra ni se reintenta', !r.ctx.opened && !r.timers.length && r.ctx._aurixOnbSettled === true); }
+
+  // P.14–P.17 · P0 v855 · TABLA INEXISTENTE ≠ CORTE. En producción `user_onboarding` no existe:
+  // con P1-3 toda lectura era 'error' y NINGUNA cuenta nueva veía el onboarding (fundador, v854).
+  { const { Eng, upserts } = bootRemote('missing'); await Eng.hydrateOnboardingState();
+    ok('P.14 tabla inexistente (PGRST205) ⇒ remoteStatus=unavailable, no error', Eng.getSnapshot().remoteStatus === 'unavailable');
+    Eng.startOnboarding(); Eng.nextStep(); await flush();
+    ok('P.17 …y sin la tabla nunca se intenta subir completed:false', !upserts.some(u => u.onboarding_completed === false), JSON.stringify(upserts)); }
+  { const r = await decide('missing', 'no-row');
+    ok('P.15 REPRODUCIDO y cerrado: cuenta nueva con la tabla inexistente ⇒ SÍ se muestra, sin reintentos', r.ctx.opened === 1 && !r.timers.length); }
+  { const r = await decide('missing', 'failed');
+    ok('P.16 tabla inexistente + cartera fallida (corte real) ⇒ no se muestra y se reintenta', !r.ctx.opened && r.timers.length === 1); }
 }
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');

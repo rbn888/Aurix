@@ -260,7 +260,17 @@
         .select('*')
         .eq('user_id', currentUser.id)
         .maybeSingle();
-      if (error) { _remoteStatus = 'error'; return null; }
+      // P0 v855 — TABLA INEXISTENTE NO ES UN CORTE. `public.user_onboarding` no existe en
+      // producción (PostgREST: PGRST205; Postgres: 42P01). Eso es configuración permanente, no un
+      // fallo transitorio: no hay estado remoto que proteger. Tratarlo como 'error' hacía que
+      // `_onbRemoteUnknown` reintentara y se rindiera SIN mostrar el onboarding a NINGUNA cuenta
+      // nueva. 'unavailable' no bloquea; un error real de red o servidor sigue siendo 'error', y la
+      // lectura de la cartera sigue protegiendo a quien ya existe durante un corte.
+      if (error) {
+        const code = String((error && error.code) || '');
+        _remoteStatus = (code === 'PGRST205' || code === '42P01') ? 'unavailable' : 'error';
+        return null;
+      }
       if (!data) { _remoteStatus = 'none'; return null; }
       _remoteStatus = 'ok';
       return {
