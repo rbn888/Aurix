@@ -3099,6 +3099,10 @@ body.modal-open {
   color: var(--text-dim);
   margin-top: -4px;
 }
+/* LOTE 1 · P0 integridad numérica — cómo se ha leído una entrada ambigua o inválida. */
+.num-hint { display: block; margin-top: 6px; font-size: 12px; line-height: 1.4; }
+.num-hint[hidden] { display: none; }
+.num-hint.is-warn { color: var(--danger); }
 
 /* ── Reduce: asset info chip ───────────────────────────── */
 .reduce-asset-info {

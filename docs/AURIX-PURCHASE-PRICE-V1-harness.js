@@ -31,7 +31,7 @@ function near(a, b, eps) { return Math.abs(a - b) <= (eps || 1e-6); }
 const ctx = { Number, Math, Object, Array, Date, console };
 vm.createContext(ctx);
 // Constants + tiny stubs the extracted fns close over (values match app.js).
-vm.runInContext('const OZ_TO_G = 31.1034768; const _PURITY_TABLE = {24:1,22:0.9167,21:0.875,18:0.75,14:0.5833,10:0.4167,9:0.375}; function liquidityNominal(a){ return a.qty; }', ctx);
+vm.runInContext('const _AURIX_TX_PRICE_CONTRACT = 2; const OZ_TO_G = 31.1034768; const _PURITY_TABLE = {24:1,22:0.9167,21:0.875,18:0.75,14:0.5833,10:0.4167,9:0.375}; function liquidityNominal(a){ return a.qty; }', ctx);
 ['_goldPurity', '_goldGrams', 'isClosedAsset', 'assetNativeValue', 'avgBuyPrice',
  'computeCostBasisFromTransactions', 'syncCostBasisFromTransactions', 'syncQtyFromTransactions',
  'migrateLegacyAssetToTransactions', 'sanitizeTransactionPrices', 'assetPnLBase'].forEach(fn => {
@@ -176,7 +176,7 @@ console.log('8 — legacy holding (no transactions) — no regression / no dupli
 // ── 9 no duplicate holdings/transactions on add ─────────────────────────────────
 console.log('9 — no duplicate holdings or transactions:');
 {
-  ok('9.1 NEW-asset path creates exactly ONE transactions:[{buy}] entry', (app.match(/transactions:\s*\[\{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs \}\]/g) || []).length === 1);
+  ok('9.1 NEW-asset path creates exactly ONE transactions:[{buy}] entry', (app.match(/transactions:\s*\[\{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs(?:, pv: _AURIX_TX_PRICE_CONTRACT)? \}\]/g) || []).length === 1);
   ok('9.2 re-buying an existing position PUSHES to existing.transactions (no new holding)', /existing\.transactions\.push\(\{ type: 'buy', qty, price: _effectivePrice/.test(app));
   ok('9.3 adding a tx is a NON-reducing save (destructive-save guard allows it)', /const drops = \(next\.assets < previous\.assets\)/.test(app) && /transactions < previous\.transactions/.test(app));
 }

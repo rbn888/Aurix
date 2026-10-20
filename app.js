@@ -5536,6 +5536,11 @@ const T = {
     wsEmptyCell:       'Celda vacía',
     // Validation / errors
     errQtyPositive:    'Introduce una cantidad válida mayor que 0.',
+    // LOTE 1 · P0 integridad numérica — cómo se ha leído una entrada ambigua o inválida.
+    numHintGroup:      (v, alt) => `Se lee como ${v}. Si es un decimal, escribe ${alt}.`,
+    numHintDecimal:    (v, alt) => `Se lee como ${v}. Si son miles, escribe ${alt}.`,
+    numHintInvalid:    'Número no válido. Usa sólo cifras y una coma para los decimales.',
+    numConfirmGroup:   (v, alt) => `¿Seguro que son ${v}? Pulsa otra vez para confirmar, o escribe ${alt} si es un decimal.`,
     errQtyMustPositive:'La cantidad debe ser positiva.',
     // Insights
     pctOfPortfolio:    ' de la cartera',
@@ -9226,6 +9231,10 @@ const T = {
     wsEmptyCell:       'Empty cell',
     // Validation / errors
     errQtyPositive:    'Enter a valid quantity greater than 0.',
+    numHintGroup:      (v, alt) => `Read as ${v}. For a decimal, type ${alt}.`,
+    numHintDecimal:    (v, alt) => `Read as ${v}. For thousands, type ${alt}.`,
+    numHintInvalid:    'Not a valid number. Use digits and a dot for decimals.',
+    numConfirmGroup:   (v, alt) => `Is it really ${v}? Press again to confirm, or type ${alt} for a decimal.`,
     errQtyMustPositive:'The quantity must be positive.',
     // Insights
     pctOfPortfolio:    ' of portfolio',
@@ -15172,67 +15181,215 @@ window.aurixRecoverHolding = async function (query) {
 };
 
 // ── Input number formatting ────────────────────────────────
-// Parse an es-ES formatted string ("1.234,56") back to a JS float
-// INPUT-HARDEN-1: returns NaN (the existing sentinel) for:
-//   - empty / non-string
-//   - exponential notation ("1e9", "1E9", "1e999") — almost never
-//     intentional in a portfolio form; also blocks the "1e999 →
-//     Infinity" path that previously slipped past `isNaN()` guards
-//   - explicit Infinity / NaN strings
-//   - magnitudes > MAX_INPUT_NUMBER (1e12 ≈ a trillion in base units)
-// Callers already use the NaN sentinel (either `|| 0` for previews
-// or `if (isNaN(v) || v <= 0)` to block submits), so the contract
-// is unchanged for valid inputs.
+// ── Entrada numérica · CONTRATO ÚNICO (LOTE 1 · P0 INTEGRIDAD NUMÉRICA) ──────
+// LO QUE HABÍA: tres lecturas distintas y ninguna sabía el idioma. `parseLocalFloat`
+// quitaba TODO punto («0.2» → 2, «300.50» → 30050), `normalizePriceInput` tomaba
+// SIEMPRE el punto por decimal («1.000» → 1 en ES), el formateador borraba el punto
+// mientras se tecleaba y reagrupaba en es-ES también en EN, y cada relleno
+// programático escribía el número a su manera (crudo, toFixed, Intl sin decimales),
+// así que lo que se rellenaba no se volvía a leer igual: editar una operación de
+// 0.5 BTC guardaba 5, y editar un inmueble en EN guardaba un alquiler de 1,2.
+//
+// AHORA, una lectura y una escritura para todos los campos numéricos de los flujos
+// de cartera (cantidad, precio de compra, precio manual, NAV, valor y alquiler del
+// inmueble, liquidez, añadir/reducir y operaciones):
+//   LECTURA `parseLocalFloat(texto, idioma)` → número o NaN (mismo centinela):
+//   · se ignoran los espacios (incl. NBSP y U+202F); sólo cifras, «.», «,» y un «-»
+//     inicial; cualquier otra cosa, exponentes, ±Infinity o |n| > 1e12 → NaN.
+//   · con «.» y «,» a la vez, el ÚLTIMO es el decimal (una sola vez) y el otro debe
+//     agrupar de tres en tres; si no → NaN («1.234,56» y «1,234.56» = 1234,56).
+//   · un separador repetido sólo vale como miles bien agrupados («1.234.567»).
+//   · una sola aparición es DECIMAL salvo en un caso: el separador de miles del
+//     idioma (ES «.», EN «,») entre 1-3 cifras sin cero inicial y EXACTAMENTE tres
+//     → miles («1.000» = mil en ES, «1,000» = mil en EN). Ése es el único caso
+//     AMBIGUO y no se resuelve en silencio: se dice bajo el campo cómo se ha leído
+//     y, en una cantidad de unidades, el primer envío se detiene a confirmarlo.
+//     El caso simétrico (separador decimal + tres cifras, «1,234» en ES) se lee
+//     como decimal y también se dice.
+//   ESCRITURA `_aurixFormatNumberInput(n)` es EXACTA: parte de la representación
+//     más corta de JS (la que se vuelve a leer igual), sin redondeo ni tope de
+//     decimales, agrupada como Intl en el idioma activo. lectura(escritura(n)) === n.
+//   Un campo rellenado y NO tocado devuelve su número original exacto (aunque el
+//   idioma cambie con el formulario abierto); uno tecleado se lee en el idioma en
+//   que se tecleó. No se toca ninguna fórmula: los consumidores siguen recibiendo
+//   un número o NaN y validan igual.
 const MAX_INPUT_NUMBER = 1e12;
-function parseLocalFloat(str) {
-  if (typeof str !== 'string' || str === '') return NaN;
-  if (/[eE]/.test(str)) return NaN;
-  const n = parseFloat(str.replace(/\./g, '').replace(',', '.'));
-  if (!Number.isFinite(n)) return NaN;
-  if (Math.abs(n) > MAX_INPUT_NUMBER) return NaN;
-  return n;
+function _aurixNumLang(l) {
+  const v = l || ((typeof lang !== 'undefined') ? lang : 'es');
+  return v === 'en' ? 'en' : 'es';
 }
-
-// Handles both European ("2.446,77") and standard ("2446.77") price strings.
-// parseLocalFloat breaks standard format by treating the decimal dot as thousands separator.
-function normalizePriceInput(value) {
-  if (typeof value === 'number') return value;
-  if (!value) return 0;
-  let v = String(value).trim();
-  if (v.includes(',') && v.includes('.')) {
-    v = v.replace(/\./g, '').replace(',', '.');
-  } else if (v.includes(',')) {
-    v = v.replace(',', '.');
-  }
-  return Number(v) || 0;
-}
-
-// Attach live thousand-separator formatting to a text input
-function attachFormatter(input, allowDecimals) {
-  input.addEventListener('input', () => {
-    const start  = input.selectionStart;
-    const oldLen = input.value.length;
-
-    // Strip invalid chars; allow one comma as decimal separator
-    let raw = input.value.replace(/[^\d,]/g, '');
-    if (!allowDecimals) raw = raw.replace(/,/g, '');
-    const ci = raw.indexOf(',');
-    if (ci !== -1) {
-      raw = raw.slice(0, ci + 1) + raw.slice(ci + 1).replace(/,/g, '');
+// Devuelve { value, ambiguous: null | 'group' | 'decimal', alt } — `alt` es cómo
+// habría que escribirlo para obtener la otra lectura.
+function _aurixReadNumberText(str, langOpt) {
+  const bad = { value: NaN, ambiguous: null, alt: null };
+  if (typeof str !== 'string') return bad;
+  let s = str.replace(/[\s  ]/g, '');
+  if (s === '' || /[eE]/.test(s)) return bad;
+  let neg = false;
+  if (s[0] === '-') { neg = true; s = s.slice(1); }
+  if (!/^[\d.,]+$/.test(s) || !/\d/.test(s)) return bad;
+  const L = _aurixNumLang(langOpt);
+  const grpSep = L === 'en' ? ',' : '.';
+  const decSep = L === 'en' ? '.' : ',';
+  const grouped = (x, sep) => (sep === '.' ? /^\d{1,3}(\.\d{3})+$/ : /^\d{1,3}(,\d{3})+$/).test(x);
+  const nDot = (s.match(/\./g) || []).length;
+  const nCom = (s.match(/,/g) || []).length;
+  let ip = s, fp = '', ambiguous = null, alt = null;
+  if (nDot && nCom) {
+    const at = Math.max(s.lastIndexOf('.'), s.lastIndexOf(','));
+    const d = s[at], g = d === '.' ? ',' : '.';
+    ip = s.slice(0, at); fp = s.slice(at + 1);
+    if (ip.indexOf(d) >= 0 || !grouped(ip, g)) return bad;
+    ip = ip.split(g).join('');
+  } else if (nDot + nCom === 1) {
+    const sep = nDot ? '.' : ',';
+    const at = s.indexOf(sep);
+    ip = s.slice(0, at); fp = s.slice(at + 1);
+    if (/^[1-9]\d{0,2}$/.test(ip) && /^\d{3}$/.test(fp)) {
+      if (sep === grpSep) { ambiguous = 'group'; alt = ip + decSep + fp; ip = ip + fp; fp = ''; }
+      else                { ambiguous = 'decimal'; alt = ip + fp; }
     }
+  } else if (nDot + nCom > 1) {
+    const sep = nDot ? '.' : ',';
+    if (!grouped(s, sep)) return bad;
+    ip = s.split(sep).join(''); fp = '';
+  }
+  const n = Number((ip || '0') + (fp ? '.' + fp : ''));
+  if (!Number.isFinite(n) || Math.abs(n) > MAX_INPUT_NUMBER) return bad;
+  return { value: neg && n !== 0 ? -n : n, ambiguous, alt };
+}
+function parseLocalFloat(str, langOpt) { return _aurixReadNumberText(str, langOpt).value; }
 
-    const [intStr = '', decStr] = raw.split(',');
-    const intVal = intStr === '' ? '' : parseInt(intStr, 10);
-    const fmtInt = intStr === '' || isNaN(intVal) ? ''
-      : new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(intVal);
+function _aurixFormatNumberInput(n, langOpt) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return '';
+  let s = String(Math.abs(n));
+  if (/e/i.test(s)) {   // 1e-7, 1.5e+21 … → notación posicional exacta, mismas cifras
+    const [m, e] = s.split(/e/i);
+    const [mi, mf = ''] = m.split('.');
+    const digits = mi + mf, point = mi.length + Number(e);
+    if (point <= 0) s = '0.' + '0'.repeat(-point) + digits;
+    else if (point >= digits.length) s = digits + '0'.repeat(point - digits.length);
+    else s = digits.slice(0, point) + '.' + digits.slice(point);
+  }
+  const L = _aurixNumLang(langOpt);
+  let [ip, fp = ''] = s.split('.');
+  // Igual que Intl: en-US agrupa desde 4 cifras enteras; es-ES desde 5 («1234», «12.345»).
+  if (ip.length >= (L === 'en' ? 4 : 5)) ip = ip.replace(/\B(?=(\d{3})+(?!\d))/g, L === 'en' ? ',' : '.');
+  return (n < 0 ? '-' : '') + ip + (fp ? (L === 'en' ? '.' : ',') + fp : '');
+}
 
-    const formatted = decStr !== undefined ? fmtInt + ',' + decStr : fmtInt;
-    input.value = formatted;
+// Lectura de un CAMPO: rellenado y sin tocar → su número exacto; tecleado → en su idioma.
+function _aurixReadNumberInput(el) {
+  if (!el) return NaN;
+  const ds = el.dataset || {};
+  if (ds.numExact != null && ds.numText === el.value) {
+    const v = Number(ds.numExact);
+    return Number.isFinite(v) ? v : NaN;
+  }
+  return parseLocalFloat(String(el.value == null ? '' : el.value), ds.numLang);
+}
+// Todo relleno programático de un campo numérico pasa por aquí.
+function _aurixSetNumberInput(el, n) {
+  if (!el) return;
+  const ok = typeof n === 'number' && Number.isFinite(n);
+  const txt = ok ? _aurixFormatNumberInput(n) : '';
+  el.value = txt;
+  if (ok) { el.dataset.numExact = String(n); el.dataset.numText = txt; el.dataset.numLang = _aurixNumLang(); }
+  else    { delete el.dataset.numExact; delete el.dataset.numText; }
+  delete el.dataset.numAmbig; delete el.dataset.numAmbigOk; delete el.dataset.numAmbigFor;
+  _aurixNumHint(el, '');
+}
+function _aurixNumUntouched(el) { return !!(el && el.dataset.numExact != null && el.dataset.numText === el.value); }
 
-    // Restore cursor accounting for added/removed separators
-    const delta  = formatted.length - oldLen;
-    const newPos = Math.max(0, Math.min(start + delta, formatted.length));
-    input.setSelectionRange(newPos, newPos);
+// La pista vive al final del grupo del campo (no junto al input: hay filas flex).
+function _aurixNumHint(el, msg, warn) {
+  if (!el) return;
+  let h = el.__aurixNumHint;
+  if (!msg) { if (h) { h.hidden = true; h.textContent = ''; h.classList.remove('is-warn'); } return; }
+  if (!h) {
+    h = document.createElement('span');
+    h.className = 'input-hint num-hint';
+    h.setAttribute('aria-live', 'polite');
+    const host = (el.closest && el.closest('.form-group')) || el.parentNode;
+    if (!host) return;
+    host.appendChild(h);
+    el.__aurixNumHint = h;
+  }
+  h.textContent = msg; h.hidden = false; h.classList.toggle('is-warn', !!warn);
+}
+function _aurixNumHintFor(el) {
+  if (!el || _aurixNumUntouched(el) || String(el.value || '').trim() === '') return _aurixNumHint(el, '');
+  const L = el.dataset.numLang;
+  const r = _aurixReadNumberText(String(el.value), L);
+  if (!Number.isFinite(r.value)) {
+    // Un separador final («5,» mientras se escribe) no es un error todavía.
+    if (/^-?[\d.,]*[.,]$/.test(String(el.value).replace(/\s/g, '')) && document.activeElement === el) return _aurixNumHint(el, '');
+    return _aurixNumHint(el, t('numHintInvalid'), true);
+  }
+  if (r.ambiguous === 'group')   return _aurixNumHint(el, t('numHintGroup')(_aurixFormatNumberInput(r.value, L), r.alt));
+  if (r.ambiguous === 'decimal') return _aurixNumHint(el, t('numHintDecimal')(_aurixFormatNumberInput(r.value, L), r.alt));
+  return _aurixNumHint(el, '');
+}
+// Cantidad de UNIDADES con lectura ambigua de miles: el primer envío se detiene y lo
+// dice; el segundo con el mismo texto es la confirmación explícita. true = continuar.
+function _aurixNumAmbiguityGate(el) {
+  if (!el || _aurixNumUntouched(el)) return true;
+  const ds = el.dataset;
+  // Tras salir del campo se juzga lo que el usuario TECLEÓ, no la forma canónica: «12345»
+  // reescrito «12.345» en ES no es ambiguo, aunque su texto canónico lo parezca.
+  const amb = (ds.numAmbigFor === el.value)
+    ? (ds.numAmbig === 'group' ? { ambiguous: 'group', value: Number(ds.numAmbigValue), alt: ds.numAmbigAlt } : { ambiguous: null })
+    : _aurixReadNumberText(String(el.value || ''), ds.numLang);
+  if (amb.ambiguous !== 'group') return true;
+  if (ds.numAmbigOk === el.value) return true;
+  ds.numAmbigOk = el.value;
+  _aurixNumHint(el, t('numConfirmGroup')(_aurixFormatNumberInput(amb.value, ds.numLang), amb.alt), true);
+  try { el.focus(); } catch (_) {}
+  return false;
+}
+
+// Campo numérico: mientras se teclea sólo se filtran caracteres (no se reescriben
+// separadores: hacerlo obligaba a adivinar a mitad de palabra); al salir se reescribe
+// en forma canónica para que el usuario VEA cómo se ha leído («0.2» → «0,2» en ES).
+function attachFormatter(input) {
+  if (!input || input.__aurixNum) return;
+  input.__aurixNum = true;
+  input.addEventListener('input', () => {
+    const v = input.value;
+    const clean = v.replace(/[^\d.,\-]/g, '');
+    if (clean !== v) {
+      const pos = (typeof input.selectionStart === 'number') ? input.selectionStart : v.length;
+      const keep = v.slice(0, pos).replace(/[^\d.,\-]/g, '').length;
+      input.value = clean;
+      try { input.setSelectionRange(keep, keep); } catch (_) {}
+    }
+    if (!_aurixNumUntouched(input)) {
+      input.dataset.numLang = _aurixNumLang();
+      delete input.dataset.numAmbig; delete input.dataset.numAmbigOk; delete input.dataset.numAmbigFor;
+    }
+    _aurixNumHintFor(input);
+  });
+  input.addEventListener('blur', () => {
+    if (_aurixNumUntouched(input) || String(input.value || '').trim() === '') return;
+    if (input.dataset.numAmbigFor === input.value) return;   // ya canónico y sin tocar desde entonces
+    const L = input.dataset.numLang;
+    const r = _aurixReadNumberText(String(input.value), L);
+    if (!Number.isFinite(r.value)) { _aurixNumHintFor(input); return; }
+    const txt = _aurixFormatNumberInput(r.value, L);
+    // Se recuerda cómo se leyó lo tecleado para el texto canónico que va a quedar.
+    input.dataset.numAmbig = r.ambiguous === 'group' ? 'group' : 'none';
+    input.dataset.numAmbigFor = txt;
+    if (r.ambiguous === 'group') {
+      input.dataset.numAmbigValue = String(r.value); input.dataset.numAmbigAlt = r.alt;
+      if (input.dataset.numAmbigOk === input.value) input.dataset.numAmbigOk = txt;
+    }
+    input.value = txt;
+    _aurixNumHint(input, r.ambiguous === 'group' ? t('numHintGroup')(txt, r.alt)
+      : r.ambiguous === 'decimal' ? t('numHintDecimal')(txt, r.alt) : '');
+  });
+  if (input.form) input.form.addEventListener('reset', () => {
+    ['numExact', 'numText', 'numAmbig', 'numAmbigOk', 'numAmbigFor', 'numAmbigValue', 'numAmbigAlt'].forEach(k => { delete input.dataset[k]; });
+    _aurixNumHint(input, '');
   });
 }
 
@@ -16180,11 +16337,21 @@ function avgBuyPrice(asset) {
   return totalQty > 0 ? totalCost / totalQty : null;
 }
 
-// Derives costBasis from buy transactions (sum of qty × price).
+// LOTE 1 · P0 INTEGRIDAD NUMÉRICA — corrección legada ACOTADA, no retirada.
+// Divide entre 100, en cada render, el precio > 100.000 de una operación: es el parche
+// (b2aeef1) del parser antiguo, que leía «2446.77» como 244677. Ese parser estuvo activo
+// hasta v851 y render no guarda, así que puede quedar en localStorage un precio crudo que
+// sólo se ve bien gracias a esta corrección: retirarla lo mostraría 100× más caro.
+// Lo que ya no puede hacer es recortar un precio LEGÍTIMO escrito con el contrato nuevo
+// (una acción BRK.A, un activo en JPY, «1.234.567,89»): toda operación escrita desde el
+// Lote 1 lleva `pv: _AURIX_TX_PRICE_CONTRACT` y queda fuera. No vale `ts < despliegue`:
+// editar una operación antigua conserva su `ts`. Los datos ya dañados por el parser
+// antiguo NO se reparan aquí (ver db/numeric_integrity_audit_readonly.sql).
+const _AURIX_TX_PRICE_CONTRACT = 2;
 function sanitizeTransactionPrices(asset) {
   if (!asset.transactions || !asset.transactions.length) return;
   asset.transactions.forEach(tx => {
-    if (!tx.price) return;
+    if (!tx || !tx.price || tx.pv === _AURIX_TX_PRICE_CONTRACT) return;
     if (tx.price > 100000) tx.price = tx.price / 100;
   });
 }
@@ -60919,7 +61086,7 @@ function _showManualNavPrompt(entry) {
   lookupStatusEl.appendChild(label);
   lookupStatusEl.appendChild(row);
   const submit = () => {
-    const v = parseFloat(String(input.value || '').replace(',', '.').trim());
+    const v = _aurixReadNumberInput(input);   // LOTE 1 · P0: «1.234,56» se leía 1,234
     if (!Number.isFinite(v) || v <= 0) {
       input.style.borderColor = '#ff8a8a';
       input.focus();
@@ -80713,9 +80880,9 @@ function enterManualMode(isin, prefill = {}) {
   if (prefill.price != null && prefill.price > 0) {
     const priceEl = document.getElementById('manualPrice');
     if (priceEl) {
-      priceEl.value = prefill.price < 100
-        ? prefill.price.toFixed(4)
-        : prefill.price.toFixed(2);
+      // Exacto: toFixed(4) convertía un precio de 1e-5 en «0.0000» y, leído con el
+      // parser antiguo, «45.1234» en 451234.
+      _aurixSetNumberInput(priceEl, Number(prefill.price));
       updatePreview();
     }
   }
@@ -81263,7 +81430,7 @@ document.getElementById('manualCurrToggle')?.addEventListener('click', e => {
 
 // ── Live Preview ───────────────────────────────────────────
 function updatePreview() {
-  const qty = parseLocalFloat(qtyInput.value) || 0;
+  const qty = _aurixReadNumberInput(qtyInput) || 0;
   // Real estate: qty IS the value, already in rePendingCurrency
   if (isRealEstateMode) {
     previewTotal.textContent = formatDisplay(qty, rePendingCurrency);
@@ -81271,7 +81438,7 @@ function updatePreview() {
   }
   // Manual ISIN mode: qty × manual price (if any), in selected manualCurrency
   if (isManualMode) {
-    const price = parseLocalFloat(document.getElementById('manualPrice')?.value) || 0;
+    const price = _aurixReadNumberInput(document.getElementById('manualPrice')) || 0;
     previewTotal.textContent = formatDisplay(qty * price, manualCurrency);
     return;
   }
@@ -81328,7 +81495,7 @@ function _formatGoldQtyText(qty, unit) {
 // value: "18K · 25 g · 75% pureza aprox." 24K reads as "pureza máxima".
 function _buildGoldContextLine() {
   if (!selectedDbAsset || selectedDbAsset.ticker !== 'XAU') return '';
-  const qty = parseLocalFloat(qtyInput.value);
+  const qty = _aurixReadNumberInput(qtyInput);
   if (!Number.isFinite(qty) || qty <= 0) return '';
   const karat = pendingKarat | 0;
   if (!karat) return '';
@@ -81388,7 +81555,7 @@ function _isGoldFormValid() {
   const section = document.getElementById('goldSection');
   if (!section) return null;
   const type     = section.dataset.goldType || '';
-  const qty      = parseLocalFloat(qtyInput.value);
+  const qty      = _aurixReadNumberInput(qtyInput);
   const qtyValid = !isNaN(qty) && qty > 0;
   // GOLD-PRICE-1: a live spot price is now mandatory for the CTA. With
   // fetchGoldSpotPrice() returning null on failure, requiring it here
@@ -81424,7 +81591,7 @@ function _updateGoldCtaState() {
   const ctaSummaryEl = document.getElementById('goldCtaSummary');
   if (ctaSummaryEl) {
     if (v.valid && _goldEstLast > 0) {
-      const qty = parseLocalFloat(qtyInput.value);
+      const qty = _aurixReadNumberInput(qtyInput);
       const qtyText = _formatGoldQtyText(qty, pendingGoldUnit);
       const valStr  = formatDisplay(_goldEstLast, 'USD');
       const fn      = t('gold_cta_secondary');
@@ -81558,10 +81725,10 @@ assetForm.addEventListener('submit', e => {
     const name = (reNameInput?.value || '').trim();
     if (!name) { reNameInput?.focus(); return; }
 
-    const value = parseLocalFloat(qtyInput.value);
+    const value = _aurixReadNumberInput(qtyInput);
     if (isNaN(value) || value <= 0) { qtyInput.focus(); return; }
 
-    const rent = parseLocalFloat(document.getElementById('reRent')?.value) || 0;
+    const rent = _aurixReadNumberInput(document.getElementById('reRent')) || 0;
     const ticker = name.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'INMU';
 
     let reFlashId = reEditTargetId;
@@ -81611,10 +81778,11 @@ assetForm.addEventListener('submit', e => {
     const nameVal = (document.getElementById('manualName')?.value || '').trim();
     if (!nameVal) { document.getElementById('manualName')?.focus(); return; }
 
-    const qty = parseLocalFloat(qtyInput.value);
+    const qty = _aurixReadNumberInput(qtyInput);
     if (isNaN(qty) || qty <= 0) { qtyInput.focus(); return; }
+    if (!_aurixNumAmbiguityGate(qtyInput)) return;   // unidades: «1.000» se confirma, no se adivina
 
-    const price  = parseLocalFloat(document.getElementById('manualPrice')?.value) || 0;
+    const price  = _aurixReadNumberInput(document.getElementById('manualPrice')) || 0;
     const ticker = nameVal.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'MANU';
 
     // MANUAL-MERGE-1: merge only when the user typed a real ISIN AND
@@ -81660,7 +81828,7 @@ assetForm.addEventListener('submit', e => {
         prevPrice:     null,
         costBasis:     qty * (price > 0 ? price : 1),
         location:      _newLoc,            // WL.2: optional Wealth Location metadata
-        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: _mBuyTs }],
+        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: _mBuyTs, pv: _AURIX_TX_PRICE_CONTRACT }],
       });
       _ledgerTrade(assets.find(a => a.id === manualFlashId), 'buy', qty, _mBuyPx, _mBuyTs);
     }
@@ -81691,8 +81859,9 @@ assetForm.addEventListener('submit', e => {
       return;
     } }
 
-  const qty = parseLocalFloat(qtyInput.value);
+  const qty = _aurixReadNumberInput(qtyInput);
   if (isNaN(qty) || qty <= 0) { qtyInput.focus(); return; }
+  if (!_aurixNumAmbiguityGate(qtyInput)) return;   // unidades: «1.000» se confirma, no se adivina
 
   // PURCHASE-PRICE-V1 — optional real purchase price → sourced into the first Buy
   // transaction (the single source of truth for cost basis / avg price / P&L). When the
@@ -81700,7 +81869,7 @@ assetForm.addEventListener('submit', e => {
   // behaviour). The gold flow never shows the field (spot-based valuation), so `_ppRaw`
   // is empty for XAU and `_effectivePrice === pendingPrice`. The live price (`asset.price`,
   // `spotPriceAtAdd`, `manualNav`) is NEVER overwritten by this value.
-  const _ppRaw = (function () { const el = document.getElementById('assetPurchasePrice'); return el ? parseLocalFloat(el.value) : NaN; })();
+  const _ppRaw = (function () { const el = document.getElementById('assetPurchasePrice'); return el ? _aurixReadNumberInput(el) : NaN; })();
   const _effectivePrice = (Number.isFinite(_ppRaw) && _ppRaw > 0) ? _ppRaw : pendingPrice;
 
   const { ticker, type, coinId = null, marketSymbol = null } = selectedDbAsset;
@@ -81756,7 +81925,7 @@ assetForm.addEventListener('submit', e => {
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
     if (!existing.transactions) existing.transactions = [];
-    existing.transactions.push({ type: 'buy', qty, price: _effectivePrice, ts: _buyTs });
+    existing.transactions.push({ type: 'buy', qty, price: _effectivePrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT });
     if (_newLoc) existing.location = _newLoc;   // WL.2: conserve unless user set one
     _ledgerTrade(existing, 'buy', qty, _effectivePrice, _buyTs);
   } else {
@@ -81814,7 +81983,7 @@ assetForm.addEventListener('submit', e => {
         resaleMargin:      pendingResaleMargin,
         resaleFactor:      +(Math.max(0, Math.min(1, 1 - pendingResaleMargin / 100))).toFixed(4),
       } : {}),
-      transactions:  [{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs }],
+      transactions:  [{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT }],
     });
     _ledgerTrade(assets.find(a => a.id === normalFlashId), 'buy', qty, _effectivePrice, _buyTs);
   }
@@ -81910,7 +82079,7 @@ function updateReducePreview() {
   const asset  = assets.find(a => a.id === reduceTargetId);
   if (!asset) return;
 
-  const amount  = parseLocalFloat(reduceQtyInput.value) || 0;
+  const amount  = _aurixReadNumberInput(reduceQtyInput) || 0;
   const cur     = (asset.assetCurrency || 'USD').toUpperCase();
   const isGold  = asset.ticker === 'XAU' && asset.karat;
   reduceError.textContent = '';
@@ -81967,7 +82136,7 @@ reduceForm.addEventListener('submit', e => {
   const asset  = assets.find(a => a.id === reduceTargetId);
   if (!asset) return;
 
-  const amount = parseLocalFloat(reduceQtyInput.value);
+  const amount = _aurixReadNumberInput(reduceQtyInput);
   if (isNaN(amount) || amount <= 0) {
     reduceError.textContent = t('errQtyPositive');
     return;
@@ -81976,6 +82145,8 @@ reduceForm.addEventListener('submit', e => {
     reduceError.textContent = t('cantExceed')(formatQty(asset.qty));
     return;
   }
+  // En importes (liquidez, inmueble) basta la pista; en unidades se confirma.
+  if (asset.type !== 'cash' && asset.type !== 'real_estate' && !_aurixNumAmbiguityGate(reduceQtyInput)) return;
 
   const remaining  = asset.qty - amount;
   const wasRemoved = remaining === 0;
@@ -82002,6 +82173,7 @@ reduceForm.addEventListener('submit', e => {
       qty:   amount,
       price: _sellPrice,
       ts:    _sellTs,
+      pv: _AURIX_TX_PRICE_CONTRACT,
     });
     asset.realizedPnL = Number(asset.realizedPnL || 0) + (Number.isFinite(realized) ? realized : 0);
   }
@@ -82116,7 +82288,7 @@ function updateAddPreview() {
   const asset = assets.find(a => a.id === addTargetId);
   if (!asset) return;
 
-  const amount    = parseLocalFloat(addQtyInput.value) || 0;
+  const amount    = _aurixReadNumberInput(addQtyInput) || 0;
   const assetCurr = (asset.assetCurrency || 'USD').toUpperCase();
   const isCash    = asset.type === 'cash';
   const isGold    = asset.ticker === 'XAU' && asset.karat;
@@ -82144,11 +82316,12 @@ addForm.addEventListener('submit', e => {
   const asset = assets.find(a => a.id === addTargetId);
   if (!asset) return;
 
-  const amount = parseLocalFloat(addQtyInput.value);
+  const amount = _aurixReadNumberInput(addQtyInput);
   if (isNaN(amount) || amount <= 0) {
     addError.textContent = t('errQtyPositive');
     return;
   }
+  if (asset.type !== 'cash' && asset.type !== 'real_estate' && !_aurixNumAmbiguityGate(addQtyInput)) return;
 
   // AURIX-CONTEXTUAL-ADD-FIX-1 — record the buy through the SAME durable path as
   // every real holdings edit (the canonical re-buy + the contextual sell): push a
@@ -82175,7 +82348,7 @@ addForm.addEventListener('submit', e => {
     asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + addedCostNative;
     asset.qty = +(asset.qty + amount).toFixed(8);
     if (!Array.isArray(asset.transactions)) asset.transactions = [];
-    asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs });
+    asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs, pv: _AURIX_TX_PRICE_CONTRACT });
     _ledgerTrade(asset, 'buy', amount, _buyPrice, _buyTs);
   }
   const addFlashId   = asset.id;
@@ -82222,14 +82395,13 @@ function openEditRealEstateModal(id) {
   if (reNameInput) reNameInput.value = asset.name || '';
 
   // Prefill value
-  const locale = lang === 'es' ? 'es-ES' : 'en-US';
-  qtyInput.value = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(asset.qty);
+  // Escritura exacta y en el idioma de lectura: con Intl sin decimales el valor se
+  // redondeaba y, en EN, «1,200» de alquiler se volvía a leer como 1,2 al guardar.
+  _aurixSetNumberInput(qtyInput, Number(asset.qty));
 
   // Prefill rent
   const reRentInput = document.getElementById('reRent');
-  if (reRentInput) reRentInput.value = asset.rent > 0
-    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(asset.rent)
-    : '';
+  if (reRentInput) _aurixSetNumberInput(reRentInput, asset.rent > 0 ? Number(asset.rent) : NaN);
 
   // Set currency toggle
   document.querySelectorAll('.re-curr-btn').forEach(b =>
@@ -82374,16 +82546,13 @@ const liquidityCurrIn   = document.getElementById('liquidityCurrency');
 const liqBtns           = document.querySelectorAll('.liq-btn');
 
 // Attach live formatters
-attachFormatter(qtyInput,       true);   // asset qty — allow decimals (e.g. 0.0015 BTC)
-attachFormatter(reduceQtyInput, true);   // reduce qty
-attachFormatter(addQtyInput,    true);   // add to position qty
-
-// Liquidity: direct integer formatter (no decimals, no cursor complexity)
-liquidityQtyInput.addEventListener('input', e => {
-  const digits = e.target.value.replace(/\D/g, '');
-  if (!digits) { e.target.value = ''; return; }
-  e.target.value = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(parseInt(digits, 10));
-});
+// LOTE 1 · P0 — el MISMO contrato en todos los campos numéricos de cartera. La
+// liquidez tenía un formateador de sólo dígitos («1500,50» → 150.050): ahora admite
+// decimales como el resto.
+[qtyInput, reduceQtyInput, addQtyInput, liquidityQtyInput,
+ document.getElementById('txQty'), document.getElementById('txPrice'),   // sus const se declaran más abajo
+ document.getElementById('manualPrice'), document.getElementById('assetPurchasePrice'),
+ document.getElementById('reRent')].forEach(el => attachFormatter(el));
 
 function openLiquidityModal() {
   // ADD-FLOW-ARCH-1: claim liquidity context and force-close any open
@@ -82457,7 +82626,7 @@ liquidityForm.addEventListener('submit', e => {
   // con dos operaciones). Reducir/añadir ya lo evitaban anulando su destino al cerrar.
   if (!liquidityOverlay.classList.contains('open')) return;
   const curr = liquidityCurrIn.value || 'EUR';
-  const qty  = parseLocalFloat(liquidityQtyInput.value);
+  const qty  = _aurixReadNumberInput(liquidityQtyInput);
   if (isNaN(qty) || qty <= 0) { liquidityQtyInput.focus(); return; }
   // ADD-FLOW-ARCHITECTURE-2: optional source label — informational
   // only, never feeds valuation. Allowed values are constrained so a
@@ -82717,7 +82886,7 @@ function addTransaction(assetId, type, qty, price) {
   const asset = assets.find(a => a.id === assetId);
   if (!asset) return;
   if (!asset.transactions) asset.transactions = [];
-  const tx = { type, qty, price, ts: Date.now(), assetName: asset.name };
+  const tx = { type, qty, price, ts: Date.now(), assetName: asset.name, pv: _AURIX_TX_PRICE_CONTRACT };
   asset.transactions.push(tx);
   if (type === 'buy') recordBuy(tx);
   save();
@@ -82741,7 +82910,7 @@ function openTxModal(assetId) {
   txErrorEl.textContent = '';
   const asset = assets.find(a => a.id === assetId);
   if (asset && asset.price && !isNaN(asset.price)) {
-    txPriceInput.value = asset.price;
+    _aurixSetNumberInput(txPriceInput, Number(asset.price));
   }
   { const b = document.getElementById('txPreview'); if (b) b.hidden = true; }
   txOverlay.classList.add('open');
@@ -82774,8 +82943,8 @@ function _aurixTxUpdatePreview() {
   const box = document.getElementById('txPreview');
   if (!box) return;
   const asset = assets.find(a => a.id === _txAssetId);
-  const qty   = parseLocalFloat(txQtyInput.value);
-  const price = normalizePriceInput(txPriceInput.value);
+  const qty   = _aurixReadNumberInput(txQtyInput);
+  const price = _aurixReadNumberInput(txPriceInput);
   const okQty = Number.isFinite(qty) && qty > 0;
   const okPx  = Number.isFinite(price) && price > 0;
   if (!asset || !okQty || !okPx) { box.hidden = true; return; }
@@ -82813,13 +82982,14 @@ document.querySelectorAll('#txTypeToggle [data-txtype]').forEach(btn => {
 txForm.addEventListener('submit', e => {
   e.preventDefault();
   if (!_txAssetId) return;
-  const qty   = parseLocalFloat(txQtyInput.value);
-  const price = normalizePriceInput(txPriceInput.value);
+  const qty   = _aurixReadNumberInput(txQtyInput);
+  const price = _aurixReadNumberInput(txPriceInput);
   if (isNaN(qty)   || qty   <= 0) { txQtyInput.focus();   return; }
   if (isNaN(price) || price <= 0) { txPriceInput.focus(); return; }
 
   const asset = assets.find(a => a.id === _txAssetId);
   if (!asset) return;
+  if (asset.type !== 'cash' && asset.type !== 'real_estate' && !_aurixNumAmbiguityGate(txQtyInput)) return;
   if (!validateTransaction(asset, { type: txTypeHidden.value, qty, price })) return;
 
   if (_editingTxIndex !== null) {
@@ -82830,6 +83000,7 @@ txForm.addEventListener('submit', e => {
         qty,
         price,
         ts:    originalTs,
+        pv: _AURIX_TX_PRICE_CONTRACT,   // reescrita con el contrato nuevo: el precio que se ve es el que se guarda
       };
       syncCostBasisFromTransactions(asset);
       save();
@@ -82974,8 +83145,8 @@ document.getElementById('adTxList').addEventListener('click', e => {
     _editingTxIndex = idx;
     closeAssetDetailModal();
     openTxModal(assetId);
-    txQtyInput.value   = tx.qty;
-    txPriceInput.value = tx.price;
+    _aurixSetNumberInput(txQtyInput, Number(tx.qty));
+    _aurixSetNumberInput(txPriceInput, Number(tx.price));
     txTypeHidden.value = tx.type;
     document.querySelectorAll('#txTypeToggle [data-txtype]')
       .forEach(b => b.classList.toggle('active', b.dataset.txtype === tx.type));

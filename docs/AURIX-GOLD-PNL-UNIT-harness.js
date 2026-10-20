@@ -29,7 +29,7 @@ const OZ_TO_G = 31.1034768;
 const ctx = { Number, Math, Object, Array, Date, console };
 vm.createContext(ctx);
 // Constants + tiny stubs the extracted owners close over (values identical to app.js).
-vm.runInContext('const OZ_TO_G = 31.1034768; const _PURITY_TABLE = {24:1,22:0.9167,21:0.875,18:0.75,14:0.5833,10:0.4167,9:0.375}; function liquidityNominal(a){ return a.qty; } function _aurixDisplayCategory(t){ return t === "metal" ? "metal" : String(t||""); }', ctx);
+vm.runInContext('const _AURIX_TX_PRICE_CONTRACT = 2; const OZ_TO_G = 31.1034768; const _PURITY_TABLE = {24:1,22:0.9167,21:0.875,18:0.75,14:0.5833,10:0.4167,9:0.375}; function liquidityNominal(a){ return a.qty; } function _aurixDisplayCategory(t){ return t === "metal" ? "metal" : String(t||""); }', ctx);
 ['_goldPurity', '_goldGrams', 'isClosedAsset', 'assetNativeValue', 'avgBuyPrice',
  'syncCostBasisFromTransactions', 'syncQtyFromTransactions', 'migrateLegacyAssetToTransactions',
  'sanitizeTransactionPrices', 'assetPnLBase', '_aurixUsableQuantity', '_aurixPositionFromAsset',
