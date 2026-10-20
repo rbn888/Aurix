@@ -1423,6 +1423,33 @@ function _aurixAssetsForBackend() {
   return { assets: null, holdings: null, omit: true, reason: 'empty-not-reset' };
 }
 
+// RENDIMIENTO EN REPOSO (2026-10-20) — huellas para no reescribir en Supabase lo que no ha cambiado.
+// Longitud + dos hashes de 32 bits independientes: una colisión saltaría una escritura real, así
+// que no basta con uno. Pura y determinista.
+function _aurixContentFingerprint(str) {
+  const t = String(str == null ? '' : str);
+  let h1 = 0x811c9dc5 >>> 0, h2 = 5381 >>> 0;
+  for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); h1 ^= c; h1 = Math.imul(h1, 0x01000193) >>> 0; h2 = (Math.imul(h2, 33) ^ c) >>> 0; }
+  return t.length + ':' + h1.toString(16) + ':' + h2.toString(16);
+}
+// Lo PERSISTIBLE del catálogo + holdings, sin los tres campos de mercado en vivo que reescribe
+// refreshPrices (currentPrice/prevPrice/change24h en la forma de convertToNewModel). Cualquier otro
+// cambio —cantidad, coste, transacciones, identidad, cierre, metadatos— cambia la huella.
+const _AURIX_LIVE_PRICE_KEYS = ['currentPrice', 'prevPrice', 'change24h'];
+function _aurixStructuralFingerprint(catalog, holdings) {
+  const cat = (Array.isArray(catalog) ? catalog : []).map(c => {
+    if (!c || typeof c !== 'object') return c;
+    const o = Object.assign({}, c); _AURIX_LIVE_PRICE_KEYS.forEach(k => { delete o[k]; }); return o;
+  });
+  return _aurixContentFingerprint(JSON.stringify(cat) + '|' + JSON.stringify(Array.isArray(holdings) ? holdings : []));
+}
+// Un cambio SÓLO de precios en vivo se sube como mucho una vez por ventana: la captura de servidor
+// (portfolio-snapshot, cada 15 min) pide sus propios precios y usa el `currentPrice` guardado sólo
+// como respaldo, así que ese respaldo nunca envejece más que su propio ciclo.
+const _AURIX_LIVE_PRICE_PERSIST_MS = 15 * 60 * 1000;
+let _aurixLastSyncedStructFp = null;   // huella estructural de la última subida CORRECTA
+let _aurixLastBackendSaveOkAt = 0;     // instante de la última subida correcta de activos/holdings
+
 function scheduleSave() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => { autoSaveToBackend(); }, 500);
@@ -1477,6 +1504,28 @@ async function autoSaveToBackend(attempt = 1) {
     }
   }
 
+  // RENDIMIENTO EN REPOSO — refreshPrices llama a save('price-refresh') cada 30 s y esto subía el
+  // catálogo entero aunque NADA persistible hubiera cambiado. Si la huella sin precios en vivo es la
+  // de la última subida correcta y ésta tiene menos de 15 min, no se sube. El estado de sincronización
+  // queda EXACTAMENTE como tras una subida (updatedAt = syncedAt), para que la fusión entre
+  // dispositivos siga viendo un remoto más nuevo como más nuevo: el tick de precios no puede hacer
+  // que este dispositivo se crea "por delante" sin haber subido nada.
+  // Si hay una mutación REAL marcada como pendiente (lastRealMutationAt > syncedAt) se sube siempre,
+  // como hasta ahora, aunque la huella coincida: el salto sólo cubre el caso «sólo precios en vivo».
+  let _structFp = null, _skipMeta = null;
+  try { _structFp = _aurixStructuralFingerprint(assets, holdings); } catch (_) { _structFp = null; }
+  try { _skipMeta = _aurixReadPortfolioMeta(); } catch (_) { _skipMeta = null; }
+  const _realPending = !_skipMeta || ((_skipMeta.lastRealMutationAt || 0) > (_skipMeta.syncedAt || 0));
+  if (safe.reason === 'live-data' && !_realPending && _structFp && _structFp === _aurixLastSyncedStructFp
+      && (Date.now() - _aurixLastBackendSaveOkAt) < _AURIX_LIVE_PRICE_PERSIST_MS) {
+    try {
+      if ((_skipMeta.updatedAt || 0) > (_skipMeta.syncedAt || 0)) { _skipMeta.updatedAt = _skipMeta.syncedAt; _aurixWritePortfolioMeta(_skipMeta); }
+    } catch (_) {}
+    try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastRemoteSaveStatus = 'skipped-live-only@' + new Date().toISOString(); } catch (_) {}
+    _setSaveStatus('saved');
+    return;
+  }
+
   try {
     _isSaving = true;
     const _syncedAt = new Date().toISOString();
@@ -1495,6 +1544,7 @@ async function autoSaveToBackend(attempt = 1) {
       }, { onConflict: 'user_id' });
 
     if (error) throw error;   // never mark synced/OK if the remote write failed
+    _aurixLastSyncedStructFp = _structFp; _aurixLastBackendSaveOkAt = Date.now();
     _persistDebug('[persist-save-backend] OK', { assetCount: Array.isArray(assets) ? assets.length : 0 });
     if (IS_DEV) console.log('[DATA] autosave success');
     try { _aurixMarkSynced(new Date(_syncedAt).getTime()); } catch (_) {}   // local is now in sync with remote
@@ -1579,6 +1629,7 @@ let _bootLoadComplete  = false;
 let _aurixPricesReady  = false;
 let _stateFlushTimer   = null;
 let _lastStateFlushMs  = 0;
+let _aurixLastFlushedStateFp = null;   // huella del último flush de estado COMPLETO y correcto (RENDIMIENTO EN REPOSO)
 let _watchlistFlushTimer = null;
 
 function _aurixWatchlistTs() {
@@ -3991,10 +4042,25 @@ async function _flushStatePersistence(reason) {
         payload.asset_classification_lineage_updated_at = new Date().toISOString();
       }
     } catch (_) {}
+    // RENDIMIENTO EN REPOSO — el flush de ciclo de vida (ocultar la pestaña / pagehide) se forzaba
+    // SIEMPRE, aunque no hubiera cambiado nada, y subía el estado entero (historiales incluidos). Si lo
+    // persistible es idéntico al último flush COMPLETO y correcto, no se reescribe. Las marcas «ahora»
+    // (updated_at y las de epoch/linaje) no cuentan como contenido. Cualquier cambio pendiente —un
+    // punto de historial, un activo, la watchlist, preferencias— cambia la huella y SÍ se escribe.
+    let _stateFp = null;
+    try {
+      const _fpObj = Object.assign({}, payload);
+      delete _fpObj.updated_at; delete _fpObj.portfolio_epoch_updated_at; delete _fpObj.asset_classification_lineage_updated_at;
+      _stateFp = _aurixContentFingerprint(JSON.stringify(_fpObj));
+    } catch (_) { _stateFp = null; }
+    if (reason === 'lifecycle' && _stateFp && _stateFp === _aurixLastFlushedStateFp) {
+      try { _aurixFlushPerformanceState(reason); } catch (_) {}
+      return 'skipped-unchanged';
+    }
     let { error } = await supabaseClient
       .from('user_portfolios')
       .upsert(payload, { onConflict: 'user_id' });
-    if (!error) { try { _aurixLineageDirty = false; } catch (_) {} }
+    if (!error) { try { _aurixLineageDirty = false; } catch (_) {} try { _aurixLastFlushedStateFp = _stateFp; } catch (_) {} }
     if (error) {
       // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: push-safe. If the ui_state OR
       // the subscription columns are not migrated yet, the whole upsert errors —
@@ -4062,7 +4128,9 @@ async function _aurixFlushPerformanceState(reason) {
     // FIX 4 — idempotent write: if the payload is byte-identical to the last one we successfully persisted,
     // skip WRITE_START/WRITE_OK/VERIFY_READ entirely. Nothing material changed ⇒ no DB write, no churn.
     // ('lifecycle'/'perf-now' are explicit forced writes and bypass the guard.)
-    if (reason !== 'lifecycle' && reason !== 'perf-now' && audit.payloadHash != null && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
+    // RENDIMIENTO EN REPOSO — 'lifecycle' ya no reescribe un payload idéntico (sigue saltándose el freno de
+    // 30 s, así que un cambio real llega antes de ocultar la pestaña). Sólo 'perf-now' fuerza la escritura.
+    if (reason !== 'perf-now' && audit.payloadHash != null && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
       audit.skipped = true; audit.failureReason = 'skipped_unchanged_payload';   // NOT audit.ok — no real write happened
       try { if (typeof IS_DEV !== 'undefined' && IS_DEV) console.log('[PERF_STATE][SKIP] unchanged payload — no write', audit.payloadHash); } catch (_) {}
       _aurixPerfWriteAudit = audit; return audit;
@@ -4098,8 +4166,16 @@ async function _aurixFlushPerformanceState(reason) {
     try { console.log('%c[PERF_STATE][WRITE_OK]', 'font-weight:700;color:#3fbf7f', { rowsAffected: audit.rowsAffected, returnedPerformanceHash: returnedHash, durationMs: audit.durationMs }); } catch (_) {}
 
     // IMMEDIATE VERIFY_READ — SELECT ONLY performance_state for the same row. If null after WRITE_OK, STOP.
+    // RENDIMIENTO EN REPOSO — la fila que devuelve el `update().select()` ES la fila guardada (misma tabla,
+    // misma fila, tras la escritura). Si trae performance_state y su huella es la enviada, eso ya es la
+    // verificación remota y se adopta tal cual (nunca el candidato local). Sólo si falta o no coincide se
+    // hace la relectura de siempre.
     let verifiedPs = null;
-    try {
+    if (audit.returnedHasPerformanceState && returnedHash != null && returnedHash === audit.payloadHash) {
+      verifiedPs = returnedPs;
+      audit.verifyRead = { source: 'returned-row', error: null, hasPerformanceState: true,
+        lifecycleId: returnedPs && returnedPs.lifecycleId, portfolioRevision: returnedPs && returnedPs.portfolioRevision };
+    } else try {
       const v = await supabaseClient.from('user_portfolios').select('performance_state').eq('user_id', currentUser.id).single();
       const vps = v && v.data && v.data.performance_state;
       verifiedPs = (vps && typeof vps === 'object') ? vps : null;
