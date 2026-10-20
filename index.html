@@ -661,13 +661,18 @@
             <div class="aurix-signal-icon" aria-hidden="true">
               <span class="aurix-signal-dot"></span>
             </div>
-            <div class="aurix-signal-body">
-              <span class="aurix-signal-msg" id="aurixSignalMsg"></span>
+            <!-- DSH.DONUT.06 — línea de contenido: estado + acción. El separador «·» viaja PEGADO a
+                 la acción (.aurix-signal-act); si la acción empieza línea, el separador cae fuera
+                 de la línea (recorte izquierdo) y nunca queda huérfano. -->
+            <div class="aurix-signal-line">
+              <div class="aurix-signal-body">
+                <span class="aurix-signal-msg" id="aurixSignalMsg"></span>
+              </div>
+              <span class="aurix-signal-act"><span class="aurix-signal-sep" aria-hidden="true">·</span><button type="button" class="aurix-signal-cta" id="aurixSignalCta">
+                <span id="aurixSignalCtaLabel" data-i18n="signalHealthCta">Ver análisis</span>
+                <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
+              </button></span>
             </div>
-            <button type="button" class="aurix-signal-cta" id="aurixSignalCta">
-              <span id="aurixSignalCtaLabel" data-i18n="signalHealthCta">Ver análisis</span>
-              <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
-            </button>
           </section>
             <button type="button" class="micro-composition-donut" id="microCompositionDonut"
                     aria-label="Ver composición de cartera" title="Ver composición de cartera">

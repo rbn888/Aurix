@@ -25653,8 +25653,42 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
    largo (EN) siga en dos líneas. */
 @media (min-width: 769px) and (max-width: 860px) {
   .hero-left .aurix-signal--health { padding-left: 11px; padding-right: 11px; }
-  .aurix-signal--health .aurix-signal-msg::after { margin: 0 5px; }
   .aurix-signal--health .aurix-signal-cta { padding-left: 2px; padding-right: 2px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.06 — ACABADO DE LA CÁPSULA (sobre DSH.DONUT.05).
+   · Sin separador huérfano: el «·» ya no es `::after` del mensaje (se quedaba al final de la
+     línea cuando la acción bajaba); va pegado a la acción y, si ésta empieza línea, cae a la
+     izquierda de la línea y se recorta (clip-path sólo por la izquierda).
+   · DOS NIVELES en escritorio cuando la fila deja sitio al estado más largo en UNA línea
+     (container query sobre el ancho real de la fila, no por idioma): estado arriba, «Ver
+     análisis ›» debajo alineado a su izquierda, cápsula del ancho de su contenido (sin hueco),
+     y el donut a 24 px, centrado en vertical con ella (57 px frente a 58).
+   · Si no hay sitio, la adaptación segura de v857 (texto fluido en dos líneas; el donut baja
+     entero de línea con <220 px para la cápsula). Tamaño y diseño del donut, intactos. */
+.aurix-signal--health .aurix-signal-msg::after { content: none; }
+.aurix-signal--health .aurix-signal-line { display: block; min-width: 0; clip-path: inset(-10px -14px -10px 0); }
+.aurix-signal--health .aurix-signal-msg { margin-right: 16px; }
+.aurix-signal--health .aurix-signal-act { display: inline-block; white-space: nowrap; margin-left: -16px; }
+.aurix-signal--health .aurix-signal-sep { display: inline-block; width: 16px; text-align: center; color: rgba(180, 200, 240, 0.34); font-weight: 600; }
+@media (min-width: 769px) {
+  /* El aire de 30 px sobre la cápsula (`.hero-left .aurix-signal`, ≥769) pasa a la FILA: misma
+     posición, y la cápsula ya puede centrarse en vertical con el donut. */
+  .aurix-signal-row { container: aurixsignalrow / inline-size; column-gap: 24px; padding-top: 30px; }
+  .aurix-signal-row > #aurixSignal { margin-top: 0; align-self: center; }
+  .micro-composition-donut { margin-top: 0; }
+  @container aurixsignalrow (min-width: 306px) {
+    /* Relleno para que la TINTA quede a la misma distancia (~11 px) de los cuatro bordes. */
+    .aurix-signal-row > #aurixSignal { flex: 0 1 auto; padding: 7px 10px 9px; }
+    .aurix-signal--health .aurix-signal-msg { white-space: normal; margin-right: 0; }
+    .aurix-signal--health .aurix-signal-act { display: block; margin-left: 0; }
+    .aurix-signal--health .aurix-signal-sep { display: none; }
+    /* La CTA conserva su relleno de hover (4 px) pero no lo suma al margen: su TINTA se alinea con
+       el estado a la izquierda y, cuando es la línea más ancha, queda a 11 px del borde derecho. */
+    .aurix-signal--health .aurix-signal-cta { margin-left: -4px; margin-right: -4px; }
+    .aurix-signal-row .micro-composition-donut { margin-left: 0; }
+  }
 }
 
 /* Modal — wider compact executive panel; donut is the protagonist */
