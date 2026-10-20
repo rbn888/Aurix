@@ -1449,6 +1449,7 @@ function _aurixStructuralFingerprint(catalog, holdings) {
 const _AURIX_LIVE_PRICE_PERSIST_MS = 15 * 60 * 1000;
 let _aurixLastSyncedStructFp = null;   // huella estructural de la última subida CORRECTA
 let _aurixLastBackendSaveOkAt = 0;     // instante de la última subida correcta de activos/holdings
+let _aurixLastSyncedStructUser = null; // de qué cuenta es esa línea base (un cambio de cuenta nunca la reutiliza)
 
 function scheduleSave() {
   clearTimeout(_saveTimer);
@@ -1517,6 +1518,7 @@ async function autoSaveToBackend(attempt = 1) {
   try { _skipMeta = _aurixReadPortfolioMeta(); } catch (_) { _skipMeta = null; }
   const _realPending = !_skipMeta || ((_skipMeta.lastRealMutationAt || 0) > (_skipMeta.syncedAt || 0));
   if (safe.reason === 'live-data' && !_realPending && _structFp && _structFp === _aurixLastSyncedStructFp
+      && _aurixLastSyncedStructUser === (currentUser && currentUser.id)
       && (Date.now() - _aurixLastBackendSaveOkAt) < _AURIX_LIVE_PRICE_PERSIST_MS) {
     try {
       if ((_skipMeta.updatedAt || 0) > (_skipMeta.syncedAt || 0)) { _skipMeta.updatedAt = _skipMeta.syncedAt; _aurixWritePortfolioMeta(_skipMeta); }
@@ -1544,7 +1546,7 @@ async function autoSaveToBackend(attempt = 1) {
       }, { onConflict: 'user_id' });
 
     if (error) throw error;   // never mark synced/OK if the remote write failed
-    _aurixLastSyncedStructFp = _structFp; _aurixLastBackendSaveOkAt = Date.now();
+    _aurixLastSyncedStructFp = _structFp; _aurixLastBackendSaveOkAt = Date.now(); _aurixLastSyncedStructUser = currentUser.id;
     _persistDebug('[persist-save-backend] OK', { assetCount: Array.isArray(assets) ? assets.length : 0 });
     if (IS_DEV) console.log('[DATA] autosave success');
     try { _aurixMarkSynced(new Date(_syncedAt).getTime()); } catch (_) {}   // local is now in sync with remote
@@ -4075,6 +4077,7 @@ async function _flushStatePersistence(reason) {
       const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
       if (retry.error) throw retry.error;
       _outcome = 'partial';
+      _aurixLastFlushedStateFp = null;   // el remoto ya no es «el último flush completo»: no se puede saltar
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
     }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
@@ -4086,6 +4089,7 @@ async function _flushStatePersistence(reason) {
     // then they are pending-local-only and the strict gate keeps the device in "Calculando…" (never divergent).
   } catch (e) {
     _outcome = 'fail';
+    _aurixLastFlushedStateFp = null;
     if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
   }
   // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — write performance_state in its OWN decoupled update, AFTER (and
@@ -4107,7 +4111,8 @@ async function _flushStatePersistence(reason) {
 // performance_state OR VERIFY_READ null ⇒ FAILURE (we do NOT assume persistence). The last audit is exposed
 // via window.aurixPerfStateWriteAudit(). Audit-only: no calc/history/render/UI change. ALWAYS logs (not IS_DEV).
 let _aurixLastPerfFlushMs = 0;
-let _aurixLastWrittenPerfPayloadHash = null;   // FIX 4 — last payload hash actually persisted (idempotent write guard)
+let _aurixLastWrittenPerfPayloadHash = null;
+let _aurixLastWrittenPerfScope = null;   // userId|lifecycleId de lo último escrito: un reset o un cambio de cuenta nunca reutiliza el «sin cambios»   // FIX 4 — last payload hash actually persisted (idempotent write guard)
 let _aurixPerfWriteAudit = null;
 async function _aurixFlushPerformanceState(reason) {
   const audit = { reason: reason || null, startedAt: Date.now(), table: 'user_portfolios', where: 'user_id = <uid>',
@@ -4130,7 +4135,10 @@ async function _aurixFlushPerformanceState(reason) {
     // ('lifecycle'/'perf-now' are explicit forced writes and bypass the guard.)
     // RENDIMIENTO EN REPOSO — 'lifecycle' ya no reescribe un payload idéntico (sigue saltándose el freno de
     // 30 s, así que un cambio real llega antes de ocultar la pestaña). Sólo 'perf-now' fuerza la escritura.
-    if (reason !== 'perf-now' && audit.payloadHash != null && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
+    // El hash sólo cubre byRange (y unos rangos pendientes dan el mismo en cualquier cuenta o ciclo de vida),
+    // así que el «sin cambios» exige además el mismo usuario y el mismo lifecycleId que lo último escrito.
+    const _perfScope = String(ps.userId || '') + '|' + String(ps.lifecycleId || '');
+    if (reason !== 'perf-now' && audit.payloadHash != null && _perfScope === _aurixLastWrittenPerfScope && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
       audit.skipped = true; audit.failureReason = 'skipped_unchanged_payload';   // NOT audit.ok — no real write happened
       try { if (typeof IS_DEV !== 'undefined' && IS_DEV) console.log('[PERF_STATE][SKIP] unchanged payload — no write', audit.payloadHash); } catch (_) {}
       _aurixPerfWriteAudit = audit; return audit;
@@ -4191,6 +4199,7 @@ async function _aurixFlushPerformanceState(reason) {
 
     audit.ok = true;
     _aurixLastWrittenPerfPayloadHash = audit.payloadHash;   // FIX 4 — remember what we persisted so an identical next payload is skipped
+    _aurixLastWrittenPerfScope = _perfScope;
     // P0-PERFORMANCE-STATE-CONSUMPTION-FIX — adopt the VERIFIED-remote performance_state into the consumed
     // var NOW, so the writing device renders from it immediately (it is confirmed in remote == what we read
     // back). Other devices adopt it on their next reconcile. This closes the "wrote OK but UI still pending

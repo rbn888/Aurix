@@ -53,7 +53,8 @@ function makeCtx(opts) {
   ctx._aurixWritePortfolioMeta = (m) => { ctx._meta = Object.assign({}, m); };
   ctx._aurixMarkSynced = (ms) => { const m = ctx._aurixReadPortfolioMeta(); m.syncedAt = ms || Date.now(); if (!(m.updatedAt > m.syncedAt)) m.updatedAt = m.syncedAt; ctx._aurixWritePortfolioMeta(m); };
   ctx._aurixAssetsForBackend = () => { const c = ctx.convertToNewModel(ctx.assets); return { assets: c.assets, holdings: c.holdings, omit: false, reason: o.reason || 'live-data' }; };
-  ctx._aurixComputePerformanceStateCandidate = () => ({ userId: 'u1', lifecycleId: 'L', portfolioRevision: ctx.__perfRev, byRange: { '24h': { performanceHash: 'h' + ctx.__perfRev } } });
+  ctx.__lc = 'L';
+  ctx._aurixComputePerformanceStateCandidate = () => ({ userId: ctx.currentUser.id, lifecycleId: ctx.__lc, portfolioRevision: ctx.__perfRev, byRange: { '24h': { performanceHash: 'h' + ctx.__perfRev } } });
   function builder(table) {
     const st = { table, op: 'select', obj: null, single: false };
     const b = {
@@ -75,7 +76,7 @@ function makeCtx(opts) {
   ctx.__ops = ops; ctx.__failNext = n => { failNext = n; };
   vm.createContext(ctx);
   for (const c of ['_AURIX_LIVE_PRICE_KEYS', '_AURIX_LIVE_PRICE_PERSIST_MS']) vm.runInContext(constSrc(c), ctx);
-  vm.runInContext('var _aurixLastSyncedStructFp = null; var _aurixLastBackendSaveOkAt = 0; var _aurixLastFlushedStateFp = null;', ctx);
+  vm.runInContext('var _aurixLastSyncedStructFp = null; var _aurixLastBackendSaveOkAt = 0; var _aurixLastSyncedStructUser = null; var _aurixLastFlushedStateFp = null; var _aurixLastWrittenPerfScope = null;', ctx);
   for (const f of ['convertToNewModel', '_aurixContentFingerprint', '_aurixStructuralFingerprint', '_aurixHistoryHash',
                    'autoSaveToBackend', '_flushStatePersistence', '_aurixFlushPerformanceState']) vm.runInContext(fnSrc(f), ctx);
   return ctx;
@@ -140,6 +141,13 @@ const run = (ctx, code) => vm.runInContext(code, ctx);
     await run(c, 'autoSaveToBackend()'); await run(c, 'autoSaveToBackend()');
     ok('A.9 un guardado que no es live-data (p. ej. reset) nunca se salta', upserts(c) === 2);
   }
+  {
+    const c = makeCtx();
+    await run(c, 'autoSaveToBackend()');
+    run(c, `currentUser = { id: 'u2' };`); c._meta = Object.assign({}, c._meta, { updatedAt: c._meta.syncedAt + 5, lastRealMutationAt: 0 });
+    await run(c, 'autoSaveToBackend()');
+    ok('A.10 un cambio de cuenta en la misma pestaña nunca reutiliza la línea base (sube)', upserts(c) === 2);
+  }
 
   console.log('\nB — Flush al ocultar la pestaña (lifecycle)');
   {
@@ -166,6 +174,17 @@ const run = (ctx, code) => vm.runInContext(code, ctx);
     await run(c, `_flushStatePersistence('lifecycle')`);
     ok('B.6 si el último flush FALLÓ, ocultar la pestaña vuelve a escribir (no se pierde nada)', upserts(c) > n);
   }
+  {
+    const c = makeCtx();
+    await run(c, `_flushStatePersistence('lifecycle')`);           // completo: fija la huella
+    c.__failNext(1);                                                 // sólo falla el primero ⇒ ruta 'partial' (núcleo escrito)
+    run(c, 'portfolioHistory = portfolioHistory.concat([{ ts: 3, value: 1 }]);');
+    const r = await run(c, `_flushStatePersistence('lifecycle')`);
+    run(c, 'portfolioHistory = portfolioHistory.slice(0, -1);');    // el estado local vuelve al del último flush completo
+    const n = upserts(c); await run(c, `_flushStatePersistence('lifecycle')`);
+    ok('B.7 tras un flush PARCIAL la huella se invalida: ocultar vuelve a escribir aunque el estado coincida con el último completo',
+      r === 'partial' && upserts(c) > n, r);
+  }
 
   console.log('\nB2/C — performance_state');
   {
@@ -180,6 +199,10 @@ const run = (ctx, code) => vm.runInContext(code, ctx);
     ok('B2.2 con un cambio real se escribe al ocultar, aunque no hayan pasado 30 s', upd() === 2 && a.ok === true);
     a = await run(c, `_aurixFlushPerformanceState('perf-now')`);
     ok('B2.3 perf-now sigue forzando la escritura', upd() === 3);
+    run(c, `__lc = 'L2';`); a = await run(c, `_aurixFlushPerformanceState('lifecycle')`);
+    ok('B2.4 tras un RESET (otro lifecycleId) con el MISMO hash de rangos ⇒ se escribe', upd() === 4 && a.ok === true, a.failureReason);
+    run(c, `currentUser = { id: 'u2' };`); a = await run(c, `_aurixFlushPerformanceState('lifecycle')`);
+    ok('B2.5 un cambio de cuenta con el MISMO hash de rangos ⇒ se escribe', upd() === 5 && a.ok === true, a.failureReason);
   }
   {
     const c = makeCtx(); c.__returnMismatch = true;
