@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=lp-commercial-3">
+  <link rel="stylesheet" href="styles.css?v=lp-commercial-4">
   <!-- V3 · animaciones de entrada: se arman antes del primer pintado. Sin movimiento reducido y sólo
        con JS; si app.js no llega a armarlas en 3 s, la página se queda en su estado final. -->
   <script>(function(d){try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;d.classList.add('lp-anim');setTimeout(function(){if(!d.classList.contains('lp-armed'))d.classList.add('lp-anim-off');},3000);}catch(e){}})(document.documentElement);</script>
@@ -107,14 +107,14 @@
                  (capturadas en la misma sesión) para animar su entrada. Sin JS o con movimiento reducido se
                  ven directamente completas. Geometría: bloque HERO-LAYERS de styles.css. -->
             <picture>
-              <source media="(max-width: 767px)" srcset="assets/hero-dashboard-v3-base-m-en.jpg" data-i18n-srcset="assets/hero-dashboard-v3-base-m-{lang}.jpg" width="764" height="1030">
+              <source media="(max-width: 767px)" srcset="assets/hero-dashboard-v4-base-m-en.jpg" data-i18n-srcset="assets/hero-dashboard-v4-base-m-{lang}.jpg" width="764" height="1082">
               <img class="hero-base" src="assets/hero-dashboard-v3-base-en.jpg" srcset="assets/hero-dashboard-v3-base-en.jpg 1248w, assets/hero-dashboard-v3-base-en-2x.jpg 2496w"
                    data-i18n-srcset="assets/hero-dashboard-v3-base-{lang}.jpg 1248w, assets/hero-dashboard-v3-base-{lang}-2x.jpg 2496w"
                    sizes="(min-width:1200px) 1152px, calc(100vw - 48px)" width="1248" height="407"
                    alt="AURIX Dashboard with a demo portfolio: investable wealth of $186,055.38, 24-hour evolution and split by category" data-i18n-alt="lp.alt.hero" fetchpriority="high" decoding="async">
             </picture>
             <picture class="hero-layer hero-curve" aria-hidden="true">
-              <source media="(max-width: 767px)" srcset="assets/hero-dashboard-v3-curve-m-en.png" data-i18n-srcset="assets/hero-dashboard-v3-curve-m-{lang}.png" width="696" height="448">
+              <source media="(max-width: 767px)" srcset="assets/hero-dashboard-v4-curve-m-en.png" data-i18n-srcset="assets/hero-dashboard-v4-curve-m-{lang}.png" width="696" height="448">
               <img src="assets/hero-dashboard-v3-curve-en.png" srcset="assets/hero-dashboard-v3-curve-en.png 1x, assets/hero-dashboard-v3-curve-en-2x.png 2x"
                    data-i18n-srcset="assets/hero-dashboard-v3-curve-{lang}.png 1x, assets/hero-dashboard-v3-curve-{lang}-2x.png 2x" width="699" height="255" alt="" decoding="async">
             </picture>
@@ -373,6 +373,6 @@
   <!-- HOTFIX LANDING — the "Request Access" modal was removed with the Private Beta section
        (Aurix is now open to the public; the CTA is "Enter Aurix"). -->
 
-  <script src="app.js?v=lp-commercial-3"></script>
+  <script src="app.js?v=lp-commercial-4"></script>
 </body>
 </html>

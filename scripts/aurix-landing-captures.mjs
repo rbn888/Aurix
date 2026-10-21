@@ -283,6 +283,22 @@ async function writeLayerCss(L) {
   console.log('  · capas del hero escritas en landing/styles.css');
 }
 
+// Ajuste móvil V4: bloque propio (posterior en la hoja ⇒ manda sólo en móvil); los de escritorio no se tocan.
+async function writeMobileBlocks(hot, L) {
+  const { writeFile } = await import('node:fs/promises');
+  const cssPath = join(ROOT, 'landing', 'styles.css');
+  const css = await readFile(cssPath, 'utf8');
+  const B = '/* HERO-MOBILE-V4:BEGIN', E = '/* HERO-MOBILE-V4:END */';
+  const box = (sel, v) => `${sel}{ left:${v.l}%; top:${v.t}%; width:${v.w}%; height:${v.h}%; }`;
+  const val = (sel, v) => `${sel}{ left:${v.l}%; top:${v.t}%; font-size:${v.fs}cqw; letter-spacing:${v.ls}cqw; line-height:${v.lh}cqw; font-weight:${v.weight}; color:${v.color}; }`;
+  const set = (pre, k) => [box(`${pre}.hero-shot .hero-hotspot`, hot[k]), box(`${pre}.hero-shot .hero-curve`, L[k].curve), val(`${pre}.hero-shot .hero-val`, L[k].value)].join('\n  ');
+  const block = `${B} — generado por scripts/aurix-landing-captures.mjs --mobile-v4: hero móvil con los puntos del carrusel. */\n@media (max-width:767px){\n  `
+    + set('', 'en-m') + '\n  ' + set('html[lang="es"] ', 'es-m') + '\n}\n' + E;
+  const i = css.indexOf(B), j = css.indexOf(E);
+  await writeFile(cssPath, (i >= 0 && j > i) ? css.slice(0, i) + block + css.slice(j + E.length) : css + '\n' + block + '\n');
+  console.log('  · bloque móvil V4 escrito en landing/styles.css');
+}
+
 const fails = [];
 const ok = (name, cond, info) => { if (cond) console.log('  ✓ ' + name); else { fails.push(name); console.log('  ✗ ' + name + (info ? '  [' + String(info).slice(0, 300) + ']' : '')); } };
 
@@ -327,9 +343,10 @@ try {
     const write = async (page, file, rect, pad) => { await shotRegion(page, join(OUT, file), rect, pad); plan.push(file); return { x: rect.x - pad, y: rect.y - pad, width: rect.width + 2 * pad, height: rect.height + 2 * pad }; };
     const hot = {}, layers = {};
     const valRel = (v, crop) => Object.assign(pctRect(v, crop), { fs: pct(v.size / crop.width), ls: +(v.ls / crop.width * 100).toFixed(4), lh: pct(v.lh / crop.width), weight: v.weight, color: v.color });
+    const MOBILE_ONLY = process.argv.includes('--mobile-v4');   // ajuste móvil: sólo recursos -v4- del móvil
     for (const lang of ['es', 'en']) {
       // 2 · Hero escritorio V2 (1x y 2x). anon ⇒ 24 h calculada en local con la curva original.
-      for (const dpr of [1, 2]) {
+      for (const dpr of (MOBILE_ONLY ? [] : [1, 2])) {
         const { ctx, page } = await open(browser, { lang, w: 1440, h: 900, premium: true, anon: true, dpr });
         const t = await retouchHero(page, true); await page.waitForTimeout(400);
         ok(`${lang} · hero @${dpr}x · valor 186.055,38 y +0,19 % en 24 h`, /186[.,]055[.,]38/.test(t.value) && /\+0[.,]19\s?%/.test(t.change), JSON.stringify({ v: t.value, c: t.change }));
@@ -356,23 +373,28 @@ try {
       { const { ctx, page } = await open(browser, { lang, w: 390, h: 1300, premium: true, anon: true });
         const t = await retouchHero(page, false); await page.waitForTimeout(400);
         ok(`${lang} · hero móvil · cápsula en una línea`, t.capsuleOneLine, JSON.stringify(t));
-        const r = await page.evaluate(`(function(){ var top=document.querySelector('.dashboard-top.hero-card'); var host=document.getElementById('wealthCurveMobile'); if(!top||!host) return null;
+        const r = await page.evaluate(`(function(mob){ var top=document.querySelector('.dashboard-top.hero-card'); var host=document.getElementById('wealthCurveMobile'); if(!top||!host) return null;
           var tr=top.getBoundingClientRect(), x=host; while (x && x.parentElement && x.getBoundingClientRect().width < tr.width - 2) x = x.parentElement;
-          var cr=x.getBoundingClientRect(); return { x: tr.left+scrollX, y: tr.top+scrollY, width: tr.width, height: (cr.bottom - tr.top) }; })()`);
+          var cr=x.getBoundingClientRect(), bottom = cr.bottom, dots = document.querySelector('.mobile-slider-dots'), db = null;
+          // V4 (ajuste móvil): la captura llega al borde inferior de la tarjeta del carrusel, con sus dos puntos enteros.
+          if (mob && dots) { var card = dots.parentElement.getBoundingClientRect(); db = dots.getBoundingClientRect().bottom; bottom = Math.max(card.bottom, db + 14); }
+          return { x: tr.left+scrollX, y: tr.top+scrollY, width: tr.width, height: (bottom - tr.top), dotsGap: db === null ? null : Math.round(bottom - db) }; })(${MOBILE_ONLY})`);
         ok(`${lang} · hero móvil localizado`, !!r && r.height > 400, r && JSON.stringify(r));
+        if (MOBILE_ONLY) ok(`${lang} · hero móvil · los dos puntos del carrusel caben con margen ≥12 px`, r && r.dotsGap >= 12, r && JSON.stringify(r));
         if (r) {
-          const crop = await write(page, `hero-dashboard-v3-full-m-${lang}.jpg`, r, 8); hot[lang + '-m'] = rel(t.capsule, crop);
+          const V = MOBILE_ONLY ? 'v4' : 'v3';
+          const crop = await write(page, `hero-dashboard-${V}-full-m-${lang}.jpg`, r, 8); hot[lang + '-m'] = rel(t.capsule, crop);
           const g = await heroLayers(page, 'm');
           ok(`${lang} · hero móvil · capas localizadas (cifra, curva)`, !!(g.curve && g.value.width), JSON.stringify(g));
-          await hideForBase(page, 'm'); await write(page, `hero-dashboard-v3-base-m-${lang}.jpg`, r, 8);
+          await hideForBase(page, 'm'); await write(page, `hero-dashboard-${V}-base-m-${lang}.jpg`, r, 8);
           await onlyLayer(page, CURVE_SEL.m);
           const scrollXY = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
-          await page.screenshot({ path: join(OUT, `hero-dashboard-v3-curve-m-${lang}.png`), omitBackground: true, clip: { x: g.curve.x - scrollXY.x, y: g.curve.y - scrollXY.y, width: g.curve.width, height: g.curve.height } }); plan.push(`hero-dashboard-v3-curve-m-${lang}.png`);
+          await page.screenshot({ path: join(OUT, `hero-dashboard-${V}-curve-m-${lang}.png`), omitBackground: true, clip: { x: g.curve.x - scrollXY.x, y: g.curve.y - scrollXY.y, width: g.curve.width, height: g.curve.height } }); plan.push(`hero-dashboard-${V}-curve-m-${lang}.png`);
           layers[lang + '-m'] = { curve: pctRect(g.curve, crop), value: valRel(g.value, crop) };
         }
         await ctx.close(); }
       // Recursos V1 (posiciones, Intelligence completa): sólo con --v1-assets, para no sobrescribirlos.
-      if (process.argv.includes('--v1-assets')) {
+      if (process.argv.includes('--v1-assets') && !MOBILE_ONLY) {
         { const { ctx, page } = await open(browser, { lang, w: 1440, h: 900, premium: true });
           await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1500);
           await dismissContextQuestion(page);
@@ -389,9 +411,12 @@ try {
       }
     }
     // 4 · Zona del enlace «Ver análisis» sobre la cápsula de cada imagen → bloque generado en styles.css.
-    if (['es-d', 'en-d', 'es-m', 'en-m'].every(k => hot[k])) await writeHotspots(hot);
+    if (MOBILE_ONLY) {
+      if (['es-m', 'en-m'].every(k => hot[k] && layers[k])) await writeMobileBlocks(hot, layers);
+      else ok('zonas y capas móviles medidas', false, JSON.stringify({ hot: Object.keys(hot), layers: Object.keys(layers) }));
+    } else if (['es-d', 'en-d', 'es-m', 'en-m'].every(k => hot[k])) await writeHotspots(hot);
     else ok('zonas del enlace «Ver análisis» medidas en las cuatro imágenes', false, JSON.stringify(hot));
-    if (['es-d', 'en-d', 'es-m', 'en-m'].every(k => layers[k])) await writeLayerCss(layers);
+    if (MOBILE_ONLY) { /* ya escrito arriba */ } else if (['es-d', 'en-d', 'es-m', 'en-m'].every(k => layers[k])) await writeLayerCss(layers);
     else ok('capas del hero medidas en las cuatro variantes', false, JSON.stringify(Object.keys(layers)));
     console.log('\nEscritas en ' + OUT + ': ' + plan.join(', '));
   }

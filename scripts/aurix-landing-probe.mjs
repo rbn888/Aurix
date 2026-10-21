@@ -43,7 +43,7 @@ if (!BASE) {
 }
 const launchArgs = process.env.HOST_IP ? { args: [`--host-resolver-rules=MAP aurixsystem.io ${process.env.HOST_IP}`] } : {};
 
-const VPS = [[360, 640], [375, 667], [390, 844], [412, 915], [768, 1024], [1440, 900]];
+const VPS = [[360, 640], [375, 667], [390, 844], [412, 915], [430, 932], [768, 1024], [1440, 900]];
 const EXPECT = {
   es: { head: 'Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas.', stat: 'Tus 3 mayores inversiones reúnen el 69 % de tu cartera financiera.',
         h1: 'Comprende mejor tu patrimonio.', cap: '', hot: 'Salud: A vigilar · Ver análisis en AURIX Intelligence', rest: 'Resto de la cartera financiera' },
@@ -136,6 +136,7 @@ for (const engine of ['chromium', 'webkit']) {
           orb: R(q('.lp-orb')), headR: R(q('.ip-head')),
           hero: heroImg ? heroImg.currentSrc.split('/').pop() : '', heroR: R(heroImg),
           hot: { href: hot.getAttribute('href'), aria: hot.getAttribute('aria-label'), r: R(hot), target: hot.getAttribute('target'), hit: parseFloat(getComputedStyle(hot, '::before').height) },
+          mob: { hdr: R(q('#siteHeader')), eye: R(q('.hero-eyebrow')), kick: R(q('.ip-kicker')), slot: R(q('.lp-orb-slot')), glow: R(q('.lp-orb-glow')), headW: R(q('.ip-head')).w, inner: q('#intelDemo').clientWidth - parseFloat(getComputedStyle(q('#intelDemo')).paddingLeft) - parseFloat(getComputedStyle(q('#intelDemo')).paddingRight), ctaFs: parseFloat(getComputedStyle(q('.hero-cta .btn-primary')).fontSize) },
           zOrb: parseInt(getComputedStyle(q('.lp-orb')).zIndex, 10), zHeader: parseInt(getComputedStyle(q('#siteHeader')).zIndex, 10),
           appLinks: [].slice.call(document.querySelectorAll('[data-app-link]')).map(function(a){ return { href: a.getAttribute('href'), premium: a.getAttribute('data-app-intent')==='premium' }; }),
           headerApp: document.querySelectorAll('#siteHeader [data-app-link]').length,
@@ -162,10 +163,21 @@ for (const engine of ['chromium', 'webkit']) {
       ok(`${T} · F «Cartera de demostración» no se repite en el texto`, m.demoMentions === 0, m.demoMentions);
       ok(`${T} · C enlace «Ver análisis»: #intelligence, misma pestaña, rótulo del idioma, área ≥44 px, dentro de la imagen`,
         m.hot.href === '#intelligence' && !m.hot.target && m.hot.aria === E.hot && m.hot.hit >= 44 && m.hot.r.l >= m.heroR.l && m.hot.r.r <= m.heroR.r && m.hot.r.t >= m.heroR.t && m.hot.r.b <= m.heroR.b, m.hot);
+      if (w <= 860) {
+        const g = m.mob.eye.t - m.mob.hdr.b, c1 = m.cta1, c2 = m.cta2, mid = x => (x.l + x.r) / 2;
+        ok(`${T} · MÓVIL hueco cabecera → antetítulo ≈32 px`, g >= 28 && g <= 36, g);
+        ok(`${T} · MÓVIL botones del hero centrados, mismo ancho ≤280 px, 48–56 px de alto, texto 16 px, 10–12 px de separación`,
+          Math.abs(mid(c1) - w / 2) <= 1 && Math.abs(mid(c2) - w / 2) <= 1 && Math.abs(c1.w - c2.w) <= 0.5 && c1.w <= 280.5 && c1.h >= 48 && c1.h <= 56 && c2.h >= 48 && m.mob.ctaFs >= 15.5 && (c2.t - c1.b) >= 10 && (c2.t - c1.b) <= 12.5, { c1, c2, fs: m.mob.ctaFs });
+      }
+      if (w < 768) {
+        const k = m.mob.kick, sl = m.mob.slot, gl = m.mob.glow;
+        ok(`${T} · MÓVIL rótulo y esfera en la misma fila sin colisión; conclusión a todo el ancho; halo sin invadir la conclusión`,
+          sl.t < k.b && sl.b > k.t && sl.l - k.r >= 12 && m.mob.headW >= m.mob.inner - 4 && gl.b <= m.headR.t && gl.r <= m.H * 10, { k, sl, headW: m.mob.headW, inner: m.mob.inner, glowB: gl.b, headT: m.headR.t });
+      }
       ok(`${T} · 17 la esfera pasa por DEBAJO de la cabecera (nunca la tapa)`, m.zOrb < m.zHeader, { orb: m.zOrb, header: m.zHeader });
       ok(`${T} · 6 enlaces a la app con lang/langhint e intent Premium`, m.appLinks.length >= 4 && m.appLinks.every(a => /[?&](lang|langhint)=(es|en)/.test(a.href) && (a.premium ? /intent=premium/.test(a.href) : !/intent=/.test(a.href))), m.appLinks);
       ok(`${T} · 6 Soporte con ?lang=`, m.support.length >= 2 && m.support.every(s => s.endsWith('support.html?lang=' + lang)), m.support);
-      ok(`${T} · B base del hero V3 en el idioma activo`, new RegExp(`hero-dashboard-v3-base-(m-)?${lang}(-2x)?\\.jpg$`).test(m.hero), m.hero);
+      ok(`${T} · B base del hero en el idioma activo (V3 escritorio · V4 móvil)`, new RegExp(w < 768 ? `hero-dashboard-v4-base-m-${lang}\\.jpg$` : `hero-dashboard-v3-base-${lang}(-2x)?\\.jpg$`).test(m.hero), m.hero);
       ok(`${T} · 7 todas las imágenes con width/height`, m.imgsNoDim === 0, m.imgsNoDim);
       const cls = await page.evaluate('window.__cls');
       ok(`${T} · 7 sin saltos de maquetación (CLS < 0.1)`, cls < 0.1, cls);
@@ -385,7 +397,7 @@ for (const engine of ['chromium', 'webkit']) {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 }); const page = await ctx.newPage();
     await page.goto(BASE + '?lang=' + lang, { waitUntil: 'networkidle' }); await page.waitForTimeout(2200);
     const el = await page.$('#heroShot'); const A = await el.screenshot();
-    const ref = `assets/hero-dashboard-v3-full-${m ? 'm-' : ''}${lang}${m ? '' : '-2x'}.jpg`;
+    const ref = m ? `assets/hero-dashboard-v4-full-m-${lang}.jpg` : `assets/hero-dashboard-v3-full-${lang}-2x.jpg`;
     await page.evaluate(src => { const sh = document.getElementById('heroShot'); sh.querySelectorAll('.hero-layer, .hero-val').forEach(e => e.style.visibility = 'hidden');
       sh.querySelectorAll('picture source').forEach(x => x.srcset = src); const im = sh.querySelector('.hero-base'); im.srcset = src; im.src = src; }, ref);
     await page.waitForTimeout(1000); const B = await el.screenshot();
@@ -452,7 +464,7 @@ for (const engine of ['chromium', 'webkit']) {
       hot: document.querySelector('.hero-hotspot').getAttribute('href'), rows: document.querySelectorAll('.ip-row').length,
       val: document.querySelector('.hero-val').textContent, valVis: getComputedStyle(document.querySelector('.hero-val')).visibility, clip: getComputedStyle(document.querySelector('.hero-curve')).clipPath,
       nums: [...document.querySelectorAll('.ip-num')].map(n => n.textContent).join() }));
-    ok(`${engine} · K sin JS: nada oculto, panel, hero EN completo (cifra, curva) y enlace a Intelligence`, r.hidden === 0 && r.head === EXPECT.en.head && /hero-dashboard-v3-base-(m-)?en/.test(r.hero) && r.hot === '#intelligence' && r.rows === 4
+    ok(`${engine} · K sin JS: nada oculto, panel, hero EN completo (cifra, curva) y enlace a Intelligence`, r.hidden === 0 && r.head === EXPECT.en.head && /hero-dashboard-v4-base-m-en/.test(r.hero) && r.hot === '#intelligence' && r.rows === 4
       && r.val === '$186,055.38' && r.valVis === 'visible' && (r.clip === 'none' || r.clip === '') && r.nums === '69,29,22,18,31', r);
     await ctx.close(); }
   await browser.close();

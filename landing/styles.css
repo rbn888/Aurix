@@ -1653,3 +1653,33 @@ html[lang="es"] .hero-shot .hero-val{ left:6.02%; top:8.15%; font-size:8.17cqw; 
 /* ── Market: sin ampliación ── */
 .how-market-fig img{ cursor:default; }
 .ip-stat-n .ip-num{ min-width:calc(2ch - .07em); }   /* el titular aprieta el espaciado: sin sangría a la izquierda */
+
+/* HERO-MOBILE-V4:BEGIN — generado por scripts/aurix-landing-captures.mjs --mobile-v4: hero móvil con los puntos del carrusel. */
+@media (max-width:767px){
+  .hero-shot .hero-hotspot{ left:6.02%; top:23.89%; width:76.93%; height:6.65%; }
+  .hero-shot .hero-curve{ left:4.45%; top:52.34%; width:91.1%; height:41.38%; }
+  .hero-shot .hero-val{ left:6.02%; top:7.76%; font-size:8.17cqw; letter-spacing:-0.1309cqw; line-height:8.98cqw; font-weight:500; color:rgb(255, 255, 255); }
+  html[lang="es"] .hero-shot .hero-hotspot{ left:6.02%; top:23.89%; width:59.74%; height:6.65%; }
+  html[lang="es"] .hero-shot .hero-curve{ left:4.45%; top:52.34%; width:91.1%; height:41.38%; }
+  html[lang="es"] .hero-shot .hero-val{ left:6.02%; top:7.76%; font-size:8.17cqw; letter-spacing:-0.1309cqw; line-height:8.98cqw; font-weight:500; color:rgb(255, 255, 255); }
+}
+/* HERO-MOBILE-V4:END */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AJUSTE MÓVIL FINAL (≤860 px, breakpoint móvil existente; el escritorio no cambia)
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width:860px){
+  /* La cabecera es sticky (en el flujo): no hace falta reservar su altura otra vez. ~32 px visibles. */
+  .hero{ padding-top:32px; }
+  /* Sólo los dos botones del hero: centrados, mismo ancho (máx. 280 px), ~50 px, texto 16 px. */
+  .hero .hero-cta{ flex-direction:column; align-items:center; gap:12px; }
+  .hero .hero-cta .btn{ width:100%; max-width:280px; height:auto; min-height:50px; padding:12px 20px; font-size:16px; white-space:normal; line-height:1.25; }
+}
+@media (max-width:767px){
+  /* Intelligence: rótulo y esfera en la misma fila; la conclusión debajo, a todo el ancho. */
+  .ip-top{ display:grid; grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"kicker orb" "head head"; column-gap:20px; align-items:center; }
+  .ip-top-copy{ display:contents; }
+  .ip-kicker{ grid-area:kicker; }
+  .lp-orb-slot{ grid-area:orb; margin:8px; }
+  .ip-head{ grid-area:head; margin-top:18px; max-width:none; }
+}

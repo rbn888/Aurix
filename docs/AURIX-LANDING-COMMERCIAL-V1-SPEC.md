@@ -272,3 +272,14 @@ Se conserva todo lo aprobado en V2 (estructura, copy, recorrido de la esfera). C
 - **Carátula:** `landing/og-aurix-v3-en.png` (la que usan los metadatos) y `landing/og-aurix-v3-es.png` (preparada). 1200×630, PNG opaco, optimizado sin pérdida con oxipng (~345 KB). Se compone con `scripts/og/aurix-og.html` usando los estilos reales de la landing (Inter, wordmark `.brand`, esfera V3 en pose fijada con ECG visible) y se renderiza con `scripts/aurix-og-render.mjs`, que comprueba márgenes ≥60 px, esfera y halo completos y que el texto no invade la esfera. `og-image.png` antiguo se conserva.
 - **Metadatos:** OG + X (`summary_large_image`) con título, descripción, imagen, `secure_url`, tipo, dimensiones, texto alternativo, URL canónica y locales. Sin duplicados ni referencias locales. **Idioma efectivo: EN para cualquier enlace** (la landing es estática; `?lang=` sólo cambia el idioma con JavaScript, y los rastreadores no lo ejecutan).
 - **Publicación DETENIDA por impedimento material:** `app.aurixsystem.io` devuelve el 404 de GitHub Pages en todas sus rutas (repo `rbn888/Aurix` con `has_pages: false` desde 2026-10-21 15:36 UTC). Publicar ahora mandaría a cada visitante de la nueva landing a ese 404, y el workflow de Pages de `main` fallaría. Se reanuda cuando Pages vuelva a estar activo, en una actuación separada.
+
+---
+
+# Ajuste final exclusivo de móvil (2026-10-21)
+
+Sólo presentación móvil (breakpoint existente ≤860 px; el panel de Intelligence a ≤767 px, el mismo del hero móvil). Escritorio sin cambios: 1440 px ES/EN idéntico píxel a píxel a la V3 publicada.
+- **Hero:** el hueco cabecera → antetítulo pasa de 100 a 32 px (la cabecera es sticky en el flujo y no hay que reservar su altura dos veces). Los dos botones del hero, centrados, mismo ancho (máx. 280 px), 50 px de alto, texto 16 px y 12 px de separación. Los demás botones no cambian.
+- **Dashboard:** los dos puntos son los indicadores del carrusel de la app DENTRO de la captura, y el recorte terminaba encima de ellos. Recurso nuevo `hero-dashboard-v4-{base,curve,full}-m-{es,en}` (la captura llega al borde inferior de la tarjeta, puntos completos con ≥12 px de margen) y su geometría en el bloque generado `HERO-MOBILE-V4` (`scripts/aurix-landing-captures.mjs --mobile-v4`). Los recursos V3 se conservan.
+- **Intelligence:** rótulo y esfera en la misma fila (rejilla con `display:contents` sobre el bloque de texto, sin posiciones absolutas) y la conclusión debajo, a todo el ancho y con la misma letra.
+- **Cache-bust:** `?v=lp-commercial-4`.
+- **Validación:** el gate añade 430 px a la matriz y comprueba hueco, botones, fila rótulo/esfera, ancho de la conclusión y halo; la alineación de capas móvil se mide contra `hero-dashboard-v4-full-m`.
