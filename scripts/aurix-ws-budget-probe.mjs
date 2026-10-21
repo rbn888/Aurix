@@ -86,8 +86,10 @@ async function open(page) {
 // bien, así que la contención hay que preguntarla hijo contra tarjeta.
 const geom = page => page.evaluate(`(function(){
   const q = s => document.querySelector(s);
-  const body = q('.wsbud-body'), ed = q('.wsbud-col-edit'), vw = q('.wsbud-col-view');
-  const top = q('.wsbud-top-card'), dn = q('.wsbud-donut'), f0 = q('.wsbud-col-edit [data-wsbud-amt]');
+  // Cierre quirúrgico C1/C5 — UNA superficie: anillo (vista) y desglose editable (edición) dentro de la
+  // misma tarjeta; el primer «campo» es la primera partida del desglose, que abre el editor.
+  const body = q('.wsbud-main .wsbud-viz'), ed = q('.wsbud-main .wsbud-break'), vw = q('.wsbud-main .wsbud-donut');
+  const top = q('.wsbud-top-card'), dn = q('.wsbud-donut'), f0 = q('.wsbud-br');
   const rect = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { t: Math.round(r.top), l: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height) }; };
   const spill = [];
   document.querySelectorAll('.wsh-tool-view .wsh-card').forEach(card => {
@@ -103,7 +105,7 @@ const geom = page => page.evaluate(`(function(){
     display: body ? getComputedStyle(body).display : null,
     tracks: body ? getComputedStyle(body).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
     edit: rect(ed), view: rect(vw), top: rect(top), donut: rect(dn), field: rect(f0),
-    sideBySide: !!(ed && vw && Math.abs(rect(ed).t - rect(vw).t) < 6 && rect(ed).l !== rect(vw).l),
+    sideBySide: !!(ed && vw && rect(ed).l > rect(vw).l + rect(vw).w - 1 && rect(ed).t < rect(vw).t + rect(vw).h && rect(vw).t < rect(ed).t + rect(ed).h),
     overlap: overlap, spill: spill.slice(0, 4),
     hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     kpiTones: [].slice.call(document.querySelectorAll('.wsbud-kpi')).map(k => getComputedStyle(k, '::before').backgroundColor),
@@ -121,14 +123,14 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const page = await ctx.newPage();
     await open(page);
     const g = await geom(page);
-    ok(`${ENG}.1440 el cuerpo son DOS columnas medidas, no una apilada`, g.tracks === 2, 'pistas=' + g.tracks);
-    // RE-DECIDIDO (SPEC «visualización primero»): el panel visual va a la IZQUIERDA.
-    ok(`${ENG}.1440 respuesta a la IZQUIERDA y edición a la DERECHA, a la misma altura`,
+    ok(`${ENG}.1440 la superficie son DOS pistas medidas (anillo | desglose), no apiladas`, g.tracks === 2, 'pistas=' + g.tracks);
+    // RE-DECIDIDO (C5): anillo a la IZQUIERDA y desglose editable a la DERECHA, en la misma tarjeta.
+    ok(`${ENG}.1440 anillo a la IZQUIERDA y desglose a la DERECHA, a la misma altura`,
       g.sideBySide === true && g.view.l < g.edit.l, JSON.stringify({ e: g.edit, v: g.view }));
     ok(`${ENG}.1440 las columnas no se solapan`, g.overlap === false);
     ok(`${ENG}.1440 el resumen va ENCIMA del cuerpo`, g.top.t < g.edit.t, JSON.stringify([g.top.t, g.edit.t]));
     // §8 — el primer viewport tiene que contener la experiencia útil: campos Y respuesta.
-    ok(`${ENG}.1440 primer viewport: primer campo Y anillo visibles sin scroll`,
+    ok(`${ENG}.1440 primer viewport: primera partida Y anillo visibles sin scroll`,
       g.field.t < 1000 && g.donut && g.donut.t + g.donut.h < 1000, JSON.stringify({ campo: g.field.t, anillo: g.donut && g.donut.t }));
     ok(`${ENG}.1440 nada se pinta fuera de su tarjeta`, g.spill.length === 0, g.spill.join(' '));
     ok(`${ENG}.1440 sin scroll horizontal`, g.hscroll === false);
@@ -147,6 +149,9 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     // Se escribe en un GASTO (`housing`), no en el primer campo del panel: el primer campo es
     // «Nómina» y mover ingresos no cambia el KPI de gastos ni el arco de vivienda. La primera
     // versión de esta sonda medía eso y se puso roja con razón — el defecto era la prueba.
+    // C4/C5: se edita desde el resumen («Gastos» abre el editor) con el mismo campo de siempre.
+    await page.click('[data-wsbud-open="expense"]');
+    await page.waitForSelector('.wsbud-ed [data-wsbud-amt="housing"]');
     const fld = await page.$('[data-wsbud-amt="housing"]');
     await fld.click({ clickCount: 3 });
     await page.keyboard.type('1400', { delay: 18 });
@@ -181,13 +186,13 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const page = await ctx.newPage();
     await open(page);
     const g = await geom(page);
-    ok(`${ENG}.${w} una sola columna`, g.sideBySide === false, JSON.stringify({ e: g.edit.l, v: g.view.l }));
-    // RE-DECIDIDO: primero entender (resumen → anillo), después editar.
-    ok(`${ENG}.${w} resumen primero, luego el anillo, luego la edición`,
-      g.top.t < g.view.t && g.view.t < g.edit.t, JSON.stringify([g.top.t, g.view.t, g.edit.t]));
-    // §33 — editar no puede exigir cruzar el gráfico entero.
-    ok(`${ENG}.${w} el primer campo está al alcance (< 1,5 pantallas)`,
-      g.field.t < h * 1.5, 'campo@' + g.field.t + ' de ' + h);
+    // ≥768 la superficie ya compone anillo | desglose; por debajo se apila (anillo y luego desglose).
+    if (w < 768) ok(`${ENG}.${w} una sola columna`, g.sideBySide === false, JSON.stringify({ e: g.edit.l, v: g.view.l }));
+    ok(`${ENG}.${w} resumen primero, luego el anillo, luego el desglose`,
+      g.top.t < g.view.t && (w >= 768 ? g.view.l < g.edit.l : g.view.t < g.edit.t), JSON.stringify([g.top.t, g.view.t, g.edit.t]));
+    // C7 — la primera pantalla enseña el comienzo del desglose.
+    ok(`${ENG}.${w} el desglose empieza dentro de la primera pantalla`,
+      g.edit.t < h, 'desglose@' + g.edit.t + ' de ' + h);
     ok(`${ENG}.${w} nada se pinta fuera de su tarjeta`, g.spill.length === 0, g.spill.join(' '));
     ok(`${ENG}.${w} sin scroll horizontal`, g.hscroll === false);
     ok(`${ENG}.${w} el anillo cabe a lo ancho`, g.donut && g.donut.w <= w - 24, 'anillo=' + (g.donut && g.donut.w));
@@ -207,10 +212,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       return JSON.stringify({ donut: document.querySelectorAll('.wsbud-donut').length,
         arcs: document.querySelectorAll('.wsbud-arc').length,
         rate: (document.querySelector('.wstool-res-final') || {}).textContent,
-        legend: document.querySelectorAll('.wsbud-leg').length });})()`).then(JSON.parse);
+        pcts: [].slice.call(document.querySelectorAll('.wsbud-br-p')).filter(function(e){ return e.textContent.trim(); }).length });})()`).then(JSON.parse);
     ok(`${ENG}.vacío sin gastos NO se pinta anillo`, empty.donut === 0 && empty.arcs === 0, JSON.stringify(empty));
     ok(`${ENG}.vacío la tasa dice «no aplicable», nunca 0 %`, !/^0\s*%/.test(String(empty.rate || '').trim()), String(empty.rate));
-    ok(`${ENG}.vacío tampoco hay leyenda de categorías inexistentes`, empty.legend === 0, 'leyenda=' + empty.legend);
+    // RE-DECIDIDO (C5): las partidas declaradas a cero se listan para poder rellenarlas, pero sin gasto
+    // que repartir NINGUNA publica un porcentaje.
+    ok(`${ENG}.vacío sin gasto que repartir ninguna partida publica un %`, empty.pcts === 0, 'pcts=' + empty.pcts);
     await ctx.close();
   }
   await browser.close();

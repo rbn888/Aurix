@@ -32903,3 +32903,172 @@ body.aurix-fintel-lock { overflow: hidden; }
   .fintel-overlay, .fintel-card { transition: none; }
   .fintel-card, .fintel-overlay.is-open .fintel-card { transform: none; animation: none; }
 }
+
+/* ══ CIERRE QUIRÚRGICO · PRESUPUESTO MENSUAL — UNA SOLA SUPERFICIE ═══════════════════════════
+   Cabecera (título, estado, moneda, periodo, Guardar, ···) → resumen que abre editores →
+   anillo + desglose editable → lectura → ayuda. Editor ÚNICO: hoja inferior en móvil, modal
+   ligero en escritorio. Sin rejillas anidadas con scroll propio. */
+/* C2 — moneda y periodo en la barra a TODAS las anchuras; Guardado y sin cambios = sólo el estado. */
+.aurix-wsh .wsh-bar-ccy.is-budget { display: flex; align-items: center; gap: 6px; }
+.aurix-wsh .wsh-bar-ccy.is-budget .wsbud-perchip-lbl { display: none; }
+.aurix-wsh .wsh-bar-ccy.is-budget .wsbud-perchip-sel { min-height: 44px; }
+.aurix-wsh[data-wsbud-view] .wsg-savebtn[disabled] { display: none; }
+/* C4 — las cifras del resumen son botones: afordancia discreta (filete + chevrón). */
+.aurix-wsh .wsbud-kpi.is-btn {
+  font: inherit; color: inherit; text-align: left; cursor: pointer; min-height: 44px;
+  padding-right: 28px; -webkit-tap-highlight-color: transparent;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.aurix-wsh .wsbud-kpi-go {
+  position: absolute; right: 9px; top: 50%; width: 14px; height: 14px; margin-top: -7px;
+  fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  color: rgba(159,194,255,0.5); transition: transform 150ms ease, color 150ms ease;
+}
+.aurix-wsh .wsbud-kpi.is-btn:hover, .aurix-wsh .wsbud-kpi.is-btn:focus-visible { border-color: rgba(120,170,255,0.55); }
+.aurix-wsh .wsbud-kpi.is-btn:hover .wsbud-kpi-go, .aurix-wsh .wsbud-kpi.is-btn:focus-visible .wsbud-kpi-go { color: #cfe0ff; transform: translateX(2px); }
+.aurix-wsh .wsbud-kpi.is-btn:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: 2px; }
+/* C5 — la superficie: cabecera con «+ Ingreso / + Gasto», anillo a la izquierda y desglose. */
+.aurix-wsh .wsbud-main { padding: 12px 14px 12px; }
+.aurix-wsh .wsbud-main-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 6px; }
+.aurix-wsh .wsbud-main-head .wsbud-chart-title { margin: 0; }
+.aurix-wsh .wsbud-main-acts { display: flex; gap: 6px; }
+.aurix-wsh .wsbud-add.is-compact { margin: 0; min-height: 44px; padding: 0 12px; gap: 6px; }
+.aurix-wsh .wsbud-main .wsbud-viz { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: stretch; align-items: start; gap: 10px; }
+.aurix-wsh .wsbud-main .wsbud-donut, .aurix-wsh .wsbud-main .wsbud-empty { justify-self: center; max-width: 172px; margin: 0; }
+@media (min-width: 768px) {
+  .aurix-wsh .wsbud-main { padding: 14px 18px 14px; }
+  .aurix-wsh .wsbud-main .wsbud-viz { grid-template-columns: minmax(168px, 232px) minmax(0, 1fr); gap: 26px; align-items: center; }
+  .aurix-wsh .wsbud-main .wsbud-donut, .aurix-wsh .wsbud-main .wsbud-empty { max-width: 232px; width: 100%; }
+}
+@media (min-width: 1200px) {
+  .aurix-wsh .wsbud-main .wsbud-viz { grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 36px; }
+  .aurix-wsh .wsbud-main .wsbud-donut, .aurix-wsh .wsbud-main .wsbud-empty { max-width: 260px; }
+}
+.aurix-wsh .wsbud-break { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.aurix-wsh .wsbud-break .wsbud-leg-basis { margin: 0; }
+.aurix-wsh .wsbud-brlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.aurix-wsh .wsbud-br {
+  display: grid; grid-template-columns: 9px minmax(0, 1fr) auto 38px 44px; align-items: center; column-gap: 6px;
+  min-height: 44px; padding-left: 8px; border-radius: 10px; border-bottom: 1px solid rgba(120,160,255,0.08);
+}
+.aurix-wsh .wsbud-br:last-child { border-bottom-color: transparent; }
+.aurix-wsh .wsbud-br.is-sel { background: rgba(74,130,240,0.10); }
+.aurix-wsh .wsbud-br-dot { width: 9px; height: 9px; border-radius: 3px; }
+.aurix-wsh .wsbud-br-n, .aurix-wsh .wsbud-br-a {
+  font: inherit; font-size: 14px; line-height: 1.3; color: inherit; background: none; border: 0; cursor: pointer;
+  min-height: 44px; padding: 4px 6px; border-radius: 8px; transition: background-color 150ms ease;
+}
+.aurix-wsh .wsbud-br-n { text-align: left; color: var(--text-bright, #e6edff); overflow-wrap: anywhere; min-width: 0; }
+.aurix-wsh .wsbud-br-a { text-align: right; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.aurix-wsh .wsbud-br-p { font-size: 12.5px; text-align: right; color: rgba(200,214,245,0.78); font-variant-numeric: tabular-nums; }
+.aurix-wsh .wsbud-br-ed {
+  width: 44px; height: 44px; display: grid; place-items: center; padding: 0; background: none; border: 0;
+  border-radius: 8px; color: rgba(159,194,255,0.5); cursor: pointer; transition: color 150ms ease, background-color 150ms ease;
+}
+.aurix-wsh .wsbud-br-ed svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.aurix-wsh .wsbud-br-n:hover, .aurix-wsh .wsbud-br-a:hover, .aurix-wsh .wsbud-br-ed:hover { background: rgba(74,130,240,0.10); }
+.aurix-wsh .wsbud-br-ed:hover { color: #cfe0ff; }
+.aurix-wsh .wsbud-br-n:focus-visible, .aurix-wsh .wsbud-br-a:focus-visible, .aurix-wsh .wsbud-br-ed:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: -2px; color: #cfe0ff; }
+/* C6 — la lectura, una franja premium breve. Tono por resultado, sin rojo de alarma. */
+.aurix-wsh .wsbud-insight {
+  display: flex; align-items: center; gap: 10px; margin: 0; padding: 11px 14px; border-radius: 14px;
+  font-size: 13.5px; line-height: 1.45; color: var(--text-bright, #e6edff);
+  border: 1px solid rgba(92,150,255,0.24); background: var(--elev-0, #0b1120);
+  background-image: linear-gradient(90deg, rgba(46,96,214,0.16), rgba(46,96,214,0) 72%);
+}
+.aurix-wsh .wsbud-insight-mk { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: #57e6a6; box-shadow: 0 0 10px rgba(87,230,166,0.5); }
+.aurix-wsh .wsbud-insight[data-tone="zero"] .wsbud-insight-mk { background: #9fb8e8; box-shadow: 0 0 10px rgba(159,184,232,0.4); }
+.aurix-wsh .wsbud-insight[data-tone="neg"] .wsbud-insight-mk { background: rgba(240,170,110,0.98); box-shadow: 0 0 10px rgba(240,170,110,0.45); }
+.aurix-wsh .wsbud-insight-slot:empty { display: none; }
+/* El editor único. */
+.wsbud-edhost { display: contents; }
+.wsbud-ed { position: fixed; inset: 0; z-index: 990; display: flex; align-items: flex-end; justify-content: center; }
+.wsbud-ed-scrim { position: absolute; inset: 0; background: rgba(3,6,14,0.62); opacity: 0; transition: opacity 180ms ease; }
+.wsbud-ed.is-open .wsbud-ed-scrim { opacity: 1; }
+.wsbud-ed-panel {
+  position: relative; display: flex; flex-direction: column; width: 100%; max-height: 88vh; max-height: 88dvh;
+  background-color: #121825; background-image: linear-gradient(180deg, rgba(46,96,214,0.10), rgba(46,96,214,0) 120px);
+  border: 1px solid rgba(92,150,255,0.26); border-bottom: 0; border-radius: 18px 18px 0 0;
+  box-shadow: 0 -18px 48px -20px rgba(0,0,0,0.7); padding-bottom: env(safe-area-inset-bottom, 0px);
+  opacity: 0; transform: translateY(18px); transition: opacity 180ms ease, transform 220ms cubic-bezier(0.22,1,0.36,1);
+}
+.wsbud-ed.is-open .wsbud-ed-panel { opacity: 1; transform: none; }
+.wsbud-ed-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 4px 16px; }
+.wsbud-ed-head > [data-wsbud-addslot] { margin-left: auto; }
+.aurix-wsh .wsbud-ed-head .wsbud-add { margin: 0; }
+.wsbud-ed-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-bright, #e6edff); }
+.wsbud-ed-x { width: 44px; height: 44px; display: grid; place-items: center; padding: 0; background: none; border: 0; border-radius: 12px; color: #b9c6de; cursor: pointer; }
+.wsbud-ed-x svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.wsbud-ed-x:hover { background: rgba(74,130,240,0.10); color: #fff; }
+.wsbud-ed-x:focus-visible { outline: 2px solid rgba(140,180,255,0.9); outline-offset: -2px; }
+.wsbud-ed-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 14px 6px; display: flex; flex-direction: column; gap: 12px; }
+.aurix-wsh .wsbud-ed-sec .wsbud-blockhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; min-height: 44px; }
+.aurix-wsh .wsbud-ed-sec .wsbud-blockhead > span:only-child { margin-left: auto; }
+.aurix-wsh .wsbud-ed-sec .wsbud-blockhead .wsbud-add { margin: 0; }
+.wsbud-ed-foot { display: flex; justify-content: flex-end; padding: 8px 14px 12px; border-top: 1px solid rgba(120,160,255,0.10); }
+.wsbud-ed-done { min-height: 44px; min-width: 112px; }
+html:has(.wsbud-ed.is-open) { overflow: hidden; }
+@media (min-width: 768px) {
+  .wsbud-ed { align-items: center; padding: 24px; }
+  .wsbud-ed-panel { width: min(560px, 100%); max-height: min(82vh, 760px); border-bottom: 1px solid rgba(92,150,255,0.26); border-radius: 18px; transform: translateY(8px) scale(0.99); box-shadow: 0 28px 70px -24px rgba(0,0,0,0.75); padding-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wsbud-ed-scrim, .wsbud-ed-panel, .aurix-wsh .wsbud-kpi.is-btn, .aurix-wsh .wsbud-kpi-go { transition: none; }
+  .wsbud-ed-panel { transform: none; }
+  .aurix-wsh .wsbud-kpi.is-btn:hover .wsbud-kpi-go { transform: none; }
+}
+@media (min-width: 1024px) {
+  .aurix-wsh .wsbud-main .wsbud-viz { grid-template-columns: minmax(200px, 260px) minmax(0, 760px); justify-content: center; column-gap: 56px; }
+}
+/* La fila de acciones cabe a 360: el periodo cede ancho, Guardar nunca salta de línea. */
+.aurix-wsh .wsh-bar-ccy.is-budget { flex: 0 1 auto; min-width: 0; }
+.aurix-wsh .wsh-bar-ccy.is-budget .wsbud-perchip { min-width: 0; }
+.aurix-wsh .wsh-bar-ccy.is-budget .wsbud-ccychip { flex: 0 0 auto; }
+.aurix-wsh .wsh-bar-ccy.is-budget .wsbud-perchip:not(.wsbud-ccychip) { flex: 0 1 auto; }
+.aurix-wsh .wsh-bar-ccy.is-budget .wsbud-perchip:not(.wsbud-ccychip) .wsbud-perchip-sel { width: 100%; min-width: 0; max-width: 200px; }
+@media (max-width: 767px) { .aurix-wsh[data-wsbud-view] .wsh-barwrap > .wsh-bar-actions { flex-wrap: nowrap; } }
+.aurix-wsh .wsbud-br-n { overflow-wrap: break-word; hyphens: auto; }
+@media (max-width: 420px) {
+  .aurix-wsh .wsbud-br { grid-template-columns: 9px minmax(0, 1fr) auto 32px 44px; column-gap: 3px; padding-left: 4px; }
+  .aurix-wsh .wsbud-br-n, .aurix-wsh .wsbud-br-a { padding-left: 4px; padding-right: 4px; }
+}
+
+/* ══ CIERRE QUIRÚRGICO · A · CÁPSULA DE SALUD Y DONUT (escritorio, ≥769) ═════════════════════
+   · La zona del patrimonio mide lo que su contenido (`fit-content`) y la fila de salud ocupa ese
+     ancho: el donut (`margin-left:auto`) cae bajo el FINAL DE LA CIFRA y no se mueve con la
+     cápsula; si la cápsula llega más lejos, la fila crece y el donut queda a 24 px de ella.
+   · Se retira el «dos niveles» forzado por container query (su `inline-size` además impedía
+     que la fila midiera su contenido): mensaje corto = UNA línea; largo = como mucho dos, con
+     aire en los cuatro lados. El «·» sigue pegado a la acción y «Ver análisis ›» no se parte.
+   · Fallback: con poco sitio la cápsula baja a dos líneas (base 220 px) y, si aún no cabe, el
+     donut baja entero de línea. Su tamaño, diseño y clic no cambian. Móvil, intacto. */
+@media (min-width: 769px) {
+  .hero-left .summary-hero-zone { width: fit-content; max-width: 100%; }
+  .summary-hero-zone .aurix-signal-row { container-type: normal; flex-wrap: wrap; column-gap: 24px; row-gap: 12px; }
+  .aurix-signal-row > #aurixSignal { flex: 1 1 220px; max-width: max-content; padding: 9px 16px 10px; border-radius: 22px; }
+  .aurix-signal--health .aurix-signal-msg { white-space: normal; margin-right: 16px; }
+  .aurix-signal--health .aurix-signal-act { display: inline-block; margin-left: -16px; }
+  .aurix-signal--health .aurix-signal-sep { display: inline-block; }
+  .aurix-signal--health .aurix-signal-cta { margin-left: 0; margin-right: 0; }
+  .aurix-signal-row .micro-composition-donut { flex: 0 0 auto; margin-left: auto; }
+}
+@media (min-width: 769px) and (max-width: 1199px) {
+  .summary-hero-zone .aurix-signal-row { column-gap: 16px; }
+  .aurix-signal-row > #aurixSignal { padding-left: 14px; padding-right: 14px; }
+}
+@media (min-width: 769px) and (max-width: 1199px) {
+  /* Base = el ancho mínimo en el que el estado más largo (EN) cabe en DOS líneas: por debajo, el
+     donut baja entero antes de que la cápsula pase a tres. */
+  .aurix-signal-row > #aurixSignal { flex-basis: 236px; }
+}
+@media (min-width: 769px) and (max-width: 860px) {
+  .aurix-signal-row > #aurixSignal { padding-left: 11px; padding-right: 11px; }
+}
+
+/* ══ CIERRE QUIRÚRGICO · B · CARDS DE CATEGORÍA (sólo escritorio, ≥769) ═════════════════════════
+   El contenido (punto, categoría, importe e iconos) se separa del agarre de seis puntos —antes a
+   3 px— y el estado del mercado y el % ganan margen interior derecho. Móvil, intacto. */
+@media (min-width: 769px) {
+  .categories-grid .cat-card { padding-left: 31px; padding-right: 28px; }
+  .categories-grid .cat-card .market-status { right: 26px; }
+}

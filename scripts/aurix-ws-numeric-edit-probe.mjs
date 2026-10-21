@@ -61,7 +61,8 @@ const CAPS = [
   { id: 'compound',    open: `_wsOpenTool('compound')`,       sel: '.wstool-inputs-card .ws4-num' },
   { id: 'loan',        open: `_wsOpenTool('loan')`,           sel: '.wsloan-fields .ws4-num' },
   // Presupuesto con FILAS (cb0776a): el importe de cada categoría es `[data-wsbud-amt]`.
-  { id: 'budget',      open: `_wsOpenTool('budget')`,         sel: '.wsbud-col-edit [data-wsbud-amt]' },
+  // Cierre quirúrgico C5: los importes se editan en el editor ÚNICO (`_wsBudgetEditorOpen`).
+  { id: 'budget',      open: `_wsOpenTool('budget')`,         sel: '.wsbud-ed [data-wsbud-amt]', post: `_wsBudgetEditorOpen('expense')` },
   { id: 'journal',     open: `_wsOpenTool('journal')`,        sel: '[data-wsjrn-input="buy"]' },
   { id: 'realestate',  open: `_wsOpenTool('realestate')`,     sel: '[data-wsre-input="buy"]' },
   { id: 'receivables', open: `_wsOpenTool('receivables')`,    sel: '[data-wsrecv-input="unitPrice"]' },
@@ -83,7 +84,7 @@ async function mount(page) {
     switchTab('workspace'); return true; })()`);
   await page.waitForTimeout(300);
 }
-const openCap = (page, cap) => page.evaluate(`(function(){ _wshView='home'; renderWorkspaceHome(); ${cap.open}; renderWorkspaceHome(); return true; })()`)
+const openCap = (page, cap) => page.evaluate(`(function(){ _wshView='home'; renderWorkspaceHome(); ${cap.open}; renderWorkspaceHome(); ${cap.post || ''}; return true; })()`)
   .then(() => page.waitForTimeout(260));
 const put = (page, sel, v) => page.evaluate(`(function(){ var el=document.querySelector('#aurixWorkspace ' + ${JSON.stringify(sel)}); if(!el) return false; el.blur(); el.value=${JSON.stringify(v)}; return true; })()`);
 const read = (page, sel) => page.evaluate(`(function(){ var el=document.querySelector('#aurixWorkspace ' + ${JSON.stringify(sel)});

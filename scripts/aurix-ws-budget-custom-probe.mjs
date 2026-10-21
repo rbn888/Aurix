@@ -64,7 +64,11 @@ async function boot(page, { lang = 'es', seed = null, uid = 'probe-a' } = {}) {
   await page.waitForTimeout(800);
   await page.evaluate(PREMIUM(uid));
 }
-const openTool = (page, id) => page.evaluate(`(function(){ switchTab('workspace'); _wsOpenTool('budget'${id ? ', ' + JSON.stringify(id) : ''}); return true; })()`).then(() => page.waitForTimeout(350));
+// Cierre quirúrgico C5: las filas se editan en el editor ÚNICO. `ed` (por defecto) lo abre en modo
+// «ingresos y gastos» para que los casos de edición hablen con las mismas filas de siempre.
+const openTool = (page, id, ed = true) => page.evaluate(`(function(){ switchTab('workspace'); _wsOpenTool('budget'${id ? ', ' + JSON.stringify(id) : ''}); ${ed ? "_wsBudgetEditorOpen('all'); try { document.activeElement.blur(); } catch (_) {}" : ''} return true; })()`).then(() => page.waitForTimeout(350));
+const edClose = page => page.evaluate(`_wsBudgetEditorClose()`).then(() => page.waitForTimeout(150));
+const edAll = page => page.evaluate(`(function(){ if (!document.querySelector('.wsbud-ed')) _wsBudgetEditorOpen('all'); try { document.activeElement.blur(); } catch (_) {} })()`).then(() => page.waitForTimeout(150));
 const J = (page, expr) => page.evaluate(`(function(){ try { return JSON.stringify((function(){ ${expr} })()); } catch (e) { return JSON.stringify({ __err: String(e && e.message || e) }); } })()`).then(JSON.parse);
 const state = page => J(page, `
   var q = function(s){ return document.querySelector(s); };
@@ -73,7 +77,7 @@ const state = page => J(page, `
     return { id: r.getAttribute('data-wsbud-row'), name: n ? (n.value || n.textContent).trim() : '', amt: a ? a.value : null, sel: r.classList.contains('is-sel') }; });
   return { rows: names,
     kpis: [].slice.call(document.querySelectorAll('.wsbud-kpi b')).map(function(b){ return b.textContent.trim(); }),
-    legend: [].slice.call(document.querySelectorAll('.wsbud-leg')).map(function(b){ return { id: b.getAttribute('data-wsbud-sel'), n: (b.querySelector('.wsbud-leg-n')||{}).textContent, pressed: b.getAttribute('aria-pressed') }; }),
+    legend: [].slice.call(document.querySelectorAll('.wsbud-br')).map(function(b){ return { id: b.getAttribute('data-wsbud-br'), n: (b.querySelector('.wsbud-br-n')||{}).textContent, pressed: b.classList.contains('is-sel') ? 'true' : 'false' }; }),
     arcs: [].slice.call(document.querySelectorAll('.wsbud-arc')).map(function(a){ return { id: a.getAttribute('data-wsbud-seg'), cls: a.getAttribute('class') }; }),
     centre: (q('.wsbud-donut-c') || { textContent: '' }).textContent.replace(/\\s+/g, ' ').trim(),
     reading: (q('.wsbud-reading') || { textContent: '' }).textContent.trim(),
@@ -117,24 +121,25 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: w < 700 ? 2 : 1, reducedMotion: 'reduce', hasTouch: w < 900 });
       const page = await ctx.newPage();
       await boot(page, { lang });
-      await openTool(page);
+      await openTool(page, null, false);
       const g = await J(page, `${CONTRAST}
         var q = function(s){ return document.querySelector(s); };
         var R = function(e){ if (!e) return null; var r = e.getBoundingClientRect(); return { t: r.top + scrollY, l: r.left, r: r.right, b: r.bottom + scrollY, w: r.width, h: r.height }; };
-        var top = R(q('.wsbud-top-card')), view = R(q('.wsbud-col-view')), edit = R(q('.wsbud-col-edit')), help = R(q('.wsbud-col-help')), dn = R(q('.wsbud-donut svg')), dc = R(q('.wsbud-donut-c b'));
+        var top = R(q('.wsbud-top-card')), view = R(q('.wsbud-main .wsbud-donut')), edit = R(q('.wsbud-main .wsbud-break')), help = R(q('.wsbud-col-help')), dn = R(q('.wsbud-donut svg')), dc = R(q('.wsbud-donut-c b')), main = R(q('.wsbud-main')), ins = R(q('.wsbud-insight'));
         var spill = []; document.querySelectorAll('.wsh-tool-view .wsh-card').forEach(function(card){ var cb = card.getBoundingClientRect();
           card.querySelectorAll('*').forEach(function(e){ var r = e.getBoundingClientRect(); if (r.width && (r.right > cb.right + 1 || r.left < cb.left - 1)) spill.push(String(e.className || e.tagName).slice(0, 40)); }); });
-        var small = []; document.querySelectorAll('.wsbud-leg, .wsbud-name, .wsbud-del, .wsbud-add, [data-wsbud-amt], .wsbud-perchip-sel').forEach(function(e){ var r = e.getBoundingClientRect(); if (r.width && (r.height < 43.5 || r.width < 43.5)) small.push(String(e.className).slice(0, 24) + ':' + Math.round(r.width) + 'x' + Math.round(r.height)); });
-        var tiny = []; document.querySelectorAll('.wsbud-leg-n, .wsbud-leg b, .wsbud-leg em, .wsbud-donut-c i, .wsbud-donut-c em, .wsbud-name, .wsbud-reading, .wsbud-kpi i').forEach(function(e){ if (parseFloat(getComputedStyle(e).fontSize) < 12) tiny.push(e.className); });
-        var low = []; document.querySelectorAll('.wsbud-leg-n, .wsbud-leg b, .wsbud-leg em, .wsbud-donut-c i, .wsbud-donut-c b, .wsbud-donut-c em, .wsbud-name, .wsbud-reading, .wsbud-kpi i, .wsbud-kpi b, .wsbud-add, .wsbud-chart-title').forEach(function(e){ var k = ratio(e); if (k < 4.5) low.push(String(e.className || e.tagName).slice(0, 20) + '=' + k.toFixed(2)); });
+        var small = []; document.querySelectorAll('.wsbud-br-n, .wsbud-br-a, .wsbud-br-ed, .wsbud-kpi.is-btn, .wsbud-add, .wsbud-perchip-sel').forEach(function(e){ var r = e.getBoundingClientRect(); if (r.width && (r.height < 43.5 || r.width < 43.5)) small.push(String(e.className).slice(0, 24) + ':' + Math.round(r.width) + 'x' + Math.round(r.height)); });
+        var tiny = []; document.querySelectorAll('.wsbud-br-n, .wsbud-br-a, .wsbud-br-p, .wsbud-donut-c i, .wsbud-donut-c em, .wsbud-reading, .wsbud-kpi i').forEach(function(e){ if (parseFloat(getComputedStyle(e).fontSize) < 12) tiny.push(e.className); });
+        var low = []; document.querySelectorAll('.wsbud-br-n, .wsbud-br-a, .wsbud-br-p, .wsbud-donut-c i, .wsbud-donut-c b, .wsbud-donut-c em, .wsbud-reading, .wsbud-kpi i, .wsbud-kpi b, .wsbud-add, .wsbud-chart-title').forEach(function(e){ var k = ratio(e); if (k < 4.5) low.push(String(e.className || e.tagName).slice(0, 20) + '=' + k.toFixed(2)); });
         var nav = [].slice.call(document.querySelectorAll('.mobile-nav, .bottom-nav, nav')).map(function(n){ return n.getBoundingClientRect(); }).filter(function(r){ return r.height > 0 && r.bottom >= innerHeight - 2 && r.top > innerHeight / 2; })[0];
         var hole = dn ? { l: dn.l + dn.w * 0.26, r: dn.r - dn.w * 0.26, t: dn.t + dn.h * 0.26, b: dn.b - dn.h * 0.26 } : null;
-        return { top: top, view: view, edit: edit, help: help, dn: dn, dc: dc, hole: hole, spill: spill.slice(0, 5), small: small.slice(0, 6), tiny: tiny.slice(0, 4), low: low.slice(0, 6),
+        return { top: top, view: view, edit: edit, help: help, main: main, ins: ins, dn: dn, dc: dc, hole: hole, spill: spill.slice(0, 5), small: small.slice(0, 6), tiny: tiny.slice(0, 4), low: low.slice(0, 6),
           hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, vw: innerWidth, vh: innerHeight, navTop: nav ? nav.top : null,
-          order: getComputedStyle(q('.wsbud-col-view')).order + ',' + getComputedStyle(q('.wsbud-col-edit')).order,
-          dom: (function(){ var b = q('.wsbud-body'); return [].slice.call(b.children).map(function(c){ return c.className.split(' ')[0]; }).join('>'); })() };`);
-      ok(`${T} DOM en orden de lectura (reparto → edición → ayuda) y sin \`order\``,
-        g.dom === 'wsbud-col-view>wsbud-col-edit>wsbud-col-help' && g.order === '0,0', g.dom + ' / ' + g.order);
+          order: getComputedStyle(q('.wsbud-main')).order + ',' + getComputedStyle(q('.wsbud-col-help')).order,
+          dom: (function(){ var v = q('.wsh-tool-view'); return [].slice.call(v.children).map(function(c){ return (c.className.match(/wsbud-[a-z-]+|wsh-barwrap/) || [''])[0]; }).filter(Boolean).join('>'); })() };`);
+      // RE-DECIDIDO (C1): resumen → superficie (anillo + desglose) → lectura → ayuda, sin `order`.
+      ok(`${T} DOM en orden de lectura (resumen → reparto → lectura → ayuda) y sin \`order\``,
+        /wsbud-top-card>wsbud-out-card>wsbud-insight-slot>wsbud-col-help/.test(g.dom) && g.order === '0,0', g.dom + ' / ' + g.order);
       ok(`${T} sin scroll horizontal`, g.hscroll === false);
       ok(`${T} nada se pinta fuera de su tarjeta`, g.spill.length === 0, g.spill.join(' '));
       ok(`${T} el anillo cabe entero en su ancho y su cifra dentro del hueco`,
@@ -142,17 +147,17 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       ok(`${T} objetivos táctiles ≥ 44 px`, g.small.length === 0, g.small.join(' '));
       ok(`${T} ningún texto del Presupuesto baja de 12 px`, g.tiny.length === 0, g.tiny.join(' '));
       ok(`${T} contraste ≥ 4,5:1 en cifras, nombres y lectura`, g.low.length === 0, g.low.join(' '));
-      if (w >= 1024 && tag !== 'landscape') {
-        ok(`${T} escritorio: panel visual a la IZQUIERDA y edición a la derecha, a la misma altura`,
-          Math.abs(g.view.t - g.edit.t) < 4 && g.view.r <= g.edit.l, JSON.stringify({ v: g.view, e: g.edit }));
-        const share = g.view.w / (g.view.w + g.edit.w);
-        ok(`${T} el panel visual es ligeramente protagonista (≈56 %)`, share > 0.53 && share < 0.59, share.toFixed(3));
-        ok(`${T} la ayuda vive bajo el reparto, en la columna izquierda`, g.help.t >= g.view.b - 1 && g.help.r <= g.edit.l, JSON.stringify(g.help));
-        if (w === 1440) ok(`${T} anillo claramente mayor que antes (208 px)`, g.dn.w >= 280, 'w=' + g.dn.w);
+      // RE-DECIDIDO (C5): ≥768 anillo a la izquierda y desglose a la derecha en la MISMA tarjeta;
+      // debajo, apilados. Lectura y ayuda, después de la superficie.
+      if (w >= 768) {
+        ok(`${T} anillo a la IZQUIERDA y desglose a la derecha, en la misma tarjeta`,
+          g.view.r <= g.edit.l && g.view.t < g.edit.b && g.edit.t < g.view.b && g.main.t <= g.view.t && g.main.b >= g.edit.b - 1, JSON.stringify({ v: g.view, e: g.edit }));
+        if (w === 1440) ok(`${T} el anillo conserva presencia en escritorio`, g.dn.w >= 240, 'w=' + g.dn.w);
       } else {
-        ok(`${T} apilado: resumen → anillo → edición`, g.top.b <= g.view.t + 1 && g.view.b <= g.edit.t + 1, JSON.stringify([g.top.b, g.view.t, g.view.b, g.edit.t]));
-        if (!tag && w < 700) ok(`${T} el anillo aparece en la primera pantalla`, g.dn.t < g.vh, 'anillo@' + Math.round(g.dn.t) + ' de ' + g.vh);
+        ok(`${T} apilado: resumen → anillo → desglose`, g.top.b <= g.view.t + 1 && g.view.b <= g.edit.t + 1, JSON.stringify([g.top.b, g.view.t, g.view.b, g.edit.t]));
       }
+      ok(`${T} la lectura y la ayuda van después de la superficie`, g.ins && g.main.b <= g.ins.t + 1 && g.ins.b <= g.help.t + 1, JSON.stringify([g.main.b, g.ins && g.ins.t, g.help.t]));
+      if (!tag && w < 1024) ok(`${T} primera pantalla: identidad, controles, resumen y comienzo del desglose`, g.edit.t < g.vh && g.top.b < g.vh, 'desglose@' + Math.round(g.edit.t) + ' de ' + g.vh);
       // La navegación inferior no tapa el final: se baja del todo y se mide la barra de guardado.
       if (w < 1024) {
         const end = await J(page, `document.documentElement.style.scrollBehavior = 'auto'; var sb = document.querySelector('[data-wstool-savebar]');
@@ -272,6 +277,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       var off = 0; for (var i = 0; i < its.length && its[i].id !== 'housing'; i++) off += its[i].value / rows.expenses;
       var mid = off + (its[i].value / rows.expenses) / 2; var ang = -Math.PI / 2 + mid * 2 * Math.PI; var k = r.width / 120;
       return { x: r.left + (60 + Math.cos(ang) * 52) * k, y: r.top + (60 + Math.sin(ang) * 52) * k };`);
+    await edClose(page);
     await ptOf(); await page.waitForTimeout(400);
     const pt = await ptOf();  // se mide DESPUÉS de que el desplazamiento se asiente (WebKit re-desplaza al enfocar)
     if (w < 900) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
@@ -281,27 +287,29 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     ok(`${T}.Q ${w < 900 ? 'toque' : 'ratón'} sobre el segmento: resalta, atenúa el resto y el centro dice nombre, importe y %`,
       selArc && /is-sel/.test(selArc.cls) && s.arcs.filter(a => a.id !== 'housing').every(a => /is-dim/.test(a.cls))
       && /Vivienda/i.test(s.centre) && /700/.test(s.centre) && /%/.test(s.centre), s.centre);
-    ok(`${T}.Q …y resalta también la fila del editor y la de la leyenda`,
-      s.rows.find(r => r.id === 'housing').sel === true && (s.legend.find(l => l.id === 'housing') || {}).pressed === 'true');
+    ok(`${T}.Q …y resalta también su partida del desglose`, (s.legend.find(l => l.id === 'housing') || {}).pressed === 'true');
     if (w < 900) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
     await page.waitForTimeout(150);
     s = await state(page);
     ok(`${T}.Q pulsar de nuevo vuelve al estado general`, !s.arcs.some(a => /is-sel|is-dim/.test(a.cls)) && /la mayor partida/.test(s.centre), s.centre);
-    // teclado
-    await page.focus('.wsbud-leg[data-wsbud-sel="food"]');
-    await page.keyboard.press('Enter'); await page.waitForTimeout(150);
-    s = await state(page);
-    const focusVis = await J(page, `var e = document.activeElement; var cs = getComputedStyle(e); return { sel: e.getAttribute('data-wsbud-sel'), outline: cs.outlineStyle + ' ' + cs.outlineWidth };`);
-    ok(`${T}.Q teclado: Enter en la leyenda selecciona y el foco se conserva`, /Alimentación/i.test(s.centre) && focusVis.sel === 'food', JSON.stringify(focusVis));
-    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-    s = await state(page);
-    ok(`${T}.Q Escape devuelve el estado general`, !s.arcs.some(a => /is-sel/.test(a.cls)));
-    await page.focus('.wsbud-leg[data-wsbud-sel="food"]'); await page.keyboard.press('Space'); await page.waitForTimeout(120);
-    await page.mouse.click(5, h - 5 > 0 ? 200 : 200); await page.waitForTimeout(150);
+    // RE-DECIDIDO (C5): la leyenda ya no selecciona; es el DESGLOSE EDITABLE. Con teclado, Enter
+    // sobre el importe de una partida abre el editor con el foco en ESE campo; Escape lo cierra y el
+    // foco vuelve a la partida. La selección sigue siendo del anillo (ratón/toque) y se limpia fuera.
+    if (w < 900) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
+    await page.waitForTimeout(120);
+    await page.mouse.click(5, 200); await page.waitForTimeout(150);
     s = await state(page);
     ok(`${T}.Q pulsar fuera devuelve el estado general`, !s.arcs.some(a => /is-sel/.test(a.cls)));
-    const kfv = await J(page, `var b = document.querySelector('.wsbud-leg'); b.focus(); var cs = getComputedStyle(b); return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2;`);
-    ok(`${T} foco visible en la leyenda`, kfv === true);
+    await page.focus('.wsbud-br-a[data-wsbud-edit="food"]');
+    await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+    const kEd = await J(page, `var e = document.activeElement; return { amt: e && e.getAttribute('data-wsbud-amt'), inEd: !!(e && e.closest('.wsbud-ed')) };`);
+    ok(`${T}.Q teclado: Enter en el importe de una partida abre el editor en ESE campo`, kEd.amt === 'food' && kEd.inEd, JSON.stringify(kEd));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const kBack = await J(page, `var e = document.activeElement; return { ed: !!document.querySelector('.wsbud-ed'), back: e && e.getAttribute('data-wsbud-edit'), f: e && e.getAttribute('data-wsbud-focus') };`);
+    ok(`${T}.Q Escape cierra el editor y el foco vuelve a la partida`, !kBack.ed && kBack.back === 'food' && kBack.f === 'amt', JSON.stringify(kBack));
+    const kfv = await J(page, `var b = document.querySelector('.wsbud-br-a'); b.focus(); var cs = getComputedStyle(b); return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 2;`);
+    ok(`${T} foco visible en el desglose`, kfv === true);
+    await edAll(page);
 
     // O · gastos > ingresos: una sola lectura, sin tasa negativa
     await typeAmt(page, 'salary', '1000'); await page.keyboard.press('Tab');
@@ -318,9 +326,11 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     await page.evaluate(`(function(){ var rows = _wsBudgetRows(_wsToolInputs).map(function(r){ return r.type === 'expense' ? Object.assign({}, r, { amount: 0 }) : Object.assign({}, r, { amount: r.id === 'salary' ? 2000 : r.amount }); }); _wsBudgetSetRows(rows); _wsBudgetRepaint(); })()`);
     s = await state(page);
     ok(`${T}.N gastos 0: estado neutro, cero segmentos y la frase breve`, s.empty && s.arcs.length === 0 && /Añade tus gastos para ver el reparto/.test(s.toolText));
-    await page.click('[data-wsbud-goto]'); await page.waitForTimeout(200);
+    await edClose(page);
+    await page.click('[data-wsbud-goto]'); await page.waitForTimeout(250);
     const goto = await page.evaluate(`(document.activeElement && document.activeElement.getAttribute('data-wsbud-amt')) || ''`);
     ok(`${T}.N …con acceso inmediato al editor de gastos`, !!goto && expIds.includes(goto), goto);
+    await edClose(page); await edAll(page);
     ok(`${T} disponible 0 tiene lectura propia, exacta y neutra`, await page.evaluate(`(function(){ var r = calculateMonthlyBudget({ rows: [{ id:'a', type:'income', label:'x', amount: 100 }, { id:'b', type:'expense', label:'y', amount: 100, color:'#4D8DFF' }] }); return _wsBudgetReading(r) === t('wsbud_read_zero'); })()`));
     // restaura cifras
     await page.evaluate(`(function(){ var rows = _wsBudgetRows(_wsToolInputs).map(function(r){ var v = ({ salary: 2500, housing: 700, food: 350, transport: 120, utilities: 110, leisure: 150, education: 50, otherexp: 100 })[r.id]; if (v == null && r.id === ${JSON.stringify(g1)}) v = 30; if (v == null && r.id === ${JSON.stringify(g2)}) v = 70; return v != null ? Object.assign({}, r, { amount: v }) : r; }); _wsBudgetSetRows(rows); _wsBudgetRepaint(); })()`);
@@ -386,6 +396,7 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     const btn = await page.$('[data-wspl-open="ws4_legacy_1"]');
     if (btn) { await btn.scrollIntoViewIfNeeded(); await btn.click(); }
     await page.waitForTimeout(500);
+    await edAll(page);
     s = await state(page);
     ok(`${T}.J abrir desde «Tus planes» tras recargar carga nombres, importes y periodo`,
       s.editId === 'ws4_legacy_1' && s.rows.find(r => r.id === 'education').name === 'Baile' && s.rows.find(r => r.id === g1).amt === '30'
@@ -427,10 +438,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       await page.setViewportSize({ width: 360, height: 780 });
       await openTool(page);
       await rename(page, 'leisure', 'Actividades extraescolares de los niños y gimnasio');
-      await page.focus('.wsbud-leg');
+      await page.waitForTimeout(150);
+      const pe = await J(page, `var pb = document.querySelector('.wsbud-ed-panel').getBoundingClientRect(), sp = [];
+        document.querySelectorAll('.wsbud-ed-panel *').forEach(function(e){ var r = e.getBoundingClientRect(); if (r.width && (r.right > pb.right + 1 || r.left < pb.left - 1)) sp.push(String(e.className || e.tagName).slice(0, 30)); });
+        return { sp: sp.slice(0, 4), hs: document.querySelector('.wsbud-ed-body').scrollWidth > document.querySelector('.wsbud-ed-body').clientWidth + 1 };`);
+      ok(`${T}.P nombre largo en el editor a 360: sin desbordes ni scroll horizontal`, pe.sp.length === 0 && !pe.hs, JSON.stringify(pe));
+      await edClose(page);
       const pl = await J(page, `var spill = []; document.querySelectorAll('.wsh-tool-view .wsh-card').forEach(function(card){ var cb = card.getBoundingClientRect();
           card.querySelectorAll('*').forEach(function(e){ var r = e.getBoundingClientRect(); if (r.width && (r.right > cb.right + 1 || r.left < cb.left - 1)) spill.push(String(e.className || e.tagName).slice(0, 30)); }); });
-        var n = document.querySelector('[data-wsbud-rename="leisure"]');
+        var n = document.querySelector('.wsbud-br-n[data-wsbud-edit="leisure"]');
         return { hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1, spill: spill.slice(0, 4), full: n.textContent.trim(), stored: _wsBudgetRows(_wsToolInputs).find(function(r){ return r.id === 'leisure'; }).label };`);
       ok(`${T}.P nombre largo a 360: se parte por palabras, completo, sin overflow ni desbordes`,
         !pl.hscroll && pl.spill.length === 0 && pl.full === 'Actividades extraescolares de los niños y gimnasio' && pl.stored === pl.full, JSON.stringify(pl));

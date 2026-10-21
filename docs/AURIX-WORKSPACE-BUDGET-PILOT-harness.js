@@ -66,7 +66,7 @@ function ctx() {
   // de lectura entran al sandbox (no cambian ninguna aritmética).
   ['_WSBUD_INCOME', '_WSBUD_EXPENSES', '_WSBUD_DONUT_R', '_WSBUD_PALETTE', '_WSBUD_LEGACY_KEYS'].forEach(n => vm.runInContext(constSrc(n), sb));
   vm.runInContext('var _wsBudSel = null;', sb);
-  ['_wsBudgetColorFor', '_wsBudgetLegacyRows', '_wsBudgetRows', '_wsBudgetRowName', 'calculateMonthlyBudget', '_wsBudgetDonutHtml', '_wsBudgetChartHtml', 'calculateLoan', '_wsLoanDonutHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
+  ['_wsBudgetColorFor', '_wsBudgetLegacyRows', '_wsBudgetRows', '_wsBudgetRowName', 'calculateMonthlyBudget', '_wsBudgetDonutHtml', '_wsBudgetBreakHtml', 'calculateLoan', '_wsLoanDonutHtml'].forEach(n => vm.runInContext(fnSrc(n), sb));
   return sb;
 }
 const C = ctx();
@@ -137,13 +137,16 @@ section('3 · UN solo camino de cálculo (§26: reordenar la caja, no duplicar e
   const render = fnSrc('_renderBudgetTool');
   ok('3.1 los dos contenedores de repintado siguen siendo los mismos dos',
     /data-wsbud-top/.test(render) && /data-wstool-out/.test(render));
-  ok('3.2 el cuerpo declara sus dos columnas', /wsbud-col-edit/.test(render) && /wsbud-col-view/.test(render));
-  ok('3.3 el resumen vive FUERA del cuerpo, así que se ve sin scroll en cualquier ancho',
-    render.indexOf('wsbud-top-card') < render.indexOf('wsbud-body'));
-  // CONTRATO RE-DECIDIDO (SPEC «Visualización primero»): el DOM va en orden de LECTURA
-  // —reparto, edición, ayuda— y ya no es el CSS quien reordena. Antes: edición primero + `order`.
-  ok('3.4 la VISTA se declara antes que la edición, y la ayuda después (orden del DOM = orden de lectura)',
-    render.indexOf('wsbud-col-view') < render.indexOf('wsbud-col-edit') && render.indexOf('wsbud-col-edit') < render.indexOf('wsbud-col-help'));
+  // CONTRATO RE-DECIDIDO (Cierre quirúrgico C1): las tarjetas de edición separadas se retiran. Una
+  // sola superficie —anillo + desglose editable— y un editor ÚNICO que reutiliza las filas de siempre.
+  ok('3.2 UNA superficie (anillo + desglose) y un editor único; sin tarjetas de edición sueltas',
+    /wsbud-main/.test(render) && /data-wsbud-edhost/.test(render) && !/data-wsbud-block/.test(render) && !/wsbud-col-edit/.test(render));
+  ok('3.3 el resumen va ANTES de la superficie, así que se ve sin scroll en cualquier ancho',
+    render.indexOf('wsbud-top-card') < render.indexOf('wsbud-main'));
+  // El DOM va en orden de LECTURA: resumen → reparto → lectura → ayuda (sin `order`).
+  ok('3.4 orden del DOM = orden de lectura (resumen → reparto → lectura → ayuda)',
+    render.indexOf('data-wsbud-top') < render.indexOf('data-wstool-out') && render.indexOf('data-wstool-out') < render.indexOf('data-wsbud-insight')
+    && render.indexOf('data-wsbud-insight') < render.indexOf('data-wsbud-help'));
   // Ni el pintor del resumen ni el de la salida recalculan por su cuenta: los dos llaman al motor.
   const top = fnSrc('_wsBudgetTopHtml'), out = fnSrc('_wsBudgetOutHtml');
   ok('3.5 resumen y salida llaman al MISMO motor, sin aritmética propia',
@@ -190,17 +193,15 @@ section('5 · §2/§7 — profundidad y densidad, sin inventar tonos:');
   ok('5.2 sin alfa BLANCA en las superficies nuevas (se leería como gris y rompe la escalera)',
     !/background:\s*rgba\(255,\s*255,\s*255/.test(bl));
   ok('5.3 §7 la cifra grande baja de 46 px', /\.wsbud-result \.wstool-res-final \{ font-size: 34px/.test(css));
-  // Proporción RE-DECIDIDA: ≈56/44 con el panel visual a la izquierda (antes 1,05/0,95 con la
-  // edición a la izquierda). Sigue exigiendo `minmax(0,…)` en las dos pistas.
-  ok('5.4 las dos pistas pueden encoger (`minmax(0,…)`, no `1fr`) en la proporción ≈56/44',
-    /grid-template-columns: minmax\(0, 1\.27fr\) minmax\(0, 1fr\)/.test(bl));
-  ok('5.5 y sus columnas declaran `min-width: 0`, que es la otra mitad de la condición',
-    (bl.match(/\.wsbud-col-(edit|view) \{[^}]*min-width: 0/g) || []).length === 2);
-  // CONTRATO RE-DECIDIDO: el SPEC prohíbe un `order` que contradiga el DOM. Ninguna columna
-  // lo declara; el escritorio compone con ÁREAS de rejilla y el móvil apila el DOM tal cual.
-  ok('5.6 ninguna columna declara `order`: el escritorio compone con áreas de rejilla',
-    !/\.wsbud-col-(edit|view|help) \{[^}]*order:/.test(bl)
-    && /grid-template-areas: "view edit" "help edit"/.test(bl));
+  // RE-DECIDIDO (Cierre quirúrgico C5): ya no hay dos columnas de tarjetas; la superficie única
+  // compone anillo + desglose. Mismo invariante: pistas que pueden encoger y sin `order`.
+  const sf = css.slice(css.indexOf('CIERRE QUIRÚRGICO · PRESUPUESTO MENSUAL'));
+  ok('5.4 la superficie compone con pistas que pueden encoger (`minmax(0,…)`, no `1fr`)',
+    /\.wsbud-main \.wsbud-viz \{[^}]*grid-template-columns: minmax\(0, 1fr\)/.test(sf) && /grid-template-columns: minmax\(168px, 232px\) minmax\(0, 1fr\)/.test(sf));
+  ok('5.5 y el nombre de cada partida puede encoger y partirse (`minmax(0,1fr)` + `min-width:0`)',
+    /\.wsbud-br \{[^}]*grid-template-columns: 9px minmax\(0, 1fr\)/.test(sf) && /\.wsbud-br-n \{[^}]*min-width: 0/.test(sf));
+  ok('5.6 la superficie no reordena con `order`: lo que se ve es lo que recorre el teclado',
+    !/(^|[\s;{])order:/.test(sf.slice(0, sf.indexOf('CIERRE QUIRÚRGICO · A'))));
   ok('5.7 la animación del anillo respeta prefers-reduced-motion (§12/§38)',
     /prefers-reduced-motion: reduce\)\s*\{\s*\.wsbud-arc\s*\{\s*transition: none/.test(css));
   ok('5.8 el anillo es SVG/CSS: ninguna librería nueva (§39)',
@@ -221,7 +222,7 @@ section('6 · §25 · Interés compuesto sobre el armazón compartido:');
   // suyo; Interés compuesto (y Préstamos, §7) lo conservan INTACTO.
   ok('6.1 el compuesto sigue en el armazón compartido y el Presupuesto compone su propia caja',
     /class="ws2col"/.test(cmp) && /ws2col-edit/.test(cmp) && /ws2col-view/.test(cmp) &&
-    /class="wsbud-body"/.test(bud) && !/ws2col/.test(bud));
+    /wsbud-main/.test(bud) && !/ws2col/.test(bud));
   ok('6.2 …y la decisión de caja vive en UN solo sitio de la hoja',
     (css.match(/\.ws2col \{ display: flex/g) || []).length === 1 &&
     (css.match(/\.ws2col-edit \{ order: 1/g) || []).length === 1);
@@ -562,9 +563,15 @@ section('13 · Categorías del usuario: filas con identidad, compatibles con lo 
   const lens = x => (x.match(/stroke-dasharray="([0-9.]+) /g) || []).join();
   ok('13.5 seleccionar cambia QUÉ se lee (nombre, importe, %) pero NINGUNA cifra del reparto',
     lens(h) === lens(hs) && /is-sel/.test(hs) && /is-dim/.test(hs) && /<b>70%<\/b>/.test(hs) && /70 €/.test(hs) && /Gimnasio/.test(hs));
-  ok('13.6 la leyenda es un botón por categoría con aria-pressed, ordenada por peso',
-    (() => { const l = R('_wsBudgetChartHtml(__d, "g2")'); const ids = [...l.matchAll(/data-wsbud-sel="([^"]+)"/g)].map(m => m[1]);
-      return ids.join() === 'g2,g1' && /data-wsbud-sel="g2" aria-pressed="true"/.test(l) && /data-wsbud-sel="g1" aria-pressed="false"/.test(l); })());
+  // RE-DECIDIDO (C5): la leyenda pasa a ser el DESGLOSE EDITABLE. Mismo orden por peso y misma
+  // marca de selección; nombre e importe abren el editor sobre ESA fila, y desde aquí no se borra.
+  ok('13.6 el desglose: una fila por partida, ordenada por peso, que abre el editor y no borra',
+    (() => { C.__dupIn = { rows: [{ id: 'i1', type: 'income', label: 'Autónomo', amount: 1000 }, { id: 'g1', type: 'expense', label: 'Gimnasio', amount: 30, color: '#4D8DFF' }, { id: 'g2', type: 'expense', label: 'Gimnasio', amount: 70, color: '#37c7b8' }] };
+      R('_wsBudSel = "g2"'); const l = R('_wsBudgetBreakHtml(__dupIn, __d)'); R('_wsBudSel = null');
+      const ids = [...l.matchAll(/data-wsbud-br="([^"]+)"/g)].map(m => m[1]);
+      return ids.join() === 'g2,g1' && /class="wsbud-br is-sel" data-wsbud-br="g2"/.test(l)
+        && /data-wsbud-edit="g2" data-wsbud-focus="name"/.test(l) && /data-wsbud-edit="g2" data-wsbud-focus="amt"/.test(l)
+        && /70%/.test(l) && /30%/.test(l) && !/data-wsbud-del/.test(l); })());
   ok('13.7 un nombre vacío NUNCA se publica: cae al sugerido',
     R(`_wsBudgetRowName({ id: 'x', type: 'expense', labelKey: 'wstool_bud_leisure', label: '   ' })`) === 'Ocio'
     && R(`_wsBudgetRowName({ id: 'y', type: 'expense', labelKey: null, label: '' })`) === R(`t('wsbud_new_expense')`));
