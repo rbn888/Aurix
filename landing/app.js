@@ -392,6 +392,196 @@
       'faq.9.a': 'With Premium, each plan is saved as a document in your account so you can pick it up later. Nothing appears on your Dashboard unless you choose to show it there.',
   });
 
+  // LANDING COMERCIAL V1 · copy definitivo (docs/AURIX-LANDING-COMMERCIAL-V1-SPEC.md §2). Claves nuevas
+  // `lp.*`; las que ya existían y cambian de texto (nav.how, meta.*) se sobrescriben aquí, después de
+  // los bloques anteriores. Las cifras del panel de Intelligence son las que publica el motor con la
+  // cartera de demostración (scripts/aurix-landing-captures.mjs las contrasta antes de cada captura).
+  Object.assign(I18N.es, {
+      'meta.title': 'AURIX — Comprende mejor tu patrimonio',
+      'meta.desc': 'Inteligencia patrimonial para inversores: reúne tus inversiones en un solo lugar y descubre de qué depende tu patrimonio y qué está cambiando. Empieza gratis.',
+      'nav.how': 'Cómo empezar',
+      'lp.cta.compact': 'Crear cuenta',
+      'lp.hero.eyebrow': 'Inteligencia patrimonial para inversores',
+      'lp.hero.h1a': 'Comprende mejor tu patrimonio.',
+      'lp.hero.h1b': 'Decide con más información.',
+      'lp.hero.sub': 'Reúne tus inversiones en un solo lugar y descubre qué está pasando con tu dinero.',
+      'lp.cta.intel': 'Descubrir Intelligence',
+      'lp.demo': 'Cartera de demostración',
+      'lp.alt.hero': 'Dashboard de AURIX con una cartera de demostración: patrimonio invertible, evolución y reparto por categorías',
+      'lp.intel.title': 'Descubre qué merece tu atención.',
+      'lp.intel.lead': 'Entiende de qué inversiones depende tu patrimonio, qué ha cambiado y dónde merece la pena mirar más de cerca.',
+      'lp.ip.head': 'Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas.',
+      'lp.ip.drivers': 'Factores principales',
+      'lp.ip.p29': '29 %', 'lp.ip.p22': '22 %', 'lp.ip.p18': '18 %', 'lp.ip.p31': '31 %',
+      'lp.ip.rest': 'Resto de la cartera, liquidez incluida',
+      'lp.ip.sum': 'Tus 3 mayores inversiones reúnen el 69 % de tu cartera financiera.',
+      'lp.ip.cons': 'Ahora sabes qué posiciones pueden marcar la evolución del conjunto.',
+      'lp.ip.demo': 'Cartera de demostración · vista Premium',
+      'lp.ip.link': 'Ver la pantalla completa',
+      'lp.if.label': 'Tu primera lectura con Free',
+      'lp.if.quote': '«El 29 % de tu cartera financiera depende de Microsoft.»',
+      'lp.b1.t': 'Comprende de qué depende tu dinero.',
+      'lp.b1.d': 'Reconoce qué posiciones tienen más peso y cómo se distribuye tu patrimonio.',
+      'lp.b2.t': 'Distingue los cambios importantes.',
+      'lp.b2.d': 'Entiende qué ha cambiado en tu cartera y qué merece una revisión más detenida.',
+      'lp.b2.note': 'Se apoya en el historial que AURIX registra desde que añades tus inversiones.',
+      'lp.b3.t': 'Encuentra respuestas en tus propios datos.',
+      'lp.b3.d': 'Explora preguntas sobre tus inversiones y descubre qué hay detrás de cada conclusión.',
+      'lp.how.title': 'Empieza con las inversiones que ya tienes.',
+      'lp.s1.t': 'Accede con tu correo.', 'lp.s1.d': 'Crea tu cuenta gratuita.',
+      'lp.s2.t': 'Añade tus inversiones.', 'lp.s2.d': 'Reúne tus posiciones en un solo lugar.',
+      'lp.s3.t': 'Descubre qué merece tu atención.', 'lp.s3.d': 'Consulta tu patrimonio y obtén tu primera lectura de Intelligence.',
+      'lp.how.note': 'Tú registras tus posiciones. Sin facilitar credenciales bancarias.',
+      'lp.trk.eyebrow': 'DASHBOARD Y SEGUIMIENTO',
+      'lp.trk.title': 'Tu patrimonio cambia. Mantén la perspectiva.',
+      'lp.trk.text': 'Consulta cuánto tienes, cómo se distribuye y cómo evoluciona.',
+      'lp.trk.ctx': 'Organiza acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez. AURIX actualiza los precios de los activos cotizados y construye el historial de tu patrimonio a medida que lo usas.',
+      'lp.alt.positions': 'Posiciones de la categoría Acciones en AURIX, con la cartera de demostración',
+      'lp.mkt.note': '',
+      'lp.ws.title': 'Pon tus próximos objetivos en números.',
+      'lp.ws.text': 'Calcula un objetivo, compara escenarios y organiza tu presupuesto.',
+      'lp.ws.e1.t': 'Objetivos.', 'lp.ws.e1.d': 'Convierte tus metas en objetivos medibles.',
+      'lp.ws.e2.t': 'Escenarios.', 'lp.ws.e2.d': 'Compara decisiones antes de ejecutarlas.',
+      'lp.ws.e3.t': 'Presupuestos.', 'lp.ws.e3.d': 'Controla ingresos, gastos y ahorro libre.',
+      'lp.ws.note': 'Incluido en Premium. Cada plan se guarda en tu cuenta para retomarlo más tarde.',
+      'lp.trust.title': 'Claridad y control, desde el principio',
+      'lp.t1.t': 'Sin acceso a tu dinero.', 'lp.t1.d': 'AURIX no se conecta a tu banco ni a tu bróker y no puede mover fondos.',
+      'lp.t2.t': 'Interpreta, no recomienda.', 'lp.t2.d': 'Explica tus propios datos. No te dice qué comprar ni qué vender.',
+      'lp.t3.t': 'Suscripción clara.', 'lp.t3.d': 'El pago lo procesa Stripe y AURIX no guarda tu tarjeta. Cancela cuando quieras desde «Gestionar mi plan».',
+      'lp.t4.t': 'Soporte por correo.', 'lp.t4.d': 'Escríbenos desde la página de', 'lp.t4.link': 'Soporte',
+      'lp.plans.title': 'Empieza gratis. Profundiza con Premium.',
+      'lp.free.3': 'Market: sigue índices y activos',
+      'lp.free.4': 'Tu primera lectura de Intelligence sobre la composición de tu cartera',
+      'lp.price.year': '69,99 €', 'lp.price.year.per': 'al año',
+      'lp.price.year.note': 'Un único cobro anual: equivale a 5,83 € al mes y ahorras un 27 % frente al pago mensual.',
+      'lp.price.month.alt': 'O 7,99 € al mes, con cobro mensual.',
+      'lp.prem.1': 'Intelligence completa: dependencias, escenarios y qué ha cambiado en tu cartera, con preguntas sobre tus propios datos',
+      'lp.prem.2': 'Todas las herramientas de Workspace: presupuestos, objetivos, escenarios, préstamos, interés compuesto y más',
+      'lp.cta.premium': 'Descubrir Premium',
+      'lp.price.terms': 'Suscripción renovable. Cancela cuando quieras desde «Gestionar mi plan».',
+      'lp.faq.0.q': '¿Qué es AURIX?',
+      'lp.faq.0.a': 'Una plataforma de inteligencia patrimonial para inversores particulares. Reúnes tus inversiones en un solo lugar, Intelligence te ayuda a entender de qué depende tu patrimonio y qué está cambiando, y Workspace te permite planificar con tus propios números.',
+      'lp.faq.6.a': 'Acciones, ETFs, fondos, cripto, metales, inmuebles y liquidez. AURIX actualiza los precios de los activos cotizados; el valor del resto lo introduces tú.',
+      'lp.faq.2.q': '¿AURIX se conecta con mi banco o mi bróker?',
+      'lp.faq.2.a': 'No. Registras tus posiciones a mano y AURIX actualiza los precios de los activos cotizados. No necesita tus credenciales bancarias y no puede mover tu dinero.',
+      'lp.faq.1.a': 'Registrar todas tus posiciones, ver tu patrimonio, su reparto y evolución, seguir el mercado y recibir una primera lectura de Intelligence sobre la composición de tu cartera. Premium añade Intelligence completa, todas las herramientas de Workspace y el guardado de tus planes.',
+      'lp.faq.7.a': 'Lee tu cartera y te la explica: de qué posiciones depende, cómo se reparte y qué ha cambiado de forma relevante. Lo que se refiere a cambios se apoya en el historial que AURIX registra desde que añades tus inversiones. Free incluye una primera lectura, que aparece cuando todos tus activos tienen precio y divisa disponibles; Premium desbloquea el análisis completo.',
+      'lp.faq.3.a': 'Mensual (7,99 € al mes) o anual (69,99 €, en un único cobro al año). La suscripción se renueva automáticamente al final de cada periodo hasta que la canceles desde «Gestionar mi plan» en la app. El pago lo procesa Stripe; AURIX no guarda tu tarjeta.',
+      'lp.faq.4.q': '¿AURIX me dice qué comprar o vender?',
+      'lp.faq.4.a': 'No. AURIX organiza y explica tu patrimonio; no ofrece asesoramiento financiero ni recomendaciones de inversión.',
+      'lp.final.title': 'Comprende mejor lo que ya has construido.',
+  });
+  Object.assign(I18N.en, {
+      'meta.title': 'AURIX — Understand your wealth better',
+      'meta.desc': 'Wealth intelligence for investors: bring your investments together in one place and discover what your wealth depends on and what is changing. Start free.',
+      'nav.how': 'Get started',
+      'lp.cta.compact': 'Sign up',
+      'lp.hero.eyebrow': 'Wealth intelligence for investors',
+      'lp.hero.h1a': 'Understand your wealth better.',
+      'lp.hero.h1b': 'Make better\u2011informed decisions.',
+      'lp.hero.sub': 'Bring your investments together in one place and see what’s happening with your money.',
+      'lp.cta.intel': 'Explore Intelligence',
+      'lp.demo': 'Demo portfolio',
+      'lp.alt.hero': 'AURIX Dashboard with a demo portfolio: investable wealth, evolution and split by category',
+      'lp.intel.title': 'See what deserves your attention.',
+      'lp.intel.lead': 'Understand which investments your wealth depends on, what has changed and where it’s worth taking a closer look.',
+      'lp.ip.head': 'Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.',
+      'lp.ip.drivers': 'Key drivers',
+      'lp.ip.p29': '29%', 'lp.ip.p22': '22%', 'lp.ip.p18': '18%', 'lp.ip.p31': '31%',
+      'lp.ip.rest': 'Rest of the portfolio, cash included',
+      'lp.ip.sum': 'Your 3 largest investments hold 69% of your financial portfolio.',
+      'lp.ip.cons': 'Now you know which positions can shape how your whole portfolio moves.',
+      'lp.ip.demo': 'Demo portfolio · Premium view',
+      'lp.ip.link': 'See the full screen',
+      'lp.if.label': 'Your first reading on Free',
+      'lp.if.quote': '“29% of your financial portfolio depends on Microsoft.”',
+      'lp.b1.t': 'Understand what your money depends on.',
+      'lp.b1.d': 'See which positions carry the most weight and how your wealth is distributed.',
+      'lp.b2.t': 'Spot the changes that matter.',
+      'lp.b2.d': 'Understand what has changed in your portfolio and what deserves a closer review.',
+      'lp.b2.note': 'Builds on the history AURIX records from the day you add your investments.',
+      'lp.b3.t': 'Find answers in your own data.',
+      'lp.b3.d': 'Ask questions about your investments and see what’s behind each conclusion.',
+      'lp.how.title': 'Start with the investments you already have.',
+      'lp.s1.t': 'Sign up with your email.', 'lp.s1.d': 'Create your free account.',
+      'lp.s2.t': 'Add your investments.', 'lp.s2.d': 'Bring your positions together in one place.',
+      'lp.s3.t': 'See what deserves your attention.', 'lp.s3.d': 'Check your wealth and get your first Intelligence reading.',
+      'lp.how.note': 'You record your positions yourself. No banking credentials needed.',
+      'lp.trk.eyebrow': 'DASHBOARD AND TRACKING',
+      'lp.trk.title': 'Your wealth changes. Keep the bigger picture.',
+      'lp.trk.text': 'See how much you have, how it is distributed and how it evolves.',
+      'lp.trk.ctx': 'Organise stocks, ETFs, funds, crypto, metals, real estate and cash. AURIX updates the prices of listed assets and builds your wealth history as you use it.',
+      'lp.alt.positions': 'Positions in the Stocks category in AURIX, with the demo portfolio',
+      'lp.mkt.note': 'Interface shown in Spanish',
+      'lp.ws.title': 'Put numbers on your next goals.',
+      'lp.ws.text': 'Plan a goal, compare scenarios and organise your budget.',
+      'lp.ws.e1.t': 'Goals.', 'lp.ws.e1.d': 'Turn your aspirations into measurable goals.',
+      'lp.ws.e2.t': 'Scenarios.', 'lp.ws.e2.d': 'Compare decisions before you make them.',
+      'lp.ws.e3.t': 'Budgets.', 'lp.ws.e3.d': 'Track income, spending and what’s left to save.',
+      'lp.ws.note': 'Included with Premium. Each plan is saved to your account so you can pick it up later.',
+      'lp.trust.title': 'Clarity and control, from the start',
+      'lp.t1.t': 'No access to your money.', 'lp.t1.d': 'AURIX does not connect to your bank or broker and cannot move funds.',
+      'lp.t2.t': 'Insight, not advice.', 'lp.t2.d': 'It explains your own data and never tells you what to buy or sell.',
+      'lp.t3.t': 'A clear subscription.', 'lp.t3.d': 'Payments are processed by Stripe and AURIX does not store your card. Cancel anytime from “Manage my plan”.',
+      'lp.t4.t': 'Email support.', 'lp.t4.d': 'Write to us from the', 'lp.t4.link': 'Support page',
+      'lp.plans.title': 'Start free. Go deeper with Premium.',
+      'lp.free.3': 'Market: follow indices and assets',
+      'lp.free.4': 'Your first Intelligence reading of your portfolio’s composition',
+      'lp.price.year': '€69.99', 'lp.price.year.per': 'per year',
+      'lp.price.year.note': 'One annual payment, equivalent to €5.83 a month: 27% less than paying monthly.',
+      'lp.price.month.alt': 'Or €7.99 a month, billed monthly.',
+      'lp.prem.1': 'Full Intelligence: dependencies, scenarios and what has changed in your portfolio, plus answers to questions about your own data',
+      'lp.prem.2': 'Every Workspace tool: budgets, goals, scenarios, loans, compound interest and more',
+      'lp.cta.premium': 'Explore Premium',
+      'lp.price.terms': 'Renewing subscription. Cancel anytime from “Manage my plan”.',
+      'lp.faq.0.q': 'What is AURIX?',
+      'lp.faq.0.a': 'A wealth intelligence platform for individual investors. You bring your investments together in one place, Intelligence helps you understand what your wealth depends on and what is changing, and Workspace lets you plan with your own numbers.',
+      'lp.faq.6.a': 'Stocks, ETFs, funds, crypto, metals, real estate and cash. AURIX updates the prices of listed assets; you enter the value of the rest yourself.',
+      'lp.faq.2.q': 'Does AURIX connect to my bank or broker?',
+      'lp.faq.2.a': 'No. You record your positions by hand and AURIX updates the prices of listed assets. It does not need your banking credentials and cannot move your money.',
+      'lp.faq.1.a': 'Record all your positions, see your wealth, its split and evolution, follow the market and get a first Intelligence reading of your portfolio’s composition. Premium adds full Intelligence, every Workspace tool and saving your plans.',
+      'lp.faq.7.a': 'It reads your portfolio and explains it: which positions it depends on, how it is split and what has changed in a meaningful way. Anything about changes builds on the history AURIX records from the day you add your investments. Free includes a first reading, which appears once every asset has an available price and currency; Premium unlocks the full analysis.',
+      'lp.faq.3.a': 'Monthly (€7.99 a month) or annual (€69.99, in a single yearly charge). The subscription renews automatically at the end of each period until you cancel it from “Manage my plan” in the app. Payments are processed by Stripe; AURIX does not store your card.',
+      'lp.faq.4.q': 'Does AURIX tell me what to buy or sell?',
+      'lp.faq.4.a': 'No. AURIX organises and explains your wealth; it does not give financial advice or investment recommendations.',
+      'lp.final.title': 'Get a clearer understanding of what you’ve already built.',
+  });
+
+  // LANDING COMERCIAL V2 · refinamiento: demostración interactiva y cápsula enlazada del hero.
+  // Sobrescribe sólo lo que cambia (el resto de V1 sigue vigente).
+  Object.assign(I18N.es, {
+      'lp.intel.eyebrow': 'AURIX Intelligence',
+      'lp.ip.kicker': 'Ejemplo de análisis · Premium',
+      'lp.ip.stat.pre': 'Tus 3 mayores inversiones reúnen el',
+      'lp.ip.stat.n': '69 %',
+      'lp.ip.stat.post': 'de tu cartera financiera.',
+      'lp.ip.rest': 'Resto de la cartera financiera',
+      'lp.ip.reset': 'Ver todo',
+      'lp.ip.hint': 'Selecciona una posición o el 69 % para resaltarla.',
+      'lp.hot.aria': 'Salud: A vigilar · Ver análisis en AURIX Intelligence',
+  });
+  Object.assign(I18N.en, {
+      'lp.intel.eyebrow': 'AURIX Intelligence',
+      'lp.ip.kicker': 'Sample analysis · Premium',
+      'lp.ip.stat.pre': 'Your 3 largest investments hold',
+      'lp.ip.stat.n': '69%',
+      'lp.ip.stat.post': 'of your financial portfolio.',
+      'lp.ip.rest': 'Rest of the financial portfolio',
+      'lp.ip.reset': 'Show all',
+      'lp.ip.hint': 'Select a position or the 69% to highlight it.',
+      'lp.hot.aria': 'Health: Worth watching · View analysis in AURIX Intelligence',
+  });
+
+  // LANDING V3 · sufijo de porcentaje (ES con espacio fino) y texto alternativo del hero con su cifra.
+  Object.assign(I18N.es, {
+      'lp.ip.pct': '\u00a0%',
+      'lp.alt.hero': 'Dashboard de AURIX con una cartera de demostración: patrimonio invertible de 186.055,38\u00a0US$, evolución de 24 horas y reparto por categorías',
+  });
+  Object.assign(I18N.en, {
+      'lp.ip.pct': '%',
+      'lp.alt.hero': 'AURIX Dashboard with a demo portfolio: investable wealth of $186,055.38, 24-hour evolution and split by category',
+  });
+
   // AURIX-AFFILIATES-V1 · aviso de recomendación (sólo aparece con un `?ref=`).
   Object.assign(I18N.es, {
       'ref.title': 'Has llegado por una recomendación',
@@ -462,6 +652,19 @@
       if (sk) imgs[m].setAttribute('src', 'assets/' + sk + '-' + lang + '.jpg');
       var ak = imgs[m].getAttribute('data-i18n-alt'); if (ak && dict[ak] != null) imgs[m].setAttribute('alt', dict[ak]);
     }
+    // LANDING COMERCIAL V1 · plantillas con `{lang}`: srcset del hero (<img> y <source> móvil) y el
+    // enlace a la captura completa de Intelligence. Misma resolución de idioma, ninguna regla nueva.
+    var tsets = document.querySelectorAll('[data-i18n-srcset]');
+    for (var ts = 0; ts < tsets.length; ts++) {
+      var tpl = tsets[ts].getAttribute('data-i18n-srcset').replace(/\{lang\}/g, lang);
+      if (tsets[ts].getAttribute('srcset') !== tpl) tsets[ts].setAttribute('srcset', tpl);
+      if (tsets[ts].tagName === 'IMG') {
+        var first = tpl.split(/\s+/)[0];
+        if (tsets[ts].getAttribute('src') !== first) tsets[ts].setAttribute('src', first);
+      }
+    }
+    var threfs = document.querySelectorAll('[data-i18n-href]');
+    for (var th = 0; th < threfs.length; th++) threfs[th].setAttribute('href', threfs[th].getAttribute('data-i18n-href').replace(/\{lang\}/g, lang));
     var arias = document.querySelectorAll('[data-i18n-aria]');
     for (var n = 0; n < arias.length; n++) { var rk = arias[n].getAttribute('data-i18n-aria'); if (dict[rk] != null) arias[n].setAttribute('aria-label', dict[rk]); }
     // Reflect active state on every language toggle (header + mobile)
@@ -487,6 +690,8 @@
     // Y lo mismo con las legales: viven en el dominio de la app, así que sin
     // `?lang=` un lector en inglés abriría Privacidad en español.
     updateLegalLinks();
+    // V2 · el idioma cambia longitudes de texto: la esfera recalcula su recorrido.
+    try { window.dispatchEvent(new Event('aurix:lang')); } catch (_) {}
   }
 
   // Fictional headline wealth figure (labelled "Product preview"). ES: 4,82 M€ · EN: $4.82M
@@ -851,6 +1056,326 @@
   }
 
 
+  /* ── LANDING V3 · entrada del dashboard del hero ─────────────────────────────
+     Tres piezas de la captura, ya en su sitio: la cifra (HTML, Inter, mismo formato que la app) cuenta
+     hasta 186.055,38; la curva se revela de izquierda a derecha (clip) y el donut en sentido horario
+     (máscara cónica). Sin puntos nuevos ni proporciones distintas: son las capas reales recortadas.
+     Una vez por carga, al entrar el dashboard de forma significativa (≥35 %); ~1,1 s; los enlaces y
+     botones funcionan desde el principio. Cambiar de idioma resuelve la cifra al instante. */
+  var HERO_VALUE = 186055.38;
+  function heroFmt(v) {
+    try { return new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'es-ES', { style: 'currency', currency: 'USD' }).format(v); }
+    catch (_) { return lang === 'en' ? '$' + v.toFixed(2) : v.toFixed(2).replace('.', ',') + ' US$'; }
+  }
+  function initHeroIntro() {
+    var root = document.documentElement, shot = document.getElementById('heroShot');
+    var val = shot && shot.querySelector('[data-hero-val]');
+    var curve = shot && shot.querySelector('.hero-curve'), donut = shot && shot.querySelector('.hero-donut');
+    var st = { playing: false, done: false, raf: 0 };
+    function final() {
+      if (val) val.textContent = heroFmt(HERO_VALUE);
+      if (curve) curve.style.clipPath = '';
+      if (donut) { donut.style.webkitMaskImage = ''; donut.style.maskImage = ''; }
+    }
+    function finish() { if (st.raf) cancelAnimationFrame(st.raf); st.raf = 0; st.playing = false; st.done = true; final(); }
+    window.addEventListener('aurix:lang', function () { if (st.playing) finish(); else if (val) val.textContent = heroFmt(st.done || !root.classList.contains('lp-anim') ? HERO_VALUE : 0); });
+    var anim = root.classList.contains('lp-anim') && !root.classList.contains('lp-anim-off') && shot && val && window.requestAnimationFrame && 'IntersectionObserver' in window;
+    if (!anim) { root.classList.add('lp-armed'); st.done = true; final(); return; }
+    var ease = function (u) { return 1 - Math.pow(1 - u, 3); };
+    var inout = function (u) { return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; };
+    function set(t) {                                 // t en ms desde el inicio
+      var a = ease(Math.min(1, t / 1100)), c = inout(Math.max(0, Math.min(1, (t - 60) / 1000))), d = ease(Math.max(0, Math.min(1, (t - 140) / 900)));
+      val.textContent = heroFmt(a >= 1 ? HERO_VALUE : HERO_VALUE * a);
+      if (curve) curve.style.clipPath = c >= 1 ? '' : 'inset(0 ' + ((1 - c) * 100).toFixed(3) + '% 0 0)';
+      if (donut) { var m = d >= 1 ? '' : 'conic-gradient(#000 ' + (d * 360).toFixed(2) + 'deg, transparent 0deg)'; donut.style.webkitMaskImage = m; donut.style.maskImage = m; }
+    }
+    set(0);
+    root.classList.add('lp-armed');                   // el estado inicial ya lo llevan los estilos en línea
+    var io = new IntersectionObserver(function (en) {
+      if (!en[0].isIntersecting || en[0].intersectionRatio < 0.35 || st.done || st.playing) return;
+      io.disconnect(); st.playing = true;
+      var t0 = 0;
+      (function step(now) {
+        if (!st.playing) return;
+        if (!t0) t0 = now;
+        set(now - t0);
+        if (now - t0 < 1140) st.raf = requestAnimationFrame(step); else finish();
+      })(performance.now());
+    }, { threshold: [0, 0.35, 0.6] });
+    io.observe(shot);
+  }
+
+  /* ── LANDING V2 · demostración de Intelligence ──────────────────────────────
+     Seleccionar una posición la resalta (forma + peso, no sólo color) y atenúa el resto;
+     el 69 % resalta las tres mayores. Volver a pulsar, «Ver todo» o Escape restablecen. */
+  function initIntelDemo() {
+    var panel = document.getElementById('intelDemo');
+    if (!panel) return;
+    var lis = [].slice.call(panel.querySelectorAll('.ip-bars li'));
+    var btns = [].slice.call(panel.querySelectorAll('[data-ip-select]'));
+    var reset = panel.querySelector('[data-ip-reset]');
+    var sel = null;
+    // V3 · entrada de los datos: 0 → 69 %, barras desde cero y 29/22/18/31 %, una sola vez (~950 ms).
+    // Las cifras finales están en el HTML (sin JS o con movimiento reducido se ven tal cual) y el nombre
+    // accesible de cada control lleva SIEMPRE el valor final, así que el conteo no se anuncia.
+    var nums = [].slice.call(panel.querySelectorAll('.ip-num[data-ip-final]'));
+    var fills = [].slice.call(panel.querySelectorAll('.ip-fill'));
+    var intro = { done: true, raf: 0 };
+    function labelAll() {
+      var stat = panel.querySelector('.ip-stat');
+      var norm = function (e) { return (e ? e.textContent : '').replace(/\s+/g, ' ').trim(); };
+      var fin = function (root) { var n = root.querySelector('.ip-num'); var suf = n && n.nextElementSibling ? n.nextElementSibling.textContent : ''; return n ? n.getAttribute('data-ip-final') + suf : ''; };
+      if (stat) stat.setAttribute('aria-label', norm(stat.querySelector('.ip-stat-pre')) + ' ' + fin(stat) + ' ' + norm(stat.querySelector('.ip-stat-post')));
+      [].slice.call(panel.querySelectorAll('.ip-row')).forEach(function (r) { r.setAttribute('aria-label', norm(r.querySelector('.ip-name')) + ' ' + fin(r)); });
+    }
+    function introSet(p) {
+      nums.forEach(function (n) { n.textContent = String(Math.round(+n.getAttribute('data-ip-final') * p)); });
+      fills.forEach(function (f) { f.style.transform = p >= 1 ? '' : 'scaleX(' + p.toFixed(4) + ')'; });
+    }
+    function introFinish() { if (intro.done) return; intro.done = true; if (intro.raf) cancelAnimationFrame(intro.raf); intro.raf = 0; introSet(1); }
+    var reduceIntro = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    labelAll();
+    window.addEventListener('aurix:lang', labelAll);
+    if (!reduceIntro && 'IntersectionObserver' in window && window.requestAnimationFrame) {
+      intro.done = false; introSet(0);
+      var io2 = new IntersectionObserver(function (en) {
+        if (!en[0].isIntersecting || intro.done) return;
+        io2.disconnect();
+        var t0 = 0, D = 950;
+        (function step(t) {
+          if (intro.done) return;
+          if (!t0) t0 = t;
+          var u = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - u, 3);
+          introSet(e);
+          if (u < 1) intro.raf = requestAnimationFrame(step); else { intro.done = true; intro.raf = 0; introSet(1); }
+        })(performance.now());
+      }, { threshold: 0.35 });
+      io2.observe(panel);
+    }
+    function apply(next) {
+      sel = next || null;
+      panel.classList.toggle('has-sel', !!sel);
+      lis.forEach(function (li) {
+        var on = !!sel && (sel === 'top3' ? li.hasAttribute('data-ip-top3') : li.getAttribute('data-ip-key') === sel);
+        li.classList.toggle('is-on', on);
+      });
+      btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ip-select') === sel)); });
+      if (reset) reset.hidden = !sel;
+    }
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-ip-select]') : null;
+      if (b) { introFinish(); var k = b.getAttribute('data-ip-select'); apply(sel === k ? null : k); return; }
+      if (e.target.closest && e.target.closest('[data-ip-reset]')) {
+        apply(null);
+        var st = panel.querySelector('.ip-stat'); if (st) st.focus();
+      }
+    });
+    panel.addEventListener('keydown', function (e) { if ((e.key === 'Escape' || e.key === 'Esc') && sel) apply(null); });
+  }
+
+  /* ── LANDING V2 · recorrido de la esfera ─────────────────────────────────────
+     Acompaña el scroll real (nunca lo secuestra): un progreso q ∈ [0,3] sale de la posición
+     de la página y la esfera lo sigue con un límite de velocidad, así que recorre SIEMPRE el
+     camino (no atajos sobre el texto) y no queda nada pendiente si se baja deprisa.
+       q = 0      en su hueco del panel (reposo; al aterrizar con el ancla no se va).
+       0 → 1      se desprende hacia el margen derecho, baja haciendo UN looping, cruza el
+                  pasillo libre entre panel y beneficios y llega al margen izquierdo.
+       1 → 2      acompaña la lectura de los beneficios en el margen izquierdo, flotando.
+       2 → 3      curva de salida y desvanecimiento antes de «Tu patrimonio cambia».
+     Sólo vuela por zonas libres (márgenes y pasillo); si no hay sitio (tablet, móvil, ventanas
+     estrechas) se queda en su hueco con movimiento local. El looping no se repite hasta que la
+     esfera ha vuelto a su hueco. Movimiento reducido ⇒ estática (no se inicia). Decorativa:
+     aria-hidden, fuera del foco; sólo transform y opacity por frame; reposo ⇒ sin rAF. */
+  function initOrbFlight() {
+    var slot = document.querySelector('.lp-orb-slot');
+    var orb = slot && slot.querySelector('.lp-orb');
+    var tilt = orb && orb.querySelector('.lp-orb-tilt');
+    var panel = document.getElementById('intelDemo');
+    var ben = document.querySelector('#intelligence .benefits');
+    var trk = document.querySelector('#tracking .section-title');
+    var intel = document.getElementById('intelligence');
+    var header = document.getElementById('siteHeader');
+    if (!orb || !panel || !ben || !trk || !intel) return;
+    var mqReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+    if (mqReduce && mqReduce.matches) return;
+
+    var M = null, raf = 0, last = 0, t0 = (window.performance ? performance.now() : Date.now());
+    var qEff = 0, qVel = 0, loopDone = false, ptr = null, slotOnScreen = true;
+    var pos = { x: 0, y: 0 }, vel = { x: 0, y: 0 }, prev = null, tiltS = { x: 0, y: 0 };   // desplazamiento respecto al hueco (px)
+    var ev = { x: 0, y: 0 }, evv = { x: 0, y: 0 };       // evasión (ratón / toque)
+
+    function measure() {
+      var sy = window.scrollY || 0, vw = document.documentElement.clientWidth, vh = window.innerHeight;
+      var rs = slot.getBoundingClientRect(), rp = panel.getBoundingClientRect(), rb = ben.getBoundingClientRect();
+      var rt = trk.getBoundingClientRect(), ri = intel.getBoundingClientRect();
+      var free = Math.min(rb.left, vw - rb.right);
+      var m = { vw: vw, vh: vh, rest: rs.width || 1, free: free, size: Math.max(0, Math.min(64, free - 28)),
+        S: { x: rs.left + rs.width / 2, y: rs.top + sy + rs.height / 2 },
+        panelBottom: rp.bottom + sy, benTop: rb.top + sy, trkTop: rt.top + sy, contL: rb.left, contR: rb.right };
+      m.fly = vw >= 1024 && m.size >= 44 && (m.benTop - m.panelBottom) >= m.size + 20;
+      var gut = Math.min(free / 2, 110), halo = m.size * 0.76;
+      m.loopR = Math.max(8, Math.min(24, gut - m.size / 2 - 10, vw - 6 - halo - (m.contR + gut)));
+      m.RG = Math.min(m.contR + gut, vw - 6 - halo - m.loopR); m.LG = Math.max(m.contL - gut, halo + 6);
+      var bandY = (m.panelBottom + m.benTop) / 2;
+      var landing = ri.top + sy - 72;                    // donde deja el ancla «Descubrir Intelligence»
+      m.s0 = Math.max(m.benTop - 0.9 * vh, landing + 0.15 * vh);
+      m.s1 = m.s0 + 0.45 * vh;
+      m.s3 = m.trkTop - 0.55 * vh; m.s2 = m.s3 - 0.25 * vh;
+      if (m.s2 < m.s1 + 40) { m.s2 = m.s1 + 40; m.s3 = Math.max(m.s3, m.s2 + 80); }
+      var K = [m.S, { x: m.RG, y: m.S.y }, { x: m.RG, y: bandY }, { x: m.LG, y: bandY }, { x: m.LG, y: m.benTop + 30 }];
+      // esquinas redondeadas (Bézier cuadrática con control en el vértice, radio 36 px): el atajo
+      // interior es de ~10 px, dentro del margen de seguridad de los márgenes y el pasillo.
+      m.P = [K[0]];
+      for (var c = 1; c < K.length - 1; c++) {
+        var A = K[c - 1], B = K[c], C = K[c + 1];
+        var la = Math.sqrt(Math.pow(A.x - B.x, 2) + Math.pow(A.y - B.y, 2)) || 1, lc = Math.sqrt(Math.pow(C.x - B.x, 2) + Math.pow(C.y - B.y, 2)) || 1;
+        var rc = Math.min(36, la / 2, lc / 2);
+        var a = { x: B.x + (A.x - B.x) * rc / la, y: B.y + (A.y - B.y) * rc / la }, b = { x: B.x + (C.x - B.x) * rc / lc, y: B.y + (C.y - B.y) * rc / lc };
+        for (var j = 0; j <= 8; j++) { var t = j / 8, u1 = 1 - t; m.P.push({ x: u1 * u1 * a.x + 2 * u1 * t * B.x + t * t * b.x, y: u1 * u1 * a.y + 2 * u1 * t * B.y + t * t * b.y, k: c }); }
+      }
+      m.P.push(K[K.length - 1]);
+      m.L = [0];
+      for (var i = 1; i < m.P.length; i++) m.L.push(m.L[i - 1] + Math.sqrt(Math.pow(m.P[i].x - m.P[i - 1].x, 2) + Math.pow(m.P[i].y - m.P[i - 1].y, 2)));
+      m.len = m.L[m.L.length - 1] || 1;
+      var i1 = -1, i2 = -1;
+      for (var q2 = 0; q2 < m.P.length; q2++) { if (m.P[q2].k === 1) i1 = q2; if (m.P[q2].k === 2 && i2 < 0) i2 = q2; }
+      var Ld1 = m.L[i1], Ld2 = m.L[i2];
+      m.loopA = (Ld1 + 0.2 * (Ld2 - Ld1)) / m.len;
+      m.loopB = (Ld1 + 0.8 * (Ld2 - Ld1)) / m.len;
+      m.endRight = Ld2 / m.len;
+      m.eShrink = Math.max(0.02, 0.8 * m.L[i1 - 8 >= 0 ? i1 - 8 : 1] / m.len);   // ya a tamaño de vuelo antes del margen
+      m.eGutter = m.L[i1] / m.len;                                                // desde aquí, en el margen derecho
+      M = m;
+    }
+    function at(u) {                                     // punto por longitud de arco, salida y llegada suaves
+      var e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+      var d = e * M.len, P = M.P, L = M.L;
+      for (var i = 1; i < P.length; i++) {
+        if (d <= L[i] || i === P.length - 1) {
+          var k = (L[i] === L[i - 1]) ? 0 : Math.max(0, Math.min(1, (d - L[i - 1]) / (L[i] - L[i - 1])));
+          return { x: P[i - 1].x + (P[i].x - P[i - 1].x) * k, y: P[i - 1].y + (P[i].y - P[i - 1].y) * k, e: e };
+        }
+      }
+      return { x: P[P.length - 1].x, y: P[P.length - 1].y, e: 1 };
+    }
+    function qRaw(s) {
+      if (!M.fly || s <= M.s0) return 0;
+      if (s <= M.s1) return (s - M.s0) / (M.s1 - M.s0);
+      if (s <= M.s2) return 1 + (s - M.s1) / (M.s2 - M.s1);
+      if (s <= M.s3) return 2 + (s - M.s2) / (M.s3 - M.s2);
+      return 3;
+    }
+    function target(q, time) {
+      var fs = M.size / M.rest, out = { x: M.S.x, y: M.S.y, scale: 1, op: 1, zone: 'rest', e: 0 };
+      if (q <= 0) return out;
+      if (q <= 1) {
+        var p = at(q);
+        out.x = p.x; out.y = p.y; out.e = p.e; out.scale = 1 + (fs - 1) * Math.min(1, p.e / M.eShrink);
+        if (!loopDone && p.e > M.loopA && p.e < M.loopB) {
+          var th = 2 * Math.PI * (p.e - M.loopA) / (M.loopB - M.loopA);
+          out.x += M.loopR * Math.sin(th); out.y += M.loopR * (Math.cos(th) - 1);
+        }
+        out.zone = p.e < M.eGutter ? 'path' : (p.e <= M.endRight ? 'right' : (p.e > 0.98 ? 'left' : 'band'));
+        return out;
+      }
+      var end = M.P[M.P.length - 1], y = end.y + Math.min(q - 1, 1) * (M.s2 - M.s1);
+      out.x = end.x + 4 * Math.sin(time * 0.7); y += 6 * Math.sin(time * 1.1);   // flota
+      out.scale = fs; out.zone = 'left'; out.e = 1;
+      if (q > 2) {
+        var x = Math.min(1, q - 2);
+        y += x * (M.s3 - M.s2) - 46 * x; out.x -= 34 * x * x; out.op = 1 - x; out.scale = fs * (1 - 0.25 * x);
+      }
+      out.y = y;
+      return out;
+    }
+    function zoneBox(t) {                                // límites del desplazamiento extra (evasión/toque)
+      var h = M.size / 2 + 8;
+      if (t.zone === 'left') return { x0: 6 + h - t.x, x1: M.contL - 14 - h - t.x, y0: -50, y1: 50 };
+      if (t.zone === 'right') return { x0: M.contR + 14 + h - t.x, x1: M.vw - 6 - h - t.x, y0: -50, y1: 50 };
+      if (t.zone === 'band' || t.zone === 'path') return { x0: -8, x1: 8, y0: -6, y1: 6 };
+      return { x0: -10, x1: 10, y0: -8, y1: 8 };
+    }
+    function zoneOf(t) {                                 // el cero siempre cabe: sin puntero, nunca desplaza
+      var z = zoneBox(t);
+      return { x0: Math.min(0, z.x0), x1: Math.max(0, z.x1), y0: Math.min(0, z.y0), y1: Math.max(0, z.y1) };
+    }
+    var clamp = function (v, a, b) { return Math.max(Math.min(a, b), Math.min(Math.max(a, b), v)); };
+    function frame(now) {
+      raf = 0;
+      if (!M) measure();
+      var dt = last ? Math.min(0.05, Math.max(0.001, (now - last) / 1000)) : 0.016; last = now;
+      var s = window.scrollY || 0, qr = qRaw(s);
+      if (!M.fly) { qEff = 0; qVel = 0; loopDone = false; }      // sin sitio para volar: en su hueco
+      // inercia: acelera y frena siguiendo al scroll; en el vuelo largo, como mucho ~750 px/s
+      var vmax = qEff < 1 ? 750 / M.len : 1.4, kq = 40;
+      qVel += (kq * (qr - qEff) - 2 * Math.sqrt(kq) * qVel) * dt;
+      qVel = Math.max(-vmax, Math.min(vmax, qVel));
+      qEff += qVel * dt;
+      if (Math.abs(qr - qEff) < 0.0005 && Math.abs(qVel) < 0.002) { qEff = qr; qVel = 0; }
+      if (qEff <= 0.02) loopDone = false;
+      var T = target(qEff, (now - t0) / 1000);
+      if (qEff > 0 && qEff <= 1 && T.e >= M.loopB) loopDone = true;
+      if (qEff >= 2.999) T.op = 0;
+      // evasión: se aparta del puntero en dirección opuesta, deprisa; vuelve despacio
+      var Z = zoneOf(T), ex = 0, ey = 0;
+      if (ptr && T.op > 0.2) {
+        var dx = (M.S.x + pos.x + ev.x) - ptr.x, dy = (M.S.y + pos.y + ev.y) - (ptr.y + s), d = Math.sqrt(dx * dx + dy * dy), R = 120;
+        if (d < R && d > 0.1) { var f = (R - d) / R * 46; ex = dx / d * f; ey = dy / d * f; }
+      }
+      ex = clamp(ex, Z.x0, Z.x1); ey = clamp(ey, Z.y0, Z.y1);
+      var ke = (Math.abs(ex) + Math.abs(ey) > Math.abs(ev.x) + Math.abs(ev.y) + 0.5) ? 170 : 14;
+      evv.x += (ke * (ex - ev.x) - 2 * Math.sqrt(ke) * evv.x) * dt; evv.y += (ke * (ey - ev.y) - 2 * Math.sqrt(ke) * evv.y) * dt;
+      ev.x = clamp(ev.x + evv.x * dt, Z.x0 - 4, Z.x1 + 4); ev.y = clamp(ev.y + evv.y * dt, Z.y0 - 4, Z.y1 + 4);
+      // posición exacta sobre el recorrido; la velocidad sólo inclina los anillos
+      pos.x = T.x - M.S.x; pos.y = T.y - M.S.y;
+      if (prev) { vel.x = (pos.x - prev.x) / dt; vel.y = (pos.y - prev.y) / dt; }
+      prev = { x: pos.x, y: pos.y };
+      var hidden = T.op < 0.01;
+      orb.style.transform = 'translate3d(' + (pos.x + ev.x).toFixed(1) + 'px,' + (pos.y + ev.y).toFixed(1) + 'px,0) scale(' + T.scale.toFixed(3) + ')';
+      orb.style.opacity = hidden ? '0' : String(+T.op.toFixed(3));
+      orb.style.visibility = hidden ? 'hidden' : '';
+      if (tilt) {                                      // inclinación con filtro de paso bajo: sin tirones en las curvas
+        var kf = 1 - Math.exp(-dt * 5);
+        tiltS.x += (clamp(vel.y * 0.03, -14, 14) - tiltS.x) * kf; tiltS.y += (clamp(vel.x * 0.03, -14, 14) - tiltS.y) * kf;
+        tilt.style.setProperty('--rx', tiltS.x.toFixed(2) + 'deg');
+        tilt.style.setProperty('--ry', tiltS.y.toFixed(2) + 'deg');
+      }
+      var flying = qEff > 0.001 && !hidden;
+      orb.classList.toggle('is-paused', !flying && !slotOnScreen);
+      var moving = Math.abs(qVel) > 0 || Math.abs(evv.x) + Math.abs(evv.y) + Math.abs(ev.x) + Math.abs(ev.y) > 0.3 || Math.abs(qr - qEff) > 0 || Math.abs(tiltS.x) + Math.abs(tiltS.y) > 0.05;
+      if (moving || flying || (ptr && slotOnScreen)) raf = requestAnimationFrame(frame);
+      else last = 0;
+    }
+    function kick() { if (!raf) raf = requestAnimationFrame(frame); }
+    function remeasure() { measure(); prev = null; kick(); }
+
+    measure();
+    // Lectura del estado para la sonda de la landing (sólo lectura; no forma parte de la interfaz).
+    orb.__lp = { state: function () { return { q: qEff, loopDone: loopDone, fly: M.fly, s0: M.s0, s1: M.s1, s2: M.s2, s3: M.s3, loopA: M.loopA, loopB: M.loopB, RG: M.RG, LG: M.LG }; } };
+    window.addEventListener('scroll', kick, { passive: true });
+    window.addEventListener('resize', remeasure);
+    window.addEventListener('orientationchange', remeasure);
+    window.addEventListener('aurix:lang', remeasure);
+    window.addEventListener('load', remeasure);
+    if ('ResizeObserver' in window) { try { var ro = new ResizeObserver(remeasure); ro.observe(panel); ro.observe(ben); ro.observe(document.body); } catch (_) {} }
+    if ('IntersectionObserver' in window) {
+      try { new IntersectionObserver(function (en) { slotOnScreen = en[0].isIntersecting; kick(); }).observe(slot); } catch (_) {}
+    }
+    // Ratón: sólo apunta (no captura nada). Táctil: un toque directo en la esfera da un impulso corto;
+    // el gesto de scroll no se intercepta (sin preventDefault, sin capa encima del contenido).
+    if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+      window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') { ptr = { x: e.clientX, y: e.clientY }; kick(); } }, { passive: true });
+      document.addEventListener('pointerleave', function () { ptr = null; kick(); });
+      window.addEventListener('blur', function () { ptr = null; });
+    }
+    orb.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse') return;
+      evv.x += (Math.random() < 0.5 ? -1 : 1) * 90; evv.y -= 70; kick();
+    }, { passive: true });
+    kick();
+  }
+
+
   function init() {
     initReferral();   // AURIX-AFFILIATES-V1 — antes de pintar los CTA
     applyLang(detectLang());
@@ -959,6 +1484,11 @@
 
     // ── Intelligence orb: desktop cursor sheen (WSPHERE.V3 #4) ──
     initOrbSheen();
+
+    // LANDING V2/V3 · entrada del dashboard, demostración de Intelligence y recorrido de la esfera.
+    initHeroIntro();
+    initIntelDemo();
+    initOrbFlight();
 
     // Footer year (no Date pinning needed for a static label)
     var y = document.getElementById('year');

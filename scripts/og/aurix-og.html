@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<!-- AURIX · carátula Open Graph (1200×630). La renderiza scripts/aurix-og-render.mjs con los estilos REALES de la
+     landing (tipografía Inter, wordmark .brand y la esfera V3 .lp-orb*), en una pose fijada. Herramienta: no se publica. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/landing/styles.css">
+<style>
+  html, body{ margin:0; width:1200px; height:630px; overflow:hidden; background:#05070f; }
+  .og{ position:relative; width:1200px; height:630px; overflow:hidden;
+    background:
+      radial-gradient(60% 75% at 80% 52%, rgba(63,127,232,.30), transparent 62%),
+      radial-gradient(48% 60% at 12% 10%, rgba(79,142,247,.14), transparent 60%),
+      linear-gradient(180deg, #070b16, #05070f); }
+  /* superficie glass sutil, borde fino y reflejo controlado */
+  .og-glass{ position:absolute; inset:36px; border-radius:30px;
+    background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.015) 42%, rgba(79,142,247,.035));
+    border:1px solid rgba(138,178,255,.24); box-shadow:inset 0 1px 0 rgba(255,255,255,.10), 0 30px 80px rgba(0,0,0,.35); }
+  .og-glass::before{ content:''; position:absolute; inset:0; border-radius:30px; pointer-events:none;
+    background:linear-gradient(115deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 32%); }
+  .og-brand{ position:absolute; left:84px; top:78px; }
+  .og-brand .brand{ font-size:26px; }
+  .og-copy{ position:absolute; left:84px; top:200px; width:660px; }
+  .og-copy .hero-title{ margin:0; font-size:62px; line-height:1.07; letter-spacing:-.035em; text-wrap:wrap; }
+  .og-copy .hero-title span{ display:block; text-wrap:pretty; }
+  /* esfera V3, pose fijada: núcleo, anillos y ECG visibles */
+  .og-orb{ position:absolute; left:812px; top:176px; }
+  .og-orb .lp-orb-slot{ --orb-size:220px; margin:0; }
+  .og-orb .lp-orb{ transform:none; }
+  .og-orb *{ animation-play-state:paused !important; }
+  .og-orb .lp-orb-ring--1{ animation-delay:-3.1s !important; }
+  .og-orb .lp-orb-ring--2{ animation-delay:-5.4s !important; }
+  .og-orb .lp-orb-swirl{ animation-delay:-2.6s !important; }
+  .og-orb .lp-orb-glow{ animation-delay:-2.6s !important; filter:blur(14px); }
+  .og-orb .lp-ecg-pulse{ animation-delay:-1.75s !important; }
+  .og-orb .lp-orb-ecg .lp-ecg-base{ stroke-width:2.6; }
+  .og-orb .lp-orb-ecg .lp-ecg-pulse{ stroke-width:3.2; }
+  .og-orb .lp-orb-core{ box-shadow:0 0 46px rgba(77,141,255,.75), 0 18px 34px rgba(0,8,30,.55), inset 0 0 0 1px rgba(205,230,255,.32),
+    inset 0 -16px 26px rgba(6,18,58,.78), inset 0 4px 14px rgba(225,240,255,.55); }
+</style>
+</head>
+<body>
+  <div class="og">
+    <div class="og-glass"></div>
+    <div class="og-brand"><span class="brand">AURIX</span></div>
+    <div class="og-copy"><h1 class="hero-title"><span id="l1">Understand your wealth better.</span><span id="l2">Make better&#8209;informed decisions.</span></h1></div>
+    <div class="og-orb" aria-hidden="true">
+      <span class="lp-orb-slot"><span class="lp-orb">
+        <span class="lp-orb-glow"></span>
+        <span class="lp-orb-tilt" style="--rx:4deg; --ry:-6deg"><span class="lp-orb-ring lp-orb-ring--1"></span><span class="lp-orb-ring lp-orb-ring--2"></span></span>
+        <span class="lp-orb-core"><span class="lp-orb-swirl"></span></span>
+        <svg class="lp-orb-ecg" viewBox="0 0 120 40" preserveAspectRatio="none"><path class="lp-ecg-base" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/><path class="lp-ecg-pulse" pathLength="100" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/></svg>
+      </span></span>
+    </div>
+  </div>
+  <script>
+    var q = new URLSearchParams(location.search).get('lang');
+    if (q === 'es') { document.documentElement.lang = 'es';
+      document.getElementById('l1').textContent = 'Comprende mejor tu patrimonio.';
+      document.getElementById('l2').textContent = 'Decide con más información.'; }
+  </script>
+</body>
+</html>

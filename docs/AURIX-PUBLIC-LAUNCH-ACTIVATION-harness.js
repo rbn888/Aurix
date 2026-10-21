@@ -51,8 +51,13 @@ ok('3 launch time is NOT computed from deploy time and NOT stored in localStorag
   !/24\s*\*\s*60\s*60\s*1000|Date\.now\(\)\s*\+\s*24/.test(lApp) && !/localStorage[^\n]*launch/i.test(lApp) && !/localStorage[^\n]*launch/i.test(login));
 
 // ── 2. LANDING — single "Enter Aurix" CTA, no public "Request Access" ───────
-ok('4 landing header CTA is a single Enter Aurix (cta.enter) linked to the app',
-  /class="header-right">[\s\S]{0,600}<a class="btn btn-primary" href="https:\/\/app\.aurixsystem\.io\/" data-app-link data-i18n="cta\.enter">/.test(lHtml));
+// RE-DECIDIDO (LANDING COMERCIAL V2/V3, docs/AURIX-LANDING-COMMERCIAL-V1-SPEC.md §V2.1 y §V3): ni la
+// cabecera ni el menú móvil llevan CTA de registro (duplicaban el del hero). Lo que este check protege
+// no cambia: el registro es un único destino, la app, sin gate — desde el hero, los planes y el cierre.
+ok('4 landing: sin CTA de registro en cabecera ni menú móvil; el hero lleva a la app (cta.start)',
+  !/data-app-link/.test(lHtml.slice(lHtml.indexOf('class="header-right">'), lHtml.indexOf('</header>'))) &&
+  !/data-app-link/.test(lHtml.slice(lHtml.indexOf('id="mobileMenu"'), lHtml.indexOf('<main'))) &&
+  /class="hero-cta">\s*<a class="btn btn-primary btn-lg" href="https:\/\/app\.aurixsystem\.io\/" data-app-link data-i18n="cta\.start">/.test(lHtml));
 ok('5 no "Request Access" (cta.request) remains as a header / hero / mobile-actions CTA',
   !/mobile-actions[\s\S]{0,160}cta\.request/.test(lHtml) && !/header-right[\s\S]{0,160}cta\.request/.test(lHtml) && !/hero-cta-mobile[\s\S]{0,160}cta\.request/.test(lHtml));
 ok('6 CTAs de registro sin hook de gate y apuntando a la app (≥ header + hero + mobile)',
