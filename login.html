@@ -537,7 +537,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 497;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 498;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -663,9 +663,14 @@
       try {
         const q = new URLSearchParams(location.search);
         if (!(q.has('intent') || q.has('lang') || q.has('langhint'))) return;
-        if (q.get('intent') === 'premium') sessionStorage.setItem('aurix_intent', 'premium');
-        else sessionStorage.removeItem('aurix_intent');
-        if (q.has('intent')) { q.delete('intent'); const r = q.toString(); history.replaceState(history.state, '', location.pathname + (r ? '?' + r : '') + location.hash); }
+        // `plan` (annual|monthly): misma regla que index.html — la sustituye una entrada nueva y el
+        // CTA gratuito la borra junto con la intención. Las vueltas internas (sin parámetros) no la tocan.
+        const pl = { annual: 'year', monthly: 'month' }[q.get('plan')];
+        if (q.get('intent') === 'premium') {
+          sessionStorage.setItem('aurix_intent', 'premium');
+          if (pl) sessionStorage.setItem('aurix_intent_plan', pl); else sessionStorage.removeItem('aurix_intent_plan');
+        } else { sessionStorage.removeItem('aurix_intent'); sessionStorage.removeItem('aurix_intent_plan'); }
+        if (q.has('intent') || q.has('plan')) { q.delete('intent'); q.delete('plan'); const r = q.toString(); history.replaceState(history.state, '', location.pathname + (r ? '?' + r : '') + location.hash); }
       } catch (_) {}
     })();
 

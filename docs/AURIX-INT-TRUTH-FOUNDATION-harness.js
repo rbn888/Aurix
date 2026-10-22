@@ -203,12 +203,15 @@ console.log('1 · Concept ownership after AURI (SPEC 5.A re-decided):');
     const intel = run('_intccHealthScore(' + JSON.stringify(s) + ', { pct: 72 })');
     if (HEALTH_BANDS.includes(intel.band)) healthLeak++;
     if (intel.score != null && intel.metric !== 'weight_dispersion') healthLeak++;
-    if (intel.tone !== 'neutral' && intel.score != null) toneLeak++;
+    // RE-DECIDIDO (founder, 2026-10-22): tono INT.2Z para estados con juicio, neutro en el resto.
+    const toned = ['single_position', 'weight_in_few', 'weight_uneven', 'weight_spread'].includes(intel.band) && intel.score != null;
+    const sc = intel.score, wantTone = !toned ? 'neutral' : sc >= 80 ? 'green' : sc >= 60 ? 'lime' : sc >= 40 ? 'amber' : sc >= 20 ? 'orange' : 'red';
+    if (intel.tone !== wantTone) toneLeak++;
     if (canon.score != null) canonAlive++;
   }
   ok('1.4 Intelligence no publica una banda de SALUD en ninguna de las ' + grid.length + ' formas',
     healthLeak === 0, 'leaks=' + healthLeak);
-  ok('1.5 …y su tono es UNO, neutro: no vuelve a ser una escalera verde→roja',
+  ok('1.5 …y su tono es el de la escalera INT.2Z sólo cuando el estado juzga (si no, neutro)',
     toneLeak === 0, 'leaks=' + toneLeak);
   ok('1.6 el motor canónico sigue produciendo su score para el resto de superficies',
     canonAlive > 0, 'alive=' + canonAlive);

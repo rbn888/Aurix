@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=lp-commercial-4">
+  <link rel="stylesheet" href="styles.css?v=lp-commercial-8">
   <!-- V3 · animaciones de entrada: se arman antes del primer pintado. Sin movimiento reducido y sólo
        con JS; si app.js no llega a armarlas en 3 s, la página se queda en su estado final. -->
   <script>(function(d){try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;d.classList.add('lp-anim');setTimeout(function(){if(!d.classList.contains('lp-armed'))d.classList.add('lp-anim-off');},3000);}catch(e){}})(document.documentElement);</script>
@@ -62,7 +62,9 @@
         <div class="lang-toggle" role="group" aria-label="Language">
           <button class="lang-btn" data-lang="es">ES</button><span class="lang-sep">|</span><button class="lang-btn" data-lang="en">EN</button>
         </div>
-        <!-- V2 §4: sin CTA de registro en la cabecera (duplicaba el del hero). El acceso sigue en el menú móvil. -->
+        <!-- Acceso para quien ya tiene cuenta (no es un CTA de registro: el de registro sigue en el hero). Entrada
+             normal de la app con el idioma; sin intención Premium ni modalidad. href final: updateLoginLinks(). -->
+        <a class="hdr-login" href="https://app.aurixsystem.io/" data-app-login data-i18n="lp.login">Log in</a>
         <button class="menu-toggle" id="menuToggle" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
       </div>
     </div>
@@ -128,60 +130,77 @@
     </section>
 
     <!-- ─────────────── AURIX INTELLIGENCE ─────────────── -->
-    <!-- Panel en HTML con las frases del motor sobre la cartera de demostración (Premium y Free).
-         Las cifras las contrasta scripts/aurix-landing-captures.mjs: 29 / 22 / 18 / 69 · Free 29. -->
+    <!-- INTELLIGENCE V2 (docs/AURIX-LANDING-INTELLIGENCE-PREMIUM-SPEC.md): Intelligence REAL de la app con la
+         cartera de demostración (scripts/aurix-landing-captures.mjs --intel-v2), sin su esfera: encima va la
+         esfera viva de la landing. La primera pregunta de «Explora» se abre sobre la captura con su respuesta
+         real (capa capturada en la misma sesión + el mismo texto, accesible). Geometría: INTEL-V2-LAYERS. -->
     <section class="section section--intel" id="intelligence">
       <div class="container">
         <div class="intel-head">
           <span class="eyebrow" data-i18n="lp.intel.eyebrow">AURIX Intelligence</span>
-          <h2 class="section-title" data-i18n="lp.intel.title">See what deserves your attention.</h2>
-          <p class="section-lead" data-i18n="lp.intel.lead">Understand which investments your wealth depends on, what has changed and where it's worth taking a closer look.</p>
+          <h2 class="section-title iv2-title"><span data-i18n="lp.intel.title.a">Turn your investments into insights,</span><br class="iv2-br"> <span class="iv2-accent" data-i18n="lp.intel.title.b">make better-informed decisions today.</span></h2>
+          <p class="iv2-problem" data-i18n="lp.intel.problem">Discover the risks you might be overlooking.</p>
+          <p class="section-lead iv2-lead"><span data-i18n="lp.intel.lead.a">Get your analysis instantly. </span><strong class="iv2-save" data-i18n="lp.intel.lead.b">Save time</strong><span data-i18n="lp.intel.lead.c">, discover what matters.</span></p>
         </div>
 
-        <!-- Demostración comercial en HTML (no es una captura): frases y cifras del motor sobre la cartera
-             de demostración, contrastadas por scripts/aurix-landing-captures.mjs (29 / 22 / 18 / 69). -->
-        <article class="intel-panel" id="intelDemo" aria-labelledby="ipHead">
-          <div class="ip-top">
-            <div class="ip-top-copy">
-              <p class="ip-kicker" data-i18n="lp.ip.kicker">Sample analysis · Premium</p>
-              <p class="ip-head" id="ipHead" data-i18n="lp.ip.head">Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.</p>
-            </div>
+        <figure class="iv2" id="intelDemo">
+          <div class="iv2-shot">
+            <picture>
+              <source media="(max-width: 1023px)" srcset="assets/intelligence-v2-m-head-en.jpg" data-i18n-srcset="assets/intelligence-v2-m-head-{lang}.jpg" width="756" height="376">
+              <img class="iv2-base" src="assets/intelligence-v2-en.jpg" srcset="assets/intelligence-v2-en.jpg 1187w, assets/intelligence-v2-en-2x.jpg 2374w"
+                   data-i18n-srcset="assets/intelligence-v2-{lang}.jpg 1187w, assets/intelligence-v2-{lang}-2x.jpg 2374w"
+                   sizes="(min-width:1200px) 1152px, calc(100vw - 48px)" width="1187" height="593" loading="lazy" decoding="async"
+                   alt="AURIX Intelligence with a demo portfolio: Microsoft, Bitcoin and Apple outweigh your other 9 investments combined. Stocks: 51% of your portfolio. Bitcoin: +1.2% in 24 h." data-i18n-alt="lp.iv2.alt">
+            </picture>
+            <!-- Arco de Salud: capa vectorial sobre la captura (la captura no lo trae); geometría y color, INTEL-V2-LAYERS. -->
+            <!-- Periodo que respalda Estabilidad y Crecimiento, dentro de la tarjeta del Radar (dato de la demo, comprobado por el script). -->
+            <p class="iv2-radar-note" data-i18n="lp.iv2.radar">History analysed: 1 day</p>
+            <svg class="iv2-arc" viewBox="0 0 130 130" aria-hidden="true" focusable="false"><circle class="iv2-arc-fg" cx="65" cy="65" r="52" transform="rotate(-90 65 65)"/></svg>
+            <img class="iv2-open" data-q="1" aria-hidden="true" alt="" src="assets/intelligence-v2-open1-en.jpg" srcset="assets/intelligence-v2-open1-en.jpg 1x, assets/intelligence-v2-open1-en-2x.jpg 2x" data-i18n-srcset="assets/intelligence-v2-open1-{lang}.jpg 1x, assets/intelligence-v2-open1-{lang}-2x.jpg 2x" width="374" height="282" loading="lazy" decoding="async">
+            <img class="iv2-open" data-q="2" aria-hidden="true" alt="" src="assets/intelligence-v2-open2-en.jpg" srcset="assets/intelligence-v2-open2-en.jpg 1x, assets/intelligence-v2-open2-en-2x.jpg 2x" data-i18n-srcset="assets/intelligence-v2-open2-{lang}.jpg 1x, assets/intelligence-v2-open2-{lang}-2x.jpg 2x" width="374" height="282" loading="lazy" decoding="async">
+            <img class="iv2-open" data-q="3" aria-hidden="true" alt="" src="assets/intelligence-v2-open3-en.jpg" srcset="assets/intelligence-v2-open3-en.jpg 1x, assets/intelligence-v2-open3-en-2x.jpg 2x" data-i18n-srcset="assets/intelligence-v2-open3-{lang}.jpg 1x, assets/intelligence-v2-open3-{lang}-2x.jpg 2x" width="374" height="282" loading="lazy" decoding="async">
+              <button type="button" class="iv2-q" data-q="1" data-iv2-toggle hidden aria-expanded="false" aria-controls="iv2dA1" aria-label="Am I spread across several investment classes, or do I still depend on a few investments?" data-i18n-aria="lp.iv2.q1"></button>
+              <button type="button" class="iv2-q" data-q="2" data-iv2-toggle hidden aria-expanded="false" aria-controls="iv2dA2" aria-label="How much of my portfolio is in Stocks and Crypto?" data-i18n-aria="lp.iv2.q2"></button>
+              <button type="button" class="iv2-q" data-q="3" data-iv2-toggle hidden aria-expanded="false" aria-controls="iv2dA3" aria-label="How much have my investments actually returned?" data-i18n-aria="lp.iv2.q3"></button>
+              <div class="iv2-ans" data-q="1" id="iv2dA1" role="region" tabindex="0" aria-label="Am I spread across several investment classes, or do I still depend on a few investments?" data-i18n-aria="lp.iv2.q1" hidden><p data-i18n="lp.iv2.a1_1">You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.</p><p data-i18n="lp.iv2.a1_2">Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.</p></div>
+              <div class="iv2-ans" data-q="2" id="iv2dA2" role="region" tabindex="0" aria-label="How much of my portfolio is in Stocks and Crypto?" data-i18n-aria="lp.iv2.q2" hidden><p data-i18n="lp.iv2.a2_1">Stocks and Crypto together hold 92% of your financial portfolio today.</p><p data-i18n="lp.iv2.a2_2">Stocks, 51%; Crypto, 41%.</p></div>
+              <div class="iv2-ans" data-q="3" id="iv2dA3" role="region" tabindex="0" aria-label="How much have my investments actually returned?" data-i18n-aria="lp.iv2.q3" hidden><p data-i18n="lp.iv2.a3_1">The return of your financial portfolio was 0.19% over the last recorded day</p></div>
             <span class="lp-orb-slot" aria-hidden="true">
-              <span class="lp-orb">
-                <span class="lp-orb-glow"></span>
-                <span class="lp-orb-tilt">
-                  <span class="lp-orb-ring lp-orb-ring--1"></span>
-                  <span class="lp-orb-ring lp-orb-ring--2"></span>
+                  <span class="lp-orb">
+                    <span class="lp-orb-glow"></span>
+                    <span class="lp-orb-tilt">
+                      <span class="lp-orb-ring lp-orb-ring--1"></span>
+                      <span class="lp-orb-ring lp-orb-ring--2"></span>
+                    </span>
+                    <span class="lp-orb-core"><span class="lp-orb-swirl"></span></span>
+                    <svg class="lp-orb-ecg" viewBox="0 0 120 40" preserveAspectRatio="none"><path class="lp-ecg-base" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/><path class="lp-ecg-pulse" pathLength="100" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/></svg>
+                  </span>
                 </span>
-                <span class="lp-orb-core"><span class="lp-orb-swirl"></span></span>
-                <svg class="lp-orb-ecg" viewBox="0 0 120 40" preserveAspectRatio="none"><path class="lp-ecg-base" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/><path class="lp-ecg-pulse" pathLength="100" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/></svg>
-              </span>
-            </span>
           </div>
-          <div class="ip-body">
-            <div class="ip-stat-col">
-              <button type="button" class="ip-stat" data-ip-select="top3" aria-pressed="false">
-                <span class="ip-stat-pre" data-i18n="lp.ip.stat.pre">Your 3 largest investments hold</span>
-                <span class="ip-stat-n"><span class="ip-num" data-ip-final="69">69</span><span data-i18n="lp.ip.pct">%</span></span>
-                <span class="ip-stat-post" data-i18n="lp.ip.stat.post">of your financial portfolio.</span>
-              </button>
-              <p class="ip-cons" data-i18n="lp.ip.cons">Now you know which positions can shape how your whole portfolio moves.</p>
-            </div>
-            <div class="ip-breakdown">
-              <div class="ip-label-row">
-                <p class="ip-label" id="ipDrivers" data-i18n="lp.ip.drivers">Key drivers</p>
-                <button type="button" class="ip-reset" data-ip-reset hidden data-i18n="lp.ip.reset">Show all</button>
-              </div>
-              <ul class="ip-bars" aria-labelledby="ipDrivers">
-                <li data-ip-key="msft" data-ip-top3 style="--w:29"><button type="button" class="ip-row" data-ip-select="msft" aria-pressed="false"><span class="ip-name">Microsoft</span><span class="ip-track" aria-hidden="true"><span class="ip-fill"></span></span><span class="ip-pct"><span class="ip-num" data-ip-final="29">29</span><span data-i18n="lp.ip.pct">%</span></span></button></li>
-                <li data-ip-key="btc" data-ip-top3 style="--w:22"><button type="button" class="ip-row" data-ip-select="btc" aria-pressed="false"><span class="ip-name">Bitcoin</span><span class="ip-track" aria-hidden="true"><span class="ip-fill"></span></span><span class="ip-pct"><span class="ip-num" data-ip-final="22">22</span><span data-i18n="lp.ip.pct">%</span></span></button></li>
-                <li data-ip-key="aapl" data-ip-top3 style="--w:18"><button type="button" class="ip-row" data-ip-select="aapl" aria-pressed="false"><span class="ip-name">Apple</span><span class="ip-track" aria-hidden="true"><span class="ip-fill"></span></span><span class="ip-pct"><span class="ip-num" data-ip-final="18">18</span><span data-i18n="lp.ip.pct">%</span></span></button></li>
-                <li class="is-rest" data-ip-key="rest" style="--w:31"><button type="button" class="ip-row" data-ip-select="rest" aria-pressed="false"><span class="ip-name" data-i18n="lp.ip.rest">Rest of the financial portfolio</span><span class="ip-track" aria-hidden="true"><span class="ip-fill"></span></span><span class="ip-pct"><span class="ip-num" data-ip-final="31">31</span><span data-i18n="lp.ip.pct">%</span></span></button></li>
-              </ul>
-              <p class="ip-hint" data-i18n="lp.ip.hint">Select a position or the 69% to highlight it.</p>
+          <div class="iv2-m-more">
+            <img class="iv2-m-card" src="assets/intelligence-v2-m-drivers-en.jpg" data-i18n-srcset="assets/intelligence-v2-m-drivers-{lang}.jpg" width="756" height="434" loading="lazy" decoding="async"
+                 alt="Key drivers: Microsoft 29%, Bitcoin 22%, Apple 18%. Your 3 largest investments hold 69% of your financial portfolio." data-i18n-alt="lp.iv2.alt.drivers">
+            <div class="iv2-m-explore">
+              <img class="iv2-m-card" src="assets/intelligence-v2-m-explore-en.jpg" data-i18n-srcset="assets/intelligence-v2-m-explore-{lang}.jpg" width="756" height="454" loading="lazy" decoding="async"
+                   alt="Explore your wealth: Am I spread across several investment classes, or do I still depend on a few investments? How much of my portfolio is in Stocks and Crypto? How much have my investments actually returned?" data-i18n-alt="lp.iv2.alt.explore">
+              <img class="iv2-open" data-q="1" aria-hidden="true" alt="" src="assets/intelligence-v2-m-explore-open1-en.jpg" data-i18n-srcset="assets/intelligence-v2-m-explore-open1-{lang}.jpg" width="756" height="454" loading="lazy" decoding="async">
+              <img class="iv2-open" data-q="2" aria-hidden="true" alt="" src="assets/intelligence-v2-m-explore-open2-en.jpg" data-i18n-srcset="assets/intelligence-v2-m-explore-open2-{lang}.jpg" width="756" height="454" loading="lazy" decoding="async">
+              <img class="iv2-open" data-q="3" aria-hidden="true" alt="" src="assets/intelligence-v2-m-explore-open3-en.jpg" data-i18n-srcset="assets/intelligence-v2-m-explore-open3-{lang}.jpg" width="756" height="454" loading="lazy" decoding="async">
+              <button type="button" class="iv2-q" data-q="1" data-iv2-toggle hidden aria-expanded="false" aria-controls="iv2mA1" aria-label="Am I spread across several investment classes, or do I still depend on a few investments?" data-i18n-aria="lp.iv2.q1"></button>
+              <button type="button" class="iv2-q" data-q="2" data-iv2-toggle hidden aria-expanded="false" aria-controls="iv2mA2" aria-label="How much of my portfolio is in Stocks and Crypto?" data-i18n-aria="lp.iv2.q2"></button>
+              <button type="button" class="iv2-q" data-q="3" data-iv2-toggle hidden aria-expanded="false" aria-controls="iv2mA3" aria-label="How much have my investments actually returned?" data-i18n-aria="lp.iv2.q3"></button>
+              <div class="iv2-ans" data-q="1" id="iv2mA1" role="region" tabindex="0" aria-label="Am I spread across several investment classes, or do I still depend on a few investments?" data-i18n-aria="lp.iv2.q1" hidden><p data-i18n="lp.iv2.a1_1">You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.</p><p data-i18n="lp.iv2.a1_2">Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.</p></div>
+              <div class="iv2-ans" data-q="2" id="iv2mA2" role="region" tabindex="0" aria-label="How much of my portfolio is in Stocks and Crypto?" data-i18n-aria="lp.iv2.q2" hidden><p data-i18n="lp.iv2.a2_1">Stocks and Crypto together hold 92% of your financial portfolio today.</p><p data-i18n="lp.iv2.a2_2">Stocks, 51%; Crypto, 41%.</p></div>
+              <div class="iv2-ans" data-q="3" id="iv2mA3" role="region" tabindex="0" aria-label="How much have my investments actually returned?" data-i18n-aria="lp.iv2.q3" hidden><p data-i18n="lp.iv2.a3_1">The return of your financial portfolio was 0.19% over the last recorded day</p></div>
             </div>
           </div>
-        </article>
+          <!-- Sin JS: las tres preguntas con su respuesta, en texto (los controles de arriba siguen `hidden`). -->
+          <div class="iv2-static">
+            <div class="iv2-static-item"><p class="iv2-static-q" data-i18n="lp.iv2.q1">Am I spread across several investment classes, or do I still depend on a few investments?</p><p data-i18n="lp.iv2.a1_1">You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.</p><p data-i18n="lp.iv2.a1_2">Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.</p></div>
+            <div class="iv2-static-item"><p class="iv2-static-q" data-i18n="lp.iv2.q2">How much of my portfolio is in Stocks and Crypto?</p><p data-i18n="lp.iv2.a2_1">Stocks and Crypto together hold 92% of your financial portfolio today.</p><p data-i18n="lp.iv2.a2_2">Stocks, 51%; Crypto, 41%.</p></div>
+            <div class="iv2-static-item"><p class="iv2-static-q" data-i18n="lp.iv2.q3">How much have my investments actually returned?</p><p data-i18n="lp.iv2.a3_1">The return of your financial portfolio was 0.19% over the last recorded day</p></div>
+          </div>
+        </figure>
 
         <ul class="benefits">
           <li class="benefit-item reveal">
@@ -263,7 +282,30 @@
       <div class="container">
         <h2 class="section-title reveal" data-i18n="lp.plans.title">Start free. Go deeper with Premium.</h2>
         <div class="plan-grid">
-          <article class="plan reveal">
+          <article class="plan plan--premium reveal">
+            <h3 class="plan-name">Premium</h3>
+            <div class="plan-modes">
+              <div class="plan-mode plan-mode--year">
+                <p class="plan-mode-name" data-i18n="lp.plan.annual">Annual</p>
+                <p class="plan-price"><b data-i18n="lp.price.year">€69.99</b> <span data-i18n="lp.price.year.per">per year</span></p>
+                <p class="plan-mode-note" data-i18n="lp.price.year.note">One annual payment, equivalent to €5.83 a month: 27% less than paying monthly.</p>
+                <a class="btn btn-primary btn-block" href="https://app.aurixsystem.io/?intent=premium&amp;plan=annual" data-app-link data-app-intent="premium" data-app-plan="annual" data-i18n="lp.cta.annual">Choose annual</a>
+              </div>
+              <div class="plan-mode plan-mode--month">
+                <p class="plan-mode-name" data-i18n="lp.plan.monthly">Monthly</p>
+                <p class="plan-price"><b data-i18n="lp.price.month">€7.99</b> <span data-i18n="lp.price.month.per">per month</span></p>
+                <a class="btn btn-ghost btn-block" href="https://app.aurixsystem.io/?intent=premium&amp;plan=monthly" data-app-link data-app-intent="premium" data-app-plan="monthly" data-i18n="lp.cta.monthly">Choose monthly</a>
+              </div>
+            </div>
+            <p class="plan-intro" data-i18n="prem.intro">Everything in Free, plus:</p>
+            <ul class="plan-list">
+              <li data-i18n="lp.prem.1">Full Intelligence: dependencies, scenarios and what has changed in your portfolio, plus answers to questions about your own data</li>
+              <li data-i18n="lp.prem.2">Every Workspace tool: budgets, goals, scenarios, loans, compound interest and more</li>
+              <li data-i18n="prem.3">Save your plans to pick them up later</li>
+            </ul>
+            <p class="plan-terms" data-i18n="lp.price.terms">Renewing subscription. Cancel anytime from “Manage my plan”.</p>
+          </article>
+          <article class="plan plan--free reveal">
             <h3 class="plan-name">Free</h3>
             <p class="plan-price"><b data-i18n="free.price">€0</b> <span data-i18n="free.per">no cost</span></p>
             <p class="plan-sub" aria-hidden="true"></p>
@@ -276,22 +318,6 @@
             </ul>
             <a class="btn btn-ghost btn-block" href="https://app.aurixsystem.io/" data-app-link data-i18n="cta.start">Create a free account</a>
             <p class="plan-terms" aria-hidden="true"></p>
-          </article>
-          <article class="plan plan--premium reveal">
-            <h3 class="plan-name">Premium</h3>
-            <p class="plan-price"><b data-i18n="lp.price.year">€69.99</b> <span data-i18n="lp.price.year.per">per year</span></p>
-            <div class="plan-sub">
-              <span class="plan-sub-line" data-i18n="lp.price.year.note">One annual payment, equivalent to €5.83 a month: 27% less than paying monthly.</span>
-              <span class="plan-sub-alt" data-i18n="lp.price.month.alt">Or €7.99 a month, billed monthly.</span>
-            </div>
-            <p class="plan-intro" data-i18n="prem.intro">Everything in Free, plus:</p>
-            <ul class="plan-list">
-              <li data-i18n="lp.prem.1">Full Intelligence: dependencies, scenarios and what has changed in your portfolio, plus answers to questions about your own data</li>
-              <li data-i18n="lp.prem.2">Every Workspace tool: budgets, goals, scenarios, loans, compound interest and more</li>
-              <li data-i18n="prem.3">Save your plans to pick them up later</li>
-            </ul>
-            <a class="btn btn-primary btn-block" href="https://app.aurixsystem.io/?intent=premium" data-app-link data-app-intent="premium" data-i18n="lp.cta.premium">Explore Premium</a>
-            <p class="plan-terms" data-i18n="lp.price.terms">Renewing subscription. Cancel anytime from “Manage my plan”.</p>
           </article>
         </div>
       </div>
@@ -373,6 +399,6 @@
   <!-- HOTFIX LANDING — the "Request Access" modal was removed with the Private Beta section
        (Aurix is now open to the public; the CTA is "Enter Aurix"). -->
 
-  <script src="app.js?v=lp-commercial-4"></script>
+  <script src="app.js?v=lp-commercial-8"></script>
 </body>
 </html>

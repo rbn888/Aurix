@@ -1426,62 +1426,6 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
 .intel-head .section-lead{ margin:14px auto 0; color:var(--text); opacity:.84; max-width:52ch; }
 @media (max-width:480px){ .intel-head, .intel-head .section-title, .intel-head .section-lead{ text-align:left; margin-left:0; } }
 
-.intel-panel{ position:relative; margin-top:32px; padding:20px; border-radius:var(--radius-lg);
-  background:linear-gradient(180deg, rgba(79,142,247,.10), rgba(255,255,255,.025));
-  border:1px solid rgba(110,160,255,.34); box-shadow:0 24px 70px rgba(20,60,160,.20), 0 16px 40px rgba(0,0,0,.34);
-  transition:box-shadow .3s var(--ease), border-color .3s var(--ease); }
-.intel-panel:hover{ border-color:rgba(125,184,255,.5); box-shadow:0 24px 80px rgba(30,80,200,.28), 0 16px 40px rgba(0,0,0,.34); }
-@media (min-width:768px){ .intel-panel{ padding:32px 36px; } }
-.ip-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.ip-top-copy{ min-width:0; flex:1 1 auto; }
-.ip-kicker{ font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
-.ip-head{ margin-top:8px; font-size:clamp(20px, 2.2vw, 28px); font-weight:700; line-height:1.28; letter-spacing:-.015em; color:var(--text); max-width:30ch; }
-.ip-body{ display:grid; grid-template-columns:1fr; gap:22px; margin-top:22px; }
-@media (min-width:900px){ .ip-body{ grid-template-columns:minmax(0, 5fr) minmax(0, 7fr); gap:40px; align-items:center; margin-top:26px; } }
-
-/* El 69 %: protagonista y seleccionable (resalta las tres posiciones). */
-.ip-stat{ display:block; width:100%; margin:0; padding:20px 22px; text-align:left; cursor:pointer; color:inherit; font:inherit;
-  border-radius:var(--radius); border:1px solid var(--border-hi); background:rgba(79,142,247,.08);
-  transition:border-color .2s var(--ease), box-shadow .25s var(--ease), background-color .2s var(--ease); }
-.ip-stat:hover{ border-color:rgba(125,184,255,.55); background:rgba(79,142,247,.12); }
-.ip-stat[aria-pressed="true"]{ border-color:rgba(125,184,255,.85); background:rgba(79,142,247,.16); box-shadow:0 0 0 1px rgba(125,184,255,.35), 0 12px 40px rgba(79,142,247,.25); }
-.ip-stat-pre, .ip-stat-post{ display:block; font-size:16px; line-height:1.4; color:var(--muted); }
-.ip-stat-n{ display:block; margin:4px 0 2px; font-size:clamp(52px, 6vw, 76px); font-weight:800; letter-spacing:-.035em; line-height:1; font-variant-numeric:tabular-nums;
-  background-image:linear-gradient(180deg, #ffffff, #bcd0ee); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
-.ip-cons{ margin-top:14px; font-size:15px; line-height:1.5; color:var(--muted); }
-
-.ip-label-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
-.ip-label{ font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-2); }
-.ip-reset{ min-height:32px; padding:0 12px; border-radius:var(--radius-pill); border:1px solid var(--border-hi); background:transparent;
-  color:var(--accent-3); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
-.ip-reset[hidden]{ display:none; }
-.ip-reset:hover{ background:rgba(125,184,255,.08); }
-.ip-bars{ list-style:none; margin:0; padding:0; display:grid; gap:4px; }
-.ip-bars li{ transition:opacity .25s var(--ease); }
-.ip-row{ display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(0, 1fr) auto; align-items:center; gap:14px; width:100%;
-  min-height:44px; padding:8px 12px; text-align:left; cursor:pointer; color:inherit; font:inherit;
-  border-radius:12px; border:1px solid transparent; background:transparent;
-  transition:background-color .2s var(--ease), border-color .2s var(--ease); }
-.ip-row:hover{ background:rgba(255,255,255,.035); }
-.ip-name{ font-size:16px; font-weight:600; color:var(--text); }
-.ip-bars li.is-rest .ip-name{ font-weight:500; color:var(--muted); font-size:15px; }
-.ip-track{ display:block; height:6px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
-.ip-fill{ display:block; height:100%; width:calc(var(--w) * 1%); border-radius:999px; background:var(--accent); transition:background-color .2s, box-shadow .2s; }
-.ip-bars li.is-rest .ip-fill{ background:rgba(138,178,255,.38); }
-.ip-pct{ min-width:3.6em; text-align:right; font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text); }
-.ip-hint{ margin-top:10px; font-size:13px; line-height:1.45; color:var(--dim); }
-/* Selección: la elegida gana forma (borde + marcador) y peso; el resto se atenúa sin perder lectura. */
-.intel-panel.has-sel .ip-bars li:not(.is-on){ opacity:.5; }
-.ip-bars li.is-on .ip-row{ background:rgba(79,142,247,.12); border-color:rgba(125,184,255,.5); }
-.ip-bars li.is-on .ip-name{ font-weight:700; color:var(--text); }
-.ip-bars li.is-on .ip-name::before{ content:'●'; margin-right:7px; font-size:.65em; vertical-align:.18em; color:var(--accent-2); }
-.ip-bars li.is-on .ip-fill{ background:var(--accent-2); box-shadow:0 0 10px rgba(125,184,255,.6); }
-.ip-stat:focus-visible, .ip-row:focus-visible, .ip-reset:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; }
-@media (max-width:479px){
-  .ip-row{ grid-template-columns:minmax(0, 1fr) auto; row-gap:6px; }
-  .ip-track{ grid-column:1 / -1; grid-row:2; }
-  .ip-name{ font-size:15px; }
-}
 
 /* ── Esfera AURIX · volumen: núcleo con luz y reflejo, anillos en perspectiva, giro interno con
    aceleración y frenado. Port del orbe Intelligence V3 de la app, sin dependencias 3D. ── */
@@ -1586,6 +1530,157 @@ a:focus-visible, .btn:focus-visible, button:focus-visible, .lang-btn:focus-visib
 /* ── Cierre ── */
 .section--final .section-title{ max-width:24ch; }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   INTELLIGENCE V2 + PREMIUM POR MODALIDAD — docs/AURIX-LANDING-INTELLIGENCE-PREMIUM-SPEC.md
+   Intelligence real (captura) con la esfera viva de la landing en su hueco y la primera pregunta de
+   «Explora» abierta sobre su card. Escritorio ≥1024 px: la pantalla completa; por debajo, la vista
+   móvil real (cabecera → Factores → Explora). Geometría generada: INTEL-V2-LAYERS (al final).
+   ══════════════════════════════════════════════════════════════════════════ */
+.intel-head{ max-width:880px; }
+.intel-head .iv2-title{ max-width:none; text-wrap:balance; }
+.iv2-accent{ color:var(--accent-2); }
+.iv2-problem{ margin:18px auto 0; font-size:clamp(18px, 1.7vw, 23px); line-height:1.4; font-weight:600; color:var(--text); }
+.intel-head .section-lead{ margin-top:10px; }
+/* Énfasis discreto en el ahorro de tiempo: mismo cuerpo, blanco pleno y algo más de peso. */
+.iv2-lead .iv2-save{ font-weight:600; color:var(--text); }
+@media (max-width:767px){ .iv2-br{ display:none; } .iv2-problem{ font-size:18px; } }
+/* Escritorio: cada frase del título en su línea (salto tras la coma), sin encoger la presencia del h2 más de lo necesario. */
+@media (min-width:1024px){ .intel-head{ max-width:1120px; } .intel-head .iv2-title{ font-size:clamp(40px, 3.8vw, 54px); } }
+@media (max-width:480px){ .iv2-problem{ text-align:left; margin-left:0; } }
+
+/* El halo de la esfera en su looping del margen derecho podía asomar unos px fuera de la ventana y crear
+   desplazamiento horizontal: se recorta SÓLO en horizontal (lo que queda fuera no se ve de todos modos). */
+.section--intel{ overflow-x:clip; }
+.iv2{ margin:32px auto 0; max-width:1152px; }
+.iv2-shot{ position:relative; container-type:inline-size; }
+.iv2-shot picture, .iv2-base, .iv2-m-card{ display:block; width:100%; height:auto; }
+.iv2-base, .iv2-m-card{ border-radius:var(--radius-lg); box-shadow:0 30px 80px -30px rgba(20,60,160,.45); }
+/* La esfera viva de la landing, centrada en el hueco de la de la app (sin margen propio: el hueco manda). */
+.iv2-shot .lp-orb-slot{ position:absolute; margin:0; --orb-size:calc(var(--iv2-ow) * 1cqw);
+  left:calc(var(--iv2-cx) - var(--orb-size) / 2); top:calc(var(--iv2-cy) - var(--orb-size) / 2); }
+/* Pregunta 1 de «Explora»: botón real sobre su fila; la capa abierta es la misma card capturada abierta. */
+.iv2-q{ position:absolute; display:block; margin:0; padding:0; border:0; border-radius:12px; background:transparent; cursor:pointer;
+  transition:box-shadow .2s var(--ease), background-color .2s var(--ease); }
+.iv2-q[hidden]{ display:none; }
+/* Área táctil ≥44 px sin mover el dibujo (mismo recurso que el enlace del hero). */
+.iv2-q::before{ content:''; position:absolute; left:0; right:0; top:50%; height:max(100%, 44px); transform:translateY(-50%); }
+.iv2-q:hover{ background-color:rgba(125,184,255,.06); box-shadow:0 0 0 1px rgba(125,184,255,.5); }
+.iv2-q:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; }
+.iv2-open{ position:absolute; display:block; opacity:0; visibility:hidden; pointer-events:none; height:auto;
+  transition:opacity .18s var(--ease), visibility 0s linear .18s; }
+[data-open="1"] > .iv2-open[data-q="1"], [data-open="2"] > .iv2-open[data-q="2"], [data-open="3"] > .iv2-open[data-q="3"]{
+  opacity:1; visibility:visible; transition:opacity .18s var(--ease); }
+/* Respuesta: TEXTO real del motor sobre la región de la card abierta, con su tipografía medida y un
+   mínimo legible de 13 px. Si no cabe, se desplaza (ratón, teclado —es enfocable— y dedo); al llegar al
+   final el desplazamiento vuelve a la página (no se bloquea). */
+.iv2-ans{ position:absolute; display:block; box-sizing:border-box; margin:0; overflow-y:auto; overscroll-behavior:auto;
+  -webkit-overflow-scrolling:touch; font-size:max(13px, var(--iv2-fs)); line-height:var(--iv2-lh);
+  padding:var(--iv2-pt) var(--iv2-pr) var(--iv2-pt) var(--iv2-pl); text-align:left;
+  scrollbar-width:thin; scrollbar-color:rgba(125,184,255,.45) transparent; }
+.iv2-ans[hidden]{ display:none; }
+.iv2-ans p{ margin:0 0 var(--iv2-gap); }
+.iv2-ans p + p{ color:var(--iv2-c2, inherit); }
+.iv2-ans p:last-child{ margin-bottom:0; }
+.iv2-ans:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; border-radius:6px; }
+/* Arco de Salud: vectorial, alineado con la pista de la captura. Valor final por CSS (sin JS / movimiento
+   reducido); con JS se arma vacío y se dibuja UNA vez al entrar en pantalla. */
+.iv2-arc{ position:absolute; display:block; overflow:visible; pointer-events:none; }
+.iv2-arc-fg{ fill:none; stroke:var(--iv2-arc-color, #4f8ef7); stroke-width:9; stroke-linecap:round;
+  stroke-dasharray:326.726px; stroke-dashoffset:calc(326.726px * (1 - var(--iv2-arc-frac, 0))); }
+.iv2-arc-fg.is-armed{ stroke-dashoffset:326.726px; }
+.iv2-arc-fg.is-run{ transition:stroke-dashoffset 1000ms cubic-bezier(.22, 1, .36, 1); }
+.iv2-m-more{ display:none; }
+/* Sin JS: las tres preguntas con su respuesta en texto. Con JS, la demostración interactiva. */
+.iv2-static{ margin:18px auto 0; max-width:760px; display:grid; gap:12px; }
+.iv2-static-item{ padding:14px 16px; border-radius:var(--radius); border:1px solid rgba(110,160,255,.28); background:rgba(8,14,30,.72); }
+.iv2-static-item p{ margin:6px 0 0; font-size:15px; line-height:1.5; color:var(--muted); }
+.iv2-static-item .iv2-static-q{ margin:0; color:var(--text); font-weight:600; }
+.iv2.is-live .iv2-static{ display:none; }
+/* Periodo del Radar dentro de su tarjeta (fila del título, a la derecha): discreto y legible (≥12 px). */
+.iv2-radar-note{ position:absolute; display:flex; align-items:center; margin:0; white-space:nowrap; pointer-events:none;
+  font-size:max(12px, var(--iv2-rn-fs, 0px)); font-weight:500; letter-spacing:.01em; color:rgba(196,212,240,.78); }
+@media (max-width:1023px){
+  .iv2{ max-width:400px; }
+  .iv2-shot .iv2-q, .iv2-shot .iv2-open, .iv2-shot .iv2-ans, .iv2-shot .iv2-arc, .iv2-radar-note{ display:none !important; }   /* Salud y Radar sólo están en la captura de escritorio */
+  .iv2-m-more{ display:grid; gap:12px; margin-top:12px; }
+  .iv2-m-explore{ position:relative; container-type:inline-size; overflow:hidden; }   /* recorta las esquinas de la captura al radio del marco */
+  .iv2-m-explore .iv2-m-card, .iv2-m-explore .iv2-open{ border-radius:0; }
+  .iv2-m-explore .iv2-open{ left:0; top:0; width:100%; }
+}
+@media (prefers-reduced-motion: reduce){ .iv2-open, [data-open] > .iv2-open, .iv2-q, .iv2-arc-fg.is-run{ transition:none !important; } }
+
+/* Premium: las dos modalidades a la vista, anual primero y destacado; una sola lista de funciones. */
+.plan-modes{ display:grid; gap:12px; }
+.plan-mode{ display:grid; gap:8px; padding:16px; border-radius:var(--radius); border:1px solid var(--border); background:rgba(255,255,255,.02); }
+.plan-mode--year{ border-color:rgba(125,184,255,.55); background:rgba(79,142,247,.10); }
+.plan-mode-name{ margin:0; font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-2); }
+.plan-mode--month .plan-mode-name{ color:var(--muted); }
+.plan-mode .plan-price{ margin:0; }
+.plan-mode--month .plan-price b{ font-size:24px; }
+.plan-mode-note{ margin:0; font-size:14px; line-height:1.45; color:var(--accent-3); }
+.plan .plan-mode .btn{ margin-top:4px; }
+/* Escritorio compacto: Anual y Mensual en dos columnas cuando la tarjeta Premium tiene anchura (se mide la
+   tarjeta, no la pantalla). Filas compartidas (subgrid): nombre · precio · nota · botón, así precios y botones
+   quedan alineados aunque Mensual no tenga nota. Anual primero y destacado. Debajo, las funciones una vez. */
+.plan--premium{ container-type:inline-size; }
+@container (min-width: 380px){
+  .plan-modes{ grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:auto auto 1fr auto; column-gap:12px; row-gap:0; }
+  .plan-mode{ grid-row:span 4; grid-template-rows:subgrid; row-gap:8px; align-content:start; }
+  .plan-mode .plan-price{ align-self:end; }
+  .plan-mode .plan-price span{ display:block; margin-top:2px; }
+  .plan-mode .btn{ grid-row:4; align-self:end; }
+  .plan-mode .plan-mode-note{ grid-row:3; }
+}
+/* Las tarjetas ya no tienen las mismas filas: cada una a la altura de su contenido (sin el hueco vacío en Free). */
+@media (min-width:861px){ .plan-grid{ align-items:start; } }
+
+/* ── ACABADO COMÚN DE LAS DEMOSTRACIONES (Dashboard, Intelligence, Seguimiento, Market, Workspace) ──
+   EXACTAMENTE el tratamiento exterior del Dashboard principal en las cinco: fondo navy, borde azul
+   discreto, difuminado azul y, al pasar el ratón (o con el foco dentro), el mismo brillo azul eléctrico
+   con la misma intensidad y transición. Una sola regla compartida. El anillo va en el CONTENEDOR
+   (box-shadow, no border): ninguna capa alineada sobre una captura se mueve. Las capturas estáticas
+   conservan el cursor normal y no ganan enlaces ni zoom (el brillo es sólo acabado). En móvil el acabado
+   de reposo es el mismo, sin depender del hover. Los colores internos de las capturas no se tocan. */
+:root{ --lp-frame-bg:#060b17; --lp-frame-line:rgba(110,160,255,.30); --lp-frame-line-hi:rgba(125,184,255,.66);
+  --lp-frame-shadow:0 30px 80px -30px rgba(30,90,220,.45), 0 16px 40px rgba(0,0,0,.36); --lp-frame-glow:0 0 40px rgba(79,142,247,.32); }
+.hero-shot, .iv2-shot, .iv2-m-explore, .iv2-m-more > .iv2-m-card, .section .shot-fig:not(.hero-visual){
+  border-radius:var(--radius-lg); background:var(--lp-frame-bg);
+  box-shadow:0 0 0 1px var(--lp-frame-line), var(--lp-frame-shadow); transition:box-shadow .3s var(--ease); }
+.hero-shot:hover, .hero-shot:focus-within, .iv2-shot:hover, .iv2-shot:focus-within, .iv2-m-explore:hover, .iv2-m-explore:focus-within,
+.iv2-m-more > .iv2-m-card:hover, .section .shot-fig:not(.hero-visual):hover{
+  box-shadow:0 0 0 1px var(--lp-frame-line-hi), var(--lp-frame-shadow), var(--lp-frame-glow); }
+.hero-visual.shot-fig img, .iv2-base, .iv2-m-explore .iv2-m-card{ box-shadow:none; }
+.section .shot-fig:not(.hero-visual){ overflow:hidden; cursor:default; }
+.section .shot-fig:not(.hero-visual) img, .section .shot-fig:not(.hero-visual):hover img{ border:0; border-radius:0; box-shadow:none; cursor:default; }
+@media (prefers-reduced-motion: reduce){ .hero-shot, .iv2-shot, .iv2-m-explore, .iv2-m-more > .iv2-m-card, .section .shot-fig:not(.hero-visual){ transition:none; } }
+
+/* ── CABECERA · «Entrar» / «Log in» — acceso para quien ya tiene cuenta, a la derecha de ES | EN. Compacto y
+   discreto (no compite con «Crear cuenta gratis» del hero), acabado AURIX; área táctil ≥44 px sin crecer. ── */
+.hdr-login{ position:relative; display:inline-flex; align-items:center; height:34px; padding:0 14px; border-radius:var(--radius-pill);
+  font-size:13px; font-weight:600; letter-spacing:.01em; color:var(--text); text-decoration:none; white-space:nowrap;
+  background:rgba(79,142,247,.08); border:1px solid rgba(125,184,255,.34);
+  transition:border-color .2s var(--ease), background-color .2s var(--ease), box-shadow .2s var(--ease); }
+.hdr-login::before{ content:''; position:absolute; left:-4px; right:-4px; top:50%; height:44px; transform:translateY(-50%); }
+.hdr-login:hover{ border-color:rgba(125,184,255,.62); background:rgba(79,142,247,.14); box-shadow:0 0 18px rgba(79,142,247,.25); }
+.hdr-login:focus-visible{ outline:2px solid var(--accent-2); outline-offset:3px; }
+@media (max-width:860px){ .hdr-login{ height:32px; padding:0 11px; font-size:13px; } }
+@media (max-width:374px){ .hdr-login{ padding:0 9px; } .header-right .lang-toggle .lang-btn{ padding:8px 5px; } }
+
+/* ── PLANES · Premium arriba (todo el ancho) y Free debajo, en el mismo contenedor centrado. Premium: Anual y
+   Mensual en dos columnas cuando hay anchura (container query existente), apiladas en móvil; funciones debajo una
+   vez. Free compacto y de altura natural (en escritorio, dos columnas internas: precio y botón | lista). ── */
+.plan-grid{ grid-template-columns:minmax(0, 1fr) !important; max-width:960px; margin-left:auto; margin-right:auto; align-items:start; }
+.plan-grid .plan-terms, .plan-grid .plan-terms:empty{ min-height:0; }   /* ya no hay columnas que igualar: sin hueco artificial */
+@media (min-width:861px){
+  .plan-grid > .plan--free{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.5fr); column-gap:40px; row-gap:10px; align-items:start; }
+  .plan--free .plan-name{ grid-column:1; grid-row:1; }
+  .plan--free .plan-price{ grid-column:1; grid-row:2; }
+  .plan--free > .btn{ grid-column:1; grid-row:3; margin-top:8px; }
+  .plan--free .plan-intro{ grid-column:2; grid-row:1; margin-top:4px; }
+  .plan--free .plan-list{ grid-column:2; grid-row:2 / span 2; }
+  .plan--free .plan-sub, .plan--free .plan-terms{ display:none !important; }
+}
+
 /* HERO-HOTSPOT:BEGIN — generado por scripts/aurix-landing-captures.mjs: cápsula de salud en cada imagen del hero (%). */
 .hero-hotspot{ left:4.25%; top:52.43%; width:22.64%; height:9.59%; }
 html[lang="es"] .hero-hotspot{ left:4.25%; top:52.43%; width:17.26%; height:9.59%; }
@@ -1629,9 +1724,6 @@ html[lang="es"] .hero-shot .hero-val{ left:6.02%; top:8.15%; font-size:8.17cqw; 
 .lp-anim:not(.lp-anim-off):not(.lp-armed) .hero-donut{ -webkit-mask-image:conic-gradient(#000 0deg, transparent 0deg); mask-image:conic-gradient(#000 0deg, transparent 0deg); }
 .lp-anim:not(.lp-anim-off):not(.lp-armed) .hero-val{ visibility:hidden; }
 
-/* ── Intelligence: cifras con ancho reservado y dígitos tabulares (sin saltos durante el conteo) ── */
-.ip-num{ display:inline-block; min-width:2ch; text-align:right; font-variant-numeric:tabular-nums; }
-.ip-fill{ transform-origin:left center; will-change:auto; }
 
 /* ── Esfera: definición y profundidad; el ECG nunca desaparece ── */
 .lp-orb{ isolation:isolate; }
@@ -1652,7 +1744,6 @@ html[lang="es"] .hero-shot .hero-val{ left:6.02%; top:8.15%; font-size:8.17cqw; 
 
 /* ── Market: sin ampliación ── */
 .how-market-fig img{ cursor:default; }
-.ip-stat-n .ip-num{ min-width:calc(2ch - .07em); }   /* el titular aprieta el espaciado: sin sangría a la izquierda */
 
 /* HERO-MOBILE-V4:BEGIN — generado por scripts/aurix-landing-captures.mjs --mobile-v4: hero móvil con los puntos del carrusel. */
 @media (max-width:767px){
@@ -1675,11 +1766,56 @@ html[lang="es"] .hero-shot .hero-val{ left:6.02%; top:8.15%; font-size:8.17cqw; 
   .hero .hero-cta{ flex-direction:column; align-items:center; gap:12px; }
   .hero .hero-cta .btn{ width:100%; max-width:280px; height:auto; min-height:50px; padding:12px 20px; font-size:16px; white-space:normal; line-height:1.25; }
 }
-@media (max-width:767px){
-  /* Intelligence: rótulo y esfera en la misma fila; la conclusión debajo, a todo el ancho. */
-  .ip-top{ display:grid; grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"kicker orb" "head head"; column-gap:20px; align-items:center; }
-  .ip-top-copy{ display:contents; }
-  .ip-kicker{ grid-area:kicker; }
-  .lp-orb-slot{ grid-area:orb; margin:8px; }
-  .ip-head{ grid-area:head; margin-top:18px; max-width:none; }
+
+
+
+/* INTEL-V2-LAYERS:BEGIN — generado por scripts/aurix-landing-captures.mjs --intel-v2: esfera, arco de Salud, preguntas y respuestas de Explora en cada imagen (%, cqw). */
+.iv2-shot{ --iv2-cx:86.37%; --iv2-cy:24.84%; --iv2-ow:7.684; }
+.iv2-shot .iv2-arc{ left:7.16%; top:14.82%; width:9.76%; height:19.53%; --iv2-arc-frac:0.33; --iv2-arc-color:rgb(230, 132, 60); }
+.iv2-shot .iv2-radar-note{ right:68.72%; top:52.88%; height:2.53%; --iv2-rn-fs:1.0522cqw; }
+.iv2-shot .iv2-open{ left:67.12%; top:49.68%; width:31.54%; height:47.63%; }
+.iv2-shot .iv2-q[data-q="1"]{ left:68.8%; top:57.93%; width:28.17%; height:11.79%; }
+.iv2-shot .iv2-q[data-q="2"]{ left:68.8%; top:71.4%; width:28.17%; height:9.09%; }
+.iv2-shot .iv2-q[data-q="3"]{ left:68.8%; top:82.18%; width:28.17%; height:9.09%; }
+.iv2-shot[data-open="1"] .iv2-q[data-q="1"]{ left:68.8%; top:57.93%; width:28.17%; height:11.79%; }
+.iv2-shot[data-open="2"] .iv2-q[data-q="2"]{ left:68.8%; top:57.93%; width:28.17%; height:9.09%; }
+.iv2-shot[data-open="3"] .iv2-q[data-q="3"]{ left:68.8%; top:57.93%; width:28.17%; height:9.09%; }
+.iv2-shot .iv2-ans[data-q="1"]{ left:68.8%; top:69.72%; width:28.17%; height:24.22%; --iv2-fs:1.0943cqw; --iv2-lh:1.5; --iv2-gap:0.8418cqw; --iv2-pl:2.3569cqw; --iv2-pr:1.1785cqw; --iv2-pt:0.3367cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+.iv2-shot .iv2-ans[data-q="2"]{ left:68.8%; top:67.02%; width:28.17%; height:26.91%; --iv2-fs:1.0943cqw; --iv2-lh:1.5; --iv2-gap:0.8418cqw; --iv2-pl:2.3569cqw; --iv2-pr:1.1785cqw; --iv2-pt:0.3367cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+.iv2-shot .iv2-ans[data-q="3"]{ left:68.8%; top:67.02%; width:28.17%; height:26.91%; --iv2-fs:1.0943cqw; --iv2-lh:1.5; --iv2-gap:0cqw; --iv2-pl:2.3569cqw; --iv2-pr:1.1785cqw; --iv2-pt:0.3367cqw; --iv2-c2:rgba(236, 242, 255, 0.96); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+html[lang="es"] .iv2-shot{ --iv2-cx:86.37%; --iv2-cy:24.84%; --iv2-ow:7.684; }
+html[lang="es"] .iv2-shot .iv2-arc{ left:6.57%; top:14.82%; width:9.76%; height:19.53%; --iv2-arc-frac:0.33; --iv2-arc-color:rgb(230, 132, 60); }
+html[lang="es"] .iv2-shot .iv2-radar-note{ right:68.72%; top:52.88%; height:2.53%; --iv2-rn-fs:1.0522cqw; }
+html[lang="es"] .iv2-shot .iv2-open{ left:67.12%; top:49.68%; width:31.54%; height:47.63%; }
+html[lang="es"] .iv2-shot .iv2-q[data-q="1"]{ left:68.8%; top:57.93%; width:28.17%; height:9.09%; }
+html[lang="es"] .iv2-shot .iv2-q[data-q="2"]{ left:68.8%; top:68.71%; width:28.17%; height:9.09%; }
+html[lang="es"] .iv2-shot .iv2-q[data-q="3"]{ left:68.8%; top:79.48%; width:28.17%; height:9.09%; }
+html[lang="es"] .iv2-shot[data-open="1"] .iv2-q[data-q="1"]{ left:68.8%; top:57.93%; width:28.17%; height:9.09%; }
+html[lang="es"] .iv2-shot[data-open="2"] .iv2-q[data-q="2"]{ left:68.8%; top:57.93%; width:28.17%; height:9.09%; }
+html[lang="es"] .iv2-shot[data-open="3"] .iv2-q[data-q="3"]{ left:68.8%; top:57.93%; width:28.17%; height:9.09%; }
+html[lang="es"] .iv2-shot .iv2-ans[data-q="1"]{ left:68.8%; top:67.02%; width:28.17%; height:26.91%; --iv2-fs:1.0943cqw; --iv2-lh:1.5; --iv2-gap:0.8418cqw; --iv2-pl:2.3569cqw; --iv2-pr:1.1785cqw; --iv2-pt:0.3367cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+html[lang="es"] .iv2-shot .iv2-ans[data-q="2"]{ left:68.8%; top:67.02%; width:28.17%; height:26.91%; --iv2-fs:1.0943cqw; --iv2-lh:1.5; --iv2-gap:0.8418cqw; --iv2-pl:2.3569cqw; --iv2-pr:1.1785cqw; --iv2-pt:0.3367cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+html[lang="es"] .iv2-shot .iv2-ans[data-q="3"]{ left:68.8%; top:67.02%; width:28.17%; height:26.91%; --iv2-fs:1.0943cqw; --iv2-lh:1.5; --iv2-gap:0cqw; --iv2-pl:2.3569cqw; --iv2-pr:1.1785cqw; --iv2-pt:0.3367cqw; --iv2-c2:rgba(236, 242, 255, 0.96); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+@media (max-width:1023px){
+  .iv2-shot{ --iv2-cx:88.09%; --iv2-cy:35.84%; --iv2-ow:12.499; }
+  .iv2-m-explore .iv2-q[data-q="1"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  .iv2-m-explore .iv2-q[data-q="2"]{ left:4.5%; top:44.49%; width:91.01%; height:22.03%; }
+  .iv2-m-explore .iv2-q[data-q="3"]{ left:4.5%; top:70.93%; width:91.01%; height:22.03%; }
+  .iv2-m-explore[data-open="1"] .iv2-q[data-q="1"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  .iv2-m-explore[data-open="2"] .iv2-q[data-q="2"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  .iv2-m-explore[data-open="3"] .iv2-q[data-q="3"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  .iv2-m-explore .iv2-ans[data-q="1"]{ left:4.5%; top:40.09%; width:91.01%; height:52.86%; --iv2-fs:3.4392cqw; --iv2-lh:1.5; --iv2-gap:2.6455cqw; --iv2-pl:7.4074cqw; --iv2-pr:3.7037cqw; --iv2-pt:1.0582cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+  .iv2-m-explore .iv2-ans[data-q="2"]{ left:4.5%; top:40.09%; width:91.01%; height:52.86%; --iv2-fs:3.4392cqw; --iv2-lh:1.5; --iv2-gap:2.6455cqw; --iv2-pl:7.4074cqw; --iv2-pr:3.7037cqw; --iv2-pt:1.0582cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+  .iv2-m-explore .iv2-ans[data-q="3"]{ left:4.5%; top:40.09%; width:91.01%; height:52.86%; --iv2-fs:3.4392cqw; --iv2-lh:1.5; --iv2-gap:0cqw; --iv2-pl:7.4074cqw; --iv2-pr:3.7037cqw; --iv2-pt:1.0582cqw; --iv2-c2:rgba(236, 242, 255, 0.96); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+  html[lang="es"] .iv2-shot{ --iv2-cx:88.09%; --iv2-cy:35.84%; --iv2-ow:12.499; }
+  html[lang="es"] .iv2-m-explore .iv2-q[data-q="1"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  html[lang="es"] .iv2-m-explore .iv2-q[data-q="2"]{ left:4.5%; top:44.49%; width:91.01%; height:22.03%; }
+  html[lang="es"] .iv2-m-explore .iv2-q[data-q="3"]{ left:4.5%; top:70.93%; width:91.01%; height:22.03%; }
+  html[lang="es"] .iv2-m-explore[data-open="1"] .iv2-q[data-q="1"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  html[lang="es"] .iv2-m-explore[data-open="2"] .iv2-q[data-q="2"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  html[lang="es"] .iv2-m-explore[data-open="3"] .iv2-q[data-q="3"]{ left:4.5%; top:18.06%; width:91.01%; height:22.03%; }
+  html[lang="es"] .iv2-m-explore .iv2-ans[data-q="1"]{ left:4.5%; top:40.09%; width:91.01%; height:52.86%; --iv2-fs:3.4392cqw; --iv2-lh:1.5; --iv2-gap:2.6455cqw; --iv2-pl:7.4074cqw; --iv2-pr:3.7037cqw; --iv2-pt:1.0582cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+  html[lang="es"] .iv2-m-explore .iv2-ans[data-q="2"]{ left:4.5%; top:40.09%; width:91.01%; height:52.86%; --iv2-fs:3.4392cqw; --iv2-lh:1.5; --iv2-gap:2.6455cqw; --iv2-pl:7.4074cqw; --iv2-pr:3.7037cqw; --iv2-pt:1.0582cqw; --iv2-c2:rgba(206, 219, 244, 0.9); color:rgba(236, 242, 255, 0.96); font-weight:400; }
+  html[lang="es"] .iv2-m-explore .iv2-ans[data-q="3"]{ left:4.5%; top:40.09%; width:91.01%; height:52.86%; --iv2-fs:3.4392cqw; --iv2-lh:1.5; --iv2-gap:0cqw; --iv2-pl:7.4074cqw; --iv2-pr:3.7037cqw; --iv2-pt:1.0582cqw; --iv2-c2:rgba(236, 242, 255, 0.96); color:rgba(236, 242, 255, 0.96); font-weight:400; }
 }
+/* INTEL-V2-LAYERS:END */

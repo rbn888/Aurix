@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v860-budget-surface';
-      var APPJS_V = '820';
+      var BUILD = 'v861-premium-plan-choice';
+      var APPJS_V = '821';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -480,7 +480,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=820">
+  <link rel="stylesheet" href="styles.css?v=821">
 </head>
 <body style="background:#040507">
 
@@ -552,9 +552,14 @@
       // la URL para que una recarga no la recupere. La consume app.js UNA vez; sólo navega.
       try {
         if (_qs.has('intent') || _qs.has('lang') || _qs.has('langhint')) {
-          if (_qs.get('intent') === 'premium') sessionStorage.setItem('aurix_intent', 'premium');
-          else sessionStorage.removeItem('aurix_intent');
-          if (_qs.has('intent')) { _qs.delete('intent'); var _qq = _qs.toString(); history.replaceState(history.state, '', location.pathname + (_qq ? '?' + _qq : '') + location.hash); }
+          // `plan` (annual|monthly) sólo acompaña a intent=premium: la modalidad elegida en la landing.
+          // Una entrada nueva la SUSTITUYE (o la borra si no trae plan válido); el CTA gratuito borra ambas.
+          var _pl = { annual: 'year', monthly: 'month' }[_qs.get('plan')];
+          if (_qs.get('intent') === 'premium') {
+            sessionStorage.setItem('aurix_intent', 'premium');
+            if (_pl) sessionStorage.setItem('aurix_intent_plan', _pl); else sessionStorage.removeItem('aurix_intent_plan');
+          } else { sessionStorage.removeItem('aurix_intent'); sessionStorage.removeItem('aurix_intent_plan'); }
+          if (_qs.has('intent') || _qs.has('plan')) { _qs.delete('intent'); _qs.delete('plan'); var _qq = _qs.toString(); history.replaceState(history.state, '', location.pathname + (_qq ? '?' + _qq : '') + location.hash); }
         }
       } catch (_) {}
       // Misma precedencia que app.js (`let lang`): elección de esta sesión → guardada →
@@ -1790,7 +1795,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=820"
+  <script src="app.js?v=821"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1801,8 +1806,8 @@
        no UI, no DERIVED/RLS changes. -->
   <script src="services/wealth-ledger.js?v=2"></script>
   <script src="services/prices.js"></script>
-  <script src="aurora-bg.js?v=820"></script>
-  <script src="orb.js?v=820"></script>
+  <script src="aurora-bg.js?v=821"></script>
+  <script src="orb.js?v=821"></script>
 
   <!-- Watchlist Modal -->
   <div id="watchlist-modal" class="watchlist-modal hidden">

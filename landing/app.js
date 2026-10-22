@@ -408,16 +408,6 @@
       'lp.cta.intel': 'Descubrir Intelligence',
       'lp.demo': 'Cartera de demostración',
       'lp.alt.hero': 'Dashboard de AURIX con una cartera de demostración: patrimonio invertible, evolución y reparto por categorías',
-      'lp.intel.title': 'Descubre qué merece tu atención.',
-      'lp.intel.lead': 'Entiende de qué inversiones depende tu patrimonio, qué ha cambiado y dónde merece la pena mirar más de cerca.',
-      'lp.ip.head': 'Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas.',
-      'lp.ip.drivers': 'Factores principales',
-      'lp.ip.p29': '29 %', 'lp.ip.p22': '22 %', 'lp.ip.p18': '18 %', 'lp.ip.p31': '31 %',
-      'lp.ip.rest': 'Resto de la cartera, liquidez incluida',
-      'lp.ip.sum': 'Tus 3 mayores inversiones reúnen el 69 % de tu cartera financiera.',
-      'lp.ip.cons': 'Ahora sabes qué posiciones pueden marcar la evolución del conjunto.',
-      'lp.ip.demo': 'Cartera de demostración · vista Premium',
-      'lp.ip.link': 'Ver la pantalla completa',
       'lp.if.label': 'Tu primera lectura con Free',
       'lp.if.quote': '«El 29 % de tu cartera financiera depende de Microsoft.»',
       'lp.b1.t': 'Comprende de qué depende tu dinero.',
@@ -454,10 +444,8 @@
       'lp.free.4': 'Tu primera lectura de Intelligence sobre la composición de tu cartera',
       'lp.price.year': '69,99 €', 'lp.price.year.per': 'al año',
       'lp.price.year.note': 'Un único cobro anual: equivale a 5,83 € al mes y ahorras un 27 % frente al pago mensual.',
-      'lp.price.month.alt': 'O 7,99 € al mes, con cobro mensual.',
       'lp.prem.1': 'Intelligence completa: dependencias, escenarios y qué ha cambiado en tu cartera, con preguntas sobre tus propios datos',
       'lp.prem.2': 'Todas las herramientas de Workspace: presupuestos, objetivos, escenarios, préstamos, interés compuesto y más',
-      'lp.cta.premium': 'Descubrir Premium',
       'lp.price.terms': 'Suscripción renovable. Cancela cuando quieras desde «Gestionar mi plan».',
       'lp.faq.0.q': '¿Qué es AURIX?',
       'lp.faq.0.a': 'Una plataforma de inteligencia patrimonial para inversores particulares. Reúnes tus inversiones en un solo lugar, Intelligence te ayuda a entender de qué depende tu patrimonio y qué está cambiando, y Workspace te permite planificar con tus propios números.',
@@ -483,16 +471,6 @@
       'lp.cta.intel': 'Explore Intelligence',
       'lp.demo': 'Demo portfolio',
       'lp.alt.hero': 'AURIX Dashboard with a demo portfolio: investable wealth, evolution and split by category',
-      'lp.intel.title': 'See what deserves your attention.',
-      'lp.intel.lead': 'Understand which investments your wealth depends on, what has changed and where it’s worth taking a closer look.',
-      'lp.ip.head': 'Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.',
-      'lp.ip.drivers': 'Key drivers',
-      'lp.ip.p29': '29%', 'lp.ip.p22': '22%', 'lp.ip.p18': '18%', 'lp.ip.p31': '31%',
-      'lp.ip.rest': 'Rest of the portfolio, cash included',
-      'lp.ip.sum': 'Your 3 largest investments hold 69% of your financial portfolio.',
-      'lp.ip.cons': 'Now you know which positions can shape how your whole portfolio moves.',
-      'lp.ip.demo': 'Demo portfolio · Premium view',
-      'lp.ip.link': 'See the full screen',
       'lp.if.label': 'Your first reading on Free',
       'lp.if.quote': '“29% of your financial portfolio depends on Microsoft.”',
       'lp.b1.t': 'Understand what your money depends on.',
@@ -529,10 +507,8 @@
       'lp.free.4': 'Your first Intelligence reading of your portfolio’s composition',
       'lp.price.year': '€69.99', 'lp.price.year.per': 'per year',
       'lp.price.year.note': 'One annual payment, equivalent to €5.83 a month: 27% less than paying monthly.',
-      'lp.price.month.alt': 'Or €7.99 a month, billed monthly.',
       'lp.prem.1': 'Full Intelligence: dependencies, scenarios and what has changed in your portfolio, plus answers to questions about your own data',
       'lp.prem.2': 'Every Workspace tool: budgets, goals, scenarios, loans, compound interest and more',
-      'lp.cta.premium': 'Explore Premium',
       'lp.price.terms': 'Renewing subscription. Cancel anytime from “Manage my plan”.',
       'lp.faq.0.q': 'What is AURIX?',
       'lp.faq.0.a': 'A wealth intelligence platform for individual investors. You bring your investments together in one place, Intelligence helps you understand what your wealth depends on and what is changing, and Workspace lets you plan with your own numbers.',
@@ -551,35 +527,75 @@
   // Sobrescribe sólo lo que cambia (el resto de V1 sigue vigente).
   Object.assign(I18N.es, {
       'lp.intel.eyebrow': 'AURIX Intelligence',
-      'lp.ip.kicker': 'Ejemplo de análisis · Premium',
-      'lp.ip.stat.pre': 'Tus 3 mayores inversiones reúnen el',
-      'lp.ip.stat.n': '69 %',
-      'lp.ip.stat.post': 'de tu cartera financiera.',
-      'lp.ip.rest': 'Resto de la cartera financiera',
-      'lp.ip.reset': 'Ver todo',
-      'lp.ip.hint': 'Selecciona una posición o el 69 % para resaltarla.',
       'lp.hot.aria': 'Salud: A vigilar · Ver análisis en AURIX Intelligence',
   });
   Object.assign(I18N.en, {
       'lp.intel.eyebrow': 'AURIX Intelligence',
-      'lp.ip.kicker': 'Sample analysis · Premium',
-      'lp.ip.stat.pre': 'Your 3 largest investments hold',
-      'lp.ip.stat.n': '69%',
-      'lp.ip.stat.post': 'of your financial portfolio.',
-      'lp.ip.rest': 'Rest of the financial portfolio',
-      'lp.ip.reset': 'Show all',
-      'lp.ip.hint': 'Select a position or the 69% to highlight it.',
       'lp.hot.aria': 'Health: Worth watching · View analysis in AURIX Intelligence',
   });
 
   // LANDING V3 · sufijo de porcentaje (ES con espacio fino) y texto alternativo del hero con su cifra.
   Object.assign(I18N.es, {
-      'lp.ip.pct': '\u00a0%',
       'lp.alt.hero': 'Dashboard de AURIX con una cartera de demostración: patrimonio invertible de 186.055,38\u00a0US$, evolución de 24 horas y reparto por categorías',
   });
   Object.assign(I18N.en, {
-      'lp.ip.pct': '%',
       'lp.alt.hero': 'AURIX Dashboard with a demo portfolio: investable wealth of $186,055.38, 24-hour evolution and split by category',
+  });
+
+  // INTELLIGENCE V2 + PREMIUM POR MODALIDAD (docs/AURIX-LANDING-INTELLIGENCE-PREMIUM-SPEC.md).
+  // El copy de Intelligence es el APROBADO, literal. Pregunta y respuesta son las del motor sobre la
+  // cartera de demostración (scripts/aurix-landing-captures.mjs --intel-v2 las comprueba antes de capturar).
+  Object.assign(I18N.es, {
+      'lp.intel.title.a': 'Convierte tus inversiones en información,',
+      'lp.intel.title.b': 'toma mejores decisiones desde hoy.',
+      'lp.intel.problem': 'Descubre qué riesgos podrías estar ignorando.',
+      'lp.intel.lead.a': 'Obtén tu análisis al instante. ',
+      'lp.intel.lead.b': 'Ahorra tiempo',
+      'lp.intel.lead.c': ', descubre lo que importa',
+      'lp.iv2.alt': 'AURIX Intelligence con una cartera de demostración: Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas. Acciones: 51% de tu cartera. Bitcoin: +1,2% en 24 h.',
+      'lp.iv2.alt.drivers': 'Factores principales: Microsoft 29%, Bitcoin 22%, Apple 18%. Tus 3 mayores inversiones reúnen el 69% de tu cartera financiera.',
+      'lp.iv2.alt.explore': 'Explora tu patrimonio: ¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones? ¿Qué parte de mi cartera está entre Acciones y Cripto? ¿Cuánto han rendido realmente mis inversiones?',
+      'lp.iv2.q1': '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?',
+      'lp.iv2.a1_1': 'Repartes entre 4 clases de inversión, pero no tanto entre posiciones: el peso sigue recayendo en tus tres mayores inversiones.',
+      'lp.iv2.a1_2': 'Clases: Acciones, Cripto, Fondos/ETF y Metales. Tres mayores: Microsoft, Bitcoin y Apple.',
+      'lp.iv2.q2': '¿Qué parte de mi cartera está entre Acciones y Cripto?',
+      'lp.iv2.a2_1': 'Acciones y Cripto reúnen hoy el 92% de tu cartera financiera.',
+      'lp.iv2.a2_2': 'Acciones, 51%; Cripto, 41%.',
+      'lp.iv2.q3': '¿Cuánto han rendido realmente mis inversiones?',
+      'lp.iv2.a3_1': 'El rendimiento de tu cartera financiera fue del 0,19% en el último día registrado',
+      'lp.iv2.radar': 'Historial analizado: 1 día',
+      'lp.plan.annual': 'Anual',
+      'lp.plan.monthly': 'Mensual',
+      'lp.price.month': '7,99\u00a0€', 'lp.price.month.per': 'al mes',
+      'lp.cta.annual': 'Elegir anual',
+      'lp.login': 'Entrar',
+      'lp.cta.monthly': 'Elegir mensual',
+  });
+  Object.assign(I18N.en, {
+      'lp.intel.title.a': 'Turn your investments into insights,',
+      'lp.intel.title.b': 'make better-informed decisions today.',
+      'lp.intel.problem': 'Discover the risks you might be overlooking.',
+      'lp.intel.lead.a': 'Get your analysis instantly. ',
+      'lp.intel.lead.b': 'Save time',
+      'lp.intel.lead.c': ', discover what matters.',
+      'lp.iv2.alt': 'AURIX Intelligence with a demo portfolio: Microsoft, Bitcoin and Apple outweigh your other 9 investments combined. Stocks: 51% of your portfolio. Bitcoin: +1.2% in 24 h.',
+      'lp.iv2.alt.drivers': 'Key drivers: Microsoft 29%, Bitcoin 22%, Apple 18%. Your 3 largest investments hold 69% of your financial portfolio.',
+      'lp.iv2.alt.explore': 'Explore your wealth: Am I spread across several investment classes, or do I still depend on a few investments? How much of my portfolio is in Stocks and Crypto? How much have my investments actually returned?',
+      'lp.iv2.q1': 'Am I spread across several investment classes, or do I still depend on a few investments?',
+      'lp.iv2.a1_1': 'You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.',
+      'lp.iv2.a1_2': 'Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.',
+      'lp.iv2.q2': 'How much of my portfolio is in Stocks and Crypto?',
+      'lp.iv2.a2_1': 'Stocks and Crypto together hold 92% of your financial portfolio today.',
+      'lp.iv2.a2_2': 'Stocks, 51%; Crypto, 41%.',
+      'lp.iv2.q3': 'How much have my investments actually returned?',
+      'lp.iv2.a3_1': 'The return of your financial portfolio was 0.19% over the last recorded day',
+      'lp.iv2.radar': 'History analysed: 1 day',
+      'lp.plan.annual': 'Annual',
+      'lp.plan.monthly': 'Monthly',
+      'lp.price.month': '€7.99', 'lp.price.month.per': 'per month',
+      'lp.cta.annual': 'Choose annual',
+      'lp.login': 'Log in',
+      'lp.cta.monthly': 'Choose monthly',
   });
 
   // AURIX-AFFILIATES-V1 · aviso de recomendación (sólo aparece con un `?ref=`).
@@ -690,6 +706,7 @@
     // Y lo mismo con las legales: viven en el dominio de la app, así que sin
     // `?lang=` un lector en inglés abriría Privacidad en español.
     updateLegalLinks();
+    updateLoginLinks();
     // V2 · el idioma cambia longitudes de texto: la esfera recalcula su recorrido.
     try { window.dispatchEvent(new Event('aurix:lang')); } catch (_) {}
   }
@@ -839,8 +856,20 @@
     var links = document.querySelectorAll('[data-app-link]');
     for (var i = 0; i < links.length; i++) {
       links[i].setAttribute('href', appUrlWithRef());
-      if (links[i].getAttribute('data-app-intent') === 'premium') links[i].setAttribute('href', links[i].getAttribute('href') + '&intent=premium');
+      if (links[i].getAttribute('data-app-intent') === 'premium') {
+        // `plan` = la modalidad que el visitante eligió (annual|monthly). La app sólo la RESALTA en sus
+        // planes: no inicia el cobro. Sin `data-app-plan`, Premium sin modalidad, como antes.
+        var pl = links[i].getAttribute('data-app-plan');
+        links[i].setAttribute('href', links[i].getAttribute('href') + '&intent=premium' + (pl === 'annual' || pl === 'monthly' ? '&plan=' + pl : ''));
+      }
     }
+  }
+  // «Entrar» / «Log in» de la cabecera: la entrada NORMAL de la app (con sesión válida → la cuenta; sin
+  // sesión → el acceso), con el idioma. Sin intención Premium, sin modalidad y sin referido: es para quien
+  // ya tiene cuenta. La app trata una entrada sin `intent` como «borrar intención» (no reabre los planes).
+  function updateLoginLinks() {
+    var links = document.querySelectorAll('[data-app-login]');
+    for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlForLang());
   }
   // Soporte y legales: páginas PÚBLICAS servidas por el dominio de la app. El
   // idioma viaja en `?lang=` (elección explícita, no una pista): quien está
@@ -1105,72 +1134,54 @@
     io.observe(shot);
   }
 
-  /* ── LANDING V2 · demostración de Intelligence ──────────────────────────────
-     Seleccionar una posición la resalta (forma + peso, no sólo color) y atenúa el resto;
-     el 69 % resalta las tres mayores. Volver a pulsar, «Ver todo» o Escape restablecen. */
-  function initIntelDemo() {
-    var panel = document.getElementById('intelDemo');
-    if (!panel) return;
-    var lis = [].slice.call(panel.querySelectorAll('.ip-bars li'));
-    var btns = [].slice.call(panel.querySelectorAll('[data-ip-select]'));
-    var reset = panel.querySelector('[data-ip-reset]');
-    var sel = null;
-    // V3 · entrada de los datos: 0 → 69 %, barras desde cero y 29/22/18/31 %, una sola vez (~950 ms).
-    // Las cifras finales están en el HTML (sin JS o con movimiento reducido se ven tal cual) y el nombre
-    // accesible de cada control lleva SIEMPRE el valor final, así que el conteo no se anuncia.
-    var nums = [].slice.call(panel.querySelectorAll('.ip-num[data-ip-final]'));
-    var fills = [].slice.call(panel.querySelectorAll('.ip-fill'));
-    var intro = { done: true, raf: 0 };
-    function labelAll() {
-      var stat = panel.querySelector('.ip-stat');
-      var norm = function (e) { return (e ? e.textContent : '').replace(/\s+/g, ' ').trim(); };
-      var fin = function (root) { var n = root.querySelector('.ip-num'); var suf = n && n.nextElementSibling ? n.nextElementSibling.textContent : ''; return n ? n.getAttribute('data-ip-final') + suf : ''; };
-      if (stat) stat.setAttribute('aria-label', norm(stat.querySelector('.ip-stat-pre')) + ' ' + fin(stat) + ' ' + norm(stat.querySelector('.ip-stat-post')));
-      [].slice.call(panel.querySelectorAll('.ip-row')).forEach(function (r) { r.setAttribute('aria-label', norm(r.querySelector('.ip-name')) + ' ' + fin(r)); });
+  /* ── INTELLIGENCE V2 · las tres preguntas de «Explora» y el arco de Salud ────────────
+     Como en el producto, UNA respuesta abierta cada vez: abrir una pregunta ocupa la card (las otras
+     dejan de estar disponibles hasta cerrarla) y su cabecera queda arriba. La respuesta es TEXTO real
+     (región enfocable y desplazable); la card abierta es la captura de la misma sesión. Volver a
+     pulsar o Escape cierran y devuelven el foco. Sin JS los controles siguen `hidden` y se ve la
+     lista estática (.iv2-static). Movimiento reducido: mismos estados, sin transiciones. */
+  function initIntelV2() {
+    var fig = document.getElementById('intelDemo');
+    if (!fig) return;
+    var hosts = [].slice.call(fig.querySelectorAll('.iv2-shot, .iv2-m-explore'));
+    var btns = [].slice.call(fig.querySelectorAll('[data-iv2-toggle]'));
+    var answers = [].slice.call(fig.querySelectorAll('.iv2-ans'));
+    var stat = fig.querySelector('.iv2-static');
+    var open = 0;
+    function visibleBtn(q) { for (var i = 0; i < btns.length; i++) if (+btns[i].getAttribute('data-q') === q && btns[i].offsetParent !== null) return btns[i]; return null; }
+    function set(q) {
+      open = q;
+      hosts.forEach(function (h) { if (q) h.setAttribute('data-open', String(q)); else h.removeAttribute('data-open'); });
+      btns.forEach(function (b) { var bq = +b.getAttribute('data-q'); b.setAttribute('aria-expanded', String(bq === q)); b.hidden = !!q && bq !== q; });
+      answers.forEach(function (a) { var on = +a.getAttribute('data-q') === q; a.hidden = !on; if (on) a.scrollTop = 0; });
     }
-    function introSet(p) {
-      nums.forEach(function (n) { n.textContent = String(Math.round(+n.getAttribute('data-ip-final') * p)); });
-      fills.forEach(function (f) { f.style.transform = p >= 1 ? '' : 'scaleX(' + p.toFixed(4) + ')'; });
-    }
-    function introFinish() { if (intro.done) return; intro.done = true; if (intro.raf) cancelAnimationFrame(intro.raf); intro.raf = 0; introSet(1); }
-    var reduceIntro = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    labelAll();
-    window.addEventListener('aurix:lang', labelAll);
-    if (!reduceIntro && 'IntersectionObserver' in window && window.requestAnimationFrame) {
-      intro.done = false; introSet(0);
-      var io2 = new IntersectionObserver(function (en) {
-        if (!en[0].isIntersecting || intro.done) return;
-        io2.disconnect();
-        var t0 = 0, D = 950;
-        (function step(t) {
-          if (intro.done) return;
-          if (!t0) t0 = t;
-          var u = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - u, 3);
-          introSet(e);
-          if (u < 1) intro.raf = requestAnimationFrame(step); else { intro.done = true; intro.raf = 0; introSet(1); }
-        })(performance.now());
-      }, { threshold: 0.35 });
-      io2.observe(panel);
-    }
-    function apply(next) {
-      sel = next || null;
-      panel.classList.toggle('has-sel', !!sel);
-      lis.forEach(function (li) {
-        var on = !!sel && (sel === 'top3' ? li.hasAttribute('data-ip-top3') : li.getAttribute('data-ip-key') === sel);
-        li.classList.toggle('is-on', on);
-      });
-      btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ip-select') === sel)); });
-      if (reset) reset.hidden = !sel;
-    }
-    panel.addEventListener('click', function (e) {
-      var b = e.target.closest ? e.target.closest('[data-ip-select]') : null;
-      if (b) { introFinish(); var k = b.getAttribute('data-ip-select'); apply(sel === k ? null : k); return; }
-      if (e.target.closest && e.target.closest('[data-ip-reset]')) {
-        apply(null);
-        var st = panel.querySelector('.ip-stat'); if (st) st.focus();
-      }
+    btns.forEach(function (b) {
+      b.hidden = false;
+      b.addEventListener('click', function () { var q = +b.getAttribute('data-q'); set(open === q ? 0 : q); });
     });
-    panel.addEventListener('keydown', function (e) { if ((e.key === 'Escape' || e.key === 'Esc') && sel) apply(null); });
+    fig.addEventListener('keydown', function (e) {
+      if ((e.key === 'Escape' || e.key === 'Esc') && open) { var q = open; set(0); var b = visibleBtn(q); if (b) b.focus(); }
+    });
+    if (stat) stat.hidden = true;
+    fig.classList.add('is-live');
+    initIv2Arc(fig);
+  }
+  // Arco de Salud: se arma vacío y se dibuja UNA vez (≈1 s) al entrar en pantalla; no se reinicia al
+  // subir y bajar. Sin JS, sin IntersectionObserver o con movimiento reducido: valor final por CSS.
+  function initIv2Arc(fig) {
+    var fg = fig.querySelector('.iv2-arc-fg');
+    if (!fg || !('IntersectionObserver' in window)) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    fg.classList.add('is-armed');
+    var io = new IntersectionObserver(function (es) {
+      for (var i = 0; i < es.length; i++) {
+        if (!es[i].isIntersecting) continue;
+        io.disconnect();
+        requestAnimationFrame(function () { requestAnimationFrame(function () { fg.classList.add('is-run'); fg.classList.remove('is-armed'); }); });
+        return;
+      }
+    }, { threshold: 0.6 });
+    io.observe(fg.ownerSVGElement || fg);
   }
 
   /* ── LANDING V2 · recorrido de la esfera ─────────────────────────────────────
@@ -1487,7 +1498,7 @@
 
     // LANDING V2/V3 · entrada del dashboard, demostración de Intelligence y recorrido de la esfera.
     initHeroIntro();
-    initIntelDemo();
+    initIntelV2();
     initOrbFlight();
 
     // Footer year (no Date pinning needed for a static label)

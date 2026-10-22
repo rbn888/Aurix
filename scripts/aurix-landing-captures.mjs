@@ -14,6 +14,13 @@
  *
  *   node scripts/aurix-landing-captures.mjs            # verifica y escribe las capturas
  *   node scripts/aurix-landing-captures.mjs --check    # sólo verifica el motor
+ *   node scripts/aurix-landing-captures.mjs --intel-v2 # sólo Intelligence V2 (escritorio + móvil, ES/EN)
+ *   node scripts/aurix-landing-captures.mjs --positions # sólo el detalle de Acciones de Seguimiento (ES/EN)
+ *
+ * INTELLIGENCE V2 (docs/AURIX-LANDING-INTELLIGENCE-PREMIUM-SPEC.md): Intelligence real con la esfera
+ * OCULTA en la captura (la landing pone encima su esfera viva) y la primera pregunta de «Explora»
+ * abierta en la misma sesión. Antes de escribir comprueba también la respuesta exacta de esa pregunta,
+ * los cinco ejes del Radar certificados y el periodo medido de Estabilidad y Crecimiento.
  */
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -47,12 +54,17 @@ const ROWS = [
   ['m_xau',  'metal',  'XAU',  'Gold',             0.04,    2541.75],
 ];
 const CASH = [['l_1', 'Broker cash', 6663.30], ['l_2', 'Savings account', 6663.30]];
+// ── Variación de la cotización en 24 h / última sesión (%) · SPEC Intelligence V2 §4 ──────────
+// Moderadas y COHERENTES con el hero: su suma ponderada es EXACTAMENTE el +0,19 % que el
+// Dashboard publica en 24 h (la curva original). AAPL es la incógnita que lo cuadra (se resuelve
+// abajo, no se elige). Sólo BTC alcanza el umbral de «movimiento» del motor (≥1 % y ≥0,05 pp).
+const CHG24 = { MSFT: 0.2, AAPL: null, AMZN: 0.5, META: 0.7, SPY: 0.3, QQQ: 0.3, IUSA: 0.3, BTC: 1.2, ETH: -0.6, SOL: -0.4, SUI: 0.3, XAU: 0.2 };
 const REAL_ESTATE = ['r_1', 'Home', 308165];
 const COIN = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', SUI: 'sui' };
 
 const ASSETS = [
   ...ROWS.map(([id, type, ticker, name, qty, price]) => ({
-    id, type, ticker, name, qty, price, assetCurrency: 'USD', costBasis: +(qty * price).toFixed(2), change24h: 0,
+    id, type, ticker, name, qty, price, assetCurrency: 'USD', costBasis: +(qty * price).toFixed(2), change24h: 0,   // se fija tras resolver CHG24
     transactions: [{ type: 'buy', qty, price, ts: BOUGHT }], createdAt: BOUGHT,
     ...(type === 'crypto' ? { coinId: COIN[ticker], marketSymbol: ticker } : { marketSymbol: ticker }),
   })),
@@ -79,6 +91,27 @@ const HERO_CURVE_24H = [0.998112,0.998064,0.998284,0.998502,0.998626,0.998675,0.
 // en una primera pasada, ver CURVE_SPAN): la curva original se coloca exactamente sobre ese tramo.
 // El 24 h publicado se mide entre esa base y el ÚLTIMO snapshot (no el valor en vivo), así que la
 // curva termina en ese snapshot y desde ahí hasta ahora el total es el actual.
+// Resolución de AAPL y factores por categoría. Valor hace 24 h de cada posición = v / (1 + c).
+// Se exige Σ (v / (1 + c)) + liquidez = INVESTABLE × curva[0] (el +0,19 % del hero), y cada
+// categoría sigue la MISMA curva escalada: f_k(t) = 1 + K_k · (F(t) − 1), con Σ CV_k · K_k =
+// INVESTABLE · ⇒ la suma de categorías ES la curva original en cada instante (hero intacto) y al
+// final todas valen 1 (pesos, titular, Salud y Radar intactos).
+const F0 = HERO_CURVE_24H[0];
+{
+  const v = a => a.qty * a.price, ago = a => v(a) / (1 + CHG24[a.ticker] / 100);
+  const fin = ASSETS.filter(a => CHG24[a.ticker] !== undefined), aapl = fin.find(a => a.ticker === 'AAPL');
+  const rest = fin.filter(a => a !== aapl).reduce((t, a) => t + ago(a), 0);
+  CHG24.AAPL = (v(aapl) / (INVESTABLE * F0 - CV_NOW.liquidity - rest) - 1) * 100;
+  fin.forEach(a => { a.change24h = CHG24[a.ticker]; });
+}
+const CAT_K = {};
+Object.keys(CV_NOW).forEach(k => {
+  if (k === 'real_estate' || k === 'liquidity' || !CV_NOW[k]) { CAT_K[k] = 0; return; }
+  const ago = ASSETS.filter(a => (a.type === 'cash' ? 'liquidity' : a.type) === k).reduce((t, a) => t + (a.qty * a.price) / (1 + (a.change24h || 0) / 100), 0);
+  CAT_K[k] = (ago / CV_NOW[k] - 1) / (F0 - 1);
+});
+{ const chk = Object.keys(CV_NOW).filter(k => k !== 'real_estate').reduce((t, k) => t + CV_NOW[k] * CAT_K[k], 0);
+  if (Math.abs(chk / INVESTABLE - 1) > 1e-9) { console.error('✗ Las variaciones de 24 h no cuadran con la curva del hero (' + chk / INVESTABLE + ')'); process.exit(1); } }
 let CURVE_SPAN = DAY, CURVE_END = 0;
 const factor = t => {
   const age = Math.max(0, NOW - t);
@@ -89,7 +122,7 @@ const factor = t => {
   return a + (b - a) * f;
 };
 const snapAt = t => { const f = factor(t), cv = {}; let inv = 0;
-  Object.keys(CV_NOW).forEach(k => { cv[k] = k === 'real_estate' ? CV_NOW[k] : +(CV_NOW[k] * f).toFixed(2); if (k !== 'real_estate') inv += cv[k]; });
+  Object.keys(CV_NOW).forEach(k => { cv[k] = k === 'real_estate' ? CV_NOW[k] : +(CV_NOW[k] * (1 + CAT_K[k] * (f - 1))).toFixed(2); if (k !== 'real_estate') inv += cv[k]; });
   return { cv, inv: +inv.toFixed(2) }; };
 const START = NOW - 30 * DAY, END = NOW - 60e3;
 let HIST = [], CATS = [], SERVER = [];
@@ -109,6 +142,32 @@ const EXPECT = {
   en: { head: 'Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.', top3: '69%', free: '29% of your financial portfolio depends on Microsoft.' },
 };
 const DRIVERS = [['Microsoft', 29], ['Bitcoin', 22], ['Apple', 18]];
+// Intelligence V2 — lo que la landing publica como texto (pregunta, respuesta) y el periodo del pie
+// del Radar. Las mismas cadenas están en landing/app.js; scripts/aurix-landing-probe.mjs las compara.
+const INTEL_V2 = {
+  // Las tres preguntas visibles de «Explora» y sus respuestas, tal como las publica el motor para esta
+  // cartera. Las mismas cadenas viven en landing/app.js (lp.iv2.q1…q3 / a1_1…a3_1); el probe las compara.
+  es: { qs: [
+    { q: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?',
+      a: ['Repartes entre 4 clases de inversión, pero no tanto entre posiciones: el peso sigue recayendo en tus tres mayores inversiones.',
+          'Clases: Acciones, Cripto, Fondos/ETF y Metales. Tres mayores: Microsoft, Bitcoin y Apple.'] },
+    { q: '¿Qué parte de mi cartera está entre Acciones y Cripto?',
+      a: ['Acciones y Cripto reúnen hoy el 92% de tu cartera financiera.', 'Acciones, 51%; Cripto, 41%.'] },
+    { q: '¿Cuánto han rendido realmente mis inversiones?',
+      a: ['El rendimiento de tu cartera financiera fue del 0,19% en el último día registrado'] } ],
+    tags: ['Acciones: 51% de tu cartera', 'Bitcoin: +1,2% · 24 h'] },
+  en: { qs: [
+    { q: 'Am I spread across several investment classes, or do I still depend on a few investments?',
+      a: ['You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.',
+          'Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.'] },
+    { q: 'How much of my portfolio is in Stocks and Crypto?',
+      a: ['Stocks and Crypto together hold 92% of your financial portfolio today.', 'Stocks, 51%; Crypto, 41%.'] },
+    { q: 'How much have my investments actually returned?',
+      a: ['The return of your financial portfolio was 0.19% over the last recorded day'] } ],
+    tags: ['Stocks: 51% of your portfolio', 'Bitcoin: +1.2% · 24 h'] },
+  days: 1,
+  health: { score: 33, tone: 'orange' },
+};
 
 // ── Servidor local del repo (mismo parche de auth que las sondas de Intelligence) ──
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
@@ -302,6 +361,175 @@ async function writeMobileBlocks(hot, L) {
 const fails = [];
 const ok = (name, cond, info) => { if (cond) console.log('  ✓ ' + name); else { fails.push(name); console.log('  ✗ ' + name + (info ? '  [' + String(info).slice(0, 300) + ']' : '')); } };
 
+
+// ── INTELLIGENCE V2 ───────────────────────────────────────────────────────────────────────
+// Una sola sesión por encuadre y la MISMA cartera: base sin esfera y sin el arco de Salud (la
+// landing pone encima su esfera viva y dibuja el arco en vector), y la card «Explora» con cada
+// pregunta abierta SIN el texto de su respuesta (la landing lo pone encima como texto real,
+// desplazable, con la tipografía medida aquí). Antes de escribir se comprueba todo lo publicado.
+const INTEL_V2_MODE = process.argv.includes('--intel-v2');
+const POSITIONS_MODE = process.argv.includes('--positions');
+const visQs = page => page.evaluate(`[...document.querySelectorAll('.intcc-explore .intcc-x-q')].filter(function(b){ return b.offsetParent !== null; }).map(function(b){ return b.id; })`);
+async function intelV2Check(page, lang, w) {
+  const E = INTEL_V2[lang];
+  const r = await page.evaluate(`(function(){
+    var o = {}; var n = function(s){ return String(s || '').replace(/\\s+/g, ' ').trim(); };
+    var qs = [].slice.call(document.querySelectorAll('.intcc-explore .intcc-x-q')).filter(function(b){ return b.offsetParent !== null; });
+    o.qs = qs.map(function(b){ var a = document.getElementById(b.getAttribute('aria-controls'));
+      return { q: n(b.innerText), a: a ? [].slice.call(a.querySelectorAll('p')).map(function(p){ return n(p.textContent); }) : null }; });
+    o.tags = [].slice.call(document.querySelectorAll('.intcc-hero .intv21-tag')).map(function(e){ return n(e.textContent); });
+    var rc = document.querySelector('.intcc-radar'); o.certified = rc ? rc.getAttribute('data-certified') : null;
+    var pr = _aurixPeakRetention('all'), gr = _aurixGrowthAxis('all');
+    var d = function(x){ return (x && x.status === 'available' && x.spanMs > 0) ? Math.max(1, Math.round(x.spanMs / 864e5)) : null; };
+    o.stabDays = d(pr); o.growthDays = d(gr);
+    var ax = _intv7RadarAxes(); o.stabDisplay = ax.display && ax.display.stability; o.spanLabel = _intv4T('intv7_axis_span_days', o.stabDays);
+    var h = document.querySelector('.intcc-hero'); o.heroCls = h ? h.className : ''; o.heroTxt = h ? n(h.innerText) : '';
+    o.r24 = (function(){ try { var x = _aurixRangeReturn('24h'); return x && x.pct; } catch(_) { return null; } })();
+    return o; })()`);
+  const T = `${lang} ${w}`;
+  ok(`${T} · V2 las tres preguntas de Explora y sus respuestas, exactas`, JSON.stringify(r.qs) === JSON.stringify(E.qs), JSON.stringify(r.qs));
+  ok(`${T} · V2 etiquetas reales del hero (clase + movimiento de 24 h)`, w < 768 || JSON.stringify(r.tags) === JSON.stringify(E.tags), JSON.stringify(r.tags));
+  ok(`${T} · V2 Radar con 5 ejes certificados`, r.certified === '5', r.certified);
+  ok(`${T} · V2 Estabilidad y Crecimiento medidos sobre ${INTEL_V2.days} d (motor)`, r.stabDays === INTEL_V2.days && r.growthDays === INTEL_V2.days, JSON.stringify(r));
+  ok(`${T} · V2 el motor declara ese periodo en el eje (${r.spanLabel})`, !!r.spanLabel && String(r.stabDisplay || '').includes(r.spanLabel), r.stabDisplay);
+  ok(`${T} · V2 Salud ${INTEL_V2.health.score} % · A vigilar, tono ${INTEL_V2.health.tone}`, w < 768 || (new RegExp('\\b' + INTEL_V2.health.score + '\\b').test(r.heroTxt) && /(A vigilar|Worth watching)/.test(r.heroTxt) && r.heroCls.includes('is-tone-' + INTEL_V2.health.tone)), r.heroCls + ' | ' + r.heroTxt.slice(0, 120));
+  return r;
+}
+// Arco de Salud: caja del SVG, color y fracción que pinta la app.
+const arcOf = page => page.evaluate(`(function(){ var s = document.querySelector('.intcc-hero .intcc-score-svg'), c = s && s.querySelector('.intcc-score-arc'); if (!c) return null;
+  var r = s.getBoundingClientRect(), cs = getComputedStyle(c), da = parseFloat(c.getAttribute('stroke-dasharray')), off = parseFloat(c.getAttribute('stroke-dashoffset'));
+  return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height, color: cs.stroke, sw: parseFloat(cs.strokeWidth), frac: +(1 - off / da).toFixed(4), r: +c.getAttribute('r') }; })()`);
+// Respuesta abierta: caja de la región desplazable, cabecera abierta y tipografía de sus párrafos.
+async function openGeom(page, id) {
+  return page.evaluate(id => { const b = document.getElementById(id), a = document.getElementById(b.getAttribute('aria-controls'));
+    const R = e => { const r = e.getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }; };
+    // Donde EMPIEZA EL TEXTO (no la caja del párrafo: el producto sangra con el padding del <p>), el
+    // padding vertical de los párrafos y su separación, y el color de cada uno.
+    const p = a.querySelector('p'), p2 = a.querySelectorAll('p')[1], cs = getComputedStyle(p), cs2 = p2 ? getComputedStyle(p2) : null, ar = a.getBoundingClientRect();
+    const rg = document.createRange(); rg.selectNodeContents(p); const t0 = rg.getClientRects()[0];
+    const pr = p.getBoundingClientRect();
+    return { hdr: R(b), box: R(a), fs: parseFloat(cs.fontSize), lh: parseFloat(cs.lineHeight), color: cs.color, color2: cs2 ? cs2.color : cs.color, weight: cs.fontWeight,
+      padL: t0.left - ar.left, padR: ar.right - pr.right + parseFloat(cs.paddingRight), padT: (pr.top - ar.top) + parseFloat(cs.paddingTop),
+      gap: p2 ? parseFloat(cs.paddingBottom) + parseFloat(cs2.paddingTop) : 0, scrolls: a.scrollHeight > a.clientHeight + 1 }; }, id);
+}
+const HIDE_ANSWER_TEXT = '.intcc-explore .intcc-x-answer-in p{ visibility:hidden !important; }';
+async function writeIntelV2Css(G) {
+  const { writeFile } = await import('node:fs/promises');
+  const cssPath = join(ROOT, 'landing', 'styles.css');
+  const css = await readFile(cssPath, 'utf8');
+  const B = '/* INTEL-V2-LAYERS:BEGIN', E = '/* INTEL-V2-LAYERS:END */';
+  const box = (sel, v) => `${sel}{ left:${v.l}%; top:${v.t}%; width:${v.w}%; height:${v.h}%; }`;
+  // La esfera de la landing se centra en el hueco de la de la app. Su anillo exterior mide 1,08 × el
+  // hueco (.lp-orb-ring--1, inset −4 %) y el de la app 0,88 × su caja (.intcc-orb-ring--1, inset 6 %):
+  // mismo diámetro de anillo ⇒ hueco = 0,88 / 1,08 × la caja de la app.
+  const orb = (sel, v) => `${sel}{ --iv2-cx:${+(v.l + v.w / 2).toFixed(2)}%; --iv2-cy:${+(v.t + v.h / 2).toFixed(2)}%; --iv2-ow:${+(v.w * 0.88 / 1.08).toFixed(3)}; }`;
+  // Texto de la respuesta en cqw de la imagen (escala con ella), con un mínimo legible de 13 px.
+  const ans = (sel, a, Wc) => `${sel}{ left:${a.box.l}%; top:${a.box.t}%; width:${a.box.w}%; height:${a.box.h}%; --iv2-fs:${+(a.fs / Wc * 100).toFixed(4)}cqw; --iv2-lh:${+(a.lh / a.fs).toFixed(3)}; --iv2-gap:${+(a.gap / Wc * 100).toFixed(4)}cqw; --iv2-pl:${+(a.padL / Wc * 100).toFixed(4)}cqw; --iv2-pr:${+(a.padR / Wc * 100).toFixed(4)}cqw; --iv2-pt:${+(a.padT / Wc * 100).toFixed(4)}cqw; --iv2-c2:${a.color2}; color:${a.color}; font-weight:${a.weight}; }`;
+  const setD = (pre, g) => [orb(`${pre}.iv2-shot`, g.orb),
+    `${pre}.iv2-shot .iv2-arc{ left:${g.arc.l}%; top:${g.arc.t}%; width:${g.arc.w}%; height:${g.arc.h}%; --iv2-arc-frac:${g.arc.frac}; --iv2-arc-color:${g.arc.color}; }`,
+    `${pre}.iv2-shot .iv2-radar-note{ right:${g.radar.right}%; top:${g.radar.top}%; height:${g.radar.h}%; --iv2-rn-fs:${g.radar.fs}cqw; }`,
+    box(`${pre}.iv2-shot .iv2-open`, g.card),
+    ...g.qs.map((q, i) => box(`${pre}.iv2-shot .iv2-q[data-q="${i + 1}"]`, q)),
+    ...g.open.map((o, i) => box(`${pre}.iv2-shot[data-open="${i + 1}"] .iv2-q[data-q="${i + 1}"]`, o.hdr)),
+    ...g.open.map((o, i) => ans(`${pre}.iv2-shot .iv2-ans[data-q="${i + 1}"]`, o, g.W))].join('\n');
+  const setM = (pre, g) => [orb(`${pre}.iv2-shot`, g.orb),
+    ...g.qs.map((q, i) => box(`${pre}.iv2-m-explore .iv2-q[data-q="${i + 1}"]`, q)),
+    ...g.open.map((o, i) => box(`${pre}.iv2-m-explore[data-open="${i + 1}"] .iv2-q[data-q="${i + 1}"]`, o.hdr)),
+    ...g.open.map((o, i) => ans(`${pre}.iv2-m-explore .iv2-ans[data-q="${i + 1}"]`, o, g.W))].join('\n  ');
+  const block = `${B} — generado por scripts/aurix-landing-captures.mjs --intel-v2: esfera, arco de Salud, preguntas y respuestas de Explora en cada imagen (%, cqw). */\n`
+    + setD('', G['en-d']) + '\n' + setD('html[lang="es"] ', G['es-d']) + '\n'
+    + '@media (max-width:1023px){\n  ' + setM('', G['en-m']) + '\n  ' + setM('html[lang="es"] ', G['es-m']) + '\n}\n' + E;
+  const i = css.indexOf(B), j = css.indexOf(E);
+  await writeFile(cssPath, (i >= 0 && j > i) ? css.slice(0, i) + block + css.slice(j + E.length) : css + '\n' + block + '\n');
+  console.log('  · geometría de Intelligence V2 escrita en landing/styles.css');
+}
+async function intelV2(browser, write) {
+  const G = {};
+  const style = (page, c) => page.addStyleTag({ content: c }).then(() => page.waitForTimeout(250));
+  const rel = (r, crop) => pctRect(r, crop);
+  for (const lang of ['es', 'en']) {
+    // Escritorio: hero (Salud + Inteligencia), Radar, Factores, Explora; 1x y 2x.
+    for (const dpr of [1, 2]) {
+      const { ctx, page } = await open(browser, { lang, w: 1440, h: 900, premium: true, dpr });
+      await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1800);
+      await dismissContextQuestion(page);
+      if (dpr === 1) await intelV2Check(page, lang, 1440);
+      const orbR = await rectOf(page, '.intcc-hero-orb-wrap .intcc-orb'), arc = await arcOf(page);
+      await style(page, '.intcc-orb{ visibility:hidden !important; } .intcc-hero .intcc-score-arc{ visibility:hidden !important; }');
+      const r = await unionRect(page, ['.intcc-hero', '.intcc-radar', '.intcc-drivers', '.intcc-explore']);
+      ok(`${lang} · V2 escritorio @${dpr}x localizado (esfera y arco)`, !!r && !!orbR && !!arc, JSON.stringify({ r, orbR, arc }));
+      if (!(r && orbR && arc)) { await ctx.close(); continue; }
+      const sfx = dpr === 2 ? '-2x' : '';
+      const crop = await write(page, `intelligence-v2-${lang}${sfx}.jpg`, r, 16);
+      const ids = await visQs(page);
+      const qs = []; for (const id of ids) qs.push(rel(await rectOf(page, '#' + id), crop));
+      const card0 = await rectOf(page, '.intcc-explore');
+      // Nota del periodo del Radar: en la fila de su título, alineada a la derecha con el mismo margen.
+      const radar = await page.evaluate(() => { const c = document.querySelector('.intcc-radar'), t = c && c.querySelector('.intcc-card-title'); if (!t) return null;
+        const R = e => { const r = e.getBoundingClientRect(); return { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height }; };
+        return { card: R(c), title: R(t), fs: parseFloat(getComputedStyle(t).fontSize) }; });
+      ok(`${lang} · V2 @${dpr}x tarjeta del Radar y su título localizados`, !!radar, JSON.stringify(radar));
+      await style(page, HIDE_ANSWER_TEXT);
+      const opened = [];
+      for (let k = 0; k < ids.length; k++) {
+        await page.click('#' + ids[k]); await page.waitForTimeout(700);
+        const card = await rectOf(page, '.intcc-explore'), g = await openGeom(page, ids[k]);
+        ok(`${lang} · V2 @${dpr}x pregunta ${k + 1} abierta en la misma caja`, Math.abs(card.height - card0.height) < 1 && Math.abs(card.y - card0.y) < 1, JSON.stringify({ card0, card }));
+        await write(page, `intelligence-v2-open${k + 1}-${lang}${sfx}.jpg`, card, 0);
+        opened.push({ hdr: rel(g.hdr, crop), box: rel(g.box, crop), fs: g.fs, lh: g.lh, gap: g.gap, padL: g.padL, padR: g.padR, padT: g.padT, color: g.color, color2: g.color2, weight: g.weight });
+        await page.click('#' + ids[k]); await page.waitForTimeout(500);
+      }
+      if (dpr === 1 && radar) { const inset = radar.title.x - radar.card.x;
+        G[lang + '-d'] = { W: crop.width, orb: rel(orbR, crop), arc: Object.assign(rel(arc, crop), { frac: arc.frac, color: arc.color }), card: rel(card0, crop), qs, open: opened,
+          radar: { right: pct((crop.x + crop.width - (radar.card.x + radar.card.width - inset)) / crop.width), top: pct((radar.title.y - crop.y) / crop.height), h: pct(radar.title.height / crop.height), fs: +(radar.fs / crop.width * 100).toFixed(4) } }; }
+      await ctx.close();
+    }
+    // Móvil real (390): cabecera de Intelligence, Factores y Explora, cada card por separado (sin Salud ni
+    // Radar). La pregunta de contexto se aplaza, como haría el usuario.
+    { const { ctx, page } = await open(browser, { lang, w: 390, h: 844, premium: true });
+      await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1800);
+      await dismissContextQuestion(page);
+      await intelV2Check(page, lang, 390);
+      const order = await page.evaluate(`['.intcc-m-hero','.intcc-drivers','.intcc-explore'].map(function(s){ var e=[].slice.call(document.querySelectorAll(s)).find(function(x){ return x.offsetParent !== null; }); return e ? e.getBoundingClientRect().top + scrollY : null; })`);
+      ok(`${lang} · V2 móvil: cabecera → Factores → Explora en ese orden`, order.every(Number.isFinite) && order[0] < order[1] && order[1] < order[2], JSON.stringify(order));
+      const shot = async (sel, file) => { await page.evaluate(`document.querySelector('${sel}').scrollIntoView({ block: 'center' })`); await page.waitForTimeout(250);
+        const r = await rectOf(page, sel); return { r, crop: await write(page, file, r, 0) }; };
+      const orbR = await rectOf(page, '.intcc-m-orb .intcc-orb');
+      await style(page, '.intcc-orb{ visibility:hidden !important; }');
+      const head = await shot('.intcc-m-hero', `intelligence-v2-m-head-${lang}.jpg`);
+      await shot('.intcc-drivers', `intelligence-v2-m-drivers-${lang}.jpg`);
+      const ex = await shot('.intcc-explore', `intelligence-v2-m-explore-${lang}.jpg`);
+      const ids = await visQs(page);
+      const qs = []; for (const id of ids) qs.push(pctRect(await rectOf(page, '#' + id), ex.crop));
+      await style(page, HIDE_ANSWER_TEXT);
+      const opened = [];
+      for (let k = 0; k < ids.length; k++) {
+        await page.click('#' + ids[k]); await page.waitForTimeout(700);
+        const e2 = await shot('.intcc-explore', `intelligence-v2-m-explore-open${k + 1}-${lang}.jpg`);
+        ok(`${lang} · V2 móvil pregunta ${k + 1} abierta en la misma caja`, Math.abs(e2.r.height - ex.r.height) < 1, JSON.stringify({ a: ex.r, b: e2.r }));
+        const g = await openGeom(page, ids[k]);
+        opened.push({ hdr: pctRect(g.hdr, ex.crop), box: pctRect(g.box, ex.crop), fs: g.fs, lh: g.lh, gap: g.gap, padL: g.padL, padR: g.padR, padT: g.padT, color: g.color, color2: g.color2, weight: g.weight });
+        await page.click('#' + ids[k]); await page.waitForTimeout(500);
+      }
+      G[lang + '-m'] = { W: ex.crop.width, orb: pctRect(orbR, head.crop), qs, open: opened };
+      await ctx.close(); }
+  }
+  if (['es-d', 'en-d', 'es-m', 'en-m'].every(k => G[k])) await writeIntelV2Css(G);
+  else ok('geometría de Intelligence V2 medida en las cuatro variantes', false, JSON.stringify(Object.keys(G)));
+}
+// Seguimiento: el detalle de Acciones con la misma cartera (variaciones de 24 h incluidas).
+async function positionsCapture(browser, write) {
+  for (const lang of ['es', 'en']) {
+    // 1440 de ancho (mismo maquetado de escritorio); alto suficiente para que el detalle quepa entero.
+    const { ctx, page } = await open(browser, { lang, w: 1440, h: 1400, premium: true, anon: true, dpr: 1 });
+    await page.evaluate(`setActiveCategory('stock')`); await page.waitForTimeout(1800);
+    const r = await rectOf(page, '#assetsSection.is-detail');
+    ok(`${lang} · detalle de Acciones localizado`, !!r, r && JSON.stringify(r));
+    if (r) { await page.evaluate(y => scrollTo(0, y), Math.max(0, r.y - 40)); await page.waitForTimeout(400); await write(page, `positions-demo-${lang}.jpg`, r, 12); }
+    await ctx.close();
+  }
+}
+
 const browser = await PWm.chromium.launch();
 const plan = [];
 try {
@@ -344,6 +572,9 @@ try {
     const hot = {}, layers = {};
     const valRel = (v, crop) => Object.assign(pctRect(v, crop), { fs: pct(v.size / crop.width), ls: +(v.ls / crop.width * 100).toFixed(4), lh: pct(v.lh / crop.width), weight: v.weight, color: v.color });
     const MOBILE_ONLY = process.argv.includes('--mobile-v4');   // ajuste móvil: sólo recursos -v4- del móvil
+    if (INTEL_V2_MODE) await intelV2(browser, write);
+    else if (POSITIONS_MODE) await positionsCapture(browser, write);
+    else {
     for (const lang of ['es', 'en']) {
       // 2 · Hero escritorio V2 (1x y 2x). anon ⇒ 24 h calculada en local con la curva original.
       for (const dpr of (MOBILE_ONLY ? [] : [1, 2])) {
@@ -418,6 +649,7 @@ try {
     else ok('zonas del enlace «Ver análisis» medidas en las cuatro imágenes', false, JSON.stringify(hot));
     if (MOBILE_ONLY) { /* ya escrito arriba */ } else if (['es-d', 'en-d', 'es-m', 'en-m'].every(k => layers[k])) await writeLayerCss(layers);
     else ok('capas del hero medidas en las cuatro variantes', false, JSON.stringify(Object.keys(layers)));
+    }
     console.log('\nEscritas en ' + OUT + ': ' + plan.join(', '));
   }
 } catch (e) { console.error('\n✗ ' + e.message); if (!fails.length) fails.push(e.message); }

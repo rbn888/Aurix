@@ -1195,6 +1195,7 @@ console.log('\nF2 · el paywall renderizado (cinco estados)');
     let _aurixEnt = { loaded: true, status: 'none', features: {} };
     let _aurixBillingPrices = { loaded: true, rows: [] };
     const _AURIX_BILLING_INTERVALS = ['year', 'month'];
+    let _chosenPlan = null;   // estado del cierre del modal: modalidad elegida en la landing (plan=annual|monthly)
     ${fnSrc(app, '_aurixBillingPriceFor')}
     ${fnSrc(app, '_aurixBillingMoney')}
     ${fnSrc(app, '_aurixBillingAnnualSaving')}

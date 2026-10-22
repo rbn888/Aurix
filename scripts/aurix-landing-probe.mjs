@@ -8,6 +8,9 @@
  * (reposo, salida, un único looping, acompañamiento, despedida, vuelta), evasión del ratón, cambio de
  * tamaño e idioma, movimiento reducido y sin JS. En cada paso del recorrido se comprueba que la esfera
  * no pisa ningún texto, botón ni enlace.
+ * INTELLIGENCE V2 + PREMIUM (docs/AURIX-LANDING-INTELLIGENCE-PREMIUM-SPEC.md): copy aprobado literal, captura
+ * real con la esfera viva en su hueco, pregunta de «Explora» (ratón, teclado, toque, Escape, texto accesible),
+ * pie del Radar, Premium con las dos modalidades y `plan=` en sus enlaces.
  *
  *   node scripts/aurix-landing-probe.mjs                       # local (sirve landing/)
  *   SHOTS=/ruta  node scripts/aurix-landing-probe.mjs          # + capturas 390/1440 ES/EN
@@ -46,9 +49,25 @@ const launchArgs = process.env.HOST_IP ? { args: [`--host-resolver-rules=MAP aur
 const VPS = [[360, 640], [375, 667], [390, 844], [412, 915], [430, 932], [768, 1024], [1440, 900]];
 const EXPECT = {
   es: { head: 'Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas.', stat: 'Tus 3 mayores inversiones reúnen el 69 % de tu cartera financiera.',
-        h1: 'Comprende mejor tu patrimonio.', cap: '', hot: 'Salud: A vigilar · Ver análisis en AURIX Intelligence', rest: 'Resto de la cartera financiera' },
+        h1: 'Comprende mejor tu patrimonio.', cap: '', hot: 'Salud: A vigilar · Ver análisis en AURIX Intelligence',
+        ta: 'Convierte tus inversiones en información,', tb: 'toma mejores decisiones desde hoy.', problem: 'Descubre qué riesgos podrías estar ignorando.',
+        lead: 'Obtén tu análisis al instante. Ahorra tiempo, descubre lo que importa',
+        h1b: 'Decide con más información.', sub: 'Reúne tus inversiones en un solo lugar y descubre qué está pasando con tu dinero.',
+        qs: [{ q: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?', a: ['Repartes entre 4 clases de inversión, pero no tanto entre posiciones: el peso sigue recayendo en tus tres mayores inversiones.', 'Clases: Acciones, Cripto, Fondos/ETF y Metales. Tres mayores: Microsoft, Bitcoin y Apple.'] },
+             { q: '¿Qué parte de mi cartera está entre Acciones y Cripto?', a: ['Acciones y Cripto reúnen hoy el 92% de tu cartera financiera.', 'Acciones, 51%; Cripto, 41%.'] },
+             { q: '¿Cuánto han rendido realmente mis inversiones?', a: ['El rendimiento de tu cartera financiera fue del 0,19% en el último día registrado'] }],
+        radar: 'Historial analizado: 1 día', login: 'Entrar',
+        year: '69,99\u00a0€', month: '7,99\u00a0€', ctaY: 'Elegir anual', ctaM: 'Elegir mensual' },
   en: { head: 'Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.', stat: 'Your 3 largest investments hold 69% of your financial portfolio.',
-        h1: 'Understand your wealth better.', cap: 'Interface shown in Spanish', hot: 'Health: Worth watching · View analysis in AURIX Intelligence', rest: 'Rest of the financial portfolio' },
+        h1: 'Understand your wealth better.', cap: 'Interface shown in Spanish', hot: 'Health: Worth watching · View analysis in AURIX Intelligence',
+        ta: 'Turn your investments into insights,', tb: 'make better-informed decisions today.', problem: 'Discover the risks you might be overlooking.',
+        lead: 'Get your analysis instantly. Save time, discover what matters.',
+        h1b: 'Make better\u2011informed decisions.', sub: 'Bring your investments together in one place and see what’s happening with your money.',
+        qs: [{ q: 'Am I spread across several investment classes, or do I still depend on a few investments?', a: ['You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.', 'Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.'] },
+             { q: 'How much of my portfolio is in Stocks and Crypto?', a: ['Stocks and Crypto together hold 92% of your financial portfolio today.', 'Stocks, 51%; Crypto, 41%.'] },
+             { q: 'How much have my investments actually returned?', a: ['The return of your financial portfolio was 0.19% over the last recorded day'] }],
+        radar: 'History analysed: 1 day', login: 'Log in',
+        year: '€69.99', month: '€7.99', ctaY: 'Choose annual', ctaM: 'Choose monthly' },
 };
 
 let pass = 0; const fails = [];
@@ -113,6 +132,7 @@ for (const engine of ['chromium', 'webkit']) {
       const page = await ctx.newPage();
       const heroReqs = [];
       page.on('request', r => { if (/hero-dashboard/.test(r.url())) heroReqs.push(r.url().split('/').pop()); });
+      const extReqs = []; page.on('request', r => { const u = new URL(r.url()); if (!/^(127\.0\.0\.1|localhost)$/.test(u.hostname) && !/^fonts\.(googleapis|gstatic)\.com$/.test(u.hostname) && u.protocol !== 'data:' && r.url().indexOf(BASE) !== 0) extReqs.push(r.method() + ' ' + u.hostname); });
       await page.addInitScript(() => {
         window.__cls = 0;
         try { new PerformanceObserver(l => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {}
@@ -124,25 +144,51 @@ for (const engine of ['chromium', 'webkit']) {
         var q=function(s){return document.querySelector(s)}; var R=function(e){ if(!e) return null; var r=e.getBoundingClientRect(); return {l:r.left,t:r.top,r:r.right,b:r.bottom,w:r.width,h:r.height}; };
         var fs=function(s){ var e=q(s); return e? parseFloat(getComputedStyle(e).fontSize) : 0; };
         var norm=function(s){ return (s||'').replace(/[ \\t\\n\\r]+/g,' ').trim(); };
-        var ws=[].slice.call(document.querySelectorAll('.ip-bars li')).map(function(li){ return parseFloat(li.style.getPropertyValue('--w')); });
         var heroImg=q('.hero-visual img'), hot=q('.hero-hotspot');
         return { ovx: document.documentElement.scrollWidth - innerWidth, H: innerHeight, lang: document.documentElement.lang,
           h1: R(q('.hero-title')), sub: R(q('.hero-sub')), cta1: R(q('.hero-cta .btn-primary')), cta2: R(q('.hero-cta .btn-ghost')),
-          h1t: q('.hero-title').textContent, head: q('.ip-head').textContent, stat: norm(q('.ip-stat').getAttribute('aria-label')), rest: q('.is-rest .ip-name').textContent,
-          rowLabels: [].slice.call(document.querySelectorAll('.ip-row')).map(function(b){ return b.getAttribute('aria-label'); }),
-          kicker: q('.ip-kicker').textContent,
-          pcts: [].slice.call(document.querySelectorAll('.ip-pct .ip-num')).map(function(e){return e.getAttribute('data-ip-final')}), ws: ws,
-          fsHead: fs('.ip-head'), fsPct: fs('.ip-pct'), fsName: fs('.ip-name'), fsStat: fs('.ip-stat-pre'),
-          orb: R(q('.lp-orb')), headR: R(q('.ip-head')),
+          h1t: q('.hero-title').textContent, subT: norm(q('.hero-sub').textContent),
+          iv2: (function(){ var t=q('#intelligence .iv2-title'), sp=t.querySelectorAll('span'), br=q('.iv2-br'), shot=q('.iv2-shot'), base=q('.iv2-base'), slot=q('.lp-orb-slot');
+            var cs=getComputedStyle(shot), br0=base.getBoundingClientRect(), sr=slot.getBoundingClientRect(), sec=q('#intelligence').getBoundingClientRect();
+            var vis=function(e){ return !!e && getComputedStyle(e).display!=='none' && e.getBoundingClientRect().width>0; };
+            var qs=[].slice.call(document.querySelectorAll('[data-iv2-toggle]')).filter(vis);
+            return { ta: norm(sp[0].textContent), tb: norm(sp[1].textContent), accent: getComputedStyle(sp[1]).color, white: getComputedStyle(sp[0]).color,
+              brShown: getComputedStyle(br).display!=='none', lines: Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight)),
+              problem: norm(q('.iv2-problem').textContent), lead: norm(q('#intelligence .section-lead').textContent), fsProblem: fs('.iv2-problem'), fsLead: fs('#intelligence .section-lead'),
+              src: base.currentSrc.split('/').pop(), imgW: br0.width,
+              orbN: document.querySelectorAll('.lp-orb').length, slot: { cx:(sr.left+sr.right)/2, cy:(sr.top+sr.bottom)/2, w: sr.width },
+              want: { cx: br0.left + parseFloat(cs.getPropertyValue('--iv2-cx'))/100*br0.width, cy: br0.top + parseFloat(cs.getPropertyValue('--iv2-cy'))/100*br0.height,
+                      w: parseFloat(cs.getPropertyValue('--iv2-ow'))/100*br0.width },
+              qLabels: qs.map(function(b){ return b.getAttribute('aria-label'); }), qHits: qs.map(function(b){ return Math.max(b.getBoundingClientRect().height, parseFloat(getComputedStyle(b, '::before').height) || 0); }),
+              qCtl: qs.map(function(b){ var a = document.getElementById(b.getAttribute('aria-controls')); return !!a && a.classList.contains('iv2-ans') && a.getAttribute('data-q') === b.getAttribute('data-q') && b.getAttribute('aria-expanded') === 'false'; }),
+              ans: qs.map(function(b){ var a = document.getElementById(b.getAttribute('aria-controls')); return a ? [].slice.call(a.querySelectorAll('p')).map(function(p){ return norm(p.textContent); }) : null; }),
+              stat: getComputedStyle(q('.iv2-static')).display, frame: getComputedStyle(shot).boxShadow,
+              arcVis: vis(q('.iv2-arc')),
+              rn: (function(){ var n=q('.iv2-radar-note'), r=n.getBoundingClientRect(); return { t: norm(n.textContent), vis: vis(n), fs: parseFloat(getComputedStyle(n).fontSize),
+                inImg: r.left >= br0.left && r.right <= br0.left + br0.width * 0.36 && r.top >= br0.top && r.bottom <= br0.bottom, cap: !!q('.iv2-note') }; })(),
+              mMore: vis(q('.iv2-m-more')), imgTopInSection: br0.top - sec.top };
+          })(),
+          plans2: (function(){ var y=q('.plan-mode--year').getBoundingClientRect(), m=q('.plan-mode--month').getBoundingClientRect(), by=q('.plan-mode--year .btn').getBoundingClientRect(), bm=q('.plan-mode--month .btn').getBoundingClientRect();
+            var py=q('.plan-mode--year .plan-price').getBoundingClientRect(), pm=q('.plan-mode--month .plan-price').getBoundingClientRect(), fr=q('.plan:not(.plan--premium)'), frr=fr.getBoundingClientRect(), last=[].slice.call(fr.children).filter(function(c){ return c.getBoundingClientRect().height > 0; }).pop().getBoundingClientRect();
+            var feats=q('.plan--premium .plan-list').getBoundingClientRect(), cw=q('.plan--premium').clientWidth - parseFloat(getComputedStyle(q('.plan--premium')).paddingLeft) - parseFloat(getComputedStyle(q('.plan--premium')).paddingRight);
+            return { cols: Math.abs(y.top - m.top) < 1 && y.right <= m.left, yearLeft: y.left < m.left, btnRow: Math.abs(by.top - bm.top) < 1, priceRow: Math.abs(py.bottom - pm.bottom) < 2, featsBelow: feats.top > Math.max(y.bottom, m.bottom),
+              cw: Math.round(cw), freeGap: Math.round(frr.bottom - last.bottom), stacked: m.top >= y.bottom - 1 }; })(),
+          plans: (function(){ var y=q('.plan-mode--year'), m=q('.plan-mode--month'); return { y: y ? norm(y.querySelector('.plan-price b').textContent) : null, m: m ? norm(m.querySelector('.plan-price b').textContent) : null,
+            yR: R(y), mR: R(m), firstIsYear: !!y && !!m && (y.compareDocumentPosition(m) & 4) > 0, ctaY: y ? norm(y.querySelector('.btn').textContent) : null, ctaM: m ? norm(m.querySelector('.btn').textContent) : null,
+            yPrimary: !!y && y.querySelector('.btn').classList.contains('btn-primary'), lists: document.querySelectorAll('.plan--premium .plan-list').length }; })(),
+          orb: R(q('.lp-orb')),
           hero: heroImg ? heroImg.currentSrc.split('/').pop() : '', heroR: R(heroImg),
           hot: { href: hot.getAttribute('href'), aria: hot.getAttribute('aria-label'), r: R(hot), target: hot.getAttribute('target'), hit: parseFloat(getComputedStyle(hot, '::before').height) },
-          mob: { hdr: R(q('#siteHeader')), eye: R(q('.hero-eyebrow')), kick: R(q('.ip-kicker')), slot: R(q('.lp-orb-slot')), glow: R(q('.lp-orb-glow')), headW: R(q('.ip-head')).w, inner: q('#intelDemo').clientWidth - parseFloat(getComputedStyle(q('#intelDemo')).paddingLeft) - parseFloat(getComputedStyle(q('#intelDemo')).paddingRight), ctaFs: parseFloat(getComputedStyle(q('.hero-cta .btn-primary')).fontSize) },
+          mob: { hdr: R(q('#siteHeader')), eye: R(q('.hero-eyebrow')), ctaFs: parseFloat(getComputedStyle(q('.hero-cta .btn-primary')).fontSize) },
           zOrb: parseInt(getComputedStyle(q('.lp-orb')).zIndex, 10), zHeader: parseInt(getComputedStyle(q('#siteHeader')).zIndex, 10),
-          appLinks: [].slice.call(document.querySelectorAll('[data-app-link]')).map(function(a){ return { href: a.getAttribute('href'), premium: a.getAttribute('data-app-intent')==='premium' }; }),
+          appLinks: [].slice.call(document.querySelectorAll('[data-app-link]')).map(function(a){ return { href: a.getAttribute('href'), premium: a.getAttribute('data-app-intent')==='premium', plan: a.getAttribute('data-app-plan') }; }),
           headerApp: document.querySelectorAll('#siteHeader [data-app-link]').length,
+          login: (function(){ var ls=document.querySelectorAll('#siteHeader [data-app-login]'), l=ls[0]; if (!l) return { n: 0 }; var r=l.getBoundingClientRect(), lt=document.querySelector('.header-right .lang-toggle').getBoundingClientRect(), hd=document.getElementById('siteHeader').getBoundingClientRect();
+            return { n: ls.length, t: norm(l.textContent), href: l.getAttribute('href'), vis: r.width > 0 && r.right <= innerWidth && r.left >= 0, afterLang: r.left >= lt.right - 0.5, inHdr: r.top >= hd.top && r.bottom <= hd.bottom, hit: Math.max(r.height, parseFloat(getComputedStyle(l, '::before').height) || 0), hdrH: Math.round(hd.height) }; })(),
+          planOrder: (function(){ var pr=q('.plan--premium'), fr=q('.plan--free'); var a=pr.getBoundingClientRect(), b=fr.getBoundingClientRect(); return { premFirst: !!(pr.compareDocumentPosition(fr) & 4) && a.bottom <= b.top, sameCol: Math.abs(a.left - b.left) < 1 && Math.abs(a.width - b.width) < 1 }; })(),
           support: [].slice.call(document.querySelectorAll('[data-legal-link="support"]')).map(function(a){return a.getAttribute('href')}),
           cap: (function(){ var c=q('.how-market-fig .shot-caption'); return { t: c.textContent, vis: getComputedStyle(c).display!=='none' && c.getBoundingClientRect().height>0 }; })(),
-          gone: { menuApp: !!q('#mobileMenu [data-app-link]'), marketLink: !!q('.how-market-fig a'), zoom: !!q('.how-market-fig img') && getComputedStyle(q('.how-market-fig img')).cursor === 'zoom-in', how: !!q('#how'), steps: !!q('.steps'), free: !!q('.intel-free'), photo: !!q('.ip-link') || !!q('a[href*="intelligence-full"]'), demoFoot: !!q('.ip-demo'), note: !!q('.benefit-note'), heroCap: !!q('.hero-visual .shot-caption'), navHow: !!q('a[href="#how"]') },
+          gone: { menuApp: !!q('#mobileMenu [data-app-link]'), marketLink: !!q('.how-market-fig a'), zoom: !!q('.how-market-fig img') && getComputedStyle(q('.how-market-fig img')).cursor === 'zoom-in', how: !!q('#how'), steps: !!q('.steps'), free: !!q('.intel-free'), photo: !!q('a[href*="intelligence-full"]'), panel: !!q('.intel-panel') || !!q('.ip-bars'), demoFoot: !!q('.ip-demo'), note: !!q('.benefit-note'), heroCap: !!q('.hero-visual .shot-caption'), navHow: !!q('a[href="#how"]') },
           demoMentions: (document.body.innerText.match(/Cartera de demostración|Demo portfolio/g) || []).length,
           imgsNoDim: [].slice.call(document.images).filter(function(i){ return !i.getAttribute('width') || !i.getAttribute('height'); }).length,
         }; })()`);
@@ -152,13 +198,40 @@ for (const engine of ['chromium', 'webkit']) {
       if (h >= 667) ok(`${T} · A CTA secundario en el primer pantallazo`, m.cta2.b <= m.H, { cta2: m.cta2.b, H: m.H });
       ok(`${T} · A idioma activo y H1`, m.lang === lang && m.h1t.indexOf(E.h1) === 0, m.h1t);
       ok(`${T} · A cabecera sin CTA de registro`, m.headerApp === 0, m.headerApp);
-      ok(`${T} · E panel con el texto del motor y 69 % junto a la conclusión`, m.head === E.head && m.stat === E.stat && m.rest === E.rest && /Premium/.test(m.kicker), { head: m.head, stat: m.stat, rest: m.rest });
-      ok(`${T} · E cifras 29/22/18/31 y suma 100`, m.pcts.map(x => parseInt(x, 10)).join() === '29,22,18,31' && m.ws.reduce((a, b) => a + b, 0) === 100, { p: m.pcts, w: m.ws });
-      const sufx = lang === 'es' ? '\u00a0%' : '%';
-      ok(`${T} · K nombre accesible con el valor final (29/22/18/31 y 69)`, m.rowLabels.join('|') === ['Microsoft 29', 'Bitcoin 22', 'Apple 18', E.rest + ' 31'].map(x => x + sufx).join('|'), m.rowLabels);
-      if (w < 768) ok(`${T} · E tamaños móviles (titular/%/frase ≥16, etiqueta ≥15)`, m.fsHead >= 16 && m.fsPct >= 16 && m.fsStat >= 16 && m.fsName >= 15, { head: m.fsHead, pct: m.fsPct, name: m.fsName, stat: m.fsStat });
-      const orbMax = w >= 1024 ? 96 : (w >= 768 ? 80 : 64);
-      ok(`${T} · H esfera ≤${orbMax}px y sin pisar el titular en reposo`, m.orb.w <= orbMax + 0.5 && (m.orb.l >= m.headR.r || m.orb.r <= m.headR.l || m.orb.t >= m.headR.b || m.orb.b <= m.headR.t), { orb: m.orb, head: m.headR });
+      ok(`${T} · A «${E.login}» en la cabecera, a la derecha de ES | EN, visible sin desbordar, área ≥44 px; entrada normal de la app con idioma, sin intención ni modalidad`,
+        m.login.n === 1 && m.login.t === E.login && m.login.vis && m.login.afterLang && m.login.inHdr && m.login.hit >= 44 - 0.5
+        && /^https:\/\/app\.aurixsystem\.io\/\?(lang|langhint)=(es|en)$/.test(m.login.href), m.login);
+      ok(`${T} · P Premium arriba y Free debajo, en el mismo contenedor`, m.planOrder.premFirst && m.planOrder.sameCol, m.planOrder);
+      // INTELLIGENCE V2 · copy aprobado literal, jerarquía y captura real con la esfera viva en su hueco.
+      const V = m.iv2, desk = w >= 1024;
+      ok(`${T} · V2 copy aprobado literal (título, problema, beneficio)`, V.ta === E.ta && V.tb === E.tb && V.problem === E.problem && V.lead === E.lead, { ta: V.ta, tb: V.tb, problem: V.problem, lead: V.lead });
+      ok(`${T} · V2 segunda parte del título en azul, primera en blanco`, V.accent !== V.white && /rgb\(125, 184, 255\)/.test(V.accent), { a: V.accent, w: V.white });
+      ok(`${T} · V2 salto tras la coma sólo desde 768 px`, V.brShown === (w >= 768), V.brShown);
+      if (desk) ok(`${T} · V2 escritorio: título en dos líneas (una por frase)`, V.lines === 2, V.lines);
+      ok(`${T} · V2 problema más presente que el beneficio`, V.fsProblem >= V.fsLead && V.fsProblem >= 17, { p: V.fsProblem, l: V.fsLead });
+      ok(`${T} · V2 captura del idioma activo (${desk ? 'escritorio' : 'móvil real'})`, new RegExp(desk ? `^intelligence-v2-${lang}(-2x)?\\.jpg$` : `^intelligence-v2-m-head-${lang}\\.jpg$`).test(V.src), V.src);
+      ok(`${T} · V2 una sola esfera, centrada en el hueco de la captura (≤2 px) y a su tamaño (≤1 px)`, V.orbN === 1 && Math.abs(V.slot.cx - V.want.cx) <= 2 && Math.abs(V.slot.cy - V.want.cy) <= 2 && Math.abs(V.slot.w - V.want.w) <= 1, { slot: V.slot, want: V.want, n: V.orbN });
+      ok(`${T} · V2 las tres preguntas de Explora como controles reales (nombre = pregunta del motor, ≥44 px, aria-expanded/aria-controls)`,
+        JSON.stringify(V.qLabels) === JSON.stringify(E.qs.map(x => x.q)) && V.qHits.every(x => x >= 44 - 0.5) && V.qCtl.every(Boolean), { labels: V.qLabels, hits: V.qHits, ctl: V.qCtl });
+      ok(`${T} · V2 las tres respuestas del motor como texto accesible`, JSON.stringify(V.ans) === JSON.stringify(E.qs.map(x => x.a)), V.ans);
+      ok(`${T} · V2 con JS no se muestra la alternativa estática`, V.stat === 'none', V.stat);
+      ok(`${T} · V2 arco de Salud sólo con la captura de escritorio`, V.arcVis === desk, V.arcVis);
+      ok(`${T} · ACABADO marco azul discreto en reposo (Intelligence)`, /rgba\(110, 160, 255, 0\.3\)/.test(V.frame), V.frame);
+      ok(`${T} · HERO copy aprobado literal intacto (título y subtítulo)`, m.h1t.replace(/\s+/g, ' ').trim() === (E.h1 + E.h1b) && m.subT === E.sub, { h1: m.h1t, sub: m.subT });
+      ok(`${T} · RADAR sin pie exterior; nota «${E.radar}» dentro de su tarjeta, legible (≥12 px), sólo con la captura de escritorio`,
+        !V.rn.cap && V.rn.t === E.radar && (desk ? (V.rn.vis && V.rn.inImg && V.rn.fs >= 12) : !V.rn.vis), V.rn);
+      ok(`${T} · V2 móvil/tablet: Factores y Explora reales bajo la cabecera; escritorio: pantalla completa`, V.mMore === !desk, V.mMore);
+      if (!desk) ok(`${T} · V2 móvil legible: la captura a ≥0,85 de su escala`, V.imgW / 378 >= 0.85, +(V.imgW / 378).toFixed(3));
+      ok(`${T} · V2 la conclusión empieza en el primer pantallazo de la sección`, V.imgTopInSection + 72 < m.H, { top: Math.round(V.imgTopInSection), H: m.H });
+      // PREMIUM · dos modalidades visibles, anual primero y destacado, una sola lista.
+      const P = m.plans;
+      ok(`${T} · P 69,99/año y 7,99/mes visibles sin interactuar`, P.y === E.year && P.m === E.month && P.yR && P.yR.h > 0 && P.mR && P.mR.h > 0, P);
+      ok(`${T} · P anual primero, destacado (botón principal) y botones «${E.ctaY}» / «${E.ctaM}»`, P.firstIsYear && P.yPrimary && P.ctaY === E.ctaY && P.ctaM === E.ctaM, P);
+      ok(`${T} · P una sola lista de funciones Premium`, P.lists === 1, P.lists);
+      const P2 = m.plans2;
+      if (P2.cw >= 380) ok(`${T} · P escritorio compacto: Anual y Mensual en dos columnas (Anual primero), precios y botones alineados, funciones debajo`, P2.cols && P2.yearLeft && P2.btnRow && P2.priceRow && P2.featsBelow, P2);
+      else ok(`${T} · P anchura insuficiente: modalidades apiladas (Anual arriba)`, P2.stacked && !P2.cols, P2);
+      ok(`${T} · P Free sin estirar (sin hueco artificial bajo su contenido)`, P2.freeGap <= 40, P2.freeGap);
       ok(`${T} · F eliminados: registro del menú móvil, ampliación de Market, pasos, bloque Free, foto, pie de demo, nota, pie del hero, «Cómo empezar»`, Object.values(m.gone).every(v => !v), m.gone);
       ok(`${T} · F «Cartera de demostración» no se repite en el texto`, m.demoMentions === 0, m.demoMentions);
       ok(`${T} · C enlace «Ver análisis»: #intelligence, misma pestaña, rótulo del idioma, área ≥44 px, dentro de la imagen`,
@@ -169,16 +242,13 @@ for (const engine of ['chromium', 'webkit']) {
         ok(`${T} · MÓVIL botones del hero centrados, mismo ancho ≤280 px, 48–56 px de alto, texto 16 px, 10–12 px de separación`,
           Math.abs(mid(c1) - w / 2) <= 1 && Math.abs(mid(c2) - w / 2) <= 1 && Math.abs(c1.w - c2.w) <= 0.5 && c1.w <= 280.5 && c1.h >= 48 && c1.h <= 56 && c2.h >= 48 && m.mob.ctaFs >= 15.5 && (c2.t - c1.b) >= 10 && (c2.t - c1.b) <= 12.5, { c1, c2, fs: m.mob.ctaFs });
       }
-      if (w < 768) {
-        const k = m.mob.kick, sl = m.mob.slot, gl = m.mob.glow;
-        ok(`${T} · MÓVIL rótulo y esfera en la misma fila sin colisión; conclusión a todo el ancho; halo sin invadir la conclusión`,
-          sl.t < k.b && sl.b > k.t && sl.l - k.r >= 12 && m.mob.headW >= m.mob.inner - 4 && gl.b <= m.headR.t && gl.r <= m.H * 10, { k, sl, headW: m.mob.headW, inner: m.mob.inner, glowB: gl.b, headT: m.headR.t });
-      }
       ok(`${T} · 17 la esfera pasa por DEBAJO de la cabecera (nunca la tapa)`, m.zOrb < m.zHeader, { orb: m.zOrb, header: m.zHeader });
       ok(`${T} · 6 enlaces a la app con lang/langhint e intent Premium`, m.appLinks.length >= 4 && m.appLinks.every(a => /[?&](lang|langhint)=(es|en)/.test(a.href) && (a.premium ? /intent=premium/.test(a.href) : !/intent=/.test(a.href))), m.appLinks);
+      ok(`${T} · P cada modalidad lleva su plan=annual|monthly y el CTA gratuito ninguno`, m.appLinks.filter(a => a.premium).map(a => (a.href.match(/[?&]plan=(\w+)/) || [])[1]).join() === 'annual,monthly' && m.appLinks.filter(a => !a.premium).every(a => !/[?&]plan=/.test(a.href)), m.appLinks);
       ok(`${T} · 6 Soporte con ?lang=`, m.support.length >= 2 && m.support.every(s => s.endsWith('support.html?lang=' + lang)), m.support);
       ok(`${T} · B base del hero en el idioma activo (V3 escritorio · V4 móvil)`, new RegExp(w < 768 ? `hero-dashboard-v4-base-m-${lang}\\.jpg$` : `hero-dashboard-v3-base-${lang}(-2x)?\\.jpg$`).test(m.hero), m.hero);
       ok(`${T} · 7 todas las imágenes con width/height`, m.imgsNoDim === 0, m.imgsNoDim);
+      ok(`${T} · 7 sin consultas a otros servidores por visita (sólo recursos locales y fuentes)`, !BASE.startsWith('http://127.0.0.1') || extReqs.length === 0, extReqs.slice(0, 5));
       const cls = await page.evaluate('window.__cls');
       ok(`${T} · 7 sin saltos de maquetación (CLS < 0.1)`, cls < 0.1, cls);
       const wrong = heroReqs.filter(u => !u.includes('-' + lang)).length;
@@ -195,7 +265,7 @@ for (const engine of ['chromium', 'webkit']) {
         await page.evaluate(() => { history.replaceState(null, '', location.pathname + location.search); window.scrollTo(0, 0); });
       }
       // K · contraste y foco
-      const low = await page.evaluate(`(function(){ var C=${CONTRAST}; return ['.ip-kicker','.ip-hint','.ip-cons','.ip-stat-pre','.shot-caption','.trust-item p','.plan-sub-alt','.hero-eyebrow','.benefit-item p']
+      const low = await page.evaluate(`(function(){ var C=${CONTRAST}; return ['.iv2-problem','#intelligence .section-lead','.plan-mode-name','.plan-mode-note','.shot-caption','.trust-item p','.hero-eyebrow','.benefit-item p']
         .map(function(s){ var e=document.querySelector(s); if(!e||!e.textContent.trim()||getComputedStyle(e).display==='none') return null; var c=C(e); return c<4.5? s+':'+c.toFixed(2) : null; }).filter(Boolean); })()`);
       ok(`${T} · K contraste AA del texto secundario`, low.length === 0, low);
       if (w === 1440) {
@@ -224,31 +294,76 @@ for (const engine of ['chromium', 'webkit']) {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch && engine === 'chromium' });
     const page = await ctx.newPage();
     await page.goto(BASE + '?lang=es', { waitUntil: 'networkidle' });
-    const st = () => page.evaluate(() => ({ on: [...document.querySelectorAll('.ip-bars li.is-on')].map(l => l.dataset.ipKey),
-      pressed: [...document.querySelectorAll('[data-ip-select][aria-pressed="true"]')].map(b => b.dataset.ipSelect),
-      dim: [...document.querySelectorAll('.ip-bars li')].map(l => +getComputedStyle(l).opacity), reset: !document.querySelector('[data-ip-reset]').hidden }));
-    const act = async sel => { const l = page.locator(sel).first(); await l.scrollIntoViewIfNeeded(); if (touch) await l.tap(); else await l.click(); await page.waitForTimeout(320); };
-    await act('[data-ip-select="msft"]');
+    // V2 · las tres preguntas de «Explora»: UNA abierta cada vez (como en el producto), su card real y su
+    // respuesta en texto; las demás no están disponibles mientras tanto; volver a pulsar / Escape cierran.
+    const st = () => page.evaluate(() => { const vis = e => !!e && e.offsetParent !== null;
+      const btns = [...document.querySelectorAll('[data-iv2-toggle]')].filter(vis);
+      const host = [...document.querySelectorAll('.iv2-shot, .iv2-m-explore')].find(h => [...h.querySelectorAll('[data-iv2-toggle]')].some(vis) || h.hasAttribute('data-open') && vis(h));
+      const lay = [...document.querySelectorAll('.iv2-open')].filter(o => getComputedStyle(o).display !== 'none' && getComputedStyle(o).visibility === 'visible' && +getComputedStyle(o).opacity > 0.99 && vis(o.parentElement));
+      const ans = [...document.querySelectorAll('.iv2-ans')].filter(a => !a.hidden && vis(a));
+      return { open: host ? host.getAttribute('data-open') : null, btns: btns.map(b => b.getAttribute('data-q') + ':' + b.getAttribute('aria-expanded')),
+        layers: lay.map(o => o.getAttribute('data-q') + '=' + o.currentSrc.split('/').pop() + (o.complete && o.naturalWidth ? '' : '(sin cargar)')),
+        ans: ans.map(a => a.getAttribute('data-q') + '=' + [...a.querySelectorAll('p')].map(p => p.textContent.trim()).join(' | ')),
+        focus: document.activeElement && document.activeElement.getAttribute('data-q') && document.activeElement.hasAttribute('data-iv2-toggle') ? document.activeElement.getAttribute('data-q') : null }; });
+    const tog = async k => { const l = page.locator(`[data-iv2-toggle][data-q="${k}"]:visible`).first(); await l.scrollIntoViewIfNeeded(); if (touch) await l.tap(); else await l.click(); await page.waitForTimeout(450); };
+    // Relativo a la propia demostración (la cabecera sticky de móvil cambia de alto al desplazar y movería todo).
+    const orbAt = () => page.evaluate(() => { const f = document.getElementById('intelDemo').getBoundingClientRect(), r = document.querySelector('.lp-orb-slot').getBoundingClientRect();
+      return [Math.round(r.left - f.left), Math.round(r.top - f.top), Math.round(r.width), Math.round(f.height)]; });
     let s = await st();
-    ok(`${T} · G seleccionar Microsoft la resalta y atenúa el resto`, s.on.join() === 'msft' && s.pressed.join() === 'msft' && s.dim.filter(o => o < 0.9).length === 3 && s.dim.every(o => o >= 0.45) && s.reset, s);
-    await act('.ip-stat');
-    s = await st();
-    ok(`${T} · G seleccionar el 69 % resalta las tres posiciones`, s.on.join() === 'msft,btc,aapl' && s.pressed.join() === 'top3', s);
-    await act('.ip-stat');
-    s = await st();
-    ok(`${T} · G volver a pulsar recupera el estado inicial`, s.on.length === 0 && s.pressed.length === 0 && !s.reset && s.dim.every(o => o > 0.99), s);
+    ok(`${T} · V2 al cargar: tres preguntas cerradas, ninguna capa ni respuesta`, s.open === null && s.btns.join() === '1:false,2:false,3:false' && !s.layers.length && !s.ans.length, s);
+    const orb0 = await orbAt();
+    for (const k of [1, 2, 3]) {
+      await tog(k); await page.waitForTimeout(250); s = await st();
+      const E2 = EXPECT.es.qs[k - 1];
+      ok(`${T} · V2 pregunta ${k}: abre su card real y su respuesta exacta; las otras no están disponibles`,
+        s.open === String(k) && s.btns.join() === `${k}:true` && s.layers.length === 1 && s.layers[0].startsWith(k + '=intelligence-v2-' + (w < 1024 ? 'm-explore-' : '') + 'open' + k + '-es') && !/sin cargar/.test(s.layers[0])
+        && s.ans.length === 1 && s.ans[0] === k + '=' + E2.a.join(' | '), s);
+      ok(`${T} · V2 pregunta ${k}: abrir no mueve la esfera ni la demostración`, JSON.stringify(await orbAt()) === JSON.stringify(orb0), { before: orb0, after: await orbAt() });
+      await tog(k); s = await st();
+      ok(`${T} · V2 pregunta ${k}: volver a pulsar la cierra`, s.open === null && s.btns.join() === '1:false,2:false,3:false' && !s.ans.length, s);
+    }
+    // Respuesta larga: se desplaza dentro (rueda / teclado / dedo) y, al final, el desplazamiento vuelve a la página.
+    { await tog(1); const a = page.locator('.iv2-ans[data-q="1"]:visible');
+      const m0 = await a.evaluate(e => ({ sh: e.scrollHeight, ch: e.clientHeight, fs: parseFloat(getComputedStyle(e).fontSize) }));
+      ok(`${T} · V2 texto de la respuesta legible (≥13 px)`, m0.fs >= 13, m0);
+      if (m0.sh > m0.ch + 1) {
+        const bb = await a.boundingBox(); await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+        if (!touch) { await page.mouse.wheel(0, 60); await page.waitForTimeout(300); }
+        else { await a.evaluate(e => { e.scrollTop = 0; }); await page.evaluate(([x, y]) => window.__tp = [x, y], [bb.x, bb.y]); await a.evaluate(e => e.scrollBy(0, 60)); await page.waitForTimeout(200); }
+        const t1 = await a.evaluate(e => e.scrollTop);
+        await a.focus(); await page.keyboard.press('End'); await page.waitForTimeout(250);
+        const t2 = await a.evaluate(e => ({ top: e.scrollTop, max: e.scrollHeight - e.clientHeight }));
+        ok(`${T} · V2 respuesta larga: se desplaza dentro (${touch ? 'gesto' : 'rueda'} y teclado)`, t1 > 0 && t2.top >= t2.max - 1, { t1, t2 });
+        if (!touch) { const y0 = await page.evaluate(() => scrollY); await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.wheel(0, 400); await page.waitForTimeout(500);
+          ok(`${T} · V2 al final de la respuesta el desplazamiento vuelve a la página (no se bloquea)`, (await page.evaluate(() => scrollY)) > y0 + 50, { y0 }); }
+      } else notes.push(`${T}: la respuesta 1 cabe sin desplazamiento (${m0.sh}/${m0.ch})`);
+      await tog(1); }
     if (!touch) {
-      await page.focus('[data-ip-select="btc"]'); await page.keyboard.press('Enter'); await page.waitForTimeout(150);
-      s = await st();
+      await page.locator('[data-iv2-toggle][data-q="2"]:visible').focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(300); s = await st();
       const foc = await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
-      ok(`${T} · G teclado: Enter selecciona y el foco es visible`, s.on.join() === 'btc' && foc !== 'none', { s, foc });
-      await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-      s = await st();
-      ok(`${T} · G teclado: Escape restablece`, s.on.length === 0, s);
-      await page.focus('[data-ip-select="rest"]'); await page.keyboard.press('Space'); await page.waitForTimeout(150);
-      await page.click('[data-ip-reset]'); await page.waitForTimeout(150);
-      s = await st();
-      ok(`${T} · G «Ver todo» restablece y devuelve el foco al 69 %`, s.on.length === 0 && await page.evaluate(() => document.activeElement.classList.contains('ip-stat')), s);
+      ok(`${T} · V2 teclado: Enter abre la pregunta 2 y el foco es visible`, s.open === '2' && foc !== 'none', { s, foc });
+      await page.keyboard.press('Escape'); await page.waitForTimeout(300); s = await st();
+      ok(`${T} · V2 teclado: Escape cierra y devuelve el foco a su control`, s.open === null && s.focus === '2', s);
+      await tog(3); await page.click('.site-header .lang-btn[data-lang="en"]'); await page.waitForTimeout(600); s = await st();
+      ok(`${T} · V2 cambio de idioma con una respuesta abierta: card y respuesta en EN`, s.layers.length === 1 && /open3-en/.test(s.layers[0]) && s.ans[0] === '3=' + EXPECT.en.qs[2].a.join(' | '), s);
+      await page.click('.site-header .lang-btn[data-lang="es"]'); await page.waitForTimeout(400); s = await st();
+      ok(`${T} · V2 y de vuelta a ES sin restos del inglés`, /open3-es/.test(s.layers[0] || '') && s.ans[0] === '3=' + EXPECT.es.qs[2].a.join(' | '), s);
+      await tog(3);
+    }
+    // ARCO DE SALUD (escritorio): se dibuja UNA vez al entrar en pantalla, ≈1 s, y termina en su valor.
+    if (w >= 1024) {
+      const ap = await browser.newPage({ viewport: { width: w, height: h } });
+      await ap.goto(BASE + '?lang=es', { waitUntil: 'networkidle' });
+      const arc = () => ap.evaluate(() => { const fg = document.querySelector('.iv2-arc-fg'); return { off: parseFloat(getComputedStyle(fg).strokeDashoffset), armed: fg.classList.contains('is-armed'), run: fg.classList.contains('is-run'),
+        want: 326.726 * (1 - parseFloat(getComputedStyle(document.querySelector('.iv2-arc')).getPropertyValue('--iv2-arc-frac'))), color: getComputedStyle(fg).stroke }; });
+      const a0 = await arc();
+      await ap.evaluate(() => { const f = document.getElementById('intelDemo'); scrollTo(0, f.getBoundingClientRect().top + scrollY - 120); });
+      await ap.waitForTimeout(450); const a1 = await arc(); await ap.waitForTimeout(1300); const a2 = await arc();
+      await ap.evaluate(() => scrollTo(0, 0)); await ap.waitForTimeout(400); await ap.evaluate(() => { const f = document.getElementById('intelDemo'); scrollTo(0, f.getBoundingClientRect().top + scrollY - 120); }); await ap.waitForTimeout(300); const a3 = await arc();
+      ok(`${T} · SALUD arco: vacío antes de verse, se dibuja al entrar y termina en su valor (≈1 s)`, a0.armed && a0.off > 326 && a1.off < 326 && a1.off > a2.off + 1 && Math.abs(a2.off - a2.want) < 0.6, { a0, a1, a2 });
+      ok(`${T} · SALUD arco: una sola vez (no se reinicia al subir y bajar)`, !a3.armed && Math.abs(a3.off - a3.want) < 0.6, a3);
+      ok(`${T} · SALUD arco: color semántico del estado «A vigilar» (naranja)`, a2.color === 'rgb(230, 132, 60)', a2.color);
+      await ap.close();
     }
     // C · «Ver análisis» en la imagen y «Descubrir Intelligence» llegan a Intelligence sin ocultar el título
     for (const sel of ['.hero-hotspot', '.hero-cta .btn-ghost']) {
@@ -306,6 +421,7 @@ for (const engine of ['chromium', 'webkit']) {
     const qOf = e => { let lo = 0, hi = 1; for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (ease(mid) < e) lo = mid; else hi = mid; } return lo; };
     const sOf = q => S.s0 + q * (S.s1 - S.s0);
     for (let y = S.s0; y <= sOf(qOf(S.loopB + 0.05)); y += 14) { await scrollTo(page, y); await settle(page, 70); }
+    await scrollTo(page, sOf(qOf(S.loopB + 0.05)));   // el último paso de 14 px puede quedarse antes del objetivo: se llega exacto
     await page.waitForTimeout(1500);
     S = await st();
     const loopedOnce = S.loopDone;
@@ -319,7 +435,8 @@ for (const engine of ['chromium', 'webkit']) {
     const findLeft = async () => { const g = await geom(page); let o = null;
       for (let y = g.ben.t - 0.7 * h; y <= g.trk.t; y += 30) { await scrollTo(page, y); await page.waitForTimeout(90); o = await page.evaluate(ORB); if (o.vis && o.cx < o.contL - 10 && o.op > 0.95) break; }
       let a = await page.evaluate(ORB);
-      for (let k = 0; k < 30; k++) { await page.waitForTimeout(250); const b = await page.evaluate(ORB); if (Math.hypot(b.cx - a.cx, b.cy - a.cy) < 14) return b; a = b; }
+      // quieta DE VERDAD (≤3 px en 250 ms): con 14 px se aceptaba una esfera que aún alcanzaba su sitio (WebKit) y se medía esa deriva
+      for (let k = 0; k < 40; k++) { await page.waitForTimeout(250); const b = await page.evaluate(ORB); if (Math.hypot(b.cx - a.cx, b.cy - a.cy) <= 3) return b; a = b; }
       return a; };
     let o1 = await findLeft();
     if (o1.vis && o1.cx < o1.contL) {
@@ -409,42 +526,33 @@ for (const engine of ['chromium', 'webkit']) {
     ok(`${T} · capas alineadas sin duplicados ni costuras (≈ captura completa)`, d.mean < 2 && d.bigPct < 1, d);
     await ctx.close();
   }
-  // V3 · entrada de Intelligence: una vez, sin reinicios, interacción durante la entrada, scroll rápido
-  { const T = `${engine} V3 Intelligence`;
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } }); const page = await ctx.newPage();
-    await page.goto(BASE + '?lang=es', { waitUntil: 'networkidle' });
-    const is = () => page.evaluate(() => ({ nums: [...document.querySelectorAll('.ip-num')].map(n => n.textContent).join(), fill: document.querySelector('.ip-fill').style.transform,
-      w: [...document.querySelectorAll('.ip-pct')].map(e => Math.round(e.getBoundingClientRect().width)).join() }));
-    const before = await is();
-    await page.evaluate(() => { const e = document.getElementById('intelDemo'); scrollTo(0, e.getBoundingClientRect().top + scrollY - 120); });
-    await page.waitForTimeout(330); const mid = await is();
-    await page.waitForTimeout(1300); const end = await is();
-    ok(`${T} · cuenta desde cero y llega exacto a 69/29/22/18/31`, before.nums === '0,0,0,0,0' && mid.nums !== '69,29,22,18,31' && /scaleX/.test(mid.fill) && end.nums === '69,29,22,18,31' && !end.fill, { before, mid, end });
-    ok(`${T} · sin saltos: el ancho de cada porcentaje no cambia durante el conteo`, mid.w === end.w, { mid: mid.w, end: end.w });
-    await page.click('[data-ip-select="btc"]'); await page.waitForTimeout(200); await page.click('[data-ip-select="btc"]');
-    await scrollTo(page, 0); await page.waitForTimeout(400);
-    await page.evaluate(() => { const e = document.getElementById('intelDemo'); scrollTo(0, e.getBoundingClientRect().top + scrollY - 120); }); await page.waitForTimeout(500);
-    const back = await is();
-    ok(`${T} · seleccionar, subir o bajar no la reinicia`, back.nums === '69,29,22,18,31' && !back.fill, back);
-    await ctx.close();
-    // interactuar durante la entrada completa los valores y ejecuta la selección
-    const c2 = await browser.newContext({ viewport: { width: 1440, height: 900 } }); const p2 = await c2.newPage();
-    await p2.goto(BASE + '?lang=es', { waitUntil: 'networkidle' });
-    await p2.evaluate(() => { const e = document.getElementById('intelDemo'); scrollTo(0, e.getBoundingClientRect().top + scrollY - 120); });
-    await p2.waitForTimeout(140); await p2.click('[data-ip-select="msft"]'); await p2.waitForTimeout(40);
-    const ia = await p2.evaluate(() => ({ nums: [...document.querySelectorAll('.ip-num')].map(n => n.textContent).join(), on: [...document.querySelectorAll('.ip-bars li.is-on')].map(l => l.dataset.ipKey).join(), fill: document.querySelector('.ip-fill').style.transform }));
-    ok(`${T} · pulsar durante la entrada: valores finales al instante y selección aplicada`, ia.nums === '69,29,22,18,31' && ia.on === 'msft' && !ia.fill, ia);
-    await c2.close();
+  // V3 · scroll rápido: el hero termina completo (la entrada animada de Intelligence se retiró con su panel).
+  {
     // scroll rápido: nada queda atascado ni a medias
     const c3 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true }); const p3 = await c3.newPage();
     await p3.goto(BASE + '?lang=en', { waitUntil: 'networkidle' });
     for (const y of [700, 1600, 2600, 4000, 9000]) { await scrollTo(p3, y); await p3.waitForTimeout(40); }
     await p3.waitForTimeout(1500); await scrollTo(p3, 0); await p3.waitForTimeout(1700);
     await p3.evaluate(() => { const e = document.getElementById('intelDemo'); scrollTo(0, e.getBoundingClientRect().top + scrollY - 100); }); await p3.waitForTimeout(1500);
-    const fr = await p3.evaluate(() => ({ val: document.querySelector('.hero-val').textContent, clip: document.querySelector('.hero-curve').style.clipPath, nums: [...document.querySelectorAll('.ip-num')].map(n => n.textContent).join(), fill: document.querySelector('.ip-fill').style.transform }));
-    ok(`${engine} V3 · scroll rápido: hero e Intelligence terminan completos`, fr.val === '$186,055.38' && !fr.clip && fr.nums === '69,29,22,18,31' && !fr.fill, fr);
+    const fr = await p3.evaluate(() => ({ val: document.querySelector('.hero-val').textContent, clip: document.querySelector('.hero-curve').style.clipPath, base: document.querySelector('.iv2-base').complete }));
+    ok(`${engine} V3 · scroll rápido: hero completo e Intelligence cargada`, fr.val === '$186,055.38' && !fr.clip && fr.base, fr);
     await c3.close(); }
 
+  // ACABADO · el MISMO tratamiento exterior del Dashboard en las cinco (reposo y hover), estáticas sin enlace ni zoom.
+  { const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } }); const page = await ctx.newPage();
+    await page.goto(BASE + '?lang=es', { waitUntil: 'networkidle' });
+    const SEL = { dashboard: '#heroShot', intelligence: '.iv2-shot', seguimiento: '#tracking .shot-fig:not(.how-market-fig)', market: '.how-market-fig', workspace: '#workspace .shot-fig, .section--how2 .shot-fig:not(.how-market-fig):last-of-type' };
+    const look = async (sel, hover) => { const l = page.locator(sel).first(); await l.scrollIntoViewIfNeeded(); if (hover) { const b = await l.boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + 8); } else await page.mouse.move(2, 2);
+      await page.waitForTimeout(450); return l.evaluate(e => { const c = getComputedStyle(e); return { sh: c.boxShadow, bg: c.backgroundColor, r: c.borderRadius, tr: c.transitionDuration + ' ' + c.transitionProperty,
+        cur: getComputedStyle(e.querySelector('img') || e).cursor, link: !!e.querySelector('a:not(.hero-hotspot)') }; }); };
+    const ref = { rest: await look(SEL.dashboard, false), hover: await look(SEL.dashboard, true) };
+    for (const [k, sel] of Object.entries(SEL)) {
+      const a = await look(sel, false), b = await look(sel, true);
+      ok(`${engine} · ACABADO ${k}: idéntico al Dashboard en reposo y al pasar el ratón (fondo, borde, difuminado, brillo, transición)`,
+        a.sh === ref.rest.sh && b.sh === ref.hover.sh && a.bg === ref.rest.bg && a.r === ref.rest.r && a.tr === ref.rest.tr && a.sh !== b.sh, { a, b, ref });
+      if (k === 'seguimiento' || k === 'market' || k === 'workspace') ok(`${engine} · ACABADO ${k}: imagen estática con cursor normal, sin enlace ni zoom`, a.cur === 'auto' || a.cur === 'default' ? !a.link : false, a);
+    }
+    await ctx.close(); }
   // K · movimiento reducido: esfera estática en su hueco en todo el recorrido
   { const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' }); const page = await ctx.newPage();
     await page.goto(BASE + '?lang=es', { waitUntil: 'networkidle' });
@@ -452,20 +560,33 @@ for (const engine of ['chromium', 'webkit']) {
     const G = await geom(page), all = [];
     for (let y = G.intel.t - 72; y <= G.trk.t + 200; y += 60) { await scrollTo(page, y); await settle(page, 80); all.push(await page.evaluate(ORB)); }
     await scrollTo(page, 0); await page.waitForTimeout(150);
-    const rmH = await page.evaluate(() => ({ val: document.querySelector('.hero-val').textContent, clip: document.querySelector('.hero-curve').style.clipPath, mask: document.querySelector('.hero-donut').style.maskImage, nums: [...document.querySelectorAll('.ip-num')].map(n => n.textContent).join(), fill: document.querySelector('.ip-fill').style.transform }));
-    ok(`${engine} · K movimiento reducido: hero e Intelligence con sus valores finales directamente`, rmH.val === '186.055,38\u00a0US$' && !rmH.clip && !rmH.mask && rmH.nums === '69,29,22,18,31' && !rmH.fill, rmH);
+    const rmH = await page.evaluate(() => ({ val: document.querySelector('.hero-val').textContent, clip: document.querySelector('.hero-curve').style.clipPath, mask: document.querySelector('.hero-donut').style.maskImage }));
+    ok(`${engine} · K movimiento reducido: hero con sus valores finales directamente`, rmH.val === '186.055,38\u00a0US$' && !rmH.clip && !rmH.mask, rmH);
+    await page.locator('[data-iv2-toggle][data-q="2"]:visible').scrollIntoViewIfNeeded(); await page.locator('[data-iv2-toggle][data-q="2"]:visible').click(); await page.waitForTimeout(30);
+    const rmI = await page.evaluate(() => { const o = document.querySelector('.iv2-shot .iv2-open[data-q="2"]'); const cs = getComputedStyle(o); const a = document.getElementById('iv2dA2');
+      const fg = document.querySelector('.iv2-arc-fg'), fcs = getComputedStyle(fg); return { op: cs.opacity, tr: cs.transitionDuration, ans: !a.hidden, armed: fg.classList.contains('is-armed'), off: parseFloat(fcs.strokeDashoffset),
+        want: 326.726 * (1 - parseFloat(getComputedStyle(document.querySelector('.iv2-arc')).getPropertyValue('--iv2-arc-frac'))) }; });
+    ok(`${engine} · K movimiento reducido: las preguntas funcionan y la card cambia sin transición`, rmI.op === '1' && /^0s(, 0s)*$/.test(rmI.tr) && rmI.ans, rmI);
+    ok(`${engine} · K movimiento reducido: arco de Salud con su valor final, sin animación`, !rmI.armed && Math.abs(rmI.off - rmI.want) < 0.6, rmI);
     ok(`${engine} · K movimiento reducido: sin animación y estática en su hueco`, an.every(a => a === 'none') && all.every(s => Math.abs(s.dx) < 0.5 && Math.abs(s.dy) < 0.5), { an, moved: all.filter(s => Math.abs(s.dx) >= 0.5).length });
     await ctx.close(); }
   // K · sin JS: legible y navegable
   { const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false }); const page = await ctx.newPage();
     await page.goto(BASE, { waitUntil: 'load' });
     const r = await page.evaluate(() => ({ hidden: [...document.querySelectorAll('.reveal')].filter(e => getComputedStyle(e).opacity !== '1').length,
-      head: document.querySelector('.ip-head').textContent, hero: document.querySelector('.hero-visual img').currentSrc.split('/').pop(),
-      hot: document.querySelector('.hero-hotspot').getAttribute('href'), rows: document.querySelectorAll('.ip-row').length,
+      hero: document.querySelector('.hero-visual img').currentSrc.split('/').pop(),
+      hot: document.querySelector('.hero-hotspot').getAttribute('href'),
+      iv2: document.querySelector('.iv2-base').currentSrc.split('/').pop(),
+      iv2Q: [...document.querySelectorAll('[data-iv2-toggle]')].filter(b => b.offsetParent !== null).length, iv2Ans: [...document.querySelectorAll('.iv2-ans')].every(a => a.hidden),
+      stat: [...document.querySelectorAll('.iv2-static-item')].filter(e => e.offsetParent !== null).map(e => e.innerText.replace(/\s+/g, ' ').trim()),
+      otherBtns: [...document.querySelectorAll('button:not([data-iv2-toggle])')].filter(b => !b.hidden).length,
+      orb: document.querySelectorAll('.iv2-shot .lp-orb').length,
       val: document.querySelector('.hero-val').textContent, valVis: getComputedStyle(document.querySelector('.hero-val')).visibility, clip: getComputedStyle(document.querySelector('.hero-curve')).clipPath,
-      nums: [...document.querySelectorAll('.ip-num')].map(n => n.textContent).join() }));
-    ok(`${engine} · K sin JS: nada oculto, panel, hero EN completo (cifra, curva) y enlace a Intelligence`, r.hidden === 0 && r.head === EXPECT.en.head && /hero-dashboard-v4-base-m-en/.test(r.hero) && r.hot === '#intelligence' && r.rows === 4
-      && r.val === '$186,055.38' && r.valVis === 'visible' && (r.clip === 'none' || r.clip === '') && r.nums === '69,29,22,18,31', r);
+    }));
+    ok(`${engine} · K sin JS: nada oculto, hero EN completo (cifra, curva) y enlace a Intelligence`, r.hidden === 0 && /hero-dashboard-v4-base-m-en/.test(r.hero) && r.hot === '#intelligence'
+      && r.val === '$186,055.38' && r.valVis === 'visible' && (r.clip === 'none' || r.clip === ''), r);
+    ok(`${engine} · K sin JS: Intelligence real, esfera en su hueco, sin el control añadido y con los demás botones`, /intelligence-v2-m-head-en/.test(r.iv2) && r.iv2Q === 0 && r.iv2Ans === true && r.otherBtns > 0 && r.orb === 1, r);
+    ok(`${engine} · K sin JS: las tres preguntas con su respuesta, en texto`, r.stat.length === 3 && EXPECT.en.qs.every((x, k) => r.stat[k] === [x.q, ...x.a].join(' ')), r.stat);
     await ctx.close(); }
   await browser.close();
 }

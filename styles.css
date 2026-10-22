@@ -25120,6 +25120,12 @@ body.aurix-premium-lock{ overflow:hidden; }
   border-color:rgba(77,141,255,.72);
   box-shadow:0 0 40px rgba(77,141,255,.18), inset 0 1px 0 rgba(125,184,255,.10);
 }
+/* La modalidad elegida en la landing (`plan=annual|monthly`): un anillo de acento sobre su tarjeta.
+   No cambia el orden ni el destacado del anual; sólo dice «esta es la que elegiste». */
+.aurix-premium-plan.is-chosen{
+  border-color:rgba(125,184,255,.95);
+  box-shadow:0 0 0 2px rgba(77,141,255,.55), 0 0 40px rgba(77,141,255,.22);
+}
 .aurix-premium-plans.is-managed,
 .aurix-premium-plans.is-empty{ grid-template-columns:1fr; }
 .aurix-premium-plans.is-empty .aurix-premium-plan-note{ margin:0; text-align:center; }

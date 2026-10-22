@@ -615,8 +615,11 @@ ok('M.3 Intelligence ya no publica el score heredado: publica SALUD V2',
 ok('M.4 …y el score heredado sigue INTACTO para Dashboard/Workspace (cero regresión)',
   /function _aurixHealthScore\(snap\)/.test(src)
   && (src.match(/_aurixHealthScore\(/g) || []).length >= 4);
-ok('M.5 un solo tono para el índice: no vuelve a ser una escalera verde→roja',
-  /tone:\s*'neutral'/.test(hsFn) && !/_intccScoreTone\(/.test(hsFn));
+// RE-DECIDIDO (founder, 2026-10-22): el anillo vuelve a la escalera INT.2Z, pero SÓLO en los
+// estados que juzgan; el resto sigue neutro. Lo que no puede volver es una escalera sin estado.
+ok('M.5 el tono sale de la escalera INT.2Z sólo para estados con juicio; si no, neutro',
+  /scoreTone\(h\.ring\)/.test(hsFn) && /TONED_STATES\.includes\(h\.state\)/.test(hsFn) && /:\s*'neutral'/.test(hsFn)
+  && /s >= 80 \? 'green' : s >= 60 \? 'lime' : s >= 40 \? 'amber' : s >= 20 \? 'orange' : 'red'/.test(hsFn));
 ok('M.6 el chip «A vigilar» deja de depender de un score retirado',
   !/score\.score/.test(bare(fnSrc('_intv5Chips'))));
 const radarFn = bare(fnSrc('_intv7RadarHtml'));

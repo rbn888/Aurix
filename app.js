@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '820'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '821'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4364,7 +4364,7 @@ async function initPortfolioData(userId) {
 // button (app.js:22401) depends on it.
 
 async function signOut() {
-  try { sessionStorage.removeItem('aurix_intent'); } catch (_) {}   // la intención Premium no pasa a otra cuenta
+  try { sessionStorage.removeItem('aurix_intent'); sessionStorage.removeItem('aurix_intent_plan'); } catch (_) {}   // la intención Premium (y su modalidad) no pasa a otra cuenta
   _explicitSignOut = true;   // SPEC POST-LOGIN-BOUNCE.03 — mark so the listener force-redirects (no guard)
   await supabaseClient.auth.signOut();
 }
@@ -6586,7 +6586,7 @@ const T = {
     // interpolan en frases ("tu exposición a la cripto"), y como rótulo suelto de
     // una barra se leían mal ("la cripto 39%").
     // ── SPEC INT.06 ────────────────────────────────────────────────────────────
-    intv6_r_effective_days: n => `los últimos ${n} ${n === 1 ? 'día' : 'días'} registrados`,
+    intv6_r_effective_days: n => n === 1 ? 'el último día registrado' : `los últimos ${n} días registrados`,
     intv6_comp_title: 'Composición',
     intv6_comp_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
     intv6_comp_single: 'Todo tu patrimonio invertible está en una sola clase de activo.',
@@ -10014,7 +10014,7 @@ const T = {
     intv5_structure_pending: 'Aurix needs to be able to value every position before it can measure your effective diversification.',
     // Standalone bar labels (the sentence forms carry articles in Spanish).
     // SPEC INT.06
-    intv6_r_effective_days: n => `the last ${n} recorded ${n === 1 ? 'day' : 'days'}`,
+    intv6_r_effective_days: n => n === 1 ? 'the last recorded day' : `the last ${n} recorded days`,
     intv6_comp_title: 'Composition',
     intv6_comp_legend: 'Weight of each asset class in your investable wealth.',
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
@@ -69017,7 +69017,19 @@ function _intccHealthLimiters(h) {
   });
   return out;
 }
+// ── SALUD · COLOR SEMÁNTICO (decisión del founder, 2026-10-22) ─────────────
+// RE-DECIDE el «un solo tono institucional» de 49b8618: el anillo vuelve a la
+// escalera INT.2Z que ya existía (CSS `is-tone-*` intacto): rojo en valores muy
+// bajos → naranja → ámbar → lima → verde. CERO umbrales nuevos: son los de INT.2Z,
+// y sus cortes 40/60 coinciden con las bandas de `_aurixIntelHealth`, así que el
+// color nunca contradice al estado. Sólo se colorea un estado que JUZGA (débil,
+// a vigilar, estable, equilibrada); «dos posiciones», «no medible» y «sin
+// posiciones» siguen neutros: ahí no hay juicio que el color pueda afirmar.
+// La puntuación, las bandas y el texto no cambian; el color no es el único indicador.
+// (Vive DENTRO de `_intccHealthScore`: los gates la extraen sola.)
 function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-unused-vars
+  const TONED_STATES = ['single_position', 'weight_in_few', 'weight_uneven', 'weight_spread'];
+  const scoreTone = (s) => (s >= 80 ? 'green' : s >= 60 ? 'lime' : s >= 40 ? 'amber' : s >= 20 ? 'orange' : 'red');
   // SPEC AURIX INTELLIGENCE · FASE 6 — ESTA SUPERFICIE YA NO PUBLICA UN «HEALTH 0–100».
   //
   // La revisión financiera lo declaró NOT COMPUTABLE, y no por falta de pulido:
@@ -69110,7 +69122,7 @@ function _intccHealthScore(snap, drivers, intel) {   // eslint-disable-line no-u
   return {
     score:   h.ringPublishable ? h.ring : null,
     band:    h.state,
-    tone:    'neutral',
+    tone:    (h.ringPublishable && Number.isFinite(h.ring) && TONED_STATES.includes(h.state)) ? scoreTone(h.ring) : 'neutral',
     metric:  h.metric,
     // `components` y `explain` SIGUEN publicándose: la metodología no se retira, se
     // retira su DISCLOSURE. Al abrirlo, la columna de Salud se expandía en
@@ -91005,13 +91017,15 @@ function _aurixPremiumIntentTryConsume(reason) {
     if (v !== 'premium') return false;
     if (!(typeof currentUser !== 'undefined' && currentUser && currentUser.id)) return false;
     if (!_aurixEntLoaded()) return false;
-    if (hasAurixPremiumAccess()) { try { sessionStorage.removeItem('aurix_intent'); } catch (_) {} return false; }
+    if (hasAurixPremiumAccess()) { try { sessionStorage.removeItem('aurix_intent'); sessionStorage.removeItem('aurix_intent_plan'); } catch (_) {} return false; }
     if (!_aurixOnbSettled) return false;
     const bc = document.body && document.body.classList;
     if (!bc || bc.contains('modal-open') || bc.contains('aurix-premium-lock')) return false;
-    try { sessionStorage.removeItem('aurix_intent'); } catch (_) {}
+    // La modalidad elegida en la landing (si la hay) sólo RESALTA su tarjeta: nunca inicia el cobro.
+    let plan = null; try { plan = sessionStorage.getItem('aurix_intent_plan'); } catch (_) {}
+    try { sessionStorage.removeItem('aurix_intent'); sessionStorage.removeItem('aurix_intent_plan'); } catch (_) {}
     if (typeof window.openAurixPremiumModal !== 'function') return false;
-    window.openAurixPremiumModal({ source: 'landing-premium' });
+    window.openAurixPremiumModal({ source: 'landing-premium', plan: (plan === 'year' || plan === 'month') ? plan : null });
     if (IS_DEV) console.log('[PREMIUM-INTENT] consumed', reason);
     return true;
   } catch (_) { return false; }
@@ -91220,6 +91234,8 @@ try {
   // Los precios NO viven aquí: se leen de `public.billing_prices`, la misma fila
   // que cobra Stripe. Sin catálogo no se ofrece comprar.
   let _open = false, _lastSource = null, _trigger = null, _el = null;
+  // Modalidad elegida en la landing (`year`|`month`): sólo resalta su tarjeta y recibe el foco. Vive lo que el modal.
+  let _chosenPlan = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const log = (action, extra) => { try { console.log('[premium-modal]', Object.assign({ action, source: _lastSource }, extra || {})); } catch (_) {} };
 
@@ -91276,8 +91292,9 @@ try {
     const isYear = row.billing_interval === 'year';
     const saving = isYear ? _aurixBillingAnnualSaving() : null;
     const per = isYear ? t('pw_per_year') : t('pw_per_month');
+    const chosen = _chosenPlan === row.billing_interval;
     return `
-      <div class="aurix-premium-plan aurix-premium-standard${featured ? ' is-featured' : ''}">
+      <div class="aurix-premium-plan aurix-premium-standard${featured ? ' is-featured' : ''}${chosen ? ' is-chosen' : ''}"${chosen ? ' data-plan-chosen="1"' : ''}>
         <h3 class="aurix-premium-plan-title">${esc(isYear ? t('pw_annual') : t('pw_monthly'))}</h3>
         <div class="aurix-premium-price">
           <span class="aurix-premium-price-amount">${esc(_aurixBillingMoney(row.amount_cents, row.currency))}</span>
@@ -91398,7 +91415,7 @@ try {
   }
   // Tras repintar por un reintento, el foco va al primer plan (o al cierre): el nodo pulsado ya no existe.
   function _focusCloseIn(root) {
-    const b = root && (root.querySelector('[data-premium-buy]') || root.querySelector('[data-premium-retry]') || root.querySelector('.aurix-premium-close'));
+    const b = root && (root.querySelector('.is-chosen [data-premium-buy]') || root.querySelector('[data-premium-buy]') || root.querySelector('[data-premium-retry]') || root.querySelector('.aurix-premium-close'));
     if (b) { try { b.focus(); } catch (_) {} }
   }
   function _ctaRelease(btn) {
@@ -91459,6 +91476,7 @@ try {
   function openAurixPremiumModal(options) {
     options = options || {};
     _lastSource = options.source || 'unknown';
+    _chosenPlan = (options.plan === 'year' || options.plan === 'month') ? options.plan : null;
     log('open');
     // M.05 — la apertura del paywall es el eslabón que faltaba del embudo: sin él no
     // se puede saber qué superficie trae gente aquí ni cuánta se queda en la puerta.
@@ -91477,7 +91495,7 @@ try {
     // pintar el estado "todavía no disponible" y repintarse al llegar el
     // catálogo. Nunca al revés: no hay importe por defecto en el bundle.
     const _focusClose = () => {
-      const b = _el && _el.querySelector('.aurix-premium-close');
+      const b = _el && (_el.querySelector('.is-chosen [data-premium-buy]') || _el.querySelector('.aurix-premium-close'));
       if (b) { try { b.focus(); } catch (_) {} }
     };
     try {
@@ -91505,6 +91523,7 @@ try {
   function closeAurixPremiumModal() {
     if (!_el || !_open) return;
     _open = false;
+    _chosenPlan = null;
     _el.classList.remove('is-open');
     document.body.classList.remove('aurix-premium-lock');
     log('close');
@@ -91526,7 +91545,7 @@ try {
   // tres CTA que ya no existen). Ahora refleja el paywall real: qué precios ha
   // podido leer del catálogo, no un cupo inventado.
   window.debugAurixPremiumModal = () => ({
-    installed: true, isOpen: _open, lastSource: _lastSource,
+    installed: true, isOpen: _open, lastSource: _lastSource, chosenPlan: _chosenPlan,
     catalogLoaded: !!(typeof _aurixBillingPrices !== 'undefined' && _aurixBillingPrices.loaded),
     intervalsAvailable: (typeof _aurixBillingPrices !== 'undefined' ? (_aurixBillingPrices.rows || []) : [])
       .map(r => r.billing_interval).sort(),

@@ -8,6 +8,8 @@
  * una recarga, volver al Dashboard u otra pestaña no los reabren; un Premium no los ve; un CTA
  * gratuito posterior borra la intención; cerrar sesión la borra. Y los cuatro estados del catálogo:
  * comprobando (sin botón de compra), disponible (CTA por plan), no disponible y error con reintento.
+ * Modalidad (`plan=annual|monthly`, docs/AURIX-LANDING-INTELLIGENCE-PREMIUM-SPEC.md): sobrevive al acceso y al OTP,
+ * resalta su tarjeta y recibe el foco, se consume con la intención, se sustituye y se borra; nunca compra.
  */
 const O = String(process.env.AURIX_DEMO_URL || 'http://127.0.0.1:8774/').replace(/\/?$/, '/');
 const PW = process.env.AURIX_PW || '/tmp/aurix-pw/node_modules/playwright/index.mjs';
@@ -164,6 +166,81 @@ for (const [ENG, L] of [['CR', chromium], ['WK', webkit]].filter(e => (process.e
         return document.querySelectorAll('[data-premium-buy]').length;
       });
       ok('reintento · recupera los planes', rt === 2, String(rt));
+      await ctx.close(); }
+
+    // 6 · MODALIDAD ELEGIDA EN LA LANDING (`plan=annual|monthly`): sobrevive al acceso y al OTP (incluida una
+    // entrada a login SIN parámetros dentro del mismo recorrido), resalta su tarjeta, recibe el foco, se consume
+    // con la intención, una elección nueva la sustituye y el CTA gratuito la borra entera. Nunca compra sola.
+    const planOf = p => p.evaluate(() => { try { return sessionStorage.getItem('aurix_intent_plan'); } catch (_) { return 'ERR'; } });
+    const chosen = p => p.evaluate(() => { const c = document.querySelector('.aurix-premium-plan.is-chosen [data-premium-buy]');
+      return { iv: c ? c.getAttribute('data-premium-buy') : null, n: document.querySelectorAll('.aurix-premium-plan.is-chosen').length,
+        focus: !!c && document.activeElement === c, busy: [...document.querySelectorAll('[data-premium-buy]')].some(x => x.disabled),
+        dbg: window.debugAurixPremiumModal ? window.debugAurixPremiumModal().chosenPlan : 'NA' }; });
+    for (const [plan, iv, entry] of [['monthly', 'month', 'index'], ['annual', 'year', 'login']])
+    { const ctx = await b.newContext({ viewport: vp }); const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+      const checkout = []; p.on('request', r => { if (/billing\/checkout|checkout\.stripe/.test(r.url())) checkout.push(r.url()); });
+      await p.goto(O + 'demo.html'); await p.check('input[value="free"]'); await p.click('[data-demo=onboarding]'); await p.waitForURL(/login/);
+      // Elección explícita en la landing; luego una vuelta a login SIN parámetros (recarga del acceso) antes del OTP.
+      await p.goto(O + 'login.html?lang=es&intent=premium&plan=' + plan); await p.waitForTimeout(400);
+      ok(`plan ${plan} · el parámetro sale de la URL`, !/plan=|intent=/.test(p.url()), p.url());
+      await p.goto(O + 'login.html'); await p.waitForTimeout(400);
+      ok(`plan ${plan} · una entrada a login sin parámetros NO borra la elección`, (await planOf(p)) === iv && (await intent(p)) === 'premium', String(await planOf(p)));
+      await login(p, 'plan' + plan + VW + ENG + '@aurix.invalid', '', entry === 'index' ? 'index' : 'login');
+      ok(`plan ${plan} · la elección sobrevive al OTP`, (await planOf(p)) === iv || (await pwOpen(p)), String(await planOf(p)));
+      await p.waitForSelector('#onbSkipBtn', { state: 'visible', timeout: 12000 }).catch(() => {});
+      if (await p.locator('#onbSkipBtn').isVisible().catch(() => false)) await p.click('#onbSkipBtn');
+      await p.waitForTimeout(1500);
+      const c = await chosen(p);
+      ok(`plan ${plan} · los planes se abren con «${iv}» resaltado (una sola tarjeta) y el foco en su botón`, (await pwOpen(p)) && c.iv === iv && c.n === 1 && c.focus && c.dbg === iv, JSON.stringify(c));
+      ok(`plan ${plan} · intención y modalidad consumidas`, (await intent(p)) === null && (await planOf(p)) === null, String(await planOf(p)));
+      ok(`plan ${plan} · no se inicia ningún cobro`, !c.busy && checkout.length === 0, checkout.join(' '));
+      // Refresco del catálogo con el modal abierto: el resaltado y el foco se conservan.
+      // Se abre con el catálogo «comprobando» y se deja que llegue: el repintado conserva resaltado y foco.
+      await p.evaluate(() => { closeAurixPremiumModal(); }); await p.waitForTimeout(300);
+      await p.evaluate((iv) => { _aurixBillingPrices = { loaded: false, loading: false, error: null, rows: [], fetchedAt: 0 }; openAurixPremiumModal({ source: 'probe', plan: iv }); }, iv);
+      await p.waitForTimeout(2000);
+      const c2 = await chosen(p);
+      ok(`plan ${plan} · tras el refresco de precios sigue resaltado y con el foco`, c2.iv === iv && c2.n === 1 && c2.focus, JSON.stringify(c2));
+      await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+      await p.evaluate(() => openAurixPremiumModal({ source: 'probe' })); await p.waitForTimeout(600);
+      const c3 = await chosen(p);
+      ok(`plan ${plan} · cerrar olvida la modalidad (una apertura posterior sin plan no resalta nada)`, c3.n === 0 && c3.dbg === null, JSON.stringify(c3));
+      await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+      await p.reload(); await p.waitForTimeout(4000);
+      ok(`plan ${plan} · una recarga no reabre los planes`, !(await pwOpen(p)));
+      ok(`plan ${plan} · sin errores de página`, errs.length === 0, errs.slice(0, 2).join(' | '));
+      await ctx.close(); }
+
+    // 6b · Sustitución y CTA gratuito, en el acceso SIN sesión (nada consume la intención mientras tanto).
+    { const ctx = await b.newContext({ viewport: vp }); const p = await ctx.newPage();
+      await p.goto(O + 'login.html?lang=es&intent=premium&plan=monthly'); await p.goto(O + 'login.html?lang=es&intent=premium&plan=annual');
+      ok('sustitución · una elección nueva reemplaza a la anterior', (await planOf(p)) === 'year', String(await planOf(p)));
+      await p.goto(O + 'login.html?lang=es&intent=premium');
+      ok('sustitución · Premium sin modalidad borra la modalidad anterior', (await planOf(p)) === null && (await intent(p)) === 'premium', String(await planOf(p)));
+      await p.goto(O + 'login.html?lang=es&intent=premium&plan=weekly');
+      ok('plan inválido · no se guarda', (await planOf(p)) === null, String(await planOf(p)));
+      await p.goto(O + 'login.html?lang=es&intent=premium&plan=monthly'); await p.goto(O + 'login.html?lang=es');
+      ok('CTA gratuito · borra la intención Premium COMPLETA', (await planOf(p)) === null && (await intent(p)) === null, String(await planOf(p)) + '/' + String(await intent(p)));
+      await p.goto(O + 'index.html?lang=es&intent=premium&plan=monthly'); await p.waitForURL(/login/, { timeout: 15000 }).catch(() => {});
+      ok('entrada por la raíz sin sesión · la modalidad llega al acceso', (await planOf(p)) === 'month' && (await intent(p)) === 'premium', String(await planOf(p)));
+      await ctx.close(); }
+    // 6b' · Free con sesión: plan inválido y cierre de sesión.
+    { const ctx = await b.newContext({ viewport: vp }); const p = await ctx.newPage();
+      await p.goto(O + 'demo.html'); await p.check('input[value="free"]'); await p.click('[data-demo=wealth]'); await p.waitForURL(/index\.html/); await p.waitForTimeout(3500);
+      await p.goto(O + 'index.html?lang=es&intent=premium&plan=weekly'); await p.waitForTimeout(4500);
+      const ci = await chosen(p);
+      ok('plan inválido · los planes se abren sin tarjeta resaltada', (await pwOpen(p)) && ci.n === 0, JSON.stringify(ci));
+      await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+      await p.evaluate(() => { sessionStorage.setItem('aurix_intent', 'premium'); sessionStorage.setItem('aurix_intent_plan', 'month'); });
+      await p.evaluate(() => signOut().catch(() => {})); await p.waitForTimeout(1500);
+      ok('cerrar sesión · borra intención y modalidad', (await intent(p).catch(() => null)) === null && (await planOf(p).catch(() => null)) === null);
+      await ctx.close(); }
+
+    // 6c · Premium con una modalidad elegida: se descartan las dos claves y no se ofrece nada.
+    { const ctx = await b.newContext({ viewport: vp }); const p = await ctx.newPage();
+      await p.goto(O + 'demo.html'); await p.check('input[value="premium"]'); await p.click('[data-demo=wealth]'); await p.waitForURL(/index\.html/); await p.waitForTimeout(3000);
+      await p.goto(O + 'index.html?lang=en&intent=premium&plan=annual'); await p.waitForTimeout(4500);
+      ok('Premium con modalidad · no se le ofrecen planes y se descartan las dos claves', !(await pwOpen(p)) && (await intent(p)) === null && (await planOf(p)) === null);
       await ctx.close(); }
 
     // 5 · Tarjetas Free: con cartera vacía ceden el sitio; con datos, dos tarjetas hermanas.
