@@ -55,7 +55,7 @@ const EXPECT = {
         h1b: 'Decide con más información.', sub: 'Reúne tus inversiones en un solo lugar y descubre qué está pasando con tu dinero.',
         qs: [{ q: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?', a: ['Repartes entre 4 clases de inversión, pero no tanto entre posiciones: el peso sigue recayendo en tus tres mayores inversiones.', 'Clases: Acciones, Cripto, Fondos/ETF y Metales. Tres mayores: Microsoft, Bitcoin y Apple.'] },
              { q: '¿Qué parte de mi cartera está entre Acciones y Cripto?', a: ['Acciones y Cripto reúnen hoy el 92% de tu cartera financiera.', 'Acciones, 51%; Cripto, 41%.'] },
-             { q: '¿Cuánto han rendido realmente mis inversiones?', a: ['El rendimiento de tu cartera financiera fue del 0,19% en el último día registrado'] }],
+             { q: '¿Qué margen tengo para afrontar imprevistos o nuevas oportunidades?', a: ['Mantienes un 7 % en liquidez. Revisa si este margen cubre tus necesidades previstas y posibles imprevistos'] }],   // editorial (autorizada)
         radar: 'Historial analizado: 1 día', login: 'Entrar',
         year: '69,99\u00a0€', month: '7,99\u00a0€', ctaY: 'Elegir anual', ctaM: 'Elegir mensual' },
   en: { head: 'Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.', stat: 'Your 3 largest investments hold 69% of your financial portfolio.',
@@ -65,7 +65,7 @@ const EXPECT = {
         h1b: 'Make better\u2011informed decisions.', sub: 'Bring your investments together in one place and see what’s happening with your money.',
         qs: [{ q: 'Am I spread across several investment classes, or do I still depend on a few investments?', a: ['You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.', 'Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.'] },
              { q: 'How much of my portfolio is in Stocks and Crypto?', a: ['Stocks and Crypto together hold 92% of your financial portfolio today.', 'Stocks, 51%; Crypto, 41%.'] },
-             { q: 'How much have my investments actually returned?', a: ['The return of your financial portfolio was 0.19% over the last recorded day'] }],
+             { q: 'How much room do I have for unexpected expenses or new opportunities?', a: ['You hold 7% in cash. Check whether this covers your expected needs and unexpected expenses.'] }],   // editorial (autorizada)
         radar: 'History analysed: 1 day', login: 'Log in',
         year: '€69.99', month: '€7.99', ctaY: 'Choose annual', ctaM: 'Choose monthly' },
 };

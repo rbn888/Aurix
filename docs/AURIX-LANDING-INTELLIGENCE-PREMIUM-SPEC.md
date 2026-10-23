@@ -254,3 +254,19 @@ cambiar límites ni comprobaciones.
 - Tercera pregunta de la demo: SIN CAMBIOS. La lectura de liquidez se descartó: el producto la excluye de Explora a
   propósito (`q_liquidity` en su variante de definición) y la cartera de demo no tiene deriva de liquidez medida.
 - Cache-bust: `?v=lp-commercial-9`. App sin cambios (v861).
+
+---
+
+## 10. TERCERA PREGUNTA · ADAPTACIÓN EDITORIAL (2026-10-23)
+
+Autorizada por dirección como adaptación editorial de la demostración comercial (no es una lectura literal de
+Explora, que excluye a propósito la definición de liquidez):
+- ES «¿Qué margen tengo para afrontar imprevistos o nuevas oportunidades?» → «Mantienes un 7 % en liquidez. Revisa
+  si este margen cubre tus necesidades previstas y posibles imprevistos».
+- EN «How much room do I have for unexpected expenses or new opportunities?» → «You hold 7% in cash. Check whether
+  this covers your expected needs and unexpected expenses.»
+El 7 % es la liquidez de la cartera de demo según el motor (7,16 %), redondeada; `--intel-v2` lo exige. La
+sustitución se hace en la página de captura DESPUÉS de comprobar el motor (que sigue verificando su pregunta real);
+sólo cambian las 12 imágenes que muestran esa pregunta (base y card abierta, escritorio 1x/2x y móvil, ES/EN), las
+claves `lp.iv2.q3`/`lp.iv2.a3_1` y el `alt` de la card móvil. Geometría, cartera, app y motor sin cambios.
+Cache-bust: `?v=lp-commercial-10`.

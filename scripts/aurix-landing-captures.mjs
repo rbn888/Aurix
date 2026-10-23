@@ -167,6 +167,16 @@ const INTEL_V2 = {
     tags: ['Stocks: 51% of your portfolio', 'Bitcoin: +1.2% · 24 h'] },
   days: 1,
   health: { score: 33, tone: 'orange' },
+  // ADAPTACIÓN EDITORIAL AUTORIZADA (dirección, 2026-10-23) de la 3.ª pregunta de la demostración. NO es una lectura
+  // literal de Explora: se sustituye en la captura DESPUÉS de comprobar el motor (que sigue verificando su pregunta
+  // real). El 7 % es la liquidez de la cartera de demo según el motor (7,16 %), redondeada; el script lo exige.
+  editorial: {
+    es: { q3: '¿Qué margen tengo para afrontar imprevistos o nuevas oportunidades?',
+          a3: 'Mantienes un 7 % en liquidez. Revisa si este margen cubre tus necesidades previstas y posibles imprevistos' },
+    en: { q3: 'How much room do I have for unexpected expenses or new opportunities?',
+          a3: 'You hold 7% in cash. Check whether this covers your expected needs and unexpected expenses.' },
+    cashPct: 7,
+  },
 };
 
 // ── Servidor local del repo (mismo parche de auth que las sondas de Intelligence) ──
@@ -395,6 +405,22 @@ async function intelV2Check(page, lang, w) {
   ok(`${T} · V2 Salud ${INTEL_V2.health.score} % · A vigilar, tono ${INTEL_V2.health.tone}`, w < 768 || (new RegExp('\\b' + INTEL_V2.health.score + '\\b').test(r.heroTxt) && /(A vigilar|Worth watching)/.test(r.heroTxt) && r.heroCls.includes('is-tone-' + INTEL_V2.health.tone)), r.heroCls + ' | ' + r.heroTxt.slice(0, 120));
   return r;
 }
+// Sustitución editorial de la 3.ª pregunta (texto de la etiqueta y de la respuesta) en la página de captura. Antes
+// exige que la liquidez del motor redondee al 7 % que afirma el texto.
+async function applyEditorial(page, lang) {
+  const ed = INTEL_V2.editorial[lang];
+  const r = await page.evaluate(([q3, a3]) => {
+    const btns = [...document.querySelectorAll('.intcc-explore .intcc-x-q')].filter(b => b.offsetParent !== null);
+    const b = btns[2]; if (!b) return { ok: false };
+    b.querySelector('.intcc-x-label').textContent = q3;
+    const a = document.getElementById(b.getAttribute('aria-controls')), ps = a ? a.querySelectorAll('p') : [];
+    if (ps[0]) ps[0].textContent = a3; for (let i = 1; i < ps.length; i++) ps[i].remove();
+    let cash = null; try { cash = _aurixHealthSnapshot().cashPct; } catch (_) {}
+    return { ok: true, cash };
+  }, [ed.q3, ed.a3]);
+  ok(`${lang} · V2 editorial: 3.ª pregunta sustituida y liquidez del motor ≈ ${INTEL_V2.editorial.cashPct} %`, r.ok && Math.round(r.cash) === INTEL_V2.editorial.cashPct, JSON.stringify(r));
+  await page.waitForTimeout(250);
+}
 // Arco de Salud: caja del SVG, color y fracción que pinta la app.
 const arcOf = page => page.evaluate(`(function(){ var s = document.querySelector('.intcc-hero .intcc-score-svg'), c = s && s.querySelector('.intcc-score-arc'); if (!c) return null;
   var r = s.getBoundingClientRect(), cs = getComputedStyle(c), da = parseFloat(c.getAttribute('stroke-dasharray')), off = parseFloat(c.getAttribute('stroke-dashoffset'));
@@ -454,6 +480,7 @@ async function intelV2(browser, write) {
       await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1800);
       await dismissContextQuestion(page);
       if (dpr === 1) await intelV2Check(page, lang, 1440);
+      await applyEditorial(page, lang);
       const orbR = await rectOf(page, '.intcc-hero-orb-wrap .intcc-orb'), arc = await arcOf(page);
       await style(page, '.intcc-orb{ visibility:hidden !important; } .intcc-hero .intcc-score-arc{ visibility:hidden !important; }');
       const r = await unionRect(page, ['.intcc-hero', '.intcc-radar', '.intcc-drivers', '.intcc-explore']);
@@ -490,6 +517,7 @@ async function intelV2(browser, write) {
       await page.evaluate(`switchTab('intelligence')`); await page.waitForTimeout(1800);
       await dismissContextQuestion(page);
       await intelV2Check(page, lang, 390);
+      await applyEditorial(page, lang);
       const order = await page.evaluate(`['.intcc-m-hero','.intcc-drivers','.intcc-explore'].map(function(s){ var e=[].slice.call(document.querySelectorAll(s)).find(function(x){ return x.offsetParent !== null; }); return e ? e.getBoundingClientRect().top + scrollY : null; })`);
       ok(`${lang} · V2 móvil: cabecera → Factores → Explora en ese orden`, order.every(Number.isFinite) && order[0] < order[1] && order[1] < order[2], JSON.stringify(order));
       const shot = async (sel, file) => { await page.evaluate(`document.querySelector('${sel}').scrollIntoView({ block: 'center' })`); await page.waitForTimeout(250);
