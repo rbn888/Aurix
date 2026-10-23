@@ -50,8 +50,8 @@ const VPS = [[360, 640], [375, 667], [390, 844], [412, 915], [430, 932], [768, 1
 const EXPECT = {
   es: { head: 'Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas.', stat: 'Tus 3 mayores inversiones reúnen el 69 % de tu cartera financiera.',
         h1: 'Comprende mejor tu patrimonio.', cap: '', hot: 'Salud: A vigilar · Ver análisis en AURIX Intelligence',
-        ta: 'Convierte tus inversiones en información,', tb: 'toma mejores decisiones desde hoy.', problem: 'Descubre qué riesgos podrías estar ignorando.',
-        lead: 'Obtén tu análisis al instante. Ahorra tiempo, descubre lo que importa',
+        ta: 'Convierte tus inversiones en información,', tb: 'toma mejores decisiones desde hoy.',
+        isub: 'Obtén tu análisis al instante y descubre qué riesgos podrías estar ignorando',
         h1b: 'Decide con más información.', sub: 'Reúne tus inversiones en un solo lugar y descubre qué está pasando con tu dinero.',
         qs: [{ q: '¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones?', a: ['Repartes entre 4 clases de inversión, pero no tanto entre posiciones: el peso sigue recayendo en tus tres mayores inversiones.', 'Clases: Acciones, Cripto, Fondos/ETF y Metales. Tres mayores: Microsoft, Bitcoin y Apple.'] },
              { q: '¿Qué parte de mi cartera está entre Acciones y Cripto?', a: ['Acciones y Cripto reúnen hoy el 92% de tu cartera financiera.', 'Acciones, 51%; Cripto, 41%.'] },
@@ -60,8 +60,8 @@ const EXPECT = {
         year: '69,99\u00a0€', month: '7,99\u00a0€', ctaY: 'Elegir anual', ctaM: 'Elegir mensual' },
   en: { head: 'Microsoft, Bitcoin and Apple outweigh your other 9 investments combined.', stat: 'Your 3 largest investments hold 69% of your financial portfolio.',
         h1: 'Understand your wealth better.', cap: 'Interface shown in Spanish', hot: 'Health: Worth watching · View analysis in AURIX Intelligence',
-        ta: 'Turn your investments into insights,', tb: 'make better-informed decisions today.', problem: 'Discover the risks you might be overlooking.',
-        lead: 'Get your analysis instantly. Save time, discover what matters.',
+        ta: 'Turn your investments into insights,', tb: 'make better-informed decisions today.',
+        isub: 'Get your analysis instantly and discover risks you might be ignoring.',
         h1b: 'Make better\u2011informed decisions.', sub: 'Bring your investments together in one place and see what’s happening with your money.',
         qs: [{ q: 'Am I spread across several investment classes, or do I still depend on a few investments?', a: ['You spread across 4 investment classes, but less so across positions: the weight still rests on your three largest investments.', 'Classes: Stocks, Crypto, ETF / Funds and Metals. Three largest: Microsoft, Bitcoin and Apple.'] },
              { q: 'How much of my portfolio is in Stocks and Crypto?', a: ['Stocks and Crypto together hold 92% of your financial portfolio today.', 'Stocks, 51%; Crypto, 41%.'] },
@@ -154,7 +154,7 @@ for (const engine of ['chromium', 'webkit']) {
             var qs=[].slice.call(document.querySelectorAll('[data-iv2-toggle]')).filter(vis);
             return { ta: norm(sp[0].textContent), tb: norm(sp[1].textContent), accent: getComputedStyle(sp[1]).color, white: getComputedStyle(sp[0]).color,
               brShown: getComputedStyle(br).display!=='none', lines: Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight)),
-              problem: norm(q('.iv2-problem').textContent), lead: norm(q('#intelligence .section-lead').textContent), fsProblem: fs('.iv2-problem'), fsLead: fs('#intelligence .section-lead'),
+              sub: norm(q('.iv2-sub').textContent), headPs: document.querySelectorAll('.intel-head p').length, fsSub: fs('.iv2-sub'),
               src: base.currentSrc.split('/').pop(), imgW: br0.width,
               orbN: document.querySelectorAll('.lp-orb').length, slot: { cx:(sr.left+sr.right)/2, cy:(sr.top+sr.bottom)/2, w: sr.width },
               want: { cx: br0.left + parseFloat(cs.getPropertyValue('--iv2-cx'))/100*br0.width, cy: br0.top + parseFloat(cs.getPropertyValue('--iv2-cy'))/100*br0.height,
@@ -204,11 +204,11 @@ for (const engine of ['chromium', 'webkit']) {
       ok(`${T} · P Premium arriba y Free debajo, en el mismo contenedor`, m.planOrder.premFirst && m.planOrder.sameCol, m.planOrder);
       // INTELLIGENCE V2 · copy aprobado literal, jerarquía y captura real con la esfera viva en su hueco.
       const V = m.iv2, desk = w >= 1024;
-      ok(`${T} · V2 copy aprobado literal (título, problema, beneficio)`, V.ta === E.ta && V.tb === E.tb && V.problem === E.problem && V.lead === E.lead, { ta: V.ta, tb: V.tb, problem: V.problem, lead: V.lead });
+      ok(`${T} · V2 copy aprobado literal (título y una sola frase bajo él)`, V.ta === E.ta && V.tb === E.tb && V.sub === E.isub && V.headPs === 1, { ta: V.ta, tb: V.tb, sub: V.sub, ps: V.headPs });
       ok(`${T} · V2 segunda parte del título en azul, primera en blanco`, V.accent !== V.white && /rgb\(125, 184, 255\)/.test(V.accent), { a: V.accent, w: V.white });
       ok(`${T} · V2 salto tras la coma sólo desde 768 px`, V.brShown === (w >= 768), V.brShown);
       if (desk) ok(`${T} · V2 escritorio: título en dos líneas (una por frase)`, V.lines === 2, V.lines);
-      ok(`${T} · V2 problema más presente que el beneficio`, V.fsProblem >= V.fsLead && V.fsProblem >= 17, { p: V.fsProblem, l: V.fsLead });
+      ok(`${T} · V2 frase bajo el título legible (≥17 px)`, V.fsSub >= 17, V.fsSub);
       ok(`${T} · V2 captura del idioma activo (${desk ? 'escritorio' : 'móvil real'})`, new RegExp(desk ? `^intelligence-v2-${lang}(-2x)?\\.jpg$` : `^intelligence-v2-m-head-${lang}\\.jpg$`).test(V.src), V.src);
       ok(`${T} · V2 una sola esfera, centrada en el hueco de la captura (≤2 px) y a su tamaño (≤1 px)`, V.orbN === 1 && Math.abs(V.slot.cx - V.want.cx) <= 2 && Math.abs(V.slot.cy - V.want.cy) <= 2 && Math.abs(V.slot.w - V.want.w) <= 1, { slot: V.slot, want: V.want, n: V.orbN });
       ok(`${T} · V2 las tres preguntas de Explora como controles reales (nombre = pregunta del motor, ≥44 px, aria-expanded/aria-controls)`,
@@ -265,7 +265,7 @@ for (const engine of ['chromium', 'webkit']) {
         await page.evaluate(() => { history.replaceState(null, '', location.pathname + location.search); window.scrollTo(0, 0); });
       }
       // K · contraste y foco
-      const low = await page.evaluate(`(function(){ var C=${CONTRAST}; return ['.iv2-problem','#intelligence .section-lead','.plan-mode-name','.plan-mode-note','.shot-caption','.trust-item p','.hero-eyebrow','.benefit-item p']
+      const low = await page.evaluate(`(function(){ var C=${CONTRAST}; return ['.iv2-sub','.plan-mode-name','.plan-mode-note','.shot-caption','.trust-item p','.hero-eyebrow','.benefit-item p']
         .map(function(s){ var e=document.querySelector(s); if(!e||!e.textContent.trim()||getComputedStyle(e).display==='none') return null; var c=C(e); return c<4.5? s+':'+c.toFixed(2) : null; }).filter(Boolean); })()`);
       ok(`${T} · K contraste AA del texto secundario`, low.length === 0, low);
       if (w === 1440) {

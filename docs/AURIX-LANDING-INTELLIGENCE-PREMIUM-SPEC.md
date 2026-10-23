@@ -242,3 +242,15 @@ cambiar límites ni comprobaciones.
   sigue en el hero.
 - Cache-bust: `?v=lp-commercial-8`. App: 821 · login 498 · `v861-premium-plan-choice`.
 - Validación: probe de la landing 1457/1457 (Chromium + WebKit, ES/EN, 360–1440).
+
+---
+
+## 9. AJUSTE DE COPY (2026-10-23)
+
+- Bajo el título de Intelligence, UNA sola frase (sustituye a «Descubre qué riesgos…» + «Obtén tu análisis al
+  instante. Ahorra tiempo…»): ES «Obtén tu análisis al instante y descubre qué riesgos podrías estar ignorando» ·
+  EN «Get your analysis instantly and discover risks you might be ignoring.» (`lp.intel.sub`, estilo de la antigua
+  frase del problema). Se retiran `lp.intel.problem` y `lp.intel.lead.a/b/c`.
+- Tercera pregunta de la demo: SIN CAMBIOS. La lectura de liquidez se descartó: el producto la excluye de Explora a
+  propósito (`q_liquidity` en su variante de definición) y la cartera de demo no tiene deriva de liquidez medida.
+- Cache-bust: `?v=lp-commercial-9`. App sin cambios (v861).

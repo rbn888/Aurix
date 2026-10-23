@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=lp-commercial-8">
+  <link rel="stylesheet" href="styles.css?v=lp-commercial-9">
   <!-- V3 · animaciones de entrada: se arman antes del primer pintado. Sin movimiento reducido y sólo
        con JS; si app.js no llega a armarlas en 3 s, la página se queda en su estado final. -->
   <script>(function(d){try{if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;d.classList.add('lp-anim');setTimeout(function(){if(!d.classList.contains('lp-armed'))d.classList.add('lp-anim-off');},3000);}catch(e){}})(document.documentElement);</script>
@@ -139,8 +139,7 @@
         <div class="intel-head">
           <span class="eyebrow" data-i18n="lp.intel.eyebrow">AURIX Intelligence</span>
           <h2 class="section-title iv2-title"><span data-i18n="lp.intel.title.a">Turn your investments into insights,</span><br class="iv2-br"> <span class="iv2-accent" data-i18n="lp.intel.title.b">make better-informed decisions today.</span></h2>
-          <p class="iv2-problem" data-i18n="lp.intel.problem">Discover the risks you might be overlooking.</p>
-          <p class="section-lead iv2-lead"><span data-i18n="lp.intel.lead.a">Get your analysis instantly. </span><strong class="iv2-save" data-i18n="lp.intel.lead.b">Save time</strong><span data-i18n="lp.intel.lead.c">, discover what matters.</span></p>
+          <p class="iv2-problem iv2-sub" data-i18n="lp.intel.sub">Get your analysis instantly and discover risks you might be ignoring.</p>
         </div>
 
         <figure class="iv2" id="intelDemo">
@@ -399,6 +398,6 @@
   <!-- HOTFIX LANDING — the "Request Access" modal was removed with the Private Beta section
        (Aurix is now open to the public; the CTA is "Enter Aurix"). -->
 
-  <script src="app.js?v=lp-commercial-8"></script>
+  <script src="app.js?v=lp-commercial-9"></script>
 </body>
 </html>

@@ -548,10 +548,7 @@
   Object.assign(I18N.es, {
       'lp.intel.title.a': 'Convierte tus inversiones en información,',
       'lp.intel.title.b': 'toma mejores decisiones desde hoy.',
-      'lp.intel.problem': 'Descubre qué riesgos podrías estar ignorando.',
-      'lp.intel.lead.a': 'Obtén tu análisis al instante. ',
-      'lp.intel.lead.b': 'Ahorra tiempo',
-      'lp.intel.lead.c': ', descubre lo que importa',
+      'lp.intel.sub': 'Obtén tu análisis al instante y descubre qué riesgos podrías estar ignorando',
       'lp.iv2.alt': 'AURIX Intelligence con una cartera de demostración: Microsoft, Bitcoin y Apple pesan más que tus otras 9 inversiones juntas. Acciones: 51% de tu cartera. Bitcoin: +1,2% en 24 h.',
       'lp.iv2.alt.drivers': 'Factores principales: Microsoft 29%, Bitcoin 22%, Apple 18%. Tus 3 mayores inversiones reúnen el 69% de tu cartera financiera.',
       'lp.iv2.alt.explore': 'Explora tu patrimonio: ¿Estoy repartido entre varias clases o sigo dependiendo de pocas inversiones? ¿Qué parte de mi cartera está entre Acciones y Cripto? ¿Cuánto han rendido realmente mis inversiones?',
@@ -574,10 +571,7 @@
   Object.assign(I18N.en, {
       'lp.intel.title.a': 'Turn your investments into insights,',
       'lp.intel.title.b': 'make better-informed decisions today.',
-      'lp.intel.problem': 'Discover the risks you might be overlooking.',
-      'lp.intel.lead.a': 'Get your analysis instantly. ',
-      'lp.intel.lead.b': 'Save time',
-      'lp.intel.lead.c': ', discover what matters.',
+      'lp.intel.sub': 'Get your analysis instantly and discover risks you might be ignoring.',
       'lp.iv2.alt': 'AURIX Intelligence with a demo portfolio: Microsoft, Bitcoin and Apple outweigh your other 9 investments combined. Stocks: 51% of your portfolio. Bitcoin: +1.2% in 24 h.',
       'lp.iv2.alt.drivers': 'Key drivers: Microsoft 29%, Bitcoin 22%, Apple 18%. Your 3 largest investments hold 69% of your financial portfolio.',
       'lp.iv2.alt.explore': 'Explore your wealth: Am I spread across several investment classes, or do I still depend on a few investments? How much of my portfolio is in Stocks and Crypto? How much have my investments actually returned?',
