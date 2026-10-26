@@ -1,0 +1,9 @@
+{
+  "name": "aurix-landing",
+  "version": "1.0.0",
+  "description": "AURIX landing page with Vercel Web Analytics",
+  "private": true,
+  "dependencies": {
+    "@vercel/analytics": "^1.3.1"
+  }
+}
