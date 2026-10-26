@@ -9,7 +9,7 @@
   <meta name="description" content="Qué datos trata Aurix, para qué y quién interviene.">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <meta name="theme-color" content="#040507">
-  <link rel="stylesheet" href="legal.css?v=712">
+  <link rel="stylesheet" href="legal.css?v=713">
 </head>
 <body>
   <header class="lg-top">
@@ -28,26 +28,16 @@
     <div data-lang-block="es">
       <h1 class="lg-title">Política de privacidad</h1>
       <p class="lg-sub">Qué datos trata Aurix, para qué, y quién interviene.</p>
-
-      <aside class="lg-draft">
-        <b>BORRADOR · pendiente de revisión.</b> Este texto describe con exactitud
-        lo que el sistema hace hoy, verificado sobre el propio código. Lo que
-        todavía <b>no</b> está decidido aparece marcado como pendiente y
-        <b>no se ha inventado</b>: identidad del titular, base jurídica, plazos de
-        conservación y marco legal aplicable. Hasta que el titular lo revise y, si
-        procede, lo valide con asesoramiento legal, este documento no es un texto
-        jurídicamente aprobado.
-      </aside>
-      <p class="lg-updated">Última actualización del borrador: 8 de octubre de 2026</p>
+      <p class="lg-updated">Última actualización: 26 de octubre de 2026</p>
 
       <section class="lg-card">
-        <h2>1 · Quién trata tus datos</h2>
-        <p>Responsable del tratamiento: <span class="lg-todo">PENDIENTE: identidad y datos de contacto del titular</span>.</p>
+        <h2>1 · Responsable</h2>
+        <p>Los datos del responsable del tratamiento figuran en el <a href="legal-notice.html#titular" data-lg-link="legal-notice.html" data-lg-hash="titular">Aviso legal</a>.</p>
         <p>Canal de contacto para cualquier asunto de privacidad: <strong>aurixsystemofficial@gmail.com</strong>.</p>
       </section>
 
       <section class="lg-card">
-        <h2>2 · Qué datos hay en Aurix</h2>
+        <h2>2 · Datos que tratamos</h2>
         <h3>Los que nos das</h3>
         <ul>
           <li><strong>Tu correo electrónico.</strong> Es lo único que se pide para crear la cuenta y acceder.</li>
@@ -62,7 +52,7 @@
           <li><strong>Visitas por código de recomendación.</strong> Cuando alguien abre la web con un <code>?ref=</code>, se suma una visita a un contador por código y día. No guarda tu dirección IP, ni cookies, ni nada que te identifique.</li>
           <li><strong>Informes técnicos de error.</strong> Si algo falla, Aurix envía un informe <em>técnico</em> a sus propios registros: tipo de error, dónde ocurrió y navegador. Antes de salir del dispositivo se eliminan automáticamente correos, tokens de sesión e importes, y se limita a diez informes por visita. No incluye tu cartera.</li>
         </ul>
-        <p><strong>Lo que Aurix no tiene:</strong> no pedimos nombre, teléfono, dirección ni documento de identidad; no conectamos con tu banco ni con tu bróker; y <strong>no guardamos datos de tarjeta</strong> — no llegan a nuestros sistemas en ningún momento.</p>
+        <p><strong>Lo que Aurix no tiene:</strong> no pedimos nombre, teléfono, dirección ni documento de identidad; <strong>no conectamos con tu banco ni con tu bróker</strong> ni accedemos a tus cuentas bancarias; y <strong>no guardamos datos de tarjeta</strong>: no llegan a nuestros sistemas en ningún momento.</p>
       </section>
 
       <section class="lg-card">
@@ -76,46 +66,64 @@
           <li>Para <strong>detectar y corregir fallos</strong>, con los informes técnicos descritos arriba.</li>
         </ul>
         <p><strong>No hay publicidad, no hay perfilado comercial y no vendemos ni cedemos tus datos a terceros para sus propios fines.</strong></p>
-        <p>Base jurídica de cada tratamiento: <span class="lg-todo">PENDIENTE: determinación legal</span>.</p>
       </section>
 
       <section class="lg-card">
-        <h2>4 · Quién más interviene</h2>
+        <h2>4 · Proveedores</h2>
         <p>Aurix se apoya en proveedores para funcionar. Cada uno ve sólo lo que necesita:</p>
         <ul>
           <li><strong>Supabase</strong> — autenticación y base de datos: tu correo y los datos de tu cartera.</li>
-          <li><strong>Vercel</strong> — el servidor donde corren las funciones de Aurix (precios, cobro, registros técnicos).</li>
+          <li><strong>Vercel</strong> — el servidor donde corren las funciones de Aurix (precios, cobro, registros técnicos) y donde se aloja la web.</li>
           <li><strong>GitHub Pages</strong> — entrega de la aplicación al navegador (ficheros estáticos).</li>
-          <li><strong>Stripe</strong> — pagos y suscripciones. El pago se hace en Stripe, no en Aurix; los datos de tu tarjeta son suyos y nunca nuestros.</li>
+          <li><strong>Stripe</strong> — pagos y suscripciones. El pago se hace en Stripe, no en Aurix; los datos de tu tarjeta los trata Stripe y nunca llegan a Aurix.</li>
           <li><strong>Proveedores de datos de mercado</strong> (CoinGecko, GeckoTerminal, Twelve Data, Yahoo Finance) — cotizaciones. Aurix los consulta <em>desde su servidor</em>: no reciben quién eres ni qué tienes, sólo qué símbolos hay que cotizar.</li>
           <li><strong>jsDelivr, CoinGecko y Financial Modeling Prep</strong> — tu navegador descarga de ellos librerías y logotipos de activos, así que ven tu dirección IP como cualquier otra imagen de una web.</li>
           <li><strong>Google Fonts</strong> — la aplicación y la web descargan de Google la tipografía, así que Google ve tu dirección IP.</li>
           <li><strong>Resend</strong> — envío de los correos de Aurix (por ejemplo, el de bienvenida): recibe tu dirección de correo.</li>
         </ul>
-        <p>Ubicación de los servidores y transferencias internacionales: <span class="lg-todo">PENDIENTE: confirmar región de cada proveedor</span>.</p>
       </section>
 
       <section class="lg-card">
-        <h2>5 · Qué se guarda en tu dispositivo</h2>
+        <h2>5 · Transferencias internacionales</h2>
+        <p>Algunos de estos proveedores pueden tratar datos fuera del Espacio Económico Europeo. Cuando ocurre, se hace con las garantías que esos proveedores ponen a disposición conforme a la normativa aplicable. Puedes pedir más información escribiendo a <strong>aurixsystemofficial@gmail.com</strong>.</p>
+      </section>
+
+      <section class="lg-card">
+        <h2>6 · Seguridad</h2>
+        <ul>
+          <li>Se accede con un <strong>código de un solo uso</strong> enviado a tu correo: no hay contraseña que pueda filtrarse.</li>
+          <li>Las comunicaciones con Aurix viajan <strong>cifradas (HTTPS)</strong>.</li>
+          <li>En la base de datos, <strong>cada cuenta sólo puede leer y modificar sus propios datos</strong>.</li>
+          <li>Los informes técnicos de error se limpian de correos, tokens e importes antes de salir de tu dispositivo.</li>
+          <li>Al cerrar sesión, los datos del usuario anterior dejan de ser accesibles en ese dispositivo.</li>
+        </ul>
+      </section>
+
+      <section class="lg-card">
+        <h2>7 · Qué se guarda en tu dispositivo</h2>
         <p>Aurix guarda en el navegador tu sesión, tu idioma y divisa, y una copia de tu cartera para que la aplicación abra rápido y siga siendo legible sin conexión. <strong>No se usan cookies de publicidad ni de seguimiento de terceros.</strong></p>
         <p><strong>Código de recomendación — sólo con tu permiso.</strong> Si llegas a la web con un enlace de recomendación, te preguntamos si podemos recordarlo. Sólo si aceptas, se guarda en el almacenamiento local del navegador (<code>localStorage</code>) el código o códigos (hasta cinco) y la fecha en que los viste, durante un máximo de 30 días, para atribuir tu registro si te das de alta más tarde. No se guarda nada más. Si no aceptas, no se guarda nada en tu dispositivo y el código sólo viaja en el enlace hacia la aplicación durante esa visita. Puedes retirar el permiso borrando los datos de este sitio en tu navegador.</p>
-        <p>Al cerrar sesión, los datos del usuario anterior dejan de ser accesibles en ese dispositivo.</p>
       </section>
 
       <section class="lg-card">
-        <h2>6 · Cuánto tiempo</h2>
-        <p>Mientras tu cuenta exista. Plazos concretos de conservación tras la baja: <span class="lg-todo">PENDIENTE: decisión del titular</span>.</p>
+        <h2>8 · Conservación</h2>
+        <ul>
+          <li>Los datos de tu cuenta y de tu cartera se conservan <strong>mientras tu cuenta exista</strong>, porque son el servicio.</li>
+          <li>Desde <strong>Ajustes → Datos y seguridad</strong> puedes <strong>resetear tu cartera</strong>: borra activos, historial y seguimiento de forma irreversible.</li>
+          <li>Si pides la supresión de tu cuenta, se eliminan tus datos, salvo los que deban conservarse para cumplir obligaciones legales, como los registros de facturación que mantiene el proveedor de pagos.</li>
+          <li>Los informes técnicos de error no contienen tu cartera y sólo se usan para diagnosticar fallos.</li>
+        </ul>
       </section>
 
       <section class="lg-card">
-        <h2>7 · Tus datos son tuyos</h2>
-        <p>Desde la propia aplicación, en <strong>Ajustes → Datos y seguridad</strong>, puedes <strong>resetear tu cartera</strong>: borra activos, historial y seguimiento. Es irreversible.</p>
-        <p>Para acceder a tus datos, corregirlos o pedir su supresión completa, escribe a <strong>aurixsystemofficial@gmail.com</strong> desde el correo de tu cuenta. Enumeración formal de derechos y plazos legales de respuesta: <span class="lg-todo">PENDIENTE: revisión legal</span>.</p>
+        <h2>9 · Tus derechos</h2>
+        <p>Puedes solicitar el acceso a tus datos, su rectificación o supresión, la limitación u oposición a su tratamiento y su portabilidad, así como retirar en cualquier momento un consentimiento que hayas dado. Escribe a <strong>aurixsystemofficial@gmail.com</strong> desde el correo de tu cuenta.</p>
+        <p>Si consideras que tus datos no se han tratado correctamente, puedes presentar una reclamación ante la autoridad de protección de datos competente (en España, la Agencia Española de Protección de Datos).</p>
       </section>
 
       <section class="lg-card">
-        <h2>8 · Cambios</h2>
-        <p>Si esta política cambia de forma relevante, se publicará aquí con su fecha. Marco legal aplicable y autoridad de control: <span class="lg-todo">PENDIENTE: revisión legal</span>.</p>
+        <h2>10 · Cambios y contacto</h2>
+        <p>Si esta política cambia de forma relevante, se publicará aquí con su fecha. Para cualquier cuestión: <strong>aurixsystemofficial@gmail.com</strong>. Consulta también las <a href="terms.html" data-lg-link="terms.html">Condiciones de servicio</a> y el <a href="legal-notice.html" data-lg-link="legal-notice.html">Aviso legal</a>.</p>
       </section>
     </div>
 
@@ -123,25 +131,16 @@
     <div data-lang-block="en">
       <h1 class="lg-title">Privacy policy</h1>
       <p class="lg-sub">What data Aurix handles, what for, and who is involved.</p>
-
-      <aside class="lg-draft">
-        <b>DRAFT · pending review.</b> This text describes exactly what the system
-        does today, verified against the code itself. Anything not yet decided is
-        marked as pending and has <b>not</b> been invented: owner identity, legal
-        basis, retention periods and applicable legal framework. Until the owner
-        reviews it and, where appropriate, validates it with legal advice, this
-        document is not a legally approved text.
-      </aside>
-      <p class="lg-updated">Draft last updated: 8 October 2026</p>
+      <p class="lg-updated">Last updated: 26 October 2026</p>
 
       <section class="lg-card">
-        <h2>1 · Who handles your data</h2>
-        <p>Data controller: <span class="lg-todo">PENDING: owner identity and contact details</span>.</p>
+        <h2>1 · Data controller</h2>
+        <p>The data controller’s details are set out in the <a href="legal-notice.html#titular" data-lg-link="legal-notice.html" data-lg-hash="titular">Legal notice</a>.</p>
         <p>Contact channel for any privacy matter: <strong>aurixsystemofficial@gmail.com</strong>.</p>
       </section>
 
       <section class="lg-card">
-        <h2>2 · What data exists in Aurix</h2>
+        <h2>2 · Data we handle</h2>
         <h3>What you give us</h3>
         <ul>
           <li><strong>Your email address.</strong> It is the only thing required to create an account and sign in.</li>
@@ -156,7 +155,7 @@
           <li><strong>Visits per referral code.</strong> When someone opens the website with a <code>?ref=</code>, one visit is added to a counter per code and day. It does not store your IP address, cookies or anything that identifies you.</li>
           <li><strong>Technical error reports.</strong> When something fails, Aurix sends a <em>technical</em> report to its own logs: error type, where it happened and browser. Before leaving the device, emails, session tokens and amounts are stripped automatically, and it is capped at ten reports per visit. It does not include your portfolio.</li>
         </ul>
-        <p><strong>What Aurix does not have:</strong> we do not ask for your name, phone, address or ID document; we do not connect to your bank or broker; and we <strong>do not store card data</strong> — it never reaches our systems.</p>
+        <p><strong>What Aurix does not have:</strong> we do not ask for your name, phone, address or ID document; <strong>we do not connect to your bank or broker</strong> or access your bank accounts; and we <strong>do not store card data</strong>: it never reaches our systems.</p>
       </section>
 
       <section class="lg-card">
@@ -170,57 +169,76 @@
           <li>To <strong>find and fix faults</strong>, with the technical reports described above.</li>
         </ul>
         <p><strong>There is no advertising, no commercial profiling, and we do not sell or share your data with third parties for their own purposes.</strong></p>
-        <p>Legal basis for each purpose: <span class="lg-todo">PENDING: legal determination</span>.</p>
       </section>
 
       <section class="lg-card">
-        <h2>4 · Who else is involved</h2>
+        <h2>4 · Providers</h2>
         <p>Aurix relies on providers to work. Each one sees only what it needs:</p>
         <ul>
           <li><strong>Supabase</strong> — authentication and database: your email and your portfolio data.</li>
-          <li><strong>Vercel</strong> — the server running Aurix’s functions (prices, billing, technical logs).</li>
+          <li><strong>Vercel</strong> — the server running Aurix’s functions (prices, billing, technical logs) and hosting the website.</li>
           <li><strong>GitHub Pages</strong> — delivery of the application to your browser (static files).</li>
-          <li><strong>Stripe</strong> — payments and subscriptions. Payment happens at Stripe, not at Aurix; your card details are theirs and never ours.</li>
+          <li><strong>Stripe</strong> — payments and subscriptions. Payment happens at Stripe, not at Aurix; your card details are handled by Stripe and never reach Aurix.</li>
           <li><strong>Market data providers</strong> (CoinGecko, GeckoTerminal, Twelve Data, Yahoo Finance) — quotes. Aurix queries them <em>from its server</em>: they do not receive who you are or what you hold, only which symbols to quote.</li>
           <li><strong>jsDelivr, CoinGecko and Financial Modeling Prep</strong> — your browser downloads libraries and asset logos from them, so they see your IP address like any other image on the web.</li>
           <li><strong>Google Fonts</strong> — the app and the website download the typeface from Google, so Google sees your IP address.</li>
           <li><strong>Resend</strong> — sending Aurix’s emails (for example, the welcome email): receives your email address.</li>
         </ul>
-        <p>Server locations and international transfers: <span class="lg-todo">PENDING: confirm each provider’s region</span>.</p>
       </section>
 
       <section class="lg-card">
-        <h2>5 · What is stored on your device</h2>
+        <h2>5 · International transfers</h2>
+        <p>Some of these providers may process data outside the European Economic Area. When that happens, it is done with the safeguards those providers make available under applicable law. You can ask for more information at <strong>aurixsystemofficial@gmail.com</strong>.</p>
+      </section>
+
+      <section class="lg-card">
+        <h2>6 · Security</h2>
+        <ul>
+          <li>You sign in with a <strong>one-time code</strong> sent to your email: there is no password that could leak.</li>
+          <li>Communication with Aurix is <strong>encrypted (HTTPS)</strong>.</li>
+          <li>In the database, <strong>each account can only read and change its own data</strong>.</li>
+          <li>Technical error reports are stripped of emails, tokens and amounts before leaving your device.</li>
+          <li>When you sign out, the previous user’s data is no longer readable on that device.</li>
+        </ul>
+      </section>
+
+      <section class="lg-card">
+        <h2>7 · What is stored on your device</h2>
         <p>Aurix stores your session, your language and currency, and a copy of your portfolio in the browser so the app opens fast and stays readable offline. <strong>No advertising or third-party tracking cookies are used.</strong></p>
         <p><strong>Referral code — only with your permission.</strong> If you reach the website through a referral link, we ask whether we may remember it. Only if you accept, the code or codes (up to five) and the date you saw them are kept in the browser’s local storage (<code>localStorage</code>) for at most 30 days, to credit your sign-up if you join later. Nothing else is stored. If you decline, nothing is stored on your device and the code only travels in the link to the app during that visit. You can withdraw permission by clearing this site’s data in your browser.</p>
-        <p>When you sign out, the previous user’s data is no longer readable on that device.</p>
       </section>
 
       <section class="lg-card">
-        <h2>6 · For how long</h2>
-        <p>For as long as your account exists. Specific retention periods after closing it: <span class="lg-todo">PENDING: owner decision</span>.</p>
+        <h2>8 · Retention</h2>
+        <ul>
+          <li>Your account and portfolio data are kept <strong>for as long as your account exists</strong>, because they are the service.</li>
+          <li>Under <strong>Settings → Data and security</strong> you can <strong>reset your portfolio</strong>: it irreversibly deletes assets, history and watchlist.</li>
+          <li>If you ask for your account to be deleted, your data is erased, except what must be kept to meet legal obligations, such as the billing records held by the payment provider.</li>
+          <li>Technical error reports do not contain your portfolio and are only used to diagnose faults.</li>
+        </ul>
       </section>
 
       <section class="lg-card">
-        <h2>7 · Your data is yours</h2>
-        <p>From the app itself, under <strong>Settings → Data and security</strong>, you can <strong>reset your portfolio</strong>: it deletes assets, history and watchlist. It is irreversible.</p>
-        <p>To access your data, correct it or request full deletion, write to <strong>aurixsystemofficial@gmail.com</strong> from your account email. Formal enumeration of rights and statutory response times: <span class="lg-todo">PENDING: legal review</span>.</p>
+        <h2>9 · Your rights</h2>
+        <p>You can request access to your data, its rectification or erasure, restriction of or objection to its processing, and its portability, and you can withdraw any consent you have given at any time. Write to <strong>aurixsystemofficial@gmail.com</strong> from your account email.</p>
+        <p>If you believe your data has not been handled properly, you can lodge a complaint with the competent data protection authority (in Spain, the Agencia Española de Protección de Datos).</p>
       </section>
 
       <section class="lg-card">
-        <h2>8 · Changes</h2>
-        <p>If this policy changes materially, it will be published here with its date. Applicable legal framework and supervisory authority: <span class="lg-todo">PENDING: legal review</span>.</p>
+        <h2>10 · Changes and contact</h2>
+        <p>If this policy changes materially, it will be published here with its date. For any question: <strong>aurixsystemofficial@gmail.com</strong>. See also the <a href="terms.html" data-lg-link="terms.html">Terms of service</a> and the <a href="legal-notice.html" data-lg-link="legal-notice.html">Legal notice</a>.</p>
       </section>
     </div>
   </main>
 
   <footer class="lg-foot">
-    <a href="support.html" data-lg-link="support.html"><span data-lang-block="es">Soporte</span><span data-lang-block="en">Support</span></a>
     <a href="privacy.html" data-lg-link="privacy.html" aria-current="page"><span data-lang-block="es">Privacidad</span><span data-lang-block="en">Privacy</span></a>
     <a href="terms.html" data-lg-link="terms.html"><span data-lang-block="es">Condiciones</span><span data-lang-block="en">Terms</span></a>
+    <a href="legal-notice.html" data-lg-link="legal-notice.html"><span data-lang-block="es">Aviso legal</span><span data-lang-block="en">Legal notice</span></a>
+    <a href="support.html" data-lg-link="support.html"><span data-lang-block="es">Soporte</span><span data-lang-block="en">Support</span></a>
     <a href="index.html"><span data-lang-block="es">Abrir Aurix</span><span data-lang-block="en">Open Aurix</span></a>
   </footer>
 
-  <script src="legal.js?v=712"></script>
+  <script src="legal.js?v=713"></script>
 </body>
 </html>

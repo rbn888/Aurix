@@ -10,8 +10,11 @@
  * que el soporte no llegue a nadie, y eso no lo caza ningún gate de sintaxis.
  * (La había: `aurixsystemoficial@` con una efe.)
  *
- * Y una regla que este SPEC impone: un texto legal SIN REVISAR no puede
- * parecer aprobado. El aviso de borrador es parte del contrato, no decoración.
+ * RE-DECIDIDO (cierre mínimo de páginas legales, 2026-10-26): el contenido público
+ * NO lleva avisos de borrador, huecos «PENDIENTE» ni notas internas. Lo que falta
+ * (los datos del titular) se declara con UNA nota profesional en el Aviso legal
+ * (`#titular`), única ubicación de esos datos; Privacidad y Condiciones enlazan ahí.
+ * Ver docs/AURIX-LEGAL-PAGES.md.
  *
  *   node scripts/aurix-legal-pages-probe.mjs
  */
@@ -47,10 +50,18 @@ const ok = (n, c, info) => { if (c) { pass++; console.log('  ✓ ' + n); } else 
 // heredar la errata que está buscando.
 const MAIL = ['aurixsystem', 'official', '@gmail.com'].join('');
 const PAGES = [
-  { file: 'support.html', draft: false, es: 'Soporte',                   en: 'Support' },
-  { file: 'privacy.html', draft: true,  es: 'Política de privacidad',    en: 'Privacy policy' },
-  { file: 'terms.html',   draft: true,  es: 'Condiciones de servicio',   en: 'Terms of service' },
+  { file: 'privacy.html',      es: 'Política de privacidad',  en: 'Privacy policy',   owner: true },
+  { file: 'terms.html',        es: 'Condiciones de servicio', en: 'Terms of service', owner: true },
+  { file: 'legal-notice.html', es: 'Aviso legal',             en: 'Legal notice' },
+  { file: 'support.html',      es: 'Soporte',                 en: 'Support' },
 ];
+// El orden del pie en las cuatro páginas (y en la landing): Privacidad · Condiciones · Aviso legal · Soporte.
+const FOOT = ['privacy.html', 'terms.html', 'legal-notice.html', 'support.html'];
+const OWNER_NOTE = {
+  es: 'Información del titular: los datos identificativos exigibles se incorporarán antes del inicio de la prestación comercial definitiva.',
+  en: 'Service operator information: the required identification details will be added before the definitive commercial launch.',
+};
+const INTERNAL = /BORRADOR|DRAFT|PENDIENTE|PENDING|TODO|lg-todo|\$\{|\{\{/;
 const VIEWPORTS = [[360, 740], [390, 844], [768, 1024], [1440, 900]];
 
 // Lo que se mide en cada página, sobre lo PINTADO.
@@ -96,6 +107,12 @@ const MEASURE = `(function(){
     text: document.body.innerText,
     draft: !!document.querySelector('.lg-draft'),
     todos: document.querySelectorAll('.lg-todo').length,
+    foot: Array.prototype.map.call(document.querySelectorAll('.lg-foot a[data-lg-link]'), function(a){ return a.getAttribute('data-lg-link'); }),
+    ownerLinks: Array.prototype.filter.call(document.querySelectorAll('a[data-lg-hash="titular"]'), function(a){ return a.offsetParent !== null; }).map(function(a){ return a.getAttribute('href'); }),
+    owner: (function(){ var o = document.getElementById('titular'); if (!o) return null; var p = Array.prototype.filter.call(o.querySelectorAll('p'), function(x){ return x.offsetParent !== null; });
+      var cs = p[0] ? getComputedStyle(p[0]) : null; return { vis: o.offsetParent !== null, text: p.map(function(x){ return x.textContent.trim(); }), fs: cs ? parseFloat(cs.fontSize) : 0, color: cs ? cs.color : '', h2: (o.querySelector('h2') || {}).innerText || '' }; })(),
+    toc: Array.prototype.filter.call(document.querySelectorAll('.lg-toc a'), function(a){ return a.offsetParent !== null; }).map(function(a){ return a.getAttribute('href'); }),
+    headings: Array.prototype.filter.call(document.querySelectorAll('h1, h2'), function(h){ return h.offsetParent !== null; }).map(function(h){ return h.tagName; }),
     // Los enlaces internos que la página ofrece.
     hrefs: Array.prototype.map.call(document.querySelectorAll('a[href]'), function(a){ return a.getAttribute('href'); }),
     scripts: Array.prototype.map.call(document.querySelectorAll('script[src]'), function(s){ return s.getAttribute('src'); }),
@@ -143,12 +160,18 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       // versión EN.
       ok(`${tag} un navegador en español la abre en español, sin tocar nada`,
         g.lang === 'es' && g.h1.trim() === P.es, JSON.stringify({ lang: g.lang, h1: g.h1.trim() }));
-      // Un borrador legal se DECLARA. Y soporte, que es factual, no lleva aviso.
-      ok(`${tag} el aviso de borrador está donde debe y no donde no`,
-        g.draft === P.draft, 'aviso=' + g.draft + ' esperado=' + P.draft);
-      if (P.draft) {
-        ok(`${tag} los datos sin decidir se marcan como huecos, no se inventan`,
-          g.todos >= 4, 'huecos marcados: ' + g.todos);
+      // Contenido público limpio: sin aviso de borrador, sin huecos y sin rótulos internos.
+      ok(`${tag} ES: sin borrador, sin «PENDIENTE» ni notas internas visibles`,
+        !g.draft && g.todos === 0 && !INTERNAL.test(g.text), (g.text.match(INTERNAL) || ['—'])[0]);
+      ok(`${tag} un solo h1 y secciones h2 (estructura de encabezados)`,
+        g.headings[0] === 'H1' && g.headings.filter(x => x === 'H1').length === 1 && g.headings.filter(x => x === 'H2').length >= 3, g.headings.join(','));
+      ok(`${tag} pie: Privacidad · Condiciones · Aviso legal · Soporte`, JSON.stringify(g.foot) === JSON.stringify(FOOT), JSON.stringify(g.foot));
+      if (P.owner) ok(`${tag} identifica al titular enlazando al Aviso legal (#titular), sin repetir datos`,
+        g.ownerLinks.length === 1 && /^legal-notice\.html\?lang=es#titular$/.test(g.ownerLinks[0]), JSON.stringify(g.ownerLinks));
+      if (P.file === 'legal-notice.html') {
+        ok(`${tag} titular: sólo la nota aprobada (ES), legible y con contraste`,
+          g.owner && g.owner.vis && g.owner.text.length === 1 && g.owner.text[0] === OWNER_NOTE.es && g.owner.fs >= 15 && /rgba?\(25[0-5], 25[0-5], 25[0-5]/.test(g.owner.color), JSON.stringify(g.owner));
+        ok(`${tag} índice con ancla directa a la información del titular`, g.toc.includes('#titular') && g.toc.length >= 6, JSON.stringify(g.toc));
       }
       ok(`${tag} sin desbordamiento horizontal, sin recortes y sin texto fuera de su tarjeta`,
         g.docOverflowX === false && g.clipped.length === 0 && g.spill.length === 0,
@@ -164,6 +187,12 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       ok(`${tag} el inglés cambia el CONTENIDO, no sólo un rótulo`,
         en.lang === 'en' && en.h1.trim() === P.en && /AURIX —/.test(en.title) &&
         !en.text.includes(P.es), JSON.stringify({ lang: en.lang, h1: en.h1.trim(), title: en.title }));
+      ok(`${tag} EN: sin borrador, sin «PENDING» ni notas internas visibles`,
+        !en.draft && en.todos === 0 && !INTERNAL.test(en.text), (en.text.match(INTERNAL) || ['—'])[0]);
+      if (P.owner) ok(`${tag} EN: el enlace al titular conserva idioma y ancla`,
+        en.ownerLinks.length === 1 && /^legal-notice\.html\?lang=en#titular$/.test(en.ownerLinks[0]), JSON.stringify(en.ownerLinks));
+      if (P.file === 'legal-notice.html') ok(`${tag} titular: sólo la nota aprobada (EN)`,
+        en.owner && en.owner.vis && en.owner.text.length === 1 && en.owner.text[0] === OWNER_NOTE.en, JSON.stringify(en.owner));
       // Y el idioma elegido viaja a las otras páginas: cambiar a inglés en
       // Soporte y aterrizar en Privacidad en español sería cambiar de idioma a
       // mitad de lectura.
@@ -181,6 +210,19 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
       /privacy\.html/.test(page.url()) &&
       (await page.evaluate(`(document.querySelector('[data-lang-block="es"] .lg-title')||{}).textContent`) || '').length > 0,
       page.url());
+    // Desde Privacidad, «Responsable» lleva al bloque del titular y lo deja a la vista.
+    await page.goto(ORIGIN + '/privacy.html', { waitUntil: 'domcontentloaded' });
+    await page.click('[data-lang-block="es"] a[data-lg-hash="titular"]');
+    await page.waitForTimeout(250);
+    const own = await page.evaluate(`(function(){ var o = document.getElementById('titular'); var r = o ? o.getBoundingClientRect() : null; return { url: location.pathname + location.hash, inView: !!r && r.top >= 0 && r.top < innerHeight }; })()`);
+    ok(`${ENG}.${w}×${h} Privacidad → Aviso legal#titular, a la vista`, own.url === '/legal-notice.html#titular' && own.inView, JSON.stringify(own));
+    // Teclado: el índice del Aviso legal se recorre con Tab y su enlace al titular funciona con Enter.
+    await page.goto(ORIGIN + '/legal-notice.html', { waitUntil: 'domcontentloaded' });
+    await page.focus('[data-lang-block="es"] .lg-toc a[href="#titular"]');
+    const foc = await page.evaluate(`getComputedStyle(document.activeElement).outlineStyle`);
+    await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+    const kb = await page.evaluate(`(function(){ var r = document.getElementById('titular').getBoundingClientRect(); return { hash: location.hash, inView: r.top >= 0 && r.top < innerHeight }; })()`);
+    ok(`${ENG}.${w}×${h} índice por teclado: foco visible y Enter lleva al titular`, foc !== 'none' && kb.hash === '#titular' && kb.inView, JSON.stringify({ foc, kb }));
     // Y la elección de idioma SOBREVIVE al salto: quien pone la página en
     // inglés y abre Condiciones no debe encontrarse el texto en español.
     await page.goto(ORIGIN + '/support.html', { waitUntil: 'domcontentloaded' });
@@ -210,11 +252,15 @@ for (const [ENG, launcher] of [['CR', chromium], ['WK', webkit]]) {
     !/data-todo="legal-(privacy|terms)"/.test(land) &&
     /app\.aurixsystem\.io\/privacy\.html/.test(land) &&
     /app\.aurixsystem\.io\/terms\.html/.test(land));
+  const footer = land.slice(land.indexOf('data-i18n="footer.legal"'), land.indexOf('footer-col--social'));
+  const legalOrder = [...footer.matchAll(/data-legal-link="([a-z-]+)"/g)].map(m => m[1]);
+  ok('WEB · LEGAL del footer: Privacidad · Condiciones · Aviso legal · Soporte',
+    JSON.stringify(legalOrder) === JSON.stringify(['privacy', 'terms', 'legal-notice', 'support']), JSON.stringify(legalOrder));
   // Y el ensamblado del sitio tiene que publicarlas: si no están en la allowlist,
   // el enlace de la app resuelve a 404 en producción con el gate en verde.
   const build = await readFile(join(ROOT, 'scripts/aurix-build-site.mjs'), 'utf8');
-  ok('DEPLOY · las tres páginas y sus assets están en la allowlist de publicación',
-    ['support.html', 'privacy.html', 'terms.html', 'legal.css', 'legal.js']
+  ok('DEPLOY · las cuatro páginas y sus assets están en la allowlist de publicación',
+    ['support.html', 'privacy.html', 'terms.html', 'legal-notice.html', 'legal.css', 'legal.js']
       .every(f => new RegExp("'" + f.replace('.', '\\.') + "'").test(build)));
 }
 

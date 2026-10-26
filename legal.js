@@ -49,9 +49,11 @@
     }
     // Los enlaces internos conservan el idioma: cambiarlo en Soporte y perderlo
     // al abrir Privacidad sería cambiar de idioma a mitad de la lectura.
+    // `data-lg-hash` conserva el ancla de destino (p. ej. #titular del Aviso legal).
     var links = document.querySelectorAll('[data-lg-link]');
     for (var j = 0; j < links.length; j++) {
-      links[j].href = links[j].getAttribute('data-lg-link') + '?lang=' + lang;
+      var hash = links[j].getAttribute('data-lg-hash');
+      links[j].href = links[j].getAttribute('data-lg-link') + '?lang=' + lang + (hash ? '#' + hash : '');
     }
   }
 

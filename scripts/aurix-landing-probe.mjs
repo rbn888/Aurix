@@ -187,6 +187,7 @@ for (const engine of ['chromium', 'webkit']) {
             return { n: ls.length, t: norm(l.textContent), href: l.getAttribute('href'), vis: r.width > 0 && r.right <= innerWidth && r.left >= 0, afterLang: r.left >= lt.right - 0.5, inHdr: r.top >= hd.top && r.bottom <= hd.bottom, hit: Math.max(r.height, parseFloat(getComputedStyle(l, '::before').height) || 0), hdrH: Math.round(hd.height) }; })(),
           planOrder: (function(){ var pr=q('.plan--premium'), fr=q('.plan--free'); var a=pr.getBoundingClientRect(), b=fr.getBoundingClientRect(); return { premFirst: !!(pr.compareDocumentPosition(fr) & 4) && a.bottom <= b.top, sameCol: Math.abs(a.left - b.left) < 1 && Math.abs(a.width - b.width) < 1 }; })(),
           support: [].slice.call(document.querySelectorAll('[data-legal-link="support"]')).map(function(a){return a.getAttribute('href')}),
+          legal: [].slice.call(document.querySelectorAll('.footer-col [data-legal-link]')).map(function(a){return a.textContent.trim() + '=' + a.getAttribute('href')}),
           cap: (function(){ var c=q('.how-market-fig .shot-caption'); return { t: c.textContent, vis: getComputedStyle(c).display!=='none' && c.getBoundingClientRect().height>0 }; })(),
           gone: { menuApp: !!q('#mobileMenu [data-app-link]'), marketLink: !!q('.how-market-fig a'), zoom: !!q('.how-market-fig img') && getComputedStyle(q('.how-market-fig img')).cursor === 'zoom-in', how: !!q('#how'), steps: !!q('.steps'), free: !!q('.intel-free'), photo: !!q('a[href*="intelligence-full"]'), panel: !!q('.intel-panel') || !!q('.ip-bars'), demoFoot: !!q('.ip-demo'), note: !!q('.benefit-note'), heroCap: !!q('.hero-visual .shot-caption'), navHow: !!q('a[href="#how"]') },
           demoMentions: (document.body.innerText.match(/Cartera de demostración|Demo portfolio/g) || []).length,
@@ -245,6 +246,9 @@ for (const engine of ['chromium', 'webkit']) {
       ok(`${T} · 17 la esfera pasa por DEBAJO de la cabecera (nunca la tapa)`, m.zOrb < m.zHeader, { orb: m.zOrb, header: m.zHeader });
       ok(`${T} · 6 enlaces a la app con lang/langhint e intent Premium`, m.appLinks.length >= 4 && m.appLinks.every(a => /[?&](lang|langhint)=(es|en)/.test(a.href) && (a.premium ? /intent=premium/.test(a.href) : !/intent=/.test(a.href))), m.appLinks);
       ok(`${T} · P cada modalidad lleva su plan=annual|monthly y el CTA gratuito ninguno`, m.appLinks.filter(a => a.premium).map(a => (a.href.match(/[?&]plan=(\w+)/) || [])[1]).join() === 'annual,monthly' && m.appLinks.filter(a => !a.premium).every(a => !/[?&]plan=/.test(a.href)), m.appLinks);
+      ok(`${T} · LEGAL del footer: Privacidad · Condiciones · Aviso legal · Soporte, con ?lang=`,
+        JSON.stringify(m.legal) === JSON.stringify((lang === 'es' ? ['Privacidad', 'Condiciones', 'Aviso legal', 'Soporte'] : ['Privacy', 'Terms', 'Legal notice', 'Support'])
+          .map((t, k) => t + '=https://app.aurixsystem.io/' + ['privacy', 'terms', 'legal-notice', 'support'][k] + '.html?lang=' + lang)), m.legal);
       ok(`${T} · 6 Soporte con ?lang=`, m.support.length >= 2 && m.support.every(s => s.endsWith('support.html?lang=' + lang)), m.support);
       ok(`${T} · B base del hero en el idioma activo (V3 escritorio · V4 móvil)`, new RegExp(w < 768 ? `hero-dashboard-v4-base-m-${lang}\\.jpg$` : `hero-dashboard-v3-base-${lang}(-2x)?\\.jpg$`).test(m.hero), m.hero);
       ok(`${T} · 7 todas las imágenes con width/height`, m.imgsNoDim === 0, m.imgsNoDim);

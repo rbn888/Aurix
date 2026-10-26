@@ -94,22 +94,32 @@ body {
   color: var(--lg-text); word-break: break-all;
 }
 
-/* ── EL AVISO DE BORRADOR ─────────────────────────────────────────────────
-   Un texto legal sin revisar NO puede parecer aprobado. Este aviso es visible,
-   no un pie de página, y se retira EN EL MISMO COMMIT en que el titular apruebe
-   el texto y rellene los datos marcados. */
-.lg-draft {
-  display: block; margin: 0 0 20px; padding: 14px 16px;
-  border-radius: 14px; border: 1px solid rgba(224,168,92,0.42);
-  background: rgba(224,168,92,0.10); color: #f3cf9a; font-size: 14px;
+/* Nota tras la acción de soporte. */
+.lg-note { margin-top: 14px; }
+
+/* ── ÍNDICE (Aviso legal) ─────────────────────────────────────────────────── */
+.lg-toc {
+  background: var(--lg-surface); border: 1px solid var(--lg-line);
+  border-radius: 16px; padding: 16px 22px; margin: 0 0 16px;
 }
-.lg-draft b { color: #ffd89a; }
-/* Un dato que falta se ve como lo que es: un hueco, no una afirmación. */
-.lg-todo {
-  display: inline-block; padding: 1px 7px; border-radius: 6px;
-  background: rgba(224,168,92,0.16); border: 1px dashed rgba(224,168,92,0.5);
-  color: #f3cf9a; font-size: 13px; font-weight: 700; font-style: normal;
+.lg-toc ol { margin: 0; padding-left: 20px; }
+.lg-toc li { margin: 0; color: var(--lg-muted); font-size: 15px; }
+.lg-toc a {
+  display: inline-flex; align-items: center; min-height: 34px;
+  color: var(--lg-blue); text-decoration: none;
 }
+.lg-toc a:hover { text-decoration: underline; }
+
+/* ── INFORMACIÓN DEL TITULAR ──────────────────────────────────────────────── */
+.lg-owner p { color: var(--lg-text); }
+.lg-owner dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; }
+.lg-owner dt { color: var(--lg-muted); font-size: 15px; }
+.lg-owner dd { margin: 0; color: var(--lg-text); font-size: 15px; overflow-wrap: anywhere; }
+/* El ancla del titular no queda pegada al borde al saltar desde el índice. */
+[id] { scroll-margin-top: 16px; }
+
+/* Foco visible en todos los enlaces y controles. */
+a:focus-visible, button:focus-visible { outline: 2px solid var(--lg-blue); outline-offset: 3px; border-radius: 6px; }
 
 /* ── PIE ──────────────────────────────────────────────────────────────────── */
 .lg-foot {
