@@ -1,0 +1,179 @@
+/* Comparison pages (/compare/*). Layout from the approved mockups.
+   Shared chrome (type, buttons, header, footer, tokens) comes from /styles.css.
+   Rules are scoped to body.cmp-page so homepage selectors in styles.css
+   (hero, section, footer columns) do not restyle these pages. */
+
+body.cmp-page{ --maxw:1200px; }
+
+body.cmp-page .site-header{
+  position:sticky; top:0; inset:auto;
+  background:rgba(7,11,22,.72);
+  backdrop-filter:saturate(160%) blur(16px);
+  -webkit-backdrop-filter:saturate(160%) blur(16px);
+  border-bottom:1px solid var(--border);
+}
+body.cmp-page .header-inner{ height:68px; }
+body.cmp-page .nav-center a[aria-current]{ color:var(--text); }
+
+body.cmp-page .narrow{ max-width:920px; }
+
+body.cmp-page .hero{ position:relative; padding:96px 0 56px; overflow:hidden; text-align:center; }
+body.cmp-page .hero-bg{
+  position:absolute; inset:-20% -10% auto -10%; height:130%; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(55% 50% at 30% 10%, rgba(79,142,247,.20) 0%, transparent 60%),
+    radial-gradient(40% 40% at 82% 0%, rgba(125,184,255,.12) 0%, transparent 60%);
+}
+body.cmp-page .hero .container{ position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; }
+body.cmp-page .crumbs{ font-size:13px; color:var(--dim); margin-bottom:26px; }
+body.cmp-page .crumbs a{ color:var(--dim); }
+body.cmp-page .crumbs a:hover{ color:var(--text); }
+body.cmp-page .crumbs span{ margin:0 8px; opacity:.6; }
+body.cmp-page .hero .hero-title{
+  font-size:clamp(40px,6vw,76px); font-weight:800; letter-spacing:-.035em; line-height:1.02;
+  margin:22px 0 18px; text-wrap:unset;
+}
+body.cmp-page .hero-title .vs{ font-weight:600; opacity:.55; margin:0 .12em; }
+body.cmp-page .hero-kicker{
+  text-wrap:balance; font-size:clamp(19px,2vw,26px); font-weight:600; letter-spacing:-.02em;
+  line-height:1.3; color:var(--accent-3); max-width:720px;
+}
+body.cmp-page .hero .hero-cta{ display:flex; gap:14px; margin-top:34px; flex-wrap:wrap; justify-content:center; }
+body.cmp-page .hero-note{ margin-top:14px; font-size:13px; color:var(--dim); }
+
+body.cmp-page .intro{ padding:24px 0 8px; }
+body.cmp-page .intro-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+body.cmp-page .intro-card{
+  border:1px solid var(--border); border-radius:var(--radius); padding:30px 30px 32px;
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+}
+body.cmp-page .intro-card.is-aurix{
+  border-color:rgba(125,184,255,.22);
+  background:linear-gradient(180deg, rgba(79,142,247,.09), rgba(79,142,247,.02));
+}
+body.cmp-page .label{ font-size:12px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:14px; }
+body.cmp-page .is-aurix .label{ color:var(--accent-2); }
+body.cmp-page .intro-card p{ font-size:16px; line-height:1.65; color:var(--muted); }
+body.cmp-page .intro-card strong{ color:var(--text); font-weight:650; }
+
+body.cmp-page .section{ padding:72px 0 0; }
+body.cmp-page .section-head{ text-align:center; margin-bottom:34px; }
+body.cmp-page .section-title{ max-width:none; font-size:clamp(28px,3.4vw,44px); font-weight:800; letter-spacing:-.03em; line-height:1.08; }
+body.cmp-page .section-sub{ text-wrap:balance; margin-top:12px; color:var(--muted); font-size:16px; }
+
+body.cmp-page .table-wrap{
+  border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
+  box-shadow:0 40px 90px -60px rgba(0,0,0,.9);
+}
+body.cmp-page table.cmp{ width:100%; border-collapse:collapse; table-layout:fixed; }
+body.cmp-page .cmp th, body.cmp-page .cmp td{ text-align:left; vertical-align:top; padding:22px 26px; font-size:15px; line-height:1.55; }
+body.cmp-page .cmp thead th{ padding:24px 26px; font-size:15px; font-weight:700; letter-spacing:-.01em; border-bottom:1px solid var(--border); }
+body.cmp-page .cmp thead th:first-child{ width:24%; }
+body.cmp-page .cmp thead .col-aurix{ color:#fff; background:rgba(79,142,247,.10); }
+body.cmp-page .cmp thead .col-aurix .brand{ font-size:15px; letter-spacing:.24em; }
+body.cmp-page .cmp thead .col-them{ color:var(--text); }
+body.cmp-page .cmp tbody th{ font-weight:600; color:var(--dim); font-size:13px; letter-spacing:.06em; text-transform:uppercase; padding-top:25px; }
+body.cmp-page .cmp tbody td{ color:var(--muted); }
+body.cmp-page .cmp tbody td.col-aurix{ color:var(--text); background:rgba(79,142,247,.06); }
+body.cmp-page .cmp tbody tr+tr th, body.cmp-page .cmp tbody tr+tr td{ border-top:1px solid var(--divider); }
+body.cmp-page sup.fn{ font-size:10.5px; line-height:0; margin-left:3px; vertical-align:super; }
+body.cmp-page sup.fn.sep{ margin-left:1px; }
+body.cmp-page sup.fn.sep::before{ content:','; color:var(--dim); margin-right:1px; }
+body.cmp-page sup.fn a{ color:var(--accent-2); font-weight:600; }
+body.cmp-page sup.fn a:hover{ text-decoration:underline; }
+
+body.cmp-page .fit-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+body.cmp-page .fit{ border:1px solid var(--border); border-radius:var(--radius); padding:32px; background:var(--surface); }
+body.cmp-page .fit.is-aurix{
+  border-color:rgba(125,184,255,.26);
+  background:linear-gradient(180deg, rgba(79,142,247,.10), rgba(79,142,247,.02));
+  box-shadow:0 0 60px -36px rgba(79,142,247,.5);
+}
+body.cmp-page .fit h3{ font-size:22px; font-weight:750; letter-spacing:-.02em; margin-bottom:12px; }
+body.cmp-page .fit p{ font-size:16px; line-height:1.65; color:var(--muted); }
+body.cmp-page .fit-dot{
+  display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--dim);
+  margin-right:10px; vertical-align:middle; transform:translateY(-2px);
+}
+body.cmp-page .is-aurix .fit-dot{ background:var(--accent); box-shadow:0 0 10px rgba(71,140,254,.8); }
+
+body.cmp-page .final{ padding:88px 0 0; }
+body.cmp-page .final-card{
+  position:relative; overflow:hidden; text-align:center;
+  border:1px solid rgba(125,184,255,.20); border-radius:var(--radius-lg); padding:64px 28px;
+  background:radial-gradient(70% 90% at 50% 0%, rgba(79,142,247,.20), transparent 70%), var(--bg-3);
+}
+body.cmp-page .final-card h2{
+  font-size:clamp(28px,3.6vw,46px); font-weight:800; letter-spacing:-.03em; line-height:1.08;
+  background:linear-gradient(180deg,#fff,#bcd0ee);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+}
+body.cmp-page .final-card p{ margin:14px auto 0; color:var(--muted); font-size:16.5px; max-width:560px; }
+body.cmp-page .final-card .btn{ margin-top:30px; }
+body.cmp-page .final-card .small{ font-size:13px; color:var(--dim); margin-top:14px; }
+
+body.cmp-page .sources{ padding:72px 0 0; }
+body.cmp-page .sources-inner{ padding-top:28px; position:relative; display:grid; grid-template-columns:1fr 1fr; gap:28px 48px; }
+body.cmp-page .sources-inner::before{
+  content:''; position:absolute; top:0; left:var(--pad); right:var(--pad); height:1px; background:var(--divider);
+}
+body.cmp-page .sources h4{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.14em; color:var(--dim); margin-bottom:12px; }
+body.cmp-page .sources ol{ margin:0; padding-left:20px; color:var(--dim); font-size:13px; line-height:1.6; }
+body.cmp-page .sources li{ padding:2px 0; }
+body.cmp-page .sources li a{ color:var(--muted); text-decoration:underline; text-decoration-color:rgba(228,236,251,.25); text-underline-offset:2px; }
+body.cmp-page .sources li a:hover{ color:var(--text); }
+body.cmp-page .sources li:target{ color:var(--accent-2); }
+body.cmp-page .sources p{ color:var(--dim); font-size:13px; line-height:1.6; }
+body.cmp-page .sources p+p{ margin-top:8px; }
+
+body.cmp-page .more{ padding:56px 0 80px; }
+body.cmp-page .more-inner{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; align-items:center; }
+body.cmp-page .more-inner span{ color:var(--dim); font-size:13px; margin-right:4px; }
+body.cmp-page #compare{ scroll-margin-top:84px; }
+
+body.cmp-page .footer-cols{ grid-template-columns:repeat(4,1fr); }
+body.cmp-page .footer-handle{ display:block; color:var(--dim); font-size:12.5px; margin-top:1px; }
+body.cmp-page .footer-col a[aria-current]{ color:var(--text); }
+
+@media (max-width:860px){
+  body.cmp-page .hero{ padding:64px 0 40px; }
+  body.cmp-page .hero .hero-cta{ flex-direction:row; align-items:center; width:auto; }
+  body.cmp-page .hero .hero-cta .btn{
+    width:auto; max-width:none; height:52px; min-height:0; padding:0 28px;
+    font-size:15.5px; white-space:nowrap; line-height:normal;
+  }
+  body.cmp-page .intro-grid,
+  body.cmp-page .fit-grid,
+  body.cmp-page .sources-inner{ grid-template-columns:1fr; }
+  body.cmp-page .intro-card,
+  body.cmp-page .fit{ padding:24px; }
+  body.cmp-page .section{ padding:56px 0 0; }
+  body.cmp-page .footer-inner{ grid-template-columns:1fr; gap:28px; }
+  body.cmp-page .footer-cols{ grid-template-columns:1fr 1fr; }
+}
+@media (max-width:640px){
+  body.cmp-page{ --pad:20px; }
+  body.cmp-page .header-inner{ height:60px; }
+  body.cmp-page .hero .hero-title{ font-size:38px; white-space:nowrap; }
+  body.cmp-page .more-inner span{ flex-basis:100%; text-align:center; margin:0 0 4px; }
+  body.cmp-page .final-card h2{ text-wrap:balance; }
+  body.cmp-page .hero-kicker{ text-wrap:balance; font-size:19px; }
+  body.cmp-page .hero .hero-cta{ width:100%; flex-direction:column; align-items:stretch; max-width:320px; }
+  body.cmp-page .hero .hero-cta .btn{ width:100%; }
+  body.cmp-page table.cmp,
+  body.cmp-page .cmp thead,
+  body.cmp-page .cmp tbody{ display:block; width:100%; }
+  body.cmp-page .cmp thead tr{ display:grid; grid-template-columns:1fr 1fr; }
+  body.cmp-page .cmp thead th:first-child{ display:none; }
+  body.cmp-page .cmp thead th{ padding:16px; font-size:14px; }
+  body.cmp-page .cmp tbody tr{ display:grid; grid-template-columns:1fr 1fr; }
+  body.cmp-page .cmp tbody th{ grid-column:1 / -1; padding:18px 16px 0; font-size:11.5px; border-top:1px solid var(--divider); }
+  body.cmp-page .cmp tbody tr:first-child th{ border-top:0; }
+  body.cmp-page .cmp tbody td{ padding:8px 16px 18px; font-size:14px; border-top:0 !important; }
+  body.cmp-page .cmp tbody td.col-aurix{ background:transparent; color:var(--text); }
+  body.cmp-page .cmp tbody td.col-them{ border-left:1px solid var(--divider); }
+  body.cmp-page .fit h3{ font-size:20px; }
+  body.cmp-page .final-card{ padding:48px 22px; }
+  body.cmp-page .footer-bottom{ flex-direction:column; gap:14px; align-items:flex-start; }
+}
