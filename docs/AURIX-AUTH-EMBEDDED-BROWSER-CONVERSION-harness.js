@@ -2,16 +2,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 // AURIX-AUTH-EMBEDDED-BROWSER-CONVERSION — continuidad de acceso
 // ════════════════════════════════════════════════════════════════════════════
-// Un usuario descubre Aurix en X/Telegram/Instagram, se autentica DENTRO de ese
-// navegador interno y luego abre Aurix en Safari: se le vuelve a pedir OTP.
-// No es un bug de persistencia — la WebView es un CONTENEDOR DE ALMACENAMIENTO
-// AISLADO, así que la sesión creada ahí no existe fuera. Este gate certifica que
-// no se gasta un OTP en un contenedor desechable y que NADA de lo que ya
-// funcionaba se ha tocado.
-//
-// La regla que protege este harness por encima de todo es FAIL OPEN: un falso
-// positivo que interceptara Safari/Chrome sería mucho peor que dejar pasar una
-// WebView desconocida.
+// Embedded-browser guidance must remain optional; email and OTP stay usable.
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
 const login = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
@@ -83,20 +74,19 @@ console.log('\n2 — Navegadores internos reconocidos (alta confianza):');
 }
 
 // ── 3 · Ningún OTP dentro de la WebView ─────────────────────────────────────
-console.log('\n3 — La intención de autenticarse queda interceptada:');
+console.log('\n3 — El acceso permanece disponible:');
 {
   const show = fnSource(login, 'showEmbeddedInterstitial');
-  ok('3.1 el interstitial oculta el paso de email Y el de OTP',
-     /'authSection', 'otpSection'/.test(show) && /style\.display = 'none'/.test(show));
-  ok('3.2 …y el gate de invitación, para que no haya ninguna vía al formulario',
-     /invite-section/.test(show) && /emb\.style\.display = ''/.test(show));
-  // El `getSession` que importa es el del BOOT, no el del bloque de diagnóstico
-  // (que aparece antes en el fichero): se ancla por su forma exacta.
-  const BOOT_GS = "client.auth.getSession().then(({ data: { session } }) => {";
-  ok('3.3 se evalúa ANTES de resolver la sesión (no hay ventana para gastar un OTP)',
-     login.indexOf('var _isEmbedded = detectEmbeddedBrowser();') > -1 &&
-     login.indexOf('var _isEmbedded = detectEmbeddedBrowser();') < login.indexOf(BOOT_GS),
-     'emb=' + login.indexOf('var _isEmbedded = detectEmbeddedBrowser();') + ' boot=' + login.indexOf(BOOT_GS));
+  for (const ua of ['Twitter for iPhone', 'Android TwitterAndroid']) {
+    const nodes = Object.fromEntries(['embeddedSection', 'authSection', 'otpSection', 'embOpen', 'embManual'].map(id => [id, { style: { display: id === 'otpSection' ? 'none' : '' } }]));
+    const before = JSON.stringify([nodes.authSection, nodes.otpSection]);
+    new Function('document', 'navigator', '_authTrace', show + ';showEmbeddedInterstitial();')(
+      { getElementById: id => nodes[id] }, { userAgent: ua }, () => {});
+    ok('3.1 ' + ua + ': email and OTP visibility preserved', before === JSON.stringify([nodes.authSection, nodes.otpSection]));
+    ok('3.2 ' + ua + ': browser help available', nodes.embeddedSection.style.display === '');
+    ok('3.3 ' + ua + ': external open only on Android', (nodes.embOpen.style.display !== 'none') === /Android/.test(ua));
+  }
+  ok('3.3b browser help collapsed by default', /<details><summary[^>]*data-i18n="lg.emb.title"/.test(login));
   ok('3.4 pero un usuario que YA tenía sesión en esa WebView sigue entrando',
      /if \(session && !_otpVerifyNavInProgress\) \{[\s\S]*?safeRedirect\('index\.html', 'login:getSession'\)/.test(login));
   ok('3.5 el interstitial NO llama a signInWithOtp ni a verifyOtp',
@@ -139,6 +129,31 @@ console.log('\n5 — iOS/Android: lo que de verdad se puede prometer:');
   ok('5.5 el portapapeles NO se toca sin que el usuario lo pida',
      !/clipboard[\s\S]{0,120}addEventListener\('load'/.test(login));
 }
+
+// Execute the actual clipboard handler, including rejected Clipboard API promises.
+const clipboardChecks = (async () => {
+  const wire = fnSource(login, '_wireEmbeddedInterstitial');
+  for (const mode of ['success', 'reject', 'unavailable', 'failure']) {
+    let click, removed = false;
+    const copy = { addEventListener: (_, fn) => { click = fn; } };
+    const document = {
+      getElementById: id => id === 'embCopy' ? copy : null,
+      createElement: () => ({ setAttribute() {}, style: {}, select() {} }),
+      body: { appendChild() {}, removeChild() { removed = true; } },
+      execCommand: () => mode !== 'failure'
+    };
+    const navigator = mode === 'unavailable' || mode === 'failure' ? {} : {
+      clipboard: { writeText: () => mode === 'reject' ? Promise.reject(new Error('denied')) : Promise.resolve() }
+    };
+    new Function('document', 'navigator', '_embTargetUrl', '_authTrace', 'tL', wire + ';_wireEmbeddedInterstitial();')(
+      document, navigator, () => 'https://app.aurixsystem.io/', () => {}, key => key);
+    click();
+    await new Promise(resolve => setImmediate(resolve));
+    ok('clipboard ' + mode + ': accurate result', copy.textContent === (mode === 'failure' ? 'lg.emb.copyFailed' : 'lg.emb.copied'));
+    if (mode !== 'success') ok('clipboard ' + mode + ': temporary field removed', removed);
+  }
+  if (fail) process.exitCode = 1;
+})();
 
 // ── 6 · ZERO REGRESSION — lo que NO se ha tocado ────────────────────────────
 console.log('\n6 — Zero regression (auth preservada):');
@@ -187,6 +202,8 @@ console.log('\n7 — Copy ES/EN completo:');
      /id="embeddedSection" class="auth-section" style="display:none"/.test(login));
 }
 
-console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
-if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }
-process.exit(fail ? 1 : 0);
+clipboardChecks.then(() => {
+  console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');
+  if (fail) { console.log('\nFALLOS:'); failed.forEach(f => console.log('  · ' + f)); }
+  process.exitCode = fail ? 1 : 0;
+}).catch(error => { console.error(error); process.exitCode = 1; });
