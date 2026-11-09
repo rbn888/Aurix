@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '821'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '822'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -59903,7 +59903,7 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
       if (!_aurixMktItem) return;
       const sym = String(_aurixMktItem.symbol || '').toUpperCase();
       if (!sym) return;
-      try { if (typeof toggleWatchlist === 'function') toggleWatchlist(sym); } catch (_) {}
+      try { if (typeof toggleWatchlist === 'function' && toggleWatchlist(sym) && _aurixMktItem._fromSearch) _aurixWlRemember(_aurixMktItem); } catch (_) {}
       _aurixMktUpdateWatchUI(sym);
       // Mirror to every star on the market screen behind the modal.
       try {
@@ -64640,6 +64640,7 @@ function renderMarket() {
         e.stopPropagation();
         const sym     = btn.dataset.symbol;
         const isAdded = toggleWatchlist(sym);
+        if (isAdded) { try { const hit = (_mktDiscResults || []).find(r => r && normalizeSymbol(r.symbol) === sym); if (hit) _aurixWlRemember(hit); } catch (_) {} }
         document.querySelectorAll(`.watchlist-btn[data-symbol="${sym}"]`).forEach(b => {
           b.textContent = isAdded ? '★' : '☆';
           b.classList.toggle('active', isAdded);
@@ -64831,11 +64832,89 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// Seguimiento sólo filtraba el universo monitorizado de Market, así que un activo marcado con la
+// estrella desde una búsqueda (un fondo 0P…, una acción fuera de la lista) quedaba guardado en la
+// watchlist pero nunca se pintaba. La watchlist guarda sólo la clave normalizada; la identidad de lo
+// que está fuera del universo se recuerda al marcarlo y, si no se vio en esta sesión (recarga, otro
+// dispositivo), se resuelve por el pipeline canónico de búsqueda. Es identidad de mercado pública,
+// nunca dato del usuario: sólo se pinta si la clave está en la watchlist de la cuenta actual.
+const _aurixWlExtra     = new Map();   // clave normalizada → fila de Market (con _wlTs = última cotización)
+const _aurixWlResolving = new Set();   // resoluciones y refrescos en vuelo
+const _aurixWlMiss      = new Map();   // clave → ts del último intento fallido (Market repinta a menudo)
+const _AURIX_WL_MISS_TTL    = 5 * 60 * 1000;
+const _AURIX_WL_REFRESH_MS  = 60 * 1000;
+function _aurixWlRemember(item) {
+  const k = item ? normalizeSymbol(item.symbol || item.ticker) : '';
+  if (k) { item._wlTs = Date.now(); _aurixWlExtra.set(k, item); _aurixWlMiss.delete(k); }
+}
+// Recotiza una fila ya resuelta. El hidratador sólo cotiza filas sin precio, así que se le pasa una
+// copia vacía y sólo se adopta un precio real: si falla, la fila conserva su última cotización.
+async function _aurixWlRefresh(key, row) {
+  if (_aurixWlResolving.has(key)) return;
+  _aurixWlResolving.add(key);
+  row._wlTs = Date.now();
+  try {
+    const probe = Object.assign({}, row, { current_price: null, price: null });
+    await _aurixMktHydrateQuotes([probe]);
+    if (Number.isFinite(probe.price) && probe.price > 0) {
+      row.current_price = probe.price; row.price = probe.price;
+      if (Number.isFinite(probe.change24h)) { row.change24h = probe.change24h; row.price_change_percentage_24h = probe.change24h; }
+      if (probe.currency) row.currency = probe.currency;
+      if (currentMarketTab === 'watchlist' && !_marketSearchQuery) renderCurrentMarketView();
+    }
+  } catch (_) {
+  } finally { _aurixWlResolving.delete(key); }
+}
+async function _aurixWlResolve(key) {
+  if (!key || _aurixWlResolving.has(key) || _aurixWlExtra.has(key)) return;
+  if (Date.now() - (_aurixWlMiss.get(key) || 0) < _AURIX_WL_MISS_TTL) return;
+  _aurixWlResolving.add(key);
+  _aurixWlMiss.set(key, Date.now());   // se borra al resolver con éxito
+  try {
+    // Catálogo curado primero: su ticker (FID-WLD) no lo encuentra una búsqueda de texto.
+    const curated = [
+      ...((typeof _AURIX_FUND_DB !== 'undefined') ? _AURIX_FUND_DB.map(f => Object.assign({ type: 'fund', marketSymbol: null }, f)) : []),
+      ...((typeof _AURIX_ETF_DB !== 'undefined') ? _AURIX_ETF_DB.map(e => Object.assign({ type: 'etf' }, e)) : []),
+    ];
+    let r = curated.find(x => normalizeSymbol(x.ticker) === key) || null;
+    if (!r) {
+      const found = await searchAllAssets(key) || [];
+      r = found.find(x => x && normalizeSymbol(x.ticker || x.symbol) === key) || null;
+    }
+    if (!r) return;
+    const row = _searchResultToMarketItem(r);
+    if (!row) return;
+    if (!row.marketSymbol && row.type === 'fund' && row.isin) {
+      try { row.marketSymbol = await _yahooFundSymbolByISIN(row.isin); } catch (_) {}
+    }
+    row.issuer = r.manager || r.issuer || null;
+    row.displayName = (typeof getDisplayName === 'function') ? getDisplayName(r) : (r.name || row.symbol);
+    row._fromSearch = true;
+    await _aurixMktHydrateQuotes([row]);
+    row._wlTs = Date.now();
+    _aurixWlExtra.set(key, row);
+    _aurixWlMiss.delete(key);
+    if (currentMarketTab === 'watchlist' && !_marketSearchQuery) renderCurrentMarketView();
+  } catch (_) {
+  } finally { _aurixWlResolving.delete(key); }
+}
+
 function renderMyAssetsBlock(data) {
   const watchedSet = new Set(getWatchlist().map(normalizeSymbol));
   const filtered = data.filter(item =>
     watchedSet.has(normalizeSymbol(item.symbol || item.provider_id))
   );
+  // Sólo con el universo ya cargado: mientras llega, BTC/ETH «faltan» y no deben salir a buscarse.
+  if (data.length) {
+    const present = new Set(filtered.map(item => normalizeSymbol(item.symbol || item.provider_id)));
+    watchedSet.forEach(k => {
+      if (present.has(k)) return;
+      const extra = _aurixWlExtra.get(k);
+      if (!extra) { _aurixWlResolve(k); return; }
+      filtered.push(extra);
+      if (Date.now() - (extra._wlTs || 0) > _AURIX_WL_REFRESH_MS) _aurixWlRefresh(k, extra);
+    });
+  }
   if (!filtered.length) {
     return `
       <div class="empty-watchlist">
@@ -79835,6 +79914,9 @@ try { if (typeof window !== 'undefined') {
 function _aurixSearchProject(items, filter) {
   const f = String(filter || '').toLowerCase();
   if (!f || f === 'all') return items;
+  // La pestaña de Add Asset es «ETF / Fondos» (filtro 'etf'): cubre etf Y fund, igual que Recientes.
+  // Con la igualdad estricta todo fondo desaparecía al entrar desde la categoría Fondos/ETF.
+  if (f === 'etf') return items.filter(a => a && (String(a.type || '').toLowerCase() === 'etf' || String(a.type || '').toLowerCase() === 'fund'));
   return items.filter(a => a && String(a.type || '').toLowerCase() === f);
 }
 async function searchAllAssets(query, signal, filter) {
@@ -79898,9 +79980,29 @@ async function searchAllAssets(query, signal, filter) {
   // para que, ante ISIN repetido, gane la entrada curada (identidad completa:
   // gestora, bolsa, moneda) frente al eco del proveedor — misma regla que SPEC 70.
   const curatedEtfs = _aurixSearchEtfsLocal(query);
+  // Consulta por ISIN exacto: un ISIN identifica UNA clase de un fondo. El proveedor devuelve sus
+  // cotizaciones (NAV Morningstar 0P…, réplica de Stuttgart …) SIN campo isin, así que la dedupe
+  // ISIN-first no las veía y el usuario tenía que adivinar cuál de tres filas casi iguales era la
+  // suya. Se les estampa el ISIN consultado —la misma confianza que ya aplica _yahooFundSymbolByISIN—
+  // y, si existe el NAV 0P… (lo que cotiza un fondo), sólo él sobrevive —sin reordenar: el orden es
+  // del ranker—. Sólo fondos: un ETF sí tiene cotizaciones distintas por bolsa y moneda, y §9
+  // prohíbe fusionarlas.
+  let yItems = yEnriched;
+  const isinQ = (typeof _aurixIsIsin === 'function' && _aurixIsIsin(query)) ? String(query).toUpperCase().trim() : '';
+  if (isinQ) {
+    const stamped = yEnriched.map(it => (it && it.type === 'fund' && !it.isin) ? Object.assign({}, it, { isin: isinQ }) : it);
+    const nav = stamped.find(it => it && it.type === 'fund' && /^0P[A-Z0-9]+(\.[A-Z]{1,3})?$/.test(String(it.marketSymbol || '')));
+    yItems = nav ? stamped.filter(it => !(it && it.type === 'fund' && it.isin === isinQ && it !== nav)) : stamped;
+    // La ficha curada gana la dedupe (identidad completa) pero no trae símbolo cotizable: hereda el
+    // de su gemela, para que Market y la lupa la pinten con precio en vez de «—».
+    const twin = yItems.find(it => it && it.type === 'fund' && it.isin === isinQ && it.marketSymbol);
+    if (twin) funds.forEach((f, i) => {
+      if (String(f.isin || '').toUpperCase() === isinQ && !f.marketSymbol) funds[i] = Object.assign({}, f, { marketSymbol: twin.marketSymbol });
+    });
+  }
   const seen = new Set();
   const merged = [];
-  for (const item of [...curatedEtfs, ...funds, ...metals, ...yEnriched, ...cryptoItems]) {
+  for (const item of [...curatedEtfs, ...funds, ...metals, ...yItems, ...cryptoItems]) {
     if (!item || !item.ticker) continue;
     // SPEC ASSET-DISCOVERY-IDENTITY.V1 — la cripto se deduplica por IDENTIDAD CANÓNICA, no por
     // ticker. La clave `TK:` de abajo fusionaba dos tokens distintos que comparten símbolo (USD Coin

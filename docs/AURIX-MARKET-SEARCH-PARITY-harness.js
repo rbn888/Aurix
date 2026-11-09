@@ -52,7 +52,10 @@ ok('1.5 el ranking vive DENTRO del motor: los dos consumidores lo reciben igual'
    /_aurixRankSearchResults\(_aurixSearchProject\(merged, filter\), query\)/.test(engine));
 ok('1.6 catalog retrieval (ETF + fondos curados) dentro del motor, antes del merge',
    /_aurixSearchEtfsLocal\(query\)/.test(engine) && /_aurixSearchFundsLocal\(query\)/.test(engine)
-   && /\[\.\.\.curatedEtfs, \.\.\.funds, \.\.\.metals, \.\.\.yEnriched, \.\.\.cryptoItems\]/.test(engine));
+   // yItems = yEnriched con el ISIN estampado en consultas ISIN (AURIX-ISIN-ADD-WATCHLIST); el contrato
+   // —curados primero en el merge— no cambia.
+   && /let yItems = yEnriched;/.test(engine)
+   && /\[\.\.\.curatedEtfs, \.\.\.funds, \.\.\.metals, \.\.\.yItems, \.\.\.cryptoItems\]/.test(engine));
 ok('1.7 dedupe por identidad canónica para cripto (nunca por símbolo)',
    /_aurixCanonicalAssetKey\(item\)/.test(engine) && /'CANON:'/.test(engine));
 ok('1.8 dedupe ISIN-first + ticker exacto para el resto',

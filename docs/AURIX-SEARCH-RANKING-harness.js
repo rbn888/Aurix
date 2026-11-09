@@ -44,7 +44,7 @@ ok('0 a single ranking function exists', (app.match(/function _aurixRankSearchRe
 // ocurrencias, una de ellas en la rama 'fund' que ha desaparecido). Se reescriben al contrato
 // nuevo, que es MÁS estricto: una sola ruta, un solo ranker.
 ok('0 searchAllAssets ranks through it',
-   /async function searchAllAssets[\s\S]{0,7000}_aurixRankSearchResults\(/.test(app));
+   /async function searchAllAssets[\s\S]{0,9000}_aurixRankSearchResults\(/  /* ventana 7000→9000: el colapso por ISIN alarga la función, el ranker es el mismo */.test(app));
 ok('0 the filtered route has NO ranker of its own (delegates to the engine)',
    /async function searchByFilter\(query, filter, signal\) \{\s*return searchAllAssets\(query, signal, filter\);\s*\}/.test(app));
 ok('0 no second/alternate ranker was introduced', !/function _aurix\w*Rank\w*Results2|function _aurixMarketRankSearch/.test(app));
