@@ -82,7 +82,9 @@ function makeCtx(opts) {
                    'autoSaveToBackend', '_flushStatePersistence', '_aurixFlushPerformanceState']) vm.runInContext(fnSrc(f), ctx);
   return ctx;
 }
-const upserts = ctx => ctx.__ops.filter(x => x.table === 'user_portfolios' && x.op === 'upsert').length;
+// Escrituras de la fila: upsert, o update que no sea el de performance_state aislado. La subida sólo-precios
+// condicional y el flush sin activos (AURIX-LIVE-PUSH-STALE-GUARD) escriben con UPDATE: siguen siendo escrituras.
+const upserts = ctx => ctx.__ops.filter(x => x.table === 'user_portfolios' && (x.op === 'upsert' || (x.op === 'update' && !(x.keys && x.keys.length === 1 && x.keys[0] === 'performance_state')))).length;
 const run = (ctx, code) => vm.runInContext(code, ctx);
 
 (async () => {

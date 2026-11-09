@@ -142,7 +142,10 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
        return !!gold && !!pgw && !/IntersectionObserver/.test(appCode.replace(gold, '').replace(pgw, ''))
          && !/_mkt|MARKET_|market/i.test(gold) && !/_mkt|MARKET_|market/i.test(pgw); })());
   ok('1.2 la precarga recibe el universo COMPLETO de la pestaña, no una porción del viewport',
-     /try \{ _mktHistoryFetchVisible\(data\); \}/.test(app)
+     true
+     // AURIX-LIVE-PUSH-STALE-GUARD: en Seguimiento recibe el universo completo MÁS las filas extra marcadas
+     // desde una búsqueda (superconjunto, nunca una porción); en el resto de pestañas, `data` tal cual.
+     && /const _histData = \(currentMarketTab === 'watchlist' && !_marketSearchQuery && _aurixWlExtraShown\.length\) \? data\.concat\(_aurixWlExtraShown\) : data;\s*_mktHistoryFetchVisible\(_histData\);/.test(app)
      && /const data = isAggregate[\s\S]{0,160}Object\.freeze\(\[\.\.\.MARKET_DATA\]\)/.test(app));
   ok('1.3 la precarga recorre TODO el dataset (sin corte ni ventana)',
      /const items = Array\.isArray\(dataset\) \? dataset : \[\];/.test(fnSource('_mktHistoryFetchVisible'))

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '822'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '823'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -1450,6 +1450,9 @@ const _AURIX_LIVE_PRICE_PERSIST_MS = 15 * 60 * 1000;
 let _aurixLastSyncedStructFp = null;   // huella estructural de la última subida CORRECTA
 let _aurixLastBackendSaveOkAt = 0;     // instante de la última subida correcta de activos/holdings
 let _aurixLastSyncedStructUser = null; // de qué cuenta es esa línea base (un cambio de cuenta nunca la reutiliza)
+// Subida sólo-precios aplazada porque el remoto era más nuevo: se reintenta como pronto pasado este plazo.
+const _AURIX_LIVE_PUSH_DEFER_MS = 5 * 60 * 1000;
+let _aurixLivePushDeferUntil = 0;
 
 function scheduleSave() {
   clearTimeout(_saveTimer);
@@ -1531,19 +1534,49 @@ async function autoSaveToBackend(attempt = 1) {
   try {
     _isSaving = true;
     const _syncedAt = new Date().toISOString();
+    // SYNC MULTI-DISPOSITIVO — una subida SIN mutación real (sólo precios en vivo: el tick de 30 s, que
+    // tras >15 min sin subir ya no se salta arriba) reescribía la fila ENTERA con los activos que ESTE
+    // dispositivo tenía. Una pestaña que vuelve de segundo plano dispara ese tick antes de terminar su
+    // reconciliación, así que borraba del servidor lo que otro dispositivo había dado de alta (un activo
+    // añadido desde el acceso directo del iPhone no aparecía nunca en el navegador).
+    // Ahora esa subida es una ESCRITURA CONDICIONAL atómica: sólo actualiza si `updated_at` sigue siendo
+    // el de nuestra última sincronización. Si otro dispositivo escribió entretanto no se toca la fila y
+    // se reconcilia. Las mutaciones reales, y una cuenta sin sincronizar aún, suben como siempre.
+    const _syncedMs0 = (_skipMeta && _skipMeta.syncedAt) || 0;
+    const _casLive = safe.reason === 'live-data' && !_realPending && _syncedMs0 > 0;
+    if (_casLive && typeof _aurixLivePushDeferUntil !== 'undefined' && Date.now() < _aurixLivePushDeferUntil) { _setSaveStatus('saved'); return; }
     _persistDebug('[persist-save-backend] upsert →', {
       reason: safe.reason, assetCount: Array.isArray(assets) ? assets.length : 0,
       symbols: Array.isArray(assets) ? assets.map(a => a.symbol || a.ticker) : [],
     });
     try { console.log('[SYNC][SAVE_START]', { reason: safe.reason, assetCount: Array.isArray(assets) ? assets.length : 0 }); } catch (_) {}
-    const { error } = await supabaseClient
-      .from('user_portfolios')
-      .upsert({
-        user_id:    currentUser.id,
-        assets,
-        holdings,
-        updated_at: _syncedAt
-      }, { onConflict: 'user_id' });
+    let error = null;
+    if (_casLive) {
+      const _cas = await supabaseClient
+        .from('user_portfolios')
+        .update({ assets, holdings, updated_at: _syncedAt })
+        .eq('user_id', currentUser.id)
+        .eq('updated_at', new Date(_syncedMs0).toISOString())
+        .select('user_id');
+      error = _cas.error;
+      if (!error && !(Array.isArray(_cas.data) && _cas.data.length)) {
+        try { console.log('[SYNC][LIVE_PUSH_DEFERRED]', 'remote changed since last sync — reconciling instead of overwriting'); } catch (_) {}
+        try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastRemoteSaveStatus = 'deferred-remote-newer@' + _syncedAt; } catch (_) {}
+        if (typeof _aurixLivePushDeferUntil !== 'undefined') _aurixLivePushDeferUntil = Date.now() + _AURIX_LIVE_PUSH_DEFER_MS;
+        _setSaveStatus('saved');
+        if (typeof _aurixResyncFromRemote === 'function') { try { _aurixResyncFromRemote('remote-newer-before-push'); } catch (_) {} }
+        return;
+      }
+    } else {
+      ({ error } = await supabaseClient
+        .from('user_portfolios')
+        .upsert({
+          user_id:    currentUser.id,
+          assets,
+          holdings,
+          updated_at: _syncedAt
+        }, { onConflict: 'user_id' }));
+    }
 
     if (error) throw error;   // never mark synced/OK if the remote write failed
     _aurixLastSyncedStructFp = _structFp; _aurixLastBackendSaveOkAt = Date.now(); _aurixLastSyncedStructUser = currentUser.id;
@@ -4030,6 +4063,30 @@ async function _flushStatePersistence(reason) {
       payload.assets   = safe.assets;
       payload.holdings = safe.holdings;
     }
+    // SYNC MULTI-DISPOSITIVO — este flush (snapshot, ocultar pestaña…) también reescribía assets/holdings
+    // y movía `updated_at` (la versión de los ACTIVOS para la fusión) sin haber cambiado ninguno: un
+    // dispositivo con la lista vieja borraba del servidor el alta hecha en otro, y su propio `updated_at`
+    // rompía la escritura condicional de autoSaveToBackend. Sin mutación real pendiente y con la fila ya
+    // sincronizada antes, se escribe con UPDATE sin activos ni `updated_at` (un UPDATE no exige columnas
+    // NOT NULL, a diferencia del upsert). Con mutación real, o sin fila conocida, sigue el upsert de siempre.
+    let _stateOnly = false, _fRealPending = false;
+    try {
+      const _fm = _aurixReadPortfolioMeta();
+      _fRealPending = !_fm || ((_fm.lastRealMutationAt || 0) > (_fm.syncedAt || 0));
+      _stateOnly = !!(_fm && (_fm.syncedAt || 0) > 0) && (safe.omit || !_fRealPending) && safe.reason !== 'reset';
+    } catch (_) { _stateOnly = false; }
+    if (_stateOnly) { delete payload.assets; delete payload.holdings; delete payload.updated_at; }
+    const _writesAssets = !!payload.assets && _fRealPending;
+    const _assetsStampMs = _writesAssets ? new Date(payload.updated_at).getTime() : 0;
+    const _writeState = async (p) => {
+      if (!_stateOnly) return supabaseClient.from('user_portfolios').upsert(p, { onConflict: 'user_id' });
+      const r = await supabaseClient.from('user_portfolios').update(p).eq('user_id', currentUser.id).select('user_id');
+      if (r.error || (Array.isArray(r.data) && r.data.length)) return r;
+      // Fila inexistente pese a la sync previa: se crea como antes (activos sólo si son seguros).
+      const full = Object.assign({}, p, { updated_at: new Date().toISOString() });
+      if (!safe.omit) { full.assets = safe.assets; full.holdings = safe.holdings; }
+      return supabaseClient.from('user_portfolios').upsert(full, { onConflict: 'user_id' });
+    };
     // SPEC MULTI-DEVICE STATE HARDENING — same defensive omit for the history columns. If the canonical
     // history is not loaded (and this is not a genuine new account), OMIT category_history/portfolio_history
     // so a partial/unhydrated client can never clobber a populated remote history. Defense-in-depth behind
@@ -4068,9 +4125,7 @@ async function _flushStatePersistence(reason) {
       try { _aurixFlushPerformanceState(reason); } catch (_) {}
       return 'skipped-unchanged';
     }
-    let { error } = await supabaseClient
-      .from('user_portfolios')
-      .upsert(payload, { onConflict: 'user_id' });
+    let { error } = await _writeState(payload);
     if (!error) { try { _aurixLineageDirty = false; } catch (_) {} try { _aurixLastFlushedStateFp = _stateFp; } catch (_) {} }
     if (error) {
       // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: push-safe. If the ui_state OR
@@ -4083,11 +4138,17 @@ async function _flushStatePersistence(reason) {
       const { ui_state, ui_state_updated_at, subscription, subscription_updated_at,
               portfolio_epoch_ms, portfolio_epoch_updated_at,
               asset_classification_lineage, asset_classification_lineage_updated_at, ...core } = payload;
-      const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
+      const retry = await _writeState(core);
       if (retry.error) throw retry.error;
       _outcome = 'partial';
       _aurixLastFlushedStateFp = null;   // el remoto ya no es «el último flush completo»: no se puede saltar
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
+    }
+    // Si este flush subió los activos con una mutación real pendiente, el remoto es ahora exactamente lo local con
+    // ese sello: se marca la sync, como hace autoSaveToBackend. Sello tomado ANTES del await, así que una
+    // mutación posterior sigue pendiente.
+    if (_writesAssets && Number.isFinite(_assetsStampMs) && _assetsStampMs > 0) {
+      try { if (_assetsStampMs >= (_aurixReadPortfolioMeta().syncedAt || 0)) _aurixMarkSynced(_assetsStampMs); } catch (_) {}   // nunca hacia atrás
     }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
     // P0-HISTORY-PARITY-EMERGENCY-GATE — do NOT promote the local cache to the canonical display store on a
@@ -12478,7 +12539,15 @@ function _aurixMergePortfolio(localModel, remote) {
   if (rc > lc) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-more', lc, rc }); } catch (_) {} return { apply: 'remote', reason: 'remote-more' }; }
   if (lc > rc) { try { console.log('[SYNC][STALE_LOCAL]', { reason: 'local-more-keep', lc, rc }); } catch (_) {} return { apply: 'local', reason: 'local-more' }; }
   const meta = _aurixReadPortfolioMeta(); const rMs = _aurixRemoteUpdatedMs(remote);
-  if (rMs > (meta.updatedAt || 0)) {
+  // SYNC MULTI-DISPOSITIVO — `updatedAt` se mueve con cada tick de precios, así que con el mismo número de
+  // activos un dispositivo vivo nunca adoptaba lo que otro había cambiado (y su subida condicional de
+  // precios quedaba bloqueada para siempre, con el precio de respaldo del servidor envejeciendo). Si ESTE
+  // dispositivo no tiene una mutación real sin subir, la referencia es lo último que sincronizó: un remoto
+  // posterior es más nuevo. Con mutación real pendiente se conserva la regla de siempre. La guarda
+  // económica de abajo sigue aplicándose en los dos casos.
+  const _localRealPending = (meta.lastRealMutationAt || 0) > (meta.syncedAt || 0);
+  const _localRefMs = _localRealPending ? (meta.updatedAt || 0) : (meta.syncedAt || 0);
+  if (rMs > _localRefMs) {
     // ── AURIX-CASH-LEDGER-TRUTH — P0 REMOTE OVERWRITE ────────────────────────
     // Hasta aquí la autoridad se decidía por NÚMERO DE FILAS y, en empate, por
     // `updated_at`. Una fila con 3.500 € y una fila con 500 € son indistinguibles
@@ -59725,6 +59794,8 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
   let item = itemOverride || null;
   if (!item) {
     try { item = (typeof _findMktItem === 'function') ? _findMktItem(symbol, MARKET_DATA) : null; } catch (_) {}
+    // Fila de Seguimiento marcada desde una búsqueda: no está en MARKET_DATA, su identidad sí.
+    if (!item) { try { item = _aurixWlExtra.get(normalizeSymbol(symbol)) || null; } catch (_) {} }
   }
   if (!item) return false;
 
@@ -64841,6 +64912,9 @@ if (typeof window !== 'undefined') {
 const _aurixWlExtra     = new Map();   // clave normalizada → fila de Market (con _wlTs = última cotización)
 const _aurixWlResolving = new Set();   // resoluciones y refrescos en vuelo
 const _aurixWlMiss      = new Map();   // clave → ts del último intento fallido (Market repinta a menudo)
+// Filas extra pintadas en el último Seguimiento. El histórico (mini gráfico y variación) y la ficha
+// sólo conocían el universo monitorizado: sin esto la fila salía sin gráfico y al tocarla no se abría.
+let _aurixWlExtraShown  = [];
 const _AURIX_WL_MISS_TTL    = 5 * 60 * 1000;
 const _AURIX_WL_REFRESH_MS  = 60 * 1000;
 function _aurixWlRemember(item) {
@@ -64905,6 +64979,7 @@ function renderMyAssetsBlock(data) {
     watchedSet.has(normalizeSymbol(item.symbol || item.provider_id))
   );
   // Sólo con el universo ya cargado: mientras llega, BTC/ETH «faltan» y no deben salir a buscarse.
+  _aurixWlExtraShown = [];
   if (data.length) {
     const present = new Set(filtered.map(item => normalizeSymbol(item.symbol || item.provider_id)));
     watchedSet.forEach(k => {
@@ -64912,6 +64987,7 @@ function renderMyAssetsBlock(data) {
       const extra = _aurixWlExtra.get(k);
       if (!extra) { _aurixWlResolve(k); return; }
       filtered.push(extra);
+      _aurixWlExtraShown.push(extra);
       if (Date.now() - (extra._wlTs || 0) > _AURIX_WL_REFRESH_MS) _aurixWlRefresh(k, extra);
     });
   }
@@ -65515,7 +65591,10 @@ function renderCurrentMarketView() {
   // is a no-op when the selected timeframe is 24H (which already has
   // live change24h baked into the row) unless we want real 24h spark
   // data. Concurrency-limited, cache-aware, generation-token-guarded.
-  try { _mktHistoryFetchVisible(data); } catch (e) { console.warn('[mkt-history] fetch fail:', e && e.message); }
+  try {
+    const _histData = (currentMarketTab === 'watchlist' && !_marketSearchQuery && _aurixWlExtraShown.length) ? data.concat(_aurixWlExtraShown) : data;
+    _mktHistoryFetchVisible(_histData);
+  } catch (e) { console.warn('[mkt-history] fetch fail:', e && e.message); }
   // MARKET-V2-01: una celda de mini gráfico sólo puede acabar en gráfico real o en vacío
   // honesto. Este cierre acotado garantiza que ningún esqueleto se quede parpadeando.
   try { _mktSparkSettle(el); } catch (_) {}

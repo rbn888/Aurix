@@ -1,1 +1,1 @@
-{"appjs": 822, "loginhtml": 499, "build": "v862-isin-add-watchlist", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)"}
+{"appjs": 823, "loginhtml": 499, "build": "v863-fund-watch-sync-guard", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)"}
